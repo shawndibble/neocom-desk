@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Checkbox } from '@/components/ui';
+import { useOnline } from '@/stores/network';
+import { NeedsConnectionButton } from './NeedsConnectionButton';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { MailInvitePanel } from './MailInvitePanel';
 import { communityInviteUrl, setRequireApproval, type CommunitySummary } from './communityStore';
@@ -27,6 +29,7 @@ export function CommunityInvites({
   onPatch: (patch: Partial<CommunitySummary>) => void;
 }) {
   const { t } = useTranslation();
+  const online = useOnline();
   const inviteUrl = community.inviteCode ? communityInviteUrl(community.inviteCode) : null;
   const approval = community.requireApproval === true;
   const [saving, setSaving] = useState(false);
@@ -51,7 +54,7 @@ export function CommunityInvites({
         <label className={`flex items-start gap-2 text-xs ${tappableRowClassName}`}>
           <Checkbox
             checked={approval}
-            disabled={saving}
+            disabled={saving || !online}
             onChange={(event) => void changeApproval(event.target.checked)}
           />
           <span>
@@ -83,20 +86,20 @@ export function CommunityInvites({
               >
                 {t('communities.copyLink')}
               </Button>
-              <Button size="sm" onClick={onRegenerate}>
+              <NeedsConnectionButton size="sm" onClick={onRegenerate}>
                 {t('communities.regenerate')}
-              </Button>
-              <Button size="sm" onClick={onRevoke}>
+              </NeedsConnectionButton>
+              <NeedsConnectionButton size="sm" onClick={onRevoke}>
                 {t('communities.revoke')}
-              </Button>
+              </NeedsConnectionButton>
             </div>
           </>
         ) : (
           <div className="flex flex-wrap items-center gap-2">
             <p className="text-xs text-text-dim">{t('communities.inviteOff')}</p>
-            <Button size="sm" data-invite-focus="" onClick={onRegenerate}>
+            <NeedsConnectionButton size="sm" data-invite-focus="" onClick={onRegenerate}>
               {t('communities.regenerate')}
-            </Button>
+            </NeedsConnectionButton>
           </div>
         )}
       </section>

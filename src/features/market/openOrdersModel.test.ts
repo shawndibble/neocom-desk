@@ -4,6 +4,7 @@ import {
   compareOpenOrderRowsWorstFirst,
   groupOpenOrders,
   needsAttentionCount,
+  notCheckedCount,
   openOrderProblemCounts,
   type BuildRowsInput,
   type OpenOrderRow,
@@ -194,6 +195,53 @@ describe('buildOpenOrderRows — station tier', () => {
     );
     expect(row.isBuyOrder).toBe(false);
     expect(row.station.beatsMe).toBe(true);
+  });
+});
+
+describe('buildOpenOrderRows — competition not checked (prices unreachable)', () => {
+  it('flags a row whose station was never priced, instead of reading it as healthy', () => {
+    const row = firstRow(baseInput({ stationPrices: new Map() }));
+    expect(row.competitionUnchecked).toBe(true);
+  });
+
+  it('does not flag a station that was priced but has no orders on my side', () => {
+    const row = firstRow(
+      baseInput({
+        stationPrices: new Map([
+          ['60003760:100', { sellMin: null, buyMax: null, sellVolume: 0, buyVolume: 0 }],
+        ]),
+      })
+    );
+    expect(row.competitionUnchecked).toBe(false);
+  });
+
+  it('does not flag a row whose deep book was read, even with no station price', () => {
+    const row = firstRow(
+      baseInput({
+        stationPrices: new Map(),
+        deepCompetition: new Map([[1, { competitors: [], truncated: false }]]),
+      })
+    );
+    expect(row.competitionUnchecked).toBe(false);
+  });
+
+  it('does not count an unchecked row as needing attention merely for being unchecked', () => {
+    const rows = buildOpenOrderRows(baseInput({ stationPrices: new Map() }));
+    expect(rows[0].competitionUnchecked).toBe(true);
+    expect(rows[0].problem).toBe('healthy');
+    expect(needsAttentionCount(rows)).toBe(0);
+  });
+});
+
+describe('notCheckedCount', () => {
+  it('counts only unchecked rows that would otherwise read healthy', () => {
+    const base = firstRow(baseInput({ stationPrices: new Map() }));
+    const rows: OpenOrderRow[] = [
+      base,
+      { ...base, orderId: 2, competitionUnchecked: false },
+      { ...base, orderId: 3, problem: 'expiringOrStale', problems: ['expiringOrStale'] },
+    ];
+    expect(notCheckedCount(rows)).toBe(1);
   });
 });
 
@@ -756,10 +804,47 @@ describe('sorting, grouping, counting', () => {
         ],
       }),
     ]);
-    const rows = buildOpenOrderRows(baseInput({ snapshot }));
+    const rows = buildOpenOrderRows(
+      baseInput({
+        snapshot,
+        // The station answered (no orders on my side), so healthy is a real reading.
+        stationPrices: new Map([
+          ['60003760:100', { sellMin: null, buyMax: null, sellVolume: 0, buyVolume: 0 }],
+        ]),
+      })
+    );
     const groups = groupOpenOrders(rows);
     expect(groups.map((g) => g.problem)).toEqual(['expiringOrStale', 'healthy']);
     expect(groups.every((g) => g.rows.length > 0)).toBe(true);
+  });
+
+  it('files an unchecked healthy order under Not checked, apart from the checked Healthy ones', () => {
+    const snapshot = makeSnapshot([
+      makeEntry({
+        orders: [
+          makeOrder({ order_id: 1, duration: 90 }),
+          makeOrder({ order_id: 2, duration: 90, type_id: 101 }),
+        ],
+      }),
+    ]);
+    const rows = buildOpenOrderRows(
+      baseInput({
+        snapshot,
+        typeNames: new Map([
+          [100, 'Tritanium'],
+          [101, 'Pyerite'],
+        ]),
+        // Only type 100's station read came back.
+        stationPrices: new Map([
+          ['60003760:100', { sellMin: null, buyMax: null, sellVolume: 0, buyVolume: 0 }],
+        ]),
+      })
+    );
+    const groups = groupOpenOrders(rows);
+    expect(groups.map((g) => [g.problem, g.rows.map((r) => r.orderId)])).toEqual([
+      ['notChecked', [2]],
+      ['healthy', [1]],
+    ]);
   });
 
   it('counts across problems (not problem) and includes every OrderProblem key, even at 0', () => {

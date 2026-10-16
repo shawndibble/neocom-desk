@@ -222,6 +222,60 @@ describe('loadDogmaEngine', () => {
   });
 });
 
+describe('loadDogmaEngine status', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('publishes idle, loading, then ready', async () => {
+    stubNetwork();
+    const { loadDogmaEngine } = await freshModule();
+    const { dogmaEngineStatus } = await import('./dogmaEngineStatus');
+    expect(dogmaEngineStatus()).toBe('idle');
+
+    const loading = loadDogmaEngine();
+    expect(dogmaEngineStatus()).toBe('loading');
+    await loading;
+
+    expect(dogmaEngineStatus()).toBe('ready');
+  });
+
+  it('tells a progress callback that joined a load someone else started', async () => {
+    stubNetwork();
+    const { loadDogmaEngine, warmDogmaEngine } = await freshModule();
+    warmDogmaEngine();
+    const reports: number[] = [];
+
+    await loadDogmaEngine((progress) => reports.push(progress.loadedBytes));
+
+    expect(reports.length).toBeGreaterThan(0);
+  });
+
+  it('publishes failed after a refused download, then loading again on a retry', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new Error('offline');
+      })
+    );
+    vi.stubGlobal('caches', {
+      open: vi.fn(async () => ({
+        match: vi.fn(async () => undefined),
+        put: vi.fn(async () => {}),
+      })),
+    });
+    const { loadDogmaEngine } = await freshModule();
+    const { dogmaEngineStatus } = await import('./dogmaEngineStatus');
+
+    await expect(loadDogmaEngine()).rejects.toThrow('offline');
+    expect(dogmaEngineStatus()).toBe('failed');
+
+    stubNetwork();
+    const retry = loadDogmaEngine();
+    expect(dogmaEngineStatus()).toBe('loading');
+    await retry;
+    expect(dogmaEngineStatus()).toBe('ready');
+  });
+});
+
 describe('loadDogmaEngine stall detection', () => {
   const STALL_MS = 20_000;
 

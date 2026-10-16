@@ -23,6 +23,8 @@ function corpAccess(state: CorpAccessState) {
     capabilities: NO_CORP_CAPABILITIES,
     missingScopes: [],
     roles: [],
+    readFailed: false,
+    retry: () => {},
   };
 }
 

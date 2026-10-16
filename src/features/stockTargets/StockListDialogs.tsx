@@ -12,6 +12,7 @@ import { matchAppraisalEntries, type AppraisalMatch } from '@/engine/market/appr
 import { loadAppraisalCatalogue } from '@/features/market/appraisalData';
 import { COMBOBOX_NAV_KEYS, moveHighlight, type ComboboxNavKey } from '@/lib/comboboxNav';
 import { cx } from '@/lib/cx';
+import { useRetryableLoad } from '@/lib/useRetryableLoad';
 import { rankedSearch } from '@/lib/rankedSearch';
 import type { MarketTypeEntry } from '@/sde/marketTypes';
 import { loadMarketTypes } from '@/sde/loadMarketSde';
@@ -149,15 +150,30 @@ export function AddStockItemDialog({
   const [error, setError] = useState<{ field: 'item' | 'quantity'; text: string } | null>(null);
   const [added, setAdded] = useState<{ name: string; quantity: number; n: number } | null>(null);
 
+  // The catalogue is a lazy download, so offline it may be missing: say so,
+  // rather than letting the search sit silently empty.
+  const {
+    failed: typesFailed,
+    attempt: typesAttempt,
+    fail: failTypes,
+    clear: clearTypesFailure,
+    retry: retryTypes,
+  } = useRetryableLoad();
   useEffect(() => {
     let live = true;
-    void loadMarketTypes().then((list) => {
-      if (live) setTypes(list);
-    });
+    clearTypesFailure();
+    loadMarketTypes().then(
+      (list) => {
+        if (live) setTypes(list);
+      },
+      () => {
+        if (live) failTypes();
+      }
+    );
     return () => {
       live = false;
     };
-  }, []);
+  }, [typesAttempt, failTypes, clearTypesFailure]);
 
   const matches = useMemo(
     () =>
@@ -247,6 +263,23 @@ export function AddStockItemDialog({
             }}
             onKeyDown={onSearchKeyDown}
           />
+          {typesFailed && (
+            <div className="flex items-center gap-2 text-xs text-text-dim">
+              <span>{t('stockTargets.add.searchUnavailable')}</span>
+              <Button
+                size="sm"
+                onClick={() => {
+                  // The note unmounts into the retry; focus goes on to the search field it serves.
+                  searchRef.current?.focus();
+                  retryTypes();
+                }}
+              >
+                {t('common.retry')}
+              </Button>
+            </div>
+          )}
+          {/* Always mounted, so the failure is announced when it appears (DESIGN.md §7). */}
+          <LiveStatus>{typesFailed ? t('stockTargets.add.searchUnavailable') : null}</LiveStatus>
           <ul
             id={listId}
             role="listbox"
@@ -336,6 +369,8 @@ export function PasteStockItemsDialog({
   const [submits, setSubmits] = useState(0);
   const [busy, setBusy] = useState(false);
   const [empty, setEmpty] = useState(false);
+  // The item catalogue is a lazy download; offline it may be missing.
+  const [catalogueFailed, setCatalogueFailed] = useState(false);
   const fieldRef = useRef<HTMLTextAreaElement>(null);
   const describedBy = [unmatched.length > 0 && `${id}-unmatched`, empty && `${id}-error`]
     .filter(Boolean)
@@ -356,6 +391,7 @@ export function PasteStockItemsDialog({
             return;
           }
           setBusy(true);
+          setCatalogueFailed(false);
           void loadAppraisalCatalogue()
             .then((catalogue) => {
               const { matched, unmatched: missed } = matchAppraisalEntries(
@@ -371,6 +407,7 @@ export function PasteStockItemsDialog({
               setSubmits((n) => n + 1);
               setText(missed.map((entry) => entry.name).join('\n'));
             })
+            .catch(() => setCatalogueFailed(true))
             .finally(() => setBusy(false));
         }}
       >
@@ -394,6 +431,11 @@ export function PasteStockItemsDialog({
         {empty && (
           <FieldError id={`${id}-error`} className="block text-xs">
             {t('stockTargets.add.pasteRequired')}
+          </FieldError>
+        )}
+        {catalogueFailed && (
+          <FieldError id={`${id}-unavailable`} className="block text-xs">
+            {t('stockTargets.add.pasteUnavailable')}
           </FieldError>
         )}
         {unmatched.length > 0 && (

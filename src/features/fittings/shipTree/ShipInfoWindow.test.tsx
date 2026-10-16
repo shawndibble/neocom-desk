@@ -9,6 +9,7 @@ import { encodeFittingShare } from '@/engine/fitting/fittingShare';
 import { loadBlueprintCatalog, type BlueprintCatalog } from '@/features/industry/blueprintCatalog';
 import { industryTabHref } from '@/features/industry/industryTabs';
 import type { TargetPlan } from '@/features/skills/useTargetPlan';
+import { loadMasteries } from '@/sde/loadSde';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { FITTING_EDIT_PATH } from '../fittingRoutes';
 import { INTERCEPTORS, MERLIN } from './__fixtures__/shipTreeFixture';
@@ -277,6 +278,22 @@ describe('Ship Info window', () => {
       'Crow'
     );
     expect((await screen.findAllByText(/Added 1 skill to Crow/))[0]).toBeVisible();
+  });
+
+  it('Skills & Mastery: says the Mastery data is not available, not that the hull has none, when it failed to load', async () => {
+    vi.mocked(loadMasteries).mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    const { user, dialog } = await openShip(/^Crow/);
+    await user.click(within(dialog).getByRole('tab', { name: 'Skills & Mastery' }));
+    expect(
+      await within(dialog).findByText(
+        "Mastery data isn't available offline yet. Connect once to load it."
+      )
+    ).toBeVisible();
+    expect(within(dialog).queryByText('No Mastery data for this hull.')).not.toBeInTheDocument();
+    expect(within(dialog).queryByText('You have no Mastery Level yet')).not.toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole('button', { name: 'Try again' }));
+    expect(await within(dialog).findByRole('group', { name: 'Mastery tiers' })).toBeVisible();
   });
 
   it('Skills & Mastery: a tier already covered by the target Skill Plan shows In plan, not a no-op Add', async () => {

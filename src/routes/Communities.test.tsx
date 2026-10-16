@@ -1,4 +1,4 @@
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation } from 'react-router-dom';
@@ -490,5 +490,116 @@ describe('Communities page', () => {
       await user.click(within(dialog).getByRole('button', { name: c.leaveAction }));
       await waitFor(() => expect(store.leaveCommunity).toHaveBeenCalledWith(ME, 'c1'));
     });
+  });
+});
+
+describe('Communities page without a connection', () => {
+  const offline = new TypeError('Failed to fetch');
+  const setOnline = (online: boolean) => {
+    vi.spyOn(window.navigator, 'onLine', 'get').mockReturnValue(online);
+    window.dispatchEvent(new Event(online ? 'online' : 'offline'));
+  };
+  afterEach(() => vi.restoreAllMocks());
+
+  it('saves the list it read, per Character', async () => {
+    store.loadMyCommunities.mockResolvedValue([community()]);
+    renderPage();
+    await screen.findByText('Pals');
+    await waitFor(async () =>
+      expect((await db.settings.get(`communitySnapshot:${ME}:list`))?.value).toEqual([community()])
+    );
+  });
+
+  it('shows the last saved list read-only, labelled, with Retry and a disabled Create', async () => {
+    await db.settings.put({ key: `communitySnapshot:${ME}:list`, value: [community()] });
+    store.loadMyCommunities.mockRejectedValue(offline);
+    setOnline(false);
+    const user = userEvent.setup();
+    renderPage();
+    expect(await screen.findByText('Pals')).toBeInTheDocument();
+    expect(screen.getByText(en.common.offlineTitle)).toBeInTheDocument();
+    expect(screen.queryByText(c.loadFailed)).not.toBeInTheDocument();
+    const create = screen.getByRole('button', { name: c.createLabel });
+    expect(create).toHaveAttribute('aria-disabled', 'true');
+
+    // Back online, the live list replaces the saved one.
+    store.loadMyCommunities.mockResolvedValue([community({ name: 'Fresh' })]);
+    setOnline(true);
+    expect(await screen.findByText('Fresh')).toBeInTheDocument();
+    expect(screen.queryByText(en.common.offlineTitle)).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: c.createLabel }));
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('does not show the saved list for a refusal', async () => {
+    await db.settings.put({ key: `communitySnapshot:${ME}:list`, value: [community()] });
+    store.loadMyCommunities.mockRejectedValue(
+      Object.assign(new Error('denied'), { code: 'permission-denied' })
+    );
+    renderPage();
+    expect(await screen.findByText(c.loadFailed)).toBeInTheDocument();
+    expect(screen.queryByText('Pals')).not.toBeInTheDocument();
+  });
+
+  it('forgets a Community’s saved roster when the Character leaves it', async () => {
+    await db.settings.put({ key: `communitySnapshot:${ME}:members:c1`, value: members });
+    store.loadMyCommunities.mockResolvedValue([community({ adminUid: 'char:92' })]);
+    store.leaveCommunity.mockResolvedValue(undefined);
+    const user = userEvent.setup();
+    renderPage('/communities?community=c1');
+    await user.click(await screen.findByRole('tab', { name: /^Members/ }));
+    await user.click(await screen.findByRole('button', { name: c.leave }));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: c.leaveAction }));
+    await waitFor(async () =>
+      expect(await db.settings.get(`communitySnapshot:${ME}:members:c1`)).toBeUndefined()
+    );
+  });
+
+  it('prunes the saved roster of a Community the live list no longer holds', async () => {
+    await db.settings.put({ key: `communitySnapshot:${ME}:members:gone`, value: members });
+    store.loadMyCommunities.mockResolvedValue([community()]);
+    renderPage();
+    await screen.findByText('Pals');
+    await waitFor(async () =>
+      expect(await db.settings.get(`communitySnapshot:${ME}:members:gone`)).toBeUndefined()
+    );
+  });
+
+  it('does not show another Character’s saved list', async () => {
+    await db.settings.put({ key: 'communitySnapshot:5:list', value: [community()] });
+    store.loadMyCommunities.mockRejectedValue(offline);
+    renderPage();
+    expect(await screen.findByText(c.loadFailed)).toBeInTheDocument();
+    expect(screen.queryByText('Pals')).not.toBeInTheDocument();
+  });
+
+  it('offers Retry when nothing was saved, and loads on the next try', async () => {
+    store.loadMyCommunities.mockRejectedValueOnce(offline);
+    store.loadMyCommunities.mockResolvedValue([community()]);
+    const user = userEvent.setup();
+    renderPage();
+    expect(await screen.findByText(c.loadFailed)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: en.common.retry }));
+    expect(await screen.findByText('Pals')).toBeInTheDocument();
+  });
+
+  it('opens a Community from the saved list with its saved roster, without Member actions', async () => {
+    await db.settings.bulkPut([
+      { key: `communitySnapshot:${ME}:list`, value: [community()] },
+      { key: `communitySnapshot:${ME}:members:c1`, value: members },
+    ]);
+    store.loadMyCommunities.mockRejectedValue(offline);
+    store.loadCommunityMembers.mockRejectedValue(offline);
+    setOnline(false);
+    const user = userEvent.setup();
+    renderPage('/communities?community=c1');
+    await user.click(await screen.findByRole('tab', { name: /^Members/ }));
+    expect(await screen.findByText('Friend')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /More actions/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Manage/ })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
   });
 });

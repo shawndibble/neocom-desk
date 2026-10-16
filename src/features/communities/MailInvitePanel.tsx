@@ -2,7 +2,8 @@ import { useCallback, useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GrantNote } from '@/app/GrantNote';
 import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
-import { Button, Field, Fields, TextInput } from '@/components/ui';
+import { Field, Fields, TextInput } from '@/components/ui';
+import { NeedsConnectionButton } from './NeedsConnectionButton';
 import { sendMail } from '@/features/character/mail';
 import { resolvePilotByName } from '@/features/travel/pilotLookup';
 import { mailSafe } from '@/lib/mailSafe';
@@ -180,9 +181,14 @@ export function MailInvitePanel({
             />
           </Field>
         </Fields>
-        <Button type="submit" size="sm" loading={busy} disabled={disabled || name.trim() === ''}>
+        <NeedsConnectionButton
+          type="submit"
+          size="sm"
+          loading={busy}
+          disabled={disabled || name.trim() === ''}
+        >
           {t('communities.mailInvite.send')}
-        </Button>
+        </NeedsConnectionButton>
       </form>
       {remaining !== null && (
         <p role="status" className="text-xs text-text-dim">

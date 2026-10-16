@@ -145,6 +145,23 @@ describe('FittingShared', () => {
     expect(await screen.findByText('Could not load this fitting')).toBeInTheDocument();
   });
 
+  it('offers Retry on a load failure, and says to connect once when offline', async () => {
+    sde.loadSkills.mockRejectedValueOnce(new Error('sde fetch failed'));
+    Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => false });
+    try {
+      const encoded = await encodeFittingShare(fittingToShareInput(RIFTER));
+      if (!encoded.ok) throw new Error('encode failed');
+
+      renderAt(`/share/fitting?f=${encodeURIComponent(encoded.payload)}`);
+
+      expect(await screen.findByText(/Connect once, then try again/)).toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+      expect(await screen.findByText('125mm Gatling AutoCannon I')).toBeInTheDocument();
+    } finally {
+      Reflect.deleteProperty(navigator, 'onLine');
+    }
+  });
+
   it('names the hull above the Ring and lists cargo in the module list', async () => {
     const encoded = await encodeFittingShare(
       fittingToShareInput({ ...RIFTER, cargo: [{ typeId: 34, quantity: 500 }] })

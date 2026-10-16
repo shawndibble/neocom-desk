@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  Button,
   MenuItem,
   MenuSeparator,
   RowActionsMenu,
@@ -12,7 +11,9 @@ import { CharacterAvatar } from '@/components/ui/CharacterAvatar';
 import { isLibraryStale } from '@/engine/communities/sharedLibrary';
 import { formatAge } from '@/lib/age';
 import { characterIdForUid } from '@/sync/uid';
+import { useOnline } from '@/stores/network';
 import { communityBadgeClassName } from './communityBadge';
+import { NeedsConnectionButton } from './NeedsConnectionButton';
 import type { CommunityMember } from './communityStore';
 
 /** Above this many Members a name filter earns its row; a short roster is read at a glance. */
@@ -45,6 +46,7 @@ export function CommunityMemberList({
   onLeave: () => void;
 }) {
   const { t } = useTranslation();
+  const online = useOnline();
   const [query, setQuery] = useState('');
   const needle = query.trim().toLowerCase();
   const shown = needle
@@ -96,12 +98,13 @@ export function CommunityMemberList({
                 {isAdminRow && (
                   <span className={communityBadgeClassName}>{t('communities.adminBadge')}</span>
                 )}
-                {isAdmin && !isAdminRow && <RowMoreActions />}
+                {isAdmin && !isAdminRow && online && <RowMoreActions />}
               </li>
             );
             // Only the admin has actions, and only on another Member: a row
             // with nothing to offer gets no ⋮ and no menu.
-            return isAdmin && !isAdminRow ? (
+            // Offline the member actions would only fail: the row stays, without its ⋮.
+            return isAdmin && !isAdminRow && online ? (
               <RowActionsMenu
                 key={member.uid}
                 name={member.characterName}
@@ -131,9 +134,9 @@ export function CommunityMemberList({
           <p className="min-w-0 flex-1 basis-48 text-xs text-text-dim">
             {t('communities.leaveHint')}
           </p>
-          <Button variant="danger" size="sm" onClick={onLeave}>
+          <NeedsConnectionButton variant="danger" size="sm" onClick={onLeave}>
             {t('communities.leave')}
-          </Button>
+          </NeedsConnectionButton>
         </section>
       )}
     </div>

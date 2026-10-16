@@ -14,6 +14,7 @@ import type { FittingStats } from '@/engine/fittings/types';
 import { neutralExtendedStats } from '@/engine/fittings/__fixtures__/fittingStats';
 import { db } from '@/db';
 import { clearHullFitMemory } from './hullFitService';
+import { setDogmaEngineStatus } from './dogmaEngineStatus';
 import type { ChargeEngineStats } from './dogmaFittingEngine';
 import { fakeDogmaEngine, fakeFittingContext } from './__fixtures__/fakeDogmaEngine';
 
@@ -139,10 +140,12 @@ describe('FittingAddPanel', () => {
   beforeEach(async () => {
     clearHullFitMemory();
     await db.hullFitCache.clear();
+    setDogmaEngineStatus('idle');
   });
 
   it('before ship data: search still works, but Add is disabled and the note says why', async () => {
     const user = userEvent.setup();
+    setDogmaEngineStatus('loading');
     renderPanel({ ready: false });
 
     expect(screen.getByText(/Ship data is still downloading/)).toBeInTheDocument();
@@ -152,6 +155,19 @@ describe('FittingAddPanel', () => {
     expect(result).toHaveAttribute('aria-disabled', 'true');
     expect(screen.queryByRole('button', { name: /Damage Control I$/ })).not.toBeInTheDocument();
     expect(checkCandidates).not.toHaveBeenCalled();
+  });
+
+  it('does not claim a download is under way when the engine was never asked for', () => {
+    setDogmaEngineStatus('idle');
+    renderPanel({ ready: false });
+    expect(screen.queryByText(/Ship data is still downloading/)).not.toBeInTheDocument();
+  });
+
+  it('says the ship data could not be downloaded, not that it is downloading, when it failed', () => {
+    setDogmaEngineStatus('failed');
+    renderPanel({ ready: false });
+    expect(screen.queryByText(/Ship data is still downloading/)).not.toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent("Couldn't download the ship data");
   });
 
   it('lists only what fits the chosen slot and hull, and adds on click', async () => {

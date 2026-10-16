@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
@@ -8,9 +8,10 @@ import { PiHeaderStrip } from './PiHeaderStrip';
 import { DEFAULT_PI_SETTINGS, usePiSettings } from './piSettings';
 
 const routes = vi.hoisted(() => ({ jumps: {} as Record<number, number> }));
-vi.mock('@/features/route/jumpBasis', () => ({
-  useJumpBasis: () => ({ rules: {}, network: {}, key: 'k', hydrated: true }),
-}));
+// One object for every render, as the real hook's memoised basis is: a fresh one
+// each call re-ran the strip's route effects on every render, endlessly.
+const basis = vi.hoisted(() => ({ rules: {}, network: {}, key: 'k', hydrated: true }));
+vi.mock('@/features/route/jumpBasis', () => ({ useJumpBasis: () => basis }));
 vi.mock('@/features/route/routeExposure', () => ({
   routeExposure: vi.fn(async (_from: number, to: number) => {
     const n = routes.jumps[to];
@@ -42,6 +43,19 @@ beforeEach(async () => {
   await db.settings.clear();
   usePiSettings.setState({ value: DEFAULT_PI_SETTINGS, hydrated: false });
 });
+
+/**
+ * Lets the strip's async work finish before a test asserts something is absent:
+ * first the settings store's own read of Dexie (a read still in flight would
+ * land on top of a `setState` made afterwards and revert it), then the mocked
+ * route and location lookups, which resolve within one macrotask.
+ */
+async function settled() {
+  await waitFor(() => expect(usePiSettings.getState().hydrated).toBe(true));
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 0));
+  });
+}
 
 function renderStrip(props: Parameters<typeof PiHeaderStrip>[0]) {
   return render(
@@ -140,7 +154,7 @@ describe('PiHeaderStrip', () => {
       routes.jumps = { [JITA]: 3, [HEK]: 9 };
       const { unmount } = render(strip());
       await screen.findByTestId('pi-header-strip');
-      await new Promise((r) => setTimeout(r, 20));
+      await settled();
       expect(screen.queryByTestId('pi-nearest-hub')).not.toBeInTheDocument();
       unmount();
 
@@ -150,14 +164,14 @@ describe('PiHeaderStrip', () => {
         hydrated: true,
       });
       const second = render(strip());
-      await new Promise((r) => setTimeout(r, 20));
+      await settled();
       expect(screen.queryByTestId('pi-nearest-hub')).not.toBeInTheDocument();
       second.unmount();
 
       routes.jumps = {};
       usePiSettings.setState({ value: DEFAULT_PI_SETTINGS, hydrated: true });
       render(strip());
-      await new Promise((r) => setTimeout(r, 20));
+      await settled();
       expect(screen.queryByTestId('pi-nearest-hub')).not.toBeInTheDocument();
     });
   });
@@ -196,7 +210,7 @@ describe('PiHeaderStrip', () => {
     it('shows no home, and never assumes a hub, when the location is unknown', async () => {
       renderStrip({ colonySystemIds: [], locationCharacterId: 91, estimate: false });
       await waitFor(() => expect(located.calls).toEqual([91]));
-      await new Promise((r) => setTimeout(r, 20));
+      await settled();
       const facts = await openFacts();
       expect(within(facts).queryByText('Location')).not.toBeInTheDocument();
       expect(within(facts).queryByText('Home')).not.toBeInTheDocument();

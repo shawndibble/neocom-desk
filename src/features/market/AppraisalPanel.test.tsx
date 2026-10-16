@@ -102,6 +102,7 @@ function outcome(overrides: Partial<AppraisalOutcome> = {}): AppraisalOutcome {
     refinesOreOrIce: false,
     accountingLevel: null,
     brokerRelationsLevel: null,
+    pricesUnreachable: false,
     ...overrides,
   };
 }
@@ -344,6 +345,7 @@ describe('AppraisalPanel', () => {
         refinesOreOrIce: false,
         accountingLevel: 0,
         brokerRelationsLevel: 0,
+        pricesUnreachable: false,
         ...overrides,
       };
     }
@@ -453,6 +455,7 @@ describe('AppraisalPanel', () => {
       hub,
       buy: index === 0 ? null : 1_000 * (index + 1),
       sell: 2_000 * (index + 1),
+      unreachable: false,
     }));
 
     async function compareCards() {
@@ -590,6 +593,7 @@ describe('AppraisalPanel', () => {
         refinesOreOrIce: false,
         accountingLevel: null,
         brokerRelationsLevel: null,
+        pricesUnreachable: false,
         ...overrides,
       };
     }
@@ -797,6 +801,7 @@ describe('AppraisalPanel', () => {
         refinesOreOrIce: false,
         accountingLevel: null,
         brokerRelationsLevel: null,
+        pricesUnreachable: false,
         ...overrides,
       };
     }
@@ -1434,5 +1439,40 @@ describe('AppraisalPanel — shopping list (#2868)', () => {
     renderPanel({ controller: controller({ result: outcome() }) });
     expect(screen.getByTestId('hold-bar')).toHaveTextContent('1,255.5 of 1,000 m³');
     expect(screen.getByText('Does not fit in one trip.')).toBeInTheDocument();
+  });
+});
+
+describe('AppraisalPanel: unreachable price source (offline)', () => {
+  it('shows a placeholder instead of 0 ISK totals and the "no orders" warning', () => {
+    renderPanel({
+      controller: controller({
+        result: outcome({
+          pricesUnreachable: true,
+          appraisal: {
+            ...APPRAISAL,
+            totals: { ...APPRAISAL.totals, buy: 0, sell: 0, spread: 0, unpricedRows: 2 },
+          },
+        }),
+      }),
+    });
+    expect(screen.getByText('Prices unavailable right now')).toBeInTheDocument();
+    expect(screen.queryByText(/no orders on one side at this hub/)).not.toBeInTheDocument();
+  });
+
+  it('marks an unreachable hub card in Compare hubs', async () => {
+    const rows: HubComparisonRow[] = TRADE_HUBS.map((hub) => ({
+      hub,
+      buy: null,
+      sell: null,
+      unreachable: true,
+    }));
+    renderPanel({
+      defaultCompareExpanded: true,
+      controller: controller({ result: outcome(), compare: rows }),
+    });
+    const list = await screen.findByRole('list', { name: 'Compare hubs' });
+    expect(within(list).getAllByText('Prices unavailable right now')).toHaveLength(
+      TRADE_HUBS.length
+    );
   });
 });

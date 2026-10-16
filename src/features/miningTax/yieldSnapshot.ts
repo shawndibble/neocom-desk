@@ -101,6 +101,12 @@ export interface MiningYieldSnapshot {
   typeVolumes: Map<number, number>;
   fetchedAt: Date | null;
   fromCache: boolean;
+  /**
+   * Refining was on but the reprocessing recipes (a lazy download) could not
+   * load, so `rows` carry no refined side. The raw values and the ledger are
+   * unaffected; the page says the refined figures are unavailable.
+   */
+  refiningUnavailable: boolean;
 }
 
 function volumeCacheKey(typeId: number): string {
@@ -216,6 +222,7 @@ export async function loadMiningYieldSnapshot(
       typeVolumes: new Map(),
       fetchedAt,
       fromCache,
+      refiningUnavailable: false,
     };
   }
 
@@ -224,10 +231,20 @@ export async function loadMiningYieldSnapshot(
   ];
   const systemIds = [...new Set(allEntries.map(({ entry }) => entry.solarSystemId))];
 
+  // Refining needs the recipes, which are a lazy download; offline they can be
+  // missing. The ledger and raw values don't depend on them, so a miss costs
+  // only the refined side.
+  let refiningUnavailable = false;
   const [compressedByRaw, reprocessingMap] = await Promise.all([
     loadCompressedOreTypeIds(),
-    showRefining ? loadReprocessing() : Promise.resolve<ReprocessingMap>({}),
+    showRefining
+      ? loadReprocessing().catch(() => {
+          refiningUnavailable = true;
+          return {} as ReprocessingMap;
+        })
+      : Promise.resolve<ReprocessingMap>({}),
   ]);
+  const includeRefining = showRefining && !refiningUnavailable;
   const pricingTypeId = (typeId: number): number =>
     oreFormTypeId(typeId, compressedByRaw, compressed);
 
@@ -341,7 +358,7 @@ export async function loadMiningYieldSnapshot(
         async (id) =>
           [
             id,
-            showRefining ? await loadCharacterModifiers(id, Date.now()) : NO_CHARACTER_MODIFIERS,
+            includeRefining ? await loadCharacterModifiers(id, Date.now()) : NO_CHARACTER_MODIFIERS,
           ] as const
       )
     )
@@ -383,7 +400,7 @@ export async function loadMiningYieldSnapshot(
           reprocessingByTypeId,
           modifiers,
           materialPrices,
-          { includeRefining: showRefining }
+          { includeRefining }
         ),
         materialUnitPrices: new Map(
           Object.entries(materialPrices).map(([typeId, price]) => [Number(typeId), price])
@@ -433,5 +450,6 @@ export async function loadMiningYieldSnapshot(
     typeVolumes,
     fetchedAt,
     fromCache,
+    refiningUnavailable,
   };
 }

@@ -156,6 +156,18 @@ describe('appraisePaste', () => {
     expect(appraisal.totals.unpricedRows).toBe(1);
   });
 
+  it('flags pricesUnreachable when Fuzzwork is down, but not for a genuine no-orders answer', async () => {
+    server.use(http.get(FUZZWORK_AGGREGATES_URL, () => HttpResponse.error()));
+    const down = await appraisePaste('Tritanium\t100', DEFAULT_TRADE_HUB, 100);
+    expect(down.pricesUnreachable).toBe(true);
+
+    clearMarketPriceCache();
+    server.use(aggregates(PRICED));
+    const up = await appraisePaste('Civilian Gatling Railgun\t4', DEFAULT_TRADE_HUB, 100);
+    expect(up.appraisal.totals.unpricedRows).toBe(1);
+    expect(up.pricesUnreachable).toBe(false);
+  });
+
   it('makes no price request for a paste that matches nothing', async () => {
     let hits = 0;
     server.use(
@@ -218,6 +230,17 @@ describe('appraisePaste', () => {
       expect(row.refineTotal).toBeCloseTo(Math.floor(415 * 10 * 0.5) * 5.41, 6);
       expect(row.refinePricedAll).toBe(true);
       expect(appraisal.totals.refine).toBe(row.refineTotal);
+    });
+
+    it('still appraises, without a refine value, when reprocessing data cannot load', async () => {
+      server.use(aggregates(PRICED));
+      mockedLoadReprocessing.mockRejectedValue(new Error('offline'));
+      mockedLoadCorrectedSkills.mockResolvedValue(skillsFixture([]));
+
+      const { appraisal } = await appraisePaste('Tritanium\t100', DEFAULT_TRADE_HUB, 100, 1);
+
+      expect(appraisal.rows).toHaveLength(1);
+      expect(appraisal.rows[0].refineTotal).toBeUndefined();
     });
 
     it('leaves a non-reprocessable row without a refine value even with a Character active', async () => {
@@ -552,6 +575,19 @@ describe('compareHubs', () => {
       expect(row.buy).toBe(1_345_950);
       expect(row.sell).toBe(1_382_400);
     }
+  });
+
+  it('flags every hub unreachable when Fuzzwork is down, and none when it answers', async () => {
+    server.use(http.get(FUZZWORK_AGGREGATES_URL, () => HttpResponse.error()));
+    const down = await compareHubs('Damage Control II\t3', 100);
+    expect(down.every((row) => row.unreachable && row.buy === null && row.sell === null)).toBe(
+      true
+    );
+
+    clearMarketPriceCache();
+    server.use(aggregates(PRICED));
+    const up = await compareHubs('Damage Control II\t3', 100);
+    expect(up.some((row) => row.unreachable)).toBe(false);
   });
 
   it('reports a hub with no orders on a side as null, not zero', async () => {

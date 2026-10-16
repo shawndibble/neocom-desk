@@ -294,6 +294,9 @@ export function ColonyExpanded({
                   tone={(load.power ?? 0) >= 0.9 ? 'warning' : 'accent'}
                 />
               </div>
+              {load.linkLoadUnknown && (
+                <p className="text-warning">{t('piColonies.expanded.linkLoadUnknown')}</p>
+              )}
               <p className="text-text-dim">
                 {t('piColonies.expanded.free', {
                   cpu: Math.max(0, Math.round(load.cpuBudget - load.cpuUsed)).toLocaleString(),

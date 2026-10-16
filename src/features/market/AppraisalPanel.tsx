@@ -971,6 +971,7 @@ export function AppraisalPanel({
                   showRefine={hasRefine}
                   showCheapest={hasLpOption}
                   implantBonusPct={implantBonusPct}
+                  pricesUnavailable={result.pricesUnreachable}
                 />
                 {loading && <Spinner label={t('common.loading')} size="sm" />}
               </div>
@@ -996,12 +997,12 @@ export function AppraisalPanel({
                 </div>
               )}
 
-              {totals.unpricedRows > 0 && (
+              {!result.pricesUnreachable && totals.unpricedRows > 0 && (
                 <p className="border-b border-line px-3 py-2 text-[0.6875rem] text-warning">
                   {t('market.appraisal.unpriced', { count: totals.unpricedRows })}
                 </p>
               )}
-              {totals.refineUnpricedRows > 0 && (
+              {!result.pricesUnreachable && totals.refineUnpricedRows > 0 && (
                 <p className="border-b border-line px-3 py-2 text-[0.6875rem] text-warning">
                   {t('market.appraisal.refineUnpriced', { count: totals.refineUnpricedRows })}
                 </p>

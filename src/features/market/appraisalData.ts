@@ -59,7 +59,7 @@ import { SKILL_IDS } from '@/engine/industry/types';
 import { loadCharacterModifiers } from '@/features/character/characterModifiers';
 import { findLpOfferMatches, toLpOfferInputs } from '@/features/market/appraisalLpAcquisition';
 import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
-import { getHubPrices, invalidateHubPrices } from '@/market/prices';
+import { getHubPricesWithStatus, invalidateHubPrices } from '@/market/prices';
 import { loadMarketTypes } from '@/sde/loadMarketSde';
 import { knownPackagedVolumeOf } from '@/sde/marketTypes';
 import { loadMarketTypesById } from '@/sde/marketTypesById';
@@ -86,6 +86,11 @@ export interface AppraisalOutcome {
   accountingLevel: number | null;
   /** Same as `accountingLevel`, for Broker Relations. */
   brokerRelationsLevel: number | null;
+  /**
+   * The price source could not be reached, so every price is unknown rather
+   * than "no orders": the panel shows a placeholder, not 0 ISK totals.
+   */
+  pricesUnreachable: boolean;
 }
 
 /**
@@ -157,7 +162,8 @@ export async function appraisePaste(
     characterId === null
       ? [null, null, null]
       : await Promise.all([
-          loadReprocessing(),
+          // A lazy download: missing offline, it costs only the refine column.
+          loadReprocessing().catch(() => null),
           loadCharacterModifiers(characterId, Date.now()),
           findLpOfferMatches(characterId, typeIds),
         ]);
@@ -179,7 +185,7 @@ export async function appraisePaste(
     ...new Set([...typeIds, ...materialTypeIds, ...(lpMatches?.requiredItemTypeIds ?? [])]),
   ];
   if (force) invalidateHubPrices(hub.stationId, allTypeIds);
-  const prices = await getHubPrices(hub, allTypeIds);
+  const { prices, unreachable: pricesUnreachable } = await getHubPricesWithStatus(hub, allTypeIds);
   const sellPrices = new Map(
     [...prices].map(([typeId, agg]) => [typeId, agg.sellMin ?? undefined])
   );
@@ -241,6 +247,7 @@ export async function appraisePaste(
     refinesOreOrIce,
     accountingLevel: modifiers ? (modifiers.skills[SKILL_IDS.accounting] ?? 0) : null,
     brokerRelationsLevel: modifiers ? (modifiers.skills[SKILL_IDS.brokerRelations] ?? 0) : null,
+    pricesUnreachable,
   };
 }
 
@@ -249,6 +256,8 @@ export interface HubComparisonRow {
   hub: TradeHub;
   buy: number | null;
   sell: number | null;
+  /** This hub's prices could not be fetched, so the dashes mean "unknown", not "no orders". */
+  unreachable: boolean;
 }
 
 /**
@@ -272,7 +281,7 @@ export async function compareHubs(
   return Promise.all(
     TRADE_HUBS.map(async (hub) => {
       if (force) invalidateHubPrices(hub.stationId, typeIds);
-      const prices = await getHubPrices(hub, typeIds);
+      const { prices, unreachable } = await getHubPricesWithStatus(hub, typeIds);
       const items: AppraisalItem[] = matched.map((match) => {
         const aggregate = prices.get(match.typeId);
         return {
@@ -284,7 +293,7 @@ export async function compareHubs(
         };
       });
       const { buy, sell } = buildHubComparison(items, pricePercent);
-      return { hub, buy, sell };
+      return { hub, buy, sell, unreachable };
     })
   );
 }

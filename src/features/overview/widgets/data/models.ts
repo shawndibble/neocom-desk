@@ -13,7 +13,11 @@
 import { severityForRemaining, type DeadlineSeverity } from '@/engine/severity';
 import { soonestCalendarDeadline, upcomingCommittedEvents } from '@/engine/calendarDeadline';
 import { extractableSp, extractorCount } from '@/engine/spExtraction';
-import { buildOpenOrderRows, openOrderProblemCounts } from '@/features/market/openOrdersModel';
+import {
+  buildOpenOrderRows,
+  notCheckedCount,
+  openOrderProblemCounts,
+} from '@/features/market/openOrdersModel';
 import { stockBoardSeverity } from '@/features/stockTargets/stockBoard';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { formatCountdown, formatDuration } from '@/lib/duration';
@@ -490,6 +494,7 @@ const orders: Builder = (feeds, { t, now, activeCharacterId, scopeAll }) => {
   const undercut = counts.undercutStation + counts.undercutSystem + counts.undercutRegion;
   const maxOrders = feeds.skills?.data?.maxOrders ?? null;
   const listed = ordersListed(rows);
+  const unchecked = notCheckedCount(rows);
   const severity = ordersSeverity(rows, needsReauth);
   return {
     ...blank(
@@ -507,10 +512,14 @@ const orders: Builder = (feeds, { t, now, activeCharacterId, scopeAll }) => {
       value: count(undercut),
       unit: t('overview.board.undercut'),
       // What is on the market is the fact the undercut count lacks; the slots sit under the table.
+      // Unchecked orders come first: "0 undercut" must not read as all-clear
+      // when the competition behind it was never looked at.
       secondary:
-        listed > 0
-          ? { text: t('overview.widgets.orders.listed', { isk: formatIskCompact(listed) }) }
-          : undefined,
+        unchecked > 0
+          ? { text: t('overview.widgets.orders.notChecked', { count: unchecked }) }
+          : listed > 0
+            ? { text: t('overview.widgets.orders.listed', { isk: formatIskCompact(listed) }) }
+            : undefined,
       tone: undercut === 0 && severity !== 'critical' ? 'clear' : (severity ?? 'clear'),
     },
     rows: [],

@@ -16,6 +16,7 @@ import {
   useBuildGroups,
   type BuildGroupsValue,
 } from '@/features/industry/buildGroups';
+import { loadBlueprints } from '@/sde/loadSde';
 import type { BlueprintMap, TypeMap } from '@/sde/types';
 
 vi.mock('virtual:pwa-register/react', () => ({
@@ -193,6 +194,18 @@ describe('IndustryGroupPage', () => {
     expect(await screen.findByText('Rifter fit')).toBeInTheDocument();
     expect(await screen.findByRole('link', { name: /Rifter run/ })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Parts run/ })).toBeInTheDocument();
+  });
+
+  it('says the blueprint data could not load, and loads it on Retry, instead of spinning forever', async () => {
+    const user = userEvent.setup();
+    vi.mocked(loadBlueprints).mockRejectedValueOnce(new Error('offline'));
+    await seedGroup('g1', 'Rifter fit');
+    await db.buildPlans.add(seedPlan({ id: 'bp-1', name: 'Rifter run', buildGroupId: 'g1' }));
+    render(<App />);
+
+    expect((await screen.findAllByText("Blueprint data couldn't load")).length).toBeGreaterThan(0);
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(await screen.findByRole('link', { name: /Rifter run/ })).toBeInTheDocument();
   });
 
   it("opening a member navigates to that plan's own page", async () => {

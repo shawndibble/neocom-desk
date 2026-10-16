@@ -31,6 +31,7 @@ import { jumpRangeLimit, type JumpRange } from '@/engine/route/jumpRange';
 import { useCurrentSystem } from '@/features/route/currentSystem';
 import { CurrentSystemPicker, JumpRangeSelect } from '@/features/route/JumpRangeControls';
 import { ComposeRequestDialog } from './ComposeRequestDialog';
+import { NeedsConnectionButton } from './NeedsConnectionButton';
 import { MyPledgesPanel } from './MyPledgesPanel';
 import { PledgeBar } from './PledgeBar';
 import { RequestPanel } from './RequestPanel';
@@ -256,9 +257,9 @@ export function RequestsTab({
     />
   );
   const newRequest = (
-    <Button size="sm" variant="primary" onClick={() => setComposing(true)}>
+    <NeedsConnectionButton size="sm" variant="primary" onClick={() => setComposing(true)}>
       {t('communities.board.new')}
-    </Button>
+    </NeedsConnectionButton>
   );
 
   if (requests.length === 0) {

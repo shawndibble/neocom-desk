@@ -132,3 +132,39 @@ describe('LoadWarnings', () => {
     expect(screen.queryByText(/Not A Ship/)).not.toBeInTheDocument();
   });
 });
+
+describe('FittingLoadCard — a load that throws', () => {
+  function renderWith(onLoad: () => Promise<void>) {
+    render(
+      <FittingLoadCard
+        onLoad={onLoad}
+        lastLoad={null}
+        shareError={null}
+        tooLargeToShare={false}
+        onLoadFittingXmlDocument={async () => []}
+        onOpenLoaded={vi.fn()}
+      />
+    );
+  }
+
+  async function submit() {
+    await userEvent.type(screen.getByRole('textbox'), 'Rifter');
+    await userEvent.click(screen.getByRole('button', { name: 'Load' }));
+  }
+
+  it('says the item data is not downloaded when the failure is a network one', async () => {
+    renderWith(() => Promise.reject(new TypeError('Failed to fetch')));
+    await submit();
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      "isn't downloaded on this device yet"
+    );
+    expect(screen.getByRole('button', { name: 'Load' })).toBeEnabled();
+  });
+
+  it('shows a generic error for any other throw, and frees the button', async () => {
+    renderWith(() => Promise.reject(new Error('boom')));
+    await submit();
+    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't load this fitting.");
+    expect(screen.getByRole('button', { name: 'Load' })).toBeEnabled();
+  });
+});

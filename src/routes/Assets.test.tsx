@@ -57,7 +57,10 @@ vi.mock('@/sde/loadSde', () => ({
 
 // The Move tab reads hull capacities from the Fitting catalogue and the pilot's
 // skills; its own tests (MovePlanTab.test.tsx) cover that, this file only opens the tab.
-vi.mock('@/features/fittings/useFittingCatalogue', () => ({ useFittingCatalogue: () => null }));
+vi.mock('@/features/fittings/useFittingCatalogue', () => ({
+  useFittingCatalogue: () => null,
+  useFittingCatalogueFailed: () => false,
+}));
 vi.mock('@/features/fittings/fittingPilotProfile', () => ({
   usePilotProfile: () => ({ profile: null, failed: false, retry: () => {} }),
 }));

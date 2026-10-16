@@ -210,6 +210,24 @@ describe('Corp Wallet: the gate', () => {
     expect(screen.queryByRole('group', { name: 'Wallet division' })).toBeNull();
   });
 
+  it('says the roles could not be checked, then shows the wallet after Try again', async () => {
+    let fail = true;
+    server.use(
+      http.get(`${BASE}/characters/${CHAR_ID}/roles`, () =>
+        fail ? HttpResponse.error() : HttpResponse.json({ roles: ['Accountant'] })
+      )
+    );
+
+    render(<App />);
+
+    expect(
+      (await screen.findAllByText("Can't check your corporation roles right now")).length
+    ).toBeGreaterThan(0);
+    fail = false;
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    await findDivisions();
+  });
+
   it('is an entry in the Corp section nav for a Character who can read the wallet', async () => {
     render(<App />);
     await findDivisions();

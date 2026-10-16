@@ -119,9 +119,9 @@ export function Tooltip({ content, children, openOnTap = false, className = '' }
   /** `null` until a tap opens the tooltip; then the echoed click has a deadline to beat. */
   const touchOpenedAt = useRef<number | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const mouseHovering = useRef(false);
   const hasContent =
     content !== null && content !== undefined && content !== false && content !== '';
+  const mouseHovering = useRef(false);
 
   function cancelLongPress() {
     clearTimeout(longPressTimer.current);
@@ -257,7 +257,9 @@ export function Tooltip({ content, children, openOnTap = false, className = '' }
   return (
     <TooltipPrimitive.Provider delayDuration={0}>
       <TooltipPrimitive.Root
-        open={hasContent && (hoverOpen || touchOpen)}
+        // No content, no bubble: a caller keeps one stable tree and passes
+        // nothing while it has nothing to say (`NeedsConnectionButton`).
+        open={(hoverOpen || touchOpen) && hasContent}
         onOpenChange={handleOpenChange}
       >
         <TooltipPrimitive.Trigger
