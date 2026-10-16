@@ -327,6 +327,23 @@ describe('the roster table', () => {
     expect(await screen.findByText('No member activity')).toBeInTheDocument();
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
   });
+
+  it('says it could not load, not "no member activity", when the tracking read failed (offline)', async () => {
+    mocked.loadCorporationMemberTracking.mockResolvedValue({ cached: null, needsReauth: false });
+    renderMembers();
+    expect(await screen.findAllByText("Couldn't load")).not.toHaveLength(0);
+    expect(screen.queryByText('No member activity')).not.toBeInTheDocument();
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    // The join/leave baseline is not consumed while the page cannot show the change.
+    expect(mocked.recordRoster).not.toHaveBeenCalled();
+
+    // Retry reads again, and a read that now succeeds fills the table.
+    mocked.loadCorporationMemberTracking.mockResolvedValue(
+      cached([tracking({ character_id: 1001 })])
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(await screen.findByRole('table', { name: 'Corporation members' })).toBeInTheDocument();
+  });
 });
 
 describe('manual refresh keeps the roster visible (issue #418)', () => {

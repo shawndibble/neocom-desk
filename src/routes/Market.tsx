@@ -30,6 +30,7 @@ import {
 import * as Icon from '@/components/ui/icons';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useOnline } from '@/stores/network';
+import { orderBookFailedOffline } from '@/features/market/orderBookView';
 import type { MarketGroupNode, MarketTypeEntry } from '@/sde/marketTypes';
 import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import { DEFAULT_JUMP_RANGE } from '@/engine/route/jumpRange';
@@ -1155,7 +1156,11 @@ export function Market() {
                         // blueprint BPC hint, just the failure and a way to retry.
                         <EmptyState
                           title={t('market.orderBookFailedTitle')}
-                          hint={t('market.orderBookFailedHint')}
+                          hint={t(
+                            orderBookFailedOffline(orderBookView, online)
+                              ? 'market.orderBookFailedOfflineHint'
+                              : 'market.orderBookFailedHint'
+                          )}
                           className="py-8"
                           action={
                             <Button size="sm" onClick={handleRefresh}>

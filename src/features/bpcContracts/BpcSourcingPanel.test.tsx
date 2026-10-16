@@ -501,11 +501,31 @@ describe('BpcSourcingPanel', () => {
     expect(await screen.findByText('No public BPC listings synced yet')).toBeInTheDocument();
   });
 
+  it('says the index could not be reached, not "synced yet", when the read returned nothing', async () => {
+    loadPublicBpcContracts.mockResolvedValue(null);
+    render(<App />);
+
+    expect(
+      await screen.findAllByText("Couldn't reach the contract index — nothing cached yet")
+    ).not.toHaveLength(0);
+    expect(screen.queryByText('No public BPC listings synced yet')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+  });
+
   it('shows a not-configured empty state rather than an empty table when sync is unavailable', async () => {
     vi.mocked(isSyncConfigured).mockReturnValue(false);
     render(<App />);
 
     expect(await screen.findByText("Public BPC search isn't available")).toBeInTheDocument();
+    // No backend is not "unreachable": neither the page nor the live region claims it.
+    expect(screen.queryByText(/Couldn't reach the contract index/)).not.toBeInTheDocument();
+  });
+
+  it('announces a failed load with the same words the page shows', async () => {
+    loadPublicBpcContracts.mockRejectedValue(new Error('boom'));
+    render(<App />);
+    expect(await screen.findAllByText('Could not load')).not.toHaveLength(0);
+    expect(screen.queryByText(/Couldn't reach the contract index/)).not.toBeInTheDocument();
   });
 
   it('right-clicking a row starts a Build Plan for the item the blueprint makes', async () => {

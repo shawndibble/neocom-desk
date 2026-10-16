@@ -22,6 +22,8 @@ import {
   DataTable,
   DataTableDenseCell,
   EmptyState,
+  LiveStatus,
+  LoadFailedState,
   FilterBar,
   FilterChip,
   CheckboxSelect,
@@ -140,6 +142,7 @@ import { loadBlueprints } from '@/sde/loadSde';
 import { isSyncConfigured } from '@/app/syncStatus';
 import type { CachedResult } from '@/esi/cache';
 import type { CharacterBlueprint } from '@/esi/endpoints';
+import { useRetryFocus } from '@/lib/useRetryFocus';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { cx } from '@/lib/cx';
 import {
@@ -730,6 +733,15 @@ export function BpcSourcingPanel({
     refreshRef.current();
     setMarketRefreshTick((tick) => tick + 1);
   }, []);
+  // Retry can unmount into the spinner: focus waits on the always-mounted card wrapper.
+  const [cardRef, , holdRetryFocus] = useRetryFocus(
+    loading
+      ? 'busy'
+      : error || (syncConfigured && contractsResult === null && ownedBlueprints.length === 0)
+        ? 'failed'
+        : 'ok',
+    activeCharacterId
+  );
   const lastSyncedAt = contractsResult?.data?.lastSyncedAt ?? null;
   useEffect(() => {
     onHeaderChange?.({
@@ -1694,6 +1706,19 @@ export function BpcSourcingPanel({
     // gear (`onHeaderChange`). The table keeps its accessible name from
     // `bpcContracts.title`.
     <>
+      <h2 ref={cardRef} tabIndex={-1} className="sr-only focus:outline-none">
+        {t('bpcContracts.title')}
+      </h2>
+      <LiveStatus>
+        {/* What the visible branch below says; nothing for a build with no sync backend. */}
+        {loading
+          ? ''
+          : error
+            ? t('common.loadFailedTitle')
+            : syncConfigured && contractsResult === null
+              ? t('common.contractIndexUnreachableTitle')
+              : ''}
+      </LiveStatus>
       <Panel padded={false}>
         {loading && !data ? (
           <div className="flex justify-center py-16">
@@ -1706,6 +1731,17 @@ export function BpcSourcingPanel({
             title={t('bpcContracts.notConfiguredTitle')}
             hint={t('bpcContracts.notConfiguredHint')}
           />
+        ) : contractsResult === null && ownedBlueprints.length === 0 ? (
+          // The public index was unreachable and nothing is cached, and there are
+          // no owned blueprints to search either: not "no listings synced yet".
+          <LoadFailedState
+            title={t('common.contractIndexUnreachableTitle')}
+            hint={t('common.contractIndexUnreachableHint')}
+            onRetry={() => {
+              holdRetryFocus();
+              refreshAll();
+            }}
+          />
         ) : rows.length === 0 && originals.length === 0 && ownedBlueprints.length === 0 ? (
           // Nothing to search from either source — distinct from
           // `noFilterMatches` below, which is "some data exists, the filter
@@ -1716,6 +1752,12 @@ export function BpcSourcingPanel({
             {contractsResult?.fromCache && (
               <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
                 {t('common.offlineTitle')}
+              </p>
+            )}
+            {contractsResult === null && (
+              // Owned blueprints still list, but no public offers came back.
+              <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
+                {t('common.contractIndexUnreachableTitle')}
               </p>
             )}
             <BpcFilterBar

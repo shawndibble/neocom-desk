@@ -8,6 +8,7 @@ import {
   fetchOrderBookAcross,
   loadGlobalMarketOverrides,
   loadOrderBookView,
+  orderBookFailedOffline,
   orderBookLocationFor,
   type OrderBookLocation,
 } from './orderBookView';
@@ -373,6 +374,27 @@ describe('clearOrderBookViewCache', () => {
       globalMarkets: new Map([[PLEX, { regionId: PLEX_REGION, regionName: 'PLEX Market' }]]),
     });
     expect(vi.mocked(clearOrderBookCache)).toHaveBeenCalledWith(PLEX_REGION, PLEX);
+  });
+});
+
+describe('orderBookFailedOffline', () => {
+  const failed = (error: unknown) =>
+    ({ status: 'failed', error, region: { regionId: 10000002, override: null } }) as never;
+
+  it('is offline when the browser says so, or the error is a network failure', () => {
+    expect(orderBookFailedOffline(failed(new Error('420')), false)).toBe(true);
+    expect(orderBookFailedOffline(failed(new TypeError('Failed to fetch')), true)).toBe(true);
+  });
+
+  it('is not offline for ESI answering badly while online, or a book that did not fail', () => {
+    expect(orderBookFailedOffline(failed(new Error('420')), true)).toBe(false);
+    expect(orderBookFailedOffline(null, false)).toBe(false);
+    expect(
+      orderBookFailedOffline(
+        { status: 'empty' } as unknown as Parameters<typeof orderBookFailedOffline>[0],
+        false
+      )
+    ).toBe(false);
   });
 });
 

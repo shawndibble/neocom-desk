@@ -94,6 +94,14 @@ describe('vitalsFigures', () => {
   const FIG_NOW = Date.UTC(2026, 8, 7, 12);
   const FIG_DAY = 86_400_000;
 
+  it('reports net and runway as unknown, not zero, when the journal could not be read', () => {
+    const figures = vitalsFigures([{ division: 1, balance: 1_000_000 }], null, 1, FIG_NOW);
+
+    expect(figures.total).toBe(1_000_000);
+    expect(figures.net).toBeNull();
+    expect(figures.runwayDays).toBeNull();
+  });
+
   it('composes the total, the net and the runway from one reading', () => {
     const figures = vitalsFigures(
       [

@@ -22,11 +22,13 @@ import {
   filterNpcStandingRows,
   type NpcStandingRow,
 } from '@/features/character/npcStandingsRows';
+import { DataGate } from '@/components/DataGate';
 import { useUrlSort } from '@/lib/useUrlState';
 
 const STANDINGS_SORT = { columnId: 'standing', direction: 'desc' } as const;
 const COLUMN_IDS = ['name', 'kind', 'standing', 'fees'] as const;
 const FEE_OWNERS = feeOwnerIds();
+const OFFLINE_NOTE_CLASS = 'text-[0.6875rem] text-warning uppercase';
 
 /**
  * The Contacts page's Standings tab (issue #2859): the Character's NPC faction,
@@ -42,6 +44,10 @@ export function useContactsStandings(characterId: number, enabled: boolean) {
     rows: NpcStandingRow[];
     failed: boolean;
     fetchedAt: Date | null;
+    /** The rows are a cached copy: ESI did not answer. */
+    fromCache: boolean;
+    /** False when no list could be loaded at all — unknown, not "no standings". */
+    available: boolean;
   } | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [text, setText] = useState('');
@@ -50,7 +56,10 @@ export function useContactsStandings(characterId: number, enabled: boolean) {
   const fetchState = useCallback(
     async (force: boolean) => {
       try {
-        const { entries, fetchedAt } = await loadCharacterStandingsResult(characterId, { force });
+        const { entries, fetchedAt, fromCache, available } = await loadCharacterStandingsResult(
+          characterId,
+          { force }
+        );
         const names = await resolveNames(entries.map((entry) => entry.from_id)).catch(
           () => new Map<number, string>()
         );
@@ -59,9 +68,18 @@ export function useContactsStandings(characterId: number, enabled: boolean) {
           rows: buildNpcStandingRows(entries, names, FEE_OWNERS),
           failed: false,
           fetchedAt,
+          fromCache,
+          available,
         };
       } catch {
-        return { characterId, rows: [], failed: true, fetchedAt: null };
+        return {
+          characterId,
+          rows: [],
+          failed: true,
+          fetchedAt: null,
+          fromCache: false,
+          available: false,
+        };
       }
     },
     [characterId]
@@ -92,11 +110,29 @@ export function useContactsStandings(characterId: number, enabled: boolean) {
     setRefreshing(true);
     void fetchState(true).then((next) => {
       if (currentCharacterId.current !== startedFor) return;
-      // A failed refresh keeps the rows already on screen rather than blanking them.
-      setState((prev) => (next.failed && prev?.characterId === startedFor ? prev : next));
+      // A failed refresh keeps the rows already on screen rather than blanking
+      // them; so does one that reached nothing (`available` false) when rows are up.
+      setState((prev) =>
+        (next.failed || !next.available) &&
+        prev?.characterId === startedFor &&
+        prev.available &&
+        !prev.failed
+          ? prev
+          : next
+      );
       setRefreshing(false);
     });
   };
+
+  const unreadable =
+    state !== null && state.characterId === characterId && (state.failed || !state.available);
+  // A refresh keeps the rows on screen (the button is disabled meanwhile); only the
+  // "couldn't load" state, which has no rows to keep, shows a spinner while it retries.
+  const spinning =
+    !state ||
+    state.characterId !== characterId ||
+    (refreshing && (state.failed || !state.available));
+  const status = lacksScope ? 'ok' : spinning ? 'busy' : unreadable ? 'failed' : 'ok';
 
   const rows = useMemo(() => filterNpcStandingRows(state?.rows ?? [], text), [state?.rows, text]);
   const columns = useMemo<DataTableColumn<NpcStandingRow>[]>(
@@ -149,24 +185,24 @@ export function useContactsStandings(characterId: number, enabled: boolean) {
         actionLabel={t('contacts.reauthAction')}
       />
     );
-  } else if (!state || state.characterId !== characterId || refreshing) {
-    content = (
-      <div className="flex justify-center py-16">
-        <Spinner label={t('common.loading')} />
-      </div>
-    );
-  } else if (state.failed) {
-    content = <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />;
+  } else if (!state || status !== 'ok') {
+    // Shown by the `DataGate` below: its spinner, or "couldn't load" with Retry —
+    // "no NPC standings" would be a guess when nothing was loaded.
+    content = null;
   } else if (state.rows.length === 0) {
     content = (
-      <EmptyState
-        title={t('contacts.standingsEmptyTitle')}
-        hint={t('contacts.standingsEmptyHint')}
-      />
+      <div className="space-y-3">
+        {state.fromCache && <p className={OFFLINE_NOTE_CLASS}>{t('common.offlineTitle')}</p>}
+        <EmptyState
+          title={t('contacts.standingsEmptyTitle')}
+          hint={t('contacts.standingsEmptyHint')}
+        />
+      </div>
     );
   } else {
     content = (
       <div className="space-y-3">
+        {state.fromCache && <p className={OFFLINE_NOTE_CLASS}>{t('common.offlineTitle')}</p>}
         <SearchInput
           value={text}
           onChange={(event) => setText(event.target.value)}
@@ -198,7 +234,8 @@ export function useContactsStandings(characterId: number, enabled: boolean) {
     );
   }
 
-  const ready = !lacksScope && state?.characterId === characterId && !state.failed;
+  const ready =
+    !lacksScope && state?.characterId === characterId && !state.failed && state.available;
   const meta = ready && state.fetchedAt && <DataAgeBadge date={state.fetchedAt} />;
   const actions = !lacksScope && (
     <IconButton
@@ -208,5 +245,24 @@ export function useContactsStandings(characterId: number, enabled: boolean) {
       disabled={refreshing || !state || state.characterId !== characterId}
     />
   );
-  return { meta, actions, content };
+  return {
+    meta,
+    actions,
+    content: (
+      <DataGate
+        status={status}
+        title={t('common.couldntLoad')}
+        hint={t('contacts.standingsUnavailableHint')}
+        onRetry={refresh}
+        resetKey={characterId}
+        busy={
+          <div className="flex justify-center py-16">
+            <Spinner label={t('common.loading')} />
+          </div>
+        }
+      >
+        {content}
+      </DataGate>
+    ),
+  };
 }

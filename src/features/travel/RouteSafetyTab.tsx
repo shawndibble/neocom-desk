@@ -459,6 +459,7 @@ export function RouteSafetyTab({ tabBar, tabsId }: TravelTabProps) {
               onUse={pinLeg}
               bridges={bridges === null ? 'off' : bridges.length === 0 ? 'none' : 'known'}
               onSetUpBridges={setBridgeDialog}
+              jumpUnavailable={jumpDrive.unavailable}
             />
           </div>
           <div className="min-w-0 space-y-4">
@@ -489,6 +490,7 @@ export function RouteSafetyTab({ tabBar, tabsId }: TravelTabProps) {
                   void useRouteJumpsEnabled.getState().setValue(enabled),
                 range: jumpRange,
                 onRangeChange: (range) => void useRouteJumpRange.getState().setValue(range),
+                unavailable: jumpDrive.unavailable,
               }}
             />
             <IncursionsPanel
@@ -537,8 +539,11 @@ function RouteBody({
   onUse,
   bridges,
   onSetUpBridges,
+  jumpUnavailable,
 }: {
   state: ReturnType<typeof useRouteSafety>;
+  /** Jump legs are on but the system map could not be read: say the route has none. */
+  jumpUnavailable: boolean;
   multiStop: boolean;
   nameOf: (systemId: number) => string;
   killsOf: (systemId: number) => RouteKillsCell;
@@ -587,6 +592,9 @@ function RouteBody({
       return (
         <Panel>
           <div className="space-y-3">
+            {jumpUnavailable && (
+              <p className="text-xs text-warning">{t('travel.jumpDrive.unavailable')}</p>
+            )}
             {trip && (
               <SetWaypoints legs={state.legs} nameOf={nameOf}>
                 <RouteFacts

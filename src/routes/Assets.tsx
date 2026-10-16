@@ -53,7 +53,8 @@ import { cx } from '@/lib/cx';
 import { nextPinState, pinStateForStation, type PinState } from '@/features/character/stationPins';
 import {
   loadCharacterAssets,
-  loadOtherCharactersAssets,
+  loadOtherCharactersAssetsDetailed,
+  type SkippedCharacterAssets,
   type OtherCharacterAssets,
 } from '@/features/character/assets';
 import { MovePlanTab } from '@/features/assets/MovePlanTab';
@@ -431,6 +432,8 @@ interface CrossCharacterData {
   characterNameById: Map<number, string>;
   /** Every other Character's blueprint copies, valued the same way as the active one's. */
   copyValueByItemId: Map<number, number>;
+  /** Chosen Characters whose assets could not be read: a search here cannot see their items. */
+  skipped: SkippedCharacterAssets[];
 }
 
 /**
@@ -505,7 +508,7 @@ async function loadCrossCharacterNames(
 async function loadCrossCharacterData(
   otherCharacterIds: readonly number[]
 ): Promise<CrossCharacterData> {
-  const entries = await loadOtherCharactersAssets(otherCharacterIds);
+  const { entries, skipped } = await loadOtherCharactersAssetsDetailed(otherCharacterIds);
   const copyValueByItemId = new Map<number, number>();
   const [{ typeNames, locationNames }] = await Promise.all([
     loadCrossCharacterNames(entries),
@@ -529,6 +532,7 @@ async function loadCrossCharacterData(
     characterIdByItemId,
     characterNameById,
     copyValueByItemId,
+    skipped,
   };
 }
 
@@ -1596,6 +1600,17 @@ export function Assets() {
               )}
               {assetsResult && <DataAgeBadge date={assetsResult.fetchedAt} />}
               {crossCharacterFilterMeta}
+              {activeCrossCharacterData && activeCrossCharacterData.skipped.length > 0 && (
+                <CharacterScopeReadout
+                  scope="all"
+                  total={
+                    activeCrossCharacterData.entries.length +
+                    activeCrossCharacterData.skipped.length +
+                    1
+                  }
+                  missing={activeCrossCharacterData.skipped.map((c) => c.name)}
+                />
+              )}
               {otherCharacterIds.length > 0 && crossCharacterLoading && (
                 <Spinner size="sm" label={t('assets.crossCharacterLoading')} />
               )}

@@ -703,12 +703,28 @@ describe('ContractSearchPanel', () => {
 
     expect(await screen.findByText("Contract search isn't available")).toBeInTheDocument();
     expect(loadPublicContractOffers).not.toHaveBeenCalled();
+    // No backend is not "unreachable": neither the page nor the live region claims it.
+    expect(screen.queryByText(/Couldn't reach the contract index/)).not.toBeInTheDocument();
   });
 
   it('distinguishes a configured-but-empty snapshot from a missing backend', async () => {
     loadPublicContractOffers.mockResolvedValue(cachedSnapshot([]));
     renderWithRouter();
 
+    expect(await screen.findByText('No public contracts synced yet')).toBeInTheDocument();
+  });
+
+  it('says the index could not be reached, not "synced yet", when the read returned nothing', async () => {
+    loadPublicContractOffers.mockResolvedValue({ cached: null, revalidating: false });
+    renderWithRouter();
+
+    expect(
+      await screen.findAllByText("Couldn't reach the contract index — nothing cached yet")
+    ).not.toHaveLength(0);
+    expect(screen.queryByText('No public contracts synced yet')).not.toBeInTheDocument();
+
+    loadPublicContractOffers.mockResolvedValue(cachedSnapshot([]));
+    await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
     expect(await screen.findByText('No public contracts synced yet')).toBeInTheDocument();
   });
 });

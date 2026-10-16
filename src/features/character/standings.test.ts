@@ -4,7 +4,7 @@ import { setupServer } from 'msw/node';
 import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
 import { useAuthFailure } from '@/stores/authFailure';
-import { loadCharacterStandings } from './standings';
+import { loadCharacterStandings, loadCharacterStandingsResult } from './standings';
 
 const CHAR_ID = 91;
 const server = setupServer();
@@ -105,5 +105,40 @@ describe('loadCharacterStandings', () => {
       )
     );
     expect(await loadCharacterStandings(CHAR_ID)).toHaveLength(1);
+  });
+
+  it('reports a fresh fetch as available and not from cache', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/standings`, () =>
+        HttpResponse.json([{ from_id: 1000035, from_type: 'npc_corp', standing: 5 }])
+      )
+    );
+    const result = await loadCharacterStandingsResult(CHAR_ID);
+    expect(result).toMatchObject({ available: true, fromCache: false });
+  });
+
+  it('reports a cached copy served after a failed fetch as from cache', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/standings`, () =>
+        HttpResponse.json([{ from_id: 1000035, from_type: 'npc_corp', standing: 5 }])
+      )
+    );
+    await loadCharacterStandingsResult(CHAR_ID);
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/standings`, () => HttpResponse.error())
+    );
+    await db.esiCache.where({ characterId: CHAR_ID, key: 'standings' }).modify({ fetchedAt: 0 });
+
+    const result = await loadCharacterStandingsResult(CHAR_ID);
+    expect(result.entries).toHaveLength(1);
+    expect(result).toMatchObject({ available: true, fromCache: true });
+  });
+
+  it('reports unavailable, not an empty list, when nothing is cached and ESI did not answer', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/standings`, () => HttpResponse.error())
+    );
+    const result = await loadCharacterStandingsResult(CHAR_ID);
+    expect(result).toMatchObject({ entries: [], fetchedAt: null, available: false });
   });
 });

@@ -33,6 +33,7 @@ import {
   SelectTrigger,
   SelectValue,
   SegmentedControl,
+  LiveStatus,
   Spinner,
   StatChip,
   StatChips,
@@ -124,6 +125,8 @@ export interface RouteJumpFieldsProps {
   onEnabledChange: (enabled: boolean) => void;
   range: RouteJumpRange;
   onRangeChange: (range: RouteJumpRange) => void;
+  /** The system map could not be read, so the route is planned without jump legs. */
+  unavailable?: boolean;
 }
 
 /**
@@ -141,11 +144,17 @@ function RouteJumpFields({
   const { t } = useTranslation();
   return (
     <div className="space-y-1.5">
+      <LiveStatus>
+        {jump.enabled && jump.unavailable ? t('travel.jumpDrive.unavailable') : ''}
+      </LiveStatus>
       <label className={`flex items-center gap-2 font-semibold ${tappableRowClassName}`}>
         <Checkbox checked={jump.enabled} onChange={() => jump.onEnabledChange(!jump.enabled)} />
         {t('travel.jumpDrive.enabled')}
       </label>
       <p className="text-text-dim">{t('travel.jumpDrive.hint')}</p>
+      {jump.enabled && jump.unavailable && (
+        <p className="text-warning">{t('travel.jumpDrive.unavailable')}</p>
+      )}
       {jump.enabled && (
         <>
           <p className="font-semibold">{t('travel.jumpDrive.range')}</p>
