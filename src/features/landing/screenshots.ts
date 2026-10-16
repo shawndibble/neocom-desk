@@ -26,13 +26,13 @@ export function screenshotSrc(shot: Pick<Screenshot, 'file'>): string {
  * ratio, so the `width`/`height` attributes still reserve the right box.
  */
 export const DESKTOP_VARIANT_WIDTHS = [640, 1280];
-export const PHONE_VARIANT_WIDTHS = [270];
+export const PHONE_VARIANT_WIDTHS = [416];
 
 export function screenshotVariantWidths(shot: Pick<Screenshot, 'size'>): number[] {
   return shot.size.width === PHONE_SIZE.width ? PHONE_VARIANT_WIDTHS : DESKTOP_VARIANT_WIDTHS;
 }
 
-export function screenshotVariantSrc(shot: Pick<Screenshot, 'file'>, width: number): string {
+function screenshotVariantSrc(shot: Pick<Screenshot, 'file'>, width: number): string {
   return `/screenshots/${shot.file}-${width}.webp`;
 }
 

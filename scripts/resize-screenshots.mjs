@@ -13,7 +13,7 @@ import { join, resolve } from 'node:path';
 import { chromium } from '@playwright/test';
 
 const DIR = resolve(import.meta.dirname, '..', 'public', 'screenshots');
-const PHONE_WIDTHS = [270];
+const PHONE_WIDTHS = [416];
 const DESKTOP_WIDTHS = [640, 1280];
 const QUALITY = 0.8;
 
