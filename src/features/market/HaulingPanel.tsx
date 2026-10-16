@@ -913,8 +913,8 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     (params.maxprice !== null ? 1 : 0) +
     (params.spend !== null ? 1 : 0);
   const hiddenCount = hidden.tooDear + (instant ? 0 : hidden.thin + hidden.slow) + hidden.lowMargin;
-  // With a max price set the hidden line names it as well.
-  const hiddenKeySuffix = params.maxprice !== null ? 'MaxPrice' : '';
+  // Only when Max price hid something does the hidden line name it.
+  const hiddenKeySuffix = hidden.tooDear > 0 ? 'MaxPrice' : '';
   // Category and mode ride along so the narrow sheet can edit them as part of
   // its draft; days/margin/demand/maxprice and spend are remembered (`rememberedFilter`).
   const filterValue = {
@@ -1499,9 +1499,7 @@ function HubField({
 
 /**
  * An ISK cap in the filters — Max price per item, Max spend. Blank is no
- * limit. Only a whole, positive figure commits: the URL holds whole ISK, and
- * leaving a half-typed `1.5` (on its way to `1.5b`) uncommitted keeps the
- * field's own text instead of resetting it to a rounded value.
+ * limit. Only a whole, positive figure commits: the URL holds whole ISK.
  */
 function IskCapField({
   label,
@@ -1518,6 +1516,18 @@ function IskCapField({
   const hintId = useId();
   // Inline the field has no caption, so its placeholder names it; in the sheet the caption does.
   const inSheet = useFilterSurface() === 'sheet';
+  // What `IskInput` last committed, unrounded, handed back as its `value`: a
+  // rounded figure (`2.01m` = 2009999.99… → 2010000) would read as an outside
+  // change and reset the typed text. Only a value this field did not send
+  // (Reset, a link) replaces it. The URL lands in a transition, so `value` lags.
+  const [raw, setRaw] = useState<string | null>(null);
+  const [sent, setSent] = useState<number | null>(value);
+  const [seen, setSeen] = useState(value);
+  if (seen !== value) {
+    setSeen(value);
+    if (value !== sent) setRaw(null);
+  }
+  const shown = raw ?? (value === null ? '' : String(value));
   return (
     <FilterField label={label}>
       <IskInput
@@ -1526,14 +1536,19 @@ function IskCapField({
         aria-describedby={hint === undefined ? undefined : hintId}
         placeholder={inSheet ? t('market.hauling.filters.noLimit') : label}
         className="w-40"
-        value={value === null ? '' : String(value)}
+        value={shown}
         onChange={(text) => {
-          if (text === '') {
-            onChange(null);
-            return;
-          }
+          setRaw(text);
           const amount = Number(text);
-          if (Number.isSafeInteger(amount) && amount > 0) onChange(amount);
+          const whole = text === '' ? null : Math.round(amount);
+          // Shorthand's float noise rounds away; a real fraction (`1.5`, on its way to `1.5b`) waits.
+          if (
+            whole === null ||
+            (Math.abs(amount - whole) < 0.001 && Number.isSafeInteger(whole) && whole > 0)
+          ) {
+            setSent(whole);
+            onChange(whole);
+          }
         }}
       />
       {hint !== undefined && (

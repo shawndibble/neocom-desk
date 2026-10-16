@@ -717,7 +717,17 @@ describe('HaulingPanel filters: Max price per item and Max spend', () => {
     const field = screen.getByRole('textbox', { name: 'Max price per item' });
     await user.type(field, '1.5b');
     expect(field).toHaveValue('1.5b');
-    expect(linkParam('maxprice')).toBe('1500000000');
+    expect(linkParam('maxprice')).toBe('1500000000'); // 2.01 × 1e6 is 2009999.99… in floating point: it still commits the whole figure, and the text stays.
+    await user.clear(field);
+    await user.type(field, '2.01m');
+    expect(field).toHaveValue('2.01m');
+    expect(linkParam('maxprice')).toBe('2010000');
+  });
+
+  it('names Max price in the hidden line only when it hid something', () => {
+    mainState = WITH_DEAR;
+    renderPanel('from=jita&to=amarr&maxprice=1000000&margin=100');
+    expect(screen.queryByText(/max price per item/)).toBeNull();
   });
 
   it('a remembered max price applies when the link has none; the link’s own wins', () => {
