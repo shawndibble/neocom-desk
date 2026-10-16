@@ -61,6 +61,8 @@ import {
   type LadderLevel,
   type SaleEstimate,
 } from '@/engine/market/haulingMarket';
+import { knownPackagedVolumeOf, type MarketTypeEntry } from '@/sde/marketTypes';
+import { loadMarketTypesById } from '@/sde/marketTypesById';
 import type { TypeMap } from '@/sde/types';
 
 /** Destination lowest sell must beat origin lowest sell by this factor to be looked at. */
@@ -177,8 +179,25 @@ function throwIfAborted(signal?: AbortSignal): void {
   if (signal?.aborted) throw new DOMException('Hauling scan aborted', 'AbortError');
 }
 
+type MarketCatalogue = ReadonlyMap<number, MarketTypeEntry>;
+
+/**
+ * The market catalogue: packaged volume for every market type (a container's
+ * is a tenth of the assembled one `types.json` carries) and a name for the
+ * market types `types.json` leaves out. Empty when it cannot load.
+ */
+function loadMarketCatalogue(): Promise<MarketCatalogue> {
+  return loadMarketTypesById().catch(() => new Map());
+}
+
 /** m3 of one unit as hauled, or null when it cannot be told: a row with no volume must not become "0 m3", which would never fill a hold. */
-async function resolveVolume(typeId: number, types: TypeMap): Promise<number | null> {
+async function resolveVolume(
+  typeId: number,
+  types: TypeMap,
+  catalogue: MarketCatalogue
+): Promise<number | null> {
+  const packaged = knownPackagedVolumeOf(catalogue.get(typeId));
+  if (packaged !== null && packaged > 0) return packaged;
   const known = types[String(typeId)];
   const fromCatalogue = known ? (known.packagedVolume ?? known.volume) : undefined;
   if (fromCatalogue !== undefined) return fromCatalogue > 0 ? fromCatalogue : null;
@@ -325,6 +344,7 @@ export async function runHaulingScan(request: HaulingScanRequest): Promise<Hauli
   const shortlist = withHistory.slice(0, MAX_BOOK_CANDIDATES);
 
   // 3. Order books, then hauled volume, for the shortlist only.
+  const catalogue: MarketCatalogue = shortlist.length > 0 ? await loadMarketCatalogue() : new Map();
   const rows: HaulingScanRow[] = [];
   let booksDone = 0;
   onProgress?.({ stage: 'books', done: 0, total: shortlist.length });
@@ -336,10 +356,12 @@ export async function runHaulingScan(request: HaulingScanRequest): Promise<Hauli
         stationLadders(candidate.lane.to, candidate.typeId),
       ]);
       const buyLadder = origin.sell;
-      const groupId = types[String(candidate.typeId)]?.groupID ?? null;
+      const known = types[String(candidate.typeId)];
+      // The market catalogue carries no SDE group: a type only it names rides in the general hold.
+      const groupId = known?.groupID ?? null;
       const base = {
         typeId: candidate.typeId,
-        name: types[String(candidate.typeId)]?.name ?? `#${candidate.typeId}`,
+        name: known?.name ?? catalogue.get(candidate.typeId)?.name ?? `#${candidate.typeId}`,
         groupId,
         categoryId: groupId === null ? null : (request.groupCategories?.[String(groupId)] ?? null),
         fromHub: candidate.lane.from,
@@ -351,7 +373,7 @@ export async function runHaulingScan(request: HaulingScanRequest): Promise<Hauli
       if (candidate.demand === null) {
         const unitVolumeM3 =
           buyLadder.length > 0 && dest.buy.length > 0
-            ? await resolveVolume(candidate.typeId, types)
+            ? await resolveVolume(candidate.typeId, types, catalogue)
             : null;
         if (unitVolumeM3 !== null) rows.push({ ...base, mode: 'instant', unitVolumeM3 });
       } else {
@@ -362,7 +384,7 @@ export async function runHaulingScan(request: HaulingScanRequest): Promise<Hauli
         });
         const unitVolumeM3 =
           sale !== null && buyLadder.length > 0
-            ? await resolveVolume(candidate.typeId, types)
+            ? await resolveVolume(candidate.typeId, types, catalogue)
             : null;
         if (sale !== null && unitVolumeM3 !== null) {
           rows.push({ ...base, mode: 'list', unitVolumeM3, demand: candidate.demand, sale });

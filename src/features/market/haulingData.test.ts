@@ -17,6 +17,11 @@ const loadUniverseTypeOnce = vi.fn();
 vi.mock('@/features/skills/data', () => ({
   loadUniverseTypeOnce: (...a: unknown[]) => loadUniverseTypeOnce(...a),
 }));
+const loadMarketTypes = vi.fn();
+vi.mock('@/sde/loadMarketSde', () => ({
+  loadMarketTypes: (...a: unknown[]) => loadMarketTypes(...a),
+}));
+const { clearMarketTypeIndex } = await import('@/sde/marketTypesById');
 
 const {
   clearHaulingScanCache,
@@ -48,6 +53,8 @@ function aggregate(
 beforeEach(() => {
   clearHaulingScanCache();
   vi.clearAllMocks();
+  clearMarketTypeIndex();
+  loadMarketTypes.mockResolvedValue([]);
   getHubPrices.mockImplementation(async (hub: { id: string }) =>
     hub.id === FROM.id ? new Map([[34, aggregate(100, 90)]]) : new Map([[34, aggregate(200, 115)]])
   );
@@ -120,6 +127,74 @@ describe('runHaulingScan, selling into buy orders', () => {
     });
     expect(loadUniverseTypeOnce).toHaveBeenCalledWith(34);
     expect(scan.rows[0]).toMatchObject({ unitVolumeM3: 0.01 });
+  });
+
+  it("hauls a container at the market catalogue's packaged volume, not types.json's assembled one", async () => {
+    loadMarketTypes.mockResolvedValue([
+      {
+        typeId: 34,
+        name: 'Station Container',
+        marketGroupId: 1658,
+        volume: 2_000_000,
+        packagedVolume: 10_000,
+      },
+    ]);
+    const scan = await runHaulingScan({
+      from: FROM,
+      to: TO,
+      typeIds: [34],
+      scope: 4,
+      types: { '34': { name: 'Station Container', volume: 2_000_000, groupID: 448 } } as never,
+      mode: 'instant',
+    });
+    expect(scan.rows[0]).toMatchObject({ unitVolumeM3: 10_000, groupId: 448 });
+  });
+
+  it('names a type types.json lacks from the market catalogue, and takes its volume there', async () => {
+    loadMarketTypes.mockResolvedValue([
+      { typeId: 34, name: 'Microorganisms', marketGroupId: 1333, volume: 0.01 },
+    ]);
+    const scan = await runHaulingScan({
+      from: FROM,
+      to: TO,
+      typeIds: [34],
+      scope: 4,
+      types: {} as never,
+      mode: 'instant',
+    });
+    expect(loadUniverseTypeOnce).not.toHaveBeenCalled();
+    // The market catalogue has no SDE group: the holds it may ride in stay unknown.
+    expect(scan.rows[0]).toMatchObject({
+      name: 'Microorganisms',
+      unitVolumeM3: 0.01,
+      groupId: null,
+    });
+  });
+
+  it('still scans when the market catalogue cannot load', async () => {
+    loadMarketTypes.mockRejectedValue(new Error('offline'));
+    const scan = await runHaulingScan({
+      from: FROM,
+      to: TO,
+      typeIds: [34],
+      scope: 4,
+      types: TYPES,
+      mode: 'instant',
+    });
+    expect(scan.rows[0]).toMatchObject({ name: 'Tritanium', unitVolumeM3: 0.01 });
+  });
+
+  it('loads the market catalogue only once some item reaches the order books', async () => {
+    getHubPrices.mockImplementation(async () => new Map([[34, aggregate(100, 90)]]));
+    await runHaulingScan({
+      from: FROM,
+      to: TO,
+      typeIds: [34],
+      scope: 4,
+      types: TYPES,
+      mode: 'instant',
+    });
+    expect(loadMarketTypes).not.toHaveBeenCalled();
   });
 
   it('drops an item whose volume cannot be told, not the scan', async () => {
