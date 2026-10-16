@@ -529,16 +529,26 @@ function MailView({ scope, scopeControl }: MailViewProps) {
     [owners, ownerById, loadedHeaders]
   );
 
-  const visibleRows = useMemo(
+  // Folder, then search, then Hide read, each kept: when the list comes up
+  // empty, the first stage that emptied it names the way out (issue #3972).
+  const folderRows = useMemo(
+    () => rows.filter((row) => folders.includes(row.tab)),
+    [rows, folders]
+  );
+  const searchRows = useMemo(
     () =>
-      rows.filter((row) => {
-        if (!folders.includes(row.tab)) return false;
-        const isRead = row.header.is_read || locallyReadKeys.has(row.key);
-        if (hideRead && isRead) return false;
+      folderRows.filter((row) => {
         const senderName = row.header.from === undefined ? undefined : names.get(row.header.from);
         return mailSearchMatches(row.header, senderName, debouncedSearch);
       }),
-    [rows, folders, hideRead, locallyReadKeys, names, debouncedSearch]
+    [folderRows, names, debouncedSearch]
+  );
+  const visibleRows = useMemo(
+    () =>
+      hideRead
+        ? searchRows.filter((row) => !(row.header.is_read || locallyReadKeys.has(row.key)))
+        : searchRows,
+    [searchRows, hideRead, locallyReadKeys]
   );
 
   // Rendered-list cap (issue #416): applied after every filter, so it caps
@@ -549,12 +559,19 @@ function MailView({ scope, scopeControl }: MailViewProps) {
     [visibleRows]
   );
 
-  // The list pane's three states, named once here rather than as a pair of
-  // nested ternaries in the middle of the JSX — "empty because nothing matched"
-  // and "empty because no folder is on" want different copy and only one of
-  // them offers a way out.
+  // The list pane's states, named once here rather than as nested ternaries in
+  // the middle of the JSX. Each empty state is named by what would bring rows
+  // back, so its one action always does: an empty folder has none to offer.
   const listState =
-    visibleRows.length > 0 ? 'rows' : folders.length === 0 ? 'no-folders' : 'no-matches';
+    visibleRows.length > 0
+      ? 'rows'
+      : folders.length === 0
+        ? 'no-folders'
+        : folderRows.length === 0
+          ? 'empty-folder'
+          : searchRows.length === 0
+            ? 'no-search-matches'
+            : 'all-read-hidden';
 
   const selectedRow = rows.find((row) => row.key === selectedKey) ?? null;
   const selectedHeader = selectedRow?.header ?? null;
@@ -712,6 +729,14 @@ function MailView({ scope, scopeControl }: MailViewProps) {
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
 
   const composeCharacterId = activeCharacterId;
+  function openNewMail() {
+    setNewMailOpen(true);
+  }
+  function clearSearch() {
+    setSearch('');
+    setDebouncedSearch('');
+    searchInputRef.current?.focus();
+  }
   function closeNewMail(reason: NewMailCloseReason) {
     setNewMailOpen(false);
     if (reason === 'kept') setNotice(t('mail.draftSaved'));
@@ -752,7 +777,7 @@ function MailView({ scope, scopeControl }: MailViewProps) {
         actions={
           <>
             {isDesktop && !newMailOpen && (
-              <Button ref={composeButtonRef} size="md" onClick={() => setNewMailOpen(true)}>
+              <Button ref={composeButtonRef} size="md" onClick={openNewMail}>
                 <Icon.MailCompose size={Icon.ICON_SIZE.sm} /> {t('mail.compose')}
               </Button>
             )}
@@ -892,11 +917,37 @@ function MailView({ scope, scopeControl }: MailViewProps) {
                     </Button>
                   }
                 />
-              ) : listState === 'no-matches' ? (
-                <EmptyState
-                  title={t('mail.noMatchesTitle')}
-                  hint={t('mail.noMatchesHint')}
+              ) : listState === 'empty-folder' ? (
+                // No action: Compose already sits in the header (or floats on
+                // a phone), and no filter here can bring mail back.
+                <CachedEmptyState
+                  result={{ fromCache: offline }}
+                  title={t('mail.emptyFolderCachedTitle', { count: folders.length })}
+                  hint={t('mail.emptyFolderCachedHint')}
+                  fetchedTitle={t('mail.emptyFolderTitle', { count: folders.length })}
                   className="py-6"
+                />
+              ) : listState === 'no-search-matches' ? (
+                <EmptyState
+                  title={t('mail.noSearchMatchesTitle')}
+                  hint={t('mail.noSearchMatchesHint')}
+                  className="py-6"
+                  action={
+                    <Button size="sm" onClick={clearSearch}>
+                      {t('mail.clearSearch')}
+                    </Button>
+                  }
+                />
+              ) : listState === 'all-read-hidden' ? (
+                <EmptyState
+                  title={t('mail.allReadHiddenTitle')}
+                  hint={t('mail.allReadHiddenHint')}
+                  className="py-6"
+                  action={
+                    <Button size="sm" onClick={() => setHideRead(false)}>
+                      {t('mail.showRead')}
+                    </Button>
+                  }
                 />
               ) : (
                 // Flat cap, not viewport-relative: the "load more" button
@@ -1146,11 +1197,22 @@ function MailView({ scope, scopeControl }: MailViewProps) {
             >
               <div ref={bodyRetryRef} tabIndex={-1} className="min-w-0 focus:outline-none">
                 {selectedKey === null ? (
-                  <EmptyState
-                    title={t('mail.selectHint')}
-                    icon={<Icon.Social size={Icon.ICON_SIZE.lg} />}
-                    className="py-6"
-                  />
+                  // Only while the pane is on screen: a phone hides it behind
+                  // the list (and floats its own Compose), and the inline
+                  // composer replaces it on a wide screen.
+                  readerVisible && (
+                    <EmptyState
+                      title={t('mail.readerEmptyTitle')}
+                      hint={t('mail.selectHint')}
+                      icon={<Icon.Social size={Icon.ICON_SIZE.lg} />}
+                      className="py-6"
+                      action={
+                        <Button size="sm" onClick={openNewMail}>
+                          <Icon.MailCompose size={Icon.ICON_SIZE.sm} /> {t('mail.compose')}
+                        </Button>
+                      }
+                    />
+                  )
                 ) : body === undefined ? (
                   <div className="flex justify-center py-4">
                     <Spinner size="sm" label={t('common.loading')} />
@@ -1285,7 +1347,7 @@ function MailView({ scope, scopeControl }: MailViewProps) {
             ref={composeButtonRef}
             variant="primary"
             className="shadow-lg"
-            onClick={() => setNewMailOpen(true)}
+            onClick={openNewMail}
           >
             <Icon.MailCompose size={Icon.ICON_SIZE.sm} /> {t('mail.compose')}
           </Button>
