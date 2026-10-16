@@ -51,7 +51,7 @@ describe('BootUpdateGate', () => {
     expect(screen.getByText('the app')).toBeInTheDocument();
   });
 
-  it.each(['skipped', 'timed-out'] as const)('renders children on %s', async (outcome) => {
+  it.each(['skipped', 'current'] as const)('renders children on %s', async (outcome) => {
     runBootUpdate.mockResolvedValue(outcome);
     renderGate();
     expect(await screen.findByText('the app')).toBeInTheDocument();
