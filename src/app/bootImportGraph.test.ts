@@ -204,3 +204,26 @@ describe('startup import graph', () => {
     expect(bootGraph.parent.has(file) ? chainTo(bootGraph.parent, file) : null).toBeNull();
   });
 });
+
+describe('Share Link import graph', () => {
+  const shared = walkFrom(['/src/routes/SharedLink.tsx']);
+
+  it('reaches a real slice of the page', () => {
+    expect(shared.parent.has('/src/features/share/ShareShell.tsx')).toBe(true);
+  });
+
+  it("loads each share type's screen on demand, not with the route", () => {
+    // A survey link must not download the appraisal, D-scan and fitting
+    // screens (the fitting one drags in the dogma engine and the abyssal
+    // weather picker). Each type crosses a dynamic import().
+    const reached = [
+      '/src/routes/FittingShared.tsx',
+      '/src/features/fittings/AbyssalWeatherPicker.tsx',
+      '/src/features/market/AppraisalShareScreen.tsx',
+      '/src/features/travel/DscanShareScreen.tsx',
+      '/src/features/travel/sharedDscanSeed.ts',
+      '/src/features/survey/SurveyShareScreen.tsx',
+    ].filter((file) => shared.parent.has(file));
+    expect(reached).toEqual([]);
+  });
+});

@@ -1,75 +1,59 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { useRetryFocus } from '@/lib/useRetryFocus';
 import { useMarkPublicRouteRendered } from '@/app/routeFocus';
 import { useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button, CachedNotice, EmptyState, Spinner } from '@/components/ui';
-import { parseAppraisalSnapshot } from '@/engine/market/appraisalSnapshot';
-import {
-  AppraisalShareScreen,
-  type AppraisalShareState,
-} from '@/features/market/AppraisalShareScreen';
-import { appraisalShareViewFromSnapshot } from '@/features/market/appraisalShareData';
-import { sharedAppraisalOpenInApp } from '@/features/market/sharedAppraisalSeed';
+import { guarded } from '@/app/routeChunks';
 import { ShareShell } from '@/features/share/ShareShell';
 import { loadShare, type LoadShareResult, type StoredShare } from '@/features/share/shareStore';
-import { parseFittingSharePayload } from '@/engine/fitting/fittingSharePayload';
-import { FittingShareView } from './FittingShared';
-import { parseDscanSnapshot } from '@/engine/pilotList/dscanSnapshot';
-import { DscanShareScreen, type DscanShareState } from '@/features/travel/DscanShareScreen';
-import { sharedDscanOpenInApp } from '@/features/travel/sharedDscanSeed';
-import { SurveyShareScreen } from '@/features/survey/SurveyShareScreen';
+
+// One chunk per share type, so a link downloads only the screen it opens: a
+// survey link must not carry the appraisal, D-scan and fitting screens (the
+// last one drags in the dogma engine). `src/app/bootImportGraph.test.ts` pins it.
+const AppraisalSharedView = lazy(() =>
+  guarded(() => import('./sharedLink/AppraisalSharedView')).then((m) => ({
+    default: m.AppraisalSharedView,
+  }))
+);
+const DscanSharedView = lazy(() =>
+  guarded(() => import('./sharedLink/DscanSharedView')).then((m) => ({
+    default: m.DscanSharedView,
+  }))
+);
+const FittingSharedView = lazy(() =>
+  guarded(() => import('./sharedLink/FittingSharedView')).then((m) => ({
+    default: m.FittingSharedView,
+  }))
+);
+const SurveyShareScreen = lazy(() =>
+  guarded(() => import('@/features/survey/SurveyShareScreen')).then((m) => ({
+    default: m.SurveyShareScreen,
+  }))
+);
 
 type LoadState = { shareId: string; result: LoadShareResult } | null;
 
-function appraisalState(share: StoredShare): AppraisalShareState {
-  const snapshot = parseAppraisalSnapshot(share.payload);
-  if (snapshot === null) return { status: 'invalid' };
-  const view = appraisalShareViewFromSnapshot(snapshot);
-  return view.ok ? { status: 'ready', view: view.value } : { status: 'invalid' };
-}
-
-function dscanState(share: StoredShare): DscanShareState {
-  const scan = parseDscanSnapshot(share.payload);
-  return scan === null ? { status: 'invalid' } : { status: 'ready', rows: scan.rows };
+function ShareLoading() {
+  const { t } = useTranslation();
+  return (
+    <div className="flex justify-center py-10">
+      <Spinner label={t('common.loading')} />
+    </div>
+  );
 }
 
 /** The page a stored share's `type` names. */
 function SharedScreen({ share, shareId }: { share: StoredShare; shareId: string }) {
   switch (share.type) {
-    case 'appraisal': {
-      const state = appraisalState(share);
-      return (
-        <AppraisalShareScreen
-          state={state}
-          expiresAt={share.expiresAt}
-          openInApp={
-            state.status === 'ready' ? sharedAppraisalOpenInApp(state.view, shareId) : undefined
-          }
-        />
-      );
-    }
-    case 'dscan': {
-      const state = dscanState(share);
-      return (
-        <DscanShareScreen
-          state={state}
-          expiresAt={share.expiresAt}
-          openInApp={state.status === 'ready' ? sharedDscanOpenInApp(shareId) : undefined}
-        />
-      );
-    }
+    case 'appraisal':
+      return <AppraisalSharedView share={share} shareId={shareId} />;
+    case 'dscan':
+      return <DscanSharedView share={share} shareId={shareId} />;
     case 'survey':
       return <SurveyShareScreen shareId={shareId} />;
     case 'fitting':
-      // Signed in, this redirects straight into the editor on the code; a
-      // malformed payload reads as an empty code, and so an invalid link.
-      return (
-        <FittingShareView
-          code={parseFittingSharePayload(share.payload)?.code ?? ''}
-          expiresAt={share.expiresAt}
-        />
-      );
+      return <FittingSharedView share={share} />;
   }
 }
 
@@ -118,7 +102,15 @@ export function SharedLink() {
             className="mx-auto max-w-3xl px-2 pt-2 sm:px-6 sm:pt-4"
           />
         )}
-        <SharedScreen share={result.share} shareId={shareId} />
+        <Suspense
+          fallback={
+            <ShareShell title={t('share.title')}>
+              <ShareLoading />
+            </ShareShell>
+          }
+        >
+          <SharedScreen share={result.share} shareId={shareId} />
+        </Suspense>
       </div>
     );
   }
@@ -126,11 +118,7 @@ export function SharedLink() {
   return (
     <ShareShell title={t('share.title')}>
       <div ref={retryRef} tabIndex={-1} className="focus:outline-none">
-        {result === null && (
-          <div className="flex justify-center py-10">
-            <Spinner label={t('common.loading')} />
-          </div>
-        )}
+        {result === null && <ShareLoading />}
         {result?.ok === false && result.reason === 'not-found' && (
           <EmptyState title={t('share.goneTitle')} hint={t('share.goneHint')} className="py-10" />
         )}
