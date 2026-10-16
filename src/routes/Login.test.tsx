@@ -408,17 +408,11 @@ describe('Login', () => {
   });
 
   it('scrolls a cold load straight to the section its hash names', async () => {
-    const scrollIntoView = vi.fn();
-    Element.prototype.scrollIntoView = scrollIntoView;
-    try {
-      renderLogin('/login#login-faq');
-      const faq = await screen.findByRole('region', { name: /quick answers/i });
-      expect(scrollIntoView).toHaveBeenCalledTimes(1);
-      expect(scrollIntoView.mock.contexts[0]).toBe(faq);
-    } finally {
-      // jsdom has no scrollIntoView of its own.
-      delete (Element.prototype as Partial<Element>).scrollIntoView;
-    }
+    const scrollIntoView = vi.spyOn(Element.prototype, 'scrollIntoView');
+    renderLogin('/login#login-faq');
+    const faq = await screen.findByRole('region', { name: /quick answers/i });
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    expect(scrollIntoView.mock.contexts[0]).toBe(faq);
   });
 
   it('links the permissions note to the privacy policy', async () => {

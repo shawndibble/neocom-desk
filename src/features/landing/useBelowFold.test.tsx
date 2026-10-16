@@ -30,14 +30,9 @@ describe('useBelowFold', () => {
   });
 
   it('waits until the page is ready to render its hero', () => {
-    const commits: boolean[] = [];
-    const { rerender } = render(
-      <MemoryRouter initialEntries={['/login']}>
-        <Probe ready={false} commits={commits} />
-      </MemoryRouter>
-    );
+    const { commits, view } = renderProbe(false);
     expect(commits.every((shown) => !shown)).toBe(true);
-    rerender(
+    view.rerender(
       <MemoryRouter initialEntries={['/login']}>
         <Probe ready commits={commits} />
       </MemoryRouter>
@@ -51,7 +46,7 @@ describe('useBelowFold', () => {
   });
 
   it('defers as usual for a hash that names no landing section', () => {
-    const { commits } = renderProbe(true, '/login#somewhere-else');
-    expect(commits).toEqual([false, true]);
+    expect(renderProbe(true, '/login#somewhere-else').commits).toEqual([false, true]);
+    expect(renderProbe(true, '/login#100%').commits).toEqual([false, true]);
   });
 });

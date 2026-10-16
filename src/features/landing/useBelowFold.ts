@@ -2,9 +2,9 @@ import { startTransition, useEffect, useLayoutEffect, useRef, useState } from 'r
 import { useLocation } from 'react-router-dom';
 import { LANDING_ANCHORS } from './landingAnchors';
 
-/** The landing section a URL `#hash` names, or null when it names none of them. */
+/** The landing section a URL `#hash` names, or null. Compared raw: the ids are plain ASCII, and decoding throws on a stray `%`. */
 function anchorTarget(hash: string): string | null {
-  const id = decodeURIComponent(hash.slice(1));
+  const id = hash.slice(1);
   return LANDING_ANCHORS.some((anchor) => anchor.id === id) ? id : null;
 }
 
