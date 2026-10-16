@@ -10,3 +10,16 @@ export function formatEveDateTime(date: Date): string {
   // month names and the hour cycle per host, and this needs neither.
   return date.toISOString().slice(5, 16).replace('T', ' ');
 }
+
+const EVE_CLOCK = new Intl.DateTimeFormat('en-GB', {
+  weekday: 'short',
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+  timeZone: 'UTC',
+});
+
+/** "Wed 02:00": EVE time is UTC, and a pilot plans a login against it, not their own zone. */
+export function eveClock(ms: number): string {
+  return EVE_CLOCK.format(new Date(ms)).replace(',', '');
+}

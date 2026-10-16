@@ -117,7 +117,13 @@ interface PlanVerdictHeroProps {
   skillGate?: SkillGateVerdict;
   nameForSkill?: (typeID: number) => string;
   nameForCharacter?: (characterId: number) => string;
-  /** Joins the hero's job time to the plan character's open job slots; omitted when the caller has none. */
+  /**
+   * Wall-clock until the whole job tree is done on the plan character's free
+   * slots, sub-jobs in parallel; shown as the plan's time. Null without slot
+   * data, when the plan's own job time stands in.
+   */
+  planSeconds?: number | null;
+  /** The plan's slot schedule line; omitted when the caller has none. */
   slotLine?: ReactNode;
   /**
    * Set while the Reaction Location is highsec, where reactions cannot run
@@ -163,6 +169,7 @@ export function PlanVerdictHero({
   skillGate,
   nameForSkill,
   nameForCharacter,
+  planSeconds = null,
   slotLine,
   locationBlock,
 }: PlanVerdictHeroProps) {
@@ -176,11 +183,11 @@ export function PlanVerdictHero({
           t('industry.heroMargin', { value: formatPercent(result.marginPct) }),
         result.iskPerHour !== null &&
           t('industry.heroIskPerHour', { value: formatIsk(result.iskPerHour) }),
-        formatDuration(result.seconds),
+        formatDuration(planSeconds ?? result.seconds),
         result.breakEvenPrice !== null &&
           t('industry.heroBreakEven', { value: formatIsk(result.breakEvenPrice) }),
       ].filter((part): part is string => typeof part === 'string')
-    : [formatDuration(result.seconds)];
+    : [formatDuration(planSeconds ?? result.seconds)];
 
   const hasItemActions = itemActionsFor !== undefined && productTypeID != null;
 

@@ -141,8 +141,8 @@ import { ResultsSummary } from './ResultsSummary';
 import { BpcCoverageWarning, PlanVerdictHero } from './PlanVerdictHero';
 import { useNearestLowsecSystem } from './useNearestLowsecSystem';
 import { planReactionLocation } from './planReactionLocation';
-import { PlanSlotLine } from './PlanSlotLine';
-import { categoryForActivity } from './planJobSlots';
+import { PlanScheduleLine } from './PlanScheduleLine';
+import { planJobNodes, usePlanSchedule } from './planJobSlots';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import { ProductionRunsPanel } from './ProductionRunsPanel';
 import { BuildSystemInput } from './BuildSystemInput';
@@ -978,11 +978,26 @@ export function BuildPlanDetail({
 
   const anySubBuilds = useMemo(() => (result ? hasSubBuilds(result.materials) : false), [result]);
 
-  /** Wall-clock every sub-job in the tree adds before the main run can even be installed. */
+  /** Job time of every sub-job in the tree, summed (not wall-clock: they run side by side). */
   const subBuildTimeSeconds = useMemo(
     () => (result ? computeSubBuildSeconds(result.materials) : 0),
     [result]
   );
+
+  // The whole tree scheduled on the plan character's free slots: the plan's
+  // wall-clock time and done-by. Null without slot data, when the hero falls
+  // back to the plan's own job time.
+  const jobNodes = useMemo(
+    () =>
+      result
+        ? planJobNodes({ activity, seconds: result.seconds, materials: result.materials }, catalog)
+        : [],
+    [result, activity, catalog]
+  );
+  const planSchedule = usePlanSchedule(plan.characterId, jobNodes);
+  const planSeconds = planSchedule
+    ? (planSchedule.schedule.finishMs - planSchedule.nowMs) / 1000
+    : null;
 
   /**
    * Make-or-buy verdict per material (GLOSSARY.md round 29), computed once for
@@ -1334,6 +1349,7 @@ export function BuildPlanDetail({
     productUnitPrice:
       entry.productTypeID !== null ? (snapshot?.hubPrices[entry.productTypeID] ?? null) : null,
     standing,
+    planSeconds,
   };
 
   // Read-only summary of the setup: plain label-over-value pairs, not chips —
@@ -1423,12 +1439,9 @@ export function BuildPlanDetail({
           skillGate={topLevelSkillGate}
           nameForSkill={(typeID) => nameForType(catalog, typeID)}
           nameForCharacter={(characterId) => characterNames.get(characterId) ?? t('common.unknown')}
+          planSeconds={planSeconds}
           slotLine={
-            <PlanSlotLine
-              characterId={plan.characterId}
-              category={categoryForActivity(activity)}
-              seconds={result.seconds}
-            />
+            planSchedule && <PlanScheduleLine plan={planSchedule} hasSubJobs={anySubBuilds} />
           }
         />
       )}
