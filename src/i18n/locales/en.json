@@ -1675,7 +1675,7 @@
     "affectedBy": {
       "title": "Affected by",
       "loading": "Working out what affects it…",
-      "none": "Nothing changes this module's attributes.",
+      "none": "Nothing is changing this module's numbers right now.",
       "failed": "Couldn't work out what affects this module.",
       "change": "{{base}} → {{value}}",
       "penalty": "stacking penalty {{pct}}%",
