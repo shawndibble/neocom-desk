@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { MutaplasmidData } from '@/sde/types';
 import type { Fitting } from './types';
 import {
+  hasMutations,
   mutaplasmidLookup,
   mutationFromDynamicItem,
   mutationStatus,
@@ -252,6 +253,32 @@ describe('withoutMutation', () => {
       state: 'active',
     });
     expect(withoutMutation(module, HEAVY_ABYSSAL_NEUT)).toBe(module);
+  });
+});
+
+describe('hasMutations', () => {
+  const fit = (mutation?: Fitting['drones'][number]['mutation']): Fitting => ({
+    name: 'x',
+    shipTypeId: 1,
+    modules: [],
+    drones: [
+      {
+        typeId: LIGHT_MUTATED_DRONE,
+        quantity: 1,
+        state: 'online',
+        ...(mutation ? { mutation } : {}),
+      },
+    ],
+    cargo: [],
+  });
+
+  it('is true for a mutated drone or module, false otherwise', () => {
+    expect(
+      hasMutations(
+        fit({ baseTypeId: HOBGOBLIN_I, mutaplasmidTypeId: EXIGENT_LIGHT_FIREPOWER, attributes: {} })
+      )
+    ).toBe(true);
+    expect(hasMutations(fit())).toBe(false);
   });
 });
 
