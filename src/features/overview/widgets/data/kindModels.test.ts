@@ -1138,8 +1138,11 @@ describe('omega coverage', () => {
       { characterId: 91, date: iso(NOW - DAY), amount: -3 * B, refKey: 'plex_bought' },
       { characterId: 92, date: iso(NOW - DAY), amount: 9 * B },
     ],
-    historyStart: { 91: NOW - 40 * DAY, 92: NOW - 40 * DAY },
-    journalFetchedAt: new Date(NOW - HOUR),
+    coverage: {
+      91: { since: NOW - 40 * DAY, gaps: [] },
+      92: { since: NOW - 40 * DAY, gaps: [] },
+    },
+    journalFetchedAt: { 91: NOW - HOUR, 92: NOW - HOUR },
     plex: { price: 2_000_000, fetchedAt: NOW - 2 * HOUR },
     truncated: false,
     skippedCount: 0,
@@ -1189,11 +1192,43 @@ describe('omega coverage', () => {
   });
 
   it('is empty with no journal lines, and needs permission for a Character it did not load', () => {
-    expect(stateOf(build(data({ rows: [], historyStart: {} })))).toBe('empty');
+    expect(stateOf(build(data({ rows: [], coverage: {} })))).toBe('empty');
     expect(stateOf(build(data({ loadedIds: [92] })))).toBe('needsPermission');
   });
 
-  it('dates the view by the older of the journal and the PLEX price', () => {
+  it('dates the view by the older of the PLEX price and the in-scope journals', () => {
     expect(build(data()).fetchedAt?.getTime()).toBe(NOW - 2 * HOUR);
+    const old = data({ journalFetchedAt: { 91: NOW - HOUR, 92: NOW - 9 * HOUR } });
+    expect(build(old).fetchedAt?.getTime()).toBe(NOW - 2 * HOUR);
+    expect(build(old, { scopeAll: true }).fetchedAt?.getTime()).toBe(NOW - 9 * HOUR);
+  });
+
+  it('shows both ages in the number, chart and table views', () => {
+    const view = build(data());
+    const ages = 'overview.widgets.chart.omega.ages';
+    expect(view.number.notes?.join(' ')).toContain(ages);
+    expect(view.chart?.note).toContain(ages);
+    expect(view.table?.footer).toContain(ages);
+    expect(view.number.notes?.join(' ')).toContain('data.omega.plexSpent');
+  });
+
+  it('a gap in the newest period marks it partial', () => {
+    const gap: [number, number] = [NOW - 10 * DAY, NOW - 5 * DAY];
+    const view = build(data({ coverage: { 91: { since: NOW - 40 * DAY, gaps: [gap] } } }));
+    if (view.chart?.kind !== 'omega') throw new Error('omega');
+    expect(view.chart.bars.map((b) => b.partial)).toEqual([true, true]);
+  });
+
+  it('states the shortfall when net is zero or negative', () => {
+    const view = build(data({ rows: [{ characterId: 91, date: iso(NOW - DAY), amount: -1 * B }] }));
+    expect(view.number.value).toContain('coversNone');
+    expect(view.number.unit).toContain('data.omega.shortBy{"amount":"2B"}');
+  });
+
+  it('steps the reference lines when there are many accounts', () => {
+    const view = build(data({ rows: [{ characterId: 91, date: iso(NOW - DAY), amount: 40 * B }] }));
+    if (view.chart?.kind !== 'omega') throw new Error('omega');
+    expect(view.chart.lines.length).toBeLessThanOrEqual(6);
+    expect(view.chart.lines[0]!.value).toBe(7 * B);
   });
 });

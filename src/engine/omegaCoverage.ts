@@ -4,8 +4,8 @@
  *
  * Net income is the journal net with lines between the pilot's own Characters
  * (`internal`) and PLEX bought or sold left out, so paying for PLEX never
- * counts against the ISK that pays for it. Periods are rolling 30 UTC (EVE)
- * days, whole days, the newest holding today.
+ * counts against the ISK that pays for it. Periods are rolling 30-day windows
+ * ending now, so the newest is a true last-30-days figure.
  */
 import { PLEX_BOUGHT_KEY, PLEX_SOLD_KEY } from './journalNetting';
 
@@ -15,8 +15,10 @@ export const OMEGA_PERIOD_DAYS = 30;
 export const DEFAULT_PLEX_PER_30_DAYS = 500;
 /** Periods drawn at most: a year of history. */
 export const MAX_PERIODS = 12;
-/** Reference lines drawn at most. */
-export const MAX_LEVELS = 12;
+/** Safety cap on levels worked out (the drawn lines are stepped, see `drawnLevels`). */
+export const MAX_LEVELS = 1000;
+/** More reference lines than this bunch up, so they are stepped. */
+export const MAX_DRAWN_LINES = 6;
 
 /** The slice of a classified journal line this reads. */
 export interface IncomeRow {
@@ -33,7 +35,7 @@ export interface OmegaPeriod {
   net: number;
   /** ISK paid for PLEX bought in the period, as a positive figure. */
   plexSpent: number;
-  /** History began inside this period, so the figure may be short. */
+  /** Local history began inside this period or has a gap in it, so the figure may be short. */
   partial: boolean;
 }
 
@@ -59,33 +61,51 @@ export function referenceLevels(nets: readonly number[], cost: number): number[]
   return Array.from({ length: top }, (_, i) => i + 1);
 }
 
+/** Every level when few; else every k-th (k = ceil(n / 6)), so lines stay apart. */
+export function drawnLevels(levels: readonly number[]): number[] {
+  const step = Math.ceil(levels.length / MAX_DRAWN_LINES);
+  return step <= 1 ? [...levels] : levels.filter((_, i) => (i + 1) % step === 0);
+}
+
+/** What one Character's local journal truly covers (`loadWalletArchiveInfo`). */
+export interface HistoryCoverage {
+  /** Start of the earliest covered window (ms). */
+  since: number;
+  /** Uncovered stretches [from, to) (ms). */
+  gaps: ReadonlyArray<readonly [number, number]>;
+}
+
 /**
- * Oldest first. `historyStartMs` is the oldest journal line held (null: none),
- * so periods wholly before it are not made and the one it falls in is partial.
+ * Oldest first, rolling 30-day windows ending at `now`. A period is partial
+ * when it starts before any Character's `since` or overlaps any one's gap.
+ * No coverage, no periods.
  */
 export function omegaPeriods(
   rows: readonly IncomeRow[],
   now: number,
-  historyStartMs: number | null
+  coverage: readonly HistoryCoverage[]
 ): OmegaPeriod[] {
-  if (historyStartMs === null) return [];
+  const sinces = coverage.map((c) => c.since).filter(Number.isFinite);
+  if (sinces.length === 0) return [];
+  const gaps = coverage
+    .flatMap((c) => c.gaps)
+    .filter(([from, to]) => Number.isFinite(from) && Number.isFinite(to));
   const span = OMEGA_PERIOD_DAYS * DAY_MS;
-  const end = (Math.floor(now / DAY_MS) + 1) * DAY_MS;
-  const count = Math.min(
-    MAX_PERIODS,
-    Math.max(1, Math.ceil((end - Math.min(historyStartMs, now)) / span))
-  );
+  const oldest = Math.min(...sinces);
+  const count = Math.min(MAX_PERIODS, Math.max(1, Math.ceil((now - oldest) / span)));
+  const youngest = Math.max(...sinces);
   const periods: OmegaPeriod[] = Array.from({ length: count }, (_, i) => {
-    const endMs = end - (count - 1 - i) * span;
+    const endMs = now - (count - 1 - i) * span;
     const startMs = endMs - span;
-    return { startMs, endMs, net: 0, plexSpent: 0, partial: historyStartMs > startMs };
+    const partial = youngest > startMs || gaps.some(([from, to]) => from < endMs && to > startMs);
+    return { startMs, endMs, net: 0, plexSpent: 0, partial };
   });
   const first = periods[0]!.startMs;
   for (const row of rows) {
     const at = Date.parse(row.date);
-    if (!(at >= first) || at >= end || at > now) continue;
+    if (!(at >= first) || at > now) continue;
     const amount = row.amount ?? 0;
-    const period = periods[Math.floor((at - first) / span)]!;
+    const period = periods[Math.min(count - 1, Math.floor((at - first) / span))]!;
     if (row.refKey === PLEX_BOUGHT_KEY) period.plexSpent += Math.max(0, -amount);
     if (row.internal || row.refKey === PLEX_BOUGHT_KEY || row.refKey === PLEX_SOLD_KEY) continue;
     period.net += amount;

@@ -19,11 +19,14 @@ import {
   type TooltipContentProps,
 } from 'recharts';
 import { ChartTooltipShell } from '@/components/ui/ChartTooltipShell';
+import { ChartTipBody } from './ChartTipBody';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { scalePx } from '@/lib/fontScale';
 import type { OmegaChartModel } from './types';
 
 const Y_AXIS_WIDTH = 40;
+/** Width of a line label such as "5 accounts". */
+const LABEL_ROOM = 56;
 const MARGIN = { top: 6, right: 8, bottom: 0, left: 0 };
 /** A partial period's bar, lighter: the "partial" word in its tick and tooltip carries the meaning. */
 const PARTIAL_OPACITY = 0.45;
@@ -35,26 +38,8 @@ function BarTooltip({ active, payload }: TooltipContentProps) {
   if (!active || !bar || bar.tip.title === '') return null;
   return (
     <ChartTooltipShell>
-      <div className="min-w-40 space-y-1 text-xs">
-        <div className="font-semibold text-text">{bar.tip.title}</div>
-        <div className="space-y-0.5 border-t border-line pt-1">
-          {bar.tip.rows.map((row) => (
-            <div key={row.label} className="flex justify-between gap-4">
-              <span>{row.label}</span>
-              <span
-                className={
-                  row.tone === 'good'
-                    ? 'text-isk-pos'
-                    : row.tone === 'bad'
-                      ? 'text-isk-neg'
-                      : 'text-text'
-                }
-              >
-                {row.value}
-              </span>
-            </div>
-          ))}
-        </div>
+      <div className="min-w-40 text-xs">
+        <ChartTipBody tip={bar.tip} />
       </div>
     </ChartTooltipShell>
   );
@@ -70,6 +55,8 @@ export function OmegaCoverageChart({ model, height }: { model: OmegaChartModel; 
           <CartesianGrid stroke="var(--color-line)" vertical={false} />
           <XAxis
             dataKey="label"
+            // Room at the left for the lines' labels, so the first bar never sits under one.
+            padding={{ left: scalePx(LABEL_ROOM), right: 0 }}
             interval="preserveStartEnd"
             tickLine={false}
             stroke="var(--color-line-bright)"

@@ -3,8 +3,9 @@
  * status derivation, the empty `KindView` every builder fills in, and the
  * placeholder figure for "cannot answer".
  */
+import { formatAge } from '@/lib/age';
 import type { WidgetStateInput } from '../state';
-import type { BuildContext, FeedState, Feeds, KindView, NumberModel } from './types';
+import type { BuildContext, FeedState, Feeds, KindView, NumberModel, Translate } from './types';
 
 /** The Stock page, where the market-stock rows and their per-market summary lead. */
 export const STOCK_PATH = '/market/stock';
@@ -47,6 +48,11 @@ export function blank(to: string | null, status: WidgetStateInput): KindView {
     to,
     emptyMessage: undefined,
   };
+}
+
+/** "3 h ago", or the unknown dash when never read. */
+export function ageText(t: Translate, nowMs: number, atMs: number | null): string {
+  return atMs === null ? UNKNOWN : formatAge(Math.max(0, nowMs - atMs), t);
 }
 
 export const count = (n: number): string => String(n);

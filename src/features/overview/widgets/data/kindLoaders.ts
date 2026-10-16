@@ -12,6 +12,8 @@
 import { db } from '@/db';
 import { ESI_REGISTRY, requiredScopesForEndpoints } from '@/esi/registry';
 import { layerValues, type LayerValues } from '@/engine/netWorth/series';
+import type { HistoryCoverage } from '@/engine/omegaCoverage';
+import type { PlexQuote } from '@/features/market/plexPrice';
 import type { SurveySummary } from '@/engine/survey/series';
 import type { RouteKillSystem } from '@/engine/route/routeKillTrend';
 import type { NetWorthSnapshotRow } from '@/engine/netWorth/snapshot';
@@ -624,12 +626,12 @@ export interface OmegaRow {
 export interface OmegaWidgetData {
   /** Every loaded Character's lines, classified against all wallet-scoped Characters. */
   rows: OmegaRow[];
-  /** Per loaded Character: the oldest journal line held (ms); absent for an empty journal. */
-  historyStart: Record<number, number>;
-  /** The older of the loaded journals' reads. */
-  journalFetchedAt: Date | null;
+  /** Per loaded Character: what its local journal truly covers; absent when nothing is held. */
+  coverage: Record<number, HistoryCoverage>;
+  /** Per loaded Character: when its journal was read (ms). */
+  journalFetchedAt: Record<number, number>;
   /** The lowest PLEX sell price and when its book was read; null when it could not be read. */
-  plex: { price: number; fetchedAt: number } | null;
+  plex: PlexQuote | null;
   /** Some journal pages were missing for a loaded Character. */
   truncated: boolean;
   /** Wallet-scoped Characters whose journal did not load. */
@@ -642,18 +644,25 @@ export interface OmegaWidgetData {
  * PLEX price. Classified here against all of them, so a donation from your own
  * alt is internal even when the widget later narrows to one Character. The
  * journal read is heavy and the book is a market read, so both stay behind
- * `import()`. A missing PLEX price is `plex: null`, not an error.
+ * `import()`. A missing PLEX price is `plex: null`, not an error. Coverage is the
+ * archive's truthful reach and gaps (#3909), not just the oldest line held.
  */
 export async function loadOmegaWidget(): Promise<OmegaWidgetData> {
-  const [{ loadAllCharactersJournals, loadWalletScopedCharacterIds }, plexModule, netting, links] =
-    await Promise.all([
-      import('@/features/character/walletJournalAll'),
-      import('@/features/market/plexPrice'),
-      import('@/engine/journalNetting'),
-      import('@/features/character/journalTransactionLink'),
-    ]);
+  const [
+    { loadAllCharactersJournals, loadWalletScopedCharacterIds },
+    plexModule,
+    netting,
+    links,
+    archive,
+  ] = await Promise.all([
+    import('@/features/character/walletJournalAll'),
+    import('@/features/market/plexPrice'),
+    import('@/engine/journalNetting'),
+    import('@/features/character/journalTransactionLink'),
+    import('@/features/character/walletArchive'),
+  ]);
   const [snapshot, scopedIds, plex] = await Promise.all([
-    loadAllCharactersJournals(),
+    loadAllCharactersJournals(undefined, { typeNames: false }),
     loadWalletScopedCharacterIds(),
     plexModule.loadPlexQuote().catch(() => null),
   ]);
@@ -677,17 +686,28 @@ export async function loadOmegaWidget(): Promise<OmegaWidgetData> {
     internal: row.internal,
     refKey: row.refKey,
   }));
-  const historyStart: Record<number, number> = {};
+  const oldest: Record<number, number> = {};
   for (const row of rows) {
     const at = Date.parse(row.date);
-    const known = historyStart[row.characterId];
-    if (known === undefined || at < known) historyStart[row.characterId] = at;
+    if (!Number.isFinite(at)) continue;
+    const known = oldest[row.characterId];
+    if (known === undefined || at < known) oldest[row.characterId] = at;
   }
-  const fetched = snapshot.loaded.map((c) => c.fetchedAt.getTime());
+  const coverage: Record<number, HistoryCoverage> = {};
+  await Promise.all(
+    snapshot.loaded.map(async ({ characterId }) => {
+      const info = await archive.loadWalletArchiveInfo(characterId).catch(() => null);
+      // Lines held with no recorded window (older archive): the oldest line is all we know.
+      const since = info?.since ?? oldest[characterId];
+      if (since !== undefined) coverage[characterId] = { since, gaps: info?.gaps ?? [] };
+    })
+  );
   return {
     rows,
-    historyStart,
-    journalFetchedAt: fetched.length === 0 ? null : new Date(Math.min(...fetched)),
+    coverage,
+    journalFetchedAt: Object.fromEntries(
+      snapshot.loaded.map((c) => [c.characterId, c.fetchedAt.getTime()])
+    ),
     plex,
     truncated: snapshot.loaded.some((c) => c.truncated),
     skippedCount: snapshot.skipped.length,

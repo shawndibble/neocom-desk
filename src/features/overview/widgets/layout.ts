@@ -22,6 +22,9 @@ export const DEFAULT_RANGE: WidgetRange = 30;
 /** The most PLEX per 30 days a plan can be set to. */
 export const MAX_PLEX_PLAN = 5000;
 
+/** Kinds a new widget opens reading every Character; each must sum across them (`SUMS_ACROSS`). */
+const OPENS_ON_ALL: ReadonlySet<string> = new Set(['omega']);
+
 /** Soft limit on how many widgets one Overview holds. */
 export const MAX_WIDGETS = 30;
 
@@ -77,7 +80,7 @@ export function newWidget(kind: WidgetKindId, id: string): Widget | null {
     kind,
     size: def.defaultSize,
     view: def.defaultView,
-    scope: def.defaultScope,
+    scope: OPENS_ON_ALL.has(kind) ? 'all' : 'header',
     showOnPhone: true,
   };
   if (def.hasRange) widget.range = DEFAULT_RANGE;

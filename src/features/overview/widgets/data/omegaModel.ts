@@ -11,15 +11,15 @@ import {
   accountCost,
   accountsCovered,
   DEFAULT_PLEX_PER_30_DAYS,
+  drawnLevels,
   nextAccountGap,
   omegaPeriods,
   referenceLevels,
   type OmegaPeriod,
 } from '@/engine/omegaCoverage';
-import { formatAge } from '@/lib/age';
 import { formatIskCompact } from '@/lib/isk';
 import type { ChartModel } from '../charts/types';
-import { blank, statusOf, UNKNOWN, type Builder } from './builderKit';
+import { ageText, blank, statusOf, UNKNOWN, type Builder } from './builderKit';
 import { dayTitle } from './chartTips';
 import type { KindView, TableRowModel, Translate } from './types';
 
@@ -28,19 +28,21 @@ const C = 'overview.widgets.chart.omega';
 const W = 'overview.widgets.omega';
 /** The Wallet page, where the journal behind the figure lives. */
 const OMEGA_PATH = '/wallet';
-const DAY_MS = 86_400_000;
 
 const isoDay = (ms: number) => new Date(ms).toISOString().slice(0, 10);
-/** The last whole day a period holds. */
-const lastDay = (p: OmegaPeriod) => isoDay(p.endMs - DAY_MS);
+/** The day a period's last moment falls on. */
+const lastDay = (p: OmegaPeriod) => isoDay(p.endMs - 1);
 
-function periodTitle(p: OmegaPeriod): string {
-  return `${dayTitle(isoDay(p.startMs))} – ${dayTitle(lastDay(p))}`;
+function periodTitle(t: Translate, p: OmegaPeriod): string {
+  return t(`${W}.period`, { from: dayTitle(isoDay(p.startMs)), to: dayTitle(lastDay(p)) });
 }
 
-function ageLine(t: Translate, now: number, journalAt: Date | null, plexAt: number | null) {
-  const age = (at: number | null) => (at === null ? UNKNOWN : formatAge(Math.max(0, now - at), t));
-  return t(`${C}.ages`, { plex: age(plexAt), journal: age(journalAt?.getTime() ?? null) });
+/** Both reads' ages, in every view: the price and the oldest journal in scope. */
+function ageLine(t: Translate, now: number, journalAt: number | null, plexAt: number | null) {
+  const journal = ageText(t, now, journalAt);
+  return plexAt === null
+    ? t(`${C}.agesNoPlex`, { journal })
+    : t(`${C}.ages`, { plex: ageText(t, now, plexAt), journal });
 }
 
 export const omega: Builder = (
@@ -57,11 +59,16 @@ export const omega: Builder = (
     : data.loadedIds.includes(activeCharacterId);
   const ids = everyone ? data.loadedIds : [activeCharacterId];
   const rows = everyone ? data.rows : data.rows.filter((r) => r.characterId === activeCharacterId);
-  const starts = ids.flatMap((id) => data.historyStart[id] ?? []);
-  const periods = omegaPeriods(rows, now, starts.length === 0 ? null : Math.min(...starts));
+  const periods = omegaPeriods(
+    rows,
+    now,
+    ids.flatMap((id) => data.coverage[id] ?? [])
+  );
   const latest = periods[periods.length - 1];
 
-  const ages = [data.journalFetchedAt?.getTime(), data.plex?.fetchedAt].flatMap((at) => at ?? []);
+  const journalReads = ids.flatMap((id) => data.journalFetchedAt[id] ?? []);
+  const journalAt = journalReads.length === 0 ? null : Math.min(...journalReads);
+  const ages = [journalAt, data.plex?.fetchedAt].flatMap((at) => at ?? []);
   const base: KindView = {
     ...blank(
       OMEGA_PATH,
@@ -74,12 +81,18 @@ export const omega: Builder = (
   const net = latest.net;
   const cost = accountCost(data.plex?.price ?? null, plexPer30Days);
   const spent = t(`${D}.plexSpent`, { amount: formatIskCompact(latest.plexSpent) });
-  const notes = [
-    cost === null ? '' : t(`${C}.note`),
-    periods[0]!.partial ? t(`${C}.partial`) : '',
-    ageLine(t, now, data.journalFetchedAt, data.plex?.fetchedAt ?? null),
+  const agesText = ageLine(t, now, journalAt, data.plex?.fetchedAt ?? null);
+  const caveats = [
+    periods.some((p) => p.partial) ? t(`${C}.partial`) : '',
     data.truncated ? t(`${C}.truncated`) : '',
     everyone && data.skippedCount > 0 ? t(`${C}.skipped`, { count: data.skippedCount }) : '',
+  ].filter(Boolean);
+  // The Number view's plain lines; the chart carries the same in its note.
+  const numberNotes = [
+    spent,
+    latest.partial ? t(`${C}.partialLatest`) : '',
+    agesText,
+    data.truncated ? t(`${C}.truncated`) : '',
   ].filter(Boolean);
 
   if (cost === null) {
@@ -90,29 +103,38 @@ export const omega: Builder = (
         value: t(`${D}.noPrice`),
         unit: t(`${D}.netOnly`, { net: formatIskCompact(net) }),
         secondary: { text: t(`${D}.noPriceHint`) },
+        notes: numberNotes,
         tone: 'clear',
       },
       summary,
-      table: { columns: tableColumns(t), rows: periodRows(t, periods, null), footer: spent },
+      table: {
+        columns: tableColumns(t),
+        rows: periodRows(t, periods, null),
+        footer: t(`${D}.footerNoPrice`, { spent, ages: agesText }),
+      },
     };
   }
 
   const covered = accountsCovered(net, cost);
   const gap = nextAccountGap(net, cost);
-  const levels = referenceLevels(
-    periods.map((p) => p.net),
-    cost
+  const levels = drawnLevels(
+    referenceLevels(
+      periods.map((p) => p.net),
+      cost
+    )
   );
   const summary = t(`${C}.summary`, {
     count: covered,
     net: formatIskCompact(net),
     cost: formatIskCompact(cost),
-    periods: periods.map((p) => `${lastDay(p)} ${formatIskCompact(p.net)}`).join(', '),
+    periods: periods
+      .map((p) => t(`${C}.summaryPeriod`, { date: lastDay(p), net: formatIskCompact(p.net) }))
+      .join(', '),
   });
   const chart: ChartModel = {
     kind: 'omega',
     summary,
-    note: notes.join(' '),
+    note: [t(`${C}.note`), ...caveats, agesText].join(' '),
     bars: periods.map((p) => {
       const n = accountsCovered(p.net, cost);
       return {
@@ -121,7 +143,7 @@ export const omega: Builder = (
         net: p.net,
         partial: p.partial,
         tip: {
-          title: periodTitle(p),
+          title: periodTitle(t, p),
           rows: [
             {
               label: t(`${C}.tip.net`),
@@ -146,14 +168,31 @@ export const omega: Builder = (
     ...base,
     number: {
       value: t(covered === 0 ? `${D}.coversNone` : `${D}.covers`, { count: covered }),
-      unit: t(`${D}.figures`, { net: formatIskCompact(net), cost: formatIskCompact(cost) }),
-      secondary: { text: t(`${D}.next`, { amount: formatIskCompact(gap) }) },
+      ...(net > 0
+        ? {
+            unit: t(`${D}.figures`, { net: formatIskCompact(net), cost: formatIskCompact(cost) }),
+            secondary: { text: t(`${D}.next`, { amount: formatIskCompact(gap) }) },
+          }
+        : {
+            unit: t(`${D}.shortBy`, { amount: formatIskCompact(gap) }),
+            secondary: {
+              text: t(`${D}.figures`, { net: formatIskCompact(net), cost: formatIskCompact(cost) }),
+            },
+          }),
+      notes: numberNotes,
       tone: 'clear',
     },
     table: {
       columns: tableColumns(t),
       rows: periodRows(t, periods, cost),
-      footer: `${spent} ${t(`${D}.plexPrice`, { price: formatIskCompact(data.plex!.price), plex: plexPer30Days })}`,
+      footer: t(`${D}.footer`, {
+        spent,
+        price: t(`${D}.plexPrice`, {
+          price: formatIskCompact(data.plex!.price),
+          plex: plexPer30Days,
+        }),
+        ages: agesText,
+      }),
     },
     summary,
     chart,
@@ -173,7 +212,7 @@ function periodRows(t: Translate, periods: OmegaPeriod[], cost: number | null): 
   return [...periods].reverse().map((p) => ({
     key: String(p.startMs),
     cells: [
-      p.partial ? t(`${W}.periodPartial`, { title: periodTitle(p) }) : periodTitle(p),
+      p.partial ? t(`${W}.periodPartial`, { title: periodTitle(t, p) }) : periodTitle(t, p),
       { text: formatIskCompact(p.net), iskAmount: p.net },
       cost === null ? UNKNOWN : String(accountsCovered(p.net, cost)),
     ],

@@ -70,6 +70,8 @@ export interface NumberModel {
   unit?: string;
   /** At most one structured line under the figure. */
   secondary?: NumberSecondary;
+  /** Plain dim lines under the secondary: the Number view only (the chart and table carry the same in their own notes). */
+  notes?: string[];
   /** The severity ladder's tone; `clear` draws plain. */
   tone: DeadlineSeverity;
 }

@@ -4176,8 +4176,11 @@
         },
         "omega": {
           "note": "Net income per 30 days. Lines mark what 1, 2... accounts cost.",
-          "partial": "The oldest period is partial: your journal history starts inside it.",
-          "ages": "PLEX price {{plex}} old, journal {{journal}} old.",
+          "partial": "Lighter bars are partial: your journal history starts inside them or has a gap there.",
+          "partialLatest": "Partial: your journal history has a gap in the last 30 days, so this may be short.",
+          "ages": "PLEX price read {{plex}}, journal read {{journal}}.",
+          "agesNoPlex": "PLEX price unavailable, journal read {{journal}}.",
+          "summaryPeriod": "to {{date}} {{net}}",
           "truncated": "Some journal pages were missing.",
           "skipped_one": "{{count}} Character's journal could not be read.",
           "skipped_other": "{{count}} Characters' journals could not be read.",
@@ -4275,13 +4278,16 @@
           "covers_one": "Covers {{count}} account",
           "covers_other": "Covers {{count}} accounts",
           "coversNone": "Doesn't cover one account",
+          "shortBy": "short by {{amount}} ISK / 30 days",
           "figures": "net {{net}} ISK / 30 days · one account {{cost}} ISK",
           "next": "Next account needs +{{amount}} ISK / 30 days",
           "noPrice": "No PLEX price",
           "netOnly": "net {{net}} ISK / 30 days",
           "noPriceHint": "Can't count accounts without PLEX's price. Try Refresh.",
-          "plexSpent": "Spent on PLEX: {{amount}} ISK.",
-          "plexPrice": "PLEX {{price}} ISK each, {{plex}} PLEX per account."
+          "plexSpent": "Spent on PLEX in the last 30 days: {{amount}} ISK.",
+          "plexPrice": "PLEX {{price}} ISK each, {{plex}} PLEX per account.",
+          "footer": "{{spent}} {{price}} {{ages}}",
+          "footerNoPrice": "{{spent}} {{ages}}"
         }
       },
       "training": {
@@ -4720,6 +4726,7 @@
         "title": "Omega coverage",
         "description": "How many Omega accounts your net income could keep going",
         "empty": "No wallet journal yet to work out your net income",
+        "period": "{{from}} – {{to}}",
         "periodPartial": "{{title}} (partial)",
         "col": {
           "period": "30 days",

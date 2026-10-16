@@ -126,6 +126,11 @@ function NumberBody({ model, dimmed = false }: { model: NumberModel; dimmed?: bo
         )}
       </div>
       {model.secondary && <SecondaryLine secondary={model.secondary} />}
+      {model.notes?.map((note) => (
+        <p key={note} className="text-xs text-text-dim">
+          {note}
+        </p>
+      ))}
     </div>
   );
 }
@@ -145,7 +150,7 @@ function TableViewBody({
   return (
     <div>
       {/* The headline stays on screen in every view; its secondary line is the table's job here. */}
-      <NumberBody model={{ ...view.number, secondary: undefined }} />
+      <NumberBody model={{ ...view.number, secondary: undefined, notes: undefined }} />
       <TableBody
         table={tableOf(view)}
         columnsFor={size}
@@ -179,7 +184,7 @@ function ChartBody({
   const beside = table !== null && table.rows.length > 0;
   return (
     <div>
-      <NumberBody model={view.number} />
+      <NumberBody model={{ ...view.number, notes: undefined }} />
       <div className={cx(beside && 'md:flex md:items-start')}>
         <Chart
           model={view.chart}

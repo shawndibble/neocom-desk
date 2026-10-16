@@ -289,13 +289,7 @@ export function WidgetMenu({ widget, inert = false }: { widget: Widget; inert?: 
         </DropdownMenuContent>
       </DropdownMenu>
       {planning && (
-        <PlexPlanDialog
-          key={widget.plexPer30Days ?? 0}
-          widget={widget}
-          title={title}
-          open
-          onClose={() => setPlanning(false)}
-        />
+        <PlexPlanDialog widget={widget} title={title} open onClose={() => setPlanning(false)} />
       )}
       {renaming && (
         <RenameDialog

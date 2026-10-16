@@ -22,7 +22,7 @@ import { stockBoardSeverity } from '@/features/stockTargets/stockBoard';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { formatCountdown, formatDuration } from '@/lib/duration';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
-import { DAY_MS, formatAge } from '@/lib/age';
+import { DAY_MS } from '@/lib/age';
 import { sortQueueEntries, selectActiveEntryFromSorted } from '@/routes/overviewQueue';
 import { dailyWalletFromJournal } from '@/engine/netWorth/series';
 import { getKind } from '../kinds';
@@ -55,6 +55,7 @@ import {
   statusOf,
   STOCK_PATH,
   UNKNOWN,
+  ageText,
   type Builder,
 } from './builderKit';
 import { queueSegments, queueStack, walletArea } from './chartBuilders';
@@ -122,7 +123,7 @@ export function feedsFor(kinds: readonly string[]): FeedId[] {
   return [...out];
 }
 
-/** Kinds that read the whole account (or every Character) whatever the header Character is. */
+/** Kinds whose read covers every Character; a widget scoped to the header Character still narrows to it in the builder. */
 const SUMS_ACROSS = new Set([
   'miningTax',
   'stock',
@@ -144,10 +145,6 @@ export function kindSumsAcrossCharacters(kind: string): boolean {
 }
 
 // --- Helpers ----------------------------------------------------------------
-
-function ageText(t: Translate, nowMs: number, atMs: number | null): string {
-  return atMs === null ? UNKNOWN : formatAge(Math.max(0, nowMs - atMs), t);
-}
 
 // --- Builders ---------------------------------------------------------------
 
