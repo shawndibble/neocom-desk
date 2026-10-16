@@ -45,3 +45,42 @@ export function saveDraft(
 export function clearDraft(characterId: number, mailId: number): Promise<void> {
   return db.mailDrafts.delete(draftId(characterId, mailId));
 }
+
+// --- New Mail: one slot per Character, reopened as left -------------------
+
+function newMailDraftId(characterId: number): string {
+  return `${characterId}:new`;
+}
+
+/** The Character's unsent New Mail, if any. */
+export async function loadNewMailDraft(characterId: number): Promise<MailDraftRecord | undefined> {
+  return db.mailDrafts.get(newMailDraftId(characterId));
+}
+
+/** Overwrites the New Mail slot. */
+export function saveNewMailDraft(
+  characterId: number,
+  recipients: readonly MailDraftRecipient[],
+  subject: string,
+  body: string
+): Promise<string> {
+  return db.mailDrafts.put({
+    id: newMailDraftId(characterId),
+    characterId,
+    mailId: 0,
+    kind: 'new',
+    recipients: recipients.map(({ recipient_id, recipient_type, name }) => ({
+      recipient_id,
+      recipient_type,
+      ...(name === undefined ? {} : { name }),
+    })),
+    subject,
+    body,
+    updatedAt: Date.now(),
+  });
+}
+
+/** On send, on Discard, or when the draft has gone empty. */
+export function clearNewMailDraft(characterId: number): Promise<void> {
+  return db.mailDrafts.delete(newMailDraftId(characterId));
+}
