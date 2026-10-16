@@ -9,9 +9,8 @@ import {
 import { ChartTooltipShell } from '@/components/ui/ChartTooltipShell';
 import { PointTooltip } from '@/components/ui/PointTooltip';
 import { cx } from '@/lib/cx';
+import { ChartTipBody } from './ChartTipBody';
 import type { ChartTip } from './types';
-
-const TONE_CLASS = { good: 'text-isk-pos', bad: 'text-isk-neg', plain: 'text-text' } as const;
 
 /**
  * The hover layer every Overview chart with per-point readouts shares: one
@@ -135,13 +134,7 @@ export function ChartHover({
       >
         {tip && (
           <ChartTooltipShell>
-            <b className="mb-1 block font-semibold text-text">{tip.title}</b>
-            {tip.rows.map((row) => (
-              <div key={row.label} className="flex justify-between gap-4">
-                <span>{row.label}</span>
-                <span className={TONE_CLASS[row.tone ?? 'plain']}>{row.value}</span>
-              </div>
-            ))}
+            <ChartTipBody tip={tip} />
           </ChartTooltipShell>
         )}
       </PointTooltip>

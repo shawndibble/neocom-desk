@@ -304,6 +304,7 @@ Reset and the Gallery all follow it. A saved layout keeps the view it stored
 | orders | Table | L | Number, Chart, Table |
 | priceWatch | Table | M | Number, Table |
 | stock | Table | M | Number, Chart, Table |
+| omega | Chart | M | Number, Chart, Table |
 | lp | Chart | M | Number, Chart, Table |
 | miningTax | Number | S | Number, Table |
 | industry | Table | M | Number, Chart, Table |

@@ -31,6 +31,7 @@ export interface OverviewEditActions {
   setScope: (id: string, scope: WidgetScope) => void;
   setRange: (id: string, range: WidgetRange) => void;
   setRowsPerPage: (id: string, rows: RowsPerPage) => void;
+  setPlexPer30Days: (id: string, plex: number) => void;
   rename: (id: string, title: string) => void;
   setShowOnPhone: (id: string, show: boolean) => void;
 }
@@ -69,6 +70,7 @@ export const OverviewEditContext = createContext<OverviewEdit>({
   setScope: none,
   setRange: none,
   setRowsPerPage: none,
+  setPlexPer30Days: none,
   rename: none,
   setShowOnPhone: none,
 });

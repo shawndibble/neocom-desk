@@ -52,6 +52,7 @@ import {
   loadJumpTimersWidget,
   loadRouteSafetyWidget,
   loadKillsWidget,
+  loadOmegaWidget,
   loadSurveyWidget,
 } from './kindLoaders';
 import { feedsFor } from './models';
@@ -63,18 +64,24 @@ const NO_FEEDS: readonly FeedId[] = [];
 type Load<T> = (characterId: number, signal: RouteSnapshotSignal) => Promise<T>;
 
 /** A read made through `useRouteSnapshot`, reloaded whenever the refresh epoch moves. */
+/** A stand-in id for a read that does not depend on the header Character. */
+const ACCOUNT_WIDE = 0;
+
 function SnapshotSource<K extends FeedId>({
   feed,
   load,
   cacheKey,
+  accountWide = false,
 }: {
   feed: K;
   load: Load<FeedMap[K]>;
   cacheKey: string;
+  /** The read covers every Character, so switching the header Character must not reload it. */
+  accountWide?: boolean;
 }) {
   const store = useFeedStore();
   const { epoch } = useOverviewRefresh();
-  const snapshot = useRouteSnapshot(load, undefined, { cacheKey });
+  const snapshot = useRouteSnapshot(load, accountWide ? ACCOUNT_WIDE : undefined, { cacheKey });
   const { refresh } = snapshot;
 
   // Skip the epoch this source mounted at: a widget added after a refresh must
@@ -246,6 +253,10 @@ function Source({ feed }: { feed: FeedId }) {
       );
     case 'kills':
       return <SnapshotSource feed="kills" load={loadKillsWidget} cacheKey="overview:kills" />;
+    case 'omega':
+      return (
+        <SnapshotSource feed="omega" load={loadOmegaWidget} cacheKey="overview:omega" accountWide />
+      );
     case 'incursions':
       return <IncursionsSource />;
     case 'spExtras':

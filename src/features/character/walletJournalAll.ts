@@ -39,9 +39,13 @@ export interface AllJournalsSnapshot {
   typeNames: Map<number, string>;
 }
 
-/** `characters` is the pick; omitted, every stored Character. */
+/**
+ * `characters` is the pick; omitted, every stored Character. `typeNames: false`
+ * skips resolving item names (an empty map), for a reader of amounts only.
+ */
 export async function loadAllCharactersJournals(
-  characters?: readonly FanOutCharacter[]
+  characters?: readonly FanOutCharacter[],
+  options: { typeNames?: boolean } = {}
 ): Promise<AllJournalsSnapshot> {
   const { entries, skipped } = await fanOutAllCharacters<CharacterJournal>({
     scope: JOURNAL_SCOPE,
@@ -63,7 +67,8 @@ export async function loadAllCharactersJournals(
     },
   });
   const typeIds = new Set(entries.flatMap((e) => e.transactions.map((txn) => txn.type_id)));
-  const typeNames = await loadTypeNames([...typeIds]);
+  const typeNames =
+    options.typeNames === false ? new Map<number, string>() : await loadTypeNames([...typeIds]);
   return { loaded: entries, skipped, typeNames };
 }
 
