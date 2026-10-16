@@ -137,6 +137,12 @@ export interface HaulingScan {
   scanned: number;
   /** True when the price or order-book cap cut the shortlist, so better-than-shown rows may exist unlooked-at. */
   capped?: boolean;
+  /**
+   * Every id looked at past pass 1 and not worth another look: dropped by the
+   * history pass, or given its order books (a row or not). Ids cut by a cap
+   * before their next pass are left out: a later scan should reach them.
+   */
+  examinedTypeIds: number[];
   fetchedAt: number;
 }
 
@@ -399,10 +405,16 @@ export async function runHaulingScan(request: HaulingScanRequest): Promise<Hauli
 
   const capped =
     pricedAll.length > MAX_PRICED_CANDIDATES || withHistory.length > MAX_BOOK_CANDIDATES;
+  const passedHistory = new Set(withHistory.map((c) => c.typeId));
+  const examinedTypeIds = [
+    ...priced.filter((c) => !passedHistory.has(c.typeId)).map((c) => c.typeId),
+    ...shortlist.map((c) => c.typeId),
+  ];
   const scan: HaulingScan = {
     rows,
     scanned: ids.length,
     ...(capped ? { capped } : {}),
+    examinedTypeIds,
     fetchedAt: Date.now(),
   };
   scanCache.set(key, { scan, expiresAt: Date.now() + SCAN_CACHE_TTL_MS });

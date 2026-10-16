@@ -48,10 +48,12 @@ describe('haulingFillStop', () => {
     expect(stop({ batchRows: 0, capped: false, newLines: 0 })).toBe('nothing-left');
   });
 
-  it('stops with no gain when a batch adds no profitable line', () => {
+  it('stops with no gain when a batch’s rows add no profitable line', () => {
     expect(stop({ newLines: 0 })).toBe('no-gain');
-    // Cut short with nothing kept: more may exist, but this batch gained nothing.
-    expect(stop({ batchRows: 0, capped: true, newLines: 0 })).toBe('no-gain');
+  });
+
+  it('goes on after an empty batch that was cut short: the next one scans further', () => {
+    expect(stop({ batchRows: 0, capped: true, newLines: 0 })).toBeNull();
   });
 
   it('stops at the batch cap, counted per press', () => {

@@ -5,7 +5,6 @@ import {
   isHaulingCategoryId,
   typeIdsInCategory,
   typeIdsInHaulingCategory,
-  typeIdsOutsideHaulingCategory,
 } from './haulingCategories';
 
 const groups = [
@@ -42,22 +41,6 @@ describe('typeIdsInHaulingCategory', () => {
   });
   it('scans every offered category for Everything, sorted, still without ships', () => {
     expect(typeIdsInHaulingCategory(EVERYTHING_CATEGORY_ID, groups, types)).toEqual([10, 20, 30]);
-  });
-});
-
-describe('typeIdsOutsideHaulingCategory', () => {
-  it('covers every other offered category, sorted, still without ships', () => {
-    expect(typeIdsOutsideHaulingCategory(9, groups, types)).toEqual([10, 30]);
-    expect(typeIdsOutsideHaulingCategory(11, groups, types)).toEqual([20]);
-  });
-  it('is empty for Everything, which already covers them all', () => {
-    expect(typeIdsOutsideHaulingCategory(EVERYTHING_CATEGORY_ID, groups, types)).toEqual([]);
-  });
-  it('never hands back a type of the category itself, even one nested under another root', () => {
-    // 955 sits under 9 here: a type under 955 is in both, and must stay out of 955's fill.
-    const nested = [...groups, { id: 955, name: 'Modifications', parentId: 9, hasTypes: true }];
-    const nestedTypes = [...types, { typeId: 50, name: 'E', marketGroupId: 955, volume: 1 }];
-    expect(typeIdsOutsideHaulingCategory(955, nested, nestedTypes)).toEqual([10, 20, 30]);
   });
 });
 

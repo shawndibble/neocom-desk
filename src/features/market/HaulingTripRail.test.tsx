@@ -325,7 +325,7 @@ describe('HaulingFillList', () => {
   it.each([
     ['full', 'Filled: 120 m³ left.'],
     ['nothing-left', 'Nothing else on this lane is profitable.'],
-    ['no-gain', 'Nothing else on this lane is profitable.'],
+    ['no-gain', 'This batch found nothing profitable; Find more checks the next items.'],
     ['budget', 'Your Max spend is the limit.'],
     ['batch-cap', 'Stopped after 8 batches; press Find more to keep going.'],
     ['stopped', 'Stopped.'],

@@ -62,7 +62,7 @@ const FILL_ROW: ListHaulingScanRow = {
 
 const READY: HaulingScanState = {
   status: 'ready',
-  scan: { rows: [SCAN_ROW], scanned: 1, fetchedAt: 0 },
+  scan: { rows: [SCAN_ROW], scanned: 1, examinedTypeIds: [], fetchedAt: 0 },
 };
 
 const INSTANT_READY: HaulingScanState = {
@@ -84,13 +84,19 @@ const INSTANT_READY: HaulingScanState = {
       },
     ],
     scanned: 1,
+    examinedTypeIds: [],
     fetchedAt: 0,
   },
 };
 
 const ANY_FROM_READY: HaulingScanState = {
   status: 'ready',
-  scan: { rows: [{ ...SCAN_ROW, fromHub: DODIXIE, toHub: JITA }], scanned: 1, fetchedAt: 0 },
+  scan: {
+    rows: [{ ...SCAN_ROW, fromHub: DODIXIE, toHub: JITA }],
+    scanned: 1,
+    examinedTypeIds: [],
+    fetchedAt: 0,
+  },
 };
 
 let mainState: HaulingScanState | null = null;
@@ -274,6 +280,7 @@ describe('HaulingPanel rows select, the rail shows the detail', () => {
       scan: {
         rows: [SCAN_ROW, { ...SCAN_ROW, typeId: 2205, name: 'Hammerhead II' }],
         scanned: 2,
+        examinedTypeIds: [],
         fetchedAt: 0,
       },
     };
@@ -738,7 +745,10 @@ describe('HaulingPanel states', () => {
   });
 
   it('shows the empty state, with a reset, when nothing passes the filters', () => {
-    mainState = { status: 'ready', scan: { rows: [], scanned: 0, fetchedAt: 0 } };
+    mainState = {
+      status: 'ready',
+      scan: { rows: [], scanned: 0, examinedTypeIds: [], fetchedAt: 0 },
+    };
     renderPanel();
     expect(screen.queryByRole('table')).toBeNull();
     expect(screen.getByRole('button', { name: 'Reset filters' })).toBeInTheDocument();
@@ -789,7 +799,7 @@ const DEAR_ROW: ListHaulingScanRow = {
 };
 const WITH_DEAR: HaulingScanState = {
   status: 'ready',
-  scan: { rows: [SCAN_ROW, DEAR_ROW], scanned: 2, fetchedAt: 0 },
+  scan: { rows: [SCAN_ROW, DEAR_ROW], scanned: 2, examinedTypeIds: [], fetchedAt: 0 },
 };
 
 describe('HaulingPanel filters: Max price per item and Max spend', () => {
@@ -843,7 +853,10 @@ describe('HaulingPanel filters: Max price per item and Max spend', () => {
   });
 
   it('Reset filters brings back rows Max price hid, and leaves Max spend alone', async () => {
-    mainState = { status: 'ready', scan: { rows: [DEAR_ROW], scanned: 1, fetchedAt: 0 } };
+    mainState = {
+      status: 'ready',
+      scan: { rows: [DEAR_ROW], scanned: 1, examinedTypeIds: [], fetchedAt: 0 },
+    };
     useHaulingBudget.setState({ value: 2_000_000 });
     const user = userEvent.setup();
     renderPanel('from=jita&to=amarr&maxprice=1000');

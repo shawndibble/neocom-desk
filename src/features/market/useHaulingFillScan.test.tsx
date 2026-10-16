@@ -26,10 +26,15 @@ vi.mock('@/sde/loadSde', () => ({
 }));
 
 const row = (typeId: number) => ({ typeId, name: `#${typeId}` }) as HaulingScanRow;
-const scanOf = (rows: HaulingScanRow[], capped = true): HaulingScan => ({
+const scanOf = (
+  rows: HaulingScanRow[],
+  capped = true,
+  examinedTypeIds = rows.map((r) => r.typeId)
+): HaulingScan => ({
   rows,
   scanned: rows.length,
   ...(capped ? { capped } : {}),
+  examinedTypeIds,
   fetchedAt: 0,
 });
 
@@ -152,6 +157,33 @@ describe('useHaulingFillScan', () => {
     expect(measure.mock.calls[1]).toEqual([[row(1), row(101)], new Set([101])]);
   });
 
+  it('never scans again what an earlier batch examined, a row or not', async () => {
+    measure.mockReturnValueOnce(ROOMY).mockReturnValueOnce({ ...ROOMY, freeM3: 0 });
+    // #1 became a row; #2 was looked at and dropped.
+    runHaulingScan.mockImplementationOnce(async () => scanOf([row(1)], true, [1, 2]));
+    const { result } = renderFill();
+    act(() => result.current.find());
+    await ready(result);
+    const second = runHaulingScan.mock.calls[1]![0];
+    expect(second.typeIds).toEqual([3]);
+    // Still an exact scope of its own.
+    expect(second.scope).toBe(haulingFillScope([1, 2]));
+    expect(second.scope).not.toBe(runHaulingScan.mock.calls[0]![0].scope);
+  });
+
+  it('carries on after an empty batch that was cut short, past what it examined', async () => {
+    runHaulingScan.mockImplementationOnce(async () => scanOf([], true, [1, 2]));
+    measure
+      .mockReturnValueOnce({ ...ROOMY, newLines: 0 })
+      .mockReturnValueOnce({ ...ROOMY, freeM3: 0 });
+    const { result } = renderFill();
+    act(() => result.current.find());
+    await ready(result);
+    expect(runHaulingScan).toHaveBeenCalledTimes(2);
+    expect(runHaulingScan.mock.calls[1]![0].typeIds).toEqual([3]);
+    expect(result.current.state).toMatchObject({ reason: 'full', batches: 2 });
+  });
+
   it('works for Everything too', async () => {
     const { result } = renderFill({ categoryId: 0 });
     act(() => result.current.find());
@@ -162,8 +194,6 @@ describe('useHaulingFillScan', () => {
 
   it.each([
     ['nothing-left', () => runHaulingScan.mockImplementation(async () => scanOf([], false))],
-    // Cut short but empty: the next batch would be the same scan.
-    ['nothing-left', () => runHaulingScan.mockImplementation(async () => scanOf([], true))],
     ['no-gain', () => measure.mockReturnValue({ ...ROOMY, newLines: 0 })],
     ['budget', () => measure.mockReturnValue({ ...ROOMY, binding: 'budget' })],
     ['stopped', () => measure.mockReturnValue(null)],

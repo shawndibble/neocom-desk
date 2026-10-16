@@ -26,7 +26,7 @@ export interface FillBatchOutcome {
   batchRows: number;
   /** The scan's caps cut its shortlist: more may be left unlooked-at. */
   capped: boolean;
-  /** Profitable fill lines from this batch's items in the plan of everything found. */
+  /** Profitable fill lines from this batch's rows in the plan of everything found. */
   newLines: number;
   /** Free m³ in every hold, and their capacity, once everything found is planned. */
   freeM3: number;
@@ -42,7 +42,8 @@ export function haulingFillStop(
   if (o.freeM3 <= fillFullAtM3(o.capacityM3)) return 'full';
   if (o.binding === 'budget') return 'budget';
   if (o.batchRows === 0 && !o.capped) return 'nothing-left';
-  if (o.newLines === 0) return 'no-gain';
+  // An empty batch cut short has nothing to judge: the next one scans further.
+  if (o.batchRows > 0 && o.newLines === 0) return 'no-gain';
   if (o.batchesThisRun >= FILL_BATCH_CAP) return 'batch-cap';
   return null;
 }

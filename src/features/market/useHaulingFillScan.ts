@@ -2,7 +2,7 @@
  * The on-demand scan behind "Fill the free space": batch after batch of the
  * same Hauling Opportunities scan as `useHaulingScan`, over every Hauling
  * category's type ids less those the table already holds and those earlier
- * batches returned, until `haulingFillStop` says stop (or the user does).
+ * batches returned or examined, until `haulingFillStop` says stop (or the user does).
  *
  * Runs only when asked (`find`, `more`), never by itself: each batch costs a
  * scan's ESI budget. Batches run one after another, never side by side. A
@@ -84,6 +84,8 @@ interface Run {
 interface Found {
   laneKey: string;
   rows: HaulingScanRow[];
+  /** Every id a batch looked at past pass 1 (`HaulingScan.examinedTypeIds`): never scanned again. */
+  examined: Set<number>;
   batches: number;
   freeM3: number | null;
   /** Every cache key a batch filled, so a reset drops exactly those. */
@@ -119,6 +121,7 @@ export function useHaulingFillScan(input: HaulingFillScanInput) {
       found.current = {
         laneKey: press.laneKey,
         rows: [],
+        examined: new Set(),
         batches: 0,
         freeM3: null,
         cacheKeys: new Set(),
@@ -145,7 +148,7 @@ export function useHaulingFillScan(input: HaulingFillScanInput) {
         const loading = (progress: HaulingProgress | null) =>
           show({ status: 'loading', batch, progress, rows: lane.rows, freeM3: lane.freeM3 });
         loading(null);
-        const skip = new Set(latest.current.excludeIds());
+        const skip = new Set([...latest.current.excludeIds(), ...lane.examined]);
         for (const row of lane.rows) skip.add(row.typeId);
         const scope = haulingFillScope(skip);
         let scan: HaulingScan;
@@ -174,6 +177,7 @@ export function useHaulingFillScan(input: HaulingFillScanInput) {
         lane.cacheKeys.add(haulingScanCacheKey({ from, to, scope, mode }));
         const kept = scan.rows.filter((row) => !skip.has(row.typeId));
         lane.rows = [...lane.rows, ...kept];
+        for (const id of scan.examinedTypeIds) lane.examined.add(id);
         lane.batches = batch;
         let measured: HaulingFillMeasure | null;
         try {
@@ -190,9 +194,7 @@ export function useHaulingFillScan(input: HaulingFillScanInput) {
                 ...measured,
                 batchesThisRun: thisRun,
                 batchRows: kept.length,
-                // Only returned rows are left out of the next batch, so after an
-                // empty one it would be the same scan: nothing more is reachable.
-                capped: kept.length > 0 && (scan.capped ?? false),
+                capped: scan.capped ?? false,
               });
         if (reason !== null) {
           show({ status: 'ready', rows: lane.rows, reason, batches: lane.batches });

@@ -307,6 +307,32 @@ describe('runHaulingScan, shortlist order', () => {
     expect(scan.rows.map((r) => r.typeId)).toContain(BULK);
     expect(scan.capped).toBe(true);
   });
+
+  it('names what it examined: dropped by history or given books, never what a cap cut first', async () => {
+    // Every tenth thin item has no history at the destination: dropped by pass 2.
+    loadPriceHistory.mockImplementation(async (_region: number, typeId: number) => {
+      if (typeId !== BULK && typeId % 10 === 0) throw new Error('no history');
+      return { points: typeId === BULK ? BULK_HISTORY : THIN_HISTORY };
+    });
+    const typeIds = [...THIN, BULK];
+    const scan = await runHaulingScan({
+      from: FROM,
+      to: TO,
+      typeIds,
+      scope: 4,
+      types: typesFor(typeIds),
+      today: TODAY,
+    });
+    const historyIds = loadPriceHistory.mock.calls.map(([, id]) => id as number);
+    const dropped = historyIds.filter((id) => id !== BULK && id % 10 === 0);
+    const booked = getOrderBook.mock.calls
+      .filter(([region]) => region === TO.regionId)
+      .map(([, id]) => id as number);
+    expect(new Set(scan.examinedTypeIds)).toEqual(new Set([...dropped, ...booked]));
+    // Cut at the price pass, or past history but cut before the books: a later scan's.
+    expect(historyIds.length).toBe(MAX_PRICED_CANDIDATES);
+    expect(scan.examinedTypeIds.length).toBeLessThan(historyIds.length);
+  });
 });
 
 describe('runHaulingScan, shortlist order selling into buy orders', () => {
