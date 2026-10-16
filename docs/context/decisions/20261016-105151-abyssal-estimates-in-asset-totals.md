@@ -60,7 +60,10 @@ places that value many items at once. Pure rules:
   they now get their own note with a link to MutaMarket's appraisal. The loss
   summary counts them apart from the market-unpriced items.
 - **No import anywhere here.** Asking MutaMarket to import (and so publish) a
-  module stays Item Detail's explicit, warned action.
+  module stays Item Detail's explicit, warned action. An abyssal row's Show
+  info opens Item Detail on that module (its item id), and a not-imported row's
+  tooltip says Show info can ask; the row tooltips reuse Item Detail's wording
+  for the other answers.
 - **Not covered:** Corp Assets (its rows take the per-item rule but nothing
   looks estimates up), Fittings prices, and contract list rows (only the detail
   modal values items).
