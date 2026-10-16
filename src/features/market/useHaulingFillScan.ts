@@ -26,10 +26,10 @@ import {
 import type { HaulingEnd } from './haulingHubs';
 import { scanHaulingLane } from './haulingScanRun';
 
-/** What sizing everything found so far into the hold gives: `FillBatchOutcome`'s plan half. */
+/** What sizing everything found so far gives: `FillBatchOutcome`'s filtered, planned half. */
 export type HaulingFillMeasure = Pick<
   FillBatchOutcome,
-  'freeM3' | 'capacityM3' | 'newLines' | 'binding'
+  'freeM3' | 'capacityM3' | 'binding' | 'newLines' | 'batchRows'
 >;
 
 export type HaulingFillScanState =
@@ -45,7 +45,7 @@ export type HaulingFillScanState =
   | {
       status: 'ready';
       rows: readonly HaulingScanRow[];
-      reason: Exclude<HaulingFillStopReason, 'error'>;
+      reason: HaulingFillStopReason;
       batches: number;
     }
   | { status: 'error'; rows: readonly HaulingScanRow[]; batches: number };
@@ -54,11 +54,13 @@ export interface HaulingFillScanInput {
   from: HaulingEnd;
   to: HaulingEnd;
   mode: HaulMode;
-  /** The route, category and mode as one key: a new one aborts → idle. */
+  /** Max price per item, for each batch's own price pass (as the category scan's). */
+  maxUnitPrice: number | null;
+  /** The route, category, mode and Max price as one key: a new one aborts → idle. */
   laneKey: string;
   /** Type ids already in the table (scanned and added): never scanned again. Read before each batch. */
   excludeIds: () => Iterable<number>;
-  /** Sizes every row found so far; `batchIds` are the last batch's. Null when nothing can be sized (stop). */
+  /** Filters and sizes every row found so far; `batchIds` are the last batch's. Null before a sizer is bound. */
   measure: (
     rows: readonly HaulingScanRow[],
     batchIds: ReadonlySet<number>
@@ -93,7 +95,7 @@ interface Found {
 }
 
 export function useHaulingFillScan(input: HaulingFillScanInput) {
-  const { from, to, mode, laneKey } = input;
+  const { from, to, mode, maxUnitPrice, laneKey } = input;
   const latest = useRef(input);
   useEffect(() => {
     latest.current = input;
@@ -143,10 +145,16 @@ export function useHaulingFillScan(input: HaulingFillScanInput) {
     };
 
     void (async () => {
-      for (let thisRun = 1; ; thisRun += 1) {
-        const batch = lane.batches + 1;
+      for (let batchInPress = 1; ; batchInPress += 1) {
+        const batchNumber = lane.batches + 1;
         const loading = (progress: HaulingProgress | null) =>
-          show({ status: 'loading', batch, progress, rows: lane.rows, freeM3: lane.freeM3 });
+          show({
+            status: 'loading',
+            batch: batchNumber,
+            progress,
+            rows: lane.rows,
+            freeM3: lane.freeM3,
+          });
         loading(null);
         const skip = new Set([...latest.current.excludeIds(), ...lane.examined]);
         for (const row of lane.rows) skip.add(row.typeId);
@@ -159,6 +167,7 @@ export function useHaulingFillScan(input: HaulingFillScanInput) {
               to,
               mode,
               scope,
+              maxUnitPrice,
               typeIds: (groups, marketTypes) =>
                 typeIdsInHaulingCategory(EVERYTHING_CATEGORY_ID, groups, marketTypes).filter(
                   (id) => !skip.has(id)
@@ -174,11 +183,11 @@ export function useHaulingFillScan(input: HaulingFillScanInput) {
         }
         // A cached batch answers at once, without looking at the signal.
         if (signal.aborted) return;
-        lane.cacheKeys.add(haulingScanCacheKey({ from, to, scope, mode }));
+        lane.cacheKeys.add(haulingScanCacheKey({ from, to, scope, mode, maxUnitPrice }));
         const kept = scan.rows.filter((row) => !skip.has(row.typeId));
         lane.rows = [...lane.rows, ...kept];
         for (const id of scan.examinedTypeIds) lane.examined.add(id);
-        lane.batches = batch;
+        lane.batches = batchNumber;
         let measured: HaulingFillMeasure | null;
         try {
           measured = latest.current.measure(lane.rows, new Set(kept.map((r) => r.typeId)));
@@ -187,15 +196,18 @@ export function useHaulingFillScan(input: HaulingFillScanInput) {
           return;
         }
         if (measured !== null) lane.freeM3 = measured.freeM3;
-        const reason =
-          measured === null
-            ? 'stopped'
-            : haulingFillStop({
-                ...measured,
-                batchesThisRun: thisRun,
-                batchRows: kept.length,
-                capped: scan.capped ?? false,
-              });
+        const reason = haulingFillStop({
+          // No sizer yet: judge the scan alone, never stop for want of one.
+          ...(measured ?? {
+            freeM3: Number.POSITIVE_INFINITY,
+            capacityM3: 0,
+            binding: null,
+            newLines: kept.length,
+            batchRows: kept.length,
+          }),
+          batchInPress,
+          capped: scan.capped ?? false,
+        });
         if (reason !== null) {
           show({ status: 'ready', rows: lane.rows, reason, batches: lane.batches });
           return;
@@ -206,7 +218,7 @@ export function useHaulingFillScan(input: HaulingFillScanInput) {
       controller.abort();
       stopRun.current = null;
     };
-  }, [active, from, to, mode]);
+  }, [active, from, to, mode, maxUnitPrice]);
 
   const find = useCallback(() => setRun({ laneKey, fresh: true }), [laneKey]);
   const more = useCallback(() => setRun({ laneKey, fresh: false }), [laneKey]);

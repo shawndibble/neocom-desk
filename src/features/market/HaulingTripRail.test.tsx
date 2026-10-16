@@ -261,6 +261,7 @@ function renderFill(props: Partial<HaulingFillListProps> = {}) {
       batch={0}
       runningFreeM3={null}
       reason="full"
+      underMaxPrice={false}
       leftM3={120}
       canFindMore={false}
       added={null}
@@ -311,6 +312,29 @@ describe('HaulingFillList', () => {
     expect(
       screen.getByRole('status', { name: 'Batch 1 · 44,462 m³ still free' })
     ).toBeInTheDocument();
+  });
+
+  it('error: what earlier batches found stays addable beside the error', async () => {
+    const user = userEvent.setup();
+    const { onAdd } = renderFill({ status: 'error' });
+    expect(screen.getByRole('alert')).toHaveTextContent("Couldn't scan for more items.");
+    expect(screen.getByRole('checkbox', { name: 'Nitrogen Fuel Block' })).toBeChecked();
+    await user.click(screen.getByRole('button', { name: 'Add 1 · +9,000 m³' }));
+    expect(onAdd).toHaveBeenCalledOnce();
+    // No stop reason: the run did not stop, it failed.
+    expect(screen.queryByText('Filled: 120 m³ left.')).toBeNull();
+  });
+
+  it.each([
+    ['nothing-left', 'Nothing else under your Max price is profitable on this lane.'],
+    [
+      'no-gain',
+      'This batch found nothing profitable under your Max price; Find more checks the next items.',
+    ],
+    ['full', 'Filled: 120 m³ left.'],
+  ] as const)('with a Max price set, says so where it matters (%s)', (reason, text) => {
+    renderFill({ reason, underMaxPrice: true });
+    expect(line(text)).toBeInTheDocument();
   });
 
   it('error: a message with a retry that carries on', async () => {

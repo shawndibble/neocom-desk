@@ -9,7 +9,7 @@ import {
 
 /** A batch that found more, with plenty of room left: the fill goes on. */
 const going: FillBatchOutcome = {
-  batchesThisRun: 1,
+  batchInPress: 1,
   batchRows: 12,
   capped: true,
   newLines: 5,
@@ -57,13 +57,13 @@ describe('haulingFillStop', () => {
   });
 
   it('stops at the batch cap, counted per press', () => {
-    expect(stop({ batchesThisRun: FILL_BATCH_CAP - 1 })).toBeNull();
-    expect(stop({ batchesThisRun: FILL_BATCH_CAP })).toBe('batch-cap');
+    expect(stop({ batchInPress: FILL_BATCH_CAP - 1 })).toBeNull();
+    expect(stop({ batchInPress: FILL_BATCH_CAP })).toBe('batch-cap');
     expect(FILL_BATCH_CAP).toBe(8);
   });
 
   it('names full before any other reason', () => {
-    expect(stop({ freeM3: 10, binding: 'budget', batchesThisRun: FILL_BATCH_CAP })).toBe('full');
+    expect(stop({ freeM3: 10, binding: 'budget', batchInPress: FILL_BATCH_CAP })).toBe('full');
   });
 });
 

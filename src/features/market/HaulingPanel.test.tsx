@@ -460,8 +460,9 @@ describe('HaulingPanel fill the free space', () => {
     expect(fillInput!.measure([FILL_ROW], new Set([4051]))).toEqual({
       freeM3: 450,
       capacityM3: 1000,
-      newLines: 1,
       binding: 'sales',
+      newLines: 1,
+      batchRows: 1,
     });
     expect(fillInput!.measure([FILL_ROW], new Set())).toMatchObject({ newLines: 0 });
   });
@@ -469,9 +470,11 @@ describe('HaulingPanel fill the free space', () => {
   it('sizes only rows the user’s filters let through', async () => {
     setCargo(1000);
     renderPanel('from=jita&to=amarr&margin=90');
+    // Filtered out, it is no row of the batch either: the batch counts as empty.
     expect(fillInput!.measure([FILL_ROW], new Set([4051]))).toMatchObject({
       freeM3: 1000,
       newLines: 0,
+      batchRows: 0,
     });
   });
 
@@ -621,6 +624,24 @@ describe('HaulingPanel fill the free space', () => {
     await user.click(screen.getByRole('button', { name: 'Find items to fill it' }));
     await user.click(screen.getByRole('checkbox', { name: 'Nitrogen Fuel Block' }));
     expect(screen.getByRole('button', { name: /^Add 0/ })).toBeDisabled();
+  });
+
+  it('keeps what earlier batches found addable when a batch fails', async () => {
+    const user = userEvent.setup();
+    setCargo(1000);
+    fillState = { status: 'error', rows: [FILL_ROW], batches: 1 };
+    renderPanel();
+    await user.click(screen.getByRole('button', { name: 'Find items to fill it' }));
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Add 1 · +200 m³' }));
+    expect(row(/Nitrogen Fuel Block/)).toBeInTheDocument();
+  });
+
+  it('gives the fill the Max price, and a new one starts it over like a new lane', () => {
+    setCargo(1000);
+    renderPanel('from=jita&to=amarr&maxprice=500');
+    expect(fillInput!.maxUnitPrice).toBe(500);
+    expect(fillInput!.laneKey).toMatch(/:max500$/);
   });
 
   it('retries a failed batch by carrying on', async () => {

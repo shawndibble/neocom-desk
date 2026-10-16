@@ -248,7 +248,12 @@ const STOP_KEYS = {
   budget: 'market.hauling.fill.stopped.budget',
   'batch-cap': 'market.hauling.fill.stopped.batchCap',
   stopped: 'market.hauling.fill.stopped.byYou',
-} as const satisfies Record<Exclude<HaulingFillStopReason, 'error'>, string>;
+} as const satisfies Record<HaulingFillStopReason, string>;
+/** With a Max price set, "nothing else" is only true under it. */
+const UNDER_MAX_PRICE_KEYS = {
+  'nothing-left': 'market.hauling.fill.stopped.nothingLeftUnderMax',
+  'no-gain': 'market.hauling.fill.stopped.noGainUnderMax',
+} as const satisfies Partial<Record<HaulingFillStopReason, string>>;
 
 export interface HaulingFillListProps {
   /** Free m³ in the plan as it stands. */
@@ -261,7 +266,9 @@ export interface HaulingFillListProps {
   /** The stage line of the batch running. */
   progressText?: string;
   /** Why the batches stopped, once `ready`. */
-  reason: Exclude<HaulingFillStopReason, 'error'> | null;
+  reason: HaulingFillStopReason | null;
+  /** A Max price is set: "nothing else" is said of what is under it. */
+  underMaxPrice: boolean;
   /** Free m³ once every offered item is in: "Filled: 120 m³ left." */
   leftM3: number;
   /** Offers Find more: the hold is not full and something may be left. */
@@ -334,6 +341,7 @@ export function HaulingFillList({
   runningFreeM3,
   progressText,
   reason,
+  underMaxPrice,
   leftM3,
   canFindMore,
   added,
@@ -351,14 +359,18 @@ export function HaulingFillList({
   const addDetailId = useId();
 
   let outcome: string | null = null;
-  if (status === 'ready' && added !== null) {
+  if ((status === 'ready' || status === 'error') && added !== null) {
     outcome = t('market.hauling.fill.added', {
       count: added.count,
       m3: formatTripM3(added.volumeM3),
       free: formatTripM3(freeM3),
     });
   } else if (status === 'ready' && reason !== null) {
-    outcome = t(STOP_KEYS[reason], { m3: formatTripM3(leftM3), count: FILL_BATCH_CAP });
+    const key =
+      underMaxPrice && (reason === 'nothing-left' || reason === 'no-gain')
+        ? UNDER_MAX_PRICE_KEYS[reason]
+        : STOP_KEYS[reason];
+    outcome = t(key, { m3: formatTripM3(leftM3), count: FILL_BATCH_CAP });
   }
 
   let body: ReactNode;
@@ -388,21 +400,21 @@ export function HaulingFillList({
         <Button onClick={onStop}>{t('market.hauling.fill.stop')}</Button>
       </div>
     );
-  } else if (status === 'error') {
-    body = (
-      <div
-        role="alert"
-        className="flex flex-col gap-2 rounded-xs border border-warning/45 bg-warning/10 p-2 text-xs"
-      >
-        <p className="text-warning">{t('market.hauling.fill.error')}</p>
-        <Button size="sm" className="self-start" onClick={onMore}>
-          {t('market.hauling.retry')}
-        </Button>
-      </div>
-    );
   } else {
+    // Ready, or a failed batch: what earlier batches found stays on offer either way.
     body = (
       <>
+        {status === 'error' && (
+          <div
+            role="alert"
+            className="flex flex-col gap-2 rounded-xs border border-warning/45 bg-warning/10 p-2 text-xs"
+          >
+            <p className="text-warning">{t('market.hauling.fill.error')}</p>
+            <Button size="sm" className="self-start" onClick={onMore}>
+              {t('market.hauling.retry')}
+            </Button>
+          </div>
+        )}
         {items.length > 0 && (
           <>
             <ul aria-label={t('market.hauling.fill.listLabel')} className="flex flex-col">

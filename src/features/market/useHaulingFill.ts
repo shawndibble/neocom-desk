@@ -6,7 +6,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { planFill } from '@/engine/market/haulingFill';
 import { fillCanFindMore } from '@/engine/market/haulingFillStop';
-import type { HoldUse, TripCandidate, TripOverride, TripPlan } from '@/engine/market/haulingPlan';
+import {
+  holdsCapacityM3,
+  holdsFreeM3,
+  type TripCandidate,
+  type TripOverride,
+  type TripPlan,
+} from '@/engine/market/haulingPlan';
 import { loadMarketTypes } from '@/sde/loadMarketSde';
 import type { MarketGroupNode } from '@/sde/marketTypes';
 import { haulingCategoryOf } from './haulingCategories';
@@ -35,7 +41,7 @@ export interface HaulingFillInput {
   from: HaulingEnd;
   to: HaulingEnd;
   mode: HaulMode;
-  /** The route, category and mode as one key: a new one drops the fill and its added rows. */
+  /** The route, category and mode as one key: a new one (or a new Max price) drops the fill and its added rows. */
   laneKey: string;
   feesAt: HaulingFeesAt;
   /** The panel's own row filters: the fill shows and sizes only what the table would. */
@@ -55,13 +61,15 @@ export function useHaulingFill({
   groups,
   scannedTypeIds,
 }: HaulingFillInput) {
+  // Max price changes what each batch's price pass keeps, so the fill starts over as on a new lane.
+  const fillKey = `${laneKey}:max${filters.maxUnitPrice ?? ''}`;
   const [addedIds, setAddedIds] = useState<ReadonlySet<number>>(NO_IDS);
   const [unticked, setUnticked] = useState<ReadonlySet<number>>(NO_IDS);
   /** What the last Add loaded, for "Added 8 items · …"; cleared by the next Find or Find more. */
   const [lastAdded, setLastAdded] = useState<{ count: number; volumeM3: number } | null>(null);
-  const [resetFor, setResetFor] = useState(laneKey);
-  if (resetFor !== laneKey) {
-    setResetFor(laneKey);
+  const [resetFor, setResetFor] = useState(fillKey);
+  if (resetFor !== fillKey) {
+    setResetFor(fillKey);
     setAddedIds(NO_IDS);
     setUnticked(NO_IDS);
     setLastAdded(null);
@@ -87,7 +95,8 @@ export function useHaulingFill({
     from,
     to,
     mode,
-    laneKey,
+    maxUnitPrice: filters.maxUnitPrice,
+    laneKey: fillKey,
     excludeIds: () => [...scannedTypeIds, ...addedIds],
     measure: (scanRows, batchIds) => {
       const size = sizeRef.current;
@@ -165,6 +174,7 @@ export function useHaulingFill({
     addedRows,
     unticked,
     lastAdded,
+    underMaxPrice: filters.maxUnitPrice !== null,
     categoryOf,
     bindSize,
     find,
@@ -191,19 +201,16 @@ export interface HaulingFillOfferInput {
   pin: (lines: readonly { typeId: number; quantity: number }[]) => void;
 }
 
-const freeOf = (holds: readonly HoldUse[]) =>
-  holds.reduce((sum, h) => sum + Math.max(0, h.capacityM3 - h.usedM3), 0);
-const capacityOf = (holds: readonly HoldUse[]) => holds.reduce((sum, h) => sum + h.capacityM3, 0);
-
 /** The fill sized against the current plan: what `HaulingFillList` shows and what Add loads. */
 export function useHaulingFillOffer(
   fill: HaulingFill,
   { offered, current, overrides, before, base, categoryName, pin }: HaulingFillOfferInput
 ) {
-  const ready = fill.state.status === 'ready';
+  // A failed batch keeps what earlier batches found on offer: only a running one hides it.
+  const settled = fill.state.status === 'ready' || fill.state.status === 'error';
   const extras = useMemo(
-    () => (offered && ready ? fill.rows.filter((r) => !fill.addedIds.has(r.typeId)) : []),
-    [offered, ready, fill.rows, fill.addedIds]
+    () => (offered && settled ? fill.rows.filter((r) => !fill.addedIds.has(r.typeId)) : []),
+    [offered, settled, fill.rows, fill.addedIds]
   );
   const planOf = useCallback(
     (rows: readonly HaulingViewRow[]) =>
@@ -219,18 +226,20 @@ export function useHaulingFillOffer(
       const plan = planOf(rows);
       const after = plan?.after ?? before;
       return {
-        freeM3: freeOf(after.holds),
-        capacityM3: capacityOf(after.holds),
-        newLines: (plan?.lines ?? []).filter((l) => batchIds.has(l.typeId) && l.profit > 0).length,
+        freeM3: holdsFreeM3(after.holds),
+        capacityM3: holdsCapacityM3(after.holds),
         binding: after.binding,
+        newLines: (plan?.lines ?? []).filter((l) => batchIds.has(l.typeId) && l.profit > 0).length,
+        batchRows: rows.filter((r) => batchIds.has(r.typeId)).length,
       };
     },
     [planOf, before]
   );
+  // A ref, not a prop: the plan this sizes against needs the fill's added rows, so it exists only after `useHaulingFill`.
   const { bindSize } = fill;
   useEffect(() => {
-    bindSize(offered ? size : null);
-  }, [bindSize, offered, size]);
+    bindSize(size);
+  }, [bindSize, size]);
 
   const offer = useMemo(() => planOf(extras), [planOf, extras]);
   const offerLines = useMemo(() => offer?.lines ?? [], [offer]);
@@ -267,20 +276,21 @@ export function useHaulingFillOffer(
   const { state } = fill;
   /** The plan once every offered item is in: what "Filled" reports and Find more is judged on. */
   const afterOffer = offer?.after ?? before;
-  const freeAfterOffer = freeOf(afterOffer.holds);
+  const freeAfterOffer = holdsFreeM3(afterOffer.holds);
   const reason = state.status === 'ready' ? state.reason : null;
   const list: Omit<HaulingFillListProps, 'freeM3' | 'progressText'> = {
     status: fill.state.status,
     batch: state.status === 'loading' ? state.batch : 0,
     runningFreeM3: state.status === 'loading' ? state.freeM3 : null,
     reason,
+    underMaxPrice: fill.underMaxPrice,
     leftM3: freeAfterOffer,
     canFindMore:
       reason !== null &&
       fillCanFindMore({
         reason,
         freeM3: freeAfterOffer,
-        capacityM3: capacityOf(before.holds),
+        capacityM3: holdsCapacityM3(before.holds),
         binding: afterOffer.binding,
       }),
     added: fill.lastAdded,
@@ -300,7 +310,7 @@ export function useHaulingFillOffer(
     holdAfter: ticked
       ? {
           usedM3: ticked.after.holds.reduce((sum, h) => sum + h.usedM3, 0),
-          capacityM3: capacityOf(ticked.after.holds),
+          capacityM3: holdsCapacityM3(ticked.after.holds),
         }
       : null,
   };

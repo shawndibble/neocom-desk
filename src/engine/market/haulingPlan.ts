@@ -108,6 +108,13 @@ export interface HoldUse {
   usedM3: number;
 }
 
+/** The room left in every hold, an overfilled one counting none. */
+export const holdsFreeM3 = (holds: readonly HoldUse[]): number =>
+  holds.reduce((sum, h) => sum + Math.max(0, h.capacityM3 - h.usedM3), 0);
+
+export const holdsCapacityM3 = (holds: readonly HoldUse[]): number =>
+  holds.reduce((sum, h) => sum + h.capacityM3, 0);
+
 export interface TripPlan {
   /** One line per candidate, in the order given (an unselected or zero line stays, with quantity 0). */
   lines: TripLine[];

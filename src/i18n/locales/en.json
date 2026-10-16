@@ -9616,6 +9616,8 @@
           "full": "Filled: {{m3}} m³ left.",
           "nothingLeft": "Nothing else on this lane is profitable.",
           "noGain": "This batch found nothing profitable; Find more checks the next items.",
+          "nothingLeftUnderMax": "Nothing else under your Max price is profitable on this lane.",
+          "noGainUnderMax": "This batch found nothing profitable under your Max price; Find more checks the next items.",
           "budget": "Your Max spend is the limit.",
           "batchCap": "Stopped after {{count}} batches; press Find more to keep going.",
           "byYou": "Stopped."

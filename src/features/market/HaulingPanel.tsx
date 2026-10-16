@@ -52,7 +52,12 @@ import { cx } from '@/lib/cx';
 import { useIsNarrow } from '@/lib/useIsNarrow';
 import { useElementNarrowerThan } from '@/lib/useElementNarrowerThan';
 import { useIsPhone } from '@/lib/useIsPhone';
-import { multibuyText, planTrip, type TripOverride } from '@/engine/market/haulingPlan';
+import {
+  holdsFreeM3,
+  multibuyText,
+  planTrip,
+  type TripOverride,
+} from '@/engine/market/haulingPlan';
 import type { DemandKind } from '@/engine/market/haulingMarket';
 import { formatIsk, formatMarketIsk, marketIskDecimals } from '@/lib/isk';
 import { writeToClipboard } from '@/lib/clipboard';
@@ -511,7 +516,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
   );
 
   /** The room left in every hold: one figure for the summary, the fill offer and the trip bar. */
-  const freeM3 = plan.holds.reduce((sum, h) => sum + Math.max(0, h.capacityM3 - h.usedM3), 0);
+  const freeM3 = holdsFreeM3(plan.holds);
 
   // Fill the free space: needs a Cargo Space and a fixed lane (Any hub would
   // scan every hub's books), and the category scan landed, so its rows stay out.

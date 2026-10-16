@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import type { CargoHold } from './cargoHolds';
 import { lotEconomics } from './haulingMarket';
-import { maxBuyPrice, multibuyText, planTrip, type TripCandidate } from './haulingPlan';
+import {
+  holdsCapacityM3,
+  holdsFreeM3,
+  maxBuyPrice,
+  multibuyText,
+  planTrip,
+  type TripCandidate,
+} from './haulingPlan';
 
 const FEES = {
   accountingLevel: 5,
@@ -481,5 +488,19 @@ describe('planTrip with specialised holds', () => {
       { kind: 'fuel', quantity: 60, volumeM3: 60 },
       { kind: 'infrastructure', quantity: 40, volumeM3: 40 },
     ]);
+  });
+});
+
+describe('holdsFreeM3 / holdsCapacityM3', () => {
+  const holds = [
+    { kind: 'general' as const, capacityM3: 1000, usedM3: 400 },
+    { kind: 'ammo' as const, capacityM3: 500, usedM3: 600 },
+  ];
+  it('sums the room left in every hold, an overfilled one counting none', () => {
+    expect(holdsFreeM3(holds)).toBe(600);
+    expect(holdsFreeM3([])).toBe(0);
+  });
+  it('sums every hold’s capacity', () => {
+    expect(holdsCapacityM3(holds)).toBe(1500);
   });
 });

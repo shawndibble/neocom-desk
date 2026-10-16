@@ -57,17 +57,18 @@ const JITA = TRADE_HUBS[0]!;
 const AMARR = TRADE_HUBS[1]!;
 const AMMO = 11;
 
+/** `batchRows` defaults to every id the batch brought: none filtered out. */
+type Measured = Omit<HaulingFillMeasure, 'batchRows'> & { batchRows?: number };
 /** Room left after every batch until told otherwise; each batch adds a line. */
-const ROOMY: HaulingFillMeasure = {
+const ROOMY: Measured = {
   freeM3: 30_000,
   capacityM3: 60_000,
   newLines: 1,
   binding: 'space',
 };
 const measure =
-  vi.fn<
-    (rows: readonly HaulingScanRow[], batchIds: ReadonlySet<number>) => HaulingFillMeasure | null
-  >();
+  vi.fn<(rows: readonly HaulingScanRow[], batchIds: ReadonlySet<number>) => Measured | null>();
+let maxUnitPrice: number | null = null;
 let tableIds: number[] = [];
 
 interface Props {
@@ -83,9 +84,13 @@ function renderFill(initial: Partial<Props> = {}) {
         from: p.from,
         to: p.to,
         mode: 'list',
-        laneKey: `${haulingEndId(p.from)}>${haulingEndId(p.to)}:${p.categoryId}`,
+        maxUnitPrice,
+        laneKey: `${haulingEndId(p.from)}>${haulingEndId(p.to)}:${p.categoryId}:${maxUnitPrice}`,
         excludeIds: () => tableIds,
-        measure: (rows, ids) => measure(rows, ids),
+        measure: (rows, ids) => {
+          const measured = measure(rows, ids);
+          return measured === null ? null : { batchRows: ids.size, ...measured };
+        },
       }),
     { initialProps: { from: JITA, to: AMARR, categoryId: AMMO, ...initial } }
   );
@@ -97,6 +102,7 @@ const ready = (result: { current: ReturnType<typeof useHaulingFillScan> }) =>
 beforeEach(() => {
   next = 100;
   tableIds = [];
+  maxUnitPrice = null;
   runHaulingScan.mockReset();
   runHaulingScan.mockImplementation(async () => scanOf([row((next += 1))]));
   measure.mockReset();
@@ -184,6 +190,46 @@ describe('useHaulingFillScan', () => {
     expect(result.current.state).toMatchObject({ reason: 'full', batches: 2 });
   });
 
+  it('judges a batch by the rows that pass the filters: all filtered out and not capped is nothing left', async () => {
+    runHaulingScan.mockImplementation(async () => scanOf([row(1)], false));
+    measure.mockReturnValue({ ...ROOMY, newLines: 0, batchRows: 0 });
+    const { result } = renderFill();
+    act(() => result.current.find());
+    await ready(result);
+    expect(result.current.state).toMatchObject({ reason: 'nothing-left' });
+  });
+
+  it('never stops for want of a sizer: the scan alone is judged', async () => {
+    measure.mockReturnValue(null);
+    const { result } = renderFill();
+    act(() => result.current.find());
+    await ready(result);
+    expect(result.current.state).toMatchObject({ reason: 'batch-cap', batches: FILL_BATCH_CAP });
+  });
+
+  it('gives every batch the Max price, and keys its cache entry by it', async () => {
+    maxUnitPrice = 500;
+    measure.mockReturnValue({ ...ROOMY, freeM3: 0 });
+    const { result } = renderFill();
+    act(() => result.current.find());
+    await ready(result);
+    const request = runHaulingScan.mock.calls[0]![0];
+    expect(request.maxUnitPrice).toBe(500);
+    act(() => result.current.reset());
+    expect(evictHaulingScan).toHaveBeenCalledWith(haulingScanCacheKey(request));
+    expect(haulingScanCacheKey(request)).toContain(':max500');
+  });
+
+  it('goes idle when the Max price changes, like a new lane', async () => {
+    measure.mockReturnValue({ ...ROOMY, freeM3: 0 });
+    const { result, rerender } = renderFill();
+    act(() => result.current.find());
+    await ready(result);
+    maxUnitPrice = 500;
+    rerender({ from: JITA, to: AMARR, categoryId: AMMO });
+    expect(result.current.state).toEqual({ status: 'idle' });
+  });
+
   it('works for Everything too', async () => {
     const { result } = renderFill({ categoryId: 0 });
     act(() => result.current.find());
@@ -196,7 +242,6 @@ describe('useHaulingFillScan', () => {
     ['nothing-left', () => runHaulingScan.mockImplementation(async () => scanOf([], false))],
     ['no-gain', () => measure.mockReturnValue({ ...ROOMY, newLines: 0 })],
     ['budget', () => measure.mockReturnValue({ ...ROOMY, binding: 'budget' })],
-    ['stopped', () => measure.mockReturnValue(null)],
   ] as const)('stops with %s', async (reason, arrange) => {
     arrange();
     const { result } = renderFill();
