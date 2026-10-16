@@ -46,6 +46,7 @@ import { useHiddenNav, useNavSetupAnswered, useRecentNav } from './navPreference
 import { PublicInfoModal } from '@/components/PublicInfoModal';
 import { EntityInfoRoute } from '@/features/entities';
 import { ItemInfoModal } from '@/features/entities/ItemInfoModal';
+import { PlaceInfoModal } from '@/features/entities/PlaceInfoModal';
 import { SkillDetailModal } from '@/components/SkillDetailModal';
 import { getAccessTokenReportingFailures } from './tokenProvider';
 import type { AppRoutePath } from './routeScopes';
@@ -238,8 +239,10 @@ function Root() {
   const characterCount = useLiveQuery(() => db.characters.count());
   const hydrated = useActiveCharacter((state) => state.hydrated);
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
+  // A landing section's hash (`/#login-faq`) survives the hop to the page that has it.
+  const { hash } = useLocation();
   if (characterCount === undefined || !hydrated) return <BootScreen gate="root" />;
-  if (characterCount === 0) return <Navigate to="/login" replace />;
+  if (characterCount === 0) return <Navigate to={{ pathname: '/login', hash }} replace />;
   return <Navigate to={activeCharacterId === null ? '/characters' : '/overview'} replace />;
 }
 
@@ -409,6 +412,7 @@ export function App() {
         <PublicInfoModal />
         <SkillDetailModal />
         <ItemInfoModal />
+        <PlaceInfoModal />
       </BrowserRouter>
     </ErrorBoundary>
   );
