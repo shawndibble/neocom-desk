@@ -37,6 +37,8 @@ import { loadBlueprints } from '@/sde/loadSde';
 import { loadSolarSystemsById } from '@/sde/solarSystems';
 import { uidForCharacter } from '@/sync/uid';
 import { loadMemberLibraries, type CommunityMember } from './communityStore';
+import { loadCommunitySnapshot, saveCommunitySnapshot } from './communityCache';
+import { useReconnectCount } from '@/stores/network';
 import { sharedBlueprintRows, systemIdsByName } from './sharedBlueprintCopies';
 import { SharedBlueprintTable } from './SharedBlueprintTable';
 
@@ -51,6 +53,8 @@ type Loaded = {
   groups: ShareMarketGroup[];
   learned: Map<number, number>;
   libraries: MemberLibrary[];
+  /** The Members' libraries are the last ones read while online (`communityCache.ts`). */
+  cached: boolean;
 };
 
 /** A Member's initial in a ring: portraits need the Character id, which a Member doc does not carry. */
@@ -212,6 +216,7 @@ export function CommunityLibrary({
   const [query, setQuery] = useState('');
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [failed, setFailed] = useState(false);
+  const reconnects = useReconnectCount();
   // Apart from the Library's own load: only the Jumps column waits on it, and
   // an unreadable list leaves that column at its placeholder, nothing else.
   const [systemIds, setSystemIds] = useState<ReadonlyMap<string, number> | null>(null);
@@ -237,8 +242,39 @@ export function CommunityLibrary({
     let cancelled = false;
     (async () => {
       try {
-        const [libraries, groups, marketTypes, blueprints] = await Promise.all([
-          loadMemberLibraries(characterId, communityId, memberKey ? memberKey.split(',') : []),
+        const uids = memberKey ? memberKey.split(',') : [];
+        // Strict, so an unreadable library throws and falls back to the saved
+        // copy, rather than reading as empty and being saved over a good one
+        // (a signed-in session can outlive the connection).
+        const live = loadMemberLibraries(characterId, communityId, uids, { strict: true }).then(
+          async (libraries) => {
+            void saveCommunitySnapshot(characterId, 'libraries', libraries, communityId);
+            return { libraries, cached: false };
+          },
+          async () => {
+            const saved = await loadCommunitySnapshot<MemberLibrary[]>(
+              characterId,
+              'libraries',
+              communityId
+            );
+            if (!saved) {
+              // Nothing saved: as before, one unreadable Member reads as empty
+              // and the rest still show (a total failure still throws).
+              return {
+                libraries: await loadMemberLibraries(characterId, communityId, uids),
+                cached: false,
+              };
+            }
+            return {
+              libraries: uids.map(
+                (uid) => saved.find((library) => library.uid === uid) ?? { uid, items: [] }
+              ),
+              cached: true,
+            };
+          }
+        );
+        const [{ libraries, cached }, groups, marketTypes, blueprints] = await Promise.all([
+          live,
           loadMarketGroups(),
           loadMarketTypes(),
           loadBlueprints(),
@@ -256,6 +292,7 @@ export function CommunityLibrary({
           groups,
           catalog,
           learned: blueprintGroupOfProductGroup(catalog, groups),
+          cached,
         });
         setFailed(false);
       } catch {
@@ -265,7 +302,7 @@ export function CommunityLibrary({
     return () => {
       cancelled = true;
     };
-  }, [characterId, communityId, memberKey]);
+  }, [characterId, communityId, memberKey, reconnects]);
 
   const allRows = useMemo(
     () => (loaded ? buildLibraryRows(loaded.catalog, loaded.libraries) : []),
@@ -327,6 +364,11 @@ export function CommunityLibrary({
 
   return (
     <div className="space-y-3">
+      {loaded.cached && (
+        <p role="status" className="text-[0.6875rem] text-warning uppercase">
+          {t('common.offlineTitle')}
+        </p>
+      )}
       <div className="flex flex-wrap items-center gap-2">
         <SearchInput
           className="min-w-40 flex-1"

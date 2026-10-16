@@ -33,7 +33,13 @@ import {
   loadMyCommunities,
   type CommunitySummary,
 } from '@/features/communities/communityStore';
+import {
+  loadCommunitySnapshot,
+  saveCommunitySnapshot,
+} from '@/features/communities/communityCache';
+import { NeedsConnectionButton } from '@/features/communities/NeedsConnectionButton';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { useReconnectCount } from '@/stores/network';
 
 /** The switcher's "back to the list" value; no Community id can equal it. */
 const ALL = '__all';
@@ -58,8 +64,11 @@ export function Communities() {
   const [loaded, setLoaded] = useState<{
     characterId: number;
     list: CommunitySummary[];
+    /** The live read failed, so this is the last list read while online (`communityCache.ts`). */
+    cached: boolean;
   } | null>(null);
   const communities = loaded && loaded.characterId === characterId ? loaded.list : null;
+  const cached = loaded?.characterId === characterId && loaded.cached;
   // Tagged like `loaded`: one Character's failure is not another's.
   const [failedFor, setFailedFor] = useState<number | null>(null);
   const failed = failedFor === characterId;
@@ -72,6 +81,8 @@ export function Communities() {
   // Bumped after a change, to refetch the list.
   const [reload, setReload] = useState(0);
   const refresh = () => setReload((n) => n + 1);
+  // The connection coming back is a retry: the list was last read while offline.
+  const reconnects = useReconnectCount();
 
   useEffect(() => {
     if (characterId === null) return;
@@ -83,17 +94,26 @@ export function Communities() {
         void rememberCommunityAdmin(characterId, list).catch(() => {});
         // And the nav badge's poll, whether it has any board to read.
         void rememberCommunityWatch(characterId, list).catch(() => {});
+        void saveCommunitySnapshot(characterId, 'list', list);
         if (cancelled) return;
-        setLoaded({ characterId, list });
+        setLoaded({ characterId, list, cached: false });
         setFailedFor(null);
       } catch {
-        if (!cancelled) setFailedFor(characterId);
+        // Offline (or the backend down): the last list read, read-only, beats nothing.
+        const snapshot = await loadCommunitySnapshot<CommunitySummary[]>(characterId, 'list');
+        if (cancelled) return;
+        if (snapshot) {
+          setLoaded({ characterId, list: snapshot, cached: true });
+          setFailedFor(null);
+        } else {
+          setFailedFor(characterId);
+        }
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [characterId, reload]);
+  }, [characterId, reload, reconnects]);
 
   const openId = params.get('community');
   useEffect(() => {
@@ -140,18 +160,28 @@ export function Communities() {
         actions={
           // Primary only while it is the one thing to do; once in a Community it
           // steps back. Always md: level with the alerts bell beside it.
-          <Button
+          <NeedsConnectionButton
             variant={communities?.length === 0 ? 'primary' : 'ghost'}
             aria-label={t('communities.createLabel')}
             onClick={() => setCreating(true)}
           >
             {t('communities.create')}
-          </Button>
+          </NeedsConnectionButton>
         }
       />
       {/* Inside a Community its own card says what it is; the intro is for the list. */}
       {!selected && <p className="text-xs text-text-dim">{t('communities.intro')}</p>}
 
+      {cached && (
+        <div className="flex flex-wrap items-center gap-2">
+          <p role="status" className="text-[0.6875rem] text-warning uppercase">
+            {t('common.offlineTitle')}
+          </p>
+          <Button size="sm" onClick={refresh}>
+            {t('common.retry')}
+          </Button>
+        </div>
+      )}
       {failed && selected && (
         <p role="alert" className="text-xs text-danger">
           {t('communities.loadFailed')}
@@ -184,9 +214,14 @@ export function Communities() {
       ) : (
         <Panel title={t('communities.yourCommunities')}>
           {failed ? (
-            <p role="alert" className="text-xs text-danger">
-              {t('communities.loadFailed')}
-            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <p role="alert" className="min-w-0 flex-1 text-xs text-danger">
+                {t('communities.loadFailed')}
+              </p>
+              <Button size="sm" onClick={refresh}>
+                {t('common.retry')}
+              </Button>
+            </div>
           ) : communities === null ? (
             <Spinner label={t('communities.loading')} />
           ) : communities.length === 0 ? (

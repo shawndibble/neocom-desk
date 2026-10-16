@@ -281,17 +281,15 @@ describe('CommandPalette', () => {
     await user.type(await screen.findByRole('combobox'), 'settings');
 
     const items = await screen.findByRole('group', { name: 'Market items' });
-    expect(await within(items).findByText("Couldn't load these results.")).toHaveAttribute(
-      'aria-hidden',
-      'true'
-    );
+    expect(
+      await within(items).findByText('Item search needs a one-time download — connect once.')
+    ).toHaveAttribute('aria-hidden', 'true');
     expect(within(items).queryByRole('option')).not.toBeInTheDocument();
     const pages = screen.getByRole('group', { name: 'Pages' });
     // Announced too: the error row is not an option, so the count alone would miss it.
-    expect(screen.getByText(/^\d+ results?\..*Couldn't load these results\.$/)).toHaveAttribute(
-      'aria-live',
-      'polite'
-    );
+    expect(
+      screen.getByText(/^\d+ results?\..*Item search needs a one-time download — connect once\.$/)
+    ).toHaveAttribute('aria-live', 'polite');
     // The error row is never highlighted; the best page still is.
     expect(within(pages).getAllByRole('option')[0]).toHaveAttribute('aria-selected', 'true');
     await user.keyboard('{Enter}');

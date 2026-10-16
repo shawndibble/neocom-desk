@@ -10,6 +10,7 @@
 // a Character they still hold — there is no signal to detect it from, so it
 // needs its own explicit entry point.
 
+import { deleteCommunitySnapshots } from '@/features/communities/communityCache';
 import { deleteShareSelections } from '@/features/communities/shareSelection';
 import { db } from '@/db';
 import { purgeCharacterCacheOrSuppress, purgeSharedStructureCache } from '@/esi/cachePurge';
@@ -139,6 +140,7 @@ export async function removeCharacter(characterId: number, syncPush = true): Pro
       await deleteFeedForCharacter(characterId);
       await clearCharacterSyncBookkeeping(characterId);
       await deleteShareSelections(characterId);
+      await deleteCommunitySnapshots(characterId);
     }
   );
   await forgetAlertsGrants([characterId]);

@@ -127,6 +127,9 @@ export function createMarketItemsProvider({
     id: 'marketItems',
     labelKey: 'commandPalette.groups.marketItems',
     order: 7,
+    // The catalogue is fetched on first use, not precached: a failure here is
+    // almost always "never downloaded, and offline".
+    errorKey: 'commandPalette.itemSearchNeedsDownload',
     minQueryLength: MARKET_ITEMS_MIN_QUERY_LENGTH,
     search: (query) => {
       const index = catalogue.peek();

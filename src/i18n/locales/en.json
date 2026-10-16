@@ -4933,6 +4933,7 @@
     "cancel": "Cancel",
     "loading": "Loading",
     "loadingEllipsis": "Loading…",
+    "needsConnection": "Needs a connection",
     "unknown": "—",
     "aboutLabel": "About {{label}}",
     "moreActionsLabel": "More actions for {{name}}",
@@ -7705,6 +7706,7 @@
       "commandCenter": "Command Center",
       "free": "Free: {{cpu}} tf CPU, {{power}} MW power. Links between buildings use a little more.",
       "loadUnknown": "Load can't be read for this colony yet.",
+      "linkLoadUnknown": "Link CPU/PG unknown — planet data not downloaded yet. The figures above leave the links out, so they read low.",
       "launchpad": "Launchpad",
       "capacity": "{{m3}} m³",
       "used": "Used",
@@ -10813,6 +10815,7 @@
     "loadingGroup": "Searching…",
     "groupCapped": "Top {{count}} shown. Keep typing to narrow.",
     "groupError": "Couldn't load these results.",
+    "itemSearchNeedsDownload": "Item search needs a one-time download — connect once.",
     "resultsCount_one": "{{count}} result",
     "resultsCount_other": "{{count}} results",
     "activeCharacter": "Active",
@@ -10859,6 +10862,7 @@
     "pasteTitle": "Paste anywhere",
     "pasteHint": "Outside a text field, a pasted fit, blueprint list, skill plan, item list (inventory, cargo or contract), Local list or D-Scan opens where it belongs. Back returns you where you were.",
     "paste": "Paste",
+    "pasteOffline": "Couldn't read that paste offline — item data isn't downloaded yet.",
     "pasteDestinations": {
       "survey": {
         "label": "Survey scan",

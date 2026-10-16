@@ -541,6 +541,20 @@ describe('colonyCheckRow against the shared advice model', () => {
     expect(result.load.ccLevel).toBe(4);
   });
 
+  it('flags the link draw as unknown when the planet radius is missing and links exist', () => {
+    const d = detail(70);
+    expect(colonyCheckRow(input(d, null)).load.linkLoadUnknown).toBe(false);
+    const result = colonyCheckRow({ ...input(d, null), radiusKm: null });
+    // CPU and power still read, but without the links' draw: understated, so flagged.
+    expect(result.load.cpu).toBeGreaterThan(0);
+    expect(result.load.linkLoadUnknown).toBe(true);
+  });
+
+  it('does not flag a colony with no links, whatever the radius', () => {
+    const d = { ...detail(70), links: [] };
+    expect(colonyCheckRow({ ...input(d, null), radiusKm: null }).load.linkLoadUnknown).toBe(false);
+  });
+
   it('tags a list that is a day old or more as stale', () => {
     const d = detail(70);
     const stale = colonyCheckRow({ ...input(d, null), dataAgeHours: 26 });

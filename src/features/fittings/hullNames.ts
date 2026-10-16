@@ -4,7 +4,9 @@
  * out special-edition and event hulls a pilot can still fit and paste.
  */
 import { loadMarketGroups, loadMarketTypes } from '@/sde/loadMarketSde';
+import { loadGroupCategories, loadTypes } from '@/sde/loadSde';
 import type { MarketGroupNode, MarketTypeEntry } from '@/sde/marketTypes';
+import type { TypeMap } from '@/sde/types';
 
 /** `market/groups.json`'s "Ships" root (`parentId: null`). */
 const SHIPS_ROOT_MARKET_GROUP = 4;
@@ -35,11 +37,37 @@ export function hullNamesFrom(
   return names;
 }
 
+/** Every ship category type id in `groupCategories.json`. */
+const SHIP_CATEGORY_ID = 6;
+
+/**
+ * The same names from the install-precached `types.json` and
+ * `groupCategories.json`: every type whose group is in the Ship category. The
+ * fallback for when the market catalogue (`market/types.json`, fetched on
+ * first use and not precached) has never been downloaded, so a fit pasted
+ * offline on a fresh install still finds its hull.
+ */
+export function hullNamesFromTypes(
+  types: TypeMap,
+  categories: Readonly<Record<string, number>>
+): Set<string> {
+  const names = new Set<string>();
+  for (const type of Object.values(types)) {
+    if (categories[String(type.groupID)] === SHIP_CATEGORY_ID) names.add(type.name.toLowerCase());
+  }
+  return names;
+}
+
 let hullNamesPromise: Promise<ReadonlySet<string>> | null = null;
 
 export function loadHullNames(): Promise<ReadonlySet<string>> {
   hullNamesPromise ??= Promise.all([loadMarketTypes(), loadMarketGroups()])
     .then(([types, groups]) => hullNamesFrom(types, groups))
+    .catch(() =>
+      Promise.all([loadTypes(), loadGroupCategories()]).then(([types, categories]) =>
+        hullNamesFromTypes(types, categories)
+      )
+    )
     .catch((error: unknown) => {
       hullNamesPromise = null; // allow retry after failure
       throw error;

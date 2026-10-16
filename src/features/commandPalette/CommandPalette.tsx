@@ -260,7 +260,7 @@ export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
   let optionIndex = 0;
   const trimmed = query.trim();
   // The error row is not an option, so the live count alone would hide it.
-  const groupFailed = groups.some((group) => group.status === 'error');
+  const failedGroups = groups.filter((group) => group.status === 'error');
   const groupCapped = groups.some(
     (group) => group.status !== 'error' && group.results.length >= GROUP_LIMIT
   );
@@ -269,7 +269,9 @@ export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
   const statusParts = [
     t('commandPalette.resultsCount', { count: options.length }),
     groupCapped && t('commandPalette.groupCapped', { count: GROUP_LIMIT }),
-    groupFailed && t('commandPalette.groupError'),
+    ...new Set(
+      failedGroups.map((group) => t(group.provider.errorKey ?? 'commandPalette.groupError'))
+    ),
   ].filter((part): part is string => typeof part === 'string');
   const statusText =
     trimmed === ''
@@ -315,7 +317,7 @@ export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
                   </div>
                   {group.status === 'error' ? (
                     <div aria-hidden="true" className="px-2 py-1.5 text-sm text-danger">
-                      {t('commandPalette.groupError')}
+                      {t(group.provider.errorKey ?? 'commandPalette.groupError')}
                     </div>
                   ) : group.status === 'loading' ? (
                     <div

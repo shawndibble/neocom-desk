@@ -24,6 +24,9 @@ import { NOTICE_MS } from '@/components/ui/useTimedToast';
 import { writeToClipboard } from '@/lib/clipboard';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { uidForCharacter } from '@/sync/uid';
+import { useOnline, useReconnectCount } from '@/stores/network';
+import { loadCommunitySnapshot, saveCommunitySnapshot } from './communityCache';
+import { NeedsConnectionButton } from './NeedsConnectionButton';
 import { CommunityHeader } from './CommunityHeader';
 import { CommunityLibrary } from './CommunityLibrary';
 import { CommunitySharedFittings } from './CommunitySharedFittings';
@@ -110,6 +113,10 @@ export function CommunityDetail({
   const [now] = useState(() => Date.now());
   const [members, setMembers] = useState<CommunityMember[] | null>(null);
   const [membersFailed, setMembersFailed] = useState(false);
+  // The roster is the last one read while online (`communityCache.ts`).
+  const [membersCached, setMembersCached] = useState(false);
+  const online = useOnline();
+  const reconnects = useReconnectCount();
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const [panel, setPanel] = useState<ManagePanel | null>(initialPanel ?? null);
   const [copied, setCopied] = useState<string | null>(null);
@@ -159,17 +166,31 @@ export function CommunityDetail({
     (async () => {
       try {
         const loaded = await loadCommunityMembers(characterId, community.id);
+        void saveCommunitySnapshot(characterId, 'members', loaded, community.id);
         if (cancelled) return;
         setMembers(loaded);
         setMembersFailed(false);
+        setMembersCached(false);
       } catch {
-        if (!cancelled) setMembersFailed(true);
+        const snapshot = await loadCommunitySnapshot<CommunityMember[]>(
+          characterId,
+          'members',
+          community.id
+        );
+        if (cancelled) return;
+        if (snapshot) {
+          setMembers(snapshot);
+          setMembersFailed(false);
+          setMembersCached(true);
+        } else {
+          setMembersFailed(true);
+        }
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [characterId, community.id, community.memberCount, reload]);
+  }, [characterId, community.id, community.memberCount, reload, reconnects]);
 
   // The admin's waiting list. A failed read (a backend not yet updated) is an empty list.
   const [requestsReload, setRequestsReload] = useState(0);
@@ -234,7 +255,12 @@ export function CommunityDetail({
         admin={admin}
         members={members}
         actions={
-          admin && (
+          admin &&
+          (!online ? (
+            <NeedsConnectionButton size="sm">
+              {t('communities.manage.trigger')}
+            </NeedsConnectionButton>
+          ) : (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button size="sm">
@@ -266,7 +292,7 @@ export function CommunityDetail({
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-          )
+          ))
         }
       />
       <div>
@@ -327,6 +353,11 @@ export function CommunityDetail({
             />
           ) : (
             <Panel>
+              {membersCached && (
+                <p role="status" className="mb-2 text-[0.6875rem] text-warning uppercase">
+                  {t('common.offlineTitle')}
+                </p>
+              )}
               {membersFailed ? (
                 <p role="alert" className="text-xs text-danger">
                   {t('communities.membersLoadFailed')}

@@ -1,5 +1,7 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate, type Location } from 'react-router-dom';
+import { Toast } from '@/components/ui';
 import { parseChatLink } from '@/engine/import/chatLink';
 import type { PasteDestination } from '@/engine/import/pasteDestination';
 import { ENTITY_INFO_PUSHED_STATE } from '@/features/entities/entityInfoState';
@@ -72,11 +74,26 @@ const DESTINATIONS: Record<
   dscan: pilotLookup,
 };
 
+/** What {@link classifyPaste} made of a paste. */
+interface Classified {
+  destination: PasteDestination | null;
+  /**
+   * The market catalogue or the hull names could not be loaded (offline, never
+   * downloaded), so a `null` destination may only mean "could not tell".
+   */
+  degraded: boolean;
+}
+
 /**
- * Classifies a paste off the critical path: the parsers and the market
- * catalogue load on the first page-level paste, not with the signed-in shell.
+ * Classifies a paste off the critical path: the parsers and the data they
+ * match against load on the first page-level paste, not with the signed-in
+ * shell. Each source is loaded on its own and a missing one only costs the
+ * destinations that need it: the market catalogue (not precached) is read by
+ * the item-list Appraisal alone, and the hull names fall back to the
+ * precached `types.json`, so a skill plan, D-Scan, fit or blueprint list
+ * still routes with no connection.
  */
-async function classifyPaste(text: string): Promise<PasteDestination | null> {
+async function classifyPaste(text: string): Promise<Classified> {
   const [
     { pasteDestination },
     { loadAppraisalCatalogue },
@@ -91,16 +108,26 @@ async function classifyPaste(text: string): Promise<PasteDestination | null> {
     import('@/features/industry/blueprintNames'),
   ]);
   const [catalogue, hullNames, skillByName, blueprintNames] = await Promise.all([
-    loadAppraisalCatalogue(),
-    loadHullNames(),
+    loadAppraisalCatalogue().catch(() => null),
+    loadHullNames().catch(() => null),
     // A skill catalogue that won't load costs only the skill-plan route.
     loadSkillNameMap().catch(() => new Map<string, { typeID: number }>()),
     // Without the blueprint data a blueprint list is just not recognised; the
     // fit and item-list pastes must not depend on it.
     loadBlueprintNames().catch(() => undefined),
   ]);
-  return pasteDestination(text, { catalogue, hullNames, skillByName, blueprintNames });
+  const destination = pasteDestination(text, {
+    catalogue: catalogue ?? new Map(),
+    hullNames: hullNames ?? new Set(),
+    skillByName,
+    blueprintNames,
+  });
+  return { destination, degraded: catalogue === null || hullNames === null };
 }
+
+/** More than one line: a list or a fit, which a pilot expects to land somewhere. */
+const looksLikeList = (text: string) =>
+  text.split(/\r?\n/).filter((l) => l.trim() !== '').length > 1;
 
 /**
  * The app-wide paste router: Ctrl+V / Cmd+V anywhere on a page — not into a
@@ -113,8 +140,11 @@ async function classifyPaste(text: string): Promise<PasteDestination | null> {
  * the global keyboard shortcuts.
  */
 export function GlobalPasteRouter() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
+  // Said when a paste that may have been a list could not be read for want of data.
+  const [notice, setNotice] = useState<string | null>(null);
   const locationRef = useRef(location);
   useEffect(() => {
     locationRef.current = location;
@@ -131,19 +161,28 @@ export function GlobalPasteRouter() {
       if (text.trim() === '') return;
 
       const id = ++latestPaste.current;
+      const unreadable = () => {
+        if (id === latestPaste.current) setNotice(t('shortcuts.pasteOffline'));
+      };
       classifyPaste(text)
-        .then((destination) => {
-          if (id !== latestPaste.current || destination === null) return;
+        .then(({ destination, degraded }) => {
+          if (id !== latestPaste.current) return;
+          if (destination === null) {
+            // Not a format we know is the usual silence. Only a list that
+            // could not be read for want of data is worth saying so.
+            if (degraded && looksLikeList(text)) unreadable();
+            return;
+          }
           void navigate(...DESTINATIONS[destination](text, locationRef.current));
         })
-        // No catalogue (offline, first visit) means no jump — the pilot can
-        // still paste into Fittings' Load or the Appraisal box by hand.
-        .catch(() => undefined);
+        // The parsers themselves failed to load: the pilot can still paste
+        // into Fittings' Load or the Appraisal box by hand, and is told so.
+        .catch(unreadable);
     }
 
     document.addEventListener('paste', onPaste);
     return () => document.removeEventListener('paste', onPaste);
-  }, [navigate]);
+  }, [navigate, t]);
 
-  return null;
+  return notice === null ? null : <Toast message={notice} onClose={() => setNotice(null)} />;
 }
