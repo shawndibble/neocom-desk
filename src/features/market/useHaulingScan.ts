@@ -10,17 +10,15 @@ import { SKILL_IDS } from '@/engine/industry/types';
 import { ZERO_STANDINGS } from '@/engine/market/standings';
 import { loadCharacterModifiers } from '@/features/character/characterModifiers';
 import type { TradeHub } from '@/market/hubs';
-import { loadMarketGroups, loadMarketTypes } from '@/sde/loadMarketSde';
-import { loadGroupCategories, loadTypes } from '@/sde/loadSde';
 import { typeIdsInHaulingCategory } from './haulingCategories';
 import {
   clearHaulingScanCache,
-  runHaulingScan,
   type HaulMode,
   type HaulingProgress,
   type HaulingScan,
 } from './haulingData';
 import type { HaulingEnd } from './haulingHubs';
+import { scanHaulingLane } from './haulingScanRun';
 import type { HaulingFeesAt } from './haulingView';
 import { tradeHubStanding, useTradeHubStandings } from './useTradeHubStandings';
 
@@ -46,27 +44,20 @@ export function useHaulingScan(
     setState({ status: 'loading', progress: null });
     void (async () => {
       try {
-        const [groups, marketTypes, types, groupCategories] = await Promise.all([
-          loadMarketGroups(),
-          loadMarketTypes(),
-          loadTypes(),
-          // Without it every category reads as unknown: items still plan, in the general hold only.
-          loadGroupCategories().catch(() => ({})),
-        ]);
-        const typeIds = typeIdsInHaulingCategory(categoryId, groups, marketTypes);
-        const scan = await runHaulingScan({
-          from,
-          to,
-          typeIds,
-          scope: categoryId,
-          mode,
-          types,
-          groupCategories,
-          signal: controller.signal,
-          onProgress: (progress) => {
-            if (!controller.signal.aborted) setState({ status: 'loading', progress });
+        const scan = await scanHaulingLane(
+          {
+            from,
+            to,
+            mode,
+            scope: categoryId,
+            typeIds: (groups, marketTypes) =>
+              typeIdsInHaulingCategory(categoryId, groups, marketTypes),
           },
-        });
+          controller.signal,
+          (progress) => {
+            if (!controller.signal.aborted) setState({ status: 'loading', progress });
+          }
+        );
         if (!controller.signal.aborted) setState({ status: 'ready', scan });
       } catch (error) {
         if (!controller.signal.aborted && !(error instanceof DOMException)) {

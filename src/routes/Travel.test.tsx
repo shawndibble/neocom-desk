@@ -85,6 +85,13 @@ vi.mock('@/features/market/useHaulingScan', () => {
   const fees = { accountingLevel: 5, brokerRelationsLevel: 4, at: () => null };
   return { useHaulingScan: () => scan, useHaulingFees: () => fees };
 });
+// The fill scan loads market types, and the jump count pulls the route
+// settings stores: neither has anything to show while the main scan failed.
+vi.mock('@/features/market/useHaulingFillScan', () => {
+  const fill = { state: { status: 'idle' }, refresh: () => {} };
+  return { useHaulingFillScan: () => fill };
+});
+vi.mock('@/features/market/useHubJumps', () => ({ useHubJumps: () => ({ status: 'none' }) }));
 
 const CHAR_ID = 91;
 const ESI = 'https://esi.evetech.net';

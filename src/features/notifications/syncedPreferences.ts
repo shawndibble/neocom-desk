@@ -28,7 +28,7 @@ import {
 } from './eventSelection';
 import type { NotificationEventId } from './events';
 import type { NotificationPreferencesValue } from './preferencesStore';
-import { setThresholds, type CharacterEventThresholds } from './eventThresholds';
+import { setThresholds, type CharacterEventThresholds } from './eventThresholdFields';
 import { recordByCharacterId } from './recordByCharacterId';
 
 export const SYNCED_NOTIFICATION_FEED_PREFS_KEY = 'sync.notificationFeedPrefs';

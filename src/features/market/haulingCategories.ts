@@ -38,6 +38,23 @@ export function typeIdsInHaulingCategory(
   );
 }
 
+/**
+ * The type ids of every offered category but `categoryId`, ascending: what a
+ * fill from other categories scans. Empty for Everything, which has none
+ * left. A set difference, so a category nested under another never leaks in.
+ */
+export function typeIdsOutsideHaulingCategory(
+  categoryId: number,
+  groups: readonly MarketGroupNode[],
+  types: readonly MarketTypeEntry[]
+): number[] {
+  if (categoryId === EVERYTHING_CATEGORY_ID) return [];
+  const inside = new Set(typeIdsInHaulingCategory(categoryId, groups, types));
+  return typeIdsInHaulingCategory(EVERYTHING_CATEGORY_ID, groups, types).filter(
+    (id) => !inside.has(id)
+  );
+}
+
 /** Every type id under `rootId`, at any depth of the market-group tree, ascending. */
 export function typeIdsInCategory(
   rootId: number,
@@ -73,4 +90,30 @@ function typeIdsInCategories(
     .filter((t) => inTree.has(t.marketGroupId))
     .map((t) => t.typeId)
     .sort((a, b) => a - b);
+}
+
+/** The Hauling category each of `typeIds` sits under, found by walking up its market group's parents. */
+export function haulingCategoryOf(
+  typeIds: readonly number[],
+  groups: readonly MarketGroupNode[],
+  types: readonly MarketTypeEntry[]
+): Map<number, number> {
+  const wanted = new Set(typeIds);
+  const parentOf = new Map(groups.map((g) => [g.id, g.parentId]));
+  const roots = new Set<number>(HAULING_CATEGORY_IDS);
+  const byType = new Map<number, number>();
+  for (const type of types) {
+    if (!wanted.has(type.typeId)) continue;
+    for (
+      let id: number | null | undefined = type.marketGroupId;
+      id != null;
+      id = parentOf.get(id)
+    ) {
+      if (roots.has(id)) {
+        byType.set(type.typeId, id);
+        break;
+      }
+    }
+  }
+  return byType;
 }

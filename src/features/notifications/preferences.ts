@@ -40,7 +40,7 @@ import {
   DEFAULT_STRUCTURE_FUEL_LOW_DAYS,
   defaultedThresholds,
   type CharacterEventThresholds,
-} from './eventThresholds';
+} from './eventThresholdFields';
 import type { EntryChannelTarget } from './feedSelection';
 import { SYNCED_NOTIFICATION_FEED_PREFS_KEY, toSyncedFeedPrefs } from './syncedPreferences';
 import {
@@ -64,8 +64,8 @@ export {
   isFeedChannelEnabled,
   type NotificationPreferencesValue,
 } from './preferencesStore';
-export type { CharacterEventThresholds } from './eventThresholds';
-/** Re-exported: the threshold field specs live in `eventThresholds.ts`, so callers that already import preferences need not reach there. */
+export type { CharacterEventThresholds } from './eventThresholdFields';
+/** Re-export so preferences importers needn't reach `eventThresholdFields.ts`. */
 export {
   STRUCTURE_FUEL_LOW_DAY_OPTIONS,
   EXTRACTOR_EXPIRING_LEAD_HOUR_OPTIONS,
@@ -81,7 +81,7 @@ export {
   DEFAULT_CORP_WALLET_TRANSACTION_CEILING_ISK,
   DEFAULT_WALLET_BALANCE_CHANGED_THRESHOLD_ISK,
   DEFAULT_INCURSION_NEARBY_JUMPS,
-} from './eventThresholds';
+} from './eventThresholdFields';
 
 /**
  * The slice of preferences the uploaded Projection reads (`projectionRebuild.ts`),

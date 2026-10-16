@@ -315,10 +315,15 @@ export function ItemMoreActions(
     () => setAlertOpen(true),
     () => setStockOpen(true)
   );
+  // Like the right-click menu: opening loads the blueprint catalog, so Build Plan is ready (or "checking…").
+  const { requestBlueprints } = useItemActions();
+  const onOpenChange = (open: boolean) => {
+    if (open) requestBlueprints();
+  };
 
   return (
     <>
-      <RowActionsContext.Provider value={{ name: itemName, items }}>
+      <RowActionsContext.Provider value={{ name: itemName, items, onOpenChange }}>
         <RowMoreActions variant={variant} size={size} />
       </RowActionsContext.Provider>
       {alertOpen && (

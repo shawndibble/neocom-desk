@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   EVERYTHING_CATEGORY_ID,
+  haulingCategoryOf,
   isHaulingCategoryId,
   typeIdsInCategory,
   typeIdsInHaulingCategory,
+  typeIdsOutsideHaulingCategory,
 } from './haulingCategories';
 
 const groups = [
@@ -43,10 +45,40 @@ describe('typeIdsInHaulingCategory', () => {
   });
 });
 
+describe('typeIdsOutsideHaulingCategory', () => {
+  it('covers every other offered category, sorted, still without ships', () => {
+    expect(typeIdsOutsideHaulingCategory(9, groups, types)).toEqual([10, 30]);
+    expect(typeIdsOutsideHaulingCategory(11, groups, types)).toEqual([20]);
+  });
+  it('is empty for Everything, which already covers them all', () => {
+    expect(typeIdsOutsideHaulingCategory(EVERYTHING_CATEGORY_ID, groups, types)).toEqual([]);
+  });
+  it('never hands back a type of the category itself, even one nested under another root', () => {
+    // 955 sits under 9 here: a type under 955 is in both, and must stay out of 955's fill.
+    const nested = [...groups, { id: 955, name: 'Modifications', parentId: 9, hasTypes: true }];
+    const nestedTypes = [...types, { typeId: 50, name: 'E', marketGroupId: 955, volume: 1 }];
+    expect(typeIdsOutsideHaulingCategory(955, nested, nestedTypes)).toEqual([10, 20, 30]);
+  });
+});
+
 describe('isHaulingCategoryId', () => {
   it('accepts the offered categories and Everything, and nothing else', () => {
     expect(isHaulingCategoryId(11)).toBe(true);
     expect(isHaulingCategoryId(EVERYTHING_CATEGORY_ID)).toBe(true);
     expect(isHaulingCategoryId(4)).toBe(false); // Ships
+  });
+});
+
+describe('haulingCategoryOf', () => {
+  it('maps each asked type to the Hauling category it sits under, at any depth', () => {
+    const byType = haulingCategoryOf([10, 30, 20], groups, types);
+    expect(byType.get(10)).toBe(11);
+    expect(byType.get(30)).toBe(11);
+    expect(byType.get(20)).toBe(9);
+  });
+  it('leaves out types outside every offered category, and types not asked for', () => {
+    const byType = haulingCategoryOf([40, 10], groups, types);
+    expect(byType.has(40)).toBe(false);
+    expect(byType.has(30)).toBe(false);
   });
 });
