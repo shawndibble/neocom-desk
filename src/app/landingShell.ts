@@ -7,9 +7,10 @@ import { useLocation } from 'react-router-dom';
  * any JS has loaded. On a slow phone that is seconds sooner than React can
  * render it.
  *
- * `index.html` carries it inside a `<template>`; the `#landing-shell-boot`
- * script clones it in, and hides `#root`, only on `/` or `/login`, with no
- * signed-in hint and outside the Play Store app. React renders under it
+ * `index.html` carries it inside a `<template>`. The `#landing-shell-gate`
+ * script in `<head>` chooses it, hides `#root` and starts the hero's ship,
+ * only on `/` or `/login`, with no signed-in hint and outside the Play Store
+ * app; the `#landing-shell-boot` script in `<body>` clones it in. React renders under it
  * unseen, and whatever the first real screen turns out to be lets it go:
  * `Login` once its Dexie read resolves (the hero commits in the same frame, so
  * the swap never paints in between), any other route on arrival, and a render

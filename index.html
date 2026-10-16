@@ -24,7 +24,7 @@
       body {
         background-color: #0a0e14;
       }
-      /* While the prerendered landing hero stands in (#landing-shell-boot
+      /* While the prerendered landing hero stands in (#landing-shell-gate
          below), React renders under it unseen. src/app/landingShell.ts. */
       html[data-landing-shell] #root {
         display: none;
@@ -41,6 +41,34 @@
         var s = Number(localStorage.getItem('neocom:font-scale'));
         if ([0.875, 1, 1.125, 1.25].indexOf(s) !== -1)
           document.documentElement.style.fontSize = s * 100 + '%';
+      } catch (e) {}
+    </script>
+    <!-- Whether the prerendered landing hero (cloned in by #landing-shell-boot,
+         src/app/landingShell.ts) stands in: only on the landing page's own
+         paths, and never for a returning pilot (the signed-in hint,
+         src/app/signedInShellHint.ts) or inside the Play Store app
+         (src/lib/playStoreApp.ts), which get no marketing page. Decided here
+         in <head>, ahead of the stylesheet, because a script after a
+         stylesheet waits for it: the hero's ship starts loading now rather
+         than once the CSS is in. Pinned by
+         src/app/landingShellBootScript.test.ts. -->
+    <script id="landing-shell-gate">
+      try {
+        var p = location.pathname;
+        if (
+          (p === '/' || p === '/login') &&
+          localStorage.getItem('neocom:has-character') !== '1' &&
+          sessionStorage.getItem('playStoreApp') !== '1' &&
+          document.referrer.indexOf('android-app://com.neocomdesk.app') !== 0
+        ) {
+          document.documentElement.setAttribute('data-landing-shell', '');
+          var l = document.createElement('link');
+          l.rel = 'preload';
+          l.setAttribute('as', 'image');
+          l.href = '/landing/megathron.webp';
+          l.setAttribute('fetchpriority', 'high');
+          document.head.appendChild(l);
+        }
       } catch (e) {}
     </script>
     <!-- Same cure as src/app/staleBuildRecovery.ts, for a build so stale that
@@ -105,27 +133,24 @@
          fills the template from src/features/landing/landingShell.snapshot.html;
          src/app/landingShell.ts explains the hand-off to React. -->
     <template id="landing-shell-template"><!-- landing-shell --></template>
-    <!-- Only on the landing page's own paths, and never for a returning pilot
-         (the signed-in hint, src/app/signedInShellHint.ts) or inside the Play
-         Store app (src/lib/playStoreApp.ts), which get no marketing page.
-         Appended where the parser is, so it lands just before #root. Pinned by
-         src/app/landingShellBootScript.test.ts. -->
+    <!-- Clones the hero in where the gate in <head> chose it, appended where
+         the parser is so it lands just before #root. An empty template (the
+         marker never filled) shows #root after all. -->
     <script id="landing-shell-boot">
       try {
-        var p = location.pathname;
+        var h = document.documentElement;
         var t = document.getElementById('landing-shell-template');
-        if (
-          (p === '/' || p === '/login') &&
-          t.content.firstElementChild &&
-          localStorage.getItem('neocom:has-character') !== '1' &&
-          sessionStorage.getItem('playStoreApp') !== '1' &&
-          document.referrer.indexOf('android-app://com.neocomdesk.app') !== 0
-        ) {
-          document.body.appendChild(t.content.cloneNode(true));
-          document.documentElement.setAttribute('data-landing-shell', '');
-          document.documentElement.setAttribute('data-landing-shell-shown', '');
+        if (h.hasAttribute('data-landing-shell')) {
+          if (t.content.firstElementChild) {
+            document.body.appendChild(t.content.cloneNode(true));
+            h.setAttribute('data-landing-shell-shown', '');
+          } else {
+            h.removeAttribute('data-landing-shell');
+          }
         }
-      } catch (e) {}
+      } catch (e) {
+        document.documentElement.removeAttribute('data-landing-shell');
+      }
     </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
