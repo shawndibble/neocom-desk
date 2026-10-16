@@ -15,7 +15,6 @@ import {
   ARCHIVE_DAYS,
   addCoverage,
   archiveGaps,
-  archiveRanges,
   archiveSince,
   fetchWindow,
 } from '@/engine/wallet/archiveCoverage';
@@ -182,13 +181,11 @@ export interface WalletArchiveInfo {
   since: number | null;
   /** Uncovered stretches, `[fromMs, toMs]`, including the one up to now. */
   gaps: Array<[number, number]>;
-  /** Preset ranges in days the archive reaches back far enough to fill. */
-  ranges: number[];
   /** Rows are stored but no complete fetch has confirmed what they cover. */
   unconfirmed: boolean;
 }
 
-/** What the Journal's history line states: reach, gaps and offered ranges. */
+/** What the Journal's history line states: reach and gaps. */
 export async function loadWalletArchiveInfo(
   characterId: number,
   nowMs: number = Date.now()
@@ -201,7 +198,6 @@ export async function loadWalletArchiveInfo(
   return {
     since: archiveSince(windows),
     gaps: archiveGaps(windows, nowMs),
-    ranges: archiveRanges(windows, nowMs),
     unconfirmed,
   };
 }

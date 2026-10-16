@@ -119,7 +119,6 @@ describe('coverage', () => {
     await archiveResult('journal', CHAR, live([entry(1, 3)]));
     const info = await loadWalletArchiveInfo(CHAR, NOW);
     expect(info.since).toBe(NOW - HOUR - 30 * DAY);
-    expect(info.ranges).toEqual([]);
     expect(info.gaps).toEqual([]);
   });
 
@@ -134,7 +133,7 @@ describe('coverage', () => {
     expect((await loadWalletArchiveInfo(CHAR, NOW)).since).toBeNull();
   });
 
-  it('shows a gap when the app was closed past ESI window, and offers 90 days once reached', async () => {
+  it('shows a gap when the app was closed past ESI window', async () => {
     await db.walletArchiveCoverage.put({
       characterId: CHAR,
       kind: 'journal',
@@ -143,7 +142,6 @@ describe('coverage', () => {
     await archiveResult('journal', CHAR, live([entry(1, 3)]));
     const info = await loadWalletArchiveInfo(CHAR, NOW);
     expect(info.gaps).toEqual([[NOW - 90 * DAY, NOW - HOUR - 30 * DAY]]);
-    expect(info.ranges).toEqual([90]);
   });
 });
 

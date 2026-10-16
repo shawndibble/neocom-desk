@@ -984,11 +984,7 @@ export function Wallet() {
                     {t('wallet.journalItemNamesCappedHint')}
                   </p>
                 )}
-                <WalletHistoryNote
-                  info={data?.archive}
-                  filter={journalFilter}
-                  onFilterChange={setJournalFilter}
-                />
+                <WalletHistoryNote info={data?.archive} />
                 <JournalTable
                   filter={journalFilter}
                   onFilterChange={setJournalFilter}

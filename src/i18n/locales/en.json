@@ -5298,8 +5298,6 @@
     "journalTruncatedHint": "Some pages failed to load. Refresh to try again.",
     "history": {
       "since": "History since {{date}} · kept on this device only.",
-      "rangeDays": "{{days}} days",
-      "range1y": "1 year",
       "unconfirmed": "History is kept on this device only; how far back it reaches is not confirmed yet.",
       "gapRange": "{{from}} – {{to}}",
       "gap": "Not recorded: {{ranges, list}}. EVE only returns 30 days, so a stretch the app was not opened for can't be recovered."
