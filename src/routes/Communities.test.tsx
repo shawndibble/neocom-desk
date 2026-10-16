@@ -494,7 +494,7 @@ describe('Communities page', () => {
 });
 
 describe('Communities page without a connection', () => {
-  const offline = new Error('Failed to fetch');
+  const offline = new TypeError('Failed to fetch');
   const setOnline = (online: boolean) => {
     vi.spyOn(window.navigator, 'onLine', 'get').mockReturnValue(online);
     window.dispatchEvent(new Event(online ? 'online' : 'offline'));
@@ -529,6 +529,41 @@ describe('Communities page without a connection', () => {
     expect(screen.queryByText(en.common.offlineTitle)).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: c.createLabel }));
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('does not show the saved list for a refusal', async () => {
+    await db.settings.put({ key: `communitySnapshot:${ME}:list`, value: [community()] });
+    store.loadMyCommunities.mockRejectedValue(
+      Object.assign(new Error('denied'), { code: 'permission-denied' })
+    );
+    renderPage();
+    expect(await screen.findByText(c.loadFailed)).toBeInTheDocument();
+    expect(screen.queryByText('Pals')).not.toBeInTheDocument();
+  });
+
+  it('forgets a Community’s saved roster when the Character leaves it', async () => {
+    await db.settings.put({ key: `communitySnapshot:${ME}:members:c1`, value: members });
+    store.loadMyCommunities.mockResolvedValue([community({ adminUid: 'char:92' })]);
+    store.leaveCommunity.mockResolvedValue(undefined);
+    const user = userEvent.setup();
+    renderPage('/communities?community=c1');
+    await user.click(await screen.findByRole('tab', { name: /^Members/ }));
+    await user.click(await screen.findByRole('button', { name: c.leave }));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: c.leaveAction }));
+    await waitFor(async () =>
+      expect(await db.settings.get(`communitySnapshot:${ME}:members:c1`)).toBeUndefined()
+    );
+  });
+
+  it('prunes the saved roster of a Community the live list no longer holds', async () => {
+    await db.settings.put({ key: `communitySnapshot:${ME}:members:gone`, value: members });
+    store.loadMyCommunities.mockResolvedValue([community()]);
+    renderPage();
+    await screen.findByText('Pals');
+    await waitFor(async () =>
+      expect(await db.settings.get(`communitySnapshot:${ME}:members:gone`)).toBeUndefined()
+    );
   });
 
   it('does not show another Character’s saved list', async () => {

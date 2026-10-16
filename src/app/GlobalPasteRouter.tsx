@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate, type Location } from 'react-router-dom';
 import { Toast } from '@/components/ui';
 import { parseChatLink } from '@/engine/import/chatLink';
+import { looksLikeEftFit } from '@/engine/import/eftFit';
 import type { PasteDestination } from '@/engine/import/pasteDestination';
 import { ENTITY_INFO_PUSHED_STATE } from '@/features/entities/entityInfoState';
 import { FITTINGS_PATH } from '@/features/fittings/fittingRoutes';
@@ -125,9 +126,25 @@ async function classifyPaste(text: string): Promise<Classified> {
   return { destination, degraded: catalogue === null || hullNames === null };
 }
 
-/** More than one line: a list or a fit, which a pilot expects to land somewhere. */
-const looksLikeList = (text: string) =>
-  text.split(/\r?\n/).filter((l) => l.trim() !== '').length > 1;
+/**
+ * Whether a paste is shaped like something the router would have placed with
+ * its data: an EFT fit, or several short lines (names with quantities, or tab
+ * columns), as an inventory copy or multibuy is. An ordinary paragraph is not,
+ * so a pilot pasting prose offline is not told about item data.
+ */
+function looksLikeList(text: string): boolean {
+  if (looksLikeEftFit(text)) return true;
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line !== '');
+  if (lines.length < 2) return false;
+  return lines.every(
+    (line) =>
+      line.includes('\t') ||
+      (line.length <= 60 && line.split(/\s+/).length <= 6 && !/[.!?:]$/.test(line))
+  );
+}
 
 /**
  * The app-wide paste router: Ctrl+V / Cmd+V anywhere on a page — not into a
@@ -161,23 +178,24 @@ export function GlobalPasteRouter() {
       if (text.trim() === '') return;
 
       const id = ++latestPaste.current;
+      // Said only for a paste shaped like a list or a fit: prose is nobody's miss.
       const unreadable = () => {
-        if (id === latestPaste.current) setNotice(t('shortcuts.pasteOffline'));
+        if (id === latestPaste.current && looksLikeList(text))
+          setNotice(t('shortcuts.pasteOffline'));
       };
-      classifyPaste(text)
-        .then(({ destination, degraded }) => {
-          if (id !== latestPaste.current) return;
-          if (destination === null) {
-            // Not a format we know is the usual silence. Only a list that
-            // could not be read for want of data is worth saying so.
-            if (degraded && looksLikeList(text)) unreadable();
-            return;
-          }
-          void navigate(...DESTINATIONS[destination](text, locationRef.current));
-        })
+      classifyPaste(text).then(({ destination, degraded }) => {
+        if (id !== latestPaste.current) return;
+        // Without the market catalogue an item list cannot be told from a Local
+        // list of names, so a "pilot list" verdict is not trusted: Pilot Lookup
+        // is no use offline either. A D-Scan (type ids) is still unmistakable.
+        if (destination === null || (degraded && destination === 'pilotList')) {
+          if (degraded) unreadable();
+          return;
+        }
+        void navigate(...DESTINATIONS[destination](text, locationRef.current));
         // The parsers themselves failed to load: the pilot can still paste
         // into Fittings' Load or the Appraisal box by hand, and is told so.
-        .catch(unreadable);
+      }, unreadable);
     }
 
     document.addEventListener('paste', onPaste);

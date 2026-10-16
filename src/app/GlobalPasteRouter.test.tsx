@@ -191,6 +191,29 @@ describe('GlobalPasteRouter', () => {
       expect(screen.getByTestId('where')).toHaveTextContent('/overview');
     });
 
+    it.each([
+      ['bare names', 'Tritanium\nPyerite'],
+      ['a multibuy', 'Tritanium x1000\nPyerite x200'],
+    ])('does not send %s to Pilot Lookup; it says so', async (_name, text) => {
+      renderRouter();
+      await paste(document.body, text);
+      expect(await screen.findByText(notice)).toBeInTheDocument();
+      expect(screen.getByTestId('where')).toHaveTextContent('/overview');
+    });
+
+    it('stays quiet for an ordinary paragraph', async () => {
+      renderRouter();
+      const classify = vi.mocked(pasteDestinationModule.pasteDestination);
+      classify.mockClear();
+      await paste(
+        document.body,
+        'I was flying through Jita last night when a fleet showed up.\nThey were all in Tengus and it was a mess, honestly.'
+      );
+      await waitFor(() => expect(classify).toHaveBeenCalled());
+      await act(async () => {});
+      expect(screen.queryByText(notice)).not.toBeInTheDocument();
+    });
+
     it('stays quiet for a one-line paste that is nothing in particular', async () => {
       renderRouter();
       const classify = vi.mocked(pasteDestinationModule.pasteDestination);

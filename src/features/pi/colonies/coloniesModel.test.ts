@@ -218,6 +218,7 @@ function row(overrides: Partial<ColonyCheckRow> = {}): ColonyCheckRow {
       cpuBudget: 20_000,
       powerUsed: 13_500,
       powerBudget: 17_000,
+      linkLoadUnknown: false,
     },
     idleFactories: 0,
     tags: [],

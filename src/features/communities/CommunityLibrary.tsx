@@ -36,8 +36,9 @@ import { loadMarketGroups, loadMarketTypes } from '@/sde/loadMarketSde';
 import { loadBlueprints } from '@/sde/loadSde';
 import { loadSolarSystemsById } from '@/sde/solarSystems';
 import { uidForCharacter } from '@/sync/uid';
-import { loadMemberLibraries, type CommunityMember } from './communityStore';
-import { loadCommunitySnapshot, saveCommunitySnapshot } from './communityCache';
+import { loadMemberLibrariesDetailed, type CommunityMember } from './communityStore';
+import { loadLibrariesWithFallback } from './communityCache';
+import type { MarketTypeEntry } from '@/sde/marketTypes';
 import { useReconnectCount } from '@/stores/network';
 import { sharedBlueprintRows, systemIdsByName } from './sharedBlueprintCopies';
 import { SharedBlueprintTable } from './SharedBlueprintTable';
@@ -243,40 +244,16 @@ export function CommunityLibrary({
     (async () => {
       try {
         const uids = memberKey ? memberKey.split(',') : [];
-        // Strict, so an unreadable library throws and falls back to the saved
-        // copy, rather than reading as empty and being saved over a good one
-        // (a signed-in session can outlive the connection).
-        const live = loadMemberLibraries(characterId, communityId, uids, { strict: true }).then(
-          async (libraries) => {
-            void saveCommunitySnapshot(characterId, 'libraries', libraries, communityId);
-            return { libraries, cached: false };
-          },
-          async () => {
-            const saved = await loadCommunitySnapshot<MemberLibrary[]>(
-              characterId,
-              'libraries',
-              communityId
-            );
-            if (!saved) {
-              // Nothing saved: as before, one unreadable Member reads as empty
-              // and the rest still show (a total failure still throws).
-              return {
-                libraries: await loadMemberLibraries(characterId, communityId, uids),
-                cached: false,
-              };
-            }
-            return {
-              libraries: uids.map(
-                (uid) => saved.find((library) => library.uid === uid) ?? { uid, items: [] }
-              ),
-              cached: true,
-            };
-          }
-        );
+        // Offline, or with every read failed, the saved libraries answer; one
+        // Member unreadable while online reads empty and the rest still show.
         const [{ libraries, cached }, groups, marketTypes, blueprints] = await Promise.all([
-          live,
+          loadLibrariesWithFallback(characterId, communityId, uids, () =>
+            loadMemberLibrariesDetailed(characterId, communityId, uids)
+          ),
           loadMarketGroups(),
-          loadMarketTypes(),
+          // The lazy market catalogue only files blueprints under market
+          // groups: without it they list under "Other" rather than not at all.
+          loadMarketTypes().catch((): MarketTypeEntry[] => []),
           loadBlueprints(),
         ]);
         if (cancelled) return;

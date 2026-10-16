@@ -33,10 +33,7 @@ import {
   loadMyCommunities,
   type CommunitySummary,
 } from '@/features/communities/communityStore';
-import {
-  loadCommunitySnapshot,
-  saveCommunitySnapshot,
-} from '@/features/communities/communityCache';
+import { loadWithSnapshot, pruneCommunitySnapshots } from '@/features/communities/communityCache';
 import { NeedsConnectionButton } from '@/features/communities/NeedsConnectionButton';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useReconnectCount } from '@/stores/network';
@@ -89,25 +86,28 @@ export function Communities() {
     let cancelled = false;
     (async () => {
       try {
-        const list = await loadMyCommunities(characterId);
-        // Tells the Community alerts poll whether this Character has anything to watch.
-        void rememberCommunityAdmin(characterId, list).catch(() => {});
-        // And the nav badge's poll, whether it has any board to read.
-        void rememberCommunityWatch(characterId, list).catch(() => {});
-        void saveCommunitySnapshot(characterId, 'list', list);
+        // Offline, the last list read answers (read-only); a refusal does not.
+        const { value: list, cached } = await loadWithSnapshot({
+          characterId,
+          kind: 'list',
+          live: () => loadMyCommunities(characterId),
+        });
+        if (!cached) {
+          // Tells the Community alerts poll whether this Character has anything to watch.
+          void rememberCommunityAdmin(characterId, list).catch(() => {});
+          // And the nav badge's poll, whether it has any board to read.
+          void rememberCommunityWatch(characterId, list).catch(() => {});
+          // A Community the Character is no longer in leaves no roster behind.
+          void pruneCommunitySnapshots(
+            characterId,
+            list.map((community) => community.id)
+          );
+        }
         if (cancelled) return;
-        setLoaded({ characterId, list, cached: false });
+        setLoaded({ characterId, list, cached });
         setFailedFor(null);
       } catch {
-        // Offline (or the backend down): the last list read, read-only, beats nothing.
-        const snapshot = await loadCommunitySnapshot<CommunitySummary[]>(characterId, 'list');
-        if (cancelled) return;
-        if (snapshot) {
-          setLoaded({ characterId, list: snapshot, cached: true });
-          setFailedFor(null);
-        } else {
-          setFailedFor(characterId);
-        }
+        if (!cancelled) setFailedFor(characterId);
       }
     })();
     return () => {

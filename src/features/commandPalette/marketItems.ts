@@ -12,6 +12,7 @@
  * against `rankedSearch`'s ~1.5 ms. Either is well under the ticket's 8 ms
  * budget, so no worker and no debounce.
  */
+import { isOnline } from '@/stores/network';
 import { loadMarketTypes } from '@/sde/loadMarketSde';
 import type { MarketTypeEntry } from '@/sde/marketTypes';
 import { GROUP_LIMIT, type PaletteProvider, type PaletteResult } from './types';
@@ -127,9 +128,13 @@ export function createMarketItemsProvider({
     id: 'marketItems',
     labelKey: 'commandPalette.groups.marketItems',
     order: 7,
-    // The catalogue is fetched on first use, not precached: a failure here is
-    // almost always "never downloaded, and offline".
-    errorKey: 'commandPalette.itemSearchNeedsDownload',
+    // The catalogue is fetched on first use, not precached: offline, a failure
+    // here is "never downloaded". Online it is some other failure, so the
+    // generic copy reads. A getter, so the browser's state is read when the
+    // row is drawn.
+    get errorKey() {
+      return isOnline() ? undefined : 'commandPalette.itemSearchNeedsDownload';
+    },
     minQueryLength: MARKET_ITEMS_MIN_QUERY_LENGTH,
     search: (query) => {
       const index = catalogue.peek();

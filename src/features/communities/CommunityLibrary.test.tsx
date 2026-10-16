@@ -45,19 +45,22 @@ vi.mock('@/features/route/currentSystem', () => ({
   useCurrentSystem: () => ({ systemId: 30000144, loaded: true }),
   useJumpRangeFilter: () => ({ status: 'off', allowed: null, jumps, jumpsStatus: 'ready' }),
 }));
-const live = vi.hoisted(() => ({ offline: false }));
+const live = vi.hoisted(() => ({ offline: false, unreadable: false }));
 vi.mock('./communityStore', () => ({
-  loadMemberLibraries: async () => {
-    if (live.offline) throw new Error('Failed to fetch');
-    return [
-      {
-        uid: 'ann',
-        items: [
-          { typeId: 10, me: 0, te: 0, runs: -1, locationName: 'Jita IV', systemName: 'Jita' },
-          { typeId: 10, me: 10, te: 20, runs: 7, locationName: 'Efa VII', systemName: 'Efa' },
-        ],
-      },
-    ];
+  loadMemberLibrariesDetailed: async () => {
+    if (live.offline) throw new TypeError('Failed to fetch');
+    return {
+      libraries: [
+        {
+          uid: 'ann',
+          items: [
+            { typeId: 10, me: 0, te: 0, runs: -1, locationName: 'Jita IV', systemName: 'Jita' },
+            { typeId: 10, me: 10, te: 20, runs: 7, locationName: 'Efa VII', systemName: 'Efa' },
+          ],
+        },
+      ],
+      failedUids: live.unreadable ? ['ann'] : [],
+    };
   },
 }));
 
@@ -280,6 +283,7 @@ describe('CommunityLibrary', () => {
   describe('without a connection', () => {
     afterEach(async () => {
       live.offline = false;
+      live.unreadable = false;
       await db.settings.clear();
     });
 
@@ -294,6 +298,17 @@ describe('CommunityLibrary', () => {
       const table = await screen.findByRole('table', { name: l.sharedLabel });
       expect(within(table).getAllByRole('row')).toHaveLength(3);
       expect(screen.getByText(en.common.offlineTitle)).toBeInTheDocument();
+    });
+
+    it('does not show the saved copy for one unreadable Member while online', async () => {
+      renderLibrary().unmount();
+      await vi.waitFor(async () =>
+        expect(await db.settings.get('communitySnapshot:1:libraries:c1')).toBeDefined()
+      );
+      live.unreadable = true;
+      renderLibrary();
+      await screen.findByRole('table', { name: l.sharedLabel });
+      expect(screen.queryByText(en.common.offlineTitle)).not.toBeInTheDocument();
     });
 
     it('says so when nothing was saved', async () => {

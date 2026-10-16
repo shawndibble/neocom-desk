@@ -6,6 +6,7 @@
 import { loadMarketGroups, loadMarketTypes } from '@/sde/loadMarketSde';
 import { loadGroupCategories, loadTypes } from '@/sde/loadSde';
 import type { MarketGroupNode, MarketTypeEntry } from '@/sde/marketTypes';
+import { SHIP_CATEGORY_ID } from '@/sde/categories';
 import type { TypeMap } from '@/sde/types';
 
 /** `market/groups.json`'s "Ships" root (`parentId: null`). */
@@ -37,9 +38,6 @@ export function hullNamesFrom(
   return names;
 }
 
-/** Every ship category type id in `groupCategories.json`. */
-const SHIP_CATEGORY_ID = 6;
-
 /**
  * The same names from the install-precached `types.json` and
  * `groupCategories.json`: every type whose group is in the Ship category. The
@@ -61,16 +59,17 @@ export function hullNamesFromTypes(
 let hullNamesPromise: Promise<ReadonlySet<string>> | null = null;
 
 export function loadHullNames(): Promise<ReadonlySet<string>> {
-  hullNamesPromise ??= Promise.all([loadMarketTypes(), loadMarketGroups()])
+  const market = (hullNamesPromise ??= Promise.all([loadMarketTypes(), loadMarketGroups()])
     .then(([types, groups]) => hullNamesFrom(types, groups))
-    .catch(() =>
-      Promise.all([loadTypes(), loadGroupCategories()]).then(([types, categories]) =>
-        hullNamesFromTypes(types, categories)
-      )
-    )
     .catch((error: unknown) => {
       hullNamesPromise = null; // allow retry after failure
       throw error;
-    });
-  return hullNamesPromise;
+    }));
+  // The fallback is never memoised, so the first call after the connection
+  // returns reads the market set (it also lists hulls `types.json` lacks).
+  return market.catch(() =>
+    Promise.all([loadTypes(), loadGroupCategories()]).then(([types, categories]) =>
+      hullNamesFromTypes(types, categories)
+    )
+  );
 }

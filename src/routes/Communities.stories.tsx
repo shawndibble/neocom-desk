@@ -45,6 +45,11 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/** The pilot's saved Fittings (My sharing › Fittings reads them from ESI): none, so the story shows what is shared. */
+const fittingsRoutes = (): FixtureRoute[] => [
+  { path: /^\/characters\/\d+\/fittings$/, respond: () => ({ body: [] }) },
+];
+
 const phone = { viewport: { value: 'mobile1', isRotated: false } } as const;
 
 /** @summary Your Communities with the list only: one you admin, one you belong to. */
@@ -64,7 +69,10 @@ export const AdminEveryonePhone: Story = { ...AdminEveryone, globals: phone };
 /** @summary Fittings: every Member's shared Fittings, each opening the editor. */
 export const AdminFittingsEveryone: Story = {
   parameters: {
-    shell: { path: `/communities?community=${SAMPLE_ADMIN_COMMUNITY_ID}&tab=fittings` },
+    shell: {
+      path: `/communities?community=${SAMPLE_ADMIN_COMMUNITY_ID}&tab=fittings`,
+      routes: fittingsRoutes,
+    },
   },
 };
 
@@ -80,6 +88,7 @@ export const AdminFittingsMine: Story = {
   parameters: {
     shell: {
       path: `/communities?community=${SAMPLE_ADMIN_COMMUNITY_ID}&tab=fittings&view=mine`,
+      routes: fittingsRoutes,
     },
   },
 };
@@ -95,7 +104,10 @@ export const MemberPlansMinePhone: Story = {
 /** @summary A Community you only belong to, on Fittings: no Manage menu in its header card. */
 export const MemberEveryone: Story = {
   parameters: {
-    shell: { path: `/communities?community=${SAMPLE_MEMBER_COMMUNITY_ID}&tab=fittings` },
+    shell: {
+      path: `/communities?community=${SAMPLE_MEMBER_COMMUNITY_ID}&tab=fittings`,
+      routes: fittingsRoutes,
+    },
   },
 };
 

@@ -25,7 +25,7 @@ import { writeToClipboard } from '@/lib/clipboard';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { uidForCharacter } from '@/sync/uid';
 import { useOnline, useReconnectCount } from '@/stores/network';
-import { loadCommunitySnapshot, saveCommunitySnapshot } from './communityCache';
+import { deleteCommunitySnapshot, loadWithSnapshot } from './communityCache';
 import { NeedsConnectionButton } from './NeedsConnectionButton';
 import { CommunityHeader } from './CommunityHeader';
 import { CommunityLibrary } from './CommunityLibrary';
@@ -165,26 +165,20 @@ export function CommunityDetail({
     let cancelled = false;
     (async () => {
       try {
-        const loaded = await loadCommunityMembers(characterId, community.id);
-        void saveCommunitySnapshot(characterId, 'members', loaded, community.id);
-        if (cancelled) return;
-        setMembers(loaded);
-        setMembersFailed(false);
-        setMembersCached(false);
-      } catch {
-        const snapshot = await loadCommunitySnapshot<CommunityMember[]>(
+        // Offline, the saved roster answers; a refusal (removed from the
+        // Community) shows as a failure, never as stale data.
+        const { value, cached } = await loadWithSnapshot({
           characterId,
-          'members',
-          community.id
-        );
+          kind: 'members',
+          communityId: community.id,
+          live: () => loadCommunityMembers(characterId, community.id),
+        });
         if (cancelled) return;
-        if (snapshot) {
-          setMembers(snapshot);
-          setMembersFailed(false);
-          setMembersCached(true);
-        } else {
-          setMembersFailed(true);
-        }
+        setMembers(value);
+        setMembersFailed(false);
+        setMembersCached(cached);
+      } catch {
+        if (!cancelled) setMembersFailed(true);
       }
     })();
     return () => {
@@ -359,9 +353,14 @@ export function CommunityDetail({
                 </p>
               )}
               {membersFailed ? (
-                <p role="alert" className="text-xs text-danger">
-                  {t('communities.membersLoadFailed')}
-                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p role="alert" className="min-w-0 flex-1 text-xs text-danger">
+                    {t('communities.membersLoadFailed')}
+                  </p>
+                  <Button size="sm" onClick={() => setReload((n) => n + 1)}>
+                    {t('communities.retry')}
+                  </Button>
+                </div>
               ) : members === null ? (
                 <Spinner size="sm" label={t('communities.loading')} />
               ) : (
@@ -507,6 +506,7 @@ export function CommunityDetail({
         onClose={close}
         onConfirm={async () => {
           await leaveCommunity(characterId, community.id);
+          await deleteCommunitySnapshot(characterId, community.id);
           onGone();
         }}
       />
@@ -518,6 +518,7 @@ export function CommunityDetail({
         onClose={close}
         onConfirm={async () => {
           await deleteCommunity(characterId, community.id);
+          await deleteCommunitySnapshot(characterId, community.id);
           onGone();
         }}
       />
