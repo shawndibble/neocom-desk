@@ -390,7 +390,7 @@ Data sources (`haulingData.ts`): pass 1 Fuzzwork aggregates once per hub the lan
 
 Engine
 
-- `haulingMarket.ts` `HAULING_THRESHOLDS`: horizon 7d, own share of demand 25%, min unit margin 5%, history 30d, recent price 7d, mean orders per trading day < 2 = rarely whatever the day count, else >=20 trading days = most days, >=8 = bursts, else rarely (trading day = volume > 0 inside the 30d window); crowded 10 orders within 1%, low margin 3%, suspicious 100%. `estimateSale` = lower of recent sale price and one-tick-under cheapest; `summarizeDemand`; `lotEconomics`.
+- `haulingMarket.ts` `HAULING_THRESHOLDS`: horizon 7d, own share of demand 25%, min unit margin 5%, history 30d, recent price 7d, mean orders per trading day < 2 = rarely whatever the day count, else >=20 trading days = most days, >=8 = bursts, else rarely (trading day = volume > 0 inside the 30d window); crowded 10 orders within 1%, low margin 3%, suspicious 100%. `estimateSale` = lower of recent sale price and one-tick-under cheapest; `summarizeDemand` (recent sale price = volume-weighted median of recent days' `highest` fill, the listing side; `latestDay` feeds the detail's "Last sales: … from a listing, … into a buy order" line when its low is under 80% of its high); `lotEconomics`.
 - `haulingPlan.ts` `planTrip`: unticked rows ship 0, typed quantities are kept and reserve space/budget first; the rest are ranked by profit per share of the scarcest resource (hold space or remaining budget), then each gets min(sales cap, profitable supply, eligible space, remaining budget) in that order; fills specialised holds first (narrowest), spills to general (`cargoHolds.ts holdAccepts`); `limitedBy` names the cap.
 
 Observed gaps
