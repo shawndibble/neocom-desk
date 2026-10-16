@@ -12,7 +12,10 @@ import {
   type FanOutCharacter,
 } from '@/features/character/allCharactersFanOut';
 import { loadTypeNames } from '@/features/character/typeNames';
-import { loadWalletJournalWithStatus, loadWalletTransactions } from '@/features/character/wallet';
+import {
+  loadWalletJournalHistory,
+  loadWalletTransactionsHistory,
+} from '@/features/character/wallet';
 
 const JOURNAL_SCOPE = ESI_REGISTRY.getCharacterWalletJournal.scope;
 
@@ -44,10 +47,10 @@ export async function loadAllCharactersJournals(
     scope: JOURNAL_SCOPE,
     characters,
     load: async ({ characterId, name }) => {
-      const { cached, needsReauth } = await loadWalletJournalWithStatus(characterId);
+      const { cached, needsReauth } = await loadWalletJournalHistory(characterId);
       if (!cached || needsReauth) return null;
       // The fills only name PLEX lines and items: a failed read costs those, not the journal.
-      const fills = await loadWalletTransactions(characterId).catch(() => null);
+      const fills = await loadWalletTransactionsHistory(characterId).catch(() => null);
       return {
         characterId,
         name,

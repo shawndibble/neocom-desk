@@ -4,8 +4,8 @@ import { loadAllCharactersJournals } from './walletJournalAll';
 
 const loadJournal = vi.hoisted(() => vi.fn());
 vi.mock('@/features/character/wallet', () => ({
-  loadWalletJournalWithStatus: loadJournal,
-  loadWalletTransactions: vi.fn(async () => ({ data: [], truncated: false })),
+  loadWalletJournalHistory: loadJournal,
+  loadWalletTransactionsHistory: vi.fn(async () => ({ data: [], truncated: false })),
 }));
 vi.mock('@/features/character/typeNames', () => ({ loadTypeNames: vi.fn(async () => new Map()) }));
 
