@@ -248,7 +248,7 @@ interface Snapshot {
   unpricedTypeIds: Set<number>;
 }
 
-const NO_HUBS: ReadonlySet<string> = new Set();
+const NO_HUBS: ReadonlySet<TradeHub['id']> = new Set();
 const NO_NAMES: ReadonlyMap<number, string> = new Map();
 
 const EMPTY_DATED_PRICES: DatedUnitPrices = {
