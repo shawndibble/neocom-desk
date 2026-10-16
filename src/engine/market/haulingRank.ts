@@ -11,14 +11,17 @@
  *
  * Pure: no fetch/DOM/Dexie.
  */
+import { salesTaxPct } from '@/engine/industry/fees';
 import { HAULING_THRESHOLDS, type HaulingThresholds } from './haulingMarket';
 
 /** Fees are not known before the order books are read, so both passes take this rough cut off the sale price. */
 export const ROUGH_FEE_FACTOR = 0.94;
+/** An instant sale pays sales tax only, no broker fee: Accounting V's, the least any seller pays. */
+export const INSTANT_ROUGH_FEE_FACTOR = 1 - salesTaxPct(5) / 100;
 
 function score(unitProfit: number, units: number): number {
   // A loss keeps its own (negative) size so a smaller loss ranks above a bigger one, both after any profit.
-  return unitProfit <= 0 ? unitProfit : unitProfit * Math.max(0, units);
+  return unitProfit <= 0 ? unitProfit : unitProfit * units;
 }
 
 export interface PriceScoreInput {
@@ -33,11 +36,14 @@ export interface PriceScoreInput {
 }
 
 /**
- * Pass 1 (hub aggregates): the gap after the rough fee times the units listed
- * at both ends, the smaller — a liquidity proxy from the same call.
+ * Pass 1 (hub aggregates): the thinner end's listed units stand in for
+ * liquidity, from the same call. An instant sale passes `INSTANT_ROUGH_FEE_FACTOR`.
  */
-export function priceScore({ buy, sell, originListed, destListed }: PriceScoreInput): number {
-  return score(sell * ROUGH_FEE_FACTOR - buy, Math.min(originListed, destListed));
+export function priceScore(
+  { buy, sell, originListed, destListed }: PriceScoreInput,
+  feeFactor: number = ROUGH_FEE_FACTOR
+): number {
+  return score(sell * feeFactor - buy, Math.min(originListed, destListed));
 }
 
 export interface HistoryScoreInput {
@@ -52,9 +58,9 @@ export interface HistoryScoreInput {
 }
 
 /**
- * Pass 2 (history): the unit profit at the recent sale price times the units a
- * lot could take — one hauler's share of the horizon's sales, capped by what
- * the origin lists.
+ * Pass 2 (history): the units a lot could take are one hauler's share of the
+ * horizon's sales, capped by what the origin lists. Unlike `estimateSale`'s
+ * demand cap there is no floor of 1: an item that sells under a unit a lot scores 0.
  */
 export function historyScore(
   { buy, recentSalePrice, dailyVolume, originListed }: HistoryScoreInput,

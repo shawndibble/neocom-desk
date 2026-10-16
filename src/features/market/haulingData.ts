@@ -9,20 +9,18 @@
  *
  * 1. **Prices.** Fuzzwork aggregates at both hub stations (`getHubPrices`,
  *    batched and cached). Keep items dearer at the destination by a wide
- *    enough gap, most a trip could earn first (`priceScore`: the gap after a
- *    rough fee times the units listed at both ends), capped at
+ *    enough gap, most a trip could earn first (`priceScore`), capped at
  *    `MAX_PRICED_CANDIDATES`.
  * 2. **History.** The destination region's daily history per survivor
  *    (`loadPriceHistory`, cached until ESI's own daily rollover). This is
  *    where a dead market drops out — a huge listed gap on an item that never
  *    sells is the trap. Keep the `MAX_BOOK_CANDIDATES` best by what a lot
  *    could earn at the recent sale price (`historyScore`).
- *
- * Both orders come from `engine/market/haulingRank` and rank by trip profit,
- * not price ratio: a 3x gap on two units listed fills no hold. The minimum-gap
- * filters still decide what is looked at.
  * 3. **Order books.** The two hubs' books for those few, station-filtered,
  *    turned into ladders and estimated by `engine/market/haulingMarket`.
+ *
+ * Passes 1 and 2 order by trip profit, not price ratio
+ * (`engine/market/haulingRank`); the minimum gaps still decide what is looked at.
  *
  * Demand is read from the destination's whole *region* history (ESI has no
  * per-station history) while the ladders are the hub *station's*; the popover
@@ -49,7 +47,12 @@ import { mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { getHubPrices } from '@/market/prices';
 import type { TradeHub } from '@/market/hubs';
 import { expandHaulingLane, haulingEndId, type HaulingEnd, type HubLane } from './haulingHubs';
-import { historyScore, priceScore, ROUGH_FEE_FACTOR } from '@/engine/market/haulingRank';
+import {
+  historyScore,
+  INSTANT_ROUGH_FEE_FACTOR,
+  priceScore,
+  ROUGH_FEE_FACTOR,
+} from '@/engine/market/haulingRank';
 import {
   estimateSale,
   hubLadders,
@@ -198,22 +201,20 @@ async function stationLadders(
 
 interface Ranked {
   typeId: number;
-  /** What a trip could earn on it (`engine/market/haulingRank`): the order. */
+  lane: HubLane;
+  buy: number;
+  /** Sort key: the trip-profit estimate from `engine/market/haulingRank`. */
   score: number;
   /** The price ratio the pass read — a tiebreak only, where scores tie (e.g. nothing listed scores 0). */
   gap: number;
 }
 
 interface PricedCandidate extends Ranked {
-  lane: HubLane;
-  buy: number;
   /** Units for sale at the origin hub: what a lot can buy at most. */
   originListed: number;
 }
 
 interface ShortlistCandidate extends Ranked {
-  lane: HubLane;
-  buy: number;
   demand: DemandSummary | null;
 }
 
@@ -258,7 +259,9 @@ export async function runHaulingScan(request: HaulingScanRequest): Promise<Hauli
     throw new Error('Hub prices are unavailable right now.');
   }
 
-  const minGap = mode === 'instant' ? MIN_INSTANT_GAP : MIN_LISTED_GAP;
+  const instant = mode === 'instant';
+  const minGap = instant ? MIN_INSTANT_GAP : MIN_LISTED_GAP;
+  const feeFactor = instant ? INSTANT_ROUGH_FEE_FACTOR : ROUGH_FEE_FACTOR;
   // Each item keeps only its best lane: the plan and the table are keyed by item.
   const pricedAll = ids
     .flatMap((typeId) => {
@@ -267,13 +270,13 @@ export async function runHaulingScan(request: HaulingScanRequest): Promise<Hauli
         const origin = pricesAt.get(lane.from.id)?.get(typeId);
         const dest = pricesAt.get(lane.to.id)?.get(typeId);
         const buy = origin?.sellMin ?? null;
-        const sell = (mode === 'instant' ? dest?.buyMax : dest?.sellMin) ?? null;
+        const sell = (instant ? dest?.buyMax : dest?.sellMin) ?? null;
         if (buy === null || sell === null || buy <= 0) continue;
         const gap = sell / buy;
         if (gap < minGap) continue;
         const originListed = origin?.sellVolume ?? 0;
-        const destListed = (mode === 'instant' ? dest?.buyVolume : dest?.sellVolume) ?? 0;
-        const score = priceScore({ buy, sell, originListed, destListed });
+        const destListed = (instant ? dest?.buyVolume : dest?.sellVolume) ?? 0;
+        const score = priceScore({ buy, sell, originListed, destListed }, feeFactor);
         const candidate = { typeId, lane, buy, originListed, score, gap };
         if (best === null || byRank(candidate, best) < 0) best = candidate;
       }
@@ -285,16 +288,7 @@ export async function runHaulingScan(request: HaulingScanRequest): Promise<Hauli
   // 2. History: drop what never sells or only sold below the origin price.
   // An instant sale skips it: the standing buy order is the demand.
   const withHistory: ShortlistCandidate[] =
-    mode === 'instant'
-      ? priced.map((c) => ({
-          typeId: c.typeId,
-          lane: c.lane,
-          buy: c.buy,
-          demand: null,
-          score: c.score,
-          gap: c.gap,
-        }))
-      : [];
+    mode === 'instant' ? priced.map((c) => ({ ...c, demand: null })) : [];
   let historyDone = 0;
   const historyPass = mode === 'instant' ? [] : priced;
   if (mode === 'list') onProgress?.({ stage: 'history', done: 0, total: priced.length });
@@ -327,7 +321,6 @@ export async function runHaulingScan(request: HaulingScanRequest): Promise<Hauli
     historyDone += 1;
     onProgress?.({ stage: 'history', done: historyDone, total: priced.length });
   });
-  // History lands in completion order: the sort's tiebreaks make the shortlist independent of it.
   withHistory.sort(byRank);
   const shortlist = withHistory.slice(0, MAX_BOOK_CANDIDATES);
 

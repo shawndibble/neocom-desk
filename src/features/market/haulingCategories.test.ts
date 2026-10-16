@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   EVERYTHING_CATEGORY_ID,
-  HAULING_CATEGORY_IDS,
   haulingCategoryOf,
   isHaulingCategoryId,
   typeIdsInCategory,
@@ -73,11 +72,10 @@ describe('isHaulingCategoryId', () => {
     for (const id of [475, 477, 2203, 2202]) expect(isHaulingCategoryId(id)).toBe(true);
   });
 
-  it('keeps out ships and the groups with nothing to haul by volume', () => {
-    // Ships, Blueprints & Reactions, Skills, Ship SKINs, Apparel, Personalization, Special Edition Assets, Pilot's Services.
-    for (const id of [4, 2, 150, 1954, 1396, 3628, 1659, 1922]) {
-      expect(HAULING_CATEGORY_IDS as readonly number[]).not.toContain(id);
-    }
+  it('keeps out the groups with nothing to haul by volume', () => {
+    // Blueprints & Reactions, Skills, Ship SKINs, Apparel, Personalization, Special Edition Assets, Pilot's Services.
+    for (const id of [2, 150, 1954, 1396, 3628, 1659, 1922])
+      expect(isHaulingCategoryId(id)).toBe(false);
   });
 });
 

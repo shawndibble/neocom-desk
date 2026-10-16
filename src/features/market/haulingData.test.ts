@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { historyPoint } from '@/engine/market/__fixtures__/priceHistory';
 import { TRADE_HUBS } from '@/market/hubs';
 
 const getHubPrices = vi.fn();
@@ -29,6 +30,11 @@ const {
 const FROM = TRADE_HUBS.find((h) => h.id === 'jita')!;
 const TO = TRADE_HUBS.find((h) => h.id === 'amarr')!;
 const TYPES = { '34': { name: 'Tritanium', volume: 0.01 } } as never;
+
+/** A catalogue entry, 1 m³ each, for every id. */
+function typesFor(ids: readonly number[]) {
+  return Object.fromEntries(ids.map((id) => [String(id), { name: `T${id}`, volume: 1 }])) as never;
+}
 
 function aggregate(
   sellMin: number | null,
@@ -171,18 +177,20 @@ describe('runHaulingScan, shortlist order', () => {
   const THIN = Array.from({ length: MAX_PRICED_CANDIDATES + 5 }, (_, i) => 2000 + i);
   const BULK = 5000;
 
-  function history(price: number, volume: number) {
-    return Array.from({ length: 30 }, (_, day) => ({
-      date: new Date(Date.parse(`${TODAY}T00:00:00Z`) - day * 86_400_000)
-        .toISOString()
-        .slice(0, 10),
-      average: price,
-      highest: price,
-      lowest: price,
-      volume,
-      orderCount: 10,
-    }));
+  function history(average: number, volume: number) {
+    return Array.from({ length: 30 }, (_, day) =>
+      historyPoint({
+        date: new Date(Date.parse(`${TODAY}T00:00:00Z`) - day * 86_400_000)
+          .toISOString()
+          .slice(0, 10),
+        average,
+        volume,
+        orderCount: 10,
+      })
+    );
   }
+  const BULK_HISTORY = history(120, 5_000);
+  const THIN_HISTORY = history(300, 1);
 
   beforeEach(() => {
     getHubPrices.mockImplementation(async (hub: { id: string }, ids: number[]) => {
@@ -197,7 +205,7 @@ describe('runHaulingScan, shortlist order', () => {
       );
     });
     loadPriceHistory.mockImplementation(async (_region: number, typeId: number) => ({
-      points: typeId === BULK ? history(120, 5_000) : history(300, 1),
+      points: typeId === BULK ? BULK_HISTORY : THIN_HISTORY,
     }));
     getOrderBook.mockImplementation(async (regionId: number, typeId: number) => {
       const hub = regionId === FROM.regionId ? FROM : TO;
@@ -210,15 +218,12 @@ describe('runHaulingScan, shortlist order', () => {
 
   it('shortlists a bulk steady seller over high-ratio items with thin stock', async () => {
     const typeIds = [...THIN, BULK];
-    const types = Object.fromEntries(
-      typeIds.map((id) => [String(id), { name: `T${id}`, volume: 1 }])
-    );
     const scan = await runHaulingScan({
       from: FROM,
       to: TO,
       typeIds,
       scope: 4,
-      types: types as never,
+      types: typesFor(typeIds),
       today: TODAY,
     });
     // Ranked by price ratio it was cut at the price pass, behind every thin item.
@@ -226,6 +231,54 @@ describe('runHaulingScan, shortlist order', () => {
     expect(getOrderBook).toHaveBeenCalledWith(TO.regionId, BULK);
     expect(scan.rows.map((r) => r.typeId)).toContain(BULK);
     expect(scan.capped).toBe(true);
+  });
+});
+
+describe('runHaulingScan, shortlist order selling into buy orders', () => {
+  const WIDE = Array.from({ length: MAX_BOOK_CANDIDATES + 5 }, (_, i) => 3000 + i);
+  const DEEP = 6000;
+
+  beforeEach(() => {
+    getHubPrices.mockImplementation(async (hub: { id: string }, ids: number[]) => {
+      const atOrigin = hub.id === FROM.id;
+      return new Map(
+        ids.map((id) => {
+          if (atOrigin) return [id, aggregate(100, 90, 100_000)];
+          // 1.05x into deep buy orders: profitable after sales tax, not after a listing's fees.
+          if (id === DEEP) return [id, aggregate(500, 105, 1, 100_000)];
+          // 1.5x, one unit wanted, though plenty is listed for sale.
+          return [id, aggregate(160, 150, 100_000, 1)];
+        })
+      );
+    });
+    getOrderBook.mockImplementation(async (regionId: number) => {
+      const origin = regionId === FROM.regionId;
+      const hub = origin ? FROM : TO;
+      return {
+        orders: [
+          {
+            price: origin ? 100 : 105,
+            volume_remain: 100_000,
+            is_buy_order: !origin,
+            location_id: hub.stationId,
+          },
+        ],
+      };
+    });
+  });
+
+  it('ranks by the buy orders standing at the destination, after sales tax only', async () => {
+    const typeIds = [...WIDE, DEEP];
+    const scan = await runHaulingScan({
+      from: FROM,
+      to: TO,
+      typeIds,
+      scope: 4,
+      types: typesFor(typeIds),
+      mode: 'instant',
+    });
+    expect(getOrderBook).toHaveBeenCalledWith(TO.regionId, DEEP);
+    expect(scan.rows.map((r) => r.typeId)).toContain(DEEP);
   });
 });
 
@@ -285,15 +338,12 @@ describe('runHaulingScan, Any hub at one end', () => {
 
   it('fetches each hub price list once and keeps the order-book pass under the overall cap', async () => {
     const typeIds = Array.from({ length: 200 }, (_, i) => 1000 + i);
-    const types = Object.fromEntries(
-      typeIds.map((id) => [String(id), { name: `T${id}`, volume: 1 }])
-    );
     const scan = await runHaulingScan({
       from: 'any',
       to: JITA,
       typeIds,
       scope: 4,
-      types: types as never,
+      types: typesFor(typeIds),
       mode: 'instant',
     });
     expect(getHubPrices).toHaveBeenCalledTimes(TRADE_HUBS.length);

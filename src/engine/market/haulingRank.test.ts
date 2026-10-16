@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { HAULING_THRESHOLDS } from './haulingMarket';
-import { historyScore, priceScore, ROUGH_FEE_FACTOR } from './haulingRank';
+import {
+  historyScore,
+  INSTANT_ROUGH_FEE_FACTOR,
+  priceScore,
+  ROUGH_FEE_FACTOR,
+} from './haulingRank';
 
 describe('priceScore', () => {
   it('ranks a bulk steady seller over a high-ratio item with thin stock', () => {
@@ -52,12 +57,25 @@ describe('priceScore', () => {
     expect(priceScore({ buy: 100, sell: 200, originListed: 0, destListed: 500 })).toBe(0);
     expect(priceScore({ buy: 100, sell: 200, originListed: 500, destListed: 0 })).toBe(0);
   });
+});
 
-  it('reads the buy-side volume for an instant sale: the caller passes it as destListed', () => {
-    // Same prices, same origin stock: only the destination buy orders differ.
-    const deepBuyers = priceScore({ buy: 100, sell: 150, originListed: 1_000, destListed: 800 });
-    const shallowBuyers = priceScore({ buy: 100, sell: 150, originListed: 1_000, destListed: 5 });
-    expect(deepBuyers).toBeGreaterThan(shallowBuyers);
+describe('priceScore, selling into buy orders', () => {
+  it('takes only sales tax off: a gap the listing fee would eat still earns', () => {
+    const input = { buy: 100, sell: 105, originListed: 100_000, destListed: 100_000 };
+    expect(priceScore(input)).toBeLessThanOrEqual(0);
+    expect(priceScore(input, INSTANT_ROUGH_FEE_FACTOR)).toBeGreaterThan(0);
+  });
+
+  it('ranks a small gap on deep buy orders over a wider one on a single unit', () => {
+    const deep = priceScore(
+      { buy: 100, sell: 105, originListed: 100_000, destListed: 100_000 },
+      INSTANT_ROUGH_FEE_FACTOR
+    );
+    const single = priceScore(
+      { buy: 100, sell: 107, originListed: 1, destListed: 1 },
+      INSTANT_ROUGH_FEE_FACTOR
+    );
+    expect(deep).toBeGreaterThan(single);
   });
 });
 
