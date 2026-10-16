@@ -99,10 +99,17 @@ test('the Gallery list scrolls only up and down; the category row is the one tha
   await expect(gallery).toBeVisible();
   const sideways = await gallery.evaluate((root) =>
     [root, ...root.querySelectorAll('*')]
-      .filter(
-        (el) => el.scrollWidth > el.clientWidth + 1 && getComputedStyle(el).overflowX !== 'hidden'
-      )
-      // sr-only helpers clip themselves; only scrollers matter
+      // Only a scroller can scroll sideways. An `overflow: visible` box that
+      // spills shows up at the scroller it spills into; counting it too made
+      // this flaky: a Recharts preview's inner box spills while its
+      // ResponsiveContainer is still 0px wide, before its first resize.
+      .filter((el) => {
+        const { overflowX } = getComputedStyle(el);
+        return (
+          el.scrollWidth > el.clientWidth + 1 && (overflowX === 'auto' || overflowX === 'scroll')
+        );
+      })
+      // sr-only helpers clip themselves
       .filter((el) => !el.classList.contains('sr-only'))
       .map((el) => el.getAttribute('role') ?? el.className.toString())
   );
