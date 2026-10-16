@@ -663,8 +663,33 @@ describe('Mail', () => {
     );
     render(<App />);
     await screen.findByText('Mail 0');
-    const list = screen.getByText('Mail 0').closest('ul');
-    expect(list).toHaveClass('max-h-[36rem]', 'overflow-y-auto');
+    // The scroller wraps the date sections, each its own <ul>.
+    const list = screen.getByText('Mail 0').closest('.overflow-y-auto');
+    expect(list).toHaveClass('max-h-[36rem]');
+  });
+
+  it('groups the list under date headings without breaking row selection (issue #3971)', async () => {
+    // Relative to the real clock, so no fake timers: "now" is always Today,
+    // and 2020 is always an older month, named with its year.
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail`, () =>
+        HttpResponse.json([
+          { ...headers[0], timestamp: new Date().toISOString() },
+          { ...headers[1], timestamp: '2020-03-15T12:00:00Z' },
+        ])
+      )
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    const subject = await screen.findByText('Fleet up!');
+    const today = screen.getByRole('heading', { name: 'Today' });
+    const march = screen.getByRole('heading', { name: 'March 2020' });
+    expect(today.compareDocumentPosition(march) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getAllByRole('heading', { name: 'Today' })).toHaveLength(1);
+
+    await user.click(subject);
+    expect(await screen.findByRole('button', { name: 'Reply' })).toBeInTheDocument();
+    expect(subject.closest('[aria-current]')).toHaveAttribute('aria-current', 'true');
   });
 
   it('does not show a "load more" affordance when fewer than 50 mails are cached', async () => {
