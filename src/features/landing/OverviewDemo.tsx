@@ -49,6 +49,11 @@ const DemoBoard = lazy(() => import('./demo/DemoBoard'));
 const BOARD_CLIP =
   'max-h-[46rem] overflow-hidden [mask-image:linear-gradient(to_bottom,#000_calc(100%-8rem),transparent)] sm:max-h-[43rem]';
 
+/** Holds the board's clipped height until its chunk arrives, so nothing below shifts. */
+function BoardPlaceholder() {
+  return <div aria-hidden="true" className="h-[46rem] sm:h-[43rem]" />;
+}
+
 /** The sample alerts behind the bell: key under `login.demo.alerts`, how bad, how long ago. */
 const ALERTS: { key: string; severity: DeadlineSeverity; minutes: number }[] = [
   { key: 'undercut', severity: 'critical', minutes: 4 },
@@ -99,6 +104,36 @@ function useAlertArrival(frameRef: RefObject<HTMLElement | null>) {
   return phase;
 }
 
+/**
+ * True once the board's chunk may start loading: the browser is idle after the
+ * page has loaded, so the hero paints first.
+ */
+function useBoardReady() {
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    if (ready) return;
+    let idle: number | undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const go = () => setReady(true);
+    const schedule = () => {
+      if (typeof requestIdleCallback === 'function') {
+        idle = requestIdleCallback(go, { timeout: 3000 });
+      } else {
+        timer = setTimeout(go, 500);
+      }
+    };
+    const loaded = document.readyState === 'complete';
+    if (loaded) schedule();
+    else window.addEventListener('load', schedule, { once: true });
+    return () => {
+      window.removeEventListener('load', schedule);
+      if (idle !== undefined) cancelIdleCallback(idle);
+      clearTimeout(timer);
+    };
+  }, [ready]);
+  return ready;
+}
+
 /** Sets `--lp-float` (0 to -12px) on the frame as the page scrolls; rAF-throttled, off on touch. */
 function useFloat(frameRef: RefObject<HTMLElement | null>) {
   useEffect(() => {
@@ -130,6 +165,7 @@ export function OverviewDemo() {
   const frameRef = useRef<HTMLDivElement>(null);
   const phase = useAlertArrival(frameRef);
   useFloat(frameRef);
+  const boardReady = useBoardReady();
   // Newest first: while `pending`, the head of the list has not arrived yet.
   const alerts = phase === 'pending' ? ALERTS.slice(1) : ALERTS;
   const breakdown = READ_AGES.map(({ kind, minutes }) => ({
@@ -260,8 +296,8 @@ export function OverviewDemo() {
       </div>
 
       <div className={cx('mt-4', BOARD_CLIP)}>
-        <Suspense fallback={<div aria-hidden="true" className="h-[40rem]" />}>
-          <DemoBoard />
+        <Suspense fallback={<BoardPlaceholder />}>
+          {boardReady ? <DemoBoard /> : <BoardPlaceholder />}
         </Suspense>
       </div>
     </div>
