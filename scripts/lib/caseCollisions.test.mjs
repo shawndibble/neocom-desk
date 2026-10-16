@@ -34,4 +34,14 @@ describe('findCaseCollisions', () => {
       ['b/X', 'b/x'],
     ]);
   });
+
+  it('treats NFC and NFD spellings as the same path (APFS/HFS+)', () => {
+    const nfc = 'src/Caf\u00e9.ts';
+    const nfd = 'src/Cafe\u0301.ts';
+    expect(findCaseCollisions([nfc, nfd])).toEqual([[nfc, nfd].sort()]);
+  });
+
+  it('reports only the shallowest colliding prefix', () => {
+    expect(findCaseCollisions(['Foo/a.ts', 'foo/a.ts'])).toEqual([['Foo', 'foo']]);
+  });
 });
