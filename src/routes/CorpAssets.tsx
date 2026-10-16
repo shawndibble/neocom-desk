@@ -497,11 +497,11 @@ function CorpAssetsView({ canReadBlueprints }: { canReadBlueprints: boolean }) {
     setSelectedIds(new Set());
   }
   function handleBulkAddToQuickbar() {
-    // One write: `quickbar.add` reads the list it rendered with, so a loop of them keeps only the last.
+    // One write: `quickbar.add` closes over the rendered list, so looping it keeps only the last.
     let items = itemActions.quickbar.items;
     for (const id of selectedIds) {
       const asset = assetsByItemId.get(id);
-      // No market for an Abyssal type: the row's own menu doesn't offer Quickbar either.
+      // Abyssal: no market; the row menu skips Quickbar too.
       if (!asset || isAbyssalType?.(asset.type_id)) continue;
       items = addQuickbarItem(items, {
         typeId: asset.type_id,

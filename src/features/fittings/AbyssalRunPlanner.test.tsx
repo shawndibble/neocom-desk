@@ -58,7 +58,6 @@ describe('AbyssalRunPlanner', () => {
     const compare = vi.fn().mockResolvedValue({ before: stats(1000), after: stats(900) });
     const user = setup(26, compare);
     await user.click(screen.getByRole('button', { name: /Plan an Abyssal run/ }));
-    // A filament fixes tier and kind; the site rolls the strength within the tier.
     expect(await screen.findByRole('link', { name: 'Fierce Electrical Filament' })).toBeTruthy();
     expect(
       screen.getByText(

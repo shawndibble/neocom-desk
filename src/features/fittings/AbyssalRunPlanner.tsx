@@ -209,9 +209,8 @@ export function AbyssalRunPlanner({
 }
 
 /**
- * The strengths `tier` rolls. A filament fixes tier and kind and the site rolls
- * the strength, so a picked strength off the tier keeps its filament and gets
- * the tiers that roll it instead; the stats below stay at the pick.
+ * A filament fixes tier and kind; the site rolls the strength. An off-tier pick
+ * keeps its filament and names the tiers that roll it; the stats stay at the pick.
  */
 function StrengthNote({ tier, weather }: { tier: AbyssalTier; weather: AbyssalWeather }) {
   const { t } = useTranslation();

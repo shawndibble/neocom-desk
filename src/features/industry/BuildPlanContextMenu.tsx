@@ -7,8 +7,8 @@
  * render.
  *
  * The actions here are the ones that need nothing from the caller but a type
- * ID: open a Build Plan, view the item in the Market Browser, copy its name,
- * add it to the Compare Set. The last two need a name to work with and appear
+ * ID: open a Build Plan, view the item in the Market Browser (not an Abyssal
+ * type), copy its name, add it to the Compare Set. The last two need a name to work with and appear
  * only when the caller passes one — the surfaces here have already resolved it
  * for their own rows, so they simply hand it over.
  *
@@ -31,13 +31,12 @@
  */
 import type { ReactElement, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { industryTabHref } from './industryTabs';
 import { MenuItem as RowMenuItem, RowActionsMenu } from '@/components/ui';
 import { writeToClipboard } from '@/lib/clipboard';
-import { marketLinkParams } from '@/engine/market/urlState';
 import { useCompareSet } from '@/features/market/compareSet';
-import { MarketOnly } from '@/features/abyssal/MarketOnly';
+import { ViewInMarketMenuItem } from '@/features/market/ViewInMarketMenuItem';
 import { plannableProductTypeID, type PlannableIndex } from './plannableProduct';
 import { applyPlanSeed, type BuildPlanSeed } from './planSeed';
 import { usePlannableIndexOnOpen } from './usePlannableIndexOnOpen';
@@ -117,24 +116,11 @@ function useBuildPlanMenuNodes(
   index: PlannableIndex | null
 ): ReactElement[] {
   const { t } = useTranslation();
-  const navigate = useNavigate();
-  const location = useLocation();
   const addToCompare = useCompareSet((state) => state.add);
 
   const nodes: ReactElement[] = omitViewInMarket
     ? []
-    : [
-        <MarketOnly key="viewInMarket" typeId={typeId}>
-          <RowMenuItem
-            onSelect={() => {
-              const params = marketLinkParams(typeId, location.search);
-              navigate(`/market/browser?${new URLSearchParams(params).toString()}`);
-            }}
-          >
-            {t('market.contextMenu.viewInMarket')}
-          </RowMenuItem>
-        </MarketOnly>,
-      ];
+    : [<ViewInMarketMenuItem key="viewInMarket" typeId={typeId} />];
   if (itemName !== undefined) {
     nodes.push(
       <RowMenuItem key="addToCompare" onSelect={() => addToCompare({ typeId, itemName })}>

@@ -74,7 +74,7 @@ describe('ItemContextMenu — Abyssal types', () => {
 
     expect(await screen.findByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'Copy name' })).toBeInTheDocument();
-    // Gone once the lookup answers, not just while it loads.
+    // Shown while the lookup loads; wait for it to answer.
     await vi.waitFor(() => {
       for (const name of MARKET_ONLY)
         expect(screen.queryByRole('menuitem', { name })).not.toBeInTheDocument();

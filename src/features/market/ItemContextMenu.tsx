@@ -25,6 +25,7 @@ import { useItemActions } from './itemActions';
 import { StockTargetDialog } from '@/features/stockTargets/StockTargetDialog';
 import { OpenInEveMenuItem } from '@/features/openInEve/OpenInEveMenuItem';
 import { MarketOnly } from '@/features/abyssal/MarketOnly';
+import { ViewInMarketMenuItem } from './ViewInMarketMenuItem';
 import { PriceAlertDialog, PriceAlertMenuItem } from './PriceAlertDialog';
 
 export interface ItemContextMenuProps {
@@ -106,25 +107,6 @@ export function OpenInEveItemMenuItems({ typeId }: { typeId: number }) {
   );
 }
 
-/** The item menu's "View in Market", keeping the page's region or hub; reused as `ShowInfoMenuItem` is. */
-export function ViewInMarketMenuItem({ typeId }: { typeId: number }) {
-  const { t } = useTranslation();
-  const navigate = useNavigate();
-  const location = useLocation();
-  return (
-    <MarketOnly typeId={typeId}>
-      <MenuItem
-        onSelect={() => {
-          const params = marketLinkParams(typeId, location.search);
-          navigate(`/market/browser?${new URLSearchParams(params).toString()}`);
-        }}
-      >
-        {t('market.contextMenu.viewInMarket')}
-      </MenuItem>
-    </MarketOnly>
-  );
-}
-
 /**
  * "Build Plan" and "View blueprint in Market" for an item — reused as
  * `ShowInfoMenuItem` is, by menus that aren't item menus (the Fittings
@@ -177,8 +159,8 @@ export function BuildPlanMenuItems({ typeId }: { typeId: number }) {
  * `PriceAlertDialog`.
  *
  * Add to Quickbar, set a price alert or a stock target, show info, add to Compare, view in
- * Market, copy name, jump to a Build Plan, jump to a PI Plan. The market-only
- * ones leave an Abyssal type's menu (`MarketOnly`).
+ * Market, copy name, jump to a Build Plan, jump to a PI Plan. Abyssal types drop
+ * Quickbar, price alert, View in Market and Open in EVE (`MarketOnly`).
  *
  * The PI action asks for itself rather than going through the page's Item
  * Actions the way `blueprintTypeID` does: `pi.json` is 15KB against

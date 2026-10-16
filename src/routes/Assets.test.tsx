@@ -2125,7 +2125,7 @@ describe('multi-select and bulk actions (issue #90)', () => {
     await openLocation(user, JITA);
     await screen.findByText('Tritanium');
     await screen.findByText('Heavy Abyssal Energy Neutralizer');
-    // The estimate is asked for once the page knows the type is Abyssal.
+    // Estimate asked for = lookup loaded, so the bulk add can tell the type is Abyssal.
     await waitFor(() => expect(abyssalEstimate).toHaveBeenCalled());
 
     await clickTool(user, 'Select');
