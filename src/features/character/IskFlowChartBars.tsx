@@ -23,7 +23,8 @@ import { DataTable, type DataTableColumn } from '@/components/ui';
 import type { JournalDayFlow } from '@/engine/journalDailyFlow';
 import { netToneClass } from '@/features/character/format';
 import { signedIsk } from '@/features/market/signedIsk';
-import { COMPACT_ISK_Y_AXIS_WIDTH } from '@/lib/chartAxis';
+import { COMPACT_ISK_Y_AXIS_MARGIN_LEFT, COMPACT_ISK_Y_AXIS_WIDTH } from '@/lib/chartAxis';
+import { formatDateTick, formatDateWithYear } from '@/lib/formatDateTick';
 import { scalePx } from '@/lib/fontScale';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
 
@@ -31,6 +32,8 @@ interface IskFlowChartBarsProps {
   days: readonly JournalDayFlow[];
   /** The day the Journal is filtered to, when it is one day: the others dim. */
   selectedDay: string | null;
+  /** Touch: a tap only reads the bar's tooltip, it never filters. */
+  readOnly: boolean;
   onSelectDay: (day: string) => void;
 }
 
@@ -39,15 +42,10 @@ interface BarPoint extends JournalDayFlow {
   below: number;
 }
 
-/** Bare calendar date to a short label, built from components so no UTC/local day shift. */
-function formatDay(day: string, withYear = false): string {
-  const [year, month, date] = day.split('-').map(Number);
-  return new Date(year, month - 1, date).toLocaleDateString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    ...(withYear ? { year: 'numeric' } : {}),
-  });
-}
+const BARS: { dataKey: string; fill: string; radius: [number, number, number, number] }[] = [
+  { dataKey: 'in', fill: 'var(--color-isk-pos)', radius: [4, 4, 0, 0] },
+  { dataKey: 'below', fill: 'var(--color-isk-neg)', radius: [0, 0, 4, 4] },
+];
 
 function FlowTooltip({ active, payload }: TooltipContentProps) {
   const { t } = useTranslation();
@@ -56,7 +54,7 @@ function FlowTooltip({ active, payload }: TooltipContentProps) {
   if (!point) return null;
   return (
     <ChartTooltipShell>
-      <p className="font-semibold text-text">{formatDay(point.day, true)}</p>
+      <p className="font-semibold text-text">{formatDateWithYear(point.day)}</p>
       <p>
         {t('wallet.journalBreakdownIn')}: {formatIsk(point.in)}
       </p>
@@ -73,13 +71,14 @@ function FlowTooltip({ active, payload }: TooltipContentProps) {
 export default function IskFlowChartBars({
   days,
   selectedDay,
+  readOnly,
   onSelectDay,
 }: IskFlowChartBarsProps) {
   const { t } = useTranslation();
   const data = useMemo<BarPoint[]>(() => days.map((d) => ({ ...d, below: -d.out })), [days]);
   const columns = useMemo<DataTableColumn<JournalDayFlow>[]>(
     () => [
-      { id: 'day', header: t('wallet.journalFlowDay'), render: (d) => formatDay(d.day, true) },
+      { id: 'day', header: t('wallet.journalFlowDay'), render: (d) => formatDateWithYear(d.day) },
       { id: 'in', header: t('wallet.journalBreakdownIn'), render: (d) => formatIsk(d.in) },
       { id: 'out', header: t('wallet.journalBreakdownOut'), render: (d) => formatIsk(d.out) },
       {
@@ -95,23 +94,25 @@ export default function IskFlowChartBars({
   const tickEvery = Math.max(0, Math.ceil(data.length / 5) - 1);
   return (
     <div>
-      <div role="img" aria-label={t('wallet.journalFlowChartLabel')} className="h-40 w-full">
+      {/* No role="img": it would swallow recharts' focusable layer; the table below is the equivalent. */}
+      <div className="h-40 w-full">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={data}
             stackOffset="sign"
-            margin={{ top: 4, right: 4, bottom: 0, left: 4 }}
+            margin={{ top: 4, right: 4, bottom: 0, left: COMPACT_ISK_Y_AXIS_MARGIN_LEFT }}
             onClick={(state) => {
+              if (readOnly) return;
               const index = Number(state?.activeIndex);
               const point = Number.isInteger(index) ? data[index] : undefined;
               if (point) onSelectDay(point.day);
             }}
-            style={{ cursor: 'pointer' }}
+            style={{ cursor: readOnly ? 'default' : 'pointer' }}
           >
             <CartesianGrid vertical={false} stroke="var(--color-line)" strokeOpacity={0.5} />
             <XAxis
               dataKey="day"
-              tickFormatter={(day: string) => formatDay(day)}
+              tickFormatter={(day: string) => formatDateTick(day)}
               tick={{ fontSize: '0.6875rem', fill: 'var(--color-text-dim)' }}
               interval={tickEvery}
               tickLine={false}
@@ -130,28 +131,20 @@ export default function IskFlowChartBars({
               content={(props) => <FlowTooltip {...props} />}
               cursor={{ fill: 'var(--color-panel-2)' }}
             />
-            <Bar
-              dataKey="in"
-              stackId="flow"
-              fill="var(--color-isk-pos)"
-              isAnimationActive={false}
-              radius={[4, 4, 0, 0]}
-            >
-              {data.map((point) => (
-                <Cell key={point.day} fillOpacity={opacity(point.day)} />
-              ))}
-            </Bar>
-            <Bar
-              dataKey="below"
-              stackId="flow"
-              fill="var(--color-isk-neg)"
-              isAnimationActive={false}
-              radius={[0, 0, 4, 4]}
-            >
-              {data.map((point) => (
-                <Cell key={point.day} fillOpacity={opacity(point.day)} />
-              ))}
-            </Bar>
+            {BARS.map(({ dataKey, fill, radius }) => (
+              <Bar
+                key={dataKey}
+                dataKey={dataKey}
+                stackId="flow"
+                fill={fill}
+                isAnimationActive={false}
+                radius={radius}
+              >
+                {data.map((point) => (
+                  <Cell key={point.day} fillOpacity={opacity(point.day)} />
+                ))}
+              </Bar>
+            ))}
           </BarChart>
         </ResponsiveContainer>
       </div>

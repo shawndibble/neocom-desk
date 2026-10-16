@@ -46,6 +46,8 @@ export function useJournalFilterResult(
   filteredJournal: JournalRow[];
   /** Filtered by date range and text only: the ref-type breakdown ignores the ref-type filter. */
   breakdownJournal: JournalRow[];
+  /** Filtered by ref type and text but not date: the chart draws its own date axis. */
+  chartJournal: JournalRow[];
   refTypeOptions: string[];
 } {
   const { t } = useTranslation();
@@ -62,8 +64,17 @@ export function useJournalFilterResult(
           ),
     [journal, filter, filteredJournal, t]
   );
+  const chartJournal = useMemo(
+    () =>
+      filter.startDate === null && filter.endDate === null
+        ? filteredJournal
+        : filterWalletJournal(journal, { ...filter, startDate: null, endDate: null }, (entry) =>
+            journalDescriptionText(entry, t)
+          ),
+    [journal, filter, filteredJournal, t]
+  );
   const refTypeOptions = useMemo(() => journalRefTypes(journal), [journal]);
-  return { filteredJournal, breakdownJournal, refTypeOptions };
+  return { filteredJournal, breakdownJournal, chartJournal, refTypeOptions };
 }
 
 /**

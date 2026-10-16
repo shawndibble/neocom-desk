@@ -40,6 +40,7 @@ import type { DailyMetricPoint } from './chartAggregation';
 import { SOURCE_FILL } from './priceSourceTone';
 import { useMiningTaxCompressedOre } from './oreForm';
 import type { ChartMetric } from './chartMetricPref';
+import { formatDateTick } from '@/lib/formatDateTick';
 
 export interface DailyRatePoint {
   date: string;
@@ -76,15 +77,6 @@ interface MiningYieldChartsProps {
 /** A drawn bar for the volume/count comparison chart — one type, or the "Other" roll-up carrying the types it folds. */
 interface MetricComparisonBar extends ValueRanked {
   folded?: ValueRanked[];
-}
-
-/** `date` is a bare calendar date — build the tick from Y/M/D components, never `new Date(string)`, to avoid a UTC/local day shift. */
-function formatDateTick(date: string): string {
-  const [year, month, day] = date.split('-').map(Number);
-  return new Date(year, month - 1, day).toLocaleDateString(undefined, {
-    month: 'short',
-    day: 'numeric',
-  });
 }
 
 export function RateTooltip({

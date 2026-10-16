@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
@@ -13,12 +13,17 @@ vi.mock('./IskFlowChartBars', () => ({
     days,
     onSelectDay,
   }: {
-    days: { day: string }[];
+    days: { day: string; in: number }[];
     onSelectDay: (day: string) => void;
   }) => (
-    <button type="button" onClick={() => onSelectDay(days[0].day)}>
-      bars {days.length}
-    </button>
+    <>
+      <button type="button" onClick={() => onSelectDay('2026-10-07')}>
+        bars {days.length}
+      </button>
+      <button type="button" onClick={() => onSelectDay('2026-10-01')}>
+        empty day
+      </button>
+    </>
   ),
 }));
 
@@ -28,6 +33,12 @@ const rows: JournalRow[] = [
 ];
 
 describe('IskFlowChart', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-10T12:00:00Z'));
+  });
+  afterEach(() => vi.useRealTimers());
+
   it('filters the Journal to a clicked day', async () => {
     const onFilterChange = vi.fn();
     render(
@@ -37,7 +48,7 @@ describe('IskFlowChart', () => {
         onFilterChange={onFilterChange}
       />
     );
-    await userEvent.click(await screen.findByRole('button', { name: 'bars 2' }));
+    await userEvent.click(await screen.findByRole('button', { name: /^bars/ }));
     expect(onFilterChange).toHaveBeenCalledWith({
       ...EMPTY_WALLET_JOURNAL_FILTER,
       startDate: '2026-10-07',
@@ -61,10 +72,61 @@ describe('IskFlowChart', () => {
       <IskFlowChart rows={rows} filter={EMPTY_WALLET_JOURNAL_FILTER} onFilterChange={vi.fn()} />
     );
     await userEvent.click(await screen.findByRole('button', { name: 'Hide chart' }));
-    expect(screen.queryByRole('button', { name: 'bars 2' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^bars/ })).not.toBeInTheDocument();
     expect(useJournalFlowChartHidden.getState().value).toBe(true);
     await userEvent.click(screen.getByRole('button', { name: 'Show chart' }));
-    expect(await screen.findByRole('button', { name: 'bars 2' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /^bars/ })).toBeInTheDocument();
     expect(useJournalFlowChartHidden.getState().value).toBe(false);
+  });
+
+  it('clears the day when the selected day is clicked again', async () => {
+    const onFilterChange = vi.fn();
+    render(
+      <IskFlowChart
+        rows={rows}
+        filter={{ ...EMPTY_WALLET_JOURNAL_FILTER, startDate: '2026-10-07', endDate: '2026-10-07' }}
+        onFilterChange={onFilterChange}
+      />
+    );
+    await userEvent.click(await screen.findByRole('button', { name: /^bars/ }));
+    expect(onFilterChange).toHaveBeenCalledWith(EMPTY_WALLET_JOURNAL_FILTER);
+  });
+
+  it('ignores a day with no entries', async () => {
+    const onFilterChange = vi.fn();
+    render(
+      <IskFlowChart
+        rows={rows}
+        filter={EMPTY_WALLET_JOURNAL_FILTER}
+        onFilterChange={onFilterChange}
+      />
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'empty day' }));
+    expect(onFilterChange).not.toHaveBeenCalled();
+  });
+
+  it('draws the last 30 days with no date filter, 92 with a long range', async () => {
+    const { unmount } = render(
+      <IskFlowChart rows={rows} filter={EMPTY_WALLET_JOURNAL_FILTER} onFilterChange={vi.fn()} />
+    );
+    expect(await screen.findByRole('button', { name: 'bars 30' })).toBeInTheDocument();
+    unmount();
+    render(
+      <IskFlowChart
+        rows={rows}
+        filter={{ ...EMPTY_WALLET_JOURNAL_FILTER, startDate: '2026-01-01', endDate: '2026-10-10' }}
+        onFilterChange={vi.fn()}
+      />
+    );
+    expect(await screen.findByRole('button', { name: 'bars 92' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /last 92 days of this range/ })).toBeInTheDocument();
+  });
+
+  it('renders nothing when hidden and there is no flow', () => {
+    useJournalFlowChartHidden.setState({ value: true, hydrated: true });
+    const { container } = render(
+      <IskFlowChart rows={[]} filter={EMPTY_WALLET_JOURNAL_FILTER} onFilterChange={vi.fn()} />
+    );
+    expect(container).toBeEmptyDOMElement();
   });
 });

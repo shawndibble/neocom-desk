@@ -605,10 +605,8 @@ export function Wallet() {
           trackedIds
         );
   }, [allCharacters, allJournalsData, multiCharacters, trackedIds]);
-  const { filteredJournal, breakdownJournal, refTypeOptions } = useJournalFilterResult(
-    classifiedJournal,
-    journalRowsFilter
-  );
+  const { filteredJournal, breakdownJournal, chartJournal, refTypeOptions } =
+    useJournalFilterResult(classifiedJournal, journalRowsFilter);
   const journalSortProps = useUrlSort('journal.sort', JOURNAL_SORT, JOURNAL_SORT_COLUMN_IDS);
 
   // Each table's title-bar export button and its row menus export the same rows, in
@@ -997,6 +995,7 @@ export function Wallet() {
                   refTypeOptions={refTypeOptions}
                   filteredJournal={filteredJournal}
                   breakdownJournal={breakdownJournal}
+                  chartJournal={chartJournal}
                   journalColumns={journalColumns}
                   label={t('wallet.journalTab')}
                   sort={journalSortProps.sort}

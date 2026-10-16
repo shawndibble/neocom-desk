@@ -147,6 +147,8 @@ interface JournalTableProps {
   filteredJournal: readonly JournalRow[];
   /** The journal under the date range and text filters only, for the panel's ref-type list. */
   breakdownJournal: readonly JournalRow[];
+  /** The journal under the ref-type and text filters only: the chart sets its own date axis. */
+  chartJournal: readonly JournalRow[];
   journalColumns: DataTableColumn<JournalRow>[];
   label: string;
   /**
@@ -178,13 +180,23 @@ interface JournalTableProps {
 const journalRowKey = (entry: JournalRow) => entry.id;
 const characterRowKey = (entry: JournalRow) => `${entry.characterId}:${entry.id}`;
 
-/** The panel's date range in words: the journal's own window when no range is set. */
-function rangeLabel(filter: WalletJournalFilter, t: TFunction): string {
+/** The panel's date range in words: with none set, the span the journal really holds. */
+function rangeLabel(
+  filter: WalletJournalFilter,
+  rows: readonly JournalRow[],
+  t: TFunction
+): string {
   const { startDate: from, endDate: to } = filter;
   if (from && to) return t('wallet.journalRangeBetween', { from, to });
   if (from) return t('wallet.journalRangeFrom', { from });
   if (to) return t('wallet.journalRangeTo', { to });
-  return t('wallet.journalRangeDefault');
+  const first = rows.reduce<string | null>(
+    (min, entry) => (min === null || entry.date < min ? entry.date : min),
+    null
+  );
+  return first === null
+    ? t('wallet.journalRangeAll')
+    : t('wallet.journalRangeSince', { since: first.slice(0, 10) });
 }
 
 /**
@@ -206,6 +218,7 @@ export function JournalTable({
   refTypeOptions,
   filteredJournal,
   breakdownJournal,
+  chartJournal,
   journalColumns,
   label,
   highlightRowKey = null,
@@ -396,15 +409,13 @@ export function JournalTable({
         open={panel.open}
         onClose={() => panel.onOpenChange(false)}
         scopeLabel={panel.scopeLabel}
-        rangeLabel={rangeLabel(filter, t)}
+        rangeLabel={rangeLabel(filter, filteredJournal, t)}
         totals={totals}
         breakdown={breakdown}
         selectedRefType={filter.refType}
         onSelectRefType={(refType) => onFilterChange(toggleBreakdownRefType(filter, refType))}
         coverage={panel.coverage}
-        chart={
-          <IskFlowChart rows={filteredJournal} filter={filter} onFilterChange={onFilterChange} />
-        }
+        chart={<IskFlowChart rows={chartJournal} filter={filter} onFilterChange={onFilterChange} />}
       />
       {filteredJournal.length === 0 ? (
         <EmptyState
