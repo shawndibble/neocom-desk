@@ -55,6 +55,7 @@ import { raisedSkillLevels } from '@/engine/fittings/moduleUpgrades';
 import type { PlanEntry } from '@/engine/types';
 import { loadSkills } from '@/sde/loadSde';
 import { useDogmaEngine } from './fittingContext';
+import { onReconnect } from '@/stores/network';
 
 /**
  * Changes to the open Fitting (Variations' swap candidates), worked out
@@ -352,6 +353,8 @@ export function useFittingEvaluation({
   const [attempt, setAttempt] = useState(0);
   const retry = useCallback(() => setAttempt((n) => n + 1), []);
   const engine = useDogmaEngine();
+  // A failure while offline mends itself when the connection returns.
+  useEffect(() => (statsError ? onReconnect(retry) : undefined), [statsError, retry]);
   const [price, setPrice] = useState<Appraisal | null>(null);
 
   // A different hull (or none) is a different Fitting: drop the old numbers at

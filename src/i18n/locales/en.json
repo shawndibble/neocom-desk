@@ -102,7 +102,9 @@
     "tree": {
       "loading": "Loading the ship tree…",
       "loadFailed": "Couldn't load the ship tree",
-      "loadFailedHint": "Check your connection, then reload the page.",
+      "loadFailedHint": "Check your connection, then try again.",
+      "loadFailedOffline": "The ship tree isn't downloaded on this device yet. Connect once, then try again.",
+      "masteriesUnavailable": "Mastery badges need data that isn't downloaded on this device yet.",
       "noCharacter": "No character selected — every hull shows as untrained. Log in to see which you can fly.",
       "credit": "Ship tree icons and emblems are EVE Online artwork © CCP hf., copied from the EVE University wiki and the game. EVE Online and the EVE logo are trademarks of CCP hf.",
       "view": {
@@ -206,6 +208,8 @@
         "masteryLevel": "You have Mastery Level {{level}}",
         "masteryLevelNone": "You have no Mastery Level yet",
         "noMasteries": "No Mastery data for this hull.",
+        "masteriesUnavailable": "Mastery data isn't available offline yet. Connect once to load it.",
+        "masteriesLoading": "Loading Mastery data…",
         "tiersLabel": "Mastery tiers",
         "tier": "Tier {{tier}}",
         "tierComplete": "Tier {{tier}}, complete",
@@ -261,6 +265,8 @@
         "invalid": "That link isn't a valid Fitting.",
         "unsupported-version": "That link was made by a newer version of Neocom Desk."
       },
+      "thrownOffline": "Couldn't load this fitting. It needs item data that isn't downloaded on this device yet. Connect once and try again.",
+      "thrownUnknown": "Couldn't load this fitting. Try again.",
       "loadError": {
         "unrecognised": "That isn't something Load can read. Paste EFT fit text, an in-game fitting link or DNA string, an eveship.fit or EVE Workbench fit link, or a zKillboard killmail link.",
         "eve-workbench-not-found": "EVE Workbench has no published fit at that link. It may have been deleted or made private.",
@@ -306,6 +312,11 @@
     "saveToEve": {
       "action": "Save to EVE…",
       "needCharacter": "Log in with a Character to save Fittings to EVE.",
+      "needsConnection": "Needs a connection.",
+      "needsConnectionKeepMine": "Saving to EVE needs a connection. You can still save to My Fittings.",
+      "unconfirmed": "EVE didn't answer in time, so this may not have been saved. Check your In-game Fittings before trying again.",
+      "offlineFailed": "Couldn't reach EVE. Check your connection and try again; nothing was saved.",
+      "saveMineOnlyAction": "Save to My Fittings",
       "title": "Save to EVE",
       "nameLabel": "Name",
       "targetLabel": "Save as",
@@ -334,6 +345,7 @@
     },
     "mastery": {
       "chip": "Mastery",
+      "unavailable": "Mastery data isn't available offline yet. Connect once to load it.",
       "menuItem": "Mastery skills…",
       "tooltip": "{{name}} Mastery — the skills its tiers ask for and how long they take",
       "title": "{{name}} Mastery",
@@ -473,6 +485,9 @@
       "metaAny": "Any meta level",
       "waitingForShipData": "Ship data is still downloading. You can search now; adding, and the hull, resource and skill filters, switch on once it's ready.",
       "loadingCatalogue": "Loading items…",
+      "catalogueOffline": "Item data isn't downloaded on this device yet. Connect once to use the fitting editor.",
+      "catalogueFailed": "Couldn't load the item data.",
+      "shipDataFailed": "Couldn't download the ship data.",
       "noResults": "No matching items.",
       "hiddenByFilters_one": "{{count}} more hidden by filters — show it",
       "hiddenByFilters_other": "{{count}} more hidden by filters — show them",
@@ -839,6 +854,8 @@
       "copied": {
         "shareLink": "Share Link copied — it works for 7 days",
         "permanentLink": "Permanent link copied",
+        "permanentLinkFallback": "Couldn't make the short Share Link, so the permanent link was copied instead.",
+        "permanentLinkOffline": "Offline: permanent link copied instead. The short Share Link needs a connection.",
         "eft": "Fitting copied",
         "multibuy": "Multibuy list copied",
         "multibuyMinusOwned": "Multibuy list copied, minus what you hold in {{station}}"
@@ -851,6 +868,8 @@
     "stats": {
       "error": "Couldn't load ship data for this fit.",
       "errorSkills": "Couldn't load this Character's skills, so the stats can't be worked out.",
+      "skillsUnknown": "Pilot skills unknown: stats assume no skills.",
+      "errorOffline": "Fitting stats need a one-time ~10 MB download. Connect once to enable them.",
       "retry": "Try again",
       "unavailable": "Not available",
       "loadingIndeterminate": "Downloading ship data…",
@@ -1415,6 +1434,7 @@
       "fixErrorsHint": "Fix the Fitting with the error above to see the comparison.",
       "statsFailed": "Couldn't calculate stats",
       "statsFailedHint": "A Fitting's stats couldn't be calculated. Remove it to see the comparison.",
+      "statsOfflineHint": "Fitting stats need a one-time ~10 MB download. Connect once to enable them.",
       "profileFailed": "Couldn't load your pilot's skills and implants, so the comparison can't be calculated.",
       "profileRetry": "Try again",
       "picker": {
@@ -1549,6 +1569,7 @@
     },
     "share": {
       "shareToCommunity": "Share to Community",
+      "needsConnection": "Sharing to a Community needs a connection.",
       "shareTo": "Share to {{community}}",
       "unshareFrom": "Stop sharing in {{community}}",
       "shared": "Shared to {{community}}.",
@@ -1949,6 +1970,8 @@
     }
   },
   "plans": {
+    "catalogFailed": "Couldn't load the skill list",
+    "catalogFailedHint": "The skill data could not be read on this device. Try again.",
     "title": "Skill Plans",
     "create": "New plan",
     "newPlanOptions": "More ways to start a plan",
@@ -5978,6 +6001,8 @@
       "tripCount_one": "{{count}} trip",
       "tripCount_other": "{{count}} trips",
       "noHauler": "No hauler you can fly could be sized for this load.",
+      "haulerSizingLoading": "Hauler data is still loading. Show the plan again in a moment.",
+      "haulerSizingUnavailable": "Hauler sizing needs data that isn't downloaded yet, or your skills couldn't be read. Connect once, then plan again.",
       "routeSafety": "Route Safety",
       "volumeUnknown": "volume unknown",
       "flyIt": "Fly it",
@@ -10127,6 +10152,7 @@
     "invalidHint": "The link may be corrupted, incomplete, or built by a newer version of Neocom Desk. Ask whoever sent it to share it again.",
     "loadFailedTitle": "Could not load this fitting",
     "loadFailedHint": "Something went wrong working out its stats. Try again.",
+    "loadFailedOffline": "This device hasn't downloaded the data to open it yet. Connect once, then try again.",
     "moduleListTitle": "Modules",
     "expiresLabel": "Expires",
     "copyEft": "Copy Fitting",

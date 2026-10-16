@@ -4,7 +4,10 @@ import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { HaulingCargoControl } from './HaulingCargoControl';
 
-vi.mock('@/features/fittings/useFittingCatalogue', () => ({ useFittingCatalogue: () => null }));
+vi.mock('@/features/fittings/useFittingCatalogue', () => ({
+  useFittingCatalogue: () => null,
+  useFittingCatalogueFailed: () => false,
+}));
 vi.mock('@/features/fittings/fittingPilotProfile', () => ({
   usePilotProfile: () => ({ profile: null }),
 }));

@@ -5,6 +5,7 @@ import { SHIPS_TABS_ID } from '@/features/fittings/shipsTabs';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { useOnline } from '@/stores/network';
 import { Trans, useTranslation } from 'react-i18next';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import type { FittingLoadState } from '@/lib/shortcuts';
@@ -243,6 +244,7 @@ function FittingsPage() {
   // refetches, picking up the fitting that just landed (or the overwrite).
   const [inGameFittingsKey, setInGameFittingsKey] = useState(0);
   const canSaveToEve = useEndpointsGranted(['postCharacterFitting']);
+  const online = useOnline();
 
   const { fitting, stats, edit } = workspace;
   // Warm the module browser's hull check in the background once the ship data,
@@ -581,6 +583,7 @@ function FittingsPage() {
       statsProgress={workspace.statsProgress}
       statsError={workspace.statsError}
       statsErrorReason={workspace.statsErrorReason}
+      skillsKnown={workspace.skillsKnown}
       onRetry={workspace.retry}
       price={workspace.price}
       typeName={(typeId) => catalogueTypeName(catalogue, typeId)}
@@ -729,9 +732,13 @@ function FittingsPage() {
                   setSaveAsNewOpen(true);
                 }}
                 onSaveToEve={() => setSaveToEveOpen(true)}
-                canSaveToEve={activeCharacterId !== null && canSaveToEve === true}
+                canSaveToEve={activeCharacterId !== null && canSaveToEve === true && online}
                 saveToEveBlockedReason={
-                  activeCharacterId === null ? t('fittings.saveToEve.needCharacter') : undefined
+                  activeCharacterId === null
+                    ? t('fittings.saveToEve.needCharacter')
+                    : !online
+                      ? t('fittings.saveToEve.needsConnection')
+                      : undefined
                 }
                 saveToEveMissingGroups={
                   activeCharacterId !== null && canSaveToEve === false ? ['fittings'] : undefined

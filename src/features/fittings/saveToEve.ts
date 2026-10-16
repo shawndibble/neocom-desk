@@ -8,7 +8,7 @@
  * rather than neither.
  */
 import { deleteCharacterFitting, postCharacterFitting } from '@/esi/endpoints';
-import { EsiError } from '@/esi/client';
+import { EsiError, EsiTimeoutError, isOfflineFailure } from '@/esi/client';
 import { reportWriteAuthFailure } from '@/esi/writeAuthFailure';
 import { fittingToEsiFitting } from '@/engine/fittings/esiFittingMapper';
 import type { Fitting } from '@/engine/fittings/types';
@@ -51,10 +51,29 @@ export type SaveToEveResult =
     }
   | {
       ok: false;
+      /** The write never got through for want of a connection: nothing was saved, and trying again online works. */
+      kind: 'offline';
+    }
+  | {
+      ok: false;
+      /** The request went out and ESI never answered in time: the Fitting may have been saved. */
+      kind: 'unconfirmed';
+    }
+  | {
+      ok: false;
+      kind?: 'refused';
       message: string;
       /** ESI refused and the grant lacks the write scope: logging in again for the Fittings Permission fixes it. */
       needsPermission?: true;
     };
+
+/**
+ * A network failure before ESI heard the request. A timeout after it was sent
+ * is `unconfirmed` instead: the Fitting may have landed.
+ */
+function failedOffline(err: unknown): boolean {
+  return isOfflineFailure(err) && !(err instanceof EsiTimeoutError && err.sent);
+}
 
 function messageOf(err: unknown): string {
   return err instanceof EsiError ? err.message : 'Unknown error';
@@ -74,6 +93,8 @@ export async function saveFittingToEve(input: SaveToEveInput): Promise<SaveToEve
     if (data === null) return { ok: false, message: 'ESI returned no fitting id' };
     fittingId = data.fitting_id;
   } catch (err) {
+    if (failedOffline(err)) return { ok: false, kind: 'offline' };
+    if (err instanceof EsiTimeoutError) return { ok: false, kind: 'unconfirmed' };
     const outcome = await reportWriteAuthFailure(characterId, err, 'postCharacterFitting');
     return outcome === 'grant-needed'
       ? { ok: false, message: messageOf(err), needsPermission: true }

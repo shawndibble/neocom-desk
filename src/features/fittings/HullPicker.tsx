@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { Button, SearchInput, TypeIcon } from '@/components/ui';
 import { buildHullCatalogue, searchHulls, type HullEntry } from '@/engine/fittings/hullCatalogue';
 import type { LoadedFitting } from '@/engine/fittings/load';
+import { CatalogueLoadingNote } from './FittingDataNotices';
 import { PopularFitsPanel } from './PopularFitsPanel';
 import type { FittingCatalogue } from './useFittingCatalogue';
 
@@ -54,7 +55,7 @@ export function HullPicker({ catalogue, onStart, onOpenPopular }: HullPickerProp
         onChange={(event) => setQuery(event.target.value)}
       />
       {catalogue === null ? (
-        <p className="text-xs text-text-dim">{t('fittings.add.loadingCatalogue')}</p>
+        <CatalogueLoadingNote />
       ) : !hasQuery ? (
         <p className="text-xs text-text-dim">{t('fittings.start.searchToBegin')}</p>
       ) : shown.length === 0 ? (

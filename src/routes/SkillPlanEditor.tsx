@@ -3,7 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
-import { buttonClassName, Spinner } from '@/components/ui';
+import { Button, buttonClassName, EmptyState, Spinner } from '@/components/ui';
+import { useRetryFocus } from '@/lib/useRetryFocus';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { scheduleSync } from '@/sync';
 import { isSyncConfigured } from '@/app/syncStatus';
@@ -30,7 +31,10 @@ export function SkillPlanEditor() {
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const hydrated = useActiveCharacter((state) => state.hydrated);
   const {
+    loaded,
     catalog,
+    catalogFailed,
+    reload,
     trainedSkills,
     trainedSkillsKnown,
     attributes,
@@ -43,6 +47,11 @@ export function SkillPlanEditor() {
     totalSp,
     unallocatedSp,
   } = usePlanEditorData(activeCharacterId);
+  // Retry unmounts while the catalog loads again; this wrapper holds focus meanwhile.
+  const [retryRef, , holdFocus] = useRetryFocus<HTMLDivElement>(
+    loaded && catalogFailed ? 'failed' : 'busy',
+    activeCharacterId
+  );
   const isDesktop = useIsDesktop();
   // Memoised: the list pane's per-plan costing re-runs when this changes.
   const scheduleInputs = useMemo(
@@ -135,7 +144,7 @@ export function SkillPlanEditor() {
         </Link>
       )}
 
-      {!catalog ? (
+      {!catalog || !loaded ? (
         // Same two-column shape while the skill catalog loads, so the plan
         // list stays put in the sidebar instead of vanishing behind a
         // full-page spinner and snapping back once the catalog arrives.
@@ -152,8 +161,28 @@ export function SkillPlanEditor() {
             ) : undefined
           }
         >
-          <div className="flex justify-center py-16">
-            <Spinner label={t('common.loading')} />
+          <div ref={retryRef} tabIndex={-1} className="focus:outline-none">
+            {loaded && catalogFailed ? (
+              <EmptyState
+                title={t('plans.catalogFailed')}
+                hint={t('plans.catalogFailedHint')}
+                action={
+                  <Button
+                    onClick={() => {
+                      holdFocus();
+                      reload();
+                    }}
+                  >
+                    {t('common.retry')}
+                  </Button>
+                }
+                className="py-16"
+              />
+            ) : (
+              <div className="flex justify-center py-16">
+                <Spinner label={t('common.loading')} />
+              </div>
+            )}
           </div>
         </PlanEditorLayout>
       ) : (

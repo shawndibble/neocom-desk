@@ -17,6 +17,7 @@ import {
 import { NOTICE_MS, useTimedToast } from '@/components/ui/useTimedToast';
 import { shareMenuMode } from '@/engine/communities/sharedFittings';
 import type { CommunitySummary } from '@/features/communities/communityStore';
+import { useOnline } from '@/stores/network';
 
 export interface EditorShare {
   items: ReactNode;
@@ -34,6 +35,7 @@ export function useEditorShare(
   record: { id: string; name: string; code: string } | null
 ): EditorShare {
   const { t } = useTranslation();
+  const online = useOnline();
   const [status, setStatus] = useState<Status | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   useTimedToast(notice, () => setNotice(null), NOTICE_MS);
@@ -79,25 +81,45 @@ export function useEditorShare(
       ? t('fittings.share.unshareFrom', { community: community.name })
       : t('fittings.share.shareTo', { community: community.name });
 
+  // Sharing writes to the Community; offline it can only fail, so say why it is off (the reason sits
+  // under the item, as on Save to EVE, because a disabled menu item takes no hover for a tooltip).
+  const offlineReason = online ? null : (
+    <p className="max-w-64 px-3 pb-2 text-xs text-text-dim">
+      {t('fittings.share.needsConnection')}
+    </p>
+  );
+
   if (mode === 'direct') {
     const [only] = status.communities;
     return {
-      items: <DropdownMenuItem onSelect={() => void toggle(only)}>{label(only)}</DropdownMenuItem>,
+      items: (
+        <>
+          <DropdownMenuItem disabled={!online} onSelect={() => void toggle(only)}>
+            {label(only)}
+          </DropdownMenuItem>
+          {offlineReason}
+        </>
+      ),
       notice,
     };
   }
   return {
     items: (
-      <DropdownMenuSub>
-        <DropdownMenuSubTrigger>{t('fittings.share.shareToCommunity')}</DropdownMenuSubTrigger>
-        <DropdownMenuSubContent>
-          {status.communities.map((community) => (
-            <DropdownMenuItem key={community.id} onSelect={() => void toggle(community)}>
-              {label(community)}
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuSubContent>
-      </DropdownMenuSub>
+      <>
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger disabled={!online}>
+            {t('fittings.share.shareToCommunity')}
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent>
+            {status.communities.map((community) => (
+              <DropdownMenuItem key={community.id} onSelect={() => void toggle(community)}>
+                {label(community)}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
+        {offlineReason}
+      </>
     ),
     notice,
   };

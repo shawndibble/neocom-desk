@@ -18,7 +18,13 @@ import { loadAllCharactersAssets } from '@/features/character/assets';
 import { useAppraisalOwnedPref } from '@/features/market/appraisalOwnedPref';
 import { useMarketHub } from '@/features/market/hub';
 import { TRADE_HUBS, getTradeHub } from '@/market/hubs';
-import { exportFitting, fittingShareCode, type FittingExportKind } from './fittingExportText';
+import {
+  exportFitting,
+  fittingShareCode,
+  fittingShareViewUrl,
+  type FittingExportKind,
+} from './fittingExportText';
+import { isOnline } from '@/stores/network';
 import { useTimedToast, NOTICE_MS } from '@/components/ui/useTimedToast';
 
 const ASSETS_ENDPOINTS: readonly EsiEndpointId[] = ['getCharacterAssets'];
@@ -115,6 +121,23 @@ export function useFittingExport(fitting: Fitting, cloneImplants: readonly numbe
       return;
     }
     let url = existingShareLink('fitting', code);
+    /**
+     * The short link is a sync-server write, which hangs or fails with no
+     * connection. The permanent view link carries the whole code and opens
+     * from it locally, so it stands in.
+     */
+    const copyPermanentInstead = async (noticeKey: string) => {
+      try {
+        await writeToClipboard(fittingShareViewUrl(code));
+        setNotice(t(noticeKey));
+      } catch {
+        setNotice(t('fittings.export.copyFailed'));
+      }
+    };
+    if (url === null && !isOnline()) {
+      await copyPermanentInstead('fittings.export.copied.permanentLinkOffline');
+      return;
+    }
     if (url === null) {
       if (characterId === null || !isSyncConfigured()) {
         setNotice(t('fittings.export.shareFailed'));
@@ -128,7 +151,8 @@ export function useFittingExport(fitting: Fitting, cloneImplants: readonly numbe
           characterId,
         });
       } catch {
-        setNotice(t('fittings.export.shareFailed'));
+        // Lie-fi, or the store refused: the permanent link still works.
+        await copyPermanentInstead('fittings.export.copied.permanentLinkFallback');
         return;
       }
     }

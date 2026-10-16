@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   loadSkillCatalog,
   toAttributeBaseline,
@@ -21,6 +21,8 @@ export interface PlanEditorData {
   /** The first load for this character has finished, successfully or not. */
   loaded: boolean;
   catalog: SkillCatalog | null;
+  /** The skill catalog could not be loaded (`loaded` is then true with `catalog` null); `reload` tries again. */
+  catalogFailed: boolean;
   trainedSkills: ReadonlyMap<number, TrainedSkill>;
   /**
    * Whether `trainedSkills` is ESI's answer rather than the empty map that
@@ -82,6 +84,7 @@ export interface PlanEditorData {
 export function usePlanEditorData(characterId: number | null): PlanEditorData {
   const [loadedFor, setLoadedFor] = useState<number | null>(null);
   const [catalog, setCatalog] = useState<SkillCatalog | null>(null);
+  const [catalogFailed, setCatalogFailed] = useState(false);
   const [trainedSkills, setTrainedSkills] = useState<ReadonlyMap<number, TrainedSkill>>(new Map());
   const [trainedSkillsKnown, setTrainedSkillsKnown] = useState(false);
   const [attributes, setAttributes] = useState<Attributes>(DEFAULT_ATTRIBUTES);
@@ -103,40 +106,83 @@ export function usePlanEditorData(characterId: number | null): PlanEditorData {
     setReloadCount((n) => n + 1);
   }, []);
 
+  // The Character the state above belongs to. A switch clears it before the
+  // new load, so a failed load for B can never leave A's skills standing as B's.
+  const stateFor = useRef<number | null>(null);
+
   useEffect(() => {
     if (characterId === null) return;
     let cancelled = false;
+    if (stateFor.current !== characterId) {
+      stateFor.current = characterId;
+      setTrainedSkills(new Map());
+      setTrainedSkillsKnown(false);
+      setAttributes(DEFAULT_ATTRIBUTES);
+      setAttributesResult(null);
+      setAttributeBaseline(null);
+      setImplants({});
+      setRemapInfo(null);
+      setQueueEntries([]);
+      setQueueFetchedAt(null);
+      setTotalSp(null);
+      setUnallocatedSp(null);
+      setFetchedAt(null);
+    }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- a retry clears the last failure, not a render-time derivation
+    setCatalogFailed(false);
     void (async () => {
-      const [cat, corrected, attrs, implantBonuses] = await Promise.all([
-        loadSkillCatalog(),
+      // Each read lands on its own: offline, one can fail while another is
+      // answered from the cache, and the editor should keep what it got.
+      // The skill catalog ships in the bundle, so it is set the moment it is
+      // in rather than after the ESI reads, which offline can be slow. Views
+      // that need the pilot's data too wait for `loaded`, not for the catalog.
+      const catalogDone = loadSkillCatalog().then(
+        (cat) => {
+          if (!cancelled) setCatalog(cat);
+          return true;
+        },
+        () => false
+      );
+      const [skillsResult, attrsResult, implantsResult] = await Promise.allSettled([
         loadCorrectedSkills(characterId, Date.now()),
         loadCharacterAttributes(characterId),
         loadImplantBonuses(characterId),
       ]);
+      const catalogLoaded = await catalogDone;
       if (cancelled) return;
-      setCatalog(cat);
-      // /skills is stale until the character next logs in. ESI says to apply
-      // past-finish_date queue entries on top, or a plan gets normalized and
-      // optimized against levels the character already trained past.
-      setTrainedSkills(corrected.trained);
-      setTrainedSkillsKnown(corrected.skillsResult !== null);
-      setQueueEntries(corrected.queueResult?.data ?? []);
-      setQueueFetchedAt(corrected.queueResult?.fetchedAt ?? null);
-      setTotalSp(corrected.totalSp);
-      setUnallocatedSp(corrected.skillsResult?.data.unallocated_sp ?? null);
-      setFetchedAt(corrected.fetchedAt);
-      if (attrs?.data) {
-        // An `impossible` sheet yields no baseline at all, so the scheduler
-        // falls back to the same placeholder it uses when ESI cannot be read.
-        // Approximating one from the reported numbers is what produced the
-        // silent zero this replaces: see engine/attributeBaseline.ts.
-        const baseline = toAttributeBaseline(attrs.data, implantBonuses);
-        setAttributeBaseline(baseline);
-        setAttributes(baselineAttributes(baseline) ?? DEFAULT_ATTRIBUTES);
+      if (!catalogLoaded) setCatalogFailed(true);
+      if (skillsResult.status === 'fulfilled') {
+        const corrected = skillsResult.value;
+        // /skills is stale until the character next logs in. ESI says to apply
+        // past-finish_date queue entries on top, or a plan gets normalized and
+        // optimized against levels the character already trained past.
+        setTrainedSkills(corrected.trained);
+        setTrainedSkillsKnown(corrected.skillsResult !== null);
+        setQueueEntries(corrected.queueResult?.data ?? []);
+        setQueueFetchedAt(corrected.queueResult?.fetchedAt ?? null);
+        setTotalSp(corrected.totalSp);
+        setUnallocatedSp(corrected.skillsResult?.data.unallocated_sp ?? null);
+        setFetchedAt(corrected.fetchedAt);
       }
-      setAttributesResult(attrs);
-      setRemapInfo(remapAvailability(attrs?.data ?? null, new Date()));
-      setImplants(implantBonuses);
+      // Without the implants the baseline can't be worked out; the attributes
+      // alone are kept, as ESI reported them.
+      const attrs = attrsResult.status === 'fulfilled' ? attrsResult.value : undefined;
+      const implantBonuses = implantsResult.status === 'fulfilled' ? implantsResult.value : null;
+      if (attrs !== undefined) {
+        if (attrs?.data && implantBonuses !== null) {
+          // An `impossible` sheet yields no baseline at all, so the scheduler
+          // falls back to the same placeholder it uses when ESI cannot be read.
+          // Approximating one from the reported numbers is what produced the
+          // silent zero this replaces: see engine/attributeBaseline.ts.
+          const baseline = toAttributeBaseline(attrs.data, implantBonuses);
+          setAttributeBaseline(baseline);
+          setAttributes(baselineAttributes(baseline) ?? DEFAULT_ATTRIBUTES);
+        }
+        setAttributesResult(attrs);
+        setRemapInfo(remapAvailability(attrs?.data ?? null, new Date()));
+      }
+      if (implantBonuses !== null) setImplants(implantBonuses);
+      // "Loaded" means this attempt is over, whichever way it went.
       setLoadedFor(characterId);
     })();
     return () => {
@@ -147,6 +193,7 @@ export function usePlanEditorData(characterId: number | null): PlanEditorData {
   return {
     loaded: characterId !== null && loadedFor === characterId,
     catalog,
+    catalogFailed,
     trainedSkills,
     trainedSkillsKnown,
     attributes,

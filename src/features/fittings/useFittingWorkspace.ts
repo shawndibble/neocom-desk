@@ -97,6 +97,8 @@ export type FittingChange = (fitting: Fitting) => Fitting;
 export interface FittingWorkspace extends FittingEvaluation {
   /** What `statsError` is about: the active Character's skills, or the ship data / calculation. */
   statsErrorReason: StatsErrorReason;
+  /** False when the active Character's skills could not be read, so the stats assume none. */
+  skillsKnown: boolean;
   fitting: Fitting | null;
   /** Set when `?f=` carries a payload this build can't read at all. */
   shareError: ShareDecodeError | null;
@@ -576,6 +578,7 @@ export function useFittingWorkspace(): FittingWorkspace {
   const {
     profile,
     failed: profileFailed,
+    skillsKnown,
     retry: retryProfile,
   } = usePilotProfile(activeCharacterId);
   const evaluation = useFittingEvaluation({ fitting, profile, implantBasis });
@@ -615,6 +618,7 @@ export function useFittingWorkspace(): FittingWorkspace {
     ...evaluation,
     statsError: evaluation.statsError || profileFailed,
     statsErrorReason: (profileFailed ? 'skills' : 'shipData') satisfies StatsErrorReason,
+    skillsKnown,
     retry,
     profile,
     savedId,

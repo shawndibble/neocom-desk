@@ -6,7 +6,7 @@ import '@/i18n';
 import { hullCountsFor, layoutShipTree } from '@/engine/shipTree/layout';
 import { classNeedsOmega } from '@/engine/shipTree/rules';
 import { CALDARI_FACTION_ID, treeFor } from '@/engine/shipTree/templates';
-import { loadShipTree } from '@/sde/loadSde';
+import { loadMasteries, loadShipTree } from '@/sde/loadSde';
 import type { TargetPlan } from '@/features/skills/useTargetPlan';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import {
@@ -276,6 +276,29 @@ describe('ShipTreeTab — loading', () => {
     renderTab();
     expect(await screen.findByText("Couldn't load the ship tree")).toBeVisible();
     expect(screen.queryByText('Loading the ship tree…')).not.toBeInTheDocument();
+  });
+
+  it('offers Retry on a failed tree load, and the offline copy when there is no connection', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => false });
+    try {
+      vi.mocked(loadShipTree).mockRejectedValueOnce(new TypeError('Failed to fetch'));
+      renderTab();
+      expect(await screen.findByText(/isn't downloaded on this device yet/)).toBeVisible();
+      expect(screen.queryByText(/reload the page/)).not.toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+      expect(await screen.findByRole('region', { name: 'Caldari State ship tree' })).toBeVisible();
+    } finally {
+      Reflect.deleteProperty(navigator, 'onLine');
+    }
+  });
+
+  it('keeps the tree when only the Mastery data is missing, and says so with a Retry', async () => {
+    vi.mocked(loadMasteries).mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    renderTab();
+    await screen.findByRole('region', { name: 'Caldari State ship tree' });
+    expect(await screen.findByText(/Mastery badges need data/)).toBeVisible();
+    await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    await waitFor(() => expect(screen.queryByText(/Mastery badges need data/)).toBeNull());
   });
 
   it("marks nothing flyable until the Character's skills have been read", async () => {
