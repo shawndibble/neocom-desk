@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -88,12 +89,56 @@ describe('HaulingTripRail', () => {
     );
     expect(screen.getByText('the trip').parentElement).toHaveFocus();
   });
+
+  it('leaves focus where it is when the detail clears from the table', () => {
+    const rail = (detail: ReactNode) => (
+      <HaulingTripRail detail={detail} onBack={() => {}} trip={<p>the trip</p>} footer={null} />
+    );
+    const { rerender } = render(
+      <>
+        <button type="button">row</button>
+        {rail(<p>the detail</p>)}
+      </>
+    );
+    screen.getByRole('button', { name: 'row' }).focus();
+    rerender(
+      <>
+        <button type="button">row</button>
+        {rail(null)}
+      </>
+    );
+    expect(screen.getByRole('button', { name: 'row' })).toHaveFocus();
+  });
+
+  it('never takes focus on mount', () => {
+    render(
+      <HaulingTripRail detail={null} onBack={() => {}} trip={<p>the trip</p>} footer={null} />
+    );
+    expect(document.body).toHaveFocus();
+  });
+
+  it('scrolls back to the top when another row detail replaces this one', () => {
+    const rail = (key: number) => (
+      <HaulingTripRail
+        detail={<p>detail {key}</p>}
+        detailKey={key}
+        onBack={() => {}}
+        trip={null}
+        footer={null}
+      />
+    );
+    const { rerender } = render(rail(1));
+    const body = screen.getByText('detail 1').parentElement!;
+    body.scrollTop = 120;
+    rerender(rail(2));
+    expect(body.scrollTop).toBe(0);
+  });
 });
 
 describe('HaulingTripSummary', () => {
   it('reads the lane with its jumps by route preference, the free m³ with a meter, and per-jump profit', () => {
     renderSummary({ cargoValueAfterFill: 619_395_524 });
-    expect(screen.getByText('Amarr to Jita · 45 jumps (safer)')).toBeInTheDocument();
+    expect(screen.getByText('Amarr to Jita · 45 jumps (Prefer safer)')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Mastodon' })).toBeInTheDocument();
     expect(screen.getByText('213,965,524', { selector: 'b' })).toBeInTheDocument();
     expect(screen.getByText('→ 619,395,524 with the fill')).toBeInTheDocument();
@@ -125,6 +170,16 @@ describe('HaulingTripSummary', () => {
     expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
     expect(screen.queryByText('free')).not.toBeInTheDocument();
     expect(screen.queryByText(/m³ used/)).not.toBeInTheDocument();
+  });
+
+  it('prints the free m³ it is given, so it matches the fill offer', () => {
+    renderSummary({ freeM3: 40_000 });
+    expect(screen.getByText('40,000 m³')).toBeInTheDocument();
+  });
+
+  it('reads a hold full to float residue as 0 free, not <1', () => {
+    renderSummary({ plan: plan([{ kind: 'general', capacityM3: 1, usedM3: 0.7 + 0.2 + 0.1 }]) });
+    expect(screen.getByText('0 m³')).toBeInTheDocument();
   });
 
   it('shows one meter per hold when the Cargo Space has several', () => {
@@ -227,8 +282,8 @@ describe('HaulingFillList', () => {
     await user.click(screen.getByRole('checkbox', { name: 'Coolant' }));
     expect(onToggle).toHaveBeenCalledWith(2, true);
 
-    const add = screen.getByRole('button', { name: /Add 1 · \+9,000 m³/ });
-    expect(add).toHaveTextContent('+30,000,000 spend · +3,903,930 profit');
+    const add = screen.getByRole('button', { name: 'Add 1 · +9,000 m³' });
+    expect(add).toHaveAccessibleDescription('+30,000,000 spend · +3,903,930 profit');
     await user.click(add);
     expect(onAdd).toHaveBeenCalledOnce();
     expect(

@@ -1,5 +1,5 @@
 /**
- * The trip rail and its parts (issue #3878): a sticky column beside the
+ * The trip rail and its parts: a sticky column beside the
  * Hauling table that holds the Trip Plan's totals, the fill offer and Copy
  * multibuy, and swaps to a selected row's detail with a "‹ Trip" crumb. On a
  * panel too narrow for it, `HaulingTripBar` is the sticky bottom bar instead.
@@ -9,26 +9,28 @@ import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Checkbox, IskAmount, Panel, ProgressBar, Spinner } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import {
-  inlineLinkClassName,
-  tappableRowClassName,
-  touchCheckboxLabelClassName,
-} from '@/components/ui/controlStyles';
+import { inlineLinkClassName, tappableRowClassName } from '@/components/ui/controlStyles';
 import type { TripPlan } from '@/engine/market/haulingPlan';
-import { ROUTE_PREFERENCE_SHORT_LABEL_KEYS } from '@/features/route/routePreferences';
-import { formatIsk } from '@/lib/isk';
+import { ROUTE_PREFERENCE_LABEL_KEYS } from '@/features/route/routePreferences';
+import { clampIskZero, formatIsk } from '@/lib/isk';
 import { useStickyClearance } from '@/lib/useStickyClearance';
+import { formatVolume } from './format';
 import { HaulingHoldMeters } from './HaulingHoldMeters';
 import { signedIsk } from './signedIsk';
 import type { HubJumps } from './useHubJumps';
 
-/** Whole m³; a non-zero volume under one says "<1" rather than a misleading 0 or 1. */
+/** Below this a summed volume is float residue, not cargo. */
+const M3_EPSILON = 1e-6;
+
+/** Whole m³; a real volume under one says "<1" rather than a misleading 0 or 1. */
 function formatTripM3(value: number): string {
-  return value > 0 && value < 1 ? '<1' : Math.round(value).toLocaleString();
+  return value >= M3_EPSILON && value < 1 ? '<1' : formatVolume(Math.max(0, value));
 }
 
 const isk = (value: number) => formatIsk(value, 0);
 const signed = (value: number) => signedIsk(value, 0);
+/** The same zero test `signedIsk` uses, so the green and the "+" always agree. */
+const gains = (value: number) => clampIskZero(value, 0) > 0;
 
 /** Literal keys, so the locale split finds them. */
 const BINDING_KEYS = {
@@ -46,29 +48,30 @@ export interface HaulingTripRailProps {
   trip: ReactNode;
   /** Always shown under both views: free m³, profit, Copy multibuy and the table menu. */
   footer: ReactNode;
+  /** Names the shown detail (the selected row's type id), so picking another row scrolls back to its top. */
+  detailKey?: string | number;
 }
 
-/**
- * Sticks 1rem under the top of the viewport (the page header scrolls away
- * above it) and is never taller than the viewport: past that its body
- * scrolls inside, so the crumb and the footer stay on screen.
- */
-export function HaulingTripRail({ detail, onBack, trip, footer }: HaulingTripRailProps) {
+/** Capped at the viewport's height so the crumb and footer stay on screen; the body scrolls inside. */
+export function HaulingTripRail({ detail, onBack, trip, footer, detailKey }: HaulingTripRailProps) {
   const { t } = useTranslation();
   const showingDetail = detail !== null;
   const bodyRef = useRef<HTMLDivElement>(null);
-  // The crumb unmounts on its own click; focus lands on the trip instead of the page body.
-  const focusTripRef = useRef(false);
+  const wasShowingDetail = useRef(showingDetail);
 
   useEffect(() => {
     const body = bodyRef.current;
+    const leftDetail = wasShowingDetail.current && !showingDetail;
+    wasShowingDetail.current = showingDetail;
     if (!body) return;
     body.scrollTop = 0;
-    if (!showingDetail && focusTripRef.current) {
-      focusTripRef.current = false;
+    // The crumb unmounts on its own click and focus drops to the page; land it on the trip.
+    // Focus still on a table row (the row deselected there) stays put.
+    const active = document.activeElement;
+    if (leftDetail && (!active || active === document.body || !active.isConnected)) {
       body.focus({ preventScroll: true });
     }
-  }, [showingDetail]);
+  }, [showingDetail, detailKey]);
 
   return (
     <Panel
@@ -79,14 +82,11 @@ export function HaulingTripRail({ detail, onBack, trip, footer }: HaulingTripRai
         showingDetail ? (
           <button
             type="button"
-            onClick={() => {
-              focusTripRef.current = true;
-              onBack();
-            }}
+            onClick={onBack}
             className={`${inlineLinkClassName} ${tappableRowClassName} inline-flex items-center gap-1 px-2 text-sm`}
           >
             <Icon.Back aria-hidden="true" size={Icon.ICON_SIZE.sm} />
-            {t('market.hauling.rail.back')}
+            {t('market.hauling.rail.title')}
           </button>
         ) : undefined
       }
@@ -111,6 +111,8 @@ export interface HaulingTripSummaryProps {
   cargoControl: ReactNode;
   /** Cargo value (plan spend) once the ticked fill items are added; null with nothing ticked. */
   cargoValueAfterFill: number | null;
+  /** The free m³ to print, so it matches the fill offer's; defaults to the room left in every hold. */
+  freeM3?: number;
 }
 
 function SummaryRow({ label, children }: { label: string; children: ReactNode }) {
@@ -129,19 +131,26 @@ export function HaulingTripSummary({
   jumps,
   cargoControl,
   cargoValueAfterFill,
+  freeM3: freeM3Given,
 }: HaulingTripSummaryProps) {
   const { t } = useTranslation();
   const { profit, cost } = plan.totals;
   const holds = cargoSet ? plan.holds : [];
-  const capacityM3 = holds.reduce((sum, hold) => sum + hold.capacityM3, 0);
-  const usedM3 = holds.reduce((sum, hold) => sum + hold.usedM3, 0);
-  const freeM3 = holds.reduce((sum, hold) => sum + Math.max(0, hold.capacityM3 - hold.usedM3), 0);
+  let capacityM3 = 0;
+  let usedM3 = 0;
+  let roomM3 = 0;
+  for (const hold of holds) {
+    capacityM3 += hold.capacityM3;
+    usedM3 += hold.usedM3;
+    roomM3 += Math.max(0, hold.capacityM3 - hold.usedM3);
+  }
+  const freeM3 = freeM3Given ?? roomM3;
   const knownJumps = jumps.status === 'known' && jumps.jumps > 0 ? jumps : null;
 
   const jumpsText = knownJumps
     ? t('market.hauling.rail.jumps', {
         count: knownJumps.jumps,
-        preference: t(ROUTE_PREFERENCE_SHORT_LABEL_KEYS[knownJumps.preference]).toLocaleLowerCase(),
+        preference: t(ROUTE_PREFERENCE_LABEL_KEYS[knownJumps.preference]),
       })
     : null;
 
@@ -172,8 +181,8 @@ export function HaulingTripSummary({
 
       {holds.length > 0 ? (
         <div className="flex flex-col gap-1.5">
-          <span className="text-2xl leading-none font-semibold tabular-nums">
-            {t('market.hauling.rail.freeFigure', { m3: formatTripM3(freeM3) })}{' '}
+          <span className="text-3xl leading-none font-semibold tabular-nums">
+            {t('market.hauling.rail.m3', { m3: formatTripM3(freeM3) })}{' '}
             <span className="text-base font-normal text-text-dim">
               {t('market.hauling.rail.freeWord')}
             </span>
@@ -186,7 +195,7 @@ export function HaulingTripSummary({
               size="md"
             />
           ) : (
-            // Its bars hide in a container under 26rem; the rail is narrower, so show them.
+            // Its bars hide in an @container under 26rem; inside one, the rail would lose them.
             <div className="[&_[role=img]]:!block">
               <HaulingHoldMeters holds={holds} bindingText={null} />
             </div>
@@ -204,7 +213,7 @@ export function HaulingTripSummary({
 
       <dl className="flex flex-col gap-1 border-t border-line pt-3">
         <SummaryRow label={t('market.hauling.rail.profit')}>
-          <span className={`font-semibold ${profit > 0 ? 'text-success' : ''}`}>
+          <span className={`font-semibold ${gains(profit) ? 'text-success' : ''}`}>
             {signed(profit)}
           </span>
         </SummaryRow>
@@ -272,23 +281,20 @@ function FillRow({
       <label
         className={`flex cursor-pointer items-center gap-2 py-1 text-xs tabular-nums ${tappableRowClassName}`}
       >
-        <span className={touchCheckboxLabelClassName}>
-          <Checkbox
-            aria-labelledby={nameId}
-            checked={ticked}
-            onChange={(event) => onToggle(item.typeId, event.target.checked)}
-          />
-        </span>
+        <Checkbox
+          aria-labelledby={nameId}
+          checked={ticked}
+          onChange={(event) => onToggle(item.typeId, event.target.checked)}
+        />
         <span className="flex min-w-0 flex-1 flex-col leading-tight">
           <span id={nameId} className="truncate">
             {item.name}
           </span>
           <span className="truncate text-text-dim">
-            {item.categoryName} ·{' '}
-            {t('market.hauling.fill.volume', { m3: formatTripM3(item.volumeM3) })}
+            {item.categoryName} · {t('market.hauling.rail.m3', { m3: formatTripM3(item.volumeM3) })}
           </span>
         </span>
-        <span className={`shrink-0 ${item.profit > 0 ? 'text-success' : ''}`}>
+        <span className={`shrink-0 ${gains(item.profit) ? 'text-success' : ''}`}>
           {signed(item.profit)}
         </span>
       </label>
@@ -309,6 +315,7 @@ export function HaulingFillList({
   holdAfter,
 }: HaulingFillListProps) {
   const { t } = useTranslation();
+  const addDetailId = useId();
 
   let body: ReactNode;
   if (status === 'idle') {
@@ -354,24 +361,25 @@ export function HaulingFillList({
             />
           ))}
         </ul>
-        <Button
-          className="!h-auto min-h-11 w-full flex-col !gap-0.5 !py-1.5 md:min-h-9 touch:min-h-11"
-          disabled={tickedTotals.count === 0}
-          onClick={onAdd}
-        >
-          <span>
+        <div className="flex flex-col gap-1">
+          <Button
+            className="w-full"
+            disabled={tickedTotals.count === 0}
+            onClick={onAdd}
+            aria-describedby={addDetailId}
+          >
             {t('market.hauling.fill.add', {
               count: tickedTotals.count,
               m3: formatTripM3(tickedTotals.volumeM3),
             })}
-          </span>
-          <span className="text-[0.6875rem] font-normal tracking-normal normal-case tabular-nums">
+          </Button>
+          <p id={addDetailId} className="text-center text-xs text-text-dim tabular-nums">
             {t('market.hauling.fill.addDetail', {
               spend: isk(tickedTotals.cost),
               profit: signed(tickedTotals.profit),
             })}
-          </span>
-        </Button>
+          </p>
+        </div>
         {holdAfter && (
           <p className="text-xs text-text-dim tabular-nums">
             {t('market.hauling.fill.holdAfter', {
@@ -399,34 +407,35 @@ export interface HaulingTripBarProps {
   profit: number;
   /** Opens the trip (summary + fill) as a sheet. */
   onOpenTrip: () => void;
-  /** The panel's Copy multibuy button. */
+  /** The panel's Copy multibuy button; `size="sm"` to match "Trip details" (DESIGN.md §3). */
   copyButton: ReactNode;
 }
 
 /**
- * Pinned above the phone tab bar (and 0.75rem off the bottom where there is
- * none). Publishes `--hauling-trip-bar-clearance` so a focused control scrolls
- * clear of it once `index.css` adds that term to `--sticky-clearance`.
+ * Pinned above the phone tab bar; at md+, where there is none, 0.75rem plus the safe area.
+ * Publishes `--hauling-trip-bar-clearance`; `index.css` must sum it into
+ * `--sticky-clearance` for focused controls to scroll clear (WCAG 2.4.11).
  */
 export function HaulingTripBar({ freeM3, profit, onOpenTrip, copyButton }: HaulingTripBarProps) {
   const { t } = useTranslation();
   const ref = useRef<HTMLDivElement>(null);
   useStickyClearance(ref, 'hauling-trip-bar');
+  const up = gains(profit);
   return (
     <div
       ref={ref}
       role="region"
-      aria-label={t('market.hauling.tripBar.label')}
-      className="sticky bottom-[var(--bottom-nav-clearance)] z-30 flex items-center gap-2 rounded-xs border border-line-bright bg-panel p-2 shadow-lg md:bottom-3"
+      aria-label={t('market.hauling.rail.title')}
+      className="sticky bottom-[var(--bottom-nav-clearance)] z-30 flex items-center gap-2 rounded-xs border border-line-bright bg-panel p-2 shadow-lg md:bottom-[calc(0.75rem+env(safe-area-inset-bottom))]"
     >
-      <span className="flex min-w-0 flex-1 flex-col text-[0.8125rem] leading-tight font-semibold whitespace-nowrap tabular-nums">
+      <span className="flex min-w-0 flex-1 flex-col text-sm leading-tight font-semibold whitespace-nowrap tabular-nums">
         {freeM3 !== null && (
           <span className="truncate">
             {t('market.hauling.tripBar.free', { m3: formatTripM3(freeM3) })}
           </span>
         )}
-        <span className={profit > 0 ? 'text-success' : undefined}>
-          {profit > 0 ? '+' : ''}
+        <span className={up ? 'text-success' : undefined}>
+          {up ? '+' : ''}
           <IskAmount value={profit} />
         </span>
       </span>
