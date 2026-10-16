@@ -6337,7 +6337,8 @@
         "location": "Location",
         "security": "Sec",
         "jumps": "Jumps"
-      }
+      },
+      "openingFitting": "Opening the fitting…"
     },
     "minValue": {
       "label": "Minimum value",

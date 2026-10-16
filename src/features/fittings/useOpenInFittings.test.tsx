@@ -24,9 +24,11 @@ describe('useOpenInFittings', () => {
     const pending = deferred();
     const load = vi.fn(() => pending.promise);
 
-    result.current(load);
-    result.current(load);
+    act(() => result.current.open(load));
+    expect(result.current.pending).toBe(true);
+    act(() => result.current.open(load));
     await act(async () => pending.resolve(LOCATION));
+    expect(result.current.pending).toBe(false);
 
     expect(load).toHaveBeenCalledTimes(1);
     expect(navigateMock).toHaveBeenCalledTimes(1);
@@ -37,7 +39,7 @@ describe('useOpenInFittings', () => {
     const { result, unmount } = renderHook(() => useOpenInFittings());
     const pending = deferred();
 
-    result.current(() => pending.promise);
+    act(() => result.current.open(() => pending.promise));
     unmount();
     await act(async () => pending.resolve(LOCATION));
 

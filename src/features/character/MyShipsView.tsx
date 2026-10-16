@@ -256,7 +256,7 @@ function ShipRowView({
     .join(' › ');
   const openInFittings = useOpenInFittings();
   const openFitting = () =>
-    openInFittings(() =>
+    openInFittings.open(() =>
       shipItemsEditLocation(
         { typeId: row.typeId, name: shipName },
         data.contentsByShip.get(row.itemId) ?? []
@@ -303,6 +303,9 @@ function ShipRowView({
               <span className="text-xs text-text-dim max-sm:ml-2 sm:block">{shipClass}</span>
             )}
           </span>
+          {openInFittings.pending && (
+            <Spinner size="sm" label={t('assets.myShips.openingFitting')} className="shrink-0" />
+          )}
           {row.inCargo && (
             <span className="shrink-0 rounded-xs border border-line px-1 text-[0.6875rem] text-text-dim">
               {t('assets.myShips.inCargo')}
