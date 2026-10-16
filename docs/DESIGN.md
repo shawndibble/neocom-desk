@@ -636,7 +636,9 @@ Three things about it are deliberate:
 
 - **The sheet is a draft, the box is not.** In the pointer-width box an edit
   lands on the page immediately, which is right when the list is visible
-  below the control. In
+  below the control — except an ISK amount (`IskInput`, shorthand like
+  `250m`), which commits on blur or Enter so a half-typed figure never
+  filters the list (Hauling's Max price / Max spend). In
   the sheet the list is behind the modal, so edits accumulate and commit on
   Apply. A route with a persisted preference in its filters (the LP Store's
   trade hub and price basis) writes it in `onChange` and nowhere else, so
