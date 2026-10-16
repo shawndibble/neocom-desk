@@ -13,6 +13,7 @@ import { FeatureShowcase } from '@/features/landing/FeatureShowcase';
 import { LandingFaq } from '@/features/landing/LandingFaq';
 import { LandingBackdrop, LandingSection } from '@/features/landing/LandingSection';
 import { TrustSection } from '@/features/landing/TrustSection';
+import { useBelowFold } from '@/features/landing/useBelowFold';
 import { LandingHeader } from '@/features/landing/LandingHeader';
 import { OverviewDemo } from '@/features/landing/OverviewDemo';
 import { Reveal } from '@/features/landing/Reveal';
@@ -49,6 +50,9 @@ export function Login() {
   useLayoutEffect(() => {
     if (characterCount !== undefined) releaseLandingShell();
   }, [characterCount]);
+
+  // After the release above: a hash's scroll needs `#root` shown.
+  const belowFold = useBelowFold(characterCount === 0 && !inApp);
 
   function onLogin() {
     setPending(true);
@@ -114,67 +118,73 @@ export function Login() {
           </div>
         </section>
 
-        <LandingSection
-          id="login-answers"
-          heading={t('login.answersHeading')}
-          ship={{ ship: 'venture', side: 'right' }}
-        >
-          <p className="mt-2 max-w-2xl text-sm text-text-dim">{t('login.answersLead')}</p>
-          <QuestionGrid />
-        </LandingSection>
-        <LandingSection
-          id="login-features"
-          heading={t('login.featuresHeading')}
-          ship={{ ship: 'hulk', side: 'left' }}
-        >
-          <FeatureShowcase />
-        </LandingSection>
-        <LandingSection id="login-trust" heading={t('login.trustHeading')} tone="panel">
-          <TrustSection />
-        </LandingSection>
-        <LandingSection id="login-community" heading={t('login.communityHeading')} tone="space">
-          <CommunitySection />
-        </LandingSection>
-        <LandingSection id="login-faq" heading={t('login.faqHeading')} tone="panel">
-          <LandingFaq />
-        </LandingSection>
+        {belowFold && (
+          <>
+            <LandingSection
+              id="login-answers"
+              heading={t('login.answersHeading')}
+              ship={{ ship: 'venture', side: 'right' }}
+            >
+              <p className="mt-2 max-w-2xl text-sm text-text-dim">{t('login.answersLead')}</p>
+              <QuestionGrid />
+            </LandingSection>
+            <LandingSection
+              id="login-features"
+              heading={t('login.featuresHeading')}
+              ship={{ ship: 'hulk', side: 'left' }}
+            >
+              <FeatureShowcase />
+            </LandingSection>
+            <LandingSection id="login-trust" heading={t('login.trustHeading')} tone="panel">
+              <TrustSection />
+            </LandingSection>
+            <LandingSection id="login-community" heading={t('login.communityHeading')} tone="space">
+              <CommunitySection />
+            </LandingSection>
+            <LandingSection id="login-faq" heading={t('login.faqHeading')} tone="panel">
+              <LandingFaq />
+            </LandingSection>
 
-        <section className="relative isolate overflow-hidden">
-          <LandingBackdrop tone="space" ship={{ ship: 'orca', side: 'left' }} />
-          <Reveal className="relative mx-auto max-w-6xl px-6 py-20 text-center">
-            <h2 className="text-2xl font-semibold">{t('login.bottomCtaHeading')}</h2>
-            <p className="mx-auto mt-3 max-w-lg text-sm text-text-dim">
-              {t('login.bottomCtaBody')}
-            </p>
-            <div className="mt-6 flex flex-col items-center gap-3">
-              <EveSsoButton
-                size="large"
-                pending={pending}
-                onClick={onLogin}
-                label={t('login.button')}
-              />
-              <CustomizeLink onClick={() => setCustomizing(true)} />
-            </div>
-          </Reveal>
-        </section>
+            <section className="relative isolate overflow-hidden">
+              <LandingBackdrop tone="space" ship={{ ship: 'orca', side: 'left' }} />
+              <Reveal className="relative mx-auto max-w-6xl px-6 py-20 text-center">
+                <h2 className="text-2xl font-semibold">{t('login.bottomCtaHeading')}</h2>
+                <p className="mx-auto mt-3 max-w-lg text-sm text-text-dim">
+                  {t('login.bottomCtaBody')}
+                </p>
+                <div className="mt-6 flex flex-col items-center gap-3">
+                  <EveSsoButton
+                    size="large"
+                    pending={pending}
+                    onClick={onLogin}
+                    label={t('login.button')}
+                  />
+                  <CustomizeLink onClick={() => setCustomizing(true)} />
+                </div>
+              </Reveal>
+            </section>
+          </>
+        )}
 
         <CustomizePermissionsDialog open={customizing} onClose={() => setCustomizing(false)} />
       </main>
 
-      <footer className="flex flex-wrap justify-center gap-6 px-6 py-6 text-xs text-text-dim">
-        <ExternalLink href={REPO_URL} variant="quiet">
-          {t('login.footerOpenSource')}
-        </ExternalLink>
-        <a href="/privacy.html" className={FOOTER_LINK}>
-          {t('login.footerPrivacy')}
-        </a>
-        <a href="/data-credit.html" className={FOOTER_LINK}>
-          {t('login.footerDataCredit')}
-        </a>
-        <ExternalLink href={DISCORD_URL} variant="quiet">
-          {t('login.footerDiscord')}
-        </ExternalLink>
-      </footer>
+      {belowFold && (
+        <footer className="flex flex-wrap justify-center gap-6 px-6 py-6 text-xs text-text-dim">
+          <ExternalLink href={REPO_URL} variant="quiet">
+            {t('login.footerOpenSource')}
+          </ExternalLink>
+          <a href="/privacy.html" className={FOOTER_LINK}>
+            {t('login.footerPrivacy')}
+          </a>
+          <a href="/data-credit.html" className={FOOTER_LINK}>
+            {t('login.footerDataCredit')}
+          </a>
+          <ExternalLink href={DISCORD_URL} variant="quiet">
+            {t('login.footerDiscord')}
+          </ExternalLink>
+        </footer>
+      )}
     </div>
   );
 }

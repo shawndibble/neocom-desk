@@ -239,8 +239,10 @@ function Root() {
   const characterCount = useLiveQuery(() => db.characters.count());
   const hydrated = useActiveCharacter((state) => state.hydrated);
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
+  // A landing section's hash (`/#login-faq`) survives the hop to the page that has it.
+  const { hash } = useLocation();
   if (characterCount === undefined || !hydrated) return <BootScreen gate="root" />;
-  if (characterCount === 0) return <Navigate to="/login" replace />;
+  if (characterCount === 0) return <Navigate to={{ pathname: '/login', hash }} replace />;
   return <Navigate to={activeCharacterId === null ? '/characters' : '/overview'} replace />;
 }
 
