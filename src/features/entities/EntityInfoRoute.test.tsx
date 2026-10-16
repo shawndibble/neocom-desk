@@ -18,8 +18,9 @@ import { PublicInfoModal } from '@/components/PublicInfoModal';
 import { usePublicInfoModalStore, openPublicInfoModal } from '@/stores/publicInfoModal';
 import { useSkillDetailModalStore, openSkillDetailModal } from '@/stores/skillDetailModal';
 import { openItemInfo, useItemInfoModalStore } from '@/stores/itemInfoModal';
+import { usePlaceInfoModalStore } from '@/stores/placeInfoModal';
 import { EntityInfoRoute } from './EntityInfoRoute';
-import { CharacterLink, SkillLink, SystemLink } from './EntityLink';
+import { CharacterLink, PlaceLink, SkillLink, SystemLink } from './EntityLink';
 
 const server = setupServer();
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
@@ -61,6 +62,7 @@ function renderAt(path: string) {
       <CharacterLink id={1}>Pilot One</CharacterLink>
       <SkillLink typeId={3300}>Gunnery</SkillLink>
       <SystemLink systemId={30000142}>Jita</SystemLink>
+      <PlaceLink id={60003760}>Jita IV - Moon 4</PlaceLink>
     </MemoryRouter>
   );
 }
@@ -91,6 +93,22 @@ describe('EntityInfoRoute', () => {
     renderAt('/contacts?info=character-1');
     await screen.findByRole('dialog');
     expect(usePublicInfoModalStore.getState().request).toEqual({ kind: 'character', id: 1 });
+  });
+
+  it('a PlaceLink sets Place Info on the URL and the store; Back clears it', async () => {
+    renderAt('/contacts');
+    expect(screen.getByRole('link', { name: 'Jita IV - Moon 4' })).toHaveAttribute(
+      'href',
+      '/contacts?info=place-60003760'
+    );
+    fireEvent.click(screen.getByRole('link', { name: 'Jita IV - Moon 4' }));
+    await waitFor(() =>
+      expect(usePlaceInfoModalStore.getState().request).toEqual({ id: 60003760 })
+    );
+    expect(usePublicInfoModalStore.getState().request).toBeNull();
+
+    act(() => void probe.navigate(-1));
+    await waitFor(() => expect(usePlaceInfoModalStore.getState().request).toBeNull());
   });
 
   it('shows no modal without info', () => {

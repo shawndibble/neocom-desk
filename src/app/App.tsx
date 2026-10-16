@@ -46,6 +46,7 @@ import { useHiddenNav, useNavSetupAnswered, useRecentNav } from './navPreference
 import { PublicInfoModal } from '@/components/PublicInfoModal';
 import { EntityInfoRoute } from '@/features/entities';
 import { ItemInfoModal } from '@/features/entities/ItemInfoModal';
+import { PlaceInfoModal } from '@/features/entities/PlaceInfoModal';
 import { SkillDetailModal } from '@/components/SkillDetailModal';
 import { getAccessTokenReportingFailures } from './tokenProvider';
 import type { AppRoutePath } from './routeScopes';
@@ -409,6 +410,7 @@ export function App() {
         <PublicInfoModal />
         <SkillDetailModal />
         <ItemInfoModal />
+        <PlaceInfoModal />
       </BrowserRouter>
     </ErrorBoundary>
   );

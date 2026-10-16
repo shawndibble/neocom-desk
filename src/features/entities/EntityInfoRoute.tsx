@@ -1,10 +1,11 @@
 /**
- * Mounted once in `App.tsx`: keeps the URL's `?info=` param and the two
- * shared modals (`PublicInfoModal`, `SkillDetailModal`, `ItemInfoModal`) in step.
+ * Mounted once in `App.tsx`: keeps the URL's `?info=` param and the shared
+ * modals (`PublicInfoModal`, `SkillDetailModal`, `ItemInfoModal`,
+ * `PlaceInfoModal`) in step.
  *
  * - `info` set (a link click, a pasted URL, Forward): the matching store's
  *   request is shown.
- * - `info` gone (Back, Close): both are cleared. Back therefore closes the
+ * - `info` gone (Back, Close): all are cleared. Back therefore closes the
  *   modal with no extra code — the previous history entry has no `info`.
  * - The stores' `open`/`close` go through the navigator registered here, so a
  *   programmatic open makes the same history entry a link click does.
@@ -21,6 +22,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { entityInfoHref, parseEntityInfo, withoutEntityInfo } from '@/lib/entityInfo';
 import { registerEntityInfoNavigator } from '@/stores/entityInfoNavigator';
 import { useItemInfoModalStore } from '@/stores/itemInfoModal';
+import { usePlaceInfoModalStore } from '@/stores/placeInfoModal';
 import { usePublicInfoModalStore } from '@/stores/publicInfoModal';
 import { useSkillDetailModalStore } from '@/stores/skillDetailModal';
 import { ENTITY_INFO_PUSHED_STATE, wasPushedHere } from './entityInfoState';
@@ -52,6 +54,7 @@ export function EntityInfoRoute() {
             usePublicInfoModalStore.getState().clear();
             useSkillDetailModalStore.getState().clear();
             useItemInfoModalStore.getState().clear();
+            usePlaceInfoModalStore.getState().clear();
           } else if (wasPushedHere(here.state)) {
             navigate(-1);
           } else {
@@ -84,13 +87,14 @@ export function EntityInfoRoute() {
     const publicInfo = usePublicInfoModalStore.getState();
     const skill = useSkillDetailModalStore.getState();
     const item = useItemInfoModalStore.getState();
-    if (kind === null || id === null) {
-      publicInfo.clear();
-      skill.clear();
-      item.clear();
-    } else if (kind === 'type') {
-      publicInfo.clear();
-      skill.clear();
+    const place = usePlaceInfoModalStore.getState();
+    // Only the modal `info` names stays open.
+    if (kind !== 'character' && kind !== 'corporation' && kind !== 'alliance') publicInfo.clear();
+    if (kind !== 'skill') skill.clear();
+    if (kind !== 'type') item.clear();
+    if (kind !== 'place') place.clear();
+    if (kind === null || id === null) return;
+    if (kind === 'type') {
       const staged = item.staged;
       item.show({
         typeId: id,
@@ -99,15 +103,13 @@ export function EntityInfoRoute() {
       });
       item.stage(id, undefined);
     } else if (kind === 'skill') {
-      publicInfo.clear();
-      item.clear();
       const staged = skill.staged?.typeID === id ? skill.staged.planEntries : undefined;
       skill.show({ typeID: id, planEntries: staged });
       // Consumed: a later open must not inherit them.
       skill.stage(id, undefined);
+    } else if (kind === 'place') {
+      place.show({ id });
     } else {
-      skill.clear();
-      item.clear();
       publicInfo.show({ kind, id });
     }
   }, [kind, id, itemId]);
