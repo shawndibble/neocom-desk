@@ -3,12 +3,13 @@ import { render, screen } from '@testing-library/react';
 import '@/i18n';
 import { UnpricedOreDetail } from './UnpricedOreDetail';
 import { hasReachableUnpricedHub } from './unpricedHubs';
+import type { TradeHub } from '@/market/hubs';
 
 const NAMES = new Map([
   [1, 'Zeolites'],
   [2, 'Veldspar'],
 ]);
-const UNPRICED = new Map<string, ReadonlySet<number>>([
+const UNPRICED = new Map<TradeHub['id'], ReadonlySet<number>>([
   ['jita', new Set([1])],
   ['hek', new Set([2])],
 ]);
