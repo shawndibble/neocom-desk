@@ -13,8 +13,11 @@ import {
   MAIL_COLOR_SWATCHES,
   MAIL_SIZE_PRESETS,
   normalizeHexColor,
-  normalizeLinkInput,
+  MAIL_LINK_TEXT_MAX,
+  linkDraftOf,
   sizePresetOf,
+  validateLinkForm,
+  type LinkTarget,
 } from '@/engine/mailFormat';
 import { BASE_SIZE_PX, EVE_MAIL_SURFACE_CLASS } from '../MailBodyView';
 
@@ -171,32 +174,42 @@ export function SizeDialog({ open, onClose, phone, canReset, current, onPick }: 
 // --- Link ------------------------------------------------------------------
 
 interface LinkDialogProps extends SheetProps {
-  /** The existing link at the caret, if any. */
-  current: string | 'mixed' | null;
-  onApply: (href: string) => void;
+  /** What the link edit would replace; read once, when the sheet opens. */
+  getTarget: () => LinkTarget;
+  onApply: (edit: { text: string; href: string }) => void;
   onRemove: () => void;
 }
 
 export function LinkDialog(props: LinkDialogProps) {
-  // Remounted per open so the field starts from the link under the caret.
+  // Remounted per open so the fields start from the selection / link under the caret.
   return props.open ? <LinkDialogBody {...props} /> : null;
 }
 
-function LinkDialogBody({ onClose, phone, canReset, current, onApply, onRemove }: LinkDialogProps) {
+function LinkDialogBody({
+  onClose,
+  phone,
+  canReset,
+  getTarget,
+  onApply,
+  onRemove,
+}: LinkDialogProps) {
   const { t } = useTranslation();
-  const existing = current !== null && current !== 'mixed' ? current : '';
-  const [url, setUrl] = useState(existing);
-  const [invalid, setInvalid] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [target] = useState(getTarget);
+  const [draft] = useState(() => linkDraftOf(target));
+  const [text, setText] = useState(draft.text);
+  const [url, setUrl] = useState(draft.url);
+  const [errors, setErrors] = useState<{ url?: true; text?: true }>({});
+  const textRef = useRef<HTMLInputElement>(null);
+  const urlRef = useRef<HTMLInputElement>(null);
 
   function submit(e: FormEvent) {
     e.preventDefault();
-    const href = normalizeLinkInput(url);
-    if (href === null) {
-      setInvalid(true);
+    const result = validateLinkForm({ text, url });
+    if (!result.ok) {
+      setErrors(result.errors);
       return;
     }
-    onApply(href);
+    onApply({ text: result.text, href: result.href });
     onClose();
   }
 
@@ -206,16 +219,38 @@ function LinkDialogBody({ onClose, phone, canReset, current, onApply, onRemove }
       onClose={onClose}
       title={t('mail.format.linkTitle')}
       placement={placement(phone)}
-      initialFocusRef={inputRef}
+      initialFocusRef={draft.text === '' ? textRef : urlRef}
     >
       <form onSubmit={submit} noValidate className="space-y-3">
+        <div className="space-y-1">
+          <label htmlFor="mail-link-text" className="block text-[0.6875rem] text-text-dim">
+            {t('mail.format.linkText')}
+          </label>
+          <TextInput
+            id="mail-link-text"
+            ref={textRef}
+            value={text}
+            onChange={(e) => {
+              setText(e.target.value);
+              setErrors((x) => ({ ...x, text: undefined }));
+            }}
+            aria-invalid={errors.text === true}
+            aria-describedby={errors.text ? 'mail-link-text-error' : undefined}
+            className="w-full"
+          />
+          {errors.text && (
+            <FieldError id="mail-link-text-error">
+              {t('mail.format.linkTextTooLong', { max: MAIL_LINK_TEXT_MAX })}
+            </FieldError>
+          )}
+        </div>
         <div className="space-y-1">
           <label htmlFor="mail-link-url" className="block text-[0.6875rem] text-text-dim">
             {t('mail.format.linkUrl')}
           </label>
           <TextInput
             id="mail-link-url"
-            ref={inputRef}
+            ref={urlRef}
             type="url"
             inputMode="url"
             autoCapitalize="none"
@@ -224,18 +259,18 @@ function LinkDialogBody({ onClose, phone, canReset, current, onApply, onRemove }
             value={url}
             onChange={(e) => {
               setUrl(e.target.value);
-              setInvalid(false);
+              setErrors((x) => ({ ...x, url: undefined }));
             }}
-            aria-invalid={invalid}
-            aria-describedby={invalid ? 'mail-link-url-error' : undefined}
+            aria-invalid={errors.url === true}
+            aria-describedby={errors.url ? 'mail-link-url-error' : undefined}
             className="w-full"
           />
-          {invalid && (
+          {errors.url && (
             <FieldError id="mail-link-url-error">{t('mail.format.linkInvalid')}</FieldError>
           )}
         </div>
         <div className="flex justify-end gap-2">
-          {existing !== '' && canReset && (
+          {target.href !== null && canReset && (
             <Button
               size="md"
               onClick={() => {

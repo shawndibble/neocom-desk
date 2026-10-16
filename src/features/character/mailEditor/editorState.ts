@@ -1,6 +1,11 @@
-import type { Editor } from '@tiptap/core';
+import { getMarkRange, type Editor } from '@tiptap/core';
 import type { Mark } from '@tiptap/pm/model';
-import { formatStateOfRuns, type FormatRun, type FormatState } from '@/engine/mailFormat';
+import {
+  formatStateOfRuns,
+  type FormatRun,
+  type FormatState,
+  type LinkTarget,
+} from '@/engine/mailFormat';
 
 function runOf(marks: readonly Mark[]): FormatRun {
   const mark = (name: string) => marks.find((m) => m.type.name === name);
@@ -26,4 +31,34 @@ export function formatStateOfEditor(editor: Editor): FormatState {
     if (node.isText) runs.push(runOf(node.marks));
   });
   return formatStateOfRuns(runs);
+}
+
+/** The selection, the caret, or the whole link either sits in. */
+export function linkTargetOfEditor(editor: Editor): LinkTarget {
+  const { selection, doc } = editor.state;
+  const { from, to, empty } = selection;
+  const type = editor.schema.marks.link;
+  const range = type ? getMarkRange(doc.resolve(from), type) : undefined;
+  if (range && (empty || to <= range.to)) {
+    const href = doc.nodeAt(range.from)?.marks.find((m) => m.type === type)?.attrs.href;
+    return {
+      from: range.from,
+      to: range.to,
+      text: doc.textBetween(range.from, range.to, ' '),
+      href: typeof href === 'string' ? href : '',
+    };
+  }
+  return { from, to, text: empty ? '' : doc.textBetween(from, to, ' '), href: null };
+}
+
+/** The marks (minus any link) of the first character of the range, or at the caret. */
+export function linkCarryMarks(editor: Editor, from: number): { type: string; attrs?: object }[] {
+  const { selection, doc, storedMarks } = editor.state;
+  const marks =
+    selection.empty && selection.from === from
+      ? (storedMarks ?? selection.$from.marks())
+      : (doc.nodeAt(from)?.marks ?? []);
+  return marks
+    .filter((m) => m.type.name !== 'link')
+    .map((m) => ({ type: m.type.name, attrs: m.attrs }));
 }

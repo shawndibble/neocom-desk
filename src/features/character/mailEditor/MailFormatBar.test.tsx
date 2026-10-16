@@ -15,7 +15,9 @@ function commands(state: Partial<FormatState> = {}, over: Partial<MailEditorComm
     toggleMark: vi.fn(),
     setColor: vi.fn(),
     setSize: vi.fn(),
+    linkTarget: () => ({ from: 0, to: 0, text: '', href: null }),
     setLink: vi.fn(),
+    removeLink: vi.fn(),
     insertTable: vi.fn(),
     clearFormatting: vi.fn(),
     ...over,
@@ -97,24 +99,72 @@ describe('MailFormatBar', () => {
     expect(c.setSize).toHaveBeenLastCalledWith(null);
   });
 
-  it('applies an http(s) link, refuses other schemes, and removes an existing one', async () => {
-    const c = commands({ link: 'https://old.example/' });
+  it('prefills both fields from the link under the caret and applies edits to both', async () => {
+    const c = commands(
+      { link: 'https://old.example/' },
+      { linkTarget: () => ({ from: 1, to: 4, text: 'old', href: 'https://old.example/' }) }
+    );
     const user = userEvent.setup();
     render(<MailFormatBar commands={c} phone dock="inline" visible />);
     await user.click(screen.getByRole('button', { name: 'Link' }));
     const dialog = await screen.findByRole('dialog');
-    const field = within(dialog).getByLabelText('Web address');
-    expect(field).toHaveValue('https://old.example/');
-    await user.clear(field);
-    await user.type(field, 'javascript:alert(1){Enter}');
-    expect(within(dialog).getByRole('alert')).toBeInTheDocument();
-    expect(c.setLink).not.toHaveBeenCalled();
-    await user.clear(field);
-    await user.type(field, 'example.com/x{Enter}');
-    expect(c.setLink).toHaveBeenCalledWith('https://example.com/x');
+    const text = within(dialog).getByLabelText('Text');
+    const url = within(dialog).getByLabelText('Web address');
+    expect(text).toHaveValue('old');
+    expect(url).toHaveValue('https://old.example/');
+    expect(url).toHaveFocus();
+    await user.clear(text);
+    await user.type(text, 'new');
+    await user.clear(url);
+    await user.type(url, 'example.com/x{Enter}');
+    expect(c.setLink).toHaveBeenCalledWith({ text: 'new', href: 'https://example.com/x' });
+  });
+
+  it('prefills the selected text, focuses Text for a bare caret, and refuses other schemes', async () => {
+    const c = commands({}, { linkTarget: () => ({ from: 1, to: 3, text: 'hi', href: null }) });
+    const user = userEvent.setup();
+    const { unmount } = render(<MailFormatBar commands={c} phone dock="inline" visible />);
     await user.click(screen.getByRole('button', { name: 'Link' }));
-    await user.click(await screen.findByRole('button', { name: 'Remove link' }));
-    expect(c.setLink).toHaveBeenLastCalledWith(null);
+    let dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByLabelText('Text')).toHaveValue('hi');
+    expect(within(dialog).getByLabelText('Web address')).toHaveFocus();
+    expect(within(dialog).queryByRole('button', { name: 'Remove link' })).toBeNull();
+    for (const bad of ['javascript:alert(1)', 'data:text/html,x', 'showinfo:1377//1']) {
+      await user.clear(within(dialog).getByLabelText('Web address'));
+      await user.type(within(dialog).getByLabelText('Web address'), `${bad}{Enter}`);
+      expect(within(dialog).getByRole('alert')).toBeInTheDocument();
+    }
+    expect(c.setLink).not.toHaveBeenCalled();
+    unmount();
+
+    const caret = commands();
+    render(<MailFormatBar commands={caret} phone dock="inline" visible />);
+    await user.click(screen.getByRole('button', { name: 'Link' }));
+    dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByLabelText('Text')).toHaveValue('');
+    expect(within(dialog).getByLabelText('Text')).toHaveFocus();
+    await user.type(within(dialog).getByLabelText('Web address'), 'example.com{Enter}');
+    expect(caret.setLink).toHaveBeenCalledWith({
+      text: 'https://example.com',
+      href: 'https://example.com',
+    });
+  });
+
+  it('rejects over-long text, and removes an existing link', async () => {
+    const c = commands(
+      {},
+      { linkTarget: () => ({ from: 1, to: 4, text: 'old', href: 'https://old.example/' }) }
+    );
+    const user = userEvent.setup();
+    render(<MailFormatBar commands={c} phone dock="inline" visible />);
+    await user.click(screen.getByRole('button', { name: 'Link' }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText('Text'), { target: { value: 'a'.repeat(201) } });
+    await user.click(within(dialog).getByRole('button', { name: 'Apply' }));
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('under 200');
+    expect(c.setLink).not.toHaveBeenCalled();
+    await user.click(within(dialog).getByRole('button', { name: 'Remove link' }));
+    expect(c.removeLink).toHaveBeenCalled();
   });
 
   it('inserts a table of the chosen size', async () => {

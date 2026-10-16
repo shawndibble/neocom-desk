@@ -174,4 +174,55 @@ describe('RichMailBodyEditor', () => {
     await user.click(screen.getByRole('button', { name: 'Text colour' }));
     expect(await screen.findByRole('button', { name: 'Default colour' })).toBeDisabled();
   });
+
+  it('Source: inserts an escaped tag over the selection, and replaces a whole selected tag', async () => {
+    const user = userEvent.setup();
+    const seen = vi.fn();
+    render(<Harness initial="say hi now" onValue={seen} />);
+    await editor();
+    await user.click(screen.getByRole('button', { name: 'Source' }));
+    const src = screen.getByRole('textbox', { name: 'Message source (EVE markup)' });
+    (src as HTMLTextAreaElement).setSelectionRange(4, 6);
+    await user.click(screen.getByRole('button', { name: 'Link' }));
+    let dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByLabelText('Text')).toHaveValue('hi');
+    await user.type(within(dialog).getByLabelText('Web address'), 'example.com{Enter}');
+    expect(src).toHaveValue('say <a href="https://example.com">hi</a> now');
+    expect(seen).toHaveBeenLastCalledWith('say <a href="https://example.com">hi</a> now');
+
+    (src as HTMLTextAreaElement).setSelectionRange(
+      4,
+      4 + '<a href="https://example.com">hi</a>'.length
+    );
+    await user.click(screen.getByRole('button', { name: 'Link' }));
+    dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByLabelText('Web address')).toHaveValue('https://example.com');
+    await user.clear(within(dialog).getByLabelText('Text'));
+    await user.type(within(dialog).getByLabelText('Text'), 'a <b> & c{Enter}');
+    expect(src).toHaveValue('say <a href="https://example.com">a &lt;b&gt; &amp; c</a> now');
+  });
+
+  it('Preview: rewrites the text and address of the link under the caret, keeping bold', async () => {
+    const user = userEvent.setup();
+    render(<Harness initial={'x <b><a href="https://old.example/">old</a></b> y'} />);
+    const pm = await editor();
+    const anchor = pm.querySelector('a')!;
+    await user.click(pm);
+    const sel = window.getSelection()!;
+    sel.setBaseAndExtent(anchor.firstChild!, 1, anchor.firstChild!, 1);
+    fireEvent(document, new Event('selectionchange'));
+    await user.click(screen.getByRole('button', { name: 'Link' }));
+    const dialog = await screen.findByRole('dialog');
+    await waitFor(() => expect(within(dialog).getByLabelText('Text')).toHaveValue('old'));
+    expect(within(dialog).getByLabelText('Web address')).toHaveValue('https://old.example/');
+    await user.clear(within(dialog).getByLabelText('Text'));
+    await user.type(within(dialog).getByLabelText('Text'), 'fresh');
+    await user.clear(within(dialog).getByLabelText('Web address'));
+    await user.type(within(dialog).getByLabelText('Web address'), 'https://new.example/{Enter}');
+    await waitFor(() =>
+      expect(screen.getByTestId('value').textContent).toBe(
+        'x <a href="https://new.example/"><b>fresh</b></a> y'
+      )
+    );
+  });
 });

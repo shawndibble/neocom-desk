@@ -7,7 +7,13 @@ import {
   emptyFormatState,
   formatStateOfRuns,
   normalizeHexColor,
+  MAIL_LINK_TEXT_MAX,
   normalizeLinkInput,
+  linkDraftOf,
+  planLinkEdit,
+  planSourceLink,
+  sourceLinkAt,
+  validateLinkForm,
   parsePastedPipeTable,
   sizePresetOf,
   sourceTagPair,
@@ -173,4 +179,103 @@ describe('normalizeLinkInput', () => {
     'rejects %j',
     (input) => expect(normalizeLinkInput(input)).toBeNull()
   );
+});
+
+describe('link dialog', () => {
+  it('prefills from the selection, the caret, or the link under it', () => {
+    expect(linkDraftOf({ from: 3, to: 8, text: 'hello', href: null })).toEqual({
+      text: 'hello',
+      url: '',
+    });
+    expect(linkDraftOf({ from: 3, to: 3, text: '', href: null })).toEqual({ text: '', url: '' });
+    expect(linkDraftOf({ from: 2, to: 9, text: 'full text', href: 'https://a.example/' })).toEqual({
+      text: 'full text',
+      url: 'https://a.example/',
+    });
+  });
+
+  it('validates the URL as http(s) and the text length', () => {
+    expect(validateLinkForm({ text: 'x', url: 'example.com' })).toEqual({
+      ok: true,
+      text: 'x',
+      href: 'https://example.com',
+    });
+    for (const url of ['javascript:alert(1)', 'data:text/html,x', 'showinfo:1377//1', '']) {
+      expect(validateLinkForm({ text: 'x', url })).toEqual({ ok: false, errors: { url: true } });
+    }
+    expect(validateLinkForm({ text: 'a'.repeat(MAIL_LINK_TEXT_MAX + 1), url: 'a.b' })).toEqual({
+      ok: false,
+      errors: { text: true },
+    });
+  });
+
+  it('uses the URL as the text when the text is empty', () => {
+    expect(validateLinkForm({ text: '  ', url: 'https://a.example/x' })).toEqual({
+      ok: true,
+      text: 'https://a.example/x',
+      href: 'https://a.example/x',
+    });
+  });
+
+  it('plans a replacement of the selection, the caret, or the whole link', () => {
+    const form = { text: 'new', href: 'https://a.example/' };
+    expect(planLinkEdit({ from: 3, to: 8, text: 'hello', href: null }, form)).toEqual({
+      from: 3,
+      to: 8,
+      ...form,
+    });
+    expect(planLinkEdit({ from: 4, to: 4, text: '', href: null }, form)).toEqual({
+      from: 4,
+      to: 4,
+      ...form,
+    });
+    expect(planLinkEdit({ from: 2, to: 9, text: 'old', href: 'https://o.example/' }, form)).toEqual(
+      {
+        from: 2,
+        to: 9,
+        ...form,
+      }
+    );
+  });
+});
+
+describe('source-mode link', () => {
+  it('inserts a tag at the caret and replaces a selection, escaping the text', () => {
+    const caret = planSourceLink('ab', 1, 1, {
+      text: 'a <b> & c',
+      href: 'https://x.example/?a=1&b=2',
+    });
+    expect(caret.value).toBe('a<a href="https://x.example/?a=1&amp;b=2">a &lt;b&gt; &amp; c</a>b');
+    expect(caret.value.slice(caret.start, caret.end)).toBe(
+      '<a href="https://x.example/?a=1&amp;b=2">a &lt;b&gt; &amp; c</a>'
+    );
+    const sel = planSourceLink('say hi now', 4, 6, { text: 'hi', href: 'https://x.example/' });
+    expect(sel.value).toBe('say <a href="https://x.example/">hi</a> now');
+  });
+
+  it('reads an exactly-selected existing tag, else the plain selection', () => {
+    const src = 'go <a href="https://x.example/?a=1&amp;b=2">here &amp; there</a> ok';
+    const from = 3;
+    const to = src.indexOf('</a>') + 4;
+    expect(sourceLinkAt(src, from, to)).toEqual({
+      from,
+      to,
+      text: 'here & there',
+      href: 'https://x.example/?a=1&b=2',
+    });
+    expect(sourceLinkAt(src, from, to - 1)).toEqual({
+      from,
+      to: to - 1,
+      text: src.slice(from, to - 1),
+      href: null,
+    });
+    expect(sourceLinkAt('abc', 1, 1)).toEqual({ from: 1, to: 1, text: '', href: null });
+  });
+
+  it('replaces the whole existing tag', () => {
+    const src = '<a href="https://x.example/">old</a>';
+    const t = sourceLinkAt(src, 0, src.length);
+    const edit = planSourceLink(src, t.from, t.to, { text: 'new', href: 'https://y.example/' });
+    expect(edit.value).toBe('<a href="https://y.example/">new</a>');
+  });
 });

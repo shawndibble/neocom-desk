@@ -9,6 +9,8 @@ import {
   MARKUP_MAX_SIZE,
   MARKUP_MIN_SIZE,
   classifyMarkupLink,
+  markupPlainText,
+  parseEveMarkup,
   serializeEveMarkup,
   type MarkupNode,
 } from './eveMarkup';
@@ -74,6 +76,107 @@ export function normalizeLinkInput(input: string): string | null {
   const withScheme = /^[a-z][a-z0-9+.-]*:/i.test(value) ? value : `https://${value}`;
   const target = classifyMarkupLink(withScheme);
   return target?.kind === 'http' ? target.url : null;
+}
+
+// --- Link dialog -----------------------------------------------------------
+
+/** Longest visible link text the dialog accepts. */
+export const MAIL_LINK_TEXT_MAX = 200;
+
+/**
+ * The range a link edit replaces, and what is in it. A caret is an empty range;
+ * a caret or selection inside an existing link widens to that link's whole
+ * range with its `href`. Positions are the surface's own (editor or textarea).
+ */
+export interface LinkTarget {
+  from: number;
+  to: number;
+  text: string;
+  href: string | null;
+}
+
+export interface LinkDraft {
+  text: string;
+  url: string;
+}
+
+/** What the two fields start with. */
+export function linkDraftOf(target: LinkTarget): LinkDraft {
+  return { text: target.text, url: target.href ?? '' };
+}
+
+export type LinkFormResult =
+  { ok: true; text: string; href: string } | { ok: false; errors: { url?: true; text?: true } };
+
+/** Checks the fields; empty text falls back to the address as the visible text. */
+export function validateLinkForm(form: LinkDraft): LinkFormResult {
+  const href = normalizeLinkInput(form.url);
+  const errors: { url?: true; text?: true } = {};
+  if (href === null) errors.url = true;
+  if (form.text.length > MAIL_LINK_TEXT_MAX) errors.text = true;
+  if (href === null || errors.text) return { ok: false, errors };
+  return { ok: true, text: form.text.trim() === '' ? href : form.text, href };
+}
+
+export interface LinkEditPlan {
+  from: number;
+  to: number;
+  text: string;
+  href: string;
+}
+
+/** Replace `[from, to)` with `text` carrying the link. */
+export function planLinkEdit(
+  target: LinkTarget,
+  form: { text: string; href: string }
+): LinkEditPlan {
+  return { from: target.from, to: target.to, text: form.text, href: form.href };
+}
+
+function linkTagOf(form: { text: string; href: string }): string {
+  return serializeEveMarkup([
+    {
+      type: 'link',
+      href: form.href,
+      target: { kind: 'http', url: form.href },
+      children: [{ type: 'text', text: form.text }],
+    },
+  ]);
+}
+
+/** Source view: the selection, or the whole `<a>` tag when that is exactly what is selected. */
+export function sourceLinkAt(source: string, from: number, to: number): LinkTarget {
+  const lo = Math.min(from, to);
+  const hi = Math.max(from, to);
+  const selected = source.slice(lo, hi);
+  if (selected === '') return { from: lo, to: hi, text: '', href: null };
+  const nodes = parseEveMarkup(selected);
+  const only = nodes.length === 1 ? nodes[0] : null;
+  if (
+    only?.type === 'link' &&
+    only.target?.kind === 'http' &&
+    /^<a\s[^>]*>[\s\S]*<\/a>$/i.test(selected)
+  ) {
+    return { from: lo, to: hi, text: markupPlainText(only.children), href: only.href };
+  }
+  return { from: lo, to: hi, text: selected, href: null };
+}
+
+/** Source view: write `<a href="URL">TEXT</a>` over the range, the tag selected after. */
+export function planSourceLink(
+  source: string,
+  from: number,
+  to: number,
+  form: { text: string; href: string }
+): SourceEdit {
+  const lo = Math.min(from, to);
+  const hi = Math.max(from, to);
+  const tag = linkTagOf(form);
+  return {
+    value: source.slice(0, lo) + tag + source.slice(hi),
+    start: lo,
+    end: lo + tag.length,
+  };
 }
 
 // --- Toolbar state ---------------------------------------------------------
