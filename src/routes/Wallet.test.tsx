@@ -225,8 +225,7 @@ describe('Wallet', () => {
     const user = userEvent.setup();
     render(<App />);
     await user.click(await screen.findByRole('tab', { name: 'Journal' }));
-    const breakdown = await screen.findByRole('table', { name: 'Where the ISK went' });
-    const rows = (await screen.findAllByRole('row')).filter((row) => !breakdown.contains(row));
+    const rows = await screen.findAllByRole('row');
     // header + 2 entries, newest (2026-08-02) first
     expect(rows).toHaveLength(3);
     expect(screen.getByText('Bounty')).toBeInTheDocument();
@@ -506,10 +505,12 @@ describe('Wallet', () => {
     await user.click(await screen.findByRole('tab', { name: 'Journal' }));
     await screen.findByText('Bounty');
 
-    const breakdown = screen.getByRole('table', { name: 'Where the ISK went' });
+    await user.click(screen.getByRole('button', { name: 'Where the ISK went' }));
+    const breakdown = await screen.findByRole('table', { name: 'Where the ISK went' });
     const bountyRow = within(breakdown).getByText('Bounty prize').closest('tr') as HTMLElement;
     await user.click(bountyRow);
     expect(screen.queryByText('Donation')).toBeNull();
+    expect(screen.getByRole('button', { name: /Type: Bounty prize ×/ })).toBeInTheDocument();
     // The breakdown ignores the ref-type filter, so every type is still listed.
     expect(within(breakdown).getAllByRole('row').length).toBeGreaterThan(2);
 
@@ -523,7 +524,8 @@ describe('Wallet', () => {
     await user.click(await screen.findByRole('tab', { name: 'Journal' }));
     await screen.findByText('Bounty');
 
-    const breakdown = screen.getByRole('table', { name: 'Where the ISK went' });
+    await user.click(screen.getByRole('button', { name: 'Where the ISK went' }));
+    const breakdown = await screen.findByRole('table', { name: 'Where the ISK went' });
     const headers = within(breakdown)
       .getAllByRole('columnheader')
       .map((header) => header.textContent);
@@ -546,11 +548,8 @@ describe('Wallet', () => {
     await user.click(screen.getByRole('combobox', { name: 'Ref type' }));
     await user.click(await screen.findByRole('option', { name: 'Bounty prize' }));
 
-    const net = (await screen.findAllByText('+1,000')).find((el) =>
-      el.parentElement?.textContent?.includes('1 entry')
-    ) as HTMLElement;
-    expect(net).toHaveClass('text-isk-pos');
-    expect(net.parentElement).toHaveTextContent('1 entry · net +1,000');
+    const line = (await screen.findByText('1 entry')).parentElement as HTMLElement;
+    expect(within(line).getByText('+1,000')).toHaveClass('text-isk-pos');
   });
 
   it('narrows the journal by free text against the description (issue #413)', async () => {
@@ -571,8 +570,7 @@ describe('Wallet', () => {
     await user.click(await screen.findByRole('tab', { name: 'Journal' }));
     await screen.findByText('Bounty');
 
-    expect(screen.queryByText(/entries · net/)).toBeNull();
-    expect(screen.queryByText(/entry · net/)).toBeNull();
+    expect(screen.queryByText(/Type: /)).toBeNull();
   });
 
   it('shows a filtered-count and net-total summary once a filter narrows the journal (issue #1721)', async () => {
@@ -583,9 +581,7 @@ describe('Wallet', () => {
 
     await user.type(screen.getByPlaceholderText('Search description…'), 'Donation');
 
-    // The sr-only live region repeats the line as plain text; the visible one is the <p>.
-    const summary = (await screen.findAllByText(/1 entry/)).find((el) => el.tagName === 'P')!;
-    expect(summary).toHaveTextContent('1 entry · net -500');
+    const summary = (await screen.findByText('1 entry')).parentElement as HTMLElement;
     expect(within(summary).getByText('-500')).toHaveClass('text-isk-neg');
   });
 

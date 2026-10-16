@@ -63,6 +63,12 @@ import { walletJournalCsvColumns } from '@/features/character/walletJournalCsv';
 import { FromWalletCrumb } from '@/features/netWorth/FromWalletCrumb';
 import { NetWorthPanel } from '@/features/netWorth/NetWorthPanel';
 import { loyaltyPointsCsvColumns } from '@/features/character/loyaltyPointsCsv';
+import { classifyJournal, journalCoverage, type OwnedJournalEntry } from '@/engine/journalNetting';
+import {
+  loadAllCharactersJournals,
+  loadWalletScopedCharacterIds,
+  type AllJournalsSnapshot,
+} from '@/features/character/walletJournalAll';
 import { journalTransactionLinks } from '@/features/character/journalTransactionLink';
 import {
   EMPTY_JOURNAL_FILTER_PARAMS,
@@ -359,9 +365,20 @@ export function Wallet() {
     async () => (activeCharacterId === null ? null : loadPersonalFills(activeCharacterId)),
     { name: 'wallet:personal-fills', characterId: activeCharacterId }
   );
+  // The Journal's own Character filter reads the same `?char=` pick as the
+  // Balance tab. "All" fans the journal out across every tracked Character.
+  const showingAllJournal = showingAllWalletBalances;
+  const allJournals = useCorpSnapshot<AllJournalsSnapshot | null>(
+    tab === 'journal' && showingAllJournal ? 'all' : null,
+    loadAllCharactersJournals
+  );
+  const scopedCharacterIds = useLiveQuery(loadWalletScopedCharacterIds, [], undefined);
+  // "Where the ISK went" side panel; the page shifts aside while it is open.
+  const [iskPanelOpen, setIskPanelOpen] = useState(false);
   const handlePersonalRefresh = () => {
     refresh();
     personalFills.refresh();
+    allJournals.refresh();
   };
 
   const balanceResult = data?.balanceResult ?? null;
@@ -429,14 +446,27 @@ export function Wallet() {
     loyaltyColumns.map((column) => column.id)
   );
 
-  const personalTransactions = personalFills.data?.transactions ?? EMPTY_FILLS;
-  const personalTypeNames = personalFills.data?.typeNames ?? NO_NAMES;
+  // The fills that name an item or a PLEX line: this Character's, or every loaded Character's.
+  const allJournalsData = showingAllJournal ? allJournals.data : null;
+  const personalTransactions = useMemo<readonly WalletTransactionCommon[]>(
+    () =>
+      allJournalsData
+        ? allJournalsData.loaded.flatMap((c) => c.transactions)
+        : (personalFills.data?.transactions ?? EMPTY_FILLS),
+    [allJournalsData, personalFills.data]
+  );
+  const personalTypeNames =
+    (allJournalsData ? allJournalsData.typeNames : personalFills.data?.typeNames) ?? NO_NAMES;
   const itemNamesTruncated = personalFills.data?.truncated ?? false;
   const personalLinkFor = useMemo(
     () => journalTransactionLinks(personalTransactions),
     [personalTransactions]
   );
   const personalNameFor = useMemo(() => typeNameLookup(personalTypeNames), [personalTypeNames]);
+  const characterNameFor = useMemo(() => {
+    const names = new Map((allCharacters ?? []).map((c) => [c.characterId, c.name]));
+    return (id: number) => names.get(id) ?? `#${id}`;
+  }, [allCharacters]);
   // Journal lines a pilot linked to a Moon Mining Tax payment get a way back
   // to the tax row they settled. Every character's Assignments, since the
   // journal can show any of them.
@@ -464,8 +494,21 @@ export function Wallet() {
   );
   const buildJournalColumns = useJournalColumnsBuilder();
   const journalColumns = useMemo(
-    () => buildJournalColumns(personalLinkFor, personalNameFor, miningTaxHrefFor),
-    [buildJournalColumns, personalLinkFor, personalNameFor, miningTaxHrefFor]
+    () =>
+      buildJournalColumns(
+        personalLinkFor,
+        personalNameFor,
+        miningTaxHrefFor,
+        showingAllJournal ? characterNameFor : undefined
+      ),
+    [
+      buildJournalColumns,
+      personalLinkFor,
+      personalNameFor,
+      miningTaxHrefFor,
+      showingAllJournal,
+      characterNameFor,
+    ]
   );
 
   // Unsorted: `DataTable`'s own controlled `sort` below is the one place
@@ -498,8 +541,42 @@ export function Wallet() {
     }
     return map;
   }, [walletBalancesSnapshot, activeCharacterId, balanceResult, balanceNeedsReauth]);
+  // Lines between the pilot's own Characters are netted against the Characters
+  // whose journals are in: all of them in the All view, those with the wallet
+  // permission in the This view (a missing one's transfers stay counted).
+  const journalRows = useMemo<OwnedJournalEntry[]>(
+    () =>
+      allJournalsData
+        ? allJournalsData.loaded.flatMap((c) =>
+            c.journal.map((entry) => ({ ...entry, characterId: c.characterId }))
+          )
+        : showingAllJournal || activeCharacterId === null
+          ? []
+          : journal.map((entry) => ({ ...entry, characterId: activeCharacterId })),
+    [allJournalsData, showingAllJournal, journal, activeCharacterId]
+  );
+  const trackedIds = useMemo(() => {
+    if (allJournalsData) return new Set(allJournalsData.loaded.map((c) => c.characterId));
+    const ids = new Set(scopedCharacterIds ?? []);
+    if (activeCharacterId !== null && !journalNeedsReauth) ids.add(activeCharacterId);
+    return ids;
+  }, [allJournalsData, scopedCharacterIds, activeCharacterId, journalNeedsReauth]);
+  const classifiedJournal = useMemo(
+    () => classifyJournal(journalRows, { trackedIds, linkFor: personalLinkFor }),
+    [journalRows, trackedIds, personalLinkFor]
+  );
+  const journalCoverageInfo = useMemo(
+    () =>
+      (allCharacters?.length ?? 0) > 1
+        ? journalCoverage(
+            (allCharacters ?? []).map((c) => ({ characterId: c.characterId, name: c.name })),
+            trackedIds
+          )
+        : undefined,
+    [allCharacters, trackedIds]
+  );
   const { filteredJournal, breakdownJournal, refTypeOptions } = useJournalFilterResult(
-    journal,
+    classifiedJournal,
     journalRowsFilter
   );
   const journalSortProps = useUrlSort('journal.sort', JOURNAL_SORT, JOURNAL_SORT_COLUMN_IDS);
@@ -511,7 +588,7 @@ export function Wallet() {
     surface: 'wallet-journal',
     rows: filteredJournal,
     columns: journalCsvColumns,
-    truncated: journalTruncated,
+    truncated: journalTruncated || (allJournalsData?.loaded.some((c) => c.truncated) ?? false),
   });
   const loyaltyCsvColumns = useMemo(
     () => loyaltyPointsCsvColumns(t, (id) => corporationNames.get(id) ?? `#${id}`),
@@ -546,7 +623,13 @@ export function Wallet() {
   if (tab === 'transactions') return <Navigate to="/market/history" replace />;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4">
+    <div
+      className={cx(
+        'mx-auto max-w-6xl space-y-4',
+        // The side panel is non-modal: the page shifts aside so no column is covered.
+        tab === 'journal' && iskPanelOpen && 'md:mr-[26rem] md:ml-0'
+      )}
+    >
       {tab === 'journal' && <FromWalletCrumb />}
       <PageHeader
         title={t('wallet.title')}
@@ -776,6 +859,7 @@ export function Wallet() {
             meta={<WalletOriginCrumb />}
             actions={
               <span className="flex items-center gap-2">
+                {walletCharacterFilterMeta}
                 <Link
                   to="/market/history"
                   className={cx(
@@ -785,16 +869,22 @@ export function Wallet() {
                 >
                   {t('wallet.transactionsLink')}
                 </Link>
-                {journalResult && (
+                {(showingAllJournal ? allJournalsData : journalResult) && (
                   <>
                     <TableActionsMenu name={t('wallet.journalTab')} tableExport={journalExport} />
-                    <DataAgeBadge date={journalResult.fetchedAt} />
+                    {!showingAllJournal && journalResult && (
+                      <DataAgeBadge date={journalResult.fetchedAt} />
+                    )}
                   </>
                 )}
               </span>
             }
           >
-            {journalNeedsReauth ? (
+            {showingAllJournal && !allJournalsData ? (
+              <div className="flex justify-center py-8">
+                <Spinner label={t('common.loading')} />
+              </div>
+            ) : !showingAllJournal && journalNeedsReauth ? (
               <div className="p-3">
                 <GrantBanner
                   characterId={activeCharacterId}
@@ -804,7 +894,7 @@ export function Wallet() {
                   actionLabel={t('wallet.reauthAction')}
                 />
               </div>
-            ) : !journalResult || journal.length === 0 ? (
+            ) : !showingAllJournal && (!journalResult || journal.length === 0) ? (
               <CachedEmptyState
                 result={journalResult}
                 title={t('wallet.journalEmptyTitle')}
@@ -814,14 +904,15 @@ export function Wallet() {
               />
             ) : (
               <>
-                {journalResult.fromCache && (
+                {!showingAllJournal && journalResult?.fromCache && (
                   <CachedNotice
                     className="px-3 pt-2"
                     fetchedAt={journalResult.fetchedAt}
                     refreshFailed={refreshCount > 0}
                   />
                 )}
-                {journalTruncated && (
+                {(journalTruncated ||
+                  (allJournalsData?.loaded.some((c) => c.truncated) ?? false)) && (
                   <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
                     {t('common.incompleteTitle')} — {t('wallet.journalTruncatedHint')}
                   </p>
@@ -848,6 +939,16 @@ export function Wallet() {
                   onSortChange={journalSortProps.onSortChange}
                   highlightRowKey={highlightedEntryId}
                   tableExport={journalExport}
+                  panel={{
+                    open: iskPanelOpen,
+                    onOpenChange: setIskPanelOpen,
+                    scopeLabel: t(
+                      showingAllJournal
+                        ? 'wallet.journalBreakdownScopeAll'
+                        : 'wallet.journalBreakdownScopeThis'
+                    ),
+                    coverage: journalCoverageInfo,
+                  }}
                 />
               </>
             )}
