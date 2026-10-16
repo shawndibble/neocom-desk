@@ -927,12 +927,8 @@ function MailView({ scope, scopeControl }: MailViewProps) {
                 // list to all remaining viewport height would push it off-screen.
                 // Raised from 32rem alongside the taller two-line row, so about
                 // as many mails stay on screen as before.
-                // Date headers are real <h3>s (not focusable, so Tab order is
-                // unchanged) that screen-reader users can jump between; each
-                // section's rows stay a list of their own. Sticky, like the
-                // Coming up rail's day headers, so the bucket stays named
-                // while scrolling it; `scroll-pt-8` keeps a focused row out
-                // from under it (WCAG 2.4.11).
+                // Sticky date <h3>s, as in the Coming up rail; `scroll-pt-8`
+                // keeps a focused row out from under one (WCAG 2.4.11).
                 <div className="max-h-[36rem] scroll-pt-8 overflow-y-auto lg:max-h-[44rem]">
                   {rowSections.map((section) => (
                     <div key={section.key}>

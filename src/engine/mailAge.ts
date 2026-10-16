@@ -1,5 +1,5 @@
 /**
- * Mail list date sections (issue #3971): Today, Yesterday, This week,
+ * Mail list date sections: Today, Yesterday, This week,
  * Earlier this month, Last month, then one section per older month.
  *
  * Calendar days are read in the viewer's Time format zone (`undefined` =
@@ -10,11 +10,7 @@
  */
 import type { WeekStart } from '@/lib/calendarGrid';
 
-/**
- * "Earlier this month" is not in the ticket's list. It covers the gap between
- * the start of this week and the 1st, which would otherwise need a header
- * naming the current month as if it were an older one.
- */
+/** "Earlier this month" covers the start of this week back to the 1st. */
 export type MailAgeBucket =
   | { kind: 'today' | 'yesterday' | 'thisWeek' | 'earlierThisMonth' | 'lastMonth' | 'undated' }
   | { kind: 'month'; year: number; month: number };
