@@ -26,8 +26,6 @@ import {
 } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { AddRow } from '@/components/ui/icons';
-import { AbyssalRunPlanner } from '@/features/fittings/AbyssalRunPlanner';
-import { AbyssalWeatherPicker } from '@/features/fittings/AbyssalWeatherPicker';
 import { SkillsUnknownNote } from '@/features/fittings/FittingPreviewPanels';
 import { StatFields } from '@/features/fittings/StatFacts';
 import { useWeatherName } from '@/features/fittings/abyssalWeatherSelection';
@@ -84,7 +82,7 @@ import { FittingAffectedByPanel } from '@/features/fittings/FittingAffectedByPan
 import { FittingFightersPanel } from '@/features/fittings/FittingFightersPanel';
 import { StatsHeadingLabel } from '@/features/fittings/StatsHeadingLabel';
 import { TacticalModePicker } from '@/features/fittings/TacticalModePicker';
-import { tacticalModeKind } from '@/engine/fittings/tacticalModes';
+import { tacticalModeKind, tacticalModesFor } from '@/engine/fittings/tacticalModes';
 import { ImplantSetControl } from '@/features/fittings/ImplantSetControl';
 import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
 import {
@@ -601,6 +599,11 @@ function FittingsPage() {
     </div>
   );
 
+  // The conditions strip under the stats heading; Abyssal weather is its own section.
+  const hasModes = tacticalModesFor(fitting.shipTypeId).length > 0;
+  const showMissingSkills = gaps !== null && gaps.missing.length > 0 && activeCharacterId !== null;
+  const showSkillsUnknown = gaps?.unknown === true && activeCharacterId !== null;
+
   const statsSections = (
     <FittingStatsSections
       stats={stats}
@@ -644,26 +647,29 @@ function FittingsPage() {
           )}
         </>
       }
+      abyssal={{
+        hullGroupId: catalogue?.types[String(fitting.shipTypeId)]?.groupID,
+        compare: workspace.compareWeather,
+      }}
       conditions={
-        <div className="space-y-2">
-          <StatFields>
-            <TacticalModePicker fitting={fitting} onChange={edit} />
-            <AbyssalWeatherPicker field />
-          </StatFields>
-          <AbyssalRunPlanner
-            hullGroupId={catalogue?.types[String(fitting.shipTypeId)]?.groupID}
-            compare={workspace.compareWeather}
-            typeName={typeName}
-          />
-          {gaps && gaps.missing.length > 0 && activeCharacterId !== null && (
-            <MissingSkillsChip
-              entries={gaps.missing}
-              characterId={activeCharacterId}
-              fittingName={fitting.name}
-            />
-          )}
-          {gaps?.unknown && activeCharacterId !== null && <SkillsUnknownNote />}
-        </div>
+        // Nothing to say (no modes, no skill gaps): no empty strip under the heading.
+        hasModes || showMissingSkills || showSkillsUnknown ? (
+          <div className="space-y-2">
+            {hasModes && (
+              <StatFields>
+                <TacticalModePicker fitting={fitting} onChange={edit} />
+              </StatFields>
+            )}
+            {showMissingSkills && (
+              <MissingSkillsChip
+                entries={gaps.missing}
+                characterId={activeCharacterId}
+                fittingName={fitting.name}
+              />
+            )}
+            {showSkillsUnknown && <SkillsUnknownNote />}
+          </div>
+        ) : undefined
       }
       heading={
         <>
