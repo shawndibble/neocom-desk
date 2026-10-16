@@ -190,6 +190,19 @@ describe('getAbyssalEstimate', () => {
     expect(transport).toHaveBeenLastCalledWith(expect.objectContaining({ importIfMissing: true }));
   });
 
+  it('lets an import click retry past a cached failure', async () => {
+    let fail = true;
+    const transport = setup(async () => {
+      if (fail) throw new Error('unavailable');
+      return PRICED;
+    });
+    expect((await getAbyssalEstimate(BCS, ITEM, OPTS)).status).toBe('unavailable');
+    fail = false;
+    expect((await getAbyssalEstimate(BCS, ITEM, OPTS)).status).toBe('unavailable');
+    expect((await getAbyssalEstimate(BCS, ITEM, IMPORT)).status).toBe('priced');
+    expect(transport).toHaveBeenCalledTimes(2);
+  });
+
   it('asks again for a not-imported module after its TTL', async () => {
     const transport = setup(async () => ({ status: 'not-imported' }));
     await getAbyssalEstimate(BCS, ITEM, OPTS);

@@ -176,9 +176,12 @@ function unpriced(status: 'unknown' | 'unavailable'): AbyssalEstimate {
   };
 }
 
-/** A cached `not-imported` doesn't answer an ask that may import. */
+/** A cached `not-imported` or `unavailable` doesn't answer the pilot's import click. */
 function answers(estimate: AbyssalEstimate, importIfMissing: boolean): boolean {
-  return !(importIfMissing && estimate.status === 'not-imported');
+  return !(
+    importIfMissing &&
+    (estimate.status === 'not-imported' || estimate.status === 'unavailable')
+  );
 }
 
 function remember(itemId: number, estimate: AbyssalEstimate): AbyssalEstimate {
