@@ -168,4 +168,25 @@ describe('MasteryChip', () => {
     expect(await screen.findByText('Vexor Mastery')).toBeInTheDocument();
     expect(await screen.findByText('Drones')).toBeInTheDocument();
   });
+
+  it('keeps the unavailable panel, with Retry busy and focused, while a retry runs', async () => {
+    vi.mocked(loadMasteries).mockImplementationOnce(() => Promise.reject(new Error('offline')));
+    render(<MasteryChip hullTypeId={626} hullName="Vexor" characterId={1} />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Mastery' }));
+
+    let release: (value: MasteryMap) => void = () => {};
+    vi.mocked(loadMasteries).mockImplementationOnce(
+      () => new Promise<MasteryMap>((resolve) => (release = resolve))
+    );
+    const retry = screen.getByRole('button', { name: 'Try again' });
+    retry.focus();
+    await userEvent.click(retry);
+
+    // Still the same panel and the same button, not a blank slot: focus has not been dropped.
+    expect(screen.getByText(/Mastery data isn't available offline yet/)).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Try again' })).toHaveFocus();
+
+    release({ '626': [[{ skillTypeID: 3300, level: 2 }], [], [], [], []] });
+    expect(await screen.findByText('Vexor Mastery')).toBeInTheDocument();
+  });
 });

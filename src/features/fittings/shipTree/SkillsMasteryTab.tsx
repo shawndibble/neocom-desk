@@ -19,6 +19,7 @@ import {
   toggleChipStateClassName,
 } from '@/components/ui/controlStyles';
 import { Done } from '@/components/ui/icons';
+import { useRetryFocus } from '@/lib/useRetryFocus';
 import { romanLevel } from '@/engine/projection';
 import type { PlanEntry } from '@/engine/types';
 import { RequiredSkillsSection } from '@/features/market/RequiredSkillsSection';
@@ -89,6 +90,11 @@ export function SkillsMasteryTab({
   const hasTiers = !!tiers && tiers.some((bundle) => bundle.length > 0);
   // No entry only means "none" once the file is in; before that it means nothing.
   const masteriesStatus = source.masteriesStatus;
+  // Retry stays mounted while it runs (the status holds at `unavailable`); the result takes focus.
+  const [masteryRef, armFocus] = useRetryFocus<HTMLElement>(
+    masteriesStatus === 'unavailable' ? 'failed' : masteriesStatus === 'loaded' ? 'ok' : 'busy',
+    ship.typeID
+  );
   // Level 0: CCP lists the skill under the tier but asks for nothing yet.
   const tierBundle = (tiers?.[tier - 1] ?? []).filter((p) => p.level > 0);
   const tierSkills = showMissing ? tierBundle.filter(missing) : tierBundle;
@@ -173,7 +179,7 @@ export function SkillsMasteryTab({
         hasCharacter={hasCharacter}
         itemName={ship.name}
       />
-      <section className="space-y-2">
+      <section ref={masteryRef} tabIndex={-1} className="space-y-2 focus:outline-none">
         <div className="flex items-center justify-between border-b border-line pb-1">
           <h3 className={heading}>{t('ships.info.skills.masteryTitle')}</h3>
           {hasCharacter && masteriesStatus === 'loaded' && (
@@ -187,8 +193,14 @@ export function SkillsMasteryTab({
         {!hasTiers && masteriesStatus === 'unavailable' ? (
           <p className="flex flex-wrap items-center gap-2 text-text-dim">
             <span>{t('ships.info.skills.masteriesUnavailable')}</span>
-            <Button size="sm" onClick={source.retryMasteries}>
-              {t('ships.info.skills.masteriesRetry')}
+            <Button
+              size="sm"
+              onClick={() => {
+                armFocus();
+                source.retryMasteries();
+              }}
+            >
+              {t('common.retry')}
             </Button>
           </p>
         ) : !hasTiers && masteriesStatus === 'loading' ? (

@@ -21,7 +21,7 @@ import { TRADE_HUBS, getTradeHub } from '@/market/hubs';
 import {
   exportFitting,
   fittingShareCode,
-  fittingShareUrl,
+  fittingShareViewUrl,
   type FittingExportKind,
 } from './fittingExportText';
 import { isOnline } from '@/stores/network';
@@ -121,16 +121,21 @@ export function useFittingExport(fitting: Fitting, cloneImplants: readonly numbe
       return;
     }
     let url = existingShareLink('fitting', code);
-    if (url === null && !isOnline()) {
-      // The short link is a Firestore write, which hangs or fails with no
-      // connection. The permanent link carries the whole code and opens
-      // from it locally, so it can be made now.
+    /**
+     * The short link is a sync-server write, which hangs or fails with no
+     * connection. The permanent view link carries the whole code and opens
+     * from it locally, so it stands in.
+     */
+    const copyPermanentInstead = async (noticeKey: string) => {
       try {
-        await writeToClipboard(fittingShareUrl(code));
-        setNotice(t('fittings.export.copied.permanentLinkOffline'));
+        await writeToClipboard(fittingShareViewUrl(code));
+        setNotice(t(noticeKey));
       } catch {
         setNotice(t('fittings.export.copyFailed'));
       }
+    };
+    if (url === null && !isOnline()) {
+      await copyPermanentInstead('fittings.export.copied.permanentLinkOffline');
       return;
     }
     if (url === null) {
@@ -146,7 +151,8 @@ export function useFittingExport(fitting: Fitting, cloneImplants: readonly numbe
           characterId,
         });
       } catch {
-        setNotice(t('fittings.export.shareFailed'));
+        // Lie-fi, or the store refused: the permanent link still works.
+        await copyPermanentInstead('fittings.export.copied.permanentLinkFallback');
         return;
       }
     }

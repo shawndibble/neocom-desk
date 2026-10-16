@@ -8,6 +8,10 @@
  * - `loading`: asked for, not here yet.
  * - `loaded`: here; a hull with no entry in it genuinely has none.
  * - `unavailable`: the load failed. Tries again by itself when the connection returns.
+ *
+ * A retry from `unavailable` stays `unavailable` with `retrying` set until it
+ * settles, rather than dropping back to `loading`: the panel holding the Retry
+ * button must not unmount (and take the keyboard focus with it) mid-retry.
  */
 import { useCallback, useEffect, useState } from 'react';
 import { loadMasteries } from '@/sde/loadSde';
@@ -17,20 +21,26 @@ import { onReconnect } from '@/stores/network';
 export type MasteriesState =
   { status: 'loading' } | { status: 'loaded'; masteries: MasteryMap } | { status: 'unavailable' };
 
-export function useMasteries(): MasteriesState & { retry: () => void } {
+export function useMasteries(): MasteriesState & { retry: () => void; retrying: boolean } {
   const [state, setState] = useState<MasteriesState>({ status: 'loading' });
+  const [retrying, setRetrying] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const retry = useCallback(() => setAttempt((n) => n + 1), []);
   useEffect(() => {
     let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset for a retry, not a render-time derivation
-    setState({ status: 'loading' });
+    // A retry keeps what is on screen; only the first load is `loading`.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- a retry marks itself, not a render-time derivation
+    if (attempt > 0) setRetrying(true);
     loadMasteries()
       .then((masteries) => {
-        if (!cancelled) setState({ status: 'loaded', masteries });
+        if (cancelled) return;
+        setState({ status: 'loaded', masteries });
+        setRetrying(false);
       })
       .catch(() => {
-        if (!cancelled) setState({ status: 'unavailable' });
+        if (cancelled) return;
+        setState({ status: 'unavailable' });
+        setRetrying(false);
       });
     return () => {
       cancelled = true;
@@ -38,5 +48,5 @@ export function useMasteries(): MasteriesState & { retry: () => void } {
   }, [attempt]);
   const unavailable = state.status === 'unavailable';
   useEffect(() => (unavailable ? onReconnect(retry) : undefined), [unavailable, retry]);
-  return { ...state, retry };
+  return { ...state, retry, retrying };
 }

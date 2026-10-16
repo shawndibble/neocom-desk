@@ -30,6 +30,7 @@ import { SkillRow } from '@/features/skills/SkillRow';
 import { TargetPlanPicker } from '@/features/skills/TargetPlanPicker';
 import { targetPlanEntries, useTargetPlan } from '@/features/skills/useTargetPlan';
 import { HeaderBadgeSlot } from './HeaderBadgeSlot';
+import { useRetryFocus } from '@/lib/useRetryFocus';
 import { useMasteries } from './useMasteries';
 
 const TIERS = [0, 1, 2, 3, 4] as const;
@@ -72,6 +73,11 @@ export function MasteryChip({
   const masteryState = useMasteries();
   const masteries = masteryState.status === 'loaded' ? masteryState.masteries : null;
   const unavailable = masteryState.status === 'unavailable';
+  // Retry stays mounted while it runs; the result takes focus when it replaces the panel.
+  const [focusRef, armFocus] = useRetryFocus<HTMLDivElement>(
+    unavailable ? 'failed' : masteryState.status === 'loaded' ? 'ok' : 'busy',
+    hullTypeId
+  );
   const [tier, setTier] = useState(4);
   const [hideCompleted, setHideCompleted] = useState(false);
   const [added, setAdded] = useState<{
@@ -139,13 +145,20 @@ export function MasteryChip({
   const unavailableBody = (
     <div className="space-y-2 text-xs text-text-dim">
       <p>{t('fittings.mastery.unavailable')}</p>
-      <Button size="sm" onClick={masteryState.retry}>
-        {t('fittings.mastery.retry')}
+      <Button
+        size="sm"
+        loading={masteryState.retrying}
+        onClick={() => {
+          armFocus();
+          masteryState.retry();
+        }}
+      >
+        {t('common.retry')}
       </Button>
     </div>
   );
 
-  const body = unavailable ? (
+  const content = unavailable ? (
     unavailableBody
   ) : (
     <div className="space-y-2">
@@ -242,6 +255,12 @@ export function MasteryChip({
           )}
         </div>
       )}
+    </div>
+  );
+
+  const body = (
+    <div ref={focusRef} tabIndex={-1} className="focus:outline-none">
+      {content}
     </div>
   );
 

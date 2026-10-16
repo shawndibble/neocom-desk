@@ -66,6 +66,11 @@ export function LoadWarnings({ load }: { load: LoadOutcome | null }) {
   );
 }
 
+/** What a load that threw says: the item data missing offline, or anything else. */
+function classifyThrown(err: unknown): 'offline' | 'unknown' {
+  return isOfflineFailure(err) ? 'offline' : 'unknown';
+}
+
 function LoadFrame({
   bare,
   title,
@@ -103,7 +108,7 @@ export function FittingLoadCard({
     try {
       await onLoad(text);
     } catch (err) {
-      setThrown(isOfflineFailure(err) ? 'offline' : 'unknown');
+      setThrown(classifyThrown(err));
     } finally {
       setLoading(false);
     }
@@ -128,7 +133,7 @@ export function FittingLoadCard({
         setXmlList(items);
       }
     } catch (err) {
-      setThrown(isOfflineFailure(err) ? 'offline' : 'unknown');
+      setThrown(classifyThrown(err));
     } finally {
       setXmlLoading(false);
     }

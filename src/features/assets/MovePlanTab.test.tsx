@@ -64,9 +64,18 @@ vi.mock('@/sde/loadSde', () => ({
   loadTypes: () => Promise.resolve({}),
   loadGroupCategories: () => Promise.resolve({}),
 }));
-vi.mock('@/features/fittings/useFittingCatalogue', () => ({ useFittingCatalogue: () => null }));
+const hullData = vi.hoisted(() => ({ catalogueFailed: false, skillsKnown: true }));
+vi.mock('@/features/fittings/useFittingCatalogue', () => ({
+  useFittingCatalogue: () => null,
+  useFittingCatalogueFailed: () => hullData.catalogueFailed,
+}));
 vi.mock('@/features/fittings/fittingPilotProfile', () => ({
-  usePilotProfile: () => ({ profile: null, failed: false, retry: () => {} }),
+  usePilotProfile: () => ({
+    profile: null,
+    failed: false,
+    skillsKnown: hullData.skillsKnown,
+    retry: () => {},
+  }),
 }));
 vi.mock('@/features/route/SolarSystemPicker', () => ({
   SolarSystemPicker: ({
@@ -97,6 +106,8 @@ describe('MovePlanTab', () => {
   beforeEach(() => {
     failing.name = false;
     failing.system = false;
+    hullData.catalogueFailed = false;
+    hullData.skillsKnown = true;
   });
 
   it('keeps the pickup system and its Route Safety link when the name read fails', async () => {
@@ -110,16 +121,34 @@ describe('MovePlanTab', () => {
     expect(screen.getAllByRole('link', { name: /^Route Safety/ })).toHaveLength(1);
   });
 
-  it('blames the missing hauler sizing data, not the pilot, when no hauler could be sized', async () => {
+  async function planAmarr() {
     const user = await open();
     await user.click(screen.getByRole('checkbox', { name: /select everything at amarr viii/i }));
     await user.click(screen.getByRole('button', { name: 'Pick a system' }));
     await user.click(screen.getByRole('button', { name: 'Show plan' }));
+  }
 
+  it('blames the missing hauler data, not the pilot, when the catalogue could not be loaded', async () => {
+    hullData.catalogueFailed = true;
+    await planAmarr();
     expect(
       await screen.findByText(/Hauler sizing needs data that isn't downloaded yet/)
     ).toBeTruthy();
     expect(screen.queryByText('No hauler you can fly could be sized for this load.')).toBeNull();
+  });
+
+  it('blames the missing data too when the pilot skills could not be read', async () => {
+    hullData.skillsKnown = false;
+    await planAmarr();
+    expect(
+      await screen.findByText(/Hauler sizing needs data that isn't downloaded yet/)
+    ).toBeTruthy();
+  });
+
+  it('says the data is still loading, not "connect once", while the catalogue is merely loading', async () => {
+    await planAmarr();
+    expect(await screen.findByText(/Hauler data is still loading/)).toBeTruthy();
+    expect(screen.queryByText(/Connect once/)).toBeNull();
   });
 
   it('keeps the pickup name when the system read fails', async () => {

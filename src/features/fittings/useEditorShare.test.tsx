@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
@@ -25,6 +25,10 @@ function Menu({ record = RECORD as typeof RECORD | null }) {
     </>
   );
 }
+
+afterEach(() => {
+  Reflect.deleteProperty(navigator, 'onLine');
+});
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -85,13 +89,9 @@ describe('useEditorShare', () => {
     act(() => {
       window.dispatchEvent(new Event('offline'));
     });
-    try {
-      await userEvent.click(screen.getByRole('button', { name: 'Export' }));
-      const item = await screen.findByRole('menuitem', { name: 'Share to Pals' });
-      expect(item).toHaveAttribute('data-disabled');
-      expect(screen.getByText('Sharing to a Community needs a connection.')).toBeVisible();
-    } finally {
-      Reflect.deleteProperty(navigator, 'onLine');
-    }
+    await userEvent.click(screen.getByRole('button', { name: 'Export' }));
+    const item = await screen.findByRole('menuitem', { name: 'Share to Pals' });
+    expect(item).toHaveAttribute('data-disabled');
+    expect(screen.getByText('Sharing to a Community needs a connection.')).toBeVisible();
   });
 });

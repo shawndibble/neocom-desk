@@ -4,8 +4,7 @@ import { Trans, useTranslation } from 'react-i18next';
 import { Button, Caret, IskAmount, RowMoreActions } from '@/components/ui';
 import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
-import { useDogmaEngineStatus } from './dogmaEngineStatus';
-import { useOnline } from '@/stores/network';
+import { useShipDataNeedsConnection } from './useDogmaEngineStatus';
 import { formatSeconds } from '@/lib/duration';
 import {
   alignTimeSeconds,
@@ -568,9 +567,7 @@ export function FittingStatsSections({
 }: FittingStatsSectionsProps) {
   const { t } = useTranslation();
   // The ship data never downloaded and there is no connection to fetch it: say so, not "couldn't load".
-  const online = useOnline();
-  const engineStatus = useDogmaEngineStatus();
-  const shipDataNeedsConnection = !online && engineStatus === 'failed';
+  const shipDataNeedsConnection = useShipDataNeedsConnection();
   const profileName = useDamageProfileName()(damageProfiles.selected);
   const [appraisalOpen, setAppraisalOpen] = useState(false);
   // A fit with nothing priceable totals 0 on both sides — that's "unknown",

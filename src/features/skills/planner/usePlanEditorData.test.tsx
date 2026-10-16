@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import type { CorrectedSkills } from '@/features/skills/correctedSkills';
+import { loadCharacterAttributes } from '@/features/skills/data';
 import { usePlanEditorData } from './usePlanEditorData';
 
 const loadCorrectedSkills = vi.fn();
@@ -13,12 +14,13 @@ vi.mock('@/esi/cache', () => ({
 vi.mock('@/features/skills/correctedSkills', () => ({
   loadCorrectedSkills: (...args: unknown[]) => loadCorrectedSkills(...args),
 }));
+const loadSkillCatalog = vi.fn();
 vi.mock('@/features/skills/skillMap', () => ({
-  loadSkillCatalog: () => Promise.resolve({ engineSkills: new Map(), bySkillTypeID: new Map() }),
+  loadSkillCatalog: () => loadSkillCatalog(),
   toAttributeBaseline: () => null,
 }));
 vi.mock('@/features/skills/data', () => ({
-  loadCharacterAttributes: () => Promise.resolve(null),
+  loadCharacterAttributes: vi.fn(() => Promise.resolve(null)),
   loadImplantBonuses: () => Promise.resolve({}),
 }));
 
@@ -43,6 +45,8 @@ function corrected(fetchedAt: Date | null, level: number): CorrectedSkills {
 }
 
 beforeEach(() => {
+  loadSkillCatalog.mockReset();
+  loadSkillCatalog.mockResolvedValue({ engineSkills: new Map(), bySkillTypeID: new Map() });
   loadCorrectedSkills.mockReset();
   invalidateFreshness.mockReset();
 });
@@ -103,5 +107,45 @@ describe('usePlanEditorData', () => {
     await waitFor(() => expect(result.current.loaded).toBe(true));
     expect(result.current.trainedSkillsKnown).toBe(false);
     expect(result.current.catalog).not.toBeNull();
+  });
+
+  it("drops the previous Character's skills when the next one's load fails", async () => {
+    loadCorrectedSkills.mockResolvedValueOnce(corrected(new Date('2026-10-04T10:00:00Z'), 3));
+    const { result, rerender } = renderHook(({ id }) => usePlanEditorData(id), {
+      initialProps: { id: 7 },
+    });
+    await waitFor(() => expect(result.current.loaded).toBe(true));
+    expect(result.current.trainedSkillsKnown).toBe(true);
+    expect(result.current.trainedSkills.get(10)?.level).toBe(3);
+
+    loadCorrectedSkills.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    rerender({ id: 8 });
+    await waitFor(() => expect(result.current.loaded).toBe(true));
+    expect(result.current.trainedSkillsKnown).toBe(false);
+    expect(result.current.trainedSkills.size).toBe(0);
+    expect(result.current.totalSp).toBeNull();
+    expect(result.current.fetchedAt).toBeNull();
+  });
+
+  it('flags a catalog that could not load, still finishing, and reload tries it again', async () => {
+    loadSkillCatalog.mockRejectedValueOnce(new Error('chunk failed'));
+    loadCorrectedSkills.mockResolvedValue(corrected(null, 0));
+    const { result } = renderHook(() => usePlanEditorData(7));
+    await waitFor(() => expect(result.current.loaded).toBe(true));
+    expect(result.current.catalog).toBeNull();
+    expect(result.current.catalogFailed).toBe(true);
+
+    act(() => result.current.reload());
+    await waitFor(() => expect(result.current.catalog).not.toBeNull());
+    expect(result.current.catalogFailed).toBe(false);
+  });
+
+  it('keeps the skills it did read when another read fails', async () => {
+    loadCorrectedSkills.mockResolvedValue(corrected(new Date('2026-10-04T10:00:00Z'), 2));
+    vi.mocked(loadCharacterAttributes).mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    const { result } = renderHook(() => usePlanEditorData(7));
+    await waitFor(() => expect(result.current.loaded).toBe(true));
+    expect(result.current.trainedSkills.get(10)?.level).toBe(2);
+    expect(result.current.trainedSkillsKnown).toBe(true);
   });
 });

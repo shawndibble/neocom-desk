@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db, type TokenRecord } from '@/db';
-import { EsiError, EsiOfflineError } from '@/esi/client';
+import { EsiError, EsiOfflineError, EsiTimeoutError } from '@/esi/client';
 import type { Fitting } from '@/engine/fittings/types';
 
 const postCharacterFittingMock = vi.hoisted(() => vi.fn());
@@ -147,7 +147,7 @@ describe('saveFittingToEve', () => {
       name: 'PvP Rifter',
       description: '',
     });
-    expect(result).toEqual({ ok: false, message: 'offline', offline: true });
+    expect(result).toEqual({ ok: false, kind: 'offline' });
   });
 
   it('reports ESI giving up offline the same way', async () => {
@@ -158,6 +158,17 @@ describe('saveFittingToEve', () => {
       name: 'PvP Rifter',
       description: '',
     });
-    expect(result).toMatchObject({ ok: false, offline: true });
+    expect(result).toEqual({ ok: false, kind: 'offline' });
+  });
+
+  it('reports a timeout after the request went out as unconfirmed, not as a plain failure', async () => {
+    postCharacterFittingMock.mockRejectedValue(new EsiTimeoutError(30_000, true));
+    const result = await saveFittingToEve({
+      characterId: 1,
+      fitting: FITTING,
+      name: 'PvP Rifter',
+      description: '',
+    });
+    expect(result).toEqual({ ok: false, kind: 'unconfirmed' });
   });
 });

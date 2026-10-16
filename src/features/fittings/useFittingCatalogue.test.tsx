@@ -19,6 +19,7 @@ vi.mock('@/sde/loadMarketSde', () => ({
 }));
 
 import {
+  resetFittingCatalogueStatusForTests,
   retryFittingCatalogue,
   useFittingCatalogue,
   useFittingCatalogueFailed,
@@ -38,6 +39,7 @@ function useBoth() {
 
 describe('useFittingCatalogue failure', () => {
   beforeEach(() => {
+    resetFittingCatalogueStatusForTests();
     loadsFine();
     sde.loadMarketTypes.mockRejectedValue(new TypeError('Failed to fetch'));
   });

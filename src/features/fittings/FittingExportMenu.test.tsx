@@ -148,7 +148,7 @@ describe('FittingExportMenu', () => {
       const copied = setup();
       await choose('Copy Share Link');
       await waitFor(() => expect(copied).toHaveLength(1));
-      expect(copied[0]).toContain('/ships/fittings?f=');
+      expect(copied[0]).toContain('/share/fitting?f=');
       expect(createShareLink).not.toHaveBeenCalled();
       expect(await screen.findByRole('status')).toHaveTextContent(
         'Offline: permanent link copied instead. The short Share Link needs a connection.'
@@ -158,15 +158,16 @@ describe('FittingExportMenu', () => {
     }
   });
 
-  it('says so when the Share Link could not be stored, copying nothing', async () => {
+  it('copies the permanent link instead, and says so, when the Share Link could not be stored', async () => {
     useActiveCharacter.setState({ activeCharacterId: 7 });
     vi.mocked(createShareLink).mockRejectedValueOnce(new Error('permission-denied'));
     const copied = setup();
     await choose('Copy Share Link');
     expect(await screen.findByRole('status')).toHaveTextContent(
-      "Couldn't create the Share Link. Try again."
+      "Couldn't make the short Share Link, so the permanent link was copied instead."
     );
-    expect(copied).toEqual([]);
+    expect(copied).toHaveLength(1);
+    expect(copied[0]).toContain('/share/fitting?f=');
   });
 
   it('copies the Fitting as EFT text and the multibuy list', async () => {

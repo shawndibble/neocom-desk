@@ -2,8 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import '@/i18n';
 
-const engine = vi.hoisted(() => ({ loadDogmaEngine: vi.fn() }));
-vi.mock('./dogmaFittingEngine', () => ({ loadDogmaEngine: engine.loadDogmaEngine }));
+const engine = vi.hoisted(() => ({ warmDogmaEngine: vi.fn() }));
+vi.mock('./dogmaFittingEngine', () => ({ warmDogmaEngine: engine.warmDogmaEngine }));
 const catalogue = vi.hoisted(() => ({ failed: { value: false }, retry: vi.fn() }));
 vi.mock('./useFittingCatalogue', () => ({
   useFittingCatalogueFailed: () => catalogue.failed.value,
@@ -18,7 +18,6 @@ function setOnline(value: boolean) {
 }
 
 beforeEach(() => {
-  engine.loadDogmaEngine.mockResolvedValue({});
   catalogue.failed.value = false;
   setOnline(true);
 });
@@ -29,6 +28,12 @@ afterEach(() => {
 });
 
 describe('ShipDataWaitingNote', () => {
+  it('says nothing while the engine has not been asked for, rather than "still downloading"', () => {
+    setDogmaEngineStatus('idle');
+    const { container } = render(<ShipDataWaitingNote />);
+    expect(container).toBeEmptyDOMElement();
+  });
+
   it('says it is downloading while it is', () => {
     setDogmaEngineStatus('loading');
     render(<ShipDataWaitingNote />);
@@ -51,7 +56,18 @@ describe('ShipDataWaitingNote', () => {
     render(<ShipDataWaitingNote />);
     expect(screen.getByText("Couldn't download the ship data.")).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
-    expect(engine.loadDogmaEngine).toHaveBeenCalledTimes(1);
+    expect(engine.warmDogmaEngine).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps focus in the note when Retry takes itself away', () => {
+    setDogmaEngineStatus('failed');
+    render(<ShipDataWaitingNote />);
+    engine.warmDogmaEngine.mockImplementationOnce(() => act(() => setDogmaEngineStatus('loading')));
+    const retry = screen.getByRole('button', { name: 'Try again' });
+    retry.focus();
+    fireEvent.click(retry);
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
+    expect(document.activeElement).not.toBe(document.body);
   });
 
   it('loads the engine again by itself when the connection returns', () => {
@@ -62,7 +78,7 @@ describe('ShipDataWaitingNote', () => {
       setOnline(true);
       window.dispatchEvent(new Event('online'));
     });
-    expect(engine.loadDogmaEngine).toHaveBeenCalledTimes(1);
+    expect(engine.warmDogmaEngine).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -230,6 +230,11 @@ export function useLibraryRowActions({
             {t('fittings.libraryMenu.saveToEve')}
           </MenuItem>
         )}
+        {saved && !online && (
+          <p className="max-w-64 px-3 pb-2 text-xs text-text-dim">
+            {t('fittings.saveToEve.needsConnection')}
+          </p>
+        )}
         {shareItems(row)}
         {saved && (onRename || onDelete) && <MenuSeparator />}
         {saved && onRename && (

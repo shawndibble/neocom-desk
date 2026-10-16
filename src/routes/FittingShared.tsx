@@ -15,6 +15,7 @@ import {
 } from '@/components/ui';
 import { ShareShell } from '@/features/share/ShareShell';
 import { writeToClipboard } from '@/lib/clipboard';
+import { useRetryFocus } from '@/lib/useRetryFocus';
 import { fittingEditLocation } from '@/features/fittings/fittingRoutes';
 import { resolveFittingShareView } from '@/features/fittings/resolveFittingShareView';
 import { FittingModuleList } from '@/features/fittings/FittingModuleList';
@@ -123,6 +124,7 @@ export function FittingShareView({
   }, [code, characterCount, attempt]);
 
   const failed = state.status === 'failed';
+  const [focusRef, , holdFocus] = useRetryFocus<HTMLDivElement>(failed ? 'failed' : 'busy', code);
   useEffect(() => (failed ? onReconnect(() => setAttempt((n) => n + 1)) : undefined), [failed]);
 
   const readyFitting = state.status === 'ready' ? state.fitting : null;
@@ -227,27 +229,37 @@ export function FittingShareView({
         </StatChips>
       )}
 
-      {state.status === 'loading' && (
-        <div className="flex justify-center py-10">
-          <Spinner label={t('common.loading')} />
-        </div>
-      )}
+      {/* Always mounted: Retry unmounts while the code resolves again, and focus waits here. */}
+      <div ref={focusRef} tabIndex={-1} className="focus:outline-none">
+        {state.status === 'loading' && (
+          <div className="flex justify-center py-10">
+            <Spinner label={t('common.loading')} />
+          </div>
+        )}
+
+        {state.status === 'failed' && (
+          <EmptyState
+            title={t('fittingShare.loadFailedTitle')}
+            hint={t(online ? 'fittingShare.loadFailedHint' : 'fittingShare.loadFailedOffline')}
+            action={
+              <Button
+                onClick={() => {
+                  holdFocus();
+                  setAttempt((n) => n + 1);
+                }}
+              >
+                {t('common.retry')}
+              </Button>
+            }
+            className="py-10"
+          />
+        )}
+      </div>
 
       {(state.status === 'invalid' || state.status === 'unsupported-version') && (
         <EmptyState
           title={t('fittingShare.invalidTitle')}
           hint={t('fittingShare.invalidHint')}
-          className="py-10"
-        />
-      )}
-
-      {state.status === 'failed' && (
-        <EmptyState
-          title={t('fittingShare.loadFailedTitle')}
-          hint={t(online ? 'fittingShare.loadFailedHint' : 'fittingShare.loadFailedOffline')}
-          action={
-            <Button onClick={() => setAttempt((n) => n + 1)}>{t('fittingShare.retry')}</Button>
-          }
           className="py-10"
         />
       )}

@@ -6,27 +6,57 @@
  * connection is the cure, with a Retry; both also try again by themselves
  * when the connection returns (`onReconnect`), so Retry is for the lie-fi
  * case where the browser still thinks it is online.
+ *
+ * Each note's wrapper stays mounted through Retry and takes focus at the
+ * click (`useRetryFocus`'s `hold`), so focus is never left on `<body>`.
  */
-import { useEffect } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
+import { useRetryFocus } from '@/lib/useRetryFocus';
 import { onReconnect, useOnline } from '@/stores/network';
-import { useDogmaEngineStatus } from './dogmaEngineStatus';
-import { loadDogmaEngine } from './dogmaFittingEngine';
+import { warmDogmaEngine } from './dogmaFittingEngine';
+import { useDogmaEngineStatus } from './useDogmaEngineStatus';
 import { retryFittingCatalogue, useFittingCatalogueFailed } from './useFittingCatalogue';
 
-function retryShipData(): void {
-  void loadDogmaEngine().catch(() => {
-    // The status the notice reads turns `failed` again; nothing else to do.
-  });
-}
-
-function Retry({ onRetry }: { onRetry: () => void }) {
+function FailedNote({
+  failed,
+  message,
+  onRetry,
+  children,
+}: {
+  failed: boolean;
+  message: string;
+  onRetry: () => void;
+  /** What shows while it is not failed. */
+  children: ReactNode;
+}) {
   const { t } = useTranslation();
+  const [ref, , hold] = useRetryFocus<HTMLDivElement>(failed ? 'failed' : 'busy', null);
   return (
-    <Button size="sm" onClick={onRetry}>
-      {t('fittings.stats.retry')}
-    </Button>
+    <div
+      ref={ref}
+      tabIndex={-1}
+      role={failed ? 'alert' : undefined}
+      className="flex flex-wrap items-center gap-2 text-xs text-warning focus:outline-none"
+    >
+      {failed ? (
+        <>
+          <span>{message}</span>
+          <Button
+            size="sm"
+            onClick={() => {
+              hold();
+              onRetry();
+            }}
+          >
+            {t('common.retry')}
+          </Button>
+        </>
+      ) : (
+        children
+      )}
+    </div>
   );
 }
 
@@ -38,31 +68,37 @@ export function CatalogueLoadingNote() {
   const { t } = useTranslation();
   const failed = useFittingCatalogueFailed();
   const online = useOnline();
-  if (!failed) return <p className="text-xs text-text-dim">{t('fittings.add.loadingCatalogue')}</p>;
   return (
-    <div role="alert" className="flex flex-wrap items-center gap-2 text-xs text-warning">
-      <span>{t(online ? 'fittings.add.catalogueFailed' : 'fittings.add.catalogueOffline')}</span>
-      <Retry onRetry={retryFittingCatalogue} />
-    </div>
+    <FailedNote
+      failed={failed}
+      message={t(online ? 'fittings.add.catalogueFailed' : 'fittings.add.catalogueOffline')}
+      onRetry={retryFittingCatalogue}
+    >
+      <span className="text-text-dim">{t('fittings.add.loadingCatalogue')}</span>
+    </FailedNote>
   );
 }
 
 /**
  * In place of "Ship data is still downloading…": that only while it is
- * downloading. When the download failed it says so, offline-aware, with Retry.
+ * downloading. When the download failed it says so, offline-aware, with
+ * Retry. Idle or ready, there is nothing to wait for: the engine is not
+ * what the panel is waiting on, so it stays quiet.
  */
 export function ShipDataWaitingNote() {
   const { t } = useTranslation();
   const status = useDogmaEngineStatus();
   const online = useOnline();
   const failed = status === 'failed';
-  useEffect(() => (failed ? onReconnect(retryShipData) : undefined), [failed]);
-  if (!failed)
-    return <p className="text-xs text-warning">{t('fittings.add.waitingForShipData')}</p>;
+  useEffect(() => (failed ? onReconnect(warmDogmaEngine) : undefined), [failed]);
+  if (status !== 'loading' && !failed) return null;
   return (
-    <div role="alert" className="flex flex-wrap items-center gap-2 text-xs text-warning">
-      <span>{t(online ? 'fittings.add.shipDataFailed' : 'fittings.stats.errorOffline')}</span>
-      <Retry onRetry={retryShipData} />
-    </div>
+    <FailedNote
+      failed={failed}
+      message={t(online ? 'fittings.add.shipDataFailed' : 'fittings.stats.errorOffline')}
+      onRetry={warmDogmaEngine}
+    >
+      <span>{t('fittings.add.waitingForShipData')}</span>
+    </FailedNote>
   );
 }

@@ -65,6 +65,8 @@ export function SaveToEveDialog({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   /** The save failed for want of a connection (the network dropped after the dialog opened). */
   const [offlineFailed, setOfflineFailed] = useState(false);
+  /** The request went out and timed out: the Fitting may or may not have been saved. */
+  const [unconfirmed, setUnconfirmed] = useState(false);
   /** The save was refused for want of the Fittings Permission, which a re-login can grant. */
   const [needsPermission, setNeedsPermission] = useState(false);
   /** Set when a save succeeded but the overwritten Fitting's delete failed — the pilot now has both. */
@@ -82,6 +84,7 @@ export function SaveToEveDialog({
     setTarget(NEW_TARGET);
     setErrorMessage(null);
     setOfflineFailed(false);
+    setUnconfirmed(false);
     setNeedsPermission(false);
     setOverwriteFailure(null);
     setMyFittingsFailed(false);
@@ -106,6 +109,7 @@ export function SaveToEveDialog({
     setSaving(true);
     setErrorMessage(null);
     setOfflineFailed(false);
+    setUnconfirmed(false);
     setNeedsPermission(false);
     try {
       if (!online) {
@@ -128,7 +132,8 @@ export function SaveToEveDialog({
         overwriteFittingId: overwriteTarget?.fitting_id,
       });
       if (!result.ok) {
-        if (result.offline) setOfflineFailed(true);
+        if (result.kind === 'offline') setOfflineFailed(true);
+        else if (result.kind === 'unconfirmed') setUnconfirmed(true);
         else if (result.needsPermission) setNeedsPermission(true);
         else setErrorMessage(result.message);
         return;
@@ -263,6 +268,11 @@ export function SaveToEveDialog({
               {t('fittings.saveToEve.offlineFailed')}
             </p>
           )
+        )}
+        {unconfirmed && (
+          <p role="alert" className="text-xs text-warning">
+            {t('fittings.saveToEve.unconfirmed')}
+          </p>
         )}
         {errorMessage && (
           <p role="alert" className="text-xs text-danger">

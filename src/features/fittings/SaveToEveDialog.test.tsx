@@ -278,13 +278,22 @@ describe('SaveToEveDialog', () => {
   });
 
   it('shows an offline message, not "Unknown error", when the save could not reach EVE', async () => {
-    saveFittingToEveMock.mockResolvedValue({ ok: false, message: 'offline', offline: true });
+    saveFittingToEveMock.mockResolvedValue({ ok: false, kind: 'offline' });
     render(
       <SaveToEveDialog open onClose={vi.fn()} characterId={1} fitting={FITTING} onSaved={vi.fn()} />
     );
     await userEvent.click(await screen.findByRole('button', { name: 'Save' }));
     expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't reach EVE");
     expect(screen.queryByText(/Unknown error/)).toBeNull();
+  });
+
+  it('says the Fitting may not have saved when the request timed out after it went out', async () => {
+    saveFittingToEveMock.mockResolvedValue({ ok: false, kind: 'unconfirmed' });
+    render(
+      <SaveToEveDialog open onClose={vi.fn()} characterId={1} fitting={FITTING} onSaved={vi.fn()} />
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Save' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('may not have been saved');
   });
 
   describe('with no connection', () => {

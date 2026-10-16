@@ -10,6 +10,7 @@ import { loadTypeNames, loadTypePackagedVolumes } from '@/features/character/typ
 import { usePilotProfile } from '@/features/fittings/fittingPilotProfile';
 import {
   useFittingCatalogue,
+  useFittingCatalogueFailed,
   type FittingCatalogue,
 } from '@/features/fittings/useFittingCatalogue';
 import { hullPackHolds } from '@/features/market/haulingCargo';
@@ -136,7 +137,13 @@ export function MovePlanTab({ onClose, characterIds, activeCharacterId }: MovePl
   const planBase = useRef<Omit<Parameters<typeof planMove>[0], 'packedShipIds'> | null>(null);
   /** Bumped on every reset so a plan still being worked out for an old session is dropped. */
   const session = useRef(0);
-  const hullSource = useRef<HullSourceData>({ catalogue: null, profile: null });
+  const hullSource = useRef<HullSourceData>({
+    catalogue: null,
+    catalogueFailed: false,
+    profile: null,
+    profileFailed: false,
+    skillsKnown: true,
+  });
   const hullHolds = useRef(new Map<number, PackHold[]>());
   const idsKey = characterIds.join(',');
   const focusAfterCommit = useFocusAfterCommit();
@@ -238,15 +245,22 @@ export function MovePlanTab({ onClose, characterIds, activeCharacterId }: MovePl
   }
 
   /**
-   * The haulers the pilot's skills size, and whether sizing was possible at
-   * all. `sizingUnavailable` is the engine or the catalogue data missing (the
-   * ship data never downloaded, offline), which "no hauler you can fly" would
-   * misreport as the pilot's skills.
+   * The haulers the pilot's skills size, and whether sizing was possible.
+   * `sizing` is `unavailable` when the data it needs is missing for good (the
+   * ship data never downloaded, the pilot's skills unread), and `loading` when
+   * it is merely not in yet; "no hauler you can fly" would misreport either as
+   * the pilot's skills.
    */
-  async function loadHulls(): Promise<{ hulls: MoveHull[]; sizingUnavailable: boolean }> {
-    const { catalogue, profile } = hullSource.current;
-    if (!loaded) return { hulls: [], sizingUnavailable: false };
-    if (!catalogue || !profile) return { hulls: [], sizingUnavailable: true };
+  async function loadHulls(): Promise<{
+    hulls: MoveHull[];
+    sizing: PlanState['haulerSizing'];
+  }> {
+    const { catalogue, catalogueFailed, profile, profileFailed, skillsKnown } = hullSource.current;
+    if (!loaded) return { hulls: [], sizing: undefined };
+    if (catalogueFailed || profileFailed || !skillsKnown) {
+      return { hulls: [], sizing: 'unavailable' };
+    }
+    if (!catalogue || !profile) return { hulls: [], sizing: 'loading' };
     const haulers =
       buildHullCatalogue([...catalogue.groupsById.values()], catalogue.marketTypes).find(
         (c) => c.name === HAULER_CLASS
@@ -282,7 +296,7 @@ export function MovePlanTab({ onClose, characterIds, activeCharacterId }: MovePl
       owned: owned.has(h.typeId),
       canFly: flyable[i],
     }));
-    return { hulls, sizingUnavailable: sizingFailures > 0 && hulls.length === 0 };
+    return { hulls, sizing: sizingFailures > 0 && hulls.length === 0 ? 'unavailable' : undefined };
   }
 
   async function showPlan() {
@@ -303,7 +317,7 @@ export function MovePlanTab({ onClose, characterIds, activeCharacterId }: MovePl
               .then((place) => place.systemId)
               .catch(() => null)
           : destSystem;
-      const { hulls, sizingUnavailable } = await loadHulls();
+      const { hulls, sizing } = await loadHulls();
       const base = {
         destinationLocationIds: atDestination,
         characters: selectedPlanCharacters(loaded.sources, loaded.shipTypeIds, selected),
@@ -321,7 +335,7 @@ export function MovePlanTab({ onClose, characterIds, activeCharacterId }: MovePl
           destinationStation:
             destStation !== null ? (loaded.places.get(destStation) ?? null) : null,
           pickupSystems: loaded.systems,
-          haulerSizingUnavailable: sizingUnavailable,
+          haulerSizing: sizing,
         });
         focusAfterCommit(planHeadingRef);
       }
@@ -552,7 +566,11 @@ function coveredLocations(
 
 interface HullSourceData {
   catalogue: FittingCatalogue | null;
+  catalogueFailed: boolean;
   profile: PilotProfile | null;
+  profileFailed: boolean;
+  /** False when the pilot's skills could not be read, so `profile` assumes none and "can fly" means nothing. */
+  skillsKnown: boolean;
 }
 
 /**
@@ -567,9 +585,10 @@ function HullSource({
   intoRef: { current: HullSourceData };
 }) {
   const catalogue = useFittingCatalogue();
-  const { profile } = usePilotProfile(characterId);
+  const catalogueFailed = useFittingCatalogueFailed();
+  const { profile, failed: profileFailed, skillsKnown } = usePilotProfile(characterId);
   useEffect(() => {
-    intoRef.current = { catalogue, profile };
-  }, [intoRef, catalogue, profile]);
+    intoRef.current = { catalogue, catalogueFailed, profile, profileFailed, skillsKnown };
+  }, [intoRef, catalogue, catalogueFailed, profile, profileFailed, skillsKnown]);
   return null;
 }

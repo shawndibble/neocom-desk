@@ -10,6 +10,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, EmptyState, SegmentedControl, Spinner } from '@/components/ui';
 import { intParam } from '@/lib/urlState';
+import { useRetryFocus } from '@/lib/useRetryFocus';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { useUrlParam } from '@/lib/useUrlState';
 import type { ShipTreeShip } from '@/sde/types';
@@ -36,13 +37,27 @@ export function ShipTreeTab() {
   const characterId = useActiveCharacter((state) => state.activeCharacterId);
   const { source, retry } = useShipTreeData(characterId);
   const online = useOnline();
+  // Retry unmounts while the tree loads, so the always-mounted wrapper holds focus meanwhile.
+  const [focusRef, , holdFocus] = useRetryFocus<HTMLDivElement>(
+    source === 'failed' ? 'failed' : source ? 'ok' : 'busy',
+    characterId
+  );
   return (
-    <div className="space-y-2">
+    <div ref={focusRef} tabIndex={-1} className="space-y-2 focus:outline-none">
       {source === 'failed' ? (
         <EmptyState
           title={t('ships.tree.loadFailed')}
           hint={t(online ? 'ships.tree.loadFailedHint' : 'ships.tree.loadFailedOffline')}
-          action={<Button onClick={retry}>{t('ships.tree.retry')}</Button>}
+          action={
+            <Button
+              onClick={() => {
+                holdFocus();
+                retry();
+              }}
+            >
+              {t('common.retry')}
+            </Button>
+          }
         />
       ) : source ? (
         <ShipTree source={source} />
@@ -96,7 +111,7 @@ function ShipTree({ source }: { source: ShipTreeSource }) {
         <p className="flex flex-wrap items-center gap-2 text-xs text-text-dim">
           <span>{t('ships.tree.masteriesUnavailable')}</span>
           <Button size="sm" onClick={source.retryMasteries}>
-            {t('ships.tree.retry')}
+            {t('common.retry')}
           </Button>
         </p>
       )}

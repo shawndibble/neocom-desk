@@ -95,6 +95,12 @@ function subscribeStatus(listener: () => void): () => void {
   return () => void statusListeners.delete(listener);
 }
 
+/** Test-only: forgets a failure and the retry count a previous test left in the module. */
+export function resetFittingCatalogueStatusForTests(): void {
+  loadFailed = false;
+  loadEpoch = 0;
+}
+
 /** Tries the catalogue files again. A no-op unless the last load failed, so several callers retrying together load once. */
 export function retryFittingCatalogue(): void {
   if (!loadFailed) return;
@@ -127,6 +133,8 @@ export function useFittingCatalogue(): FittingCatalogue | null {
   const failed = useFittingCatalogueFailed();
   useEffect(() => {
     let cancelled = false;
+    // A new attempt starts clean: an earlier failure is not this one's.
+    setLoadFailed(false);
     void Promise.all([
       loadTypes(),
       loadFittingSlots(),

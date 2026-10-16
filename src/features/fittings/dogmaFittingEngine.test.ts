@@ -238,6 +238,17 @@ describe('loadDogmaEngine status', () => {
     expect(dogmaEngineStatus()).toBe('ready');
   });
 
+  it('tells a progress callback that joined a load someone else started', async () => {
+    stubNetwork();
+    const { loadDogmaEngine, warmDogmaEngine } = await freshModule();
+    warmDogmaEngine();
+    const reports: number[] = [];
+
+    await loadDogmaEngine((progress) => reports.push(progress.loadedBytes));
+
+    expect(reports.length).toBeGreaterThan(0);
+  });
+
   it('publishes failed after a refused download, then loading again on a retry', async () => {
     vi.stubGlobal(
       'fetch',

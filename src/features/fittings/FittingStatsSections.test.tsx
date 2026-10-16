@@ -782,19 +782,19 @@ describe('FittingStatsSections — a failed calculation', () => {
     expect(onRetry).toHaveBeenCalledOnce();
   });
 
+  afterEach(() => {
+    Reflect.deleteProperty(navigator, 'onLine');
+    setDogmaEngineStatus('idle');
+  });
+
   it('offline with the ship data never downloaded: says it needs a one-time download', () => {
     Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => false });
     setDogmaEngineStatus('failed');
-    try {
-      renderFailed('shipData');
-      expect(screen.getByRole('alert')).toHaveTextContent(
-        'Fitting stats need a one-time ~10 MB download. Connect once to enable them.'
-      );
-      expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy();
-    } finally {
-      Reflect.deleteProperty(navigator, 'onLine');
-      setDogmaEngineStatus('idle');
-    }
+    renderFailed('shipData');
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Fitting stats need a one-time ~10 MB download. Connect once to enable them.'
+    );
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy();
   });
 
   it('names the Character’s skills when those are what failed', () => {
