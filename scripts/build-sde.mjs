@@ -97,7 +97,12 @@ const DELVE_REGION_ID = 10000060;
 // Jita: the game's busiest system, used as the jump graph's canary — if the
 // stargate join ever produces nothing, it shows up here first.
 const JITA_SYSTEM_ID = 30000142;
-const MARKET_REGIONS_MIN = 78;
+// Regions with live orders, as counted against ESI on 2026-10-15: 77 = 68
+// known-space + 9 wormhole (C-R00012 had emptied since the last bake's 10).
+// Wormhole player markets come and go, so the floor sits under the stable
+// known-space count, not the last total. A failing probe throws; this band
+// catches ESI silently answering empty for many regions (issue #3891).
+const MARKET_REGIONS_MIN = 65;
 const MARKET_REGIONS_MAX = 116;
 // Ore, ice and moon-ore types carrying attribute 790 (Reprocessing Skill), as
 // counted against the bake on 2026-09-14: 338. A join that silently breaks
@@ -520,8 +525,8 @@ async function fetchAllMarketTypeIds(regionId) {
  * Probes every candidate region for a non-empty market-types listing rather
  * than trusting NPC-station presence or a hand-written exclusion list — 31
  * nullsec regions have no NPC station and still carry busy player-structure
- * markets, while wormhole/Abyssal/dev regions never carry orders at all
- * (GLOSSARY.md). Results are cached to disk (like the CSV downloads), so
+ * markets, wormhole regions carry orders only while a public player-structure
+ * market is up, and Abyssal/dev regions never do (GLOSSARY.md). Results are cached to disk (like the CSV downloads), so
  * repeated local builds do not re-probe ~150 regions against ESI every time.
  */
 async function probeMarketRegions(candidates) {

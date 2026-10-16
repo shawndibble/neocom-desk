@@ -9,7 +9,11 @@ import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharact
 import { usePublicInfo } from '@/stores/publicInfo';
 import { useMarketHub } from '@/features/market/hub';
 import { useMarketBrowserHub } from '@/features/market/browserHub';
-import { useLocationMode, DEFAULT_LOCATION_MODE } from '@/features/market/locationMode';
+import {
+  useLocationMode,
+  DEFAULT_LOCATION_MODE,
+  LOCATION_MODE_SETTING_KEY,
+} from '@/features/market/locationMode';
 import {
   useBrowserFilterSetting,
   DEFAULT_BROWSER_FILTER_SETTING,
@@ -1992,6 +1996,21 @@ describe('Shareable Market Browser URLs (issue #4)', () => {
     expect(await screen.findByRole('heading', { name: 'Rifter', level: 2 })).toBeInTheDocument();
     const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
     expect(within(sellTable).queryByText('2,000,000')).not.toBeInTheDocument();
+  });
+
+  it('a stored region no longer among the Market Regions falls back to the hub region (issue #3891)', async () => {
+    server.use(ordersHandler({ count: 0 }));
+    // A wormhole region whose market emptied between SDE bakes.
+    await db.settings.put({
+      key: LOCATION_MODE_SETTING_KEY,
+      value: { mode: 'region', regionId: 11000012 },
+    });
+    window.history.pushState({}, '', '/market?type=587');
+    render(<App />);
+
+    // Still Region mode, over the Jita hub's region: the player structure shows.
+    const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
+    expect(await within(sellTable).findByText('2,000,000')).toBeInTheDocument();
   });
 
   it('does not touch the URL while the user is still typing a search', async () => {
