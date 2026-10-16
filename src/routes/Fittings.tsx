@@ -26,6 +26,7 @@ import {
 } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { AddRow } from '@/components/ui/icons';
+import { AbyssalRunPlanner } from '@/features/fittings/AbyssalRunPlanner';
 import { AbyssalWeatherPicker } from '@/features/fittings/AbyssalWeatherPicker';
 import { SkillsUnknownNote } from '@/features/fittings/FittingPreviewPanels';
 import { StatFields } from '@/features/fittings/StatFacts';
@@ -632,6 +633,11 @@ function FittingsPage() {
             <TacticalModePicker fitting={fitting} onChange={edit} />
             <AbyssalWeatherPicker field />
           </StatFields>
+          <AbyssalRunPlanner
+            hullGroupId={catalogue?.types[String(fitting.shipTypeId)]?.groupID}
+            compare={workspace.compareWeather}
+            typeName={typeName}
+          />
           {gaps && gaps.missing.length > 0 && activeCharacterId !== null && (
             <MissingSkillsChip
               entries={gaps.missing}

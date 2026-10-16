@@ -144,6 +144,13 @@ export interface FittingEvaluation {
   explainModule: ((moduleIndex: number) => Promise<AffectedAttribute[]>) | null;
   /** "What to train"; null until the pilot, the Damage Profile and the engine are ready. */
   skillGains: SkillGainEvaluator | null;
+  /**
+   * The open Fitting in normal space and inside Abyssal weather
+   * `weatherTypeId`, both without overheat and under everything else the
+   * page is worked out under (the Abyssal run plan). Null until ready.
+   */
+  compareWeather:
+    ((weatherTypeId: number) => Promise<{ before: FittingStats; after: FittingStats }>) | null;
 }
 
 /**
@@ -432,6 +439,20 @@ export function useFittingEvaluation({
     };
   }, [fitting, pilot, damageProfile, conditions, engine]);
 
+  const compareWeather = useMemo(() => {
+    if (fitting === null || pilot === null || damageProfile === null) return null;
+    return async (weatherTypeId: number) => {
+      const under = (weather: number | null) =>
+        statsUnder(
+          fitting,
+          { pilot, damageProfile, conditions: { ...conditions, weatherTypeId: weather } },
+          { overheated: false }
+        );
+      const [before, after] = await Promise.all([under(null), under(weatherTypeId)]);
+      return { before, after };
+    };
+  }, [fitting, pilot, damageProfile, conditions]);
+
   const explain = useMemo(
     () =>
       fitting === null || pilot === null || damageProfile === null || engine === null
@@ -455,5 +476,6 @@ export function useFittingEvaluation({
     variants: evaluators?.variants ?? null,
     explainModule: explain,
     skillGains: evaluators?.skillGains ?? null,
+    compareWeather,
   };
 }
