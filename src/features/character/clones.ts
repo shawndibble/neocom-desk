@@ -6,7 +6,7 @@ import { extractAttributeBonuses, extractImplantSlot } from '@/features/skills/d
 import type { Attributes } from '@/engine/types';
 import { conditionalFetch, loadWithCacheStatus, type StatusResult } from '@/esi/cache';
 
-const KEY = 'clones';
+export const KEY = 'clones';
 
 /**
  * Jump clones, home location and last-jump timestamp. ESI or cache, with the

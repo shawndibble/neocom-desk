@@ -264,9 +264,9 @@ export const PREFETCH_TASKS: readonly PrefetchTask[] = [
  * only after every list task has finished, read their ids from the cache
  * rather than fetching a list again, and are optional traffic: each skips
  * itself on a metered, Data Saver or slow link (`detailPrefetchAllowed`).
- * Gated on the same scopes as the list they read, so nothing here can raise a
- * re-auth notice; the endpoints they hit themselves (`/universe/names`,
- * `/universe/structures`, LP offers, types) need no more than that.
+ * Scope-gated on the scoped endpoint each one calls (structures, implants,
+ * loyalty); names and LP offers are public. They read whichever lists exist in
+ * the cache, so a missing list scope just means nothing to warm.
  */
 export const DERIVED_PREFETCH_TASKS: readonly PrefetchTask[] = [
   {

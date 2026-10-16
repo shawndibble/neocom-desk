@@ -87,3 +87,11 @@ describe('derived prefetch phase', () => {
     expect(second).toHaveBeenCalled();
   });
 });
+
+describe('derived task scope gating', () => {
+  it('drops structure and implant warm-ups when their scopes are missing', async () => {
+    const { prefetchTasksFor } = await import('./prefetch');
+    const ids = prefetchTasksFor([], DERIVED_PREFETCH_TASKS).map((t) => t.id);
+    expect(ids).toEqual(['names']);
+  });
+});

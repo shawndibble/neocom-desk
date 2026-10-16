@@ -27,6 +27,8 @@ import { KEY as ASSETS_KEY } from './assets';
 import { KEY as CONTRACTS_KEY } from './contracts';
 import { KEYS as ORDER_KEYS } from './orders';
 import { KEY as LOYALTY_KEY } from './loyalty';
+import { KEYS as MAIL_KEYS } from './mail';
+import { KEY as CLONES_KEY } from './clones';
 import { KEYS as SKILL_KEYS, loadUniverseType } from '@/features/skills/data';
 import { loadLoyaltyStoreOffers, loadCorporationName } from '@/features/loyalty/store';
 import { contractIssuer, contractReceiver } from './contractCounterparty';
@@ -35,13 +37,10 @@ import { detailPrefetchAllowed, prefetchDetails } from './detailPrefetch';
 import { resolveNames } from './names';
 import { loadStructureName } from './structures';
 
-/** Most structures (citadels) resolved per Character per boot. */
-export const STRUCTURE_PREFETCH_LIMIT = 100;
+/** Most structures (citadels) resolved per Character per boot. Low on purpose: each one the Character is not on the ACL of is a 403, which counts against ESI's error limit. */
+export const STRUCTURE_PREFETCH_LIMIT = 30;
 /** Most LP Stores warmed per Character: the corporations they hold the most LP with. */
 export const LP_STORE_PREFETCH_LIMIT = 15;
-
-const MAIL_HEADERS_KEY = 'mail:headers';
-const CLONES_KEY = 'clones';
 
 function positive(ids: readonly (number | undefined)[]): number[] {
   return [...new Set(ids.filter((id): id is number => id !== undefined && id > 0))];
@@ -83,8 +82,8 @@ export interface StructureIds {
 
 /**
  * Structure ids found in cached assets, orders, clones and contracts, capped at
- * {@link STRUCTURE_PREFETCH_LIMIT} between the two kinds (smallest sources
- * first: orders, clones, contracts, then assets).
+ * {@link STRUCTURE_PREFETCH_LIMIT} between the two kinds (contract locations
+ * reserved first, then orders, clones and assets).
  */
 export function structureIdsFor(input: {
   assets: readonly CharacterAsset[];
@@ -139,7 +138,7 @@ export function lpStoreCorporationsFor(loyalty: readonly CharacterLoyaltyPoints[
 export async function warmNames(characterId: number): Promise<void> {
   if (!detailPrefetchAllowed()) return;
   const [headers, contracts, loyalty] = await Promise.all([
-    readCached<MailHeader[]>(characterId, MAIL_HEADERS_KEY),
+    readCached<MailHeader[]>(characterId, MAIL_KEYS.headers),
     readCached<Contract[]>(characterId, CONTRACTS_KEY),
     readCached<CharacterLoyaltyPoints[]>(characterId, LOYALTY_KEY),
   ]);
