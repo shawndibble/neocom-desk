@@ -32,6 +32,8 @@ describe('loadPriceHistory', () => {
     );
 
     const result = await loadPriceHistory(REGION_ID, TYPE_ID);
+    // A read that just succeeded is not the saved copy.
+    expect(result.fromCache).toBe(false);
     // Every field the endpoint sends, including the day's own extremes and
     // its order count — the chart's band and activity strip are drawn from
     // these, and dropping them here is what used to hide them.

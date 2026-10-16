@@ -3,7 +3,14 @@ import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
-import { DataAgeBadge, EmptyState, IconButton, Panel, Spinner } from '@/components/ui';
+import {
+  DataAgeBadge,
+  EmptyState,
+  IconButton,
+  Panel,
+  Spinner,
+  CachedNotice,
+} from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import {
   deriveEmploymentHistoryRows,
@@ -142,9 +149,7 @@ export function EmploymentHistory() {
         ) : (
           <>
             {historyResult.fromCache && (
-              <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
-                {t('common.offlineTitle')}
-              </p>
+              <CachedNotice className="px-3 pt-2" fetchedAt={historyResult.fetchedAt} />
             )}
             <div className="space-y-4 p-3">
               <EmploymentSummaryChips summary={summary} names={corpNames} />

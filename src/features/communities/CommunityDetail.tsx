@@ -18,6 +18,8 @@ import {
   useOpenAfterMenu,
   useTabsId,
   useTimedToast,
+  CachedNotice,
+  NeedsConnection,
 } from '@/components/ui';
 import { Expanded } from '@/components/ui/icons';
 import { NOTICE_MS } from '@/components/ui/useTimedToast';
@@ -26,7 +28,6 @@ import { useIsPhone } from '@/lib/useIsPhone';
 import { uidForCharacter } from '@/sync/uid';
 import { useOnline, useReconnectCount } from '@/stores/network';
 import { deleteCommunitySnapshot, loadWithSnapshot } from './communityCache';
-import { NeedsConnectionButton } from './NeedsConnectionButton';
 import { CommunityHeader } from './CommunityHeader';
 import { CommunityLibrary } from './CommunityLibrary';
 import { CommunitySharedFittings } from './CommunitySharedFittings';
@@ -251,9 +252,9 @@ export function CommunityDetail({
         actions={
           admin &&
           (!online ? (
-            <NeedsConnectionButton size="sm">
-              {t('communities.manage.trigger')}
-            </NeedsConnectionButton>
+            <NeedsConnection>
+              <Button size="sm">{t('communities.manage.trigger')}</Button>
+            </NeedsConnection>
           ) : (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -347,11 +348,7 @@ export function CommunityDetail({
             />
           ) : (
             <Panel>
-              {membersCached && (
-                <p role="status" className="mb-2 text-[0.6875rem] text-warning uppercase">
-                  {t('common.offlineTitle')}
-                </p>
-              )}
+              {membersCached && <CachedNotice className="mb-2" fetchedAt={null} />}
               {membersFailed ? (
                 <div className="flex flex-wrap items-center gap-2">
                   <p role="alert" className="min-w-0 flex-1 text-xs text-danger">

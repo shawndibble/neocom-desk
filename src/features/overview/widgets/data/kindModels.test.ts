@@ -168,6 +168,11 @@ describe('netWorth', () => {
     history: [],
   });
 
+  it('is history, not a cached read: it never sets fromCache, so the header notice stays off online', () => {
+    const view = buildView('netWorth', { netWorth: ok({ characters: [char(91)] }) }, ctx());
+    expect(view.fromCache).toBe(false);
+  });
+
   it('stacks the recorded layers in bar order with a legend, and no contracts layer', () => {
     const view = buildView('netWorth', { netWorth: ok({ characters: [char(91)] }) }, ctx());
     expect(view.number.iskAmount).toBe(12_000);

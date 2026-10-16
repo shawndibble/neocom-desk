@@ -73,6 +73,15 @@ function cached<T>(data: T): StatusResult<T> {
   return { cached: result, needsReauth: false };
 }
 
+/** A read that fell back to its saved copy, an hour older than a fresh one. */
+function savedCopy<T>(data: T): StatusResult<T> {
+  const result = cached(data).cached!;
+  return {
+    cached: { ...result, fromCache: true, fetchedAt: new Date(NOW - HOUR) },
+    needsReauth: false,
+  };
+}
+
 function tracking(
   overrides: Partial<CorporationMemberTracking> & { character_id: number }
 ): CorporationMemberTracking {
@@ -207,6 +216,29 @@ describe('access (AC1)', () => {
     await waitFor(() => expect(mocked.loadCorporationId).toHaveBeenCalled());
     expect(mocked.loadCorporationMemberIds).not.toHaveBeenCalled();
     expect(mocked.loadCorporationMemberTracking).not.toHaveBeenCalled();
+  });
+});
+
+describe('the cached data notice', () => {
+  it('says nothing while every read is fresh', async () => {
+    await rosterTable();
+    expect(screen.queryByText('Showing cached data')).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['the roster read', 'loadCorporationMemberIds', [1001, 1002]],
+    ['the tracking read', 'loadCorporationMemberTracking', [tracking({ character_id: 1001 })]],
+  ] as const)('shows it, aged, when %s is the saved copy', async (_name, loader, data) => {
+    (mocked[loader] as ReturnType<typeof vi.fn>).mockResolvedValue(savedCopy(data));
+    renderMembers();
+    expect(await screen.findByText('Showing cached data')).toBeInTheDocument();
+    expect(screen.getByText('1h ago', { selector: 'p time' })).toBeInTheDocument();
+  });
+
+  it('ignores a saved-copy roles read, which only feeds an optional column', async () => {
+    mocked.loadCorporationMemberRoles.mockResolvedValue(savedCopy([]));
+    await rosterTable();
+    expect(screen.queryByText('Showing cached data')).not.toBeInTheDocument();
   });
 });
 

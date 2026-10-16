@@ -200,6 +200,34 @@ describe('loadOtherCharactersAssetsDetailed', () => {
     expect(skipped).toEqual([{ characterId: THIRD_ID, name: 'Offline Pilot' }]);
   });
 
+  it('dates the read by the oldest saved-copy list, and by none when every list is live', async () => {
+    const savedAt = Date.now() - 5 * 3_600_000;
+    await db.esiCache.put({
+      characterId: OTHER_ID,
+      key: 'assets',
+      value: [ASSET(2)],
+      fetchedAt: savedAt,
+    });
+    server.use(
+      // ESI is down for the Character whose list is saved; the other answers live.
+      http.get(`${ESI_BASE_URL}/characters/${OTHER_ID}/assets`, () => HttpResponse.error()),
+      http.get(`${ESI_BASE_URL}/characters/${THIRD_ID}/assets`, () =>
+        HttpResponse.json([ASSET(3)], { headers: { 'X-Pages': '1' } })
+      )
+    );
+    const mixed = await loadOtherCharactersAssetsDetailed([OTHER_ID, THIRD_ID]);
+    expect(mixed.entries.map((e) => e.characterId).sort()).toEqual([OTHER_ID, THIRD_ID]);
+    expect(mixed.cachedAt).toBe(savedAt);
+
+    await db.esiCache.clear();
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${OTHER_ID}/assets`, () =>
+        HttpResponse.json([ASSET(2)], { headers: { 'X-Pages': '1' } })
+      )
+    );
+    expect((await loadOtherCharactersAssetsDetailed([OTHER_ID, THIRD_ID])).cachedAt).toBeNull();
+  });
+
   it('skips nobody when every Character loads', async () => {
     server.use(
       http.get(`${ESI_BASE_URL}/characters/${OTHER_ID}/assets`, () =>

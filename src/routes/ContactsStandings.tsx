@@ -10,6 +10,7 @@ import {
   Spinner,
   StandingIcon,
   type DataTableColumn,
+  CachedNotice,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { GrantBanner } from '@/app/GrantNote';
@@ -28,7 +29,6 @@ import { useUrlSort } from '@/lib/useUrlState';
 const STANDINGS_SORT = { columnId: 'standing', direction: 'desc' } as const;
 const COLUMN_IDS = ['name', 'kind', 'standing', 'fees'] as const;
 const FEE_OWNERS = feeOwnerIds();
-const OFFLINE_NOTE_CLASS = 'text-[0.6875rem] text-warning uppercase';
 
 /**
  * The Contacts page's Standings tab (issue #2859): the Character's NPC faction,
@@ -192,7 +192,7 @@ export function useContactsStandings(characterId: number, enabled: boolean) {
   } else if (state.rows.length === 0) {
     content = (
       <div className="space-y-3">
-        {state.fromCache && <p className={OFFLINE_NOTE_CLASS}>{t('common.offlineTitle')}</p>}
+        {state.fromCache && <CachedNotice fetchedAt={state.fetchedAt} />}
         <EmptyState
           title={t('contacts.standingsEmptyTitle')}
           hint={t('contacts.standingsEmptyHint')}
@@ -202,7 +202,7 @@ export function useContactsStandings(characterId: number, enabled: boolean) {
   } else {
     content = (
       <div className="space-y-3">
-        {state.fromCache && <p className={OFFLINE_NOTE_CLASS}>{t('common.offlineTitle')}</p>}
+        {state.fromCache && <CachedNotice fetchedAt={state.fetchedAt} />}
         <SearchInput
           value={text}
           onChange={(event) => setText(event.target.value)}

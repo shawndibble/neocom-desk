@@ -12,6 +12,8 @@ import { sortPriceHistory, type MarketHistoryPoint } from '@/engine/market/price
 export interface PriceHistoryResult {
   points: MarketHistoryPoint[];
   fetchedAt: number;
+  /** The series is the saved copy: the live read failed or the app is offline. */
+  fromCache?: boolean;
 }
 
 /**
@@ -73,5 +75,5 @@ export async function loadPriceHistory(
       orderCount: entry.order_count,
     }))
   );
-  return { points, fetchedAt: cached.fetchedAt.getTime() };
+  return { points, fetchedAt: cached.fetchedAt.getTime(), fromCache: cached.fromCache };
 }

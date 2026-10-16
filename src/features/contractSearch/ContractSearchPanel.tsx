@@ -45,6 +45,7 @@ import {
   IskAmount,
   LiveStatus,
   type DataTableColumn,
+  CachedNotice,
 } from '@/components/ui';
 import {
   CONTRACT_SEARCH_ITEMS_COLUMN_IDS,
@@ -1090,20 +1091,18 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
         ) : (
           <>
             {activeResult?.fromCache && (
-              <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
-                {/*
-                  A Refresh that still falls back to cache is a more alarming
-                  case than the first load finding cache — same banner, different
-                  copy. It is also how a background revalidation that failed
-                  reaches the screen: `esi/cache.ts` re-serves the stored row
-                  with `fromCache` set once the late call reports a failure, so
-                  a refresh that never lands is stated rather than left standing
-                  as a loading state.
-                */}
-                {active.refreshCount > 0
-                  ? t('common.refreshFailedTitle')
-                  : t('common.offlineTitle')}
-              </p>
+              // A Refresh that still falls back to cache is a more alarming
+              // case than the first load finding cache — same banner, different
+              // copy. It is also how a background revalidation that failed
+              // reaches the screen: `esi/cache.ts` re-serves the stored row
+              // with `fromCache` set once the late call reports a failure, so
+              // a refresh that never lands is stated rather than left standing
+              // as a loading state.
+              <CachedNotice
+                className="px-3 pt-2"
+                fetchedAt={activeResult.fetchedAt}
+                refreshFailed={active.refreshCount > 0}
+              />
             )}
             {revalidating && (
               // The visible half of stale-serve: these rows are last publish

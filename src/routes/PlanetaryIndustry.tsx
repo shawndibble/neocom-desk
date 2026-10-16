@@ -13,6 +13,7 @@ import {
   TabPanel,
   Tabs,
   useTabsId,
+  CachedNotice,
 } from '@/components/ui';
 import { PageSettingsButton } from '@/features/settings/PageSettingsModal';
 import { PiSettingsForm } from '@/features/settings/PiSettingsForm';
@@ -97,11 +98,8 @@ export function PlanetaryIndustry() {
   const [explainerOpen, setExplainerOpen] = useState(false);
   const [{ type: seedTypeId, goals, off: disabledColonies, colony: linkedColonyId }, setPiParams] =
     useUrlParams(PI_URL_PARAMS);
-  const { data, error, loading, hydrated, activeCharacterId, refresh } = useRouteSnapshot(
-    loadPiSnapshot,
-    undefined,
-    { cacheKey: 'planetary-industry' }
-  );
+  const { data, error, loading, hydrated, activeCharacterId, refresh, refreshCount } =
+    useRouteSnapshot(loadPiSnapshot, undefined, { cacheKey: 'planetary-industry' });
   // Show info for every item name and menu on the three tabs.
   const itemActions = usePageItemActions({ activeCharacterId, lazyBlueprints: true });
 
@@ -199,6 +197,10 @@ export function PlanetaryIndustry() {
             hint={t('pi.reauthHint')}
             actionLabel={t('pi.reauthAction')}
           />
+        )}
+
+        {planetsResult?.fromCache && (
+          <CachedNotice fetchedAt={planetsResult.fetchedAt} refreshFailed={refreshCount > 0} />
         )}
 
         <Tabs

@@ -19,7 +19,6 @@ import {
   Spinner,
 } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
-import { NeedsConnectionButton } from '@/features/communities/NeedsConnectionButton';
 import { db } from '@/db';
 import { CharacterSharePicker } from '@/features/communities/SharePicker';
 import { publishSharedLibrary } from '@/features/communities/libraryPush';
@@ -311,14 +310,16 @@ export function CommunityJoin() {
                   })}
                 </ul>
                 <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <NeedsConnectionButton
-                    variant="primary"
-                    loading={working}
-                    disabled={chosen.length === 0}
-                    onClick={() => void join()}
-                  >
-                    {t('communities.join.joinAction', { count: totalShared })}
-                  </NeedsConnectionButton>
+                  <NeedsConnection>
+                    <Button
+                      variant="primary"
+                      loading={working}
+                      disabled={chosen.length === 0}
+                      onClick={() => void join()}
+                    >
+                      {t('communities.join.joinAction', { count: totalShared })}
+                    </Button>
+                  </NeedsConnection>
                   <NeedsConnection>
                     <Button onClick={logIn} disabled={loggingIn || working}>
                       {t('communities.join.another')}

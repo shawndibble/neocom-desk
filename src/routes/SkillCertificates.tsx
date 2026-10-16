@@ -13,6 +13,7 @@ import {
   SelectValue,
   Spinner,
   Toast,
+  CachedNotice,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { PlanEntry } from '@/engine/types';
@@ -287,6 +288,7 @@ export function SkillCertificates() {
         }
       />
       <SkillsSubNav />
+      {data.fromCache && <CachedNotice fetchedAt={data.fetchedAt} />}
       {body}
       {added && (
         <Toast
