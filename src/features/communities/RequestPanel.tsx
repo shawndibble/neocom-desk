@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GrantMissingLink } from '@/app/GrantMissingLink';
 import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
-import { SlideOver } from '@/components/ui';
+import { SlideOver, NeedsConnection, Button } from '@/components/ui';
 import { permissionsForEndpoints } from '@/esi/registry';
 import { pledgeEntryAfterManual } from '@/engine/communities/delivery';
 import {
@@ -44,7 +44,6 @@ import {
   setRequestClosed,
   updateMyPledge,
 } from './requestStore';
-import { NeedsConnectionButton } from './NeedsConnectionButton';
 
 const DELIVERY_GROUPS = permissionsForEndpoints(DELIVERY_ENDPOINTS);
 const SEND_MAIL = ['postCharacterMail'] as const;
@@ -358,14 +357,16 @@ export function RequestPanel({
                         count: Object.keys(pledge.lines).length,
                       })}
                     </span>
-                    <NeedsConnectionButton
-                      size="sm"
-                      variant="ghost"
-                      aria-label={t('communities.board.admin.removePledgeFor', { name })}
-                      onClick={() => setRemoving({ kind: 'pledge', uid: pledge.uid, name })}
-                    >
-                      {t('communities.board.admin.removePledge')}
-                    </NeedsConnectionButton>
+                    <NeedsConnection>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        aria-label={t('communities.board.admin.removePledgeFor', { name })}
+                        onClick={() => setRemoving({ kind: 'pledge', uid: pledge.uid, name })}
+                      >
+                        {t('communities.board.admin.removePledge')}
+                      </Button>
+                    </NeedsConnection>
                   </li>
                 );
               })}
@@ -374,55 +375,61 @@ export function RequestPanel({
         )}
         {isAdmin && (
           <div>
-            <NeedsConnectionButton
-              size="sm"
-              variant="danger"
-              onClick={() => setRemoving({ kind: 'request' })}
-            >
-              {t('communities.board.admin.removeRequest')}
-            </NeedsConnectionButton>
+            <NeedsConnection>
+              <Button size="sm" variant="danger" onClick={() => setRemoving({ kind: 'request' })}>
+                {t('communities.board.admin.removeRequest')}
+              </Button>
+            </NeedsConnection>
           </div>
         )}
         {mine && (
           <div className="flex flex-wrap gap-2">
             {request.closed ? (
-              <NeedsConnectionButton
-                size="sm"
-                loading={busy === 'close'}
-                onClick={() =>
-                  void run('close', () =>
-                    setRequestClosed(characterId, communityId, request.id, false)
-                  )
-                }
-              >
-                {t('communities.board.reopen')}
-              </NeedsConnectionButton>
-            ) : (
-              <>
-                <NeedsConnectionButton size="sm" onClick={onEdit}>
-                  {t('communities.board.edit')}
-                </NeedsConnectionButton>
-                <NeedsConnectionButton
+              <NeedsConnection>
+                <Button
                   size="sm"
-                  loading={busy === 'extend'}
-                  onClick={() =>
-                    void run('extend', () => extendRequest(characterId, communityId, request.id))
-                  }
-                >
-                  {t('communities.board.extend')}
-                </NeedsConnectionButton>
-                <NeedsConnectionButton
-                  size="sm"
-                  variant="ghost"
                   loading={busy === 'close'}
                   onClick={() =>
                     void run('close', () =>
-                      setRequestClosed(characterId, communityId, request.id, true)
+                      setRequestClosed(characterId, communityId, request.id, false)
                     )
                   }
                 >
-                  {t('communities.board.close')}
-                </NeedsConnectionButton>
+                  {t('communities.board.reopen')}
+                </Button>
+              </NeedsConnection>
+            ) : (
+              <>
+                <NeedsConnection>
+                  <Button size="sm" onClick={onEdit}>
+                    {t('communities.board.edit')}
+                  </Button>
+                </NeedsConnection>
+                <NeedsConnection>
+                  <Button
+                    size="sm"
+                    loading={busy === 'extend'}
+                    onClick={() =>
+                      void run('extend', () => extendRequest(characterId, communityId, request.id))
+                    }
+                  >
+                    {t('communities.board.extend')}
+                  </Button>
+                </NeedsConnection>
+                <NeedsConnection>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    loading={busy === 'close'}
+                    onClick={() =>
+                      void run('close', () =>
+                        setRequestClosed(characterId, communityId, request.id, true)
+                      )
+                    }
+                  >
+                    {t('communities.board.close')}
+                  </Button>
+                </NeedsConnection>
               </>
             )}
           </div>

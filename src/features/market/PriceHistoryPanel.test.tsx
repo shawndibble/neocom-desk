@@ -88,6 +88,28 @@ describe('PriceHistoryPanel', () => {
     expect(screen.getByTestId('chart')).toHaveTextContent('Tritanium: 1 points');
   });
 
+  it('says the series is a saved copy, with its age, only when the read fell back to the cache', async () => {
+    const points = [historyPoint({ date: '2026-08-01', average: 5, volume: 50 })];
+    mockedLoad.mockResolvedValueOnce({
+      points,
+      fetchedAt: Date.now() - 3 * 3_600_000,
+      fromCache: true,
+    });
+    const { unmount } = render(
+      <PriceHistoryPanel regionId={10000002} typeId={34} itemName="Tritanium" now={FIXED_NOW} />
+    );
+    expect(await screen.findByText('Showing cached data')).toBeInTheDocument();
+    expect(screen.getByText('3h ago')).toBeInTheDocument();
+    unmount();
+
+    mockedLoad.mockResolvedValueOnce({ points, fetchedAt: Date.now(), fromCache: false });
+    render(
+      <PriceHistoryPanel regionId={10000002} typeId={34} itemName="Tritanium" now={FIXED_NOW} />
+    );
+    await waitFor(() => expect(screen.getByTestId('chart')).toBeInTheDocument());
+    expect(screen.queryByText('Showing cached data')).not.toBeInTheDocument();
+  });
+
   it('re-fetches when the region or type changes', async () => {
     mockedLoad.mockResolvedValue({ points: [], fetchedAt: 1_000_000 });
     const { rerender } = render(

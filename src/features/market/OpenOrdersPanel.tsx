@@ -38,6 +38,7 @@ import {
   Spinner,
   textActionClassName,
   type DataTableColumn,
+  CachedNotice,
 } from '@/components/ui';
 import { useColumnVisibility } from '@/lib/columnVisibility';
 import * as Icon from '@/components/ui/icons';
@@ -806,9 +807,7 @@ export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
               hint={t('market.orders.assumesBaseStandingsHint')}
             />
           ))}
-          {fromCacheAny && (
-            <p className="text-[0.6875rem] text-warning uppercase">{t('common.offlineTitle')}</p>
-          )}
+          {fromCacheAny && <CachedNotice fetchedAt={oldestFetchedAt} />}
           {skipped.map((s) => (
             <p key={s.characterId} className="text-xs text-text-dim">
               {s.name} — {t('market.orders.characterNotShared')}

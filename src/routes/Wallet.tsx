@@ -17,6 +17,7 @@ import {
   Tabs,
   useTabsId,
   type DataTableColumn,
+  CachedNotice,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
@@ -323,6 +324,15 @@ export function Wallet() {
     []
   );
   const walletBalancesLoading = walletBalancesSnapshot === null;
+  // The all-characters totals add up one balance read per character: if any of
+  // them is the saved copy the total is only as fresh as the oldest of those.
+  const walletBalancesCachedAt = useMemo(() => {
+    const shown = new Set(multiCharacters.map((c) => c.characterId));
+    const times = (walletBalancesSnapshot?.entries ?? [])
+      .filter((e) => shown.has(e.characterId) && e.balanceResult?.fromCache)
+      .map((e) => e.balanceResult?.fetchedAt.getTime() ?? 0);
+    return times.length > 0 ? Math.min(...times) : null;
+  }, [walletBalancesSnapshot, multiCharacters]);
 
   // Opt-in: fetched only once the Journal tab is open, and kept alive once
   // visited, so a tab toggle doesn't walk the cursor again.
@@ -346,10 +356,6 @@ export function Wallet() {
     refresh();
     personalFills.refresh();
   };
-
-  // A manual Refresh that still falls back to cache is a more alarming case
-  // than the initial load finding cache first — same banner, different copy.
-  const offlineTitleKey = refreshCount > 0 ? 'common.refreshFailedTitle' : 'common.offlineTitle';
 
   const balanceResult = data?.balanceResult ?? null;
   const balanceNeedsReauth = data?.balanceNeedsReauth ?? false;
@@ -604,6 +610,11 @@ export function Wallet() {
                 mode="multi"
                 characters={multiCharacters}
                 liveWallet={liveWallet}
+                notices={
+                  walletBalancesCachedAt !== null && (
+                    <CachedNotice className="mt-3" fetchedAt={walletBalancesCachedAt} />
+                  )
+                }
                 filterMeta={walletCharacterFilterMeta}
                 onDrill={drillInto}
                 onBack={leaveDrill}
@@ -658,9 +669,11 @@ export function Wallet() {
                         </div>
                       )}
                       {(balanceResult?.fromCache || loyaltyResult?.fromCache) && (
-                        <p className="mt-3 text-[0.6875rem] text-warning uppercase">
-                          {t(offlineTitleKey)}
-                        </p>
+                        <CachedNotice
+                          className="mt-3"
+                          fetchedAt={oldestFetchedAt}
+                          refreshFailed={refreshCount > 0}
+                        />
                       )}
                       {journalNeedsReauth ? (
                         <div className="mt-4">
@@ -791,9 +804,11 @@ export function Wallet() {
             ) : (
               <>
                 {journalResult.fromCache && (
-                  <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
-                    {t(offlineTitleKey)}
-                  </p>
+                  <CachedNotice
+                    className="px-3 pt-2"
+                    fetchedAt={journalResult.fetchedAt}
+                    refreshFailed={refreshCount > 0}
+                  />
                 )}
                 {journalTruncated && (
                   <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">

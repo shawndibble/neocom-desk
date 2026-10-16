@@ -13,6 +13,7 @@ import {
   TabPanel,
   Tabs,
   useTabsId,
+  CachedNotice,
 } from '@/components/ui';
 import { PageSettingsButton } from '@/features/settings/PageSettingsModal';
 import { PiSettingsForm } from '@/features/settings/PiSettingsForm';
@@ -199,6 +200,11 @@ export function PlanetaryIndustry() {
             hint={t('pi.reauthHint')}
             actionLabel={t('pi.reauthAction')}
           />
+        )}
+
+        {/* The Colonies tab draws its own, beside the list the figures belong to. */}
+        {planetsResult?.fromCache && tab !== 'colonies' && (
+          <CachedNotice fetchedAt={planetsResult.fetchedAt} />
         )}
 
         <Tabs

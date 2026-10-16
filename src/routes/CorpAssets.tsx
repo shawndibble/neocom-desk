@@ -45,6 +45,7 @@ import {
   Panel,
   SearchInput,
   Spinner,
+  CachedNotice,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { useCorpRouteGate } from '@/features/corp/useCorpRouteGate';
@@ -142,6 +143,8 @@ interface AssetsSnapshot {
   assetsShown: number;
   /** Oldest `fetchedAt` across the reads — the badge speaks for the whole view. */
   fetchedAt: Date | null;
+  /** Either read fell back to its saved copy. */
+  fromCache: boolean;
 }
 
 const EMPTY_SNAPSHOT: AssetsSnapshot = {
@@ -156,6 +159,7 @@ const EMPTY_SNAPSHOT: AssetsSnapshot = {
   truncated: false,
   assetsShown: 0,
   fetchedAt: null,
+  fromCache: false,
 };
 
 async function loadAssetsSnapshot(
@@ -217,6 +221,7 @@ async function loadAssetsSnapshot(
     truncated,
     assetsShown,
     fetchedAt,
+    fromCache: [assetsResult, divisionsResult].some((result) => result.cached?.fromCache),
   };
 }
 
@@ -608,6 +613,7 @@ function CorpAssetsView({ canReadBlueprints }: { canReadBlueprints: boolean }) {
           <EmptyState title={t('corp.assets.empty')} hint={t('corp.assets.emptyHint')} />
         ) : (
           <div className="space-y-2">
+            {data.fromCache && <CachedNotice fetchedAt={data.fetchedAt} />}
             {data.truncated && (
               <p className="text-[0.6875rem] text-warning uppercase">
                 {t('common.incompleteTitle')} —{' '}

@@ -13,7 +13,14 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Button, SEVERITY_TEXT, SeverityIcon, Tooltip, buttonClassName } from '@/components/ui';
+import {
+  Button,
+  SEVERITY_TEXT,
+  SeverityIcon,
+  Tooltip,
+  buttonClassName,
+  CachedNotice,
+} from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import { formatCountdown } from '@/lib/duration';
@@ -59,11 +66,13 @@ function useOverviewSummary(widgets: readonly Widget[]) {
     }))
   );
   const remaining = next ? next.at - now : 0;
+  const stalest = stalestFetch(all);
   return {
     next,
     remaining,
     tone: chipTone(remaining),
-    fetchedAt: stalestFetch(all).date,
+    fetchedAt: stalest.date,
+    fromCache: stalest.fromCache,
     breakdown,
     now,
   };
@@ -81,6 +90,17 @@ export function OverviewDataAge({ widgets }: { widgets: readonly Widget[] }) {
   return (
     <DataAgePopover fetchedAt={fetchedAt} breakdown={breakdown} now={now} onRefresh={refresh} />
   );
+}
+
+/**
+ * "Showing cached data · N ago" under the sub-nav when any drawn widget read
+ * from the saved copy, at every width: `OverviewDataAge` above sits on a tab
+ * row a phone has no room for, and says how old, not that it is a saved copy.
+ */
+export function OverviewCachedNotice({ widgets }: { widgets: readonly Widget[] }) {
+  const { fetchedAt, fromCache } = useOverviewSummary(widgets);
+  if (!fromCache) return null;
+  return <CachedNotice fetchedAt={fetchedAt} />;
 }
 
 /**

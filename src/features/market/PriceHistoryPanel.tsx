@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
   Spinner,
+  CachedNotice,
 } from '@/components/ui';
 import { cx } from '@/lib/cx';
 import { formatMeanCount, formatVolume } from './format';
@@ -139,6 +140,8 @@ export function PriceHistoryPanel({
     [compare?.regionIds, regionId]
   );
   const [points, setPoints] = useState<MarketHistoryPoint[] | null>(null);
+  // Set only when the series on screen is the saved copy; its age, in ms.
+  const [cachedAt, setCachedAt] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   // Nothing is fetched for a compared region until the primary one has days
   // to draw: an empty or failed primary shows its own state, with no chart
@@ -169,10 +172,14 @@ export function PriceHistoryPanel({
     void (async () => {
       setLoading(true);
       setPoints(null);
+      setCachedAt(null);
       setError(false);
       try {
         const result = await loadPriceHistory(regionId, typeId);
-        if (!cancelled) setPoints(result.points);
+        if (!cancelled) {
+          setPoints(result.points);
+          setCachedAt(result.fromCache ? result.fetchedAt : null);
+        }
       } catch {
         if (!cancelled) setError(true);
       } finally {
@@ -207,17 +214,20 @@ export function PriceHistoryPanel({
   }
 
   return (
-    <RangedHistory
-      points={points}
-      range={range}
-      onRangeChange={(next) => void setRange(next)}
-      itemName={itemName}
-      now={now}
-      primaryRegionId={regionId}
-      compare={compare}
-      compareIds={compareIds}
-      comparedHistories={comparedHistories}
-    />
+    <>
+      {cachedAt !== null && <CachedNotice className="px-1 pt-2" fetchedAt={cachedAt} />}
+      <RangedHistory
+        points={points}
+        range={range}
+        onRangeChange={(next) => void setRange(next)}
+        itemName={itemName}
+        now={now}
+        primaryRegionId={regionId}
+        compare={compare}
+        compareIds={compareIds}
+        comparedHistories={comparedHistories}
+      />
+    </>
   );
 }
 

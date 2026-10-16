@@ -26,6 +26,7 @@ import { DangerBanner } from '@/features/notifications/DangerBanner';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useIsPhone } from '@/lib/useIsPhone';
 import {
+  OverviewCachedNotice,
   OverviewCustomize,
   OverviewDataAge,
   OverviewNext,
@@ -79,6 +80,7 @@ function Board({ characterId, layout }: BoardProps) {
       />
       <OverviewSubNav trailing={<OverviewDataAge widgets={layout.widgets} />} />
       <DangerBanner />
+      <OverviewCachedNotice widgets={layout.widgets} />
       {editing && (
         <CustomizeBar onAdd={() => setGalleryOpen(true)} onRoles={() => setRolesOpen(true)} />
       )}

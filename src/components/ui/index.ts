@@ -10,6 +10,7 @@ export { STAT_CHIP_TONE_TEXT_CLASS } from './statChipTone';
 export type { StatChipTone } from './statChipTone';
 export { DataAgeBadge } from './DataAgeBadge';
 export { CachedEmptyState } from './CachedEmptyState';
+export { CachedNotice } from './CachedNotice';
 export { EmptyState } from './EmptyState';
 export { Toast } from './Toast';
 export { useTimedToast } from './useTimedToast';

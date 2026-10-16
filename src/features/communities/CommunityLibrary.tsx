@@ -15,6 +15,7 @@ import {
   SelectValue,
   Spinner,
   Tooltip,
+  CachedNotice,
 } from '@/components/ui';
 import {
   buildLibraryRows,
@@ -341,11 +342,7 @@ export function CommunityLibrary({
 
   return (
     <div className="space-y-3">
-      {loaded.cached && (
-        <p role="status" className="text-[0.6875rem] text-warning uppercase">
-          {t('common.offlineTitle')}
-        </p>
-      )}
+      {loaded.cached && <CachedNotice fetchedAt={null} />}
       <div className="flex flex-wrap items-center gap-2">
         <SearchInput
           className="min-w-40 flex-1"

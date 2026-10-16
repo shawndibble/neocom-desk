@@ -23,7 +23,7 @@
  */
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { DataAgeBadge, IconButton, PageHeader, Spinner } from '@/components/ui';
+import { CachedNotice, DataAgeBadge, IconButton, PageHeader, Spinner } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import { useCorpRouteGate } from '@/features/corp/useCorpRouteGate';
@@ -145,6 +145,8 @@ interface CorpSnapshot {
   memberNames: ReadonlyMap<number, string>;
   /** Oldest `fetchedAt` across the panels actually read — see `Corp` below. */
   oldestFetchedAt: Date | null;
+  /** Any of those panels fell back to its saved copy. */
+  fromCache: boolean;
   /** Captured in the loader: `Date.now()` in render is impure. */
   loadedAt: number;
 }
@@ -162,6 +164,7 @@ const EMPTY_SNAPSHOT: CorpSnapshot = {
   peopleHighlights: NO_PEOPLE_HIGHLIGHTS,
   memberNames: new Map(),
   oldestFetchedAt: null,
+  fromCache: false,
   loadedAt: 0,
 };
 
@@ -275,7 +278,9 @@ async function loadCorpSnapshot(
   // The oldest of the panels that were read, not the newest: the badge is a
   // promise about the whole view, and a fresh wallet must not vouch for an
   // hour-old structure list.
-  const fetchedAts = [structures, extractions, jobs, wallets, divisions, journal, roster, tracking]
+  const reads = [structures, extractions, jobs, wallets, divisions, journal, roster, tracking];
+  const fromCache = reads.some((result) => result?.cached?.fromCache);
+  const fetchedAts = reads
     .map((result) => result?.cached?.fetchedAt)
     .filter((date): date is Date => date !== undefined);
   const oldestFetchedAt =
@@ -308,6 +313,7 @@ async function loadCorpSnapshot(
     memberNames,
     typeNames,
     oldestFetchedAt,
+    fromCache,
     loadedAt,
   };
 }
@@ -439,6 +445,8 @@ function CorpBoardView({ capabilities }: { capabilities: CorpCapabilities }) {
             />
           }
         />
+
+        {data?.fromCache && <CachedNotice fetchedAt={data.oldestFetchedAt} />}
 
         {snapshot.loading && data === null ? (
           <Spinner />

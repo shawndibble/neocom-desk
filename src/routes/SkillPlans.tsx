@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { db } from '@/db';
-import { DataAgeBadge, Spinner } from '@/components/ui';
+import { DataAgeBadge, Spinner, CachedNotice } from '@/components/ui';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { scheduleSync } from '@/sync';
@@ -43,6 +43,8 @@ export function SkillPlans() {
     trainedSkillsKnown,
     attributes,
     queueEntries,
+    fetchedAt,
+    fromCache,
   } = usePlanEditorData(activeCharacterId);
   // Memoised: the list pane's per-plan costing re-runs when this changes.
   const scheduleInputs = useMemo(
@@ -120,6 +122,10 @@ export function SkillPlans() {
         meta={queueResult?.fetchedAt && <DataAgeBadge date={queueResult.fetchedAt} />}
       />
       <SkillsSubNav />
+
+      {(queueResult?.fromCache || fromCache) && (
+        <CachedNotice fetchedAt={queueResult?.fetchedAt ?? fetchedAt} />
+      )}
 
       <QueueStrip view={queueView} nowMs={nowMs} />
 
