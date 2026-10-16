@@ -9534,6 +9534,39 @@
         "ice": "Ice hold",
         "fuel": "Fuel bay",
         "infrastructure": "Infrastructure hold"
+      },
+      "rail": {
+        "title": "Trip",
+        "jumps_one": "{{count}} jump ({{preference}})",
+        "jumps_other": "{{count}} jumps ({{preference}})",
+        "laneJumps": "{{lane}} · {{jumps}}",
+        "cargoValue": "Cargo value",
+        "cargoValueAfter": "→ {{value}} with the fill",
+        "m3": "{{m3}} m³",
+        "freeWord": "free",
+        "holdLabel": "Hold used",
+        "used": "{{used}} of {{total}} m³ used",
+        "profit": "Profit",
+        "spend": "Spend",
+        "perJump": "Profit per jump",
+        "limitedSales": "A week of sales caps every item; the hold is not the limit.",
+        "limitedSpace": "The hold is full; space is the limit.",
+        "limitedBudget": "Your budget is the limit."
+      },
+      "fill": {
+        "title": "Fill the free space",
+        "find": "Find items for the free {{m3}} m³",
+        "findNote": "Scans the other categories on this lane for items that fit. It costs a scan, so it runs only when you ask.",
+        "error": "Couldn't scan the other categories.",
+        "empty": "Nothing else on this lane fits.",
+        "listLabel": "Items that fit the free space",
+        "add": "Add {{count}} · +{{m3}} m³",
+        "addDetail": "+{{spend}} spend · {{profit}} profit",
+        "holdAfter": "Hold after: {{used}} of {{total}} m³, {{free}} m³ still free."
+      },
+      "tripBar": {
+        "free": "{{m3}} m³ free",
+        "details": "Trip details"
       }
     },
     "appraisal": {
