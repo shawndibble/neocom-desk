@@ -54,8 +54,10 @@ export type AbyssalHullRule =
   | { eligible: false; reason: 'tech3Cruiser' | 'tooLarge' | 'unlisted' };
 
 const TECH3_CRUISER_GROUP = 963;
-// Interdictor, Command Destroyer, Rookie Ship, Flag Cruiser: no source names them.
-const UNCONFIRMED_GROUPS = new Set([541, 1534, 237, 1972]);
+// Interdictor, Command Destroyer: destroyer hulls no source names.
+const UNCONFIRMED_GROUPS = new Set([541, 1534]);
+// Rookie Ship, Flag Cruiser: sized by D-Scan, but no rule claimed.
+const UNLISTED_GROUPS = new Set([237, 1972]);
 const CLASS_BY_RANK = {
   1: { shipClass: 'frigate', ships: 3 },
   2: { shipClass: 'destroyer', ships: 2 },
@@ -63,7 +65,8 @@ const CLASS_BY_RANK = {
 } as const;
 
 export function abyssalHullRule(groupId: number | undefined): AbyssalHullRule {
-  if (groupId === undefined) return { eligible: false, reason: 'unlisted' };
+  if (groupId === undefined || UNLISTED_GROUPS.has(groupId))
+    return { eligible: false, reason: 'unlisted' };
   if (groupId === TECH3_CRUISER_GROUP) return { eligible: false, reason: 'tech3Cruiser' };
   const rank = hullRankOf(groupId);
   if ((rank !== null && rank > 3) || wormholeSizeForShipGroup(groupId) === 'capital')
