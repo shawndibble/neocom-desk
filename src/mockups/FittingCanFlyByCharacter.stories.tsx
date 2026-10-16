@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { DataTable, FilterChip, SearchInput, type DataTableColumn } from '@/components/ui';
+import { Caret, DataTable, FilterChip, SearchInput, type DataTableColumn } from '@/components/ui';
 import { Fittings } from '@/routes/Fittings';
 import { haulingFixtureRoutes } from '@/storybook/haulingFixtures';
 import { NewComponent } from './NewComponent';
@@ -241,7 +241,10 @@ function YourCharactersSectionRow() {
     <section className="border-b border-line">
       <div className="flex min-h-11 items-center gap-2 pr-3 pl-3 md:min-h-9">
         <h3 className="min-w-0 flex-1 text-xs font-semibold tracking-widest uppercase">
-          ▾ Your Characters
+          <span className="inline-flex items-center gap-2">
+            <Caret expanded />
+            Your Characters
+          </span>
         </h3>
         <span className="shrink-0 text-sm font-semibold tabular-nums">7 of 20 can fly</span>
       </div>
