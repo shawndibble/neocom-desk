@@ -387,12 +387,9 @@ export const MailReply = withWeight(ArrowBendUpLeft);
 export const MailForward = withWeight(ArrowBendUpRight);
 /** Start a new mail — the Compose entry on the Mail page. */
 export const MailCompose = withWeight(PencilSimple);
-/**
- * A recipient chip's image slot when there is no image: a mailing list
- * always, a character whose portrait failed. A failed corporation or alliance
- * logo takes `Corporation` / `MailAlliance`.
- */
+/** A mail recipient chip's slot for a mailing list, which has no image. */
 export const MailingList = withWeight(ListBullets);
+/** A character recipient chip's slot when the portrait fails to load. */
 export const MailCharacter = withWeight(User);
 /** Jump clones and implants. */
 export const Clones = withWeight(Stack);

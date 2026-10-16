@@ -7,9 +7,13 @@ import {
 import * as Icon from '@/components/ui/icons';
 import { allianceLogoUrl, corporationLogoUrl } from '@/lib/eveImages';
 import { cx } from '@/lib/cx';
-import type { ComposeRecipient, ComposeRecipientType } from '@/engine/mailCompose';
+import {
+  recipientKey,
+  type ComposeRecipient,
+  type ComposeRecipientType,
+} from '@/engine/mailCompose';
 
-const SIZE = 'sm';
+const AVATAR_SIZE = 'sm';
 
 const FALLBACK: Record<ComposeRecipientType, typeof Icon.MailingList> = {
   character: Icon.MailCharacter,
@@ -31,8 +35,8 @@ interface RecipientAvatarProps {
 export function RecipientAvatar({ recipient }: RecipientAvatarProps) {
   const { recipient_id: id, recipient_type: type } = recipient;
   const [failedKey, setFailedKey] = useState<string | null>(null);
-  const key = `${type}:${id}`;
-  const box = characterAvatarBoxClassName(SIZE);
+  const key = recipientKey(recipient);
+  const box = characterAvatarBoxClassName(AVATAR_SIZE);
 
   if (type === 'mailing_list' || failedKey === key) {
     const Glyph = FALLBACK[type];
@@ -48,9 +52,9 @@ export function RecipientAvatar({ recipient }: RecipientAvatarProps) {
 
   const onError = () => setFailedKey(key);
   if (type === 'character') {
-    return <CharacterAvatar characterId={id} size={SIZE} loading="lazy" onError={onError} />;
+    return <CharacterAvatar characterId={id} size={AVATAR_SIZE} loading="lazy" onError={onError} />;
   }
-  const { px, source } = CHARACTER_AVATAR_SIZE[SIZE];
+  const { px, source } = CHARACTER_AVATAR_SIZE[AVATAR_SIZE];
   return (
     <img
       src={type === 'corporation' ? corporationLogoUrl(id, source) : allianceLogoUrl(id, source)}
