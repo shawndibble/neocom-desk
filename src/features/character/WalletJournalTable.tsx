@@ -25,6 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
   type DataTableColumn,
+  type DataTableGroupBy,
   type DataTableSort,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -40,10 +41,18 @@ import {
   toggleBreakdownRefType,
   type WalletJournalFilter,
 } from '@/features/character/walletJournalFilter';
+import { netToneClass } from '@/features/character/format';
+import {
+  journalDayKey,
+  journalDayLabel,
+  journalDayNet,
+} from '@/features/character/walletJournalDays';
 import { signedIsk } from '@/features/market/signedIsk';
 import { useColumnVisibility } from '@/lib/columnVisibility';
 import { useElementNarrowerThan } from '@/lib/useElementNarrowerThan';
 import { useIsPhone } from '@/lib/useIsPhone';
+import { useTimeZone } from '@/lib/timeFormat';
+import { formatTimeOfDay, formatTimestamp } from '@/lib/timestamp';
 import {
   useVisibleWalletJournalColumns,
   WALLET_JOURNAL_COLUMN_IDS,
@@ -178,6 +187,12 @@ function rangeLabel(filter: WalletJournalFilter, t: TFunction): string {
   return t('wallet.journalRangeDefault');
 }
 
+/**
+ * The columns the phone sort picker offers: Date, Amount and Type. The owner
+ * ruled out Description and Character sorts, and Balance is off by default.
+ */
+const CARD_SORT_COLUMNS = new Set(['date', 'amount', 'refType']);
+
 /** Columns that are not in the picker's catalog and so are never hidden by it. */
 const ALWAYS_SHOWN_COLUMNS = new Set(['refType', 'character']);
 
@@ -202,7 +217,9 @@ export function JournalTable({
   const [tableRef, [tableNarrow = false]] = useElementNarrowerThan<HTMLDivElement>([
     JOURNAL_TABLE_CARDS_REM,
   ]);
-  const cards = !isPhone && tableNarrow;
+  // The phone list, and the table beside the open panel when its columns no longer fit.
+  const cards = isPhone || tableNarrow;
+  const timeZone = useTimeZone();
   // Internal lines (own-Character transfers) are in neither, so the panel and the
   // Journal's In / Out / Net line can never disagree.
   const totals = useMemo(() => journalRefTypeBreakdown(filteredJournal), [filteredJournal]);
@@ -231,6 +248,71 @@ export function JournalTable({
           ALWAYS_SHOWN_COLUMNS.has(column.id) || isVisible(column.id as WalletJournalColumnId)
       ),
     [journalColumns, isVisible]
+  );
+  // Day headers only under the Date sort: under Amount or Type a day's rows
+  // would be scattered, so the list is flat and each line carries its own date.
+  const grouped = cards && sort.columnId === 'date';
+  const cardColumns = useMemo(
+    () =>
+      shownColumns.map((column): DataTableColumn<JournalRow> => {
+        const sortable = CARD_SORT_COLUMNS.has(column.id) ? {} : { sortValue: undefined };
+        switch (column.id) {
+          case 'date':
+            return {
+              ...column,
+              // Under a day header only the time; a flat list needs the date too. The
+              // header's day is UTC, so the time is, or a line could sit under the wrong day.
+              render: (entry) =>
+                grouped
+                  ? formatTimeOfDay(new Date(entry.date), 'UTC')
+                  : formatTimestamp(new Date(entry.date), timeZone),
+            };
+          case 'description':
+            return {
+              ...column,
+              ...sortable,
+              primary: true,
+              className: 'whitespace-normal [overflow-wrap:anywhere]',
+            };
+          case 'amount':
+            return {
+              ...column,
+              cardCorner: true,
+              render: (entry) =>
+                entry.amount !== undefined ? signedIsk(entry.amount, 0) : t('common.unknown'),
+            };
+          case 'balance':
+            return {
+              ...column,
+              ...sortable,
+              stackAffix: { before: `${t('wallet.balanceCol')} ` },
+            };
+          default:
+            return { ...column, ...sortable };
+        }
+      }),
+    [shownColumns, grouped, timeZone, t]
+  );
+  const groupBy = useMemo<DataTableGroupBy<JournalRow> | undefined>(
+    () =>
+      grouped
+        ? {
+            key: journalDayKey,
+            minSize: 1,
+            defaultExpanded: () => true,
+            renderHeader: (rows) => {
+              const net = journalDayNet(rows);
+              const day = journalDayKey(rows[0] as JournalRow);
+              return (
+                <span className="flex w-full items-baseline justify-between gap-4 tabular-nums">
+                  <span>{day ? journalDayLabel(day) : t('common.unknown')}</span>
+                  <span className={netToneClass(net)}>{signedIsk(net, 0)}</span>
+                </span>
+              );
+            },
+          }
+        : undefined,
+    [grouped, t]
   );
   // A filter with no criteria active still runs (it's the identity filter), so
   // "is a filter active" is asked separately here rather than read off the result.
@@ -311,17 +393,19 @@ export function JournalTable({
           <DataTable
             {...tableExport.tableProps}
             label={label}
-            columns={shownColumns}
+            columns={cards ? cardColumns : shownColumns}
             rows={filteredJournal}
             rowKey={keyByCharacter ? characterRowKey : journalRowKey}
             highlightRowKey={highlightRowKey}
             sort={sort}
             onSortChange={onSortChange}
-            // A ledger read across columns: a plain table on a phone, scrolling
-            // sideways (DESIGN.md §6c Restraint). Beside the open panel on a wider
-            // screen the table is narrower than its columns: cards, not a clipped table.
+            // A wide table on a desktop. On a phone, and beside the open panel where
+            // the table is narrower than its columns, two-line cards grouped by day.
             responsive={cards ? 'stack' : 'table'}
             stacked={cards}
+            stackLayout="dense"
+            mobileSort
+            groupBy={groupBy}
             // Every page of the journal, uncapped: thousands of rows for an
             // active trader.
             virtualize="auto"

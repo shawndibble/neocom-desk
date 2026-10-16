@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -9,6 +9,9 @@ import { JournalTable } from './WalletJournalTable';
 import { useJournalColumnsBuilder } from './walletJournal';
 import { EMPTY_WALLET_JOURNAL_FILTER, type WalletJournalFilter } from './walletJournalFilter';
 import { walletJournalCsvColumns } from './walletJournalCsv';
+
+const phone = vi.hoisted(() => ({ value: false }));
+vi.mock('@/lib/useIsPhone', () => ({ useIsPhone: () => phone.value }));
 
 const journal: JournalRow[] = [
   { id: 1, date: '2026-10-07T23:47:00Z', ref_type: 'bounty_prize', amount: 5000, description: 'x' },
@@ -36,7 +39,9 @@ function Harness({
   keyByCharacter = false,
   highlightRowKey = null,
   onFilterChange = () => {},
+  sort = { columnId: 'date', direction: 'desc' },
 }: {
+  sort?: { columnId: string; direction: 'asc' | 'desc' };
   filter?: WalletJournalFilter;
   rows?: JournalRow[];
   /** The personal journal: own-Character netting on. The corp journal passes false. */
@@ -66,7 +71,7 @@ function Harness({
         breakdownJournal={rows}
         journalColumns={journalColumns}
         label="Journal"
-        sort={{ columnId: 'date', direction: 'desc' }}
+        sort={sort}
         onSortChange={() => {}}
         tableExport={tableExport}
         keyByCharacter={keyByCharacter}
@@ -174,5 +179,59 @@ describe('JournalTable filtered summary status', () => {
       <Harness filter={{ ...EMPTY_WALLET_JOURNAL_FILTER, text: 'x' }} />
     );
     await waitFor(() => expect(statusRegion(container)).toHaveTextContent(/3 entries · net /));
+  });
+
+  describe('on a phone', () => {
+    afterEach(() => {
+      phone.value = false;
+    });
+
+    const days: JournalRow[] = [
+      ...journal,
+      {
+        id: 4,
+        date: '2026-10-06T10:00:00Z',
+        ref_type: 'bounty_prize',
+        amount: 700,
+        description: 'z',
+      },
+    ];
+
+    it('groups lines under UTC day headers, each with a net that leaves out own-Character transfers', () => {
+      phone.value = true;
+      render(<Harness rows={days} />);
+      const headers = document.querySelectorAll('.dt-group-header');
+      expect(headers).toHaveLength(2);
+      // 5,000 - 2,000; the 900 own-Character transfer is left out.
+      expect(headers[0]).toHaveTextContent('+3,000');
+      expect(headers[1]).toHaveTextContent('+700');
+    });
+
+    it('folds a day away', async () => {
+      phone.value = true;
+      const user = userEvent.setup();
+      render(<Harness rows={days} />);
+      expect(document.querySelector('[data-row-key="4"]')).toBeInTheDocument();
+      await user.click(document.querySelectorAll('.dt-group-header button')[1] as HTMLElement);
+      expect(document.querySelector('[data-row-key="4"]')).not.toBeInTheDocument();
+    });
+
+    it('is a flat list under the Amount sort, and offers only Date, Amount and Type', () => {
+      phone.value = true;
+      render(<Harness rows={days} sort={{ columnId: 'amount', direction: 'desc' }} />);
+      expect(document.querySelectorAll('.dt-group-header')).toHaveLength(0);
+      const picker = screen.getByRole('combobox', { name: 'Sort by' });
+      const options = within(picker)
+        .getAllByRole('option')
+        .map((option) => option.textContent);
+      expect(options.join(' ')).toMatch(/Date.*Type.*Amount/);
+      expect(options.join(' ')).not.toMatch(/Description|Character|Balance/);
+    });
+
+    it('keeps the unchanged table at desktop width', () => {
+      render(<Harness rows={days} />);
+      expect(document.querySelectorAll('.dt-group-header')).toHaveLength(0);
+      expect(screen.queryByRole('combobox', { name: 'Sort by' })).not.toBeInTheDocument();
+    });
   });
 });
