@@ -8,6 +8,8 @@ import {
   compactContractOfferRow,
   accumulateRequestedPlex,
   requestedPlexByContract,
+  accumulateRequestsItems,
+  requestsItemsContracts,
   filterAndCompactPublicContractOffers,
   sortContractOfferRows,
   buildContractOfferIndex,
@@ -229,6 +231,15 @@ describe('compactContractOfferRow', () => {
     const row = compactContractOfferRow(bpc, parent);
     expect(row).not.toHaveProperty('requestedPlex');
   });
+
+  it('flags the row when the caller says the contract asks for items in return', () => {
+    expect(compactContractOfferRow(bpc, parent, undefined, true)?.requestsItems).toBe(true);
+  });
+
+  it('omits requestsItems rather than writing false when the contract asks for none', () => {
+    expect(compactContractOfferRow(bpc, parent, 1000, false)).not.toHaveProperty('requestsItems');
+    expect(compactContractOfferRow(bpc, parent)).not.toHaveProperty('requestsItems');
+  });
 });
 
 describe('requestedPlexByContract', () => {
@@ -310,6 +321,74 @@ describe('accumulateRequestedPlex', () => {
     for (const item of items) accumulateRequestedPlex(item, eligibleContracts, totals);
     expect(totals).toEqual(requestedPlexByContract(items, eligibleContracts));
     expect(totals.get('1')).toBe(1000);
+  });
+});
+
+describe('requestsItemsContracts', () => {
+  const eligibleContracts = new Map([
+    [
+      '1',
+      {
+        contractId: 1,
+        regionId: 10000002,
+        locationId: 60003760,
+        price: 1,
+        isAuction: false,
+        dateExpired: Date.parse(FUTURE),
+      },
+    ],
+  ]);
+
+  it('names a contract whose requested side holds any non-PLEX item', () => {
+    const items = parseContractItemsCsv(
+      itemsCsv([
+        'true,true,1,10,1,1001,3,18,32858,2026-09-01T11:31:43Z,1',
+        '"",false,2,,1000,1002,,,44992,2026-09-01T11:31:43Z,1',
+        '"",false,3,,1,1003,,,35,2026-09-01T11:31:43Z,1',
+      ])
+    );
+    expect(requestsItemsContracts(items, eligibleContracts)).toEqual(new Set(['1']));
+  });
+
+  it('leaves out a contract that asks only for PLEX', () => {
+    const items = parseContractItemsCsv(
+      itemsCsv([
+        'true,true,1,10,1,1001,3,18,32858,2026-09-01T11:31:43Z,1',
+        '"",false,2,,1000,1002,,,44992,2026-09-01T11:31:43Z,1',
+      ])
+    );
+    expect(requestsItemsContracts(items, eligibleContracts).size).toBe(0);
+  });
+
+  it('never counts an offered line, PLEX or not', () => {
+    const items = parseContractItemsCsv(
+      itemsCsv([
+        '"",true,1,,1,1001,,,35,2026-09-01T11:31:43Z,1',
+        '"",true,2,,10,1002,,,44992,2026-09-01T11:31:43Z,1',
+      ])
+    );
+    expect(requestsItemsContracts(items, eligibleContracts).size).toBe(0);
+  });
+
+  it('ignores a requested-item line on a contract that is not eligible', () => {
+    const items = parseContractItemsCsv(
+      itemsCsv(['"",false,2,,1,1002,,,35,2026-09-01T11:31:43Z,999'])
+    );
+    expect(requestsItemsContracts(items, eligibleContracts).size).toBe(0);
+  });
+
+  it('folds line by line to the same answer regardless of line order', () => {
+    const items = parseContractItemsCsv(
+      itemsCsv([
+        '"",false,3,,1,1003,,,35,2026-09-01T11:31:43Z,1',
+        'true,true,1,10,1,1001,3,18,32858,2026-09-01T11:31:43Z,1',
+      ])
+    );
+    const contracts = new Set<string>();
+    for (const item of [...items].reverse()) {
+      accumulateRequestsItems(item, eligibleContracts, contracts);
+    }
+    expect(contracts).toEqual(requestsItemsContracts(items, eligibleContracts));
   });
 });
 
@@ -395,6 +474,45 @@ describe('filterAndCompactPublicContractOffers', () => {
     );
     expect(plexRows).toHaveLength(1);
     expect(plexRows[0]).toMatchObject({ contractId: 1, typeId: 32858, requestedPlex: 1000 });
+  });
+
+  it('flags every offer row of a contract that asks for items in return', () => {
+    expect(rows().filter((r) => r.contractId === 1)).toEqual([
+      expect.objectContaining({ typeId: 34, requestsItems: true }),
+      expect.objectContaining({ typeId: 32858, requestsItems: true }),
+    ]);
+    expect(rows().find((r) => r.contractId === 2)).not.toHaveProperty('requestsItems');
+  });
+
+  it('keeps requestedPlex and no requestsItems on a contract asking only for PLEX', () => {
+    const plexOnly = filterAndCompactPublicContractOffers(
+      parseContractsCsv(contracts),
+      parseContractItemsCsv(
+        itemsCsv([
+          '"",true,2,,250,1002,,,34,2026-09-01T11:31:43Z,1',
+          '"",false,9,,1000,1009,,,44992,2026-09-01T11:31:43Z,1',
+        ])
+      ),
+      NOW
+    );
+    expect(plexOnly).toHaveLength(1);
+    expect(plexOnly[0].requestedPlex).toBe(1000);
+    expect(plexOnly[0]).not.toHaveProperty('requestsItems');
+  });
+
+  it('carries both flags when a contract asks for PLEX and an item', () => {
+    const both = filterAndCompactPublicContractOffers(
+      parseContractsCsv(contracts),
+      parseContractItemsCsv(
+        itemsCsv([
+          '"",true,2,,250,1002,,,34,2026-09-01T11:31:43Z,1',
+          '"",false,9,,1000,1009,,,44992,2026-09-01T11:31:43Z,1',
+          '"",false,10,,5,1010,,,35,2026-09-01T11:31:43Z,1',
+        ])
+      ),
+      NOW
+    );
+    expect(both[0]).toMatchObject({ requestedPlex: 1000, requestsItems: true });
   });
 
   it('sorts deterministically by type then contract, independent of input order', () => {
@@ -571,7 +689,8 @@ describe('public contract offers snapshot sizing', () => {
         isAuction: true,
         dateExpired: Date.parse(FUTURE),
       },
-      2_100_000_000
+      2_100_000_000,
+      true
     );
 
     // Every optional field populated, or it isn't the worst case.
@@ -580,6 +699,7 @@ describe('public contract offers snapshot sizing', () => {
       isBlueprintCopy: true,
       runs: 300,
       requestedPlex: 2_100_000_000,
+      requestsItems: true,
     });
     expect(
       PUBLIC_CONTRACT_OFFERS_CHUNK_SIZE * Buffer.byteLength(JSON.stringify(widest))

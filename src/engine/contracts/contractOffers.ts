@@ -48,6 +48,13 @@ export interface PublicContractOfferRow {
    * Absent, not zero, when the contract asks for nothing PLEX.
    */
   requestedPlex?: number;
+  /**
+   * The contract's issuer wants at least one non-PLEX item in return (issue
+   * #3986) — the same on every offer row of one contract. The snapshot keeps
+   * only this yes/no, not which items, so a value comparison can leave the
+   * contract out. Absent, not false, otherwise.
+   */
+  requestsItems?: true;
   /** Epoch ms. */
   dateExpired: number;
 }

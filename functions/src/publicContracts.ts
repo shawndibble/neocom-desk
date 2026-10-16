@@ -221,6 +221,16 @@ export interface PublicContractOfferRow {
    * already follow.
    */
   requestedPlex?: number;
+  /**
+   * The contract's issuer wants at least one non-PLEX item in return (issue
+   * #3986) — computed by `requestsItemsContracts`. Like `requestedPlex`, the
+   * same on every offer row of one contract. Which items, and how many, stay
+   * out of the snapshot: the flag is what lets a value comparison leave the
+   * contract out (a pile of items for 1 ISK that also asks for items is bait,
+   * not a deal), and that needs no more than yes/no. Absent, not false,
+   * otherwise — the same omit-don't-zero rule as the fields above.
+   */
+  requestsItems?: true;
   /** Epoch ms. */
   dateExpired: number;
 }
@@ -238,12 +248,14 @@ export interface PublicContractOfferRow {
  * very same contract, rides along on the *offer* rows this function does
  * publish (issue #1080's PLEX-for-item barter): a caller precomputes it per
  * contract (`requestedPlexByContract`) since answering it needs every item
- * line of the contract, not the one this call is narrowing.
+ * line of the contract, not the one this call is narrowing. `requestsItems`
+ * (`requestsItemsContracts`) rides along the same way, for the same reason.
  */
 export function compactContractOfferRow(
   item: ContractItemRecord,
   contract: EligibleContract,
-  requestedPlex?: number
+  requestedPlex?: number,
+  requestsItems?: boolean
 ): PublicContractOfferRow | null {
   if (item.is_included !== 'true') return null;
 
@@ -265,6 +277,7 @@ export function compactContractOfferRow(
     ...(te === undefined ? {} : { te }),
     ...(runs === undefined || runs < 0 ? {} : { runs }),
     ...(requestedPlex ? { requestedPlex } : {}),
+    ...(requestsItems ? { requestsItems: true as const } : {}),
     dateExpired: contract.dateExpired,
   };
 }
@@ -312,6 +325,35 @@ export function requestedPlexByContract(
   const totals = new Map<string, number>();
   for (const item of items) accumulateRequestedPlex(item, eligibleContracts, totals);
   return totals;
+}
+
+/**
+ * Adds one `contract_items.csv` line's contract to `contracts` when the line is
+ * on the requested (`is_included: false`) side, names anything but PLEX, and
+ * belongs to an already-eligible contract. PLEX has its own answer
+ * (`accumulateRequestedPlex`), so a PLEX-only request never sets the flag.
+ * Exposed for the production sync's single streaming pass, the same as
+ * `accumulateRequestedPlex`.
+ */
+export function accumulateRequestsItems(
+  item: ContractItemRecord,
+  eligibleContracts: ReadonlyMap<string, EligibleContract>,
+  contracts: Set<string>
+): void {
+  if (item.is_included === 'true') return;
+  if (Number(item.type_id) === PLEX_TYPE_ID) return;
+  if (!eligibleContracts.has(item.contract_id)) return;
+  contracts.add(item.contract_id);
+}
+
+/** Every eligible contract that asks for at least one non-PLEX item, keyed by raw `contract_id`. */
+export function requestsItemsContracts(
+  items: readonly ContractItemRecord[],
+  eligibleContracts: ReadonlyMap<string, EligibleContract>
+): Set<string> {
+  const contracts = new Set<string>();
+  for (const item of items) accumulateRequestsItems(item, eligibleContracts, contracts);
+  return contracts;
 }
 
 /** One CSV column as a number, or absent when it is blank or unparsable. */
@@ -424,12 +466,18 @@ export function filterAndCompactPublicContractOffers(
     if (eligible) eligibleContracts.set(contract.contract_id, eligible);
   }
   const requestedPlex = requestedPlexByContract(items, eligibleContracts);
+  const requestsItems = requestsItemsContracts(items, eligibleContracts);
 
   const rows: PublicContractOfferRow[] = [];
   for (const item of items) {
     const contract = eligibleContracts.get(item.contract_id);
     if (!contract) continue;
-    const row = compactContractOfferRow(item, contract, requestedPlex.get(item.contract_id));
+    const row = compactContractOfferRow(
+      item,
+      contract,
+      requestedPlex.get(item.contract_id),
+      requestsItems.has(item.contract_id)
+    );
     if (row) rows.push(row);
   }
 

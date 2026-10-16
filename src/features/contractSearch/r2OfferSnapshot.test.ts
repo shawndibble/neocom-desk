@@ -110,6 +110,12 @@ describe('loadR2TypeRows', () => {
     expect(urlsRead(fetchMock)).toEqual([obj(34, 'aaaa')]);
   });
 
+  it('keeps the requested-side flags a row carries', async () => {
+    const flagged = { ...row(34, 1), requestedPlex: 10, requestsItems: true };
+    serve({ [`${ORIGIN}/${obj(34, 'aaaa')}`]: [flagged] });
+    expect(await loadR2TypeRows(INDEX, [34])).toEqual([flagged]);
+  });
+
   it('joins every region part of a split type', async () => {
     serve(files);
     expect(await loadR2TypeRows(INDEX, [35])).toEqual([row(35, 2), row(35, 3)]);

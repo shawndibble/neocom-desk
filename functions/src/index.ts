@@ -139,6 +139,7 @@ import {
 } from './marketSnapshot.js';
 import {
   accumulateRequestedPlex,
+  accumulateRequestsItems,
   chunkDocId,
   buildContractOfferIndex,
   chunkDocData,
@@ -1300,6 +1301,8 @@ export const syncPublicContractOffers = onSchedule(
     // (below) gets `requestedPlexByContract`'s answer without a second pass
     // or buffering the line-by-line records.
     const requestedPlexTotals = new Map<string, number>();
+    // Same fold, same reason, for contracts asking for any non-PLEX item.
+    const requestsItemsContractIds = new Set<string>();
     let outstandingCourierContracts = 0;
 
     await streamPublicContractsCsvs({
@@ -1315,6 +1318,7 @@ export const syncPublicContractOffers = onSchedule(
       },
       onItem: (record) => {
         accumulateRequestedPlex(record, eligibleContracts, requestedPlexTotals);
+        accumulateRequestsItems(record, eligibleContracts, requestsItemsContractIds);
         const contract = eligibleContracts.get(record.contract_id);
         if (!contract) return;
         const row = compactContractOfferRow(record, contract);
@@ -1322,10 +1326,12 @@ export const syncPublicContractOffers = onSchedule(
       },
     });
 
-    if (requestedPlexTotals.size > 0) {
+    if (requestedPlexTotals.size > 0 || requestsItemsContractIds.size > 0) {
       for (const row of rows) {
-        const requestedPlex = requestedPlexTotals.get(String(row.contractId));
+        const contractId = String(row.contractId);
+        const requestedPlex = requestedPlexTotals.get(contractId);
         if (requestedPlex) row.requestedPlex = requestedPlex;
+        if (requestsItemsContractIds.has(contractId)) row.requestsItems = true;
       }
     }
 
