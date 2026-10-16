@@ -65,17 +65,12 @@ export interface HaulingFillScanInput {
 }
 
 /**
- * A batch's cache scope, from its id set: every batch scans a different set,
- * so two never share an entry, and a string never collides with a category's
- * numeric scope. FNV-1a over the ids, with their count.
+ * A batch's cache scope: the ids it leaves out of every Hauling category,
+ * which name its id set exactly, so two batches never share an entry. A
+ * string, so it never collides with a category's numeric scope.
  */
-export function haulingFillScope(typeIds: readonly number[]): string {
-  let hash = 0x811c9dc5;
-  for (const id of typeIds) {
-    hash ^= id;
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return `fill-${typeIds.length}-${(hash >>> 0).toString(36)}`;
+export function haulingFillScope(skipped: Iterable<number>): string {
+  return `fill:${[...new Set(skipped)].sort((a, b) => a - b).join(',')}`;
 }
 
 /** One press: Find starts afresh; Find more and Try again carry on. */
@@ -152,7 +147,7 @@ export function useHaulingFillScan(input: HaulingFillScanInput) {
         loading(null);
         const skip = new Set(latest.current.excludeIds());
         for (const row of lane.rows) skip.add(row.typeId);
-        let cacheKey: string | null = null;
+        const scope = haulingFillScope(skip);
         let scan: HaulingScan;
         try {
           scan = await scanHaulingLane(
@@ -160,11 +155,7 @@ export function useHaulingFillScan(input: HaulingFillScanInput) {
               from,
               to,
               mode,
-              scope: (typeIds) => {
-                const scope = haulingFillScope(typeIds);
-                cacheKey = haulingScanCacheKey({ from, to, scope, mode });
-                return scope;
-              },
+              scope,
               typeIds: (groups, marketTypes) =>
                 typeIdsInHaulingCategory(EVERYTHING_CATEGORY_ID, groups, marketTypes).filter(
                   (id) => !skip.has(id)
@@ -180,11 +171,17 @@ export function useHaulingFillScan(input: HaulingFillScanInput) {
         }
         // A cached batch answers at once, without looking at the signal.
         if (signal.aborted) return;
-        if (cacheKey !== null) lane.cacheKeys.add(cacheKey);
+        lane.cacheKeys.add(haulingScanCacheKey({ from, to, scope, mode }));
         const kept = scan.rows.filter((row) => !skip.has(row.typeId));
         lane.rows = [...lane.rows, ...kept];
         lane.batches = batch;
-        const measured = latest.current.measure(lane.rows, new Set(kept.map((r) => r.typeId)));
+        let measured: HaulingFillMeasure | null;
+        try {
+          measured = latest.current.measure(lane.rows, new Set(kept.map((r) => r.typeId)));
+        } catch {
+          show({ status: 'error', rows: lane.rows, batches: lane.batches });
+          return;
+        }
         if (measured !== null) lane.freeM3 = measured.freeM3;
         const reason =
           measured === null
@@ -193,7 +190,9 @@ export function useHaulingFillScan(input: HaulingFillScanInput) {
                 ...measured,
                 batchesThisRun: thisRun,
                 batchRows: kept.length,
-                capped: scan.capped ?? false,
+                // Only returned rows are left out of the next batch, so after an
+                // empty one it would be the same scan: nothing more is reachable.
+                capped: kept.length > 0 && (scan.capped ?? false),
               });
         if (reason !== null) {
           show({ status: 'ready', rows: lane.rows, reason, batches: lane.batches });

@@ -101,16 +101,16 @@ beforeEach(() => {
 describe('haulingFillScope', () => {
   it('never shares a cache key with a category scan, Everything included', () => {
     for (const category of [0, AMMO]) {
-      expect(
-        haulingScanCacheKey({ from: JITA, to: AMARR, scope: haulingFillScope([1, 2]) })
-      ).not.toBe(haulingScanCacheKey({ from: JITA, to: AMARR, scope: category }));
+      expect(haulingScanCacheKey({ from: JITA, to: AMARR, scope: haulingFillScope([]) })).not.toBe(
+        haulingScanCacheKey({ from: JITA, to: AMARR, scope: category })
+      );
     }
   });
 
-  it('differs for every id set, and repeats for the same one', () => {
-    expect(haulingFillScope([1, 2, 3])).toBe(haulingFillScope([1, 2, 3]));
-    expect(haulingFillScope([1, 2, 3])).not.toBe(haulingFillScope([1, 2]));
-    expect(haulingFillScope([1, 2])).not.toBe(haulingFillScope([1, 3]));
+  it('names the ids left out exactly, in any order', () => {
+    expect(haulingFillScope([3, 1, 3])).toBe(haulingFillScope([1, 3]));
+    expect(haulingFillScope([1, 3])).not.toBe(haulingFillScope([1]));
+    expect(haulingFillScope([12])).not.toBe(haulingFillScope([1, 2]));
   });
 });
 
@@ -143,8 +143,9 @@ describe('useHaulingFillScan', () => {
     const calls = runHaulingScan.mock.calls.map(([request]) => request);
     expect(calls.map((r) => r.typeIds)).toEqual([[1, 3], [3], [3]]);
     // Its own scope per id set, never a category's.
-    expect(calls[0]!.scope).toBe(haulingFillScope([1, 3]));
-    expect(calls[1]!.scope).toBe(haulingFillScope([3]));
+    expect(calls[0]!.scope).toBe(haulingFillScope([2]));
+    expect(calls[1]!.scope).toBe(haulingFillScope([1, 2]));
+    expect(calls[2]!.scope).toBe(haulingFillScope([1, 2, 101]));
     // Sized on everything found, told which ids the batch brought.
     expect(measure.mock.calls[1]).toEqual([[row(1), row(101)], new Set([101])]);
   });
@@ -159,6 +160,8 @@ describe('useHaulingFillScan', () => {
 
   it.each([
     ['nothing-left', () => runHaulingScan.mockImplementation(async () => scanOf([], false))],
+    // Cut short but empty: the next batch would be the same scan.
+    ['nothing-left', () => runHaulingScan.mockImplementation(async () => scanOf([], true))],
     ['no-gain', () => measure.mockReturnValue({ ...ROOMY, newLines: 0 })],
     ['budget', () => measure.mockReturnValue({ ...ROOMY, binding: 'budget' })],
     ['stopped', () => measure.mockReturnValue(null)],
@@ -262,6 +265,15 @@ describe('useHaulingFillScan', () => {
     expect(result.current.state).toMatchObject({ rows: [row(1), row(101)], batches: 2 });
   });
 
+  it('reports a sizing failure as a failed batch, not a run that never ends', async () => {
+    measure.mockImplementation(() => {
+      throw new Error('plan failed');
+    });
+    const { result } = renderFill();
+    act(() => result.current.find());
+    await waitFor(() => expect(result.current.state.status).toBe('error'));
+  });
+
   it('reset evicts only the fill’s own cache entries and goes idle', async () => {
     measure.mockReturnValueOnce(ROOMY).mockReturnValueOnce({ ...ROOMY, freeM3: 0 });
     runHaulingScan.mockImplementationOnce(async () => scanOf([row(1)]));
@@ -274,7 +286,7 @@ describe('useHaulingFillScan', () => {
     expect(result.current.state).toEqual({ status: 'idle' });
     expect(keys).toHaveLength(2);
     expect(evictHaulingScan.mock.calls.map(([key]) => key)).toEqual(keys);
-    expect(keys.every((key) => key.includes(':fill-'))).toBe(true);
+    expect(keys.every((key) => key.includes(':fill:'))).toBe(true);
     expect(clearHaulingScanCache).not.toHaveBeenCalled();
   });
 

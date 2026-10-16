@@ -271,8 +271,9 @@ export function useHaulingFillOffer(
   };
 
   const { state } = fill;
-  /** Free m³ once every offered item is in: what "Filled" reports and Find more is judged on. */
-  const freeAfterOffer = freeOf((offer?.after ?? before).holds);
+  /** The plan once every offered item is in: what "Filled" reports and Find more is judged on. */
+  const afterOffer = offer?.after ?? before;
+  const freeAfterOffer = freeOf(afterOffer.holds);
   const reason = state.status === 'ready' ? state.reason : null;
   const list: Omit<HaulingFillListProps, 'freeM3' | 'progressText'> = {
     status: fill.status,
@@ -283,6 +284,8 @@ export function useHaulingFillOffer(
     canFindMore:
       reason !== null &&
       reason !== 'nothing-left' &&
+      // Spending more needs a higher Max spend first; then the binding moves and Find more is back.
+      afterOffer.binding !== 'budget' &&
       freeAfterOffer > fillFullAtM3(capacityOf(before.holds)),
     added: fill.lastAdded,
     items,

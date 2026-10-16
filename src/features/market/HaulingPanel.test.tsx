@@ -6,7 +6,7 @@ import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { TRADE_HUBS } from '@/market/hubs';
 import { useActiveCharacter } from '@/stores/activeCharacter';
-import { useHaulingCargo } from './haulingCargo';
+import { useHaulingBudget, useHaulingCargo } from './haulingCargo';
 import type { ListHaulingScanRow } from './haulingData';
 import type { HaulingScanState } from './useHaulingScan';
 import type { HaulingFillScanInput, HaulingFillScanState } from './useHaulingFillScan';
@@ -218,6 +218,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   useHaulingCargo.setState({ value: null });
+  useHaulingBudget.setState({ value: null });
   configureClipboard(null);
 });
 
@@ -512,6 +513,18 @@ describe('HaulingPanel fill the free space', () => {
     ).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Find more' }));
     expect(fillMore).toHaveBeenCalledOnce();
+  });
+
+  it('offers no Find more while Max spend binds: more items could not be bought', async () => {
+    const user = userEvent.setup();
+    setCargo(1000);
+    // Damage Control II takes 7,000 ISK; 1,000 is left for the fill.
+    useHaulingBudget.setState({ hydrated: true, value: 8_000 });
+    fillState = fillDone([FILL_ROW], 'budget');
+    renderPanel();
+    await user.click(screen.getByRole('button', { name: 'Find items to fill it' }));
+    expect(screen.getByText('Your Max spend is the limit.', { selector: 'p' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Find more' })).toBeNull();
   });
 
   it('sizes the ticked items again: unticking one frees its room for the rest', async () => {
