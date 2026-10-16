@@ -21,7 +21,11 @@
 import type { StockBoardData } from '@/features/stockTargets/stockBoard';
 import { formatIskCompact } from '@/lib/isk';
 import { isJobDone } from '@/features/industry/jobs';
-import { needsAttentionCount, openOrderProblemCounts } from '@/features/market/openOrdersModel';
+import {
+  needsAttentionCount,
+  notCheckedCount,
+  openOrderProblemCounts,
+} from '@/features/market/openOrdersModel';
 import type { OpenOrderRow } from '@/features/market/openOrdersModel';
 import { compareSeverity } from '@/engine/severity';
 import { formatCountdown } from '@/lib/duration';
@@ -69,8 +73,11 @@ export function ordersSummary(
   const counts = openOrderProblemCounts(rows);
   if (counts.belowFloor > 0) return t('overview.board.belowFloor', { count: counts.belowFloor });
   const needsWork = needsAttentionCount(rows);
-  return needsWork > 0
-    ? t('overview.board.ordersMeta', { count: needsWork })
+  if (needsWork > 0) return t('overview.board.ordersMeta', { count: needsWork });
+  // "Nothing needs work" would claim a check that never ran.
+  const unchecked = notCheckedCount(rows);
+  return unchecked > 0
+    ? t('overview.board.ordersNotChecked', { count: unchecked })
     : t('overview.board.ordersClear');
 }
 

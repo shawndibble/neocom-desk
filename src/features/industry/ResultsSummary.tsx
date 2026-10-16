@@ -22,6 +22,7 @@ import {
   type OwnedStockSaleLine,
 } from '@/engine/industry/ownedStockSale';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
+import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
 import { formatDuration } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
 import { formatCostIndex, formatPercent, formatVolume } from './format';
@@ -181,6 +182,7 @@ export function ResultsSummary({
   totalVolume,
 }: ResultsSummaryProps) {
   const { t } = useTranslation();
+  const pricesUnavailableLabel = usePricesUnavailableLabel();
   const [jobFeeExpanded, setJobFeeExpanded] = useState(false);
   const [profitView, setProfitView] = useState<'net' | 'gross'>('net');
   const [saleBasis, setSaleBasis] = useState<LiquidationBasis>('instant');
@@ -274,11 +276,7 @@ export function ResultsSummary({
   if (!pricesReady) {
     return (
       <EmptyState
-        title={
-          pricesUnreachable
-            ? t('common.pricesUnavailableOffline')
-            : t('industry.pricesUnavailableTitle')
-        }
+        title={pricesUnreachable ? pricesUnavailableLabel : t('industry.pricesUnavailableTitle')}
         hint={
           pricesUnreachable
             ? t('industry.pricesUnavailableOfflineHint')

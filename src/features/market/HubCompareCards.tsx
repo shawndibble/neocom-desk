@@ -13,6 +13,7 @@
  * so a hub is always in the same place on the grid — which is the thing a
  * sort would otherwise destroy.
  */
+import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Tooltip } from '@/components/ui';
@@ -101,6 +102,7 @@ type CopiedKey = `${string}:${'sell' | 'buy'}`;
 
 export function HubCompareCards({ rows }: { rows: readonly HubComparisonRow[] }) {
   const { t } = useTranslation();
+  const pricesUnavailableLabel = usePricesUnavailableLabel();
   const [copied, setCopied] = useState<CopiedKey | null>(null);
   const resetTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
@@ -158,9 +160,7 @@ export function HubCompareCards({ rows }: { rows: readonly HubComparisonRow[] })
               />
             </dl>
             {row.unreachable && (
-              <p className="mt-2 text-[0.6875rem] text-text-dim">
-                {t('common.pricesUnavailableOffline')}
-              </p>
+              <p className="mt-2 text-[0.6875rem] text-text-dim">{pricesUnavailableLabel}</p>
             )}
           </li>
         ))}

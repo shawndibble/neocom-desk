@@ -419,16 +419,36 @@ export function buildOpenOrderRows(input: BuildRowsInput): OpenOrderRow[] {
   return rows.sort(compareOpenOrderRowsWorstFirst);
 }
 
+/**
+ * A group's heading: every `OrderProblem`, plus `notChecked` for orders that
+ * read healthy only because nothing could check their competition — kept out
+ * of the Healthy group so that heading holds only orders actually checked.
+ */
+export type OrderGroupKey = OrderProblem | 'notChecked';
+
 export interface OrderGroup {
-  problem: OrderProblem;
+  /** The group's key; named `problem` for every group but `notChecked`, which is not a problem. */
+  problem: OrderGroupKey;
   rows: OpenOrderRow[];
 }
 
-/** Groups by `problem` in ORDER_PROBLEMS order. Empty groups are dropped. */
+/** The group a row is filed under. */
+export function orderGroupKey(row: OpenOrderRow): OrderGroupKey {
+  return row.problem === 'healthy' && row.competitionUnchecked === true
+    ? 'notChecked'
+    : row.problem;
+}
+
+/** Worst first, `notChecked` just above `healthy`. */
+const GROUP_ORDER: readonly OrderGroupKey[] = ORDER_PROBLEMS.flatMap((problem) =>
+  problem === 'healthy' ? (['notChecked', 'healthy'] as const) : [problem]
+);
+
+/** Groups by `orderGroupKey` in worst-first order. Empty groups are dropped. */
 export function groupOpenOrders(rows: readonly OpenOrderRow[]): OrderGroup[] {
   const groups: OrderGroup[] = [];
-  for (const problem of ORDER_PROBLEMS) {
-    const groupRows = rows.filter((row) => row.problem === problem);
+  for (const problem of GROUP_ORDER) {
+    const groupRows = rows.filter((row) => orderGroupKey(row) === problem);
     if (groupRows.length > 0) groups.push({ problem, rows: groupRows });
   }
   return groups;
@@ -446,6 +466,16 @@ export function openOrderProblemCounts(
     for (const problem of row.problems) counts[problem]++;
   }
   return counts;
+}
+
+/**
+ * Orders that read healthy only because nothing could check their competition
+ * (`competitionUnchecked`). Surfaces that summarise order health count these
+ * apart from the checked healthy ones instead of calling them healthy.
+ */
+export function notCheckedCount(rows: readonly OpenOrderRow[]): number {
+  return rows.filter((row) => row.competitionUnchecked === true && row.problem === 'healthy')
+    .length;
 }
 
 /** Orders that are not `healthy`. */
@@ -477,8 +507,6 @@ export interface OpenOrderGroupSummary {
   worstGapPct: number | null;
   /** Descending by count, then by name, so the header's order is stable across refreshes. */
   byCharacter: GroupCharacterShare[];
-  /** Rows whose competition was not checked (`competitionUnchecked`). */
-  uncheckedCount: number;
 }
 
 function rowGapPct(row: OpenOrderRow): number | null {
@@ -490,11 +518,9 @@ function rowGapPct(row: OpenOrderRow): number | null {
 export function summariseOrderGroup(rows: readonly OpenOrderRow[]): OpenOrderGroupSummary {
   let iskTiedUp = 0;
   let worstGapPct: number | null = null;
-  let uncheckedCount = 0;
   const shares = new Map<number, GroupCharacterShare>();
   for (const row of rows) {
     iskTiedUp += row.iskTiedUp;
-    if (row.competitionUnchecked) uncheckedCount++;
     const gap = rowGapPct(row);
     if (gap !== null && (worstGapPct === null || gap > worstGapPct)) worstGapPct = gap;
     const share = shares.get(row.characterId);
@@ -509,5 +535,5 @@ export function summariseOrderGroup(rows: readonly OpenOrderRow[]): OpenOrderGro
   const byCharacter = [...shares.values()].sort(
     (a, b) => b.count - a.count || a.characterName.localeCompare(b.characterName)
   );
-  return { iskTiedUp, worstGapPct, byCharacter, uncheckedCount };
+  return { iskTiedUp, worstGapPct, byCharacter };
 }

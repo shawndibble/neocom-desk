@@ -161,6 +161,14 @@ describe('PlanVerdictHero: verdict labels and prose', () => {
   });
 });
 
+describe('PlanVerdictHero: unreachable price source', () => {
+  it('says prices are unavailable instead of "No price data yet"', () => {
+    renderHero({ pricesReady: false, pricesUnreachable: true });
+    expect(screen.getByText('Prices unavailable right now')).toBeInTheDocument();
+    expect(screen.queryByText('No price data yet')).not.toBeInTheDocument();
+  });
+});
+
 describe('PlanVerdictHero: the big profit figure and qualifier line', () => {
   it('shows net profit as the big figure', () => {
     renderHero();

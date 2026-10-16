@@ -56,7 +56,7 @@ export async function loadPlanPrices(hub: TradeHub, typeIds: number[]): Promise<
   try {
     const read = await loadMarketSnapshot(hub, wanted);
     snapshot = { hubPrices: read.hubPrices, hubBuyPrices: read.hubBuyPrices ?? {} };
-    unreachable = read.pricesUnreachable === true;
+    unreachable = read.hubPricesUnreachable === true;
   } catch {
     return { prices: {}, buyPrices: {}, unpriced: wanted, failed: true, fetchedAt: new Date() };
   }
@@ -77,7 +77,7 @@ export async function loadPlanPrices(hub: TradeHub, typeIds: number[]): Promise<
   // `getHubPrices` degrades an unreachable Fuzzwork (a 503) to per-type nulls
   // rather than throwing, so a hub that quotes none of the types asked for is
   // the same outage as a thrown read. A real hub quotes some of ~80 commodities.
-  // The snapshot's own `pricesUnreachable` says so directly; the empty-quotes
+  // The snapshot's own `hubPricesUnreachable` says so directly; the empty-quotes
   // check stays as the fallback for a read that did not carry it.
   const failed = unreachable || Object.keys(prices).length === 0;
   return { prices, buyPrices, unpriced, failed, fetchedAt: new Date() };

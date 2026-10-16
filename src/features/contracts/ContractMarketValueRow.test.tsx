@@ -12,14 +12,14 @@ describe('ContractMarketValueRow', () => {
       />
     );
     expect(screen.getByText(/1 item unpriced/)).toBeInTheDocument();
-    expect(screen.queryByText('Prices unavailable offline')).not.toBeInTheDocument();
+    expect(screen.queryByText('Prices unavailable right now')).not.toBeInTheDocument();
   });
 
   it('shows a placeholder, not 0 ISK, when every line failed because prices were unreachable', () => {
     render(
       <ContractMarketValueRow value={{ total: 0, unpriced: 3, unreachable: true }} hubName="Jita" />
     );
-    expect(screen.getByText('Prices unavailable offline')).toBeInTheDocument();
+    expect(screen.getByText('Prices unavailable right now')).toBeInTheDocument();
     expect(screen.queryByText(/unpriced/)).not.toBeInTheDocument();
     expect(screen.queryByText(/ISK/)).not.toBeInTheDocument();
   });
@@ -31,6 +31,6 @@ describe('ContractMarketValueRow', () => {
         hubName="Jita"
       />
     );
-    expect(screen.queryByText('Prices unavailable offline')).not.toBeInTheDocument();
+    expect(screen.queryByText('Prices unavailable right now')).not.toBeInTheDocument();
   });
 });

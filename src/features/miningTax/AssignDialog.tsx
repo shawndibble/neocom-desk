@@ -1,3 +1,4 @@
+import { typeLabels } from './typeLabels';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { OreIcon, OreLink } from './OreIcon';
 import { useMemo, useState, type ReactNode } from 'react';
@@ -43,11 +44,12 @@ interface AssignDialogProps {
    */
   pricesFor: (hubId: string | undefined, date: string) => ReadonlyMap<number, number>;
   /**
-   * The price source could not be reached (offline). A line with no price is
-   * then valued at 0 ISK because the fetch failed, not because the ore is
-   * worthless, so the dialog warns before that 0 ISK is saved and synced.
+   * Hubs whose price source could not be reached (offline). A line with no
+   * price at one of them is valued at 0 ISK because the fetch failed, not
+   * because the ore is worthless, so the dialog warns before that 0 ISK is
+   * saved and synced. Decided for the selected Payee's hub only.
    */
-  pricesUnreachable?: boolean;
+  unreachableHubs?: ReadonlySet<string>;
   /** True while a sibling action (Mark as paid / Resolve / Undo) is in flight, so this form's own submit can't race it. */
   busy: boolean;
   onAssigned: () => void;
@@ -142,7 +144,7 @@ export function AssignDialog({
   systemName,
   typeNames,
   pricesFor,
-  pricesUnreachable = false,
+  unreachableHubs,
   busy,
   onAssigned,
   onCancel,
@@ -202,7 +204,7 @@ export function AssignDialog({
 
   // Lines valued at 0 only because the price fetch failed, while the estimate
   // still tracks that computed default (a typed override is the pilot's own).
-  const unpricedOffline = pricesUnreachable
+  const unpricedOffline = unreachableHubs?.has(hub.id)
     ? selectedLines.filter((line) => (prices.get(line.typeId) ?? 0) <= 0)
     : [];
   const warnUnpricedOffline = unpricedOffline.length > 0 && estimatedValueOverride.trim() === '';
@@ -448,9 +450,10 @@ export function AssignDialog({
       {warnUnpricedOffline && (
         <p role="status" className="text-xs text-warning">
           {t('miningTax.assignUnpricedOfflineWarning', {
-            types: unpricedOffline
-              .map((line) => typeNames.get(line.typeId) ?? `#${line.typeId}`)
-              .join(', '),
+            types: typeLabels(
+              unpricedOffline.map((line) => line.typeId),
+              typeNames
+            ),
           })}
         </p>
       )}

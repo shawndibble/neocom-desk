@@ -1378,13 +1378,13 @@ describe('BuildPlanDetail with an unreachable price source (offline)', () => {
       hubBuyPrices: {},
       adjustedPrices: {},
       systemCostIndex: 0.05,
-      pricesUnreachable: true,
+      hubPricesUnreachable: true,
     });
     render(<Harness />);
     await openSetup(user);
 
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
-    expect(await screen.findByText('Prices unavailable offline')).toBeInTheDocument();
+    expect((await screen.findAllByText('Prices unavailable right now')).length).toBeGreaterThan(0);
     expect(screen.queryByText(/have no price on the chosen side/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Try again shortly/)).not.toBeInTheDocument();
   });

@@ -100,6 +100,17 @@ describe('isGroupFolded', () => {
     ).toBe(false);
   });
 
+  it('the not-checked group folds by collapsedGroups, not by the healthy fold', () => {
+    expect(isGroupFolded('notChecked', null, filter, new Set())).toBe(false);
+    expect(isGroupFolded('notChecked', null, filter, new Set(['notChecked']))).toBe(true);
+  });
+
+  it("a highlighted unchecked row keeps its not-checked group open, not the healthy one's", () => {
+    const highlighted = makeRow({ orderId: 9, competitionUnchecked: true });
+    expect(isGroupFolded('notChecked', highlighted, filter, new Set(['notChecked']))).toBe(false);
+    expect(isGroupFolded('healthy', highlighted, filter, new Set())).toBe(true);
+  });
+
   it('non-healthy group folds by collapsedGroups membership', () => {
     expect(isGroupFolded('belowFloor', null, filter, new Set(['belowFloor']))).toBe(true);
     expect(isGroupFolded('belowFloor', null, filter, new Set())).toBe(false);

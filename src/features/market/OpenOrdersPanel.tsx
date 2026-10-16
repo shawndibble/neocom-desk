@@ -87,6 +87,7 @@ import {
   openOrderProblemCounts,
   type OpenOrderGroupSummary,
   type OpenOrderRow,
+  type OrderGroupKey,
 } from './openOrdersModel';
 import {
   EMPTY_OPEN_ORDERS_FILTER,
@@ -102,7 +103,6 @@ import {
 import { useCharacterFilterPick } from '@/features/character/characterFilterPicks';
 import { useOpenOrdersLocationFilterPref } from './openOrdersLocationFilterPref';
 import { buildOpenOrdersView, isGroupFolded } from './openOrdersView';
-import type { OrderProblem } from '@/engine/market/orderProblems';
 import { OrderProblemBadge } from './OrderProblemBadge';
 import { adviseOrder } from './orderAdvice';
 import { OrderBadgeLegend } from './OrderBadgeLegend';
@@ -140,13 +140,14 @@ const PROBLEM_FILTER_OPTIONS = FILTERABLE_PROBLEMS;
  * look. Colour is never the only signal here — the header always carries its
  * own words and count (DESIGN.md §7).
  */
-const GROUP_ACCENT: Record<OrderProblem, string> = {
+const GROUP_ACCENT: Record<OrderGroupKey, string> = {
   belowFloor: 'border-l-danger',
   undercutStation: 'border-l-danger',
   undercutSystem: 'border-l-warning',
   undercutRegion: 'border-l-accent',
   expiringOrStale: 'border-l-line',
   outbid: 'border-l-line',
+  notChecked: 'border-l-line',
   healthy: 'border-l-success',
 };
 
@@ -254,7 +255,7 @@ export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
   const [detailOrderId, setDetailOrderId] = useState<number | null>(null);
   const [legendOpen, setLegendOpen] = useState(false);
   /** Groups the player has folded away by hand. `healthy` is never in here — see the toggle below. */
-  const [collapsedGroups, setCollapsedGroups] = useState<ReadonlySet<OrderProblem>>(
+  const [collapsedGroups, setCollapsedGroups] = useState<ReadonlySet<OrderGroupKey>>(
     () => new Set()
   );
   /**
@@ -1302,19 +1303,14 @@ function chipLabel(
  * undercut in it drops the gap clause rather than claiming "worst -0.0%".
  */
 function groupHeaderLine(
-  problem: OrderProblem,
+  problem: OrderGroupKey,
   summary: OpenOrderGroupSummary | undefined,
   {
     showCharacters,
     t,
   }: { showCharacters: boolean; t: (key: string, options?: Record<string, unknown>) => string }
 ): ReactNode {
-  const unchecked = problem === 'healthy' ? (summary?.uncheckedCount ?? 0) : 0;
-  const parts: ReactNode[] = [
-    unchecked > 0
-      ? t('market.orders.group.healthyUncheckedHint', { count: unchecked })
-      : t(`market.orders.group.${problem}Hint`),
-  ];
+  const parts: ReactNode[] = [t(`market.orders.group.${problem}Hint`)];
   if (summary) {
     parts.push(
       <Trans

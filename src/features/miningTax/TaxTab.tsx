@@ -1,5 +1,9 @@
 import { HintText } from '@/components/ui/HintText';
 import { OreIcon } from './OreIcon';
+import { typeLabels } from './typeLabels';
+import { UnpricedOreDetail } from './UnpricedOreDetail';
+import { hasReachableUnpricedHub } from './unpricedHubs';
+import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { TFunction } from 'i18next';
@@ -79,7 +83,6 @@ import {
 } from '@/features/miningTax/groupRows';
 import { resolveRowNames } from '@/features/miningTax/names';
 import {
-  hubForPayee,
   loadDatedUnitPricesByHub,
   pricesAtHubOnDate,
   sellFallbackAtHubOnDate,
@@ -245,6 +248,9 @@ interface Snapshot {
   unpricedTypeIds: Set<number>;
 }
 
+const NO_HUBS: ReadonlySet<string> = new Set();
+const NO_NAMES: ReadonlyMap<number, string> = new Map();
+
 const EMPTY_DATED_PRICES: DatedUnitPrices = {
   byHubAndDate: new Map(),
   unpricedByHub: new Map(),
@@ -346,6 +352,7 @@ interface TaxTabProps {
 
 export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
   const { t } = useTranslation();
+  const pricesUnavailableLabel = usePricesUnavailableLabel();
   const isPhone = useIsPhone();
   const selectionToolbarRef = useRef<HTMLDivElement>(null);
   // The Ore column only where the table has room for it beside a full Payee
@@ -920,9 +927,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
                 {t('miningTax.pricingGapEntry', {
                   date: gap.row.row.entry.date,
                   system: systemName(gap.row),
-                  types: pick(gap)
-                    .map((typeId) => data?.typeNames.get(typeId) ?? `#${typeId}`)
-                    .join(', '),
+                  types: typeLabels(pick(gap), data?.typeNames ?? NO_NAMES),
                 })}
               </button>
             </li>
@@ -1595,54 +1600,27 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     // renders exactly like a cheap ore and silently understates the bill.
     // Named per hub rather than pooled: "no buy orders" is a fact about one
     // order book, and once two Payees bill at two hubs, blaming both for one
-    // thin book would be wrong.
+    // thin book would be wrong. A hub whose price source could not be reached
+    // (offline) is a different fact again; `UnpricedOreDetail` decides per hub.
     if (data.unpricedTypeIds.size > 0) {
+      const unreachableHubs = data.datedPrices.unreachableHubs ?? NO_HUBS;
       attentionItems.push({
         id: 'unpriced',
         tone: 'warning',
-        // The price source being unreachable (offline) is a different fact
-        // from a thin order book, and "move that payee to a busier hub" would
-        // be the wrong advice for it.
-        title: data.datedPrices.pricesUnreachable
-          ? t('common.pricesUnavailableOffline')
-          : t('miningTax.unpricedTitle'),
+        title: hasReachableUnpricedHub(data.unpricedByHub, unreachableHubs)
+          ? t('miningTax.unpricedTitle')
+          : pricesUnavailableLabel,
         detail: (
-          <>
-            {data.datedPrices.pricesUnreachable ? (
-              <>
-                <p>
-                  {t('miningTax.unpricedOfflineTypes', {
-                    types: [...data.unpricedTypeIds]
-                      .map((typeId) => data.typeNames.get(typeId) ?? `#${typeId}`)
-                      .join(', '),
-                  })}
-                </p>
-                <p>{t('miningTax.unpricedOfflineHint')}</p>
-              </>
-            ) : (
-              <>
-                <ul className="space-y-0.5">
-                  {[...data.unpricedByHub]
-                    .filter(([, typeIds]) => typeIds.size > 0)
-                    .map(([hubId, typeIds]) => (
-                      <li key={hubId}>
-                        {t('miningTax.unpricedAtHub', {
-                          hub: hubForPayee(hubId).systemName,
-                          types: [...typeIds]
-                            .map((typeId) => data.typeNames.get(typeId) ?? `#${typeId}`)
-                            .join(', '),
-                        })}
-                      </li>
-                    ))}
-                </ul>
-                <p>{t('miningTax.unpricedHint')}</p>
-              </>
-            )}
+          <UnpricedOreDetail
+            unpricedByHub={data.unpricedByHub}
+            unreachableHubs={unreachableHubs}
+            typeNames={data.typeNames}
+          >
             {renderGapLinks(
               pricingGaps.filter((g) => g.unpriced.length > 0),
               (g) => g.unpriced
             )}
-          </>
+          </UnpricedOreDetail>
         ),
       });
     }
@@ -2156,7 +2134,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
             payees={allPayees}
             suggestion={detailTarget.assignment ? undefined : suggestionFor(detailTarget.row)}
             pricesFor={pricesFor}
-            pricesUnreachable={data.datedPrices.pricesUnreachable === true}
+            unreachableHubs={data.datedPrices.unreachableHubs}
             busy={busy}
             // A failed link shows in its own dialog, open on top of this one.
             saveError={linkTransactionTarget ? null : actionError}

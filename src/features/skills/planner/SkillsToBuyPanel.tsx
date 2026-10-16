@@ -1,3 +1,4 @@
+import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Disclosure, IskAmount, IskFigureGroup, LiveStatus } from '@/components/ui';
@@ -36,6 +37,7 @@ export function SkillsToBuyPanel({
   collapsible = false,
 }: SkillsToBuyPanelProps) {
   const { t } = useTranslation();
+  const pricesUnavailableLabel = usePricesUnavailableLabel();
   const hubId = useMarketHub((state) => state.value);
   const hubHydrated = useMarketHub((state) => state.hydrated);
   const hydrateHub = useMarketHub((state) => state.hydrate);
@@ -72,7 +74,7 @@ export function SkillsToBuyPanel({
         setPrices({ key, hub: hubMap, region, unreachable });
       })
       .catch(() => {
-        // A failed fetch reads as "no sell orders", never as an endless "Loading".
+        // A failed fetch is flagged unreachable (shown as the prices-unavailable placeholder), never an endless "Loading".
         if (!cancelled) setPrices({ key, hub: new Map(), region: new Map(), unreachable: true });
       });
     return () => {
@@ -128,7 +130,7 @@ export function SkillsToBuyPanel({
                 ) : row.price === null ? (
                   <span className="text-text-dim">
                     {unreachable
-                      ? t('common.pricesUnavailableOffline')
+                      ? pricesUnavailableLabel
                       : t('plans.skillsToBuy.noSellOrders', { hub: hub.name })}
                   </span>
                 ) : (

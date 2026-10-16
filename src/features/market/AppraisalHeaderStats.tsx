@@ -2,6 +2,7 @@
  * The Appraisal result's header: eight-plus figures in three titled groups
  * (You get / It's worth / Cargo), one emphasised figure each. Nothing dropped.
  */
+import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { IskAmount, StatChip } from '@/components/ui';
@@ -52,11 +53,12 @@ export function AppraisalHeaderStats({
   pricesUnavailable = false,
 }: AppraisalHeaderStatsProps) {
   const { t } = useTranslation();
+  const pricesUnavailableLabel = usePricesUnavailableLabel();
   if (pricesUnavailable) {
     return (
       <div className="grid w-full grid-cols-[repeat(auto-fit,minmax(min(100%,12rem),1fr))] gap-2">
         <Group title={t('market.appraisal.groupWorth')}>
-          <p className="text-sm text-text-dim">{t('common.pricesUnavailableOffline')}</p>
+          <p className="text-sm text-text-dim">{pricesUnavailableLabel}</p>
         </Group>
         <Group title={t('market.appraisal.groupCargo')}>
           <AppraisalVolumeChip totals={totals} emphasis />

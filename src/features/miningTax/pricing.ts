@@ -206,11 +206,11 @@ export interface DatedUnitPrices {
   /** Per hub, per date, the raw typeIds valued at today's live sell for want of any buy side — see `UnitPrices.sellFallback`. */
   sellFallbackByHubAndDate: ReadonlyMap<TradeHub['id'], ReadonlyMap<string, ReadonlySet<number>>>;
   /**
-   * True when a hub's live lookup could not reach the price source. Read with
-   * `unpriced`: a type that stays unpriced then failed to load, rather than
-   * having no buy orders.
+   * Hubs whose live lookup could not reach the price source. Read with
+   * `unpricedByHub`: an unpriced type at one of these failed to load, rather
+   * than having no buy orders. Per hub, so a reachable hub keeps its own advice.
    */
-  pricesUnreachable?: boolean;
+  unreachableHubs?: ReadonlySet<TradeHub['id']>;
   /** Per hub, per date, which price tier priced each raw typeId. */
   sourcesByHubAndDate?: ReadonlyMap<
     TradeHub['id'],
@@ -315,14 +315,14 @@ export async function loadDatedUnitPricesByHub(
     TradeHub['id'],
     ReadonlyMap<string, ReadonlyMap<number, TaxPriceSource>>
   >();
-  let pricesUnreachable = false;
+  const unreachableHubs = new Set<TradeHub['id']>();
   for (const [hubId, result] of loaded) {
     const sourcesByDate = new Map<string, ReadonlyMap<number, TaxPriceSource>>();
     const byDate = new Map<string, ReadonlyMap<number, number>>();
     const sellByDate = new Map<string, ReadonlySet<number>>();
     const hubUnpriced = new Set<number>();
     for (const [date, dayResult] of result.byDate) {
-      if (dayResult.liveUnreachable) pricesUnreachable = true;
+      if (dayResult.liveUnreachable) unreachableHubs.add(hubId);
       byDate.set(date, dayResult.prices);
       sellByDate.set(date, dayResult.sellFallback);
       sourcesByDate.set(date, dayResult.sources ?? NO_SOURCES);
@@ -342,6 +342,6 @@ export async function loadDatedUnitPricesByHub(
     unpriced,
     sellFallbackByHubAndDate,
     sourcesByHubAndDate,
-    pricesUnreachable,
+    unreachableHubs,
   };
 }

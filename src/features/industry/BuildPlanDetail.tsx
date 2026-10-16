@@ -1,3 +1,4 @@
+import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
 import { tappableRowClassName, touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
@@ -778,7 +779,12 @@ export function BuildPlanDetail({
   // Blueprint prices are provisional until the market/LP offers land, so the
   // page doesn't offer to "find" a blueprint the next render prices.
   // An unreachable price source reads as "not ready", never as free materials.
-  const pricesUnreachable = snapshot?.pricesUnreachable === true;
+  // Either source being down leaves the result unpriceable: the hub lookup, or
+  // the ESI adjusted prices the job cost is computed from.
+  const pricesUnavailableLabel = usePricesUnavailableLabel();
+  const pricesUnreachable =
+    snapshot !== null &&
+    (snapshot.hubPricesUnreachable === true || snapshot.adjustedPrices === null);
   const pricesReady =
     snapshot !== null &&
     snapshot.adjustedPrices !== null &&
@@ -1398,6 +1404,7 @@ export function BuildPlanDetail({
         <PlanVerdictHero
           result={result}
           pricesReady={pricesReady}
+          pricesUnreachable={pricesUnreachable}
           pricesLoading={pricesLoading}
           productName={entry.productName}
           productTypeID={entry.productTypeID}
@@ -2201,7 +2208,7 @@ export function BuildPlanDetail({
                   )}
                 </dl>
               ) : pricesUnreachable ? (
-                <p className="text-xs text-text-dim">{t('common.pricesUnavailableOffline')}</p>
+                <p className="text-xs text-text-dim">{pricesUnavailableLabel}</p>
               ) : null
             }
             expanded={costsExpanded}

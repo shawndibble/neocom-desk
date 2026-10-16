@@ -261,7 +261,7 @@ describe('LoyaltyStore with an unreachable price source (offline)', () => {
     useDesktopViewport();
     mockOffers(true);
     renderStore();
-    expect(await screen.findByText('Prices unavailable offline')).toBeInTheDocument();
+    expect(await screen.findByText('Prices unavailable right now')).toBeInTheDocument();
     expect(screen.getByText(ITEM_ROW.itemName)).toBeInTheDocument();
   });
 
@@ -270,7 +270,7 @@ describe('LoyaltyStore with an unreachable price source (offline)', () => {
     mockOffers(false);
     renderStore();
     expect(await screen.findByText(ITEM_ROW.itemName)).toBeInTheDocument();
-    expect(screen.queryByText('Prices unavailable offline')).not.toBeInTheDocument();
+    expect(screen.queryByText('Prices unavailable right now')).not.toBeInTheDocument();
   });
 });
 

@@ -11,7 +11,7 @@ const VIEWPORTS = [
   ['phone', { width: 390, height: 844 }],
   ['desktop', { width: 1440, height: 900 }],
 ] as const;
-const NOTICE = 'Hub prices could not be fetched';
+const NOTICE = 'Prices unavailable right now';
 
 async function openPricesDown(page: Page, tab: string) {
   await signInAndGoto(page, `./planetary-industry/${tab}`);

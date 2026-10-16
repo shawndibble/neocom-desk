@@ -1455,7 +1455,7 @@ describe('AppraisalPanel: unreachable price source (offline)', () => {
         }),
       }),
     });
-    expect(screen.getByText('Prices unavailable offline')).toBeInTheDocument();
+    expect(screen.getByText('Prices unavailable right now')).toBeInTheDocument();
     expect(screen.queryByText(/no orders on one side at this hub/)).not.toBeInTheDocument();
   });
 
@@ -1471,6 +1471,8 @@ describe('AppraisalPanel: unreachable price source (offline)', () => {
       controller: controller({ result: outcome(), compare: rows }),
     });
     const list = await screen.findByRole('list', { name: 'Compare hubs' });
-    expect(within(list).getAllByText('Prices unavailable offline')).toHaveLength(TRADE_HUBS.length);
+    expect(within(list).getAllByText('Prices unavailable right now')).toHaveLength(
+      TRADE_HUBS.length
+    );
   });
 });

@@ -15,7 +15,7 @@ describe('PricesUnavailable', () => {
   it('asks for a connection check when online', () => {
     setOnline(true);
     render(<PricesUnavailable />);
-    expect(screen.getByText('Hub prices could not be fetched')).toBeInTheDocument();
+    expect(screen.getByText('Prices unavailable right now')).toBeInTheDocument();
     expect(screen.getByText(/Check your connection/)).toBeInTheDocument();
   });
 

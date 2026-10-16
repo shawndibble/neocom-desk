@@ -221,6 +221,15 @@ describe('ordersStateChart', () => {
     ]);
   });
 
+  it('counts an unchecked healthy order as Not checked, never in the Healthy part', () => {
+    const unchecked = order({ orderId: 8, problem: 'healthy', competitionUnchecked: true });
+    const model = ordersStateChart(t, [healthy, unchecked, unchecked])!;
+    expect(model.parts.map((p) => [p.key, p.value])).toEqual([
+      ['healthy', 1],
+      ['notChecked', 2],
+    ]);
+  });
+
   it('folds the three undercut scopes into one Undercut part and skips empty states', () => {
     const region = order({ orderId: 7, problem: 'undercutRegion' });
     const model = ordersStateChart(t, [undercut, region])!;

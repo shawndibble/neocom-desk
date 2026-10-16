@@ -582,8 +582,7 @@ describe('OpenOrdersPanel', () => {
     spy.mockRestore();
   });
 
-  it('says competition was not checked, instead of Healthy, when station prices could not be fetched', async () => {
-    const user = userEvent.setup();
+  it('files an order under Not checked, not Healthy, when station prices could not be fetched', async () => {
     mockedStationPrices.mockResolvedValue(new Map());
     mockedLoadAll.mockResolvedValue(
       snapshot([
@@ -599,11 +598,13 @@ describe('OpenOrdersPanel', () => {
     );
 
     renderPanel();
-    await user.click(await screen.findByRole('button', { name: 'Show healthy orders' }));
 
-    const group = await screen.findByTestId('order-group-healthy');
+    // Not behind the Healthy fold, and the Healthy heading is not there at all.
+    const group = await screen.findByTestId('order-group-notChecked');
+    expect(screen.queryByTestId('order-group-healthy')).not.toBeInTheDocument();
+    expect(within(group).getByText(/Not checked · 1/)).toBeInTheDocument();
+    expect(within(group).getByText(/Market prices couldn't be loaded/)).toBeInTheDocument();
     expect(within(group).queryByText(/Nobody beats your price/)).not.toBeInTheDocument();
-    expect(within(group).getByText(/Competition wasn't checked for 1 order/)).toBeInTheDocument();
     const row = within(group).getByRole('row', { name: /Pyerite/ });
     expect(within(row).getByText('Not checked')).toBeInTheDocument();
     expect(within(row).queryByText('Best price')).not.toBeInTheDocument();

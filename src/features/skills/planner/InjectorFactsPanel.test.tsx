@@ -27,13 +27,13 @@ describe('InjectorFactsPanel', () => {
     pricesMock.getHubPricesWithStatus.mockResolvedValue({ prices: new Map(), unreachable: false });
     renderPanel();
     expect((await screen.findAllByText(/No sell orders at/)).length).toBeGreaterThan(0);
-    expect(screen.queryByText('Prices unavailable offline')).not.toBeInTheDocument();
+    expect(screen.queryByText('Prices unavailable right now')).not.toBeInTheDocument();
   });
 
-  it('says prices are unavailable offline, not "No sell orders", when the source was unreachable', async () => {
+  it('says prices are unavailable right now, not "No sell orders", when the source was unreachable', async () => {
     pricesMock.getHubPricesWithStatus.mockResolvedValue({ prices: new Map(), unreachable: true });
     renderPanel();
-    expect((await screen.findAllByText('Prices unavailable offline')).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText('Prices unavailable right now')).length).toBeGreaterThan(0);
     expect(screen.queryByText(/No sell orders at/)).not.toBeInTheDocument();
   });
 });

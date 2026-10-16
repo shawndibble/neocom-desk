@@ -244,7 +244,7 @@ export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult
     hub,
     hubHydrated,
     ready: offers !== null && catalog !== null && snapshot !== null,
-    pricesUnreachable: snapshot?.pricesUnreachable === true,
+    pricesUnreachable: snapshot?.hubPricesUnreachable === true,
     useOwnMaterialsFor,
     toggleUseOwnMaterials,
   };

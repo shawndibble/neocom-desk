@@ -61,12 +61,13 @@ export interface MarketSnapshot {
   /** True only when ESI answered but has no index for the system — never for the offline null. */
   systemCostIndexMissing?: boolean;
   /**
-   * True when the price source could not be reached — the Fuzzwork hub lookup
-   * failed, or the live adjusted-price call did (offline). Every price above is
-   * then "unknown", not "no orders": a view says "Prices unavailable offline"
-   * instead of "no price" / "0 ISK" copy.
+   * True when the Fuzzwork hub lookup failed. Every hub price above is then
+   * "unknown", not "no orders": a view says "Prices unavailable" instead of
+   * "no price" / "0 ISK" copy. Deliberately not set when only the ESI adjusted
+   * prices failed (`adjustedPrices === null` says that), so a view that needs
+   * only hub prices is not told they are missing.
    */
-  pricesUnreachable?: boolean;
+  hubPricesUnreachable?: boolean;
 }
 
 /** Reuses the hub-price TTL: both are "how often do market conditions change" caches. */
@@ -258,7 +259,7 @@ export function loadMarketSnapshots(
       adjustedPrices: adjusted,
       systemCostIndex,
       systemCostIndexMissing,
-      pricesUnreachable: unreachable || adjusted === null,
+      hubPricesUnreachable: unreachable,
     };
   });
 }

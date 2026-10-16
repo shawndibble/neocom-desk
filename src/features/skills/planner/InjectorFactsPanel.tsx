@@ -1,3 +1,4 @@
+import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { IskAmount } from '@/components/ui';
@@ -31,6 +32,7 @@ export function InjectorFactsPanel({
   cloneState,
 }: InjectorFactsPanelProps) {
   const { t } = useTranslation();
+  const pricesUnavailableLabel = usePricesUnavailableLabel();
   const hubId = useMarketHub((state) => state.value);
   const hubHydrated = useMarketHub((state) => state.hydrated);
   const hydrateHub = useMarketHub((state) => state.hydrate);
@@ -75,7 +77,7 @@ export function InjectorFactsPanel({
 
   const priceCell = (value: number | null) => {
     if (!priceLoaded) return t('common.loading');
-    if (value === null && unreachable) return t('common.pricesUnavailableOffline');
+    if (value === null && unreachable) return pricesUnavailableLabel;
     return value === null ? (
       t('plans.injectors.noSellOrders', { hub: hub.name })
     ) : (

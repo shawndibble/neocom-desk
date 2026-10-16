@@ -17,14 +17,14 @@ describe('PiMapTab when hub prices could not be read', () => {
   it('keeps the board and adds the notice', () => {
     state = ready(null, true);
     render(<PiMapTab characterId={7} />);
-    expect(screen.getByText('Hub prices could not be fetched')).toBeInTheDocument();
+    expect(screen.getByText('Prices unavailable right now')).toBeInTheDocument();
     expect(screen.getByText('map board')).toBeInTheDocument();
   });
 
   it('shows no price notice when prices loaded', () => {
     state = ready(null);
     render(<PiMapTab characterId={7} />);
-    expect(screen.queryByText('Hub prices could not be fetched')).not.toBeInTheDocument();
+    expect(screen.queryByText('Prices unavailable right now')).not.toBeInTheDocument();
   });
 });
 

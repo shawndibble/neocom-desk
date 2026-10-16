@@ -69,7 +69,7 @@ describe('SkillsToBuyPanel', () => {
 });
 
 describe('SkillsToBuyPanel with an unreachable price source (offline)', () => {
-  it('says prices are unavailable offline instead of "No sell orders", and shows no total', async () => {
+  it('says prices are unavailable right now instead of "No sell orders", and shows no total', async () => {
     pricesMock.getHubPricesWithStatus.mockResolvedValueOnce({
       prices: new Map(),
       unreachable: true,
@@ -77,7 +77,7 @@ describe('SkillsToBuyPanel with an unreachable price source (offline)', () => {
     pricesMock.getRegionSellPrices.mockResolvedValueOnce(new Map());
     renderPanel();
 
-    expect(await screen.findAllByText('Prices unavailable offline')).toHaveLength(2);
+    expect(await screen.findAllByText('Prices unavailable right now')).toHaveLength(2);
     expect(screen.queryByText(/No sell orders/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Total cost/)).not.toBeInTheDocument();
     expect(screen.queryByText(/without a price/)).not.toBeInTheDocument();

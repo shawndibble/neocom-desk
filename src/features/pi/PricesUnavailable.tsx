@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { useOnline } from '@/stores/network';
+import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
 
 /**
  * The one "prices unavailable" notice, shared by Plan, Map and Colonies. Prices
@@ -9,14 +10,13 @@ import { useOnline } from '@/stores/network';
 export function PricesUnavailable() {
   const { t } = useTranslation();
   const online = useOnline();
+  const pricesUnavailableLabel = usePricesUnavailableLabel();
   return (
     <div
       role="status"
       className="rounded-sm border border-warning/45 bg-warning/10 px-4 py-3 text-sm"
     >
-      <p className="font-semibold text-warning">
-        {online ? t('piPlan.pricesFailedTitle') : t('common.pricesUnavailableOffline')}
-      </p>
+      <p className="font-semibold text-warning">{pricesUnavailableLabel}</p>
       <p className="mt-1 text-xs text-text-dim">
         {online ? t('piPlan.pricesFailedHint') : t('piPlan.pricesFailedOfflineHint')}
       </p>
