@@ -18,18 +18,10 @@ import type { TripPlan } from '@/engine/market/haulingPlan';
 import { ROUTE_PREFERENCE_LABEL_KEYS } from '@/features/route/routePreferences';
 import { clampIskZero, formatIsk, formatIskCompactSigned } from '@/lib/isk';
 import { useStickyClearance } from '@/lib/useStickyClearance';
-import { formatVolume } from './format';
+import { formatTripM3 } from './format';
 import { HaulingHoldMeters } from './HaulingHoldMeters';
 import { signedIsk } from './signedIsk';
 import type { HubJumps } from './useHubJumps';
-
-/** Below this a summed volume is float residue, not cargo. */
-const M3_EPSILON = 1e-6;
-
-/** Whole m³; a real volume under one says "<1" rather than a misleading 0 or 1. */
-function formatTripM3(value: number): string {
-  return value >= M3_EPSILON && value < 1 ? '<1' : formatVolume(Math.max(0, value));
-}
 
 const isk = (value: number) => formatIsk(value, 0);
 const signed = (value: number) => signedIsk(value, 0);

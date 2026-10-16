@@ -91,3 +91,17 @@ function typeIdsInCategories(
     .map((t) => t.typeId)
     .sort((a, b) => a - b);
 }
+
+/** Each offered type id's Hauling category: what a fill row names as where it comes from. */
+export function haulingCategoryByType(
+  groups: readonly MarketGroupNode[],
+  types: readonly MarketTypeEntry[]
+): Map<number, number> {
+  const byType = new Map<number, number>();
+  for (const categoryId of HAULING_CATEGORY_IDS) {
+    for (const typeId of typeIdsInCategory(categoryId, groups, types)) {
+      if (!byType.has(typeId)) byType.set(typeId, categoryId);
+    }
+  }
+  return byType;
+}

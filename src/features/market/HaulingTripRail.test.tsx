@@ -149,7 +149,7 @@ describe('HaulingTripSummary', () => {
     // 137,608,611 / 45
     expect(screen.getByText('+3,057,969')).toBeInTheDocument();
     expect(
-      screen.getByText('A week of sales caps every item; the hold is not the limit.')
+      screen.getByText("Limited by sales: some items stop at a realistic share of a week's sales.")
     ).toBeInTheDocument();
   });
 

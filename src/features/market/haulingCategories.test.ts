@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   EVERYTHING_CATEGORY_ID,
+  haulingCategoryByType,
   isHaulingCategoryId,
   typeIdsInCategory,
   typeIdsInHaulingCategory,
@@ -65,5 +66,17 @@ describe('isHaulingCategoryId', () => {
     expect(isHaulingCategoryId(11)).toBe(true);
     expect(isHaulingCategoryId(EVERYTHING_CATEGORY_ID)).toBe(true);
     expect(isHaulingCategoryId(4)).toBe(false); // Ships
+  });
+});
+
+describe('haulingCategoryByType', () => {
+  it('maps each offered type to the Hauling category it sits under, at any depth', () => {
+    const byType = haulingCategoryByType(groups, types);
+    expect(byType.get(10)).toBe(11);
+    expect(byType.get(30)).toBe(11);
+    expect(byType.get(20)).toBe(9);
+  });
+  it('leaves out types outside every offered category', () => {
+    expect(haulingCategoryByType(groups, types).has(40)).toBe(false);
   });
 });
