@@ -6485,7 +6485,6 @@
     "title": "Mail",
     "markup": {
       "openInEve": "Open this in EVE. Neocom Desk can't show it.",
-      "placeSoon": "A place view isn't available yet. Open it in EVE.",
       "realHost": "Opens {{host}}"
     },
     "refresh": "Refresh",
@@ -11922,6 +11921,22 @@
     "noOrigin": "Set your current system to filter by distance.",
     "graphUnavailable": "Distances are unavailable offline. Showing every distance.",
     "distanceUnavailable": "Distance unavailable — the local stargate snapshot couldn't be read."
+  },
+  "placeInfo": {
+    "title": "Place info",
+    "loading": "Loading place",
+    "type": "Type",
+    "system": "System",
+    "region": "Region",
+    "kind": {
+      "region": "Region",
+      "station": "Station",
+      "structure": "Structure"
+    },
+    "structureUnreadable": "Can't read this structure",
+    "structureUnreadableHint": "Only a character with docking access can see a structure's name and system.",
+    "unknown": "Can't find this place",
+    "unknownHint": "Neocom Desk has no record of this location."
   },
   "openInEve": {
     "information": "Open in EVE",

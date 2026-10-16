@@ -4,6 +4,7 @@ export {
   CharacterLink,
   CorporationLink,
   ItemInfoLink,
+  PlaceLink,
   SkillLink,
   SystemLink,
 } from './EntityLink';

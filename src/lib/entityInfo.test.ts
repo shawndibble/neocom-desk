@@ -15,6 +15,15 @@ describe('parseEntityInfo', () => {
     expect(parseEntityInfo('?info=alliance-5')).toEqual({ kind: 'alliance', id: 5 });
     expect(parseEntityInfo('?info=skill-3300')).toEqual({ kind: 'skill', id: 3300 });
     expect(parseEntityInfo('?info=type-34')).toEqual({ kind: 'type', id: 34 });
+    expect(parseEntityInfo('?info=place-60003760')).toEqual({ kind: 'place', id: 60003760 });
+    expect(parseEntityInfo('?info=place-1030000000000')).toEqual({
+      kind: 'place',
+      id: 1_030_000_000_000,
+    });
+  });
+
+  it('takes no item id on a place', () => {
+    expect(parseEntityInfo('?info=place-60003760-5')).toBeNull();
   });
 
   it('writes and rejects item types', () => {

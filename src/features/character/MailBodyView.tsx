@@ -18,6 +18,7 @@ import {
   CharacterLink,
   CorporationLink,
   ItemInfoLink,
+  PlaceLink,
   SkillLink,
   SystemLink,
 } from '@/features/entities/EntityLink';
@@ -98,7 +99,9 @@ function ShowInfoLink({ target, children }: { target: MarkupLinkTarget; children
       case 'item':
         return <ItemOrSkillLink typeId={info.typeId}>{children}</ItemOrSkillLink>;
       case 'place':
-        return <HintText content={t('mail.markup.placeSoon')}>{children}</HintText>;
+        return <PlaceLink id={info.id}>{children}</PlaceLink>;
+      case 'noView':
+        break;
     }
   }
   return <HintText content={t('mail.markup.openInEve')}>{children}</HintText>;
