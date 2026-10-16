@@ -60,6 +60,49 @@ describe('NeedsConnection', () => {
     expect(onClick).not.toHaveBeenCalled();
   });
 
+  it('keeps the same control and its focus across a connectivity change, in both directions', () => {
+    go(true);
+    render(
+      <NeedsConnection>
+        <Button>Log in</Button>
+      </NeedsConnection>
+    );
+    const button = screen.getByRole('button', { name: 'Log in' });
+    button.focus();
+    expect(document.activeElement).toBe(button);
+
+    act(() => go(false));
+    expect(screen.getByRole('button', { name: 'Log in' })).toBe(button);
+    expect(document.activeElement).toBe(button);
+    expect(button).toHaveAttribute('aria-disabled', 'true');
+
+    act(() => go(true));
+    expect(screen.getByRole('button', { name: 'Log in' })).toBe(button);
+    expect(document.activeElement).toBe(button);
+    expect(button).not.toHaveAttribute('aria-disabled');
+  });
+
+  it('adds the reason under the control’s own tooltip offline, and shows only that tooltip online', async () => {
+    go(true);
+    render(
+      <NeedsConnection tooltip="Add character">
+        <Button aria-label="Add character">+</Button>
+      </NeedsConnection>
+    );
+    const button = screen.getByRole('button', { name: 'Add character' });
+    await userEvent.hover(button);
+    const online = await screen.findByRole('tooltip');
+    expect(online).toHaveTextContent('Add character');
+    expect(online).not.toHaveTextContent('Needs a connection');
+    await userEvent.unhover(button);
+
+    act(() => go(false));
+    await userEvent.hover(button);
+    const offline = (await screen.findAllByRole('tooltip')).at(-1);
+    expect(offline).toHaveTextContent('Add character');
+    expect(offline).toHaveTextContent('Needs a connection');
+  });
+
   it('works again as soon as the connection returns', async () => {
     go(false);
     const onClick = vi.fn();

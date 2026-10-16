@@ -13,6 +13,7 @@ import {
   IconButton,
   InfoTooltip,
   Tooltip,
+  NeedsConnection,
   IskAmount,
   MenuItem,
   Modal,
@@ -409,8 +410,12 @@ export function InteractionGrammar() {
               <OfflineStrip>{t('offline.banner')}</OfflineStrip>
             </Cue>
             <Cue rule={k('rules.needsConnection')} note={k('notes.needsConnection')}>
+              {/* The live guard (dims when this browser goes offline), then the same look held still. */}
+              <NeedsConnection>
+                <Button>{k('samples.signIn')}</Button>
+              </NeedsConnection>
               <Tooltip content={t('common.needsConnection')}>
-                <Button aria-disabled="true">{k('samples.signIn')}</Button>
+                <Button aria-disabled="true">{k('samples.signInOffline')}</Button>
               </Tooltip>
             </Cue>
             <Cue rule={k('rules.stateLoading')}>

@@ -8,9 +8,18 @@ import { useOnline } from '@/stores/network';
  * The strip itself, without the connection logic: what the shell shows, and
  * what the styleguide's interaction grammar renders as the cue's sample.
  */
-export function OfflineStrip({ children, className }: { children: string; className?: string }) {
+export function OfflineStrip({
+  children,
+  className,
+  'data-testid': testId,
+}: {
+  children: string;
+  className?: string;
+  'data-testid'?: string;
+}) {
   return (
     <p
+      data-testid={testId}
       className={cx(
         'flex items-start gap-2 rounded-xs border border-line bg-panel px-3 py-1.5 text-xs text-text-dim',
         className
@@ -45,7 +54,11 @@ export function OfflineBanner() {
   return (
     <>
       <LiveStatus>{!online && message}</LiveStatus>
-      {!online && <OfflineStrip className="mb-4">{message}</OfflineStrip>}
+      {!online && (
+        <OfflineStrip className="mb-4" data-testid="offline-banner">
+          {message}
+        </OfflineStrip>
+      )}
     </>
   );
 }

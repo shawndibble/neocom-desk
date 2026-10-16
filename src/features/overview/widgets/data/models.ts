@@ -376,7 +376,12 @@ const comingUp: Builder = (feeds, { t, now }) => {
   return {
     ...blank(
       to,
-      statusOf(feed, { needsPermission: data.needsReauth, isEmpty: upcoming.length === 0 })
+      statusOf(feed, {
+        needsPermission: data.needsReauth,
+        isEmpty: upcoming.length === 0,
+        // A read time means the events came from a real (cached) read.
+        hasStaleData: data.fetchedAt !== null,
+      })
     ),
     fetchedAt: data.fetchedAt,
     number: next
@@ -429,7 +434,10 @@ const mail: Builder = (feeds, { t, now }) => {
   const to = '/mail';
   if (!data) return blank(to, statusOf(feed));
   return {
-    ...blank(to, statusOf(feed, { needsPermission: data.needsReauth })),
+    ...blank(
+      to,
+      statusOf(feed, { needsPermission: data.needsReauth, hasStaleData: data.fetchedAt !== null })
+    ),
     fetchedAt: data.fetchedAt,
     number: {
       value: count(data.unread),
@@ -484,7 +492,15 @@ const orders: Builder = (feeds, { t, now, activeCharacterId, scopeAll }) => {
   const listed = ordersListed(rows);
   const severity = ordersSeverity(rows, needsReauth);
   return {
-    ...blank(to, statusOf(feed, { needsPermission: needsReauth, isEmpty: rows.length === 0 })),
+    ...blank(
+      to,
+      statusOf(feed, {
+        needsPermission: needsReauth,
+        isEmpty: rows.length === 0,
+        // Saved orders for this view's Characters are still worth showing.
+        hasStaleData: rows.length > 0,
+      })
+    ),
     // The snapshot's own clock: when its orders were read, not when this view was built.
     fetchedAt: new Date(snapshot.now),
     number: {
@@ -584,7 +600,10 @@ const contracts: Builder = (feeds, { t, now }) => {
         tone,
       };
   return {
-    ...blank(to, statusOf(feed, { needsPermission: data.needsReauth })),
+    ...blank(
+      to,
+      statusOf(feed, { needsPermission: data.needsReauth, hasStaleData: data.fetchedAt !== null })
+    ),
     fetchedAt: data.fetchedAt,
     number,
     rows: list,

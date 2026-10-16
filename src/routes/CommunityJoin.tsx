@@ -13,6 +13,7 @@ import {
   CharacterAvatar,
   EmptyState,
   EveSsoButton,
+  NeedsConnection,
   LogoMark,
   Panel,
   Spinner,
@@ -276,9 +277,11 @@ export function CommunityJoin() {
                               <span id={`needs-${character.characterId}`} className="text-text-dim">
                                 {t('communities.join.needsPermission')}
                               </span>
-                              <Button size="sm" onClick={() => grant(character.characterId)}>
-                                {t('communities.join.grant')}
-                              </Button>
+                              <NeedsConnection>
+                                <Button size="sm" onClick={() => grant(character.characterId)}>
+                                  {t('communities.join.grant')}
+                                </Button>
+                              </NeedsConnection>
                             </>
                           )}
                           {result && (
@@ -315,9 +318,11 @@ export function CommunityJoin() {
                   >
                     {t('communities.join.joinAction', { count: totalShared })}
                   </Button>
-                  <Button onClick={logIn} disabled={loggingIn || working}>
-                    {t('communities.join.another')}
-                  </Button>
+                  <NeedsConnection>
+                    <Button onClick={logIn} disabled={loggingIn || working}>
+                      {t('communities.join.another')}
+                    </Button>
+                  </NeedsConnection>
                   {anyJoined && (
                     <Link to="/communities" className="text-xs underline">
                       {t('communities.join.open')}

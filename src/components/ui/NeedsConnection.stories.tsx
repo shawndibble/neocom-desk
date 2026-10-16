@@ -44,3 +44,16 @@ export const Online: Story = {};
 
 /** @summary Offline the child is `aria-disabled`; hover or focus it for the reason. */
 export const Offline: Story = { decorators: [offline] };
+
+/** @summary Pass the control's own tooltip: online it is shown as is, offline the reason is added beneath it. */
+export const WithOwnTooltip: Story = {
+  args: {
+    tooltip: 'Add character',
+    children: (
+      <Button variant="primary" aria-label="Add character">
+        Add
+      </Button>
+    ),
+  },
+  decorators: [offline],
+};

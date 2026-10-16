@@ -81,9 +81,8 @@ test('shows the offline banner while the browser is offline and drops it on reco
   context,
 }) => {
   await signInAndGoto(page);
-  const banner = page.getByText(
-    "You're offline — showing data saved on this device. Changes sync when you reconnect."
-  );
+  // The strip by test id: its sentence is also in a screen-reader-only live region, so text alone matches twice.
+  const banner = page.getByTestId('offline-banner');
   await expect(banner).toHaveCount(0);
 
   await context.setOffline(true);

@@ -41,6 +41,7 @@ import {
   TextInput,
   Toast,
   Tooltip,
+  NeedsConnection,
   type DataTableColumn,
   type StatChipTone,
 } from '@/components/ui';
@@ -48,7 +49,6 @@ import * as Icon from '@/components/ui/icons';
 import { beginAddCharacterLogin } from '@/app/loginFlow';
 import { NeedsLoginNotice } from '@/app/AuthFailureNotice';
 import { useAuthFailure } from '@/stores/authFailure';
-import { useOnline } from '@/stores/network';
 import { CustomizePermissionsDialog } from '@/features/permissions/CustomizePermissionsDialog';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { usePublicInfo, type PublicInfoEntry } from '@/stores/publicInfo';
@@ -897,7 +897,6 @@ function buildColumns(
 /** Character wall: pick the active character, group/sort/densify it, or add another via EVE SSO. */
 export function Characters() {
   const { t } = useTranslation();
-  const online = useOnline();
   const navigate = useNavigate();
   const location = useLocation();
   const characters = useLiveQuery(() => db.characters.orderBy('characterId').toArray());
@@ -1605,21 +1604,19 @@ export function Characters() {
               adding several alts with one hand-picked grant stays one click each.
             */}
             <div className="flex">
-              {/* Offline the same button reports why (the tooltip is already here, so no `NeedsConnection` wrapper). */}
-              <Tooltip content={online ? t('characters.add') : t('common.needsConnection')}>
+              <NeedsConnection tooltip={t('characters.add')}>
                 <Button
                   variant="primary"
                   size="md"
                   className="rounded-r-none"
                   aria-label={t('characters.add')}
-                  aria-disabled={!online || undefined}
                   onClick={() => void beginAddCharacterLogin()}
                 >
                   <Icon.AddCharacter />
                   {/* Icon-only below `sm`: no room beside the split trigger. */}
                   <span className="hidden sm:inline">{t('characters.addLabel')}</span>
                 </Button>
-              </Tooltip>
+              </NeedsConnection>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button

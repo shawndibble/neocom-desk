@@ -12443,6 +12443,7 @@
         "disabled": "Disabled",
         "ariaDisabled": "aria-disabled",
         "signIn": "Log in with EVE",
+        "signInOffline": "Log in with EVE (offline)",
         "saving": "Saving",
         "toggleOn": "Toggle on",
         "toggleOff": "Toggle off",

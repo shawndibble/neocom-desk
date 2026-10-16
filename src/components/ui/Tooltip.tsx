@@ -58,6 +58,11 @@ interface TooltipProps {
    * its reasoning), never for laying out a panel: 14rem of undismissable,
    * unscrollable hover is the wrong home for a list, and on touch it is only
    * reachable by long-press.
+   *
+   * Nullish, `false` or empty renders just the trigger — same tree, same DOM
+   * position, no bubble — so a caller whose tooltip only sometimes has
+   * something to say (`NeedsConnection`) can keep its control mounted instead
+   * of swapping the wrapper in and out, which would drop focus.
    */
   content: ReactNode;
   /** Single focusable trigger element (button, etc.) — tooltip reveals on hover or focus. */
@@ -115,6 +120,8 @@ export function Tooltip({ content, children, openOnTap = false, className = '' }
   const touchOpenedAt = useRef<number | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const mouseHovering = useRef(false);
+  const hasContent =
+    content !== null && content !== undefined && content !== false && content !== '';
 
   function cancelLongPress() {
     clearTimeout(longPressTimer.current);
@@ -249,7 +256,10 @@ export function Tooltip({ content, children, openOnTap = false, className = '' }
 
   return (
     <TooltipPrimitive.Provider delayDuration={0}>
-      <TooltipPrimitive.Root open={hoverOpen || touchOpen} onOpenChange={handleOpenChange}>
+      <TooltipPrimitive.Root
+        open={hasContent && (hoverOpen || touchOpen)}
+        onOpenChange={handleOpenChange}
+      >
         <TooltipPrimitive.Trigger
           asChild
           ref={triggerRef}
@@ -268,15 +278,17 @@ export function Tooltip({ content, children, openOnTap = false, className = '' }
         >
           {trigger}
         </TooltipPrimitive.Trigger>
-        <TooltipPrimitive.Portal container={container}>
-          <TooltipPrimitive.Content
-            sideOffset={4}
-            collisionPadding={8}
-            className="pointer-events-none z-50 max-w-56 rounded-xs border border-line bg-panel p-2 text-[0.6875rem] font-normal whitespace-pre-line text-text-dim normal-case shadow-lg shadow-black/50"
-          >
-            {content}
-          </TooltipPrimitive.Content>
-        </TooltipPrimitive.Portal>
+        {hasContent && (
+          <TooltipPrimitive.Portal container={container}>
+            <TooltipPrimitive.Content
+              sideOffset={4}
+              collisionPadding={8}
+              className="pointer-events-none z-50 max-w-56 rounded-xs border border-line bg-panel p-2 text-[0.6875rem] font-normal whitespace-pre-line text-text-dim normal-case shadow-lg shadow-black/50"
+            >
+              {content}
+            </TooltipPrimitive.Content>
+          </TooltipPrimitive.Portal>
+        )}
       </TooltipPrimitive.Root>
     </TooltipPrimitive.Provider>
   );
