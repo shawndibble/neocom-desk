@@ -866,8 +866,7 @@
         "exotic": "Scan resolution +50% · kinetic resists −{{penalty}}%",
         "firestorm": "Armor HP +50% · thermal resists −{{penalty}}%",
         "gamma": "Shield HP +50% · explosive resists −{{penalty}}%"
-      },
-      "in": "in {{weather}}"
+      }
     },
     "phoneTabs": {
       "stats": "Stats",
@@ -997,16 +996,41 @@
       "ehpColumn": "EHP",
       "incomplete": "incomplete",
       "headingCharacter": {
-        "character": "Stats as {{name}}, own skills",
-        "allV": "Stats as {{name}}, all skills V",
-        "all0": "Stats as {{name}}, all skills 0"
+        "character": "{{name}}, own skills",
+        "allV": "{{name}}, all skills V",
+        "all0": "{{name}}, all skills 0"
+      },
+      "headingCharacterShort": {
+        "character": "{{name}}",
+        "allV": "{{name}}, all V",
+        "all0": "{{name}}, all 0"
       },
       "headingNoCharacter": {
-        "allV": "Stats at all skills V",
-        "all0": "Stats at all skills 0"
+        "allV": "All skills V",
+        "all0": "All skills 0"
       },
       "headingSkillsSet_one": "{{count}} skill set by hand",
       "headingSkillsSet_other": "{{count}} skills set by hand",
+      "headingSkillsSetShort_one": "{{count}} set by hand",
+      "headingSkillsSetShort_other": "{{count}} set by hand",
+      "group": {
+        "damage": "Damage",
+        "tank": "Tank",
+        "ship": "Ship"
+      },
+      "pilot": {
+        "label": "Pilot",
+        "missing_one": "{{count}} missing",
+        "missing_other": "{{count}} missing",
+        "skillsUnknown": "skills unknown"
+      },
+      "situation": {
+        "label": "Situation",
+        "subtitle": "What every figure on the page is worked out in",
+        "overheated": "overheated",
+        "projected_one": "{{count}} ship projected",
+        "projected_other": "{{count}} ships projected"
+      },
       "layerHp": "{{hp}} HP",
       "rahRow": "Reactive Armor Hardener",
       "fittingMeta": "CPU {{cpu}}% · PG {{pg}}%",
