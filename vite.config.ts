@@ -336,14 +336,14 @@ export default defineConfig({
         // system/region/group/attribute pickers read (`blueprints.json`,
         // `shipTree.json`, `market/{systems,jumps,systemPositions,groups,
         // attributes,regions,globalMarkets,lpCorporations}.json`; ~3.5 MB raw)
+        // and the market catalogue `market/{types,stations,variations}.json`
+        // (~3.1 MB raw, ~360 KB gzip: Fittings, Show Info and station names read them)
         // — see docs/context/decisions/*-core-feature-sde-files-are-precached*.
         // Everything else under `public/data` is the lazy set,
         // `src/sde/lazySdeFiles.ts`: one list, also what the idle background
         // warm fetches, cached cache-first under its content-versioned URL by
         // src/sw.ts (docs/context/decisions/*-feature-sde-files-load-on-demand-
-        // not-precached.md, amended). The market catalogue's three big files
-        // (types, stations, variations) are in it, so the Market Browser's
-        // order-book data is never paid for up front.
+        // not-precached.md, amended).
         // The dogma engine's WASM binary and its SDE data file (ADR 0016,
         // ~10 MB together) are fetched lazily on first Fitting open instead.
         // The 512px install icons and the brand lockup are fetched by the
