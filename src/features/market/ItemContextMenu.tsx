@@ -26,6 +26,8 @@ import { StockTargetDialog } from '@/features/stockTargets/StockTargetDialog';
 import { OpenInEveMenuItem } from '@/features/openInEve/OpenInEveMenuItem';
 import { MarketOnly } from '@/features/abyssal/MarketOnly';
 import { ViewInMarketMenuItem } from './ViewInMarketMenuItem';
+// Re-exported: menus built on this module's entries import it from here.
+export { ViewInMarketMenuItem };
 import { PriceAlertDialog, PriceAlertMenuItem } from './PriceAlertDialog';
 
 export interface ItemContextMenuProps {
