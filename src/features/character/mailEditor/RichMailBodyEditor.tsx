@@ -327,9 +327,8 @@ export default function RichMailBodyEditor({
             'min-h-0 flex-1 overflow-y-auto p-3 text-xs leading-normal break-words whitespace-pre-wrap',
             inSource ? 'hidden' : 'flex flex-col'
           )}
-          // The editable fills the box (flex, not `min-h-full`: Reply's card has no
+          // Editable fills the box via flex, not `min-h-full` (Reply's card has no
           // definite height), so a tap lands in it natively and the keyboard opens.
-          // This only catches the padding, and leaves a drag-selection alone.
           onClick={(e) => {
             if (!editor || editor.isDestroyed || !(e.target instanceof Node)) return;
             if (editor.view.dom.contains(e.target)) return;

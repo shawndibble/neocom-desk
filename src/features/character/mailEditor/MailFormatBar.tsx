@@ -2,10 +2,9 @@
  * The mail format bar (decision 20261016-124635): bold, italic, underline,
  * colour, size, link, table and clear formatting, as one row of flat icon
  * buttons split into groups by hairlines, with the Source toggle at the right
- * end. Inline it is the top strip of the editor's card (the card owns the
- * frame; the bar draws only a hairline under itself), on a phone too: there it
- * is one row that scrolls sideways, on a wide screen it wraps. Colour, size,
- * link and table open a sheet rather than crowding the row.
+ * end. It is the top strip of the editor's card on every width (the card owns
+ * the frame; the bar draws only a hairline under itself). Colour, size, link
+ * and table open a sheet rather than crowding the row.
  *
  * It only calls `MailEditorCommands`, so it works the same over the Preview
  * (Tiptap) and the Source textarea. Buttons never take focus from the writing
