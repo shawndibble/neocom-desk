@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { fittingCompareHref, fittingsRedirect } from '@/features/fittings/fittingRoutes';
 import { ShipsTabBar } from '@/features/fittings/ShipsTabBar';
 import { SHIPS_TABS_ID } from '@/features/fittings/shipsTabs';
@@ -200,6 +200,11 @@ function FittingsPage() {
     () => (activeCharacterId === null ? undefined : db.characters.get(activeCharacterId)),
     [activeCharacterId]
   )?.name;
+  const allCharacters = useLiveQuery(() => db.characters.toArray(), [], []);
+  const yourCharacters = useMemo(
+    () => allCharacters.map(({ characterId, name }) => ({ characterId, name })),
+    [allCharacters]
+  );
   const gaps = useFittingSkillGaps(workspace.fitting, activeCharacterId);
   const alpha = useFittingAlpha(workspace.fitting);
   const hardpoints = useFittingHardpoints(workspace.fitting);
@@ -608,6 +613,7 @@ function FittingsPage() {
           catalogue={catalogue}
         />
       }
+      yourCharacters={yourCharacters.length > 1 ? yourCharacters : undefined}
       implants={
         <>
           <ImplantSetControl
