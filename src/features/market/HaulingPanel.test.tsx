@@ -62,7 +62,7 @@ const FILL_ROW: ListHaulingScanRow = {
 
 const READY: HaulingScanState = {
   status: 'ready',
-  scan: { rows: [SCAN_ROW], scanned: 1, examinedTypeIds: [], fetchedAt: 0 },
+  scan: { rows: [SCAN_ROW], scanned: 1, examinedTypeIds: [], overMaxPrice: 0, fetchedAt: 0 },
 };
 
 const INSTANT_READY: HaulingScanState = {
@@ -85,6 +85,7 @@ const INSTANT_READY: HaulingScanState = {
     ],
     scanned: 1,
     examinedTypeIds: [],
+    overMaxPrice: 0,
     fetchedAt: 0,
   },
 };
@@ -95,6 +96,7 @@ const ANY_FROM_READY: HaulingScanState = {
     rows: [{ ...SCAN_ROW, fromHub: DODIXIE, toHub: JITA }],
     scanned: 1,
     examinedTypeIds: [],
+    overMaxPrice: 0,
     fetchedAt: 0,
   },
 };
@@ -281,6 +283,7 @@ describe('HaulingPanel rows select, the rail shows the detail', () => {
         rows: [SCAN_ROW, { ...SCAN_ROW, typeId: 2205, name: 'Hammerhead II' }],
         scanned: 2,
         examinedTypeIds: [],
+        overMaxPrice: 0,
         fetchedAt: 0,
       },
     };
@@ -296,6 +299,23 @@ describe('HaulingPanel rows select, the rail shows the detail', () => {
       'aria-expanded',
       'false'
     );
+  });
+
+  it('counts what ships, not what is ticked: a row Max spend sizes to nothing is not in the trip', () => {
+    mainState = {
+      status: 'ready',
+      scan: {
+        rows: [SCAN_ROW, { ...SCAN_ROW, typeId: 2205, name: 'Hammerhead II' }],
+        scanned: 2,
+        examinedTypeIds: [],
+        overMaxPrice: 0,
+        fetchedAt: 0,
+      },
+    };
+    // 70 Damage Control II at 100 each: nothing left for the second.
+    useHaulingBudget.setState({ hydrated: true, value: 7_000 });
+    renderPanel();
+    expect(screen.getByText('1 of 2 in the trip')).toBeInTheDocument();
   });
 
   it('the Trip crumb goes back to the trip but keeps the row selected', async () => {
@@ -447,7 +467,7 @@ describe('HaulingPanel fill the free space', () => {
     await user.click(screen.getByRole('button', { name: 'Find items to fill it' }));
     expect(fillFind).toHaveBeenCalledOnce();
     expect(screen.queryByRole('button', { name: /Find items/ })).toBeNull();
-    expect(screen.getByRole('status', { name: 'Batch 2 · 300 m³ still free' })).toBeInTheDocument();
+    expect(screen.getByRole('status', { name: 'Batch 2 · 300 m³ free' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Stop' }));
     expect(fillStop).toHaveBeenCalledOnce();
   });
@@ -465,6 +485,22 @@ describe('HaulingPanel fill the free space', () => {
       batchRows: 1,
     });
     expect(fillInput!.measure([FILL_ROW], new Set())).toMatchObject({ newLines: 0 });
+  });
+
+  it('never spends a batch on what the category scan examined either', () => {
+    setCargo(1000);
+    mainState = {
+      status: 'ready',
+      scan: {
+        rows: [SCAN_ROW],
+        scanned: 3,
+        examinedTypeIds: [2048, 77],
+        overMaxPrice: 0,
+        fetchedAt: 0,
+      },
+    };
+    renderPanel();
+    expect(new Set(fillInput!.excludeIds())).toEqual(new Set([2048, 77]));
   });
 
   it('sizes only rows the user’s filters let through', async () => {
@@ -525,7 +561,7 @@ describe('HaulingPanel fill the free space', () => {
     await user.click(screen.getByRole('button', { name: 'Find more' }));
     expect(fillMore).toHaveBeenCalledOnce();
     expect(row(/Nitrogen Fuel Block/)).toBeInTheDocument();
-    expect(screen.getByRole('status', { name: 'Batch 2 · 450 m³ still free' })).toBeInTheDocument();
+    expect(screen.getByRole('status', { name: 'Batch 2 · 450 m³ free' })).toBeInTheDocument();
   });
 
   it('says why it stopped, and offers Find more while the hold has room', async () => {
@@ -768,7 +804,7 @@ describe('HaulingPanel states', () => {
   it('shows the empty state, with a reset, when nothing passes the filters', () => {
     mainState = {
       status: 'ready',
-      scan: { rows: [], scanned: 0, examinedTypeIds: [], fetchedAt: 0 },
+      scan: { rows: [], scanned: 0, examinedTypeIds: [], overMaxPrice: 0, fetchedAt: 0 },
     };
     renderPanel();
     expect(screen.queryByRole('table')).toBeNull();
@@ -820,10 +856,25 @@ const DEAR_ROW: ListHaulingScanRow = {
 };
 const WITH_DEAR: HaulingScanState = {
   status: 'ready',
-  scan: { rows: [SCAN_ROW, DEAR_ROW], scanned: 2, examinedTypeIds: [], fetchedAt: 0 },
+  scan: {
+    rows: [SCAN_ROW, DEAR_ROW],
+    scanned: 2,
+    examinedTypeIds: [],
+    overMaxPrice: 0,
+    fetchedAt: 0,
+  },
 };
 
 describe('HaulingPanel filters: Max price per item and Max spend', () => {
+  it('counts what the scan’s own price pass dropped for Max price in the hidden line', () => {
+    mainState = {
+      status: 'ready',
+      scan: { rows: [SCAN_ROW], scanned: 9, examinedTypeIds: [], overMaxPrice: 4, fetchedAt: 0 },
+    };
+    renderPanel('from=jita&to=amarr&maxprice=1000');
+    expect(screen.getByText(/4 cost more than your max price per item/)).toBeInTheDocument();
+  });
+
   it('Max price per item hides the dearer rows, says so, and is written to the link and remembered', async () => {
     mainState = WITH_DEAR;
     const user = userEvent.setup();
@@ -918,7 +969,7 @@ describe('HaulingPanel filters: Max price per item and Max spend', () => {
   it('Reset filters brings back rows Max price hid, and leaves Max spend alone', async () => {
     mainState = {
       status: 'ready',
-      scan: { rows: [DEAR_ROW], scanned: 1, examinedTypeIds: [], fetchedAt: 0 },
+      scan: { rows: [DEAR_ROW], scanned: 1, examinedTypeIds: [], overMaxPrice: 0, fetchedAt: 0 },
     };
     useHaulingBudget.setState({ value: 2_000_000 });
     const user = userEvent.setup();

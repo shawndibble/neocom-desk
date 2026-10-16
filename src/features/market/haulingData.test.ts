@@ -28,7 +28,6 @@ const {
   clearHaulingScanCache,
   evictHaulingScan,
   haulingScanCacheKey,
-  haulingScanCacheSize,
   MAX_BOOK_CANDIDATES,
   MAX_PRICED_CANDIDATES,
   runHaulingScan,
@@ -428,6 +427,9 @@ describe('runHaulingScan, Max price', () => {
     const capped = await run(500);
     expect(capped.rows.map((r) => r.typeId)).toEqual([CHEAP]);
     expect(getOrderBook).toHaveBeenCalledTimes(2);
+    // Said, not silent: every dear item pass 1 would have kept.
+    expect(capped.overMaxPrice).toBe(DEAR.length);
+    expect((await run()).overMaxPrice).toBe(0);
   });
 
   it('keeps a Max price scan apart in the cache', () => {
@@ -465,20 +467,33 @@ describe('runHaulingScan, the scan cache', () => {
         signal: controller.signal,
       })
     ).rejects.toThrow(/aborted/);
-    expect(haulingScanCacheSize()).toBe(0);
+    // Nothing cached: the same scan asked again reads the hubs again.
+    getHubPrices.mockClear();
+    await runHaulingScan({
+      from: FROM,
+      to: TO,
+      typeIds: [34],
+      scope: 4,
+      types: TYPES,
+      mode: 'instant',
+    });
+    expect(getHubPrices).toHaveBeenCalled();
   });
 
-  it('sweeps expired entries when it writes a new one', async () => {
+  it('answers a fresh scan from the cache and an expired one afresh', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     try {
       const scan = (scope: number) =>
         runHaulingScan({ from: FROM, to: TO, typeIds: [34], scope, types: TYPES, mode: 'instant' });
       await scan(4);
-      await scan(5);
-      expect(haulingScanCacheSize()).toBe(2);
+      getHubPrices.mockClear();
+      await scan(4);
+      expect(getHubPrices).not.toHaveBeenCalled();
       vi.setSystemTime(Date.now() + 10 * 60_000);
-      await scan(6);
-      expect(haulingScanCacheSize()).toBe(1);
+      await scan(5);
+      getHubPrices.mockClear();
+      await scan(4);
+      expect(getHubPrices).toHaveBeenCalled();
     } finally {
       vi.useRealTimers();
     }

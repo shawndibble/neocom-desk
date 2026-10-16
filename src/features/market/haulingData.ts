@@ -19,9 +19,6 @@
  * 3. **Order books.** The two hubs' books for those few, station-filtered,
  *    turned into ladders and estimated by `engine/market/haulingMarket`.
  *
- * Passes 1 and 2 order by trip profit, not price ratio
- * (`engine/market/haulingRank`); the minimum gaps still decide what is looked at.
- *
  * Demand is read from the destination's whole *region* history (ESI has no
  * per-station history) while the ladders are the hub *station's*; the popover
  * says so. Pure decisions live in the engine — this module only fetches and
@@ -139,12 +136,12 @@ export interface HaulingScan {
   /** True when the price or order-book cap cut the shortlist, so better-than-shown rows may exist unlooked-at. */
   capped?: boolean;
   /**
-   * Every id looked at past pass 1 and not worth another look: dropped by the
-   * history pass, or given its order books (a row or not). Ids cut by a cap
-   * before their next pass, or whose history read failed, are left out: a
-   * later scan should reach them.
+   * Ids past pass 1 not worth another look: dropped by history, or given books.
+   * Cap-cut or history-read-failed ids stay out, so a later scan reaches them.
    */
   examinedTypeIds: number[];
+  /** Items pass 1 would have kept but for Max price: the "cost more than your max price" count. */
+  overMaxPrice: number;
   fetchedAt: number;
 }
 
@@ -171,11 +168,6 @@ const scanCache = new Map<string, { scan: HaulingScan; expiresAt: number }>();
 
 export function clearHaulingScanCache(): void {
   scanCache.clear();
-}
-
-/** Test-only: how many scans the cache holds, expired ones included. */
-export function haulingScanCacheSize(): number {
-  return scanCache.size;
 }
 
 function writeScanCache(key: string, scan: HaulingScan): void {
@@ -305,24 +297,30 @@ export async function runHaulingScan(request: HaulingScanRequest): Promise<Hauli
   const minGap = instant ? MIN_INSTANT_GAP : MIN_LISTED_GAP;
   const feeFactor = instant ? INSTANT_ROUGH_FEE_FACTOR : ROUGH_FEE_FACTOR;
   // Each item keeps only its best lane: the plan and the table are keyed by item.
+  let overMaxPrice = 0;
   const pricedAll = ids
     .flatMap((typeId) => {
       let best: PricedCandidate | null = null;
+      let cutByMaxPrice = false;
       for (const lane of lanes) {
         const origin = pricesAt.get(lane.from.id)?.get(typeId);
         const dest = pricesAt.get(lane.to.id)?.get(typeId);
         const buy = origin?.sellMin ?? null;
         const sell = (instant ? dest?.buyMax : dest?.sellMin) ?? null;
         if (buy === null || sell === null || buy <= 0) continue;
-        if (maxUnitPrice !== null && buy > maxUnitPrice) continue;
         const gap = sell / buy;
         if (gap < minGap) continue;
+        if (maxUnitPrice !== null && buy > maxUnitPrice) {
+          cutByMaxPrice = true;
+          continue;
+        }
         const originListed = origin?.sellVolume ?? 0;
         const destListed = (instant ? dest?.buyVolume : dest?.sellVolume) ?? 0;
         const score = priceScore({ buy, sell, originListed, destListed }, feeFactor);
         const candidate = { typeId, lane, buy, originListed, score, gap };
         if (best === null || byRank(candidate, best) < 0) best = candidate;
       }
+      if (best === null && cutByMaxPrice) overMaxPrice += 1;
       return best === null ? [] : [best];
     })
     .sort(byRank);
@@ -438,6 +436,7 @@ export async function runHaulingScan(request: HaulingScanRequest): Promise<Hauli
     scanned: ids.length,
     ...(capped ? { capped } : {}),
     examinedTypeIds,
+    overMaxPrice,
     fetchedAt: Date.now(),
   };
   // An abandoned scan never lands: its caller moved on, and a later one must not be answered from it.

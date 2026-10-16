@@ -1,6 +1,6 @@
 /**
  * The Hauling Opportunities table's rows: a scan's items at this Character's
- * own fee rates, with the two default filters applied and counted. Pure —
+ * own fee rates, with the row filters applied and counted. Pure —
  * `haulingData.ts` fetches, `engine/market/haulingMarket` prices, and this
  * only joins the two for the panel.
  */

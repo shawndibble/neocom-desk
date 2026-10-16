@@ -117,6 +117,23 @@ function line(quantity: number): TripLine {
 }
 
 describe('HaulingItemDetail — listing', () => {
+  it('without its title row, puts the given actions on the flags and lane line', () => {
+    render(
+      <MemoryRouter initialEntries={['/travel/hauling']}>
+        <FakeItemActions actions={fakeItemActions()}>
+          <HaulingItemDetail
+            row={listRow()}
+            showTitle={false}
+            laneActions={<button type="button">More</button>}
+          />
+        </FakeItemActions>
+      </MemoryRouter>
+    );
+    const lane = screen.getByText('Amarr to Jita').closest('div')!.parentElement!;
+    expect(within(lane).getByRole('button', { name: 'More' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading')).toBeNull();
+  });
+
   it('shows Pay at most as full ISK, never shorthand', () => {
     renderDetail(listRow());
     const label = screen.getByText('Pay at most');

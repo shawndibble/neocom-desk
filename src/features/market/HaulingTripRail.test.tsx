@@ -154,6 +154,11 @@ describe('HaulingTripRail', () => {
 });
 
 describe('HaulingTripSummary', () => {
+  it('says nothing of the fill when it leaves the cargo value as shown', () => {
+    renderSummary({ cargoValueAfterFill: 213_965_524.2 });
+    expect(screen.queryByText(/with the fill/)).toBeNull();
+  });
+
   it('reads the lane with its jumps by route preference, the free m³ with a meter, and per-jump profit', () => {
     renderSummary({ cargoValueAfterFill: 619_395_524 });
     expect(hubJumps.calls.at(-1)).toEqual([30002187, 30000142]);
@@ -254,7 +259,7 @@ function renderFill(props: Partial<HaulingFillListProps> = {}) {
     onStop: vi.fn(),
     onAdd: vi.fn(),
   };
-  render(
+  const list = (more: Partial<HaulingFillListProps>) => (
     <HaulingFillList
       freeM3={44_462}
       status="ready"
@@ -268,18 +273,38 @@ function renderFill(props: Partial<HaulingFillListProps> = {}) {
       items={ITEMS}
       ticked={new Set([1])}
       tickedTotals={{ count: 1, volumeM3: 9_000, cost: 30_000_000, profit: 3_903_930 }}
-      holdAfter={{ usedM3: 29_038, capacityM3: 64_500 }}
+      holdAfter={{ usedM3: 29_038, capacityM3: 64_500, freeM3: 35_462 }}
       {...handlers}
       {...props}
+      {...more}
     />
   );
-  return handlers;
+  const { rerender } = render(list({}));
+  return { ...handlers, update: (more: Partial<HaulingFillListProps>) => rerender(list(more)) };
 }
 
 /** The visible line, not its screen-reader copy in the live region. */
 const line = (text: string | RegExp) => screen.getByText(text, { selector: 'p' });
 
 describe('HaulingFillList', () => {
+  it('brings a finished run’s result into view, then Add’s line', () => {
+    const scroll = vi.fn();
+    const original = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = scroll;
+    try {
+      const { update } = renderFill({ status: 'loading', batch: 1, items: [] });
+      expect(scroll).not.toHaveBeenCalled();
+      update({ status: 'ready' });
+      expect(scroll).toHaveBeenCalledWith({ block: 'nearest' });
+      scroll.mockClear();
+      update({ status: 'ready', added: { count: 1, volumeM3: 9_000 } });
+      expect(scroll).toHaveBeenCalledOnce();
+      expect(scroll.mock.contexts[0]).toHaveTextContent(/^Added 1 item/);
+    } finally {
+      Element.prototype.scrollIntoView = original;
+    }
+  });
+
   it('idle: offers the scan for the free m³, and never runs it by itself', async () => {
     const user = userEvent.setup();
     const { onFind } = renderFill({ status: 'idle', items: [] });
@@ -298,9 +323,7 @@ describe('HaulingFillList', () => {
       items: [],
       progressText: 'Reading 3 of 12 categories',
     });
-    expect(
-      screen.getByRole('status', { name: 'Batch 3 · 21,000 m³ still free' })
-    ).toBeInTheDocument();
+    expect(screen.getByRole('status', { name: 'Batch 3 · 21,000 m³ free' })).toBeInTheDocument();
     expect(screen.getByText('Reading 3 of 12 categories')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Stop' }));
     expect(onStop).toHaveBeenCalledOnce();
@@ -309,9 +332,7 @@ describe('HaulingFillList', () => {
 
   it('loading before the first batch lands: the plan’s own free m³', () => {
     renderFill({ status: 'loading', batch: 1, runningFreeM3: null, items: [] });
-    expect(
-      screen.getByRole('status', { name: 'Batch 1 · 44,462 m³ still free' })
-    ).toBeInTheDocument();
+    expect(screen.getByRole('status', { name: 'Batch 1 · 44,462 m³ free' })).toBeInTheDocument();
   });
 
   it('error: what earlier batches found stays addable beside the error', async () => {

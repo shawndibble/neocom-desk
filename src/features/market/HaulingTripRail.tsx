@@ -15,13 +15,14 @@ import {
   tappableRowClassName,
 } from '@/components/ui/controlStyles';
 import { FILL_BATCH_CAP, type HaulingFillStopReason } from '@/engine/market/haulingFillStop';
-import type { TripPlan } from '@/engine/market/haulingPlan';
+import { holdsCapacityM3, holdsUsedM3, type TripPlan } from '@/engine/market/haulingPlan';
 import { ROUTE_PREFERENCE_LABEL_KEYS } from '@/features/route/routePreferences';
 import { formatIsk, formatIskCompactSigned } from '@/lib/isk';
 import { useStickyClearance } from '@/lib/useStickyClearance';
-import { formatTripM3 } from './format';
+import { formatTripM3, shownUsedM3 } from './format';
 import { HaulingHoldMeters } from './HaulingHoldMeters';
 import { iskGains, signedIsk } from './signedIsk';
+import type { HaulingFillScanState } from './useHaulingFillScan';
 import { useHubJumps } from './useHubJumps';
 
 const isk = (value: number) => formatIsk(value, 0);
@@ -137,12 +138,8 @@ export function HaulingTripSummary({
   const jumps = useHubJumps(fromSystemId, toSystemId);
   const { profit, cost } = plan.totals;
   const holds = cargoSet ? plan.holds : [];
-  let capacityM3 = 0;
-  let usedM3 = 0;
-  for (const hold of holds) {
-    capacityM3 += hold.capacityM3;
-    usedM3 += hold.usedM3;
-  }
+  const capacityM3 = holdsCapacityM3(holds);
+  const usedM3 = holdsUsedM3(holds);
   const knownJumps = jumps.status === 'known' && jumps.jumps > 0 ? jumps : null;
 
   const jumpsText = knownJumps
@@ -169,7 +166,8 @@ export function HaulingTripSummary({
           <span>
             {t('market.hauling.rail.cargoValue')} <b className="text-text">{isk(cost)}</b>
           </span>
-          {cargoValueAfterFill !== null && (
+          {/* Only when the fill changes the figure as shown. */}
+          {cargoValueAfterFill !== null && isk(cargoValueAfterFill) !== isk(cost) && (
             <span>
               {t('market.hauling.rail.cargoValueAfter', { value: isk(cargoValueAfterFill) })}
             </span>
@@ -197,7 +195,7 @@ export function HaulingTripSummary({
           )}
           <span className="text-xs text-text-dim tabular-nums">
             {t('market.hauling.rail.used', {
-              used: formatTripM3(usedM3),
+              used: formatTripM3(shownUsedM3(holds)),
               total: formatTripM3(capacityM3),
             })}
           </span>
@@ -238,7 +236,7 @@ export interface HaulingFillItem {
   profit: number;
 }
 
-export type HaulingFillStatus = 'idle' | 'loading' | 'ready' | 'error';
+export type HaulingFillStatus = HaulingFillScanState['status'];
 
 /** Literal keys, so the locale split finds them. */
 const STOP_KEYS = {
@@ -267,13 +265,13 @@ export interface HaulingFillListProps {
   progressText?: string;
   /** Why the batches stopped, once `ready`. */
   reason: HaulingFillStopReason | null;
-  /** A Max price is set: "nothing else" is said of what is under it. */
+  /** A Max price is set. */
   underMaxPrice: boolean;
   /** Free m³ once every offered item is in: "Filled: 120 m³ left." */
   leftM3: number;
   /** Offers Find more: the hold is not full and something may be left. */
   canFindMore: boolean;
-  /** What the last Add loaded; it replaces the stop reason until the next Find. */
+  /** What the last Add loaded; it replaces the stop reason until the next Find or Find more. */
   added: { count: number; volumeM3: number } | null;
   /** Best profit per m³ first. */
   items: readonly HaulingFillItem[];
@@ -290,7 +288,7 @@ export interface HaulingFillListProps {
   /** Totals of the ticked items. */
   tickedTotals: { count: number; volumeM3: number; cost: number; profit: number };
   /** The hold once the ticked items are added; null without a Cargo Space. */
-  holdAfter: { usedM3: number; capacityM3: number } | null;
+  holdAfter: { usedM3: number; capacityM3: number; freeM3: number } | null;
 }
 
 function FillRow({
@@ -357,6 +355,20 @@ export function HaulingFillList({
 }: HaulingFillListProps) {
   const { t } = useTranslation();
   const addDetailId = useId();
+  // A finished run's result (stop sentence, Add) and Add's "Added …" line land below the fold in a long rail: bring them in.
+  const endRef = useRef<HTMLDivElement>(null);
+  const outcomeRef = useRef<HTMLParagraphElement>(null);
+  const ran = useRef(false);
+  useEffect(() => {
+    if (status === 'loading') ran.current = true;
+    else if (ran.current) {
+      ran.current = false;
+      endRef.current?.scrollIntoView?.({ block: 'nearest' });
+    }
+  }, [status]);
+  useEffect(() => {
+    if (added !== null) outcomeRef.current?.scrollIntoView?.({ block: 'nearest' });
+  }, [added]);
 
   let outcome: string | null = null;
   if ((status === 'ready' || status === 'error') && added !== null) {
@@ -391,13 +403,16 @@ export function HaulingFillList({
       m3: formatTripM3(runningFreeM3 ?? freeM3),
     });
     body = (
-      <div className="flex items-center gap-2 text-xs text-text-dim">
-        <Spinner size="sm" label={running} />
-        <span aria-hidden="true" className="flex min-w-0 flex-1 flex-col leading-tight">
-          <span className="tabular-nums">{running}</span>
-          {progressText && <span>{progressText}</span>}
-        </span>
-        <Button onClick={onStop}>{t('market.hauling.fill.stop')}</Button>
+      <div className="flex flex-col gap-1 text-xs text-text-dim">
+        <div className="flex items-center gap-2">
+          <Spinner size="sm" label={running} />
+          <span aria-hidden="true" className="min-w-0 flex-1 tabular-nums">
+            {running}
+          </span>
+          <Button onClick={onStop}>{t('market.hauling.fill.stop')}</Button>
+        </div>
+        {/* Its own line, the rail's full width: beside Stop it wrapped. */}
+        {progressText && <span aria-hidden="true">{progressText}</span>}
       </div>
     );
   } else {
@@ -451,18 +466,23 @@ export function HaulingFillList({
                 {t('market.hauling.fill.holdAfter', {
                   used: formatTripM3(holdAfter.usedM3),
                   total: formatTripM3(holdAfter.capacityM3),
-                  free: formatTripM3(Math.max(0, holdAfter.capacityM3 - holdAfter.usedM3)),
+                  free: formatTripM3(holdAfter.freeM3),
                 })}
               </p>
             )}
           </>
         )}
-        {outcome && <p className="text-xs text-text-dim tabular-nums">{outcome}</p>}
+        {outcome && (
+          <p ref={outcomeRef} className="text-xs text-text-dim tabular-nums">
+            {outcome}
+          </p>
+        )}
         {canFindMore && (
           <Button className="w-full" onClick={onMore}>
             {t('market.hauling.fill.more')}
           </Button>
         )}
+        <div ref={endRef} aria-hidden="true" className="-mt-2" />
       </>
     );
   }

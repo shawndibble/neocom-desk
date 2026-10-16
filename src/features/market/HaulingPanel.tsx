@@ -5,13 +5,13 @@
  *
  * The first view needs nothing from the user: a route and a category are
  * preset and the list works with no ship chosen. Choosing Cargo Space (and,
- * optionally, a budget) adds the hold meter and lets the Trip Plan stop at
+ * optionally, Max spend) adds the hold meter and lets the Trip Plan stop at
  * what fits. The plan is a suggestion — every row starts ticked at a suggested
  * quantity, and unticking or typing a number re-sizes the rest through the
  * same `planTrip` the suggestion came from.
  *
  * The Trip Plan lives in a rail beside the table: its totals, the
- * offer to fill the free space from other categories, and Copy multibuy. A
+ * fill offer, and Copy multibuy. A
  * row click selects the row and shows its detail in the rail. Where the
  * panel is too narrow for the rail (by its own width, ADR 0017), a sticky bar
  * carries the trip instead, and the trip and the detail open as sheets.
@@ -52,12 +52,7 @@ import { cx } from '@/lib/cx';
 import { useIsNarrow } from '@/lib/useIsNarrow';
 import { useElementNarrowerThan } from '@/lib/useElementNarrowerThan';
 import { useIsPhone } from '@/lib/useIsPhone';
-import {
-  holdsFreeM3,
-  multibuyText,
-  planTrip,
-  type TripOverride,
-} from '@/engine/market/haulingPlan';
+import { multibuyText, planTrip, type TripOverride } from '@/engine/market/haulingPlan';
 import type { DemandKind } from '@/engine/market/haulingMarket';
 import { formatIsk, formatMarketIsk, marketIskDecimals } from '@/lib/isk';
 import { writeToClipboard } from '@/lib/clipboard';
@@ -81,7 +76,7 @@ import { haulingCsvColumns } from './haulingCsv';
 import { HaulingFlagWord } from './HaulingFlagWord';
 import { HAULING_FLAG_KEY } from './haulingFlagKeys';
 import { HaulingItemActions, HaulingItemDetail } from './HaulingItemDetail';
-import { formatSignedPct, formatTripM3, formatVolume } from './format';
+import { formatSignedPct, formatTripM3, formatVolume, shownFreeM3 } from './format';
 import {
   HaulingFillList,
   HaulingTripBar,
@@ -162,7 +157,7 @@ const HAULING_URL_FILTERS = {
   demand: enumParam(['steady', 'any'] as const, DEFAULT_HAULING_FILTER.demand),
   /** Max price per item, whole ISK; absent is no limit. */
   maxprice: optionalIntParam({ min: 1 }),
-  /** Max spend: the Trip Plan's ISK budget, whole ISK; absent is no limit. Remembered in `useHaulingBudget`, not with the filters. */
+  /** Max spend: the Trip Plan's ISK budget, whole ISK; absent is no limit. */
   spend: optionalIntParam({ min: 1 }),
 };
 
@@ -217,7 +212,7 @@ function useRememberedHaulingFilter(): RememberedDefaults<ReturnType<typeof haul
     () => ({
       values: pickRememberedParams({
         ...filterPref,
-        // Whole ISK, as the link holds it: the old budget field could save a fraction.
+        // Whole ISK, as the link holds it: a stored budget may be a fraction.
         spend: storedBudget === null ? null : Math.round(storedBudget) || null,
       }),
       // Called with only the remembered fields that changed.
@@ -322,8 +317,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
 
   const rememberedFilter = useRememberedHaulingFilter();
   const [params, setParams] = useRememberedUrlParams(haulingSchema, rememberedFilter);
-  /** Max spend. */
-  const budget = params.spend;
+  const maxSpend = params.spend;
   // Stable references (a hub from `TRADE_HUBS`, or the Any string): the scans key their effects on them.
   const from = haulingEnd(params.from);
   const to = haulingEnd(params.to);
@@ -470,8 +464,12 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     setDetailOpen(false);
   }
 
+  // What the category scan returned or examined: the fill never spends a batch on them again.
   const scannedTypeIds = useMemo(
-    () => (state.status === 'ready' ? state.scan.rows.map((r) => r.typeId) : []),
+    () =>
+      state.status === 'ready'
+        ? [...state.scan.rows.map((r) => r.typeId), ...state.scan.examinedTypeIds]
+        : [],
     [state]
   );
   const fill = useHaulingFill({
@@ -506,8 +504,8 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
 
   // Every candidate carries its own destination's fees; `fees` here is only the fallback.
   const planBase = useMemo(
-    () => ({ holds: cargo?.holds ?? null, budgetIsk: budget, fees: fees.at(TRADE_HUBS[0]!) }),
-    [cargo, budget, fees]
+    () => ({ holds: cargo?.holds ?? null, budgetIsk: maxSpend, fees: fees.at(TRADE_HUBS[0]!) }),
+    [cargo, maxSpend, fees]
   );
   const plan = useMemo(
     () => planTrip({ ...planBase, candidates: tableCandidates, overrides }),
@@ -531,7 +529,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
   );
 
   /** The room left in every hold: one figure for the summary, the fill offer and the trip bar. */
-  const freeM3 = holdsFreeM3(plan.holds);
+  const freeM3 = shownFreeM3(plan.holds);
 
   // Fill the free space: needs a Cargo Space and a fixed lane (Any hub would
   // scan every hub's books), and the category scan landed, so its rows stay out.
@@ -567,7 +565,8 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
 
   const allSelected =
     tableRows.length > 0 && tableRows.every((r) => overrides.get(r.typeId)?.selected !== false);
-  const selectedCount = tableRows.filter((r) => overrides.get(r.typeId)?.selected !== false).length;
+  // What ships, not what is ticked: a ticked row the plan sized to nothing is not in the trip.
+  const selectedCount = plan.totals.items;
 
   // A row click selects the row and shows its detail; a click on the
   // selected row clears it (DESIGN.md §6c). The rail's "‹ Trip" only leaves
@@ -920,19 +919,19 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
         (columnVisibility.isVisible(column.id) || (cards && column.id === 'margin')))
   );
 
-  // Selling into buy orders reads neither days nor demand, so only the
-  // margin, max price and max spend count there.
+  // Selling into buy orders reads neither days nor demand.
   const activeFilterCount =
     (!instant && params.days !== DEFAULT_HAULING_FILTER.days ? 1 : 0) +
     (params.margin !== DEFAULT_HAULING_FILTER.margin ? 1 : 0) +
     (!instant && params.demand !== DEFAULT_HAULING_FILTER.demand ? 1 : 0) +
     (params.maxprice !== null ? 1 : 0) +
     (params.spend !== null ? 1 : 0);
-  const hiddenCount = hidden.tooDear + (instant ? 0 : hidden.thin + hidden.slow) + hidden.lowMargin;
+  // Max price hides at both ends: the scan's price pass drops most, the row filter what a lot pushes over it.
+  const dear = hidden.tooDear + (state.status === 'ready' ? state.scan.overMaxPrice : 0);
+  const hiddenCount = dear + (instant ? 0 : hidden.thin + hidden.slow) + hidden.lowMargin;
   // Only when Max price hid something does the hidden line name it.
-  const hiddenKeySuffix = hidden.tooDear > 0 ? 'MaxPrice' : '';
-  // Category and mode ride along so the narrow sheet can edit them as part of
-  // its draft; only the remembered params are remembered.
+  const hiddenKeySuffix = dear > 0 ? 'MaxPrice' : '';
+  // Category and mode ride along so the narrow sheet can edit them in its draft; neither is remembered.
   const filterValue = { ...pickRememberedParams(params), cat: categoryId, mode };
 
   // With Any hub at an end each row has its own lane: no one label, no one jump count.
@@ -1022,7 +1021,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     setDetailOpen(false);
     setSelectedTypeId(null);
   };
-  const detail = (row: HaulingViewRow, showTitle: boolean) => (
+  const detail = (row: HaulingViewRow, showTitle: boolean, laneActions?: ReactNode) => (
     // Keyed, so a new row opens with its own folds closed ("Show the math").
     <HaulingItemDetail
       key={row.typeId}
@@ -1030,6 +1029,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       line={lineOf.get(row.typeId)}
       loadNote={limitTextOf(row)}
       showTitle={showTitle}
+      laneActions={laneActions}
     />
   );
 
@@ -1082,12 +1082,12 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
               : instant
                 ? t(`market.hauling.emptyHiddenHintInstant${hiddenKeySuffix}`, {
                     scanned: state.scan.scanned,
-                    dear: hidden.tooDear,
+                    dear,
                     low: hidden.lowMargin,
                   })
                 : t(`market.hauling.emptyHiddenHint${hiddenKeySuffix}`, {
                     scanned: state.scan.scanned,
-                    dear: hidden.tooDear,
+                    dear,
                     thin: hidden.thin,
                     slow: hidden.slow,
                     low: hidden.lowMargin,
@@ -1160,11 +1160,11 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
             ? t('market.hauling.scannedLine', { count: state.scan.scanned })
             : instant
               ? t(`market.hauling.hiddenLineInstant${hiddenKeySuffix}`, {
-                  dear: hidden.tooDear,
+                  dear,
                   low: hidden.lowMargin,
                 })
               : t(`market.hauling.hiddenLine${hiddenKeySuffix}`, {
-                  dear: hidden.tooDear,
+                  dear,
                   thin: hidden.thin,
                   slow: hidden.slow,
                   low: hidden.lowMargin,
@@ -1260,14 +1260,8 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
                   onClose={closeDetail}
                   title={selectedRow?.name ?? t('market.hauling.title')}
                 >
-                  {selectedRow && (
-                    <div className="flex flex-col gap-2">
-                      <div className="flex justify-end">
-                        <HaulingItemActions row={selectedRow} />
-                      </div>
-                      {detail(selectedRow, false)}
-                    </div>
-                  )}
+                  {selectedRow &&
+                    detail(selectedRow, false, <HaulingItemActions row={selectedRow} />)}
                 </SlideOver>
               </>
             )}

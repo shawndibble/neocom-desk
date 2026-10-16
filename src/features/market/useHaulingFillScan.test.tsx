@@ -35,6 +35,7 @@ const scanOf = (
   scanned: rows.length,
   ...(capped ? { capped } : {}),
   examinedTypeIds,
+  overMaxPrice: 0,
   fetchedAt: 0,
 });
 
