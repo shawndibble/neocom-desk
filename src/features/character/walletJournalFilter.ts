@@ -58,14 +58,17 @@ export function resolveJournalFilter(
 }
 
 /**
- * A filter edit made on the resolved filter, back to what is stored. Touching
- * From/To drops the preset; any other edit keeps it and leaves its dates unstored.
+ * A filter edit made on the resolved filter, back to what is stored. Picking a
+ * preset (or All history) stores it with no dates; touching From/To drops the
+ * preset; any other edit keeps it and leaves its dates unstored.
  */
 export function storeJournalFilterEdit(
   stored: WalletJournalFilter,
   resolved: WalletJournalFilter,
   next: WalletJournalFilter
 ): WalletJournalFilter {
+  if (next.range !== resolved.range)
+    return next.range === null ? next : { ...next, startDate: null, endDate: null };
   if (next.startDate !== resolved.startDate || next.endDate !== resolved.endDate)
     return { ...next, range: null };
   return { ...next, startDate: stored.startDate, endDate: stored.endDate };

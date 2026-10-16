@@ -5389,7 +5389,7 @@
     "journalPanelSubtitle": "{{scope}} · {{range}} · follows the Journal's filters",
     "journalDayHeader": "{{day}} · EVE time",
     "range": {
-      "label": "Range",
+      "label": "Quick range",
       "last7": "Last 7 days",
       "last30": "Last 30 days",
       "last90": "Last 3 months",

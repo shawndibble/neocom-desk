@@ -47,6 +47,7 @@ import {
   activeWalletJournalFilterCount,
   journalNet,
   journalRefTypeBreakdown,
+  resolveJournalFilter,
   storeJournalFilterEdit,
   toggleBreakdownRefType,
   type WalletJournalFilter,
@@ -77,66 +78,77 @@ interface JournalFilterBarProps {
   refTypeOptions: string[];
   /** The column picker, inline between the search box and the funnel. */
   actions?: ReactNode;
+  /** Presets (days) the local history reaches; none for the corp journal. */
+  archiveRanges: readonly number[];
 }
 
 /** Module-level so the range options memo sees one stable array. */
 const NO_ARCHIVE_RANGES: readonly number[] = [];
 
 /**
- * The journal's "Range" select (#3933): a preset is stored as `range` (days),
+ * The Filters panel's "Quick range" select (#3933), beside From / To. It edits
+ * the panel's draft like the other fields: a preset is stored as `range` (days),
  * so it stays "last N days" as the day turns; All history clears the range and
- * both dates. Reads "Custom" when From/To were set by hand in Filters.
+ * both dates. Reads "Custom" when From/To were set by hand.
  */
-function JournalRangeSelect({
-  filter,
-  onChange,
+function JournalQuickRange({
+  draft,
+  setDraft,
   archiveRanges,
 }: {
-  filter: WalletJournalFilter;
-  onChange: (filter: WalletJournalFilter) => void;
+  draft: WalletJournalFilter;
+  setDraft: (filter: WalletJournalFilter) => void;
   archiveRanges: readonly number[];
 }) {
   const { t } = useTranslation();
   const options = useMemo(
-    () => journalRangeOptions(archiveRanges, filter.range),
-    [archiveRanges, filter.range]
+    () => journalRangeOptions(archiveRanges, draft.range),
+    [archiveRanges, draft.range]
   );
-  const hand = filter.range !== null || filter.startDate !== null || filter.endDate !== null;
+  const hand = draft.range !== null || draft.startDate !== null || draft.endDate !== null;
   const current: JournalRange | typeof CUSTOM_RANGE =
-    filter.range !== null && options.includes(filter.range)
-      ? filter.range
+    draft.range !== null && options.includes(draft.range)
+      ? draft.range
       : hand
         ? CUSTOM_RANGE
         : 'all';
   return (
-    <Select
-      value={String(current)}
-      onValueChange={(value) => {
-        const range = options.find((option) => String(option) === value) ?? 'all';
-        onChange({
-          ...filter,
-          range: range === 'all' ? null : range,
-          startDate: null,
-          endDate: null,
-        });
-      }}
-    >
-      <SelectTrigger aria-label={t('wallet.range.label')} className="w-40 shrink-0">
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        {current === CUSTOM_RANGE && (
-          <SelectItem value={CUSTOM_RANGE} disabled>
-            {t('wallet.range.custom')}
-          </SelectItem>
-        )}
-        {options.map((range) => (
-          <SelectItem key={range} value={String(range)}>
-            {t(JOURNAL_RANGE_LABEL_KEYS[range])}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <FilterField label={t('wallet.range.label')}>
+      <Select
+        value={String(current)}
+        onValueChange={(value) => {
+          const range = options.find((option) => String(option) === value) ?? 'all';
+          // The draft shows the preset's resolved start in From, like the stored filter does.
+          setDraft(
+            resolveJournalFilter(
+              {
+                ...draft,
+                range: range === 'all' ? null : range,
+                startDate: null,
+                endDate: null,
+              },
+              Date.now()
+            )
+          );
+        }}
+      >
+        <SelectTrigger aria-label={t('wallet.range.label')} className="w-40">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {current === CUSTOM_RANGE && (
+            <SelectItem value={CUSTOM_RANGE} disabled>
+              {t('wallet.range.custom')}
+            </SelectItem>
+          )}
+          {options.map((range) => (
+            <SelectItem key={range} value={String(range)}>
+              {t(JOURNAL_RANGE_LABEL_KEYS[range])}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </FilterField>
   );
 }
 
@@ -148,7 +160,13 @@ function JournalRangeSelect({
 const ALL_REF_TYPES = '__all';
 
 /** The ref-type / date-range / text filter row above a journal table (issue #413). */
-function JournalFilterBar({ filter, onChange, refTypeOptions, actions }: JournalFilterBarProps) {
+function JournalFilterBar({
+  filter,
+  onChange,
+  refTypeOptions,
+  actions,
+  archiveRanges,
+}: JournalFilterBarProps) {
   const { t } = useTranslation();
   return (
     <FilterBar
@@ -189,11 +207,12 @@ function JournalFilterBar({ filter, onChange, refTypeOptions, actions }: Journal
               </SelectContent>
             </Select>
           </FilterField>
+          <JournalQuickRange draft={draft} setDraft={setDraft} archiveRanges={archiveRanges} />
           <DateRangeFields
             from={draft.startDate}
             to={draft.endDate}
-            onFromChange={(value) => setDraft({ ...draft, startDate: value })}
-            onToChange={(value) => setDraft({ ...draft, endDate: value })}
+            onFromChange={(value) => setDraft({ ...draft, range: null, startDate: value })}
+            onToChange={(value) => setDraft({ ...draft, range: null, endDate: value })}
             fromLabel={t('wallet.dateFromLabel')}
             toLabel={t('wallet.dateToLabel')}
           />
@@ -446,13 +465,9 @@ export function JournalTable({
         filter={filter}
         onChange={onFilterChange}
         refTypeOptions={refTypeOptions}
+        archiveRanges={archiveRanges}
         actions={
           <>
-            <JournalRangeSelect
-              filter={storedFilter}
-              onChange={onStoredFilterChange}
-              archiveRanges={archiveRanges}
-            />
             <IconButton
               icon={<Icon.Orders />}
               label={t('wallet.journalBreakdownTitle')}

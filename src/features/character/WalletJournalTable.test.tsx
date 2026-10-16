@@ -92,9 +92,12 @@ function Harness({
 }
 
 describe('JournalTable', () => {
-  describe('Range select', () => {
+  describe('Quick range select (Filters panel)', () => {
+    const openFilters = () => userEvent.click(screen.getByRole('button', { name: /Filters/ }));
+    const rangeBox = () => screen.getByRole('combobox', { name: 'Quick range' });
     const optionNames = async () => {
-      await userEvent.click(screen.getByRole('combobox', { name: 'Range' }));
+      await openFilters();
+      await userEvent.click(rangeBox());
       return screen.getAllByRole('option').map((option) => option.textContent?.replace('✓', ''));
     };
 
@@ -127,7 +130,8 @@ describe('JournalTable', () => {
           onFilterChange={onFilterChange}
         />
       );
-      await userEvent.click(screen.getByRole('combobox', { name: 'Range' }));
+      await openFilters();
+      await userEvent.click(rangeBox());
       await userEvent.click(screen.getByRole('option', { name: 'Last 3 months' }));
       expect(onFilterChange).toHaveBeenCalledWith({
         ...EMPTY_WALLET_JOURNAL_FILTER,
@@ -145,21 +149,29 @@ describe('JournalTable', () => {
           onFilterChange={onFilterChange}
         />
       );
-      await userEvent.click(screen.getByRole('combobox', { name: 'Range' }));
+      await openFilters();
+      await userEvent.click(rangeBox());
       await userEvent.click(screen.getByRole('option', { name: 'All history' }));
       expect(onFilterChange).toHaveBeenCalledWith(EMPTY_WALLET_JOURNAL_FILTER);
     });
 
-    it('shows the preset, and a chip for it, even before the archive info loads', () => {
+    it('shows the preset, and a chip for it, even before the archive info loads', async () => {
       render(<Harness filter={{ ...EMPTY_WALLET_JOURNAL_FILTER, range: 90 }} />);
-      expect(screen.getByRole('combobox', { name: 'Range' })).toHaveTextContent('Last 3 months');
+      await openFilters();
+      expect(rangeBox()).toHaveTextContent('Last 3 months');
       expect(screen.getByRole('button', { name: /Last 3 months/ })).toBeInTheDocument();
       expect(screen.queryByText(/^From:/)).not.toBeInTheDocument();
     });
 
-    it('reads Custom for dates that match no preset', () => {
+    it('is not on the toolbar', () => {
+      render(<Harness />);
+      expect(screen.queryByRole('combobox', { name: 'Quick range' })).not.toBeInTheDocument();
+    });
+
+    it('reads Custom for dates that match no preset', async () => {
       render(<Harness filter={{ ...EMPTY_WALLET_JOURNAL_FILTER, startDate: '2020-01-01' }} />);
-      expect(screen.getByRole('combobox', { name: 'Range' })).toHaveTextContent('Custom');
+      await openFilters();
+      expect(rangeBox()).toHaveTextContent('Custom');
     });
   });
 

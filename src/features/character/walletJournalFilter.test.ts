@@ -303,6 +303,12 @@ describe('range preset', () => {
       text: 'x',
     });
   });
+  it('stores a newly picked preset with no dates', () => {
+    const stored = { ...base, range: 7 };
+    const resolved = resolveJournalFilter(stored, NOW);
+    const picked = resolveJournalFilter({ ...resolved, range: 30, startDate: null }, NOW);
+    expect(storeJournalFilterEdit(stored, resolved, picked)).toEqual({ ...base, range: 30 });
+  });
   it('counts the preset as one active criterion', () => {
     expect(activeWalletJournalFilterCount({ ...base, range: 7, startDate: '2026-10-10' })).toBe(1);
   });
