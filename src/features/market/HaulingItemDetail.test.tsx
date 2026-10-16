@@ -196,7 +196,7 @@ describe('HaulingItemDetail — listing', () => {
     expect(screen.getByText('Profit each')).toBeInTheDocument();
     expect(
       screen.getByText(
-        'the lower of the recent sale (23,500,000) and one tick under the cheapest listing (23,160,000).'
+        'the lower of what listings recently sold for (23,500,000) and one tick under the cheapest listing (23,160,000).'
       )
     ).toBeInTheDocument();
     expect(
