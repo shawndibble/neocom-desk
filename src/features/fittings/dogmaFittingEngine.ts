@@ -8,6 +8,15 @@ import wasmInit, {
   type Violation,
 } from '@eveshipfit/dogma-engine';
 import { setDogmaEngineStatus } from './dogmaEngineStatus';
+import {
+  CACHE_NAME,
+  CACHE_PREFIX,
+  ENGINE_ASSET_URLS,
+  SDE_URL,
+  WASM_URL,
+  cachedEngineAsset,
+  isEngineAsset,
+} from './dogmaEngineAssets';
 import { createIdleGuard, drainBodyWithGuard, readBodyWithGuard } from '@/lib/idleTimeout';
 import { classifyRuleBreaks, type CandidateRack } from '@/engine/fittings/candidates';
 import type { PlanEntry } from '@/engine/types';
@@ -57,21 +66,6 @@ import {
  * later means rewriting this file, not its callers.
  */
 
-const WASM_URL = '/vendor/dogma/esf_dogma_engine_bg.wasm';
-const SDE_URL = '/vendor/dogma/sde.dat';
-
-/**
- * Keyed on the pinned `@eveshipfit/dogma-engine` + `@eveshipfit/sde`
- * versions (`__DOGMA_PINS__`, from `package.json` via `vite.config.ts`;
- * ADR 0016: the two are pinned and bumped together). The fetch URLs above
- * never change, so without a per-pin name a browser that already cached the
- * old files would keep serving them forever — a bump is a fresh
- * `caches.open` bucket, and hence a fresh fetch, with nothing to remember
- * to hand-bump (it used to be a hand-maintained `-v1`).
- */
-const CACHE_PREFIX = 'dogma-engine-assets-';
-const CACHE_NAME = `${CACHE_PREFIX}${__DOGMA_PINS__}`;
-
 /**
  * Deletes every earlier pin's bucket — each holds ~10 MB that nothing will
  * read again. Best-effort and off the load's critical path: a failure here
@@ -94,15 +88,6 @@ export interface DogmaAssetProgress {
   loadedBytes: number;
   /** Null until both downloads' `Content-Length` are known. */
   totalBytes: number | null;
-}
-
-/**
- * Whether a response is the binary asset rather than an error or the app's
- * own HTML page — which a host's SPA fallback (or a dev server that started
- * before the copy below it landed) answers a missing file with, as a 200.
- */
-function isEngineAsset(response: Response): boolean {
-  return response.ok && !(response.headers.get('content-type') ?? '').includes('text/html');
 }
 
 async function fetchWithProgress(
@@ -152,12 +137,22 @@ async function fetchWithProgress(
  * bucket and URLs `loadDogmaEngine` reads. Resolves quietly on any failure,
  * a stalled download included.
  */
-export async function warmDogmaEngineAssets(): Promise<void> {
+export function warmDogmaEngineAssets(): Promise<void> {
+  // One at a time: the background warm and a Settings "Download everything"
+  // that overlap share this fetch instead of each pulling ~10 MB.
+  warming ??= fillEngineAssetCache().finally(() => {
+    warming = null;
+  });
+  return warming;
+}
+
+let warming: Promise<void> | null = null;
+
+async function fillEngineAssetCache(): Promise<void> {
   try {
     const cache = await caches.open(CACHE_NAME);
-    for (const url of [WASM_URL, SDE_URL]) {
-      const hit = await cache.match(url);
-      if (hit && isEngineAsset(hit)) continue;
+    for (const url of ENGINE_ASSET_URLS) {
+      if (await cachedEngineAsset(cache, url)) continue;
       const guard = createIdleGuard();
       try {
         guard.arm();
