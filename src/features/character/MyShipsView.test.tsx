@@ -8,11 +8,13 @@ import { MyShipsView } from './MyShipsView';
 const read = vi.hoisted(() => ({
   entries: [] as { characterId: number; name: string; assets: never[] }[],
   skipped: [] as { characterId: number; name: string }[],
+  cachedAt: null as number | null,
 }));
 vi.mock('./assets', () => ({
   loadOtherCharactersAssetsDetailed: vi.fn(async () => ({
     entries: read.entries,
     skipped: read.skipped,
+    cachedAt: read.cachedAt,
   })),
 }));
 vi.mock('@/sde/loadSde', () => ({
@@ -42,6 +44,7 @@ function renderShips(characterIds: number[]) {
 beforeEach(() => {
   read.entries = [];
   read.skipped = [];
+  read.cachedAt = null;
 });
 
 describe('MyShipsView with unreadable assets', () => {
@@ -71,5 +74,22 @@ describe('MyShipsView with unreadable assets', () => {
     read.skipped = [];
     await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
     expect(await screen.findByText('No ships found')).toBeInTheDocument();
+  });
+});
+
+describe('MyShipsView with saved-copy assets', () => {
+  it('says the list is cached, with the age of the oldest saved read', async () => {
+    read.entries = [{ characterId: 1, name: 'Alice', assets: [] }];
+    read.cachedAt = Date.now() - 3 * 3_600_000 - 60_000;
+    renderShips([1]);
+    expect(await screen.findByText('Showing cached data')).toBeInTheDocument();
+    expect(screen.getByText('3h ago')).toBeInTheDocument();
+  });
+
+  it('says nothing when every list came from ESI', async () => {
+    read.entries = [{ characterId: 1, name: 'Alice', assets: [] }];
+    renderShips([1]);
+    expect(await screen.findByText('No ships found')).toBeInTheDocument();
+    expect(screen.queryByText('Showing cached data')).not.toBeInTheDocument();
   });
 });

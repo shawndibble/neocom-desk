@@ -76,7 +76,12 @@ interface PriceHistoryPanelProps {
 type RegionHistoryState =
   | { status: 'loading' }
   | { status: 'error' }
-  | { status: 'ready'; points: readonly MarketHistoryPoint[] };
+  | {
+      status: 'ready';
+      points: readonly MarketHistoryPoint[];
+      /** When this series was read, if it is the saved copy; null for a live read. */
+      cachedAt: number | null;
+    };
 
 const NO_REGIONS: readonly number[] = [];
 
@@ -100,7 +105,13 @@ function useComparedHistories(typeId: number, regionIds: readonly number[]) {
       requested.current.add(key);
       loadPriceHistory(regionId, typeId).then(
         (result) =>
-          setByKey((prev) => new Map(prev).set(key, { status: 'ready', points: result.points })),
+          setByKey((prev) =>
+            new Map(prev).set(key, {
+              status: 'ready',
+              points: result.points,
+              cachedAt: result.fromCache ? result.fetchedAt : null,
+            })
+          ),
         () => {
           requested.current.delete(key);
           setByKey((prev) => new Map(prev).set(key, { status: 'error' }));
@@ -140,8 +151,8 @@ export function PriceHistoryPanel({
     [compare?.regionIds, regionId]
   );
   const [points, setPoints] = useState<MarketHistoryPoint[] | null>(null);
-  // Set only when the series on screen is the saved copy; its age, in ms.
-  const [cachedAt, setCachedAt] = useState<number | null>(null);
+  // Set only when the primary series on screen is the saved copy; its age, in ms.
+  const [primaryCachedAt, setPrimaryCachedAt] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   // Nothing is fetched for a compared region until the primary one has days
   // to draw: an empty or failed primary shows its own state, with no chart
@@ -172,13 +183,13 @@ export function PriceHistoryPanel({
     void (async () => {
       setLoading(true);
       setPoints(null);
-      setCachedAt(null);
+      setPrimaryCachedAt(null);
       setError(false);
       try {
         const result = await loadPriceHistory(regionId, typeId);
         if (!cancelled) {
           setPoints(result.points);
-          setCachedAt(result.fromCache ? result.fetchedAt : null);
+          setPrimaryCachedAt(result.fromCache ? result.fetchedAt : null);
         }
       } catch {
         if (!cancelled) setError(true);
@@ -190,6 +201,17 @@ export function PriceHistoryPanel({
       cancelled = true;
     };
   }, [regionId, typeId]);
+
+  // A compared region's saved copy dates the chart too: the oldest one wins.
+  const cachedAt = comparedHistories.reduce<number | null>(
+    (oldest, state) =>
+      state.status === 'ready' &&
+      state.cachedAt !== null &&
+      (oldest === null || state.cachedAt < oldest)
+        ? state.cachedAt
+        : oldest,
+    primaryCachedAt
+  );
 
   if (loading) return <ChartFallback label={t('common.loading')} />;
 

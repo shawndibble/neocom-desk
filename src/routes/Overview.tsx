@@ -31,6 +31,7 @@ import {
   OverviewDataAge,
   OverviewNext,
 } from '@/features/overview/OverviewHeader';
+import { useOverviewSummary } from '@/features/overview/useOverviewSummary';
 import { useOverviewCardOrder } from '@/features/overview/cardOrder';
 import { useOverviewHiddenCards } from '@/features/overview/hiddenCards';
 import { OverviewRefreshProvider } from '@/features/overview/widgets/data/OverviewRefreshProvider';
@@ -65,6 +66,7 @@ function Board({ characterId, layout }: BoardProps) {
   const isPhone = useIsPhone();
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [rolesOpen, setRolesOpen] = useState(false);
+  const summary = useOverviewSummary(layout.widgets);
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
@@ -73,14 +75,14 @@ function Board({ characterId, layout }: BoardProps) {
         overview
         actions={
           <>
-            <OverviewNext widgets={layout.widgets} />
+            <OverviewNext summary={summary} />
             <OverviewCustomize />
           </>
         }
       />
-      <OverviewSubNav trailing={<OverviewDataAge widgets={layout.widgets} />} />
+      <OverviewSubNav trailing={<OverviewDataAge summary={summary} />} />
       <DangerBanner />
-      <OverviewCachedNotice widgets={layout.widgets} />
+      <OverviewCachedNotice summary={summary} />
       {editing && (
         <CustomizeBar onAdd={() => setGalleryOpen(true)} onRoles={() => setRolesOpen(true)} />
       )}

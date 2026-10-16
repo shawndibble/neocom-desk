@@ -645,6 +645,39 @@ describe('SkillPlans editor: the same attributes, on the route they are costed o
   });
 });
 
+describe('SkillPlans: cached data notice', () => {
+  const HOUR = 3_600_000;
+
+  it('says nothing while every read is live', async () => {
+    render(<App />);
+    expect(await screen.findByRole('button', { name: 'New plan' })).toBeInTheDocument();
+    // Both reads have landed once they are saved.
+    await waitFor(async () => {
+      expect(await db.esiCache.get([CHAR_ID, 'skills'])).toBeDefined();
+      expect(await db.esiCache.get([CHAR_ID, 'skillqueue'])).toBeDefined();
+    });
+    expect(screen.queryByText('Showing cached data')).not.toBeInTheDocument();
+  });
+
+  it('dates the notice by the cached skills, not by the fresh queue read next to them', async () => {
+    await db.esiCache.put({
+      characterId: CHAR_ID,
+      key: 'skills',
+      value: emptySkillsPayload,
+      // A minute over, so the shared 30 s ticker being a little behind still reads 5 h.
+      fetchedAt: Date.now() - 5 * HOUR - 60_000,
+    });
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skills`, () => HttpResponse.error())
+    );
+    render(<App />);
+    expect(await screen.findByText('Showing cached data')).toBeInTheDocument();
+    expect(screen.getByText('Showing cached data').closest('p')).toHaveTextContent(
+      'Showing cached data · 5h ago'
+    );
+  });
+});
+
 describe('SkillPlans: sync error visibility (UX-REVIEW #10)', () => {
   it('shows a visible "Sync error" note (not tooltip-only) when sync is in the error state', async () => {
     subscribeSyncStatusMock.mockImplementation((listener: (s: unknown) => void) => {

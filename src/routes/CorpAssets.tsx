@@ -613,7 +613,9 @@ function CorpAssetsView({ canReadBlueprints }: { canReadBlueprints: boolean }) {
           <EmptyState title={t('corp.assets.empty')} hint={t('corp.assets.emptyHint')} />
         ) : (
           <div className="space-y-2">
-            {data.fromCache && <CachedNotice fetchedAt={data.fetchedAt} />}
+            {data.fromCache && (
+              <CachedNotice fetchedAt={data.fetchedAt} refreshFailed={snapshot.refreshCount > 0} />
+            )}
             {data.truncated && (
               <p className="text-[0.6875rem] text-warning uppercase">
                 {t('common.incompleteTitle')} —{' '}

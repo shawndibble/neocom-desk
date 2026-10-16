@@ -108,9 +108,6 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
   const { data, error, loading, hydrated, activeCharacterId, refreshCount, refresh } =
     useRouteSnapshot(loadTransactionsSnapshot, undefined, { cacheKey: 'market:transactions' });
   const highlightTypeId = useHighlightParam();
-  // A manual Refresh that still falls back to cache is a more alarming case
-  // than the initial load finding cache first — same banner, different copy.
-
   const transactionsResult = data?.transactionsResult ?? null;
   const transactionsNeedsReauth = data?.transactionsNeedsReauth ?? false;
   const transactionsTruncated = data?.transactionsTruncated ?? false;

@@ -159,7 +159,10 @@ const netWorth: Builder = (feeds, { t, activeCharacterId, scopeAll }) => {
   return {
     ...blank(to, statusOf(feed)),
     fetchedAt: new Date(Date.parse(day)),
-    fromCache: true,
+    // Recorded daily snapshots are history, not a cached read of a live feed: `true`
+    // here made the header's "Showing cached data" notice show on a fresh online
+    // board. Its age is the "as of" day below.
+    fromCache: false,
     number: {
       value: formatIskCompact(total),
       iskAmount: total,

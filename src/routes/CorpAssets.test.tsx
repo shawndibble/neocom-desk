@@ -146,6 +146,30 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+describe('the cached data notice', () => {
+  it('says nothing while every read is fresh', async () => {
+    await divisionList();
+    expect(screen.queryByText('Showing cached data')).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['the assets read', 'assets'],
+    ['the divisions read', 'divisions'],
+  ] as const)('shows it, aged, when only %s is the saved copy', async (_name, which) => {
+    const saved = { fromCache: true, fetchedAt: new Date(NOW - 3 * 3_600_000) };
+    if (which === 'assets') {
+      mocked.loadCorporationAssets.mockResolvedValue(cached([asset({ item_id: 1 })], saved));
+    } else {
+      mocked.loadCorporationDivisions.mockResolvedValue(
+        cached<CorporationDivisions>({ hangar: [] }, saved)
+      );
+    }
+    await divisionList();
+    expect(await screen.findByText('Showing cached data')).toBeInTheDocument();
+    expect(screen.getByText('3h ago', { selector: 'p time' })).toBeInTheDocument();
+  });
+});
+
 describe('access (AC2)', () => {
   it('waits rather than deciding while corp access is still resolving', () => {
     mockedAccess.mockReturnValue(accessOf('unknown', {}));

@@ -11,7 +11,6 @@ import {
   IskAmount,
   Panel,
   buttonClassName,
-  CachedNotice,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -542,8 +541,6 @@ export function ColoniesTab({
           <AssumedCustomsNote
             names={assumedCustomsNames(advice?.colonies ?? [], (id) => t('pi.planetLabel', { id }))}
           />
-
-          {planetsResult?.fromCache && <CachedNotice fetchedAt={planetsResult.fetchedAt} />}
 
           <Panel
             title={t('pi.colonies.panelTitle', {

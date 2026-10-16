@@ -78,6 +78,16 @@ export function SkillPlans() {
     [queueResult, nowMs]
   );
 
+  // The oldest of the sources that are actually the saved copy: a fresh queue
+  // must not date cached skills as "just now".
+  const cachedAt = useMemo(() => {
+    const times = [
+      queueResult?.fromCache ? queueResult.fetchedAt.getTime() : null,
+      fromCache && fetchedAt ? fetchedAt.getTime() : null,
+    ].filter((time): time is number => time !== null);
+    return times.length > 0 ? Math.min(...times) : null;
+  }, [queueResult, fromCache, fetchedAt]);
+
   // A skill plan pasted anywhere (`app/GlobalPasteRouter.tsx`) lands here: it
   // gets a plan of its own and that plan's editor opens the Import dialog on
   // the text. A fresh plan, never the pilot's existing one — importing appends
@@ -123,9 +133,7 @@ export function SkillPlans() {
       />
       <SkillsSubNav />
 
-      {(queueResult?.fromCache || fromCache) && (
-        <CachedNotice fetchedAt={queueResult?.fetchedAt ?? fetchedAt} />
-      )}
+      {cachedAt !== null && <CachedNotice fetchedAt={cachedAt} />}
 
       <QueueStrip view={queueView} nowMs={nowMs} />
 

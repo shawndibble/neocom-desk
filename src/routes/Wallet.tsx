@@ -32,6 +32,7 @@ import {
   loadWalletJournalWithStatus,
   loadWalletTransactions,
   loadAllCharactersWalletBalances,
+  oldestCachedBalanceAt,
   type WalletBalancesSnapshot,
 } from '@/features/character/wallet';
 import { LpStorePicker } from '@/features/loyalty/LpStorePicker';
@@ -327,11 +328,10 @@ export function Wallet() {
   // The all-characters totals add up one balance read per character: if any of
   // them is the saved copy the total is only as fresh as the oldest of those.
   const walletBalancesCachedAt = useMemo(() => {
-    const shown = new Set(multiCharacters.map((c) => c.characterId));
-    const times = (walletBalancesSnapshot?.entries ?? [])
-      .filter((e) => shown.has(e.characterId) && e.balanceResult?.fromCache)
-      .map((e) => e.balanceResult?.fetchedAt.getTime() ?? 0);
-    return times.length > 0 ? Math.min(...times) : null;
+    return oldestCachedBalanceAt(
+      walletBalancesSnapshot?.entries ?? [],
+      new Set(multiCharacters.map((c) => c.characterId))
+    );
   }, [walletBalancesSnapshot, multiCharacters]);
 
   // Opt-in: fetched only once the Journal tab is open, and kept alive once
@@ -612,7 +612,11 @@ export function Wallet() {
                 liveWallet={liveWallet}
                 notices={
                   walletBalancesCachedAt !== null && (
-                    <CachedNotice className="mt-3" fetchedAt={walletBalancesCachedAt} />
+                    <CachedNotice
+                      className="mt-3"
+                      fetchedAt={walletBalancesCachedAt}
+                      refreshFailed={walletBalancesRefreshCount > 0}
+                    />
                   )
                 }
                 filterMeta={walletCharacterFilterMeta}

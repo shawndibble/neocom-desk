@@ -459,7 +459,12 @@ function CorpBoardView({ capabilities }: { capabilities: CorpCapabilities }) {
           }
         />
 
-        {data?.fromCache && <CachedNotice fetchedAt={data.oldestFetchedAt} />}
+        {data?.fromCache && (
+          <CachedNotice
+            fetchedAt={data.oldestFetchedAt}
+            refreshFailed={snapshot.refreshCount > 0}
+          />
+        )}
 
         {snapshot.loading && data === null ? (
           <Spinner />

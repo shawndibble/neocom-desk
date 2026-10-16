@@ -98,11 +98,8 @@ export function PlanetaryIndustry() {
   const [explainerOpen, setExplainerOpen] = useState(false);
   const [{ type: seedTypeId, goals, off: disabledColonies, colony: linkedColonyId }, setPiParams] =
     useUrlParams(PI_URL_PARAMS);
-  const { data, error, loading, hydrated, activeCharacterId, refresh } = useRouteSnapshot(
-    loadPiSnapshot,
-    undefined,
-    { cacheKey: 'planetary-industry' }
-  );
+  const { data, error, loading, hydrated, activeCharacterId, refresh, refreshCount } =
+    useRouteSnapshot(loadPiSnapshot, undefined, { cacheKey: 'planetary-industry' });
   // Show info for every item name and menu on the three tabs.
   const itemActions = usePageItemActions({ activeCharacterId, lazyBlueprints: true });
 
@@ -202,9 +199,8 @@ export function PlanetaryIndustry() {
           />
         )}
 
-        {/* The Colonies tab draws its own, beside the list the figures belong to. */}
-        {planetsResult?.fromCache && tab !== 'colonies' && (
-          <CachedNotice fetchedAt={planetsResult.fetchedAt} />
+        {planetsResult?.fromCache && (
+          <CachedNotice fetchedAt={planetsResult.fetchedAt} refreshFailed={refreshCount > 0} />
         )}
 
         <Tabs
