@@ -44,8 +44,8 @@ vi.mock('@/features/abyssal/mutaplasmidData', async () => {
   return { useMutaplasmidLookup: () => lookup };
 });
 
-vi.mock('@/features/skills/typeDetail', () => ({
-  loadTypeDetail: vi.fn(async (typeId: number) => ({
+const typeDetail = vi.hoisted(() => ({
+  load: vi.fn(async (typeId: number) => ({
     description: '',
     dogma_effects: [],
     dogma_attributes:
@@ -57,6 +57,7 @@ vi.mock('@/features/skills/typeDetail', () => ({
         : [],
   })),
 }));
+vi.mock('@/features/skills/typeDetail', () => ({ loadTypeDetail: typeDetail.load }));
 
 vi.mock('@/sde/loadMarketSde', () => ({
   loadAttributeDictionary: vi.fn(async () => ({
@@ -93,20 +94,23 @@ const catalogue = {
 
 function setup(module: FittingModule, characterId: number | null = null) {
   const edit = vi.fn<(change: FittingChange, coalesceKey?: string) => void>();
-  render(
+  const panel = (shown: FittingModule, character: number | null) => (
     <MemoryRouter>
       <FittingMutationPanel
-        module={module}
+        module={shown}
         catalogue={catalogue}
         edit={edit}
-        characterId={characterId}
+        characterId={character}
       />
     </MemoryRouter>
   );
+  const { rerender } = render(panel(module, characterId));
   const fitting: Fitting = { ...newFitting(1, 'Test'), modules: [module] };
   /** The module as the `n`th edit leaves it. */
   const after = (n = 0) => edit.mock.calls[n]![0](fitting).modules[0]!;
-  return { edit, after };
+  /** Shows the panel again, as the editor does after an edit or a Character switch. */
+  const show = (shown: FittingModule, character = characterId) => rerender(panel(shown, character));
+  return { edit, after, show };
 }
 
 const plain: FittingModule = { slot: 'high', slotIndex: 0, typeId: NEUT_II, state: 'active' };
@@ -155,7 +159,7 @@ describe('FittingMutationPanel', () => {
     const { edit, after } = setup(mutated);
     const cap = await screen.findByRole('slider', { name: 'Activation Cost' });
     // 80 GJ is the best activation cost Gravid rolls (lower is better).
-    expect(cap).toHaveValue('1000');
+    expect(cap).toHaveValue('100');
     expect(cap).toHaveAttribute('aria-valuetext', '80 GJ, 100% roll');
     expect(screen.getByText('Worst 130 GJ')).toBeInTheDocument();
     expect(screen.getByText('Best 80 GJ')).toBeInTheDocument();
@@ -165,11 +169,22 @@ describe('FittingMutationPanel', () => {
     expect(after().mutation!.attributes).toEqual({ [CAP]: 130, [POWER]: 1000 });
   });
 
-  it('takes the mutation off, back to the base module', async () => {
+  it('takes the mutation off, back to the base module, focus on the picker', async () => {
     const user = userEvent.setup();
-    const { after } = setup(mutated);
+    const { after, show } = setup(mutated);
     await user.click(await screen.findByRole('button', { name: 'Remove mutation' }));
     expect(after()).toEqual(plain);
+    show(plain);
+    expect(screen.getByRole('combobox', { name: 'Mutaplasmid' })).toHaveFocus();
+  });
+
+  it("says so when the base's values can't be read, and takes no mutaplasmid", async () => {
+    typeDetail.load.mockResolvedValueOnce(null as never);
+    setup(plain);
+    expect(
+      await screen.findByText("Couldn't read the base module's values", { exact: false })
+    ).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Mutaplasmid' })).toBeDisabled();
   });
 
   it('says when the rolls are unknown, showing the base values', async () => {
@@ -229,6 +244,20 @@ describe('FittingMutationPanel', () => {
       })
     );
     expect(after()).toMatchObject({ typeId: ABYSSAL, mutation: owned });
+  });
+
+  it("drops another Character's results", async () => {
+    const user = userEvent.setup();
+    assets.loadCharacterAssets.mockResolvedValue({
+      cached: { data: [], truncated: false },
+      needsReauth: false,
+    });
+    const { show } = setup(plain, 90000001);
+    await user.click(screen.getByRole('button', { name: 'Load rolls from my assets' }));
+    expect(await screen.findByText('None of your assets is this module.')).toBeInTheDocument();
+    show(plain, 90000002);
+    expect(screen.queryByText('None of your assets is this module.')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Load rolls from my assets' })).toBeInTheDocument();
   });
 
   it('says so when the assets hold none', async () => {

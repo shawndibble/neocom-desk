@@ -1,5 +1,5 @@
 /**
- * The flag on a fitted mutated module whose stats the app can't state
+ * The flag on a fitted mutated item whose stats the app can't state
  * exactly (`mutationStatus`): rolls unknown (the base module's own values
  * stand in) or base unknown (it adds nothing to the stats). DESIGN.md §6c's
  * amber warning mark — a figure leaning on something the pilot hasn't
@@ -9,14 +9,22 @@
 import { useTranslation } from 'react-i18next';
 import { HintText } from '@/components/ui/HintText';
 import * as Icon from '@/components/ui/icons';
-import type { ItemMutation } from '@/engine/fittings/types';
-import { useUnknownMutation, useUnknownMutationTip } from './useUnknownMutation';
+import { useUnknownMutation, useUnknownMutationTip, type MutableItem } from './useUnknownMutation';
 
-/** The List row's flag after the module's name. */
-export function MutationBadge({ item }: { item: { typeId: number; mutation?: ItemMutation } }) {
+/**
+ * The List row's flag after the item's name: a module, or a drone type's
+ * units. Drones have no "Mutate…", so `fixable={false}` leaves the fix out of the tip.
+ */
+export function MutationBadge({
+  items,
+  fixable,
+}: {
+  items: readonly MutableItem[];
+  fixable?: boolean;
+}) {
   const { t } = useTranslation();
-  const status = useUnknownMutation(item);
-  const tip = useUnknownMutationTip(status);
+  const status = useUnknownMutation(items);
+  const tip = useUnknownMutationTip(status, fixable);
   if (status === null || tip === null) return null;
   return (
     <HintText

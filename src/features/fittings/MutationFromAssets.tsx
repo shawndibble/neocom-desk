@@ -16,7 +16,8 @@ import { rollRows } from '@/engine/fittings/mutationEdit';
 import type { ItemMutation } from '@/engine/fittings/types';
 import { mutationsForItems } from '@/features/abyssal/dynamicItems';
 import { loadCharacterAssets } from '@/features/character/assets';
-import { loadTypeDetail } from '@/features/skills/typeDetail';
+import { useRetryFocus } from '@/lib/useRetryFocus';
+import { loadBaseValues } from './loadBaseValues';
 
 interface OwnedItem {
   itemId: number;
@@ -44,15 +45,11 @@ async function meanQuality(
   mutation: ItemMutation,
   lookup: MutaplasmidLookup
 ): Promise<number | null> {
-  const detail = await loadTypeDetail(mutation.baseTypeId).catch(() => null);
-  if (!detail?.dogma_attributes) return null;
-  const values = new Map(detail.dogma_attributes.map((a) => [a.attribute_id, a.value] as const));
-  const rows = rollRows(
-    mutation.mutaplasmidTypeId,
-    mutation.attributes,
-    (id) => values.get(id),
-    lookup
-  ).filter((row) => row.rolled);
+  const baseValue = await loadBaseValues(mutation.baseTypeId);
+  if (baseValue === null) return null;
+  const rows = rollRows(mutation.mutaplasmidTypeId, mutation.attributes, baseValue, lookup).filter(
+    (row) => row.rolled
+  );
   if (rows.length === 0) return null;
   return rows.reduce((sum, row) => sum + row.quality, 0) / rows.length;
 }
@@ -108,8 +105,14 @@ export function MutationFromAssets({
   const { t } = useTranslation();
   const [found, setFound] = useState<Found>({ kind: 'idle' });
   const lacksScope = useCharacterLacksEndpoints(characterId, ['getCharacterAssets']);
+  // The button stays mounted until the list replaces it; then focus moves to the list.
+  const [listRef, armListFocus] = useRetryFocus(
+    found.kind === 'done' ? 'ok' : found.kind === 'failed' ? 'failed' : 'busy',
+    characterId
+  );
 
   async function search() {
+    armListFocus();
     setFound({ kind: 'loading' });
     try {
       setFound({ kind: 'done', ...(await findOwned(characterId, typeIds, lookup)) });
@@ -125,25 +128,22 @@ export function MutationFromAssets({
       </p>
     );
   }
-  if (found.kind === 'idle' || found.kind === 'loading') {
+  if (found.kind !== 'done') {
     return (
-      <Button size="sm" loading={found.kind === 'loading'} onClick={() => void search()}>
-        {t('fittings.mutation.fromAssets')}
-      </Button>
-    );
-  }
-  if (found.kind === 'failed') {
-    return (
-      <div className="flex w-full flex-wrap items-center gap-2 text-warning" role="alert">
-        <span>{t('fittings.mutation.fromAssetsFailed')}</span>
-        <Button size="sm" onClick={() => void search()}>
-          {t('common.retry')}
+      <div className="flex w-full flex-wrap items-center gap-2">
+        {found.kind === 'failed' && (
+          <span className="text-warning" role="alert">
+            {t('fittings.mutation.fromAssetsFailed')}
+          </span>
+        )}
+        <Button size="sm" loading={found.kind === 'loading'} onClick={() => void search()}>
+          {found.kind === 'failed' ? t('common.retry') : t('fittings.mutation.fromAssets')}
         </Button>
       </div>
     );
   }
   return (
-    <div className="w-full space-y-1">
+    <div ref={listRef} tabIndex={-1} className="w-full space-y-1 focus:outline-none">
       <p className="text-text-dim">
         {found.items.length === 0
           ? t('fittings.mutation.fromAssetsNone')

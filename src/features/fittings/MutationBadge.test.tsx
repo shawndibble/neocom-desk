@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import type { Fitting, FittingModule, FittingStats } from '@/engine/fittings/types';
 import { neutralExtendedStats } from '@/engine/fittings/__fixtures__/fittingStats';
@@ -40,16 +41,41 @@ const rolled: FittingModule = {
 
 describe('MutationBadge', () => {
   it('flags an abyssal module of unknown base, and one whose rolls are unknown', () => {
-    const { rerender } = render(<MutationBadge item={bare} />);
+    const { rerender } = render(<MutationBadge items={[bare]} />);
     expect(screen.getByText('Base unknown')).toBeInTheDocument();
-    rerender(<MutationBadge item={noRolls} />);
+    rerender(<MutationBadge items={[noRolls]} />);
     expect(screen.getByText('Rolls unknown')).toBeInTheDocument();
   });
 
+  it('points an editable module to Mutate…, saying what is missing', async () => {
+    render(
+      <FittingItemActionsProvider value={fakeItemActions()}>
+        <MutationBadge items={[bare]} />
+      </FittingItemActionsProvider>
+    );
+    await userEvent.tab();
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(
+      "What it was mutated from isn't known, so it adds nothing to the stats. Say what made it with Mutate… in its menu."
+    );
+  });
+
+  it("flags a drone type when any unit's rolls are unknown, with no Mutate… to point to", async () => {
+    render(
+      <FittingItemActionsProvider value={fakeItemActions()}>
+        <MutationBadge items={[rolled, noRolls]} fixable={false} />
+      </FittingItemActionsProvider>
+    );
+    expect(screen.getByText('Rolls unknown')).toBeInTheDocument();
+    await userEvent.tab();
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(
+      /^Its rolls aren't known, so the stats use its base's own values\.$/
+    );
+  });
+
   it('flags nothing the app knows fully: a rolled module, a plain one', () => {
-    const { container, rerender } = render(<MutationBadge item={rolled} />);
+    const { container, rerender } = render(<MutationBadge items={[rolled]} />);
     expect(container).toBeEmptyDOMElement();
-    rerender(<MutationBadge item={{ ...bare, typeId: NEUT_II }} />);
+    rerender(<MutationBadge items={[{ ...bare, typeId: NEUT_II }]} />);
     expect(container).toBeEmptyDOMElement();
   });
 });

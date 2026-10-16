@@ -556,7 +556,7 @@ function SlotTile({
   const index = slot.index + 1;
   const shownState = module && shownModuleState(slot.rack, reachedState, module.state);
   const state = shownState ? t(`fittings.list.moduleState.${shownState}`) : '';
-  const unknownMutation = useUnknownMutation(module ?? { typeId: 0 });
+  const unknownMutation = useUnknownMutation(module ? [module] : []);
   const unknownMutationTip = useUnknownMutationTip(unknownMutation);
   const label = module
     ? [

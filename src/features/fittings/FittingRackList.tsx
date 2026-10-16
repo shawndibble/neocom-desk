@@ -224,7 +224,7 @@ export function ModuleRow({
         <>
           <TypeIcon typeId={typeId} size={32} width={24} height={24} />
           <SlotName typeId={typeId} name={name} />
-          <MutationBadge item={module} />
+          <MutationBadge items={[module]} />
           {cantUse && (
             <span className="shrink-0 text-[0.6875rem] font-semibold text-danger">
               {t('fittings.list.cantUse')}
@@ -720,6 +720,10 @@ export function DroneSection({
                 <>
                   <TypeIcon typeId={group.typeId} size={32} width={24} height={24} />
                   <SlotName typeId={group.typeId} name={name} />
+                  <MutationBadge
+                    items={fitting.drones.filter((drone) => drone.typeId === group.typeId)}
+                    fixable={false}
+                  />
                 </>
               }
               removeLabel={t('fittings.edit.remove', { name })}

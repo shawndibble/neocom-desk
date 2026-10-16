@@ -14,7 +14,7 @@
  * Drones are not covered: a mutated drone is its own one-drone stack, and
  * the drone rows have no dialog to hold this.
  */
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -45,39 +45,33 @@ import {
 } from '@/engine/fittings/mutationEdit';
 import type { FittingModule, ItemMutation } from '@/engine/fittings/types';
 import { useMutaplasmidLookup } from '@/features/abyssal/mutaplasmidData';
-import { loadTypeDetail } from '@/features/skills/typeDetail';
+import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { loadAttributeDictionary } from '@/sde/loadMarketSde';
 import type { AttributeDictionary } from '@/sde/marketTypes';
 import { attributeValueText, formatAttributeNumber } from './attributeValueText';
+import { loadBaseValues } from './loadBaseValues';
 import { MutationFromAssets } from './MutationFromAssets';
 import { catalogueTypeName, type FittingCatalogue } from './useFittingCatalogue';
 import type { FittingChange } from './useFittingWorkspace';
 
-/** Slider positions from worst to best: one arrow-key press is 0.1% of the range. */
-const STEPS = 1000;
+/** Slider positions from worst to best: one arrow-key press is 1%, the step the printed roll shows. */
+const STEPS = 100;
 
-/** The base module's own attribute values, by attribute id; null while they load (or for no base). */
-function useBaseValues(typeId: number | null): BaseValue | null {
-  const [loaded, setLoaded] = useState<{ typeId: number; values: Map<number, number> } | null>(
-    null
-  );
+/** The base module's own attribute values; null while they load (or for no base), 'failed' when unreadable. */
+function useBaseValues(typeId: number | null): BaseValue | 'failed' | null {
+  const [loaded, setLoaded] = useState<{ typeId: number; value: BaseValue | null } | null>(null);
   useEffect(() => {
     if (typeId === null) return;
     let live = true;
-    void loadTypeDetail(typeId, { retry: true }).then((detail) => {
-      if (!live) return;
-      const values = new Map(
-        (detail?.dogma_attributes ?? []).map((a) => [a.attribute_id, a.value] as const)
-      );
-      setLoaded({ typeId, values });
+    void loadBaseValues(typeId, { retry: true }).then((value) => {
+      if (live) setLoaded({ typeId, value });
     });
     return () => {
       live = false;
     };
   }, [typeId]);
   if (typeId === null || loaded?.typeId !== typeId) return null;
-  const { values } = loaded;
-  return (attributeId) => values.get(attributeId);
+  return loaded.value ?? 'failed';
 }
 
 function useAttributeDictionary(): AttributeDictionary | null {
@@ -126,11 +120,22 @@ function MutationEditor({
   const { slot, slotIndex } = module;
   const mutation = module.mutation;
   const baseTypeId = status === 'none' ? module.typeId : (mutation?.baseTypeId ?? null);
-  const baseValue = useBaseValues(baseTypeId);
+  const base = useBaseValues(baseTypeId);
+  const baseFailed = base === 'failed';
+  const baseValue = baseFailed ? null : base;
   const dictionary = useAttributeDictionary();
+  const pickerId = useId();
+  const focusAfterCommit = useFocusAfterCommit();
 
   const apply = (next: ItemMutation | null) =>
     edit((f) => setModuleMutation(f, slot, slotIndex, next, lookup));
+  // Remove mutation and the base pick unmount the control that ran them; the
+  // picker takes focus once enabled (it waits on the new base's values).
+  const focusPicker = () =>
+    focusAfterCommit(() => {
+      const picker = document.getElementById(pickerId);
+      return picker instanceof HTMLButtonElement && !picker.disabled ? picker : null;
+    });
 
   // What "Load rolls from my assets" looks for: this abyssal type, or every
   // one this base can become.
@@ -140,6 +145,8 @@ function MutationEditor({
       : new Set([module.typeId]);
   const fromAssets = characterId !== null && (
     <MutationFromAssets
+      // Another Character or base starts a fresh search: the old one's items aren't these.
+      key={`${characterId}:${[...assetTypes].sort((a, b) => a - b).join(',')}`}
       characterId={characterId}
       typeIds={assetTypes}
       lookup={lookup}
@@ -151,17 +158,15 @@ function MutationEditor({
   if (status === 'baseUnknown') {
     return (
       <div className="space-y-3 text-xs">
-        <p className="flex gap-1.5 text-warning">
-          <Icon.Warn aria-hidden className="mt-0.5 size-3.5 shrink-0" />
-          {t('fittings.mutation.baseUnknownNote')}
-        </p>
+        <WarnNote>{t('fittings.mutation.baseUnknownNote')}</WarnNote>
         <BasePicker
           resultTypeId={module.typeId}
           lookup={lookup}
           nameOf={nameOf}
-          onPick={(mutaplasmidTypeId, base) =>
-            apply({ baseTypeId: base, mutaplasmidTypeId, attributes: {} })
-          }
+          onPick={(mutaplasmidTypeId, baseTypeId) => {
+            apply({ baseTypeId, mutaplasmidTypeId, attributes: {} });
+            focusPicker();
+          }}
         />
         {fromAssets}
       </div>
@@ -182,6 +187,7 @@ function MutationEditor({
         </p>
       )}
       <MutaplasmidSelect
+        triggerId={pickerId}
         options={options}
         value={mutation?.mutaplasmidTypeId ?? null}
         nameOf={nameOf}
@@ -195,13 +201,10 @@ function MutationEditor({
           });
         }}
       />
-      {status === 'rollsUnknown' && (
-        <p className="flex gap-1.5 text-warning">
-          <Icon.Warn aria-hidden className="mt-0.5 size-3.5 shrink-0" />
-          {t('fittings.mutation.rollsUnknownNote')}
-        </p>
-      )}
+      {baseFailed && <WarnNote>{t('fittings.mutation.baseValuesFailed')}</WarnNote>}
+      {status === 'rollsUnknown' && <WarnNote>{t('fittings.mutation.rollsUnknownNote')}</WarnNote>}
       {mutation &&
+        !baseFailed &&
         (rows === null || dictionary === null ? (
           <p className="text-text-dim">{t('fittings.mutation.loading')}</p>
         ) : (
@@ -234,7 +237,13 @@ function MutationEditor({
       <div className="flex flex-wrap items-start gap-2">
         {fromAssets}
         {mutation && (
-          <Button size="sm" onClick={() => apply(null)}>
+          <Button
+            size="sm"
+            onClick={() => {
+              apply(null);
+              focusPicker();
+            }}
+          >
             {t('fittings.mutation.remove')}
           </Button>
         )}
@@ -243,8 +252,18 @@ function MutationEditor({
   );
 }
 
+function WarnNote({ children }: { children: ReactNode }) {
+  return (
+    <p className="flex gap-1.5 text-warning">
+      <Icon.Warn aria-hidden className="mt-0.5 size-3.5 shrink-0" />
+      {children}
+    </p>
+  );
+}
+
 /** A mutaplasmid choice, grouped by strain. */
 function MutaplasmidSelect({
+  triggerId,
   options,
   value,
   nameOf,
@@ -252,6 +271,7 @@ function MutaplasmidSelect({
   placeholder,
   onChange,
 }: {
+  triggerId?: string;
   options: readonly Mutaplasmid[];
   value: number | null;
   nameOf: (typeId: number) => string;
@@ -275,6 +295,7 @@ function MutaplasmidSelect({
       disabled={disabled}
     >
       <SelectTrigger
+        id={triggerId}
         size="sm"
         className="w-full max-w-md"
         aria-label={t('fittings.mutation.mutaplasmid')}
