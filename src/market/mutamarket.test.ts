@@ -1,9 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '@/db';
+import { ensureAnySession } from '@/sync/syncAuth';
 import { GLOBAL_CACHE_CHARACTER_ID } from '@/esi/cache';
 import {
   ABYSSAL_ESTIMATE_TTL_MS,
   ABYSSAL_NO_ESTIMATE_TTL_MS,
+  ABYSSAL_NOT_IMPORTED_TTL_MS,
   ABYSSAL_UNAVAILABLE_RETRY_MS,
   MUTAMARKET_SITE_URL,
   abyssalEstimateCacheKey,
@@ -14,6 +16,19 @@ import {
   type MutamarketEstimateResponse,
   type MutamarketTransport,
 } from './mutamarket';
+
+const callable = vi.hoisted(() => vi.fn());
+vi.mock('firebase/functions', () => ({
+  httpsCallable: (_fns: unknown, name: string, options: unknown) => (data: unknown) =>
+    callable(name, data, options),
+}));
+vi.mock('@/sync/firebaseApp', () => ({ getSyncFunctions: () => ({}) }));
+vi.mock('@/sync/syncAuth', () => ({ ensureAnySession: vi.fn(async () => 'char:7') }));
+vi.mock('@/app/syncStatus', () => ({ isSyncConfigured: () => true }));
+
+const CHARACTER = 7;
+const OPTS = { characterId: CHARACTER };
+const IMPORT = { characterId: CHARACTER, importIfMissing: true };
 
 const BCS = 49738;
 const ITEM = 1056087009644;
@@ -52,7 +67,7 @@ afterEach(() => {
 describe('getAbyssalEstimate', () => {
   it('returns a priced estimate with its source and link', async () => {
     const transport = setup(async () => PRICED);
-    await expect(getAbyssalEstimate(BCS, ITEM)).resolves.toEqual({
+    await expect(getAbyssalEstimate(BCS, ITEM, OPTS)).resolves.toEqual({
       status: 'priced',
       value: 282840604.66,
       valueUpdatedAt: '2026-10-16 06:20:34.839067+00',
@@ -60,42 +75,47 @@ describe('getAbyssalEstimate', () => {
       source: 'mutamarket',
       fetchedAt: 1_000_000,
     });
-    expect(transport).toHaveBeenCalledWith({ typeId: BCS, itemId: ITEM });
+    expect(transport).toHaveBeenCalledWith({
+      characterId: CHARACTER,
+      typeId: BCS,
+      itemId: ITEM,
+      importIfMissing: false,
+    });
   });
 
   it('caches per item until the TTL lapses', async () => {
     const transport = setup(async () => PRICED);
-    await getAbyssalEstimate(BCS, ITEM);
-    await getAbyssalEstimate(BCS, ITEM);
+    await getAbyssalEstimate(BCS, ITEM, OPTS);
+    await getAbyssalEstimate(BCS, ITEM, OPTS);
     expect(transport).toHaveBeenCalledTimes(1);
     clock += ABYSSAL_ESTIMATE_TTL_MS + 1;
-    await getAbyssalEstimate(BCS, ITEM);
+    await getAbyssalEstimate(BCS, ITEM, OPTS);
     expect(transport).toHaveBeenCalledTimes(2);
   });
 
   it('answers a reload from the persisted cache', async () => {
     const transport = setup(async () => PRICED);
-    await getAbyssalEstimate(BCS, ITEM);
+    await getAbyssalEstimate(BCS, ITEM, OPTS);
     await flushWrites();
     const row = await db.esiCache.get([GLOBAL_CACHE_CHARACTER_ID, abyssalEstimateCacheKey(ITEM)]);
     expect(row?.value).toMatchObject({ status: 'priced', value: 282840604.66 });
 
     clearAbyssalEstimateMemory();
     clock += 1000;
-    const again = await getAbyssalEstimate(BCS, ITEM);
+    const again = await getAbyssalEstimate(BCS, ITEM, OPTS);
     expect(again).toMatchObject({ status: 'priced', fetchedAt: 1_000_000 });
     expect(transport).toHaveBeenCalledTimes(1);
   });
 
   it('holds "no estimate" for its own longer TTL', async () => {
     const transport = setup(async () => ({ status: 'no-estimate', url: null }));
-    const first = await getAbyssalEstimate(BCS, ITEM);
+    const first = await getAbyssalEstimate(BCS, ITEM, OPTS);
     expect(first).toMatchObject({ status: 'no-estimate', value: null, url: MUTAMARKET_SITE_URL });
     clock += ABYSSAL_ESTIMATE_TTL_MS + 1;
-    await getAbyssalEstimate(BCS, ITEM);
+    await getAbyssalEstimate(BCS, ITEM, OPTS);
     expect(transport).toHaveBeenCalledTimes(1);
     clock += ABYSSAL_NO_ESTIMATE_TTL_MS;
-    await getAbyssalEstimate(BCS, ITEM);
+    await getAbyssalEstimate(BCS, ITEM, OPTS);
     expect(transport).toHaveBeenCalledTimes(2);
   });
 
@@ -103,15 +123,15 @@ describe('getAbyssalEstimate', () => {
     const transport = setup(async () => {
       throw new Error('functions/not-found');
     });
-    const result = await getAbyssalEstimate(BCS, ITEM);
+    const result = await getAbyssalEstimate(BCS, ITEM, OPTS);
     expect(result).toMatchObject({ status: 'unavailable', value: null });
     await flushWrites();
     expect(await db.esiCache.count()).toBe(0);
 
-    await getAbyssalEstimate(BCS, ITEM);
+    await getAbyssalEstimate(BCS, ITEM, OPTS);
     expect(transport).toHaveBeenCalledTimes(1);
     clock += ABYSSAL_UNAVAILABLE_RETRY_MS + 1;
-    await getAbyssalEstimate(BCS, ITEM);
+    await getAbyssalEstimate(BCS, ITEM, OPTS);
     expect(transport).toHaveBeenCalledTimes(2);
   });
 
@@ -126,18 +146,46 @@ describe('getAbyssalEstimate', () => {
       return PRICED;
     });
     await Promise.all([
-      getAbyssalEstimate(BCS, 1),
-      getAbyssalEstimate(BCS, 2),
-      getAbyssalEstimate(BCS, 2),
-      getAbyssalEstimate(BCS, 3),
+      getAbyssalEstimate(BCS, 1, OPTS),
+      getAbyssalEstimate(BCS, 2, OPTS),
+      getAbyssalEstimate(BCS, 2, OPTS),
+      getAbyssalEstimate(BCS, 3, OPTS),
     ]);
     expect(peak).toBe(1);
     expect(transport).toHaveBeenCalledTimes(3);
   });
 
+  it('imports only on an explicit ask, past a cached not-imported', async () => {
+    const transport = setup(async ({ importIfMissing }) =>
+      importIfMissing ? PRICED : { status: 'not-imported' }
+    );
+    expect(await getAbyssalEstimate(BCS, ITEM, OPTS)).toMatchObject({
+      status: 'not-imported',
+      value: null,
+    });
+    await getAbyssalEstimate(BCS, ITEM, OPTS);
+    expect(transport).toHaveBeenCalledTimes(1);
+
+    await flushWrites();
+    clearAbyssalEstimateMemory();
+    expect((await getAbyssalEstimate(BCS, ITEM, OPTS)).status).toBe('not-imported');
+    expect(transport).toHaveBeenCalledTimes(1);
+
+    expect((await getAbyssalEstimate(BCS, ITEM, IMPORT)).status).toBe('priced');
+    expect(transport).toHaveBeenLastCalledWith(expect.objectContaining({ importIfMissing: true }));
+  });
+
+  it('asks again for a not-imported module after its TTL', async () => {
+    const transport = setup(async () => ({ status: 'not-imported' }));
+    await getAbyssalEstimate(BCS, ITEM, OPTS);
+    clock += ABYSSAL_NOT_IMPORTED_TTL_MS + 1;
+    await getAbyssalEstimate(BCS, ITEM, OPTS);
+    expect(transport).toHaveBeenCalledTimes(2);
+  });
+
   it('makes no call for ids that are not positive integers', async () => {
     const transport = setup(async () => PRICED);
-    const result = await getAbyssalEstimate(BCS, Number.NaN);
+    const result = await getAbyssalEstimate(BCS, Number.NaN, OPTS);
     expect(result).toMatchObject({ status: 'unknown', value: null });
     expect(transport).not.toHaveBeenCalled();
   });
@@ -160,5 +208,19 @@ describe('toStoredEstimate', () => {
   it('reads anything unrecognised as unknown', () => {
     expect(toStoredEstimate(null)).toMatchObject({ status: 'unknown', value: null });
     expect(toStoredEstimate({ status: 'weird' })).toMatchObject({ status: 'unknown' });
+  });
+});
+
+describe('the callable transport', () => {
+  it('signs in as the Character, then sends only the ids and the import flag', async () => {
+    callable.mockResolvedValue({ data: PRICED });
+    const result = await getAbyssalEstimate(BCS, ITEM, IMPORT);
+    expect(result.status).toBe('priced');
+    expect(ensureAnySession).toHaveBeenCalledWith(CHARACTER);
+    expect(callable).toHaveBeenCalledWith(
+      'mutamarketEstimate',
+      { typeId: BCS, itemId: ITEM, importIfMissing: true },
+      { timeout: 120_000 }
+    );
   });
 });

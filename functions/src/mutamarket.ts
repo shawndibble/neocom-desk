@@ -7,16 +7,21 @@
  * caller for a User-Agent with a contact address — which page JS can't set.
  *
  * MutaMarket asks that `POST /api/modules` (import from ESI + run the price
- * model, seconds per call) is never looped, so:
- * - GET `/api/modules/{itemId}` first; POST only when MutaMarket answers 404.
+ * model, seconds per call) is never looped, and an import publishes the
+ * module's rolls and creator on mutamarket.com, so:
+ * - GET `/api/modules/{itemId}` first. A 404 is `not-imported`; POST only when
+ *   the caller sent `importIfMissing` (a pilot's explicit click).
  *   A POST for a known module re-imports it, which is the loop they forbid.
  * - No POST for a type `/api/estimator-statistics` doesn't list (not an
  *   abyssal type MutaMarket prices) or whose model is untrained (`r2` null:
  *   the import would carry no estimate anyway).
  * - Imports run one at a time, `IMPORT_MIN_GAP_MS` apart, at most
  *   `MAX_PENDING_IMPORTS` waiting; past that the caller is told to come back.
- * - Every answer MutaMarket gives — an estimate, no estimate, unknown — is
- *   held in memory for a TTL. Network and 5xx failures are not.
+ * - A failed import (5xx, timeout) backs off per module for
+ *   `IMPORT_FAILURE_BACKOFF_MS`, so retrying clients can't loop it either.
+ * - Every answer MutaMarket gives is held in memory for a TTL, keyed by type
+ *   and item id so a wrong type id can't blank another caller's answer.
+ *   Network and 5xx failures are not.
  *
  * The callable runs with `maxInstances: 1`, so the memory cache and the
  * import queue are global rather than per instance.
@@ -35,6 +40,9 @@ export const ESTIMATE_TTL_MS = 6 * 60 * 60 * 1000;
 export const NO_ESTIMATE_TTL_MS = 24 * 60 * 60 * 1000;
 /** The per-type model list changes when MutaMarket retrains. */
 export const ESTIMATOR_STATS_TTL_MS = 24 * 60 * 60 * 1000;
+/** `not-imported`: someone else may import it meanwhile. */
+export const NOT_IMPORTED_TTL_MS = 60 * 60 * 1000;
+export const IMPORT_FAILURE_BACKOFF_MS = 60 * 60 * 1000;
 export const IMPORT_MIN_GAP_MS = 3_000;
 export const MAX_PENDING_IMPORTS = 5;
 export const REQUEST_TIMEOUT_MS = 20_000;
@@ -44,17 +52,21 @@ export const MAX_CACHED_ESTIMATES = 5_000;
 export interface EstimateInput {
   typeId: number;
   itemId: number;
+  /** POST an import on a 404. Only on a pilot's explicit ask: it publishes the module. */
+  importIfMissing: boolean;
 }
 
 /**
  * What MutaMarket says about one module.
  * - `priced`: a positive, finite estimate.
  * - `no-estimate`: MutaMarket knows the module (or its type) but has no value.
+ * - `not-imported`: MutaMarket hasn't seen the module; `importIfMissing` would import it.
  * - `unknown`: not a type MutaMarket prices, or the import was refused.
  */
 export type MutamarketEstimate =
   | { status: 'priced'; value: number; valueUpdatedAt: string | null; url: string | null }
   | { status: 'no-estimate'; url: string | null }
+  | { status: 'not-imported' }
   | { status: 'unknown' };
 
 /** MutaMarket is unreachable or failing; nothing was cached. */
@@ -90,10 +102,17 @@ function positiveId(value: unknown, field: string): number {
 
 export function parseEstimateInput(data: unknown): EstimateInput {
   if (typeof data !== 'object' || data === null || Array.isArray(data)) {
-    throw new MutamarketInputError('expected { typeId, itemId }');
+    throw new MutamarketInputError('expected { typeId, itemId, importIfMissing? }');
   }
   const d = data as Record<string, unknown>;
-  return { typeId: positiveId(d.typeId, 'typeId'), itemId: positiveId(d.itemId, 'itemId') };
+  if (d.importIfMissing !== undefined && typeof d.importIfMissing !== 'boolean') {
+    throw new MutamarketInputError('importIfMissing must be a boolean');
+  }
+  return {
+    typeId: positiveId(d.typeId, 'typeId'),
+    itemId: positiveId(d.itemId, 'itemId'),
+    importIfMissing: d.importIfMissing === true,
+  };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -153,10 +172,39 @@ interface Cached<V> {
   expiresAt: number;
 }
 
+/** Insertion-ordered TTL map; past `MAX_CACHED_ESTIMATES` the oldest entry goes. */
+class BoundedTtlMap<V> {
+  private readonly entries = new Map<string, Cached<V>>();
+
+  get(key: string, now: number): V | undefined {
+    const hit = this.entries.get(key);
+    if (!hit) return undefined;
+    if (hit.expiresAt > now) return hit.value;
+    this.entries.delete(key);
+    return undefined;
+  }
+
+  set(key: string, value: V, expiresAt: number): void {
+    this.entries.delete(key);
+    this.entries.set(key, { value, expiresAt });
+    if (this.entries.size > MAX_CACHED_ESTIMATES) {
+      const oldest = this.entries.keys().next().value;
+      if (oldest !== undefined) this.entries.delete(oldest);
+    }
+  }
+}
+
+function ttlFor(estimate: MutamarketEstimate): number {
+  if (estimate.status === 'priced') return ESTIMATE_TTL_MS;
+  if (estimate.status === 'not-imported') return NOT_IMPORTED_TTL_MS;
+  return NO_ESTIMATE_TTL_MS;
+}
+
 export class MutamarketProxy {
   private readonly deps: MutamarketDeps;
-  private readonly estimates = new Map<number, Cached<MutamarketEstimate>>();
-  private readonly inFlight = new Map<number, Promise<MutamarketEstimate>>();
+  private readonly estimates = new BoundedTtlMap<MutamarketEstimate>();
+  private readonly importBackoff = new BoundedTtlMap<true>();
+  private readonly inFlight = new Map<string, Promise<MutamarketEstimate>>();
   private stats: Cached<Map<number, boolean>> | null = null;
   private statsInFlight: Promise<Map<number, boolean>> | null = null;
   private importTail: Promise<unknown> = Promise.resolve();
@@ -167,53 +215,73 @@ export class MutamarketProxy {
     this.deps = { ...defaultDeps, ...deps };
   }
 
-  /** One module's estimate. Concurrent asks for one item share a lookup. */
+  /**
+   * One module's estimate. Concurrent asks share a lookup; an import ask skips
+   * a cached `not-imported` and never joins a lookup-only ask.
+   */
   estimate(input: EstimateInput): Promise<MutamarketEstimate> {
-    const cached = this.estimates.get(input.itemId);
-    if (cached && cached.expiresAt > this.deps.now()) return Promise.resolve(cached.value);
-    const running = this.inFlight.get(input.itemId);
+    const key = `${input.typeId}:${input.itemId}`;
+    const cached = this.estimates.get(key, this.deps.now());
+    if (cached && !(cached.status === 'not-imported' && input.importIfMissing)) {
+      return Promise.resolve(cached);
+    }
+    const flightKey = `${key}:${input.importIfMissing}`;
+    const running = this.inFlight.get(flightKey);
     if (running) return running;
-    const run = this.lookup(input).finally(() => this.inFlight.delete(input.itemId));
-    this.inFlight.set(input.itemId, run);
+    const run = this.lookup(key, input).finally(() => this.inFlight.delete(flightKey));
+    this.inFlight.set(flightKey, run);
     return run;
   }
 
-  private async lookup({ typeId, itemId }: EstimateInput): Promise<MutamarketEstimate> {
+  private async lookup(
+    key: string,
+    { typeId, itemId, importIfMissing }: EstimateInput
+  ): Promise<MutamarketEstimate> {
     const trainedByType = await this.estimatorStats();
     const trained = trainedByType.get(typeId);
-    if (trained === undefined) return this.remember(itemId, { status: 'unknown' });
+    // Not cached per item: the stats map already holds this answer by type.
+    if (trained === undefined) return { status: 'unknown' };
 
     const got = await this.request(`${MUTAMARKET_API}/modules/${itemId}`, { method: 'GET' });
-    if (got.status === 200) return this.remember(itemId, parseModuleEnvelope(got.body, typeId));
+    if (got.status === 200) return this.remember(key, parseModuleEnvelope(got.body, typeId));
     if (got.status !== 404) throw new MutamarketUnavailableError(`GET module: ${got.status}`);
 
-    if (!trained) return this.remember(itemId, { status: 'no-estimate', url: null });
+    if (!trained) return this.remember(key, { status: 'no-estimate', url: null });
+    if (!importIfMissing) return this.remember(key, { status: 'not-imported' });
+    if (this.importBackoff.get(key, this.deps.now())) {
+      throw new MutamarketUnavailableError('import backing off after a failure');
+    }
 
-    const posted = await this.enqueueImport(() =>
-      this.request(`${MUTAMARKET_API}/modules`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type_id: typeId, item_id: itemId }),
-      })
-    );
+    let posted: { status: number; body: unknown };
+    try {
+      posted = await this.enqueueImport(() =>
+        this.request(`${MUTAMARKET_API}/modules`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type_id: typeId, item_id: itemId }),
+        })
+      );
+    } catch (err) {
+      if (err instanceof MutamarketUnavailableError) this.backOffImport(key);
+      throw err;
+    }
     if (posted.status === 200) {
-      return this.remember(itemId, parseModuleEnvelope(posted.body, typeId));
+      return this.remember(key, parseModuleEnvelope(posted.body, typeId));
     }
     // 400: MutaMarket couldn't import it (not abyssal, not in EVE any more).
     if (posted.status === 400 || posted.status === 404 || posted.status === 422) {
-      return this.remember(itemId, { status: 'unknown' });
+      return this.remember(key, { status: 'unknown' });
     }
+    this.backOffImport(key);
     throw new MutamarketUnavailableError(`POST module: ${posted.status}`);
   }
 
-  private remember(itemId: number, value: MutamarketEstimate): MutamarketEstimate {
-    const ttl = value.status === 'priced' ? ESTIMATE_TTL_MS : NO_ESTIMATE_TTL_MS;
-    this.estimates.delete(itemId);
-    this.estimates.set(itemId, { value, expiresAt: this.deps.now() + ttl });
-    if (this.estimates.size > MAX_CACHED_ESTIMATES) {
-      const oldest = this.estimates.keys().next().value;
-      if (oldest !== undefined) this.estimates.delete(oldest);
-    }
+  private backOffImport(key: string): void {
+    this.importBackoff.set(key, true, this.deps.now() + IMPORT_FAILURE_BACKOFF_MS);
+  }
+
+  private remember(key: string, value: MutamarketEstimate): MutamarketEstimate {
+    this.estimates.set(key, value, this.deps.now() + ttlFor(value));
     return value;
   }
 

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   ESTIMATE_TTL_MS,
+  IMPORT_FAILURE_BACKOFF_MS,
   IMPORT_MIN_GAP_MS,
   MAX_PENDING_IMPORTS,
   MUTAMARKET_USER_AGENT,
@@ -9,6 +10,7 @@ import {
   MutamarketProxy,
   MutamarketUnavailableError,
   NO_ESTIMATE_TTL_MS,
+  NOT_IMPORTED_TTL_MS,
   parseEstimateInput,
   parseModuleEnvelope,
 } from './mutamarket.js';
@@ -16,6 +18,9 @@ import {
 const BCS = 49738;
 const UNTRAINED = 47702;
 const ITEM = 1056087009644;
+
+const LOOKUP = { typeId: BCS, itemId: ITEM, importIfMissing: false };
+const IMPORT = { ...LOOKUP, importIfMissing: true };
 
 const STATS = [
   { id: 1, type_id: BCS, name: 'Abyssal Ballistic Control System', data_count: 10, r2: 0.6 },
@@ -75,11 +80,11 @@ function harness(route: Route) {
 }
 
 describe('parseEstimateInput', () => {
-  it('accepts positive integer ids', () => {
-    expect(parseEstimateInput({ typeId: BCS, itemId: ITEM })).toEqual({
-      typeId: BCS,
-      itemId: ITEM,
-    });
+  it('accepts positive integer ids; import is off unless asked', () => {
+    expect(parseEstimateInput({ typeId: BCS, itemId: ITEM })).toEqual(LOOKUP);
+    expect(parseEstimateInput({ typeId: BCS, itemId: ITEM, importIfMissing: true })).toEqual(
+      IMPORT
+    );
   });
 
   it.each([
@@ -92,6 +97,7 @@ describe('parseEstimateInput', () => {
     { typeId: 0, itemId: ITEM },
     { typeId: BCS },
     { typeId: BCS, itemId: '1/../../admin' },
+    { typeId: BCS, itemId: ITEM, importIfMissing: 'yes' },
   ])('rejects %j', (input) => {
     expect(() => parseEstimateInput(input)).toThrow(MutamarketInputError);
   });
@@ -124,7 +130,7 @@ describe('parseModuleEnvelope', () => {
 describe('MutamarketProxy', () => {
   it('GETs a known module with a contact User-Agent and never POSTs', async () => {
     const h = harness(() => json(200, moduleBody()));
-    const result = await h.proxy.estimate({ typeId: BCS, itemId: ITEM });
+    const result = await h.proxy.estimate(LOOKUP);
     expect(result).toMatchObject({ status: 'priced', value: 282840604.66 });
     expect(h.moduleCalls()).toHaveLength(1);
     expect(h.moduleCalls()[0]).toMatchObject({
@@ -136,9 +142,20 @@ describe('MutamarketProxy', () => {
     expect(MUTAMARKET_USER_AGENT).toContain('github.com/shawndibble/neocom-desk');
   });
 
-  it('POSTs an import only after a 404', async () => {
+  it('answers not-imported on a 404 without an import ask, and never POSTs', async () => {
+    const h = harness(() => json(404));
+    expect(await h.proxy.estimate(LOOKUP)).toEqual({ status: 'not-imported' });
+    expect(await h.proxy.estimate(LOOKUP)).toEqual({ status: 'not-imported' });
+    expect(h.moduleCalls().map((c) => c.method)).toEqual(['GET']);
+    h.advance(NOT_IMPORTED_TTL_MS + 1);
+    await h.proxy.estimate(LOOKUP);
+    expect(h.moduleCalls().map((c) => c.method)).toEqual(['GET', 'GET']);
+  });
+
+  it('POSTs an import only after a 404, when asked, past a cached not-imported', async () => {
     const h = harness((method) => (method === 'GET' ? json(404) : json(200, moduleBody())));
-    const result = await h.proxy.estimate({ typeId: BCS, itemId: ITEM });
+    expect(await h.proxy.estimate(LOOKUP)).toEqual({ status: 'not-imported' });
+    const result = await h.proxy.estimate(IMPORT);
     expect(result.status).toBe('priced');
     const post = h.moduleCalls().find((c) => c.method === 'POST');
     expect(post?.url).toBe('https://mutamarket.com/api/modules');
@@ -147,63 +164,86 @@ describe('MutamarketProxy', () => {
 
   it('serves a repeat from memory until the TTL lapses', async () => {
     const h = harness(() => json(200, moduleBody()));
-    await h.proxy.estimate({ typeId: BCS, itemId: ITEM });
-    await h.proxy.estimate({ typeId: BCS, itemId: ITEM });
+    await h.proxy.estimate(LOOKUP);
+    await h.proxy.estimate(LOOKUP);
     expect(h.moduleCalls()).toHaveLength(1);
     h.advance(ESTIMATE_TTL_MS + 1);
-    await h.proxy.estimate({ typeId: BCS, itemId: ITEM });
+    await h.proxy.estimate(LOOKUP);
     expect(h.moduleCalls()).toHaveLength(2);
   });
 
   it('shares one lookup between concurrent asks for an item', async () => {
     const h = harness(() => json(200, moduleBody()));
-    await Promise.all([
-      h.proxy.estimate({ typeId: BCS, itemId: ITEM }),
-      h.proxy.estimate({ typeId: BCS, itemId: ITEM }),
-    ]);
+    await Promise.all([h.proxy.estimate(LOOKUP), h.proxy.estimate(LOOKUP)]);
     expect(h.moduleCalls()).toHaveLength(1);
+  });
+
+  it('never folds an import ask into a lookup-only ask', async () => {
+    const h = harness((method) => (method === 'GET' ? json(404) : json(200, moduleBody())));
+    const [lookup, imported] = await Promise.all([
+      h.proxy.estimate(LOOKUP),
+      h.proxy.estimate(IMPORT),
+    ]);
+    expect(lookup).toEqual({ status: 'not-imported' });
+    expect(imported.status).toBe('priced');
   });
 
   it('makes no call for a type MutaMarket does not price', async () => {
     const h = harness(() => json(200, moduleBody()));
-    expect(await h.proxy.estimate({ typeId: 587, itemId: ITEM })).toEqual({ status: 'unknown' });
+    expect(await h.proxy.estimate({ ...LOOKUP, typeId: 587 })).toEqual({ status: 'unknown' });
     expect(h.moduleCalls()).toHaveLength(0);
+  });
+
+  it("does not let a wrong type id blank the item's real answer", async () => {
+    const h = harness(() => json(200, moduleBody()));
+    expect(await h.proxy.estimate({ ...LOOKUP, typeId: 587 })).toEqual({ status: 'unknown' });
+    expect(await h.proxy.estimate({ ...LOOKUP, typeId: UNTRAINED })).toEqual({
+      status: 'unknown',
+    });
+    expect((await h.proxy.estimate(LOOKUP)).status).toBe('priced');
   });
 
   it('does not import a module of an untrained type', async () => {
     const h = harness(() => json(404));
-    const result = await h.proxy.estimate({ typeId: UNTRAINED, itemId: ITEM });
+    const result = await h.proxy.estimate({ ...IMPORT, typeId: UNTRAINED });
     expect(result).toEqual({ status: 'no-estimate', url: null });
     expect(h.moduleCalls().map((c) => c.method)).toEqual(['GET']);
   });
 
   it('caches a refused import so it is not retried', async () => {
     const h = harness((method) => (method === 'GET' ? json(404) : json(400)));
-    expect(await h.proxy.estimate({ typeId: BCS, itemId: ITEM })).toEqual({ status: 'unknown' });
-    expect(await h.proxy.estimate({ typeId: BCS, itemId: ITEM })).toEqual({ status: 'unknown' });
+    expect(await h.proxy.estimate(IMPORT)).toEqual({ status: 'unknown' });
+    expect(await h.proxy.estimate(IMPORT)).toEqual({ status: 'unknown' });
     expect(h.moduleCalls().filter((c) => c.method === 'POST')).toHaveLength(1);
     h.advance(NO_ESTIMATE_TTL_MS + 1);
-    await h.proxy.estimate({ typeId: BCS, itemId: ITEM });
+    await h.proxy.estimate(IMPORT);
     expect(h.moduleCalls().filter((c) => c.method === 'POST')).toHaveLength(2);
   });
 
   it('throws unavailable on a 5xx and caches nothing', async () => {
     let status = 503;
     const h = harness(() => (status === 503 ? json(503) : json(200, moduleBody())));
-    await expect(h.proxy.estimate({ typeId: BCS, itemId: ITEM })).rejects.toThrow(
-      MutamarketUnavailableError
-    );
+    await expect(h.proxy.estimate(LOOKUP)).rejects.toThrow(MutamarketUnavailableError);
     status = 200;
-    expect((await h.proxy.estimate({ typeId: BCS, itemId: ITEM })).status).toBe('priced');
+    expect((await h.proxy.estimate(LOOKUP)).status).toBe('priced');
+  });
+
+  it('backs off a failed import instead of retrying it', async () => {
+    const h = harness((method) => (method === 'GET' ? json(404) : json(503)));
+    const posts = () => h.moduleCalls().filter((c) => c.method === 'POST');
+    await expect(h.proxy.estimate(IMPORT)).rejects.toThrow(MutamarketUnavailableError);
+    await expect(h.proxy.estimate(IMPORT)).rejects.toThrow(MutamarketUnavailableError);
+    expect(posts()).toHaveLength(1);
+    h.advance(IMPORT_FAILURE_BACKOFF_MS + 1);
+    await expect(h.proxy.estimate(IMPORT)).rejects.toThrow(MutamarketUnavailableError);
+    expect(posts()).toHaveLength(2);
   });
 
   it('throws unavailable when the network fails', async () => {
     const h = harness(() => {
       throw new TypeError('network down');
     });
-    await expect(h.proxy.estimate({ typeId: BCS, itemId: ITEM })).rejects.toThrow(
-      MutamarketUnavailableError
-    );
+    await expect(h.proxy.estimate(LOOKUP)).rejects.toThrow(MutamarketUnavailableError);
   });
 
   it('spaces imports apart, one at a time', async () => {
@@ -211,9 +251,9 @@ describe('MutamarketProxy', () => {
       method === 'GET' ? json(404) : json(200, moduleBody({ id: Number(url.length), slug: 'x' }))
     );
     await Promise.all([
-      h.proxy.estimate({ typeId: BCS, itemId: 1 }),
-      h.proxy.estimate({ typeId: BCS, itemId: 2 }),
-      h.proxy.estimate({ typeId: BCS, itemId: 3 }),
+      h.proxy.estimate({ ...IMPORT, itemId: 1 }),
+      h.proxy.estimate({ ...IMPORT, itemId: 2 }),
+      h.proxy.estimate({ ...IMPORT, itemId: 3 }),
     ]);
     expect(h.moduleCalls().filter((c) => c.method === 'POST')).toHaveLength(3);
     expect(h.sleeps).toEqual([IMPORT_MIN_GAP_MS, IMPORT_MIN_GAP_MS]);
@@ -230,7 +270,7 @@ describe('MutamarketProxy', () => {
       return json(200, moduleBody());
     });
     const asks = Array.from({ length: MAX_PENDING_IMPORTS + 1 }, (_, i) =>
-      h.proxy.estimate({ typeId: BCS, itemId: i + 1 }).catch((e: unknown) => e)
+      h.proxy.estimate({ ...IMPORT, itemId: i + 1 }).catch((e: unknown) => e)
     );
     await new Promise((resolve) => setTimeout(resolve, 0));
     release();

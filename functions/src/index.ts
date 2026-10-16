@@ -1477,15 +1477,17 @@ export const syncLpStoreOffers = onSchedule(
 );
 
 // mutamarketEstimate: one abyssal module's estimated value from MutaMarket
-// (mutamarket.ts). No session: asset values show with nobody signed in to
-// sync, and the answer is public data. `maxInstances: 1` makes the proxy's
-// memory cache and import queue global, which is what keeps MutaMarket's
-// "never loop POST /api/modules" true across every client.
+// (mutamarket.ts). Needs a Character session (`ensureAnySession` client side):
+// an import publishes a module on MutaMarket under our User-Agent, so no
+// anonymous caller may drive it. `maxInstances: 1` makes the proxy's memory
+// cache and import queue global, which keeps MutaMarket's "never loop POST
+// /api/modules" true across every client.
 const mutamarket = new MutamarketProxy();
 
 export const mutamarketEstimate = onCall<unknown>(
   { maxInstances: 1, timeoutSeconds: 120 },
   async (request) => {
+    callerOf(request);
     let input;
     try {
       input = parseEstimateInput(request.data);

@@ -15,8 +15,8 @@
 // Fourth: `features/fittings/workbenchFits.ts` reads the public, admin-write-only
 // `workbenchFits` collection (EVE Workbench fits by hull, issue #2484) with no
 // session at all, by document id only (the rules deny listing it).
-// Fifth: `market/mutamarket.ts` calls the session-less `mutamarketEstimate`
-// function for abyssal module estimates (MutaMarket has no CORS).
+// Fifth: `market/mutamarket.ts` calls the `mutamarketEstimate` function for
+// abyssal module estimates (MutaMarket has no CORS), on any Character's session.
 
 import { getAuth, type Auth } from 'firebase/auth';
 import { getFirestore, type Firestore } from 'firebase/firestore/lite';
