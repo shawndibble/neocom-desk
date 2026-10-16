@@ -16,7 +16,9 @@ const mocks = vi.hoisted(() => ({
   orders: vi.fn(),
   hubPrices: vi.fn(),
   averages: vi.fn(),
+  abyssal: vi.fn(),
 }));
+vi.mock('@/features/abyssal/abyssalEstimates', () => ({ lastKnownAbyssalValues: mocks.abyssal }));
 vi.mock('@/features/character/wallet', () => ({ loadWalletBalanceWithStatus: mocks.wallet }));
 vi.mock('@/features/character/assets', () => ({ loadCharacterAssets: mocks.assets }));
 vi.mock('@/features/character/orders', () => ({ loadOrders: mocks.orders }));
@@ -194,6 +196,7 @@ describe('liveSources.fetch', () => {
     mocks.orders.mockResolvedValue(fresh([]));
     mocks.hubPrices.mockResolvedValue(new Map([[34, { sellMin: 5 }]]));
     mocks.averages.mockResolvedValue(new Map());
+    mocks.abyssal.mockResolvedValue({ isAbyssalType: () => false, values: new Map() });
   });
 
   it('returns the figures when every source answered live', async () => {
@@ -226,6 +229,30 @@ describe('liveSources.fetch', () => {
       expect(await liveSources.fetch(1)).toBeNull();
     }
   );
+
+  it('values an abyssal module at its last known estimate, never a type price', async () => {
+    const NEUT = 47832;
+    mocks.assets.mockResolvedValue(
+      fresh([
+        { item_id: 1, type_id: 34, quantity: 2 },
+        { item_id: 9, type_id: NEUT, quantity: 1 },
+      ])
+    );
+    mocks.averages.mockResolvedValue(new Map([[NEUT, 1_000]]));
+    mocks.abyssal.mockResolvedValue({
+      isAbyssalType: (typeId: number) => typeId === NEUT,
+      values: new Map([[9, 80_000_000]]),
+    });
+    const fetched = await liveSources.fetch(1);
+    expect(fetched?.itemValueByItemId).toEqual(new Map([[9, 80_000_000]]));
+    expect(fetched?.priceByTypeId.has(NEUT)).toBe(false);
+    expect(mocks.hubPrices.mock.calls[0][1]).toEqual([34]);
+  });
+
+  it('records nothing when the mutaplasmid data would not load', async () => {
+    mocks.abyssal.mockResolvedValue(null);
+    expect(await liveSources.fetch(1)).toBeNull();
+  });
 
   it('keeps the average-priced valuation when the hub lists none of the assets', async () => {
     mocks.hubPrices.mockResolvedValue(new Map([[34, { sellMin: null }]]));

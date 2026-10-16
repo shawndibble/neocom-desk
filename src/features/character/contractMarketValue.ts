@@ -11,9 +11,15 @@
  * so `AppraisalTotals.unpricedRows` (which flags a row missing *either* side)
  * would always count every row; `unpriced` is derived from each row's
  * `sellTotal` instead, so it reflects only the side this feature prices.
+ *
+ * An abyssal (mutated) module has no market price, so it stays out of the
+ * market total and is valued apart, at its own MutaMarket estimate (looked up,
+ * never imported) when the line carries an item id.
  */
 import { buildAppraisal, type AppraisalItem } from '@/engine/market/appraisal';
 import { getHubPricesWithStatus } from '@/market/prices';
+import { getAbyssalEstimate } from '@/market/mutamarket';
+import { mapWithConcurrencyLimit } from '@/lib/concurrency';
 import type { TradeHub } from '@/market/hubs';
 
 export interface ContractMarketValue {
@@ -26,6 +32,18 @@ export interface ContractMarketValue {
    * "worth nothing": the row shows a placeholder when no line priced.
    */
   unreachable: boolean;
+  /** The contract's abyssal modules, never in `total` or `unpriced`. Absent when it has none. */
+  abyssal?: AbyssalContractValue;
+}
+
+export interface AbyssalContractValue {
+  /** ISK: the priced modules' MutaMarket estimates, summed. */
+  estimated: number;
+  priced: number;
+  /** No estimate: no item id on the line, no Character to ask with, or MutaMarket has none. */
+  unpriced: number;
+  /** Every line is abyssal, so there is no market figure to show. */
+  onlyAbyssal: boolean;
 }
 
 /**
@@ -37,23 +55,76 @@ export interface ContractMarketValue {
 export interface PricedContractLine {
   type_id: number;
   quantity: number;
+  /** An abyssal module's own item id (public contracts only), for its estimate. */
+  item_id?: number;
 }
 
-/**
- * `sellOverrides` prices a type the hub station never lists — PLEX, which
- * trades only on its own global market — from wherever the caller found it.
- */
+export interface AbyssalPricing {
+  isAbyssalType: (typeId: number) => boolean;
+  /** The Character whose session reaches MutaMarket; null asks nothing. */
+  characterId: number | null;
+  /** True once the view closed: lookups not yet started are dropped. */
+  isCancelled?: () => boolean;
+}
+
+const ABYSSAL_LOOKUP_WORKERS = 4;
+
+async function valueAbyssalLines(
+  lines: readonly PricedContractLine[],
+  { characterId, isCancelled = () => false }: AbyssalPricing
+): Promise<Omit<AbyssalContractValue, 'onlyAbyssal'>> {
+  const values: (number | null)[] = lines.map(() => null);
+  if (characterId === null) return { estimated: 0, priced: 0, unpriced: lines.length };
+  // A few at a time, stopping at the first `unavailable`: the rest would only fail too.
+  let unavailable = false;
+  await mapWithConcurrencyLimit(
+    lines.map((line, index) => ({ line, index })),
+    ABYSSAL_LOOKUP_WORKERS,
+    async ({ line, index }) => {
+      if (unavailable || isCancelled()) return;
+      if (line.item_id === undefined) return;
+      const estimate = await getAbyssalEstimate(line.type_id, line.item_id, { characterId });
+      if (estimate.status === 'unavailable') unavailable = true;
+      values[index] = estimate.value;
+    }
+  );
+  const priced = values.filter((value): value is number => value !== null);
+  return {
+    estimated: priced.reduce((sum, value) => sum + value, 0),
+    priced: priced.length,
+    unpriced: values.length - priced.length,
+  };
+}
+
+export interface ContractMarketValueOptions {
+  /**
+   * Prices a type the hub station never lists — PLEX, which trades only on its
+   * own global market — from wherever the caller found it.
+   */
+  sellOverrides?: ReadonlyMap<number, number>;
+  /** Without it no line reads as abyssal. */
+  abyssal?: AbyssalPricing;
+}
+
 export async function loadContractMarketValue(
   hub: TradeHub,
   items: readonly PricedContractLine[],
   typeNames: ReadonlyMap<number, string>,
-  sellOverrides: ReadonlyMap<number, number> = new Map()
+  { sellOverrides = new Map(), abyssal }: ContractMarketValueOptions = {}
 ): Promise<ContractMarketValue> {
-  const { prices, unreachable } = await getHubPricesWithStatus(
-    hub,
-    items.map((item) => item.type_id)
-  );
-  const appraisalItems: AppraisalItem[] = items.map((item) => ({
+  const isAbyssal = (line: PricedContractLine) => abyssal?.isAbyssalType(line.type_id) ?? false;
+  const abyssalLines = items.filter(isAbyssal);
+  const marketLines = items.filter((line) => !isAbyssal(line));
+  const [{ prices, unreachable }, abyssalValue] = await Promise.all([
+    marketLines.length === 0
+      ? { prices: new Map(), unreachable: false }
+      : getHubPricesWithStatus(
+          hub,
+          marketLines.map((item) => item.type_id)
+        ),
+    abyssal && abyssalLines.length > 0 ? valueAbyssalLines(abyssalLines, abyssal) : undefined,
+  ]);
+  const appraisalItems: AppraisalItem[] = marketLines.map((item) => ({
     typeId: item.type_id,
     name: typeNames.get(item.type_id) ?? `#${item.type_id}`,
     quantity: item.quantity,
@@ -65,5 +136,8 @@ export async function loadContractMarketValue(
     total: totals.sell,
     unpriced: rows.filter((row) => row.sellTotal === null).length,
     unreachable,
+    ...(abyssalValue
+      ? { abyssal: { ...abyssalValue, onlyAbyssal: marketLines.length === 0 } }
+      : {}),
   };
 }

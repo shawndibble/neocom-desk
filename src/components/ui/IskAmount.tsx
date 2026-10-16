@@ -17,6 +17,8 @@ interface IskAmountProps {
   decimals?: number;
   /** Extra classes on the trigger, e.g. a tone or `tabular-nums` alignment from the cell. */
   className?: string;
+  /** A line under the exact figure in the same bubble (e.g. where the value comes from). */
+  note?: string;
 }
 
 /**
@@ -47,7 +49,7 @@ interface IskAmountProps {
  * `sortValue`), never on this text. Ledgers and editable fields keep full
  * precision instead — see `docs/context/decisions/` for the rule.
  */
-export function IskAmount({ value, decimals = 2, className = '' }: IskAmountProps) {
+export function IskAmount({ value, decimals = 2, className = '', note }: IskAmountProps) {
   const { t } = useTranslation();
   // Inside a clickable row the tap opens the row, whose detail carries the exact figure.
   const rowTappable = useContext(RowTappableContext);
@@ -55,7 +57,20 @@ export function IskAmount({ value, decimals = 2, className = '' }: IskAmountProp
   const inGroup = useContext(IskFigureGroupContext);
   const exact = t('common.iskExact', { amount: formatIsk(value, decimals) });
   return (
-    <Tooltip content={exact} openOnTap={!rowTappable}>
+    <Tooltip
+      content={
+        note ? (
+          <>
+            {exact}
+            <br />
+            {note}
+          </>
+        ) : (
+          exact
+        )
+      }
+      openOnTap={!rowTappable}
+    >
       <span
         tabIndex={inGroup ? -1 : 0}
         data-isk-figure={inGroup ? '' : undefined}
@@ -66,7 +81,11 @@ export function IskAmount({ value, decimals = 2, className = '' }: IskAmountProp
       >
         {formatIskCompact(value)}
         {/* The separating space lives inside the hidden text, so no visible gap trails the figure. */}
-        <span className="sr-only"> {exact}</span>
+        <span className="sr-only">
+          {' '}
+          {exact}
+          {note && ` ${note}`}
+        </span>
       </span>
     </Tooltip>
   );

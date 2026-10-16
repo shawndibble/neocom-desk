@@ -59,6 +59,21 @@ describe('mergeContractItemLines', () => {
     expect(lines[1].quantity).toBe(2);
   });
 
+  it('never merges abyssal modules, each worth its own rolls, and keeps their item ids', () => {
+    const NEUT = 47832;
+    const lines = mergeContractItemLines(
+      [
+        item({ record_id: 1, type_id: NEUT, item_id: 11 }),
+        item({ record_id: 2, type_id: NEUT, item_id: 12 }),
+      ],
+      (typeId) => typeId === NEUT
+    );
+    expect(lines.map((line) => [line.quantity, line.itemId])).toEqual([
+      [1, 11],
+      [1, 12],
+    ]);
+  });
+
   it('lists items in the order ESI first reported them', () => {
     const lines = mergeContractItemLines([
       item({ record_id: 1, type_id: 34 }),

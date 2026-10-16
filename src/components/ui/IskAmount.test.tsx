@@ -26,6 +26,15 @@ describe('IskAmount', () => {
     expect(screen.getByText(EXACT)).toHaveClass('sr-only');
   });
 
+  it('adds a note after the exact value, in the hidden text and the same bubble', async () => {
+    const user = userEvent.setup();
+    render(<IskAmount value={1_284_500_000} note="An estimate." />);
+    const figure = screen.getByText('1.3B', { exact: false });
+    expect(figure).toHaveTextContent(`1.3B ${EXACT} An estimate.`);
+    await user.hover(figure);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(`${EXACT}An estimate.`);
+  });
+
   it('carries no aria-label, which a role-less span may not have', () => {
     render(<IskAmount value={1_284_500_000} />);
     expect(trigger()).not.toHaveAttribute('aria-label');

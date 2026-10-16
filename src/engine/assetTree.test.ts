@@ -65,6 +65,16 @@ describe('buildAssetTree', () => {
     expect(tree[0].estimatedValue).toBe(2_005_000_000);
   });
 
+  it('values any item carrying its own value at that, not at its type price (an abyssal estimate)', () => {
+    const prices = new Map([[47832, 1_000]]);
+    const assets = [
+      asset({ item_id: 1, type_id: 47832 }),
+      asset({ item_id: 2, type_id: 34, quantity: 10 }),
+    ];
+    const tree = buildAssetTree(assets, new Map([...prices, [34, 5]]), new Map([[1, 90_000_000]]));
+    expect(tree[0].estimatedValue).toBe(90_000_050);
+  });
+
   it('classifies a singleton with Cargo/DroneBay/fitting-slot children as a ship, bucketed into named bays', () => {
     const tree = buildAssetTree([
       asset({ item_id: 10, type_id: 650, location_id: 60003760, location_flag: 'Hangar' }),

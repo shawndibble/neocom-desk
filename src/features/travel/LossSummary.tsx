@@ -7,6 +7,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { computeNetLoss, matchInsurance, type LossInsurance } from '@/engine/losses/netLoss';
+import { useMutaplasmidLookup } from '@/features/abyssal/mutaplasmidData';
 import { loadWalletJournal } from '@/features/character/wallet';
 import { useMarketHub } from '@/features/market/hub';
 import { formatIsk } from '@/lib/isk';
@@ -30,6 +31,7 @@ export function LossSummary({ detail, zkbValue }: LossSummaryProps) {
   const hubHydrated = useMarketHub((state) => state.hydrated);
   const hydrateHub = useMarketHub((state) => state.hydrate);
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
+  const mutaplasmids = useMutaplasmidLookup();
   const [prices, setPrices] = useState<ReadonlyMap<number, number | null> | null>(null);
   const [pricesFailed, setPricesFailed] = useState(false);
   const [payout, setPayout] = useState<Insurance>({ state: 'loading' });
@@ -104,6 +106,7 @@ export function LossSummary({ detail, zkbValue }: LossSummaryProps) {
     prices,
     insurance: payout.state === 'done' ? payout.value : null,
     zkbValue,
+    isAbyssalType: mutaplasmids?.isAbyssalType,
   });
   const row = (label: string, value: string, strong = false) => (
     <div className="flex justify-between gap-4">
@@ -148,6 +151,11 @@ export function LossSummary({ detail, zkbValue }: LossSummaryProps) {
       {loss.unpricedTypes.length > 0 && (
         <p className="text-warning">
           {t('travel.pilot.recent.lossSummary.unpriced', { count: loss.unpricedTypes.length })}
+        </p>
+      )}
+      {loss.abyssalItems > 0 && (
+        <p className="text-warning">
+          {t('travel.pilot.recent.lossSummary.abyssal', { count: loss.abyssalItems })}
         </p>
       )}
       {zkbValue !== null && (

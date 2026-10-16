@@ -25,6 +25,12 @@ export interface NetLoss {
   zkbValue: number | null;
   /** Type ids with no price; they count as zero in the totals, so the totals are partial. */
   unpricedTypes: number[];
+  /**
+   * Abyssal (mutated) modules on the loss, destroyed or dropped. Never priced:
+   * each is worth its own rolls, and a killmail names only the type. Out of
+   * the totals, like `unpricedTypes`.
+   */
+  abyssalItems: number;
 }
 
 /** Slot flags (low/mid/high/rig/subsystem) are fitted; every other flag is hold contents. */
@@ -37,9 +43,12 @@ export function computeNetLoss(input: {
   prices: ReadonlyMap<number, number | null>;
   insurance: LossInsurance | null;
   zkbValue: number | null;
+  /** Abyssal (mutated) types; omitted, none are. */
+  isAbyssalType?: (typeId: number) => boolean;
 }): NetLoss {
-  const { victim, prices, insurance, zkbValue } = input;
+  const { victim, prices, insurance, zkbValue, isAbyssalType } = input;
   const unpriced = new Set<number>();
+  let abyssalItems = 0;
   const price = (typeId: number): number => {
     const value = prices.get(typeId);
     if (value == null) {
@@ -54,8 +63,12 @@ export function computeNetLoss(input: {
   let cargo = 0;
   let dropped = 0;
   for (const item of victim.items ?? []) {
-    const unit = price(item.item_type_id);
     const droppedQty = item.quantity_dropped ?? 0;
+    if (isAbyssalType?.(item.item_type_id)) {
+      abyssalItems += (item.quantity_destroyed ?? 0) + droppedQty;
+      continue;
+    }
+    const unit = price(item.item_type_id);
     const value = unit * ((item.quantity_destroyed ?? 0) + droppedQty);
     if (isFittedFlag(item.flag)) fitted += value;
     else cargo += value;
@@ -73,6 +86,7 @@ export function computeNetLoss(input: {
     net: lost - (insurance?.amount ?? 0),
     zkbValue,
     unpricedTypes: [...unpriced].sort((a, b) => a - b),
+    abyssalItems,
   };
 }
 

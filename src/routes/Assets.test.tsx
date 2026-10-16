@@ -34,7 +34,15 @@ const TYPES: TypeMap = {
   '650': { name: 'Drake', groupID: 27, volume: 92150 },
   '587': { name: 'Rifter', groupID: 25, volume: 27289 },
   '691': { name: 'Rifter Blueprint', groupID: 105, volume: 0.01 },
+  '47832': { name: 'Heavy Abyssal Energy Neutralizer', groupID: 71, volume: 50 },
 };
+
+const ABYSSAL_NEUT = 47832;
+const abyssalEstimate = vi.hoisted(() => vi.fn());
+vi.mock('@/market/mutamarket', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/market/mutamarket')>()),
+  getAbyssalEstimate: abyssalEstimate,
+}));
 
 // Show info's modal fetches the type's dogma/market data; a stub that names
 // its item is all the name-button tests need to see it opened.
@@ -53,6 +61,11 @@ vi.mock('@/sde/loadSde', () => ({
   loadPi: vi.fn(async () => ({ schematics: {}, raw: [] })),
   loadMarketWideTrees: vi.fn(async () => ({})),
   loadCompressedOreTypeIds: vi.fn(async () => ({})),
+  loadMutaplasmids: vi.fn(async () => ({
+    attributeNames: {},
+    mutaplasmids: {},
+    abyssalTypeIds: [47832],
+  })),
 }));
 
 // The Move tab reads hull capacities from the Fitting catalogue and the pilot's
@@ -903,6 +916,54 @@ describe('Assets', () => {
     expect(await screen.findByText('This location is gone')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Back to all locations' }));
     expect(await screen.findByText(JITA)).toBeInTheDocument();
+  });
+});
+
+describe('abyssal modules', () => {
+  it('values an abyssal module at its MutaMarket estimate and credits MutaMarket once', async () => {
+    abyssalEstimate.mockResolvedValue({
+      status: 'priced',
+      value: 90_000_000,
+      source: 'mutamarket',
+      fetchedAt: Date.now(),
+      valueUpdatedAt: null,
+      url: 'https://mutamarket.com/modules/x',
+    });
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>
+        HttpResponse.json([
+          ...assetPage1,
+          {
+            item_id: 1054645434634,
+            type_id: ABYSSAL_NEUT,
+            quantity: 1,
+            location_id: 60003760,
+            location_type: 'station' as const,
+            location_flag: 'Hangar',
+            is_singleton: true,
+          },
+        ])
+      )
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    expect(
+      await screen.findByText("1 abyssal module at MutaMarket's estimate", undefined, {
+        timeout: 3000,
+      })
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Price from MutaMarket/ })).toHaveAttribute(
+      'href',
+      'https://mutamarket.com'
+    );
+    expect(screen.getByTestId('assets-total-value')).toHaveTextContent('90,000,000');
+    expect(abyssalEstimate).toHaveBeenCalledWith(ABYSSAL_NEUT, 1054645434634, {
+      characterId: CHAR_ID,
+    });
+
+    await openLocation(user, JITA);
+    expect(await screen.findByText('Heavy Abyssal Energy Neutralizer')).toBeInTheDocument();
+    expect(screen.getByTestId('abyssal-value-note')).toBeInTheDocument();
   });
 });
 

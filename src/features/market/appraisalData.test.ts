@@ -5,7 +5,7 @@ import { FUZZWORK_AGGREGATES_URL } from '@/market/fuzzwork';
 import { clearMarketPriceCache } from '@/market/prices';
 import { DEFAULT_TRADE_HUB, TRADE_HUBS } from '@/market/hubs';
 import { SKILL_IDS } from '@/engine/industry/types';
-import { loadReprocessing } from '@/sde/loadSde';
+import { loadMutaplasmids, loadReprocessing, loadTypes } from '@/sde/loadSde';
 import { loadCorrectedSkills, type CorrectedSkills } from '@/features/skills/correctedSkills';
 import { loadCharacterImplants } from '@/features/skills/data';
 import { findLpOfferMatches, toLpOfferInputs } from '@/features/market/appraisalLpAcquisition';
@@ -24,7 +24,11 @@ vi.mock('@/sde/loadMarketSde', () => ({
   ]),
 }));
 
-vi.mock('@/sde/loadSde', () => ({ loadReprocessing: vi.fn() }));
+vi.mock('@/sde/loadSde', () => ({
+  loadReprocessing: vi.fn(),
+  loadMutaplasmids: vi.fn(),
+  loadTypes: vi.fn(),
+}));
 vi.mock('@/features/skills/correctedSkills', () => ({ loadCorrectedSkills: vi.fn() }));
 vi.mock('@/features/skills/data', () => ({ loadCharacterImplants: vi.fn(async () => null) }));
 vi.mock('@/features/market/appraisalLpAcquisition', () => ({
@@ -182,6 +186,26 @@ describe('appraisePaste', () => {
     expect(appraisal.rows).toEqual([]);
     expect(unmatched).toHaveLength(1);
     expect(hits).toBe(0);
+  });
+
+  it('tells a pasted abyssal module apart from a line that names nothing', async () => {
+    vi.mocked(loadMutaplasmids).mockResolvedValueOnce({
+      attributeNames: {},
+      mutaplasmids: {},
+      abyssalTypeIds: [47832],
+    });
+    vi.mocked(loadTypes).mockResolvedValueOnce({
+      '47832': { name: 'Heavy Abyssal Energy Neutralizer', groupID: 71, volume: 50 },
+    });
+
+    const { unmatched, abyssal } = await appraisePaste(
+      'Nope\t1\nHeavy Abyssal Energy Neutralizer\t1',
+      DEFAULT_TRADE_HUB,
+      100
+    );
+
+    expect(unmatched).toEqual([{ name: 'Nope', lines: [1] }]);
+    expect(abyssal).toEqual([{ name: 'Heavy Abyssal Energy Neutralizer', lines: [2] }]);
   });
 
   it('merges the same item pasted twice into one priced row', async () => {

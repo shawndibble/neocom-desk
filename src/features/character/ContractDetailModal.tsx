@@ -41,6 +41,7 @@ import {
 import { ItemInfoLink } from '@/features/entities';
 import { BuildPlanContextMenu } from '@/features/industry/BuildPlanContextMenu';
 import { useMarketHub } from '@/features/market/hub';
+import { useMutaplasmidLookup } from '@/features/abyssal/mutaplasmidData';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { CharacterLink, CorporationLink, SystemLink } from '@/features/entities';
 import { resolvePlaceSystemId } from '@/features/route/placeSystem';
@@ -130,6 +131,7 @@ export function ContractDetailModal({
   const deliverByMs = courierDeliveryDeadlineMs(contract);
   const hubId = useMarketHub((s) => s.value);
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
+  const isAbyssalType = useMutaplasmidLookup()?.isAbyssalType;
   const [location, setLocation] = useState<LocationState | undefined>(undefined);
   /** `undefined` until resolved; the System rows stay hidden meanwhile rather than spinning. */
   const [systems, setSystems] = useState<SystemsState | undefined>(undefined);
@@ -213,10 +215,13 @@ export function ContractDetailModal({
       }
       const includedItems = items.list.filter((item) => item.is_included);
       const requestedItems = items.list.filter((item) => !item.is_included);
+      // A Character's own contract items carry no item id, so an abyssal module
+      // here can't be identified to MutaMarket: it shows as not priced, and why.
+      const abyssal = isAbyssalType ? { isAbyssalType, characterId: null } : undefined;
       const [included, requested] = await Promise.all([
-        loadContractMarketValue(hub, includedItems, items.typeNames),
+        loadContractMarketValue(hub, includedItems, items.typeNames, { abyssal }),
         requestedItems.length > 0
-          ? loadContractMarketValue(hub, requestedItems, items.typeNames)
+          ? loadContractMarketValue(hub, requestedItems, items.typeNames, { abyssal })
           : Promise.resolve(null),
       ]);
       if (!cancelled) setMarketValue({ included, requested });
@@ -224,7 +229,7 @@ export function ContractDetailModal({
     return () => {
       cancelled = true;
     };
-  }, [contract.type, contract.status, items, hub]);
+  }, [contract.type, contract.status, items, hub, isAbyssalType]);
 
   const title = contract.title || t(CONTRACT_TYPE_KEY[contract.type]);
 

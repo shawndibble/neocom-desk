@@ -14,6 +14,10 @@
  * type are genuinely two different offers. A blueprint *original* carries none
  * of those fields, so it stacks with other originals like any other item — and
  * separately from the copies it shares a type ID with.
+ *
+ * Abyssal (mutated) modules never merge either: each is its own item with
+ * its own rolls and its own MutaMarket estimate, so its line keeps its
+ * `item_id` (pass `isAbyssalType` to tell them apart).
  */
 import type { PublicContractItem } from '@/esi/endpoints';
 import { seedFromContractItem, type BuildPlanSeed } from '@/features/industry/planSeed';
@@ -32,18 +36,25 @@ export interface ContractItemLine {
   runs?: number;
   /** How many ESI lines this one stands for. 1 when nothing merged. */
   sourceCount: number;
+  /** An abyssal module's own item id, which its MutaMarket estimate needs. Set on no other line. */
+  itemId?: number;
 }
 
 function stackKey(item: PublicContractItem): string {
   return `${item.type_id}:${item.is_included}`;
 }
 
-export function mergeContractItemLines(items: readonly PublicContractItem[]): ContractItemLine[] {
+export function mergeContractItemLines(
+  items: readonly PublicContractItem[],
+  isAbyssalType: (typeId: number) => boolean = () => false
+): ContractItemLine[] {
   const lines: ContractItemLine[] = [];
   const stacks = new Map<string, ContractItemLine>();
 
   for (const item of items) {
-    const existing = item.is_blueprint_copy ? undefined : stacks.get(stackKey(item));
+    const abyssal = isAbyssalType(item.type_id);
+    const single = item.is_blueprint_copy || abyssal;
+    const existing = single ? undefined : stacks.get(stackKey(item));
     if (existing) {
       existing.quantity += item.quantity;
       existing.sourceCount += 1;
@@ -59,9 +70,10 @@ export function mergeContractItemLines(items: readonly PublicContractItem[]): Co
       timeEfficiency: item.time_efficiency,
       runs: item.runs,
       sourceCount: 1,
+      ...(abyssal && item.item_id !== undefined ? { itemId: item.item_id } : {}),
     };
     lines.push(line);
-    if (!line.isBlueprintCopy) stacks.set(stackKey(item), line);
+    if (!single) stacks.set(stackKey(item), line);
   }
 
   return lines;
