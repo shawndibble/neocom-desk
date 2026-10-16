@@ -15,17 +15,18 @@ export function PlanScheduleLine({ plan }: { plan: PlanScheduleResult }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const { schedule, stages, nowMs, hasSubJobs } = plan;
-  const stageText = stages
-    .map((stage) =>
-      t('industry.planSchedule.stage', {
-        time:
-          stage.startMs <= nowMs ? t('industry.planSchedule.now') : eveWhen(stage.startMs, nowMs),
-        jobs: KIND_ORDER.filter((kind) => stage.counts[kind] > 0)
-          .map((kind) => t(`industry.planSchedule.${kind}`, { count: stage.counts[kind] }))
-          .join(' + '),
-      })
-    )
-    .join(' · ');
+  const stageText = () =>
+    stages
+      .map((stage) =>
+        t('industry.planSchedule.stage', {
+          time:
+            stage.startMs <= nowMs ? t('industry.planSchedule.now') : eveWhen(stage.startMs, nowMs),
+          jobs: KIND_ORDER.filter((kind) => stage.counts[kind] > 0)
+            .map((kind) => t(`industry.planSchedule.${kind}`, { count: stage.counts[kind] }))
+            .join(' + '),
+        })
+      )
+      .join(' · ');
   return (
     <div className="text-xs tabular-nums text-text-dim">
       <p>
@@ -46,7 +47,7 @@ export function PlanScheduleLine({ plan }: { plan: PlanScheduleResult }) {
       </p>
       {open && (
         <>
-          <p>{stageText}</p>
+          <p>{stageText()}</p>
           {hasSubJobs && <p className="text-text-faint">{t('industry.planSchedule.teNote')}</p>}
         </>
       )}

@@ -984,9 +984,6 @@ export function BuildPlanDetail({
     [result]
   );
 
-  // The whole tree scheduled on the plan character's free slots: the plan's
-  // wall-clock time and done-by. Null without slot data, when the hero falls
-  // back to the plan's own job time.
   const jobNodes = useMemo(
     () =>
       result

@@ -117,11 +117,7 @@ interface PlanVerdictHeroProps {
   skillGate?: SkillGateVerdict;
   nameForSkill?: (typeID: number) => string;
   nameForCharacter?: (characterId: number) => string;
-  /**
-   * Wall-clock until the whole job tree is done on the plan character's free
-   * slots, sub-jobs in parallel; shown as the plan's time. Null without slot
-   * data, when the plan's own job time stands in.
-   */
+  /** Wall-clock for the whole tree on free slots; absent without slot data (the plan's own job time stands in). */
   planSeconds?: number;
   /** The plan's slot schedule line; omitted when the caller has none. */
   slotLine?: ReactNode;

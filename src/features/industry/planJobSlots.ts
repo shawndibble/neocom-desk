@@ -6,8 +6,6 @@
  * never a false "0 free".
  */
 import { useEffect, useMemo, useState } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '@/db';
 import { scheduleJobs, type JobSchedule, type ScheduleNode } from '@/engine/industry/jobSchedule';
 import {
   type JobSlotCategory,
@@ -25,7 +23,6 @@ import type { BlueprintCatalog } from './blueprintCatalog';
 import { loadCharacterIndustryJobs } from './jobs';
 
 export interface PlanJobSlotData {
-  characterName: string;
   skills: JobSlotSkills;
   jobs: readonly JobSlotJob[];
   /** When the jobs and skills were read: the schedule's "now". */
@@ -122,10 +119,6 @@ export async function loadJobSlotSkills(
  * skills) scope was never granted — so the caller renders nothing at all.
  */
 export function usePlanJobSlots(characterId: number | null): PlanJobSlotData | null {
-  const character = useLiveQuery(
-    () => (characterId === null ? undefined : db.characters.get(characterId)),
-    [characterId]
-  );
   const [loaded, setLoaded] = useState<{
     characterId: number;
     skills: JobSlotSkills;
@@ -159,14 +152,7 @@ export function usePlanJobSlots(characterId: number | null): PlanJobSlotData | n
     };
   }, [characterId]);
 
-  const characterName = character?.name;
-  return useMemo(
-    () =>
-      characterName === undefined || !loaded || loaded.characterId !== characterId
-        ? null
-        : { ...loaded, characterName },
-    [characterName, loaded, characterId]
-  );
+  return loaded && loaded.characterId === characterId ? loaded : null;
 }
 
 export interface PlanScheduleResult {
@@ -178,9 +164,8 @@ export interface PlanScheduleResult {
 }
 
 /**
- * The plan (or group) tree scheduled on the character's slots, or
- * null while slot data is unknown — the caller then falls back to job time
- * and draws no slot line.
+ * The tree scheduled on the character's slots; null while slot data is
+ * unknown (the caller falls back to job time and draws no line).
  */
 export function usePlanSchedule(
   characterId: number | null,
