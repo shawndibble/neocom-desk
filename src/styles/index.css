@@ -1599,3 +1599,19 @@
     left: -4rem;
   }
 }
+
+/*
+ * Mail composer, phone: the format bar docks `fixed` at the keyboard's top edge
+ * and sets `data-mail-format-bar="docked"` (`MailFormatBar`). The pinned footer
+ * sits at that same edge, so it lifts by the bar's height. One variable is the
+ * bar's height for both this lift and the editor's bottom reserve
+ * (`DOCKED_BAR_SPACE_CLASS`). Written as a plain rule, not a built class name,
+ * because Tailwind only generates whole literal class tokens.
+ */
+:root {
+  --mail-format-bar-space: calc(3.5rem + env(safe-area-inset-bottom, 0px));
+}
+
+.mail-pane:has([data-mail-format-bar='docked']) .mail-footer {
+  margin-bottom: var(--mail-format-bar-space);
+}

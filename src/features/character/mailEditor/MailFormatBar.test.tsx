@@ -5,7 +5,9 @@ import '@/i18n';
 import { emptyFormatState, type FormatState } from '@/engine/mailFormat';
 import { keyboardInset } from '@/lib/useVisualViewportBox';
 import type { MailEditorCommands } from './commands';
-import { MailFormatBar } from './MailFormatBar';
+import { readFileSync } from 'node:fs';
+import footerSource from '../MailComposeFooter.tsx?raw';
+import { DOCKED_BAR_SPACE_CLASS, MailFormatBar } from './MailFormatBar';
 
 function commands(state: Partial<FormatState> = {}, over: Partial<MailEditorCommands> = {}) {
   const c: MailEditorCommands = {
@@ -161,5 +163,35 @@ describe('keyboardInset', () => {
     expect(keyboardInset(800, { height: 500, offsetTop: 40 })).toBe(260);
     expect(keyboardInset(800, { height: 800, offsetTop: 0 })).toBe(0);
     expect(keyboardInset(800, null)).toBe(0);
+  });
+});
+
+describe('docked bar contract with the pinned footer', () => {
+  const bar = (dock: 'keyboard' | 'inline', visible: boolean) => (
+    <MailFormatBar commands={commands()} phone dock={dock} visible={visible} keyboardInset={300} />
+  );
+
+  it('marks itself docked only when fixed above the keyboard and shown', () => {
+    const { rerender } = render(bar('keyboard', true));
+    expect(screen.getByRole('toolbar')).toHaveAttribute('data-mail-format-bar', 'docked');
+    rerender(bar('inline', true));
+    expect(screen.getByRole('toolbar')).not.toHaveAttribute('data-mail-format-bar');
+    rerender(bar('keyboard', false));
+    expect(screen.getByRole('toolbar', { hidden: true })).not.toHaveAttribute(
+      'data-mail-format-bar'
+    );
+  });
+
+  // Read from disk: the CSS pipeline stubs a `?raw` import of a stylesheet to ''.
+  const indexCss = readFileSync('src/styles/index.css', 'utf-8');
+
+  it('has a stylesheet rule that lifts the footer, from the same variable as the editor reserve', () => {
+    expect(indexCss).toMatch(
+      /\.mail-pane:has\(\[data-mail-format-bar='docked'\]\) \.mail-footer\s*\{\s*margin-bottom: var\(--mail-format-bar-space\);/
+    );
+    expect(indexCss).toContain('--mail-format-bar-space:');
+    expect(DOCKED_BAR_SPACE_CLASS).toBe('pb-(--mail-format-bar-space)');
+    // The footer carries the class the rule targets, as a whole literal token.
+    expect(footerSource).toContain("'mail-footer ");
   });
 });

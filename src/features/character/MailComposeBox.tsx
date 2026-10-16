@@ -401,7 +401,7 @@ export function MailComposeBox({
         <Button size="sm" onClick={onClose} disabled={sending}>
           {t('mail.cancel')}
         </Button>
-        {!online && <span className="text-xs text-text-dim">{t('mail.draftSaved')}</span>}
+        {!online && <span className="truncate text-xs text-text-dim">{t('mail.draftSaved')}</span>}
       </MailComposeFooter>
     </div>
   );

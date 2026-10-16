@@ -9,9 +9,6 @@ import { useTranslation } from 'react-i18next';
 import { Button, NeedsConnection, Spinner } from '@/components/ui';
 import { cx } from '@/lib/cx';
 
-/** Matches the format bar only while it is docked (`fixed`) above the keyboard. */
-export const KEYBOARD_DOCKED_BAR = 'group-has-[[role=toolbar].fixed.flex]/pane';
-
 interface MailSendButtonProps {
   size: 'sm' | 'md';
   sending: boolean;
@@ -20,7 +17,7 @@ interface MailSendButtonProps {
   onSend: () => void;
 }
 
-export function MailSendButton({ size, sending, blocked, onSend }: MailSendButtonProps) {
+function MailSendButton({ size, sending, blocked, onSend }: MailSendButtonProps) {
   const { t } = useTranslation();
   return (
     <NeedsConnection>
@@ -49,9 +46,8 @@ export function MailComposeFooter({ children, pinned = false, ...send }: MailCom
     <footer
       className={cx(
         'flex shrink-0 items-center justify-between gap-2',
-        pinned && 'border-t border-line bg-bg px-3 py-2',
-        // The docked format bar sits at the keyboard's top edge; lift the row above it.
-        pinned && `${KEYBOARD_DOCKED_BAR}:mb-14`
+        // `.mail-footer` lifts above a keyboard-docked format bar (rule in styles/index.css).
+        pinned && 'mail-footer border-t border-line bg-bg px-3 py-2'
       )}
     >
       <div className="flex min-w-0 items-center gap-2">{children}</div>

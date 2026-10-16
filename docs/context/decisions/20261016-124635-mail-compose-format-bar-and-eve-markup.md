@@ -11,7 +11,8 @@ bullets still stand._
 
 - **Mobile compose is a full-pane takeover; wide screens keep it inline.** A
   floating Compose button over the list opens it (Gmail/Outlook pattern). Close
-  top-left, Send top-right. The format bar docks above the keyboard as one
+  top-left, Send top-right (superseded: see
+  `20261016-150102-mail-composer-action-layout.md`). The format bar docks above the keyboard as one
   horizontally scrolling row; colour and size open a sheet (swatches, size
   steps) rather than crowding the row.
 

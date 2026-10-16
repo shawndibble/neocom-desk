@@ -274,7 +274,7 @@ export function NewMailComposer({
         fullPane && viewport ? { top: viewport.offsetTop, height: viewport.height } : undefined
       }
       className={cx(
-        'group/pane flex flex-col',
+        'mail-pane flex flex-col',
         fullPane
           ? cx(
               'fixed inset-x-0 z-50 bg-bg pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]',
@@ -391,7 +391,9 @@ export function NewMailComposer({
             {t('mail.discardDraft')}
           </Button>
         )}
-        {!online && saved && <span className="text-xs text-text-dim">{t('mail.draftSaved')}</span>}
+        {!online && saved && (
+          <span className="truncate text-xs text-text-dim">{t('mail.draftSaved')}</span>
+        )}
       </MailComposeFooter>
 
       <Modal
