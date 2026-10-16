@@ -11,6 +11,8 @@ const REVIEWED = new Set<string>([
   'src/features/character/assetBrowserRows.tsx',
   'src/features/character/ContractDetailModal.tsx',
   'src/features/character/JournalDescriptionCell.tsx',
+  // A show-info link inside a mail body's prose, not a row: no primary action competes.
+  'src/features/character/MailBodyView.tsx',
   'src/features/communities/SharedBlueprintTable.tsx',
   'src/features/contracts/PublicContractDetailModal.tsx',
   'src/features/corp/CorpBoardRow.tsx',

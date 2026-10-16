@@ -177,6 +177,10 @@ async function seed() {
 
 beforeEach(seed);
 
+/** The body paragraph 'Undock <b>now</b>.': bold splits its text across elements. */
+const findUndockBody = () =>
+  screen.findByText((_, el) => el?.tagName === 'P' && el.textContent === 'Undock now.');
+
 describe('Mail', () => {
   it('lists headers newest first with resolved sender names', async () => {
     render(<App />);
@@ -205,11 +209,13 @@ describe('Mail', () => {
     expect(document.querySelectorAll('header')).toHaveLength(2);
   });
 
-  it('shows the body, markup stripped, on click', async () => {
+  it('shows the body, markup rendered, on click', async () => {
     const user = userEvent.setup();
     render(<App />);
     await user.click(await screen.findByText('Fleet up!'));
-    expect(await screen.findByText('Undock now.')).toBeInTheDocument();
+    expect(await findUndockBody()).toBeInTheDocument();
+    // `<b>now</b>` renders as bold, not as literal tags.
+    expect(screen.getByText('now').tagName).toBe('STRONG');
   });
 
   it('focuses the reader heading on open, and the mail row on Back (issue #1485)', async () => {
@@ -270,7 +276,7 @@ describe('Mail', () => {
     // The compose box mounts with the body, on the same commit as the
     // reader heading the body's arrival would otherwise focus.
     releaseBody();
-    expect(await screen.findByText('Undock now.')).toBeInTheDocument();
+    expect(await findUndockBody()).toBeInTheDocument();
     await waitFor(() => expect(screen.getByLabelText('Subject')).toHaveFocus());
   });
 
@@ -680,7 +686,7 @@ describe('Mail', () => {
     expect(await screen.findByText("This mail hasn't been downloaded yet.")).toBeInTheDocument();
     fail = false;
     await user.click(screen.getByRole('button', { name: 'Try again' }));
-    expect(await screen.findByText('Undock now.')).toBeInTheDocument();
+    expect(await findUndockBody()).toBeInTheDocument();
   });
 
   it('resolves sender names for mail fetched by "load more", not just the first page', async () => {
@@ -933,7 +939,7 @@ describe('Mail', () => {
 
     await user.click(fleetSubject);
 
-    expect(await screen.findByText('Undock now.')).toBeInTheDocument();
+    expect(await findUndockBody()).toBeInTheDocument();
     expect(within(fleetRow).getByText('Fleet up!')).toHaveClass('font-normal', 'text-text-dim');
   });
 
