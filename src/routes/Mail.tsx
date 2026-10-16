@@ -26,6 +26,8 @@ import { GrantBanner, GrantNote } from '@/app/GrantNote';
 import { ReauthCachedNote } from '@/app/ReauthCachedNote';
 import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { useOnline } from '@/stores/network';
+import { useRetryFocus } from '@/lib/useRetryFocus';
 import { CharacterLink } from '@/features/entities';
 import { StandingTag } from '@/features/character/StandingTag';
 import {
@@ -404,6 +406,11 @@ function MailView({ scope, scopeControl }: MailViewProps) {
     key: string;
     result: CachedResult<MailBody> | null;
   } | null>(null);
+  /** Bumped by "Try again" on a body that could not be read, to refetch it. */
+  const [bodyAttempt, setBodyAttempt] = useState(0);
+  const online = useOnline();
+  /** Why the last "Load more" gave nothing, or `null`. Cleared when the next attempt starts. */
+  const [loadMoreFailure, setLoadMoreFailure] = useState<'offline' | 'error' | null>(null);
 
   // Headers loaded via "load more" (issue #161) live outside useRouteSnapshot,
   // which only supports a full reload, not an incremental patch. `null` means
@@ -582,18 +589,24 @@ function MailView({ scope, scopeControl }: MailViewProps) {
     if (owners.length === 0 || loadingMore) return;
     const requestSnapshot = data;
     setLoadingMore(true);
+    setLoadMoreFailure(null);
     try {
       const fresh = new Map<number, { headers: MailHeader[]; hasMore: boolean }>();
+      const failures = new Set<'offline' | 'error'>();
       await Promise.all(
         owners.map(async (owner) => {
           const current = currentHeadersOf(owner.characterId);
-          fresh.set(
-            owner.characterId,
-            hasMoreByOwner.get(owner.characterId)
-              ? await loadMoreMailHeaders(owner.characterId, current)
-              : { headers: current, hasMore: false }
-          );
+          if (!hasMoreByOwner.get(owner.characterId)) {
+            fresh.set(owner.characterId, { headers: current, hasMore: false });
+            return;
+          }
+          const page = await loadMoreMailHeaders(owner.characterId, current);
+          if (page.failure) failures.add(page.failure);
+          fresh.set(owner.characterId, page);
         })
+      );
+      setLoadMoreFailure(
+        failures.has('offline') ? 'offline' : failures.has('error') ? 'error' : null
       );
       await applyFreshHeaders(requestSnapshot, fresh);
     } finally {
@@ -637,9 +650,13 @@ function MailView({ scope, scopeControl }: MailViewProps) {
     return () => {
       cancelled = true;
     };
-  }, [selected]);
+  }, [selected, bodyAttempt]);
 
   const body = bodySnapshot?.key === selectedKey ? bodySnapshot.result : undefined;
+  const [bodyRetryRef, , holdBodyFocus] = useRetryFocus<HTMLDivElement>(
+    body === undefined ? 'busy' : body === null ? 'failed' : 'ok',
+    selectedKey
+  );
   // Stripped once, shared by the reading pane's own paragraph and the
   // compose box's auto-quote — both must quote exactly what the pilot reads.
   const bodyText = body?.data.body ? stripEveMarkup(body.data.body) : '';
@@ -997,6 +1014,13 @@ function MailView({ scope, scopeControl }: MailViewProps) {
                   >
                     {loadingMore ? t('common.loading') : t('mail.loadMore')}
                   </Button>
+                  {loadMoreFailure !== null && (
+                    <p role="alert" className="mt-1.5 text-xs text-danger">
+                      {loadMoreFailure === 'offline'
+                        ? t('mail.loadMoreOffline')
+                        : t('mail.loadMoreFailed')}
+                    </p>
+                  )}
                 </div>
               )}
             </Panel>
@@ -1059,104 +1083,124 @@ function MailView({ scope, scopeControl }: MailViewProps) {
                 ) : undefined
               }
             >
-              {selectedKey === null ? (
-                <EmptyState
-                  title={t('mail.selectHint')}
-                  icon={<Icon.Social size={Icon.ICON_SIZE.lg} />}
-                  className="py-6"
-                />
-              ) : body === undefined ? (
-                <div className="flex justify-center py-4">
-                  <Spinner size="sm" label={t('common.loading')} />
-                </div>
-              ) : body === null ? (
-                // Still gets the reader-heading focus target (issue #1485):
-                // a failed/uncached body is the same "opening this mail
-                // just changed the pane" transition as the success path
-                // below, just with nothing to read yet.
-                <div
-                  ref={(el) => {
-                    readerHeadingRef.current = el;
-                  }}
-                  tabIndex={-1}
-                  className="focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                >
-                  <EmptyState title={t('mail.emptyTitle')} className="py-4" />
-                </div>
-              ) : (
-                <div className="min-w-0 space-y-2 text-xs">
-                  <h3
+              <div ref={bodyRetryRef} tabIndex={-1} className="min-w-0 focus:outline-none">
+                {selectedKey === null ? (
+                  <EmptyState
+                    title={t('mail.selectHint')}
+                    icon={<Icon.Social size={Icon.ICON_SIZE.lg} />}
+                    className="py-6"
+                  />
+                ) : body === undefined ? (
+                  <div className="flex justify-center py-4">
+                    <Spinner size="sm" label={t('common.loading')} />
+                  </div>
+                ) : body === null ? (
+                  // Still gets the reader-heading focus target (issue #1485):
+                  // a failed/uncached body is the same "opening this mail
+                  // just changed the pane" transition as the success path
+                  // below, just with nothing to read yet.
+                  <div
                     ref={(el) => {
                       readerHeadingRef.current = el;
                     }}
                     tabIndex={-1}
-                    className="text-base font-semibold break-words text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                    className="focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                   >
-                    {body.data.subject || t('mail.noSubject')}
-                  </h3>
-                  <div className="space-y-0.5 border-b border-line pb-2 text-text-dim">
-                    <p className="flex flex-wrap items-center gap-1.5">
-                      {t('mail.from')}
-                      {selectedHeader?.from !== undefined ? (
-                        <>
-                          <CharacterLink id={selectedHeader.from}>{selectedSender}</CharacterLink>
-                          <StandingTag
-                            standing={characterStanding(
-                              selectedOwner?.standingIndex ?? NO_STANDING_INDEX,
-                              selectedHeader.from,
-                              senderAffiliations
-                            )}
-                          />
-                        </>
-                      ) : (
-                        <span className="text-text">{selectedSender}</span>
-                      )}
-                    </p>
-                    {selectedHeader !== null && recipients.length > 0 && (
-                      <p className="flex flex-wrap items-center gap-x-1">
-                        {t('mail.to')}
-                        {recipients.map((recipient, index) => (
-                          <span key={`${recipient.recipient_type}-${recipient.recipient_id}`}>
-                            {recipient.recipient_type === 'character' ? (
-                              <CharacterLink id={recipient.recipient_id}>
-                                {resolveRecipientName(recipient)}
-                              </CharacterLink>
-                            ) : (
-                              resolveRecipientName(recipient)
-                            )}
-                            {index < recipients.length - 1 ? ', ' : ''}
-                          </span>
-                        ))}
-                      </p>
-                    )}
+                    <EmptyState
+                      title={
+                        online ? t('mail.bodyNotDownloadedOnline') : t('mail.bodyNotDownloaded')
+                      }
+                      className="py-4"
+                      action={
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            // This button unmounts while the body loads: the wrapper holds focus meanwhile.
+                            holdBodyFocus();
+                            setBodySnapshot(null);
+                            setBodyAttempt((n) => n + 1);
+                          }}
+                        >
+                          {t('common.retry')}
+                        </Button>
+                      }
+                    />
                   </div>
-                  {/* `text-sm text-text`, not `text-xs text-text-dim`: this is
+                ) : (
+                  <div className="min-w-0 space-y-2 text-xs">
+                    <h3
+                      ref={(el) => {
+                        readerHeadingRef.current = el;
+                      }}
+                      tabIndex={-1}
+                      className="text-base font-semibold break-words text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                    >
+                      {body.data.subject || t('mail.noSubject')}
+                    </h3>
+                    <div className="space-y-0.5 border-b border-line pb-2 text-text-dim">
+                      <p className="flex flex-wrap items-center gap-1.5">
+                        {t('mail.from')}
+                        {selectedHeader?.from !== undefined ? (
+                          <>
+                            <CharacterLink id={selectedHeader.from}>{selectedSender}</CharacterLink>
+                            <StandingTag
+                              standing={characterStanding(
+                                selectedOwner?.standingIndex ?? NO_STANDING_INDEX,
+                                selectedHeader.from,
+                                senderAffiliations
+                              )}
+                            />
+                          </>
+                        ) : (
+                          <span className="text-text">{selectedSender}</span>
+                        )}
+                      </p>
+                      {selectedHeader !== null && recipients.length > 0 && (
+                        <p className="flex flex-wrap items-center gap-x-1">
+                          {t('mail.to')}
+                          {recipients.map((recipient, index) => (
+                            <span key={`${recipient.recipient_type}-${recipient.recipient_id}`}>
+                              {recipient.recipient_type === 'character' ? (
+                                <CharacterLink id={recipient.recipient_id}>
+                                  {resolveRecipientName(recipient)}
+                                </CharacterLink>
+                              ) : (
+                                resolveRecipientName(recipient)
+                              )}
+                              {index < recipients.length - 1 ? ', ' : ''}
+                            </span>
+                          ))}
+                        </p>
+                      )}
+                    </div>
+                    {/* `text-sm text-text`, not `text-xs text-text-dim`: this is
                       the one thing the pilot opened the page to read, and it
                       shipped at the smallest size in the dimmest readable
                       tier. `break-words` so an unbroken URL cannot push the
                       pane sideways. */}
-                  <MailBodyView text={bodyText} />
+                    <MailBodyView text={bodyText} />
 
-                  {composeKind !== null && selectedRow !== null && (
-                    <MailComposeBox
-                      key={`${selectedRow.key}:${composeKind}`}
-                      characterId={selectedRow.ownerId}
-                      kind={composeKind}
-                      header={selectedRow.header}
-                      bodyText={bodyText}
-                      senderName={selectedSender}
-                      formattedTimestamp={
-                        selectedRow.header.timestamp
-                          ? formatTimestamp(new Date(selectedRow.header.timestamp), timeZone)
-                          : ''
-                      }
-                      resolveRecipientName={resolveRecipientName}
-                      onClose={() => setComposeKind(null)}
-                      onSent={() => void handleSent(selectedRow.ownerId)}
-                    />
-                  )}
-                </div>
-              )}
+                    {composeKind !== null && selectedRow !== null && (
+                      <MailComposeBox
+                        key={`${selectedRow.key}:${composeKind}`}
+                        characterId={selectedRow.ownerId}
+                        kind={composeKind}
+                        header={selectedRow.header}
+                        bodyText={bodyText}
+                        senderName={selectedSender}
+                        formattedTimestamp={
+                          selectedRow.header.timestamp
+                            ? formatTimestamp(new Date(selectedRow.header.timestamp), timeZone)
+                            : ''
+                        }
+                        resolveRecipientName={resolveRecipientName}
+                        onClose={() => setComposeKind(null)}
+                        onSent={() => void handleSent(selectedRow.ownerId)}
+                      />
+                    )}
+                  </div>
+                )}
+              </div>
             </Panel>
           </div>
         </>

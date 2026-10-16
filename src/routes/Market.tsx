@@ -516,7 +516,7 @@ export function Market() {
   }, [location.key, location.state, appraisal]);
   // "Open Neocom Desk" on a stored Appraisal Share Link lands here with
   // `?share=<id>`, its hub and percent riding `?hub=` and `?percent=`.
-  useSharedAppraisalSeed((text) => appraisal.appraiseText(text));
+  const sharedSeed = useSharedAppraisalSeed((text) => appraisal.appraiseText(text));
   // Feeds the net-of-fees chips' broker fee — resolved once per character,
   // same as every other configurable-Trade-Hub broker-fee surface.
   const tradeHubStandings = useTradeHubStandings(activeCharacterId);
@@ -1385,6 +1385,18 @@ export function Market() {
                 : (marketRegions?.find((region) => region.id === orderBookLocation.regionId)
                     ?.name ?? hubRegionName)
             }
+          />
+        )}
+
+        {sharedSeed.loadFailed && (
+          <Toast
+            message={t('market.sharedAppraisalLoadFailed')}
+            // Stays mounted, busy, until the retry settles: it unmounts only on success.
+            action={{
+              label: sharedSeed.retrying ? t('common.loading') : t('common.retry'),
+              onAction: sharedSeed.retrying ? () => {} : sharedSeed.retry,
+            }}
+            onClose={sharedSeed.dismiss}
           />
         )}
 

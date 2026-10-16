@@ -30,6 +30,7 @@ import { db } from '@/db';
 import { permissionsForEndpoints, type EsiEndpointId } from '@/esi/registry';
 import { waypointSequence } from '@/engine/route/waypoints';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { useOnline } from '@/stores/network';
 import { setWaypointsInGame } from './sendWaypoints';
 import type { RouteSafetyLeg } from './useRouteSafety';
 
@@ -56,6 +57,7 @@ export function SetWaypoints({
     chosenId !== null && characters.some((c) => c.characterId === chosenId) ? chosenId : activeId;
   const characterName = characters.find((c) => c.characterId === characterId)?.name;
   const lacksScope = useCharacterLacksEndpoints(characterId, ENDPOINTS);
+  const online = useOnline();
   const [sending, setSending] = useState(false);
   const [outcome, setOutcome] = useState<Outcome>(null);
 
@@ -64,7 +66,9 @@ export function SetWaypoints({
       ? t('travel.waypoints.needCharacter')
       : lacksScope
         ? t('permissions.grantMissing')
-        : null;
+        : !online
+          ? t('common.needsConnection')
+          : null;
 
   async function send(id: number) {
     setSending(true);
@@ -86,6 +90,22 @@ export function SetWaypoints({
         return;
       }
       const result = await setWaypointsInGame(id, waypoints);
+      if (!result.ok && result.offline) {
+        setOutcome({
+          tone: 'alert',
+          text: result.unconfirmed
+            ? result.set === 0
+              ? t('travel.waypoints.unconfirmed')
+              : t('travel.waypoints.unconfirmedPartway', {
+                  set: result.set,
+                  total: waypoints.length,
+                })
+            : result.set === 0
+              ? t('travel.waypoints.offline')
+              : t('travel.waypoints.offlinePartway', { set: result.set, total: waypoints.length }),
+        });
+        return;
+      }
       if (!result.ok) {
         const message = result.message ?? t('travel.waypoints.unknownError');
         setOutcome({
@@ -157,14 +177,11 @@ export function SetWaypoints({
             </Select>
           )}
           {/* `aria-disabled`, not `disabled`: the blocked reason stays reachable in a tooltip. */}
-          {blockedReason === null ? (
-            sendButton
-          ) : (
-            <Tooltip content={blockedReason}>{sendButton}</Tooltip>
-          )}
+          {/* Always the Tooltip, so the button is not remounted when the reason comes and goes. */}
+          <Tooltip content={blockedReason}>{sendButton}</Tooltip>
         </div>
       </div>
-      {characterId === null && blockedReason !== null && (
+      {blockedReason !== null && !lacksScope && (
         <p className="text-text-dim sm:text-right">{blockedReason}</p>
       )}
       {lacksScope && characterId !== null && (

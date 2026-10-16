@@ -3688,6 +3688,7 @@
     "errorSpent": "This login link has already been used, or it was opened in a different tab or window. Log in again.",
     "errorMismatch": "This login could not be verified. Another login may have started before this one finished. Log in again.",
     "errorDenied": "Login was cancelled on the EVE Online page. Nothing was added.",
+    "errorOffline": "You're offline — the connection dropped while logging you in. Nothing was added. Reconnect, then try again.",
     "retry": "Try again"
   },
   "character": {
@@ -6321,7 +6322,16 @@
     "sending": "Sending…",
     "cancel": "Cancel",
     "sendErrorPrefix": "Couldn't send: {{message}} Try sending from the EVE client instead.",
-    "sendNoRecipients": "Add at least one recipient before sending."
+    "sendNoRecipients": "Add at least one recipient before sending.",
+    "sendUnconfirmed": "Couldn't confirm the mail was sent. Check your Sent folder before sending it again.",
+    "draftSaved": "Your draft is saved.",
+    "sendOffline": "You're offline — your draft is saved. Send it when you're back online.",
+    "loadMoreOffline": "Couldn't load more — you're offline.",
+    "loadMoreFailed": "Couldn't load more mail. Try again.",
+    "recipientSearchFailed": "Search failed. Try again.",
+    "recipientSearchOffline": "Search needs a connection.",
+    "bodyNotDownloadedOnline": "This mail hasn't been downloaded yet.",
+    "bodyNotDownloaded": "This mail hasn't been downloaded yet — reconnect to read it."
   },
   "calendar": {
     "title": "Calendar",
@@ -6342,6 +6352,8 @@
     "rsvpDecline": "Decline",
     "rsvpTentative": "Tentative",
     "rsvpFailed": "Couldn't save your response. Try again.",
+    "rsvpUnconfirmed": "The connection timed out, so your response may not have been saved. Check the event, then try again.",
+    "rsvpOffline": "You're offline — your response wasn't saved. Reconnect and try again.",
     "yourResponse": "Your response",
     "export": "Export",
     "contextMenu": {
@@ -9224,6 +9236,7 @@
   },
   "market": {
     "title": "Market",
+    "sharedAppraisalLoadFailed": "Couldn't load the shared appraisal. You may be offline.",
     "compareUndo": {
       "added_one": "Added {{count}} variant of {{name}}",
       "added_other": "Added {{count}} variants of {{name}}",
@@ -11193,6 +11206,7 @@
     }
   },
   "publicInfo": {
+    "loadFailedHint": "Couldn't look this up. Check your connection, then try again.",
     "title": "Public info",
     "tabsLabel": "Character, corporation, alliance, and employment",
     "characterTab": "Character",
@@ -11473,7 +11487,9 @@
     "opened": "Opened in your EVE client.",
     "needCharacter": "Log in a character to open this in its EVE client.",
     "failed": "Couldn't open it in EVE: {{message}}",
-    "unknownError": "Is your character logged in to the game?"
+    "unknownError": "Is your character logged in to the game?",
+    "offline": "You're offline — reconnect to open this in EVE.",
+    "unconfirmed": "The connection timed out. Couldn't confirm it opened in EVE — check your client."
   },
   "travel": {
     "incursions": {
@@ -12291,6 +12307,10 @@
       },
       "nothingToSet": "No waypoints to set: the trip has no jumps.",
       "failed": "Waypoints not set: {{message}}",
+      "offline": "You're offline — waypoints weren't set. Reconnect and try again.",
+      "unconfirmed": "The connection timed out, so the waypoints may not have been set. Check your EVE client.",
+      "unconfirmedPartway": "The connection timed out. At least {{set}} of {{total}} waypoints were set; check your EVE client.",
+      "offlinePartway": "You're offline — {{set}} of {{total}} waypoints were set before the connection dropped. Reconnect and set them again.",
       "failedPartway": "{{set}} of {{total}} waypoints set, then ESI refused the rest: {{message}}",
       "unknownError": "ESI gave no reason. Is the character logged in to the game?"
     },

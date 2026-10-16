@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import '@/i18n';
 import { db } from '@/db';
@@ -133,6 +134,21 @@ describe('SharedLink', () => {
     vi.mocked(loadShare).mockResolvedValue({ ok: false, reason: 'not-found' });
     renderAt('/share/abc123XYZ');
     expect(await screen.findByText('This link has expired')).toBeInTheDocument();
+  });
+
+  it('offers Try again when the link could not be read, and shows it once it loads', async () => {
+    vi.mocked(loadShare).mockResolvedValueOnce({ ok: false, reason: 'failed' });
+    renderAt('/s/abc123XYZ');
+    expect(await screen.findByText("Couldn't load this link")).toBeInTheDocument();
+
+    vi.mocked(loadShare).mockResolvedValueOnce({
+      ok: true,
+      share: { type: 'appraisal', payload: SNAPSHOT, expiresAt: Date.now() + 1000 },
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+
+    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
+    expect(loadShare).toHaveBeenCalledTimes(2);
   });
 
   it('reads a malformed stored appraisal as an invalid link, not a crash', async () => {

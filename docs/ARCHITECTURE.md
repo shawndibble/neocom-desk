@@ -40,7 +40,7 @@ Auth is browser-only OAuth2 PKCE against `login.eveonline.com`; refresh
 tokens never leave the device. Market prices come from Fuzzwork aggregates,
 ESI as fallback (ADR 0002). The item/skill/blueprint catalog (SDE) is
 snapshotted at build time into `public/data/*.json` by `scripts/build-sde.mjs`
-— no SDE calls at runtime. Core-feature files are precached for offline-first use (`blueprints`, `shipTree` and the small `market/` lookups). The large single-feature files (`src/sde/lazySdeFiles.ts`, the one list `vite.config.ts` ignores and `src/sde/warmLazySde.ts` fetches) are not: they are fetched on first use or by an idle, connection-gated background warm (also the dogma engine assets), cached by the service worker's `sde-data` route.
+— no SDE calls at runtime. Core-feature files are precached for offline-first use (`blueprints`, `shipTree` and the small `market/` lookups). The large single-feature files (`src/sde/lazySdeFiles.ts`, the one list `vite.config.ts` ignores and `src/sde/warmLazySde.ts` fetches) are not: they are fetched on first use or by an idle, connection-gated background warm (also the dogma engine assets), cached by the service worker's `sde-data` route. Item Detail's per-type description and dogma attributes are lazy the same way, split into 64 range-bucket shards, `public/data/typeInfo/<floor(typeId / 2000)>.json` (`src/sde/typeInfoShard.ts`; neighbouring ids share text, so gzip packs them together), so opening one item reads one small file; a type no shard carries falls back to the cached ESI read.
 
 External dependencies: `esi.evetech.net`, `login.eveonline.com`,
 `market.fuzzwork.co.uk`, `data.everef.net` (public BPC contract search, ADR

@@ -6,6 +6,7 @@
  * Which waypoints, and where a wormhole or bridge cuts them off, is
  * `engine/route/waypoints.ts`'s job — this only sends them.
  */
+import { isOfflineFailure, isUnconfirmedWrite } from '@/esi/client';
 import { EsiError } from '@/esi/errors';
 import { postAutopilotWaypoint } from '@/esi/endpoints';
 import { reportWriteAuthFailure } from '@/esi/writeAuthFailure';
@@ -20,6 +21,10 @@ export type SetWaypointsResult =
       message: string | null;
       /** ESI refused and the grant lacks the waypoint scope: a Grant fixes it. */
       needsPermission?: true;
+      /** The request never reached ESI (offline, a timeout): nothing was refused. */
+      offline?: true;
+      /** The failure was a timeout after the request left: that waypoint may have been set. */
+      unconfirmed?: true;
     };
 
 function messageOf(err: unknown): string | null {
@@ -36,6 +41,11 @@ export async function setWaypointsInGame(
         clearOtherWaypoints: index === 0,
       });
     } catch (err) {
+      if (isOfflineFailure(err)) {
+        return isUnconfirmedWrite(err)
+          ? { ok: false, set: index, message: null, offline: true, unconfirmed: true }
+          : { ok: false, set: index, message: null, offline: true };
+      }
       const outcome = await reportWriteAuthFailure(characterId, err, 'postAutopilotWaypoint');
       return outcome === 'grant-needed'
         ? { ok: false, set: index, message: messageOf(err), needsPermission: true }

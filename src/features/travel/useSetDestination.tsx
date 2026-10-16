@@ -16,6 +16,7 @@ import { GrantMissingLink } from '@/app/GrantMissingLink';
 import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
 import { permissionsForEndpoints, type EsiEndpointId, type ScopeGroup } from '@/esi/registry';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { useOnline } from '@/stores/network';
 import { setWaypointsInGame } from './sendWaypoints';
 
 const ENDPOINTS: readonly EsiEndpointId[] = ['postAutopilotWaypoint'];
@@ -27,6 +28,8 @@ type SetDestinationOutcome = { tone: 'status' | 'alert'; text: ReactNode } | nul
 interface SetDestination {
   /** Why sending can't work yet — no Character, or no waypoint scope — or null when it can. */
   blockedReason: ReactNode;
+  /** Sending is blocked only because the browser is offline: the item reads "Needs a connection". */
+  offline: boolean;
   /** The Permissions blocking it, for a menu that can't carry a link in its reason; empty otherwise. */
   missingGroups: readonly ScopeGroup[];
   sending: boolean;
@@ -39,6 +42,7 @@ export function useSetDestination(locationId: number, placeName: string): SetDes
   const { t } = useTranslation();
   const characterId = useActiveCharacter((s) => (s.hydrated ? s.activeCharacterId : null));
   const lacksScope = useCharacterLacksEndpoints(characterId, ENDPOINTS);
+  const online = useOnline();
   const [sending, setSending] = useState(false);
   const [outcome, setOutcome] = useState<SetDestinationOutcome>(null);
   /** `sending` lags a render behind; two quick selects must not both send. */
@@ -49,6 +53,8 @@ export function useSetDestination(locationId: number, placeName: string): SetDes
       t('travel.waypoints.needCharacter')
     ) : lacksScope ? (
       <GrantMissingLink groups={MISSING_GROUPS} />
+    ) : !online ? (
+      t('common.needsConnection')
     ) : null;
 
   async function sendFor(id: number) {
@@ -59,6 +65,13 @@ export function useSetDestination(locationId: number, placeName: string): SetDes
       const result = await setWaypointsInGame(id, [locationId]);
       if (result.ok) {
         setOutcome({ tone: 'status', text: t('market.orderDetail.destinationSet', { placeName }) });
+      } else if (result.offline) {
+        setOutcome({
+          tone: 'alert',
+          text: result.unconfirmed
+            ? t('travel.waypoints.unconfirmed')
+            : t('travel.waypoints.offline'),
+        });
       } else {
         setOutcome({
           tone: 'alert',
@@ -79,6 +92,7 @@ export function useSetDestination(locationId: number, placeName: string): SetDes
 
   return {
     blockedReason,
+    offline: characterId !== null && !lacksScope && !online,
     missingGroups: lacksScope && characterId !== null ? MISSING_GROUPS : [],
     sending,
     outcome,
