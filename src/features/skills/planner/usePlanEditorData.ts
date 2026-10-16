@@ -5,11 +5,8 @@ import {
   type SkillCatalog,
 } from '@/features/skills/skillMap';
 import { baselineAttributes, type AttributeBaseline } from '@/engine/attributeBaseline';
-import {
-  loadCharacterAttributes,
-  loadImplantBonuses,
-  type CachedResult,
-} from '@/features/skills/data';
+import { loadCharacterAttributes, type CachedResult } from '@/features/skills/data';
+import { loadImplantBonuses } from '@/features/skills/typeDetail';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import { invalidateFreshness } from '@/esi/cache';
 import { DEFAULT_ATTRIBUTES } from './planSchedule';

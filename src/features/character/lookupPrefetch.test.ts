@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
   loadContractLocationName: vi.fn(async () => 'x'),
   loadLoyaltyStoreOffers: vi.fn(async () => null),
   loadCorporationName: vi.fn(async () => null),
-  loadUniverseType: vi.fn(async () => null),
+  loadTypeDetail: vi.fn(async () => null),
   allowed: true,
 }));
 
@@ -25,10 +25,7 @@ vi.mock('@/features/loyalty/store', () => ({
   loadLoyaltyStoreOffers: mocks.loadLoyaltyStoreOffers,
   loadCorporationName: mocks.loadCorporationName,
 }));
-vi.mock('@/features/skills/data', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@/features/skills/data')>()),
-  loadUniverseType: mocks.loadUniverseType,
-}));
+vi.mock('@/features/skills/typeDetail', () => ({ loadTypeDetail: mocks.loadTypeDetail }));
 vi.mock('@/lib/lazyAssetWarmGate', () => ({
   currentWarmLevel: () => (mocks.allowed ? 'all' : 'none'),
 }));
@@ -221,6 +218,6 @@ describe('warmLoyaltyStores and warmImplantTypes', () => {
       },
     });
     await warmImplantTypes(1);
-    expect(mocks.loadUniverseType.mock.calls.map((c) => (c as unknown[])[0])).toEqual([1, 2]);
+    expect(mocks.loadTypeDetail.mock.calls.map((c) => (c as unknown[])[0])).toEqual([1, 2]);
   });
 });

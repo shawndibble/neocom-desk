@@ -1,7 +1,6 @@
 /**
- * Which hardpoint a type takes, from its dogma effects on ESI — the same
- * cached `/universe/types/{id}` lookup the skill requirements read, so a
- * fitted type is fetched once for both.
+ * Which hardpoint a type takes, from its dogma effects on cached ESI: the baked
+ * shards carry no effects, so a type never fetched online has no offline read.
  */
 import type { HardpointKind } from '@/engine/fittings/hardpoints';
 import { loadUniverseType } from '@/features/skills/data';

@@ -4,16 +4,12 @@
  * every module/charge/drone, then sort by skillTypeID (stable sort) for a
  * deterministic, diffable result independent of item order in the fit.
  *
- * IMPORTANT — our slim SDE (src/sde/types.ts, built by scripts/build-sde.mjs)
- * does not carry per-type required-skill dogma attributes: `skills.json`'s
- * `SkillType.prereqs` only covers skill-of-skill dependencies, not the
- * "this module needs Gunnery IV" relationships ships/modules carry. The
- * caller must supply a `RequiredSkillsLookup` derived from one of:
- *   - ESI `GET /universe/types/{type_id}/` dogma_attributes: paired
- *     `requiredSkillN` / `requiredSkillNLevel` attributes (N = 1, 2, 3, …;
- *     everef.net's dogma attribute dump has the full set — don't hardcode a
- *     max N, a fit item can require more than 3 skills), or
- *   - a future SDE extension (e.g. a generated typeDogma.json).
+ * `skills.json`'s `SkillType.prereqs` only covers skill-of-skill
+ * dependencies, not the "this module needs Gunnery IV" relationships
+ * ships/modules carry. The caller supplies a `RequiredSkillsLookup` derived
+ * from a type's dogma_attributes (baked typeInfo shards, cached ESI fallback):
+ * paired `requiredSkillN` / `requiredSkillNLevel` attributes (N = 1, 2, 3, …;
+ * don't hardcode a max N, a fit item can require more than 3 skills).
  * That keeps this module a pure aggregator with no ESI/SDE-shape coupling.
  */
 

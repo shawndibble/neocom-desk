@@ -13,7 +13,8 @@ import { computeSkillPlanSchedule, type SkillPlanSchedule } from '@/engine/skill
 import { baselineAttributes, type AttributeBaseline } from '@/engine/attributeBaseline';
 import type { Attributes, CloneState, Implants, TrainedSkill } from '@/engine/types';
 import type { SkillQueueEntry } from '@/esi/endpoints';
-import { loadCharacterAttributes, loadImplantBonuses } from '@/features/skills/data';
+import { loadCharacterAttributes } from '@/features/skills/data';
+import { loadImplantBonuses } from '@/features/skills/typeDetail';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import { projectQueueEnd } from '@/features/skills/queueStatus';
 import {

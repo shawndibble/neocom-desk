@@ -29,7 +29,8 @@ import { KEYS as ORDER_KEYS } from './orders';
 import { KEY as LOYALTY_KEY } from './loyalty';
 import { KEYS as MAIL_KEYS } from './mail';
 import { KEY as CLONES_KEY } from './clones';
-import { KEYS as SKILL_KEYS, loadUniverseType } from '@/features/skills/data';
+import { KEYS as SKILL_KEYS } from '@/features/skills/data';
+import { loadTypeDetail } from '@/features/skills/typeDetail';
 import { loadLoyaltyStoreOffers, loadCorporationName } from '@/features/loyalty/store';
 import { contractIssuer, contractReceiver } from './contractCounterparty';
 import { loadContractLocationName } from './contractLocationName';
@@ -178,11 +179,13 @@ export async function warmLoyaltyStores(characterId: number): Promise<void> {
   await prefetchDetails(corporations, (id) => loadCorporationName(id));
 }
 
-/** The type rows behind worn and jump-clone implants, which Clones and the implant bonuses read. */
+/** Worn and jump-clone implant types as their readers read them: the baked shard, else cached ESI. */
 export async function warmImplantTypes(characterId: number): Promise<void> {
   const [worn, clones] = await Promise.all([
     readCached<number[]>(characterId, SKILL_KEYS.implants),
     readCached<CharacterClones>(characterId, CLONES_KEY),
   ]);
-  await prefetchDetails(implantTypeIdsFor(worn ?? [], clones), (id) => loadUniverseType(id));
+  await prefetchDetails(implantTypeIdsFor(worn ?? [], clones), (id) =>
+    loadTypeDetail(id, { retry: true })
+  );
 }

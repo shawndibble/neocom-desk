@@ -5,30 +5,30 @@
  * by the other.
  */
 import type { RequiredSkill } from '@/engine/import/fitToSkills';
-import { loadUniverseType } from '@/features/skills/data';
+import { loadTypeDetail } from '@/features/skills/typeDetail';
 import { extractRequiredSkills } from '@/features/skills/dogma';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 
 const requirementCache = new Map<number, readonly RequiredSkill[]>();
 
-/** A type's required skills, or null when ESI couldn't supply the type (left uncached, to retry). */
+/** A type's required skills; null when no source has the type (left uncached, to retry). */
 export async function loadKnownRequirements(
   typeId: number
 ): Promise<readonly RequiredSkill[] | null> {
   const cached = requirementCache.get(typeId);
   if (cached) return cached;
-  const result = await loadUniverseType(typeId);
-  if (!result) return null;
-  const required = extractRequiredSkills(result.data.dogma_attributes);
+  const type = await loadTypeDetail(typeId, { retry: true });
+  if (!type) return null;
+  const required = extractRequiredSkills(type.dogma_attributes);
   requirementCache.set(typeId, required);
   return required;
 }
 
 export interface TypeRequirements {
-  /** Requirements of every type that could be read (cache or ESI). */
+  /** Requirements of every type that could be read (baked shard, cache or ESI). */
   byType: Map<number, readonly RequiredSkill[]>;
   /**
-   * Types that could be neither read from cache nor fetched. They are NOT
+   * Types no source could read. They are NOT
    * "no requirements": a type that might need anything must never read as
    * flyable, so callers surface this as "unknown".
    */

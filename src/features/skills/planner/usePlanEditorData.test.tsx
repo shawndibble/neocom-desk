@@ -21,6 +21,8 @@ vi.mock('@/features/skills/skillMap', () => ({
 }));
 vi.mock('@/features/skills/data', () => ({
   loadCharacterAttributes: vi.fn(() => Promise.resolve(null)),
+}));
+vi.mock('@/features/skills/typeDetail', () => ({
   loadImplantBonuses: () => Promise.resolve({}),
 }));
 
