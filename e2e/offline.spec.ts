@@ -97,3 +97,32 @@ test('shows the offline banner while the browser is offline and drops it on reco
   await context.setOffline(false);
   await expect(banner).toHaveCount(0);
 });
+
+/**
+ * Item Detail offline for a never-opened item (issue #3882): description and attributes come from
+ * the baked typeInfo shard. Opened via `?info=type-<id>` over Overview, not Market Browser, whose
+ * item panel also reads `/universe/types/587` (useOrderRowSkills). Counting those requests
+ * (aborted ones still fire) proves the baked path, not an esiCache row.
+ */
+test('opens Item Detail with baked description and attributes for a never-seen item', async ({
+  page,
+}) => {
+  const RIFTER = 587;
+  const typeRequests: string[] = [];
+  page.on('request', (request) => {
+    if (new URL(request.url()).pathname === `/universe/types/${RIFTER}`) {
+      typeRequests.push(request.url());
+    }
+  });
+
+  await signInAndGoto(page);
+  await goExternallyOffline(page);
+  await page.goto(`./overview?info=type-${RIFTER}`);
+
+  const dialog = page.getByRole('dialog', { name: 'Rifter' });
+  await expect(dialog.getByText(/very powerful combat frigate/)).toBeVisible();
+  await expect(dialog.getByText('Maximum Velocity', { exact: true })).toBeVisible();
+  await expect(dialog.getByText('365 m/sec', { exact: true })).toBeVisible();
+  await expect(dialog.getByText("Couldn't load item info")).toHaveCount(0);
+  expect(typeRequests).toEqual([]);
+});

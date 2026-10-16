@@ -12,7 +12,7 @@ export interface WarmConditions {
   type?: string;
 }
 
-/** none: skip; small: SDE JSON (~16 MB raw, ~2 MB gzip); all: plus the ~10 MB dogma engine. */
+/** none: skip; small: SDE JSON (~28 MB raw, ~3.4 MB gzip summed per file); all: plus the ~10 MB dogma engine. */
 export type WarmLevel = 'none' | 'small' | 'all';
 
 const SLOW = new Set(['slow-2g', '2g', '3g']);

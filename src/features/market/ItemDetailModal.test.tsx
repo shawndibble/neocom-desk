@@ -10,6 +10,7 @@ import { ESI_BASE_URL } from '@/esi/client';
 import { ItemDetailModal } from './ItemDetailModal';
 import { loadAttributeDictionary, loadGlobalMarkets } from '@/sde/loadMarketSde';
 import { loadPi, loadSkillAttributeModifiers, loadSkills } from '@/sde/loadSde';
+import { loadTypeInfo } from '@/sde/loadTypeInfo';
 import { piFixture } from '@/sde/__fixtures__/pi';
 import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -29,12 +30,16 @@ vi.mock('@/sde/loadSde', () => ({
   loadPi: vi.fn(async () => ({ schematics: {}, raw: [] })),
   loadSkillAttributeModifiers: vi.fn(async () => ({})),
 }));
+// Default: the baked shard doesn't carry the type, so the ESI handlers below
+// serve it through the cached-ESI fallback.
+vi.mock('@/sde/loadTypeInfo', () => ({ loadTypeInfo: vi.fn(async () => null) }));
 
 const mockedLoadDictionary = vi.mocked(loadAttributeDictionary);
 const mockedLoadGlobalMarkets = vi.mocked(loadGlobalMarkets);
 const mockedLoadSkills = vi.mocked(loadSkills);
 const mockedLoadPi = vi.mocked(loadPi);
 const mockedLoadSkillAttributeModifiers = vi.mocked(loadSkillAttributeModifiers);
+const mockedLoadTypeInfo = vi.mocked(loadTypeInfo);
 
 const TYPE_ID = 587;
 
@@ -881,5 +886,90 @@ describe('ItemDetailModal best sell/buy price', () => {
 
     expect(await screen.findByText('Cached frigate.')).toBeInTheDocument();
     expect(screen.queryByText("Couldn't load item info")).not.toBeInTheDocument();
+  });
+});
+
+describe('ItemDetailModal type info source (issue #3882)', () => {
+  const REACTIVE_METALS = 2398;
+
+  function countEsiTypeCalls(typeId: number, respond: () => Response) {
+    const calls = { count: 0 };
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/types/${typeId}`, () => {
+        calls.count += 1;
+        return respond();
+      })
+    );
+    return calls;
+  }
+
+  it('renders from the baked shard without asking ESI', async () => {
+    const esi = countEsiTypeCalls(TYPE_ID, () => HttpResponse.error());
+    mockedLoadTypeInfo.mockResolvedValue({
+      description: 'Baked frigate.',
+      attributes: [[9, 1200]],
+      volume: 27289,
+    });
+    mockedLoadDictionary.mockResolvedValue({
+      9: { name: 'Structure Hitpoints', unit: 'HP', category: 'Structure' },
+    });
+
+    render(<ItemDetailModal typeId={TYPE_ID} itemName="Rifter" onClose={() => {}} />);
+
+    expect(await screen.findByText('Baked frigate.')).toBeInTheDocument();
+    expect(screen.getByText('Volume: 27,289 m3')).toBeInTheDocument();
+    expect(screen.getByText('1,200 HP')).toBeInTheDocument();
+    expect(mockedLoadTypeInfo).toHaveBeenCalledWith(TYPE_ID);
+    expect(esi.count).toBe(0);
+  });
+
+  it('falls back to ESI when the shard cannot be fetched', async () => {
+    mockedLoadTypeInfo.mockRejectedValue(new TypeError('Failed to fetch'));
+    countEsiTypeCalls(TYPE_ID, () =>
+      HttpResponse.json({
+        type_id: TYPE_ID,
+        name: 'Rifter',
+        description: 'Live frigate.',
+        group_id: 25,
+        published: true,
+        volume: 27289,
+        dogma_attributes: [],
+      })
+    );
+    mockedLoadDictionary.mockResolvedValue({});
+
+    render(<ItemDetailModal typeId={TYPE_ID} itemName="Rifter" onClose={() => {}} />);
+
+    expect(await screen.findByText('Live frigate.')).toBeInTheDocument();
+  });
+
+  it('offline with neither source, keeps the local planetary schematic beside the error', async () => {
+    mockedLoadTypeInfo.mockRejectedValue(new TypeError('Failed to fetch'));
+    countEsiTypeCalls(REACTIVE_METALS, () => HttpResponse.error());
+    mockedLoadDictionary.mockResolvedValue({});
+    mockedLoadPi.mockResolvedValue(
+      piFixture({
+        schematics: {
+          '2398': {
+            schematicId: 133,
+            name: 'Reactive Metals',
+            cycleTime: 1800,
+            quantity: 20,
+            volume: 0.19,
+            facility: 'basic',
+            planetTypes: ['barren'],
+            inputs: [{ typeID: 2267, quantity: 3000, name: 'Base Metals' }],
+          },
+        },
+      })
+    );
+
+    render(
+      <ItemDetailModal typeId={REACTIVE_METALS} itemName="Reactive Metals" onClose={() => {}} />
+    );
+
+    expect(await screen.findByText("Couldn't load item info")).toBeInTheDocument();
+    expect(screen.getByText('Planetary production')).toBeInTheDocument();
+    expect(screen.getByText('3,000 x Base Metals')).toBeInTheDocument();
   });
 });
