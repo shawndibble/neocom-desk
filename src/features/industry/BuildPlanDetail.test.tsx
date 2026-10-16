@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
+import type { SolarSystemResolution } from '@/features/character/systemLookup';
 import { afterEach, beforeAll, beforeEach, describe, it, expect, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -51,10 +52,13 @@ vi.mock('./marketData', () => ({ loadMarketSnapshot }));
 // The build-system field resolves a typed name through ESI. Mocked here for the
 // same reason as the snapshot: the panel under test needs an answer, not a network.
 const resolveSolarSystem = vi.hoisted(() =>
-  vi.fn(async (name: string) =>
+  vi.fn(async (name: string): Promise<SolarSystemResolution> =>
     name.trim().toLowerCase() === 'badivefi'
-      ? { id: 30003888, name: 'Badivefi', security: 'highsec' as const }
-      : null
+      ? {
+          status: 'found',
+          system: { id: 30003888, name: 'Badivefi', security: 'highsec' as const },
+        }
+      : { status: 'notFound' }
   )
 );
 vi.mock('@/features/character/systemLookup', () => ({ resolveSolarSystem }));
@@ -1098,6 +1102,21 @@ describe('BuildPlanDetail build system', () => {
     // The plan is untouched, and the near-miss is still there to correct.
     expect(onUpdate).not.toHaveBeenCalled();
     expect(valueOf(systemInput())).toBe('Notasystem');
+  });
+
+  it('says it could not check, not "no such system", when the lookup is unavailable', async () => {
+    resolveSolarSystem.mockResolvedValueOnce({ status: 'unavailable' });
+    const user = userEvent.setup();
+    const onUpdate = vi.fn();
+    render(<Harness onUpdate={onUpdate} />);
+    await openOverride(user);
+
+    await user.type(systemInput(), 'Badivefi');
+    await user.tab();
+
+    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't check that name");
+    expect(onUpdate).not.toHaveBeenCalled();
+    expect(valueOf(systemInput())).toBe('Badivefi');
   });
 
   it('clears back to the hub system when the field is emptied', async () => {

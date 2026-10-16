@@ -27,6 +27,7 @@ import {
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { AddRow } from '@/components/ui/icons';
 import { AbyssalWeatherPicker } from '@/features/fittings/AbyssalWeatherPicker';
+import { SkillsUnknownNote } from '@/features/fittings/FittingPreviewPanels';
 import { StatFields } from '@/features/fittings/StatFacts';
 import { useWeatherName } from '@/features/fittings/abyssalWeatherSelection';
 import { useEndpointsGranted } from '@/app/useGrantedScopes';
@@ -631,6 +632,7 @@ function FittingsPage() {
               fittingName={fitting.name}
             />
           )}
+          {gaps?.unknown && activeCharacterId !== null && <SkillsUnknownNote />}
         </div>
       }
       heading={

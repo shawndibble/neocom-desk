@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { db } from '@/db';
 import { DevicePanel } from './DevicePanel';
+import { setStatus } from '@/sync/status';
 
 vi.mock('@/app/syncStatus', () => ({ isSyncConfigured: () => true }));
 const deleteMock = vi.hoisted(() => ({
@@ -40,6 +41,50 @@ async function openDeleteDialog() {
   const dialog = await screen.findByRole('dialog');
   return { user, dialog };
 }
+
+function setOnline(value: boolean) {
+  Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => value });
+}
+
+describe('DevicePanel log out', () => {
+  afterEach(() => {
+    Reflect.deleteProperty(navigator, 'onLine');
+    setStatus(1, { state: 'idle', lastSyncedAt: null, error: null });
+    setStatus(2, { state: 'idle', lastSyncedAt: null, error: null });
+  });
+
+  async function openLogoutDialog() {
+    const user = userEvent.setup();
+    render(<DevicePanel />);
+    await user.click(await screen.findByRole('button', { name: 'Log out…' }));
+    return within(await screen.findByRole('dialog'));
+  }
+
+  it('warns that unsynced edits are lost when offline', async () => {
+    setOnline(false);
+    const dialog = await openLogoutDialog();
+    expect(dialog.getByRole('alert')).toHaveTextContent(/offline.*will be lost/i);
+  });
+
+  it('warns when a character has not synced cleanly', async () => {
+    setStatus(1, { state: 'idle', lastSyncedAt: 5, error: null });
+    setStatus(2, { state: 'error', lastSyncedAt: 5, error: 'boom' });
+    const dialog = await openLogoutDialog();
+    expect(dialog.getByRole('alert')).toHaveTextContent(/may not have synced/i);
+  });
+
+  it('shows no warning when online and every character synced cleanly', async () => {
+    setStatus(1, { state: 'idle', lastSyncedAt: 5, error: null });
+    setStatus(2, { state: 'idle', lastSyncedAt: 5, error: null });
+    const dialog = await openLogoutDialog();
+    expect(dialog.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('puts focus on Cancel, not the destructive button', async () => {
+    const dialog = await openLogoutDialog();
+    expect(dialog.getByRole('button', { name: 'Cancel' })).toHaveFocus();
+  });
+});
 
 describe('DevicePanel delete all character data', () => {
   it('purges remote data, wipes local data, then reloads to a fresh boot', async () => {

@@ -7,7 +7,7 @@
  * plan, since all three feed that one panel together.
  */
 import { useEffect, useState } from 'react';
-import { getUniverseType } from '@/esi/endpoints';
+import { loadUniverseTypeOnce } from '@/features/skills/data';
 import { loadAttributeDictionary } from '@/sde/loadMarketSde';
 import { loadAttributeReferenceNames } from '@/features/market/attributeReferenceNames';
 import { extractRequiredSkills, type RequiredSkill } from '@/features/skills/dogma';
@@ -41,10 +41,11 @@ export function useOrderRowSkills(
       // nothing while `itemSkills` is null, so a failure just leaves it out
       // rather than needing an error state of its own.
       try {
-        const [{ data: type }, dictionary] = await Promise.all([
-          getUniverseType(selectedTypeId),
+        const [typeResult, dictionary] = await Promise.all([
+          loadUniverseTypeOnce(selectedTypeId),
           loadAttributeDictionary(),
         ]);
+        const type = typeResult?.data;
         if (cancelled || !type) return;
         const names = await loadAttributeReferenceNames([type.dogma_attributes], dictionary);
         if (cancelled) return;

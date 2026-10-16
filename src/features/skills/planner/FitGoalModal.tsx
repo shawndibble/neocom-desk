@@ -10,7 +10,7 @@ import { Button, Modal } from '@/components/ui';
 import { focusRingClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { formatLocalDate } from '@/lib/localDate';
-import type { FitGoalOption } from './fitGoalOptions';
+import { isFitGoalPickable, type FitGoalOption } from './fitGoalOptions';
 
 interface FitGoalModalProps {
   open: boolean;
@@ -24,6 +24,8 @@ function stateText(option: FitGoalOption, t: TFunction): string {
   switch (option.state) {
     case 'loading':
       return t('plans.fitGoal.loading');
+    case 'unknown':
+      return t('plans.fitGoal.unknown');
     case 'flyable-now':
       return t('plans.fitGoal.flyableNow');
     case 'on-date':
@@ -63,7 +65,7 @@ export function FitGoalModal({ open, options, onClose, onPick }: FitGoalModalPro
               <li key={option.id}>
                 <button
                   type="button"
-                  disabled={option.state === 'loading' || option.state === 'flyable-now'}
+                  disabled={!isFitGoalPickable(option)}
                   onClick={() => choose(option)}
                   className={cx(
                     'flex w-full items-center justify-between gap-3 rounded-xs px-2 py-1.5 text-left hover:bg-panel-2 disabled:cursor-default disabled:hover:bg-transparent',

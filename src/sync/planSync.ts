@@ -64,7 +64,7 @@ import {
   type PullCursor,
 } from './localBookkeeping';
 import { isOnline } from '@/stores/network';
-import { setStatus } from './status';
+import { clearSyncScheduled, setStatus, setSyncScheduled } from './status';
 import { ensureSignedIn } from './syncAuth';
 import {
   mergeFeed,
@@ -506,6 +506,7 @@ export async function haltSync(): Promise<void> {
   halted = true;
   for (const { timer } of pendingTimers.values()) clearTimeout(timer);
   pendingTimers.clear();
+  clearSyncScheduled();
   // Not-yet-started jobs settle now, without running.
   for (const job of queue.splice(0)) finish(job);
   await Promise.allSettled([...running.values()].map((job) => job.promise));
@@ -529,10 +530,13 @@ export function scheduleSync(
   const existing = pendingTimers.get(characterId);
   if (existing !== undefined) clearTimeout(existing.timer);
   const merged = higher(existing?.priority ?? null, priority);
+  // Only an edit counts: the background sweep schedules every Character.
+  setSyncScheduled(characterId, merged === 'foreground');
   pendingTimers.set(characterId, {
     priority: merged,
     timer: setTimeout(() => {
       pendingTimers.delete(characterId);
+      setSyncScheduled(characterId, false);
       triggerSync(characterId, merged).catch(() => {
         // Failure already surfaced via subscribeSyncStatus.
       });
@@ -555,6 +559,7 @@ export function triggerSync(
   if (pending !== undefined) {
     clearTimeout(pending.timer);
     pendingTimers.delete(characterId);
+    setSyncScheduled(characterId, false);
     priority = higher(pending.priority, priority);
   }
   const existing = running.get(characterId);

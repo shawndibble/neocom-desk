@@ -12,7 +12,7 @@
  * ESI layer keeps its own network-failure handling (`esi/cache.ts`) and treats
  * this only as the fast path for the case the browser is sure about.
  */
-import { useSyncExternalStore } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 
 type Listener = () => void;
 
@@ -77,4 +77,14 @@ export function useOnline(): boolean {
 export function onReconnect(callback: () => void): () => void {
   reconnectListeners.add(callback);
   return () => void reconnectListeners.delete(callback);
+}
+
+/**
+ * A counter that bumps each time the browser comes back online, for an effect
+ * that must re-run its lookup on reconnect: list it as a dependency.
+ */
+export function useReconnectCount(): number {
+  const [count, setCount] = useState(0);
+  useEffect(() => onReconnect(() => setCount((n) => n + 1)), []);
+  return count;
 }

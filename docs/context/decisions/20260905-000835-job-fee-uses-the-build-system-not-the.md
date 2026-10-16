@@ -1,6 +1,6 @@
 # Scope decisions — job fee uses the build system, not the trade hub
 
-_Recorded 2026-09-05._
+_Recorded 2026-09-05. The build-system-resolution bullet below is superseded by `20261015-234032-static-game-data-resolves-locally-first-unknown-skill.md`: the name now resolves from the local solar-system table first._
 
 - **A Build Plan names the solar system its job runs in, and the job fee reads
   that system's cost index.** The fee had been priced at the plan's _trade

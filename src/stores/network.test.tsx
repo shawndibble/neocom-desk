@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
-import { isOnline, onReconnect, useOnline } from './network';
+import { isOnline, onReconnect, useOnline, useReconnectCount } from './network';
 
 function setNavigatorOnline(value: boolean): void {
   Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => value });
@@ -116,5 +116,19 @@ describe('useOnline subscription', () => {
     go(false);
 
     expect(renders).toBe(rendersWhileMounted);
+  });
+});
+
+describe('useReconnectCount', () => {
+  it('bumps on each reconnect and not on going offline', () => {
+    setNavigatorOnline(true);
+    const { result } = renderHook(() => useReconnectCount());
+    expect(result.current).toBe(0);
+
+    act(() => go(false));
+    expect(result.current).toBe(0);
+
+    act(() => go(true));
+    expect(result.current).toBe(1);
   });
 });

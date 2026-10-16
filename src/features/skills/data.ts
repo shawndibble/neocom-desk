@@ -153,7 +153,14 @@ function universeTypeCacheKey(typeId: number): string {
   return `universeType:${typeId}`;
 }
 
-function loadUniverseTypeOnce(typeId: number): Promise<CachedResult<UniverseType> | null> {
+/**
+ * One cache-first, ETag-revalidated read of a type (no retry, no delay):
+ * `null` only when the type is neither cached nor fetchable. The Show Info
+ * modal, row skills, Compare Attributes and hauling use this so a type they
+ * have seen once still renders offline; `loadUniverseType` adds a retry on
+ * top for the one-at-a-time callers that want it.
+ */
+export function loadUniverseTypeOnce(typeId: number): Promise<CachedResult<UniverseType> | null> {
   const { fetchLive, conditional } = conditionalFetch((options) =>
     getUniverseType(typeId, options)
   );
