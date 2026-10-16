@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { splitMailBody } from '@/engine/mailBodyBlocks';
+import { splitMailBody, splitMailLines } from '@/engine/mailBodyBlocks';
 
 const MOON = [
   'Greetings Pilots,',
@@ -89,5 +89,46 @@ describe('splitMailBody', () => {
   it('does not treat lines with only two cells as a table', () => {
     const text = 'Name    Bob\nShip    Rifter';
     expect(splitMailBody(text)).toEqual([{ kind: 'text', text }]);
+  });
+});
+
+describe('pipe tables', () => {
+  it('reads | a | b | rows, skipping the separator row', () => {
+    const text = 'Intro\n\n| Name | ISK |\n|---|---:|\n| Olorf | 1,200 |\n| Mero | 90 |\n\nBye';
+    expect(splitMailBody(text)).toEqual([
+      { kind: 'text', text: 'Intro' },
+      {
+        kind: 'table',
+        rows: [
+          ['Name', 'ISK'],
+          ['Olorf', '1,200'],
+          ['Mero', '90'],
+        ],
+        align: ['left', 'right'],
+      },
+      { kind: 'text', text: 'Bye' },
+    ]);
+  });
+
+  it('works without a separator row and with two columns', () => {
+    const blocks = splitMailBody('| a | b |\n| c | d |');
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0].kind).toBe('table');
+  });
+
+  it('leaves a lone pipe line as prose', () => {
+    const text = '| just one row |';
+    expect(splitMailBody(text)).toEqual([{ kind: 'text', text }]);
+  });
+});
+
+describe('splitMailLines', () => {
+  it('reports the line range of each block', () => {
+    const blocks = splitMailLines(['hi', '| a | b |', '| c | d |', 'bye']);
+    expect(blocks.map((b) => [b.kind, b.start, b.end])).toEqual([
+      ['text', 0, 1],
+      ['table', 1, 3],
+      ['text', 3, 4],
+    ]);
   });
 });

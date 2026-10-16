@@ -1178,7 +1178,7 @@ function MailView({ scope, scopeControl }: MailViewProps) {
                       shipped at the smallest size in the dimmest readable
                       tier. `break-words` so an unbroken URL cannot push the
                       pane sideways. */}
-                    <MailBodyView text={bodyText} />
+                    <MailBodyView text={bodyText} markup={body?.data.body ?? undefined} />
 
                     {composeKind !== null && selectedRow !== null && (
                       <MailComposeBox

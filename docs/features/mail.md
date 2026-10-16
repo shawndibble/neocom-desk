@@ -13,7 +13,7 @@ Code: `src/routes/Mail.tsx`, `src/features/character/{mail,mailAll,mailScopePref
 | Hide read         | Toggle chip, URL `hideRead`                                                                         | `Mail.tsx:636`                                  |
 | List              | Two-line rows, unread dot, folder glyph+name, date; newest first; capped at 200 rendered            | `Mail.tsx:675`, `capHeadersForDisplay`          |
 | Load more         | Pages older mail via `last_mail_id`, 50 per page                                                    | `Mail.tsx:805`, `loadMoreMailHeaders`           |
-| Reader            | Subject, From (+standing tag), To, body (EVE markup stripped), timestamp                            | `Mail.tsx:862-965`                              |
+| Reader            | Subject, From (+standing tag), To, body (EVE markup rendered), timestamp                            | `Mail.tsx:862-965`                              |
 | Mark read         | Instant local dim + ESI write on open                                                               | `markMailReadOnEsi`                             |
 | Reply (reply-all) | Inline compose box, recipients prefilled, quoted body                                               | `MailComposeBox.tsx`                            |
 | Forward           | Same box, empty recipients + recipient picker                                                       | `MailComposeBox.tsx`                            |
@@ -94,7 +94,7 @@ Code: `src/routes/Mail.tsx`, `src/features/character/{mail,mailAll,mailScopePref
 - Body fetched on open (`/mail/{id}`), cached 'static' tier (bodies never change). Spinner while loading; `EmptyState` if body null (failed/uncached).
 - Title = folder name of the open mail; meta = full timestamp.
 - From: `CharacterLink` (opens Public Info) + `StandingTag` (from the active Character's contacts; precedence character > corp > alliance > faction, via sender affiliations). To: character recipients are `CharacterLink`s, corp/alliance/mailing-list are plain text. Mailing-list names resolved from `/mail/lists` (the `/universe/names` endpoint cannot resolve list ids; list ids are excluded from the name batch).
-- Body: `stripEveMarkup`, `whitespace-pre-wrap`. Links/markup in EVE mail are flattened to text; no images, no clickable links.
+- Body: `MailBodyView` parses the raw body with `src/engine/eveMarkup.ts` (safe subset: bold, italic, underline, size, colour, links; unknown tags dropped, never injected as HTML) and renders it as the game shows it, on a dark surface when the mail carries any formatting. `showinfo:` links open the app's modal (character, corporation, alliance, item/skill/ship via Item Detail) or Route Safety (system); region, station, structure and `fitting:`/`contract:`/`killReport:`/`joinChannel:`/`localsvc:` render as dotted-underline text with a tooltip. Bare URLs linkify; space-aligned and `| a | b |` pipe tables draw as real tables. List-row snippets and the Reply quote still use the flattened `stripEveMarkup` text. No images.
 - Header actions: Reply, Forward icon buttons (hidden while composing). Back (phone).
 
 ## Compose (Reply / Forward)
@@ -136,7 +136,7 @@ Registry: `src/esi/registry.ts:249-281`. Mail is not synced to Firestore.
 - No compose-new, no delete, no mark-unread, no label assignment, no mailing-list view; `getCharacterMailingLists` is used only to name recipients.
 - Search matches subject and sender name only; not body, not recipients (Sent folder rows are searched by sender = yourself).
 - Unread count per chip is ESI's count for all mail, not for the loaded/filtered window; "Hide read" uses per-header flags.
-- Reader flattens EVE markup to plain text (`stripEveMarkup`): no links, fonts or images.
+- Reader renders a safe subset of EVE markup; no images, no Place Info modal for region/station/structure links yet.
 - Folder chips on phone are hidden while a mail is open, so folder cannot be changed without Back.
 - `loadMoreMailHeaders` swallows non-auth errors silently (list stays, button stays).
 - Forward picker only adds characters; cannot add a corp, alliance or mailing list.
@@ -180,4 +180,4 @@ Newest-first with names (:177); reader header absent until selection (:184); mar
 - Mark unread, bulk mark read, delete (needs organize scope), compose-new with contact picker.
 - Persist the open mail in URL (`?mail=<id>`) so reload/back keeps place; keyboard j/k navigation.
 - Surface load-more failure inline; show total fetched vs shown count.
-- Render safe EVE links (character/system/item show-info) in the body instead of flattening.
+- ~~Render safe EVE links (character/system/item show-info) in the body instead of flattening.~~ Done.
