@@ -519,3 +519,129 @@ describe('miningYield (world)', () => {
     expect(text(withUnits.table!.rows[0]!.cells[2])).toBe('75%');
   });
 });
+
+describe('industry job slots', () => {
+  const skills = (massProduction: number) => ({
+    massProduction,
+    advancedMassProduction: 0,
+    laboratoryOperation: 0,
+    advancedLaboratoryOperation: 0,
+    massReactions: 0,
+    advancedMassReactions: 0,
+  });
+  const job = (id: number, endOffset: number) => ({
+    job_id: id,
+    activity_id: 1,
+    runs: 1,
+    blueprint_type_id: 5,
+    product_type_id: 6,
+    station_id: 60003760,
+    start_date: iso(NOW + endOffset - HOUR),
+    end_date: iso(NOW + endOffset),
+    status: 'active',
+  });
+  // Header Character 91: 2 Mfg slots, one busy. Character 92: base slots, nothing running.
+  const own = [job(1, 2 * HOUR)];
+  const other = [job(2, -10 * MIN)];
+  const feeds = (): Feeds => ({
+    industry: ok({
+      jobs: own,
+      allJobs: [...own, ...other],
+      productNames: new Map([
+        [1, 'Item 1'],
+        [2, 'Item 2'],
+      ]),
+      slots: [
+        {
+          characterId: 91,
+          characterName: 'Kestrel Vane',
+          skills: skills(1),
+          jobs: [{ activityId: 1, endMs: NOW + 2 * HOUR }],
+        },
+        { characterId: 92, characterName: 'Orsa Tellemar', skills: skills(0), jobs: [] },
+      ],
+      needsReauth: false,
+      fetchedAt: new Date(NOW),
+    }) as never,
+  });
+
+  it('adds the header Character’s free slots to the Number view and keeps the jobs table', () => {
+    const view = buildView('industry', feeds(), ctx());
+    expect(view.number.notes).toEqual(['overview.widgets.industry.slotsFree{"count":3}']);
+    expect(view.number.value).toBe('1');
+    expect(view.number.unit).toBe('overview.widgets.industry.running');
+    expect(view.table!.columns[0].key).toBe('job');
+    expect(view.chart!.kind).toBe('gantt');
+  });
+
+  it('on All characters counts every Character’s jobs and free slots', () => {
+    const view = buildView('industry', feeds(), ctx({ scopeAll: true }));
+    expect(view.number.notes).toEqual(['overview.widgets.industry.slotsFree{"count":6}']);
+    expect(view.number.value).toBe('1');
+    expect(view.number.unit).toBe('overview.widgets.industry.ready');
+  });
+
+  it('on All characters tables free / max slots per Character and pool', () => {
+    const view = buildView('industry', feeds(), ctx({ scopeAll: true }));
+    const table = view.table!;
+    expect(table.columns.map((c) => c.key)).toEqual(['character', 'mfg', 'sci', 'react']);
+    expect(table.rows.map((row) => row.cells.map(text))).toEqual([
+      ['Kestrel Vane', '1/2', '1/1', '1/1'],
+      ['Orsa Tellemar', '1/1', '1/1', '1/1'],
+    ]);
+    expect(table.footer).toBe('overview.widgets.industry.slotsFooter');
+  });
+
+  it('on All characters charts free slots per Character as bars', () => {
+    const chart = buildView('industry', feeds(), ctx({ scopeAll: true })).chart!;
+    expect(chart.kind).toBe('hbars');
+    if (chart.kind !== 'hbars') return;
+    expect(chart.rows.map((row) => [row.label, row.text, row.share])).toEqual([
+      ['Kestrel Vane', 'overview.widgets.industry.slotsOf{"free":3,"max":4}', 1],
+      ['Orsa Tellemar', 'overview.widgets.industry.slotsOf{"free":3,"max":3}', 1],
+    ]);
+  });
+
+  it('never counts an over-capacity pool as negative free slots', () => {
+    const view = buildView(
+      'industry',
+      {
+        industry: ok({
+          jobs: [],
+          productNames: new Map(),
+          slots: [
+            {
+              characterId: 91,
+              characterName: 'Kestrel Vane',
+              skills: skills(0),
+              jobs: [
+                { activityId: 1, endMs: NOW + HOUR },
+                { activityId: 1, endMs: NOW + HOUR },
+              ],
+            },
+          ],
+          needsReauth: false,
+          fetchedAt: new Date(NOW),
+        }) as never,
+      },
+      ctx()
+    );
+    expect(view.number.notes).toEqual(['overview.widgets.industry.slotsFree{"count":2}']);
+  });
+
+  it('says nothing about slots when no Character’s skills are known', () => {
+    const view = buildView(
+      'industry',
+      {
+        industry: ok({
+          jobs: own,
+          productNames: new Map([[1, 'Item 1']]),
+          needsReauth: false,
+          fetchedAt: new Date(NOW),
+        }) as never,
+      },
+      ctx()
+    );
+    expect(view.number.notes).toBeUndefined();
+  });
+});

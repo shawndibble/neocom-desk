@@ -4136,7 +4136,8 @@
           "ganttSummary": "{{note}}. {{jobs}}.",
           "ganttAgo": "{{duration}} ago",
           "ganttNow": "Now",
-          "ganttIn": "in {{duration}}"
+          "ganttIn": "in {{duration}}",
+          "slotsNote": "Free slots per Character, all activities"
         },
         "training": {
           "note": "Queue ends in {{duration}}"
@@ -4531,17 +4532,25 @@
       },
       "industry": {
         "title": "Industry",
-        "description": "Jobs ready to deliver and the next to finish",
+        "description": "Jobs ready to deliver, the next to finish, and free job slots",
         "empty": "No industry jobs running.",
         "ready": "ready",
         "running": "running",
         "next": "Next: {{name}}, {{duration}}",
+        "slotsFree_one": "{{count}} slot free",
+        "slotsFree_other": "{{count}} slots free",
+        "slotsOf": "{{free}} of {{max}} free",
+        "slotsFooter": "Free / max slots per activity",
         "col": {
           "job": "Job",
           "ends": "Ends in",
           "progress": "Done",
           "activity": "Activity",
-          "location": "Location"
+          "location": "Location",
+          "character": "Character",
+          "manufacturing": "Manufacturing",
+          "science": "Science",
+          "reactions": "Reactions"
         }
       },
       "profit": {

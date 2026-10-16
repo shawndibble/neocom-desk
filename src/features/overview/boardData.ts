@@ -13,7 +13,14 @@
 import { colonyStatus } from '@/engine/pi/colonyStatus';
 import { groupColoniesIntoBatches, type ColonyBatch } from '@/engine/pi/colonyBatches';
 import type { ColonyStatus } from '@/engine/pi/types';
-import { loadCharacterIndustryJobs } from '@/features/industry/jobs';
+import { loadAllCharactersIndustryJobs, loadCharacterIndustryJobs } from '@/features/industry/jobs';
+import type { JobSlotJob, JobSlotSkills } from '@/engine/industry/jobSlots';
+import {
+  jobSlotSkillsFromCharacterSkills,
+  toJobSlotJobs,
+} from '@/features/character/jobSlotSkills';
+import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
+import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import type { IndustryJob } from '@/esi/endpoints';
 import type { RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { loadAllColonyDetails, loadCharacterPlanets } from '@/features/pi/data';
@@ -201,8 +208,21 @@ export async function loadMiningTaxBoard(): Promise<MiningTaxBoardData> {
 
 // --- Industry -------------------------------------------------------------
 
+/** One Character's job-slot inputs: free / max per pool is worked out at build time, against the clock. */
+export interface IndustryCharacterSlots {
+  characterId: number;
+  characterName: string;
+  skills: JobSlotSkills;
+  jobs: JobSlotJob[];
+}
+
 export interface IndustryBoardData {
+  /** The header Character's jobs. */
   jobs: IndustryJob[];
+  /** Every Character's jobs, the header Character's included, for a widget on All characters. */
+  allJobs?: IndustryJob[];
+  /** Job-slot inputs per Character whose skills and jobs are both known; never a guessed zero. */
+  slots?: IndustryCharacterSlots[];
   /**
    * What each job is making, keyed by job id. A row saying "2 runs" names
    * nothing you can act on — the product is the whole point of the row, and it
@@ -222,16 +242,63 @@ export interface IndustryBoardData {
 /** A pilot's jobs sit in a handful of places; naming more than this is not worth the reads. */
 const MAX_JOB_LOCATIONS = 6;
 
+/** Each fanned-out Character's slot inputs; one whose skills don't load is left out. */
+async function loadIndustrySlots(
+  entries: readonly { characterId: number; characterName: string; jobs: IndustryJob[] }[]
+): Promise<IndustryCharacterSlots[]> {
+  const nowMs = Date.now();
+  const slots: (IndustryCharacterSlots | null)[] = entries.map(() => null);
+  await mapWithConcurrencyLimit(
+    entries.map((entry, index) => ({ entry, index })),
+    ESI_FANOUT_CONCURRENCY,
+    async ({ entry, index }) => {
+      try {
+        const corrected = await loadCorrectedSkills(entry.characterId, nowMs, {
+          skipQueueWithoutScope: true,
+        });
+        if (!corrected.skillsResult) return;
+        slots[index] = {
+          characterId: entry.characterId,
+          characterName: entry.characterName,
+          skills: jobSlotSkillsFromCharacterSkills(
+            corrected.skillsResult.data.skills,
+            corrected.queueResult?.data ?? [],
+            nowMs
+          ),
+          jobs: toJobSlotJobs(entry.jobs),
+        };
+      } catch {
+        // Unknown skills read as "no slot row", never a guessed zero.
+      }
+    }
+  );
+  return slots.filter((row): row is IndustryCharacterSlots => row !== null);
+}
+
 export async function loadIndustryBoard(characterId: number): Promise<IndustryBoardData> {
-  const { cached, needsReauth } = await loadCharacterIndustryJobs(characterId);
+  // Every Character's jobs at once (the widget can sum across them); the
+  // header Character's own read is reused from the fan-out when it is in it.
+  const fanOut = await loadAllCharactersIndustryJobs();
+  const ownEntry = fanOut.entries.find((entry) => entry.characterId === characterId);
+  const { cached, needsReauth } =
+    ownEntry?.result ?? (await loadCharacterIndustryJobs(characterId));
   const jobs = cached?.data ?? [];
+  const known = fanOut.entries.flatMap((entry) =>
+    entry.result.cached && !entry.result.needsReauth
+      ? [{ ...entry, jobs: entry.result.cached.data }]
+      : []
+  );
+  const allJobs = ownEntry
+    ? known.flatMap((entry) => entry.jobs)
+    : [...jobs, ...known.flatMap((entry) => entry.jobs)];
+  const slots = await loadIndustrySlots(known);
 
   // Blueprint id as the fallback: research and copying jobs have no product,
   // and "Ishtar Blueprint" is still the right thing to call that row.
-  const typeIds = jobs.map((job) => job.product_type_id ?? job.blueprint_type_id);
+  const typeIds = allJobs.map((job) => job.product_type_id ?? job.blueprint_type_id);
   const names = typeIds.length > 0 ? await loadTypeNames(typeIds) : new Map<number, string>();
   const productNames = new Map<number, string>();
-  for (const job of jobs) {
+  for (const job of allJobs) {
     const name = names.get(job.product_type_id ?? job.blueprint_type_id);
     if (name !== undefined) productNames.set(job.job_id, name);
   }
@@ -250,6 +317,8 @@ export async function loadIndustryBoard(characterId: number): Promise<IndustryBo
 
   return {
     jobs,
+    allJobs,
+    slots,
     productNames,
     locationNames,
     needsReauth,
