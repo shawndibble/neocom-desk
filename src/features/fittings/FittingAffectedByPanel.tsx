@@ -105,16 +105,16 @@ export function FittingAffectedByPanel({
     return <p className="text-xs text-text-dim">{t('fittings.affectedBy.none')}</p>;
 
   return (
-    <ul className="space-y-3 text-xs">
+    <ul className="divide-y divide-line text-xs">
       {shownRows.map(({ row, entry, base, value, sources }) => (
-        <li key={row.attributeId} className="rounded-xs border border-line bg-panel-2">
-          <div className="flex justify-between gap-2 border-b border-line px-3 py-1.5 font-semibold">
+        <li key={row.attributeId} className="py-2 first:pt-0 last:pb-0">
+          <div className="flex justify-between gap-2 font-semibold">
             <span className="min-w-0">{entry.name}</span>
             <span className="shrink-0 tabular-nums">
               {t('fittings.affectedBy.change', { base, value })}
             </span>
           </div>
-          <ul className="space-y-0.5 px-3 py-1.5">
+          <ul className="mt-1 space-y-0.5 pl-3">
             {sources.map((source, index) => (
               <SourceLine key={index} source={source} unitId={entry.unitId} typeName={typeName} />
             ))}
