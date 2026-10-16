@@ -1,0 +1,395 @@
+/**
+ * "Mutation" in a fitted module's dialog (GLOSSARY.md **Mutated module**,
+ * **Mutaplasmid**, **Roll**): apply a mutaplasmid to the module, roll each
+ * attribute it changes on a slider, load a real item's rolls from the
+ * pilot's assets, or take the mutation off again. Every change is an
+ * ordinary editor edit, so the stats and the Fitting Share Code follow.
+ *
+ * A mutaplasmid's ranges are multipliers on the base module's own values,
+ * read here from the base's dogma attributes (`loadTypeDetail`); the rolls
+ * are absolute (`engine/fittings/mutationEdit.ts`). Each slider runs worst
+ * (left) to best (right), whichever way the attribute's good direction
+ * points, and prints the absolute value beside it.
+ *
+ * Drones are not covered: a mutated drone is its own one-drone stack, and
+ * the drone rows have no dialog to hold this.
+ */
+import { useEffect, useId, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import {
+  Button,
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+  Slider,
+} from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
+import {
+  mutationStatus,
+  type Mutaplasmid,
+  type MutaplasmidLookup,
+} from '@/engine/fittings/mutaplasmids';
+import {
+  groupMutaplasmidsByStrain,
+  rollAtQuality,
+  rollRows,
+  setModuleMutation,
+  setModuleRoll,
+  startingRolls,
+  type BaseValue,
+  type RollRow,
+} from '@/engine/fittings/mutationEdit';
+import type { FittingModule, ItemMutation } from '@/engine/fittings/types';
+import { useMutaplasmidLookup } from '@/features/abyssal/mutaplasmidData';
+import { loadTypeDetail } from '@/features/skills/typeDetail';
+import { loadAttributeDictionary } from '@/sde/loadMarketSde';
+import type { AttributeDictionary } from '@/sde/marketTypes';
+import { attributeValueText, formatAttributeNumber } from './attributeValueText';
+import { MutationFromAssets } from './MutationFromAssets';
+import { catalogueTypeName, type FittingCatalogue } from './useFittingCatalogue';
+import type { FittingChange } from './useFittingWorkspace';
+
+/** Slider positions from worst to best: one arrow-key press is 0.1% of the range. */
+const STEPS = 1000;
+
+/** The base module's own attribute values, by attribute id; null while they load (or for no base). */
+function useBaseValues(typeId: number | null): BaseValue | null {
+  const [loaded, setLoaded] = useState<{ typeId: number; values: Map<number, number> } | null>(
+    null
+  );
+  useEffect(() => {
+    if (typeId === null) return;
+    let live = true;
+    void loadTypeDetail(typeId, { retry: true }).then((detail) => {
+      if (!live) return;
+      const values = new Map(
+        (detail?.dogma_attributes ?? []).map((a) => [a.attribute_id, a.value] as const)
+      );
+      setLoaded({ typeId, values });
+    });
+    return () => {
+      live = false;
+    };
+  }, [typeId]);
+  if (typeId === null || loaded?.typeId !== typeId) return null;
+  const { values } = loaded;
+  return (attributeId) => values.get(attributeId);
+}
+
+function useAttributeDictionary(): AttributeDictionary | null {
+  const [dictionary, setDictionary] = useState<AttributeDictionary | null>(null);
+  useEffect(() => {
+    let live = true;
+    void loadAttributeDictionary().then(
+      (loaded) => {
+        if (live) setDictionary(loaded);
+      },
+      () => {}
+    );
+    return () => {
+      live = false;
+    };
+  }, []);
+  return dictionary;
+}
+
+export interface FittingMutationPanelProps {
+  module: FittingModule;
+  catalogue: FittingCatalogue | null;
+  edit: (change: FittingChange, coalesceKey?: string) => void;
+  /** The active Character, whose assets "Load rolls from my assets" reads; null hides it. */
+  characterId: number | null;
+}
+
+export function FittingMutationPanel(props: FittingMutationPanelProps) {
+  const { t } = useTranslation();
+  const lookup = useMutaplasmidLookup();
+  if (lookup === null)
+    return <p className="text-xs text-text-dim">{t('fittings.mutation.loading')}</p>;
+  return <MutationEditor {...props} lookup={lookup} />;
+}
+
+function MutationEditor({
+  module,
+  catalogue,
+  edit,
+  characterId,
+  lookup,
+}: FittingMutationPanelProps & { lookup: MutaplasmidLookup }) {
+  const { t } = useTranslation();
+  const nameOf = (typeId: number) => catalogueTypeName(catalogue, typeId);
+  const status = mutationStatus(module, lookup);
+  const { slot, slotIndex } = module;
+  const mutation = module.mutation;
+  const baseTypeId = status === 'none' ? module.typeId : (mutation?.baseTypeId ?? null);
+  const baseValue = useBaseValues(baseTypeId);
+  const dictionary = useAttributeDictionary();
+
+  const apply = (next: ItemMutation | null) =>
+    edit((f) => setModuleMutation(f, slot, slotIndex, next, lookup));
+
+  // What "Load rolls from my assets" looks for: this abyssal type, or every
+  // one this base can become.
+  const assetTypes =
+    status === 'none'
+      ? new Set(lookup.mutaplasmidsForBase(module.typeId).map((m) => m.resultTypeId))
+      : new Set([module.typeId]);
+  const fromAssets = characterId !== null && (
+    <MutationFromAssets
+      characterId={characterId}
+      typeIds={assetTypes}
+      lookup={lookup}
+      nameOf={nameOf}
+      onApply={apply}
+    />
+  );
+
+  if (status === 'baseUnknown') {
+    return (
+      <div className="space-y-3 text-xs">
+        <p className="flex gap-1.5 text-warning">
+          <Icon.Warn aria-hidden className="mt-0.5 size-3.5 shrink-0" />
+          {t('fittings.mutation.baseUnknownNote')}
+        </p>
+        <BasePicker
+          resultTypeId={module.typeId}
+          lookup={lookup}
+          nameOf={nameOf}
+          onPick={(mutaplasmidTypeId, base) =>
+            apply({ baseTypeId: base, mutaplasmidTypeId, attributes: {} })
+          }
+        />
+        {fromAssets}
+      </div>
+    );
+  }
+
+  const options = baseTypeId === null ? [] : lookup.mutaplasmidsForBase(baseTypeId);
+  const rows =
+    mutation && baseValue
+      ? rollRows(mutation.mutaplasmidTypeId, mutation.attributes, baseValue, lookup)
+      : null;
+
+  return (
+    <div className="space-y-3 text-xs">
+      {mutation && (
+        <p className="text-text-dim">
+          {t('fittings.mutation.baseIs', { name: nameOf(mutation.baseTypeId) })}
+        </p>
+      )}
+      <MutaplasmidSelect
+        options={options}
+        value={mutation?.mutaplasmidTypeId ?? null}
+        nameOf={nameOf}
+        disabled={baseValue === null}
+        onChange={(mutaplasmidTypeId) => {
+          if (baseTypeId === null || baseValue === null) return;
+          apply({
+            baseTypeId,
+            mutaplasmidTypeId,
+            attributes: startingRolls(mutaplasmidTypeId, baseValue, lookup),
+          });
+        }}
+      />
+      {status === 'rollsUnknown' && (
+        <p className="flex gap-1.5 text-warning">
+          <Icon.Warn aria-hidden className="mt-0.5 size-3.5 shrink-0" />
+          {t('fittings.mutation.rollsUnknownNote')}
+        </p>
+      )}
+      {mutation &&
+        (rows === null || dictionary === null ? (
+          <p className="text-text-dim">{t('fittings.mutation.loading')}</p>
+        ) : (
+          <ul className="space-y-3" aria-label={t('fittings.mutation.rollsLabel')}>
+            {rows.map((row) => (
+              <RollSlider
+                key={row.attributeId}
+                row={row}
+                name={
+                  dictionary[row.attributeId]?.name ??
+                  lookup.attributeName(row.attributeId) ??
+                  `#${row.attributeId}`
+                }
+                format={(value) => {
+                  const entry = dictionary[row.attributeId];
+                  return entry ? attributeValueText(value, entry) : formatAttributeNumber(value);
+                }}
+                onChange={(value) =>
+                  baseValue &&
+                  edit(
+                    (f) =>
+                      setModuleRoll(f, slot, slotIndex, row.attributeId, value, baseValue, lookup),
+                    `mutation-${slot}-${slotIndex}-${row.attributeId}`
+                  )
+                }
+              />
+            ))}
+          </ul>
+        ))}
+      {fromAssets}
+      {mutation && (
+        <Button size="sm" onClick={() => apply(null)}>
+          {t('fittings.mutation.remove')}
+        </Button>
+      )}
+    </div>
+  );
+}
+
+/** A mutaplasmid choice, grouped by strain. */
+function MutaplasmidSelect({
+  options,
+  value,
+  nameOf,
+  disabled,
+  onChange,
+}: {
+  options: readonly Mutaplasmid[];
+  value: number | null;
+  nameOf: (typeId: number) => string;
+  disabled?: boolean;
+  onChange: (mutaplasmidTypeId: number) => void;
+}) {
+  const { t } = useTranslation();
+  if (options.length === 0) {
+    return <p className="text-text-dim">{t('fittings.mutation.noMutaplasmids')}</p>;
+  }
+  const groups = groupMutaplasmidsByStrain(
+    options.map((m) => m.typeId),
+    nameOf
+  );
+  return (
+    <Select
+      value={value === null ? '' : String(value)}
+      onValueChange={(next) => onChange(Number(next))}
+      disabled={disabled}
+    >
+      <SelectTrigger
+        size="sm"
+        className="w-full max-w-md"
+        aria-label={t('fittings.mutation.mutaplasmid')}
+      >
+        <SelectValue placeholder={t('fittings.mutation.pickMutaplasmid')} />
+      </SelectTrigger>
+      <SelectContent>
+        {groups.map((group) => (
+          <SelectGroup key={group.strain}>
+            <SelectLabel>{t(`fittings.mutation.strain.${group.strain}`)}</SelectLabel>
+            {group.typeIds.map((typeId) => (
+              <SelectItem key={typeId} value={String(typeId)}>
+                {nameOf(typeId)}
+              </SelectItem>
+            ))}
+          </SelectGroup>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
+/**
+ * For an abyssal module of unknown base: which mutaplasmid made it, then
+ * which base it was — every base that mutaplasmid takes becomes the same
+ * abyssal type, so the pilot has to say.
+ */
+function BasePicker({
+  resultTypeId,
+  lookup,
+  nameOf,
+  onPick,
+}: {
+  resultTypeId: number;
+  lookup: MutaplasmidLookup;
+  nameOf: (typeId: number) => string;
+  onPick: (mutaplasmidTypeId: number, baseTypeId: number) => void;
+}) {
+  const { t } = useTranslation();
+  const [mutaplasmidTypeId, setMutaplasmidTypeId] = useState<number | null>(null);
+  const bases = [...(lookup.mutaplasmid(mutaplasmidTypeId ?? -1)?.baseTypeIds ?? [])].sort((a, b) =>
+    nameOf(a).localeCompare(nameOf(b))
+  );
+  return (
+    <div className="flex flex-wrap gap-2">
+      <MutaplasmidSelect
+        options={lookup.mutaplasmidsForResult(resultTypeId)}
+        value={mutaplasmidTypeId}
+        nameOf={nameOf}
+        onChange={setMutaplasmidTypeId}
+      />
+      {mutaplasmidTypeId !== null && (
+        <Select value="" onValueChange={(next) => onPick(mutaplasmidTypeId, Number(next))}>
+          <SelectTrigger
+            size="sm"
+            className="w-full max-w-md"
+            aria-label={t('fittings.mutation.base')}
+          >
+            <SelectValue placeholder={t('fittings.mutation.pickBase')} />
+          </SelectTrigger>
+          <SelectContent>
+            {bases.map((typeId) => (
+              <SelectItem key={typeId} value={String(typeId)}>
+                {nameOf(typeId)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
+    </div>
+  );
+}
+
+/** One rolled attribute: its name and value, a worst-to-best slider, and the ends of its range. */
+function RollSlider({
+  row,
+  name,
+  format,
+  onChange,
+}: {
+  row: RollRow;
+  name: string;
+  format: (value: number) => string;
+  onChange: (value: number) => void;
+}) {
+  const { t } = useTranslation();
+  const id = useId();
+  const quality = Math.round(row.quality * 100);
+  const value = format(row.value);
+  const worst = format(row.range.highIsGood ? row.range.min : row.range.max);
+  const best = format(row.range.highIsGood ? row.range.max : row.range.min);
+  const fixed = row.range.max <= row.range.min;
+  return (
+    <li className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-2">
+      <label htmlFor={id} className="truncate text-text">
+        {name}
+      </label>
+      <span className="text-right text-text tabular-nums">
+        {value}
+        <span className="ml-1.5 text-text-dim">
+          {row.rolled
+            ? t('fittings.mutation.quality', { pct: quality })
+            : t('fittings.mutation.baseValue')}
+        </span>
+      </span>
+      <Slider
+        id={id}
+        className="col-span-2"
+        min={0}
+        max={STEPS}
+        step={1}
+        value={Math.round(row.quality * STEPS)}
+        disabled={fixed}
+        valueText={t('fittings.mutation.valueText', { value, pct: quality })}
+        onChange={(event) => onChange(rollAtQuality(Number(event.target.value) / STEPS, row.range))}
+      />
+      <span className="col-span-2 flex justify-between gap-2 text-text-dim tabular-nums">
+        <span>{t('fittings.mutation.worst', { value: worst })}</span>
+        <span>{t('fittings.mutation.best', { value: best })}</span>
+      </span>
+    </li>
+  );
+}

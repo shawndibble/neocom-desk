@@ -63,6 +63,7 @@ import {
   useFittingDropTarget,
   useFittingItemActions,
 } from './fittingItemActions';
+import { MutationBadge } from './MutationBadge';
 import type { AddTarget } from './addTarget';
 import type { FittingContext } from './fittingContext';
 import { catalogueTypeName, catalogueVolume, type FittingCatalogue } from './useFittingCatalogue';
@@ -223,6 +224,7 @@ export function ModuleRow({
         <>
           <TypeIcon typeId={typeId} size={32} width={24} height={24} />
           <SlotName typeId={typeId} name={name} />
+          <MutationBadge item={module} />
           {cantUse && (
             <span className="shrink-0 text-[0.6875rem] font-semibold text-danger">
               {t('fittings.list.cantUse')}

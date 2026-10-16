@@ -1884,6 +1884,51 @@
       "turnInUnbuyable_other": "need {{count}}× {{name}}, nobody sells it",
       "turnInToBuy_one": "buy {{count}}× {{name}} ({{isk}} ISK, included)",
       "turnInToBuy_other": "buy {{count}}× {{name}} ({{isk}} ISK, included)"
+    },
+    "mutation": {
+      "menu": "Mutate…",
+      "title": "Mutation",
+      "loading": "Loading mutaplasmids…",
+      "mutaplasmid": "Mutaplasmid",
+      "pickMutaplasmid": "Apply a mutaplasmid",
+      "noMutaplasmids": "No mutaplasmid takes this module.",
+      "base": "Base module",
+      "pickBase": "Pick its base module",
+      "baseIs": "Mutated from {{name}}.",
+      "strain": {
+        "decayed": "Decayed",
+        "gravid": "Gravid",
+        "unstable": "Unstable",
+        "glorified": "Glorified",
+        "exigent": "Exigent",
+        "radical": "Radical",
+        "other": "Other"
+      },
+      "rollsLabel": "Rolls",
+      "quality": "{{pct}}% roll",
+      "baseValue": "base value",
+      "valueText": "{{value}}, {{pct}}% roll",
+      "worst": "Worst {{value}}",
+      "best": "Best {{value}}",
+      "remove": "Remove mutation",
+      "rollsUnknownNote": "Rolls unknown: the stats use the base module's own values. Move a slider, or load the rolls from your assets.",
+      "baseUnknownNote": "Base module unknown: this module adds nothing to the stats until you say which mutaplasmid and base module made it, or load it from your assets.",
+      "fromAssets": "Load rolls from my assets",
+      "fromAssetsFailed": "Couldn't read your assets. Try again once you're online.",
+      "fromAssetsNone": "None of your assets is this module.",
+      "fromAssetsCount_one": "{{count}} in your assets. Pick one to use its rolls:",
+      "fromAssetsCount_other": "{{count}} in your assets. Pick one to use its rolls:",
+      "fromAssetsUnread_one": "{{count}} more couldn't be read.",
+      "fromAssetsUnread_other": "{{count}} more couldn't be read.",
+      "ownedItem": "{{base}} · {{mutaplasmid}}",
+      "ownedQuality": "avg {{pct}}%",
+      "badge": {
+        "rollsUnknown": "Rolls unknown",
+        "baseUnknown": "Base unknown",
+        "rollsUnknownTip": "Its rolls aren't known, so the stats use the base module's own values.",
+        "baseUnknownTip": "Its base module isn't known, so it adds nothing to the stats.",
+        "fixTip": "Set them with Mutate… in its menu."
+      }
     }
   },
   "skills": {
@@ -3554,7 +3599,7 @@
         "caption": "A live order book with jumps from you"
       },
       "skills": {
-        "alt": "The Skills page: the skill in training with its time left, the queue grouped by this week and the next three weeks, and the character\u2019s attributes.",
+        "alt": "The Skills page: the skill in training with its time left, the queue grouped by this week and the next three weeks, and the character’s attributes.",
         "caption": "A training queue you can read at a glance"
       },
       "mail": {

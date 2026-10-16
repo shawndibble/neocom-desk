@@ -79,6 +79,7 @@ import {
 import { FittingRing } from '@/features/fittings/FittingRing';
 import { FittingStatsSections } from '@/features/fittings/FittingStatsSections';
 import { FittingVariationsPanel } from '@/features/fittings/FittingVariationsPanel';
+import { FittingMutationPanel } from '@/features/fittings/FittingMutationPanel';
 import { FittingAffectedByPanel } from '@/features/fittings/FittingAffectedByPanel';
 import { FittingFightersPanel } from '@/features/fittings/FittingFightersPanel';
 import { StatsHeadingLabel } from '@/features/fittings/StatsHeadingLabel';
@@ -187,6 +188,7 @@ function FittingsPage() {
   // The module dialog's variations start folded: a tap on a module is
   // mostly for its state and ammo.
   const [variationsOpen, setVariationsOpen] = useState(false);
+  const [mutationOpen, setMutationOpen] = useState(false);
   const [affectedOpen, setAffectedOpen] = useState(false);
   // The filled slot whose module panel is open.
   const [moduleSlot, setModuleSlot] = useState<{ slot: FittingSlotKind; slotIndex: number } | null>(
@@ -309,6 +311,13 @@ function FittingsPage() {
     setRackSheet(null);
     setModuleSlot({ slot, slotIndex });
     setVariationsOpen(true);
+    setMutationOpen(false);
+  }, []);
+  const openMutation = useCallback((slot: FittingSlotKind, slotIndex: number) => {
+    setRackSheet(null);
+    setModuleSlot({ slot, slotIndex });
+    setVariationsOpen(false);
+    setMutationOpen(true);
   }, []);
   const { itemActions, fitAt, droneBay, noteRecent, defaultCharges } = useEditorItemActions({
     fitting,
@@ -324,6 +333,7 @@ function FittingsPage() {
     selectTarget,
     openCargoQuantity: setCargoQuantityFor,
     openVariations,
+    openMutation,
   });
 
   function openLibrary(action: LibraryAction) {
@@ -399,6 +409,7 @@ function FittingsPage() {
   function openModuleDialog(slot: FittingSlotKind, slotIndex: number, withVariations: boolean) {
     setModuleSlot({ slot, slotIndex });
     setVariationsOpen(withVariations);
+    setMutationOpen(false);
   }
 
   /** From a phone sheet (a rack's or the drones'): one sheet at a time, so the Add sheet takes over. */
@@ -1020,6 +1031,23 @@ function FittingsPage() {
                     <FittingVariationsPanel rows={variationRows} onSelect={swapVariation} />
                   </div>
                 </Disclosure>
+                {itemActions?.canMutate(openModule.typeId) && (
+                  <Disclosure
+                    label={t('fittings.mutation.title')}
+                    expanded={mutationOpen}
+                    onToggle={() => setMutationOpen((open) => !open)}
+                    className="rounded-xs border border-line"
+                  >
+                    <div className="p-2">
+                      <FittingMutationPanel
+                        module={openModule}
+                        catalogue={catalogue}
+                        edit={edit}
+                        characterId={activeCharacterId}
+                      />
+                    </div>
+                  </Disclosure>
+                )}
                 <Disclosure
                   label={t('fittings.affectedBy.title')}
                   expanded={affectedOpen}
