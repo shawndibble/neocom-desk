@@ -61,24 +61,47 @@ describe('loadTypeDetail', () => {
         [9, 350],
         [161, 27289],
       ],
+      effects: [12, 42],
+      defaultEffect: 12,
       volume: 27289,
+      packagedVolume: 2500,
     });
 
     // No ESI handler: an ESI read would fail the test on the unhandled request.
     expect(await loadTypeDetail(RIFTER)).toEqual({
       description: 'Baked.',
       volume: 27289,
+      packaged_volume: 2500,
       dogma_attributes: [
         { attribute_id: 9, value: 350 },
         { attribute_id: 161, value: 27289 },
       ],
+      dogma_effects: [
+        { effect_id: 12, is_default: true },
+        { effect_id: 42, is_default: false },
+      ],
     });
   });
 
-  it('leaves volume absent when the baked record has none, as ESI does', async () => {
-    mockedLoadTypeInfo.mockResolvedValue({ description: '', attributes: [] });
+  it('gives packaged volume as volume when the record carries no distinct one, as ESI does', async () => {
+    mockedLoadTypeInfo.mockResolvedValue({
+      description: '',
+      attributes: [],
+      effects: [],
+      volume: 0.01,
+    });
 
-    expect(await loadTypeDetail(RIFTER)).toEqual({ description: '', dogma_attributes: [] });
+    expect(await loadTypeDetail(RIFTER)).toMatchObject({ volume: 0.01, packaged_volume: 0.01 });
+  });
+
+  it('leaves both volumes absent when the baked record has none, as ESI does', async () => {
+    mockedLoadTypeInfo.mockResolvedValue({ description: '', attributes: [], effects: [] });
+
+    expect(await loadTypeDetail(RIFTER)).toEqual({
+      description: '',
+      dogma_attributes: [],
+      dogma_effects: [],
+    });
   });
 
   it('falls back to cached ESI for a type the shard does not carry', async () => {
@@ -132,6 +155,7 @@ describe('loadImplantTypeBonuses', () => {
       typeId === MEMORY_IMPLANT
         ? {
             description: '',
+            effects: [],
             attributes: [
               [176, 0],
               [177, 5],
@@ -166,6 +190,7 @@ describe('loadImplantBonuses', () => {
     });
     mockedLoadTypeInfo.mockImplementation(async (typeId) => ({
       description: '',
+      effects: [],
       attributes: typeId === MEMORY_IMPLANT ? [[177, 5]] : [[178, 1]],
     }));
     server.use(

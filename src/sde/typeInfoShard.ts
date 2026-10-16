@@ -1,6 +1,6 @@
 /**
- * Which `public/data/typeInfo/<n>.json` shard holds a type's baked Item Detail
- * data (issue #3882). `scripts/lib/typeInfo.mjs` mirrors the key;
+ * Which `public/data/typeInfo/<n>.json` shard holds a type's baked data
+ * (issues #3882, #3884). `scripts/lib/typeInfo.mjs` mirrors the key;
  * `typeInfoShards.test.ts` checks they agree.
  *
  * Range buckets of TYPE_INFO_SHARD_WIDTH ids, not `id % n`: neighbouring ids
@@ -19,13 +19,19 @@
 export const TYPE_INFO_SHARD_WIDTH = 2000;
 export const TYPE_INFO_SHARD_COUNT = 64;
 
-/** One published type's baked Item Detail data, as ESI's `/universe/types/{id}` would give it. */
+/** One published type's baked data, as ESI's `/universe/types/{id}` would give it. */
 export interface TypeInfoRecord {
   /** English description, newlines as ESI sends them. */
   description: string;
   /** `[attributeId, value]` pairs: ESI's `dogma_attributes`, including the type-row ones (4, 38, 161, 162). */
   attributes: [number, number][];
+  /** ESI's `dogma_effects` ids, ascending. Required: absent would read as "no effects". */
+  effects: number[];
+  /** The one effect ESI marks `is_default`, if any. */
+  defaultEffect?: number;
   volume?: number;
+  /** Only where it differs from `volume`. */
+  packagedVolume?: number;
 }
 
 /** One shard file: type id (as a string key) -> record. */

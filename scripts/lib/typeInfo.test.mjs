@@ -115,6 +115,30 @@ describe('bakeTypeInfoShards', () => {
     expect(shards[bucket(2256)]['2256']).not.toHaveProperty('volume');
   });
 
+  it('carries effect ids sorted, and the default one apart; [] for no dogma row', () => {
+    const dogma = {
+      ...rifterDogma,
+      dogmaEffects: [
+        { effectID: 42, isDefault: false },
+        { effectID: 12, isDefault: true },
+        { effectID: 16, isDefault: false },
+      ],
+    };
+    const shards = bakeTypeInfoShards([rifter, { _key: 34, published: true }], [dogma]);
+    expect(shards[bucket(587)]['587'].effects).toEqual([12, 16, 42]);
+    expect(shards[bucket(587)]['587'].defaultEffect).toBe(12);
+    expect(shards[bucket(34)]['34'].effects).toEqual([]);
+    expect(shards[bucket(34)]['34']).not.toHaveProperty('defaultEffect');
+  });
+
+  it('carries packaged volume only where it differs from volume', () => {
+    const merlin = { _key: 603, published: true, volume: 16500, packagedVolume: 2500 };
+    const tritanium = { _key: 34, published: true, volume: 0.01, packagedVolume: 0.01 };
+    const shards = bakeTypeInfoShards([merlin, tritanium], []);
+    expect(shards[bucket(603)]['603'].packagedVolume).toBe(2500);
+    expect(shards[bucket(34)]['34']).not.toHaveProperty('packagedVolume');
+  });
+
   it('writes keys in ascending type id order', () => {
     const shards = bakeTypeInfoShards(
       [

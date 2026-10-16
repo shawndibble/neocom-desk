@@ -40,7 +40,7 @@ describe('loadJumpCloneImplantSets', () => {
       },
     } as Awaited<ReturnType<typeof loadCharacterClones>>);
     vi.mocked(loadTypeInfo).mockImplementation(async (typeId) =>
-      typeId === MEMORY_IMPLANT ? { description: '', attributes: [[177, 5]] } : null
+      typeId === MEMORY_IMPLANT ? { description: '', effects: [], attributes: [[177, 5]] } : null
     );
     vi.mocked(loadUniverseType).mockImplementation(async (typeId) =>
       typeId === OCULAR_FILTER

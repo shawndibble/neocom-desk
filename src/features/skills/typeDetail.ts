@@ -1,7 +1,7 @@
 /**
- * Read path for a type's description, dogma attributes and volume; works
- * offline for any published type. Readers needing `name`, `dogma_effects` or
- * `packaged_volume` stay on `data.ts`'s cached ESI: the shards lack them.
+ * Read path for a type's description, dogma attributes and effects, and
+ * volumes; works offline for any published type. Readers needing `name` stay
+ * on `data.ts`'s cached ESI: the shards lack it.
  */
 import type { UniverseType } from '@/esi/endpoints';
 import type { Implants } from '@/engine/types';
@@ -11,7 +11,10 @@ import { loadCharacterImplants, loadUniverseType, loadUniverseTypeOnce } from '.
 import { extractAttributeBonuses, sumAttributeBonuses } from './dogma';
 
 /** The fields of ESI's `/universe/types/{id}` a baked record carries. */
-export type TypeDetail = Pick<UniverseType, 'description' | 'volume' | 'dogma_attributes'>;
+export type TypeDetail = Pick<
+  UniverseType,
+  'description' | 'volume' | 'packaged_volume' | 'dogma_attributes' | 'dogma_effects'
+>;
 
 export interface LoadTypeDetailOptions {
   /** On the ESI fallback, retry a failed read once (`loadUniverseType`), for one-at-a-time callers. */
@@ -21,8 +24,15 @@ export interface LoadTypeDetailOptions {
 function fromTypeInfo(record: TypeInfoRecord): TypeDetail {
   return {
     description: record.description,
-    ...(record.volume !== undefined && { volume: record.volume }),
+    ...(record.volume !== undefined && {
+      volume: record.volume,
+      packaged_volume: record.packagedVolume ?? record.volume,
+    }),
     dogma_attributes: record.attributes.map(([attribute_id, value]) => ({ attribute_id, value })),
+    dogma_effects: record.effects.map((effect_id) => ({
+      effect_id,
+      is_default: effect_id === record.defaultEffect,
+    })),
   };
 }
 
