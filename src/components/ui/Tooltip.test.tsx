@@ -28,6 +28,17 @@ describe('Tooltip', () => {
     expect(dialog).toContainElement(await screen.findByRole('tooltip'));
   });
 
+  it('shows no bubble when it has no content', async () => {
+    render(
+      <Tooltip content={null}>
+        <button type="button">Trigger</button>
+      </Tooltip>
+    );
+    fireEvent.pointerMove(screen.getByRole('button', { name: 'Trigger' }));
+    await act(async () => {});
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+  });
+
   it('reveals a role="tooltip" bubble on hover, wired to its trigger via aria-describedby', async () => {
     render(
       <Tooltip content="One-line explanation.">

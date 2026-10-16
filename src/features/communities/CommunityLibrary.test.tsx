@@ -1,4 +1,5 @@
-import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { db } from '@/db';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation } from 'react-router-dom';
@@ -44,16 +45,23 @@ vi.mock('@/features/route/currentSystem', () => ({
   useCurrentSystem: () => ({ systemId: 30000144, loaded: true }),
   useJumpRangeFilter: () => ({ status: 'off', allowed: null, jumps, jumpsStatus: 'ready' }),
 }));
+const live = vi.hoisted(() => ({ offline: false, unreadable: false }));
 vi.mock('./communityStore', () => ({
-  loadMemberLibraries: async () => [
-    {
-      uid: 'ann',
-      items: [
-        { typeId: 10, me: 0, te: 0, runs: -1, locationName: 'Jita IV', systemName: 'Jita' },
-        { typeId: 10, me: 10, te: 20, runs: 7, locationName: 'Efa VII', systemName: 'Efa' },
+  loadMemberLibrariesDetailed: async () => {
+    if (live.offline) throw new TypeError('Failed to fetch');
+    return {
+      libraries: [
+        {
+          uid: 'ann',
+          items: [
+            { typeId: 10, me: 0, te: 0, runs: -1, locationName: 'Jita IV', systemName: 'Jita' },
+            { typeId: 10, me: 10, te: 20, runs: 7, locationName: 'Efa VII', systemName: 'Efa' },
+          ],
+        },
       ],
-    },
-  ],
+      failedUids: live.unreadable ? ['ann'] : [],
+    };
+  },
 }));
 
 const members = [
@@ -270,5 +278,43 @@ describe('CommunityLibrary', () => {
       screen.getByRole('button', { name: en.communities.blueprints.browseAbout })
     ).toBeInTheDocument();
     expect(screen.queryByText(en.communities.blueprints.browseHint)).not.toBeInTheDocument();
+  });
+
+  describe('without a connection', () => {
+    afterEach(async () => {
+      live.offline = false;
+      live.unreadable = false;
+      await db.settings.clear();
+    });
+
+    it('shows the last libraries read, labelled, and saves them as they are read', async () => {
+      renderLibrary().unmount();
+      await vi.waitFor(async () =>
+        expect(await db.settings.get('communitySnapshot:1:libraries:c1')).toBeDefined()
+      );
+
+      live.offline = true;
+      renderLibrary();
+      const table = await screen.findByRole('table', { name: l.sharedLabel });
+      expect(within(table).getAllByRole('row')).toHaveLength(3);
+      expect(screen.getByText(en.common.offlineTitle)).toBeInTheDocument();
+    });
+
+    it('does not show the saved copy for one unreadable Member while online', async () => {
+      renderLibrary().unmount();
+      await vi.waitFor(async () =>
+        expect(await db.settings.get('communitySnapshot:1:libraries:c1')).toBeDefined()
+      );
+      live.unreadable = true;
+      renderLibrary();
+      await screen.findByRole('table', { name: l.sharedLabel });
+      expect(screen.queryByText(en.common.offlineTitle)).not.toBeInTheDocument();
+    });
+
+    it('says so when nothing was saved', async () => {
+      live.offline = true;
+      renderLibrary();
+      expect(await screen.findByText(l.loadFailed)).toBeInTheDocument();
+    });
   });
 });

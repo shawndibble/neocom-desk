@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GrantMissingLink } from '@/app/GrantMissingLink';
 import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
-import { Button, SlideOver } from '@/components/ui';
+import { SlideOver } from '@/components/ui';
 import { permissionsForEndpoints } from '@/esi/registry';
 import { pledgeEntryAfterManual } from '@/engine/communities/delivery';
 import {
@@ -44,6 +44,7 @@ import {
   setRequestClosed,
   updateMyPledge,
 } from './requestStore';
+import { NeedsConnectionButton } from './NeedsConnectionButton';
 
 const DELIVERY_GROUPS = permissionsForEndpoints(DELIVERY_ENDPOINTS);
 const SEND_MAIL = ['postCharacterMail'] as const;
@@ -357,14 +358,14 @@ export function RequestPanel({
                         count: Object.keys(pledge.lines).length,
                       })}
                     </span>
-                    <Button
+                    <NeedsConnectionButton
                       size="sm"
                       variant="ghost"
                       aria-label={t('communities.board.admin.removePledgeFor', { name })}
                       onClick={() => setRemoving({ kind: 'pledge', uid: pledge.uid, name })}
                     >
                       {t('communities.board.admin.removePledge')}
-                    </Button>
+                    </NeedsConnectionButton>
                   </li>
                 );
               })}
@@ -373,15 +374,19 @@ export function RequestPanel({
         )}
         {isAdmin && (
           <div>
-            <Button size="sm" variant="danger" onClick={() => setRemoving({ kind: 'request' })}>
+            <NeedsConnectionButton
+              size="sm"
+              variant="danger"
+              onClick={() => setRemoving({ kind: 'request' })}
+            >
               {t('communities.board.admin.removeRequest')}
-            </Button>
+            </NeedsConnectionButton>
           </div>
         )}
         {mine && (
           <div className="flex flex-wrap gap-2">
             {request.closed ? (
-              <Button
+              <NeedsConnectionButton
                 size="sm"
                 loading={busy === 'close'}
                 onClick={() =>
@@ -391,13 +396,13 @@ export function RequestPanel({
                 }
               >
                 {t('communities.board.reopen')}
-              </Button>
+              </NeedsConnectionButton>
             ) : (
               <>
-                <Button size="sm" onClick={onEdit}>
+                <NeedsConnectionButton size="sm" onClick={onEdit}>
                   {t('communities.board.edit')}
-                </Button>
-                <Button
+                </NeedsConnectionButton>
+                <NeedsConnectionButton
                   size="sm"
                   loading={busy === 'extend'}
                   onClick={() =>
@@ -405,8 +410,8 @@ export function RequestPanel({
                   }
                 >
                   {t('communities.board.extend')}
-                </Button>
-                <Button
+                </NeedsConnectionButton>
+                <NeedsConnectionButton
                   size="sm"
                   variant="ghost"
                   loading={busy === 'close'}
@@ -417,7 +422,7 @@ export function RequestPanel({
                   }
                 >
                   {t('communities.board.close')}
-                </Button>
+                </NeedsConnectionButton>
               </>
             )}
           </div>

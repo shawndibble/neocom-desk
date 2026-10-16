@@ -235,6 +235,23 @@ describe('removeCharacter', () => {
     expect(await db.netWorthSnapshots.where('characterId').equals(2).count()).toBe(1);
   });
 
+  it("deletes the removed Character's saved Community snapshots and no one else's", async () => {
+    await seedCharacter(1);
+    await seedCharacter(2);
+    await db.settings.bulkPut([
+      { key: 'communitySnapshot:1:list', value: [] },
+      { key: 'communitySnapshot:1:members:c1', value: [] },
+      { key: 'communitySnapshot:2:list', value: [] },
+    ]);
+
+    await removeCharacter(1);
+
+    const keys = (await db.settings.toArray()).map((row) => row.key);
+    expect(keys.filter((key) => key.startsWith('communitySnapshot:'))).toEqual([
+      'communitySnapshot:2:list',
+    ]);
+  });
+
   it('leaves remote sync data to the inactivity purge: no remote call, no pending marker', async () => {
     await seedCharacter(1);
 
