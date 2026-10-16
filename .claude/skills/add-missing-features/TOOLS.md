@@ -317,9 +317,13 @@ known-live prior status and on the character being issuer or acceptor (the
 endpoint also returns contracts merely offered TO them),
 feed-on/browser-off. #1092 bug — an accepted courier's Character Board countdown
 shows the offer expiry, not `date_accepted + days_to_complete`; symptom is
-UNDER-warning. #3908 NARROW — Journal breakdown gains This/All Characters and
-nets own-Character transfers into one line (N of M loaded note; corp journal
-untouched); PLEX bought as one row. #3909 SHIP — wallet journal +
+UNDER-warning. #3908 NARROW — Where the ISK went becomes a side panel that
+filters the Journal (owner: no new Wallet tab, decision fatigue); This/All
+Characters on the Journal; own-Character transfers netted (N of M loaded;
+corp journal untouched); PLEX bought as one row. #3914 — hideable daily
+In/Out chart in that panel, click a day to filter (owner ask; position, not
+colour, carries In/Out). #3915 — phone Journal as day-grouped two-line rows;
+sort by Date, Amount, Type only. #3909 SHIP — wallet journal +
 transactions archived 365 days device-only, poll-fed, gaps shown. #3910 NARROW
 — "Your Characters" stats section on an open Fitting: can fly, missing
 skills, training time; chips + search for 20+ Characters (owner: a popover

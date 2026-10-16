@@ -1,10 +1,13 @@
-# Wallet › Journal: Where the ISK went across all Characters
+# Wallet › Journal: Where the ISK went side panel, all Characters, phone list
 
-Issue: #3908. Source: `src/mockups/WalletJournalAllCharacters.stories.tsx` (`mockups-walletjournalallcharacters--proposed`, `--partial-coverage`). Sample data; the ticket text wins over the picture.
+Issues: #3908 (side panel, Character filter, filter chips, netting), #3914 (daily chart, hideable), #3915 (phone day-grouped list). Source: `src/mockups/WalletJournalAllCharacters.stories.tsx`. Sample data; the ticket text wins over the picture.
 
-New components: `BetweenYourCharactersRow` (the collapsed line under the table) and `CharacterCoverageNote` (the "1 of 2 loaded" readout). The Character filter is the existing `CharacterFilterControl`; the table is the existing breakdown with one new row, "PLEX bought". Today's page renders under the proposal in every shot.
+New components: `IskBreakdownPanel` (side panel body), `IskFlowChart` (#3914), `ActiveFilterRow` (removable chips and the filtered In / Out / Net line), `BetweenYourCharactersRow`. Everything else is an existing primitive (`SlideOver`, `DataTable`, `FilterChip`, `ProgressBar`, `StatChip`, `CharacterFilterControl`).
 
-| | 1440 | 390 |
+Patterns from Mobbin: Origin and Copilot (side panel over the list), Vivid and Copilot (removable filter chip), Lloyds and Monzo (filtered totals), YNAB (category list with share bars), Copilot, Monzo and Starling (day-grouped phone list).
+
+| | Desktop 1440 | Phone 390 |
 |---|---|---|
-| Proposed, All Characters | ![](proposed-1440.png) | ![](proposed-390.png) |
-| One Character without the wallet permission | ![](partial-1440.png) | ![](partial-390.png) |
+| Panel open, Bounty prizes picked (story `--panel-open`, `--panel-phone`) | ![](panel-open-1440.png) | ![](panel-phone-390.png) |
+| Chart hidden (`--chart-hidden`) | ![](chart-hidden-1440.png) | ![](chart-hidden-390.png) |
+| Journal, panel closed (`--journal-only`, `--journal-phone`) | ![](journal-only-1440.png) | ![](journal-phone-390.png) |
