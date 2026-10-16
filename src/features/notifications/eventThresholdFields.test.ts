@@ -6,7 +6,7 @@ import {
   defaultedThresholds,
   isCharacterEventThresholds,
   setThresholds,
-} from './eventThresholds';
+} from './eventThresholdFields';
 import { ENDING_SOON_MS } from '@/features/skills/queueStatus';
 
 describe('THRESHOLD_FIELDS', () => {

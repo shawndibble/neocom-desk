@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { LandingFaq } from './LandingFaq';
-import { LANDING_FAQ } from './landingFaq';
+import { LANDING_FAQ } from './landingFaqEntries';
 
 describe('LandingFaq', () => {
   it('lists 4 to 6 closed questions', () => {

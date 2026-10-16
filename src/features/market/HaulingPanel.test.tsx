@@ -1,14 +1,16 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { configureClipboard } from '@/lib/clipboard';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { TRADE_HUBS } from '@/market/hubs';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useHaulingCargo } from './haulingCargo';
-import type { HaulingScanRow } from './haulingData';
+import type { ListHaulingScanRow } from './haulingData';
 import type { HaulingScanState } from './useHaulingScan';
+import type { HaulingFillScanState } from './useHaulingFillScan';
+import type { HubJumps } from './useHubJumps';
 import { fakeItemActions, FakeItemActions } from './__fixtures__/itemActions';
 
 const FEES = {
@@ -21,7 +23,7 @@ const JITA = TRADE_HUBS.find((h) => h.id === 'jita')!;
 const AMARR = TRADE_HUBS.find((h) => h.id === 'amarr')!;
 const DODIXIE = TRADE_HUBS.find((h) => h.id === 'dodixie')!;
 
-const SCAN_ROW: HaulingScanRow = {
+const SCAN_ROW: ListHaulingScanRow = {
   mode: 'list',
   fromHub: JITA,
   toHub: AMARR,
@@ -44,6 +46,16 @@ const SCAN_ROW: HaulingScanRow = {
     daysToSell: 1,
     demandCapUnits: 70,
   },
+};
+
+/** From another category: what the fill offers. */
+const FILL_ROW: ListHaulingScanRow = {
+  ...SCAN_ROW,
+  typeId: 4051,
+  name: 'Nitrogen Fuel Block',
+  groupId: 1136,
+  categoryId: 4,
+  sale: { ...SCAN_ROW.sale, demandCapUnits: 40 },
 };
 
 const READY: HaulingScanState = {
@@ -79,6 +91,7 @@ const ANY_FROM_READY: HaulingScanState = {
   scan: { rows: [{ ...SCAN_ROW, fromHub: DODIXIE, toHub: JITA }], scanned: 1, fetchedAt: 0 },
 };
 
+let mainState: HaulingScanState | null = null;
 const scanModes: string[] = [];
 const scanCalls: { from: unknown; to: unknown; enabled: boolean }[] = [];
 vi.mock('./useHaulingScan', () => ({
@@ -91,12 +104,51 @@ vi.mock('./useHaulingScan', () => ({
   ) => {
     scanModes.push(mode);
     scanCalls.push({ from, to, enabled });
-    const state = from === 'any' ? ANY_FROM_READY : mode === 'instant' ? INSTANT_READY : READY;
+    const state =
+      mainState ?? (from === 'any' ? ANY_FROM_READY : mode === 'instant' ? INSTANT_READY : READY);
     return { state, refresh: vi.fn() };
   },
   useHaulingFees: () => ({ accountingLevel: 5, brokerRelationsLevel: 4, at: () => FEES }),
 }));
-vi.mock('@/sde/loadMarketSde', () => ({ loadMarketGroups: vi.fn(async () => []) }));
+
+let fillState: HaulingFillScanState = { status: 'idle' };
+const fillCalls: { enabled: boolean }[] = [];
+const fillRefresh = vi.fn();
+vi.mock('./useHaulingFillScan', () => ({
+  useHaulingFillScan: (
+    _from: unknown,
+    _to: unknown,
+    _cat: unknown,
+    _mode: unknown,
+    enabled: boolean
+  ) => {
+    fillCalls.push({ enabled });
+    return { state: enabled ? fillState : { status: 'idle' }, refresh: fillRefresh };
+  },
+}));
+
+const jumpCalls: [number | null, number | null][] = [];
+vi.mock('./useHubJumps', () => ({
+  useHubJumps: (from: number | null, to: number | null): HubJumps => {
+    jumpCalls.push([from, to]);
+    return from === null || to === null
+      ? { status: 'none' }
+      : { status: 'known', jumps: 9, preference: 'shortest' };
+  },
+}));
+
+let phone = false;
+vi.mock('@/lib/useIsPhone', () => ({ useIsPhone: () => phone }));
+
+vi.mock('@/sde/loadMarketSde', () => ({
+  loadMarketGroups: vi.fn(async () => [
+    { id: 11, name: 'Ammunition & Charges', parentId: null, hasTypes: true },
+    { id: 1320, name: 'Planetary Infrastructure', parentId: null, hasTypes: true },
+  ]),
+  loadMarketTypes: vi.fn(async () => [
+    { typeId: 4051, name: 'Nitrogen Fuel Block', marketGroupId: 1320, volume: 5 },
+  ]),
+}));
 
 const { HaulingPanel } = await import('./HaulingPanel');
 
@@ -112,72 +164,148 @@ function renderPanel(query = 'from=jita&to=amarr') {
   return { actions };
 }
 
-describe('HaulingPanel item rows', () => {
-  beforeEach(() => {
-    useActiveCharacter.setState({ activeCharacterId: null });
-  });
+const row = (name: RegExp | string = /Damage Control II/) => screen.getByRole('row', { name });
+const bringBox = (item = 'Damage Control II') =>
+  screen.getByRole('textbox', { name: `Quantity of ${item} to bring` });
 
-  it('keeps the item name plain; the expanded detail links to Market', () => {
-    renderPanel();
-    expect(screen.queryByRole('link', { name: 'Damage Control II' })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('row', { name: /Damage Control II/ }));
-    const link = screen.getByRole('link', { name: /Price history and all orders/ });
-    expect(link.getAttribute('href')).toMatch(/^\/market\/browser\?.*type=2048/);
+function setCargo(m3: number) {
+  useHaulingCargo.setState({
+    hydrated: true,
+    value: { label: 'Hold', holds: [{ kind: 'general', capacityM3: m3 }] },
   });
+}
 
-  it('lists a Route Safety link per hub in the expanded detail', () => {
-    renderPanel();
-    fireEvent.click(screen.getByRole('row', { name: /Damage Control II/ }));
-    const links = screen.getAllByRole('link', { name: /^Route safety:/ });
-    expect(links).toHaveLength(2);
-    for (const link of links) expect(link.getAttribute('href')).toMatch(/^\/travel/);
-  });
+beforeEach(() => {
+  useActiveCharacter.setState({ activeCharacterId: null });
+  mainState = null;
+  fillState = { status: 'idle' };
+  fillCalls.length = 0;
+  fillRefresh.mockClear();
+  jumpCalls.length = 0;
+  phone = false;
+});
+afterEach(() => {
+  useHaulingCargo.setState({ value: null });
+  configureClipboard(null);
+});
 
-  it('carries the item context menu on every row', async () => {
+describe('HaulingPanel rows select, the rail shows the detail', () => {
+  it('has no row ⋮ or row menu; the item’s menu lives in its detail', async () => {
+    const user = userEvent.setup();
     const { actions } = renderPanel();
-    fireEvent.contextMenu(screen.getByRole('row', { name: /Damage Control II/ }));
+    expect(screen.queryByRole('button', { name: /more actions/i })).toBeNull();
+    // The name is the row's handle, not a link.
+    expect(screen.queryByRole('link', { name: 'Damage Control II' })).toBeNull();
 
-    expect(await screen.findByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Show info' }));
-    expect(actions.showInfo).toHaveBeenCalledWith(2048, 'Damage Control II');
-  });
-
-  it('asks for the blueprint catalog the first time a row menu opens', () => {
-    const { actions } = renderPanel();
-    fireEvent.contextMenu(screen.getByRole('row', { name: /Damage Control II/ }));
+    await user.click(row());
+    await user.click(screen.getByRole('button', { name: 'More actions for Damage Control II' }));
     expect(actions.requestBlueprints).toHaveBeenCalled();
+    expect(await screen.findByRole('menuitem', { name: 'View in Market' })).toBeInTheDocument();
   });
 
-  it('offers a visible More actions button on each row', () => {
+  it('a click selects the row and shows its detail in the rail; a second click clears it', async () => {
+    const user = userEvent.setup();
     renderPanel();
-    expect(screen.getByRole('button', { name: /more actions/i })).toBeInTheDocument();
+    await user.click(row());
+    expect(row()).toHaveAttribute('aria-current', 'true');
+    expect(
+      screen.getByRole('link', { name: 'Price history and orders in Amarr' })
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Trip' })).toBeInTheDocument();
+
+    await user.click(row());
+    expect(row()).not.toHaveAttribute('aria-current');
+    expect(screen.queryByRole('link', { name: /Price history/ })).toBeNull();
+  });
+
+  it('opens each row’s detail with its folds closed', async () => {
+    const user = userEvent.setup();
+    mainState = {
+      status: 'ready',
+      scan: {
+        rows: [SCAN_ROW, { ...SCAN_ROW, typeId: 2205, name: 'Hammerhead II' }],
+        scanned: 2,
+        fetchedAt: 0,
+      },
+    };
+    renderPanel();
+    await user.click(row());
+    await user.click(screen.getByRole('button', { name: 'Show the math' }));
+    expect(screen.getByRole('button', { name: 'Show the math' })).toHaveAttribute(
+      'aria-expanded',
+      'true'
+    );
+    await user.click(row(/Hammerhead II/));
+    expect(screen.getByRole('button', { name: 'Show the math' })).toHaveAttribute(
+      'aria-expanded',
+      'false'
+    );
+  });
+
+  it('the Trip crumb goes back to the trip but keeps the row selected', async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    await user.click(row());
+    await user.click(screen.getByRole('button', { name: 'Trip' }));
+    expect(screen.queryByRole('link', { name: /Price history/ })).toBeNull();
+    expect(screen.getByText('Select an item to see its price math.')).toBeInTheDocument();
+    expect(row()).toHaveAttribute('aria-current', 'true');
+  });
+
+  it('ticking a row or typing in Bring does not select it', async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    await user.click(screen.getByRole('checkbox', { name: /Include Damage Control II/ }));
+    await user.click(bringBox());
+    expect(row()).not.toHaveAttribute('aria-current');
   });
 });
 
-describe('HaulingPanel trip summary', () => {
-  beforeEach(() => {
-    useActiveCharacter.setState({ activeCharacterId: null });
+describe('HaulingPanel table', () => {
+  it('lists for sale by default: Profit with its margin, m³, Days; ISK/m³ and Margin start hidden', () => {
+    renderPanel();
+    expect(scanModes.at(-1)).toBe('list');
+    for (const name of [/^Buy/, /^Sell/, /^Profit/, /^m³/, /^Days/, /^Bring/]) {
+      expect(screen.getByRole('columnheader', { name })).toBeInTheDocument();
+    }
+    expect(screen.queryByRole('columnheader', { name: /ISK\/m³/ })).toBeNull();
+    expect(screen.queryByRole('columnheader', { name: /^Margin/ })).toBeNull();
+    // 70 units (a week of sales), 350 m³, Profit with the margin under it.
+    expect(row()).toHaveTextContent('Sells most days');
+    expect(row()).toHaveTextContent('350');
+    expect(row()).toHaveTextContent(/\+[\d,]+.*% margin/);
+    expect(bringBox()).toHaveValue('70');
   });
-  afterEach(() => configureClipboard(null));
 
-  it('select all in the summary row unticks and reticks every row', async () => {
+  it('selling into buy orders hides Days, and the detail shows the buy orders', async () => {
+    const user = userEvent.setup();
+    renderPanel('from=jita&to=amarr&mode=instant');
+    expect(scanModes.at(-1)).toBe('instant');
+    expect(screen.queryByRole('columnheader', { name: /^Days/ })).toBeNull();
+    // The realised buy-order price: 10 units sold at 130.
+    expect(row()).toHaveTextContent('130.00');
+    await user.click(row());
+    expect(screen.getByText('Buy orders in Amarr')).toBeInTheDocument();
+  });
+
+  it('select all in the strip unticks and reticks every row', async () => {
     const user = userEvent.setup();
     renderPanel();
-    const all = screen.getByRole('checkbox', { name: /select all.*[0-9]+ of [0-9]+/i });
-    const row = screen.getByRole('checkbox', { name: /Include Damage Control II/ });
+    const all = screen.getByRole('checkbox', { name: 'Select all' });
+    const tick = screen.getByRole('checkbox', { name: /Include Damage Control II/ });
     expect(all).toBeChecked();
+    expect(screen.getByText('1 of 1 in the trip')).toBeInTheDocument();
     await user.click(all);
-    expect(row).not.toBeChecked();
-    expect(screen.getByText('0 of 1')).toBeInTheDocument();
-    expect(row.closest('tr')?.className).not.toMatch(/opacity-/);
-    expect(
-      screen.getByRole('textbox', { name: 'Quantity of Damage Control II to bring' })
-    ).toHaveValue('');
+    expect(tick).not.toBeChecked();
+    expect(screen.getByText('0 of 1 in the trip')).toBeInTheDocument();
+    expect(bringBox()).toHaveValue('');
     await user.click(all);
-    expect(row).toBeChecked();
+    expect(tick).toBeChecked();
   });
+});
 
-  it('keeps Fill my hold, Clear all and the multibuy list in the actions menu', async () => {
+describe('HaulingPanel trip rail', () => {
+  it('keeps Fill my hold, Clear all and the multibuy list in the trip’s menu', async () => {
     const user = userEvent.setup();
     renderPanel();
     expect(screen.queryByLabelText('Multibuy list')).toBeNull();
@@ -187,7 +315,7 @@ describe('HaulingPanel trip summary', () => {
     expect(screen.getByRole('menuitem', { name: 'Clear all' })).toBeInTheDocument();
     await user.click(screen.getByRole('menuitem', { name: 'Show multibuy list' }));
 
-    expect(screen.getByLabelText('Multibuy list')).toHaveTextContent('Damage Control II');
+    expect(screen.getByLabelText('Multibuy list')).toHaveTextContent('Damage Control II 70');
   });
 
   it('opens the multibuy list when the clipboard refuses the copy', async () => {
@@ -196,78 +324,24 @@ describe('HaulingPanel trip summary', () => {
       throw new Error('denied');
     });
     renderPanel();
-
     await user.click(screen.getByRole('button', { name: 'Copy multibuy list' }));
-
     expect(await screen.findByLabelText('Multibuy list')).toHaveTextContent('Damage Control II');
   });
-});
 
-describe('HaulingPanel modes', () => {
-  beforeEach(() => {
-    useActiveCharacter.setState({ activeCharacterId: null });
-    scanModes.length = 0;
-  });
-
-  it('lists for sale by default, with Days (carrying demand) and ISK/m³ columns', () => {
+  it('names the lane and its profit per jump', () => {
     renderPanel();
-    expect(scanModes.at(-1)).toBe('list');
-    expect(screen.getByRole('columnheader', { name: /^Days/ })).toBeInTheDocument();
-    expect(screen.getByRole('columnheader', { name: /ISK\/m³/ })).toBeInTheDocument();
-    expect(screen.getByRole('row', { name: /Damage Control II/ })).toHaveTextContent(
-      'Sells most days'
-    );
+    expect(jumpCalls.at(-1)).toEqual([JITA.systemId, AMARR.systemId]);
+    expect(screen.getByText(/Jita to Amarr · 9 jumps/)).toBeInTheDocument();
+    expect(screen.getByText('Profit per jump (9)')).toBeInTheDocument();
   });
 
-  it('selling into buy orders scans that mode and hides Days and Demand', () => {
-    renderPanel('from=jita&to=amarr&mode=instant');
-    expect(scanModes.at(-1)).toBe('instant');
-    expect(screen.queryByRole('columnheader', { name: /^Days/ })).toBeNull();
-    expect(screen.queryByRole('columnheader', { name: /^Demand/ })).toBeNull();
-    expect(screen.getByRole('columnheader', { name: /ISK\/m³/ })).toBeInTheDocument();
-    // The realised buy-order price: 10 units sold at 130.
-    expect(screen.getByRole('row', { name: /Damage Control II/ })).toHaveTextContent('130.00');
-  });
-});
-
-describe('HaulingPanel, Any hub', () => {
-  beforeEach(() => {
-    useActiveCharacter.setState({ activeCharacterId: null });
-    scanCalls.length = 0;
-  });
-
-  it('reads Any from the link, scans with it, and names each row hub', () => {
-    renderPanel('from=any&to=jita');
-    expect(scanCalls.at(-1)).toMatchObject({ from: 'any', to: JITA });
-    expect(screen.getByRole('combobox', { name: 'From' })).toHaveTextContent('Any hub');
-    expect(screen.getByRole('columnheader', { name: /^Hub/ })).toBeInTheDocument();
-    expect(screen.getByRole('row', { name: /Damage Control II/ })).toHaveTextContent('Dodixie');
-  });
-
-  it('picking Any hub writes it to the link and rescans with it', async () => {
-    const user = userEvent.setup();
-    renderPanel('from=jita&to=amarr');
-    await user.click(screen.getByRole('combobox', { name: 'From' }));
-    await user.click(screen.getByRole('option', { name: 'Any hub' }));
-    expect(scanCalls.at(-1)).toMatchObject({ from: 'any', to: AMARR });
-    expect(screen.getByRole('combobox', { name: 'From' })).toHaveTextContent('Any hub');
-  });
-
-  it('shows no Hub column on a plain lane', () => {
+  it('with no Cargo Space set, offers no fill', () => {
     renderPanel();
-    expect(screen.queryByRole('columnheader', { name: /^Hub/ })).toBeNull();
+    expect(screen.getByText('Cargo value')).toBeInTheDocument();
+    expect(screen.queryByText('Fill the free space')).toBeNull();
   });
 
-  it('refuses Any at both ends with a message, and runs no scan', () => {
-    renderPanel('from=any&to=any');
-    expect(screen.getByText('Any hub works at one end only')).toBeInTheDocument();
-    expect(scanCalls.every((call) => !call.enabled)).toBe(true);
-  });
-});
-
-describe('HaulingPanel, a Cargo Space of several holds', () => {
-  beforeEach(() => {
-    useActiveCharacter.setState({ activeCharacterId: null });
+  it('says which hold each plan line rides in, one bar per hold', async () => {
     useHaulingCargo.setState({
       hydrated: true,
       value: {
@@ -278,10 +352,6 @@ describe('HaulingPanel, a Cargo Space of several holds', () => {
         ],
       },
     });
-  });
-  afterEach(() => useHaulingCargo.setState({ value: null }));
-
-  it('shows one fill bar per hold, leaving a hold no item fits empty', () => {
     renderPanel();
     // Damage Control II is a module: it fills the cargo hold, never the ammo hold.
     expect(
@@ -290,24 +360,233 @@ describe('HaulingPanel, a Cargo Space of several holds', () => {
     expect(
       screen.getByRole('img', { name: 'Ammo hold: 0 of 41,000 cubic metres used' })
     ).toBeInTheDocument();
-  });
-
-  it('says which hold each plan line rides in', async () => {
-    renderPanel();
-    await userEvent.hover(
-      screen.getByRole('textbox', { name: 'Quantity of Damage Control II to bring' })
-    );
+    await userEvent.hover(bringBox());
     expect(await screen.findByRole('tooltip')).toHaveTextContent(
       '300 m³ · in Cargo hold · limited by space'
     );
   });
 });
 
-describe('HaulingPanel data age (#3534)', () => {
-  beforeEach(() => {
-    useActiveCharacter.setState({ activeCharacterId: null });
+describe('HaulingPanel fill the free space', () => {
+  it('scans only when asked: idle, then loading', async () => {
+    const user = userEvent.setup();
+    setCargo(1000);
+    fillState = { status: 'loading', progress: { stage: 'prices', done: 1, total: 3 } };
+    renderPanel();
+    expect(fillCalls.every((c) => !c.enabled)).toBe(true);
+    // 1,000 m³ less Damage Control II's 350.
+    expect(screen.getByText(/fit the free 650 m³/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Find items to fill it' }));
+    expect(fillCalls.at(-1)).toEqual({ enabled: true });
+    expect(screen.queryByRole('button', { name: /Find items/ })).toBeNull();
   });
 
+  it('offers other categories’ items, and Add puts the ticked ones in the trip as offered', async () => {
+    const user = userEvent.setup();
+    setCargo(1000);
+    fillState = {
+      status: 'ready',
+      scan: { rows: [FILL_ROW], scanned: 1, fetchedAt: 0 },
+    };
+    renderPanel();
+    await user.click(screen.getByRole('button', { name: 'Find items to fill it' }));
+
+    const list = screen.getByRole('list', { name: 'Items that fit the free space' });
+    expect(within(list).getByText('Nitrogen Fuel Block')).toBeInTheDocument();
+    expect(within(list).getByText('200 m³')).toBeInTheDocument();
+    expect(await within(list).findByText('· Planetary Infrastructure')).toBeInTheDocument();
+    expect(screen.getByText(/with the fill/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Add 1 · +200 m³' }));
+
+    expect(row(/Nitrogen Fuel Block/)).toHaveTextContent('Added from Planetary Infrastructure');
+    expect(bringBox('Nitrogen Fuel Block')).toHaveValue('40');
+    // The plan already shipped stays as it was.
+    expect(bringBox()).toHaveValue('70');
+    expect(screen.getByText('2 of 2 in the trip')).toBeInTheDocument();
+    expect(screen.getByText('Nothing else on this lane fits.')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Hauling actions' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Show multibuy list' }));
+    expect(screen.getByLabelText('Multibuy list')).toHaveTextContent('Nitrogen Fuel Block 40');
+  });
+
+  it('sizes the ticked items again: unticking one frees its room for the rest', async () => {
+    const user = userEvent.setup();
+    setCargo(1000);
+    // Two of 500 m³ each for the 650 m³ free: the second gets only what is left.
+    const big = (typeId: number, name: string, price: number): ListHaulingScanRow => ({
+      ...FILL_ROW,
+      typeId,
+      name,
+      sale: { ...FILL_ROW.sale, price, demandCapUnits: 100 },
+    });
+    fillState = {
+      status: 'ready',
+      scan: {
+        rows: [big(4051, 'Nitrogen Fuel Block', 160), big(4246, 'Hydrogen Fuel Block', 150)],
+        scanned: 2,
+        fetchedAt: 0,
+      },
+    };
+    renderPanel();
+    await user.click(screen.getByRole('button', { name: 'Find items to fill it' }));
+    const list = screen.getByRole('list', { name: 'Items that fit the free space' });
+    expect(within(list).getByText('150 m³')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('checkbox', { name: 'Nitrogen Fuel Block' }));
+    expect(within(list).getAllByText('500 m³')).toHaveLength(2);
+    expect(within(list).queryByText('150 m³')).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Add 1 · +500 m³' }));
+    expect(bringBox('Hydrogen Fuel Block')).toHaveValue('100');
+  });
+
+  it('drops the fill and the added items with a new lane, and with a reload', async () => {
+    const user = userEvent.setup();
+    setCargo(1000);
+    fillState = { status: 'ready', scan: { rows: [FILL_ROW], scanned: 1, fetchedAt: 0 } };
+    let info: { refresh: () => void } | null = null;
+    render(
+      <MemoryRouter initialEntries={['/travel/hauling?from=jita&to=amarr']}>
+        <FakeItemActions actions={fakeItemActions()}>
+          <HaulingPanel onRefreshInfoChange={(next) => (info = next)} />
+        </FakeItemActions>
+      </MemoryRouter>
+    );
+    const addOne = async () => {
+      await user.click(screen.getByRole('button', { name: 'Find items to fill it' }));
+      await user.click(screen.getByRole('button', { name: /^Add 1/ }));
+      expect(row(/Nitrogen Fuel Block/)).toBeInTheDocument();
+    };
+
+    await addOne();
+    act(() => info!.refresh());
+    expect(screen.queryByRole('row', { name: /Nitrogen Fuel Block/ })).toBeNull();
+    // Add's pins go with the rows: nothing is left edited for Fill my hold to undo.
+    await user.click(screen.getByRole('button', { name: 'Hauling actions' }));
+    expect(screen.getByRole('menuitem', { name: 'Fill my hold' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
+    await user.keyboard('{Escape}');
+
+    await addOne();
+    await user.click(screen.getByRole('combobox', { name: 'From' }));
+    await user.click(screen.getByRole('option', { name: 'Dodixie' }));
+    expect(screen.queryByRole('row', { name: /Nitrogen Fuel Block/ })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Find items to fill it' })).toBeInTheDocument();
+  });
+
+  it('an unticked item is not added', async () => {
+    const user = userEvent.setup();
+    setCargo(1000);
+    fillState = { status: 'ready', scan: { rows: [FILL_ROW], scanned: 1, fetchedAt: 0 } };
+    renderPanel();
+    await user.click(screen.getByRole('button', { name: 'Find items to fill it' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Nitrogen Fuel Block' }));
+    expect(screen.getByRole('button', { name: /^Add 0/ })).toBeDisabled();
+  });
+
+  it('retries a failed scan with a refresh', async () => {
+    const user = userEvent.setup();
+    setCargo(1000);
+    fillState = { status: 'error' };
+    renderPanel();
+    await user.click(screen.getByRole('button', { name: 'Find items to fill it' }));
+    await user.click(within(screen.getByRole('alert')).getByRole('button', { name: 'Try again' }));
+    expect(fillRefresh).toHaveBeenCalled();
+  });
+
+  it('is not offered with Any hub at an end: it would scan every hub', () => {
+    setCargo(1000);
+    renderPanel('from=any&to=jita');
+    expect(screen.queryByText('Fill the free space')).toBeNull();
+  });
+
+  it('is not offered for Everything, which leaves no other category', () => {
+    setCargo(1000);
+    renderPanel('from=jita&to=amarr&cat=0');
+    expect(screen.queryByText('Fill the free space')).toBeNull();
+  });
+});
+
+describe('HaulingPanel on a phone', () => {
+  it('has no rail: a trip bar opens the trip, and a card opens its detail in a sheet', async () => {
+    phone = true;
+    const user = userEvent.setup();
+    renderPanel();
+    expect(screen.queryByText('Select an item to see its price math.')).toBeNull();
+    const bar = screen.getByRole('region', { name: 'Trip' });
+    expect(within(bar).getByRole('button', { name: 'Copy multibuy list' })).toBeInTheDocument();
+
+    await user.click(row());
+    const sheet = screen.getByRole('dialog', { name: 'Damage Control II' });
+    // The item's ⋮ rides in the sheet's title row, once.
+    expect(
+      within(sheet).getAllByRole('button', { name: 'More actions for Damage Control II' })
+    ).toHaveLength(1);
+    expect(
+      within(sheet).getByRole('link', { name: 'Price history and orders in Amarr' })
+    ).toBeInTheDocument();
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).toBeNull();
+
+    await user.click(within(bar).getByRole('button', { name: /Trip details/ }));
+    const trip = screen.getByRole('dialog', { name: 'Trip' });
+    expect(within(trip).getByText('Profit')).toBeInTheDocument();
+  });
+});
+
+describe('HaulingPanel, Any hub', () => {
+  it('reads Any from the link, names each row’s hub, and shows no per-jump figure', () => {
+    renderPanel('from=any&to=jita');
+    expect(scanCalls.at(-1)).toMatchObject({ from: 'any', to: JITA });
+    expect(screen.getByRole('combobox', { name: 'From' })).toHaveTextContent('Any hub');
+    expect(screen.getByRole('columnheader', { name: /^Hub/ })).toBeInTheDocument();
+    expect(row()).toHaveTextContent('Dodixie');
+    expect(jumpCalls.at(-1)).toEqual([null, null]);
+    expect(screen.queryByText(/Profit per jump/)).toBeNull();
+  });
+
+  it('picking Any hub writes it to the link and rescans with it', async () => {
+    const user = userEvent.setup();
+    renderPanel('from=jita&to=amarr');
+    await user.click(screen.getByRole('combobox', { name: 'From' }));
+    await user.click(screen.getByRole('option', { name: 'Any hub' }));
+    expect(scanCalls.at(-1)).toMatchObject({ from: 'any', to: AMARR });
+  });
+
+  it('refuses Any at both ends with a message, and runs no scan', () => {
+    scanCalls.length = 0;
+    renderPanel('from=any&to=any');
+    expect(screen.getByText('Any hub works at one end only')).toBeInTheDocument();
+    expect(scanCalls.every((call) => !call.enabled)).toBe(true);
+  });
+});
+
+describe('HaulingPanel states', () => {
+  it('says so for the same hub at both ends', () => {
+    renderPanel('from=jita&to=jita');
+    expect(screen.queryByRole('table')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Copy multibuy list' })).toBeNull();
+  });
+
+  it('offers a retry when the scan fails', () => {
+    mainState = { status: 'error' };
+    renderPanel();
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Copy multibuy list' })).toBeNull();
+  });
+
+  it('shows the empty state, with a reset, when nothing passes the filters', () => {
+    mainState = { status: 'ready', scan: { rows: [], scanned: 0, fetchedAt: 0 } };
+    renderPanel();
+    expect(screen.queryByRole('table')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Reset filters' })).toBeInTheDocument();
+  });
+});
+
+describe('HaulingPanel data age (#3534)', () => {
   it('hands the ready scan’s fetchedAt up to the page header instead of badging its own filter bar', () => {
     const onRefreshInfoChange = vi.fn();
     const { container } = render(

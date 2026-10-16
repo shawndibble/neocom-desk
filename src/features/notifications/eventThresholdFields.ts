@@ -81,7 +81,7 @@ export const DEFAULT_INCURSION_NEARBY_JUMPS = 5;
  * its own literal rather than importing that constant: this module
  * deliberately imports nothing at runtime (see the file's own doc comment),
  * since it is reachable from the service worker. A test in
- * `eventThresholds.test.ts` pins the two together instead.
+ * `eventThresholdFields.test.ts` pins the two together instead.
  */
 export const DEFAULT_SKILL_QUEUE_ENDING_LEAD_HOURS = 24;
 

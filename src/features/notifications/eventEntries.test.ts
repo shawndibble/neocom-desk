@@ -7,7 +7,7 @@
 import { describe, expect, it } from 'vitest';
 import { PROJECTABLE_EVENT_IDS } from '@/engine/projection';
 import { NOTIFICATION_EVENT_IDS, type NotificationEventId } from './events';
-import { THRESHOLD_KEYS } from './eventThresholds';
+import { THRESHOLD_KEYS } from './eventThresholdFields';
 import { NOTIFICATION_EVENT_ENTRIES, eventEntry } from './eventEntries';
 
 const C = 1;
