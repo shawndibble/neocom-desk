@@ -9404,6 +9404,7 @@
       "errorHint": "Hub prices did not load. Check your connection and try again.",
       "retry": "Try again",
       "emptyHiddenHint": "We looked at {{scanned}} items. Hidden by your filters: {{thin}} rarely sell, {{slow}} take too long to sell, {{low}} have a margin under your minimum.",
+      "emptyHiddenHintMaxPrice": "We looked at {{scanned}} items. Hidden by your filters: {{dear}} cost more than your max price per item, {{thin}} rarely sell, {{slow}} take too long to sell, {{low}} have a margin under your minimum.",
       "emptyTitle": "Nothing worth hauling on this route",
       "emptyHint": "We looked at {{scanned}} items. Try another category, or loosen the filters above.",
       "volumeEach": "{{m3}} m³ each",
@@ -9428,10 +9429,13 @@
       "feesLine": "Fees: Accounting {{accounting}}, Broker Relations {{broker}}",
       "feesLineInstant": "Fees: Accounting {{accounting}}. Selling into buy orders pays sales tax only.",
       "hiddenLineInstant": "Hidden by your filters: {{low}} have a margin under your minimum.",
+      "hiddenLineInstantMaxPrice": "Hidden by your filters: {{dear}} cost more than your max price per item, {{low}} have a margin under your minimum.",
       "emptyHiddenHintInstant": "We looked at {{scanned}} items. Hidden by your filters: {{low}} have a margin under your minimum.",
+      "emptyHiddenHintInstantMaxPrice": "We looked at {{scanned}} items. Hidden by your filters: {{dear}} cost more than your max price per item, {{low}} have a margin under your minimum.",
       "cappedLine": "Only the best {{priced}} price gaps were checked for demand and the best {{books}} got order books, so more routes may exist. Narrow the category to see them.",
       "scannedLine": "{{count}} items looked at. Prices and history come from public market data.",
       "hiddenLine": "Hidden by your filters: {{thin}} rarely sell, {{slow}} take too long to sell, {{low}} have a margin under your minimum.",
+      "hiddenLineMaxPrice": "Hidden by your filters: {{dear}} cost more than your max price per item, {{thin}} rarely sell, {{slow}} take too long to sell, {{low}} have a margin under your minimum.",
       "columns": {
         "item": "Item",
         "hub": "Hub",
@@ -9481,7 +9485,11 @@
         "anyDemand": "Show all",
         "anyTime": "Any time",
         "days_one": "{{count}} day",
-        "days_other": "{{count}} days"
+        "days_other": "{{count}} days",
+        "maxPrice": "Max price per item",
+        "maxSpend": "Max spend",
+        "maxSpendHint": "For the whole trip",
+        "noLimit": "No limit"
       },
       "plan": {
         "holdNamed": "{{name}} {{used}} of {{total}} m³",
@@ -9519,10 +9527,7 @@
         "use": "Use",
         "working": "Working out cargo space…",
         "failed": "Couldn't work out that ship's cargo space. Try another, or enter it yourself.",
-        "budgetLabel": "Budget (optional)",
-        "budgetPlaceholder": "No limit",
-        "budgetHint": "The most ISK to spend on one load. Leave it empty for no limit.",
-        "clear": "Clear ship and budget",
+        "clear": "Clear ship",
         "holdKindLabel": "Takes",
         "anyItem": "Any item"
       },

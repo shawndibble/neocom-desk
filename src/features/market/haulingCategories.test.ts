@@ -67,6 +67,16 @@ describe('isHaulingCategoryId', () => {
     expect(isHaulingCategoryId(EVERYTHING_CATEGORY_ID)).toBe(true);
     expect(isHaulingCategoryId(4)).toBe(false); // Ships
   });
+
+  it('offers the bulk-goods categories: Manufacture & Research, Structures and their modifications and equipment', () => {
+    for (const id of [475, 477, 2203, 2202]) expect(isHaulingCategoryId(id)).toBe(true);
+  });
+
+  it('keeps out the groups with nothing to haul by volume', () => {
+    // Blueprints & Reactions, Skills, Ship SKINs, Apparel, Personalization, Special Edition Assets, Pilot's Services.
+    for (const id of [2, 150, 1954, 1396, 3628, 1659, 1922])
+      expect(isHaulingCategoryId(id)).toBe(false);
+  });
 });
 
 describe('haulingCategoryOf', () => {

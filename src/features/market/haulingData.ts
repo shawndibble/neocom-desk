@@ -9,14 +9,18 @@
  *
  * 1. **Prices.** Fuzzwork aggregates at both hub stations (`getHubPrices`,
  *    batched and cached). Keep items dearer at the destination by a wide
- *    enough gap, best gaps first, capped at `MAX_PRICED_CANDIDATES`.
+ *    enough gap, most a trip could earn first (`priceScore`), capped at
+ *    `MAX_PRICED_CANDIDATES`.
  * 2. **History.** The destination region's daily history per survivor
  *    (`loadPriceHistory`, cached until ESI's own daily rollover). This is
  *    where a dead market drops out — a huge listed gap on an item that never
- *    sells is the trap. Keep the `MAX_BOOK_CANDIDATES` best by what they
- *    recently sold for against the origin price.
+ *    sells is the trap. Keep the `MAX_BOOK_CANDIDATES` best by what a lot
+ *    could earn at the recent sale price (`historyScore`).
  * 3. **Order books.** The two hubs' books for those few, station-filtered,
  *    turned into ladders and estimated by `engine/market/haulingMarket`.
+ *
+ * Passes 1 and 2 order by trip profit, not price ratio
+ * (`engine/market/haulingRank`); the minimum gaps still decide what is looked at.
  *
  * Demand is read from the destination's whole *region* history (ESI has no
  * per-station history) while the ladders are the hub *station's*; the popover
@@ -26,12 +30,13 @@
  * In `instant` mode (sell straight into the destination's buy orders) pass 1
  * compares the origin's lowest sell with the destination's highest *buy*,
  * pass 2 is skipped — a buy order already standing is the demand, and Days to
- * Sell does not apply — and pass 3 reads the destination's buy ladder at the
- * hub station.
+ * Sell does not apply; the shortlist keeps pass 1's order, scored against the
+ * destination's buy-side volume — and pass 3 reads the destination's buy
+ * ladder at the hub station.
  *
  * One end may be _Any hub_ (`ANY_HUB`): pass 1 then prices every hub's
  * aggregates (one cheap call per hub) and keeps each item on its single best
- * lane by that pass's gap; passes 2 and 3 read that lane's hubs. The caps stay
+ * lane by that pass's score; passes 2 and 3 read that lane's hubs. The caps stay
  * overall, not per lane — at most `MAX_BOOK_CANDIDATES` items reach the
  * order-book pass whichever hubs they use — and each row says its lane.
  */
@@ -43,6 +48,12 @@ import { getHubPrices } from '@/market/prices';
 import type { TradeHub } from '@/market/hubs';
 import { expandHaulingLane, haulingEndId, type HaulingEnd, type HubLane } from './haulingHubs';
 import {
+  historyScore,
+  INSTANT_ROUGH_FEE_FACTOR,
+  priceScore,
+  ROUGH_FEE_FACTOR,
+} from '@/engine/market/haulingRank';
+import {
   estimateSale,
   hubLadders,
   summarizeDemand,
@@ -50,6 +61,8 @@ import {
   type LadderLevel,
   type SaleEstimate,
 } from '@/engine/market/haulingMarket';
+import { knownPackagedVolumeOf, type MarketTypeEntry } from '@/sde/marketTypes';
+import { loadMarketTypesById } from '@/sde/marketTypesById';
 import type { TypeMap } from '@/sde/types';
 
 /** Destination lowest sell must beat origin lowest sell by this factor to be looked at. */
@@ -64,8 +77,7 @@ export const MIN_LISTED_GAP = 1.1;
 export const MIN_INSTANT_GAP = 1.035;
 export const MAX_PRICED_CANDIDATES = 80;
 export const MAX_BOOK_CANDIDATES = 40;
-/** Fees are not known here, so the history pass keeps anything that could clear a rough cut. */
-const ROUGH_FEE_FACTOR = 0.94;
+/** The history pass keeps anything whose recent sale price, after the rough fee, could clear this gap. */
 const MIN_RECENT_GAP = 1.03;
 /** Books and history are 1 request each per item: stay well under `ESI_FANOUT_CONCURRENCY`. */
 const SCAN_CONCURRENCY = 4;
@@ -167,8 +179,25 @@ function throwIfAborted(signal?: AbortSignal): void {
   if (signal?.aborted) throw new DOMException('Hauling scan aborted', 'AbortError');
 }
 
+type MarketCatalogue = ReadonlyMap<number, MarketTypeEntry>;
+
+/**
+ * The market catalogue: packaged volume for every market type (a container's
+ * is a tenth of the assembled one `types.json` carries) and a name for the
+ * market types `types.json` leaves out. Empty when it cannot load.
+ */
+function loadMarketCatalogue(): Promise<MarketCatalogue> {
+  return loadMarketTypesById().catch(() => new Map());
+}
+
 /** m3 of one unit as hauled, or null when it cannot be told: a row with no volume must not become "0 m3", which would never fill a hold. */
-async function resolveVolume(typeId: number, types: TypeMap): Promise<number | null> {
+async function resolveVolume(
+  typeId: number,
+  types: TypeMap,
+  catalogue: MarketCatalogue
+): Promise<number | null> {
+  const packaged = knownPackagedVolumeOf(catalogue.get(typeId));
+  if (packaged !== null && packaged > 0) return packaged;
   const known = types[String(typeId)];
   const fromCatalogue = known ? (known.packagedVolume ?? known.volume) : undefined;
   if (fromCatalogue !== undefined) return fromCatalogue > 0 ? fromCatalogue : null;
@@ -187,6 +216,30 @@ async function stationLadders(
 ): Promise<{ sell: LadderLevel[]; buy: LadderLevel[] }> {
   const { orders } = await getOrderBook(hub.regionId, typeId);
   return hubLadders(orders, hub.stationId);
+}
+
+interface Ranked {
+  typeId: number;
+  lane: HubLane;
+  buy: number;
+  /** Sort key: the trip-profit estimate from `engine/market/haulingRank`. */
+  score: number;
+  /** The price ratio the pass read — a tiebreak only, where scores tie (e.g. nothing listed scores 0). */
+  gap: number;
+}
+
+interface PricedCandidate extends Ranked {
+  /** Units for sale at the origin hub: what a lot can buy at most. */
+  originListed: number;
+}
+
+interface ShortlistCandidate extends Ranked {
+  demand: DemandSummary | null;
+}
+
+/** Best first: by score, then gap, then type id, so equal scores never order by fetch timing. */
+function byRank(a: Ranked, b: Ranked): number {
+  return b.score - a.score || b.gap - a.gap || a.typeId - b.typeId;
 }
 
 export async function runHaulingScan(request: HaulingScanRequest): Promise<HaulingScan> {
@@ -225,42 +278,36 @@ export async function runHaulingScan(request: HaulingScanRequest): Promise<Hauli
     throw new Error('Hub prices are unavailable right now.');
   }
 
-  const minGap = mode === 'instant' ? MIN_INSTANT_GAP : MIN_LISTED_GAP;
+  const instant = mode === 'instant';
+  const minGap = instant ? MIN_INSTANT_GAP : MIN_LISTED_GAP;
+  const feeFactor = instant ? INSTANT_ROUGH_FEE_FACTOR : ROUGH_FEE_FACTOR;
   // Each item keeps only its best lane: the plan and the table are keyed by item.
   const pricedAll = ids
     .flatMap((typeId) => {
-      let best: { typeId: number; lane: HubLane; buy: number; gap: number } | null = null;
+      let best: PricedCandidate | null = null;
       for (const lane of lanes) {
-        const buy = pricesAt.get(lane.from.id)?.get(typeId)?.sellMin ?? null;
+        const origin = pricesAt.get(lane.from.id)?.get(typeId);
         const dest = pricesAt.get(lane.to.id)?.get(typeId);
-        const sell = (mode === 'instant' ? dest?.buyMax : dest?.sellMin) ?? null;
+        const buy = origin?.sellMin ?? null;
+        const sell = (instant ? dest?.buyMax : dest?.sellMin) ?? null;
         if (buy === null || sell === null || buy <= 0) continue;
         const gap = sell / buy;
-        if (gap >= minGap && (best === null || gap > best.gap)) best = { typeId, lane, buy, gap };
+        if (gap < minGap) continue;
+        const originListed = origin?.sellVolume ?? 0;
+        const destListed = (instant ? dest?.buyVolume : dest?.sellVolume) ?? 0;
+        const score = priceScore({ buy, sell, originListed, destListed }, feeFactor);
+        const candidate = { typeId, lane, buy, originListed, score, gap };
+        if (best === null || byRank(candidate, best) < 0) best = candidate;
       }
       return best === null ? [] : [best];
     })
-    .sort((a, b) => b.gap - a.gap);
+    .sort(byRank);
   const priced = pricedAll.slice(0, MAX_PRICED_CANDIDATES);
 
   // 2. History: drop what never sells or only sold below the origin price.
   // An instant sale skips it: the standing buy order is the demand.
-  const withHistory: {
-    typeId: number;
-    lane: HubLane;
-    buy: number;
-    demand: DemandSummary | null;
-    proxy: number;
-  }[] =
-    mode === 'instant'
-      ? priced.map((c) => ({
-          typeId: c.typeId,
-          lane: c.lane,
-          buy: c.buy,
-          demand: null,
-          proxy: c.gap,
-        }))
-      : [];
+  const withHistory: ShortlistCandidate[] =
+    mode === 'instant' ? priced.map((c) => ({ ...c, demand: null })) : [];
   let historyDone = 0;
   const historyPass = mode === 'instant' ? [] : priced;
   if (mode === 'list') onProgress?.({ stage: 'history', done: 0, total: priced.length });
@@ -270,14 +317,20 @@ export async function runHaulingScan(request: HaulingScanRequest): Promise<Hauli
       const { points } = await loadPriceHistory(candidate.lane.to.regionId, candidate.typeId);
       const demand = summarizeDemand(points, today);
       if (demand.recentSalePrice !== null && demand.dailyVolume > 0) {
-        const proxy = (demand.recentSalePrice * ROUGH_FEE_FACTOR) / candidate.buy;
-        if (proxy >= MIN_RECENT_GAP) {
+        const recentGap = (demand.recentSalePrice * ROUGH_FEE_FACTOR) / candidate.buy;
+        if (recentGap >= MIN_RECENT_GAP) {
           withHistory.push({
             typeId: candidate.typeId,
             lane: candidate.lane,
             buy: candidate.buy,
             demand,
-            proxy,
+            score: historyScore({
+              buy: candidate.buy,
+              recentSalePrice: demand.recentSalePrice,
+              dailyVolume: demand.dailyVolume,
+              originListed: candidate.originListed,
+            }),
+            gap: recentGap,
           });
         }
       }
@@ -287,10 +340,11 @@ export async function runHaulingScan(request: HaulingScanRequest): Promise<Hauli
     historyDone += 1;
     onProgress?.({ stage: 'history', done: historyDone, total: priced.length });
   });
-  withHistory.sort((a, b) => b.proxy - a.proxy);
+  withHistory.sort(byRank);
   const shortlist = withHistory.slice(0, MAX_BOOK_CANDIDATES);
 
   // 3. Order books, then hauled volume, for the shortlist only.
+  const catalogue: MarketCatalogue = shortlist.length > 0 ? await loadMarketCatalogue() : new Map();
   const rows: HaulingScanRow[] = [];
   let booksDone = 0;
   onProgress?.({ stage: 'books', done: 0, total: shortlist.length });
@@ -302,10 +356,12 @@ export async function runHaulingScan(request: HaulingScanRequest): Promise<Hauli
         stationLadders(candidate.lane.to, candidate.typeId),
       ]);
       const buyLadder = origin.sell;
-      const groupId = types[String(candidate.typeId)]?.groupID ?? null;
+      const known = types[String(candidate.typeId)];
+      // The market catalogue carries no SDE group: a type only it names rides in the general hold.
+      const groupId = known?.groupID ?? null;
       const base = {
         typeId: candidate.typeId,
-        name: types[String(candidate.typeId)]?.name ?? `#${candidate.typeId}`,
+        name: known?.name ?? catalogue.get(candidate.typeId)?.name ?? `#${candidate.typeId}`,
         groupId,
         categoryId: groupId === null ? null : (request.groupCategories?.[String(groupId)] ?? null),
         fromHub: candidate.lane.from,
@@ -317,7 +373,7 @@ export async function runHaulingScan(request: HaulingScanRequest): Promise<Hauli
       if (candidate.demand === null) {
         const unitVolumeM3 =
           buyLadder.length > 0 && dest.buy.length > 0
-            ? await resolveVolume(candidate.typeId, types)
+            ? await resolveVolume(candidate.typeId, types, catalogue)
             : null;
         if (unitVolumeM3 !== null) rows.push({ ...base, mode: 'instant', unitVolumeM3 });
       } else {
@@ -328,7 +384,7 @@ export async function runHaulingScan(request: HaulingScanRequest): Promise<Hauli
         });
         const unitVolumeM3 =
           sale !== null && buyLadder.length > 0
-            ? await resolveVolume(candidate.typeId, types)
+            ? await resolveVolume(candidate.typeId, types, catalogue)
             : null;
         if (sale !== null && unitVolumeM3 !== null) {
           rows.push({ ...base, mode: 'list', unitVolumeM3, demand: candidate.demand, sale });

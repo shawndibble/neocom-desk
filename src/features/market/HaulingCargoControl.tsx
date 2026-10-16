@@ -2,8 +2,8 @@
  * "Cargo space" on the Hauling Opportunities page: one control that opens a
  * small popover with three ways to say how much the hauler can carry — a ship
  * (its base holds), a saved Fitting (the exact holds, skills and expanders
- * included) or a typed number of m³ in one hold of a chosen kind — plus an
- * optional ISK budget.
+ * included) or a typed number of m³ in one hold of a chosen kind. The ISK
+ * budget is the Hauling filters' Max spend.
  *
  * The popover body mounts only when opened, so the catalogue and saved
  * Fittings it reads cost nothing to a visit that never picks a ship.
@@ -50,8 +50,6 @@ interface HaulingCargoControlProps {
   characterId: number | null;
   cargo: HaulingCargo | null;
   onCargoChange: (cargo: HaulingCargo | null) => void;
-  budget: number | null;
-  onBudgetChange: (budget: number | null) => void;
 }
 
 function formatM3(m3: number): string {
@@ -62,8 +60,6 @@ export function HaulingCargoControl({
   characterId,
   cargo,
   onCargoChange,
-  budget,
-  onBudgetChange,
 }: HaulingCargoControlProps) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -100,15 +96,12 @@ export function HaulingCargoControl({
         {open && (
           <CargoPickerBody
             characterId={characterId}
-            budget={budget}
-            onBudgetChange={onBudgetChange}
             onPick={(next) => {
               onCargoChange(next);
               setOpen(false);
             }}
             onClear={() => {
               onCargoChange(null);
-              onBudgetChange(null);
               setOpen(false);
             }}
             hasCargo={cargo !== null}
@@ -121,21 +114,12 @@ export function HaulingCargoControl({
 
 interface CargoPickerBodyProps {
   characterId: number | null;
-  budget: number | null;
-  onBudgetChange: (budget: number | null) => void;
   onPick: (cargo: HaulingCargo) => void;
   onClear: () => void;
   hasCargo: boolean;
 }
 
-function CargoPickerBody({
-  characterId,
-  budget,
-  onBudgetChange,
-  onPick,
-  onClear,
-  hasCargo,
-}: CargoPickerBodyProps) {
+function CargoPickerBody({ characterId, onPick, onClear, hasCargo }: CargoPickerBodyProps) {
   const { t } = useTranslation();
   const [tab, setTab] = useState<CargoTab>('ship');
   const [working, setWorking] = useState(false);
@@ -206,8 +190,6 @@ function CargoPickerBody({
           {t('market.hauling.cargo.failed')}
         </p>
       )}
-
-      <BudgetField budget={budget} onChange={onBudgetChange} />
 
       {hasCargo && (
         <Button variant="ghost" size="sm" onClick={onClear}>
@@ -355,35 +337,5 @@ function CustomTab({ onChoose }: { onChoose: (hold: CargoHold) => void }) {
         {t('market.hauling.cargo.use')}
       </Button>
     </form>
-  );
-}
-
-function BudgetField({
-  budget,
-  onChange,
-}: {
-  budget: number | null;
-  onChange: (budget: number | null) => void;
-}) {
-  const { t } = useTranslation();
-  const [text, setText] = useState(budget === null ? '' : budget.toLocaleString());
-  return (
-    <label className="flex flex-col gap-1 border-t border-line pt-3 text-[0.6875rem] uppercase tracking-wider text-text-dim">
-      {t('market.hauling.cargo.budgetLabel')}
-      <TextInput
-        size="sm"
-        inputMode="numeric"
-        placeholder={t('market.hauling.cargo.budgetPlaceholder')}
-        value={text}
-        onChange={(event) => {
-          setText(event.target.value);
-          const parsed = parseIskAmount(event.target.value);
-          onChange(parsed !== null && parsed > 0 ? parsed : null);
-        }}
-      />
-      <span className="text-[0.6875rem] normal-case tracking-normal">
-        {t('market.hauling.cargo.budgetHint')}
-      </span>
-    </label>
   );
 }

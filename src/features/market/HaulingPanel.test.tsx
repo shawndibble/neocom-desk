@@ -1,12 +1,14 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, onTestFinished } from 'vitest';
+import { NARROW_QUERY } from '@/lib/useIsNarrow';
 import { configureClipboard } from '@/lib/clipboard';
-import { act, render, screen, within } from '@testing-library/react';
+import { act, cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import '@/i18n';
 import { TRADE_HUBS } from '@/market/hubs';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useHaulingBudget, useHaulingCargo } from './haulingCargo';
+import { DEFAULT_HAULING_FILTER, useHaulingFilterPref } from './haulingFilterPref';
 import type { ListHaulingScanRow } from './haulingData';
 import type { HaulingScanState } from './useHaulingScan';
 import type { HaulingFillScanInput, HaulingFillScanState } from './useHaulingFillScan';
@@ -179,6 +181,17 @@ vi.mock('@/sde/loadMarketSde', () => ({
 
 const { HaulingPanel } = await import('./HaulingPanel');
 
+/** The link as the panel last wrote it, read back by `linkParam`. */
+function LocationSpy() {
+  return (
+    <output data-testid="link" hidden>
+      {useLocation().search}
+    </output>
+  );
+}
+const linkParam = (key: string) =>
+  new URLSearchParams(screen.getByTestId('link').textContent ?? '').get(key);
+
 function renderPanel(query = 'from=jita&to=amarr') {
   const actions = fakeItemActions();
   render(
@@ -186,6 +199,7 @@ function renderPanel(query = 'from=jita&to=amarr') {
       <FakeItemActions actions={actions}>
         <HaulingPanel />
       </FakeItemActions>
+      <LocationSpy />
     </MemoryRouter>
   );
   return { actions };
@@ -214,6 +228,9 @@ beforeEach(() => {
   jumpCalls.length = 0;
   phone = false;
   panelRem = Infinity;
+  // Hydrated, so a value one test remembers never leaks into the next through storage.
+  useHaulingFilterPref.setState({ hydrated: true, value: DEFAULT_HAULING_FILTER });
+  useHaulingBudget.setState({ hydrated: true, value: null });
 });
 afterEach(() => {
   useHaulingCargo.setState({ value: null });
@@ -760,3 +777,142 @@ describe('HaulingPanel data age (#3534)', () => {
     );
   });
 });
+
+/** Buys at 5,000 ISK at the origin; sells well enough to pass the other filters. */
+const DEAR_ROW: ListHaulingScanRow = {
+  ...SCAN_ROW,
+  typeId: 3001,
+  name: 'Expensive Widget',
+  buyLadder: [{ price: 5_000, units: 100, orders: 1 }],
+  destLadder: [{ price: 10_000, units: 50, orders: 3 }],
+  sale: { ...SCAN_ROW.sale, price: 7_500, lowestAsk: 10_000, undercutPrice: 9_999 },
+};
+const WITH_DEAR: HaulingScanState = {
+  status: 'ready',
+  scan: { rows: [SCAN_ROW, DEAR_ROW], scanned: 2, fetchedAt: 0 },
+};
+
+describe('HaulingPanel filters: Max price per item and Max spend', () => {
+  it('Max price per item hides the dearer rows, says so, and is written to the link and remembered', async () => {
+    mainState = WITH_DEAR;
+    const user = userEvent.setup();
+    renderPanel();
+    expect(row(/Expensive Widget/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Filters' }));
+    await user.type(screen.getByRole('textbox', { name: 'Max price per item' }), '1000');
+    expect(screen.queryByRole('row', { name: /Expensive Widget/ })).toBeNull();
+    expect(row()).toBeInTheDocument();
+    expect(screen.getByText(/1 cost more than your max price per item/)).toBeInTheDocument();
+    expect(linkParam('maxprice')).toBe('1000');
+    expect(useHaulingFilterPref.getState().value.maxprice).toBe(1_000);
+    expect(screen.getByRole('button', { name: 'Filters (1 active)' })).toBeInTheDocument();
+    // Cleared: no limit, gone from the link and from storage.
+    await user.clear(screen.getByRole('textbox', { name: 'Max price per item' }));
+    expect(row(/Expensive Widget/)).toBeInTheDocument();
+    expect(linkParam('maxprice')).toBeNull();
+    expect(useHaulingFilterPref.getState().value.maxprice).toBeNull();
+  });
+
+  it('keeps shorthand typed on its way to a figure: 1.5b commits 1,500,000,000', async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    await user.click(screen.getByRole('button', { name: 'Filters' }));
+    const field = screen.getByRole('textbox', { name: 'Max price per item' });
+    await user.type(field, '1.5b');
+    expect(field).toHaveValue('1.5b');
+    expect(linkParam('maxprice')).toBe('1500000000'); // 2.01 × 1e6 is 2009999.99… in floating point: it still commits the whole figure, and the text stays.
+    await user.clear(field);
+    await user.type(field, '2.01m');
+    expect(field).toHaveValue('2.01m');
+    expect(linkParam('maxprice')).toBe('2010000');
+  });
+
+  it('names Max price in the hidden line only when it hid something', () => {
+    mainState = WITH_DEAR;
+    renderPanel('from=jita&to=amarr&maxprice=1000000&margin=100');
+    expect(screen.queryByText(/max price per item/)).toBeNull();
+  });
+
+  it('a remembered max price applies when the link has none; the link’s own wins', () => {
+    mainState = WITH_DEAR;
+    useHaulingFilterPref.setState({ value: { ...DEFAULT_HAULING_FILTER, maxprice: 1_000 } });
+    renderPanel();
+    expect(screen.queryByRole('row', { name: /Expensive Widget/ })).toBeNull();
+    cleanupAndRender('from=jita&to=amarr&maxprice=9000');
+    expect(row(/Expensive Widget/)).toBeInTheDocument();
+  });
+
+  it('Reset filters brings back rows Max price hid, and leaves Max spend alone', async () => {
+    mainState = { status: 'ready', scan: { rows: [DEAR_ROW], scanned: 1, fetchedAt: 0 } };
+    useHaulingBudget.setState({ value: 2_000_000 });
+    const user = userEvent.setup();
+    renderPanel('from=jita&to=amarr&maxprice=1000');
+    expect(screen.getByText(/1 cost more than your max price per item/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Reset filters' }));
+    expect(row(/Expensive Widget/)).toBeInTheDocument();
+    expect(linkParam('maxprice')).toBeNull();
+    expect(useHaulingBudget.getState().value).toBe(2_000_000);
+  });
+
+  it('Max spend edits the Trip Plan budget, and the plan stays within it', async () => {
+    setCargo(100_000);
+    const user = userEvent.setup();
+    renderPanel();
+    expect(bringBox()).toHaveValue('70');
+    await user.click(screen.getByRole('button', { name: 'Filters' }));
+    const field = screen.getByRole('textbox', { name: 'Max spend' });
+    expect(field).toHaveAccessibleDescription(/For the whole trip/);
+    await user.type(field, '1000');
+    // 100 ISK a unit: 1,000 ISK buys 10.
+    expect(bringBox()).toHaveValue('10');
+    expect(useHaulingBudget.getState().value).toBe(1_000);
+    expect(linkParam('spend')).toBe('1000');
+  });
+
+  it('a saved budget shows in Max spend, and a link’s spend wins without being saved', async () => {
+    setCargo(100_000);
+    useHaulingBudget.setState({ value: 2_000 });
+    const user = userEvent.setup();
+    renderPanel('from=jita&to=amarr&spend=500');
+    expect(bringBox()).toHaveValue('5');
+    await user.click(screen.getByRole('button', { name: /^Filters/ }));
+    expect(screen.getByRole('textbox', { name: 'Max spend' })).toHaveValue('500');
+    expect(useHaulingBudget.getState().value).toBe(2_000);
+  });
+
+  it('on a phone, both are drafts in the filter sheet: Apply commits them', async () => {
+    phone = true;
+    panelRem = 20;
+    // jsdom's `matchMedia` never matches; the filter sheet needs the narrow query to.
+    const realMatchMedia = window.matchMedia;
+    window.matchMedia = (media: string) =>
+      ({
+        media,
+        matches: media === NARROW_QUERY,
+        onchange: null,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        addListener: () => {},
+        removeListener: () => {},
+        dispatchEvent: () => false,
+      }) as unknown as MediaQueryList;
+    onTestFinished(() => {
+      window.matchMedia = realMatchMedia;
+    });
+    setCargo(100_000);
+    const user = userEvent.setup();
+    renderPanel();
+    await user.click(screen.getByRole('button', { name: 'Filters' }));
+    const sheet = screen.getByRole('dialog');
+    await user.type(within(sheet).getByRole('textbox', { name: 'Max spend' }), '1000');
+    expect(useHaulingBudget.getState().value).toBeNull();
+    await user.click(within(sheet).getByRole('button', { name: 'Apply' }));
+    expect(useHaulingBudget.getState().value).toBe(1_000);
+    expect(linkParam('spend')).toBe('1000');
+  });
+});
+
+function cleanupAndRender(query: string) {
+  cleanup();
+  renderPanel(query);
+}

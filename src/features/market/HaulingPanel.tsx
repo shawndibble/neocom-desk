@@ -17,7 +17,7 @@
  * carries the trip instead, and the trip and the detail open as sheets.
  */
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -27,6 +27,7 @@ import {
   EmptyState,
   FilterBar,
   FilterField,
+  IskInput,
   Modal,
   SlideOver,
   Panel,
@@ -43,6 +44,7 @@ import {
   IskAmount,
   TypeIcon,
   DataTableDenseCell,
+  useFilterSurface,
   type DataTableColumn,
 } from '@/components/ui';
 import { focusRingClassName, touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
@@ -56,7 +58,7 @@ import { formatIsk, formatMarketIsk, marketIskDecimals } from '@/lib/isk';
 import { writeToClipboard } from '@/lib/clipboard';
 import { createColumnVisibilitySetting, useColumnVisibility } from '@/lib/columnVisibility';
 import { createLocalSetting } from '@/lib/useLocalSetting';
-import { enumParam, intParam } from '@/lib/urlState';
+import { enumParam, intParam, optionalIntParam } from '@/lib/urlState';
 import {
   useRememberedUrlParams,
   type RememberedDefaults,
@@ -153,6 +155,10 @@ const HAULING_URL_FILTERS = {
   days: intParam(DEFAULT_HAULING_FILTER.days, { min: 0, max: 365 }),
   margin: intParam(DEFAULT_HAULING_FILTER.margin, { min: 0, max: 100 }),
   demand: enumParam(['steady', 'any'] as const, DEFAULT_HAULING_FILTER.demand),
+  /** Max price per item, whole ISK; absent is no limit. */
+  maxprice: optionalIntParam({ min: 1 }),
+  /** Max spend: the Trip Plan's ISK budget, whole ISK; absent is no limit. Remembered in `useHaulingBudget`, not with the filters. */
+  spend: optionalIntParam({ min: 1 }),
 };
 
 /** From/To default to the pilot's Trade Hub (`haulingHubs.ts`), so the schema is built per hub. */
@@ -168,15 +174,17 @@ function haulingUrl(hubId: TradeHub['id']) {
 type HaulingUrlValues = UrlParamValues<ReturnType<typeof haulingUrl>>;
 
 /**
- * Lifts `days`/`margin`/`demand` off any wider object that carries them
- * (`params`, the remembered-filter store's value) — the three travel
- * together everywhere this filter is read, so this is the one place that
+ * Lifts the remembered filter fields off any wider object that carries them
+ * (`params`, a store patch merged over its value) — the one place that
  * reassembles them rather than each call site picking fields by hand.
  */
-function pickHaulingFilter<T extends { days: number; margin: number; demand: HaulingDemandFilter }>(
-  source: T
-): StoredHaulingFilter {
-  return { days: source.days, margin: source.margin, demand: source.demand };
+function pickHaulingFilter(source: StoredHaulingFilter): StoredHaulingFilter {
+  return {
+    days: source.days,
+    margin: source.margin,
+    demand: source.demand,
+    maxprice: source.maxprice,
+  };
 }
 
 const useIntroDismissed = createLocalSetting<boolean>({
@@ -267,30 +275,35 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
   }, [hydrateDefaultHub]);
   const haulingSchema = useMemo(() => haulingUrl(defaultHubId), [defaultHubId]);
 
-  // The filter fields (days/margin/demand) are remembered across sessions
-  // (issue: hauling toolbar redesign) — a link's own value always wins, and
-  // an edit is written to both the URL and this store in the same call. See
-  // `haulingFilterPref.ts`.
+  // Remembered: the filters in `haulingFilterPref.ts`, Max spend in the Trip Plan budget's store. A link's own value wins.
   const haulingFilterPref = useHaulingFilterPref((s) => s.value);
   const hydrateHaulingFilterPref = useHaulingFilterPref((s) => s.hydrate);
+  const storedBudget = useHaulingBudget((s) => s.value);
+  const hydrateBudget = useHaulingBudget((s) => s.hydrate);
   useEffect(() => {
     void hydrateHaulingFilterPref();
-  }, [hydrateHaulingFilterPref]);
+    void hydrateBudget();
+  }, [hydrateHaulingFilterPref, hydrateBudget]);
   const rememberedFilter: RememberedDefaults<ReturnType<typeof haulingUrl>> = useMemo(
     () => ({
-      values: pickHaulingFilter(haulingFilterPref),
-      remember: (patch: Partial<HaulingUrlValues>) => {
+      values: {
+        ...pickHaulingFilter(haulingFilterPref),
+        // Whole ISK, as the link holds it: the old budget field could save a fraction.
+        spend: storedBudget === null ? null : Math.round(storedBudget) || null,
+      },
+      // Called with only the remembered fields that changed.
+      remember: ({ spend, ...filter }: Partial<HaulingUrlValues>) => {
+        if (spend !== undefined) void useHaulingBudget.getState().setValue(spend);
+        if (Object.keys(filter).length === 0) return;
         const { value, setValue } = useHaulingFilterPref.getState();
-        void setValue({
-          days: patch.days ?? value.days,
-          margin: patch.margin ?? value.margin,
-          demand: patch.demand ?? value.demand,
-        });
+        void setValue(pickHaulingFilter({ ...value, ...filter }));
       },
     }),
-    [haulingFilterPref]
+    [haulingFilterPref, storedBudget]
   );
   const [params, setParams] = useRememberedUrlParams(haulingSchema, rememberedFilter);
+  /** Max spend. */
+  const budget = params.spend;
   // Stable references (a hub from `TRADE_HUBS`, or the Any string): the scans key their effects on them.
   const from = haulingEnd(params.from);
   const to = haulingEnd(params.to);
@@ -353,17 +366,13 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
   const cargo = useHaulingCargo((s) => s.value);
   const hydrateCargo = useHaulingCargo((s) => s.hydrate);
   const setCargo = useHaulingCargo((s) => s.setValue);
-  const budget = useHaulingBudget((s) => s.value);
-  const hydrateBudget = useHaulingBudget((s) => s.hydrate);
-  const setBudget = useHaulingBudget((s) => s.setValue);
   const introDismissed = useIntroDismissed((s) => s.value);
   const hydrateIntro = useIntroDismissed((s) => s.hydrate);
   const setIntroDismissed = useIntroDismissed((s) => s.setValue);
   useEffect(() => {
     void hydrateCargo();
-    void hydrateBudget();
     void hydrateIntro();
-  }, [hydrateCargo, hydrateBudget, hydrateIntro]);
+  }, [hydrateCargo, hydrateIntro]);
   const cargoSet = cargo !== null && cargo.holds.length > 0;
 
   // The pickers never leave Any at both ends (`pickHaulingHub` swaps), but a hand-written link can.
@@ -390,8 +399,9 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       maxDays: params.days === 0 ? null : params.days,
       minMarginPct: params.margin,
       steadyOnly: params.demand === 'steady',
+      maxUnitPrice: params.maxprice,
     }),
-    [params.days, params.margin, params.demand]
+    [params.days, params.margin, params.demand, params.maxprice]
   );
   const viewRows = useMemo(
     () => (state.status === 'ready' ? toViewRows(state.scan.rows, fees.at) : []),
@@ -411,6 +421,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       maxDays: DEFAULT_HAULING_FILTER.days,
       minMarginPct: DEFAULT_HAULING_FILTER.margin,
       steadyOnly: DEFAULT_HAULING_FILTER.demand === 'steady',
+      maxUnitPrice: DEFAULT_HAULING_FILTER.maxprice,
     });
     const summary = summarizeHaulingRows(usual, scanFetchedAt);
     if (summary) rememberHaulingSummary(summary);
@@ -888,15 +899,25 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
         (columnVisibility.isVisible(column.id) || (cards && column.id === 'margin')))
   );
 
-  // Selling into buy orders reads neither days nor demand, so only the margin filter counts there.
+  // Selling into buy orders reads neither days nor demand, so only the
+  // margin, max price and max spend count there.
   const activeFilterCount =
     (!instant && params.days !== DEFAULT_HAULING_FILTER.days ? 1 : 0) +
     (params.margin !== DEFAULT_HAULING_FILTER.margin ? 1 : 0) +
-    (!instant && params.demand !== DEFAULT_HAULING_FILTER.demand ? 1 : 0);
-  const hiddenCount = (instant ? 0 : hidden.thin + hidden.slow) + hidden.lowMargin;
+    (!instant && params.demand !== DEFAULT_HAULING_FILTER.demand ? 1 : 0) +
+    (params.maxprice !== null ? 1 : 0) +
+    (params.spend !== null ? 1 : 0);
+  const hiddenCount = hidden.tooDear + (instant ? 0 : hidden.thin + hidden.slow) + hidden.lowMargin;
+  // Only when Max price hid something does the hidden line name it.
+  const hiddenKeySuffix = hidden.tooDear > 0 ? 'MaxPrice' : '';
   // Category and mode ride along so the narrow sheet can edit them as part of
-  // its draft; only days/margin/demand are remembered (`rememberedFilter`).
-  const filterValue = { ...pickHaulingFilter(params), cat: categoryId, mode };
+  // its draft; only `rememberedFilter`'s fields are remembered.
+  const filterValue = {
+    ...pickHaulingFilter(params),
+    spend: params.spend,
+    cat: categoryId,
+    mode,
+  };
 
   // With Any hub at an end each row has its own lane: no one label, no one jump count.
   const laneLabel =
@@ -963,8 +984,6 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
             characterId={activeCharacterId}
             cargo={cargo}
             onCargoChange={(next) => void setCargo(next)}
-            budget={budget}
-            onBudgetChange={(next) => void setBudget(next)}
           />
         }
         cargoValueAfterFill={fillOffer.cargoValueAfterFill}
@@ -1045,12 +1064,14 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
             hiddenCount === 0
               ? t('market.hauling.emptyHint', { scanned: state.scan.scanned })
               : instant
-                ? t('market.hauling.emptyHiddenHintInstant', {
+                ? t(`market.hauling.emptyHiddenHintInstant${hiddenKeySuffix}`, {
                     scanned: state.scan.scanned,
+                    dear: hidden.tooDear,
                     low: hidden.lowMargin,
                   })
-                : t('market.hauling.emptyHiddenHint', {
+                : t(`market.hauling.emptyHiddenHint${hiddenKeySuffix}`, {
                     scanned: state.scan.scanned,
+                    dear: hidden.tooDear,
                     thin: hidden.thin,
                     slow: hidden.slow,
                     low: hidden.lowMargin,
@@ -1122,8 +1143,12 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
           {hiddenCount === 0
             ? t('market.hauling.scannedLine', { count: state.scan.scanned })
             : instant
-              ? t('market.hauling.hiddenLineInstant', { low: hidden.lowMargin })
-              : t('market.hauling.hiddenLine', {
+              ? t(`market.hauling.hiddenLineInstant${hiddenKeySuffix}`, {
+                  dear: hidden.tooDear,
+                  low: hidden.lowMargin,
+                })
+              : t(`market.hauling.hiddenLine${hiddenKeySuffix}`, {
+                  dear: hidden.tooDear,
                   thin: hidden.thin,
                   slow: hidden.slow,
                   low: hidden.lowMargin,
@@ -1392,6 +1417,17 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
                     </Select>
                   </FilterField>
                 )}
+                <IskCapField
+                  label={t('market.hauling.filters.maxPrice')}
+                  value={draft.maxprice}
+                  onChange={(maxprice) => setDraft({ ...draft, maxprice })}
+                />
+                <IskCapField
+                  label={t('market.hauling.filters.maxSpend')}
+                  hint={t('market.hauling.filters.maxSpendHint')}
+                  value={draft.spend}
+                  onChange={(spend) => setDraft({ ...draft, spend })}
+                />
                 <p className="text-[0.6875rem] text-text-dim">
                   {draftInstant
                     ? t('market.hauling.feesLineInstant', { accounting: fees.accountingLevel })
@@ -1455,6 +1491,69 @@ function HubField({
         <SelectItem value={ANY_HUB}>{t('market.hauling.anyHub')}</SelectItem>
       </SelectContent>
     </Select>
+  );
+}
+
+/**
+ * An ISK cap in the filters — Max price per item, Max spend. Blank is no
+ * limit. Only a whole, positive figure commits: the URL holds whole ISK.
+ */
+function IskCapField({
+  label,
+  hint,
+  value,
+  onChange,
+}: {
+  label: string;
+  hint?: string;
+  value: number | null;
+  onChange: (next: number | null) => void;
+}) {
+  const { t } = useTranslation();
+  const hintId = useId();
+  // Inline the field has no caption, so its placeholder names it; in the sheet the caption does.
+  const inSheet = useFilterSurface() === 'sheet';
+  // What `IskInput` last committed, unrounded, handed back as its `value`: a
+  // rounded figure (`2.01m` = 2009999.99… → 2010000) would read as an outside
+  // change and reset the typed text. Only a value this field did not send
+  // (Reset, a link) replaces it. The URL lands in a transition, so `value` lags.
+  const [raw, setRaw] = useState<string | null>(null);
+  const [sent, setSent] = useState<number | null>(value);
+  const [seen, setSeen] = useState(value);
+  if (seen !== value) {
+    setSeen(value);
+    if (value !== sent) setRaw(null);
+  }
+  const shown = raw ?? (value === null ? '' : String(value));
+  return (
+    <FilterField label={label}>
+      <IskInput
+        size="sm"
+        aria-label={label}
+        aria-describedby={hint === undefined ? undefined : hintId}
+        placeholder={inSheet ? t('market.hauling.filters.noLimit') : label}
+        className="w-40"
+        value={shown}
+        onChange={(text) => {
+          setRaw(text);
+          const amount = Number(text);
+          const whole = text === '' ? null : Math.round(amount);
+          // Shorthand's float noise rounds away; a real fraction (`1.5`, on its way to `1.5b`) waits.
+          if (
+            whole === null ||
+            (Math.abs(amount - whole) < 0.001 && Number.isSafeInteger(whole) && whole > 0)
+          ) {
+            setSent(whole);
+            onChange(whole);
+          }
+        }}
+      />
+      {hint !== undefined && (
+        <span id={hintId} className={inSheet ? 'text-[0.6875rem] text-text-dim' : 'sr-only'}>
+          {hint}
+        </span>
+      )}
+    </FilterField>
   );
 }
 
