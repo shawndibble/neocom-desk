@@ -1,8 +1,8 @@
 # Mail
 
-`/mail` (nav: Social group, scope-gated, phone tab). Two-pane EVE mail client for the active Character, or for every Character at once (see "All characters"): folder chips + search above, list left, reader right. Reads headers/bodies, marks read on ESI, Reply / Forward with drafts. No new-mail compose, no delete, no labels management, no mailing-list browsing.
+`/mail` (nav: Social group, scope-gated, phone tab). Two-pane EVE mail client for the active Character, or for every Character at once (see "All characters"): folder chips + search above, list left, reader right. Reads headers/bodies, marks read on ESI, New Mail / Reply / Forward with drafts. No delete, no labels management, no mailing-list browsing.
 
-Code: `src/routes/Mail.tsx`, `src/features/character/{mail,mailAll,mailScopePref,mailFolderPref,mailDrafts,mailRecipientSearch,MailComposeBox}.ts(x)`, `src/engine/mail.ts` (pure), `src/features/character/{contacts,contactStandings,affiliations,names}.ts`.
+Code: `src/routes/Mail.tsx`, `src/features/character/{mail,mailAll,mailScopePref,mailFolderPref,mailDrafts,mailRecipientSearch,MailComposeBox,NewMailComposer,NewMailRecipientPicker,MailBodyEditor}.ts(x)`, `src/engine/{mail,mailCompose}.ts` (pure), `src/features/character/{contacts,contactStandings,affiliations,names}.ts`.
 
 ## Summary
 
@@ -107,6 +107,18 @@ Code: `src/routes/Mail.tsx`, `src/features/character/{mail,mailAll,mailScopePref
 - Send: requires >= 1 recipient (inline error `mail.sendNoRecipients`); posts `POST /characters/{id}/mail/` with `esi-mail.send_mail.v1`. On success: clears draft, closes box, refetches headers only (cache row deleted, not a full refresh) so the Sent mail appears. On failure: inline "Couldn't send: <message> Try sending from the EVE client instead."; 401/403 also raises the reauth banner.
 - Draft: debounced 500 ms save to Dexie `mailDrafts` (id `characterId:mailId`; kind, recipients, subject, body). Restored on reopen when kind matches; touching recipients first suppresses restore race. Cleared on Send. Cancel keeps the draft.
 
+## Compose (New Mail)
+
+Decision: `docs/context/decisions/20261016-124635-mail-compose-format-bar-and-eve-markup.md`.
+
+- Entry: a floating Compose button over the list on a phone (hidden while a mail is open or the composer is); a Compose button in the page header on a wide screen. Sends as the active Character, also under "All characters".
+- Placement: `NewMailComposer` is one component. Phone (`fullPane`): fixed full-viewport takeover, safe-area padded, `dvh` tall so the keyboard does not hide the body; Close (X) top-left, Send top-right. Wide: replaces the reader Panel (reader hidden, not unmounted). Reply/Forward are untouched (`MailComposeBox`).
+- Recipients (`NewMailRecipientPicker`): characters, corporations, alliances and the Character's joined mailing lists (`loadMailingLists`, local filter). Each chip and option shows its type. Search is `searchTypedMailRecipients` (ESI character+corporation+alliance, >= 3 chars, 300 ms debounce); it needs `esi-search.search_structures.v1`, so without it a `GrantNote` shows and only mailing lists are offered. Capped at 50 (`MAX_RECIPIENTS`): counter beside the field, input disabled at the cap.
+- Limits (`engine/mailCompose.ts`): subject 1000, body 10,000, live counters, Send disabled past either (`validateNewMail`). The body is counted by `composeBodyLength` (raw characters today; swap for the markup length function).
+- Body seam: `MailBodyEditorProps` (`value`, `onChange`, `id`, aria props, `className`) in `MailBodyEditor.tsx`; `NewMailComposer` takes `bodyEditor` (default `PlainBodyEditor`, a `TextArea`). The composer and draft/send code only ever see the body string.
+- Draft: one slot per Character in `mailDrafts` (id `characterId:new`, `kind: 'new'`, `mailId: 0`), recipients keep their names. Debounced 500 ms save; an empty composer deletes the slot. Reopened as left. Close (X) flushes and keeps it, with the "Your draft is saved." toast; Discard draft... asks in a Modal then clears.
+- Send: `sendMail`, same never-sent / unconfirmed / error logic as Reply/Forward, `NeedsConnection` on Send. Success clears the slot, closes, shows a "Mail sent" toast (no Undo: ESI sends immediately) and refetches the sender's headers.
+
 ## Data sources and scopes
 
 | Data                                         | Endpoint                                  | Scope                                | Cache                             |
@@ -133,7 +145,7 @@ Registry: `src/esi/registry.ts:249-281`. Mail is not synced to Firestore.
 ## Observed gaps
 
 - Custom labels are not shown or filterable (labels are fetched, only the four System Labels are read; chips were removed by decision `20260905-140358`). A mail with only a custom label files under Inbox.
-- No compose-new, no delete, no mark-unread, no label assignment, no mailing-list view; `getCharacterMailingLists` is used only to name recipients.
+- No delete, no mark-unread, no label assignment, no mailing-list view; `getCharacterMailingLists` is used only to name recipients.
 - Search matches subject and sender name only; not body, not recipients (Sent folder rows are searched by sender = yourself).
 - Unread count per chip is ESI's count for all mail, not for the loaded/filtered window; "Hide read" uses per-header flags.
 - Reader flattens EVE markup to plain text (`stripEveMarkup`): no links, fonts or images.
@@ -145,15 +157,15 @@ Registry: `src/esi/registry.ts:249-281`. Mail is not synced to Firestore.
 
 ## Persistence and sync
 
-| State                                         | Storage                                                                                                  | Synced? |
-| --------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ------- |
-| `search`, `hideRead`                          | URL query (ADR 0015 `docs/adr/0015-tab-is-a-path-segment-url-holds-view-state.md`), omitted when default | no      |
-| Selected folders                              | Dexie `settings` key `mailFolders`, device-wide                                                          | no      |
-| Scope (This / All characters)                 | Dexie `settings` key `mailScope`, device-wide; URL `scope` overrides per view                            | no      |
-| Selected mail, open compose, locally-read set | React state only                                                                                         | no      |
-| Headers/labels/lists/bodies                   | Dexie `esiCache` per Character (`mail:headers`, `mail:labels`, `mail:lists`, `mail:<id>`)                | no      |
-| Drafts                                        | Dexie `mailDrafts`                                                                                       | no      |
-| Read flag                                     | ESI (source of truth) + patched cache                                                                    | via ESI |
+| State                                                            | Storage                                                                                                  | Synced? |
+| ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ------- |
+| `search`, `hideRead`                                             | URL query (ADR 0015 `docs/adr/0015-tab-is-a-path-segment-url-holds-view-state.md`), omitted when default | no      |
+| Selected folders                                                 | Dexie `settings` key `mailFolders`, device-wide                                                          | no      |
+| Scope (This / All characters)                                    | Dexie `settings` key `mailScope`, device-wide; URL `scope` overrides per view                            | no      |
+| Selected mail, open compose, locally-read set                    | React state only                                                                                         | no      |
+| Headers/labels/lists/bodies                                      | Dexie `esiCache` per Character (`mail:headers`, `mail:labels`, `mail:lists`, `mail:<id>`)                | no      |
+| Drafts (Reply/Forward per mail, New Mail one slot per Character) | Dexie `mailDrafts`                                                                                       | no      |
+| Read flag                                                        | ESI (source of truth) + patched cache                                                                    | via ESI |
 
 ## Test-covered behaviours (`src/routes/Mail.test.tsx`)
 

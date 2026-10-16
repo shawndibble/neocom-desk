@@ -380,6 +380,8 @@ export const MailAlliance = withWeight(UsersFour);
 /** Reply and Forward, on the reading pane's compose actions. */
 export const MailReply = withWeight(ArrowBendUpLeft);
 export const MailForward = withWeight(ArrowBendUpRight);
+/** Start a new mail — the Compose entry on the Mail page. */
+export const MailCompose = withWeight(PencilSimple);
 /** Jump clones and implants. */
 export const Clones = withWeight(Stack);
 /** A calendar event — the Coming Up rail's own kind. */

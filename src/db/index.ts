@@ -981,6 +981,8 @@ export interface OrderProblemSampleRecord {
 export interface MailDraftRecipient {
   recipient_id: number;
   recipient_type: 'alliance' | 'character' | 'corporation' | 'mailing_list';
+  /** New Mail drafts keep the chip's name so a reopened draft needs no lookup; Reply/Forward drafts leave it out. */
+  name?: string;
 }
 
 /**
@@ -993,12 +995,13 @@ export interface MailDraftRecipient {
  * separate expiry is added here.
  */
 export interface MailDraftRecord {
-  /** `${characterId}:${mailId}` — one draft per source mail per Character. */
+  /** `${characterId}:${mailId}` — one draft per source mail per Character; `${characterId}:new` for New Mail. */
   id: string;
   characterId: number;
-  /** The mail this is a reply/forward of. */
+  /** The mail this is a reply/forward of; `0` for the New Mail slot (no real mail id is 0). */
   mailId: number;
-  kind: 'reply' | 'forward';
+  /** `new` is the single New Mail slot per Character (`id` = `${characterId}:new`). */
+  kind: 'reply' | 'forward' | 'new';
   recipients: MailDraftRecipient[];
   subject: string;
   body: string;
