@@ -10,6 +10,7 @@
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID } from './support/fixtureData';
+import { expectNoPageOverflow } from './support/overflow';
 
 const PHONE = { width: 390, height: 844 };
 const TOUCH_TARGET_PX = 44;
@@ -109,6 +110,20 @@ test.describe('contracts history — detail opener', () => {
       await expect(page.locator('tr.dt-group-header')).toHaveCount(0);
     });
   });
+
+  // Issue #3960: at 768px the full desktop table measured 922px and dragged
+  // the whole page sideways. The table scrolls inside its own wrapper instead.
+  for (const width of [390, 768, 1024, 1280]) {
+    test.describe(`at ${width}px`, () => {
+      test.use({ viewport: { width, height: 800 } });
+
+      test('the page never scrolls sideways', async ({ page }) => {
+        await page.goto('./contracts/history');
+        await expect(page.getByRole('table').first()).toBeVisible();
+        await expectNoPageOverflow(page);
+      });
+    });
+  }
 });
 
 test.describe('contracts history — untitled courier route (issue #1706)', () => {
