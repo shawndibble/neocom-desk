@@ -135,7 +135,7 @@ interface OfferDetailProps {
   lpBasis: LpBasis;
   concord: ConcordRate | null;
   concordPending: boolean;
-  playerLp: number;
+  playerLp: number | null;
   useOwnMaterials: boolean;
   onToggleUseOwnMaterials: () => void;
   onPlanInIndustry: (row: LoyaltyOfferRow) => Promise<void>;
@@ -348,7 +348,7 @@ function OfferDetail({
         </div>
       </dl>
 
-      {!profit.affordableLp && (
+      {profit.affordableLp === false && playerLp !== null && (
         <p className="text-xs text-text-dim">
           {t('loyaltyStore.needMoreLp', {
             amount: (row.offer.lp_cost - playerLp).toLocaleString(),
@@ -599,7 +599,7 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
   const filteredRows = useMemo(() => {
     const q = rowsSearch.trim().toLowerCase();
     return rows.filter((row) => {
-      if (affordableOnly && !row.profit.affordableLp) return false;
+      if (affordableOnly && row.profit.affordableLp === false) return false;
       if (blueprintsOnly && !row.isBlueprint) return false;
       if (q && !row.itemName.toLowerCase().includes(q)) return false;
       return true;
@@ -607,7 +607,7 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
   }, [rows, rowsSearch, affordableOnly, blueprintsOnly]);
 
   const affordableCount = useMemo(
-    () => rows.filter((row) => row.profit.affordableLp).length,
+    () => rows.filter((row) => row.profit.affordableLp !== false).length,
     [rows]
   );
 
@@ -918,7 +918,7 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
               <StatChips>
                 <StatChip
                   label={t('loyaltyStore.yourLp')}
-                  value={playerLp.toLocaleString()}
+                  value={playerLp === null ? '—' : playerLp.toLocaleString()}
                   tone="accent"
                   emphasis
                 />

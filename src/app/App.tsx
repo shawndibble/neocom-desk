@@ -25,6 +25,7 @@ import { NotFound } from '@/routes/NotFound';
 import { preloadedLazy } from './preloadedLazy';
 import { writeSignedInShellHint } from './signedInShellHint';
 import { AnalyticsPageViewTracker } from './AnalyticsPageViewTracker';
+import { LandingShellOffLandingRelease } from './landingShell';
 import { DocumentTitleTracker } from './DocumentTitleTracker';
 import { StaleStoresReloader } from './StaleStoresReloader';
 import { ReloadPrompt } from './ReloadPrompt';
@@ -347,6 +348,7 @@ export function App() {
       <BrowserRouter basename={ROUTER_BASENAME}>
         <AuthFailureRedirect />
         <AnalyticsPageViewTracker />
+        <LandingShellOffLandingRelease />
         <DocumentTitleTracker />
         <StaleStoresReloader />
         <Suspense fallback={<RouteFallback />}>

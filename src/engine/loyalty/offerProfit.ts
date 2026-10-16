@@ -45,8 +45,8 @@ export interface LoyaltyOfferProfitInput {
    * module's own revenue leg, and never inherited from `buildVsBuy`.
    */
   buildCost: number;
-  /** The character's current LP balance with this corporation. */
-  playerLp: number;
+  /** The character's current LP balance with this corporation; null when it is unknown (never read). */
+  playerLp: number | null;
   /**
    * How the offer's goods are turned into ISK, mirroring the LP store's
    * revenue price basis: `order` lists at the hub's sell price (sales tax
@@ -73,8 +73,11 @@ export interface LoyaltyOfferProfit {
   profit: number | null;
   /** `profit / lpCost` — the ranking metric. Null when unpriceable or `lpCost <= 0`. */
   iskPerLp: number | null;
-  /** Whether the character's current LP balance covers `lpCost`. Independent of profitability. */
-  affordableLp: boolean;
+  /**
+   * Whether the character's current LP balance covers `lpCost`. Independent of
+   * profitability. Null when the balance is unknown — not "can't afford".
+   */
+  affordableLp: boolean | null;
 }
 
 export function loyaltyOfferProfit(input: LoyaltyOfferProfitInput): LoyaltyOfferProfit {
@@ -124,7 +127,7 @@ export function loyaltyOfferProfit(input: LoyaltyOfferProfitInput): LoyaltyOffer
     netRevenue,
     profit,
     iskPerLp,
-    affordableLp: playerLp >= lpCost,
+    affordableLp: playerLp === null ? null : playerLp >= lpCost,
   };
 }
 

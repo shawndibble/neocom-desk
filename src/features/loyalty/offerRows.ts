@@ -125,7 +125,8 @@ export interface LoyaltyOfferComputeInputs {
    * is keyed by material typeID and different offers can share a material.
    */
   useOwnMaterialsFor?: ReadonlySet<number>;
-  playerLp: number;
+  /** Null when the LP balance has never been read (unknown, not zero). */
+  playerLp: number | null;
 }
 
 /**

@@ -18,6 +18,7 @@ import type { LayerId } from '@/engine/netWorth/series';
 import { summarizeRouteKills, type KillLevel } from '@/engine/route/routeKillTrend';
 import type { ChartColor, StackPart } from '../charts/types';
 import { blank, count, NEUTRAL_NUMBER, statusOf, UNKNOWN, type Builder } from './builderKit';
+import { omega } from './omegaModel';
 import { hbarsFromRows } from './chartBuilders';
 import { clonesTable, locationTable } from './characterTables';
 import {
@@ -51,6 +52,7 @@ export const KIND_FEED_LISTS: Readonly<Record<string, readonly FeedId[]>> = {
   hauling: ['hauling'],
   routeSafety: ['routeSafety'],
   kills: ['kills'],
+  omega: ['omega'],
 };
 
 /** Where each net worth layer sits in the bar and which series hue it keeps (the Net Worth page's). */
@@ -834,4 +836,5 @@ export const KIND_BUILDERS: Readonly<Record<string, Builder>> = {
   jumpTimers,
   routeSafety,
   kills,
+  omega,
 };

@@ -23,6 +23,7 @@ import { DataTable, type DataTableColumn } from '@/components/ui';
 import { COMPACT_ISK_Y_AXIS_MARGIN_LEFT, COMPACT_ISK_Y_AXIS_WIDTH } from '@/lib/chartAxis';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
 import type { ProductionProfitPoint, ProductionProfitTrend } from './productionProfitHistory';
+import { formatDateTick } from '@/lib/formatDateTick';
 
 interface ProductionProfitChartProps {
   points: ProductionProfitPoint[];
@@ -34,15 +35,6 @@ const TREND_STROKE: Record<ProductionProfitTrend, string> = {
   down: 'var(--color-isk-neg)',
   flat: 'var(--color-accent)',
 };
-
-/** `date` is a bare calendar date — build the tick from Y/M/D components, never `new Date(string)`, to avoid a UTC/local day shift. */
-function formatDateTick(date: string): string {
-  const [year, month, day] = date.split('-').map(Number);
-  return new Date(year, month - 1, day).toLocaleDateString(undefined, {
-    month: 'short',
-    day: 'numeric',
-  });
-}
 
 function ProfitTooltip({ active, payload }: TooltipContentProps): React.ReactElement | null {
   const { t } = useTranslation();

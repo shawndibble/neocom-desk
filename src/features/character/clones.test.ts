@@ -3,7 +3,11 @@ import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
+import { loadTypeInfo } from '@/sde/loadTypeInfo';
 import { loadCharacterClones, loadImplantDetails } from './clones';
+
+// Default: the baked shard lacks the type, so ESI handlers serve it.
+vi.mock('@/sde/loadTypeInfo', () => ({ loadTypeInfo: vi.fn(async () => null) }));
 
 const CHAR_ID = 91;
 const server = setupServer();
@@ -16,6 +20,7 @@ beforeEach(async () => {
 afterEach(() => {
   server.resetHandlers();
   configureEsi({ getToken: null });
+  vi.mocked(loadTypeInfo).mockResolvedValue(null);
 });
 afterAll(() => server.close());
 
@@ -109,6 +114,24 @@ describe('loadImplantDetails', () => {
         )
       )
     );
+    const result = await loadImplantDetails([10209]);
+    expect(result.get(10209)).toEqual({
+      description: '+5 Memory',
+      slot: 2,
+      bonuses: { memory: 5 },
+    });
+  });
+
+  it('reads a baked implant offline, without asking ESI', async () => {
+    vi.mocked(loadTypeInfo).mockResolvedValue({
+      description: '+5 <b>Memory</b>',
+      effects: [],
+      attributes: [
+        [177, 5],
+        [331, 2],
+      ],
+    });
+    // No ESI handler: an ESI read would fail on the unhandled request.
     const result = await loadImplantDetails([10209]);
     expect(result.get(10209)).toEqual({
       description: '+5 Memory',

@@ -6,7 +6,7 @@ import tseslint from 'typescript-eslint';
 import prettier from 'eslint-config-prettier';
 
 // Raw text-like <input>s: banned in app code, fine in test fixtures (no
-// styling to be consistent with). Legit raw inputs are type="file"/"range".
+// styling to be consistent with). The legit raw input is type="file".
 const rawInputSyntax = [
   {
     selector:
@@ -38,6 +38,11 @@ const restrictedSyntax = [
     selector:
       "JSXOpeningElement[name.name='input'] > JSXAttribute[name.name='type'][value.value='radio']",
     message: 'Use Radio from src/components/ui instead of a raw <input type="radio">.',
+  },
+  {
+    selector:
+      "JSXOpeningElement[name.name='input'] > JSXAttribute[name.name='type'][value.value='range']",
+    message: 'Use Slider from src/components/ui instead of a raw <input type="range">.',
   },
   {
     selector: "JSXOpeningElement[name.name='textarea']",

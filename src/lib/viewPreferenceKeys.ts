@@ -55,4 +55,5 @@ export const VIEW_PREFERENCE_KEYS: readonly string[] = [
   'planColumnVisibility.v2',
   'planGroupingMode',
   'walletJournalBreakdownOpen',
+  'walletJournalFlowChartHidden',
 ];

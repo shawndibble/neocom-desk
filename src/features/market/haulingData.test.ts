@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { historyPoint } from '@/engine/market/__fixtures__/priceHistory';
+import { EsiError } from '@/esi/errors';
 import { TRADE_HUBS } from '@/market/hubs';
 
 const getHubPrices = vi.fn();
@@ -16,12 +18,21 @@ const loadUniverseTypeOnce = vi.fn();
 vi.mock('@/features/skills/data', () => ({
   loadUniverseTypeOnce: (...a: unknown[]) => loadUniverseTypeOnce(...a),
 }));
+// Default: the baked shard lacks the type, so reads take the ESI fallback.
+vi.mock('@/sde/loadTypeInfo', () => ({ loadTypeInfo: vi.fn(async () => null) }));
+const { loadTypeInfo } = await import('@/sde/loadTypeInfo');
+const loadMarketTypes = vi.fn();
+vi.mock('@/sde/loadMarketSde', () => ({
+  loadMarketTypes: (...a: unknown[]) => loadMarketTypes(...a),
+}));
+const { clearMarketTypeIndex } = await import('@/sde/marketTypesById');
 
 const {
   clearHaulingScanCache,
   evictHaulingScan,
   haulingScanCacheKey,
   MAX_BOOK_CANDIDATES,
+  MAX_PRICED_CANDIDATES,
   runHaulingScan,
 } = await import('./haulingData');
 
@@ -29,13 +40,25 @@ const FROM = TRADE_HUBS.find((h) => h.id === 'jita')!;
 const TO = TRADE_HUBS.find((h) => h.id === 'amarr')!;
 const TYPES = { '34': { name: 'Tritanium', volume: 0.01 } } as never;
 
-function aggregate(sellMin: number | null, buyMax: number | null) {
-  return { sellMin, buyMax, sellVolume: 100, buyVolume: 100 };
+/** A catalogue entry, 1 m³ each, for every id. */
+function typesFor(ids: readonly number[]) {
+  return Object.fromEntries(ids.map((id) => [String(id), { name: `T${id}`, volume: 1 }])) as never;
+}
+
+function aggregate(
+  sellMin: number | null,
+  buyMax: number | null,
+  sellVolume = 100,
+  buyVolume = 100
+) {
+  return { sellMin, buyMax, sellVolume, buyVolume };
 }
 
 beforeEach(() => {
   clearHaulingScanCache();
   vi.clearAllMocks();
+  clearMarketTypeIndex();
+  loadMarketTypes.mockResolvedValue([]);
   getHubPrices.mockImplementation(async (hub: { id: string }) =>
     hub.id === FROM.id ? new Map([[34, aggregate(100, 90)]]) : new Map([[34, aggregate(200, 115)]])
   );
@@ -110,6 +133,94 @@ describe('runHaulingScan, selling into buy orders', () => {
     expect(scan.rows[0]).toMatchObject({ unitVolumeM3: 0.01 });
   });
 
+  it('reads a baked packaged volume for a type no catalogue carries, without asking ESI', async () => {
+    vi.mocked(loadTypeInfo).mockResolvedValueOnce({
+      description: '',
+      attributes: [],
+      effects: [],
+      volume: 16_500,
+      packagedVolume: 2_500,
+    });
+    const scan = await runHaulingScan({
+      from: FROM,
+      to: TO,
+      typeIds: [34],
+      scope: 4,
+      types: { '34': { name: 'Unlisted hull' } } as never,
+      mode: 'instant',
+    });
+    expect(loadUniverseTypeOnce).not.toHaveBeenCalled();
+    expect(scan.rows[0]).toMatchObject({ unitVolumeM3: 2_500 });
+  });
+
+  it("hauls a container at the market catalogue's packaged volume, not types.json's assembled one", async () => {
+    loadMarketTypes.mockResolvedValue([
+      {
+        typeId: 34,
+        name: 'Station Container',
+        marketGroupId: 1658,
+        volume: 2_000_000,
+        packagedVolume: 10_000,
+      },
+    ]);
+    const scan = await runHaulingScan({
+      from: FROM,
+      to: TO,
+      typeIds: [34],
+      scope: 4,
+      types: { '34': { name: 'Station Container', volume: 2_000_000, groupID: 448 } } as never,
+      mode: 'instant',
+    });
+    expect(scan.rows[0]).toMatchObject({ unitVolumeM3: 10_000, groupId: 448 });
+  });
+
+  it('names a type types.json lacks from the market catalogue, and takes its volume there', async () => {
+    loadMarketTypes.mockResolvedValue([
+      { typeId: 34, name: 'Microorganisms', marketGroupId: 1333, volume: 0.01 },
+    ]);
+    const scan = await runHaulingScan({
+      from: FROM,
+      to: TO,
+      typeIds: [34],
+      scope: 4,
+      types: {} as never,
+      mode: 'instant',
+    });
+    expect(loadUniverseTypeOnce).not.toHaveBeenCalled();
+    // The market catalogue has no SDE group: the holds it may ride in stay unknown.
+    expect(scan.rows[0]).toMatchObject({
+      name: 'Microorganisms',
+      unitVolumeM3: 0.01,
+      groupId: null,
+    });
+  });
+
+  it('still scans when the market catalogue cannot load', async () => {
+    loadMarketTypes.mockRejectedValue(new Error('offline'));
+    const scan = await runHaulingScan({
+      from: FROM,
+      to: TO,
+      typeIds: [34],
+      scope: 4,
+      types: TYPES,
+      mode: 'instant',
+    });
+    expect(scan.rows[0]).toMatchObject({ name: 'Tritanium', unitVolumeM3: 0.01 });
+  });
+
+  it('loads the market catalogue only once some item reaches the order books', async () => {
+    getHubPrices.mockImplementation(async () => new Map([[34, aggregate(100, 90)]]));
+    await runHaulingScan({
+      from: FROM,
+      to: TO,
+      typeIds: [34],
+      scope: 4,
+      types: TYPES,
+      mode: 'instant',
+    });
+    expect(loadMarketTypes).not.toHaveBeenCalled();
+  });
+
   it('drops an item whose volume cannot be told, not the scan', async () => {
     loadUniverseTypeOnce.mockResolvedValue(null);
     const scan = await runHaulingScan({
@@ -156,6 +267,307 @@ describe('runHaulingScan, selling into buy orders', () => {
       mode: 'instant',
     });
     expect(instant.rows).toHaveLength(1);
+  });
+});
+
+describe('runHaulingScan, shortlist order', () => {
+  const TODAY = '2026-10-15';
+  /** More high-ratio, thin items than the price pass keeps, and one bulk steady seller at a lower ratio. */
+  const THIN = Array.from({ length: MAX_PRICED_CANDIDATES + 5 }, (_, i) => 2000 + i);
+  const BULK = 5000;
+
+  function history(average: number, volume: number) {
+    return Array.from({ length: 30 }, (_, day) =>
+      historyPoint({
+        date: new Date(Date.parse(`${TODAY}T00:00:00Z`) - day * 86_400_000)
+          .toISOString()
+          .slice(0, 10),
+        average,
+        volume,
+        orderCount: 10,
+      })
+    );
+  }
+  const BULK_HISTORY = history(120, 5_000);
+  const THIN_HISTORY = history(300, 1);
+
+  beforeEach(() => {
+    getHubPrices.mockImplementation(async (hub: { id: string }, ids: number[]) => {
+      const atOrigin = hub.id === FROM.id;
+      return new Map(
+        ids.map((id) => {
+          if (id === BULK)
+            return [id, atOrigin ? aggregate(100, 90, 50_000) : aggregate(120, 110, 30_000)];
+          // 3x the price, two units for sale at the origin.
+          return [id, atOrigin ? aggregate(100, 90, 2) : aggregate(300, 250, 500)];
+        })
+      );
+    });
+    loadPriceHistory.mockImplementation(async (_region: number, typeId: number) => ({
+      points: typeId === BULK ? BULK_HISTORY : THIN_HISTORY,
+    }));
+    getOrderBook.mockImplementation(async (regionId: number, typeId: number) => {
+      const hub = regionId === FROM.regionId ? FROM : TO;
+      const price = hub === FROM ? 100 : typeId === BULK ? 120 : 300;
+      return {
+        orders: [{ price, volume_remain: 50_000, is_buy_order: false, location_id: hub.stationId }],
+      };
+    });
+  });
+
+  it('shortlists a bulk steady seller over high-ratio items with thin stock', async () => {
+    const typeIds = [...THIN, BULK];
+    const scan = await runHaulingScan({
+      from: FROM,
+      to: TO,
+      typeIds,
+      scope: 4,
+      types: typesFor(typeIds),
+      today: TODAY,
+    });
+    // Ranked by price ratio it was cut at the price pass, behind every thin item.
+    expect(loadPriceHistory).toHaveBeenCalledWith(TO.regionId, BULK);
+    expect(getOrderBook).toHaveBeenCalledWith(TO.regionId, BULK);
+    expect(scan.rows.map((r) => r.typeId)).toContain(BULK);
+    expect(scan.capped).toBe(true);
+  });
+
+  it('names what it examined: dropped by history or given books, never what a cap cut first', async () => {
+    // Every tenth thin item has no market at the destination: dropped by pass 2.
+    loadPriceHistory.mockImplementation(async (_region: number, typeId: number) => {
+      if (typeId !== BULK && typeId % 10 === 0) throw new EsiError(400, 'no market');
+      return { points: typeId === BULK ? BULK_HISTORY : THIN_HISTORY };
+    });
+    const typeIds = [...THIN, BULK];
+    const scan = await runHaulingScan({
+      from: FROM,
+      to: TO,
+      typeIds,
+      scope: 4,
+      types: typesFor(typeIds),
+      today: TODAY,
+    });
+    const historyIds = loadPriceHistory.mock.calls.map(([, id]) => id as number);
+    const dropped = historyIds.filter((id) => id !== BULK && id % 10 === 0);
+    const booked = getOrderBook.mock.calls
+      .filter(([region]) => region === TO.regionId)
+      .map(([, id]) => id as number);
+    expect(new Set(scan.examinedTypeIds)).toEqual(new Set([...dropped, ...booked]));
+    // Cut at the price pass, or past history but cut before the books: a later scan's.
+    expect(historyIds.length).toBe(MAX_PRICED_CANDIDATES);
+    expect(scan.examinedTypeIds.length).toBeLessThan(historyIds.length);
+  });
+});
+
+describe('runHaulingScan, examined ids and a failed history read', () => {
+  const TODAY = '2026-10-15';
+  const points = (average: number, volume: number) =>
+    Array.from({ length: 30 }, (_, day) =>
+      historyPoint({
+        date: new Date(Date.parse(`${TODAY}T00:00:00Z`) - day * 86_400_000)
+          .toISOString()
+          .slice(0, 10),
+        average,
+        volume,
+        orderCount: 10,
+      })
+    );
+
+  it('leaves an item whose history read failed (rate limit, network) unexamined, for a later scan', async () => {
+    loadPriceHistory.mockRejectedValue(new Error('429'));
+    const scan = await runHaulingScan({
+      from: FROM,
+      to: TO,
+      typeIds: [34],
+      scope: 4,
+      types: TYPES,
+      today: TODAY,
+    });
+    expect(scan.examinedTypeIds).not.toContain(34);
+  });
+
+  it('marks examined an item whose history loaded and did not sell above the origin price', async () => {
+    loadPriceHistory.mockResolvedValue({ points: points(90, 1_000) });
+    const scan = await runHaulingScan({
+      from: FROM,
+      to: TO,
+      typeIds: [34],
+      scope: 4,
+      types: TYPES,
+      today: TODAY,
+    });
+    expect(scan.examinedTypeIds).toContain(34);
+  });
+});
+
+describe('runHaulingScan, Max price', () => {
+  /** More dear, high-scoring items than the order-book pass takes, and one cheap one. */
+  const DEAR = Array.from({ length: MAX_BOOK_CANDIDATES + 5 }, (_, i) => 7000 + i);
+  const CHEAP = 8000;
+
+  beforeEach(() => {
+    getHubPrices.mockImplementation(async (hub: { id: string }, ids: number[]) => {
+      const atOrigin = hub.id === FROM.id;
+      return new Map(
+        ids.map((id) => {
+          if (id === CHEAP) return [id, atOrigin ? aggregate(100, 90) : aggregate(200, 150)];
+          return [
+            id,
+            atOrigin ? aggregate(1_000_000, 1) : aggregate(3_000_000, 2_000_000, 1_000, 1_000),
+          ];
+        })
+      );
+    });
+    getOrderBook.mockImplementation(async (regionId: number) => {
+      const origin = regionId === FROM.regionId;
+      return {
+        orders: [
+          {
+            price: origin ? 100 : 150,
+            volume_remain: 100,
+            is_buy_order: !origin,
+            location_id: (origin ? FROM : TO).stationId,
+          },
+        ],
+      };
+    });
+  });
+
+  it('gives no shortlist slot to an item dearer than Max price, so a cheaper one takes it', async () => {
+    const typeIds = [...DEAR, CHEAP];
+    const run = (maxUnitPrice?: number) =>
+      runHaulingScan({
+        from: FROM,
+        to: TO,
+        typeIds,
+        scope: 4,
+        types: typesFor(typeIds),
+        mode: 'instant',
+        maxUnitPrice,
+      });
+    expect((await run()).rows.map((r) => r.typeId)).not.toContain(CHEAP);
+    getOrderBook.mockClear();
+    const capped = await run(500);
+    expect(capped.rows.map((r) => r.typeId)).toEqual([CHEAP]);
+    expect(getOrderBook).toHaveBeenCalledTimes(2);
+    // Said, not silent: every dear item pass 1 would have kept.
+    expect(capped.overMaxPrice).toBe(DEAR.length);
+    expect((await run()).overMaxPrice).toBe(0);
+  });
+
+  it('keeps a Max price scan apart in the cache', () => {
+    const base = { from: FROM, to: TO, scope: 4, mode: 'instant' as const };
+    expect(haulingScanCacheKey({ ...base, maxUnitPrice: 500 })).not.toBe(haulingScanCacheKey(base));
+    expect(haulingScanCacheKey({ ...base, maxUnitPrice: null })).toBe(haulingScanCacheKey(base));
+  });
+});
+
+describe('runHaulingScan, the scan cache', () => {
+  it('writes nothing once the scan was aborted, even after the last book landed', async () => {
+    const controller = new AbortController();
+    getOrderBook.mockImplementation(async (regionId: number) => {
+      controller.abort();
+      return regionId === FROM.regionId
+        ? {
+            orders: [
+              { price: 100, volume_remain: 10, is_buy_order: false, location_id: FROM.stationId },
+            ],
+          }
+        : {
+            orders: [
+              { price: 115, volume_remain: 5, is_buy_order: true, location_id: TO.stationId },
+            ],
+          };
+    });
+    await expect(
+      runHaulingScan({
+        from: FROM,
+        to: TO,
+        typeIds: [34],
+        scope: 4,
+        types: TYPES,
+        mode: 'instant',
+        signal: controller.signal,
+      })
+    ).rejects.toThrow(/aborted/);
+    // Nothing cached: the same scan asked again reads the hubs again.
+    getHubPrices.mockClear();
+    await runHaulingScan({
+      from: FROM,
+      to: TO,
+      typeIds: [34],
+      scope: 4,
+      types: TYPES,
+      mode: 'instant',
+    });
+    expect(getHubPrices).toHaveBeenCalled();
+  });
+
+  it('answers a fresh scan from the cache and an expired one afresh', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      const scan = (scope: number) =>
+        runHaulingScan({ from: FROM, to: TO, typeIds: [34], scope, types: TYPES, mode: 'instant' });
+      await scan(4);
+      getHubPrices.mockClear();
+      await scan(4);
+      expect(getHubPrices).not.toHaveBeenCalled();
+      vi.setSystemTime(Date.now() + 10 * 60_000);
+      await scan(5);
+      getHubPrices.mockClear();
+      await scan(4);
+      expect(getHubPrices).toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe('runHaulingScan, shortlist order selling into buy orders', () => {
+  const WIDE = Array.from({ length: MAX_BOOK_CANDIDATES + 5 }, (_, i) => 3000 + i);
+  const DEEP = 6000;
+
+  beforeEach(() => {
+    getHubPrices.mockImplementation(async (hub: { id: string }, ids: number[]) => {
+      const atOrigin = hub.id === FROM.id;
+      return new Map(
+        ids.map((id) => {
+          if (atOrigin) return [id, aggregate(100, 90, 100_000)];
+          // 1.05x into deep buy orders: profitable after sales tax, not after a listing's fees.
+          if (id === DEEP) return [id, aggregate(500, 105, 1, 100_000)];
+          // 1.5x, one unit wanted, though plenty is listed for sale.
+          return [id, aggregate(160, 150, 100_000, 1)];
+        })
+      );
+    });
+    getOrderBook.mockImplementation(async (regionId: number) => {
+      const origin = regionId === FROM.regionId;
+      const hub = origin ? FROM : TO;
+      return {
+        orders: [
+          {
+            price: origin ? 100 : 105,
+            volume_remain: 100_000,
+            is_buy_order: !origin,
+            location_id: hub.stationId,
+          },
+        ],
+      };
+    });
+  });
+
+  it('ranks by the buy orders standing at the destination, after sales tax only', async () => {
+    const typeIds = [...WIDE, DEEP];
+    const scan = await runHaulingScan({
+      from: FROM,
+      to: TO,
+      typeIds,
+      scope: 4,
+      types: typesFor(typeIds),
+      mode: 'instant',
+    });
+    expect(getOrderBook).toHaveBeenCalledWith(TO.regionId, DEEP);
+    expect(scan.rows.map((r) => r.typeId)).toContain(DEEP);
   });
 });
 
@@ -215,15 +627,12 @@ describe('runHaulingScan, Any hub at one end', () => {
 
   it('fetches each hub price list once and keeps the order-book pass under the overall cap', async () => {
     const typeIds = Array.from({ length: 200 }, (_, i) => 1000 + i);
-    const types = Object.fromEntries(
-      typeIds.map((id) => [String(id), { name: `T${id}`, volume: 1 }])
-    );
     const scan = await runHaulingScan({
       from: 'any',
       to: JITA,
       typeIds,
       scope: 4,
-      types: types as never,
+      types: typesFor(typeIds),
       mode: 'instant',
     });
     expect(getHubPrices).toHaveBeenCalledTimes(TRADE_HUBS.length);

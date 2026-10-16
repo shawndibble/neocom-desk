@@ -176,7 +176,7 @@ async function resolveEndpoints(
 /**
  * Names for every distinct region across both corpora.
  *
- * Out of `public/data/market/regions.json` — 78 entries, 2.7 KB, one fetch —
+ * Out of `public/data/market/regions.json` — one small fetch —
  * rather than `loadRegionName`'s one `GET /universe/regions/{id}` per region.
  * On a cold cache that lookup was the single network-bound stage of the whole
  * load, and it was spending dozens of round-trips re-learning constants the

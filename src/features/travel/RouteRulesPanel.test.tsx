@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { db } from '@/db';
 import { ROUTE_RULE_STORES } from '@/features/route/routeRules';
-import type { RouteHoleQuery } from '@/features/route/routeHoleSettings';
+import type { RouteHoleChange, RouteHoleQuery } from '@/features/route/routeHoleSettings';
 import { RouteHoleFields, RouteRulesPanel } from './RouteRulesPanel';
 
 vi.mock('@/features/route/routeShip', async (importOriginal) => {
@@ -41,7 +41,13 @@ function renderPanel({
   holes = false,
   bridges = false,
   onBrowseWormholes = () => undefined,
-}: { holes?: boolean; bridges?: boolean; onBrowseWormholes?: () => void } = {}) {
+  onHoleChange = () => undefined,
+}: {
+  holes?: boolean;
+  bridges?: boolean;
+  onBrowseWormholes?: () => void;
+  onHoleChange?: (change: RouteHoleChange) => void;
+} = {}) {
   const holeQuery: RouteHoleQuery = {
     enabled: holes,
     settings: { shipSize: 'medium', minLifeHours: 1, hubs: 'all' },
@@ -52,7 +58,7 @@ function renderPanel({
       preference="prefer-highsec"
       onPreferenceChange={() => undefined}
       holeQuery={holeQuery}
-      onHoleChange={() => undefined}
+      onHoleChange={onHoleChange}
       bridges={{
         bridgeQuery: { enabled: bridges, hydrated: true },
         onBridgesChange: () => undefined,
@@ -71,7 +77,7 @@ function renderPanel({
 }
 
 describe('RouteRulesPanel › More route options', () => {
-  it('keeps wormhole and bridge settings behind a closed disclosure', async () => {
+  it('keeps the Thera / Turnur switch out, and the rest behind a closed disclosure', async () => {
     const user = userEvent.setup();
     renderPanel();
 
@@ -79,23 +85,25 @@ describe('RouteRulesPanel › More route options', () => {
     expect(screen.getByRole('group', { name: 'Route preference' })).toBeInTheDocument();
     const toggle = screen.getByRole('button', { name: /More route options/ });
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.queryByRole('checkbox', { name: /Route through Thera/ })).toBeNull();
+    expect(
+      screen.getByRole('checkbox', { name: 'Route through Thera / Turnur' })
+    ).toBeInTheDocument();
     expect(screen.queryByRole('checkbox', { name: /jump bridges/i })).toBeNull();
     expect(within(toggle).queryByText(/ on$/)).toBeNull();
 
     await user.click(toggle);
 
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByRole('checkbox', { name: /Route through Thera/ })).toBeInTheDocument();
+    expect(screen.getAllByRole('checkbox', { name: /Route through Thera/ })).toHaveLength(1);
     expect(screen.getByRole('checkbox', { name: /jump bridges/i })).toBeInTheDocument();
   });
 
-  it('says from the closed state how many of its rules are on, and keeps the chips', async () => {
+  it('says from the closed state how many of its hidden rules are on', async () => {
     renderPanel({ holes: true, bridges: true });
 
     const toggle = await screen.findByRole('button', { name: /More route options/ });
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    expect(toggle).toHaveTextContent('2 on');
+    expect(toggle).toHaveTextContent('1 on');
   });
 });
 
@@ -147,17 +155,20 @@ describe('RouteHoleFields › My ship', () => {
   });
 });
 
-describe('RouteRulesPanel › Thera / Turnur modal openers', () => {
-  it('opens the modal from the switch label and from Browse open wormholes, the switch still toggling', async () => {
+describe('RouteRulesPanel › Thera / Turnur switch', () => {
+  it('toggles from its label, and only Browse open wormholes opens the modal', async () => {
     const user = userEvent.setup();
     const onBrowseWormholes = vi.fn();
-    renderPanel({ onBrowseWormholes });
-    await user.click(await screen.findByRole('button', { name: /More route options/ }));
+    const onHoleChange = vi.fn();
+    renderPanel({ onBrowseWormholes, onHoleChange });
 
-    await user.click(screen.getByRole('button', { name: 'Route through Thera / Turnur' }));
-    expect(onBrowseWormholes).toHaveBeenCalledTimes(1);
+    await user.click(await screen.findByText('Route through Thera / Turnur'));
+    expect(onHoleChange).toHaveBeenCalledWith({ field: 'enabled', value: true });
+    expect(screen.queryByRole('button', { name: 'Route through Thera / Turnur' })).toBeNull();
+    expect(onBrowseWormholes).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('button', { name: /More route options/ }));
     await user.click(screen.getByRole('button', { name: 'Browse open wormholes' }));
-    expect(onBrowseWormholes).toHaveBeenCalledTimes(2);
-    expect(screen.getByRole('checkbox', { name: /Route through Thera/ })).toBeInTheDocument();
+    expect(onBrowseWormholes).toHaveBeenCalledTimes(1);
   });
 });

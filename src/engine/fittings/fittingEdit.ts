@@ -19,6 +19,7 @@ import {
   type FittingSlotKind,
   type FittingStats,
 } from './types';
+import { withoutMutation } from './mutaplasmids';
 
 const RACK_ORDER = new Map(FITTING_SLOT_KINDS.map((slot, index) => [slot, index]));
 
@@ -108,7 +109,7 @@ export function swapModuleType(
   slotIndex: number,
   typeId: number
 ): Fitting {
-  return updateModule(fitting, slot, slotIndex, (module) => ({ ...module, typeId }));
+  return updateModule(fitting, slot, slotIndex, (module) => withoutMutation(module, typeId));
 }
 
 /**
@@ -427,6 +428,9 @@ export function setDroneCounts(
 ): Fitting {
   const inSpace = wholeCount(counts.inSpace);
   const inBay = wholeCount(counts.inBay);
+  if (fitting.drones.some((drone) => drone.typeId === typeId && drone.mutation)) {
+    return setMutatedDroneCounts(fitting, typeId, inSpace, inBay);
+  }
   const replacement: FittingDrone[] = [];
   if (inSpace > 0) replacement.push({ typeId, quantity: inSpace, state: 'active' });
   if (inBay > 0) replacement.push({ typeId, quantity: inBay, state: 'online' });
@@ -442,6 +446,62 @@ export function setDroneCounts(
     }
   }
   if (!placed) drones.push(...replacement);
+  return { ...fitting, drones };
+}
+
+/**
+ * `setDroneCounts` when the type has mutated drones, which are never merged.
+ * Space first, then bay, in listed order; excess dropped from the end, any
+ * shortfall plain drones; plain stacks worked in counts, one per state.
+ */
+function setMutatedDroneCounts(
+  fitting: Fitting,
+  typeId: number,
+  inSpace: number,
+  inBay: number
+): Fitting {
+  const stacks = fitting.drones
+    .filter((drone) => drone.typeId === typeId)
+    .map((drone) => ({ drone, active: 0, bay: 0 }));
+  let space = inSpace;
+  let bay = inBay;
+  for (const stack of [
+    ...stacks.filter(({ drone }) => drone.state === 'active'),
+    ...stacks.filter(({ drone }) => drone.state !== 'active'),
+  ]) {
+    stack.active = Math.min(stack.drone.quantity, space);
+    space -= stack.active;
+    stack.bay = Math.min(stack.drone.quantity - stack.active, bay);
+    bay -= stack.bay;
+  }
+
+  const replacement: FittingDrone[] = [];
+  const addPlain = (state: FittingDrone['state'], quantity: number) => {
+    if (quantity <= 0) return;
+    const stack = replacement.find((d) => !d.mutation && d.state === state);
+    if (stack) stack.quantity += quantity;
+    else replacement.push({ typeId, quantity, state });
+  };
+  for (const { drone, active, bay: inBayHere } of stacks) {
+    if (!drone.mutation) {
+      addPlain('active', active);
+      addPlain('online', inBayHere);
+    } else if (active > 0 || inBayHere > 0) {
+      replacement.push({ ...drone, state: active > 0 ? 'active' : 'online' });
+    }
+  }
+  addPlain('active', space);
+  addPlain('online', bay);
+
+  const drones: FittingDrone[] = [];
+  let placed = false;
+  for (const drone of fitting.drones) {
+    if (drone.typeId !== typeId) drones.push(drone);
+    else if (!placed) {
+      drones.push(...replacement);
+      placed = true;
+    }
+  }
   return { ...fitting, drones };
 }
 

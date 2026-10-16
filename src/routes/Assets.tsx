@@ -137,6 +137,7 @@ import {
 import { hasItemRows } from '@/features/character/assetBrowserFormat';
 import { OreItemMenu } from '@/features/assets/oreDecision/OreItemMenu';
 import { assetShipEditLocation } from '@/features/fittings/assetShipLocation';
+import { useOpenInFittings } from '@/features/fittings/useOpenInFittings';
 import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
 import { useItemActions } from '@/features/market/itemActions';
 import { usePageItemActions } from '@/features/market/usePageItemActions';
@@ -688,6 +689,7 @@ export function Assets() {
   const isPhone = useIsPhone();
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const openInFittings = useOpenInFittings();
   const viewedCharacterId = useViewedCharacterId();
   const { data, error, loading, hydrated, activeCharacterId, refresh } = useRouteSnapshot(
     loadAssetsSnapshot,
@@ -1914,11 +1916,10 @@ export function Assets() {
                         <Button
                           size="md"
                           className="shrink-0"
+                          loading={openInFittings.pending}
                           onClick={() =>
-                            void assetShipEditLocation(deepest, nodeLabel(deepest)).then(
-                              (location) => {
-                                if (location) void navigate(location);
-                              }
+                            openInFittings.open(() =>
+                              assetShipEditLocation(deepest, nodeLabel(deepest))
                             )
                           }
                         >

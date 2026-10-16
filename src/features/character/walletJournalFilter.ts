@@ -1,5 +1,6 @@
 import type { WalletJournalEntry } from '@/esi/endpoints';
 import { defineUrlFilter, nullableTextParam, textParam } from '@/lib/urlState';
+import { journalRefKey, type JournalRow } from '@/engine/journalNetting';
 import { bountyKillsOf } from './bountyKills';
 import { dailyGoalMessageIdOf } from './dailyGoal';
 
@@ -45,15 +46,15 @@ export const {
  * slice of `entry.date` is sufficient for the range check — ISO dates sort
  * lexicographically the same as chronologically.
  */
-export function filterWalletJournal(
-  entries: readonly WalletJournalEntry[],
+export function filterWalletJournal<T extends WalletJournalEntry>(
+  entries: readonly T[],
   filter: WalletJournalFilter,
   /** The description the journal shows for a line, which free text matches against. */
   describe: (entry: WalletJournalEntry) => string = (entry) => entry.description
-): WalletJournalEntry[] {
+): T[] {
   const text = filter.text.trim().toLowerCase();
   return entries.filter((entry) => {
-    if (filter.refType !== null && entry.ref_type !== filter.refType) return false;
+    if (filter.refType !== null && journalRefKey(entry) !== filter.refType) return false;
     const day = entry.date.slice(0, 10);
     if (filter.startDate !== null && day < filter.startDate) return false;
     if (filter.endDate !== null && day > filter.endDate) return false;
@@ -71,9 +72,9 @@ export function filterWalletJournal(
   });
 }
 
-/** Net ISK across a set of journal entries — a missing `amount` (a partial fetch) counts as zero. */
-export function journalNetTotal(entries: readonly WalletJournalEntry[]): number {
-  return entries.reduce((total, entry) => total + (entry.amount ?? 0), 0);
+/** Net ISK across a set of journal entries — a missing `amount` (a partial fetch) counts as zero. Lines between the pilot's own Characters net to nothing and are left out. */
+export function journalNetTotal(entries: readonly JournalRow[]): number {
+  return entries.reduce((total, entry) => total + (entry.internal ? 0 : (entry.amount ?? 0)), 0);
 }
 
 export interface RefTypeBreakdownRow {
@@ -93,15 +94,28 @@ export interface JournalBreakdown {
   net: number;
   /** One row per ref type, largest absolute net first. */
   rows: RefTypeBreakdownRow[];
+  /** Lines between the pilot's own Characters, left out of everything above. */
+  internalCount: number;
+}
+
+/** The net of lines that move ISK: own-Character transfers are out, a missing amount is zero. */
+export function journalNet(entries: readonly JournalRow[]): number {
+  return entries.reduce((sum, entry) => (entry.internal ? sum : sum + (entry.amount ?? 0)), 0);
 }
 
 /** Where the ISK came from and went: income, expense and net per `ref_type` (issue #2858). A missing `amount` counts as zero. */
-export function journalRefTypeBreakdown(entries: readonly WalletJournalEntry[]): JournalBreakdown {
+export function journalRefTypeBreakdown(entries: readonly JournalRow[]): JournalBreakdown {
   const byType = new Map<string, RefTypeBreakdownRow>();
+  let internalCount = 0;
   for (const entry of entries) {
+    if (entry.internal) {
+      internalCount += 1;
+      continue;
+    }
     const amount = entry.amount ?? 0;
-    const row = byType.get(entry.ref_type) ?? {
-      refType: entry.ref_type,
+    const key = journalRefKey(entry);
+    const row = byType.get(key) ?? {
+      refType: key,
       income: 0,
       expense: 0,
       net: 0,
@@ -111,14 +125,14 @@ export function journalRefTypeBreakdown(entries: readonly WalletJournalEntry[]):
     else row.expense -= amount;
     row.net += amount;
     row.count += 1;
-    byType.set(entry.ref_type, row);
+    byType.set(key, row);
   }
   const rows = [...byType.values()].sort(
     (a, b) => Math.abs(b.net) - Math.abs(a.net) || a.refType.localeCompare(b.refType)
   );
   const totalIn = rows.reduce((sum, row) => sum + row.income, 0);
   const totalOut = rows.reduce((sum, row) => sum + row.expense, 0);
-  return { totalIn, totalOut, net: totalIn - totalOut, rows };
+  return { totalIn, totalOut, net: journalNet(entries), rows, internalCount };
 }
 
 /** A breakdown row click: select that ref type, or clear it when it is already the one selected. */
@@ -135,8 +149,8 @@ export function toggleBreakdownRefType(
  * Radix `Select`, so one blank ESI row would give the list an entry that blanks
  * the control when picked.
  */
-export function journalRefTypes(entries: readonly WalletJournalEntry[]): string[] {
-  return [...new Set(entries.map((entry) => entry.ref_type))].filter(Boolean).sort();
+export function journalRefTypes(entries: readonly JournalRow[]): string[] {
+  return [...new Set(entries.map(journalRefKey))].filter(Boolean).sort();
 }
 
 /**

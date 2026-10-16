@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { PHONE_TILES, QUESTION_TILES, type Tile } from './questionTiles';
-import { screenshotSrc, type Screenshot } from './screenshots';
+import { screenshotSrc, screenshotSrcSet, type Screenshot } from './screenshots';
 import { ScreenshotZoom, ZoomBadge } from './ScreenshotZoom';
 
 const EYEBROW_CLASS = 'font-mono text-[0.6875rem] tracking-widest text-text-dim uppercase';
@@ -76,6 +76,8 @@ function ShotButton({
       <span className="absolute inset-0 block mask-[linear-gradient(to_bottom,black_60%,transparent)]">
         <img
           src={screenshotSrc(shot)}
+          srcSet={screenshotSrcSet(shot)}
+          sizes="(min-width: 1024px) 40vw, (min-width: 768px) 50vw, 100vw"
           alt={alt}
           width={shot.size.width}
           height={shot.size.height}
@@ -184,6 +186,8 @@ function PhoneShot({ shot, onOpen }: { shot: Screenshot; onOpen: () => void }) {
     >
       <img
         src={screenshotSrc(shot)}
+        srcSet={screenshotSrcSet(shot)}
+        sizes="min(32vw, 13rem)"
         alt={alt}
         width={shot.size.width}
         height={shot.size.height}

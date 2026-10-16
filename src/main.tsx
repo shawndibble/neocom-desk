@@ -13,6 +13,7 @@ import { BootCoverHost } from './app/BootCoverHost';
 import { BootUpdateGate } from './app/BootUpdateGate';
 import { hideBootCover, showBootCover } from './app/bootCover';
 import { installInputModality } from './app/inputModality';
+import { LANDING_SHELL_BACKSTOP_MS, releaseLandingShell } from './app/landingShell';
 import { installTranslateGuard } from './app/translateGuard';
 import {
   canRecoverFromStaleBuild,
@@ -61,9 +62,20 @@ installInputModality();
 // `onRecoverableError` when React retries and survives. This is the only
 // reporting hookup — `ErrorBoundary` itself deliberately does not also
 // capture, which would file every boundary-caught error twice.
+// The prerendered landing hero (`app/landingShell.ts`) hides `#root` until
+// the first real screen lets it go. A render error shows `#root` at once, so
+// the error screen is never stuck behind it, and the timer is the backstop for
+// anything else that keeps that screen from arriving.
+const reportError = reactErrorHandler();
+function releaseAndReport(...args: Parameters<typeof reportError>) {
+  releaseLandingShell();
+  reportError(...args);
+}
+setTimeout(releaseLandingShell, LANDING_SHELL_BACKSTOP_MS);
+
 createRoot(document.getElementById('root')!, {
-  onCaughtError: reactErrorHandler(),
-  onUncaughtError: reactErrorHandler(),
+  onCaughtError: releaseAndReport,
+  onUncaughtError: releaseAndReport,
   onRecoverableError: reactErrorHandler(),
 }).render(
   <StrictMode>

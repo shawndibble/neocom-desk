@@ -23,7 +23,7 @@ const DOWNLOAD_TIMEOUT_MS = 10 * 60_000;
  * redirect to a build-numbered file throws: caching under "latest" itself
  * would freeze the cache on whichever build it first saw.
  */
-async function resolveLatestUrl(userAgent) {
+export async function resolveLatestUrl(userAgent) {
   const res = await fetch(LATEST_URL, {
     method: 'HEAD',
     redirect: 'manual',

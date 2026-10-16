@@ -218,6 +218,39 @@ function copyDogmaEngineAssets() {
   };
 }
 
+/**
+ * Fills `index.html`'s `<template id="landing-shell-template">` with the
+ * prerendered landing hero (`src/app/landingShell.ts`, #3926), read from the
+ * snapshot `src/features/landing/landingShell.test.tsx` keeps of the real
+ * `Login` render. Read per transform so a regenerated snapshot shows in dev
+ * without a restart. Throws if the marker is gone: a build without the shell
+ * would ship silently slower.
+ *
+ * The built page links the stylesheet in `<head>`, so the shell paints styled.
+ * The dev server only injects CSS once the module graph runs, so there it gets
+ * the same stylesheet linked directly, or the shell would flash unstyled.
+ */
+function landingShellTemplate() {
+  const marker = '<!-- landing-shell -->';
+  const snapshot = fileURLToPath(
+    new URL('./src/features/landing/landingShell.snapshot.html', import.meta.url)
+  );
+  let serve = false;
+  return {
+    name: 'neocom-landing-shell',
+    configResolved(config: { command: 'build' | 'serve' }) {
+      serve = config.command === 'serve';
+    },
+    transformIndexHtml(html: string) {
+      if (!html.includes(marker)) throw new Error(`index.html has no ${marker} marker`);
+      const filled = html.replace(marker, readFileSync(snapshot, 'utf-8').trim());
+      return serve
+        ? filled.replace('</head>', '<link rel="stylesheet" href="/src/styles/index.css" /></head>')
+        : filled;
+    },
+  };
+}
+
 function spaFallbackHtml() {
   return {
     name: 'neocom-spa-fallback-html',
@@ -289,6 +322,7 @@ export default defineConfig({
     copyDogmaEngineAssets(),
     phosphorWeightsPlugin(),
     localeSplitPlugin(),
+    landingShellTemplate(),
     VitePWA({
       // Hand-written src/sw.ts (originally ADR 0007, issue #176; now ADR 0009)
       // — only strategy that will support a custom `push` handler (future
@@ -336,14 +370,14 @@ export default defineConfig({
         // system/region/group/attribute pickers read (`blueprints.json`,
         // `shipTree.json`, `market/{systems,jumps,systemPositions,groups,
         // attributes,regions,globalMarkets,lpCorporations}.json`; ~3.5 MB raw)
+        // and the market catalogue `market/{types,stations,variations}.json`
+        // (~3.1 MB raw, ~360 KB gzip: Fittings, Show Info and station names read them)
         // — see docs/context/decisions/*-core-feature-sde-files-are-precached*.
         // Everything else under `public/data` is the lazy set,
         // `src/sde/lazySdeFiles.ts`: one list, also what the idle background
         // warm fetches, cached cache-first under its content-versioned URL by
         // src/sw.ts (docs/context/decisions/*-feature-sde-files-load-on-demand-
-        // not-precached.md, amended). The market catalogue's three big files
-        // (types, stations, variations) are in it, so the Market Browser's
-        // order-book data is never paid for up front.
+        // not-precached.md, amended).
         // The dogma engine's WASM binary and its SDE data file (ADR 0016,
         // ~10 MB together) are fetched lazily on first Fitting open instead.
         // The 512px install icons and the brand lockup are fetched by the

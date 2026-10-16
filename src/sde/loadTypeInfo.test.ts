@@ -10,13 +10,14 @@ const SAME_SHARD = RIFTER + 32;
 const shard: TypeInfoShard = {
   [String(RIFTER)]: {
     description: 'A rugged little frigate.',
+    effects: [],
     attributes: [
       [9, 350],
       [161, 27289],
     ],
     volume: 27289,
   },
-  [String(SAME_SHARD)]: { description: '', attributes: [] },
+  [String(SAME_SHARD)]: { description: '', effects: [], attributes: [] },
 };
 
 function shardResponse(): Response {

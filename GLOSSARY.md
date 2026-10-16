@@ -9,6 +9,10 @@ alphabetical position lands mid-file, so two agents adding terms at once do not
 collide the way appending to the end always did. Scope decisions do not belong
 here — they go one per file in `docs/context/decisions/`.
 
+- **Abyssal type**: The item type a **Mutaplasmid** makes — "Heavy Abyssal
+  Energy Neutralizer", "Light Mutated Drone". One abyssal type is made from
+  many base modules, so the type alone never says which base an item came
+  from, nor what it rolled: those belong to the **Mutated module** itself.
 - **Account**: UI-level grouping of a user's Characters. Has no storage, no
   sync and no server-side identity, because EVE SSO exposes no account
   identifier. Never surfaced to the user as a thing to manage.
@@ -30,6 +34,7 @@ here — they go one per file in `docs/context/decisions/`.
   worth", Compare answers "which of these is cheaper". Its "Compare hubs"
   section prices the same pile at all 5 Trade Hubs ("where is it worth the
   most") and is not the **Compare** drawer.
+- **Omega coverage**: Overview widget: how many Omega subscriptions ("accounts") a pilot's net ISK income per rolling 30 days could pay for, at PLEX's price. Its "accounts" are EVE subscriptions counted from ISK, not the **Account** UI grouping of Characters.
 - **Open in EVE**: A button or menu item that asks the running EVE client to open a window (the information window for a character, corporation or alliance; an item's market window; or a contract) through `esi-ui.open_window.v1`. A write only in that it reaches the game: nothing in EVE changes. Its own default-on **Permission**, "Open in EVE".
 - **Price Percent**: The fraction of market an **Appraisal** is quoted at —
   100 is the order book untouched, and a buyer quoting loot pays some fraction
@@ -348,7 +353,8 @@ here — they go one per file in `docs/context/decisions/`.
 - **Baseline Character**: The **Character** in a **Skill Comparison** every other column is measured against (`+2`, `−3`, `missing`). Defaults to the active Character; any selected Character can be set as it.
 - **Fitting Compare**: The Ships section's page showing up to three **Fitting**s side by side, their stats worked out for the active Character's skills. The whole comparison lives in the URL as **Fitting Share Code**s. Distinct from Market **Compare** / **Compare Set**, Appraisal's **Compare hubs**, and **Build Plan Compare**: it shares nothing with them.
 - **Fitting Share Code**: A **Fitting** compressed into its URL: hull,
-  modules and their state, charges, drones, cargo, and any implant set.
+  modules and their state, charges, drones, cargo, any implant set, and each
+  **Mutated module**'s base, mutaplasmid and **Roll**s.
   Permanent and stateless; nothing is stored. Opened with nobody logged in, it
   shows the Fitting at every skill level V. Distinct from a **Share Link**,
   the short, expiring kind.
@@ -399,6 +405,14 @@ here — they go one per file in `docs/context/decisions/`.
 - **ISK/m³**: What a public courier haul pays per cubic metre of cargo (reward divided by volume), the secondary rate beside **ISK/jump**. A haul stating no volume has none, never an infinite one. **Hauling Opportunities** carries the same rate for a trade run: profit per unit over the unit's hauled volume.
 - **ISK/run**: What a listed blueprint copy costs per use: the contract's asking price divided by every run that ask buys (quantity as well as runs). A **BPC Sourcing** column. A row with no asking price, or a copy stating zero runs, has none, never an infinite rate.
 - **Reverse Lane**: The way home from a public courier haul: the same region pair, run backwards, shown on the haul detail as a count that links to the swapped search. Paired region to region, not station to station. A haul with an end nothing local places has no lane to look up, never a count of zero.
+- **Roll**: The value one attribute of a **Mutated module** came out at:
+  the base module's own value times a uniform pick within that attribute's
+  **Roll range**. Stated as the absolute attribute value, as the game shows
+  it. A roll is good or bad in the attribute's own direction — a higher
+  activation cost is a worse roll.
+- **Roll range**: The span a **Mutaplasmid** lets one attribute roll in, as
+  multipliers of the base module's value (0.8 to 1.3 of its activation cost,
+  say).
 - **Route Safety**: Travel's view of a stargate route: every system on it, in order, with its security, region, last-hour jumps and ship, pod and NPC kills, zKillboard's last-hour player kills, and a mark on any **Gank Chokepoint**. States conditions, never a verdict: no system or route is called safe or not. A figure that could not be supplied is unknown, never zero.
 - **Route strip**: Route Safety's one-glance picture of a route: one cell per system, coloured by security, with each **Gank Chokepoint** and each system with recent kills marked.
 - **Quiet stretch**: A run of two or more consecutive middle systems on a route or **Leg** that Route Safety folds into one row: no ship, pod or player kills in the last hour, no **Gank Chokepoint**, and no J-space. A figure still loading or unavailable never counts as zero. Named for the figures, never a verdict on the systems.
@@ -429,14 +443,28 @@ here — they go one per file in `docs/context/decisions/`.
 - **Liquidity Floor**: The minimum sell-order ISK a product must carry at the hub to be considered at all in **Market-Wide Build Opportunities**: a hard cutoff applied before any material pricing runs.
 - **Market Order Filled**: Fires when any of a Character's market orders completes — a sell order being bought out, or a buy order being delivered. Both directions count as one event type, not two.
 - **Made Payment**: ISK (or ore) the pilot has already sent, gathered so the Moon Mining Tax ledger can settle up backwards: "I already paid this; what did it cover?" Two sources only: an outgoing wallet-journal entry of a hand-sent kind, and an `item_exchange` contract the pilot issued at no price (payment in kind, cargo never priced). Offered only when it has a plausible target.
-- **Market Region**: A region that can actually hold orders. Wormhole, Abyssal and the unreachable dev regions never do; having an NPC station is not the test.
+- **Market Region**: A region whose market ESI lists live orders in, probed at each SDE bake: most of known space, plus whichever wormhole regions currently have public player-structure markets (these come and go between bakes). Abyssal and the unreachable dev regions never do; having an NPC station is not the test.
 - **Material Price Basis**: Which side of a Build Plan's **Trade Hub** order book its materials are costed at: sell orders (buy now) or buy orders (place orders and wait). Stored per plan; absent reads as sell. Materials only: the product is always valued at the hub's lowest sell. A material the chosen side cannot price is unpriceable, never re-quoted at the other side.
 - **Manual Ore Tag**: A pilot's hand-classification of an ore type the SDE-derived allowlists don't recognise: "Tag as moon ore" (group it into **Mining Ledger Entries**) or "Ignore" (treat it as ordinary ore/ice). Device-local and never synced; a stop-gap until the next SDE build. Reversible.
+- **Max price per item**: A Hauling filter: the highest origin unit price (the Buy column) worth buying at. Hides rows whose cheapest origin offer is dearer, and stops the **Trip Plan** buying any origin offer above it — in the table and in the fill alike. Blank is no limit.
+- **Max spend**: A Hauling filter: the **Trip Plan**'s ISK budget for the whole trip. Limits what the plan buys; hides no rows. Blank is no limit.
 - **Member**: One Character that has joined a **Community**, never a person:
   an account's alts join separately and appear separately. EVE exposes no
   account identity (see **Account**), so none is invented here.
 - **Mining Ledger Entry**: One row of the Moon Mining Tax ledger, derived (not stored) from ESI's personal mining ledger: every moon-goo row for one (character, EVE/UTC date, solar system), summed per ore type.
 - **Multi-Type Contract**: A public contract whose for-sale lines span more than one distinct item type. Its price is a real, indivisible ask for the whole contract, never attributed to any single line as that item's own price.
+- **Mutaplasmid**: The consumable that turns one base module or drone into a
+  **Mutated module**, irreversibly. Each applies to a fixed set of bases, makes
+  one **Abyssal type**, and gives each attribute it touches a **Roll range**.
+  Its strain (Decayed, Gravid, Unstable, their Glorified forms, Exigent,
+  Radical) sets how wide those ranges are.
+- **Mutated module**: One module or drone a **Mutaplasmid** was applied to:
+  an **Abyssal type** with its own base, mutaplasmid and **Roll**s. Each is a
+  unique item, never a stack. Its rolls are known only from the game itself
+  (ESI, by item id), a Pyfa EFT block or a **Fitting Share Code**; a
+  killmail, an **In-game Fitting** or a bare EFT line names the abyssal type
+  alone, and the app then states the module as unknown rather than guessing
+  its base.
 - **Need Book**: The marker on a skill in the Trained board that the Character's ESI skills do not list at all, so its skill book is still to buy and inject. Not shown for a skill ESI lists at level 0 (injected, untrained). Cannot tell a book the Character owns but has not injected from one it lacks; that needs assets.
 - **Notification Allow-List**: The closed set of EVE Notification `type` strings the app delivers. A type outside it is dropped at the poller.
 - **Notification Event**: One of a fixed catalog of character-state changes a user can be notified about — Skill Level Complete, Character Not Training, Industry Job Complete, New Mail, Planetary Extraction Done, Market Order Filled, New Calendar Event, Calendar Event Starting, Contract Accepted, Wallet Balance Changed. Each is independently toggleable per Character.
@@ -584,7 +612,7 @@ here — they go one per file in `docs/context/decisions/`.
 - **Cargo Space**: The holds a hauler can fill, each with its own m³, chosen once per device as a ship's base holds, a saved **Fitting**'s exact holds or a typed number. The general hold (cargo hold plus fleet hangar) takes anything; beside it sit any **Specialised Holds**. Optional. Hauled volume is the packaged volume where a type has one.
 - **Specialised Hold**: A ship hold that takes only certain contents, such as an ammo, planetary commodities, command center, mineral, gas, mining, ice, fuel or infrastructure hold, as opposed to the general hold (cargo hold plus fleet hangar).
 - **Consolidation Plan**: What each Character would have to move to bring their loose stock (not assembled, not inside a container or ship) to one destination station: per-Character packaged m3, trips against the saved **Cargo Space**, and a **Route Safety** link. A volume estimate, never a safety verdict.
-- **Trip Plan**: The suggested load for one trip's **Cargo Space** on one route: a quantity per item capped by a week of sales, the units worth buying at all, the remaining **Cargo Space** and an optional ISK budget, with the limit that applied named on each line. A suggestion the user can edit.
+- **Trip Plan**: The suggested load for one trip's **Cargo Space** on one route: a quantity per item capped by a week of sales, the units worth buying at all, the remaining **Cargo Space** and the optional **Max spend**, with the limit that applied named on each line. A suggestion the user can edit.
 - **Training Progress**: How much SP a Character has already banked toward the level it is training _right now_. Distinct from **Trained Skills**, which is levels finished. Interpolated from the skill queue's training window, as the in-game queue displays it.
 - **Undercut Scope**: Station, system or region: the nested scopes a rival's cheaper order can sit in. A row shows one severity, the tightest scope containing a rival. A scope absent from the result was never checked; a checked scope with no rival is recorded as clean, not absent.
 - **Use-or-Sell Check**: A Build Plan's third read, alongside the **Acquisition Verdict** and **Sale Profitability**, stated in the Costs panel rather than the **Verdict Hero**: is the stock the player already owns worth more sold than consumed? Compares the plan's profit (which counts owned units as free) against what those units would net if liquidated, on a chosen **Liquidation Basis**.

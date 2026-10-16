@@ -5,19 +5,19 @@
  *
  * The first view needs nothing from the user: a route and a category are
  * preset and the list works with no ship chosen. Choosing Cargo Space (and,
- * optionally, a budget) adds the hold meter and lets the Trip Plan stop at
+ * optionally, Max spend) adds the hold meter and lets the Trip Plan stop at
  * what fits. The plan is a suggestion — every row starts ticked at a suggested
  * quantity, and unticking or typing a number re-sizes the rest through the
  * same `planTrip` the suggestion came from.
  *
  * The Trip Plan lives in a rail beside the table: its totals, the
- * offer to fill the free space from other categories, and Copy multibuy. A
+ * fill offer, and Copy multibuy. A
  * row click selects the row and shows its detail in the rail. Where the
  * panel is too narrow for the rail (by its own width, ADR 0017), a sticky bar
  * carries the trip instead, and the trip and the detail open as sheets.
  */
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -27,7 +27,9 @@ import {
   EmptyState,
   FilterBar,
   FilterField,
+  IskInput,
   Modal,
+  SlideOver,
   Panel,
   Select,
   SelectContent,
@@ -42,6 +44,7 @@ import {
   IskAmount,
   TypeIcon,
   DataTableDenseCell,
+  useFilterSurface,
   type DataTableColumn,
 } from '@/components/ui';
 import { focusRingClassName, touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
@@ -55,7 +58,7 @@ import { formatIsk, formatMarketIsk, marketIskDecimals } from '@/lib/isk';
 import { writeToClipboard } from '@/lib/clipboard';
 import { createColumnVisibilitySetting, useColumnVisibility } from '@/lib/columnVisibility';
 import { createLocalSetting } from '@/lib/useLocalSetting';
-import { enumParam, intParam } from '@/lib/urlState';
+import { enumParam, intParam, optionalIntParam } from '@/lib/urlState';
 import {
   useRememberedUrlParams,
   type RememberedDefaults,
@@ -73,7 +76,7 @@ import { haulingCsvColumns } from './haulingCsv';
 import { HaulingFlagWord } from './HaulingFlagWord';
 import { HAULING_FLAG_KEY } from './haulingFlagKeys';
 import { HaulingItemActions, HaulingItemDetail } from './HaulingItemDetail';
-import { formatSignedPct, formatTripM3, formatVolume } from './format';
+import { formatSignedPct, formatTripM3, formatVolume, shownFreeM3 } from './format';
 import {
   HaulingFillList,
   HaulingTripBar,
@@ -134,8 +137,14 @@ const TABLE_WIDTHS = {
   oneHub: { compact: 45, cards: 42.5 },
   anyHub: { compact: 50.5, cards: 48 },
 } as const;
-/** Rail 20rem + 1rem gap; rail only where table keeps full figures beside it. */
+/** Rail 20rem + 1rem gap. */
 const RAIL_REM = 21;
+/**
+ * Narrowest column left of the rail: a phone's card list (24rem). Beside the
+ * rail the table goes compact, then to cards, before the panel falls back to
+ * the phone layout (trip bar + sheets) — a laptop keeps the rail.
+ */
+const RAIL_MIN_COLUMN_REM = 24;
 const RAIL_GRID = { gridTemplateColumns: 'minmax(0, 1fr) 20rem' } as const;
 const MARGIN_CHOICES = [0, 3, 5, 10] as const;
 
@@ -146,6 +155,10 @@ const HAULING_URL_FILTERS = {
   days: intParam(DEFAULT_HAULING_FILTER.days, { min: 0, max: 365 }),
   margin: intParam(DEFAULT_HAULING_FILTER.margin, { min: 0, max: 100 }),
   demand: enumParam(['steady', 'any'] as const, DEFAULT_HAULING_FILTER.demand),
+  /** Max price per item, whole ISK; absent is no limit. */
+  maxprice: optionalIntParam({ min: 1 }),
+  /** Max spend: the Trip Plan's ISK budget, whole ISK; absent is no limit. */
+  spend: optionalIntParam({ min: 1 }),
 };
 
 /** From/To default to the pilot's Trade Hub (`haulingHubs.ts`), so the schema is built per hub. */
@@ -161,15 +174,57 @@ function haulingUrl(hubId: TradeHub['id']) {
 type HaulingUrlValues = UrlParamValues<ReturnType<typeof haulingUrl>>;
 
 /**
- * Lifts `days`/`margin`/`demand` off any wider object that carries them
- * (`params`, the remembered-filter store's value) — the three travel
- * together everywhere this filter is read, so this is the one place that
+ * Lifts the remembered filter fields off any wider object that carries them
+ * (`params`, a store patch merged over its value) — the one place that
  * reassembles them rather than each call site picking fields by hand.
  */
-function pickHaulingFilter<T extends { days: number; margin: number; demand: HaulingDemandFilter }>(
-  source: T
-): StoredHaulingFilter {
-  return { days: source.days, margin: source.margin, demand: source.demand };
+function pickHaulingFilter(source: StoredHaulingFilter): StoredHaulingFilter {
+  return {
+    days: source.days,
+    margin: source.margin,
+    demand: source.demand,
+    maxprice: source.maxprice,
+  };
+}
+
+/** Every remembered field as the URL holds it: the stored filter plus Max spend. */
+type RememberedHaulingParams = StoredHaulingFilter & { spend: number | null };
+
+function pickRememberedParams(source: RememberedHaulingParams): RememberedHaulingParams {
+  return { ...pickHaulingFilter(source), spend: source.spend };
+}
+
+/**
+ * The remembered defaults behind the URL (a link's own value wins): the
+ * filters in `haulingFilterPref.ts`, Max spend in the Trip Plan budget's own
+ * store. The one place that knows `spend` lives apart.
+ */
+function useRememberedHaulingFilter(): RememberedDefaults<ReturnType<typeof haulingUrl>> {
+  const filterPref = useHaulingFilterPref((s) => s.value);
+  const hydrateFilterPref = useHaulingFilterPref((s) => s.hydrate);
+  const storedBudget = useHaulingBudget((s) => s.value);
+  const hydrateBudget = useHaulingBudget((s) => s.hydrate);
+  useEffect(() => {
+    void hydrateFilterPref();
+    void hydrateBudget();
+  }, [hydrateFilterPref, hydrateBudget]);
+  return useMemo(
+    () => ({
+      values: pickRememberedParams({
+        ...filterPref,
+        // Whole ISK, as the link holds it: a stored budget may be a fraction.
+        spend: storedBudget === null ? null : Math.round(storedBudget) || null,
+      }),
+      // Called with only the remembered fields that changed.
+      remember: ({ spend, ...filter }: Partial<HaulingUrlValues>) => {
+        if (spend !== undefined) void useHaulingBudget.getState().setValue(spend);
+        if (Object.keys(filter).length === 0) return;
+        const { value, setValue } = useHaulingFilterPref.getState();
+        void setValue(pickHaulingFilter({ ...value, ...filter }));
+      },
+    }),
+    [filterPref, storedBudget]
+  );
 }
 
 const useIntroDismissed = createLocalSetting<boolean>({
@@ -260,30 +315,9 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
   }, [hydrateDefaultHub]);
   const haulingSchema = useMemo(() => haulingUrl(defaultHubId), [defaultHubId]);
 
-  // The filter fields (days/margin/demand) are remembered across sessions
-  // (issue: hauling toolbar redesign) — a link's own value always wins, and
-  // an edit is written to both the URL and this store in the same call. See
-  // `haulingFilterPref.ts`.
-  const haulingFilterPref = useHaulingFilterPref((s) => s.value);
-  const hydrateHaulingFilterPref = useHaulingFilterPref((s) => s.hydrate);
-  useEffect(() => {
-    void hydrateHaulingFilterPref();
-  }, [hydrateHaulingFilterPref]);
-  const rememberedFilter: RememberedDefaults<ReturnType<typeof haulingUrl>> = useMemo(
-    () => ({
-      values: pickHaulingFilter(haulingFilterPref),
-      remember: (patch: Partial<HaulingUrlValues>) => {
-        const { value, setValue } = useHaulingFilterPref.getState();
-        void setValue({
-          days: patch.days ?? value.days,
-          margin: patch.margin ?? value.margin,
-          demand: patch.demand ?? value.demand,
-        });
-      },
-    }),
-    [haulingFilterPref]
-  );
+  const rememberedFilter = useRememberedHaulingFilter();
   const [params, setParams] = useRememberedUrlParams(haulingSchema, rememberedFilter);
+  const maxSpend = params.spend;
   // Stable references (a hub from `TRADE_HUBS`, or the Any string): the scans key their effects on them.
   const from = haulingEnd(params.from);
   const to = haulingEnd(params.to);
@@ -304,7 +338,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
   // measured on the whole panel, never on the table beside the rail, whose
   // width the rail itself decides.
   const [layoutRef, [layoutNarrow = false]] = useElementNarrowerThan<HTMLDivElement>([
-    widths.compact + RAIL_REM,
+    RAIL_MIN_COLUMN_REM + RAIL_REM,
   ]);
   const railShown = !isPhone && !layoutNarrow;
   // Narrow table → compact figures (full ones starve Item, scroll page); narrower still → cards.
@@ -346,17 +380,13 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
   const cargo = useHaulingCargo((s) => s.value);
   const hydrateCargo = useHaulingCargo((s) => s.hydrate);
   const setCargo = useHaulingCargo((s) => s.setValue);
-  const budget = useHaulingBudget((s) => s.value);
-  const hydrateBudget = useHaulingBudget((s) => s.hydrate);
-  const setBudget = useHaulingBudget((s) => s.setValue);
   const introDismissed = useIntroDismissed((s) => s.value);
   const hydrateIntro = useIntroDismissed((s) => s.hydrate);
   const setIntroDismissed = useIntroDismissed((s) => s.setValue);
   useEffect(() => {
     void hydrateCargo();
-    void hydrateBudget();
     void hydrateIntro();
-  }, [hydrateCargo, hydrateBudget, hydrateIntro]);
+  }, [hydrateCargo, hydrateIntro]);
   const cargoSet = cargo !== null && cargo.holds.length > 0;
 
   // The pickers never leave Any at both ends (`pickHaulingHub` swaps), but a hand-written link can.
@@ -369,7 +399,8 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     mode,
     // Not before the default hub has loaded: until then the lane is the
     // fallback one, and scanning it would spend ESI budget on the wrong route.
-    defaultHubHydrated && !sameHub && !bothAny
+    defaultHubHydrated && !sameHub && !bothAny,
+    params.maxprice
   );
   const fees = useHaulingFees(activeCharacterId);
 
@@ -383,8 +414,9 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       maxDays: params.days === 0 ? null : params.days,
       minMarginPct: params.margin,
       steadyOnly: params.demand === 'steady',
+      maxUnitPrice: params.maxprice,
     }),
-    [params.days, params.margin, params.demand]
+    [params.days, params.margin, params.demand, params.maxprice]
   );
   const viewRows = useMemo(
     () => (state.status === 'ready' ? toViewRows(state.scan.rows, fees.at) : []),
@@ -404,6 +436,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       maxDays: DEFAULT_HAULING_FILTER.days,
       minMarginPct: DEFAULT_HAULING_FILTER.margin,
       steadyOnly: DEFAULT_HAULING_FILTER.demand === 'steady',
+      maxUnitPrice: DEFAULT_HAULING_FILTER.maxprice,
     });
     const summary = summarizeHaulingRows(usual, scanFetchedAt);
     if (summary) rememberHaulingSummary(summary);
@@ -431,15 +464,23 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     setDetailOpen(false);
   }
 
+  // What the category scan returned or examined: the fill never spends a batch on them again.
+  const scannedTypeIds = useMemo(
+    () =>
+      state.status === 'ready'
+        ? [...state.scan.rows.map((r) => r.typeId), ...state.scan.examinedTypeIds]
+        : [],
+    [state]
+  );
   const fill = useHaulingFill({
     from,
     to,
-    categoryId,
     mode,
     laneKey: scanKey,
     feesAt: fees.at,
     filters: rowFilters,
     groups,
+    scannedTypeIds,
   });
   // A reload re-prices the lane: the fill and the rows added from it were
   // priced from the old books, so they go, and with them Add's pins.
@@ -463,8 +504,8 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
 
   // Every candidate carries its own destination's fees; `fees` here is only the fallback.
   const planBase = useMemo(
-    () => ({ holds: cargo?.holds ?? null, budgetIsk: budget, fees: fees.at(TRADE_HUBS[0]!) }),
-    [cargo, budget, fees]
+    () => ({ holds: cargo?.holds ?? null, budgetIsk: maxSpend, fees: fees.at(TRADE_HUBS[0]!) }),
+    [cargo, maxSpend, fees]
   );
   const plan = useMemo(
     () => planTrip({ ...planBase, candidates: tableCandidates, overrides }),
@@ -488,13 +529,11 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
   );
 
   /** The room left in every hold: one figure for the summary, the fill offer and the trip bar. */
-  const freeM3 = plan.holds.reduce((sum, h) => sum + Math.max(0, h.capacityM3 - h.usedM3), 0);
+  const freeM3 = shownFreeM3(plan.holds);
 
-  // Fill the free space: on demand only (the scan costs ESI budget), never for
-  // Everything (no other category left), only once a Cargo Space binds the plan,
-  // and on a fixed lane only: with Any hub at an end it would scan every hub's books.
-  const fillOffered =
-    categoryId !== EVERYTHING_CATEGORY_ID && cargoSet && anyEnd === null && !sameHub;
+  // Fill the free space: needs a Cargo Space and a fixed lane (Any hub would
+  // scan every hub's books), and the category scan landed, so its rows stay out.
+  const fillOffered = cargoSet && anyEnd === null && !sameHub && state.status === 'ready';
   const fillOffer = useHaulingFillOffer(fill, {
     offered: fillOffered,
     current: tableCandidates,
@@ -526,7 +565,8 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
 
   const allSelected =
     tableRows.length > 0 && tableRows.every((r) => overrides.get(r.typeId)?.selected !== false);
-  const selectedCount = tableRows.filter((r) => overrides.get(r.typeId)?.selected !== false).length;
+  // What ships, not what is ticked: a ticked row the plan sized to nothing is not in the trip.
+  const selectedCount = plan.totals.items;
 
   // A row click selects the row and shows its detail; a click on the
   // selected row clears it (DESIGN.md §6c). The rail's "‹ Trip" only leaves
@@ -879,15 +919,20 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
         (columnVisibility.isVisible(column.id) || (cards && column.id === 'margin')))
   );
 
-  // Selling into buy orders reads neither days nor demand, so only the margin filter counts there.
+  // Selling into buy orders reads neither days nor demand.
   const activeFilterCount =
     (!instant && params.days !== DEFAULT_HAULING_FILTER.days ? 1 : 0) +
     (params.margin !== DEFAULT_HAULING_FILTER.margin ? 1 : 0) +
-    (!instant && params.demand !== DEFAULT_HAULING_FILTER.demand ? 1 : 0);
-  const hiddenCount = (instant ? 0 : hidden.thin + hidden.slow) + hidden.lowMargin;
-  // Category and mode ride along so the narrow sheet can edit them as part of
-  // its draft; only days/margin/demand are remembered (`rememberedFilter`).
-  const filterValue = { ...pickHaulingFilter(params), cat: categoryId, mode };
+    (!instant && params.demand !== DEFAULT_HAULING_FILTER.demand ? 1 : 0) +
+    (params.maxprice !== null ? 1 : 0) +
+    (params.spend !== null ? 1 : 0);
+  // Max price hides at both ends: the scan's price pass drops most, the row filter what a lot pushes over it.
+  const dear = hidden.tooDear + (state.status === 'ready' ? state.scan.overMaxPrice : 0);
+  const hiddenCount = dear + (instant ? 0 : hidden.thin + hidden.slow) + hidden.lowMargin;
+  // Only when Max price hid something does the hidden line name it.
+  const hiddenKeySuffix = dear > 0 ? 'MaxPrice' : '';
+  // Category and mode ride along so the narrow sheet can edit them in its draft; neither is remembered.
+  const filterValue = { ...pickRememberedParams(params), cat: categoryId, mode };
 
   // With Any hub at an end each row has its own lane: no one label, no one jump count.
   const laneLabel =
@@ -954,8 +999,6 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
             characterId={activeCharacterId}
             cargo={cargo}
             onCargoChange={(next) => void setCargo(next)}
-            budget={budget}
-            onBudgetChange={(next) => void setBudget(next)}
           />
         }
         cargoValueAfterFill={fillOffer.cargoValueAfterFill}
@@ -966,12 +1009,19 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
         <HaulingFillList
           {...fillOffer.list}
           freeM3={freeM3}
-          progressText={fill.status === 'loading' ? progressText(fill.progress) : undefined}
+          progressText={
+            fill.state.status === 'loading' ? progressText(fill.state.progress) : undefined
+          }
         />
       )}
     </div>
   );
-  const detail = (row: HaulingViewRow, showTitle: boolean) => (
+  // Without the rail the sheet is the selection's only sign: closing it clears both (§6c).
+  const closeDetail = () => {
+    setDetailOpen(false);
+    setSelectedTypeId(null);
+  };
+  const detail = (row: HaulingViewRow, showTitle: boolean, laneActions?: ReactNode) => (
     // Keyed, so a new row opens with its own folds closed ("Show the math").
     <HaulingItemDetail
       key={row.typeId}
@@ -979,6 +1029,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       line={lineOf.get(row.typeId)}
       loadNote={limitTextOf(row)}
       showTitle={showTitle}
+      laneActions={laneActions}
     />
   );
 
@@ -1029,12 +1080,14 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
             hiddenCount === 0
               ? t('market.hauling.emptyHint', { scanned: state.scan.scanned })
               : instant
-                ? t('market.hauling.emptyHiddenHintInstant', {
+                ? t(`market.hauling.emptyHiddenHintInstant${hiddenKeySuffix}`, {
                     scanned: state.scan.scanned,
+                    dear,
                     low: hidden.lowMargin,
                   })
-                : t('market.hauling.emptyHiddenHint', {
+                : t(`market.hauling.emptyHiddenHint${hiddenKeySuffix}`, {
                     scanned: state.scan.scanned,
+                    dear,
                     thin: hidden.thin,
                     slow: hidden.slow,
                     low: hidden.lowMargin,
@@ -1106,8 +1159,12 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
           {hiddenCount === 0
             ? t('market.hauling.scannedLine', { count: state.scan.scanned })
             : instant
-              ? t('market.hauling.hiddenLineInstant', { low: hidden.lowMargin })
-              : t('market.hauling.hiddenLine', {
+              ? t(`market.hauling.hiddenLineInstant${hiddenKeySuffix}`, {
+                  dear,
+                  low: hidden.lowMargin,
+                })
+              : t(`market.hauling.hiddenLine${hiddenKeySuffix}`, {
+                  dear,
                   thin: hidden.thin,
                   slow: hidden.slow,
                   low: hidden.lowMargin,
@@ -1162,30 +1219,52 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
               onOpenTrip={() => setTripOpen(true)}
               copyButton={copyButton('sm', 'shrink-0')}
             />
-            <Modal
-              open={tripOpen}
-              onClose={() => setTripOpen(false)}
-              title={t('market.hauling.rail.title')}
-              placement="sheet-full"
-            >
-              <div className="flex flex-col gap-4">
-                {tripView}
-                {tripFooter}
-              </div>
-            </Modal>
-            <Modal
-              open={detailOpen && selectedRow !== undefined}
-              // Without the rail the sheet is the selection's only sign: closing it clears both (§6c).
-              onClose={() => {
-                setDetailOpen(false);
-                setSelectedTypeId(null);
-              }}
-              title={selectedRow?.name ?? t('market.hauling.title')}
-              titleActions={selectedRow && <HaulingItemActions row={selectedRow} />}
-              placement="sheet-full"
-            >
-              {selectedRow && detail(selectedRow, false)}
-            </Modal>
+            {isPhone ? (
+              <>
+                <Modal
+                  open={tripOpen}
+                  onClose={() => setTripOpen(false)}
+                  title={t('market.hauling.rail.title')}
+                  placement="sheet-full"
+                >
+                  <div className="flex flex-col gap-4">
+                    {tripView}
+                    {tripFooter}
+                  </div>
+                </Modal>
+                <Modal
+                  open={detailOpen && selectedRow !== undefined}
+                  onClose={closeDetail}
+                  title={selectedRow?.name ?? t('market.hauling.title')}
+                  titleActions={selectedRow && <HaulingItemActions row={selectedRow} />}
+                  placement="sheet-full"
+                >
+                  {selectedRow && detail(selectedRow, false)}
+                </Modal>
+              </>
+            ) : (
+              // Too narrow for the rail but not a phone: the same views slide in over the right edge (§6c drawer).
+              <>
+                <SlideOver
+                  open={tripOpen}
+                  onClose={() => setTripOpen(false)}
+                  title={t('market.hauling.rail.title')}
+                >
+                  <div className="flex flex-col gap-4">
+                    {tripView}
+                    {tripFooter}
+                  </div>
+                </SlideOver>
+                <SlideOver
+                  open={detailOpen && selectedRow !== undefined}
+                  onClose={closeDetail}
+                  title={selectedRow?.name ?? t('market.hauling.title')}
+                >
+                  {selectedRow &&
+                    detail(selectedRow, false, <HaulingItemActions row={selectedRow} />)}
+                </SlideOver>
+              </>
+            )}
           </>
         )}
       </div>
@@ -1235,8 +1314,13 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
                     value={categoryId}
                     onChange={(cat) => setParams({ cat })}
                     nameOf={categoryName}
+                    inRouteRow
                   />
-                  <ModeSelect value={mode} onChange={(next) => setParams({ mode: next })} />
+                  <ModeSelect
+                    value={mode}
+                    onChange={(next) => setParams({ mode: next })}
+                    inRouteRow
+                  />
                 </>
               )}
             </>
@@ -1337,7 +1421,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
                       <SelectTrigger
                         size="sm"
                         aria-label={t('market.hauling.filters.demand')}
-                        className="w-32"
+                        className="w-40"
                       >
                         <SelectValue />
                       </SelectTrigger>
@@ -1348,6 +1432,17 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
                     </Select>
                   </FilterField>
                 )}
+                <IskCapField
+                  label={t('market.hauling.filters.maxPrice')}
+                  value={draft.maxprice}
+                  onChange={(maxprice) => setDraft({ ...draft, maxprice })}
+                />
+                <IskCapField
+                  label={t('market.hauling.filters.maxSpend')}
+                  hint={t('market.hauling.filters.maxSpendHint')}
+                  value={draft.spend}
+                  onChange={(spend) => setDraft({ ...draft, spend })}
+                />
                 <p className="text-[0.6875rem] text-text-dim">
                   {draftInstant
                     ? t('market.hauling.feesLineInstant', { accounting: fees.accountingLevel })
@@ -1414,20 +1509,125 @@ function HubField({
   );
 }
 
+/** A typed ISK cap not yet committed: none, a whole figure (null = no limit), or a fraction that can't commit. */
+type HeldIsk = 'none' | 'partial' | { amount: number | null };
+
+/**
+ * An ISK cap in the filters — Max price per item, Max spend. Blank is no
+ * limit. Only a whole, positive figure commits: the URL holds whole ISK.
+ * Inline it commits on blur or Enter, not per keystroke: `250m` passes
+ * through 2 ISK, which would hide every row and drop the selection. The
+ * sheet's draft takes each keystroke; its Apply is the commit.
+ */
+function IskCapField({
+  label,
+  hint,
+  value,
+  onChange,
+}: {
+  label: string;
+  hint?: string;
+  value: number | null;
+  onChange: (next: number | null) => void;
+}) {
+  const { t } = useTranslation();
+  const hintId = useId();
+  // Inline the field has no caption, so its placeholder names it; in the sheet the caption does.
+  const inSheet = useFilterSurface() === 'sheet';
+  // `IskInput`'s own last parse, unrounded, handed back as its `value`: a
+  // rounded figure (`2.01m` = 2009999.99… → 2010000) would read as an outside
+  // change and reset the typed text. The URL lands in a transition, so `value` lags.
+  const [typedText, setTypedText] = useState<string | null>(null);
+  // What the typed text says, not yet committed: a whole figure (or null, no
+  // limit) waiting for blur/Enter inline, or a fraction that can't commit.
+  const [held, setHeld] = useState<HeldIsk>('none');
+  const [lastSent, setLastSent] = useState<number | null>(value);
+  const [prevValue, setPrevValue] = useState(value);
+  // A value this field did not send (Reset, a link) replaces what was typed.
+  if (prevValue !== value) {
+    setPrevValue(value);
+    if (value !== lastSent) {
+      setTypedText(null);
+      setHeld('none');
+    }
+  }
+  const shown = typedText ?? (value === null ? '' : String(value));
+  function commit(next: number | null) {
+    setHeld('none');
+    if (next === value) return;
+    setLastSent(next);
+    onChange(next);
+  }
+  /** Blur/Enter: commit a held figure; a fraction reverts to the committed value. */
+  function settle() {
+    if (held === 'partial') {
+      setTypedText(null);
+      setHeld('none');
+    } else if (held !== 'none') commit(held.amount);
+  }
+  return (
+    <FilterField label={label}>
+      <IskInput
+        size="sm"
+        aria-label={label}
+        aria-describedby={hint === undefined ? undefined : hintId}
+        placeholder={inSheet ? t('market.hauling.filters.noLimit') : label}
+        // Inline the echo rides beside the box, not under it, so the row keeps one height.
+        className={inSheet ? 'w-40' : 'flex-row! items-center [&>input]:w-40'}
+        value={shown}
+        onChange={(text) => {
+          setTypedText(text);
+          const amount = Number(text);
+          const whole = text === '' ? null : Math.round(amount);
+          // Shorthand's float noise rounds away; a real fraction (`1.5`, on its way to `1.5b`) waits.
+          const usable =
+            whole === null ||
+            (Math.abs(amount - whole) < 0.001 && Number.isSafeInteger(whole) && whole > 0);
+          if (!usable) setHeld('partial');
+          else if (inSheet) commit(whole);
+          else setHeld({ amount: whole });
+        }}
+        onBlur={settle}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') settle();
+        }}
+      />
+      {hint !== undefined && (
+        <span id={hintId} className={inSheet ? 'text-[0.6875rem] text-text-dim' : 'sr-only'}>
+          {hint}
+        </span>
+      )}
+    </FilterField>
+  );
+}
+
+/**
+ * In the route row Category and Sell by give way before the row wraps: they
+ * break the line at a smaller basis and grow back to their full width, so the
+ * filter funnel stays on the route's line beside the trip rail.
+ */
+const ROUTE_ROW_SELECT = 'grow basis-36';
+
 /** The market category to scan — in the route row on a wide screen, in the filter sheet on a narrow one. */
 function CategorySelect({
   value,
   onChange,
   nameOf,
+  inRouteRow = false,
 }: {
   value: number;
   onChange: (cat: number) => void;
   nameOf: (id: number) => string;
+  inRouteRow?: boolean;
 }) {
   const { t } = useTranslation();
   return (
     <Select value={String(value)} onValueChange={(next) => onChange(Number(next))}>
-      <SelectTrigger size="sm" aria-label={t('market.hauling.category')} className="w-52">
+      <SelectTrigger
+        size="sm"
+        aria-label={t('market.hauling.category')}
+        className={inRouteRow ? `${ROUTE_ROW_SELECT} max-w-52` : 'w-52'}
+      >
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
@@ -1442,11 +1642,23 @@ function CategorySelect({
 }
 
 /** How the load is sold at the destination — placed like `CategorySelect`. */
-function ModeSelect({ value, onChange }: { value: HaulMode; onChange: (mode: HaulMode) => void }) {
+function ModeSelect({
+  value,
+  onChange,
+  inRouteRow = false,
+}: {
+  value: HaulMode;
+  onChange: (mode: HaulMode) => void;
+  inRouteRow?: boolean;
+}) {
   const { t } = useTranslation();
   return (
     <Select value={value} onValueChange={(next) => onChange(next as HaulMode)}>
-      <SelectTrigger size="sm" aria-label={t('market.hauling.mode')} className="w-48">
+      <SelectTrigger
+        size="sm"
+        aria-label={t('market.hauling.mode')}
+        className={inRouteRow ? `${ROUTE_ROW_SELECT} max-w-48` : 'w-48'}
+      >
         <SelectValue />
       </SelectTrigger>
       <SelectContent>

@@ -18,6 +18,7 @@ import { DataGate } from '@/components/DataGate';
 import { OpenInEveItemMenuItems, ShowInfoMenuItem } from '@/features/market/ItemContextMenu';
 import { useItemActions } from '@/features/market/itemActions';
 import { shipItemsEditLocation } from '@/features/fittings/assetShipLocation';
+import { useOpenInFittings } from '@/features/fittings/useOpenInFittings';
 import { routeToHref } from '@/features/route/routeSafetyLink';
 import * as Icon from '@/components/ui/icons';
 import {
@@ -98,6 +99,7 @@ async function loadShipData(characterIds: readonly number[]): Promise<ShipData> 
       typeId: asset.type_id,
       quantity: asset.quantity,
       flag: asset.location_flag,
+      itemId: asset.item_id,
     });
     contentsByShip.set(asset.location_id, list);
   }
@@ -252,13 +254,14 @@ function ShipRowView({
     .map((itemId) => data.holderNames.get(itemId))
     .filter(Boolean)
     .join(' › ');
+  const openInFittings = useOpenInFittings();
   const openFitting = () =>
-    void shipItemsEditLocation(
-      { typeId: row.typeId, name: shipName },
-      data.contentsByShip.get(row.itemId) ?? []
-    ).then((location) => {
-      if (location) void navigate(location);
-    });
+    openInFittings.open(() =>
+      shipItemsEditLocation(
+        { typeId: row.typeId, name: shipName },
+        data.contentsByShip.get(row.itemId) ?? []
+      )
+    );
   return (
     <RowActionsMenu
       name={shipName}
@@ -300,6 +303,9 @@ function ShipRowView({
               <span className="text-xs text-text-dim max-sm:ml-2 sm:block">{shipClass}</span>
             )}
           </span>
+          {openInFittings.pending && (
+            <Spinner size="sm" label={t('assets.myShips.openingFitting')} className="shrink-0" />
+          )}
           {row.inCargo && (
             <span className="shrink-0 rounded-xs border border-line px-1 text-[0.6875rem] text-text-dim">
               {t('assets.myShips.inCargo')}

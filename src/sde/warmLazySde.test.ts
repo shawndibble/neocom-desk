@@ -4,8 +4,10 @@ import {
   LAZY_ASSET_TOTAL,
   LAZY_SDE_FILES,
   cachedLazySdeFiles,
+  warmFittingAssets,
   warmLazySde,
 } from './warmLazySde';
+import { LAZY_SDE_PRIORITY_COUNT } from './lazySdeFiles';
 
 const warmDogma = vi.fn(async () => {});
 vi.mock('@/features/fittings/dogmaFittingEngine', () => ({ warmDogmaEngineAssets: warmDogma }));
@@ -166,6 +168,15 @@ describe('cachedLazySdeFiles', () => {
 describe('overlapping passes', () => {
   it('fetch each file once when the background warm and a forced pass run together', async () => {
     env({});
+    // A real cache: a finished fetch is found by whichever pass arrives later.
+    const stored = new Set<string>();
+    vi.stubGlobal('caches', {
+      match: vi.fn(async (url: string) => (stored.has(url) ? new Response('x') : undefined)),
+    });
+    fetchMock.mockImplementation(async (url) => {
+      stored.add(String(url));
+      return new Response('{}', { status: 200 });
+    });
     await Promise.all([
       warmLazySde({ cancelled: false }),
       warmLazySde({ cancelled: false }, { force: true }),
@@ -184,5 +195,76 @@ describe('engine import failure', () => {
     const failed = await warmLazySde({ cancelled: false }, { onProgress });
     expect(failed).toEqual([ENGINE_ITEM]);
     expect(onProgress).toHaveBeenLastCalledWith(LAZY_ASSET_TOTAL, LAZY_ASSET_TOTAL);
+  });
+});
+
+describe('warm order', () => {
+  it('fetches the dogma engine after the priority files and before the low-value rest', async () => {
+    env({});
+    let fetchedWhenEngineRan = 0;
+    warmDogma.mockImplementationOnce(async () => {
+      fetchedWhenEngineRan = fetchMock.mock.calls.length;
+    });
+    await warmLazySde({ cancelled: false });
+    expect(fetchedWhenEngineRan).toBe(LAZY_SDE_PRIORITY_COUNT);
+    expect(LAZY_SDE_FILES[0]).toMatch(/^typeInfo\//);
+    expect(LAZY_SDE_FILES[LAZY_SDE_PRIORITY_COUNT]).toBe('masteries.json');
+  });
+
+  it('on cellular still warms the files after the skipped engine', async () => {
+    env({ connection: { type: 'cellular' } });
+    const progress = vi.fn();
+    await warmLazySde({ cancelled: false }, { onProgress: progress });
+    expect(progress).toHaveBeenLastCalledWith(LAZY_ASSET_TOTAL, LAZY_ASSET_TOTAL);
+  });
+
+  it('a second pass (a reconnect) fetches only what the first missed', async () => {
+    env({});
+    fetchMock.mockRejectedValueOnce(new Error('reset'));
+    const cached = new Set<string>();
+    vi.stubGlobal('caches', {
+      match: vi.fn(async (url: string) => (cached.has(url) ? new Response('x') : undefined)),
+    });
+    fetchMock.mockImplementation(async (url) => {
+      cached.add(String(url));
+      return new Response('{}', { status: 200 });
+    });
+    const first = await warmLazySde({ cancelled: false });
+    expect(first).toEqual([LAZY_SDE_FILES[0]]);
+    fetchMock.mockClear();
+    await warmLazySde({ cancelled: false });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain(`data/${LAZY_SDE_FILES[0]}`);
+  });
+});
+
+describe('warmFittingAssets', () => {
+  it('warms the engine on wifi, with or without a service worker', async () => {
+    env({ controller: false });
+    await warmFittingAssets();
+    expect(warmDogma).toHaveBeenCalledOnce();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['cellular', { type: 'cellular' }],
+    ['Save-Data', { saveData: true }],
+    ['2g', { effectiveType: '2g' }],
+  ])('does not auto-download the engine on %s', async (_n, connection) => {
+    env({ connection });
+    await warmFittingAssets();
+    expect(warmDogma).not.toHaveBeenCalled();
+  });
+
+  it('does nothing offline', async () => {
+    env({ online: false });
+    await warmFittingAssets();
+    expect(warmDogma).not.toHaveBeenCalled();
+  });
+
+  it('swallows a failing engine chunk', async () => {
+    env({});
+    warmDogma.mockRejectedValueOnce(new Error('chunk'));
+    await expect(warmFittingAssets()).resolves.toBeUndefined();
   });
 });

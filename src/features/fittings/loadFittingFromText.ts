@@ -11,6 +11,7 @@ import { fetchEveWorkbenchEft } from '@/lib/eveWorkbench';
 import { loadText, type LoadOutcome, type ShareLoad } from '@/engine/fittings/load';
 import { loadItemNameMap } from '@/features/skills/typeCatalog';
 import { loadFittingSlots, typeName } from '@/sde/loadSde';
+import { loadMutaplasmidLookup } from '@/features/abyssal/mutaplasmidData';
 
 /**
  * Loads EFT text, a DNA string / chat link, a Fitting Share Code, an
@@ -19,8 +20,12 @@ import { loadFittingSlots, typeName } from '@/sde/loadSde';
 export function loadFittingFromText(text: string): Promise<LoadOutcome | ShareLoad> {
   return loadText(text, {
     catalog: async () => {
-      const [typeByName, slotByTypeId] = await Promise.all([loadItemNameMap(), loadFittingSlots()]);
-      return { typeByName, slotByTypeId };
+      const [typeByName, slotByTypeId, mutaplasmids] = await Promise.all([
+        loadItemNameMap(),
+        loadFittingSlots(),
+        loadMutaplasmidLookup().catch(() => undefined),
+      ]);
+      return { typeByName, slotByTypeId, mutaplasmids };
     },
     hullName: typeName,
     killmailHash: fetchKillmailHash,

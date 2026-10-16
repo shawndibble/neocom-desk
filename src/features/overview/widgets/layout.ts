@@ -8,6 +8,7 @@
  *
  * No React, Dexie or fetch here: the store lives in `layoutStore.ts`.
  */
+import { DEFAULT_PLEX_PER_30_DAYS } from '@/engine/omegaCoverage';
 import { isRowsPerPage, DEFAULT_ROWS_PER_PAGE, type RowsPerPage } from './tableSortPage';
 import { getKind, isAddable, type WidgetKindId, type WidgetSize, type WidgetView } from './kinds';
 
@@ -17,6 +18,12 @@ export type WidgetScope = 'header' | 'all';
 export type WidgetRange = 7 | 30 | 90;
 export const WIDGET_RANGES: readonly WidgetRange[] = [7, 30, 90];
 export const DEFAULT_RANGE: WidgetRange = 30;
+
+/** The most PLEX per 30 days a plan can be set to. */
+export const MAX_PLEX_PLAN = 5000;
+
+/** Kinds a new widget opens reading every Character; each must sum across them (`SUMS_ACROSS`). */
+const OPENS_ON_ALL: ReadonlySet<string> = new Set(['omega']);
 
 /** Soft limit on how many widgets one Overview holds. */
 export const MAX_WIDGETS = 30;
@@ -31,6 +38,8 @@ export interface Widget {
   range?: WidgetRange;
   /** Rows per page for a paged table; absent means the default. Only a table that opts in reads it. */
   rowsPerPage?: RowsPerPage;
+  /** The pilot's Omega plan: PLEX per 30 days. Absent means the default (500). Only a kind with a plan reads it. */
+  plexPer30Days?: number;
   showOnPhone: boolean;
 }
 
@@ -71,7 +80,7 @@ export function newWidget(kind: WidgetKindId, id: string): Widget | null {
     kind,
     size: def.defaultSize,
     view: def.defaultView,
-    scope: 'header',
+    scope: OPENS_ON_ALL.has(kind) ? 'all' : 'header',
     showOnPhone: true,
   };
   if (def.hasRange) widget.range = DEFAULT_RANGE;
@@ -168,6 +177,28 @@ export function setRowsPerPage(
       return rest;
     }
     return { ...w, rowsPerPage: rows };
+  });
+}
+
+export function isPlexPlan(value: unknown): value is number {
+  return (
+    typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= MAX_PLEX_PLAN
+  );
+}
+
+/** Stored only when it differs from the default, so a widget nobody touched stays as small as before. */
+export function setPlexPer30Days(layout: OverviewLayout, id: string, plex: number): OverviewLayout {
+  if (!isPlexPlan(plex)) return layout;
+  return update(layout, id, (w) => {
+    if (!getKind(w.kind)?.hasPlexPlan || plex === (w.plexPer30Days ?? DEFAULT_PLEX_PER_30_DAYS)) {
+      return null;
+    }
+    if (plex === DEFAULT_PLEX_PER_30_DAYS) {
+      const { plexPer30Days: _dropped, ...rest } = w;
+      void _dropped;
+      return rest;
+    }
+    return { ...w, plexPer30Days: plex };
   });
 }
 

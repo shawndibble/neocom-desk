@@ -66,6 +66,9 @@ vi.mock('@/sde/loadSde', () => ({
   loadMarketWideTrees: vi.fn(async () => ({})),
 }));
 
+// The baked typeInfo shard lacks every type here, so reads take the ESI fallback.
+vi.mock('@/sde/loadTypeInfo', () => ({ loadTypeInfo: vi.fn(async () => null) }));
+
 const CHAR_ID = 91;
 
 const skillsPayload = {

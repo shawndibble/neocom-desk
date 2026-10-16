@@ -8,6 +8,7 @@ import { SCOPES } from '@/esi/scopes';
 import { assignLocation } from '@/app/navigation';
 import { AUTHORIZED_APPS_URL, DISCORD_URL, REPO_URL } from '@/lib/links';
 import { PLAY_STORE_PACKAGE } from '@/lib/playStoreApp';
+import { LANDING_SHELL_ATTR, LANDING_SHELL_ID } from '@/app/landingShell';
 import { Login } from './Login';
 
 vi.mock('@/app/navigation', () => ({ assignLocation: vi.fn() }));
@@ -95,6 +96,23 @@ describe('Login', () => {
     expect(
       screen.getByRole('button', { name: /log in with custom permissions/i })
     ).toBeInTheDocument();
+  });
+
+  it('lets the prerendered hero go once it renders its own', async () => {
+    const shell = document.createElement('div');
+    shell.id = LANDING_SHELL_ID;
+    document.body.append(shell);
+    document.documentElement.setAttribute(LANDING_SHELL_ATTR, '');
+    try {
+      renderLogin();
+      expect(document.getElementById(LANDING_SHELL_ID)).not.toBeNull();
+      await screen.findByRole('heading', { name: /answers, not api dumps/i });
+      expect(document.getElementById(LANDING_SHELL_ID)).toBeNull();
+      expect(document.documentElement.hasAttribute(LANDING_SHELL_ATTR)).toBe(false);
+    } finally {
+      shell.remove();
+      document.documentElement.removeAttribute(LANDING_SHELL_ATTR);
+    }
   });
 
   it('shows the app name, hero heading and SSO button', async () => {

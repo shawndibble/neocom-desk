@@ -12,6 +12,11 @@ export function iskToneClass(value: number): string {
   return clampIskZero(value, 2) < 0 ? 'text-isk-neg' : 'text-isk-pos';
 }
 
+/** `iskToneClass` for a net figure: no tint at all when it rounds to zero. */
+export function netToneClass(value: number): string {
+  return clampIskZero(value, 0) === 0 ? '' : iskToneClass(value);
+}
+
 /**
  * "contract_price_payment_corp" → "Contract price payment corp". Generic
  * transform, no per-ref-type map: ESI adds new ref types over time and this

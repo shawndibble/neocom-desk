@@ -78,6 +78,20 @@ const LOCATION_PARAMS = {
 };
 type LocationParams = UrlParamValues<typeof LOCATION_PARAMS>;
 
+/**
+ * True when `choice` names All regions or a region in the Market Regions
+ * catalogue. A catalogue still loading (null) is not yet known to be invalid.
+ */
+function isMarketRegionChoice(
+  choice: RegionChoice,
+  marketRegions: MarketRegionEntry[] | null
+): boolean {
+  // All regions needs no catalogue check — it names every region there is.
+  return (
+    choice === ALL_REGIONS || resolveAgainstCatalogue(choice, marketRegions, (r, id) => r.id === id)
+  );
+}
+
 export interface UseMarketBrowserArgs {
   groups: MarketGroupNode[] | null;
   types: MarketTypeEntry[] | null;
@@ -278,11 +292,7 @@ export function useMarketBrowser({
         // A hub id is a small static set (`TRADE_HUBS`), so unlike the region
         // catalogue there's no loading window to be optimistic about.
         if (key === 'hub') return getTradeHub(value as TradeHub['id']) !== undefined;
-        // All regions needs no catalogue check — it names every region there is.
-        return (
-          value === ALL_REGIONS ||
-          resolveAgainstCatalogue(value as number, marketRegions, (r, id) => r.id === id)
-        );
+        return isMarketRegionChoice(value as RegionChoice, marketRegions);
       },
       remember: (patch: Partial<LocationParams>) => {
         if (patch.hub) void setHubId(patch.hub as TradeHub['id']);
@@ -304,14 +314,19 @@ export function useMarketBrowser({
   const [linkedLocation, , isLinked] = useRememberedUrlParams(LOCATION_PARAMS, rememberedLocation);
 
   // Whichever of region/hub the URL names wins, falling back to the
-  // device-local Location Mode preference when neither param resolves.
-  const fallbackLocation: MarketLocationParam = useMemo(
-    () =>
-      locationModeValue.mode === 'region'
-        ? { mode: 'region', regionId: locationModeValue.regionId ?? hub.regionId }
-        : { mode: 'hub', hubId: hub.id },
-    [locationModeValue, hub]
-  );
+  // device-local Location Mode preference when neither param resolves. A
+  // stored region gets the same catalogue check as a linked one: a region
+  // can drop out of the Market Regions between SDE bakes (#3891), and the
+  // hub's region stands in for it rather than an empty book.
+  const fallbackLocation: MarketLocationParam = useMemo(() => {
+    if (locationModeValue.mode !== 'region') return { mode: 'hub', hubId: hub.id };
+    const stored = locationModeValue.regionId;
+    return {
+      mode: 'region',
+      regionId:
+        stored !== null && isMarketRegionChoice(stored, marketRegions) ? stored : hub.regionId,
+    };
+  }, [locationModeValue, hub, marketRegions]);
   const regionLinked = isLinked('region');
   const hubLinked = isLinked('hub');
   const effectiveLocation: MarketLocationParam = useMemo(

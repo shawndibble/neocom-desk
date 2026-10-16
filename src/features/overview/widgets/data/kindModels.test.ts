@@ -8,6 +8,7 @@ import type {
   JumpTimersWidgetData,
   HaulingWidgetData,
   KillsWidgetData,
+  OmegaWidgetData,
   RouteSafetyWidgetData,
   SurveyWidgetData,
 } from './kindLoaders';
@@ -1125,5 +1126,107 @@ describe('kills', () => {
     expect(
       stateOf(buildView('kills', { kills: { data: null, error: false, loading: true } }, ctx()))
     ).toBe('loading');
+  });
+});
+
+describe('omega coverage', () => {
+  const B = 1e9;
+  const data = (over: Partial<OmegaWidgetData> = {}): OmegaWidgetData => ({
+    rows: [
+      { characterId: 91, date: iso(NOW - DAY), amount: 1.2 * B },
+      { characterId: 91, date: iso(NOW - DAY), amount: 5 * B, internal: true },
+      { characterId: 91, date: iso(NOW - DAY), amount: -3 * B, refKey: 'plex_bought' },
+      { characterId: 92, date: iso(NOW - DAY), amount: 9 * B },
+    ],
+    coverage: {
+      91: { since: NOW - 40 * DAY, gaps: [] },
+      92: { since: NOW - 40 * DAY, gaps: [] },
+    },
+    journalFetchedAt: { 91: NOW - HOUR, 92: NOW - HOUR },
+    plex: { price: 2_000_000, fetchedAt: NOW - 2 * HOUR },
+    truncated: false,
+    skippedCount: 0,
+    loadedIds: [91, 92],
+    ...over,
+  });
+  const build = (d: OmegaWidgetData, over: Partial<BuildContext> = {}) =>
+    buildView('omega', { omega: ok(d) }, ctx(over));
+
+  it('reads its own feed and sums across Characters', () => {
+    expect(KIND_FEEDS.omega).toEqual(['omega']);
+  });
+
+  it('covers whole accounts: net 1.2B against 1.0B per account', () => {
+    const view = build(data());
+    expect(view.number.value).toContain('data.omega.covers{"count":1}');
+    expect(view.number.secondary?.text).toContain('data.omega.next{"amount":"800M"}');
+  });
+
+  it('counts net across every Character when scoped to all, leaving out transfers and PLEX', () => {
+    const view = build(data(), { scopeAll: true });
+    expect(view.number.value).toContain('"count":10');
+  });
+
+  it('the PLEX per 30 days setting changes the cost and the count', () => {
+    expect(build(data(), { plexPer30Days: 250 }).number.value).toContain('"count":2');
+    expect(build(data(), { plexPer30Days: 1000 }).number.value).toContain('coversNone');
+  });
+
+  it('draws one bar per period and a labelled line per account up to one above the tallest', () => {
+    const view = build(data());
+    if (view.chart?.kind !== 'omega') throw new Error('omega');
+    expect(view.chart.bars).toHaveLength(2);
+    expect(view.chart.bars[0]!.partial).toBe(true);
+    expect(view.chart.bars[1]!.partial).toBe(false);
+    expect(view.chart.lines.map((l) => l.value)).toEqual([1 * B, 2 * B]);
+    expect(view.chart.bars[1]!.tip.rows.map((r) => r.label)).toContain(
+      'overview.widgets.chart.omega.tip.covers'
+    );
+  });
+
+  it('says why when PLEX has no price, with no count and no chart', () => {
+    const view = build(data({ plex: null }));
+    expect(view.number.value).toBe('overview.widgets.data.omega.noPrice');
+    expect(view.chart).toBeUndefined();
+    expect(stateOf(view)).toBe('ok');
+  });
+
+  it('is empty with no journal lines, and needs permission for a Character it did not load', () => {
+    expect(stateOf(build(data({ rows: [], coverage: {} })))).toBe('empty');
+    expect(stateOf(build(data({ loadedIds: [92] })))).toBe('needsPermission');
+  });
+
+  it('dates the view by the older of the PLEX price and the in-scope journals', () => {
+    expect(build(data()).fetchedAt?.getTime()).toBe(NOW - 2 * HOUR);
+    const old = data({ journalFetchedAt: { 91: NOW - HOUR, 92: NOW - 9 * HOUR } });
+    expect(build(old).fetchedAt?.getTime()).toBe(NOW - 2 * HOUR);
+    expect(build(old, { scopeAll: true }).fetchedAt?.getTime()).toBe(NOW - 9 * HOUR);
+  });
+
+  it('keeps read ages and PLEX spent out of the number, chart and table text', () => {
+    const view = build(data());
+    const text = [view.number.notes?.join(' '), view.chart?.note, view.table?.footer].join(' ');
+    expect(text).not.toContain('.ages');
+    expect(text).not.toContain('plexSpent');
+  });
+
+  it('a gap in the newest period marks it partial', () => {
+    const gap: [number, number] = [NOW - 10 * DAY, NOW - 5 * DAY];
+    const view = build(data({ coverage: { 91: { since: NOW - 40 * DAY, gaps: [gap] } } }));
+    if (view.chart?.kind !== 'omega') throw new Error('omega');
+    expect(view.chart.bars.map((b) => b.partial)).toEqual([true, true]);
+  });
+
+  it('states the shortfall when net is zero or negative', () => {
+    const view = build(data({ rows: [{ characterId: 91, date: iso(NOW - DAY), amount: -1 * B }] }));
+    expect(view.number.value).toContain('coversNone');
+    expect(view.number.unit).toContain('data.omega.shortBy{"amount":"2B"}');
+  });
+
+  it('steps the reference lines when there are many accounts', () => {
+    const view = build(data({ rows: [{ characterId: 91, date: iso(NOW - DAY), amount: 40 * B }] }));
+    if (view.chart?.kind !== 'omega') throw new Error('omega');
+    expect(view.chart.lines.length).toBeLessThanOrEqual(6);
+    expect(view.chart.lines[0]!.value).toBe(7 * B);
   });
 });

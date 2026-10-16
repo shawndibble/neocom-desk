@@ -11,7 +11,7 @@
  * in context; a surface without it (the Start screen's read-only preview)
  * simply shows no menu.
  */
-import { type ReactElement, type ReactNode } from 'react';
+import { createContext, useContext, type ReactElement, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   MenuItem,
@@ -22,6 +22,7 @@ import {
   MenuSubContent,
   MenuSubTrigger,
   RowActionsMenu,
+  useOpenAfterMenu,
 } from '@/components/ui';
 import type { CandidateRack } from '@/engine/fittings/candidates';
 import { reachableModuleStates } from '@/engine/fittings/fittingEdit';
@@ -57,12 +58,27 @@ export function FittingItemMenu({
   onOpenChange?: (open: boolean) => void;
   children: ReactElement;
 }) {
+  const openAfter = useOpenAfterMenu();
   return (
-    <RowActionsMenu name={name} items={items} tooltip={tooltip} onOpenChange={onOpenChange}>
-      {children}
-    </RowActionsMenu>
+    <OpenAfterMenuContext.Provider value={openAfter.run}>
+      <RowActionsMenu
+        name={name}
+        items={items}
+        tooltip={tooltip}
+        onOpenChange={onOpenChange}
+        onCloseAutoFocus={openAfter.onCloseAutoFocus}
+      >
+        {children}
+      </RowActionsMenu>
+    </OpenAfterMenuContext.Provider>
   );
 }
+
+/**
+ * `useOpenAfterMenu().run` of the enclosing `FittingItemMenu`: a dialog item
+ * opens once the menu closes and focus is back on its trigger (DESIGN.md §6c).
+ */
+const OpenAfterMenuContext = createContext<(fn: () => void) => void>((fn) => fn());
 
 function slotName(t: ReturnType<typeof useTranslation>['t'], rack: FittingSlotKind, index: number) {
   return t('fittings.item.slot', { rack: t(`fittings.list.rack.${rack}`), index: index + 1 });
@@ -185,6 +201,7 @@ export function ModuleMenuItems({
 }) {
   const { t } = useTranslation();
   const actions = useFittingItemActions();
+  const openAfterMenu = useContext(OpenAfterMenuContext);
   if (actions === null) return null;
   const { slot: rack, slotIndex: index, typeId } = module;
   const name = actions.typeName(typeId);
@@ -232,8 +249,13 @@ export function ModuleMenuItems({
         {t('fittings.item.copyToAllOfType')}
       </MenuItem>
       {actions.hasVariants(typeId) && (
-        <MenuItem onSelect={() => actions.openVariations(rack, index)}>
+        <MenuItem onSelect={() => openAfterMenu(() => actions.openVariations(rack, index))}>
           {t('fittings.item.variations')}
+        </MenuItem>
+      )}
+      {actions.canMutate(typeId) && (
+        <MenuItem onSelect={() => openAfterMenu(() => actions.openMutation(rack, index))}>
+          {t('fittings.mutation.menu')}
         </MenuItem>
       )}
       <MenuItem onSelect={() => actions.copyModule(module)}>

@@ -1,9 +1,10 @@
 import { ExternalLink } from '@/components/ui/ExternalLink';
-import { useMemo, useRef, useState } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Navigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { BootScreen } from '@/app/BootScreen';
+import { releaseLandingShell } from '@/app/landingShell';
 import { beginAddCharacterLogin } from '@/app/loginFlow';
 import { db } from '@/db';
 import { EveSsoButton, LogoMark, plainTextActionClassName } from '@/components/ui';
@@ -41,6 +42,13 @@ export function Login() {
   // Bookmark/back-button case: a Character already exists, so the marketing
   // page is not the right thing to show — mirror App.tsx's root gate.
   const characterCount = useLiveQuery(() => db.characters.count());
+
+  // The prerendered hero (`app/landingShell.ts`) stands in through the boot
+  // screen. Let it go once this page knows what it renders: a layout effect,
+  // so the real hero commits in the frame the shell leaves.
+  useLayoutEffect(() => {
+    if (characterCount !== undefined) releaseLandingShell();
+  }, [characterCount]);
 
   function onLogin() {
     setPending(true);

@@ -18,6 +18,7 @@ import { createSyncedSetting } from '@/lib/useSyncedSetting';
 import { getKind } from './kinds';
 import {
   DEFAULT_RANGE,
+  isPlexPlan,
   WIDGET_RANGES,
   type OverviewLayout,
   type Widget,
@@ -53,6 +54,7 @@ function parseWidget(raw: unknown): Widget | null {
     delete out.range;
   }
   if (!isRowsPerPage(raw.rowsPerPage)) delete out.rowsPerPage;
+  if (!def.hasPlexPlan || !isPlexPlan(raw.plexPer30Days)) delete out.plexPer30Days;
   return out as unknown as Widget;
 }
 

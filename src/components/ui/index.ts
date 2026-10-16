@@ -126,6 +126,7 @@ export {
 export { NativeSelect } from './NativeSelect';
 export { Checkbox } from './Checkbox';
 export { Radio } from './Radio';
+export { Slider } from './Slider';
 export { TextInput } from './TextInput';
 export { IskInput } from './IskInput';
 export { TextArea } from './TextArea';

@@ -50,7 +50,8 @@ export interface LoyaltyStoreResult {
   catalog: BlueprintCatalog | null;
   /** The blueprint catalog couldn't load: blueprint offers list as plain items, with no build-versus-buy figures. */
   catalogUnavailable: boolean;
-  playerLp: number;
+  /** Null until a cached LP balance exists; unknown is not zero. */
+  playerLp: number | null;
   hub: TradeHub;
   hubHydrated: boolean;
   /** True once offers, the catalog and (when there are offers to price) a market snapshot have all loaded at least once. */
@@ -87,7 +88,7 @@ export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult
     clear: clearCatalogFailure,
   } = useRetryableLoad();
   const [catalog, setCatalog] = useState<BlueprintCatalog | null>(null);
-  const [playerLp, setPlayerLp] = useState(0);
+  const [playerLp, setPlayerLp] = useState<number | null>(null);
   const [skills, setSkills] = useState<SkillLevels>({});
   const [itemNames, setItemNames] = useState<ReadonlyMap<number, string>>(new Map());
   const [useOwnMaterialsFor, setUseOwnMaterialsFor] = useState<ReadonlySet<number>>(new Set());
@@ -140,8 +141,14 @@ export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult
         loadCorrectedSkills(activeCharacterId, Date.now(), { skipQueueWithoutScope: true }),
       ]);
       if (cancelled) return;
-      const entry = lpResult.cached?.data.find((e) => e.corporation_id === corporationId);
-      setPlayerLp(entry?.loyalty_points ?? 0);
+      // No cached read at all is unknown, not zero: an uncached device has
+      // not learned the balance. A read that lists no entry for this
+      // corporation is a real 0.
+      if (lpResult.cached === null || lpResult.cached === undefined) setPlayerLp(null);
+      else {
+        const entry = lpResult.cached.data.find((e) => e.corporation_id === corporationId);
+        setPlayerLp(entry?.loyalty_points ?? 0);
+      }
       const map: SkillLevels = {};
       for (const [skillId, trained] of corrected.trained) map[skillId] = trained.level;
       setSkills(map);

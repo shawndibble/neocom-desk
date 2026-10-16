@@ -2,7 +2,7 @@
 import { getCharacterLoyaltyPoints, type CharacterLoyaltyPoints } from '@/esi/endpoints';
 import { conditionalFetch, loadWithCacheStatus, readCached, type StatusResult } from '@/esi/cache';
 
-const KEY = 'loyalty';
+export const KEY = 'loyalty';
 
 /**
  * Loyalty point balances per corporation. ESI or cache, with the

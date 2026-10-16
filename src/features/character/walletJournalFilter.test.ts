@@ -172,7 +172,13 @@ describe('journalNetTotal', () => {
 
 describe('journalRefTypeBreakdown', () => {
   it('is all zero for an empty journal', () => {
-    expect(journalRefTypeBreakdown([])).toEqual({ totalIn: 0, totalOut: 0, net: 0, rows: [] });
+    expect(journalRefTypeBreakdown([])).toEqual({
+      totalIn: 0,
+      totalOut: 0,
+      net: 0,
+      rows: [],
+      internalCount: 0,
+    });
   });
 
   it('splits income and expense per ref type and sums the totals', () => {
@@ -223,5 +229,43 @@ describe('toggleBreakdownRefType', () => {
   it('clears it when already active', () => {
     const f: WalletJournalFilter = { ...EMPTY_WALLET_JOURNAL_FILTER, refType: 'tax' };
     expect(toggleBreakdownRefType(f, 'tax').refType).toBeNull();
+  });
+});
+
+describe('journalRefTypeBreakdown netting', () => {
+  it('leaves internal lines out of every figure and counts them', () => {
+    const result = journalRefTypeBreakdown([
+      {
+        id: 1,
+        date: '2026-10-01T00:00:00Z',
+        ref_type: 'bounty_prize',
+        amount: 100,
+        description: '',
+      },
+      {
+        id: 2,
+        date: '2026-10-01T00:00:00Z',
+        ref_type: 'player_donation',
+        amount: 250,
+        description: '',
+        internal: true,
+      },
+    ]);
+    expect(result).toMatchObject({ totalIn: 100, totalOut: 0, net: 100, internalCount: 1 });
+    expect(result.rows.map((r) => r.refType)).toEqual(['bounty_prize']);
+  });
+
+  it('groups a PLEX line under its own key', () => {
+    const result = journalRefTypeBreakdown([
+      {
+        id: 1,
+        date: '2026-10-01T00:00:00Z',
+        ref_type: 'market_transaction',
+        amount: -5,
+        description: '',
+        refKey: 'plex_bought',
+      },
+    ]);
+    expect(result.rows[0].refType).toBe('plex_bought');
   });
 });

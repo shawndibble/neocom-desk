@@ -15,19 +15,25 @@
 import { TYPE_INFO_SHARD_COUNT } from './typeInfoShard';
 
 export const LAZY_SDE_FILES: readonly string[] = [
+  // Item Detail typeInfo shards (issue #3882); every slot has a file (`{}` if
+  // empty), so this is constant, not read from the build. First: Show Info is
+  // a core local feature and the shards are small. The warm fetches the
+  // dogma engine right after this block (`LAZY_SDE_PRIORITY_COUNT`).
+  ...Array.from({ length: TYPE_INFO_SHARD_COUNT }, (_, n) => `typeInfo/${n}.json`),
   'masteries.json',
-  'reprocessing.json',
-  'marketWideTrees.json',
+  'typeNames.json',
   'pi-planet-radius.json',
   'pi-system-planets.json',
-  'typeNames.json',
-  'market/types.json',
-  'market/stations.json',
-  'market/variations.json',
-  // Item Detail typeInfo shards (issue #3882); every slot has a file (`{}` if
-  // empty), so this is constant, not read from the build.
-  ...Array.from({ length: TYPE_INFO_SHARD_COUNT }, (_, n) => `typeInfo/${n}.json`),
+  'reprocessing.json',
+  'marketWideTrees.json',
 ];
+
+/**
+ * How many leading {@link LAZY_SDE_FILES} the warm fetches before the dogma
+ * engine; the rest follow it, so a short session reaches the engine (it
+ * unlocks Fittings stats) before the low-value files.
+ */
+export const LAZY_SDE_PRIORITY_COUNT = TYPE_INFO_SHARD_COUNT;
 
 /** `injectManifest.globIgnores` entries for {@link LAZY_SDE_FILES}. */
 export function lazySdeGlobIgnores(): string[] {
