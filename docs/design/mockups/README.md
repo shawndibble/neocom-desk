@@ -23,5 +23,7 @@ PNG exports of the chosen mockups for ready tickets. Delete a folder (and its ro
 | [lp-store-search](lp-store-search/README.md) | Issue #2873 | option B, one box for item or corporation |
 | [wallet-balance-trend](wallet-balance-trend/README.md) | worked example | story `mockups-wallet--proposed`, today vs proposed |
 | [stock-targets](stock-targets/index.html) | Issue #3521 | revised: Market › Stock, one list per market (station picked), listed vs hangar; HTML, not PNGs |
+| [wallet-journal-all-characters](wallet-journal-all-characters/README.md) | Issue #3908 | first draft: All Characters breakdown, Between your Characters line, PLEX bought row |
+| [fitting-can-fly-by-character](fitting-can-fly-by-character/README.md) | Issue #3910 | first draft: missing skills + training time per Character, opened from a saved Fitting |
 
 First draft mockup; sample data. The ticket's Agent Brief text wins over the picture where they differ.

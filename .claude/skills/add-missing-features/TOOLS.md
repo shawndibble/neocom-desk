@@ -32,7 +32,10 @@ market pricing, wallet or industry; the LP finder is covered by #718/#1050/#1068
 the rest is mission-running remit), Gatewatch (Discord intel/DScan backend) and
 EVE PvP Corp Activity Search (both intel). Blizbor's skill trio (EvE Modular
 Skillplans, EVEMon Pilot Progression, EVEMon Certificates Enhanced — no license,
-so their data is unusable; surfaced #2390).
+so their data is unusable; surfaced #2390). EVE Ledger (hiram-git/eve-ledger,
+live local desktop wallet accountant: activity split, own-alt netting, journal
+archive, ratting ISK/h, loss replacement matching, doctrine view — surfaced
+#3908–#3910; the rest is Killed).
 EVE Omni, Canopus, Eve-Omnitool, Eve Deep Industry, SNOW//OPS, New Eden Command,
 eve-hub.ru, Telescope, EVE Killmap, The Bounty Bid, PI Nexus, sde-deltas (all
 closed classes 1-3 or intel/dev infra; Slipway Jobs view + slot deduction is
@@ -262,6 +265,9 @@ Numbering is stable — later runs cite these by number. Append, never renumber.
     (#1084, #1085) share one shape: a baked field narrower than consumers
     assume.
 46. **A proxy is not a measurement — name the property, then test it** (#1085).
+47. **A rate divided by a guessed duration is a typed-in estimate** — tick
+    counts and session gaps are not time played; show per-day totals
+    (`20261006-085420`).
 
 ## Filed candidates
 
@@ -311,12 +317,26 @@ known-live prior status and on the character being issuer or acceptor (the
 endpoint also returns contracts merely offered TO them),
 feed-on/browser-off. #1092 bug — an accepted courier's Character Board countdown
 shows the offer expiry, not `date_accepted + days_to_complete`; symptom is
-UNDER-warning.
+UNDER-warning. #3908 NARROW — Journal breakdown gains This/All Characters and
+nets own-Character transfers into one line (N of M loaded note; corp journal
+untouched); PLEX bought as one row. #3909 SHIP — wallet journal +
+transactions archived 365 days device-only, poll-fed, gaps shown. #3910 NARROW
+— all-Characters Can-fly list adds missing-skill count + training time, opens
+from a saved Fitting.
 
 ## Killed / dropped candidates (never filed)
 
 Grouped by the test that killed them; the reason is what stops a re-pitch.
 
+- **EVE Ledger leftovers:** Omega self-funding / "does it cover its PLEX" (13 —
+  the Omega price in PLEX is in neither ESI nor the SDE and varies by term;
+  Omega is per Account, which has no identity; residue is #3908's PLEX row).
+  Ratting ISK/h (47 — 20-minute bounty ticks; ESS lags; loot and LP never hit
+  the journal). Own-loss replacement matching (10 — a later hull buy is not
+  provably the replacement; SRP and builders read unreplaced; the loss cost
+  ships in Pilot Lookup). Journal activity groups and a fees total (3, 11 — a
+  ratter's ship and ammo buys read as a trading loss). Doctrine "wallet
+  covers it" and per-Character injector ISK (3).
 - **1**: hub arbitrage/trade finder (ships as `hubHaulGaps`), corp
   buyback/payout split, EQM Corporate Exchange, dd24tool.de, Element43 and
   EveMarketProphet (dead), Space Trucker / EVE Flipper route sequencing (also
