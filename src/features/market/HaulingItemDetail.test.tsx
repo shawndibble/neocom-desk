@@ -139,8 +139,9 @@ describe('HaulingItemDetail — listing', () => {
   it('shows Days to Sell and how fast it sells', () => {
     renderDetail(listRow());
     expect(screen.getByText('about 9 days')).toBeInTheDocument();
-    expect(screen.getByText('· 0.6 sold a day')).toBeInTheDocument();
-    expect(screen.getByText('· 5 listed near your price')).toBeInTheDocument();
+    // Each segment carries its trailing dot, so a wrap never starts a line with one.
+    expect(screen.getByText('0.6 sold a day ·')).toBeInTheDocument();
+    expect(screen.getByText('5 listed near your price')).toBeInTheDocument();
   });
 
   it('keeps the math closed until asked, then shows the ledger and why the price', async () => {

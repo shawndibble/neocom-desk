@@ -393,7 +393,8 @@ describe('HaulingPanel fill the free space', () => {
 
     const list = screen.getByRole('list', { name: 'Items that fit the free space' });
     expect(within(list).getByText('Nitrogen Fuel Block')).toBeInTheDocument();
-    expect(await within(list).findByText('Planetary Infrastructure · 200 m³')).toBeInTheDocument();
+    expect(within(list).getByText('200 m³')).toBeInTheDocument();
+    expect(await within(list).findByText('· Planetary Infrastructure')).toBeInTheDocument();
     expect(screen.getByText(/with the fill/)).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Add 1 · +200 m³' }));
@@ -431,11 +432,11 @@ describe('HaulingPanel fill the free space', () => {
     renderPanel();
     await user.click(screen.getByRole('button', { name: 'Find items to fill it' }));
     const list = screen.getByRole('list', { name: 'Items that fit the free space' });
-    expect(within(list).getByText(/· 150 m³/)).toBeInTheDocument();
+    expect(within(list).getByText('150 m³')).toBeInTheDocument();
 
     await user.click(screen.getByRole('checkbox', { name: 'Nitrogen Fuel Block' }));
-    expect(within(list).getAllByText(/· 500 m³/)).toHaveLength(2);
-    expect(within(list).queryByText(/· 150 m³/)).toBeNull();
+    expect(within(list).getAllByText('500 m³')).toHaveLength(2);
+    expect(within(list).queryByText('150 m³')).toBeNull();
     await user.click(screen.getByRole('button', { name: 'Add 1 · +500 m³' }));
     expect(bringBox('Hydrogen Fuel Block')).toHaveValue('100');
   });
@@ -520,6 +521,10 @@ describe('HaulingPanel on a phone', () => {
 
     await user.click(row());
     const sheet = screen.getByRole('dialog', { name: 'Damage Control II' });
+    // The item's ⋮ rides in the sheet's title row, once.
+    expect(
+      within(sheet).getAllByRole('button', { name: 'More actions for Damage Control II' })
+    ).toHaveLength(1);
     expect(
       within(sheet).getByRole('link', { name: 'Price history and orders in Amarr' })
     ).toBeInTheDocument();

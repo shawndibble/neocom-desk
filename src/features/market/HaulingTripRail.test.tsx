@@ -300,8 +300,11 @@ describe('HaulingFillList', () => {
     expect(within(list).getAllByRole('listitem')).toHaveLength(2);
     expect(screen.getByRole('checkbox', { name: 'Nitrogen Fuel Block' })).toBeChecked();
     expect(screen.getByRole('checkbox', { name: 'Coolant' })).not.toBeChecked();
-    expect(screen.getByText('Fuel Blocks · 9,000 m³')).toBeInTheDocument();
-    expect(screen.getByText('Planetary Commodities · <1 m³')).toBeInTheDocument();
+    // m³ leads the line, where truncating the category can't hide it.
+    expect(screen.getByText('9,000 m³')).toBeInTheDocument();
+    expect(screen.getByText('· Fuel Blocks')).toHaveClass('truncate');
+    expect(screen.getByText('<1 m³')).not.toHaveClass('truncate');
+    expect(screen.getByText('· Planetary Commodities')).toBeInTheDocument();
     expect(screen.getByText('+3,903,930')).toBeInTheDocument();
 
     await user.click(screen.getByRole('checkbox', { name: 'Coolant' }));

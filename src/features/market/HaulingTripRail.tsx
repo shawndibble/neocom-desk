@@ -281,11 +281,15 @@ function FillRow({
           onChange={(event) => onToggle(item.typeId, event.target.checked)}
         />
         <span className="flex min-w-0 flex-1 flex-col leading-tight">
-          <span id={nameId} className="truncate">
+          <span id={nameId} className="line-clamp-2 break-words">
             {item.name}
           </span>
-          <span className="truncate text-text-dim">
-            {item.categoryName} · {t('market.hauling.rail.m3', { m3: formatTripM3(item.volumeM3) })}
+          {/* m³ first, untruncatable: only the category gives way. */}
+          <span className="flex min-w-0 gap-1 text-text-dim">
+            <span className="shrink-0">
+              {t('market.hauling.rail.m3', { m3: formatTripM3(item.volumeM3) })}
+            </span>
+            {item.categoryName && <span className="truncate">· {item.categoryName}</span>}
           </span>
         </span>
         <span className={`shrink-0 ${gains(item.profit) ? 'text-success' : ''}`}>
@@ -408,7 +412,7 @@ export interface HaulingTripBarProps {
 }
 
 /**
- * Pinned above the phone tab bar; at md+, where there is none, 0.75rem plus the safe area.
+ * Pinned above the phone tab bar; at md+, where there is none, flush with the bottom (plus the safe area).
  * Publishes `--hauling-trip-bar-clearance`; `index.css` must sum it into
  * `--sticky-clearance` for focused controls to scroll clear (WCAG 2.4.11).
  */
@@ -422,7 +426,7 @@ export function HaulingTripBar({ freeM3, profit, onOpenTrip, copyButton }: Hauli
       ref={ref}
       role="region"
       aria-label={t('market.hauling.rail.title')}
-      className="sticky bottom-[var(--bottom-nav-clearance)] z-30 flex items-center gap-2 rounded-xs border border-line-bright bg-panel p-2 shadow-lg md:bottom-[calc(0.75rem_+_env(safe-area-inset-bottom))]"
+      className="sticky bottom-[var(--bottom-nav-clearance)] z-30 flex items-center gap-2 rounded-xs border border-line-bright bg-panel p-2 shadow-lg md:bottom-[env(safe-area-inset-bottom)]"
     >
       {/* The whole summary opens the trip, so its figures stay plain text (nothing tabbable inside a button). */}
       <button

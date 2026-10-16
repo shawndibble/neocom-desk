@@ -72,7 +72,7 @@ import { HaulingCargoControl } from './HaulingCargoControl';
 import { haulingCsvColumns } from './haulingCsv';
 import { HaulingFlagWord } from './HaulingFlagWord';
 import { HAULING_FLAG_KEY } from './haulingFlagKeys';
-import { HaulingItemDetail } from './HaulingItemDetail';
+import { HaulingItemActions, HaulingItemDetail } from './HaulingItemDetail';
 import { formatSignedPct, formatTripM3, formatVolume } from './format';
 import {
   HaulingFillList,
@@ -648,43 +648,35 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
           ? fill.categoryOf?.get(row.typeId)
           : undefined;
         const added = addedCategory === undefined ? null : categoryName(addedCategory);
-        if (cards) {
-          return (
-            <span className="flex min-w-0 items-center gap-2">
-              <span className={entityLinkClassName('min-w-0 truncate font-medium')}>
-                {row.name}
-              </span>
-              {row.flags.map((flag) => (
-                <HaulingFlagWord key={flag} flag={flag} />
-              ))}
-              {added && (
-                <span className="min-w-0 truncate text-[0.6875rem] text-text-dim">
-                  {t('market.hauling.addedFrom', { category: added })}
-                </span>
+        // The name wraps (two lines at most on a card) and the notes go under it, so neither cuts the name.
+        const nameAndNotes = (
+          <span className="flex min-w-0 flex-col">
+            <span
+              className={entityLinkClassName(
+                cx('min-w-0 font-medium leading-snug break-words', cards && 'line-clamp-2')
               )}
+            >
+              {row.name}
             </span>
-          );
-        }
+            {(row.flags.length > 0 || added) && (
+              <span className="flex flex-wrap gap-x-2 leading-tight">
+                {added && (
+                  <span className="text-[0.6875rem] text-text-dim">
+                    {t('market.hauling.addedFrom', { category: added })}
+                  </span>
+                )}
+                {row.flags.map((flag) => (
+                  <HaulingFlagWord key={flag} flag={flag} />
+                ))}
+              </span>
+            )}
+          </span>
+        );
+        if (cards) return nameAndNotes;
         return (
           <span className="flex min-w-0 items-center gap-2">
             <TypeIcon typeId={row.typeId} size={32} className="size-6 shrink-0" />
-            <span className="flex min-w-0 flex-col">
-              <span className={entityLinkClassName('min-w-0 font-medium leading-snug break-words')}>
-                {row.name}
-              </span>
-              {(row.flags.length > 0 || added) && (
-                <span className="flex flex-wrap gap-x-2 leading-tight">
-                  {added && (
-                    <span className="text-[0.6875rem] text-text-dim">
-                      {t('market.hauling.addedFrom', { category: added })}
-                    </span>
-                  )}
-                  {row.flags.map((flag) => (
-                    <HaulingFlagWord key={flag} flag={flag} />
-                  ))}
-                </span>
-              )}
-            </span>
+            {nameAndNotes}
           </span>
         );
       },
@@ -1189,6 +1181,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
                 setSelectedTypeId(null);
               }}
               title={selectedRow?.name ?? t('market.hauling.title')}
+              titleActions={selectedRow && <HaulingItemActions row={selectedRow} />}
               placement="sheet-full"
             >
               {selectedRow && detail(selectedRow, false)}

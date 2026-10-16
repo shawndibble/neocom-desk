@@ -36,10 +36,15 @@ export interface HaulingItemDetailProps {
   /** What capped the line ("22 m³ · your share of a week's sales"), from the panel. */
   loadNote?: string;
   /**
-   * False where the item's icon and name are already the surface's own title
-   * (the phone sheet). The flags, the lane and the ⋮ stay either way.
+   * False where the surface's own title row names the item (the phone sheet):
+   * that row then carries `HaulingItemActions` too. The flags and lane stay.
    */
   showTitle?: boolean;
+}
+
+/** The item's ⋮, for the detail's title row or a sheet's. */
+export function HaulingItemActions({ row }: { row: HaulingViewRow }) {
+  return <ItemMoreActions typeId={row.typeId} itemName={row.name} variant="ghost" size="sm" />;
 }
 
 const signed = (value: number) => signedIsk(value, marketIskDecimals(value));
@@ -68,11 +73,6 @@ export function HaulingItemDetail({
 
 function Header({ row, showTitle }: { row: HaulingViewRow; showTitle: boolean }) {
   const { t } = useTranslation();
-  const actions = (
-    <span className="ml-auto shrink-0">
-      <ItemMoreActions typeId={row.typeId} itemName={row.name} />
-    </span>
-  );
   const lane = (
     <span className="flex min-w-0 flex-wrap items-center gap-x-2 text-xs text-text-dim">
       {row.flags.map((flag) => (
@@ -87,23 +87,20 @@ function Header({ row, showTitle }: { row: HaulingViewRow; showTitle: boolean })
     </span>
   );
 
-  if (!showTitle) {
-    return (
-      <div className="flex items-center gap-2">
-        {lane}
-        {actions}
-      </div>
-    );
-  }
+  if (!showTitle) return lane;
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex items-start gap-3">
       <TypeIcon typeId={row.typeId} size={64} className="size-10 shrink-0" />
-      {/* Plain text, not a link: Show info is a link below and in the ⋮ (DESIGN.md §6c). */}
-      <div className="flex min-w-0 flex-col gap-0.5">
-        <h3 className="text-base leading-tight font-semibold break-words">{row.name}</h3>
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <div className="flex items-start gap-2">
+          {/* Plain text, not a link: Show info is a link below and in the ⋮ (DESIGN.md §6c). */}
+          <h3 className="min-w-0 flex-1 text-base leading-tight font-semibold break-words">
+            {row.name}
+          </h3>
+          <HaulingItemActions row={row} />
+        </div>
         {lane}
       </div>
-      {actions}
     </div>
   );
 }
@@ -422,22 +419,27 @@ function ListingBody({
       />
       <div className="flex flex-col gap-0.5">
         <Label>{t('market.hauling.itemDetail.sellsIn')}</Label>
-        <span className="flex flex-wrap gap-x-1.5 text-sm">
-          <b className="whitespace-nowrap tabular-nums">
-            {t('market.hauling.itemDetail.sellsInDays', {
-              count: Math.max(1, Math.round(sale.daysToSell)),
-              days: formatDaysToSell(sale.daysToSell),
-            })}
-          </b>
-          <span className="whitespace-nowrap text-text-dim">
+        {/* Each segment keeps its trailing "·": a wrap falls between segments, never before a dot. */}
+        <p className="text-sm text-text-dim">
+          <span className="whitespace-nowrap">
+            <b className="text-text tabular-nums">
+              {t('market.hauling.itemDetail.sellsInDays', {
+                count: Math.max(1, Math.round(sale.daysToSell)),
+                days: formatDaysToSell(sale.daysToSell),
+              })}
+            </b>{' '}
+            ·
+          </span>{' '}
+          <span className="whitespace-nowrap">
             {t('market.hauling.itemDetail.soldPerDay', {
               units: sale.dailyVolume.toLocaleString(undefined, { maximumFractionDigits: 1 }),
-            })}
-          </span>
-          <span className="whitespace-nowrap text-text-dim">
+            })}{' '}
+            ·
+          </span>{' '}
+          <span className="whitespace-nowrap">
             {t('market.hauling.itemDetail.listedNear', { units: sale.unitsAhead.toLocaleString() })}
           </span>
-        </span>
+        </p>
       </div>
       <TheMath
         row={row}
@@ -525,7 +527,12 @@ function Links({ row }: { row: HaulingViewRow }) {
       >
         {t('market.hauling.itemDetail.routeSafety')}
       </Link>
-      <ItemInfoLink typeId={row.typeId} itemName={row.name} className={inlineLinkClassName}>
+      {/* `!`: ItemInfoLink's entity recipe hides the underline at rest; here it matches its neighbours. */}
+      <ItemInfoLink
+        typeId={row.typeId}
+        itemName={row.name}
+        className={cx(inlineLinkClassName, '!decoration-current')}
+      >
         {t('market.contextMenu.showInfo')}
       </ItemInfoLink>
     </p>
