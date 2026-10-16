@@ -40,7 +40,7 @@ export interface PlanFill {
   lines: TripLine[];
   /** What all of `lines` together add. */
   added: { volumeM3: number; cost: number; profit: number };
-  /** The current plan as it stands (pinned), and the plan with every fill line added. */
+  /** The current plan as the user's own overrides make it, and the plan with every fill line added (current lines pinned). */
   before: TripPlan;
   after: TripPlan;
 }
@@ -59,7 +59,12 @@ export function planFill(input: PlanFillInput): PlanFill {
 
   // planTrip keys lines by typeId: an extra already planned, or listed twice, would duplicate a line.
   const seen = new Set(current.map((c) => c.typeId));
-  const extras = input.extras.filter((c) => !seen.has(c.typeId) && seen.add(c.typeId));
+  const extras: TripCandidate[] = [];
+  for (const extra of input.extras) {
+    if (seen.has(extra.typeId)) continue;
+    seen.add(extra.typeId);
+    extras.push(extra);
+  }
 
   const after = planTrip({
     candidates: [...current, ...extras],

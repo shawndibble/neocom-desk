@@ -12,8 +12,8 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { EVERYTHING_CATEGORY_ID, typeIdsOutsideHaulingCategory } from './haulingCategories';
-import { clearHaulingScanCache, type HaulMode } from './haulingData';
-import { haulingEndId, type HaulingEnd } from './haulingHubs';
+import { clearHaulingScanCache, haulingScanCacheKey, type HaulMode } from './haulingData';
+import type { HaulingEnd } from './haulingHubs';
 import { scanHaulingLane } from './haulingScanRun';
 import type { HaulingScanState } from './useHaulingScan';
 
@@ -34,12 +34,13 @@ export function useHaulingFillScan(
   mode: HaulMode,
   enabled: boolean
 ): { state: HaulingFillScanState; refresh: () => void } {
-  const key = `${haulingEndId(from)}>${haulingEndId(to)}:${categoryId}:${mode}`;
+  const key = haulingScanCacheKey({ from, to, scope: categoryId, mode });
   const [ask, setAsk] = useState<Ask | null>(enabled ? { key, attempt: 0 } : null);
-  const [wasEnabled, setWasEnabled] = useState(enabled);
-  if (enabled !== wasEnabled) {
-    setWasEnabled(enabled);
-    setAsk(enabled ? { key, attempt: 0 } : null);
+  const [seen, setSeen] = useState({ enabled, key });
+  if (enabled !== seen.enabled || key !== seen.key) {
+    setSeen({ enabled, key });
+    // A new lane drops the ask, so coming back to the old one never re-scans unasked.
+    setAsk(enabled && enabled !== seen.enabled ? { key, attempt: 0 } : null);
   }
   // Tagged with the ask it answers, so an old lane's rows never show for a new ask.
   const [result, setResult] = useState<{ ask: Ask; state: HaulingScanState } | null>(null);
@@ -67,8 +68,9 @@ export function useHaulingFillScan(
           (progress) => settle({ status: 'loading', progress })
         );
         settle({ status: 'ready', scan });
-      } catch (error) {
-        if (!(error instanceof DOMException)) settle({ status: 'error' });
+      } catch {
+        // An abort lands nowhere (`settle` checks); any other failure, IndexedDB's included, is an error.
+        settle({ status: 'error' });
       }
     })();
     return () => controller.abort();

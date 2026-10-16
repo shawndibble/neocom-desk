@@ -114,6 +114,15 @@ describe('useHaulingFillScan', () => {
     expect(runHaulingScan.mock.calls[1]![0]).toMatchObject({ to: other });
   });
 
+  it('stays idle on coming back to the lane it was asked for', async () => {
+    const { result, rerender } = renderFill({ enabled: true });
+    await waitFor(() => expect(result.current.state).toMatchObject({ status: 'ready' }));
+    rerender({ from: JITA, to: TRADE_HUBS[2]!, categoryId: AMMO, enabled: true });
+    rerender({ from: JITA, to: AMARR, categoryId: AMMO, enabled: true });
+    expect(result.current.state).toEqual({ status: 'idle' });
+    expect(runHaulingScan).toHaveBeenCalledTimes(1);
+  });
+
   it('goes idle on a category or mode change too', async () => {
     const { result, rerender } = renderFill({ enabled: true });
     await waitFor(() => expect(result.current.state).toMatchObject({ status: 'ready' }));
@@ -137,10 +146,14 @@ describe('useHaulingFillScan', () => {
     expect(runHaulingScan).toHaveBeenCalledTimes(3);
   });
 
-  it('reports a failed scan', async () => {
+  it('reports a failed scan, a storage failure included', async () => {
     runHaulingScan.mockRejectedValueOnce(new Error('ESI down'));
     const { result } = renderFill({ enabled: true });
     await waitFor(() => expect(result.current.state).toEqual({ status: 'error' }));
+
+    runHaulingScan.mockRejectedValueOnce(new DOMException('Quota', 'QuotaExceededError'));
+    const quota = renderFill({ enabled: true });
+    await waitFor(() => expect(quota.result.current.state).toEqual({ status: 'error' }));
   });
 
   it('does nothing on refresh before the user asks', () => {
