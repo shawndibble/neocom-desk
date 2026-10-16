@@ -1654,6 +1654,7 @@ describe('Settings — sections rail', () => {
       'Travel',
       'Notifications',
       'Data & storage',
+      'Offline data',
       'Activity Log',
     ]);
     for (const group of ['App', 'Defaults', 'Alerts', 'Data & device']) {
@@ -1724,7 +1725,7 @@ describe('Settings — phone list', () => {
     }
     // Corporation is absent: this character has no corp access.
     expect(within(nav).queryByRole('link', { name: /corporation/i })).not.toBeInTheDocument();
-    expect(within(nav).getAllByRole('link')).toHaveLength(10);
+    expect(within(nav).getAllByRole('link')).toHaveLength(11);
     expect(within(nav).getByRole('link', { name: /^display/i })).toHaveTextContent(
       /default text, my local time/i
     );

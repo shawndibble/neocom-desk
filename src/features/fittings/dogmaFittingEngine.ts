@@ -175,6 +175,24 @@ export async function warmDogmaEngineAssets(): Promise<void> {
   }
 }
 
+/**
+ * Whether the WASM and the SDE snapshot are both in this pin's cache bucket,
+ * i.e. the engine would start offline (Settings → Offline data). Reads only;
+ * false where Cache Storage is unavailable.
+ */
+export async function dogmaEngineAssetsCached(): Promise<boolean> {
+  try {
+    const cache = await caches.open(CACHE_NAME);
+    for (const url of [WASM_URL, SDE_URL]) {
+      const hit = await cache.match(url);
+      if (!hit || !isEngineAsset(hit)) return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 let enginePromise: Promise<DogmaEngine> | null = null;
 /** Set once `loadDogmaEngine` has resolved; the only way to the synchronous fit checks. */
 let readyEngine: DogmaEngine | null = null;

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { LAZY_SDE_FILES, warmLazySde } from './warmLazySde';
+import { LAZY_SDE_FILES, cachedLazySdeFiles, warmLazySde } from './warmLazySde';
 
 const warmDogma = vi.fn(async () => {});
 vi.mock('@/features/fittings/dogmaFittingEngine', () => ({ warmDogmaEngineAssets: warmDogma }));
@@ -88,5 +88,52 @@ describe('warmLazySde', () => {
     await expect(warmLazySde({ cancelled: false })).resolves.toEqual([]);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(warmDogma).not.toHaveBeenCalled();
+  });
+});
+
+describe('warmLazySde force', () => {
+  it('ignores Save-Data and cellular, and still warms the engine', async () => {
+    env({ connection: { saveData: true, effectiveType: '3g', type: 'cellular' } });
+    await warmLazySde({ cancelled: false }, { force: true });
+    expect(fetchMock).toHaveBeenCalledTimes(LAZY_SDE_FILES.length);
+    expect(warmDogma).toHaveBeenCalledOnce();
+  });
+
+  it('still does nothing offline or without a controlling service worker', async () => {
+    env({ online: false });
+    await warmLazySde({ cancelled: false }, { force: true });
+    env({ controller: false });
+    await warmLazySde({ cancelled: false }, { force: true });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(warmDogma).not.toHaveBeenCalled();
+  });
+
+  it('reports progress out of files plus the engine', async () => {
+    env({});
+    const onProgress = vi.fn();
+    await warmLazySde({ cancelled: false }, { force: true, onProgress });
+    const total = LAZY_SDE_FILES.length + 1;
+    expect(onProgress).toHaveBeenCalledTimes(total);
+    expect(onProgress).toHaveBeenNthCalledWith(1, 1, total);
+    expect(onProgress).toHaveBeenLastCalledWith(total, total);
+  });
+});
+
+describe('cachedLazySdeFiles', () => {
+  it('lists the lazy files whose versioned URL is in Cache Storage', async () => {
+    vi.stubGlobal('__SDE_DATA_VERSIONS__', { 'masteries.json': 'abc' });
+    const match = vi.fn(async (url: string) =>
+      url.endsWith('data/masteries.json?v=abc') || url.endsWith('data/typeNames.json')
+        ? new Response('x')
+        : undefined
+    );
+    vi.stubGlobal('caches', { match });
+    const cached = await cachedLazySdeFiles();
+    expect([...cached].sort()).toEqual(['masteries.json', 'typeNames.json']);
+  });
+
+  it('reports nothing cached when Cache Storage is unavailable', async () => {
+    vi.stubGlobal('caches', undefined);
+    expect((await cachedLazySdeFiles()).size).toBe(0);
   });
 });

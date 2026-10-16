@@ -376,6 +376,28 @@ describe('warmDogmaEngineAssets stall detection', () => {
   });
 });
 
+describe('dogmaEngineAssetsCached', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('is false until both files are in the pinned bucket, true once warmed', async () => {
+    stubNetwork();
+    const { dogmaEngineAssetsCached, warmDogmaEngineAssets } = await freshModule();
+    await expect(dogmaEngineAssetsCached()).resolves.toBe(false);
+    await warmDogmaEngineAssets();
+    await expect(dogmaEngineAssetsCached()).resolves.toBe(true);
+  });
+
+  it('is false when Cache Storage is unavailable or throws', async () => {
+    vi.stubGlobal('caches', {
+      open: vi.fn(async () => {
+        throw new Error('SecurityError');
+      }),
+    });
+    const { dogmaEngineAssetsCached } = await freshModule();
+    await expect(dogmaEngineAssetsCached()).resolves.toBe(false);
+  });
+});
+
 describe('computeFittingStats', () => {
   afterEach(() => vi.unstubAllGlobals());
 
