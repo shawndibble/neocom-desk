@@ -1,5 +1,5 @@
 /**
- * Fill the free space (issue #3878): what items from other categories would
+ * Fill the free space: what items from other categories would
  * add to a Trip Plan whose own lines stay as they are.
  *
  * The current plan is pinned first — every line it ships keeps its quantity
@@ -40,7 +40,7 @@ export interface PlanFill {
   lines: TripLine[];
   /** What all of `lines` together add. */
   added: { volumeM3: number; cost: number; profit: number };
-  /** The current plan as the user's own overrides make it, and the plan with every fill line added (current lines pinned). */
+  /** The current plan as the user's own overrides make it, and the plan with every fill line added. */
   before: TripPlan;
   after: TripPlan;
 }
@@ -49,7 +49,6 @@ export function planFill(input: PlanFillInput): PlanFill {
   const { current, overrides, holds, budgetIsk, fees } = input;
   const before = planTrip({ candidates: current, overrides, holds, budgetIsk, fees });
 
-  // Each line ships what it ships now; an unticked one stays out.
   const pinned = new Map<number, TripOverride>(
     before.lines.map((line) => [
       line.typeId,

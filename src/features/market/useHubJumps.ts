@@ -1,5 +1,5 @@
 /**
- * Jumps between a Hauling lane's two Trade Hubs (issue #3878), by the user's
+ * Jumps between a Hauling lane's two Trade Hubs, by the user's
  * route preference — what the trip rail's profit per jump divides by. Null
  * system ids (an Any hub end) give `none`: each row has its own lane then.
  *

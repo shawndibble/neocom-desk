@@ -1,5 +1,5 @@
 /**
- * The on-demand scan behind "Fill the free space" (issue #3878): the same
+ * The on-demand scan behind "Fill the free space": the same
  * Hauling Opportunities scan as `useHaulingScan`, over the type ids of every
  * other Hauling category on the lane, run only once `enabled` turns true (the
  * user asked) and never when the category is already Everything.
@@ -22,9 +22,9 @@ export type HaulingFillScanState = { status: 'idle' } | HaulingScanState;
 /** The fill's cache scope: category ids are positive, so it never shares an entry with a category scan. */
 export const haulingFillScope = (categoryId: number): number => -categoryId;
 
+/** One ask from the user for one lane; a refresh is a new ask, so it re-runs. */
 interface Ask {
   key: string;
-  attempt: number;
 }
 
 export function useHaulingFillScan(
@@ -34,21 +34,21 @@ export function useHaulingFillScan(
   mode: HaulMode,
   enabled: boolean
 ): { state: HaulingFillScanState; refresh: () => void } {
-  const key = haulingScanCacheKey({ from, to, scope: categoryId, mode });
-  const [ask, setAsk] = useState<Ask | null>(enabled ? { key, attempt: 0 } : null);
+  const key = haulingScanCacheKey({ from, to, scope: haulingFillScope(categoryId), mode });
+  const [ask, setAsk] = useState<Ask | null>(enabled ? { key } : null);
   const [seen, setSeen] = useState({ enabled, key });
   if (enabled !== seen.enabled || key !== seen.key) {
     setSeen({ enabled, key });
-    // A new lane drops the ask, so coming back to the old one never re-scans unasked.
-    setAsk(enabled && enabled !== seen.enabled ? { key, attempt: 0 } : null);
+    setAsk(enabled && enabled !== seen.enabled ? { key } : null);
   }
   // Tagged with the ask it answers, so an old lane's rows never show for a new ask.
   const [result, setResult] = useState<{ ask: Ask; state: HaulingScanState } | null>(null);
 
-  const active = ask !== null && ask.key === key && categoryId !== EVERYTHING_CATEGORY_ID;
+  const active = ask?.key === key && categoryId !== EVERYTHING_CATEGORY_ID ? ask : null;
 
   useEffect(() => {
-    if (!active || ask === null) return;
+    if (active === null) return;
+    const ask = active;
     const controller = new AbortController();
     const settle = (state: HaulingScanState) => {
       if (!controller.signal.aborted) setResult({ ask, state });
@@ -74,18 +74,18 @@ export function useHaulingFillScan(
       }
     })();
     return () => controller.abort();
-  }, [active, ask, from, to, categoryId, mode]);
+  }, [active, from, to, categoryId, mode]);
 
   const refresh = useCallback(() => {
     if (!enabled) return;
-    // The lane already asked for is fetched afresh; a new lane may still come from the cache.
+    // A new lane may still come from the cache.
     if (ask?.key === key) clearHaulingScanCache();
-    setAsk({ key, attempt: (ask?.attempt ?? 0) + 1 });
+    setAsk({ key });
   }, [enabled, key, ask]);
 
   let state: HaulingFillScanState = { status: 'idle' };
-  if (active) {
-    state = result?.ask === ask ? result.state : { status: 'loading', progress: null };
+  if (active !== null) {
+    state = result?.ask === active ? result.state : { status: 'loading', progress: null };
   }
   return { state, refresh };
 }
