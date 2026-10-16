@@ -14,6 +14,7 @@ import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { phosphorWeightsPlugin } from './src/components/ui/phosphorWeightsPlugin';
 import { localeSplitPlugin } from './src/i18n/localeSplitPlugin';
+import { deferEntryHtml } from './src/app/deferredEntry';
 import { lazySdeGlobIgnores } from './src/sde/lazySdeFiles';
 
 const { version, dependencies } = JSON.parse(
@@ -251,6 +252,19 @@ function landingShellTemplate() {
   };
 }
 
+/**
+ * On the landing page, holds the app's JS until the prerendered hero has
+ * painted (`src/app/deferredEntry.ts`, #3950). Build only, and `post`, so it
+ * sees the entry script and module preloads Vite has injected.
+ */
+function deferredEntryHtml() {
+  return {
+    name: 'neocom-deferred-entry',
+    apply: 'build' as const,
+    transformIndexHtml: { order: 'post' as const, handler: deferEntryHtml },
+  };
+}
+
 function spaFallbackHtml() {
   return {
     name: 'neocom-spa-fallback-html',
@@ -334,6 +348,7 @@ export default defineConfig({
     phosphorWeightsPlugin(),
     localeSplitPlugin(),
     landingShellTemplate(),
+    deferredEntryHtml(),
     VitePWA({
       // Hand-written src/sw.ts (originally ADR 0007, issue #176; now ADR 0009)
       // — only strategy that will support a custom `push` handler (future
