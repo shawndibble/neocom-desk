@@ -387,6 +387,13 @@ export const MailReply = withWeight(ArrowBendUpLeft);
 export const MailForward = withWeight(ArrowBendUpRight);
 /** Start a new mail — the Compose entry on the Mail page. */
 export const MailCompose = withWeight(PencilSimple);
+/**
+ * A recipient chip's image slot when there is no image: a mailing list
+ * always, a character whose portrait failed. A failed corporation or alliance
+ * logo takes `Corporation` / `MailAlliance`.
+ */
+export const MailingList = withWeight(ListBullets);
+export const MailCharacter = withWeight(User);
 /** Jump clones and implants. */
 export const Clones = withWeight(Stack);
 /** A calendar event — the Coming Up rail's own kind. */

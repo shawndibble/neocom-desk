@@ -18,6 +18,8 @@ interface CharacterAvatarProps {
    * where deferring costs a visible late paint. Lists pass `lazy`.
    */
   loading?: 'eager' | 'lazy';
+  /** For a caller that swaps in a fallback when the portrait fails. */
+  onError?: () => void;
   className?: string;
 }
 
@@ -32,6 +34,7 @@ export function CharacterAvatar({
   selected = false,
   alt,
   loading = 'eager',
+  onError,
   className = '',
 }: CharacterAvatarProps) {
   const { px, source } = CHARACTER_AVATAR_SIZE[size];
@@ -45,6 +48,7 @@ export function CharacterAvatar({
       height={px}
       loading={loading}
       decoding="async"
+      onError={onError}
       className={cx(
         characterAvatarBoxClassName(size),
         selected ? 'border-accent' : 'border-line',

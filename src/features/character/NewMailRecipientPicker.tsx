@@ -22,6 +22,7 @@ import {
   type ComposeRecipient,
 } from '@/engine/mailCompose';
 import { loadMailingLists } from './mail';
+import { RecipientAvatar } from './RecipientAvatar';
 import { MIN_RECIPIENT_SEARCH_LENGTH, searchTypedMailRecipients } from './mailRecipientSearch';
 
 const SEARCH_DEBOUNCE_MS = 300;
@@ -192,9 +193,10 @@ export function NewMailRecipientPicker({
           {recipients.map((r) => (
             <li
               key={recipientKey(r)}
-              className="flex items-center gap-1 rounded-xs border border-line bg-panel-2 py-0.5 pr-0.5 pl-2 text-xs text-text"
+              className="flex items-center gap-1 rounded-xs border border-line bg-panel-2 py-0.5 pr-0.5 pl-0.5 text-xs text-text"
             >
-              <span>{r.name}</span>
+              <RecipientAvatar recipient={r} />
+              <span className="ml-0.5">{r.name}</span>
               <span className="text-text-dim">{t(`mail.recipientType.${r.recipient_type}`)}</span>
               <IconButton
                 icon={<Icon.Close size={Icon.ICON_SIZE.sm} />}
@@ -275,7 +277,7 @@ export function NewMailRecipientPicker({
                   role="option"
                   aria-selected={highlight === i}
                   className={cx(
-                    'flex min-h-11 cursor-pointer items-center justify-between gap-2 px-3 py-2 text-xs text-text md:min-h-0',
+                    'flex min-h-11 cursor-pointer items-center gap-2 px-3 py-1 text-xs text-text md:min-h-0',
                     highlight === i ? `bg-panel-2 ${activeOptionClassName}` : 'hover:bg-panel-2'
                   )}
                   onMouseEnter={() => setHighlight(i)}
@@ -285,7 +287,8 @@ export function NewMailRecipientPicker({
                     pick(c);
                   }}
                 >
-                  <span className="min-w-0 truncate">{c.name}</span>
+                  <RecipientAvatar recipient={c} />
+                  <span className="min-w-0 flex-1 truncate">{c.name}</span>
                   <span className="shrink-0 text-text-dim">
                     {t(`mail.recipientType.${c.recipient_type}`)}
                   </span>
