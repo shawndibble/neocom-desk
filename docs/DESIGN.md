@@ -233,8 +233,10 @@ Added with the Fittings section — see
 **EVE mail surface.** The mail reader draws a body on a fixed dark surface
 (`#0a0e14`, default text white at 75%, the game's `#bfffffff`) in every theme,
 a documented exception to the theme tokens: senders choose colours against the
-game's dark mail window, so a colour only reads as sent on that ground. It is one
-constant in `MailBodyView.tsx`, used for nothing else.
+game's dark mail window, so a colour only reads as sent on that ground. It lives
+in `MailBodyView.tsx` as `EVE_MAIL_SURFACE_FRAME_CLASS` (frame, fill, text colour)
+and `EVE_MAIL_SURFACE_CLASS` (the frame plus padding). Only the reader, the mail
+editor's card and the editor's colour-swatch sheet (`FormatDialogs.tsx`) use them.
 
 The Ship Tree (Ships › Tree) is a replica of the in-game one (ISIS), drawn
 from in-game screenshots — a game-art surface, and a documented exception to
