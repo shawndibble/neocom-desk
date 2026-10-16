@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Panel } from '@/components/ui';
 import { PASTE_DETECTORS } from '@/engine/import/pasteDestination';
+import { SEQUENCE_PREFIX } from '@/lib/shortcutSequence';
 import { useSingleKeyShortcuts } from '@/lib/singleKeyShortcuts';
 import {
   SHORTCUTS,
@@ -69,7 +70,7 @@ export function ShortcutsPanel() {
             >
               {shortcut.sequence ? (
                 <>
-                  <kbd className={KBD}>G</kbd>{' '}
+                  <kbd className={KBD}>{SEQUENCE_PREFIX.toUpperCase()}</kbd>{' '}
                   <span className="text-text-dim">{t('shortcuts.then')}</span>{' '}
                   <kbd className={KBD}>{shortcut.displayKey}</kbd>
                 </>

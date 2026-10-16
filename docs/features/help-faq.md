@@ -34,11 +34,11 @@ Command palette (`src/features/commandPalette`) is covered elsewhere; here only 
 
 ## Shortcuts tab
 
-Three panels, definition lists (two columns from `md`, one on phone), each row = description + `<kbd>`.
+Three panels (Keyboard shortcuts, Paste anywhere, On a page), definition lists (two columns from `md`, one on phone), each row = description + `<kbd>`.
 
 - "Keyboard shortcuts": first row "Open the command palette" with the chord (Cmd+K on Apple platforms via `isApplePlatform`, Ctrl K otherwise; `commandPaletteDisplayKey`; not a `SHORTCUTS` row, fires inside text fields). Then every `SHORTCUTS` entry (`src/lib/shortcuts.ts`): `G` then `C` switch character, `O` Overview, `M` Market, `I` Industry, `W` Wallet, `P` Planetary Industry, `A` Alerts, `T` Mining tax, `S` Settings (rendered as two keys joined by "then"), `?` show this list (allows Shift), `Esc` close the open dialog (native, no handler). Dispatch in `app/useKeyboardShortcuts.ts`. The `G` sequences and `?` follow the Settings › Display "Single-key shortcuts" switch; when off the panel says so and dims those rows (Esc and the palette chord stay live).
-- "On a page": "These work inside text boxes too. Every fitting edit is in the address bar, so your browser's Back button is undo." Rows: save fitting (Mod+S), save as new copy (Mod+Shift+S), submit a pasted list or fit (Mod+Enter, any paste box).
 - "Paste anywhere": hint that outside a text field a pasted fit, skill plan or item list opens where it belongs; rows Paste (Cmd/Ctrl V), EFT fitting -> "Opens in Fittings", Item list -> "Opens in Appraisal", Skill plan -> "Opens in the Skills planner" (`app/GlobalPasteRouter.tsx`).
+- "On a page": "These work inside text boxes too. Every fitting edit is in the address bar, so your browser's Back button is undo." Rows: save fitting (Mod+S), save as new copy (Mod+Shift+S), submit a pasted list or fit (Mod+Enter, any paste box).
 
 ## FAQ tab
 
@@ -81,9 +81,8 @@ No ESI, no scope, no Dexie, no Firestore, no URL state beyond the tab path. Stat
 ## Observed gaps
 
 - FAQ does not name Characters-page groups or stars (device-local, user-created) or the Customize-permissions selection; "preferences" line only covers display settings and remembered sorts/filters/sections. `whatWeStore.ts` has no entry for them.
-- `ShortcutDef.descriptionKey` doc still says "shown in the Settings shortcut list" (`src/lib/shortcuts.ts:136`); the list moved to Help.
-- Single-character shortcuts cannot be turned off (decision `20261002-165816` records the WCAG 2.1.4 cost).
-- Shortcut list is static (rendered from the `SHORTCUTS` array, no per-context filtering); the only page-level shortcuts documented are the three "On a page" rows (Mod+S and Mod+Shift+S are Fittings-only).
+- The "Single-key shortcuts" switch (Settings › Display) is the WCAG 2.1.4 answer for the `G` sequences and `?`; they are not remappable (decision `20261016-121137`).
+- Shortcut list is static (rendered from the `SHORTCUTS` array, no per-context filtering); the only page-level shortcuts documented are the "On a page" rows (the `G` sequences are global and listed in the first panel) (Mod+S and Mod+Shift+S are Fittings-only).
 - No search or anchor links within FAQ; open state is local (not in URL), so a specific answer cannot be linked (only the tab: `/help/faq`).
 - Support tab has no in-app bug-report form, version/build number or diagnostics copy; Discord only.
 - No Help entry for per-page behaviour (e.g. what a card or column means); only InfoTooltips on individual surfaces.

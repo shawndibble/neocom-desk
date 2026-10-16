@@ -4,7 +4,9 @@ import { isTypingTarget, OVERLAY_SELECTOR, SHORTCUTS } from '@/lib/shortcuts';
 import { advanceSequence, IDLE, type SequenceState } from '@/lib/shortcutSequence';
 import { useSingleKeyShortcuts } from '@/lib/singleKeyShortcuts';
 
-const SEQUENCE_KEYS = SHORTCUTS.filter((shortcut) => shortcut.sequence);
+const SEQUENCE_BY_KEY = new Map(
+  SHORTCUTS.filter((shortcut) => shortcut.sequence).map((shortcut) => [shortcut.key, shortcut])
+);
 
 /**
  * Global shortcut listener, mounted once from `Layout` so every authenticated
@@ -16,7 +18,8 @@ const SEQUENCE_KEYS = SHORTCUTS.filter((shortcut) => shortcut.sequence);
  * single key. The Settings "Single-key shortcuts" switch turns all of them off
  * (scope decision `20261016-*-shortcuts-become-g-sequences-with-an-off-switch`);
  * until it has loaded the listener stays off, so a pilot who switched them off
- * never gets a live key on a cold load. Typing in a field never fires one
+ * never gets a live key on a cold load. (The setting keeps its "single-key" name
+ * for WCAG 2.1.4's wording; its storage key is `singleKeyShortcuts`.) Typing in a field never fires one
  * (`isTypingTarget`).
  */
 export function useKeyboardShortcuts(): void {
@@ -66,13 +69,13 @@ export function useKeyboardShortcuts(): void {
 
       if (!event.shiftKey) {
         const result = advanceSequence(sequence.current, key, event.timeStamp, (k) =>
-          SEQUENCE_KEYS.some((s) => s.key === k)
+          SEQUENCE_BY_KEY.has(k)
         );
         sequence.current = result.state;
         if (result.kind === 'pending') return;
         if (result.kind === 'match') {
           event.preventDefault();
-          SEQUENCE_KEYS.find((s) => s.key === result.key)?.run?.(navigate);
+          SEQUENCE_BY_KEY.get(result.key)?.run?.(navigate);
           return;
         }
       } else {
