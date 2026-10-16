@@ -215,7 +215,7 @@ export function HaulingTripSummary({
         </SummaryRow>
         <SummaryRow label={t('market.hauling.rail.spend')}>{isk(cost)}</SummaryRow>
         {knownJumps && (
-          <SummaryRow label={t('market.hauling.rail.perJump')}>
+          <SummaryRow label={t('market.hauling.rail.perJump', { jumps: knownJumps.jumps })}>
             {signed(profit / knownJumps.jumps)}
           </SummaryRow>
         )}
@@ -318,9 +318,11 @@ export function HaulingFillList({
     body = (
       <>
         <Button className="w-full" onClick={onFind}>
-          {t('market.hauling.fill.find', { m3: formatTripM3(freeM3) })}
+          {t('market.hauling.fill.find')}
         </Button>
-        <p className="text-xs text-text-dim">{t('market.hauling.fill.findNote')}</p>
+        <p className="text-xs text-text-dim">
+          {t('market.hauling.fill.findNote', { m3: formatTripM3(freeM3) })}
+        </p>
       </>
     );
   } else if (status === 'loading') {

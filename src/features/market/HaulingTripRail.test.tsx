@@ -147,6 +147,7 @@ describe('HaulingTripSummary', () => {
     expect(screen.getByText('20,038 of 64,500 m³ used')).toBeInTheDocument();
     expect(screen.getByText('+137,608,611')).toBeInTheDocument();
     // 137,608,611 / 45
+    expect(screen.getByText('Profit per jump (45)')).toBeInTheDocument();
     expect(screen.getByText('+3,057,969')).toBeInTheDocument();
     expect(
       screen.getByText("Limited by sales: some items stop at a realistic share of a week's sales.")
@@ -161,7 +162,7 @@ describe('HaulingTripSummary', () => {
     renderSummary({ jumps: { status } });
     expect(screen.getByText('Amarr to Jita')).toBeInTheDocument();
     expect(screen.queryByText(/jumps/)).not.toBeInTheDocument();
-    expect(screen.queryByText('Profit per jump')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Profit per jump/)).not.toBeInTheDocument();
   });
 
   it('without a Cargo Space shows the cargo tip instead of a meter or free m³', () => {
@@ -243,8 +244,8 @@ describe('HaulingFillList', () => {
     const user = userEvent.setup();
     const { onFind } = renderFill({ status: 'idle', items: [] });
     expect(onFind).not.toHaveBeenCalled();
-    expect(screen.getByText(/scans the other categories on this lane/i)).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Find items for the free 44,462 m³' }));
+    expect(screen.getByText(/items that fit the free 44,462 m³/i)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Find items to fill it' }));
     expect(onFind).toHaveBeenCalledOnce();
   });
 

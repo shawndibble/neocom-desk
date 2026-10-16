@@ -17,8 +17,13 @@ vi.mock('@/features/skills/data', () => ({
   loadUniverseTypeOnce: (...a: unknown[]) => loadUniverseTypeOnce(...a),
 }));
 
-const { clearHaulingScanCache, haulingScanCacheKey, MAX_BOOK_CANDIDATES, runHaulingScan } =
-  await import('./haulingData');
+const {
+  clearHaulingScanCache,
+  evictHaulingScan,
+  haulingScanCacheKey,
+  MAX_BOOK_CANDIDATES,
+  runHaulingScan,
+} = await import('./haulingData');
 
 const FROM = TRADE_HUBS.find((h) => h.id === 'jita')!;
 const TO = TRADE_HUBS.find((h) => h.id === 'amarr')!;
@@ -116,6 +121,20 @@ describe('runHaulingScan, selling into buy orders', () => {
       mode: 'instant',
     });
     expect(scan.rows).toHaveLength(0);
+  });
+
+  it('evicts one scan from the cache and keeps the others', async () => {
+    const scan = (scope: number | string) =>
+      runHaulingScan({ from: FROM, to: TO, typeIds: [34], scope, types: TYPES, mode: 'instant' });
+    await scan(4);
+    await scan('fill-4');
+    expect(getHubPrices).toHaveBeenCalledTimes(4);
+
+    evictHaulingScan(haulingScanCacheKey({ from: FROM, to: TO, scope: 'fill-4', mode: 'instant' }));
+    await scan(4);
+    expect(getHubPrices).toHaveBeenCalledTimes(4);
+    await scan('fill-4');
+    expect(getHubPrices).toHaveBeenCalledTimes(6);
   });
 
   it('does not answer an instant scan from a cached listing scan', async () => {

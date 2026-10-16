@@ -23,6 +23,7 @@ import { cx } from '@/lib/cx';
 import { formatMarketIsk } from '@/lib/isk';
 import { HAULING_THRESHOLDS, lotEconomics, type LadderLevel } from '@/engine/market/haulingMarket';
 import { maxBuyPrice, type TripLine } from '@/engine/market/haulingPlan';
+import { ItemInfoLink } from '@/features/entities';
 import { routeToHref } from '@/features/route/routeSafetyLink';
 import { HaulingFlagWord } from './HaulingFlagWord';
 import { ItemMoreActions } from './ItemContextMenu';
@@ -528,7 +529,6 @@ function InstantBody({
 /** Show info, the destination's full book and price history, and Route Safety for the lane. */
 function Links({ row }: { row: HaulingViewRow }) {
   const { t } = useTranslation();
-  const { showInfo } = useItemActions();
   return (
     <p className="flex flex-wrap gap-x-3 gap-y-1 text-sm">
       <MarketItemLink typeId={row.typeId} hubId={row.toHub.id} className={inlineLinkClassName}>
@@ -540,13 +540,9 @@ function Links({ row }: { row: HaulingViewRow }) {
       >
         {t('market.hauling.itemDetail.routeSafety')}
       </Link>
-      <button
-        type="button"
-        className={inlineLinkClassName}
-        onClick={() => showInfo(row.typeId, row.name)}
-      >
+      <ItemInfoLink typeId={row.typeId} itemName={row.name} className={inlineLinkClassName}>
         {t('market.contextMenu.showInfo')}
-      </button>
+      </ItemInfoLink>
     </p>
   );
 }

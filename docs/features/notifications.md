@@ -159,7 +159,7 @@ Hedged = push wording hedges because an ordinary in-game action while the app is
 
 ## Test-covered behaviours
 
-`src/routes/Alerts.test.tsx` (grouping, severity text, mute across Characters, dismissal, filters in URL, focus management, one-Character name drop, feed-off banner); `src/features/notifications/*.test.ts(x)` (alertGroups, alertsFilter, appBadge, display, domainCopy, eventSelection, eventThresholds, feed, feedSync, foregroundPoller/pollerState, notificationClick/Options, permission, projectionRebuild(+Scheduler), pushHandler, syncedPreferences, webPush); `src/engine/notificationDiffs.test.ts`, `projection.test.ts`. Read the specific test before quoting an edge case.
+`src/routes/Alerts.test.tsx` (grouping, severity text, mute across Characters, dismissal, filters in URL, focus management, one-Character name drop, feed-off banner); `src/features/notifications/*.test.ts(x)` (alertGroups, alertsFilter, appBadge, display, domainCopy, eventSelection, eventThresholdFields, feed, feedSync, foregroundPoller/pollerState, notificationClick/Options, permission, projectionRebuild(+Scheduler), pushHandler, syncedPreferences, webPush); `src/engine/notificationDiffs.test.ts`, `projection.test.ts`. Read the specific test before quoting an edge case.
 
 ## Interview Q&A
 

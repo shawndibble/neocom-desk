@@ -20,7 +20,7 @@ export interface HaulingScanTarget {
   to: HaulingEnd;
   mode: HaulMode;
   /** The cache scope (`HaulingScanRequest.scope`): two scans of different ids must never share one. */
-  scope: number;
+  scope: number | string;
   typeIds: (
     groups: readonly MarketGroupNode[],
     marketTypes: readonly MarketTypeEntry[]

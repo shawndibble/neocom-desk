@@ -459,16 +459,22 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     setFillRequested(false);
     setAddedIds(NO_IDS);
     setUnticked(NO_IDS);
-  }, [refresh]);
+    // Their quantities were pinned on Add; left behind, Fill hold would stay on with nothing edited.
+    setOverrides((current) => {
+      const next = new Map([...current].filter(([typeId]) => !addedIds.has(typeId)));
+      return next.size === current.size ? current : next;
+    });
+  }, [refresh, addedIds]);
   useEffect(() => {
     onRefreshInfoChange?.({ refresh: reload, disabled: refreshDisabled, fetchedAt });
     return () => onRefreshInfoChange?.(null);
   }, [onRefreshInfoChange, reload, refreshDisabled, fetchedAt]);
 
-  // Fill the free space: on demand only (the scan costs ESI budget), never
-  // for Everything (no other category is left), and only once the plan is
-  // bound by a Cargo Space.
-  const fillOffered = categoryId !== EVERYTHING_CATEGORY_ID && cargoSet && !sameHub && !bothAny;
+  // Fill the free space: on demand only (the scan costs ESI budget), never for
+  // Everything (no other category left), only once a Cargo Space binds the plan,
+  // and on a fixed lane only: with Any hub at an end it would scan every hub's books.
+  const fillOffered =
+    categoryId !== EVERYTHING_CATEGORY_ID && cargoSet && anyEnd === null && !sameHub;
   const fill = useHaulingFillScan(from, to, categoryId, mode, fillRequested);
   const fillShown = useMemo(
     () =>
@@ -1129,7 +1135,9 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     </div>
   );
   const detail = (row: HaulingViewRow, showTitle: boolean) => (
+    // Keyed, so a new row opens with its own folds closed ("Show the math").
     <HaulingItemDetail
+      key={row.typeId}
       row={row}
       line={lineOf.get(row.typeId)}
       loadNote={limitTextOf(row)}

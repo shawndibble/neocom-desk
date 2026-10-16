@@ -132,8 +132,8 @@ export interface HaulingScanRequest {
   from: HaulingEnd;
   to: HaulingEnd;
   typeIds: readonly number[];
-  /** Which category the ids came from, so two categories can never share a cache entry. */
-  scope: number;
+  /** Which ids these are (a category id, or a fill's own string scope), so two id sets never share a cache entry. */
+  scope: number | string;
   /** How the cargo is sold; defaults to `list`. */
   mode?: HaulMode;
   types: TypeMap;
@@ -149,6 +149,11 @@ const scanCache = new Map<string, { scan: HaulingScan; expiresAt: number }>();
 
 export function clearHaulingScanCache(): void {
   scanCache.clear();
+}
+
+/** Drops one scan's cache entry (by `haulingScanCacheKey`), leaving every other lane's. */
+export function evictHaulingScan(key: string): void {
+  scanCache.delete(key);
 }
 
 /** A scan is cached per route (Any included), category and mode: the two modes keep different rows for the same route. */

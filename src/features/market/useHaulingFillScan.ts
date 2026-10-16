@@ -12,15 +12,15 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { EVERYTHING_CATEGORY_ID, typeIdsOutsideHaulingCategory } from './haulingCategories';
-import { clearHaulingScanCache, haulingScanCacheKey, type HaulMode } from './haulingData';
+import { evictHaulingScan, haulingScanCacheKey, type HaulMode } from './haulingData';
 import type { HaulingEnd } from './haulingHubs';
 import { scanHaulingLane } from './haulingScanRun';
 import type { HaulingScanState } from './useHaulingScan';
 
 export type HaulingFillScanState = { status: 'idle' } | HaulingScanState;
 
-/** The fill's cache scope: category ids are positive, so it never shares an entry with a category scan. */
-export const haulingFillScope = (categoryId: number): number => -categoryId;
+/** The fill's cache scope: a string, so it never shares an entry with a category scan's numeric one. */
+export const haulingFillScope = (categoryId: number): string => `fill-${categoryId}`;
 
 /** One ask from the user for one lane; a refresh is a new ask, so it re-runs. */
 interface Ask {
@@ -78,8 +78,8 @@ export function useHaulingFillScan(
 
   const refresh = useCallback(() => {
     if (!enabled) return;
-    // A new lane may still come from the cache.
-    if (ask?.key === key) clearHaulingScanCache();
+    // A new lane may still come from the cache; a retry drops only this fill's entry, never the category scan's.
+    if (ask?.key === key) evictHaulingScan(key);
     setAsk({ key });
   }, [enabled, key, ask]);
 

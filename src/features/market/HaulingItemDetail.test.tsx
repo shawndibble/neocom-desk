@@ -165,9 +165,8 @@ describe('HaulingItemDetail — listing', () => {
     ).toBeInTheDocument();
   });
 
-  it('links Show info, the destination market and Route Safety for the lane', async () => {
-    const user = userEvent.setup();
-    const actions = renderDetail(listRow());
+  it('links Show info, the destination market and Route Safety for the lane', () => {
+    renderDetail(listRow());
     expect(screen.getByRole('link', { name: 'Price history and orders in Jita' })).toHaveAttribute(
       'href',
       expect.stringContaining('/market/browser?')
@@ -175,8 +174,11 @@ describe('HaulingItemDetail — listing', () => {
     const route = screen.getByRole('link', { name: 'Route safety' }).getAttribute('href')!;
     expect(route).toContain(`from=${AMARR.systemId}`);
     expect(route).toContain(String(JITA.systemId));
-    await user.click(screen.getByRole('button', { name: 'Show info' }));
-    expect(actions.showInfo).toHaveBeenCalledWith(2048, 'Damage Control II');
+    // A real link (new tab, copy link), not a button.
+    expect(screen.getByRole('link', { name: 'Show info' })).toHaveAttribute(
+      'href',
+      expect.stringContaining('info=type-2048')
+    );
   });
 
   it('carries every item action in its ⋮', async () => {

@@ -218,6 +218,30 @@ describe('HaulingPanel rows select, the rail shows the detail', () => {
     expect(screen.queryByRole('link', { name: /Price history/ })).toBeNull();
   });
 
+  it('opens each row’s detail with its folds closed', async () => {
+    const user = userEvent.setup();
+    mainState = {
+      status: 'ready',
+      scan: {
+        rows: [SCAN_ROW, { ...SCAN_ROW, typeId: 2205, name: 'Hammerhead II' }],
+        scanned: 2,
+        fetchedAt: 0,
+      },
+    };
+    renderPanel();
+    await user.click(row());
+    await user.click(screen.getByRole('button', { name: 'Show the math' }));
+    expect(screen.getByRole('button', { name: 'Show the math' })).toHaveAttribute(
+      'aria-expanded',
+      'true'
+    );
+    await user.click(row(/Hammerhead II/));
+    expect(screen.getByRole('button', { name: 'Show the math' })).toHaveAttribute(
+      'aria-expanded',
+      'false'
+    );
+  });
+
   it('the Trip crumb goes back to the trip but keeps the row selected', async () => {
     const user = userEvent.setup();
     renderPanel();
@@ -308,7 +332,7 @@ describe('HaulingPanel trip rail', () => {
     renderPanel();
     expect(jumpCalls.at(-1)).toEqual([JITA.systemId, AMARR.systemId]);
     expect(screen.getByText(/Jita to Amarr · 9 jumps/)).toBeInTheDocument();
-    expect(screen.getByText('Profit per jump')).toBeInTheDocument();
+    expect(screen.getByText('Profit per jump (9)')).toBeInTheDocument();
   });
 
   it('with no Cargo Space set, offers no fill', () => {
@@ -351,7 +375,8 @@ describe('HaulingPanel fill the free space', () => {
     renderPanel();
     expect(fillCalls.every((c) => !c.enabled)).toBe(true);
     // 1,000 m³ less Damage Control II's 350.
-    await user.click(screen.getByRole('button', { name: 'Find items for the free 650 m³' }));
+    expect(screen.getByText(/fit the free 650 m³/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Find items to fill it' }));
     expect(fillCalls.at(-1)).toEqual({ enabled: true });
     expect(screen.queryByRole('button', { name: /Find items/ })).toBeNull();
   });
@@ -364,7 +389,7 @@ describe('HaulingPanel fill the free space', () => {
       scan: { rows: [FILL_ROW], scanned: 1, fetchedAt: 0 },
     };
     renderPanel();
-    await user.click(screen.getByRole('button', { name: /Find items for the free/ }));
+    await user.click(screen.getByRole('button', { name: 'Find items to fill it' }));
 
     const list = screen.getByRole('list', { name: 'Items that fit the free space' });
     expect(within(list).getByText('Nitrogen Fuel Block')).toBeInTheDocument();
@@ -404,7 +429,7 @@ describe('HaulingPanel fill the free space', () => {
       },
     };
     renderPanel();
-    await user.click(screen.getByRole('button', { name: /Find items for the free/ }));
+    await user.click(screen.getByRole('button', { name: 'Find items to fill it' }));
     const list = screen.getByRole('list', { name: 'Items that fit the free space' });
     expect(within(list).getByText(/· 150 m³/)).toBeInTheDocument();
 
@@ -428,7 +453,7 @@ describe('HaulingPanel fill the free space', () => {
       </MemoryRouter>
     );
     const addOne = async () => {
-      await user.click(screen.getByRole('button', { name: /Find items for the free/ }));
+      await user.click(screen.getByRole('button', { name: 'Find items to fill it' }));
       await user.click(screen.getByRole('button', { name: /^Add 1/ }));
       expect(row(/Nitrogen Fuel Block/)).toBeInTheDocument();
     };
@@ -436,12 +461,19 @@ describe('HaulingPanel fill the free space', () => {
     await addOne();
     act(() => info!.refresh());
     expect(screen.queryByRole('row', { name: /Nitrogen Fuel Block/ })).toBeNull();
+    // Add's pins go with the rows: nothing is left edited for Fill my hold to undo.
+    await user.click(screen.getByRole('button', { name: 'Hauling actions' }));
+    expect(screen.getByRole('menuitem', { name: 'Fill my hold' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
+    await user.keyboard('{Escape}');
 
     await addOne();
     await user.click(screen.getByRole('combobox', { name: 'From' }));
     await user.click(screen.getByRole('option', { name: 'Dodixie' }));
     expect(screen.queryByRole('row', { name: /Nitrogen Fuel Block/ })).toBeNull();
-    expect(screen.getByRole('button', { name: /Find items for the free/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Find items to fill it' })).toBeInTheDocument();
   });
 
   it('an unticked item is not added', async () => {
@@ -449,7 +481,7 @@ describe('HaulingPanel fill the free space', () => {
     setCargo(1000);
     fillState = { status: 'ready', scan: { rows: [FILL_ROW], scanned: 1, fetchedAt: 0 } };
     renderPanel();
-    await user.click(screen.getByRole('button', { name: /Find items for the free/ }));
+    await user.click(screen.getByRole('button', { name: 'Find items to fill it' }));
     await user.click(screen.getByRole('checkbox', { name: 'Nitrogen Fuel Block' }));
     expect(screen.getByRole('button', { name: /^Add 0/ })).toBeDisabled();
   });
@@ -459,9 +491,15 @@ describe('HaulingPanel fill the free space', () => {
     setCargo(1000);
     fillState = { status: 'error' };
     renderPanel();
-    await user.click(screen.getByRole('button', { name: /Find items for the free/ }));
+    await user.click(screen.getByRole('button', { name: 'Find items to fill it' }));
     await user.click(within(screen.getByRole('alert')).getByRole('button', { name: 'Try again' }));
     expect(fillRefresh).toHaveBeenCalled();
+  });
+
+  it('is not offered with Any hub at an end: it would scan every hub', () => {
+    setCargo(1000);
+    renderPanel('from=any&to=jita');
+    expect(screen.queryByText('Fill the free space')).toBeNull();
   });
 
   it('is not offered for Everything, which leaves no other category', () => {
@@ -502,7 +540,7 @@ describe('HaulingPanel, Any hub', () => {
     expect(screen.getByRole('columnheader', { name: /^Hub/ })).toBeInTheDocument();
     expect(row()).toHaveTextContent('Dodixie');
     expect(jumpCalls.at(-1)).toEqual([null, null]);
-    expect(screen.queryByText('Profit per jump')).toBeNull();
+    expect(screen.queryByText(/Profit per jump/)).toBeNull();
   });
 
   it('picking Any hub writes it to the link and rescans with it', async () => {

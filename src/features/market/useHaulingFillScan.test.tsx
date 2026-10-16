@@ -28,10 +28,12 @@ const runHaulingScan = vi.fn<(request: HaulingScanRequest) => Promise<HaulingSca
   async () => SCAN
 );
 const clearHaulingScanCache = vi.fn();
+const evictHaulingScan = vi.fn<(key: string) => void>();
 vi.mock('./haulingData', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./haulingData')>()),
   runHaulingScan: (request: HaulingScanRequest) => runHaulingScan(request),
   clearHaulingScanCache: () => clearHaulingScanCache(),
+  evictHaulingScan: (key: string) => evictHaulingScan(key),
 }));
 
 const { haulingScanCacheKey } = await import('./haulingData');
@@ -40,6 +42,7 @@ const { useHaulingFillScan, haulingFillScope } = await import('./useHaulingFillS
 const JITA = TRADE_HUBS[0]!;
 const AMARR = TRADE_HUBS[1]!;
 const AMMO = 11;
+const EVERYTHING = 0;
 
 interface Props {
   from: HaulingEnd;
@@ -59,6 +62,20 @@ beforeEach(() => {
   runHaulingScan.mockReset();
   runHaulingScan.mockImplementation(async () => SCAN);
   clearHaulingScanCache.mockClear();
+  evictHaulingScan.mockClear();
+});
+
+describe('haulingFillScope', () => {
+  it('never shares a cache key with a category scan, Everything included', () => {
+    for (const category of [0, AMMO]) {
+      expect(
+        haulingScanCacheKey({ from: JITA, to: AMARR, scope: haulingFillScope(category) })
+      ).not.toBe(haulingScanCacheKey({ from: JITA, to: AMARR, scope: category }));
+    }
+    expect(haulingScanCacheKey({ from: JITA, to: AMARR, scope: haulingFillScope(AMMO) })).not.toBe(
+      haulingScanCacheKey({ from: JITA, to: AMARR, scope: EVERYTHING })
+    );
+  });
 });
 
 describe('useHaulingFillScan', () => {
@@ -135,13 +152,18 @@ describe('useHaulingFillScan', () => {
     await waitFor(() => expect(result.current.state).toMatchObject({ status: 'ready' }));
 
     act(() => result.current.refresh());
-    expect(clearHaulingScanCache).toHaveBeenCalledTimes(1);
+    // Only the fill's own entry: the category scan's cache stays.
+    expect(evictHaulingScan).toHaveBeenCalledTimes(1);
+    expect(evictHaulingScan).toHaveBeenCalledWith(
+      haulingScanCacheKey({ from: JITA, to: AMARR, scope: haulingFillScope(AMMO), mode: 'list' })
+    );
+    expect(clearHaulingScanCache).not.toHaveBeenCalled();
     await waitFor(() => expect(runHaulingScan).toHaveBeenCalledTimes(2));
 
     rerender({ from: JITA, to: TRADE_HUBS[2]!, categoryId: AMMO, enabled: true });
     expect(result.current.state).toEqual({ status: 'idle' });
     act(() => result.current.refresh());
-    expect(clearHaulingScanCache).toHaveBeenCalledTimes(1);
+    expect(evictHaulingScan).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(result.current.state).toMatchObject({ status: 'ready' }));
     expect(runHaulingScan).toHaveBeenCalledTimes(3);
   });
