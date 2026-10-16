@@ -36,7 +36,7 @@ Command palette (`src/features/commandPalette`) is covered elsewhere; here only 
 
 Three panels, definition lists (two columns from `md`, one on phone), each row = description + `<kbd>`.
 
-- "Keyboard shortcuts": first row "Open the command palette" with the chord (Cmd+K on Apple platforms via `isApplePlatform`, Ctrl K otherwise; `commandPaletteDisplayKey`; not a `SHORTCUTS` row, fires inside text fields). Then every `SHORTCUTS` entry (`src/lib/shortcuts.ts`): `C` switch character, `O` Overview, `M` Market, `I` Industry, `W` Wallet, `P` Planetary Industry, `A` Alerts, `T` Mining tax, `,` Settings, `?` show this list (allows Shift), `Esc` close the open dialog (native, no handler). Dispatch in `app/useKeyboardShortcuts.ts`. Single-key shortcuts are always on (no off switch).
+- "Keyboard shortcuts": first row "Open the command palette" with the chord (Cmd+K on Apple platforms via `isApplePlatform`, Ctrl K otherwise; `commandPaletteDisplayKey`; not a `SHORTCUTS` row, fires inside text fields). Then every `SHORTCUTS` entry (`src/lib/shortcuts.ts`): `G` then `C` switch character, `O` Overview, `M` Market, `I` Industry, `W` Wallet, `P` Planetary Industry, `A` Alerts, `T` Mining tax, `S` Settings (rendered as two keys joined by "then"), `?` show this list (allows Shift), `Esc` close the open dialog (native, no handler). Dispatch in `app/useKeyboardShortcuts.ts`. The `G` sequences and `?` follow the Settings › Display "Single-key shortcuts" switch; when off the panel says so and dims those rows (Esc and the palette chord stay live).
 - "On a page": "These work inside text boxes too. Every fitting edit is in the address bar, so your browser's Back button is undo." Rows: save fitting (Mod+S), save as new copy (Mod+Shift+S), submit a pasted list or fit (Mod+Enter, any paste box).
 - "Paste anywhere": hint that outside a text field a pasted fit, skill plan or item list opens where it belongs; rows Paste (Cmd/Ctrl V), EFT fitting -> "Opens in Fittings", Item list -> "Opens in Appraisal", Skill plan -> "Opens in the Skills planner" (`app/GlobalPasteRouter.tsx`).
 
@@ -70,7 +70,7 @@ No ESI, no scope, no Dexie, no Firestore, no URL state beyond the tab path. Stat
 
 ## Decisions
 
-`docs/context/decisions/20261002-145653-lp-store-under-market-pilot-lookup-its-own.md` (Help is a page, not a setting), `20261002-165816-shortcuts-move-to-help-always-on-and-lose.md` (shortcuts here, always on, WCAG 2.1.4 cost accepted; supersedes `20260924-135633`), `20260907-205018-what-we-store-the-faq-tab-as-a.md`, `20260929-235256-command-palette-opens-by-shortcut-only.md`; ADR 0015 (tab is a path segment).
+`docs/context/decisions/20261002-145653-lp-store-under-market-pilot-lookup-its-own.md` (Help is a page, not a setting), `20261002-165816-shortcuts-move-to-help-always-on-and-lose.md` (shortcuts here; supersedes `20260924-135633`), `20261016-121137-shortcuts-become-g-sequences-with-an-off-switch.md` (G sequences, off switch back; re-supersedes the always-on part), `20260907-205018-what-we-store-the-faq-tab-as-a.md`, `20260929-235256-command-palette-opens-by-shortcut-only.md`; ADR 0015 (tab is a path segment).
 
 ## Tests assert
 
@@ -92,7 +92,7 @@ No ESI, no scope, no Dexie, no Firestore, no URL state beyond the tab path. Stat
 
 1. Where do Help tabs live in the URL? `/help/shortcuts|faq|support`, one page instance (`pageTabs.ts:66`); legacy `/settings/*` redirect (`legacyPaths.ts`).
 2. Why is Help separate from Settings? Help is not a setting (decision `20261002-145653`); shortcuts moved here (`20261002-165816`).
-3. Are shortcuts configurable? No; always on; known WCAG 2.1.4 cost recorded in the decision.
+3. Are shortcuts configurable? Only on or off (Settings › Display › Single-key shortcuts, this device); no remapping.
 4. How is the FAQ kept honest? `whatWeStore.ts` mirrors `syncedCollections.ts` (typed `faqItem`), `SYNCED_SETTING_KEYS` and Sentry config; decision `20260907-205018`.
 5. What syncs vs stays local? See FAQ answers 1-2 above; ESI data and tokens never sync.
 6. What does the app write to EVE? Six writes listed in FAQ 3 and on Login.

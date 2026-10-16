@@ -2,13 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate, type Location } from 'react-router-dom';
 import { Toast } from '@/components/ui';
-import { parseChatLink } from '@/engine/import/chatLink';
 import { looksLikeEftFit } from '@/engine/import/eftFit';
 import type { PasteDestination } from '@/engine/import/pasteDestination';
-import { ENTITY_INFO_PUSHED_STATE } from '@/features/entities/entityInfoState';
 import { FITTINGS_PATH } from '@/features/fittings/fittingRoutes';
-import { routeToHref } from '@/features/route/routeSafetyLink';
-import { entityInfoHref } from '@/lib/entityInfo';
 import { tabPath } from '@/lib/pageTabs';
 import {
   isTypingTarget,
@@ -51,18 +47,6 @@ const DESTINATIONS: Record<
     tabPath(MARKET_TABS, 'appraisal'),
     { state: { appraiseText: text } satisfies MarketAppraiseState },
   ],
-  // An item or ship opens its Item Detail over the current page (the same
-  // `?info=type-<id>` a name link makes); a system opens Route Safety.
-  chatLink: (text, here) => {
-    const link = parseChatLink(text);
-    // The detector already found a link; null only means "stay on this page".
-    if (link === null) return [`${here.pathname}${here.search}`, { state: null }];
-    if (link.kind === 'system') return [routeToHref(link.id), { state: null }];
-    return [
-      entityInfoHref(here, { kind: 'type', id: link.id }),
-      { state: ENTITY_INFO_PUSHED_STATE },
-    ];
-  },
   skillPlan: (text) => [
     SKILL_PLANS_PATH,
     { state: { skillPlanImportText: text } satisfies SkillPlanImportState },

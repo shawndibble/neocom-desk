@@ -11,6 +11,7 @@ import { NO_CORP_CAPABILITIES } from '@/engine/corpRoles';
 import { useCorpAccess, type CorpAccessState } from '@/features/corp/useCorpAccess';
 import { DEFAULT_MOBILE_TABS, useMobileTabs } from '@/lib/mobileTabs';
 import { KEYBOARD_OVERLAY_ATTRIBUTE } from '@/lib/shortcuts';
+import { useSingleKeyShortcuts } from '@/lib/singleKeyShortcuts';
 import { Layout } from './Layout';
 import { useHiddenNav, useRecentNav } from './navPreferences';
 
@@ -544,32 +545,33 @@ describe('Layout runtime auth-failure notice', () => {
 describe('Layout keyboard shortcuts (issue #25)', () => {
   beforeEach(() => {
     mockIsSyncConfigured.mockReturnValue(false);
+    useSingleKeyShortcuts.setState({ value: true, hydrated: true });
   });
 
-  it('"c" switches character', async () => {
+  it('"g" then "c" switches character', async () => {
     const user = userEvent.setup();
     renderLayoutWithRoutes();
     await screen.findByText('overview page');
 
-    await user.keyboard('c');
+    await user.keyboard('gc');
     expect(await screen.findByText('characters page')).toBeInTheDocument();
   });
 
-  it('"c" still fires with Caps Lock on, where the browser reports it as "C"', async () => {
+  it('still fires with Caps Lock on, where the browser reports "G" and "C"', async () => {
     const user = userEvent.setup();
     renderLayoutWithRoutes();
     await screen.findByText('overview page');
 
-    await user.keyboard('{CapsLock}c{CapsLock}');
+    await user.keyboard('{CapsLock}gc{CapsLock}');
     expect(await screen.findByText('characters page')).toBeInTheDocument();
   });
 
-  it('"," opens Settings', async () => {
+  it('"g" then "s" opens Settings', async () => {
     const user = userEvent.setup();
     renderLayoutWithRoutes();
     await screen.findByText('overview page');
 
-    await user.keyboard(',');
+    await user.keyboard('gs');
     expect(await screen.findByText('settings page')).toBeInTheDocument();
   });
 
@@ -578,7 +580,7 @@ describe('Layout keyboard shortcuts (issue #25)', () => {
     renderLayoutWithRoutes();
     await user.click(screen.getByLabelText('dummy input'));
 
-    await user.keyboard('c');
+    await user.keyboard('gc');
     expect(screen.getByText('overview page')).toBeInTheDocument();
     expect(screen.queryByText('characters page')).not.toBeInTheDocument();
   });
@@ -588,7 +590,7 @@ describe('Layout keyboard shortcuts (issue #25)', () => {
     renderLayoutWithRoutes();
     await screen.findByText('overview page');
 
-    await user.keyboard('{Control>}m{/Control}');
+    await user.keyboard('g{Control>}m{/Control}');
     expect(screen.queryByText('market page')).not.toBeInTheDocument();
   });
 
@@ -604,6 +606,39 @@ describe('Layout keyboard shortcuts (issue #25)', () => {
     expect(await screen.findByText('help page')).toBeInTheDocument();
   });
 
+  it('does nothing for a lone letter, or a letter after a different first key', async () => {
+    const user = userEvent.setup();
+    renderLayoutWithRoutes();
+    await screen.findByText('overview page');
+
+    await user.keyboard('c');
+    await user.keyboard('xc');
+    await user.keyboard('gxc');
+    expect(screen.queryByText('characters page')).not.toBeInTheDocument();
+  });
+
+  it('cancels a pending "g" when typing moves into a field', async () => {
+    const user = userEvent.setup();
+    renderLayoutWithRoutes();
+    await screen.findByText('overview page');
+
+    await user.keyboard('g');
+    await user.click(screen.getByLabelText('dummy input'));
+    await user.keyboard('c');
+    expect(screen.queryByText('characters page')).not.toBeInTheDocument();
+  });
+
+  it('is switched off, "?" included, by the Single-key shortcuts setting', async () => {
+    useSingleKeyShortcuts.setState({ value: false, hydrated: true });
+    const user = userEvent.setup();
+    renderLayoutWithRoutes();
+    await screen.findByText('overview page');
+
+    await user.keyboard('gc{Shift>}?{/Shift}');
+    expect(screen.queryByText('characters page')).not.toBeInTheDocument();
+    expect(screen.queryByText('help page')).not.toBeInTheDocument();
+  });
+
   it('does not turn a capital letter into a shortcut', async () => {
     const user = userEvent.setup();
     renderLayoutWithRoutes();
@@ -612,7 +647,7 @@ describe('Layout keyboard shortcuts (issue #25)', () => {
     // Shift no longer blocks every press — only `?` opted in — so Shift+C has
     // to stay an ordinary capital C rather than becoming a second way to
     // reach the character switcher.
-    await user.keyboard('{Shift>}c{/Shift}');
+    await user.keyboard('g{Shift>}c{/Shift}');
     expect(screen.queryByText('characters page')).not.toBeInTheDocument();
   });
 
@@ -635,7 +670,7 @@ describe('Layout keyboard shortcuts (issue #25)', () => {
     // matches anywhere in the document — a node leaked by a failed assertion
     // would silently green every shortcut test after it.
     try {
-      await user.keyboard('c');
+      await user.keyboard('gc');
       expect(screen.queryByText('characters page')).not.toBeInTheDocument();
     } finally {
       overlay.remove();
@@ -650,7 +685,7 @@ describe('Layout keyboard shortcuts (issue #25)', () => {
     await user.click(within(mobileNav).getByRole('button', { name: 'More' }));
     expect(screen.getByRole('dialog', { name: 'More' })).toBeInTheDocument();
 
-    await user.keyboard('c');
+    await user.keyboard('gc');
     expect(screen.queryByText('characters page')).not.toBeInTheDocument();
   });
 
@@ -666,7 +701,7 @@ describe('Layout keyboard shortcuts (issue #25)', () => {
     menu.setAttribute('role', 'menu');
     document.body.appendChild(menu);
     try {
-      await user.keyboard('c');
+      await user.keyboard('gc');
       expect(screen.queryByText('characters page')).not.toBeInTheDocument();
     } finally {
       menu.remove();

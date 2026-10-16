@@ -96,15 +96,6 @@ describe('pasteDestination', () => {
     expect(pasteDestination('Alpha One\nBeta Two\nGamma Three', SOURCES)).toBe('pilotList');
   });
 
-  it('sends an in-game chat link to its page', () => {
-    expect(pasteDestination('<url=showinfo:587>Rifter</url>', SOURCES)).toBe('chatLink');
-    expect(pasteDestination('<url=showinfo:5//30000142>Jita</url>', SOURCES)).toBe('chatLink');
-  });
-
-  it('leaves an unsupported chat link alone', () => {
-    expect(pasteDestination('<url=showinfo:2//98000001>Corp</url>', SOURCES)).toBeNull();
-  });
-
   it('sends a D-Scan to Pilot Lookup', () => {
     expect(pasteDestination('626\tMy Vexor\tVexor\t1 km\n626\tB\tVexor\t2 km', SOURCES)).toBe(
       'dscan'
@@ -224,11 +215,10 @@ describe('detectPasteDestination', () => {
     expect(detectPasteDestination('   ', SOURCES, [claims('first', 'match')])).toBeNull();
   });
 
-  it('keeps the shipped order: survey scan, fit, chat link, D-Scan, blueprint list, skill plan, item list, then Local list', () => {
+  it('keeps the shipped order: survey scan, fit, D-Scan, blueprint list, skill plan, item list, then Local list', () => {
     expect(PASTE_DETECTORS.map((d) => d.id)).toEqual([
       'survey',
       'fitting',
-      'chatLink',
       'dscan',
       'blueprintList',
       'skillPlan',
