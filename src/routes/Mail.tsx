@@ -71,6 +71,8 @@ import { boolParam, textParam } from '@/lib/urlState';
 import { useTimeZone } from '@/lib/timeFormat';
 import { formatDateOnly, formatTimestamp } from '@/lib/timestamp';
 import { useCalendarWeekStart } from '@/features/character/calendarWeekStart';
+import { useNow } from '@/lib/useNow';
+import { formatMonthLabel } from '@/lib/calendarGrid';
 import { groupMailByAge, type MailAgeBucket } from '@/engine/mailAge';
 import {
   buildLabelTabMap,
@@ -186,17 +188,10 @@ function senderIds(headers: readonly MailHeader[]): number[] {
   return headers.flatMap((header) => (header.from !== undefined ? [header.from] : []));
 }
 
-/**
- * An older month's header names the month and year in the viewer's locale.
- * Mid-month in UTC, formatted in UTC, so no offset can tip it into a neighbour.
- */
 function mailAgeLabel(bucket: MailAgeBucket, t: TFunction): string {
-  if (bucket.kind !== 'month') return t(`mail.age.${bucket.kind}`);
-  return new Date(Date.UTC(bucket.year, bucket.month - 1, 15)).toLocaleDateString(undefined, {
-    month: 'long',
-    year: 'numeric',
-    timeZone: 'UTC',
-  });
+  return bucket.kind === 'month'
+    ? formatMonthLabel(new Date(bucket.year, bucket.month - 1, 1))
+    : t(`mail.age.${bucket.kind}`);
 }
 
 /**
@@ -505,6 +500,8 @@ function MailView({ scope, scopeControl }: MailViewProps) {
   // Notifications and Clones thread it into their own timestamps.
   const timeZone = useTimeZone();
   const weekStart = useCalendarWeekStart((state) => state.value);
+  // Minute clock, so a list left open past midnight moves its mail out of Today.
+  const now = useNow();
 
   const owners = data?.owners ?? NO_OWNERS;
   const ownerById = useMemo(() => new Map(owners.map((o) => [o.characterId, o])), [owners]);
@@ -571,8 +568,8 @@ function MailView({ scope, scopeControl }: MailViewProps) {
   // gains rows keeps its one header instead of repeating at the page seam.
   const rowSections = useMemo(
     () =>
-      groupMailByAge(cappedRows, (row) => row.header.timestamp, new Date(), timeZone, weekStart),
-    [cappedRows, timeZone, weekStart]
+      groupMailByAge(cappedRows, (row) => row.header.timestamp, new Date(now), timeZone, weekStart),
+    [cappedRows, now, timeZone, weekStart]
   );
 
   // The list pane's three states, named once here rather than as a pair of
@@ -934,12 +931,12 @@ function MailView({ scope, scopeControl }: MailViewProps) {
                 // unchanged) that screen-reader users can jump between; each
                 // section's rows stay a list of their own. Sticky, like the
                 // Coming up rail's day headers, so the bucket stays named
-                // while scrolling it; `scroll-pt-7` keeps a focused row out
+                // while scrolling it; `scroll-pt-8` keeps a focused row out
                 // from under it (WCAG 2.4.11).
-                <div className="max-h-[36rem] scroll-pt-7 overflow-y-auto lg:max-h-[44rem]">
+                <div className="max-h-[36rem] scroll-pt-8 overflow-y-auto lg:max-h-[44rem]">
                   {rowSections.map((section) => (
-                    <div key={section.key} className="border-t border-line first:border-t-0">
-                      <h3 className="sticky top-0 z-10 border-b border-line bg-panel-2 px-3 py-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                    <div key={section.key}>
+                      <h3 className="sticky top-0 z-10 border-y border-line bg-panel-2 px-3 py-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                         {mailAgeLabel(section.bucket, t)}
                       </h3>
                       <ul className="divide-y divide-line">

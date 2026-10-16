@@ -153,6 +153,7 @@ afterEach(() => {
   server.resetHandlers();
   restoreMatchMedia?.();
   restoreMatchMedia = undefined;
+  vi.useRealTimers();
 });
 async function seed() {
   await db.characters.clear();
@@ -669,12 +670,14 @@ describe('Mail', () => {
   });
 
   it('groups the list under date headings without breaking row selection (issue #3971)', async () => {
-    // Relative to the real clock, so no fake timers: "now" is always Today,
-    // and 2020 is always an older month, named with its year.
+    // Only Date is faked: real timers keep findBy/waitFor polling. Local noon,
+    // so the 09:00 mail is Today in any runner zone.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 7, 2, 12));
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail`, () =>
         HttpResponse.json([
-          { ...headers[0], timestamp: new Date().toISOString() },
+          { ...headers[0], timestamp: new Date(2026, 7, 2, 9).toISOString() },
           { ...headers[1], timestamp: '2020-03-15T12:00:00Z' },
         ])
       )
@@ -683,7 +686,13 @@ describe('Mail', () => {
     render(<App />);
     const subject = await screen.findByText('Fleet up!');
     const today = screen.getByRole('heading', { name: 'Today' });
-    const march = screen.getByRole('heading', { name: 'March 2020' });
+    // Device locale, like every other date in the app.
+    const marchLabel = new Date(Date.UTC(2020, 2, 15)).toLocaleDateString(undefined, {
+      month: 'long',
+      year: 'numeric',
+      timeZone: 'UTC',
+    });
+    const march = screen.getByRole('heading', { name: marchLabel });
     expect(today.compareDocumentPosition(march) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getAllByRole('heading', { name: 'Today' })).toHaveLength(1);
 

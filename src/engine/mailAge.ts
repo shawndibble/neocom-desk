@@ -84,15 +84,15 @@ export function groupMailByAge<T>(
   timeZone: string | undefined,
   weekStart: WeekStart
 ): MailAgeSection<T>[] {
-  const read = calendarDayReader(timeZone);
-  const today = read(now);
+  const calendarDayOf = calendarDayReader(timeZone);
+  const today = calendarDayOf(now);
   const weekday = new Date(today.day * DAY_MS).getUTCDay(); // 0 = Sunday
   const weekStartDay = today.day - ((weekday - (weekStart === 'sunday' ? 0 : 1) + 7) % 7);
 
   function bucketOf(timestamp: string | undefined): MailAgeBucket {
     const date = timestamp === undefined ? null : new Date(timestamp);
     if (date === null || Number.isNaN(date.getTime())) return { kind: 'undated' };
-    const { day, monthIndex } = read(date);
+    const { day, monthIndex } = calendarDayOf(date);
     if (day >= today.day) return { kind: 'today' };
     if (day === today.day - 1) return { kind: 'yesterday' };
     if (day >= weekStartDay) return { kind: 'thisWeek' };
@@ -110,9 +110,10 @@ export function groupMailByAge<T>(
     else sections.set(key, { key, bucket, items: [item] });
   }
 
-  const order = (bucket: MailAgeBucket): number =>
+  const monthRecency = (bucket: MailAgeBucket): number =>
     bucket.kind === 'month' ? -(bucket.year * 12 + bucket.month) : 0;
   return [...sections.values()].sort(
-    (a, b) => RANK[a.bucket.kind] - RANK[b.bucket.kind] || order(a.bucket) - order(b.bucket)
+    (a, b) =>
+      RANK[a.bucket.kind] - RANK[b.bucket.kind] || monthRecency(a.bucket) - monthRecency(b.bucket)
   );
 }
