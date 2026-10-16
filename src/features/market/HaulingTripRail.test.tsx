@@ -317,7 +317,8 @@ describe('HaulingTripBar', () => {
     const bar = screen.getByRole('region', { name: 'Trip' });
     expect(bar).toHaveTextContent('44,462 m³ free');
     expect(within(bar).getByRole('button', { name: 'Copy multibuy' })).toBeInTheDocument();
-    await user.click(within(bar).getByRole('button', { name: 'Trip details' }));
+    expect(bar).toHaveTextContent('+137.6M');
+    await user.click(within(bar).getByRole('button', { name: /Trip details/ }));
     expect(onOpenTrip).toHaveBeenCalledOnce();
   });
 

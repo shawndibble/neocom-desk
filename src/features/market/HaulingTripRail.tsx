@@ -7,12 +7,16 @@
  */
 import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Checkbox, IskAmount, Panel, ProgressBar, Spinner } from '@/components/ui';
+import { Button, Checkbox, Panel, ProgressBar, Spinner } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { inlineLinkClassName, tappableRowClassName } from '@/components/ui/controlStyles';
+import {
+  focusRingClassName,
+  inlineLinkClassName,
+  tappableRowClassName,
+} from '@/components/ui/controlStyles';
 import type { TripPlan } from '@/engine/market/haulingPlan';
 import { ROUTE_PREFERENCE_LABEL_KEYS } from '@/features/route/routePreferences';
-import { clampIskZero, formatIsk } from '@/lib/isk';
+import { clampIskZero, formatIsk, formatIskCompactSigned } from '@/lib/isk';
 import { useStickyClearance } from '@/lib/useStickyClearance';
 import { formatVolume } from './format';
 import { HaulingHoldMeters } from './HaulingHoldMeters';
@@ -407,7 +411,7 @@ export interface HaulingTripBarProps {
   profit: number;
   /** Opens the trip (summary + fill) as a sheet. */
   onOpenTrip: () => void;
-  /** The panel's Copy multibuy button; `size="sm"` to match "Trip details" (DESIGN.md §3). */
+  /** The panel's Copy multibuy button: the bar's one boxed control, `variant="primary"`, `size="sm"`. */
   copyButton: ReactNode;
 }
 
@@ -420,28 +424,30 @@ export function HaulingTripBar({ freeM3, profit, onOpenTrip, copyButton }: Hauli
   const { t } = useTranslation();
   const ref = useRef<HTMLDivElement>(null);
   useStickyClearance(ref, 'hauling-trip-bar');
-  const up = gains(profit);
+  const profitText = formatIskCompactSigned(profit);
   return (
     <div
       ref={ref}
       role="region"
       aria-label={t('market.hauling.rail.title')}
-      className="sticky bottom-[var(--bottom-nav-clearance)] z-30 flex items-center gap-2 rounded-xs border border-line-bright bg-panel p-2 shadow-lg md:bottom-[calc(0.75rem+env(safe-area-inset-bottom))]"
+      className="sticky bottom-[var(--bottom-nav-clearance)] z-30 flex items-center gap-2 rounded-xs border border-line-bright bg-panel p-2 shadow-lg md:bottom-[calc(0.75rem_+_env(safe-area-inset-bottom))]"
     >
-      <span className="flex min-w-0 flex-1 flex-col text-sm leading-tight font-semibold whitespace-nowrap tabular-nums">
-        {freeM3 !== null && (
-          <span className="truncate">
-            {t('market.hauling.tripBar.free', { m3: formatTripM3(freeM3) })}
+      {/* The whole summary opens the trip, so its figures stay plain text (nothing tabbable inside a button). */}
+      <button
+        type="button"
+        onClick={onOpenTrip}
+        className={`flex min-w-0 flex-1 flex-col items-start rounded-xs px-1 text-left ${tappableRowClassName} ${focusRingClassName}`}
+      >
+        <span className="max-w-full truncate text-sm font-semibold whitespace-nowrap tabular-nums">
+          {freeM3 !== null && (
+            <>{t('market.hauling.tripBar.free', { m3: formatTripM3(freeM3) })} · </>
+          )}
+          <span className={profitText.startsWith('+') ? 'text-success' : undefined}>
+            {profitText}
           </span>
-        )}
-        <span className={up ? 'text-success' : undefined}>
-          {up ? '+' : ''}
-          <IskAmount value={profit} />
         </span>
-      </span>
-      <Button size="sm" className="shrink-0" onClick={onOpenTrip}>
-        {t('market.hauling.tripBar.details')}
-      </Button>
+        <span className="text-xs text-accent">{t('market.hauling.tripBar.details')}</span>
+      </button>
       {copyButton}
     </div>
   );
