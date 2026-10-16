@@ -52,6 +52,7 @@ import {
   loadJumpTimersWidget,
   loadRouteSafetyWidget,
   loadKillsWidget,
+  loadOmegaWidget,
   loadSurveyWidget,
 } from './kindLoaders';
 import { feedsFor } from './models';
@@ -246,6 +247,8 @@ function Source({ feed }: { feed: FeedId }) {
       );
     case 'kills':
       return <SnapshotSource feed="kills" load={loadKillsWidget} cacheKey="overview:kills" />;
+    case 'omega':
+      return <SnapshotSource feed="omega" load={loadOmegaWidget} cacheKey="overview:omega" />;
     case 'incursions':
       return <IncursionsSource />;
     case 'spExtras':

@@ -248,7 +248,8 @@ function LiveWidget(props: WidgetProps) {
   const view = useWidgetView(
     widget.kind,
     scope.scopeAll,
-    kind?.hasRange ? (widget.range ?? DEFAULT_RANGE) : undefined
+    kind?.hasRange ? (widget.range ?? DEFAULT_RANGE) : undefined,
+    kind?.hasPlexPlan ? widget.plexPer30Days : undefined
   );
   return <WidgetFrame {...props} view={view} />;
 }

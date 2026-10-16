@@ -4173,6 +4173,30 @@
           "profit": "Profit",
           "mined": "Mined",
           "total": "Total"
+        },
+        "omega": {
+          "note": "Net income per 30 days. Lines mark what 1, 2... accounts cost.",
+          "partial": "The oldest period is partial: your journal history starts inside it.",
+          "ages": "PLEX price {{plex}} old, journal {{journal}} old.",
+          "truncated": "Some journal pages were missing.",
+          "skipped_one": "{{count}} Character's journal could not be read.",
+          "skipped_other": "{{count}} Characters' journals could not be read.",
+          "tick": "to {{date}}",
+          "tickPartial": "to {{date}} (partial)",
+          "line_one": "{{count}} account",
+          "line_other": "{{count}} accounts",
+          "summary_one": "Net income {{net}} ISK over the last 30 days covers {{count}} account at {{cost}} ISK each. Per 30 days, oldest first: {{periods}}.",
+          "summary_other": "Net income {{net}} ISK over the last 30 days covers {{count}} accounts at {{cost}} ISK each. Per 30 days, oldest first: {{periods}}.",
+          "summaryNoPrice": "Net income {{net}} ISK over the last 30 days. PLEX has no price, so accounts cannot be counted.",
+          "tip": {
+            "net": "Net income",
+            "covers": "Covers",
+            "accounts_one": "{{count}} account",
+            "accounts_other": "{{count}} accounts",
+            "plex": "Spent on PLEX",
+            "history": "History",
+            "partial": "Partial"
+          }
         }
       },
       "data": {
@@ -4246,6 +4270,18 @@
           "unit_one": "kill or loss",
           "unit_other": "kills and losses",
           "secondary": "Kills {{kills}} · Losses {{losses}}"
+        },
+        "omega": {
+          "covers_one": "Covers {{count}} account",
+          "covers_other": "Covers {{count}} accounts",
+          "coversNone": "Doesn't cover one account",
+          "figures": "net {{net}} ISK / 30 days · one account {{cost}} ISK",
+          "next": "Next account needs +{{amount}} ISK / 30 days",
+          "noPrice": "No PLEX price",
+          "netOnly": "net {{net}} ISK / 30 days",
+          "noPriceHint": "Can't count accounts without PLEX's price. Try Refresh.",
+          "plexSpent": "Spent on PLEX: {{amount}} ISK.",
+          "plexPrice": "PLEX {{price}} ISK each, {{plex}} PLEX per account."
         }
       },
       "training": {
@@ -4679,7 +4715,18 @@
         "nextPage": "Next page",
         "pageStatus": "{{from}}–{{to}} of {{count}}"
       },
-      "noWidgets": "There are no widgets to show on this Overview."
+      "noWidgets": "There are no widgets to show on this Overview.",
+      "omega": {
+        "title": "Omega coverage",
+        "description": "How many Omega accounts your net income could keep going",
+        "empty": "No wallet journal yet to work out your net income",
+        "periodPartial": "{{title}} (partial)",
+        "col": {
+          "period": "30 days",
+          "net": "Net income",
+          "accounts": "Accounts"
+        }
+      }
     },
     "header": {
       "next": "Next",
@@ -4956,7 +5003,13 @@
       "top": "Move to top",
       "bottom": "Move to bottom",
       "phone": "Show on phone",
-      "remove": "Remove from Overview"
+      "remove": "Remove from Overview",
+      "plexPlan": "PLEX per 30 days…",
+      "plexPlanTitle": "{{title}}: your Omega plan",
+      "plexPlanLabel": "PLEX per 30 days",
+      "plexPlanHint": "Your plan, not a fact: 500 is one month, and longer plans cost less per month. Between 1 and 5000.",
+      "plexPlanSave": "Save",
+      "plexPlanCancel": "Cancel"
     }
   },
   "alerts": {
@@ -10681,7 +10734,7 @@
             "skills": "Skills: Alpha/Omega per character, the target skill plan, and SP Extraction monitoring and its threshold. Clones: the names you gave your jump clones.",
             "fittings": "Fittings: your damage and target profiles, and which ones are active.",
             "pi": "PI and mining tax: customs rate overrides, ore types you tagged, whether ore is valued as compressed ore, and how the Assign form edits ore values. Assets: the refining rate you type for your own structure. Market: the markets you stock, with their stock targets. Mining Survey: the survey links you created or opened, the names you gave them, and your survey info templates.",
-            "layout": "Layout: your Overview layout (the widgets you chose, with their sizes, views and order), hidden and reordered Overview cards from before the widget grid, pages hidden from the navigation, and whether you answered the rail question.",
+            "layout": "Layout: your Overview layout (the widgets you chose, with their sizes, views, order and Omega plan), hidden and reordered Overview cards from before the widget grid, pages hidden from the navigation, and whether you answered the rail question.",
             "travel": "Travel: route preference, security penalty, avoided systems (and whether the list is on), and avoiding EDENCOM, Triglavian and recent pod-kill systems (with your threshold). Route Safety: whether it routes through Thera / Turnur, your ship size, minimum hole life and which hubs."
           }
         },

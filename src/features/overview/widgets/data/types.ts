@@ -41,6 +41,7 @@ import type {
   ProfitWidgetData,
   RouteSafetyWidgetData,
   KillsWidgetData,
+  OmegaWidgetData,
 } from './kindLoaders';
 
 /** The narrow slice of i18next's `t` the adapters need. */
@@ -238,6 +239,7 @@ export interface FeedMap {
   location: LocationWidgetData;
   routeSafety: RouteSafetyWidgetData;
   kills: KillsWidgetData;
+  omega: OmegaWidgetData;
 }
 
 export type FeedId = keyof FeedMap;
@@ -255,4 +257,6 @@ export interface BuildContext {
   notTrainingAlert: boolean;
   /** The widget's time window in days, for kinds that read one (applied over shared data here, never in a loader). */
   range: WidgetRange;
+  /** The widget's Omega plan (PLEX per 30 days), for kinds that read one. */
+  plexPer30Days?: number;
 }

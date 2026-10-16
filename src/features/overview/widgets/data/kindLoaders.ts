@@ -607,3 +607,90 @@ export async function loadKillsWidget(): Promise<KillsWidgetData> {
     fetchedAt: new Date(),
   };
 }
+
+// --- Omega coverage ----------------------------------------------------------------
+
+/** One journal line, reduced to what net income needs, with the netting already decided. */
+export interface OmegaRow {
+  characterId: number;
+  date: string;
+  amount?: number;
+  /** Both parties are the pilot's own Characters. */
+  internal?: boolean;
+  /** `plex_bought` / `plex_sold` for a PLEX market line. */
+  refKey?: string;
+}
+
+export interface OmegaWidgetData {
+  /** Every loaded Character's lines, classified against all wallet-scoped Characters. */
+  rows: OmegaRow[];
+  /** Per loaded Character: the oldest journal line held (ms); absent for an empty journal. */
+  historyStart: Record<number, number>;
+  /** The older of the loaded journals' reads. */
+  journalFetchedAt: Date | null;
+  /** The lowest PLEX sell price and when its book was read; null when it could not be read. */
+  plex: { price: number; fetchedAt: number } | null;
+  /** Some journal pages were missing for a loaded Character. */
+  truncated: boolean;
+  /** Wallet-scoped Characters whose journal did not load. */
+  skippedCount: number;
+  loadedIds: number[];
+}
+
+/**
+ * Every wallet-scoped Character's journal (the local history, #3909) and the
+ * PLEX price. Classified here against all of them, so a donation from your own
+ * alt is internal even when the widget later narrows to one Character. The
+ * journal read is heavy and the book is a market read, so both stay behind
+ * `import()`. A missing PLEX price is `plex: null`, not an error.
+ */
+export async function loadOmegaWidget(): Promise<OmegaWidgetData> {
+  const [{ loadAllCharactersJournals, loadWalletScopedCharacterIds }, plexModule, netting, links] =
+    await Promise.all([
+      import('@/features/character/walletJournalAll'),
+      import('@/features/market/plexPrice'),
+      import('@/engine/journalNetting'),
+      import('@/features/character/journalTransactionLink'),
+    ]);
+  const [snapshot, scopedIds, plex] = await Promise.all([
+    loadAllCharactersJournals(),
+    loadWalletScopedCharacterIds(),
+    plexModule.loadPlexQuote().catch(() => null),
+  ]);
+  if (snapshot.loaded.length === 0 && scopedIds.length > 0) {
+    throw new Error('The wallet journal could not be read');
+  }
+  const trackedIds = new Set(scopedIds);
+  for (const c of snapshot.loaded) trackedIds.add(c.characterId);
+  const lines = snapshot.loaded.flatMap((c) =>
+    c.journal.map((entry) => ({ ...entry, characterId: c.characterId }))
+  );
+  const linkFor = links.journalTransactionLinks(
+    snapshot.loaded.flatMap((c) =>
+      c.transactions.map((txn) => ({ ...txn, characterId: c.characterId }))
+    )
+  );
+  const rows = netting.classifyJournal(lines, { trackedIds, linkFor }).map((row) => ({
+    characterId: row.characterId as number,
+    date: row.date,
+    amount: row.amount,
+    internal: row.internal,
+    refKey: row.refKey,
+  }));
+  const historyStart: Record<number, number> = {};
+  for (const row of rows) {
+    const at = Date.parse(row.date);
+    const known = historyStart[row.characterId];
+    if (known === undefined || at < known) historyStart[row.characterId] = at;
+  }
+  const fetched = snapshot.loaded.map((c) => c.fetchedAt.getTime());
+  return {
+    rows,
+    historyStart,
+    journalFetchedAt: fetched.length === 0 ? null : new Date(Math.min(...fetched)),
+    plex,
+    truncated: snapshot.loaded.some((c) => c.truncated),
+    skippedCount: snapshot.skipped.length,
+    loadedIds: snapshot.loaded.map((c) => c.characterId),
+  };
+}

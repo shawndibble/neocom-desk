@@ -135,6 +135,8 @@ const SUMS_ACROSS = new Set([
   'routeSafety',
   // Reads every tracked Character's killboard; the builder narrows to the header Character.
   'kills',
+  // Every Character's journal, classified together; the builder narrows to the header Character.
+  'omega',
 ]);
 
 export function kindSumsAcrossCharacters(kind: string): boolean {
