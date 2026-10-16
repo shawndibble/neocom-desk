@@ -1493,6 +1493,9 @@ function HubField({
 /**
  * An ISK cap in the filters — Max price per item, Max spend. Blank is no
  * limit. Only a whole, positive figure commits: the URL holds whole ISK.
+ * Inline it commits on blur or Enter, not per keystroke: `250m` passes
+ * through 2 ISK, which would hide every row and drop the selection. The
+ * sheet's draft takes each keystroke; its Apply is the commit.
  */
 function IskCapField({
   label,
@@ -1516,11 +1519,22 @@ function IskCapField({
   const [raw, setRaw] = useState<string | null>(null);
   const [sent, setSent] = useState<number | null>(value);
   const [seen, setSeen] = useState(value);
+  // The typed figure not yet committed inline; undefined when there is none.
+  const [pending, setPending] = useState<number | null | undefined>(undefined);
   if (seen !== value) {
     setSeen(value);
-    if (value !== sent) setRaw(null);
+    if (value !== sent) {
+      setRaw(null);
+      setPending(undefined);
+    }
   }
   const shown = raw ?? (value === null ? '' : String(value));
+  function commit(next: number | null) {
+    setPending(undefined);
+    if (next === value) return;
+    setSent(next);
+    onChange(next);
+  }
   return (
     <FilterField label={label}>
       <IskInput
@@ -1535,13 +1549,18 @@ function IskCapField({
           const amount = Number(text);
           const whole = text === '' ? null : Math.round(amount);
           // Shorthand's float noise rounds away; a real fraction (`1.5`, on its way to `1.5b`) waits.
-          if (
+          const usable =
             whole === null ||
-            (Math.abs(amount - whole) < 0.001 && Number.isSafeInteger(whole) && whole > 0)
-          ) {
-            setSent(whole);
-            onChange(whole);
-          }
+            (Math.abs(amount - whole) < 0.001 && Number.isSafeInteger(whole) && whole > 0);
+          if (!usable) setPending(undefined);
+          else if (inSheet) commit(whole);
+          else setPending(whole);
+        }}
+        onBlur={() => {
+          if (pending !== undefined) commit(pending);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' && pending !== undefined) commit(pending);
         }}
       />
       {hint !== undefined && (

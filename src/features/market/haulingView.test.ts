@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { filterHaulingRows, formatDaysToSell, toViewRows } from './haulingView';
+import { planTrip } from '@/engine/market/haulingPlan';
 import type { HaulingScanRow, InstantHaulingScanRow, ListHaulingScanRow } from './haulingData';
 import { TRADE_HUBS } from '@/market/hubs';
 
@@ -167,6 +168,41 @@ describe('filterHaulingRows', () => {
     });
     expect(shown.map((r) => r.typeId)).toEqual([1]);
     expect(hidden).toEqual({ tooDear: 2, thin: 0, slow: 0, lowMargin: 0 });
+  });
+
+  it('binds the plan too: only origin levels at or under the max price are bought', () => {
+    const laddered = scanRow(
+      {
+        typeId: 5,
+        buyLadder: [
+          { price: 100, units: 10, orders: 1 },
+          { price: 300, units: 1_000, orders: 1 },
+        ],
+        destLadder: [{ price: 2_000, units: 50, orders: 3 }],
+      },
+      { price: 1_500, demandCapUnits: 500 }
+    );
+    const [uncapped] = toViewRows([laddered], FEES_AT);
+    // Without a cap the profitable depth runs into the 300 level.
+    expect(uncapped!.suggestedUnits).toBeGreaterThan(10);
+    const {
+      shown: [row],
+    } = filterHaulingRows([uncapped!], {
+      maxDays: null,
+      minMarginPct: -100,
+      steadyOnly: false,
+      maxUnitPrice: 200,
+    });
+    expect(row!.candidate.buyLadder).toEqual([{ price: 100, units: 10, orders: 1 }]);
+    expect(row!.suggestedUnits).toBe(10);
+    const plan = planTrip({
+      candidates: [row!.candidate],
+      holds: null,
+      budgetIsk: null,
+      fees: FEES,
+      overrides: new Map(),
+    });
+    expect(plan.lines[0]).toMatchObject({ typeId: 5, quantity: 10 });
   });
 
   it('keeps a row priced exactly at the max price, and applies to an instant sale too', () => {
