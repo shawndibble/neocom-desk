@@ -42,28 +42,44 @@ describe('Tabs', () => {
   /**
    * The bar scrolls sideways once it outgrows its frame, so a tab selected
    * from outside this component — a deep link opening a specific tab — can
-   * start off-screen. jsdom does no layout, so what is asserted is that the
-   * newly selected tab is the one asked to scroll, and that it is asked with
-   * `block: 'nearest'`: the default would scroll the page vertically to put
-   * the tab bar at the top, which changing a tab never asked for.
+   * start off-screen. Bringing it back must only slide the bar: a bar below
+   * the fold (the landing page's feature tabs) once dragged the whole page
+   * down to it on load. jsdom does no layout, so the rects are stubbed.
    */
-  it('scrolls the selected tab into view when the selection changes', () => {
-    const scrollIntoView = vi
-      .spyOn(Element.prototype, 'scrollIntoView')
-      .mockImplementation(() => undefined);
+  function stubRect(element: Element, left: number, right: number) {
+    vi.spyOn(element, 'getBoundingClientRect').mockReturnValue({
+      left,
+      right,
+      top: 0,
+      bottom: 0,
+      width: right - left,
+      height: 0,
+      x: left,
+      y: 0,
+      toJSON: () => ({}),
+    });
+  }
+
+  it('slides the bar to a selected tab without scrolling the page', () => {
+    const scrollIntoView = vi.spyOn(Element.prototype, 'scrollIntoView');
+    const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined);
 
     const { rerender } = render(
       <Tabs tabsId="t" label="Orders" tabs={tabs} value="open" onChange={() => undefined} />
     );
-    expect(scrollIntoView.mock.instances.at(-1)).toBe(screen.getByRole('tab', { name: 'Open' }));
-    expect(scrollIntoView).toHaveBeenLastCalledWith({ block: 'nearest', inline: 'nearest' });
+    const scroller = screen.getByRole('tablist').parentElement!;
+    stubRect(scroller, 0, 100);
+    stubRect(screen.getByRole('tab', { name: 'History' }), 120, 180);
 
     rerender(
       <Tabs tabsId="t" label="Orders" tabs={tabs} value="history" onChange={() => undefined} />
     );
-    expect(scrollIntoView.mock.instances.at(-1)).toBe(screen.getByRole('tab', { name: 'History' }));
 
-    scrollIntoView.mockRestore();
+    expect(scroller.scrollLeft).toBe(80);
+    expect(scrollIntoView).not.toHaveBeenCalled();
+    expect(scrollTo).not.toHaveBeenCalled();
+
+    vi.restoreAllMocks();
   });
 
   it('moves selection with arrow keys, wrapping', async () => {

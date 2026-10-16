@@ -135,9 +135,11 @@ export const tappableRowClassName = 'min-h-11 md:min-h-7 touch:min-h-11';
  * bare control sits alone in a table cell or a card corner; a control already
  * inside a `tappableRowClassName` label row needs nothing. The label grows the
  * cell it sits in on touch rather than overlaying its neighbours, so no two
- * targets can overlap (WCAG 2.5.8).
+ * targets can overlap (WCAG 2.5.8). `shrink-0`: as a flex item beside long
+ * text it would otherwise squeeze narrower and slide the box out of line.
  */
-export const touchCheckboxLabelClassName = 'inline-flex items-center justify-center touch:size-11';
+export const touchCheckboxLabelClassName =
+  'inline-flex shrink-0 items-center justify-center touch:size-11';
 
 /**
  * A 44px-tall hit area on a coarse pointer for a small drag grip: an invisible
