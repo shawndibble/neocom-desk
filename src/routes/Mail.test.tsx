@@ -207,7 +207,7 @@ describe('Mail', () => {
     // Only the page's own top header should exist — the empty reading pane
     // must not render a second, actionless header bar above the empty state.
     expect(document.querySelectorAll('header')).toHaveLength(1);
-    expect(screen.getByText('Select a message to read it.')).toBeInTheDocument();
+    expect(screen.getByText('No message open')).toBeInTheDocument();
 
     await user.click(await screen.findByText('Fleet up!'));
     expect(await screen.findByRole('button', { name: 'Reply' })).toBeInTheDocument();
@@ -231,9 +231,34 @@ describe('Mail', () => {
     const user = userEvent.setup();
     render(<App />);
     await screen.findByText('Fleet up!');
-    await user.click(screen.getByRole('button', { name: 'Compose' }));
+    const header = document.querySelector('header')!;
+    await user.click(within(header).getByRole('button', { name: 'Compose' }));
     expect(await screen.findByRole('region', { name: 'New mail' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Compose' })).not.toBeInTheDocument();
+  });
+
+  it('offers Compose from the empty reading pane on a wide screen, landing focus in To (issue #3972)', async () => {
+    useDesktopViewport();
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('Fleet up!');
+    expect(screen.getByText('No message open')).toBeInTheDocument();
+    expect(screen.getByText('Select a message from the list to read it.')).toBeInTheDocument();
+    // Header Compose plus the reading pane's own.
+    const buttons = screen.getAllByRole('button', { name: 'Compose' });
+    expect(buttons).toHaveLength(2);
+    await user.click(buttons[1]!);
+    const composer = await screen.findByRole('region', { name: 'New mail' });
+    await waitFor(() => expect(within(composer).getByLabelText('To')).toHaveFocus());
+    expect(screen.queryByText('No message open')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Compose' })).not.toBeInTheDocument();
+  });
+
+  it('shows no reading-pane placeholder and one Compose on a phone (issue #3972)', async () => {
+    render(<App />);
+    await screen.findByText('Fleet up!');
+    expect(screen.queryByText('No message open')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Compose' })).toHaveLength(1);
   });
 
   it('shows the body, markup rendered, on click', async () => {
@@ -451,13 +476,82 @@ describe('Mail', () => {
     expect(await screen.findByText('Fleet up!')).toBeInTheDocument();
   });
 
-  it('says no mail matched, not "no mail cached", when a filter empties the list', async () => {
+  it('says no mail matched, not "no mail cached", and Clear search brings the list back', async () => {
     const user = userEvent.setup();
     render(<App />);
     await screen.findByText('Fleet up!');
-    await user.type(screen.getByRole('searchbox', { name: /search/i }), 'zzzznotamatch');
-    expect(await screen.findByText('No mail matches these filters')).toBeInTheDocument();
+    const search = screen.getByRole('searchbox', { name: /search/i });
+    await user.type(search, 'zzzznotamatch');
+    expect(await screen.findByText('No mail matches your search')).toBeInTheDocument();
     expect(screen.queryByText('No mail cached')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Clear search' }));
+    expect(await screen.findByText('Fleet up!')).toBeInTheDocument();
+    expect(search).toHaveValue('');
+    expect(search).toHaveFocus();
+  });
+
+  /** Turns every folder chip off except `keep`. */
+  async function onlyFolders(user: ReturnType<typeof userEvent.setup>, keep: string[]) {
+    const group = screen.getByRole('group', { name: 'Mail folders' });
+    for (const chip of within(group).getAllByRole('button')) {
+      if (!keep.some((name) => chip.textContent?.startsWith(name))) await user.click(chip);
+    }
+  }
+
+  it('says a folder is empty, with no action, when it holds no mail (issue #3972)', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('Fleet up!');
+    await onlyFolders(user, ['Sent']);
+    expect(await screen.findByText('No mail in this folder')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Clear search' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Show read mail' })).not.toBeInTheDocument();
+  });
+
+  it('says an empty folder holds no saved mail when showing cached data (issue #3972)', async () => {
+    await db.esiCache.put({
+      characterId: CHAR_ID,
+      key: 'mail:headers',
+      value: headers,
+      fetchedAt: STALE_FETCHED_AT,
+    });
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail`, () => HttpResponse.error())
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('Fleet up!');
+    await onlyFolders(user, ['Sent']);
+    expect(await screen.findByText('No saved mail in this folder')).toBeInTheDocument();
+  });
+
+  it('offers Show read mail when Hide read hid everything (issue #3972)', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('Fleet up!');
+    // Inbox holds only the read "Market report".
+    await onlyFolders(user, ['Inbox']);
+    await user.click(screen.getByRole('button', { name: 'Hide read' }));
+    expect(await screen.findByText('No unread mail')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Show read mail' }));
+    expect(await screen.findByText('Market report')).toBeInTheDocument();
+    expect(screen.getByRole('searchbox', { name: /search/i })).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'Hide read' })).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    );
+  });
+
+  it('offers Clear search, not Show read mail, when the search alone empties the list', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('Fleet up!');
+    await user.click(screen.getByRole('button', { name: 'Hide read' }));
+    await user.type(screen.getByRole('searchbox', { name: /search/i }), 'zzzznotamatch');
+    expect(await screen.findByRole('button', { name: 'Clear search' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Show read mail' })).not.toBeInTheDocument();
   });
 
   it('keeps search and hide-read in the URL, and restores them on a fresh visit', async () => {
@@ -734,6 +828,27 @@ describe('Mail', () => {
     expect(await screen.findByText('Older mail', {}, { timeout: 5000 })).toBeInTheDocument();
     expect(lastMailIdParam).toBe('951');
     expect(screen.queryByRole('button', { name: /load more/i })).not.toBeInTheDocument();
+  });
+
+  it('says only recent mail is empty, pointing at Load more, while older pages are unloaded', async () => {
+    const fullPage = Array.from({ length: 50 }, (_, i) => ({
+      mail_id: 1000 - i,
+      subject: `Mail ${1000 - i}`,
+      timestamp: '2026-08-05T00:00:00Z',
+      labels: [],
+    }));
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail`, () =>
+        HttpResponse.json(fullPage)
+      )
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('Mail 1000');
+    await onlyFolders(user, ['Sent']);
+    expect(await screen.findByText('No recent mail in this folder')).toBeInTheDocument();
+    expect(screen.queryByText('No mail in this folder')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /load more/i })).toBeInTheDocument();
   });
 
   it('says it is offline when "load more" cannot reach ESI, and keeps the button to try again', async () => {
