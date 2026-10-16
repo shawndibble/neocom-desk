@@ -82,7 +82,7 @@ import type {
 } from '@/engine/types';
 import { evaluateFitGoal } from '@/engine/fitGoal';
 import { FitGoalModal } from './FitGoalModal';
-import { fitGoalOptions, type FitGoalOption } from './fitGoalOptions';
+import { fitGoalOptions, isFitGoalPickable, type FitGoalOption } from './fitGoalOptions';
 import {
   addMilestone,
   reanchorFitGoals,
@@ -1473,10 +1473,20 @@ export function PlanEditor({
             trainedLevels,
             scheduled,
             stepByKey,
-            startDate
+            startDate,
+            fitGoalData.unknownIds
           )
         : [],
-    [fitGoalOpen, fitGoalData.records, fitNeeds, trainedLevels, scheduled, stepByKey, startDate]
+    [
+      fitGoalOpen,
+      fitGoalData.records,
+      fitGoalData.unknownIds,
+      fitNeeds,
+      trainedLevels,
+      scheduled,
+      stepByKey,
+      startDate,
+    ]
   );
 
   // Keeps each fit goal on the latest step its Fitting needs: follows a
@@ -1490,7 +1500,7 @@ export function PlanEditor({
   /** FitGoalModal's pick: add the Fitting's missing skills (prerequisites follow), then anchor its goal. */
   function pickFitGoal(option: FitGoalOption) {
     const need = fitNeeds.get(option.id);
-    if (!need || option.state === 'flyable-now' || option.state === 'loading') return;
+    if (!need || !isFitGoalPickable(option)) return;
     const entries =
       option.state === 'missing' ? (appendImport(editable, option.toAdd).entries ?? []) : null;
     const known = (entries ?? plan.entries).filter((e) => catalog.engineSkills.has(e.skillTypeID));

@@ -12,7 +12,10 @@ vi.mock('@/features/market/priceHistory', () => ({
 vi.mock('@/features/market/orderBook', () => ({
   getOrderBook: (...a: unknown[]) => getOrderBook(...a),
 }));
-vi.mock('@/esi/endpoints', () => ({ getUniverseType: vi.fn() }));
+const loadUniverseTypeOnce = vi.fn();
+vi.mock('@/features/skills/data', () => ({
+  loadUniverseTypeOnce: (...a: unknown[]) => loadUniverseTypeOnce(...a),
+}));
 
 const { clearHaulingScanCache, haulingScanCacheKey, MAX_BOOK_CANDIDATES, runHaulingScan } =
   await import('./haulingData');
@@ -86,6 +89,33 @@ describe('runHaulingScan, selling into buy orders', () => {
       mode: 'instant',
     });
     expect(scan.rows[0]).toMatchObject({ groupId: 18, categoryId: 4 });
+  });
+
+  it('reads a missing catalogue volume through the cached type loader', async () => {
+    loadUniverseTypeOnce.mockResolvedValue({ data: { volume: 0.01 } });
+    const scan = await runHaulingScan({
+      from: FROM,
+      to: TO,
+      typeIds: [34],
+      scope: 4,
+      types: { '34': { name: 'Tritanium' } } as never,
+      mode: 'instant',
+    });
+    expect(loadUniverseTypeOnce).toHaveBeenCalledWith(34);
+    expect(scan.rows[0]).toMatchObject({ unitVolumeM3: 0.01 });
+  });
+
+  it('drops an item whose volume cannot be told, not the scan', async () => {
+    loadUniverseTypeOnce.mockResolvedValue(null);
+    const scan = await runHaulingScan({
+      from: FROM,
+      to: TO,
+      typeIds: [34],
+      scope: 4,
+      types: { '34': { name: 'Tritanium' } } as never,
+      mode: 'instant',
+    });
+    expect(scan.rows).toHaveLength(0);
   });
 
   it('does not answer an instant scan from a cached listing scan', async () => {
