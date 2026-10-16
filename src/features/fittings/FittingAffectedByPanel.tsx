@@ -9,9 +9,8 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { AffectedAttribute, AffectedSource } from '@/engine/fittings/affectedBy';
 import { displaySourceValue } from '@/engine/fittings/attributeUnits';
-import { loadAttributeDictionary } from '@/sde/loadMarketSde';
-import type { AttributeDictionary } from '@/sde/marketTypes';
 import { attributeValueText, formatAttributeNumber } from './attributeValueText';
+import { useAttributeDictionary } from './useAttributeDictionary';
 
 function SourceLine({
   source,
@@ -66,20 +65,7 @@ export function FittingAffectedByPanel({
   const { t } = useTranslation();
   const [rows, setRows] = useState<AffectedAttribute[] | null>(null);
   const [failed, setFailed] = useState(false);
-  const [dictionary, setDictionary] = useState<AttributeDictionary | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    void loadAttributeDictionary().then(
-      (loaded) => {
-        if (!cancelled) setDictionary(loaded);
-      },
-      () => {}
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const dictionary = useAttributeDictionary();
 
   useEffect(() => {
     let cancelled = false;
@@ -112,7 +98,6 @@ export function FittingAffectedByPanel({
     <ul className="space-y-2 text-xs">
       {named.map((row) => {
         const entry = dictionary[row.attributeId]!;
-        // As the game shows it: a rate of fire in seconds, not milliseconds; a resonance as a resistance.
         const shown = (value: number) => attributeValueText(value, entry);
         return (
           <li key={row.attributeId} className="space-y-1 rounded-xs bg-panel-2 p-2">

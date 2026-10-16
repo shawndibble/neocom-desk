@@ -1,10 +1,7 @@
 /**
- * "Load rolls from my assets" in the module dialog's Mutation section: the
- * active Character's own abyssal items of the types this module can be,
- * each with its real base, mutaplasmid and rolls (ESI's dynamic item, kept
- * for good once read — `features/abyssal/dynamicItems.ts`). Picking one
- * makes the module that item. Asked only on a press, so opening the dialog
- * never reads assets or ESI.
+ * "Load rolls from my assets": the active Character's abyssal items of the
+ * types this module can be, each with its real base, mutaplasmid and rolls
+ * (`features/abyssal/dynamicItems.ts`). Only on a press, so opening the dialog never reads assets or ESI.
  */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -12,7 +9,7 @@ import { GrantMissingLink } from '@/app/GrantMissingLink';
 import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
 import { Button } from '@/components/ui';
 import type { MutaplasmidLookup } from '@/engine/fittings/mutaplasmids';
-import { rollRows } from '@/engine/fittings/mutationEdit';
+import { rollRows, type BaseValue } from '@/engine/fittings/mutationEdit';
 import type { ItemMutation } from '@/engine/fittings/types';
 import { mutationsForItems } from '@/features/abyssal/dynamicItems';
 import { loadCharacterAssets } from '@/features/character/assets';
@@ -37,15 +34,15 @@ interface Owned {
   truncated: boolean;
 }
 
-/** How long a press waits on ESI for the items' rolls. */
 const ROLLS_TIMEOUT_MS = 15_000;
 
 /** Mean quality of `mutation`'s rolls against its base's own values. */
 async function meanQuality(
   mutation: ItemMutation,
+  baseValues: Promise<BaseValue | null>,
   lookup: MutaplasmidLookup
 ): Promise<number | null> {
-  const baseValue = await loadBaseValues(mutation.baseTypeId);
+  const baseValue = await baseValues;
   if (baseValue === null) return null;
   const rows = rollRows(mutation.mutaplasmidTypeId, mutation.attributes, baseValue, lookup).filter(
     (row) => row.rolled
@@ -70,12 +67,19 @@ async function findOwned(
   const mutations = await mutationsForItems(refs, lookup, {
     signal: AbortSignal.timeout(ROLLS_TIMEOUT_MS),
   });
+  // Many owned items share a base: read each base's values once.
+  const bases = new Map<number, Promise<BaseValue | null>>();
+  const baseValuesOf = (typeId: number) => {
+    let values = bases.get(typeId);
+    if (!values) bases.set(typeId, (values = loadBaseValues(typeId)));
+    return values;
+  };
   const items = await Promise.all(
     refs.flatMap((ref) => {
       const mutation = mutations.get(ref.itemId);
       if (!mutation) return [];
       return [
-        meanQuality(mutation, lookup).then((quality) => ({
+        meanQuality(mutation, baseValuesOf(mutation.baseTypeId), lookup).then((quality) => ({
           itemId: ref.itemId,
           mutation,
           quality,

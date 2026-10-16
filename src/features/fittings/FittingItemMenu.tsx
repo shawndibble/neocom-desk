@@ -75,10 +75,8 @@ export function FittingItemMenu({
 }
 
 /**
- * `useOpenAfterMenu`'s `run` for the enclosing `FittingItemMenu`: an item
- * that opens a dialog (Variations, Mutate…) opens it once the menu has
- * closed and focus is back on its trigger (DESIGN.md §6c "Menu item that
- * opens a dialog"). Outside one, the dialog just opens.
+ * `useOpenAfterMenu().run` of the enclosing `FittingItemMenu`: a dialog item
+ * opens once the menu closes and focus is back on its trigger (DESIGN.md §6c).
  */
 const OpenAfterMenuContext = createContext<(fn: () => void) => void>((fn) => fn());
 

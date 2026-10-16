@@ -1,19 +1,13 @@
 /**
- * Editing a fitted module's mutation (GLOSSARY.md **Mutated module**,
- * **Mutaplasmid**, **Roll**), pure: what the module dialog's Mutation
- * section does. A mutaplasmid's ranges are multipliers on the base module's
- * own values (`MutaplasmidLookup.rollRange` turns them absolute); the rolls
- * an `ItemMutation` carries are absolute, so every edit here needs the base
- * module's own attribute values, which the feature layer reads
- * (`baseValue`).
- *
- * A rolled attribute the base does not carry (or carries as 0) has no
- * range to roll in, so it is left out everywhere here rather than shown as
- * a slider that cannot move.
+ * Pure edits for a fitted module's mutation (GLOSSARY.md **Mutated module**,
+ * **Mutaplasmid**, **Roll**). Ranges are multipliers on the base's own values
+ * but rolls are absolute, so every edit takes `baseValue`. A rolled attribute
+ * the base lacks (or has as 0) has no range: left out, not a dead slider.
  */
 import {
   normaliseMutation,
   rollQuality,
+  withoutMutation,
   type MutaplasmidLookup,
   type RollRange,
 } from './mutaplasmids';
@@ -22,7 +16,6 @@ import type { Fitting, FittingModule, FittingSlotKind, ItemMutation } from './ty
 /** The base module's own value of a dogma attribute; undefined when it has none. */
 export type BaseValue = (attributeId: number) => number | undefined;
 
-/** `value` inside `range`: one outside it moves to the nearer edge. */
 export function clampRoll(value: number, range: RollRange): number {
   return Math.min(range.max, Math.max(range.min, value));
 }
@@ -55,10 +48,8 @@ function usableRanges(
 }
 
 /**
- * The rolls a freshly applied mutaplasmid starts from: the base's own value
- * of each attribute it rolls, clamped into the range (a few ranges leave
- * ×1 out). A starting point the pilot then moves, so the item reads as
- * rolled from the first edit rather than as rolls unknown.
+ * A fresh mutaplasmid's rolls: the base's own value per rolled attribute,
+ * clamped (a few ranges leave ×1 out), so the item reads as rolled, not rolls unknown.
  */
 export function startingRolls(
   mutaplasmidTypeId: number,
@@ -121,14 +112,9 @@ function updateModuleAt(
 }
 
 /**
- * Sets or clears the mutation of the module at `slot`/`slotIndex`.
- *
- * - A mutation makes the module the abyssal type its base and mutaplasmid
- *   produce, rolls cut to the mutaplasmid's own (`normaliseMutation`); an
- *   abyssal module of unknown base keeps its type and gains them. A
- *   mutaplasmid that does not take the base changes nothing.
- * - `null` reverts a mutated module to its base type. State and charge stay
- *   either way; the engine lowers what the new type can't reach.
+ * A mutation makes the module its resulting abyssal type, rolls cut by
+ * `normaliseMutation` (one the base doesn't take changes nothing); `null`
+ * reverts it to its base. State and charge stay; the engine lowers what the new type can't reach.
  */
 export function setModuleMutation(
   fitting: Fitting,
@@ -139,10 +125,7 @@ export function setModuleMutation(
 ): Fitting {
   return updateModuleAt(fitting, slot, slotIndex, (module) => {
     if (mutation === null) {
-      if (!module.mutation) return module;
-      const next = { ...module, typeId: module.mutation.baseTypeId };
-      delete next.mutation;
-      return next;
+      return module.mutation ? withoutMutation(module, module.mutation.baseTypeId) : module;
     }
     const typeId = lookup.resultingType(mutation.baseTypeId, mutation.mutaplasmidTypeId);
     if (typeId === null) return module;
@@ -152,11 +135,8 @@ export function setModuleMutation(
 }
 
 /**
- * Sets one roll of a mutated module, clamped into its range. Rolls the
- * mutation lacks are filled from the base (`startingRolls`), so a module
- * whose rolls were unknown states one consistent set once the pilot moves
- * any of them. A module with no mutation, or an attribute its mutaplasmid
- * does not roll, changes nothing.
+ * Sets one roll, clamped. Missing rolls fill from the base (`startingRolls`),
+ * so an unknown-rolls module becomes one consistent set on its first move.
  */
 export function setModuleRoll(
   fitting: Fitting,

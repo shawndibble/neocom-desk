@@ -5,12 +5,6 @@
  * pilot's assets, or take the mutation off again. Every change is an
  * ordinary editor edit, so the stats and the Fitting Share Code follow.
  *
- * A mutaplasmid's ranges are multipliers on the base module's own values,
- * read here from the base's dogma attributes (`loadTypeDetail`); the rolls
- * are absolute (`engine/fittings/mutationEdit.ts`). Each slider runs worst
- * (left) to best (right), whichever way the attribute's good direction
- * points, and prints the absolute value beside it.
- *
  * Drones are not covered: a mutated drone is its own one-drone stack, and
  * the drone rows have no dialog to hold this.
  */
@@ -46,11 +40,10 @@ import {
 import type { FittingModule, ItemMutation } from '@/engine/fittings/types';
 import { useMutaplasmidLookup } from '@/features/abyssal/mutaplasmidData';
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
-import { loadAttributeDictionary } from '@/sde/loadMarketSde';
-import type { AttributeDictionary } from '@/sde/marketTypes';
 import { attributeValueText, formatAttributeNumber } from './attributeValueText';
 import { loadBaseValues } from './loadBaseValues';
 import { MutationFromAssets } from './MutationFromAssets';
+import { useAttributeDictionary } from './useAttributeDictionary';
 import { catalogueTypeName, type FittingCatalogue } from './useFittingCatalogue';
 import type { FittingChange } from './useFittingWorkspace';
 
@@ -72,23 +65,6 @@ function useBaseValues(typeId: number | null): BaseValue | 'failed' | null {
   }, [typeId]);
   if (typeId === null || loaded?.typeId !== typeId) return null;
   return loaded.value ?? 'failed';
-}
-
-function useAttributeDictionary(): AttributeDictionary | null {
-  const [dictionary, setDictionary] = useState<AttributeDictionary | null>(null);
-  useEffect(() => {
-    let live = true;
-    void loadAttributeDictionary().then(
-      (loaded) => {
-        if (live) setDictionary(loaded);
-      },
-      () => {}
-    );
-    return () => {
-      live = false;
-    };
-  }, []);
-  return dictionary;
 }
 
 export interface FittingMutationPanelProps {
@@ -261,7 +237,6 @@ function WarnNote({ children }: { children: ReactNode }) {
   );
 }
 
-/** A mutaplasmid choice, grouped by strain. */
 function MutaplasmidSelect({
   triggerId,
   options,
@@ -370,7 +345,6 @@ function BasePicker({
   );
 }
 
-/** One rolled attribute: its name and value, a worst-to-best slider, and the ends of its range. */
 function RollSlider({
   row,
   name,

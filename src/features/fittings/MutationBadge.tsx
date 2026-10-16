@@ -1,10 +1,6 @@
 /**
- * The flag on a fitted mutated item whose stats the app can't state
- * exactly (`mutationStatus`): rolls unknown (the base module's own values
- * stand in) or base unknown (it adds nothing to the stats). DESIGN.md §6c's
- * amber warning mark — a figure leaning on something the pilot hasn't
- * confirmed — with a tooltip saying what is missing and where it is set
- * (the module menu's "Mutate…"). A module the app knows fully shows nothing.
+ * DESIGN.md §6c amber warning mark on a fitted mutated item whose stats the
+ * app can't state exactly (`mutationStatus`); the tooltip says what is missing.
  */
 import { useTranslation } from 'react-i18next';
 import { HintText } from '@/components/ui/HintText';
@@ -25,7 +21,7 @@ export function MutationBadge({
   const { t } = useTranslation();
   const status = useUnknownMutation(items);
   const tip = useUnknownMutationTip(status, fixable);
-  if (status === null || tip === null) return null;
+  if (status === null) return null;
   return (
     <HintText
       content={tip}
