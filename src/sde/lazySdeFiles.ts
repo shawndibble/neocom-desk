@@ -25,7 +25,7 @@ export const LAZY_SDE_FILES: readonly string[] = [
   'market/stations.json',
   'market/variations.json',
   // Item Detail's description + attributes per type (issue #3882), ~12 MB in
-  // all, so one range-bucket shard per `typeInfoShard` slot. Every slot has a
+  // all, so one range-bucket shard per `typeInfoBucket` slot. Every slot has a
   // file (`{}` when empty), so this is a constant, not read from the build.
   ...Array.from({ length: TYPE_INFO_SHARD_COUNT }, (_, n) => `typeInfo/${n}.json`),
 ];

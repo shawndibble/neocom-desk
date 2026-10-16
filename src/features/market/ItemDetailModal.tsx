@@ -3,7 +3,7 @@
  * description for one item — the things a shopper checks before deciding
  * whether a price is worth paying. The item's own description, volume and
  * attribute values come from the baked `typeInfo` shards (lazy SDE, one
- * small file per 1/32 of the type ids — `itemDetailType.ts`), falling back
+ * small file per 2000-id range — `itemDetailType.ts`), falling back
  * to the cached ESI read for a type the build doesn't carry; only the
  * order-book prices need the network. The market snapshot carries the
  * small attribute dictionary that turns attribute ids into names/units/categories.
