@@ -5222,7 +5222,7 @@
       "emptyHint": "A snapshot is recorded each day the app is open. Wallet history comes from your journal.",
       "firstDays": "Layers start on {{date}}. The chart fills in as days are recorded.",
       "gapNote": "Hatched days: the app was not open, so only the wallet is known. Nothing is estimated.",
-      "footnote": "Assets are priced at your chosen hub on the day they were recorded and are not re-valued later.",
+      "footnote": "Assets are priced at your chosen hub on the day they were recorded and are not re-valued later. An abyssal module counts at the last MutaMarket estimate this device held that day, so the line steps up on the day one is first estimated.",
       "walletCrumb": "Wallet",
       "layers": {
         "isk": "ISK",
@@ -6290,6 +6290,16 @@
     "fetchTruncatedRetry": "Try again",
     "unknownValue": "-",
     "noEstimate": "No estimate",
+    "abyssal": {
+      "estimated_one": "{{count}} abyssal module at MutaMarket's estimate",
+      "estimated_other": "{{count}} abyssal modules at MutaMarket's estimate",
+      "unpriced_one": "{{count}} abyssal module not priced, left out of the total",
+      "unpriced_other": "{{count}} abyssal modules not priced, left out of the total",
+      "pending_one": "{{count}} abyssal module not looked up yet, left out of the total",
+      "pending_other": "{{count}} abyssal modules not looked up yet, left out of the total",
+      "rowEstimatedAge": "Estimated {{age}}.",
+      "rowNotImported": "MutaMarket hasn't priced this module yet. Show info can ask it to."
+    },
     "security": {
       "ariaLabel": "Security status: {{value}}"
     },
@@ -8195,6 +8205,12 @@
     "detailMarketValue": "Market value at {{hub}} (sell orders)",
     "detailMarketValueUnpriced_one": "({{count}} item unpriced)",
     "detailMarketValueUnpriced_other": "({{count}} items unpriced)",
+    "detailAbyssalValue": "Abyssal modules (MutaMarket estimate)",
+    "detailAbyssalNotPriced": "Not priced",
+    "detailAbyssalUnpriced_one": "({{count}} not priced)",
+    "detailAbyssalUnpriced_other": "({{count}} not priced)",
+    "detailAbyssalEstimateNote": "MutaMarket's model estimate for each module's exact rolls, not a sale price.",
+    "detailAbyssalWhy": "An abyssal module is worth its own rolls, so it has no market price; MutaMarket can only estimate one it can identify.",
     "statusFilterLabel": "Status",
     "typeFilterLabel": "Contract type"
   },
@@ -9953,6 +9969,10 @@
       "unmatched_one": "{{count}} line not matched",
       "unmatched_other": "{{count}} lines not matched",
       "unmatchedLine": "line {{lines}} · {{name}}",
+      "abyssal_one": "{{count}} abyssal module not priced",
+      "abyssal_other": "{{count}} abyssal modules not priced",
+      "abyssalHint": "An abyssal module is worth its own rolls, which a pasted name doesn't carry. MutaMarket can estimate one from its in-game link.",
+      "abyssalLink": "Appraise on MutaMarket",
       "unpriced_one": "{{count}} item has no orders on one side at this hub, so it is left out of that total.",
       "unpriced_other": "{{count}} items have no orders on one side at this hub, so they are left out of that total.",
       "compareHubsTitle": "Compare hubs",
@@ -12337,6 +12357,8 @@
           "dropped": "Of which {{value}} dropped as loot.",
           "unpriced_one": "{{count}} item has no sell price here and counts as zero.",
           "unpriced_other": "{{count}} items have no sell price here and count as zero.",
+          "abyssal_one": "{{count}} abyssal module isn't priced: its worth depends on its rolls, which a killmail doesn't record. It's left out of the loss.",
+          "abyssal_other": "{{count}} abyssal modules aren't priced: their worth depends on their rolls, which a killmail doesn't record. They're left out of the loss.",
           "zkb": "zKillboard valued it at {{value}} when it died."
         }
       }

@@ -63,12 +63,15 @@ import { getHubPricesWithStatus, invalidateHubPrices } from '@/market/prices';
 import { loadMarketTypes } from '@/sde/loadMarketSde';
 import { knownPackagedVolumeOf } from '@/sde/marketTypes';
 import { loadMarketTypesById } from '@/sde/marketTypesById';
-import { loadReprocessing } from '@/sde/loadSde';
+import { loadMutaplasmids, loadReprocessing, loadTypes } from '@/sde/loadSde';
+import { splitAbyssalUnmatched } from '@/engine/market/abyssalValuation';
 import type { ReprocessingType } from '@/sde/types';
 
 export interface AppraisalOutcome {
   appraisal: Appraisal;
   unmatched: AppraisalUnmatched[];
+  /** Unmatched lines naming an abyssal type; kept apart so they don't read as typos. */
+  abyssal?: AppraisalUnmatched[];
   /**
    * The active clone's refining implant bonus, 0 with none fitted, no active
    * Character, or the whole paste is scrap — the implant's own ESI
@@ -135,6 +138,14 @@ export interface AppraiseOptions {
   force?: boolean;
 }
 
+/** Every abyssal type's name, lower-case: read only when a paste has unmatched lines. */
+async function loadAbyssalTypeNames(): Promise<Set<string>> {
+  const [data, types] = await Promise.all([loadMutaplasmids(), loadTypes()]);
+  return new Set(
+    data.abyssalTypeIds.flatMap((typeId) => types[String(typeId)]?.name.toLowerCase() ?? [])
+  );
+}
+
 /**
  * Parse, resolve and price a paste at `hub`. Throws only if the catalogue
  * itself cannot be loaded — an unreachable price source degrades to null
@@ -155,7 +166,13 @@ export async function appraisePaste(
     loadAppraisalCatalogue(),
     loadMarketTypesById(),
   ]);
-  const { matched, unmatched } = matchAppraisalEntries(entries, catalogue);
+  const matchResult = matchAppraisalEntries(entries, catalogue);
+  const { matched } = matchResult;
+  const abyssalNames =
+    matchResult.unmatched.length === 0 ? null : await loadAbyssalTypeNames().catch(() => null);
+  const { abyssal, unmatched } = abyssalNames
+    ? splitAbyssalUnmatched(matchResult.unmatched, abyssalNames)
+    : { abyssal: [], unmatched: matchResult.unmatched };
   const typeIds = matched.map((match) => match.typeId);
 
   const [reprocessingMap, modifiers, lpMatches] =
@@ -243,6 +260,7 @@ export async function appraisePaste(
   return {
     appraisal: buildAppraisal(items, pricePercent),
     unmatched,
+    abyssal,
     implantBonusPct: implantApplied ? (modifiers?.refiningImplantPct ?? 0) : 0,
     refinesOreOrIce,
     accountingLevel: modifiers ? (modifiers.skills[SKILL_IDS.accounting] ?? 0) : null,

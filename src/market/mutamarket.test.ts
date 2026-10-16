@@ -12,6 +12,8 @@ import {
   clearAbyssalEstimateMemory,
   configureMutamarket,
   getAbyssalEstimate,
+  onAbyssalEstimate,
+  readCachedAbyssalEstimates,
   toStoredEstimate,
   type MutamarketEstimateResponse,
   type MutamarketTransport,
@@ -216,6 +218,60 @@ describe('getAbyssalEstimate', () => {
     const result = await getAbyssalEstimate(BCS, Number.NaN, OPTS);
     expect(result).toMatchObject({ status: 'unknown', value: null });
     expect(transport).not.toHaveBeenCalled();
+  });
+});
+
+describe('onAbyssalEstimate', () => {
+  it('tells listeners of every answer, an import included, until they unsubscribe', async () => {
+    setup(async (request) => (request.importIfMissing ? PRICED : { status: 'not-imported' }));
+    const heard: [number, string][] = [];
+    const stop = onAbyssalEstimate((itemId, estimate) => heard.push([itemId, estimate.status]));
+    await getAbyssalEstimate(BCS, ITEM, OPTS);
+    await getAbyssalEstimate(BCS, ITEM, IMPORT);
+    stop();
+    await getAbyssalEstimate(BCS, ITEM + 1, OPTS);
+    expect(heard).toEqual([
+      [ITEM, 'not-imported'],
+      [ITEM, 'priced'],
+    ]);
+  });
+});
+
+describe('readCachedAbyssalEstimates', () => {
+  const OTHER = 1056087009645;
+
+  it('answers from memory and the persisted cache without calling MutaMarket', async () => {
+    setup(async () => PRICED);
+    await getAbyssalEstimate(BCS, ITEM, OPTS);
+    await flushWrites();
+    const transport = setup(async () => PRICED);
+    const fromMemory = await readCachedAbyssalEstimates([ITEM, OTHER]);
+    expect(fromMemory.get(ITEM)?.value).toBe(282840604.66);
+    expect(fromMemory.has(OTHER)).toBe(false);
+    clearAbyssalEstimateMemory();
+    const fromDisk = await readCachedAbyssalEstimates([ITEM, OTHER]);
+    expect(fromDisk.get(ITEM)).toMatchObject({ status: 'priced', fetchedAt: 1_000_000 });
+    expect(transport).not.toHaveBeenCalled();
+  });
+
+  it('skips an expired answer unless asked for the last known one', async () => {
+    setup(async () => PRICED);
+    await getAbyssalEstimate(BCS, ITEM, OPTS);
+    await flushWrites();
+    clock += ABYSSAL_ESTIMATE_TTL_MS + 1;
+    expect((await readCachedAbyssalEstimates([ITEM])).has(ITEM)).toBe(false);
+    clearAbyssalEstimateMemory();
+    expect((await readCachedAbyssalEstimates([ITEM])).has(ITEM)).toBe(false);
+    const lastKnown = await readCachedAbyssalEstimates([ITEM], { includeExpired: true });
+    expect(lastKnown.get(ITEM)?.value).toBe(282840604.66);
+  });
+
+  it('never returns an unavailable answer as a cached one', async () => {
+    setup(async () => {
+      throw new Error('down');
+    });
+    await getAbyssalEstimate(BCS, ITEM, OPTS);
+    expect((await readCachedAbyssalEstimates([ITEM])).has(ITEM)).toBe(false);
   });
 });
 

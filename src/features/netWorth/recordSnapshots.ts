@@ -17,6 +17,7 @@ import {
   utcDay,
   type SnapshotInputs,
 } from '@/engine/netWorth/snapshot';
+import { lastKnownAbyssalValues } from '@/features/abyssal/abyssalEstimates';
 import { loadCharacterAssets } from '@/features/character/assets';
 import { loadOrders } from '@/features/character/orders';
 import { loadWalletBalanceWithStatus } from '@/features/character/wallet';
@@ -72,8 +73,14 @@ export const liveSources: SnapshotSources = {
     if ([wallet, assets, orders].some((source) => isStale(source.cached))) return null;
     const hubId = await hubIdSetting();
     const assetList = assets.cached?.data ?? null;
+    // An abyssal module counts at its last known MutaMarket estimate, cached on
+    // this device; never a type price, never a lookup from here.
+    const abyssal = await lastKnownAbyssalValues(assetList ?? []);
+    // Without the mutaplasmid data no module reads as abyssal: a day's row is
+    // final, so wait for a run that can value them rather than freeze it low.
+    if (!abyssal) return null;
     const typeIds = [...new Set((assetList ?? []).map((a) => a.type_id))].filter(
-      (id) => id !== PLEX_TYPE_ID
+      (id) => id !== PLEX_TYPE_ID && !abyssal.isAbyssalType(id)
     );
     const [hubPrices, averages] = await Promise.all([
       getHubPrices(getTradeHub(hubId) ?? DEFAULT_TRADE_HUB, typeIds),
@@ -93,6 +100,7 @@ export const liveSources: SnapshotSources = {
       assets: assetList,
       orders: orders.cached?.data ?? null,
       priceByTypeId,
+      itemValueByItemId: abyssal.values,
     };
   },
 };

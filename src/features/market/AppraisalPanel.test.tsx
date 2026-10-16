@@ -853,6 +853,23 @@ describe('AppraisalPanel', () => {
     expect(screen.getByText('line 3, 7 · Nanite Repair Past')).toBeInTheDocument();
   });
 
+  it('says a pasted abyssal module is unpriced, apart from unmatched lines, and where to price it', () => {
+    renderPanel({
+      controller: controller({
+        result: outcome({
+          abyssal: [{ name: 'Heavy Abyssal Energy Neutralizer', lines: [2] }],
+        }),
+      }),
+    });
+    expect(screen.getByText('1 abyssal module not priced')).toBeInTheDocument();
+    expect(screen.getByText('line 2 · Heavy Abyssal Energy Neutralizer')).toBeInTheDocument();
+    expect(screen.queryByText(/not matched/)).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Appraise on MutaMarket/ })).toHaveAttribute(
+      'href',
+      'https://mutamarket.com'
+    );
+  });
+
   it('names the hub and percentage the figures are quoted at', () => {
     renderPanel({ controller: controller({ result: outcome() }) });
     expect(screen.getAllByText('Jita').length).toBeGreaterThan(1);

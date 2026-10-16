@@ -55,6 +55,16 @@ describe('buildSnapshotRow', () => {
     });
   });
 
+  it("adds an item's own value (an abyssal module's last known estimate) instead of a type price", () => {
+    const row = buildSnapshotRow({
+      ...base,
+      assets: [...base.assets, { type_id: 47832, quantity: 1, item_id: 3 }],
+      priceByTypeId: new Map([...base.priceByTypeId, [47832, 1]]),
+      itemValueByItemId: new Map([[3, 80_000_000]]),
+    });
+    expect(row?.assetValue).toBe(80_000_060);
+  });
+
   it('counts only buy-order escrow', () => {
     expect(
       buildSnapshotRow({ ...base, orders: [{ is_buy_order: false, escrow: 5 }] })?.escrow

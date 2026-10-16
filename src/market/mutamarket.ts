@@ -184,8 +184,22 @@ function answers(estimate: AbyssalEstimate, importIfMissing: boolean): boolean {
   );
 }
 
+type EstimateListener = (itemId: number, estimate: AbyssalEstimate) => void;
+const listeners = new Set<EstimateListener>();
+
+/**
+ * Hear every answer as it lands, whoever asked — so a list (Assets) picks up
+ * an estimate the pilot asked for elsewhere (Item Detail's import). Returns
+ * the unsubscribe.
+ */
+export function onAbyssalEstimate(listener: EstimateListener): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
 function remember(itemId: number, estimate: AbyssalEstimate): AbyssalEstimate {
   memory.set(itemId, { estimate, expiresAt: estimate.fetchedAt + ttlFor(estimate.status) });
+  for (const listener of listeners) listener(itemId, estimate);
   return estimate;
 }
 
@@ -259,6 +273,42 @@ export function getAbyssalEstimate(
   );
   inFlight.set(flightKey, run);
   return run;
+}
+
+/**
+ * Answers already held (memory, then the persisted cache); never calls
+ * MutaMarket, never returns `unavailable`. `includeExpired`: past-TTL rows too,
+ * so a total doesn't swing with whether the pilot looked recently.
+ */
+export async function readCachedAbyssalEstimates(
+  itemIds: readonly number[],
+  options: { includeExpired?: boolean } = {}
+): Promise<Map<number, AbyssalEstimate>> {
+  const found = new Map<number, AbyssalEstimate>();
+  const missing: number[] = [];
+  for (const itemId of new Set(itemIds)) {
+    const held = memory.get(itemId);
+    if (held && held.expiresAt > now() && held.estimate.status !== 'unavailable') {
+      found.set(itemId, held.estimate);
+    } else missing.push(itemId);
+  }
+  if (missing.length === 0) return found;
+  try {
+    const rows = await readCachedEntries<StoredEstimate>(
+      GLOBAL_CACHE_CHARACTER_ID,
+      missing.map(abyssalEstimateCacheKey)
+    );
+    for (const itemId of missing) {
+      const row = rows.get(abyssalEstimateCacheKey(itemId));
+      if (!row) continue;
+      const stored = toStoredEstimate(row.value);
+      if (!options.includeExpired && row.fetchedAt + ttlFor(stored.status) <= now()) continue;
+      found.set(itemId, { ...stored, source: 'mutamarket', fetchedAt: row.fetchedAt });
+    }
+  } catch {
+    // A cache that can't be read holds nothing.
+  }
+  return found;
 }
 
 /** Test-only: production relies on TTL expiry. Leaves persisted rows alone. */
