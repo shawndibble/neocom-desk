@@ -10,7 +10,7 @@
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Checkbox, IconButton, TextInput } from '@/components/ui';
+import { Button, Checkbox, IconButton, LiveStatus, TextInput } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
@@ -18,6 +18,7 @@ import { EDENCOM_SYSTEMS, TRIGLAVIAN_MINOR_VICTORY_SYSTEMS } from '@/engine/rout
 import { clampInt } from '@/features/industry/clampInt';
 import { cx } from '@/lib/cx';
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
+import { useRetryFocus } from '@/lib/useRetryFocus';
 import { addAvoidedSystem, removeAvoidedSystem, useAvoidedSystems } from './avoidedSystems';
 import {
   MAX_POD_KILL_THRESHOLD,
@@ -32,7 +33,7 @@ import {
   useSecurityPenalty,
 } from './routeRules';
 import { SolarSystemPicker } from './SolarSystemPicker';
-import { useSolarSystems } from './useSolarSystems';
+import { useSolarSystemList } from './useSolarSystems';
 
 /** A whole number typed into a field, clamped to its range; `null` for an unreadable entry. */
 function clampedInt(raw: string, min: number, max: number): number | null {
@@ -173,7 +174,12 @@ export function AvoidedSystemsEditor({
     void hydrateEnabled();
   }, [hydrate, hydrateEnabled]);
 
-  const systems = useSolarSystems(true);
+  const { systems, failed: systemsFailed, retry: retrySystems } = useSolarSystemList(true);
+  // Retry's note unmounts when the read restarts: focus waits on the section.
+  const [sectionRef, , holdRetryFocus] = useRetryFocus(
+    systemsFailed ? 'failed' : systems === null ? 'busy' : 'ok',
+    'systems'
+  );
   const byId = useMemo(() => new Map(systems?.map((s) => [s.id, s]) ?? []), [systems]);
   const exclude = useMemo(() => new Set(avoided), [avoided]);
 
@@ -193,7 +199,8 @@ export function AvoidedSystemsEditor({
   if (!hydrated || !enabledHydrated) return null;
 
   return (
-    <div className="space-y-3">
+    <div ref={sectionRef} tabIndex={-1} className="space-y-3 focus:outline-none">
+      <LiveStatus>{systemsFailed ? t('jumpRange.systemsFailed') : ''}</LiveStatus>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         {/* Off routes straight through the list without the pilot losing it. */}
         <label className={`flex items-center gap-2 text-xs font-semibold ${tappableRowClassName}`}>
@@ -215,6 +222,21 @@ export function AvoidedSystemsEditor({
           triggerRef={addTriggerRef}
         />
       </div>
+      {systemsFailed && rows.length > 0 && (
+        // The names come off the system list: without it each row shows `#id`.
+        <div className="flex flex-wrap items-center gap-2 text-xs text-warning">
+          <span>{t('jumpRange.systemsFailed')}</span>
+          <Button
+            size="sm"
+            onClick={() => {
+              holdRetryFocus();
+              retrySystems();
+            }}
+          >
+            {t('common.retry')}
+          </Button>
+        </div>
+      )}
       {rows.length === 0 ? (
         <p className="text-xs text-text-dim">{t('settings.avoidedSystems.empty')}</p>
       ) : (

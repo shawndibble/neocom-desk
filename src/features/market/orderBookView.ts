@@ -14,6 +14,7 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import type { RegionOrder } from '@/esi/endpoints';
+import { isOfflineFailure } from '@/esi/client';
 import { passesOrderFilters } from '@/engine/market/orderBookFilters';
 import { mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { loadGlobalMarkets } from '@/sde/loadMarketSde';
@@ -96,6 +97,17 @@ export interface FailedOrderBookView extends OrderBookViewBase {
 }
 
 export type OrderBookView = LoadedOrderBookView | FailedOrderBookView;
+
+/**
+ * Whether a failed book failed because there is no connection (the browser says
+ * offline, or the error is a network failure / timeout) rather than because ESI
+ * answered badly. The view says "you're offline" for it, not "ESI may be
+ * limiting requests". False for a view that did not fail.
+ */
+export function orderBookFailedOffline(view: OrderBookView | null | undefined, online: boolean) {
+  if (!view || view.status !== 'failed') return false;
+  return !online || isOfflineFailure(view.error);
+}
 
 function regionFor(typeId: number, location: OrderBookLocation): ResolvedOrderBookRegion {
   return resolveOrderBookRegion(typeId, location.regionId, location.globalMarkets);

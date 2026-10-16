@@ -14,9 +14,10 @@ import { useEffect, useId, useMemo, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGrantedScopes } from '@/app/useGrantedScopes';
 import { SecurityStatus } from '@/components/SecurityStatus';
-import { TextInput } from '@/components/ui';
+import { Button, LiveStatus, TextInput } from '@/components/ui';
+import { useRetryFocus } from '@/lib/useRetryFocus';
 import { ESI_REGISTRY } from '@/esi/registry';
-import { useSolarSystems } from '@/features/route/useSolarSystems';
+import { useSolarSystemList } from '@/features/route/useSolarSystems';
 import { moveHighlight, COMBOBOX_NAV_KEYS, type ComboboxNavKey } from '@/lib/comboboxNav';
 import { cx } from '@/lib/cx';
 import { loadNpcStations } from '@/sde/loadMarketSde';
@@ -53,7 +54,12 @@ export function SurveyLocationPicker({
   const [structureHits, setStructureHits] = useState<{ key: string; places: SurveyPlace[] } | null>(
     null
   );
-  const systems = useSolarSystems(open);
+  const { systems, failed: systemsFailed, retry: retrySystems } = useSolarSystemList(open);
+  // Retry's note unmounts when the read restarts: focus waits on the field wrapper.
+  const [wrapRef, , holdRetryFocus] = useRetryFocus(
+    systemsFailed ? 'failed' : systems === null ? 'busy' : 'ok',
+    'systems'
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -125,7 +131,12 @@ export function SurveyLocationPicker({
   const showList = open && places.length > 0;
 
   return (
-    <div className="relative min-w-0 flex-1 basis-64">
+    <div
+      ref={wrapRef}
+      tabIndex={-1}
+      className="relative min-w-0 flex-1 basis-64 focus:outline-none"
+    >
+      <LiveStatus>{open && systemsFailed ? t('jumpRange.systemsFailed') : ''}</LiveStatus>
       <TextInput
         size="sm"
         role="combobox"
@@ -153,6 +164,24 @@ export function SurveyLocationPicker({
         }}
         onKeyDown={onKeyDown}
       />
+      {open && systemsFailed && (
+        // System names can't be searched without the list; stations and typed text still work.
+        <div
+          onMouseDown={(event) => event.preventDefault()}
+          className="mt-1 flex flex-wrap items-center gap-2 text-xs text-warning"
+        >
+          <span>{t('jumpRange.systemsFailed')}</span>
+          <Button
+            size="sm"
+            onClick={() => {
+              holdRetryFocus();
+              retrySystems();
+            }}
+          >
+            {t('common.retry')}
+          </Button>
+        </div>
+      )}
       {showList && (
         <ul
           id={listId}

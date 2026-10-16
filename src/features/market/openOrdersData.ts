@@ -44,7 +44,7 @@ export interface OpenOrdersSnapshot {
 /**
  * Every authenticated Character's open market orders, active one included —
  * this page IS the cross-character view, so there is no "active Character"
- * to exclude the way `loadOtherCharactersAssets`'s toggle does.
+ * to exclude the way `loadOtherCharactersAssetsDetailed`'s toggle does.
  */
 export function loadAllCharactersOpenOrders(): Promise<OpenOrdersSnapshot> {
   return fanOutAllCharacters<CharacterOpenOrders>({

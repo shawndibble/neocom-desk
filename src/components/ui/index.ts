@@ -11,6 +11,7 @@ export type { StatChipTone } from './statChipTone';
 export { DataAgeBadge } from './DataAgeBadge';
 export { CachedEmptyState } from './CachedEmptyState';
 export { CachedNotice } from './CachedNotice';
+export { LoadFailedState } from './LoadFailedState';
 export { EmptyState } from './EmptyState';
 export { Toast } from './Toast';
 export { useTimedToast } from './useTimedToast';
