@@ -487,8 +487,10 @@ reading order and identity disagree, mark the identifying column
 `primary: true` rather than resorting the table — the row keeps its column
 order at every width and the card hoists that cell with CSS `order`. Wallet's
 journal is the case that motivated it: a ledger should lead with its date on
-desktop, but a card titled "9/1/2026, 9:34:21 PM" says nothing, so `refType`
-("Bounty prizes") titles it and the date becomes a labelled field.
+desktop, but a card titled "9/1/2026, 9:34:21 PM" says nothing, so the
+`description` ("Bounty prizes: …") titles the dense two-line card and the time
+rides the second line. The narrow cards beside an open panel follow `stacked`
+and stay a flat list: day groups and the sort bar are phone-only.
 
 Three rules hold this together:
 
