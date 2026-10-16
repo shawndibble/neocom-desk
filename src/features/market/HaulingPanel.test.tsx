@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { configureClipboard } from '@/lib/clipboard';
-import { render, screen, within } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
@@ -383,6 +383,65 @@ describe('HaulingPanel fill the free space', () => {
     await user.click(screen.getByRole('button', { name: 'Hauling actions' }));
     await user.click(screen.getByRole('menuitem', { name: 'Show multibuy list' }));
     expect(screen.getByLabelText('Multibuy list')).toHaveTextContent('Nitrogen Fuel Block 40');
+  });
+
+  it('sizes the ticked items again: unticking one frees its room for the rest', async () => {
+    const user = userEvent.setup();
+    setCargo(1000);
+    // Two of 500 m³ each for the 650 m³ free: the second gets only what is left.
+    const big = (typeId: number, name: string, price: number): ListHaulingScanRow => ({
+      ...FILL_ROW,
+      typeId,
+      name,
+      sale: { ...FILL_ROW.sale, price, demandCapUnits: 100 },
+    });
+    fillState = {
+      status: 'ready',
+      scan: {
+        rows: [big(4051, 'Nitrogen Fuel Block', 160), big(4246, 'Hydrogen Fuel Block', 150)],
+        scanned: 2,
+        fetchedAt: 0,
+      },
+    };
+    renderPanel();
+    await user.click(screen.getByRole('button', { name: /Find items for the free/ }));
+    const list = screen.getByRole('list', { name: 'Items that fit the free space' });
+    expect(within(list).getByText(/· 150 m³/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('checkbox', { name: 'Nitrogen Fuel Block' }));
+    expect(within(list).getAllByText(/· 500 m³/)).toHaveLength(2);
+    expect(within(list).queryByText(/· 150 m³/)).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Add 1 · +500 m³' }));
+    expect(bringBox('Hydrogen Fuel Block')).toHaveValue('100');
+  });
+
+  it('drops the fill and the added items with a new lane, and with a reload', async () => {
+    const user = userEvent.setup();
+    setCargo(1000);
+    fillState = { status: 'ready', scan: { rows: [FILL_ROW], scanned: 1, fetchedAt: 0 } };
+    let info: { refresh: () => void } | null = null;
+    render(
+      <MemoryRouter initialEntries={['/travel/hauling?from=jita&to=amarr']}>
+        <FakeItemActions actions={fakeItemActions()}>
+          <HaulingPanel onRefreshInfoChange={(next) => (info = next)} />
+        </FakeItemActions>
+      </MemoryRouter>
+    );
+    const addOne = async () => {
+      await user.click(screen.getByRole('button', { name: /Find items for the free/ }));
+      await user.click(screen.getByRole('button', { name: /^Add 1/ }));
+      expect(row(/Nitrogen Fuel Block/)).toBeInTheDocument();
+    };
+
+    await addOne();
+    act(() => info!.refresh());
+    expect(screen.queryByRole('row', { name: /Nitrogen Fuel Block/ })).toBeNull();
+
+    await addOne();
+    await user.click(screen.getByRole('combobox', { name: 'From' }));
+    await user.click(screen.getByRole('option', { name: 'Dodixie' }));
+    expect(screen.queryByRole('row', { name: /Nitrogen Fuel Block/ })).toBeNull();
+    expect(screen.getByRole('button', { name: /Find items for the free/ })).toBeInTheDocument();
   });
 
   it('an unticked item is not added', async () => {

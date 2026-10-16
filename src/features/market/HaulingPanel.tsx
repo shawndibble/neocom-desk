@@ -10,14 +10,14 @@
  * quantity, and unticking or typing a number re-sizes the rest through the
  * same `planTrip` the suggestion came from.
  *
- * The Trip Plan lives in a rail beside the table (#3878): its totals, the
+ * The Trip Plan lives in a rail beside the table: its totals, the
  * offer to fill the free space from other categories, and Copy multibuy. A
  * row click selects the row and shows its detail in the rail. Where the
  * panel is too narrow for the rail (by its own width, ADR 0017), a sticky bar
  * carries the trip instead, and the trip and the detail open as sheets.
  */
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -78,7 +78,7 @@ import { HaulingCargoControl } from './HaulingCargoControl';
 import { haulingCsvColumns } from './haulingCsv';
 import { HaulingFlagWord } from './HaulingFlagWord';
 import { HaulingItemDetail } from './HaulingItemDetail';
-import { formatTripM3 } from './format';
+import { formatTripM3, formatVolume } from './format';
 import {
   HaulingFillList,
   HaulingTripBar,
@@ -127,13 +127,14 @@ import {
   HAUL_MODES,
   MAX_BOOK_CANDIDATES,
   MAX_PRICED_CANDIDATES,
+  type HaulingProgress,
   type HaulMode,
 } from './haulingData';
 const DAY_CHOICES = [7, 14, 30, 0] as const;
 
 /**
  * The table widths (rem) the layout changes at, measured in Chrome beside a
- * 20rem rail (#3878): below `compact` the figures go compact (`12.08M`; the
+ * 20rem rail: below `compact` the figures go compact (`12.08M`; the
  * full columns need about 35.8rem, and a long Item name needs about 9rem to
  * wrap to two lines at most), and below `cards` the rows become the phone's
  * cards (the compact columns need about 34.3rem, plus the Item column's
@@ -145,7 +146,7 @@ const TABLE_WIDTHS = {
   oneHub: { compact: 45, cards: 42.5 },
   anyHub: { compact: 50.5, cards: 48 },
 } as const;
-/** The rail's 20rem and the 1rem gap beside it: the rail shows only where the table still fits beside it as a table. */
+/** The rail's 20rem and the 1rem gap beside it: the rail shows only where the table keeps its full figures beside it. */
 const RAIL_REM = 21;
 const RAIL_GRID = { gridTemplateColumns: 'minmax(0, 1fr) 20rem' } as const;
 const MARGIN_CHOICES = [0, 3, 5, 10] as const;
@@ -192,7 +193,7 @@ const useIntroDismissed = createLocalSetting<boolean>({
  * The list's optional (non-identity) columns, for `ColumnPickerMenu`
  * (issue: hauling toolbar redesign). `select`/`item` stay out of `ids` —
  * hiding either loses the row's own identity or the multibuy checkbox.
- * Margin and ISK/m³ start hidden: the margin rides under Profit (#3878).
+ * Margin and ISK/m³ start hidden: the margin rides under Profit.
  */
 const HAULING_COLUMN_IDS = [
   'buy',
@@ -218,9 +219,8 @@ function isHaulingColumnId(id: string): id is HaulingColumnId {
 }
 
 /**
- * A new key for #3878's column set: the old one stored a visible list, and a
- * saved list of the old ids would have hidden Profit and m³, the new
- * headline columns. A pilot's old picks start over from the new defaults.
+ * Not `haulingColumns`: that key stored a visible list of the old ids, which
+ * would hide Profit and m³. Old picks start over from the new defaults.
  */
 const useHaulingColumns = createColumnVisibilitySetting<HaulingColumnId>({
   key: 'haulingTripColumns',
@@ -321,7 +321,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
   // measured on the whole panel, never on the table beside the rail, whose
   // width the rail itself decides.
   const [layoutRef, [layoutNarrow = false]] = useElementNarrowerThan<HTMLDivElement>([
-    widths.cards + RAIL_REM,
+    widths.compact + RAIL_REM,
   ]);
   const railShown = !isPhone && !layoutNarrow;
   // A narrow table goes compact: its full figures (`12,080,000.00`) left
@@ -396,10 +396,6 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
   // lane must not report that stale scan's age (or offer to reload it).
   const fetchedAt = state.status === 'ready' && !sameHub && !bothAny ? state.scan.fetchedAt : null;
   const refreshDisabled = fetchedAt === null;
-  useEffect(() => {
-    onRefreshInfoChange?.({ refresh, disabled: refreshDisabled, fetchedAt });
-    return () => onRefreshInfoChange?.(null);
-  }, [onRefreshInfoChange, refresh, refreshDisabled, fetchedAt]);
 
   const rowFilters = useMemo<HaulingFilters>(
     () => ({
@@ -441,6 +437,13 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
   const [selectedTypeId, setSelectedTypeId] = useState<number | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [tripOpen, setTripOpen] = useState(false);
+  // Crossing the rail's width closes the sheets, so a resize never opens one on its own.
+  const [railWas, setRailWas] = useState(railShown);
+  if (railWas !== railShown) {
+    setRailWas(railShown);
+    setDetailOpen(false);
+    setTripOpen(false);
+  }
   const scanKey = `${params.from}>${params.to}:${categoryId}:${mode}`;
   const [overridesFor, setOverridesFor] = useState(scanKey);
   if (overridesFor !== scanKey) {
@@ -452,6 +455,19 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     setSelectedTypeId(null);
     setDetailOpen(false);
   }
+
+  // A reload re-prices the lane: the fill's offer and the rows added from it
+  // were priced from the old books, so they go and the user asks again.
+  const reload = useCallback(() => {
+    refresh();
+    setFillRequested(false);
+    setAddedIds(NO_IDS);
+    setUnticked(NO_IDS);
+  }, [refresh]);
+  useEffect(() => {
+    onRefreshInfoChange?.({ refresh: reload, disabled: refreshDisabled, fetchedAt });
+    return () => onRefreshInfoChange?.(null);
+  }, [onRefreshInfoChange, reload, refreshDisabled, fetchedAt]);
 
   // Fill the free space: on demand only (the scan costs ESI budget), never
   // for Everything (no other category is left), and only once the plan is
@@ -497,7 +513,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
 
   const holds = cargo?.holds ?? null;
   // Every candidate carries its own destination's fees; this is only the fallback.
-  const fallbackFees = fees.at(TRADE_HUBS[0]!);
+  const fallbackFees = useMemo(() => fees.at(TRADE_HUBS[0]!), [fees]);
   const plan = useMemo(
     () =>
       planTrip({
@@ -507,9 +523,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
         fees: fallbackFees,
         overrides,
       }),
-    // `fallbackFees` follows `fees`.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [tableCandidates, holds, budget, fees, overrides]
+    [tableCandidates, holds, budget, fallbackFees, overrides]
   );
   const lineOf = useMemo(() => new Map(plan.lines.map((l) => [l.typeId, l])), [plan]);
   // The Profit column sorts by the suggestion, not the edited plan: unticking
@@ -523,8 +537,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       overrides: NO_OVERRIDES,
     });
     return new Map(suggestion.lines.map((l) => [l.typeId, l.profit]));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tableCandidates, holds, budget, fees]);
+  }, [tableCandidates, holds, budget, fallbackFees]);
 
   /** The room left in every hold: one figure for the summary, the fill offer and the trip bar. */
   const freeM3 = plan.holds.reduce((sum, h) => sum + Math.max(0, h.capacityM3 - h.usedM3), 0);
@@ -535,44 +548,50 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     () => (fillOffered ? fillShown.filter((r) => !addedIds.has(r.typeId)) : []),
     [fillOffered, fillShown, addedIds]
   );
-  const fillPlanOf = (extras: readonly TripCandidate[]) =>
-    extras.length === 0
-      ? null
-      : planFill({
-          current: tableCandidates,
-          overrides,
-          extras,
-          holds,
-          budgetIsk: budget,
-          fees: fallbackFees,
-        });
+  const fillPlanOf = useCallback(
+    (extras: readonly TripCandidate[]) =>
+      extras.length === 0
+        ? null
+        : planFill({
+            current: tableCandidates,
+            overrides,
+            extras,
+            holds,
+            budgetIsk: budget,
+            fees: fallbackFees,
+          }),
+    [tableCandidates, overrides, holds, budget, fallbackFees]
+  );
   const fillPlan = useMemo(
     () => fillPlanOf(fillExtras.map((r) => r.candidate)),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [fillExtras, tableCandidates, overrides, holds, budget, fees]
+    [fillPlanOf, fillExtras]
   );
   const fillLines = useMemo(() => fillPlan?.lines ?? [], [fillPlan]);
   // Every offered item starts ticked; the user unticks what they don't want.
-  // The ticked ones are sized again on their own, so the Add button's totals
-  // are exactly what Add loads (an unticked item frees room for the rest).
+  // The ticked ones are sized again on their own (an unticked item frees room
+  // for the rest), so each line and the Add button show exactly what Add loads.
   const tickedPlan = useMemo(() => {
+    if (!fillLines.some((l) => unticked.has(l.typeId))) return fillPlan;
     const offered = new Set(fillLines.map((l) => l.typeId));
     return fillPlanOf(
       fillExtras
         .filter((r) => offered.has(r.typeId) && !unticked.has(r.typeId))
         .map((r) => r.candidate)
     );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fillLines, fillExtras, unticked, tableCandidates, overrides, holds, budget, fees]);
-  const fillItems: HaulingFillItem[] = fillLines.map((line) => ({
-    typeId: line.typeId,
-    name: line.name,
-    categoryName: fillCategoryName(line.typeId),
-    quantity: line.quantity,
-    volumeM3: line.volumeM3,
-    cost: line.cost,
-    profit: line.profit,
-  }));
+  }, [fillPlanOf, fillPlan, fillLines, fillExtras, unticked]);
+  const tickedLineOf = new Map((tickedPlan?.lines ?? []).map((l) => [l.typeId, l]));
+  const fillItems: HaulingFillItem[] = fillLines.map((offered) => {
+    const line = tickedLineOf.get(offered.typeId) ?? offered;
+    return {
+      typeId: line.typeId,
+      name: line.name,
+      categoryName: fillCategoryName(line.typeId),
+      quantity: line.quantity,
+      volumeM3: line.volumeM3,
+      cost: line.cost,
+      profit: line.profit,
+    };
+  });
   const ticked = new Set(fillLines.filter((l) => !unticked.has(l.typeId)).map((l) => l.typeId));
   const tickedTotals = {
     count: tickedPlan?.lines.length ?? 0,
@@ -593,7 +612,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     else setFillRequested(true);
   }
 
-  /** Adds the ticked fill lines at the quantities the offer showed, so the plan already shipped stays as it was. */
+  /** Adds the ticked fill lines pinned at the quantities shown, so the plan already shipped stays as it was. */
   function addFill() {
     const lines = tickedPlan?.lines ?? [];
     if (lines.length === 0) return;
@@ -636,6 +655,12 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
   // the detail: the row stays selected.
   const selectedRow =
     selectedTypeId === null ? undefined : tableRows.find((r) => r.typeId === selectedTypeId);
+  // A filter or reload that drops the selected row drops the selection, so
+  // its detail never springs back open on its own when the row returns.
+  if (selectedTypeId !== null && !selectedRow && state.status === 'ready') {
+    setSelectedTypeId(null);
+    setDetailOpen(false);
+  }
   function selectRow(row: HaulingViewRow) {
     if (row.typeId === selectedTypeId) {
       setSelectedTypeId(null);
@@ -773,6 +798,11 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
               {row.flags.map((flag) => (
                 <HaulingFlagWord key={flag} flag={flag} />
               ))}
+              {added && (
+                <span className="min-w-0 truncate text-[0.6875rem] text-text-dim">
+                  {t('market.hauling.addedFrom', { category: added })}
+                </span>
+              )}
             </span>
           );
         }
@@ -965,9 +995,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
             card={cards}
             label={t('market.hauling.bringRow', { item: row.name })}
             title={limitTextOf(row)}
-            value={
-              overrides.get(row.typeId)?.selected === false ? '' : line.quantity.toLocaleString()
-            }
+            value={overrides.get(row.typeId)?.selected === false ? '' : formatVolume(line.quantity)}
             onCommit={(quantity) =>
               patchOverride(
                 row.typeId,
@@ -1020,6 +1048,13 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       ? t('market.hauling.itemDetail.lane', { from: from.systemName, to: to.systemName })
       : null;
 
+  const progressText = (progress: HaulingProgress | null) =>
+    progress === null
+      ? t('market.hauling.progress.starting')
+      : t(`market.hauling.progress.${progress.stage}`, {
+          done: progress.done,
+          total: progress.total,
+        });
   const copyDisabled = plan.totals.items === 0;
   const tripMenu = (
     <TableActionsMenu name={t('market.hauling.title')} tableExport={tableExport} size="md">
@@ -1079,14 +1114,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
           freeM3={freeM3}
           status={fill.state.status}
           progressText={
-            fill.state.status === 'loading'
-              ? fill.state.progress === null
-                ? t('market.hauling.progress.starting')
-                : t(`market.hauling.progress.${fill.state.progress.stage}`, {
-                    done: fill.state.progress.done,
-                    total: fill.state.progress.total,
-                  })
-              : undefined
+            fill.state.status === 'loading' ? progressText(fill.state.progress) : undefined
           }
           items={fillItems}
           ticked={ticked}
@@ -1132,14 +1160,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       <Panel padded={false}>
         <div className="flex items-center gap-3 px-3 py-10" role="status">
           <Spinner label={t('common.loading')} size="sm" />
-          <span className="text-sm text-text-dim">
-            {state.progress === null
-              ? t('market.hauling.progress.starting')
-              : t(`market.hauling.progress.${state.progress.stage}`, {
-                  done: state.progress.done,
-                  total: state.progress.total,
-                })}
-          </span>
+          <span className="text-sm text-text-dim">{progressText(state.progress)}</span>
         </div>
       </Panel>
     );
@@ -1257,72 +1278,82 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       </Panel>
     );
 
-    content = railShown ? (
-      // The rail is a direct grid child: a wrapper would end its sticky.
-      <div className="grid items-start gap-4" style={RAIL_GRID}>
+    content = (
+      // One wrapper either way, so crossing the rail's width never remounts
+      // the table (its sort, its scroll). The rail is a direct grid child: a
+      // wrapper would end its sticky.
+      <div
+        className={railShown ? 'grid items-start gap-4' : 'flex flex-col gap-4'}
+        style={railShown ? RAIL_GRID : undefined}
+      >
         {table}
-        {/* The rail repaints in place; a sheet would announce itself (#1490). */}
-        <p aria-live="polite" className="sr-only">
-          {detailOpen && selectedRow
-            ? t('market.hauling.selectedAnnouncement', { name: selectedRow.name })
-            : ''}
-        </p>
-        <HaulingTripRail
-          detail={detailOpen && selectedRow ? detail(selectedRow, true) : null}
-          onBack={() => setDetailOpen(false)}
-          trip={
-            <>
-              {tripView}
-              <p className="mt-4 text-xs text-text-dim">{t('market.hauling.rail.selectHint')}</p>
-            </>
-          }
-          footer={tripFooter}
-          detailKey={selectedRow?.typeId}
-        />
-      </div>
-    ) : (
-      <>
-        {table}
-        <HaulingTripBar
-          freeM3={cargoSet ? freeM3 : null}
-          profit={plan.totals.profit}
-          onOpenTrip={() => setTripOpen(true)}
-          copyButton={
-            <Button
-              variant="primary"
-              size="sm"
-              className="shrink-0"
-              disabled={copyDisabled}
-              onClick={() => void copyMultibuy()}
+        {railShown ? (
+          <>
+            {/* The rail repaints in place; a sheet would announce itself (#1490). */}
+            <p aria-live="polite" className="sr-only">
+              {detailOpen && selectedRow
+                ? t('market.hauling.selectedAnnouncement', { name: selectedRow.name })
+                : ''}
+            </p>
+            <HaulingTripRail
+              detail={detailOpen && selectedRow ? detail(selectedRow, true) : null}
+              onBack={() => setDetailOpen(false)}
+              trip={
+                <>
+                  {tripView}
+                  <p className="mt-4 text-xs text-text-dim">
+                    {t('market.hauling.rail.selectHint')}
+                  </p>
+                </>
+              }
+              footer={tripFooter}
+              detailKey={selectedRow?.typeId}
+            />
+          </>
+        ) : (
+          <>
+            <HaulingTripBar
+              freeM3={cargoSet ? freeM3 : null}
+              profit={plan.totals.profit}
+              onOpenTrip={() => setTripOpen(true)}
+              copyButton={
+                <Button
+                  variant="primary"
+                  size="sm"
+                  className="shrink-0"
+                  disabled={copyDisabled}
+                  onClick={() => void copyMultibuy()}
+                >
+                  {t('market.hauling.copyMultibuy')}
+                </Button>
+              }
+            />
+            <Modal
+              open={tripOpen}
+              onClose={() => setTripOpen(false)}
+              title={t('market.hauling.rail.title')}
+              placement="sheet-full"
             >
-              {t('market.hauling.copyMultibuy')}
-            </Button>
-          }
-        />
-        <Modal
-          open={tripOpen}
-          onClose={() => setTripOpen(false)}
-          title={t('market.hauling.rail.title')}
-          placement="sheet-full"
-        >
-          <div className="flex flex-col gap-4">
-            {tripView}
-            {tripFooter}
-          </div>
-        </Modal>
-        <Modal
-          open={detailOpen && selectedRow !== undefined}
-          // On a phone the selection is only the sheet: closing it clears both.
-          onClose={() => {
-            setDetailOpen(false);
-            setSelectedTypeId(null);
-          }}
-          title={selectedRow?.name ?? t('market.hauling.title')}
-          placement="sheet-full"
-        >
-          {selectedRow && detail(selectedRow, false)}
-        </Modal>
-      </>
+              <div className="flex flex-col gap-4">
+                {tripView}
+                {tripFooter}
+              </div>
+            </Modal>
+            <Modal
+              open={detailOpen && selectedRow !== undefined}
+              // Without the rail the sheet is the selection's only sign: closing it clears both (§6c).
+              onClose={() => {
+                setDetailOpen(false);
+                setSelectedTypeId(null);
+              }}
+              title={selectedRow?.name ?? t('market.hauling.title')}
+              placement="sheet-full"
+            >
+              {selectedRow && detail(selectedRow, false)}
+            </Modal>
+          </>
+        )}
+      </div>
     );
   }
 

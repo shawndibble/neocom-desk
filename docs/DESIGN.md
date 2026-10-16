@@ -1132,9 +1132,10 @@ Rows:
   it as Enter does.
 - **A detail pane beside a table** (Hauling's trip rail): where the panel
   is wide enough by its own width (ADR 0017) it is a sticky column beside
-  the table, and a "‹ Back" crumb in it leaves the detail without clearing the
-  selection; narrower, a row click opens the same detail as a sheet
-  (`sheet-full` for a long one). Where the row's ⋮ would hold only the
+  the table, and a back crumb in it (Hauling's "‹ Trip") leaves the detail
+  without clearing the selection; narrower, a row click opens the same
+  detail as a sheet (`sheet-full` for a long one), and closing the sheet
+  clears the selection, since nothing else would show it. Where the row's ⋮ would hold only the
   item's own actions, the row drops it and its right-click menu, and they
   move to an `ItemMoreActions` ⋮ in the detail's header.
 - **A row with a menu** shows the ⋮ (`rowMoreActions`) only if the menu
