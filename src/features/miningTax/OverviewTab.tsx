@@ -23,6 +23,7 @@ import {
   EmptyState,
   IconButton,
   IskAmount,
+  NeedsConnection,
   PageHeader,
   Panel,
   Spinner,
@@ -612,12 +613,14 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
                       <span>
                         {t('miningTax.reauthCharacterHint', { character: c.characterName })}
                       </span>
-                      <Button
-                        size="sm"
-                        onClick={() => void beginGrant(c.characterId, ['getCharacterMining'])}
-                      >
-                        {t('miningTax.reauthAction')}
-                      </Button>
+                      <NeedsConnection>
+                        <Button
+                          size="sm"
+                          onClick={() => void beginGrant(c.characterId, ['getCharacterMining'])}
+                        >
+                          {t('miningTax.reauthAction')}
+                        </Button>
+                      </NeedsConnection>
                     </li>
                   ))}
                 </ul>

@@ -164,7 +164,11 @@ const wallet: Builder = (feeds, { t, now, range }) => {
   const series = walletSeries(feeds, now, range, balance);
   const journal = feeds.journal?.data?.result?.data;
   return {
-    ...blank('/wallet', statusOf(feed, { needsPermission: data.needsReauth })),
+    // A lapsed grant over a saved balance keeps the balance (with a sign-in note).
+    ...blank(
+      '/wallet',
+      statusOf(feed, { needsPermission: data.needsReauth, hasStaleData: balance !== null })
+    ),
     fetchedAt: data.result?.fetchedAt ?? null,
     fromCache: data.result?.fromCache ?? false,
     number:
@@ -198,7 +202,14 @@ const training: Builder = (feeds, { t, now, notTrainingAlert }) => {
   const nameOf = (skillId: number) =>
     data.catalog.bySkillTypeID.get(skillId)?.name ?? `#${skillId}`;
   const base = {
-    ...blank(to, statusOf(feed, { needsPermission: data.queueNeedsReauth })),
+    ...blank(
+      to,
+      // A lapsed grant over a saved queue keeps the queue (with a sign-in note).
+      statusOf(feed, {
+        needsPermission: data.queueNeedsReauth,
+        hasStaleData: data.queueResult !== null,
+      })
+    ),
     fetchedAt: data.queueResult?.fetchedAt ?? null,
     fromCache: data.queueResult?.fromCache ?? false,
   };

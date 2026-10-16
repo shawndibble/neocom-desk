@@ -1,0 +1,8 @@
+# Scope decisions — Offline strip, needs-connection sign-in and saved data under a lapsed grant
+
+_Recorded 2026-10-16._
+
+- **One slim offline strip in the shell, at every width, in flow.** It sits at the top of `<main>`, never fixed, so it covers no content and needs no safe-area or tab-bar handling. Neutral, not a warning: the saved data below is still good. It replaces the rail's sync dot as the only offline signal a phone has; the dot stays.
+- **Every control that starts EVE's SSO is disabled offline** (`aria-disabled` plus a "Needs a connection" tooltip, via `NeedsConnection`). Offline, that navigation strands an installed app on the browser's error page. `ReauthBanner` and `EveSsoButton` carry it themselves. The command palette's "Add Character" is not a button and is not guarded.
+- **A lapsed grant over saved data shows the data with a small "Log in again" note**, not the full banner in its place. The full banner stays when there is nothing saved. Skills, Clones, Assets Items, Mail and Contacts do this; on the Overview, a widget opts in per kind (`hasStaleData`), and only Wallet and Training have so far, because a kind has to confirm its saved payload actually holds the figures or it would show a blank "—" under a note.
+- **`DataAgeBadge` stays hidden below `md`.** The existing decision (data age off phone headers) stands, and the cached-data notice with its age on every width is the planned phone answer (the `CachedNotice` primitive), not a compact badge crowding the header.

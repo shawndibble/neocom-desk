@@ -77,7 +77,11 @@ describe('buildView status', () => {
   it('is failed, with nothing to dim, when the read threw and nothing was cached', () => {
     const feeds: Feeds = { wallet: { data: null, error: true, loading: false } };
     const view = buildView('wallet', feeds, ctx());
-    expect(resolveWidget(view.status)).toEqual({ state: 'failed', showLastGood: false });
+    expect(resolveWidget(view.status)).toEqual({
+      state: 'failed',
+      showLastGood: false,
+      reauthNote: false,
+    });
   });
 
   it('keeps the last good value when a refresh failed', () => {
@@ -92,13 +96,29 @@ describe('buildView status', () => {
       },
     };
     const view = buildView('wallet', feeds, ctx());
-    expect(resolveWidget(view.status)).toEqual({ state: 'failed', showLastGood: true });
+    expect(resolveWidget(view.status)).toEqual({
+      state: 'failed',
+      showLastGood: true,
+      reauthNote: false,
+    });
     expect(view.number.iskAmount).toBe(5_000_000);
   });
 
   it('needs permission when the read says the grant lapsed', () => {
     const feeds: Feeds = { wallet: ok({ result: null, needsReauth: true }) };
     expect(stateOf(buildView('wallet', feeds, ctx()))).toBe('needsPermission');
+  });
+
+  it('keeps a saved balance, with a sign-in note, when the grant lapsed over it', () => {
+    const feeds: Feeds = {
+      wallet: ok({
+        result: { data: 5_000_000, fetchedAt: new Date(NOW), fromCache: true, truncated: false },
+        needsReauth: true,
+      }),
+    };
+    const view = buildView('wallet', feeds, ctx());
+    expect(resolveWidget(view.status)).toMatchObject({ state: 'ok', reauthNote: true });
+    expect(view.number.iskAmount).toBe(5_000_000);
   });
 });
 

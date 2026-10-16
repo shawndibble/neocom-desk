@@ -133,6 +133,31 @@ describe('Widget states', () => {
     expect(within(region).getByRole('button', { name: 'Grant access' })).toBeInTheDocument();
   });
 
+  it('keeps a saved wallet balance on screen, with a small sign-in note, when the grant lapsed over it', () => {
+    useActiveCharacter.setState({ activeCharacterId: 91, hydrated: true });
+    renderWidget(model({ kind: 'wallet', view: 'number' }), (store) =>
+      store.set('wallet', {
+        data: {
+          result: {
+            data: 5_000_000,
+            fetchedAt: new Date(NOW - 60_000),
+            fromCache: true,
+            truncated: false,
+          },
+          needsReauth: true,
+        },
+        error: false,
+        loading: false,
+      })
+    );
+    const region = screen.getByRole('region', { name: 'Wallet' });
+    expect(within(region).queryByText('Needs permission')).not.toBeInTheDocument();
+    expect(within(region).getByText('5,000,000 ISK')).toBeInTheDocument();
+    expect(
+      within(region).getByRole('button', { name: 'Log in again with EVE Online' })
+    ).toBeInTheDocument();
+  });
+
   it('says it could not load, dims the last good value and retries from the refresh epoch', async () => {
     const user = userEvent.setup();
     const { refresh } = renderWidget(model(), (store) =>

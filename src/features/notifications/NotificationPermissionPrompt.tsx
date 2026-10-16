@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Button } from '@/components/ui';
+import { Button, NeedsConnection } from '@/components/ui';
 import { db, type CharacterRecord } from '@/db';
 import {
   useNotificationPromptState,
@@ -136,6 +136,11 @@ export function NotificationPermissionPrompt() {
         onDismiss: dismiss,
         onEnable: enable,
       };
+  const enableButton = (
+    <Button size="sm" variant="primary" onClick={() => void copy.onEnable()}>
+      {copy.enable}
+    </Button>
+  );
 
   return (
     <div
@@ -153,11 +158,9 @@ export function NotificationPermissionPrompt() {
         <Button size="sm" onClick={copy.onDismiss}>
           {copy.dismiss}
         </Button>
-        {copy.enable && (
-          <Button size="sm" variant="primary" onClick={() => void copy.onEnable()}>
-            {copy.enable}
-          </Button>
-        )}
+        {copy.enable &&
+          // The Alerts offer starts a login (needs a connection); the plain push explainer does not.
+          (offering ? <NeedsConnection>{enableButton}</NeedsConnection> : enableButton)}
       </div>
     </div>
   );

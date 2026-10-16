@@ -18,7 +18,7 @@
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Modal, Checkbox } from '@/components/ui';
+import { Button, Modal, Checkbox, NeedsConnection } from '@/components/ui';
 import { beginCustomizedAddCharacterLogin } from '@/app/loginFlow';
 import { PERMISSIONS, SCOPE_GROUPS, type ScopeGroup } from '@/esi/registry';
 import { useCustomizePermissionsSelection } from './customizeSelection';
@@ -175,9 +175,11 @@ export function CustomizePermissionsDialog({
           bottom. It only visibly differs once the checklist actually scrolls
           (a phone); buttons stay at the default `md` 44px touch tier. */}
         <div className="sticky -bottom-3 -mx-3 -mb-3 flex flex-wrap gap-2 border-t border-line bg-panel px-3 py-2">
-          <Button variant="primary" disabled={locked} onClick={() => void submit()}>
-            {t('permissions.customize.submit')}
-          </Button>
+          <NeedsConnection>
+            <Button variant="primary" disabled={locked} onClick={() => void submit()}>
+              {t('permissions.customize.submit')}
+            </Button>
+          </NeedsConnection>
           <Button onClick={handleClose} disabled={submitting}>
             {t('common.cancel')}
           </Button>

@@ -16,6 +16,7 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { GrantBanner } from '@/app/GrantNote';
+import { ReauthCachedNote } from '@/app/ReauthCachedNote';
 import { SkillsPageHeader } from '@/features/skills/SkillsPageHeader';
 import { SkillsSubNav } from '@/features/skills/SkillsSubNav';
 import { SkillCompareDrawer } from '@/features/skills/compare/SkillCompareDrawer';
@@ -156,6 +157,9 @@ export function Skills() {
   const catalog = data?.catalog ?? null;
   const skillsResult = data?.skillsResult ?? null;
   const skillsNeedsReauth = data?.skillsNeedsReauth ?? false;
+  // The full banner is for a lapsed grant with nothing saved to show; with a
+  // saved copy the list stays and a small note sits above it.
+  const skillsBlocked = skillsNeedsReauth && !skillsResult;
   const attributesResult = data?.attributesResult ?? null;
   const completedLevels = data?.completedLevels ?? null;
   const queuedLevels = data?.queuedLevels ?? null;
@@ -274,7 +278,7 @@ export function Skills() {
   // is not a filter, so collapsed groups still export). Nothing while the
   // skills scope needs re-auth — the old export button was disabled then too.
   const csvRows = useMemo(() => {
-    if (skillsNeedsReauth) return [];
+    if (skillsBlocked) return [];
     if (!searching) return skillCsvRows(boardCsvGroups(groups));
     return skillCsvRows(
       boardCsvGroups(
@@ -286,7 +290,7 @@ export function Skills() {
           }))
       )
     );
-  }, [groups, skillsNeedsReauth, searching, filterResult]);
+  }, [groups, skillsBlocked, searching, filterResult]);
   const csvColumns = useMemo(() => skillCsvColumns(t), [t]);
   const skillsExport = useTableExport({
     surface: 'skills',
@@ -357,7 +361,7 @@ export function Skills() {
         </div>
       ) : error ? (
         <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
-      ) : skillsNeedsReauth ? (
+      ) : skillsBlocked ? (
         <GrantBanner
           characterId={activeCharacterId}
           endpoints={['getCharacterSkills']}
@@ -369,6 +373,9 @@ export function Skills() {
         <EmptyState title={t('skills.emptyTitle')} hint={t('skills.emptyHint')} />
       ) : (
         <>
+          {skillsNeedsReauth && (
+            <ReauthCachedNote characterId={activeCharacterId} endpoints={['getCharacterSkills']} />
+          )}
           {skillsResult.fromCache && (
             <p className="text-[0.6875rem] text-warning uppercase">{t('skills.offlineTitle')}</p>
           )}

@@ -44,6 +44,7 @@ import * as Icon from '@/components/ui/icons';
 import { CharacterLink, SkillLink, SystemLink } from '@/features/entities';
 import { MyOrderMark } from '@/features/market/marketOrderCells';
 import { cx } from '@/lib/cx';
+import { OfflineStrip } from '@/app/OfflineBanner';
 
 const SAMPLE_ROWS = [
   { id: 1, name: 'Rifter' },
@@ -403,6 +404,14 @@ export function InteractionGrammar() {
             <Cue rule={k('rules.stateDisabled')} note={k('notes.disabled')}>
               <Button disabled>{k('samples.disabled')}</Button>
               <Button aria-disabled="true">{k('samples.ariaDisabled')}</Button>
+            </Cue>
+            <Cue rule={k('rules.offlineStrip')} note={k('notes.offlineStrip')}>
+              <OfflineStrip>{t('offline.banner')}</OfflineStrip>
+            </Cue>
+            <Cue rule={k('rules.needsConnection')} note={k('notes.needsConnection')}>
+              <Tooltip content={t('common.needsConnection')}>
+                <Button aria-disabled="true">{k('samples.signIn')}</Button>
+              </Tooltip>
             </Cue>
             <Cue rule={k('rules.stateLoading')}>
               <Button loading>{k('samples.saving')}</Button>

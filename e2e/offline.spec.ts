@@ -69,3 +69,26 @@ test('shows cached character and skills after external hosts go unreachable', as
   await expect(page.getByText('Small Hybrid Turret', { exact: true })).toBeVisible();
   await expect(page.locator('time')).toBeVisible();
 });
+
+/**
+ * The shell's offline strip follows the browser's connection state at every
+ * width. `setOffline` on an already-loaded page is safe here (unlike the
+ * reload specs above): nothing needs the dev server again, and the page gets
+ * the real `offline` / `online` events and `navigator.onLine`.
+ */
+test('shows the offline banner while the browser is offline and drops it on reconnect', async ({
+  page,
+  context,
+}) => {
+  await signInAndGoto(page);
+  const banner = page.getByText(
+    "You're offline — showing data saved on this device. Changes sync when you reconnect."
+  );
+  await expect(banner).toHaveCount(0);
+
+  await context.setOffline(true);
+  await expect(banner).toBeVisible();
+
+  await context.setOffline(false);
+  await expect(banner).toHaveCount(0);
+});

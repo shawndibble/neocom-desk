@@ -51,16 +51,51 @@ describe('resolveWidgetState', () => {
   });
 });
 
+describe('resolveWidgetState with a lapsed grant over cached data', () => {
+  it('keeps showing the cached data when the grant lapsed but a saved copy exists', () => {
+    expect(s({ needsPermission: true, hasStaleData: true })).toBe('ok');
+  });
+
+  it('still shows the empty and failed states a saved copy would otherwise get', () => {
+    expect(s({ needsPermission: true, hasStaleData: true, isEmpty: true })).toBe('empty');
+    expect(s({ needsPermission: true, hasStaleData: true, error: true })).toBe('failed');
+  });
+
+  it('shows the full prompt when there is no saved copy', () => {
+    expect(s({ needsPermission: true, hasStaleData: false })).toBe('needsPermission');
+    expect(s({ needsPermission: true })).toBe('needsPermission');
+  });
+
+  it('ignores a saved copy when the grant is fine', () => {
+    expect(s({ needsPermission: false, hasStaleData: true })).toBe('ok');
+  });
+});
+
 describe('resolveWidget', () => {
+  it('asks for the small sign-in note only when the lapsed grant sits over cached data', () => {
+    expect(resolveWidget({ ...base, needsPermission: true, hasStaleData: true })).toEqual({
+      state: 'ok',
+      showLastGood: false,
+      reauthNote: true,
+    });
+    expect(resolveWidget({ ...base, needsPermission: true })).toEqual({
+      state: 'needsPermission',
+      showLastGood: false,
+      reauthNote: false,
+    });
+  });
+
   it('shows the last good value only on failed with data', () => {
     expect(resolveWidget({ ...base, error: true })).toEqual({
       state: 'failed',
       showLastGood: true,
+      reauthNote: false,
     });
     expect(resolveWidget({ ...base, error: true, hasData: false })).toEqual({
       state: 'failed',
       showLastGood: false,
+      reauthNote: false,
     });
-    expect(resolveWidget(base)).toEqual({ state: 'ok', showLastGood: false });
+    expect(resolveWidget(base)).toEqual({ state: 'ok', showLastGood: false, reauthNote: false });
   });
 });

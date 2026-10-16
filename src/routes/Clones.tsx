@@ -17,6 +17,7 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { GrantBanner } from '@/app/GrantNote';
+import { ReauthCachedNote } from '@/app/ReauthCachedNote';
 import { CharacterHeader } from '@/features/character/CharacterHeader';
 import {
   loadCharacterClones,
@@ -519,6 +520,9 @@ export function Clones() {
 
   const clonesResult = data?.clonesResult ?? null;
   const clonesNeedsReauth = data?.clonesNeedsReauth ?? false;
+  // The full banner is for a lapsed grant with nothing saved to show; with a
+  // saved copy the clones stay and a small note sits above them.
+  const clonesBlocked = clonesNeedsReauth && clonesResult === null;
   const infomorphLevel = data?.infomorphLevel ?? 0;
   const implantNames = data?.implantNames ?? NO_NAMES;
   const implantDetails = data?.implantDetails ?? NO_DETAILS;
@@ -655,7 +659,7 @@ export function Clones() {
   const homeSecurity = securityOf(homeLocation?.location_id);
   const hasWorn = data?.wornImplants != null;
   // The summary cards need loaded clones data; every other state lives in the list panel.
-  const showSummary = !(loading && !data) && !clonesNeedsReauth && !error && clonesResult !== null;
+  const showSummary = !(loading && !data) && !clonesBlocked && !error && clonesResult !== null;
 
   // Which clone is best for the active queue (the engine does the numbers).
   const sort = useClonesSort((state) => state.value);
@@ -759,8 +763,8 @@ export function Clones() {
   );
   const clonesExport = useTableExport({
     surface: 'clones',
-    // Nothing behind the re-login banner, same as the list.
-    rows: clonesNeedsReauth ? NO_CLONES : clones,
+    // Nothing behind the full re-login banner, same as the list.
+    rows: clonesBlocked ? NO_CLONES : clones,
     columns: csvColumns,
   });
 
@@ -902,7 +906,7 @@ export function Clones() {
           <div className="flex justify-center py-16">
             <Spinner label={t('common.loading')} />
           </div>
-        ) : clonesNeedsReauth ? (
+        ) : clonesBlocked ? (
           <div className="p-3">
             <GrantBanner
               characterId={activeCharacterId}
@@ -918,6 +922,13 @@ export function Clones() {
           <EmptyState title={t('clones.emptyTitle')} hint={t('clones.emptyHint')} />
         ) : (
           <>
+            {clonesNeedsReauth && (
+              <ReauthCachedNote
+                className="border-b border-line p-3"
+                characterId={activeCharacterId}
+                endpoints={['getCharacterClones']}
+              />
+            )}
             {implantsNeedsReauth && (
               <div className="border-b border-line p-3">
                 <GrantBanner
