@@ -9609,7 +9609,7 @@
         "find": "Find items to fill it",
         "findNote": "Scans every category on this lane, in batches, for items that fit the free {{m3}} m³. Each batch costs a scan, so it runs only when you ask.",
         "error": "Couldn't scan for more items.",
-        "running": "Batch {{batch}} · {{m3}} m³ still free",
+        "running": "Batch {{batch}} · {{m3}} m³ free",
         "stop": "Stop",
         "more": "Find more",
         "stopped": {

@@ -428,6 +428,9 @@ describe('runHaulingScan, Max price', () => {
     const capped = await run(500);
     expect(capped.rows.map((r) => r.typeId)).toEqual([CHEAP]);
     expect(getOrderBook).toHaveBeenCalledTimes(2);
+    // Said, not silent: every dear item pass 1 would have kept.
+    expect(capped.overMaxPrice).toBe(DEAR.length);
+    expect((await run()).overMaxPrice).toBe(0);
   });
 
   it('keeps a Max price scan apart in the cache', () => {

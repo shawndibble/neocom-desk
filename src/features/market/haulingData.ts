@@ -145,6 +145,8 @@ export interface HaulingScan {
    * later scan should reach them.
    */
   examinedTypeIds: number[];
+  /** Items pass 1 would have kept but for Max price: the "cost more than your max price" count. */
+  overMaxPrice: number;
   fetchedAt: number;
 }
 
@@ -305,24 +307,30 @@ export async function runHaulingScan(request: HaulingScanRequest): Promise<Hauli
   const minGap = instant ? MIN_INSTANT_GAP : MIN_LISTED_GAP;
   const feeFactor = instant ? INSTANT_ROUGH_FEE_FACTOR : ROUGH_FEE_FACTOR;
   // Each item keeps only its best lane: the plan and the table are keyed by item.
+  let overMaxPrice = 0;
   const pricedAll = ids
     .flatMap((typeId) => {
       let best: PricedCandidate | null = null;
+      let cutByMaxPrice = false;
       for (const lane of lanes) {
         const origin = pricesAt.get(lane.from.id)?.get(typeId);
         const dest = pricesAt.get(lane.to.id)?.get(typeId);
         const buy = origin?.sellMin ?? null;
         const sell = (instant ? dest?.buyMax : dest?.sellMin) ?? null;
         if (buy === null || sell === null || buy <= 0) continue;
-        if (maxUnitPrice !== null && buy > maxUnitPrice) continue;
         const gap = sell / buy;
         if (gap < minGap) continue;
+        if (maxUnitPrice !== null && buy > maxUnitPrice) {
+          cutByMaxPrice = true;
+          continue;
+        }
         const originListed = origin?.sellVolume ?? 0;
         const destListed = (instant ? dest?.buyVolume : dest?.sellVolume) ?? 0;
         const score = priceScore({ buy, sell, originListed, destListed }, feeFactor);
         const candidate = { typeId, lane, buy, originListed, score, gap };
         if (best === null || byRank(candidate, best) < 0) best = candidate;
       }
+      if (best === null && cutByMaxPrice) overMaxPrice += 1;
       return best === null ? [] : [best];
     })
     .sort(byRank);
@@ -438,6 +446,7 @@ export async function runHaulingScan(request: HaulingScanRequest): Promise<Hauli
     scanned: ids.length,
     ...(capped ? { capped } : {}),
     examinedTypeIds,
+    overMaxPrice,
     fetchedAt: Date.now(),
   };
   // An abandoned scan never lands: its caller moved on, and a later one must not be answered from it.

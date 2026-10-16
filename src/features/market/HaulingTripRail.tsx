@@ -354,6 +354,20 @@ export function HaulingFillList({
 }: HaulingFillListProps) {
   const { t } = useTranslation();
   const addDetailId = useId();
+  // A finished run's result (stop sentence, Add) and Add's "Added …" line land below the fold in a long rail: bring them in.
+  const endRef = useRef<HTMLDivElement>(null);
+  const outcomeRef = useRef<HTMLParagraphElement>(null);
+  const ran = useRef(false);
+  useEffect(() => {
+    if (status === 'loading') ran.current = true;
+    else if (ran.current) {
+      ran.current = false;
+      endRef.current?.scrollIntoView?.({ block: 'nearest' });
+    }
+  }, [status]);
+  useEffect(() => {
+    if (added !== null) outcomeRef.current?.scrollIntoView?.({ block: 'nearest' });
+  }, [added]);
 
   let outcome: string | null = null;
   if ((status === 'ready' || status === 'error') && added !== null) {
@@ -454,12 +468,17 @@ export function HaulingFillList({
             )}
           </>
         )}
-        {outcome && <p className="text-xs text-text-dim tabular-nums">{outcome}</p>}
+        {outcome && (
+          <p ref={outcomeRef} className="text-xs text-text-dim tabular-nums">
+            {outcome}
+          </p>
+        )}
         {canFindMore && (
           <Button className="w-full" onClick={onMore}>
             {t('market.hauling.fill.more')}
           </Button>
         )}
+        <div ref={endRef} aria-hidden="true" className="-mt-2" />
       </>
     );
   }

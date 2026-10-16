@@ -40,6 +40,8 @@ export interface HaulingItemDetailProps {
    * that row then carries `HaulingItemActions` too. The flags and lane stay.
    */
   showTitle?: boolean;
+  /** Without the title row: actions right-aligned on the flags and lane line (the slide-over's ⋮). */
+  laneActions?: ReactNode;
 }
 
 /** The item's ⋮, for the detail's title row or a sheet's. */
@@ -57,10 +59,11 @@ export function HaulingItemDetail({
   line,
   loadNote,
   showTitle = true,
+  laneActions,
 }: HaulingItemDetailProps) {
   return (
     <div className="flex min-w-0 flex-col gap-3">
-      <Header row={row} showTitle={showTitle} />
+      <Header row={row} showTitle={showTitle} laneActions={laneActions} />
       {row.mode === 'instant' ? (
         <InstantBody row={row} line={line} loadNote={loadNote} />
       ) : (
@@ -71,7 +74,15 @@ export function HaulingItemDetail({
   );
 }
 
-function Header({ row, showTitle }: { row: HaulingViewRow; showTitle: boolean }) {
+function Header({
+  row,
+  showTitle,
+  laneActions,
+}: {
+  row: HaulingViewRow;
+  showTitle: boolean;
+  laneActions?: ReactNode;
+}) {
   const { t } = useTranslation();
   const lane = (
     <span className="flex min-w-0 flex-wrap items-center gap-x-2 text-xs text-text-dim">
@@ -87,7 +98,15 @@ function Header({ row, showTitle }: { row: HaulingViewRow; showTitle: boolean })
     </span>
   );
 
-  if (!showTitle) return lane;
+  if (!showTitle) {
+    if (laneActions === undefined) return lane;
+    return (
+      <div className="flex items-center gap-2">
+        <div className="min-w-0 flex-1">{lane}</div>
+        {laneActions}
+      </div>
+    );
+  }
   return (
     <div className="flex items-start gap-3">
       <TypeIcon typeId={row.typeId} size={64} className="size-10 shrink-0" />

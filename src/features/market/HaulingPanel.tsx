@@ -924,9 +924,11 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     (!instant && params.demand !== DEFAULT_HAULING_FILTER.demand ? 1 : 0) +
     (params.maxprice !== null ? 1 : 0) +
     (params.spend !== null ? 1 : 0);
-  const hiddenCount = hidden.tooDear + (instant ? 0 : hidden.thin + hidden.slow) + hidden.lowMargin;
+  // Max price hides at both ends: the scan's price pass drops most, the row filter what a lot pushes over it.
+  const dear = hidden.tooDear + (state.status === 'ready' ? state.scan.overMaxPrice : 0);
+  const hiddenCount = dear + (instant ? 0 : hidden.thin + hidden.slow) + hidden.lowMargin;
   // Only when Max price hid something does the hidden line name it.
-  const hiddenKeySuffix = hidden.tooDear > 0 ? 'MaxPrice' : '';
+  const hiddenKeySuffix = dear > 0 ? 'MaxPrice' : '';
   // Category and mode ride along so the narrow sheet can edit them as part of
   // its draft; only the remembered params are remembered.
   const filterValue = { ...pickRememberedParams(params), cat: categoryId, mode };
@@ -1018,7 +1020,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     setDetailOpen(false);
     setSelectedTypeId(null);
   };
-  const detail = (row: HaulingViewRow, showTitle: boolean) => (
+  const detail = (row: HaulingViewRow, showTitle: boolean, laneActions?: ReactNode) => (
     // Keyed, so a new row opens with its own folds closed ("Show the math").
     <HaulingItemDetail
       key={row.typeId}
@@ -1026,6 +1028,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       line={lineOf.get(row.typeId)}
       loadNote={limitTextOf(row)}
       showTitle={showTitle}
+      laneActions={laneActions}
     />
   );
 
@@ -1078,12 +1081,12 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
               : instant
                 ? t(`market.hauling.emptyHiddenHintInstant${hiddenKeySuffix}`, {
                     scanned: state.scan.scanned,
-                    dear: hidden.tooDear,
+                    dear,
                     low: hidden.lowMargin,
                   })
                 : t(`market.hauling.emptyHiddenHint${hiddenKeySuffix}`, {
                     scanned: state.scan.scanned,
-                    dear: hidden.tooDear,
+                    dear,
                     thin: hidden.thin,
                     slow: hidden.slow,
                     low: hidden.lowMargin,
@@ -1156,11 +1159,11 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
             ? t('market.hauling.scannedLine', { count: state.scan.scanned })
             : instant
               ? t(`market.hauling.hiddenLineInstant${hiddenKeySuffix}`, {
-                  dear: hidden.tooDear,
+                  dear,
                   low: hidden.lowMargin,
                 })
               : t(`market.hauling.hiddenLine${hiddenKeySuffix}`, {
-                  dear: hidden.tooDear,
+                  dear,
                   thin: hidden.thin,
                   slow: hidden.slow,
                   low: hidden.lowMargin,
@@ -1256,14 +1259,8 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
                   onClose={closeDetail}
                   title={selectedRow?.name ?? t('market.hauling.title')}
                 >
-                  {selectedRow && (
-                    <div className="flex flex-col gap-2">
-                      <div className="flex justify-end">
-                        <HaulingItemActions row={selectedRow} />
-                      </div>
-                      {detail(selectedRow, false)}
-                    </div>
-                  )}
+                  {selectedRow &&
+                    detail(selectedRow, false, <HaulingItemActions row={selectedRow} />)}
                 </SlideOver>
               </>
             )}
