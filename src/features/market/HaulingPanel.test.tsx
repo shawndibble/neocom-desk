@@ -869,6 +869,22 @@ describe('HaulingPanel filters: Max price per item and Max spend', () => {
     expect(row()).toHaveAttribute('aria-current', 'true');
   });
 
+  it('a half-typed figure left on blur or Enter reverts to the committed one', async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    await user.click(screen.getByRole('button', { name: 'Filters' }));
+    const field = screen.getByRole('textbox', { name: 'Max price per item' });
+    await user.type(field, '1.5');
+    await user.tab();
+    expect(field).toHaveValue('');
+    expect(linkParam('maxprice')).toBeNull();
+    await user.type(field, '1000{Enter}');
+    await user.clear(field);
+    await user.type(field, '2.5{Enter}');
+    expect(field).toHaveValue('1000');
+    expect(linkParam('maxprice')).toBe('1000');
+  });
+
   it('keeps shorthand typed on its way to a figure: 1.5b commits 1,500,000,000', async () => {
     const user = userEvent.setup();
     renderPanel();
