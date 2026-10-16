@@ -24,7 +24,7 @@ Code: `src/routes/Alerts.tsx`; `src/features/notifications/*` (see below); `src/
 | Settings panel         | Master switch, Device and Overview channel gates, Alerts when closed, one event-first list (rows speak for all Characters) | `NotificationsPanel.tsx`, `NotificationEventList.tsx`, `AggregateRow.tsx`                |
 | Event catalog          | 25 Notification Events                                                                                                     | `events.ts`                                                                              |
 | EVE notification types | 26 allow-listed types in 6 families, per type per channel                                                                  | `eventSelection.ts:301`                                                                  |
-| Thresholds             | 7 per-Character values                                                                                                     | `eventThresholds.ts`                                                                     |
+| Thresholds             | 7 per-Character values                                                                                                     | `eventThresholdFields.ts`                                                                |
 | Permission prompt      | Explainer banner + Enable button in Settings                                                                               | `NotificationPermissionPrompt.tsx`, `permission.ts`, `webPush.ts`                        |
 | Foreground Poller      | Diff 17 domains every 5 min                                                                                                | `foregroundPoller.ts`, `pollDomains/`                                                    |
 | Scheduled Push         | 72 h Projection upload; OS push with app closed                                                                            | `projectionRebuild.ts`, `projectionUpload.ts`, `deviceRegistration.ts`, `pushHandler.ts` |
@@ -159,7 +159,7 @@ Hedged = push wording hedges because an ordinary in-game action while the app is
 
 ## Test-covered behaviours
 
-`src/routes/Alerts.test.tsx` (grouping, severity text, mute across Characters, dismissal, filters in URL, focus management, one-Character name drop, feed-off banner); `src/features/notifications/*.test.ts(x)` (alertGroups, alertsFilter, appBadge, display, domainCopy, eventSelection, eventThresholds, feed, feedSync, foregroundPoller/pollerState, notificationClick/Options, permission, projectionRebuild(+Scheduler), pushHandler, syncedPreferences, webPush); `src/engine/notificationDiffs.test.ts`, `projection.test.ts`. Read the specific test before quoting an edge case.
+`src/routes/Alerts.test.tsx` (grouping, severity text, mute across Characters, dismissal, filters in URL, focus management, one-Character name drop, feed-off banner); `src/features/notifications/*.test.ts(x)` (alertGroups, alertsFilter, appBadge, display, domainCopy, eventSelection, eventThresholdFields, feed, feedSync, foregroundPoller/pollerState, notificationClick/Options, permission, projectionRebuild(+Scheduler), pushHandler, syncedPreferences, webPush); `src/engine/notificationDiffs.test.ts`, `projection.test.ts`. Read the specific test before quoting an edge case.
 
 ## Interview Q&A
 

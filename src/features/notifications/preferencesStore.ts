@@ -17,7 +17,7 @@ import {
   type EventEnabledMap,
   type EveTypeEnabledMap,
 } from './eventSelection';
-import { isCharacterEventThresholds, type CharacterEventThresholds } from './eventThresholds';
+import { isCharacterEventThresholds, type CharacterEventThresholds } from './eventThresholdFields';
 import {
   SYNCED_NOTIFICATION_FEED_PREFS_KEY,
   withSyncedFeedPrefsApplied,

@@ -7,7 +7,7 @@ import {
   rowInteractiveClassName,
 } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
-import { LANDING_FAQ } from './landingFaq';
+import { LANDING_FAQ } from './landingFaqEntries';
 
 function FaqRow({
   question,

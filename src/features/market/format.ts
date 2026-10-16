@@ -10,6 +10,20 @@ export function formatVolume(value: number): string {
   return VOLUME_FORMAT.format(value);
 }
 
+/** A signed percentage ("+12.5%", "-3.0%"); a figure that rounds to zero takes no sign. */
+export function formatSignedPct(value: number, digits: number): string {
+  const rounded = Number(value.toFixed(digits));
+  return `${rounded > 0 ? '+' : ''}${rounded.toFixed(digits)}%`;
+}
+
+/** Below this a summed volume is float residue, not cargo. */
+const M3_EPSILON = 1e-6;
+
+/** A Trip Plan's whole m³; a real volume under one says "<1" rather than a misleading 0 or 1. */
+export function formatTripM3(value: number): string {
+  return value >= M3_EPSILON && value < 1 ? '<1' : formatVolume(Math.max(0, value));
+}
+
 const MEAN_COUNT_FORMAT = new Intl.NumberFormat('en', { maximumFractionDigits: 1 });
 
 /**
