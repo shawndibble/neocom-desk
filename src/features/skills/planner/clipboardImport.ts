@@ -12,8 +12,8 @@ import {
 } from '@/engine/import/fitToSkills';
 import { parseSkillPlanPaste } from '@/engine/import/skillPlanPaste';
 import { extractRequiredSkills } from '../dogma';
+import type { TypeDetail } from '../typeDetail';
 import type { PlanEntry } from '@/engine/types';
-import type { UniverseType } from '@/esi/endpoints';
 import type { TypeCatalogEntry } from '../typeCatalog';
 import type { PlanXmlDocumentErrorCode } from './planXmlDocument';
 
@@ -45,8 +45,8 @@ export interface ClipboardImportDeps {
   skillByName: ReadonlyMap<string, TypeCatalogEntry>;
   /** Ship/module/charge names, for the EFT-fit path. */
   typeByName: ReadonlyMap<string, TypeCatalogEntry>;
-  /** ESI or cache; used to fetch each resolved item's dogma_attributes. */
-  loadType: (typeId: number) => Promise<{ data: UniverseType } | null | undefined>;
+  /** Baked shard, then cached ESI; reads each resolved item's dogma_attributes. */
+  loadType: (typeId: number) => Promise<Pick<TypeDetail, 'dogma_attributes'> | null>;
 }
 
 /** EFT fits always start with "[Ship Name, Fit Name]" — same signal parseEftFit's own header check uses. */
@@ -78,8 +78,7 @@ async function previewEftFit(
   const missingDogma: number[] = [];
   await Promise.all(
     [...resolvedIds].map(async (typeId) => {
-      const result = await loadType(typeId);
-      const dogmaAttributes = result?.data?.dogma_attributes;
+      const dogmaAttributes = (await loadType(typeId))?.dogma_attributes;
       if (!dogmaAttributes) {
         missingDogma.push(typeId);
         requiredByTypeId.set(typeId, []);
