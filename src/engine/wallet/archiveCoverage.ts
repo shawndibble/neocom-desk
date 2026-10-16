@@ -13,7 +13,7 @@ export const ESI_WALLET_WINDOW_DAYS = 30;
 /** ESI may serve a wallet list cached up to this long, so a fetch proves nothing newer. */
 export const ESI_WALLET_CACHE_MS = 3_600_000;
 /** Journal date-range presets, in days, offered once coverage reaches back that far. */
-export const ARCHIVE_RANGE_DAYS = [90, ARCHIVE_DAYS] as const;
+export const ARCHIVE_RANGE_DAYS = [90, 180, ARCHIVE_DAYS] as const;
 
 /** `[fromMs, toMs]`, inclusive. */
 export type CoverageWindow = readonly [number, number];

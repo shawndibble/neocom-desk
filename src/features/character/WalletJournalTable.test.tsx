@@ -39,6 +39,7 @@ function Harness({
   keyByCharacter = false,
   highlightRowKey = null,
   onFilterChange = () => {},
+  archiveRanges,
   sort = { columnId: 'date', direction: 'desc' },
 }: {
   sort?: { columnId: string; direction: 'asc' | 'desc' };
@@ -49,6 +50,7 @@ function Harness({
   keyByCharacter?: boolean;
   highlightRowKey?: string | number | null;
   onFilterChange?: (filter: WalletJournalFilter) => void;
+  archiveRanges?: number[];
 }) {
   const journalColumns = useJournalColumnsBuilder()(
     () => undefined,
@@ -68,6 +70,7 @@ function Harness({
         onFilterChange={onFilterChange}
         refTypeOptions={['bounty_prize', 'market_escrow']}
         filteredJournal={rows}
+        archiveRanges={archiveRanges}
         breakdownJournal={rows}
         chartJournal={rows}
         journalColumns={journalColumns}
@@ -89,6 +92,71 @@ function Harness({
 }
 
 describe('JournalTable', () => {
+  describe('Range select', () => {
+    const optionNames = async () => {
+      await userEvent.click(screen.getByRole('combobox', { name: 'Range' }));
+      return screen.getAllByRole('option').map((option) => option.textContent?.replace('✓', ''));
+    };
+
+    it('offers 7 / 30 days and All history with no archive (corp journal)', async () => {
+      render(<Harness netted={false} />);
+      expect(await optionNames()).toEqual(['Last 7 days', 'Last 30 days', 'All history']);
+    });
+
+    it('adds the longer presets the history reaches', async () => {
+      render(<Harness archiveRanges={[90, 180]} />);
+      expect(await optionNames()).toEqual([
+        'Last 7 days',
+        'Last 30 days',
+        '3 months',
+        '6 months',
+        'All history',
+      ]);
+    });
+
+    it('sets From to N days ago and clears To', async () => {
+      const onFilterChange = vi.fn();
+      render(
+        <Harness
+          archiveRanges={[90]}
+          filter={{ ...EMPTY_WALLET_JOURNAL_FILTER, endDate: '2026-01-01' }}
+          onFilterChange={onFilterChange}
+        />
+      );
+      await userEvent.click(screen.getByRole('combobox', { name: 'Range' }));
+      await userEvent.click(screen.getByRole('option', { name: '3 months' }));
+      const [next] = onFilterChange.mock.calls[0] as [WalletJournalFilter];
+      expect(next.endDate).toBeNull();
+      expect(next.startDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    });
+
+    it('All history clears both dates', async () => {
+      const onFilterChange = vi.fn();
+      render(
+        <Harness
+          filter={{
+            ...EMPTY_WALLET_JOURNAL_FILTER,
+            startDate: '2026-01-01',
+            endDate: '2026-02-01',
+          }}
+          onFilterChange={onFilterChange}
+        />
+      );
+      await userEvent.click(screen.getByRole('combobox', { name: 'Range' }));
+      await userEvent.click(screen.getByRole('option', { name: 'All history' }));
+      expect(onFilterChange).toHaveBeenCalledWith({
+        ...EMPTY_WALLET_JOURNAL_FILTER,
+        startDate: null,
+        endDate: null,
+      });
+    });
+
+    it('reads Custom for dates that match no preset', () => {
+      render(<Harness filter={{ ...EMPTY_WALLET_JOURNAL_FILTER, startDate: '2020-01-01' }} />);
+      expect(screen.getByRole('combobox', { name: 'Range' })).toHaveTextContent('Custom');
+    });
+  });
+
   it('leaves own-Character transfers out of the In / Out / Net line and says so', () => {
     render(<Harness />);
     expect(screen.getByText('3 entries')).toBeInTheDocument();

@@ -95,7 +95,8 @@ describe('archive reach', () => {
   it('offers a range only when covered back that far', () => {
     expect(archiveRanges([[NOW - 91 * DAY, NOW]], NOW)).toEqual([90]);
     expect(archiveRanges([[NOW - 89 * DAY, NOW]], NOW)).toEqual([]);
-    expect(archiveRanges([[NOW - 366 * DAY, NOW]], NOW)).toEqual([90, 365]);
+    expect(archiveRanges([[NOW - 366 * DAY, NOW]], NOW)).toEqual([90, 180, 365]);
+    expect(archiveRanges([[NOW - 200 * DAY, NOW]], NOW)).toEqual([90, 180]);
     expect(archiveRanges([], NOW)).toEqual([]);
   });
 });

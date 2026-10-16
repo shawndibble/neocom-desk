@@ -5,8 +5,14 @@
  * and one column-visibility store, so hiding a column on one hides it on the
  * other.
  */
+import {
+  journalRangeOptions,
+  journalRangeStart,
+  matchJournalRange,
+  type JournalRange,
+} from '@/engine/wallet/journalRange';
 import { formatIsoDay } from '@/lib/formatDateTick';
-import { useMemo, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import {
@@ -69,6 +75,65 @@ interface JournalFilterBarProps {
   refTypeOptions: string[];
   /** The column picker, inline between the search box and the funnel. */
   actions?: ReactNode;
+}
+
+const CUSTOM_RANGE = 'custom';
+/** Module-level so the range options memo sees one stable array. */
+const NO_ARCHIVE_RANGES: readonly number[] = [];
+
+/**
+ * The journal's "Range" select (#3933): a preset sets From to N EVE days ago
+ * and clears To, All history clears both. Reads "Custom" when the Filters
+ * panel's dates match no offered preset. Same filter the panel and chart follow.
+ */
+function JournalRangeSelect({
+  filter,
+  onChange,
+  archiveRanges,
+}: {
+  filter: WalletJournalFilter;
+  onChange: (filter: WalletJournalFilter) => void;
+  archiveRanges: readonly number[];
+}) {
+  const { t } = useTranslation();
+  const [now] = useState(() => Date.now());
+  const options = useMemo(() => journalRangeOptions(archiveRanges), [archiveRanges]);
+  const current = matchJournalRange(filter, options, now);
+  const optionLabel = (range: JournalRange) => {
+    if (range === 'all') return t('wallet.range.all');
+    if (range === 365) return t('wallet.range.year');
+    return range % 30 === 0 && range > 30
+      ? t('wallet.range.months', { count: range / 30 })
+      : t('wallet.range.days', { count: range });
+  };
+  return (
+    <Select
+      value={String(current)}
+      onValueChange={(value) =>
+        onChange({
+          ...filter,
+          startDate: journalRangeStart(value === 'all' ? 'all' : Number(value), now),
+          endDate: null,
+        })
+      }
+    >
+      <SelectTrigger aria-label={t('wallet.range.label')} className="w-40 shrink-0">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {current === CUSTOM_RANGE && (
+          <SelectItem value={CUSTOM_RANGE} disabled>
+            {t('wallet.range.custom')}
+          </SelectItem>
+        )}
+        {options.map((range) => (
+          <SelectItem key={range} value={String(range)}>
+            {optionLabel(range)}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
 }
 
 /**
@@ -146,6 +211,8 @@ interface JournalTableProps {
   onFilterChange: (filter: WalletJournalFilter) => void;
   refTypeOptions: string[];
   filteredJournal: readonly JournalRow[];
+  /** Presets (days) the local history reaches, from `loadWalletArchiveInfo`. The corp journal has no archive: omit. */
+  archiveRanges?: readonly number[];
   /** The journal under the date range and text filters only, for the panel's ref-type list. */
   breakdownJournal: readonly JournalRow[];
   /** The journal under the ref-type and text filters only: the chart sets its own date axis. */
@@ -219,6 +286,7 @@ export function JournalTable({
   onFilterChange,
   refTypeOptions,
   filteredJournal,
+  archiveRanges = NO_ARCHIVE_RANGES,
   breakdownJournal,
   chartJournal,
   journalColumns,
@@ -369,6 +437,11 @@ export function JournalTable({
         refTypeOptions={refTypeOptions}
         actions={
           <>
+            <JournalRangeSelect
+              filter={filter}
+              onChange={onFilterChange}
+              archiveRanges={archiveRanges}
+            />
             <IconButton
               icon={<Icon.Orders />}
               label={t('wallet.journalBreakdownTitle')}
