@@ -54,8 +54,22 @@ describe('FittingAffectedByPanel', () => {
     expect(screen.getByText('15%')).toBeInTheDocument();
     expect(screen.getByText('×1.1')).toBeInTheDocument();
     expect(screen.getByText('stacking penalty 87%')).toBeInTheDocument();
-    expect(screen.getByText(/Fleet boost #12/)).toBeInTheDocument();
-    expect(screen.getByText(/not running/)).toBeInTheDocument();
+    // A source that isn't running changes nothing, so it isn't listed.
+    expect(screen.queryByText(/Fleet boost #12/)).toBeNull();
+    expect(screen.queryByText(/not running/)).toBeNull();
+  });
+
+  it('leaves out an attribute that reads the same before and after', async () => {
+    const unchanged: AffectedAttribute = { ...damage, base: 0, value: 0 };
+    render(
+      <FittingAffectedByPanel
+        explain={async () => [unchanged, { ...damage, attributeId: 51, base: 12000, value: 9760 }]}
+        moduleIndex={0}
+        typeName={typeName}
+      />
+    );
+    expect(await screen.findByText('Rate of fire')).toBeInTheDocument();
+    expect(screen.queryByText('Damage Modifier')).toBeNull();
   });
 
   it('shows each attribute in the unit the game does: seconds, not milliseconds; a resistance, not a resonance', async () => {

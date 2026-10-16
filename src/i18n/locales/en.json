@@ -1678,7 +1678,6 @@
       "none": "Nothing changes this module's attributes.",
       "failed": "Couldn't work out what affects this module.",
       "change": "{{base}} → {{value}}",
-      "notApplied": "not running",
       "penalty": "stacking penalty {{pct}}%",
       "kind": {
         "ship": "Hull",
