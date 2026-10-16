@@ -320,6 +320,17 @@ export default defineConfig({
     babel({ presets: [reactCompilerPreset({ compilationMode: 'annotation' })] }),
     tailwindcss(),
     copyDogmaEngineAssets(),
+    // Same sentence as the manifest description (appStrings.tagline), so the two cannot drift.
+    {
+      name: 'meta-description',
+      transformIndexHtml: () => [
+        {
+          tag: 'meta',
+          attrs: { name: 'description', content: appStrings.tagline },
+          injectTo: 'head',
+        },
+      ],
+    },
     phosphorWeightsPlugin(),
     localeSplitPlugin(),
     landingShellTemplate(),
