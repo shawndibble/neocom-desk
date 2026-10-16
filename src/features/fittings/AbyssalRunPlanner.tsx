@@ -32,7 +32,7 @@ import { StatField, StatFields, StatNote } from './StatFacts';
 import { STAT_FIELD_WIDTH } from './statKit';
 import { kmValue } from './rangeText';
 
-export type Compare = (
+export type WeatherCompare = (
   weatherTypeId: number
 ) => Promise<{ before: FittingStats; after: FittingStats }>;
 
@@ -47,11 +47,11 @@ interface RunDelta {
  * an edited fit never shows the old fit's delta.
  */
 function useRunDelta(
-  compare: Compare | null,
+  compare: WeatherCompare | null,
   weatherTypeId: number | null
 ): RunDelta | 'failed' | null {
   const [result, setResult] = useState<{
-    compare: Compare;
+    compare: WeatherCompare;
     weatherTypeId: number;
     delta: RunDelta | 'failed';
   } | null>(null);
@@ -98,7 +98,7 @@ export function AbyssalRunPlanner({
 }: {
   /** The open fit's hull's inventory group; undefined while the catalogue loads hides the hull rule. */
   hullGroupId: number | undefined;
-  compare: Compare | null;
+  compare: WeatherCompare | null;
   typeName: (typeId: number) => string;
 }) {
   const { t } = useTranslation();

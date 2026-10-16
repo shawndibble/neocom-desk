@@ -64,11 +64,7 @@ import type { OverlayFitting } from './useOverlayFitting';
 import { FittingItemMenu, WeaponMenuItems } from './FittingItemMenu';
 import { kmValue, rangeLines } from './rangeText';
 import { useFittingItemActions } from './fittingItemActions';
-import {
-  AbyssalRunPlanner,
-  AbyssalWeatherMeta,
-  type Compare as AbyssalCompare,
-} from './AbyssalRunPlanner';
+import { AbyssalRunPlanner, AbyssalWeatherMeta, type WeatherCompare } from './AbyssalRunPlanner';
 
 const DMG_FILL_CLASS = {
   em: 'bg-dmg-em',
@@ -430,10 +426,10 @@ interface FittingStatsSectionsProps {
   conditions?: ReactNode;
   /**
    * The Abyssal section — the session weather and a run planned in it
-   * (`AbyssalRunPlanner`); absent where the page has no fit to compare in it.
-   * The weather's delta on the fit is only worked out while the section is open.
+   * (`AbyssalRunPlanner`). Its body mounts only while open, which is what keeps
+   * the weather's delta from being worked out while it is shut.
    */
-  abyssal?: { hullGroupId: number | undefined; compare: AbyssalCompare | null };
+  abyssal?: { hullGroupId: number | undefined; compare: WeatherCompare | null };
   /** The implant controls, grouped with the skills override under "Implants & skills" — absent where a Fitting has no implants to choose. */
   implants?: ReactNode;
   /** "What to train" (`FittingWhatToTrainPanel`) — absent where there's no Character to train. Collapsed by default: it only works anything out once opened. */
