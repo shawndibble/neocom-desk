@@ -536,6 +536,7 @@ describe('Mail', () => {
 
     await user.click(screen.getByRole('button', { name: 'Show read mail' }));
     expect(await screen.findByText('Market report')).toBeInTheDocument();
+    expect(screen.getByRole('searchbox', { name: /search/i })).toHaveFocus();
     expect(screen.getByRole('button', { name: 'Hide read' })).toHaveAttribute(
       'aria-pressed',
       'false'
@@ -793,6 +794,27 @@ describe('Mail', () => {
     expect(await screen.findByText('Older mail', {}, { timeout: 5000 })).toBeInTheDocument();
     expect(lastMailIdParam).toBe('951');
     expect(screen.queryByRole('button', { name: /load more/i })).not.toBeInTheDocument();
+  });
+
+  it('says only recent mail is empty, pointing at Load more, while older pages are unloaded', async () => {
+    const fullPage = Array.from({ length: 50 }, (_, i) => ({
+      mail_id: 1000 - i,
+      subject: `Mail ${1000 - i}`,
+      timestamp: '2026-08-05T00:00:00Z',
+      labels: [],
+    }));
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail`, () =>
+        HttpResponse.json(fullPage)
+      )
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('Mail 1000');
+    await onlyFolders(user, ['Sent']);
+    expect(await screen.findByText('No recent mail in this folder')).toBeInTheDocument();
+    expect(screen.queryByText('No mail in this folder')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /load more/i })).toBeInTheDocument();
   });
 
   it('says it is offline when "load more" cannot reach ESI, and keeps the button to try again', async () => {

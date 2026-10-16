@@ -559,19 +559,15 @@ function MailView({ scope, scopeControl }: MailViewProps) {
     [visibleRows]
   );
 
-  // The list pane's states, named once here rather than as nested ternaries in
-  // the middle of the JSX. Each empty state is named by what would bring rows
-  // back, so its one action always does: an empty folder has none to offer.
-  const listState =
-    visibleRows.length > 0
-      ? 'rows'
-      : folders.length === 0
-        ? 'no-folders'
-        : folderRows.length === 0
-          ? 'empty-folder'
-          : searchRows.length === 0
-            ? 'no-search-matches'
-            : 'all-read-hidden';
+  // Each empty state is named by the first stage that emptied the list, so
+  // its one action always brings rows back: an empty folder has none to offer.
+  const listState = (() => {
+    if (visibleRows.length > 0) return 'rows';
+    if (folders.length === 0) return 'no-folders';
+    if (folderRows.length === 0) return 'empty-folder';
+    if (searchRows.length === 0) return 'no-search-matches';
+    return 'all-read-hidden';
+  })();
 
   const selectedRow = rows.find((row) => row.key === selectedKey) ?? null;
   const selectedHeader = selectedRow?.header ?? null;
@@ -735,6 +731,11 @@ function MailView({ scope, scopeControl }: MailViewProps) {
   function clearSearch() {
     setSearch('');
     setDebouncedSearch('');
+    searchInputRef.current?.focus();
+  }
+  function showRead() {
+    setHideRead(false);
+    // The pressed button unmounts with the empty state; land on the filter row (Hide read is next).
     searchInputRef.current?.focus();
   }
   function closeNewMail(reason: NewMailCloseReason) {
@@ -918,15 +919,23 @@ function MailView({ scope, scopeControl }: MailViewProps) {
                   }
                 />
               ) : listState === 'empty-folder' ? (
-                // No action: Compose already sits in the header (or floats on
-                // a phone), and no filter here can bring mail back.
-                <CachedEmptyState
-                  result={{ fromCache: offline }}
-                  title={t('mail.emptyFolderCachedTitle', { count: folders.length })}
-                  hint={t('mail.emptyFolderCachedHint')}
-                  fetchedTitle={t('mail.emptyFolderTitle', { count: folders.length })}
-                  className="py-6"
-                />
+                // No action: no filter here brings mail back. With older pages
+                // unloaded, "none" isn't known yet: point at Load more below.
+                hasMore ? (
+                  <EmptyState
+                    title={t('mail.emptyFolderLoadedTitle', { count: folders.length })}
+                    hint={t('mail.emptyFolderLoadMoreHint')}
+                    className="py-6"
+                  />
+                ) : (
+                  <CachedEmptyState
+                    result={{ fromCache: offline }}
+                    title={t('mail.emptyFolderCachedTitle', { count: folders.length })}
+                    hint={t('mail.emptyFolderCachedHint')}
+                    fetchedTitle={t('mail.emptyFolderTitle', { count: folders.length })}
+                    className="py-6"
+                  />
+                )
               ) : listState === 'no-search-matches' ? (
                 <EmptyState
                   title={t('mail.noSearchMatchesTitle')}
@@ -944,7 +953,7 @@ function MailView({ scope, scopeControl }: MailViewProps) {
                   hint={t('mail.allReadHiddenHint')}
                   className="py-6"
                   action={
-                    <Button size="sm" onClick={() => setHideRead(false)}>
+                    <Button size="sm" onClick={showRead}>
                       {t('mail.showRead')}
                     </Button>
                   }
