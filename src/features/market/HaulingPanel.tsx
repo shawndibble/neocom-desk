@@ -1320,8 +1320,13 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
                     value={categoryId}
                     onChange={(cat) => setParams({ cat })}
                     nameOf={categoryName}
+                    inRouteRow
                   />
-                  <ModeSelect value={mode} onChange={(next) => setParams({ mode: next })} />
+                  <ModeSelect
+                    value={mode}
+                    onChange={(next) => setParams({ mode: next })}
+                    inRouteRow
+                  />
                 </>
               )}
             </>
@@ -1422,7 +1427,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
                       <SelectTrigger
                         size="sm"
                         aria-label={t('market.hauling.filters.demand')}
-                        className="w-32"
+                        className="w-40"
                       >
                         <SelectValue />
                       </SelectTrigger>
@@ -1573,7 +1578,8 @@ function IskCapField({
         aria-label={label}
         aria-describedby={hint === undefined ? undefined : hintId}
         placeholder={inSheet ? t('market.hauling.filters.noLimit') : label}
-        className="w-40"
+        // Inline the echo rides beside the box, not under it, so the row keeps one height.
+        className={inSheet ? 'w-40' : 'flex-row! items-center [&>input]:w-40'}
         value={shown}
         onChange={(text) => {
           setTypedText(text);
@@ -1601,20 +1607,33 @@ function IskCapField({
   );
 }
 
+/**
+ * In the route row Category and Sell by give way before the row wraps: they
+ * break the line at a smaller basis and grow back to their full width, so the
+ * filter funnel stays on the route's line beside the trip rail.
+ */
+const ROUTE_ROW_SELECT = 'grow basis-36';
+
 /** The market category to scan — in the route row on a wide screen, in the filter sheet on a narrow one. */
 function CategorySelect({
   value,
   onChange,
   nameOf,
+  inRouteRow = false,
 }: {
   value: number;
   onChange: (cat: number) => void;
   nameOf: (id: number) => string;
+  inRouteRow?: boolean;
 }) {
   const { t } = useTranslation();
   return (
     <Select value={String(value)} onValueChange={(next) => onChange(Number(next))}>
-      <SelectTrigger size="sm" aria-label={t('market.hauling.category')} className="w-52">
+      <SelectTrigger
+        size="sm"
+        aria-label={t('market.hauling.category')}
+        className={inRouteRow ? `${ROUTE_ROW_SELECT} max-w-52` : 'w-52'}
+      >
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
@@ -1629,11 +1648,23 @@ function CategorySelect({
 }
 
 /** How the load is sold at the destination — placed like `CategorySelect`. */
-function ModeSelect({ value, onChange }: { value: HaulMode; onChange: (mode: HaulMode) => void }) {
+function ModeSelect({
+  value,
+  onChange,
+  inRouteRow = false,
+}: {
+  value: HaulMode;
+  onChange: (mode: HaulMode) => void;
+  inRouteRow?: boolean;
+}) {
   const { t } = useTranslation();
   return (
     <Select value={value} onValueChange={(next) => onChange(next as HaulMode)}>
-      <SelectTrigger size="sm" aria-label={t('market.hauling.mode')} className="w-48">
+      <SelectTrigger
+        size="sm"
+        aria-label={t('market.hauling.mode')}
+        className={inRouteRow ? `${ROUTE_ROW_SELECT} max-w-48` : 'w-48'}
+      >
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
