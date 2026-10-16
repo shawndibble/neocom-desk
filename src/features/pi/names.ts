@@ -12,6 +12,7 @@ import {
   GLOBAL_CACHE_CHARACTER_ID,
   STALE_AFTER,
 } from '@/esi/cache';
+import { loadPi } from '@/sde/loadSde';
 
 // Both are static game data, as this module's name says — a planet does not
 // get renamed and a schematic's output does not change between patches.
@@ -83,7 +84,28 @@ function schematicKey(schematicId: number): string {
   return `schematic:${schematicId}`;
 }
 
+/**
+ * Schematic names from the precached `pi.json`, keyed by ESI schematic id.
+ * Works offline and on a device that has never called ESI. Empty on any
+ * load failure, so the ESI path stays the fallback.
+ */
+async function localSchematicNames(): Promise<Map<number, string>> {
+  try {
+    const pi = await loadPi();
+    const names = new Map<number, string>();
+    for (const schematic of Object.values(pi.schematics)) {
+      names.set(schematic.schematicId, schematic.name);
+    }
+    return names;
+  } catch {
+    return new Map();
+  }
+}
+
+/** Local `pi.json` first (offline-safe), ESI only for an id it does not list. */
 export async function loadSchematicName(schematicId: number): Promise<string | null> {
+  const local = (await localSchematicNames()).get(schematicId);
+  if (local) return local;
   const { fetchLive, conditional } = conditionalFetch((options) =>
     getUniverseSchematic(schematicId, options)
   );
@@ -109,8 +131,14 @@ export async function readCachedSchematicNames(
 ): Promise<Map<number, string>> {
   const unique = [...new Set(schematicIds)];
   const names = new Map<number, string>();
+  const local = await localSchematicNames();
   await Promise.all(
     unique.map(async (schematicId) => {
+      const bundled = local.get(schematicId);
+      if (bundled) {
+        names.set(schematicId, bundled);
+        return;
+      }
       // `loadWithCache` stores the full ESI schematic object, not a bare
       // string — same shape `loadSchematicName` reads `.schematic_name` off.
       const info = await readCached<{ schematic_name?: string }>(

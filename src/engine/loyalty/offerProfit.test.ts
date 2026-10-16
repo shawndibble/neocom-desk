@@ -241,6 +241,20 @@ describe('loyaltyOfferProfit', () => {
     expect(unaffordable.profit).not.toBeNull();
   });
 
+  it('reports affordability as unknown (null) when the LP balance is unknown', () => {
+    const result = loyaltyOfferProfit({
+      iskCost: 0,
+      lpCost: 100,
+      requiredItemsCost: 0,
+      revenue: 1,
+      buildCost: 0,
+      playerLp: null,
+      liquidationBasis: 'order',
+      skills: MAX_SKILLS,
+    });
+    expect(result.affordableLp).toBeNull();
+  });
+
   it('never divides by zero LP cost', () => {
     const result = loyaltyOfferProfit({
       iskCost: 0,
