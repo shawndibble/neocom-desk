@@ -266,6 +266,34 @@ describe('per-panel capability gating (AC3)', () => {
     expect(screen.getByText('Division 1')).toBeInTheDocument();
   });
 
+  it('says the wallet could not load, not 0 ISK, when the balances read failed', async () => {
+    mockedAccess.mockReturnValue(accessOf('ready', { canReadWallet: true }));
+    mocked.loadCorporationWallets.mockResolvedValue({ cached: null, needsReauth: false });
+    mocked.loadCorporationDivisions.mockResolvedValue(cached({}));
+    mocked.loadCorporationWalletJournal.mockResolvedValue(cached([]));
+
+    renderCorp();
+
+    expect(await screen.findAllByText("Couldn't load — try again")).not.toHaveLength(0);
+    expect(screen.getByText('Vitals')).toBeInTheDocument();
+    expect(screen.queryByText('Division 1')).not.toBeInTheDocument();
+    expect(screen.queryByText('Runway')).not.toBeInTheDocument();
+  });
+
+  it('shows net and runway as unknown, not 0, when only the journal read failed', async () => {
+    mockedAccess.mockReturnValue(accessOf('ready', { canReadWallet: true }));
+    mocked.loadCorporationWallets.mockResolvedValue(cached([{ division: 1, balance: 1_000_000 }]));
+    mocked.loadCorporationDivisions.mockResolvedValue(cached({}));
+    mocked.loadCorporationWalletJournal.mockResolvedValue({ cached: null, needsReauth: false });
+
+    renderCorp();
+
+    await waitFor(() => expect(screen.getByText('Vitals')).toBeInTheDocument());
+    // Net reads as the unknown dash in both the Standing panel and the rail.
+    expect(screen.getAllByText('—').length).toBeGreaterThan(0);
+    expect(screen.queryByText(/^0 ISK$/)).not.toBeInTheDocument();
+  });
+
   /**
    * Issue #419: each balance links to the matching Wallet division view
    * rather than making the manager reopen Wallet and flip both the switch

@@ -305,6 +305,27 @@ describe('ContractDetailModal', () => {
     expect(within(included).getByText('744')).toBeInTheDocument();
   });
 
+  it('treats a 404 on the items as "no item data", with no Retry', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/stations/60003760`, () =>
+        HttpResponse.json({ station_id: 60003760, name: 'Jita', type_id: 1, system_id: 2 })
+      ),
+      http.get(
+        `${ESI_BASE_URL}/characters/${CHAR_ID}/contracts/12345/items`,
+        () => new HttpResponse(null, { status: 404 })
+      )
+    );
+    renderModal({
+      characterId: CHAR_ID,
+      contract: ITEM_EXCHANGE,
+      issuerName: 'Mero Otichoda',
+      onClose: () => {},
+    });
+    expect(await screen.findByText('No item data for this contract')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Couldn't load/)).not.toBeInTheDocument();
+  });
+
   /*
    * Two short columns (icon + name, quantity) fit a 390px screen unaided, so
    * the stacked card layout would only add a "QUANTITY" gutter label to a

@@ -634,7 +634,11 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
   }, [offersRefresh, courierRefresh]);
   // Retry can unmount into the spinner: focus waits on the always-mounted wrapper.
   const [resultRef, , holdRetryFocus] = useRetryFocus(
-    active.loading ? 'busy' : active.error || activeResult === null ? 'failed' : 'ok',
+    active.loading
+      ? 'busy'
+      : syncConfigured && (active.error || activeResult === null)
+        ? 'failed'
+        : 'ok',
     mode
   );
 
@@ -1058,9 +1062,14 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
 
   return (
     <>
-      <div ref={resultRef} tabIndex={-1} className="sr-only" />
+      <h2 ref={resultRef} tabIndex={-1} className="sr-only focus:outline-none">
+        {t('contractSearch.title')}
+      </h2>
       <LiveStatus>
-        {!active.loading && activeResult === null ? t('common.contractIndexUnreachableTitle') : ''}
+        {/* Only what the visible branch below says, and never for a build with no sync backend. */}
+        {syncConfigured && !active.loading && (active.error || activeResult === null)
+          ? t('common.contractIndexUnreachableTitle')
+          : ''}
       </LiveStatus>
       <Panel
         padded={false}
@@ -1115,11 +1124,10 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
                   {modeLoadingLabel}
                 </p>
               </div>
-            ) : modeError ? (
-              <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
-            ) : activeResult === null && !modeLoading ? (
-              // The read came back with nothing: the live index was unreachable
-              // and nothing is cached. That is not "no contracts synced yet".
+            ) : modeError || (activeResult === null && !modeLoading) ? (
+              // The read failed, or came back with nothing: the live index was
+              // unreachable and nothing is cached. That is not "no contracts
+              // synced yet".
               <LoadFailedState
                 title={t('common.contractIndexUnreachableTitle')}
                 hint={t('common.contractIndexUnreachableHint')}

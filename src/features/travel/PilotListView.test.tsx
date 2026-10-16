@@ -23,7 +23,7 @@ vi.mock('@/features/character/typeNames', () => ({
   loadTypeNames: () => Promise.resolve(new Map([[24698, 'Drake']])),
 }));
 vi.mock('@/features/route/useSolarSystems', () => ({
-  useSolarSystems: () => null,
+  useSolarSystemList: () => ({ systems: null, failed: false, retry: () => {} }),
   useSystemName: () => 'Uedama',
 }));
 vi.mock('./useHereSpace', () => ({

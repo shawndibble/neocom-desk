@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
-import { useSolarSystemList, useSolarSystems } from './useSolarSystems';
+import { useSolarSystemList } from './useSolarSystems';
 
 const sde = vi.hoisted(() => ({ loadSolarSystems: vi.fn() }));
 vi.mock('@/sde/loadMarketSde', () => ({ loadSolarSystems: sde.loadSolarSystems }));
@@ -37,14 +37,5 @@ describe('useSolarSystemList', () => {
   it('reads nothing until enabled', () => {
     renderHook(() => useSolarSystemList(false));
     expect(sde.loadSolarSystems).not.toHaveBeenCalled();
-  });
-});
-
-describe('useSolarSystems', () => {
-  it('keeps its old contract for callers with nowhere to say it failed: [] after a failure, null while loading', async () => {
-    sde.loadSolarSystems.mockRejectedValueOnce(new Error('offline'));
-    const { result } = renderHook(() => useSolarSystems(true));
-    expect(result.current).toBeNull();
-    await waitFor(() => expect(result.current).toEqual([]));
   });
 });

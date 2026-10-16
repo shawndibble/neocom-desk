@@ -192,7 +192,10 @@ async function loadMembersSnapshot(
   let diff = EMPTY_ROSTER_DIFF;
   if (memberIds !== null) {
     diff = diffRoster(await readPreviousRoster(characterId, corporationId), memberIds);
-    if (!signal.cancelled) await recordRoster(characterId, corporationId, memberIds, loadedAt);
+    // Nor while the page is saying "couldn't load" (no tracking rows): the change would be
+    // consumed unseen.
+    if (!signal.cancelled && tracking.cached)
+      await recordRoster(characterId, corporationId, memberIds, loadedAt);
   }
 
   const members = tracking.cached ? toMemberActivity(tracking.cached.data) : null;
@@ -334,7 +337,9 @@ function CorpMembersView() {
         }
       />
 
-      <div ref={resultRef} tabIndex={-1} className="sr-only" />
+      <h2 ref={resultRef} tabIndex={-1} className="sr-only focus:outline-none">
+        {t('corp.members.title')}
+      </h2>
       <LiveStatus>{!snapshot.loading && loadFailed ? t('common.couldntLoad') : ''}</LiveStatus>
       {snapshot.loading && data === null ? (
         <Spinner />

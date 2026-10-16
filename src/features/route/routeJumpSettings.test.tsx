@@ -55,4 +55,21 @@ describe('useRouteJump', () => {
     await waitFor(() => expect(result.current.setup).not.toBeNull());
     expect(result.current.unavailable).toBe(false);
   });
+
+  it('recovers on reconnect when only the systems read came back empty', async () => {
+    // Positions load, but the systems index resolves null (its own failed read).
+    sde.positions.mockResolvedValue([30000142, 0, 0, 0]);
+    sde.systems.mockResolvedValueOnce(null);
+    const { result } = renderHook(() => useRouteJump());
+    await waitFor(() => expect(result.current.unavailable).toBe(true));
+
+    sde.systems.mockResolvedValue(
+      new Map([[30000142, { id: 30000142, security: 0.9, regionId: 1 }]])
+    );
+    act(() => {
+      window.dispatchEvent(new Event('online'));
+    });
+    await waitFor(() => expect(result.current.setup).not.toBeNull());
+    expect(result.current.unavailable).toBe(false);
+  });
 });

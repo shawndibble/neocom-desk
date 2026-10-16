@@ -73,7 +73,12 @@ let jumpMap: Promise<JumpMap | null> | null = null;
 function loadJumpMap(): Promise<JumpMap | null> {
   jumpMap ??= Promise.all([loadSystemPositions(), loadSolarSystemsById()])
     .then(([flat, entries]) => {
-      if (!entries) return null;
+      if (!entries) {
+        // `loadSolarSystemsById` resolves null on a failed read; drop the cached
+        // promise so a retry (on reconnect) reads again instead of replaying null.
+        jumpMap = null;
+        return null;
+      }
       const positions = indexSystemPositions(flat);
       const systems: JumpSystem[] = [];
       for (const [id, position] of positions) {
@@ -109,6 +114,9 @@ export function useRouteJump(): RouteJump {
   useEffect(() => {
     if (!wanted) return;
     let live = true;
+    // A fresh attempt is not yet settled, so it cannot flash "unavailable" first.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- restarting the map read
+    setMapSettled(false);
     void loadJumpMap().then((loaded) => {
       if (!live) return;
       setMap(loaded);

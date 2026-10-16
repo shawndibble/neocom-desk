@@ -345,6 +345,10 @@ export function MovePlanTab({ onClose, characterIds, activeCharacterId }: MovePl
     setResult((r) => (r ? { ...r, plan: planMove({ ...base, packedShipIds: next }) } : r));
   }
 
+  const skippedMessage =
+    loaded && loaded.skipped.length > 0
+      ? t('assets.skippedCharacters', { names: loaded.skipped.map((c) => c.name).join(', ') })
+      : '';
   const name = (typeId: number) => loaded?.typeNames.get(typeId) ?? `#${typeId}`;
   const placeLabel = (id: number) => loaded?.places.get(id) ?? String(id);
   const hueOf = (id: number) => loaded?.hues.get(id) ?? 0;
@@ -368,11 +372,7 @@ export function MovePlanTab({ onClose, characterIds, activeCharacterId }: MovePl
             ? t('assets.movePlan.failed')
             : planFailed
               ? t('assets.movePlan.planFailed')
-              : loaded && loaded.skipped.length > 0
-                ? t('assets.skippedCharacters', {
-                    names: loaded.skipped.map((c) => c.name).join(', '),
-                  })
-                : ''}
+              : skippedMessage}
         </LiveStatus>
         {failed ? (
           <p className="text-text-dim">{t('assets.movePlan.failed')}</p>
@@ -470,11 +470,7 @@ export function MovePlanTab({ onClose, characterIds, activeCharacterId }: MovePl
                 )}
               </div>
               {loaded.skipped.length > 0 && (
-                <p className="text-xs text-warning">
-                  {t('assets.skippedCharacters', {
-                    names: loaded.skipped.map((c) => c.name).join(', '),
-                  })}
-                </p>
+                <p className="text-xs text-warning">{skippedMessage}</p>
               )}
               {loaded.stacks.length === 0 &&
                 (loaded.sources.length === 0 && loaded.skipped.length > 0 ? (

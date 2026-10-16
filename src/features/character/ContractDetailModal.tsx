@@ -189,7 +189,12 @@ export function ContractDetailModal({
       setItemsFailed(false);
       const outcome = await loadContractItemsDetailed(characterId, contract.contract_id);
       if (outcome.result === null) {
-        if (!cancelled) setItemsFailed(true);
+        if (cancelled) return;
+        // ESI answered 404: this contract has no item lines (it is gone, or never had
+        // any), a definite answer that Retry cannot change. Anything else — no
+        // answer, a 5xx, a 403 — is "couldn't load" and keeps Retry.
+        if (outcome.failureStatus === 404) setItems({ list: [], typeNames: new Map() });
+        else setItemsFailed(true);
         return;
       }
       const list = outcome.result.data;

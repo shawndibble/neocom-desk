@@ -54,17 +54,6 @@ export function useSolarSystemList(enabled: boolean): SolarSystemList {
   return { systems, failed, retry };
 }
 
-/**
- * `useSolarSystemList`'s systems for a caller with nowhere to say a read
- * failed: `[]` after a failure, `null` while loading.
- */
-export function useSolarSystems(enabled: boolean): readonly SolarSystemEntry[] | null {
-  const { systems, failed } = useSolarSystemList(enabled);
-  return systems ?? (failed ? EMPTY_SYSTEMS : null);
-}
-
-const EMPTY_SYSTEMS: readonly SolarSystemEntry[] = [];
-
 /** A system's name off the local snapshot, or `null` until (or unless) it resolves. */
 export function useSystemName(systemId: number | null): string | null {
   const [name, setName] = useState<{ id: number; name: string } | null>(null);

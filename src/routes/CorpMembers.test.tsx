@@ -320,6 +320,8 @@ describe('the roster table', () => {
     expect(await screen.findAllByText("Couldn't load — try again")).not.toHaveLength(0);
     expect(screen.queryByText('No member activity')).not.toBeInTheDocument();
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    // The join/leave baseline is not consumed while the page cannot show the change.
+    expect(mocked.recordRoster).not.toHaveBeenCalled();
 
     // Retry reads again, and a read that now succeeds fills the table.
     mocked.loadCorporationMemberTracking.mockResolvedValue(

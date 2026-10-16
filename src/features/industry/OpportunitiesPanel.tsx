@@ -820,7 +820,9 @@ export function OpportunitiesPanel({
         </span>
       }
     >
-      <div ref={bodyRef} tabIndex={-1} className="sr-only" />
+      <h3 ref={bodyRef} tabIndex={-1} className="sr-only focus:outline-none">
+        {t('industry.opportunitiesTitle')}
+      </h3>
       <LiveStatus>
         {!blueprintsLoading && failedCount > 0
           ? allBlueprintsFailed
@@ -903,7 +905,6 @@ export function OpportunitiesPanel({
           nameForCharacter={(id) => characterNames.get(id) ?? unknown}
         />
       )}
-
       {historyItem && (
         <Modal
           open

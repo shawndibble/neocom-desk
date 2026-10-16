@@ -367,6 +367,10 @@ export function MyShipsView({
 
   const allSkipped =
     state.status === 'ready' && state.data.skipped.length > 0 && state.data.loadedCount === 0;
+  const skippedMessage =
+    state.status === 'ready' && state.data.skipped.length > 0
+      ? t('assets.skippedCharacters', { names: state.data.skipped.map((c) => c.name).join(', ') })
+      : '';
   // Retry unmounts into the spinner: focus waits on the always-mounted wrapper.
   const [bodyRef, , holdRetryFocus] = useRetryFocus(
     state.status === 'loading' ? 'busy' : allSkipped || state.status === 'error' ? 'failed' : 'ok',
@@ -458,14 +462,14 @@ export function MyShipsView({
             className="w-full sm:ml-auto sm:w-64"
           />
         </div>
-        <div ref={bodyRef} tabIndex={-1} className="sr-only" />
+        <h2 ref={bodyRef} tabIndex={-1} className="sr-only focus:outline-none">
+          {t('assets.myShips.title')}
+        </h2>
         <LiveStatus>
           {state.status === 'ready' && state.data.skipped.length > 0
             ? allSkipped
               ? t('common.couldntLoad')
-              : t('assets.skippedCharacters', {
-                  names: state.data.skipped.map((c) => c.name).join(', '),
-                })
+              : skippedMessage
             : ''}
         </LiveStatus>
         {state.status === 'loading' && (
@@ -475,11 +479,7 @@ export function MyShipsView({
         )}
         {state.status === 'error' && <EmptyState title={t('assets.myShips.error')} />}
         {state.status === 'ready' && !allSkipped && state.data.skipped.length > 0 && (
-          <p className="text-[0.6875rem] text-warning uppercase">
-            {t('assets.skippedCharacters', {
-              names: state.data.skipped.map((c) => c.name).join(', '),
-            })}
-          </p>
+          <p className="text-[0.6875rem] text-warning uppercase">{skippedMessage}</p>
         )}
         {allSkipped && (
           // Every chosen Character was skipped: "No ships found" would be a guess.

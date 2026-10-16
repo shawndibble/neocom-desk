@@ -6,7 +6,6 @@ import { db } from '@/db';
 import {
   loadAllCharactersAssets,
   loadCharacterAssets,
-  loadOtherCharactersAssets,
   loadOtherCharactersAssetsDetailed,
 } from './assets';
 
@@ -106,7 +105,10 @@ describe('loadCharacterAssets', () => {
   });
 });
 
-describe('loadOtherCharactersAssets (issue #85)', () => {
+describe('loadOtherCharactersAssetsDetailed entries (issue #85)', () => {
+  const loadOtherCharactersAssets = async (ids: number[]) =>
+    (await loadOtherCharactersAssetsDetailed(ids)).entries;
+
   const OTHER_ID = 92;
   const THIRD_ID = 93;
 

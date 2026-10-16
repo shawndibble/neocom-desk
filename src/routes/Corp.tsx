@@ -23,7 +23,14 @@
  */
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { DataAgeBadge, IconButton, PageHeader, Spinner } from '@/components/ui';
+import {
+  DataAgeBadge,
+  IconButton,
+  LoadFailedState,
+  PageHeader,
+  Panel,
+  Spinner,
+} from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import { useCorpRouteGate } from '@/features/corp/useCorpRouteGate';
@@ -130,7 +137,8 @@ interface CorpSnapshot {
   jobs: CorporationIndustryJob[] | null;
   /** Balances joined to the corporation's own division names (#298). */
   wallets: WalletDivision[] | null;
-  journal: VitalsJournalEntry[];
+  /** `null` when the journal read failed: net and runway are unknown, not 0. */
+  journal: VitalsJournalEntry[] | null;
   /** Tracking rows for the People rail, or `null` when unread (#345). */
   members: MemberActivity[] | null;
   /**
@@ -155,7 +163,7 @@ const EMPTY_SNAPSHOT: CorpSnapshot = {
   extractions: null,
   jobs: null,
   wallets: null,
-  journal: [],
+  journal: null,
   members: null,
   rosterDiff: null,
   typeNames: new Map(),
@@ -295,7 +303,7 @@ async function loadCorpSnapshot(
       wallets?.cached === undefined || wallets.cached === null
         ? null
         : walletDivisions(wallets.cached.data, divisions?.cached?.data ?? null),
-    journal: toVitalsJournal(journal?.cached?.data ?? []),
+    journal: journal?.cached ? toVitalsJournal(journal.cached.data) : null,
     // `null`, not `[]`, for the same reason every other panel here is: a
     // tracking read that did not happen must hide the rail, where a corporation
     // that genuinely returned no rows is a rail reading zero. The member count
@@ -490,14 +498,21 @@ function CorpBoardView({ capabilities }: { capabilities: CorpCapabilities }) {
                   showVitals && showPeople && 'lg:grid-cols-2 lg:items-start'
                 )}
               >
-                {showVitals && (
-                  <CorpVitalsRail
-                    divisions={data.wallets ?? []}
-                    journal={data.journal}
-                    journalDivision={MASTER_WALLET_DIVISION}
-                    nowMs={data.loadedAt}
-                  />
-                )}
+                {showVitals &&
+                  (data.wallets === null ? (
+                    // The wallet read failed: an empty rail would print 0 ISK as if
+                    // the corporation were broke.
+                    <Panel title={t('corp.vitalsTitle')}>
+                      <LoadFailedState onRetry={snapshot.refresh} />
+                    </Panel>
+                  ) : (
+                    <CorpVitalsRail
+                      divisions={data.wallets}
+                      journal={data.journal}
+                      journalDivision={MASTER_WALLET_DIVISION}
+                      nowMs={data.loadedAt}
+                    />
+                  ))}
                 {showPeople && (
                   <CorpPeopleRail
                     members={data.members ?? []}

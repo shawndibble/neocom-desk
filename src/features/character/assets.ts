@@ -75,18 +75,6 @@ async function loadFannedOutAssets(character: {
   };
 }
 
-/**
- * The given Characters' assets, for the Assets page's cross-character
- * `CharacterFilterControl` (issue #746, replacing issue #85's all-or-nothing
- * toggle) — a Character degrades individually rather than failing the whole
- * fetch.
- */
-export async function loadOtherCharactersAssets(
-  characterIds: readonly number[]
-): Promise<OtherCharacterAssets[]> {
-  return (await loadOtherCharactersAssetsDetailed(characterIds)).entries;
-}
-
 /** The Characters whose assets were read, and those that could not be (named, so a view can say who is missing). */
 export interface OtherCharactersAssetsRead {
   entries: OtherCharacterAssets[];
@@ -94,10 +82,14 @@ export interface OtherCharactersAssetsRead {
 }
 
 /**
- * `loadOtherCharactersAssets`, keeping who was skipped. A Character with no
- * cached assets and no live answer (offline, ESI down, no scope) drops out of
- * `entries`; without `skipped` a view cannot tell "owns no ships" from "their
- * assets didn't load", and says the first.
+ * The given Characters' assets, for the Assets page's cross-character
+ * `CharacterFilterControl` (issue #746, replacing issue #85's all-or-nothing
+ * toggle) — a Character degrades individually rather than failing the whole
+ * fetch.
+ *
+ * A Character with no cached assets and no live answer (offline, ESI down, no
+ * scope) drops out of `entries` and is named in `skipped`; without that a view
+ * cannot tell "owns no ships" from "their assets didn't load", and says the first.
  */
 export async function loadOtherCharactersAssetsDetailed(
   characterIds: readonly number[]

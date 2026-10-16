@@ -4968,7 +4968,7 @@
     "couldntLoad": "Couldn't load — try again",
     "couldntLoadOffline": "Couldn't load — you're offline",
     "contractIndexUnreachableTitle": "Couldn't reach the contract index — nothing cached yet",
-    "contractIndexUnreachableHint": "Public contracts show once the index answers. Try again when you're back online.",
+    "contractIndexUnreachableHint": "Public contracts show here once the index answers.",
     "retry": "Try again",
     "spaceOption": {
       "highsec": "Highsec",
@@ -5913,7 +5913,7 @@
       "move": "Move"
     },
     "skippedCharacters": "Couldn't load assets for {{names}} — they are missing here.",
-    "skippedAllHint": "Your characters' assets aren't saved on this device yet. They load once ESI answers.",
+    "skippedAllHint": "Their assets aren't saved on this device yet. They load once ESI answers.",
     "movePlan": {
       "title": "Plan a move",
       "loading": "Reading the assets…",

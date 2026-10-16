@@ -703,6 +703,8 @@ describe('ContractSearchPanel', () => {
 
     expect(await screen.findByText("Contract search isn't available")).toBeInTheDocument();
     expect(loadPublicContractOffers).not.toHaveBeenCalled();
+    // No backend is not "unreachable": neither the page nor the live region claims it.
+    expect(screen.queryByText(/Couldn't reach the contract index/)).not.toBeInTheDocument();
   });
 
   it('distinguishes a configured-but-empty snapshot from a missing backend', async () => {

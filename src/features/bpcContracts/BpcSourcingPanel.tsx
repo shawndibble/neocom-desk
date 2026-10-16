@@ -737,7 +737,7 @@ export function BpcSourcingPanel({
   const [cardRef, , holdRetryFocus] = useRetryFocus(
     loading
       ? 'busy'
-      : error || (contractsResult === null && ownedBlueprints.length === 0)
+      : error || (syncConfigured && contractsResult === null && ownedBlueprints.length === 0)
         ? 'failed'
         : 'ok',
     activeCharacterId
@@ -1706,9 +1706,18 @@ export function BpcSourcingPanel({
     // gear (`onHeaderChange`). The table keeps its accessible name from
     // `bpcContracts.title`.
     <>
-      <div ref={cardRef} tabIndex={-1} className="sr-only" />
+      <h2 ref={cardRef} tabIndex={-1} className="sr-only focus:outline-none">
+        {t('bpcContracts.title')}
+      </h2>
       <LiveStatus>
-        {!loading && contractsResult === null ? t('common.contractIndexUnreachableTitle') : ''}
+        {/* What the visible branch below says; nothing for a build with no sync backend. */}
+        {loading
+          ? ''
+          : error
+            ? t('common.loadFailedTitle')
+            : syncConfigured && contractsResult === null
+              ? t('common.contractIndexUnreachableTitle')
+              : ''}
       </LiveStatus>
       <Panel padded={false}>
         {loading && !data ? (
