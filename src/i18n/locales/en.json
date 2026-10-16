@@ -4225,9 +4225,9 @@
           "total": "Total"
         },
         "omega": {
-          "note": "Net income per 30 days. Lines mark what 1, 2... accounts cost.",
+          "note": "Net income per {{days}} days. Lines mark what 1, 2... accounts cost for {{days}} days.",
           "partial": "Lighter bars are partial: your journal history starts inside them or has a gap there.",
-          "partialLatest": "Partial: your journal history has a gap in the last 30 days, so this may be short.",
+          "partialLatest": "Your journal history covers only part of the last {{days}} days, so this undercounts.",
           "summaryPeriod": "to {{date}} {{net}}",
           "truncated": "Some journal pages were missing.",
           "skipped_one": "{{count}} Character's journal could not be read.",
@@ -4236,9 +4236,9 @@
           "tickPartial": "to {{date}} (partial)",
           "line_one": "{{count}} account",
           "line_other": "{{count}} accounts",
-          "summary_one": "Net income {{net}} ISK over the last 30 days covers {{count}} account at {{cost}} ISK each. Per 30 days, oldest first: {{periods}}.",
-          "summary_other": "Net income {{net}} ISK over the last 30 days covers {{count}} accounts at {{cost}} ISK each. Per 30 days, oldest first: {{periods}}.",
-          "summaryNoPrice": "Net income {{net}} ISK over the last 30 days. PLEX has no price, so accounts cannot be counted.",
+          "summary_one": "Net income {{net}} ISK over the last {{days}} days covers {{count}} account at {{cost}} ISK each per {{days}} days. Per {{days}} days, oldest first: {{periods}}.",
+          "summary_other": "Net income {{net}} ISK over the last {{days}} days covers {{count}} accounts at {{cost}} ISK each per {{days}} days. Per {{days}} days, oldest first: {{periods}}.",
+          "summaryNoPrice": "Net income {{net}} ISK over the last {{days}} days. PLEX has no price, so accounts cannot be counted.",
           "tip": {
             "net": "Net income",
             "covers": "Covers",
@@ -4326,13 +4326,13 @@
           "covers_one": "Covers {{count}} account",
           "covers_other": "Covers {{count}} accounts",
           "coversNone": "Doesn't cover one account",
-          "shortBy": "short by {{amount}} ISK / 30 days",
-          "figures": "net {{net}} ISK / 30 days · one account {{cost}} ISK",
-          "next": "Next account needs +{{amount}} ISK / 30 days",
+          "shortBy": "short by {{amount}} ISK / {{days}} days",
+          "figures": "net {{net}} ISK / {{days}} days · one account {{cost}} ISK / {{days}} days",
+          "next": "Next account needs +{{amount}} ISK / {{days}} days",
           "noPrice": "No PLEX price",
-          "netOnly": "net {{net}} ISK / 30 days",
+          "netOnly": "net {{net}} ISK / {{days}} days",
           "noPriceHint": "Can't count accounts without PLEX's price. Try Refresh.",
-          "plexPrice": "PLEX {{price}} ISK each, {{plex}} PLEX per account."
+          "plexPrice": "PLEX {{price}} ISK each, {{plex}} PLEX per account per 30 days."
         }
       },
       "training": {
@@ -4774,7 +4774,7 @@
         "period": "{{from}} – {{to}}",
         "periodPartial": "{{title}} (partial)",
         "col": {
-          "period": "30 days",
+          "period": "{{days}} days",
           "net": "Net income",
           "accounts": "Accounts"
         }

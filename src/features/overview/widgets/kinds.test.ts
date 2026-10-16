@@ -153,7 +153,14 @@ describe('widget kind catalogue', () => {
 
   it('gives a range only to the kinds that read a time window', () => {
     const ranged = WIDGET_KINDS.filter((k: WidgetKindDef) => k.hasRange).map((k) => k.id);
-    expect(ranged.sort()).toEqual(['kills', 'miningYield', 'profit', 'wallet', 'walletFlow']);
+    expect(ranged.sort()).toEqual([
+      'kills',
+      'miningYield',
+      'omega',
+      'profit',
+      'wallet',
+      'walletFlow',
+    ]);
   });
 
   it('looks kinds up and tells known from unknown', () => {
