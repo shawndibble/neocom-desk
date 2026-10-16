@@ -22,6 +22,7 @@
     "verify-hooks": "node scripts/verify-husky.mjs",
     "storybook": "node scripts/storybook.mjs",
     "ui:catalog": "node scripts/ui-catalog.mjs",
+    "shots:resize": "node scripts/resize-screenshots.mjs",
     "ui:shot": "node scripts/ui-shot.mjs"
   },
   "lint-staged": {
