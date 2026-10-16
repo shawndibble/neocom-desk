@@ -24,7 +24,7 @@ import { useCompareSet } from './compareSet';
 import { useItemActions } from './itemActions';
 import { StockTargetDialog } from '@/features/stockTargets/StockTargetDialog';
 import { OpenInEveMenuItem } from '@/features/openInEve/OpenInEveMenuItem';
-import { useIsAbyssalType } from '@/features/abyssal/mutaplasmidData';
+import { MarketOnly } from '@/features/abyssal/MarketOnly';
 import { PriceAlertDialog, PriceAlertMenuItem } from './PriceAlertDialog';
 
 export interface ItemContextMenuProps {
@@ -69,18 +69,6 @@ export type ItemMenuFor = (typeId: number, trigger: ReactElement) => ReactElemen
 
 /** Everything the menu's entries need — the props minus the trigger wiring. */
 type ItemMenuProps = Omit<ItemContextMenuProps, 'children'>;
-
-/**
- * `children` unless `typeId` is an Abyssal type: no order book exists for one
- * (Item Detail drops its market line and link the same way). Mutaplasmids
- * trade, so they keep theirs. Shown while the lookup loads, so an ordinary
- * item's entries never appear under a cursor already in the menu; the pages
- * that list Abyssal types (Assets, Fittings, contracts) have it loaded.
- * Mounts with the menu's entries, so only an opened menu loads the lookup.
- */
-function MarketOnly({ typeId, children }: { typeId: number; children: ReactNode }) {
-  return useIsAbyssalType(typeId) === true ? null : children;
-}
 
 /** The item menu's "Show info" — also reused as-is by menus that aren't item menus (the Fittings editor's). */
 export function ShowInfoMenuItem({

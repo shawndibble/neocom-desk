@@ -37,6 +37,7 @@ import { MenuItem as RowMenuItem, RowActionsMenu } from '@/components/ui';
 import { writeToClipboard } from '@/lib/clipboard';
 import { marketLinkParams } from '@/engine/market/urlState';
 import { useCompareSet } from '@/features/market/compareSet';
+import { MarketOnly } from '@/features/abyssal/MarketOnly';
 import { plannableProductTypeID, type PlannableIndex } from './plannableProduct';
 import { applyPlanSeed, type BuildPlanSeed } from './planSeed';
 import { usePlannableIndexOnOpen } from './usePlannableIndexOnOpen';
@@ -123,15 +124,16 @@ function useBuildPlanMenuNodes(
   const nodes: ReactElement[] = omitViewInMarket
     ? []
     : [
-        <RowMenuItem
-          key="viewInMarket"
-          onSelect={() => {
-            const params = marketLinkParams(typeId, location.search);
-            navigate(`/market/browser?${new URLSearchParams(params).toString()}`);
-          }}
-        >
-          {t('market.contextMenu.viewInMarket')}
-        </RowMenuItem>,
+        <MarketOnly key="viewInMarket" typeId={typeId}>
+          <RowMenuItem
+            onSelect={() => {
+              const params = marketLinkParams(typeId, location.search);
+              navigate(`/market/browser?${new URLSearchParams(params).toString()}`);
+            }}
+          >
+            {t('market.contextMenu.viewInMarket')}
+          </RowMenuItem>
+        </MarketOnly>,
       ];
   if (itemName !== undefined) {
     nodes.push(

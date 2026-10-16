@@ -99,7 +99,7 @@ import { loadTypeVolumes } from '@/features/character/typeNames';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
 import { addQuickbarItem } from '@/features/market/quickbar';
-import { loadMutaplasmidLookup } from '@/features/abyssal/mutaplasmidData';
+import { useMutaplasmidLookup } from '@/features/abyssal/mutaplasmidData';
 import { usePageItemActions } from '@/features/market/usePageItemActions';
 import { useBlueprintTypeIds } from '@/features/character/useBlueprintTypeIds';
 import { assetBlueprintKind } from '@/engine/blueprintKind';
@@ -476,6 +476,7 @@ function CorpAssetsView({ canReadBlueprints }: { canReadBlueprints: boolean }) {
   );
 
   const itemActions = usePageItemActions({ activeCharacterId: snapshot.activeCharacterId });
+  const isAbyssalType = useMutaplasmidLookup()?.isAbyssalType;
 
   function collectRowItemIds(): number[] {
     return rows.flatMap((row) => {
@@ -495,21 +496,19 @@ function CorpAssetsView({ canReadBlueprints }: { canReadBlueprints: boolean }) {
   function handleDeselectAll() {
     setSelectedIds(new Set());
   }
-  async function handleBulkAddToQuickbar() {
-    const picked = [...selectedIds];
-    // No market for an Abyssal type: the row's own menu doesn't offer Quickbar either.
-    const lookup = await loadMutaplasmidLookup().catch(() => null);
+  function handleBulkAddToQuickbar() {
     // One write: `quickbar.add` reads the list it rendered with, so a loop of them keeps only the last.
     let items = itemActions.quickbar.items;
-    for (const id of picked) {
+    for (const id of selectedIds) {
       const asset = assetsByItemId.get(id);
-      if (!asset || lookup?.isAbyssalType(asset.type_id)) continue;
+      // No market for an Abyssal type: the row's own menu doesn't offer Quickbar either.
+      if (!asset || isAbyssalType?.(asset.type_id)) continue;
       items = addQuickbarItem(items, {
         typeId: asset.type_id,
         name: typeDisplayName(asset.type_id, typeNames),
       });
     }
-    await itemActions.quickbar.write(items);
+    void itemActions.quickbar.write(items);
   }
   function handleBulkAddToCompare() {
     const addToCompare = useCompareSet.getState().add;
@@ -665,7 +664,7 @@ function CorpAssetsView({ canReadBlueprints }: { canReadBlueprints: boolean }) {
                     <Button
                       size="sm"
                       disabled={!itemActions.quickbar.available}
-                      onClick={() => void handleBulkAddToQuickbar()}
+                      onClick={handleBulkAddToQuickbar}
                     >
                       {t('assets.select.addToQuickbar')}
                     </Button>

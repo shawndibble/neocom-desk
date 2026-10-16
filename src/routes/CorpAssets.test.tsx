@@ -35,14 +35,14 @@ vi.mock('@/features/market/ItemDetailModal', () => ({
     <div role="dialog" aria-label={`Item detail: ${itemName}`} />
   ),
 }));
-const ABYSSAL_NEUT = 47832;
+const ABYSSAL_NEUT = vi.hoisted(() => 47832);
 vi.mock('@/sde/loadSde', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/sde/loadSde')>()),
   loadBlueprints: vi.fn(async () => ({})),
   loadMutaplasmids: vi.fn(async () => ({
     attributeNames: {},
     mutaplasmids: {},
-    abyssalTypeIds: [47832],
+    abyssalTypeIds: [ABYSSAL_NEUT],
   })),
 }));
 // Copy valuation reaches Firestore; these tests only need a copy's badge.
@@ -451,7 +451,7 @@ describe('row context menu (issue #420)', () => {
 });
 
 describe('bulk Add to Quickbar', () => {
-  it('adds every selected item but an Abyssal module, which has no market', async () => {
+  it('adds every selected item but a Mutated module, which has no market', async () => {
     await db.quickbars.clear();
     mocked.loadCorporationAssets.mockResolvedValue(
       cached([

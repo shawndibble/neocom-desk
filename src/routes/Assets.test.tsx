@@ -2099,7 +2099,7 @@ describe('multi-select and bulk actions (issue #90)', () => {
     });
   });
 
-  it('leaves an Abyssal module out of the bulk Quickbar add: it has no market', async () => {
+  it('leaves a Mutated module out of the bulk Quickbar add: it has no market', async () => {
     await db.quickbars.clear(); // the test above leaves its two items there
     abyssalEstimate.mockResolvedValue({
       status: 'unknown',
@@ -2125,6 +2125,8 @@ describe('multi-select and bulk actions (issue #90)', () => {
     await openLocation(user, JITA);
     await screen.findByText('Tritanium');
     await screen.findByText('Heavy Abyssal Energy Neutralizer');
+    // The estimate is asked for once the page knows the type is Abyssal.
+    await waitFor(() => expect(abyssalEstimate).toHaveBeenCalled());
 
     await clickTool(user, 'Select');
     await user.click(screen.getByRole('checkbox', { name: 'Select Tritanium' }));
