@@ -906,8 +906,17 @@ export function Wallet() {
           <Panel
             padded={false}
             title={t('wallet.journalTab')}
+            wrapMeta
+            // Beside the open panel the page is narrow at any viewport, so the
+            // Character filter drops under the title instead of crowding the actions.
+            className={iskPanelOpen ? '[&>header>div:first-child]:flex-wrap' : undefined}
             meta={
-              <span className="flex flex-wrap items-center gap-2">
+              <span
+                className={cx(
+                  'flex flex-wrap items-center gap-2 max-md:basis-full',
+                  iskPanelOpen && 'md:basis-full'
+                )}
+              >
                 <WalletOriginCrumb />
                 {walletCharacterFilterMeta}
               </span>

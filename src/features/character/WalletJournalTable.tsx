@@ -42,6 +42,8 @@ import {
 } from '@/features/character/walletJournalFilter';
 import { signedIsk } from '@/features/market/signedIsk';
 import { useColumnVisibility } from '@/lib/columnVisibility';
+import { useElementNarrowerThan } from '@/lib/useElementNarrowerThan';
+import { useIsPhone } from '@/lib/useIsPhone';
 import {
   useVisibleWalletJournalColumns,
   WALLET_JOURNAL_COLUMN_IDS,
@@ -120,6 +122,13 @@ function JournalFilterBar({ filter, onChange, refTypeOptions, actions }: Journal
   );
 }
 
+/**
+ * Width (rem) of the journal's own container below which its columns no longer
+ * fit and the rows become cards (ADR 0017). Measured in Chrome with every
+ * default column shown.
+ */
+const JOURNAL_TABLE_CARDS_REM = 43;
+
 interface JournalTableProps {
   filter: WalletJournalFilter;
   onFilterChange: (filter: WalletJournalFilter) => void;
@@ -189,6 +198,11 @@ export function JournalTable({
   panel,
 }: JournalTableProps) {
   const { t } = useTranslation();
+  const isPhone = useIsPhone();
+  const [tableRef, [tableNarrow = false]] = useElementNarrowerThan<HTMLDivElement>([
+    JOURNAL_TABLE_CARDS_REM,
+  ]);
+  const cards = !isPhone && tableNarrow;
   // Internal lines (own-Character transfers) are in neither, so the panel and the
   // Journal's In / Out / Net line can never disagree.
   const totals = useMemo(() => journalRefTypeBreakdown(filteredJournal), [filteredJournal]);
@@ -293,7 +307,7 @@ export function JournalTable({
           }
         />
       ) : (
-        <div className="overflow-x-auto">
+        <div ref={tableRef} className="overflow-x-auto">
           <DataTable
             {...tableExport.tableProps}
             label={label}
@@ -304,8 +318,10 @@ export function JournalTable({
             sort={sort}
             onSortChange={onSortChange}
             // A ledger read across columns: a plain table on a phone, scrolling
-            // sideways (DESIGN.md §6c Restraint).
-            responsive="table"
+            // sideways (DESIGN.md §6c Restraint). Beside the open panel on a wider
+            // screen the table is narrower than its columns: cards, not a clipped table.
+            responsive={cards ? 'stack' : 'table'}
+            stacked={cards}
             // Every page of the journal, uncapped: thousands of rows for an
             // active trader.
             virtualize="auto"
