@@ -97,3 +97,38 @@ test('shows the offline banner while the browser is offline and drops it on reco
   await context.setOffline(false);
   await expect(banner).toHaveCount(0);
 });
+
+/**
+ * Item Detail offline for an item never opened before (issue #3882): its
+ * description and dogma attributes come from the baked `typeInfo` shard
+ * (`public/data/typeInfo/0.json` for the Rifter), served by the app's own
+ * server, so cutting ESI off before the modal ever opens still renders them.
+ *
+ * Opened by its `?info=type-<id>` URL over Overview, not from the Market
+ * Browser: that item panel reads the same type from ESI for its order-row
+ * skills (`useOrderRowSkills`), which would muddy the count below. Counting
+ * `/universe/types/587` requests — an aborted one still fires `request` —
+ * proves the baked path, not an `esiCache` row from an earlier online read.
+ */
+test('opens Item Detail with baked description and attributes for a never-seen item', async ({
+  page,
+}) => {
+  const RIFTER = 587;
+  const typeRequests: string[] = [];
+  page.on('request', (request) => {
+    if (new URL(request.url()).pathname === `/universe/types/${RIFTER}`) {
+      typeRequests.push(request.url());
+    }
+  });
+
+  await signInAndGoto(page);
+  await goExternallyOffline(page);
+  await page.goto(`./overview?info=type-${RIFTER}`);
+
+  const dialog = page.getByRole('dialog', { name: 'Rifter' });
+  await expect(dialog.getByText(/very powerful combat frigate/)).toBeVisible();
+  await expect(dialog.getByText('Maximum Velocity', { exact: true })).toBeVisible();
+  await expect(dialog.getByText('365 m/sec', { exact: true })).toBeVisible();
+  await expect(dialog.getByText("Couldn't load item info")).toHaveCount(0);
+  expect(typeRequests).toEqual([]);
+});
