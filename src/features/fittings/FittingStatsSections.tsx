@@ -51,6 +51,8 @@ import {
 } from './statsSectionsPreference';
 import { CapacitorFacts, TankFacts } from './FittingTankStats';
 import { capacitorTone, type CapacitorTone } from './capacitorTone';
+import { FittingYourCharactersPanel } from './FittingYourCharactersPanel';
+import { canFlyHeadline, useCharacterGaps, type GapCharacter } from './useCharacterGaps';
 import { SupportFacts } from './FittingSupportStats';
 import { MiningFacts } from './FittingMiningStats';
 import { FleetBoostFacts } from './FittingFleetBoostStats';
@@ -278,6 +280,7 @@ function DamageFigures({
 type Section =
   | 'assumptions'
   | 'whatToTrain'
+  | 'yourCharacters'
   | 'offense'
   | 'appliedDps'
   | 'defense'
@@ -352,6 +355,27 @@ function StatSection({
   );
 }
 
+/** The "Your Characters" row: its headline comes from whatever is worked out, the rows only while open. */
+function YourCharactersSection({
+  fitting,
+  characters,
+  expanded,
+  render,
+}: {
+  fitting: Fitting;
+  characters: readonly GapCharacter[];
+  expanded: boolean;
+  render: (meta: ReactNode, body: ReactNode) => ReactNode;
+}) {
+  const { t } = useTranslation();
+  const rows = useCharacterGaps(fitting, characters, expanded);
+  const headline = canFlyHeadline(rows);
+  return render(
+    headline ? t('fittings.yourCharacters.headline', headline) : undefined,
+    <FittingYourCharactersPanel rows={rows} />
+  );
+}
+
 /** Lines the "no data" tooltip lists before it sums up the rest — a tooltip is no place for a long list. */
 const UNKNOWN_ITEMS_SHOWN = 10;
 
@@ -403,6 +427,8 @@ interface FittingStatsSectionsProps {
   implants?: ReactNode;
   /** "What to train" (`FittingWhatToTrainPanel`) — absent where there's no Character to train. Collapsed by default: it only works anything out once opened. */
   whatToTrain?: ReactNode;
+  /** "Your Characters": every Character's gap to this Fitting. Absent with fewer than two Characters. */
+  yourCharacters?: readonly GapCharacter[];
   /** The hull takes drones (`showsDrones`) — else there is no Drones section. */
   showDrones?: boolean;
   /**
@@ -561,6 +587,7 @@ export function FittingStatsSections({
   conditions,
   implants,
   whatToTrain,
+  yourCharacters,
   showDrones = true,
   fitting = null,
   moduleResults = null,
@@ -831,6 +858,15 @@ export function FittingStatsSections({
         )}
 
       {stats && whatToTrain && section('whatToTrain', undefined, whatToTrain)}
+
+      {stats && fitting && yourCharacters && (
+        <YourCharactersSection
+          fitting={fitting}
+          characters={yourCharacters}
+          render={(meta, body) => section('yourCharacters', meta, body)}
+          expanded={isExpanded('yourCharacters')}
+        />
+      )}
 
       {section(
         'offense',

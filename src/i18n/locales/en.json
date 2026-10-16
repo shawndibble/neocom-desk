@@ -892,6 +892,7 @@
         "appliedDps": "Applied DPS",
         "assumptions": "Implants & skills",
         "whatToTrain": "What to train",
+        "yourCharacters": "Your Characters",
         "defense": "Defense",
         "targeting": "Targeting",
         "navigation": "Navigation",
@@ -1117,6 +1118,22 @@
         "fuel": "{{value}} {{fuel}}"
       },
       "fightersNoOverheat": "Fighters don't overheat"
+    },
+    "yourCharacters": {
+      "headline": "{{canFly}} of {{total}} can fly",
+      "all": "All",
+      "canFly": "Can fly",
+      "cantFly": "Can't fly",
+      "search": "Search Characters",
+      "none": "No Characters match.",
+      "tableLabel": "Your Characters for this Fitting",
+      "character": "Character",
+      "missing": "Missing",
+      "toTrain": "To train",
+      "skills_one": "{{count}} skill",
+      "skills_other": "{{count}} skills",
+      "notLoaded": "Skills not loaded",
+      "prerequisite": "(prerequisite)"
     },
     "whatToTrain": {
       "noCharacter": "Log in a Character to see which skill to train next for this fit.",
