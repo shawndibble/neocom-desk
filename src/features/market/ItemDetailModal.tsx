@@ -302,6 +302,8 @@ export function ItemDetailModal({
   // Gates which attribute-modifier popovers can apply (empty while `data`
   // hasn't loaded yet).
   const requiredSkillTypeIds = new Set((data?.requiredSkills ?? []).map((r) => r.skillTypeID));
+  // Implies Open in EVE too: an abyssal type gets neither.
+  const showMarketLink = showOpenInMarket && abyssal === false;
 
   return (
     <Modal
@@ -314,7 +316,7 @@ export function ItemDetailModal({
       title={itemName}
       titleActions={
         // Two text buttons squeeze the name to a letter on a phone; there they share one ⋮.
-        narrow && showOpenInMarket && abyssal === false ? (
+        narrow && showMarketLink ? (
           <ItemDetailMoreActions
             typeId={typeId}
             itemName={itemName}
@@ -327,7 +329,7 @@ export function ItemDetailModal({
             {abyssal !== true && (
               <OpenInEveButton kind="marketDetails" id={typeId} name={itemName} />
             )}
-            {showOpenInMarket && abyssal === false && (
+            {showMarketLink && (
               <OpenInMarketLink
                 typeId={typeId}
                 onNavigate={leave}

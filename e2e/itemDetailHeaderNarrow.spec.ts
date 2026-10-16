@@ -20,7 +20,6 @@ for (const width of [390, 768, 1280]) {
     await signInAndGoto(page, `./overview?info=type-${TYPE_ID}`);
     const dialog = page.getByRole('dialog', { name: 'Rifter' });
     await expect(dialog).toBeVisible({ timeout: 15_000 });
-    await page.screenshot({ path: `test-results/item-detail-header-${width}.png` });
 
     const more = dialog.getByRole('button', { name: 'More actions for Rifter' });
     const market = dialog.getByRole('link', { name: 'View in Market' });
