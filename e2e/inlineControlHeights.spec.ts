@@ -37,3 +37,15 @@ for (const url of [...new Set([...ROUTES, ...TABS])]) {
     }
   });
 }
+
+// The filter row opens behind its funnel, so the sweep above never sees it.
+// Hauling's mixes selects with the two ISK fields (Max price per item, Max
+// spend): one size across the lot. Desktop only — below `md` it is a sheet
+// of stacked fields, not a row.
+test('/travel/hauling: the open filter row shares one height', async ({ page }) => {
+  await page.setViewportSize({ width: CONTROL_ROW_WIDTHS[0], height: 900 });
+  await signInAndGoto(page, '/travel/hauling');
+  await page.getByRole('button', { name: /^Filters/ }).click();
+  await expect(page.getByRole('textbox', { name: 'Max spend' })).toBeVisible();
+  await expectInlineControlsAligned(page, '/travel/hauling filters open');
+});
