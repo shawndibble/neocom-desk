@@ -45,7 +45,7 @@ export interface ClipboardImportDeps {
   skillByName: ReadonlyMap<string, TypeCatalogEntry>;
   /** Ship/module/charge names, for the EFT-fit path. */
   typeByName: ReadonlyMap<string, TypeCatalogEntry>;
-  /** Baked shard, then cached ESI; reads each resolved item's dogma_attributes. */
+  /** Each resolved item's dogma_attributes; null when unreadable. */
   loadType: (typeId: number) => Promise<Pick<TypeDetail, 'dogma_attributes'> | null>;
 }
 

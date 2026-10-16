@@ -2,7 +2,7 @@
  * Fetches each Compare Set item's full dogma attributes, for the drawer's
  * Attributes view (moved out of the old `VariationsCompareModal`, issue
  * #1425). Only fetches while `enabled` — a closed drawer, or one open on
- * Prices, must not fire N ESI reads for attributes nobody is looking at,
+ * Prices, must not fire N type reads for attributes nobody is looking at,
  * mirroring `useCompareRows.ts`'s own enabled gate.
  */
 import { useEffect, useRef, useState } from 'react';
@@ -12,7 +12,7 @@ import type {
   AttributeReferenceNames,
   RawDogmaAttribute,
 } from '@/engine/market/itemAttributes';
-import { loadTypeDetail } from '@/features/skills/typeDetail';
+import { loadTypeDetail, type TypeDetail } from '@/features/skills/typeDetail';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { loadAttributeDictionary } from '@/sde/loadMarketSde';
 import { loadAttributeReferenceNames } from './attributeReferenceNames';
@@ -61,7 +61,7 @@ export function useCompareAttributes(
       setData(null);
       setError(false);
       try {
-        const types = new Array<Awaited<ReturnType<typeof loadTypeDetail>>>(currentItems.length);
+        const types = new Array<TypeDetail | null>(currentItems.length);
         const [, dictionary] = await Promise.all([
           // A large variation group (up to `VARIATIONS_LIMIT`) fanning out
           // unbounded risks ESI's rate limit, same reasoning as

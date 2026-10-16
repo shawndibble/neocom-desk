@@ -1,9 +1,7 @@
 /**
- * A type's description, dogma attributes and volume, read from the baked
- * typeInfo shards first (issues #3882, #3884) so it works offline for any
- * published type, including ones never fetched online. Every reader of only
- * those fields goes through here; a reader needing more of ESI's type
- * (`name`, `dogma_effects`, `packaged_volume`) stays on `loadUniverseType`.
+ * Read path for a type's description, dogma attributes and volume; works
+ * offline for any published type. Readers needing `name`, `dogma_effects` or
+ * `packaged_volume` stay on `data.ts`'s cached ESI: the shards lack them.
  */
 import type { UniverseType } from '@/esi/endpoints';
 import type { Implants } from '@/engine/types';
@@ -44,17 +42,15 @@ export async function loadTypeDetail(
   return cached?.data ?? null;
 }
 
-/** Summed attribute bonuses of these implant types; an unreadable type adds nothing. */
+/** An unreadable type adds nothing. */
 export async function loadImplantTypeBonuses(typeIds: readonly number[]): Promise<Implants> {
   const types = await Promise.all(typeIds.map((id) => loadTypeDetail(id, { retry: true })));
   return sumAttributeBonuses(types.map((type) => extractAttributeBonuses(type?.dogma_attributes)));
 }
 
 /**
- * Aggregate attribute bonuses across a character's fitted implants: implant
- * typeIDs (ESI or cache) -> per-type dogma attributes -> summed into one
- * Implants map (engine's computeSchedule/optimizer input). Returns `{}` when
- * there's no implant data cached or fetchable (offline first-load).
+ * Worn-implant bonuses (engine computeSchedule/optimizer input); `{}` when the
+ * implant list is neither cached nor fetchable.
  */
 export async function loadImplantBonuses(characterId: number): Promise<Implants> {
   const implants = await loadCharacterImplants(characterId);

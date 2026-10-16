@@ -11,7 +11,7 @@ import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurren
 
 const requirementCache = new Map<number, readonly RequiredSkill[]>();
 
-/** A type's required skills, or null when neither the baked shard nor ESI has the type (left uncached, to retry). */
+/** A type's required skills; null when no source has the type (left uncached, to retry). */
 export async function loadKnownRequirements(
   typeId: number
 ): Promise<readonly RequiredSkill[] | null> {
@@ -25,10 +25,10 @@ export async function loadKnownRequirements(
 }
 
 export interface TypeRequirements {
-  /** Requirements of every type that could be read (cache or ESI). */
+  /** Requirements of every type that could be read (baked shard, cache or ESI). */
   byType: Map<number, readonly RequiredSkill[]>;
   /**
-   * Types that could be neither read from cache nor fetched. They are NOT
+   * Types no source could read. They are NOT
    * "no requirements": a type that might need anything must never read as
    * flyable, so callers surface this as "unknown".
    */

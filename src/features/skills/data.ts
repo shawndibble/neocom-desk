@@ -155,9 +155,8 @@ function universeTypeCacheKey(typeId: number): string {
  * One cache-first, ETag-revalidated read of a type (no retry, no delay):
  * `null` only when the type is neither cached nor fetchable, so a type seen
  * once still renders offline; `loadUniverseType` adds a retry on top for the
- * one-at-a-time callers that want it. A reader of only the description, dogma
- * attributes or volume goes through `typeDetail.ts` instead, which tries the
- * baked typeInfo shard first and falls back to these.
+ * one-at-a-time callers that want it. Readers of only description, dogma
+ * attributes or volume use `typeDetail.ts` (baked first).
  */
 export function loadUniverseTypeOnce(typeId: number): Promise<CachedResult<UniverseType> | null> {
   const { fetchLive, conditional } = conditionalFetch((options) =>
@@ -179,12 +178,11 @@ export function loadUniverseTypeOnce(typeId: number): Promise<CachedResult<Unive
  *
  * One retry on a failed live call, paced by a short delay: unlike
  * typeNames.ts's POST /universe/names (a batch with a per-id fallback), every
- * caller here — implant names and bonuses, notification item/skill names,
- * the clipboard import flow, and the ESI fallback of `typeDetail.ts`'s
- * implant reads — resolves one type at a time, so a single
- * transient failure used to silently drop just that lookup (an implant read
- * "#12345", and the SAME failure also meant its attribute bonus never
- * reached `loadImplantBonuses`, reading the character's sheet as an
+ * caller here — hardpoint kinds, notification item/skill names, and
+ * `typeDetail.ts`'s `retry` fallback (required skills, implants, clipboard
+ * import) — resolves one type at a time, so a single transient failure would
+ * silently drop just that lookup (an implant read "#12345", and its attribute
+ * bonus never reached the sum, reading the character's sheet as an
  * unexplainable "impossible" baseline). Retries indiscriminately rather than
  * narrowing by failure kind, since `loadWithCache` doesn't surface why a
  * call failed; the delay assumes a failure surviving esiFetch's own 429/420
