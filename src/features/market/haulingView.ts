@@ -109,24 +109,36 @@ export interface HaulingFilters {
   minMarginPct: number;
   /** Hide rows whose demand is "rarely sells". */
   steadyOnly: boolean;
+  /** Highest origin unit price (the Buy column's figure) a row may have, ISK; null shows any. */
+  maxUnitPrice: number | null;
 }
 
 export interface FilteredHaulingRows {
   shown: HaulingViewRow[];
-  /** Why rows are missing, so the footer can name them instead of dropping them silently. A row failing several counts under the first that applies: thin, then slow. */
-  hidden: { thin: number; slow: number; lowMargin: number };
+  /** Why rows are missing, so the footer can name them instead of dropping them silently. A row failing several counts under the first that applies: too dear, thin, slow, then low margin. */
+  hidden: { tooDear: number; thin: number; slow: number; lowMargin: number };
 }
 
-/** Best margin first. */
+/**
+ * Best margin first. The one row filter: the table and the fill both run
+ * their rows through it, so a filter applies to both.
+ */
 export function filterHaulingRows(
   rows: readonly HaulingViewRow[],
   filters: HaulingFilters
 ): FilteredHaulingRows {
   const shown: HaulingViewRow[] = [];
-  const hidden = { thin: 0, slow: 0, lowMargin: 0 };
+  const hidden = { tooDear: 0, thin: 0, slow: 0, lowMargin: 0 };
   for (const row of rows) {
-    // Demand and Days to Sell are not read for an instant sale: only the margin filter applies.
-    if (row.mode === 'list' && filters.steadyOnly && row.demand.demand === 'rarely')
+    const unitPrice = row.buyLadder[0]?.price;
+    if (
+      filters.maxUnitPrice !== null &&
+      unitPrice !== undefined &&
+      unitPrice > filters.maxUnitPrice
+    )
+      hidden.tooDear += 1;
+    // Demand and Days to Sell are not read for an instant sale: only the price and margin filters apply.
+    else if (row.mode === 'list' && filters.steadyOnly && row.demand.demand === 'rarely')
       hidden.thin += 1;
     else if (
       row.mode === 'list' &&

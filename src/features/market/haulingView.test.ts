@@ -111,9 +111,10 @@ describe('filterHaulingRows', () => {
       maxDays: 14,
       minMarginPct: 3,
       steadyOnly: false,
+      maxUnitPrice: null,
     });
     expect(shown.map((r) => r.typeId)).toEqual([1]);
-    expect(hidden).toEqual({ thin: 0, slow: 1, lowMargin: 1 });
+    expect(hidden).toEqual({ tooDear: 0, thin: 0, slow: 1, lowMargin: 1 });
   });
 
   it('shows everything when the days limit is off and the margin floor is zero', () => {
@@ -121,9 +122,10 @@ describe('filterHaulingRows', () => {
       maxDays: null,
       minMarginPct: -100,
       steadyOnly: false,
+      maxUnitPrice: null,
     });
     expect(shown).toHaveLength(3);
-    expect(hidden).toEqual({ thin: 0, slow: 0, lowMargin: 0 });
+    expect(hidden).toEqual({ tooDear: 0, thin: 0, slow: 0, lowMargin: 0 });
   });
 
   it('sorts best margin first', () => {
@@ -131,6 +133,7 @@ describe('filterHaulingRows', () => {
       maxDays: null,
       minMarginPct: -100,
       steadyOnly: false,
+      maxUnitPrice: null,
     });
     const margins = shown.map((r) => r.marginPct);
     expect(margins).toEqual([...margins].sort((a, b) => b - a));
@@ -144,9 +147,39 @@ describe('filterHaulingRows', () => {
       maxDays: null,
       minMarginPct: -100,
       steadyOnly: true,
+      maxUnitPrice: null,
     });
     expect(shown.map((r) => r.typeId)).toEqual([1]);
     expect(hidden.thin).toBe(1);
+  });
+
+  it('hides a row whose origin buy price is above the max price per item, and counts it', () => {
+    const dear = scanRow({ typeId: 7, buyLadder: [{ price: 5_000, units: 100, orders: 1 }] });
+    // Thin and dear: counted once, as too dear.
+    const thinDear = scanRow({ typeId: 8, buyLadder: [{ price: 5_000, units: 100, orders: 1 }] });
+    thinDear.demand = { ...thinDear.demand, demand: 'rarely' };
+    const all = toViewRows([scanRow({ typeId: 1 }), dear, thinDear], FEES_AT);
+    const { shown, hidden } = filterHaulingRows(all, {
+      maxDays: null,
+      minMarginPct: -100,
+      steadyOnly: true,
+      maxUnitPrice: 1_000,
+    });
+    expect(shown.map((r) => r.typeId)).toEqual([1]);
+    expect(hidden).toEqual({ tooDear: 2, thin: 0, slow: 0, lowMargin: 0 });
+  });
+
+  it('keeps a row priced exactly at the max price, and applies to an instant sale too', () => {
+    const atCap = scanRow({ typeId: 1 });
+    const instant = instantRow({ typeId: 2, buyLadder: [{ price: 101, units: 10, orders: 1 }] });
+    const { shown, hidden } = filterHaulingRows(toViewRows([atCap, instant], FEES_AT), {
+      maxDays: null,
+      minMarginPct: -100,
+      steadyOnly: false,
+      maxUnitPrice: 100,
+    });
+    expect(shown.map((r) => r.typeId)).toEqual([1]);
+    expect(hidden.tooDear).toBe(1);
   });
 });
 
@@ -206,9 +239,10 @@ describe('selling into buy orders', () => {
       maxDays: 1,
       minMarginPct: 3,
       steadyOnly: true,
+      maxUnitPrice: null,
     });
     expect(shown.map((r) => r.typeId)).toEqual([1]);
-    expect(hidden).toEqual({ thin: 0, slow: 0, lowMargin: 1 });
+    expect(hidden).toEqual({ tooDear: 0, thin: 0, slow: 0, lowMargin: 1 });
   });
 });
 
