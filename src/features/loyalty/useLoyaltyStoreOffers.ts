@@ -14,7 +14,11 @@ import { useMarketHub } from '@/features/market/hub';
 import { getTradeHub, DEFAULT_TRADE_HUB, type TradeHub } from '@/market/hubs';
 import { useTradeHubStandings, tradeHubStanding } from '@/features/market/useTradeHubStandings';
 import { loadLoyaltyStoreOffersStatus, loadCorporationName } from './store';
-import { loadBlueprintCatalog, type BlueprintCatalog } from '@/features/industry/blueprintCatalog';
+import {
+  EMPTY_BLUEPRINT_CATALOG,
+  loadBlueprintCatalog,
+  type BlueprintCatalog,
+} from '@/features/industry/blueprintCatalog';
 import { useMarketSnapshot } from '@/features/industry/useMarketSnapshot';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import { loadCharacterLoyaltyPoints } from '@/features/character/loyalty';
@@ -43,10 +47,12 @@ export interface LoyaltyStoreResult {
   rows: LoyaltyOfferRow[];
   /** For resolving a blueprint's material names in the detail panel. */
   catalog: BlueprintCatalog | null;
+  /** The blueprint catalog couldn't load: blueprint offers list as plain items, with no build-versus-buy figures. */
+  catalogUnavailable: boolean;
   playerLp: number;
   hub: TradeHub;
   hubHydrated: boolean;
-  /** True once offers, the catalog and a market snapshot have all loaded at least once. */
+  /** True once offers, the catalog and (when there are offers to price) a market snapshot have all loaded at least once. */
   ready: boolean;
   useOwnMaterialsFor: ReadonlySet<number>;
   toggleUseOwnMaterials: (offerId: number) => void;
@@ -98,9 +104,15 @@ export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult
 
   useEffect(() => {
     let cancelled = false;
-    void loadBlueprintCatalog().then((cat) => {
-      if (!cancelled) setCatalog(cat);
-    });
+    loadBlueprintCatalog().then(
+      (cat) => {
+        if (!cancelled) setCatalog(cat);
+      },
+      // Offers still list; they just carry no build-vs-buy figures.
+      () => {
+        if (!cancelled) setCatalog(EMPTY_BLUEPRINT_CATALOG);
+      }
+    );
     return () => {
       cancelled = true;
     };
@@ -241,7 +253,10 @@ export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult
     playerLp,
     hub,
     hubHydrated,
-    ready: offers !== null && catalog !== null && snapshot !== null,
+    catalogUnavailable: catalog === EMPTY_BLUEPRINT_CATALOG,
+    // A store with no offers has no prices to wait for, so `snapshot` stays
+    // null for good: that is "no offers", not still loading.
+    ready: offers !== null && catalog !== null && (typeIds.length === 0 || snapshot !== null),
     useOwnMaterialsFor,
     toggleUseOwnMaterials,
   };

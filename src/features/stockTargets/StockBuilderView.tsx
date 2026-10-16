@@ -4,7 +4,7 @@
  * for it, and one action that turns the buildable part into a Build Group
  * sized to cover each.
  */
-import { useEffect, useId, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -16,6 +16,8 @@ import {
   type DataTableColumn,
 } from '@/components/ui';
 import { HintText } from '@/components/ui/HintText';
+import { DataUnavailable } from '@/components/DataUnavailable';
+import { onReconnect } from '@/stores/network';
 import { db } from '@/db';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import { runsToCover, timePerRunAtTe } from '@/engine/stockTargets/builder';
@@ -55,6 +57,12 @@ export function StockBuilderView({
   const navigate = useNavigate();
   const { showInfo } = useItemActions();
   const [catalog, setCatalog] = useState<BlueprintCatalog | null>(null);
+  const [catalogFailed, setCatalogFailed] = useState(false);
+  const [catalogAttempt, setCatalogAttempt] = useState(0);
+  const retryCatalog = useCallback(() => {
+    setCatalogFailed(false);
+    setCatalogAttempt((attempt) => attempt + 1);
+  }, []);
   const [blueprints, setBlueprints] = useState<CharacterBlueprint[] | null>(null);
   const [naming, setNaming] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -71,9 +79,14 @@ export function StockBuilderView({
     void hydrateMe();
     void hydrateTe();
     let cancelled = false;
-    void loadBlueprintCatalog().then((c) => {
-      if (!cancelled) setCatalog(c);
-    });
+    loadBlueprintCatalog().then(
+      (c) => {
+        if (!cancelled) setCatalog(c);
+      },
+      () => {
+        if (!cancelled) setCatalogFailed(true);
+      }
+    );
     const owned =
       activeCharacterId === null
         ? Promise.resolve<CharacterBlueprint[]>([])
@@ -86,7 +99,12 @@ export function StockBuilderView({
     return () => {
       cancelled = true;
     };
-  }, [activeCharacterId, hydrateBuildGroups, hydrateMe, hydrateTe]);
+  }, [activeCharacterId, hydrateBuildGroups, hydrateMe, hydrateTe, catalogAttempt]);
+  // A catalog that couldn't load is fetched again once the connection returns.
+  useEffect(
+    () => (catalogFailed ? onReconnect(retryCatalog) : undefined),
+    [catalogFailed, retryCatalog]
+  );
 
   const split = useMemo(() => {
     if (!catalog || !blueprints) return null;
@@ -116,6 +134,9 @@ export function StockBuilderView({
     };
   }, [catalog, blueprints, rows]);
 
+  if (catalogFailed && !catalog) {
+    return <DataUnavailable title={t('industry.catalogUnavailable')} onRetry={retryCatalog} />;
+  }
   if (!split) {
     return <Spinner label={t('common.loading')} />;
   }

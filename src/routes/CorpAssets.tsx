@@ -48,6 +48,7 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { useCorpRouteGate } from '@/features/corp/useCorpRouteGate';
+import { DataUnavailable } from '@/components/DataUnavailable';
 import { CorpDenied } from '@/features/corp/CorpDenied';
 import { CorpSubNav } from '@/features/corp/CorpSubNav';
 import { loadCorporationId } from '@/features/corp/boardData';
@@ -927,6 +928,17 @@ export function CorpAssets() {
   const gate = useCorpRouteGate((capabilities) => capabilities.canReadAssets);
 
   if (gate.status === 'loading') return <Spinner />;
+
+  // The roles read failed (offline, nothing cached): say so, rather than a spinner for good.
+  if (gate.status === 'failed') {
+    return (
+      <DataUnavailable
+        title={t('corp.rolesUnavailable')}
+        hint={t('corp.rolesUnavailableHint')}
+        onRetry={gate.retry}
+      />
+    );
+  }
 
   if (gate.status === 'denied') {
     return (

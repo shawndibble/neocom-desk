@@ -27,6 +27,7 @@ import { DataAgeBadge, IconButton, PageHeader, Spinner } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import { useCorpRouteGate } from '@/features/corp/useCorpRouteGate';
+import { DataUnavailable } from '@/components/DataUnavailable';
 import { CorpDenied } from '@/features/corp/CorpDenied';
 import { CorpSubNav } from '@/features/corp/CorpSubNav';
 import { CorpVitalsRail } from '@/features/corp/CorpVitalsRail';
@@ -520,6 +521,17 @@ export function Corp() {
   // bouncing a Director who deep-linked before their roles read landed would
   // simply be a bug. See `useCorpRouteGate`.
   if (gate.status === 'loading') return <Spinner />;
+
+  // The roles read failed (offline, nothing cached): say so, rather than a spinner for good.
+  if (gate.status === 'failed') {
+    return (
+      <DataUnavailable
+        title={t('corp.rolesUnavailable')}
+        hint={t('corp.rolesUnavailableHint')}
+        onRetry={gate.retry}
+      />
+    );
+  }
 
   // Reached the URL without the access for it. A bare explanation, not the
   // section's shell drawn over nothing — that would be a lock, and corp UI

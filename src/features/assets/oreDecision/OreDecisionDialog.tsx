@@ -8,7 +8,7 @@
  * Market Hub's buy price less sales tax, both exits taxed alike so they compare
  * like with like. The refining facility is an assumption the dialog states.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { cx } from '@/lib/cx';
@@ -26,6 +26,8 @@ import {
   textActionClassName,
   type DataTableColumn,
 } from '@/components/ui';
+import { DataUnavailable } from '@/components/DataUnavailable';
+import { onReconnect } from '@/stores/network';
 import { db } from '@/db';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -151,6 +153,15 @@ export function OreDecisionDialog({
     void useOreRefiningStructureRate.getState().hydrate();
   }, []);
 
+  // Whether what the dialog needs couldn't load, rather than a spinner for good.
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const retryLoad = useCallback(() => {
+    setLoadFailed(false);
+    setLoadAttempt((attempt) => attempt + 1);
+  }, []);
+  useEffect(() => (loadFailed ? onReconnect(retryLoad) : undefined), [loadFailed, retryLoad]);
+
   useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -177,11 +188,14 @@ export function OreDecisionDialog({
         if (price && price > 0) buyPrices[id] = price;
       }
       if (!cancelled) setData({ recipe, modifiers, hub, buyPrices, names });
-    })();
+    })().catch(() => {
+      // Reprocessing data is a lazy download, so offline it can be missing.
+      if (!cancelled) setLoadFailed(true);
+    });
     return () => {
       cancelled = true;
     };
-  }, [typeId, hubId, activeCharacterId]);
+  }, [typeId, hubId, activeCharacterId, loadAttempt]);
 
   // Plans: resolved exactly as the Industry index resolves them.
   const workspace = useIndustryWorkspace();
@@ -354,7 +368,9 @@ export function OreDecisionDialog({
       title={t('assets.oreDecision.title', { name: itemName, count: quantity })}
     >
       <div className="space-y-3 text-sm">
-        {data === null || exits === null ? (
+        {data === null && loadFailed ? (
+          <DataUnavailable title={t('assets.oreDecision.loadFailed')} onRetry={retryLoad} />
+        ) : data === null || exits === null ? (
           <p className="text-text-dim">
             {data === null ? t('assets.oreDecision.loading') : t('assets.oreDecision.noRecipe')}
           </p>

@@ -16,7 +16,11 @@ import { getTradeHub, DEFAULT_TRADE_HUB } from '@/market/hubs';
 import { useTradeHubStandings, tradeHubStanding } from '@/features/market/useTradeHubStandings';
 import { useCurrentSystem } from '@/features/route/currentSystem';
 import { useJumpRangeFilter } from '@/features/route/currentSystem';
-import { loadBlueprintCatalog, type BlueprintCatalog } from '@/features/industry/blueprintCatalog';
+import {
+  EMPTY_BLUEPRINT_CATALOG,
+  loadBlueprintCatalog,
+  type BlueprintCatalog,
+} from '@/features/industry/blueprintCatalog';
 import { useMarketSnapshot } from '@/features/industry/useMarketSnapshot';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import { loadTypeNames } from '@/features/character/typeNames';
@@ -102,9 +106,15 @@ export function useLpStoreSearch(query: string): LpStoreSearchState {
       if (cancelled || !byId) return;
       setSystemNames(new Map([...byId].map(([id, entry]) => [id, entry.name])));
     });
-    void loadBlueprintCatalog().then((cat) => {
-      if (!cancelled) setCatalog(cat);
-    });
+    loadBlueprintCatalog().then(
+      (cat) => {
+        if (!cancelled) setCatalog(cat);
+      },
+      // Search still lists matches; they just carry no build-vs-buy figures.
+      () => {
+        if (!cancelled) setCatalog(EMPTY_BLUEPRINT_CATALOG);
+      }
+    );
     return () => {
       cancelled = true;
     };

@@ -3,6 +3,7 @@ import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
+import { DataUnavailable } from '@/components/DataUnavailable';
 import { Spinner, TabPanel } from '@/components/ui';
 import { useIndustryWorkspace } from '@/features/industry/useIndustryWorkspace';
 import { IndustryHeader } from '@/features/industry/IndustryHeader';
@@ -36,6 +37,8 @@ export function IndustryPlanPage() {
   const {
     activeCharacterId,
     catalog,
+    catalogFailed,
+    retryCatalog,
     pi,
     ownedBlueprints,
     modifiers,
@@ -128,7 +131,9 @@ export function IndustryPlanPage() {
             hang (`buildPlanPricingInputs.ts`'s own doc comment), so this
             never becomes a real wait. */}
         <TabPanel tabsId={INDUSTRY_TABS_ID} tabId="plans" className="space-y-4">
-          {!catalog || !pricingInputs.hydrated ? (
+          {catalogFailed ? (
+            <DataUnavailable title={t('industry.catalogUnavailable')} onRetry={retryCatalog} />
+          ) : !catalog || !pricingInputs.hydrated ? (
             <div className="flex justify-center py-16">
               <Spinner label={t('common.loading')} />
             </div>

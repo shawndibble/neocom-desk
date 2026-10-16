@@ -60,6 +60,8 @@ function accessOf(state: CorpAccessState, capabilities: Partial<CorpCapabilities
     capabilities: { ...NO_CORP_CAPABILITIES, ...capabilities },
     missingScopes: [],
     roles: [],
+    readFailed: false,
+    retry: () => {},
   };
 }
 

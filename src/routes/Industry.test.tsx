@@ -24,6 +24,7 @@ import {
   useReactionFacilityDefaults,
 } from '@/features/industry/reactionFacilityDefaults';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
+import { loadBlueprints, loadMarketWideTrees } from '@/sde/loadSde';
 import type { BlueprintMap, TypeMap } from '@/sde/types';
 
 vi.mock('virtual:pwa-register/react', () => ({
@@ -225,6 +226,45 @@ async function seedRun() {
 }
 
 beforeEach(resetSession);
+
+describe('Industry: data that fails to load', () => {
+  it('says the blueprint data could not load instead of spinning, and loads it on Try again', async () => {
+    vi.mocked(loadBlueprints).mockRejectedValueOnce(new Error('offline'));
+    const user = userEvent.setup();
+    render(<App />);
+
+    expect(await screen.findByText("Blueprint data couldn't load")).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(await screen.findByRole('searchbox', { name: 'Add Build Plan' })).toBeInTheDocument();
+  });
+
+  it('keeps BPC Sourcing usable while the blueprint data is missing', async () => {
+    vi.mocked(loadBlueprints).mockRejectedValue(new Error('offline'));
+    window.history.pushState({}, '', '/industry/sourcing');
+    try {
+      render(<App />);
+      await waitFor(() =>
+        expect(screen.getByRole('tab', { name: /sourcing|BPC/i })).toHaveAttribute(
+          'aria-selected',
+          'true'
+        )
+      );
+      expect(screen.queryByText("Blueprint data couldn't load")).not.toBeInTheDocument();
+    } finally {
+      vi.mocked(loadBlueprints).mockImplementation(async () => BLUEPRINTS);
+    }
+  });
+
+  it('notes that the market-wide build data is not downloaded, rather than rejecting unhandled', async () => {
+    vi.mocked(loadMarketWideTrees).mockRejectedValueOnce(new Error('offline'));
+    window.history.pushState({}, '', '/industry/opportunities');
+    render(<App />);
+
+    expect(
+      await screen.findByText("Market-wide build data hasn't been downloaded yet")
+    ).toBeInTheDocument();
+  });
+});
 
 describe('Industry: tabs are paths (issue #1300)', () => {
   it('sends bare /industry to the Build Plans tab, and a tab click pushes its own path', async () => {

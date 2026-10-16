@@ -3,7 +3,15 @@
  * add items to one by searching for each, or by pasting a whole list the way
  * Appraisal takes a paste.
  */
-import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, FieldError, LiveStatus, Modal, TextArea, TextInput } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
@@ -12,6 +20,7 @@ import { matchAppraisalEntries, type AppraisalMatch } from '@/engine/market/appr
 import { loadAppraisalCatalogue } from '@/features/market/appraisalData';
 import { COMBOBOX_NAV_KEYS, moveHighlight, type ComboboxNavKey } from '@/lib/comboboxNav';
 import { cx } from '@/lib/cx';
+import { onReconnect } from '@/stores/network';
 import { rankedSearch } from '@/lib/rankedSearch';
 import type { MarketTypeEntry } from '@/sde/marketTypes';
 import { loadMarketTypes } from '@/sde/loadMarketSde';
@@ -149,15 +158,29 @@ export function AddStockItemDialog({
   const [error, setError] = useState<{ field: 'item' | 'quantity'; text: string } | null>(null);
   const [added, setAdded] = useState<{ name: string; quantity: number; n: number } | null>(null);
 
+  // The catalogue is a lazy download, so offline it may be missing: say so,
+  // rather than letting the search sit silently empty.
+  const [typesFailed, setTypesFailed] = useState(false);
+  const [typesAttempt, setTypesAttempt] = useState(0);
+  const retryTypes = useCallback(() => {
+    setTypesFailed(false);
+    setTypesAttempt((attempt) => attempt + 1);
+  }, []);
   useEffect(() => {
     let live = true;
-    void loadMarketTypes().then((list) => {
-      if (live) setTypes(list);
-    });
+    loadMarketTypes().then(
+      (list) => {
+        if (live) setTypes(list);
+      },
+      () => {
+        if (live) setTypesFailed(true);
+      }
+    );
     return () => {
       live = false;
     };
-  }, []);
+  }, [typesAttempt]);
+  useEffect(() => (typesFailed ? onReconnect(retryTypes) : undefined), [typesFailed, retryTypes]);
 
   const matches = useMemo(
     () =>
@@ -247,6 +270,14 @@ export function AddStockItemDialog({
             }}
             onKeyDown={onSearchKeyDown}
           />
+          {typesFailed && (
+            <div role="status" className="flex items-center gap-2 text-xs text-text-dim">
+              <span>{t('stockTargets.add.searchUnavailable')}</span>
+              <Button size="sm" onClick={retryTypes}>
+                {t('common.retry')}
+              </Button>
+            </div>
+          )}
           <ul
             id={listId}
             role="listbox"

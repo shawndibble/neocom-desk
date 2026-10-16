@@ -58,6 +58,8 @@ function accessOf(state: CorpAccessState, capabilities: Partial<CorpCapabilities
     capabilities: { ...NO_CORP_CAPABILITIES, ...capabilities },
     missingScopes: [],
     roles: [],
+    readFailed: false,
+    retry: () => {},
   };
 }
 
@@ -166,6 +168,16 @@ describe('access (AC1)', () => {
     renderMembers();
     expect(screen.getByRole('status')).toBeInTheDocument();
     expect(mocked.loadCorporationMemberTracking).not.toHaveBeenCalled();
+  });
+
+  it('says the roles could not be checked, with a Try again, instead of waiting for good', async () => {
+    const retry = vi.fn();
+    mockedAccess.mockReturnValue({ ...accessOf('unknown', {}), readFailed: true, retry });
+    renderMembers();
+    expect(screen.getByText("Can't check your corporation roles right now")).toBeInTheDocument();
+    expect(screen.queryByRole('status')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(retry).toHaveBeenCalledTimes(1);
   });
 
   /**

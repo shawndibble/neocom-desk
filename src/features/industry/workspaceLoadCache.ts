@@ -13,14 +13,18 @@
  * with the rest of its cache (removal, sign-out) and reset between tests.
  */
 import type { CharacterBlueprint } from '@/esi/endpoints';
-import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
+import {
+  NO_CHARACTER_MODIFIERS,
+  type CharacterModifiers,
+} from '@/engine/industry/characterModifiers';
 import type { PiData } from '@/sde/types';
 import { readRouteSnapshot, writeRouteSnapshot } from '@/lib/routeSnapshotCache';
 import type { BlueprintCatalog } from './blueprintCatalog';
 
 export interface WorkspaceLoad {
   characterId: number;
-  catalog: BlueprintCatalog;
+  /** Null until the blueprint catalog has loaded: it is loaded apart from the Character's own data. */
+  catalog: BlueprintCatalog | null;
   pi: PiData | null;
   ownedBlueprints: CharacterBlueprint[];
   blueprintsNeedsReauth: boolean;
@@ -36,6 +40,30 @@ export function lastWorkspaceLoad(characterId: number | null): WorkspaceLoad | n
 
 export function rememberWorkspaceLoad(load: WorkspaceLoad): void {
   writeRouteSnapshot(SNAPSHOT_NAME, load.characterId, load);
+}
+
+/**
+ * Merges `patch` into the last load for `characterId` (or an empty one), so the
+ * catalog and the Character's own data — which load, and fail, independently —
+ * each record what they got without waiting for the other.
+ */
+export function patchWorkspaceLoad(
+  characterId: number,
+  patch: Partial<Omit<WorkspaceLoad, 'characterId'>>
+): WorkspaceLoad {
+  const load: WorkspaceLoad = {
+    ...(lastWorkspaceLoad(characterId) ?? {
+      characterId,
+      catalog: null,
+      pi: null,
+      ownedBlueprints: [],
+      blueprintsNeedsReauth: false,
+      modifiers: NO_CHARACTER_MODIFIERS,
+    }),
+    ...patch,
+  };
+  rememberWorkspaceLoad(load);
+  return load;
 }
 
 /**

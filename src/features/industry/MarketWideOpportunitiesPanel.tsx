@@ -32,10 +32,13 @@ import {
   SelectValue,
   LiveStatus,
   Spinner,
+  Tooltip,
   type DataTableColumn,
   type StatChipTone,
   STAT_CHIP_TONE_TEXT_CLASS,
 } from '@/components/ui';
+import { DataUnavailable } from '@/components/DataUnavailable';
+import { useOnline } from '@/stores/network';
 import { db } from '@/db';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { PriceHistoryPanel } from '@/features/market/PriceHistoryPanel';
@@ -102,6 +105,9 @@ const ORDER_DEPTH_TONE: Record<OrderDepthLevel, StatChipTone> = {
 interface MarketWideOpportunitiesPanelProps {
   hub: TradeHub;
   trees: MarketWideTreeMap | null;
+  /** The precomputed trees couldn't be loaded (not downloaded yet, no connection). */
+  treesFailed?: boolean;
+  onRetryTrees?: () => void;
   catalog: BlueprintCatalog | null;
   modifiers: CharacterModifiers;
   /** For the standing toward `hub`'s NPC owner (issue #1238). Null while no character is active. */
@@ -235,6 +241,8 @@ const MARKET_WIDE_DEFAULT_SORT = { columnId: 'iskPerHour', direction: 'desc' } a
 export function MarketWideOpportunitiesPanel({
   hub,
   trees,
+  treesFailed = false,
+  onRetryTrees,
   catalog,
   modifiers,
   activeCharacterId,
@@ -242,6 +250,7 @@ export function MarketWideOpportunitiesPanel({
   startFolded = false,
 }: MarketWideOpportunitiesPanelProps) {
   const { t } = useTranslation();
+  const online = useOnline();
   const unknownName = t('common.unknown');
   // Below `lg` the ranking is cards, the same breakpoint Ranked and All owned switch at.
   const isDesktop = useIsDesktop();
@@ -305,6 +314,19 @@ export function MarketWideOpportunitiesPanel({
     setExpandedChoice(true);
     run(next);
   };
+  // `aria-disabled` while offline, not the native attribute, so the reason stays reachable.
+  const scanButton = (
+    <Button
+      size="sm"
+      onClick={() => online && scan(filter)}
+      disabled={!trees || !catalog}
+      aria-disabled={loading || !online || undefined}
+    >
+      {loading
+        ? t('industry.marketOpportunitiesScanning')
+        : t('industry.marketOpportunitiesRunScan')}
+    </Button>
+  );
   const applyFilter = (next: MarketWideFilterState) => {
     setFilter(next);
     // Any narrowing starts the pilot back at the top of the ranking.
@@ -754,16 +776,11 @@ export function MarketWideOpportunitiesPanel({
             />
           )}
           {filterBar}
-          <Button
-            size="sm"
-            onClick={() => scan(filter)}
-            disabled={!trees || !catalog}
-            aria-disabled={loading || undefined}
-          >
-            {loading
-              ? t('industry.marketOpportunitiesScanning')
-              : t('industry.marketOpportunitiesRunScan')}
-          </Button>
+          {online ? (
+            scanButton
+          ) : (
+            <Tooltip content={t('common.needsConnection')}>{scanButton}</Tooltip>
+          )}
         </span>
       }
     >
@@ -780,6 +797,12 @@ export function MarketWideOpportunitiesPanel({
               {t('industry.marketOpportunitiesRetry')}
             </Button>
           }
+          className="py-8"
+        />
+      ) : !hasRun && treesFailed && !trees ? (
+        <DataUnavailable
+          title={t('industry.marketWideTreesUnavailable')}
+          onRetry={onRetryTrees}
           className="py-8"
         />
       ) : !hasRun ? (

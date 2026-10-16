@@ -3,6 +3,8 @@ import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-route
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
+import { DataUnavailable } from '@/components/DataUnavailable';
+import { onReconnect } from '@/stores/network';
 import {
   Button,
   DataAgeBadge,
@@ -102,6 +104,8 @@ export function Industry() {
     activeCharacterId,
     hydrated,
     catalog,
+    catalogFailed,
+    retryCatalog,
     pi,
     ownedBlueprints,
     pricingInputs,
@@ -119,15 +123,31 @@ export function Industry() {
   // input (issue #819). Not part of `useIndustryWorkspace`: only this index's
   // Opportunities tab needs it, never the plan/group detail pages.
   const [marketWideTrees, setMarketWideTrees] = useState<MarketWideTreeMap | null>(null);
+  const [marketWideTreesFailed, setMarketWideTreesFailed] = useState(false);
+  const [marketWideTreesAttempt, setMarketWideTreesAttempt] = useState(0);
+  const retryMarketWideTrees = useCallback(() => {
+    setMarketWideTreesFailed(false);
+    setMarketWideTreesAttempt((attempt) => attempt + 1);
+  }, []);
   useEffect(() => {
     let cancelled = false;
-    void loadMarketWideTrees().then((trees) => {
-      if (!cancelled) setMarketWideTrees(trees);
-    });
+    loadMarketWideTrees().then(
+      (trees) => {
+        if (!cancelled) setMarketWideTrees(trees);
+      },
+      () => {
+        if (!cancelled) setMarketWideTreesFailed(true);
+      }
+    );
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [marketWideTreesAttempt]);
+  // The scan's input is a lazy download: fetch it again when the connection returns.
+  useEffect(
+    () => (marketWideTreesFailed ? onReconnect(retryMarketWideTrees) : undefined),
+    [marketWideTreesFailed, retryMarketWideTrees]
+  );
 
   const [searchParams, setSearchParams] = useSearchParams();
   const [tab, setTab] = usePageTab(INDUSTRY_TABS);
@@ -666,6 +686,8 @@ export function Industry() {
       key="market-wide"
       hub={DEFAULT_TRADE_HUB}
       trees={marketWideTrees}
+      treesFailed={marketWideTreesFailed}
+      onRetryTrees={retryMarketWideTrees}
       catalog={catalog}
       modifiers={modifiers}
       activeCharacterId={activeCharacterId}
@@ -724,15 +746,18 @@ export function Industry() {
         />
 
         <TabPanel tabsId={INDUSTRY_TABS_ID} tabId={tab} className="space-y-4">
-          {!plans || !catalog || !buildGroupsHydrated || !expandedGroupsHydrated ? (
+          {/* BPC Sourcing needs neither the catalog nor the plans, so it stays usable when the catalog can't load. */}
+          {tab === 'sourcing' ? (
+            <BpcSourcingPanel onHeaderChange={setBpcSourcingHeader} />
+          ) : catalogFailed ? (
+            <DataUnavailable title={t('industry.catalogUnavailable')} onRetry={retryCatalog} />
+          ) : !plans || !catalog || !buildGroupsHydrated || !expandedGroupsHydrated ? (
             <div className="flex justify-center py-16">
               <Spinner label={t('common.loading')} />
             </div>
           ) : (
             <>
-              {tab === 'sourcing' ? (
-                <BpcSourcingPanel onHeaderChange={setBpcSourcingHeader} />
-              ) : tab === 'opportunities' ? (
+              {tab === 'opportunities' ? (
                 <div className="flex flex-col gap-4">
                   {/* "What's profitable" (the market-wide scan) always leads,
                     open; the owned-blueprint ranking follows it. */}

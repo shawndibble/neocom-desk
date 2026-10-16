@@ -220,6 +220,17 @@ describe('appraisePaste', () => {
       expect(appraisal.totals.refine).toBe(row.refineTotal);
     });
 
+    it('still appraises, without a refine value, when reprocessing data cannot load', async () => {
+      server.use(aggregates(PRICED));
+      mockedLoadReprocessing.mockRejectedValue(new Error('offline'));
+      mockedLoadCorrectedSkills.mockResolvedValue(skillsFixture([]));
+
+      const { appraisal } = await appraisePaste('Tritanium\t100', DEFAULT_TRADE_HUB, 100, 1);
+
+      expect(appraisal.rows).toHaveLength(1);
+      expect(appraisal.rows[0].refineTotal).toBeUndefined();
+    });
+
     it('leaves a non-reprocessable row without a refine value even with a Character active', async () => {
       server.use(aggregates(PRICED));
       mockedLoadReprocessing.mockResolvedValue({});

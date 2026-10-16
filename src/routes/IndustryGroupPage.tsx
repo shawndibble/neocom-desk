@@ -3,6 +3,7 @@ import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type BuildPlanRecord } from '@/db';
+import { DataUnavailable } from '@/components/DataUnavailable';
 import { Spinner, TabPanel, Toast, useTimedToast } from '@/components/ui';
 import { useIndustryWorkspace } from '@/features/industry/useIndustryWorkspace';
 import { useAccountSkillLevels } from '@/features/skills/useAccountSkillLevels';
@@ -46,6 +47,8 @@ export function IndustryGroupPage() {
   const {
     activeCharacterId,
     catalog,
+    catalogFailed,
+    retryCatalog,
     pi,
     ownedBlueprints,
     pricingInputs,
@@ -175,7 +178,9 @@ export function IndustryGroupPage() {
         />
 
         <TabPanel tabsId={INDUSTRY_TABS_ID} tabId="plans" className="space-y-4">
-          {!catalog ? (
+          {catalogFailed ? (
+            <DataUnavailable title={t('industry.catalogUnavailable')} onRetry={retryCatalog} />
+          ) : !catalog ? (
             <div className="flex justify-center py-16">
               <Spinner label={t('common.loading')} />
             </div>

@@ -4,6 +4,7 @@ import type { BlueprintCatalog } from './blueprintCatalog';
 import { forgetRouteSnapshots, resetRouteSnapshots } from '@/lib/routeSnapshotCache';
 import {
   lastWorkspaceLoad,
+  patchWorkspaceLoad,
   rememberWorkspaceLoad,
   reuseIfUnchanged,
   type WorkspaceLoad,
@@ -62,5 +63,22 @@ describe('reuseIfUnchanged', () => {
   it('takes the fresh value when there was none before', () => {
     const fresh = { skills: {} };
     expect(reuseIfUnchanged(undefined, fresh)).toBe(fresh);
+  });
+});
+
+describe('patchWorkspaceLoad', () => {
+  it('starts an empty load when there is none, with no catalog', () => {
+    const patched = patchWorkspaceLoad(1, { pi: null });
+    expect(patched.catalog).toBeNull();
+    expect(patched.ownedBlueprints).toEqual([]);
+    expect(lastWorkspaceLoad(1)).toBe(patched);
+  });
+
+  it('keeps what was already loaded, so the catalog and the Character’s data land apart', () => {
+    const loaded = load(1);
+    rememberWorkspaceLoad({ ...loaded, catalog: null });
+    const patched = patchWorkspaceLoad(1, { catalog: loaded.catalog });
+    expect(patched.catalog).toBe(loaded.catalog);
+    expect(patched.modifiers).toBe(loaded.modifiers);
   });
 });

@@ -157,7 +157,8 @@ export async function appraisePaste(
     characterId === null
       ? [null, null, null]
       : await Promise.all([
-          loadReprocessing(),
+          // A lazy download: missing offline, it costs only the refine column.
+          loadReprocessing().catch(() => null),
           loadCharacterModifiers(characterId, Date.now()),
           findLpOfferMatches(characterId, typeIds),
         ]);

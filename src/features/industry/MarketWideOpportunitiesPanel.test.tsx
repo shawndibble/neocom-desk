@@ -103,14 +103,22 @@ function renderPanel(
   actions = fakeItemActions(),
   initialEntries = ['/'],
   onStartPlan: () => Promise<boolean> = () => Promise.resolve(false),
-  extra: { catalog?: BlueprintCatalog; startFolded?: boolean } = {}
+  extra: {
+    catalog?: BlueprintCatalog;
+    startFolded?: boolean;
+    trees?: Record<string, never> | null;
+    treesFailed?: boolean;
+    onRetryTrees?: () => void;
+  } = {}
 ) {
   return render(
     <MemoryRouter initialEntries={initialEntries}>
       {withItemActions(
         <MarketWideOpportunitiesPanel
           hub={{ id: 'jita' } as unknown as TradeHub}
-          trees={{}}
+          trees={'trees' in extra ? extra.trees! : {}}
+          treesFailed={extra.treesFailed}
+          onRetryTrees={extra.onRetryTrees}
           catalog={extra.catalog ?? catalog}
           modifiers={{} as CharacterModifiers}
           activeCharacterId={null}
@@ -600,5 +608,51 @@ describe('MarketWideOpportunitiesPanel scan outcome announcement', () => {
     hookState.error = true;
     renderPanel();
     await waitFor(() => expect(statusText()).toMatch(/fail|couldn|error/i));
+  });
+});
+
+describe('MarketWideOpportunitiesPanel offline', () => {
+  function setOnline(value: boolean | null) {
+    if (value === null) Reflect.deleteProperty(navigator, 'onLine');
+    else Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => value });
+  }
+  afterEach(() => {
+    setOnline(null);
+    hookState.hasRun = true;
+  });
+
+  it('keeps Scan from running while offline, and says why', async () => {
+    setOnline(false);
+    const user = userEvent.setup();
+    renderPanel();
+    const scan = screen.getByRole('button', { name: 'Scan' });
+    expect(scan).toHaveAttribute('aria-disabled', 'true');
+    await user.click(scan);
+    expect(hookState.run).not.toHaveBeenCalled();
+    await user.hover(scan);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Needs a connection');
+  });
+
+  it('scans as usual while online', async () => {
+    setOnline(true);
+    hookState.run.mockClear();
+    renderPanel();
+    await userEvent.click(screen.getByRole('button', { name: 'Scan' }));
+    expect(hookState.run).toHaveBeenCalledTimes(1);
+  });
+
+  it('says the market-wide build data is not downloaded, with a retry, when its trees failed to load', async () => {
+    hookState.hasRun = false;
+    const onRetryTrees = vi.fn();
+    renderPanel(fakeItemActions(), ['/'], undefined, {
+      trees: null,
+      treesFailed: true,
+      onRetryTrees,
+    });
+    expect(
+      screen.getByText("Market-wide build data hasn't been downloaded yet")
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(onRetryTrees).toHaveBeenCalledTimes(1);
   });
 });
