@@ -9,7 +9,9 @@ import '@/i18n';
 import { ESI_BASE_URL } from '@/esi/client';
 import { ItemDetailModal } from './ItemDetailModal';
 import { loadAttributeDictionary, loadGlobalMarkets } from '@/sde/loadMarketSde';
-import { loadPi, loadSkillAttributeModifiers, loadSkills } from '@/sde/loadSde';
+import { loadMutaplasmids, loadPi, loadSkillAttributeModifiers, loadSkills } from '@/sde/loadSde';
+import { resetMutaplasmidLookupForTests } from '@/features/abyssal/mutaplasmidData';
+import { resetDynamicItemFailuresForTests } from '@/features/abyssal/dynamicItems';
 import { loadTypeInfo } from '@/sde/loadTypeInfo';
 import { piFixture } from '@/sde/__fixtures__/pi';
 import { db } from '@/db';
@@ -29,6 +31,11 @@ vi.mock('@/sde/loadSde', () => ({
   loadTypes: vi.fn(async () => ({})),
   loadPi: vi.fn(async () => ({ schematics: {}, raw: [] })),
   loadSkillAttributeModifiers: vi.fn(async () => ({})),
+  loadMutaplasmids: vi.fn(async () => ({
+    attributeNames: {},
+    mutaplasmids: {},
+    abyssalTypeIds: [],
+  })),
 }));
 // Default: the baked shard doesn't carry the type, so the ESI handlers below
 // serve it through the cached-ESI fallback.
@@ -40,6 +47,7 @@ const mockedLoadSkills = vi.mocked(loadSkills);
 const mockedLoadPi = vi.mocked(loadPi);
 const mockedLoadSkillAttributeModifiers = vi.mocked(loadSkillAttributeModifiers);
 const mockedLoadTypeInfo = vi.mocked(loadTypeInfo);
+const mockedLoadMutaplasmids = vi.mocked(loadMutaplasmids);
 
 const TYPE_ID = 587;
 
@@ -56,6 +64,9 @@ afterEach(async () => {
   // leak a resolved name into the next test's "unresolvable" case.
   await db.esiCache.clear();
   await db.skillPlans.clear();
+  await db.dynamicItems.clear();
+  resetMutaplasmidLookupForTests();
+  resetDynamicItemFailuresForTests();
   // Order Book has its own 300s TTL cache, keyed by region+type — several
   // tests reuse TYPE_ID, and a real Date.now would let one test's response
   // leak into the next's.
@@ -65,7 +76,8 @@ afterEach(async () => {
 
 describe('ItemDetailModal', () => {
   it('offers View in Market only when asked, closing itself on the way', async () => {
-    server.use(http.get(`${ESI_BASE_URL}/universe/types/${TYPE_ID}`, () => new Promise(() => {})));
+    // Fails fast: a request left hanging would hold an ESI slot the next tests need.
+    server.use(http.get(`${ESI_BASE_URL}/universe/types/${TYPE_ID}`, () => HttpResponse.error()));
     mockedLoadDictionary.mockReturnValue(new Promise(() => {}));
     const onClose = vi.fn();
     const { rerender } = render(
@@ -73,7 +85,8 @@ describe('ItemDetailModal', () => {
         <ItemDetailModal typeId={TYPE_ID} itemName="Rifter" onClose={onClose} showOpenInMarket />
       </MemoryRouter>
     );
-    const link = screen.getByRole('link', { name: 'View in Market' });
+    // Waits for the mutaplasmid data: an abyssal type offers no View in Market.
+    const link = await screen.findByRole('link', { name: 'View in Market' });
     expect(link).toHaveAttribute('href', `/market/browser?type=${TYPE_ID}`);
     await userEvent.setup().click(link);
     expect(onClose).toHaveBeenCalledTimes(1);
@@ -741,6 +754,30 @@ describe('ItemDetailModal best sell/buy price', () => {
     expect(screen.getByText('420,000 ISK', { selector: '.sr-only' })).toBeInTheDocument();
   });
 
+  it('treats every type as ordinary when the mutaplasmid data fails to load', async () => {
+    mockedLoadMutaplasmids.mockRejectedValue(new Error('offline'));
+    serveRifter();
+    server.use(
+      http.get(`${ESI_BASE_URL}/markets/${JITA_REGION_ID}/orders`, () =>
+        HttpResponse.json([order({ order_id: 1, is_buy_order: false, price: 450_000 })])
+      )
+    );
+
+    render(
+      <MemoryRouter>
+        <ItemDetailModal typeId={TYPE_ID} itemName="Rifter" onClose={() => {}} showOpenInMarket />
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByRole('link', { name: 'View in Market' })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: /best sell 450,000 ISK/i })).toBeInTheDocument();
+    mockedLoadMutaplasmids.mockResolvedValue({
+      attributeNames: {},
+      mutaplasmids: {},
+      abyssalTypeIds: [],
+    });
+  });
+
   it('links best sell and best buy to the item in the Market, keeping the hub', async () => {
     serveRifter();
     server.use(
@@ -972,5 +1009,74 @@ describe('ItemDetailModal type info source (issue #3882)', () => {
     expect(await screen.findByText("Couldn't load item info")).toBeInTheDocument();
     expect(screen.getByText('Planetary production')).toBeInTheDocument();
     expect(screen.getByText('3,000 x Base Metals')).toBeInTheDocument();
+  });
+});
+
+describe('ItemDetailModal — an owned abyssal module', () => {
+  const ABYSSAL_TYPE = 47832;
+  const BASE_TYPE = 12271;
+  const MUTAPLASMID = 47831;
+  const ITEM_ID = 1040000000001;
+
+  it("shows the module's own attributes and no order-book prices", async () => {
+    let orderReads = 0;
+    mockedLoadMutaplasmids.mockResolvedValue({
+      attributeNames: { 9: 'hp' },
+      mutaplasmids: {
+        [MUTAPLASMID]: {
+          result: ABYSSAL_TYPE,
+          bases: [BASE_TYPE],
+          attributes: [{ id: 9, min: 0.8, max: 1.2, highIsGood: true }],
+        },
+      },
+      abyssalTypeIds: [ABYSSAL_TYPE],
+    });
+    mockedLoadDictionary.mockResolvedValue({
+      9: { name: 'Structure Hitpoints', unit: 'HP', category: 'Structure' },
+    });
+    // The abyssal type's own shard carries no hit points; the base's does.
+    mockedLoadTypeInfo.mockImplementation(async (typeId: number) => ({
+      description: '',
+      effects: [],
+      attributes: typeId === BASE_TYPE ? [[9, 1000]] : [],
+      volume: 5,
+    }));
+    server.use(
+      http.get(`${ESI_BASE_URL}/dogma/dynamic/items/${ABYSSAL_TYPE}/${ITEM_ID}`, () =>
+        HttpResponse.json({
+          created_by: 1,
+          mutator_type_id: MUTAPLASMID,
+          source_type_id: BASE_TYPE,
+          dogma_attributes: [{ attribute_id: 9, value: 1150 }],
+          dogma_effects: [],
+        })
+      ),
+      http.post(`${ESI_BASE_URL}/universe/names`, () => HttpResponse.json([])),
+      http.get(`${ESI_BASE_URL}/markets/:regionId/orders`, () => {
+        orderReads += 1;
+        return HttpResponse.json([]);
+      })
+    );
+
+    render(
+      <MemoryRouter>
+        <ItemDetailModal
+          typeId={ABYSSAL_TYPE}
+          itemId={ITEM_ID}
+          itemName="Heavy Abyssal Energy Neutralizer"
+          onClose={() => {}}
+          showOpenInMarket
+        />
+      </MemoryRouter>
+    );
+
+    const rolls = await screen.findByRole('table', { name: "This module's rolls" });
+    expect(within(rolls).getByText('1,150')).toBeInTheDocument();
+    // The grouped attributes are the module's own (1,150 HP), not its type's empty shard.
+    expect(await screen.findByText('1,150 HP')).toBeInTheDocument();
+    expect(screen.queryByText('Best sell:')).not.toBeInTheDocument();
+    // No market order exists for an abyssal type: no book is read, no Market link offered.
+    expect(orderReads).toBe(0);
+    expect(screen.queryByRole('link', { name: 'View in Market' })).not.toBeInTheDocument();
   });
 });

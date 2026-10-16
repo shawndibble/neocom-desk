@@ -55,8 +55,9 @@ function ItemInfoHost() {
     <ItemActionsContext.Provider value={actions}>
       <Suspense fallback={null}>
         <ItemDetailModal
-          key={request.typeId}
+          key={`${request.typeId}-${request.itemId ?? ''}`}
           typeId={request.typeId}
+          itemId={request.itemId}
           itemName={name}
           showOpenInMarket
           onClose={close}

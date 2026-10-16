@@ -77,6 +77,24 @@ export function useMutaplasmidLookup(): MutaplasmidLookup | null {
   return lookup;
 }
 
+/** Whether `typeId` is an Abyssal type: null while the data loads, false if it won't load. */
+export function useIsAbyssalType(typeId: number): boolean | null {
+  const lookup = useMutaplasmidLookup();
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    if (lookup) return;
+    let live = true;
+    loadMutaplasmidLookup().catch(() => {
+      if (live) setFailed(true);
+    });
+    return () => {
+      live = false;
+    };
+  }, [lookup]);
+  if (lookup) return lookup.isAbyssalType(typeId);
+  return failed ? false : null;
+}
+
 /** Test-only: forget the loaded lookup. */
 export function resetMutaplasmidLookupForTests(): void {
   lookupPromise = null;

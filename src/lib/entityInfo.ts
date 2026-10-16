@@ -1,7 +1,8 @@
 /**
  * The `info` search param: which entity's Show Info (or Skill) modal a URL
  * has open — `?info=character-<id>`, `corporation-<id>`, `alliance-<id>` or
- * `skill-<typeId>` or `type-<typeId>` (an item's Item Detail). It rides on the *current* location, so a link to an
+ * `skill-<typeId>`, `type-<typeId>` (Item Detail) or `type-<typeId>-<itemId>`
+ * (one Mutated module's Rolls). It rides on the *current* location, so a link to an
  * entity is a real, shareable `<a href>` that opens the modal over whatever
  * page the pilot is on (DESIGN.md §6c "Entities").
  *
@@ -13,14 +14,21 @@ export type EntityInfoKind = 'character' | 'corporation' | 'alliance' | 'skill' 
 export interface EntityInfoTarget {
   kind: EntityInfoKind;
   id: number;
+  /** `type` only: a Mutated module's item id. */
+  itemId?: number;
 }
 
 export const ENTITY_INFO_PARAM = 'info';
 
-const INFO_PATTERN = /^(character|corporation|alliance|skill|type)-(\d+)$/;
+const INFO_PATTERN = /^(character|corporation|alliance|skill|type)-(\d+)(?:-(\d+))?$/;
 
-export function formatEntityInfo({ kind, id }: EntityInfoTarget): string {
-  return `${kind}-${id}`;
+function positiveId(raw: string): number | null {
+  const id = Number(raw);
+  return Number.isSafeInteger(id) && id > 0 ? id : null;
+}
+
+export function formatEntityInfo({ kind, id, itemId }: EntityInfoTarget): string {
+  return kind === 'type' && itemId !== undefined ? `${kind}-${id}-${itemId}` : `${kind}-${id}`;
 }
 
 /** The entity a search string opens, or null when `info` is absent or unreadable. */
@@ -28,9 +36,12 @@ export function parseEntityInfo(search: string): EntityInfoTarget | null {
   const raw = new URLSearchParams(search).get(ENTITY_INFO_PARAM);
   const match = raw === null ? null : INFO_PATTERN.exec(raw);
   if (!match) return null;
-  const id = Number(match[2]);
-  if (!Number.isSafeInteger(id) || id <= 0) return null;
-  return { kind: match[1] as EntityInfoKind, id };
+  const kind = match[1] as EntityInfoKind;
+  const id = positiveId(match[2]!);
+  if (id === null) return null;
+  if (match[3] === undefined) return { kind, id };
+  const itemId = kind === 'type' ? positiveId(match[3]) : null;
+  return itemId === null ? null : { kind, id, itemId };
 }
 
 /** `pathname + search` with `info` set to `target`, every other param kept. */

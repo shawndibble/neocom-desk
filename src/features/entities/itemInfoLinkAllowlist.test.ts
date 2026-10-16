@@ -8,6 +8,7 @@ import { describe, it, expect } from 'vitest';
  * keeps a plain name. Market-context pages use `MarketItemLink` instead.
  */
 const REVIEWED = new Set<string>([
+  'src/features/abyssal/AbyssalItemDetail.tsx',
   'src/features/character/assetBrowserRows.tsx',
   'src/features/character/ContractDetailModal.tsx',
   'src/features/character/JournalDescriptionCell.tsx',

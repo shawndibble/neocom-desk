@@ -388,6 +388,8 @@ interface ItemRowProps {
   blueprintKind?: BlueprintKind | null;
   /** Makes the name a Market link (§6c); Show info stays in the row menu. */
   typeId?: number;
+  /** Set for a Mutated module only: Show info opens on its own Rolls. */
+  itemId?: number;
   /** Wraps the row in the shared item context menu — supplied by the route. */
   wrap: (children: ReactElement) => ReactNode;
   selectMode: boolean;
@@ -431,6 +433,7 @@ export function ItemRow({
   characterBadge,
   blueprintKind = null,
   typeId,
+  itemId,
   wrap,
   selectMode,
   selectionState,
@@ -466,6 +469,7 @@ export function ItemRow({
               ) : (
                 <ItemInfoLink
                   typeId={typeId}
+                  itemId={itemId}
                   className={cx('flex min-w-0 items-center text-sm', tappableRowClassName)}
                   {...guard.handlers}
                   onClick={(e) => {

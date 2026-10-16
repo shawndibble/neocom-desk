@@ -17,6 +17,7 @@ import { db } from '@/db';
 import { PublicInfoModal } from '@/components/PublicInfoModal';
 import { usePublicInfoModalStore, openPublicInfoModal } from '@/stores/publicInfoModal';
 import { useSkillDetailModalStore, openSkillDetailModal } from '@/stores/skillDetailModal';
+import { openItemInfo, useItemInfoModalStore } from '@/stores/itemInfoModal';
 import { EntityInfoRoute } from './EntityInfoRoute';
 import { CharacterLink, SkillLink, SystemLink } from './EntityLink';
 
@@ -133,6 +134,20 @@ describe('EntityInfoRoute', () => {
     act(() => openPublicInfoModal('corporation', 7));
     await screen.findByRole('dialog');
     expect(probe.search).toBe('?info=corporation-7');
+  });
+
+  it('a programmatic item open carries an owned item id through the URL', async () => {
+    renderAt('/assets');
+    act(() => openItemInfo(47408, 'Abyssal MWD', 1040000000001));
+    await waitFor(() =>
+      expect(useItemInfoModalStore.getState().request).toEqual({
+        typeId: 47408,
+        itemName: 'Abyssal MWD',
+        itemId: 1040000000001,
+      })
+    );
+    expect(probe.search).toBe('?info=type-47408-1040000000001');
+    act(() => useItemInfoModalStore.getState().clear());
   });
 
   it('a programmatic skill open carries its plan entries alongside the URL', async () => {

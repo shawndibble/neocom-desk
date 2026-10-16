@@ -23,6 +23,20 @@ describe('parseEntityInfo', () => {
     expect(parseEntityInfo('?info=type-x')).toBeNull();
   });
 
+  it('carries an owned item id on an item type only', () => {
+    expect(formatEntityInfo({ kind: 'type', id: 47408, itemId: 1040000000001 })).toBe(
+      'type-47408-1040000000001'
+    );
+    expect(parseEntityInfo('?info=type-47408-1040000000001')).toEqual({
+      kind: 'type',
+      id: 47408,
+      itemId: 1040000000001,
+    });
+    expect(parseEntityInfo('?info=type-47408-0')).toBeNull();
+    expect(parseEntityInfo('?info=character-1-2')).toBeNull();
+    expect(parseEntityInfo('?info=type-47408-99999999999999999999')).toBeNull();
+  });
+
   it('accepts a search without the leading ? and finds it among other params', () => {
     expect(parseEntityInfo('tab=a&info=skill-7&x=1')).toEqual({ kind: 'skill', id: 7 });
   });

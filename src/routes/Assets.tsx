@@ -141,6 +141,7 @@ import { useOpenInFittings } from '@/features/fittings/useOpenInFittings';
 import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
 import { useItemActions } from '@/features/market/itemActions';
 import { usePageItemActions } from '@/features/market/usePageItemActions';
+import { useMutaplasmidLookup } from '@/features/abyssal/mutaplasmidData';
 import { addQuickbarItem } from '@/features/market/quickbar';
 import { useCompareSet } from '@/features/market/compareSet';
 import { writeToClipboard } from '@/lib/clipboard';
@@ -2200,6 +2201,7 @@ function NodeRowView({
 }: BrowseRowViewProps & { node: AssetTreeNode }) {
   const actions = useAssetItemActions();
   const pageActions = useItemActions();
+  const mutaplasmids = useMutaplasmidLookup();
   const label = nodeLabel(node);
   const badge = node.kind === 'bay' ? null : characterBadgeFor(node.asset.item_id, characterBadges);
 
@@ -2221,6 +2223,8 @@ function NodeRowView({
   }
 
   const { asset } = node;
+  // A Mutated module's Show info opens on its own Rolls; any other stack's on its type.
+  const itemId = mutaplasmids?.isAbyssalType(asset.type_id) ? asset.item_id : undefined;
   const estimatedValue = assetStackValue(asset, actions.priceByTypeId, actions.copyValueByItemId);
   const planTarget =
     pageActions.blueprints === null
@@ -2241,6 +2245,7 @@ function NodeRowView({
       characterBadge={badge}
       blueprintKind={assetBlueprintKind(asset, actions.blueprintTypeIds)}
       typeId={asset.type_id}
+      itemId={itemId}
       selectMode={selectMode}
       selectionState={selectedIds.has(asset.item_id) ? 'checked' : 'unchecked'}
       onToggleSelection={() => onToggleSelection([asset.item_id])}
@@ -2249,6 +2254,7 @@ function NodeRowView({
         <OreItemMenu
           quantity={asset.quantity}
           typeId={asset.type_id}
+          itemId={itemId}
           itemName={label}
           blueprintTypeID={blueprintTypeID}
           planProductTypeID={planTarget?.productTypeID}

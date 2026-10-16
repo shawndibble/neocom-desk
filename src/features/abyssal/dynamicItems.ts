@@ -24,7 +24,9 @@ export interface DynamicItemRef {
  */
 const DEFAULT_CONCURRENCY = 4;
 
-const rejectedThisSession = new Set<number>();
+/** By `typeId:itemId`: a wrong type in a hand-edited URL must not block the item's real lookup. */
+const rejectedThisSession = new Set<string>();
+const refKey = (ref: DynamicItemRef) => `${ref.typeId}:${ref.itemId}`;
 
 /** Test-only: forget the ids ESI rejected. */
 export function resetDynamicItemFailuresForTests(): void {
@@ -56,7 +58,7 @@ async function fetchOne(
   ref: DynamicItemRef,
   signal?: AbortSignal
 ): Promise<DynamicItemRecord | null> {
-  if (rejectedThisSession.has(ref.itemId)) return null;
+  if (rejectedThisSession.has(refKey(ref))) return null;
   try {
     const result = await getDogmaDynamicItem(ref.typeId, ref.itemId, signal ? { signal } : {});
     if (!result.data) return null;
@@ -74,16 +76,20 @@ async function fetchOne(
       err.status !== 420 &&
       err.status !== 429
     ) {
-      rejectedThisSession.add(ref.itemId);
+      rejectedThisSession.add(refKey(ref));
     }
     return null;
   }
 }
 
-/** One mutated item's dynamic attributes — cached, else fetched once; null when ESI has none for it. */
+/**
+ * One mutated item's dynamic attributes — cached, else fetched once; null when
+ * ESI has none for it, or the item is cached under another type (item ids are unique).
+ */
 export async function getDynamicItem(ref: DynamicItemRef): Promise<DynamicItemRecord | null> {
   const [cached] = await readCached([ref.itemId]);
-  return cached ?? fetchOne(ref);
+  if (cached) return cached.typeId === ref.typeId ? cached : null;
+  return fetchOne(ref);
 }
 
 /**
@@ -120,6 +126,30 @@ export async function fetchDynamicItems(
   return found;
 }
 
+/** A stored record's attributes in ESI's `{ attribute_id, value }` shape. */
+export function recordAttributes(
+  record: DynamicItemRecord
+): { attribute_id: number; value: number }[] {
+  return record.attributes.map(([attribute_id, value]) => ({ attribute_id, value }));
+}
+
+/** `record`'s mutation, when it and this build's mutaplasmid data agree (`mutationFromDynamicItem`). */
+export function mutationFromRecord(
+  typeId: number,
+  record: DynamicItemRecord,
+  lookup: MutaplasmidLookup
+): ItemMutation | null {
+  return mutationFromDynamicItem(
+    typeId,
+    {
+      source_type_id: record.sourceTypeId,
+      mutator_type_id: record.mutatorTypeId,
+      dogma_attributes: recordAttributes(record),
+    },
+    lookup
+  );
+}
+
 /**
  * The `ItemMutation` of each ref ESI and this build's mutaplasmid data agree
  * on, by item id: base, mutaplasmid, and only the rolls that mutaplasmid
@@ -136,18 +166,7 @@ export async function mutationsForItems(
   for (const ref of refs) {
     const record = items.get(ref.itemId);
     if (!record) continue;
-    const mutation = mutationFromDynamicItem(
-      ref.typeId,
-      {
-        source_type_id: record.sourceTypeId,
-        mutator_type_id: record.mutatorTypeId,
-        dogma_attributes: record.attributes.map(([attribute_id, value]) => ({
-          attribute_id,
-          value,
-        })),
-      },
-      lookup
-    );
+    const mutation = mutationFromRecord(ref.typeId, record, lookup);
     if (mutation) mutations.set(ref.itemId, mutation);
   }
   return mutations;
