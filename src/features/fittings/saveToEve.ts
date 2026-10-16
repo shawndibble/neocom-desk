@@ -8,7 +8,7 @@
  * rather than neither.
  */
 import { deleteCharacterFitting, postCharacterFitting } from '@/esi/endpoints';
-import { EsiError } from '@/esi/client';
+import { EsiError, EsiTimeoutError, isOfflineFailure } from '@/esi/client';
 import { reportWriteAuthFailure } from '@/esi/writeAuthFailure';
 import { fittingToEsiFitting } from '@/engine/fittings/esiFittingMapper';
 import type { Fitting } from '@/engine/fittings/types';
@@ -52,9 +52,19 @@ export type SaveToEveResult =
   | {
       ok: false;
       message: string;
+      /** The write never got through for want of a connection: nothing was saved, and trying again online works. */
+      offline?: true;
       /** ESI refused and the grant lacks the write scope: logging in again for the Fittings Permission fixes it. */
       needsPermission?: true;
     };
+
+/**
+ * A network failure before ESI heard the request. A timeout after it was sent
+ * is not this: the Fitting may have landed, so it keeps the generic message.
+ */
+function failedOffline(err: unknown): boolean {
+  return isOfflineFailure(err) && !(err instanceof EsiTimeoutError && err.sent);
+}
 
 function messageOf(err: unknown): string {
   return err instanceof EsiError ? err.message : 'Unknown error';
@@ -74,6 +84,7 @@ export async function saveFittingToEve(input: SaveToEveInput): Promise<SaveToEve
     if (data === null) return { ok: false, message: 'ESI returned no fitting id' };
     fittingId = data.fitting_id;
   } catch (err) {
+    if (failedOffline(err)) return { ok: false, message: 'offline', offline: true };
     const outcome = await reportWriteAuthFailure(characterId, err, 'postCharacterFitting');
     return outcome === 'grant-needed'
       ? { ok: false, message: messageOf(err), needsPermission: true }

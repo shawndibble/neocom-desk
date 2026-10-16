@@ -7,6 +7,7 @@ import wasmInit, {
   type Projection,
   type Violation,
 } from '@eveshipfit/dogma-engine';
+import { setDogmaEngineStatus } from './dogmaEngineStatus';
 import { createIdleGuard, drainBodyWithGuard, readBodyWithGuard } from '@/lib/idleTimeout';
 import { classifyRuleBreaks, type CandidateRack } from '@/engine/fittings/candidates';
 import type { PlanEntry } from '@/engine/types';
@@ -207,6 +208,7 @@ export function loadDogmaEngine(
 ): Promise<DogmaEngine> {
   if (!enginePromise) {
     void deleteStaleAssetCaches();
+    setDogmaEngineStatus('loading');
     enginePromise = (async () => {
       let wasmLoaded = 0;
       let sdeLoaded = 0;
@@ -233,12 +235,14 @@ export function loadDogmaEngine(
       await wasmInit({ module_or_path: wasmBytes });
       load_sde(new Uint8Array(sdeBytes));
       readyEngine = dogmaEngine;
+      setDogmaEngineStatus('ready');
       for (const listener of readyListeners) listener();
       return dogmaEngine;
     })().catch((error: unknown) => {
       // A failed load (offline on first visit, a bad response, …) must not
       // wedge every later attempt behind the same rejected promise.
       enginePromise = null;
+      setDogmaEngineStatus('failed');
       throw error;
     });
   }

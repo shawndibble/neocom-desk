@@ -107,37 +107,53 @@ export function usePlanEditorData(characterId: number | null): PlanEditorData {
     if (characterId === null) return;
     let cancelled = false;
     void (async () => {
-      const [cat, corrected, attrs, implantBonuses] = await Promise.all([
-        loadSkillCatalog(),
-        loadCorrectedSkills(characterId, Date.now()),
-        loadCharacterAttributes(characterId),
-        loadImplantBonuses(characterId),
-      ]);
-      if (cancelled) return;
-      setCatalog(cat);
-      // /skills is stale until the character next logs in. ESI says to apply
-      // past-finish_date queue entries on top, or a plan gets normalized and
-      // optimized against levels the character already trained past.
-      setTrainedSkills(corrected.trained);
-      setTrainedSkillsKnown(corrected.skillsResult !== null);
-      setQueueEntries(corrected.queueResult?.data ?? []);
-      setQueueFetchedAt(corrected.queueResult?.fetchedAt ?? null);
-      setTotalSp(corrected.totalSp);
-      setUnallocatedSp(corrected.skillsResult?.data.unallocated_sp ?? null);
-      setFetchedAt(corrected.fetchedAt);
-      if (attrs?.data) {
-        // An `impossible` sheet yields no baseline at all, so the scheduler
-        // falls back to the same placeholder it uses when ESI cannot be read.
-        // Approximating one from the reported numbers is what produced the
-        // silent zero this replaces: see engine/attributeBaseline.ts.
-        const baseline = toAttributeBaseline(attrs.data, implantBonuses);
-        setAttributeBaseline(baseline);
-        setAttributes(baselineAttributes(baseline) ?? DEFAULT_ATTRIBUTES);
+      // The skill catalog ships in the bundle, so it is set the moment it is
+      // in, not after the ESI reads: offline those can take their time or
+      // fail, and the editor must not wait on them to draw its skill list.
+      const catalogDone = loadSkillCatalog()
+        .then((cat) => {
+          if (!cancelled) setCatalog(cat);
+        })
+        .catch(() => {
+          // Stays null; the views that need it show their own failed state.
+        });
+      try {
+        const [corrected, attrs, implantBonuses] = await Promise.all([
+          loadCorrectedSkills(characterId, Date.now()),
+          loadCharacterAttributes(characterId),
+          loadImplantBonuses(characterId),
+        ]);
+        if (cancelled) return;
+        // /skills is stale until the character next logs in. ESI says to apply
+        // past-finish_date queue entries on top, or a plan gets normalized and
+        // optimized against levels the character already trained past.
+        setTrainedSkills(corrected.trained);
+        setTrainedSkillsKnown(corrected.skillsResult !== null);
+        setQueueEntries(corrected.queueResult?.data ?? []);
+        setQueueFetchedAt(corrected.queueResult?.fetchedAt ?? null);
+        setTotalSp(corrected.totalSp);
+        setUnallocatedSp(corrected.skillsResult?.data.unallocated_sp ?? null);
+        setFetchedAt(corrected.fetchedAt);
+        if (attrs?.data) {
+          // An `impossible` sheet yields no baseline at all, so the scheduler
+          // falls back to the same placeholder it uses when ESI cannot be read.
+          // Approximating one from the reported numbers is what produced the
+          // silent zero this replaces: see engine/attributeBaseline.ts.
+          const baseline = toAttributeBaseline(attrs.data, implantBonuses);
+          setAttributeBaseline(baseline);
+          setAttributes(baselineAttributes(baseline) ?? DEFAULT_ATTRIBUTES);
+        }
+        setAttributesResult(attrs);
+        setRemapInfo(remapAvailability(attrs?.data ?? null, new Date()));
+        setImplants(implantBonuses);
+      } catch {
+        // An ESI read threw (offline with nothing cached, say). The defaults
+        // stay in place and `trainedSkillsKnown` stays false, which is how the
+        // views tell "could not read" from "nothing trained".
       }
-      setAttributesResult(attrs);
-      setRemapInfo(remapAvailability(attrs?.data ?? null, new Date()));
-      setImplants(implantBonuses);
-      setLoadedFor(characterId);
+      await catalogDone;
+      // "Loaded" means the first attempt is over, whichever way it went.
+      if (!cancelled) setLoadedFor(characterId);
     })();
     return () => {
       cancelled = true;

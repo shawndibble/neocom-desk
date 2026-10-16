@@ -87,6 +87,8 @@ export function SkillsMasteryTab({
   }, [ship, skillName]);
 
   const hasTiers = !!tiers && tiers.some((bundle) => bundle.length > 0);
+  // No entry only means "none" once the file is in; before that it means nothing.
+  const masteriesStatus = source.masteriesStatus;
   // Level 0: CCP lists the skill under the tier but asks for nothing yet.
   const tierBundle = (tiers?.[tier - 1] ?? []).filter((p) => p.level > 0);
   const tierSkills = showMissing ? tierBundle.filter(missing) : tierBundle;
@@ -174,7 +176,7 @@ export function SkillsMasteryTab({
       <section className="space-y-2">
         <div className="flex items-center justify-between border-b border-line pb-1">
           <h3 className={heading}>{t('ships.info.skills.masteryTitle')}</h3>
-          {hasCharacter && (
+          {hasCharacter && masteriesStatus === 'loaded' && (
             <span className="text-text">
               {mastery
                 ? t('ships.info.skills.masteryLevel', { level: romanLevel(mastery) })
@@ -182,7 +184,16 @@ export function SkillsMasteryTab({
             </span>
           )}
         </div>
-        {!hasTiers ? (
+        {!hasTiers && masteriesStatus === 'unavailable' ? (
+          <p className="flex flex-wrap items-center gap-2 text-text-dim">
+            <span>{t('ships.info.skills.masteriesUnavailable')}</span>
+            <Button size="sm" onClick={source.retryMasteries}>
+              {t('ships.info.skills.masteriesRetry')}
+            </Button>
+          </p>
+        ) : !hasTiers && masteriesStatus === 'loading' ? (
+          <p className="text-text-dim">{t('ships.info.skills.masteriesLoading')}</p>
+        ) : !hasTiers ? (
           <p className="text-text-dim">{t('ships.info.skills.noMasteries')}</p>
         ) : (
           <>

@@ -1,5 +1,6 @@
 import { useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { isOfflineFailure } from '@/esi/client';
 import { Button, entityLinkClassName, Panel, TextArea } from '@/components/ui';
 import type { LoadedFitting, LoadOutcome } from '@/engine/fittings/load';
 import type { FittingXmlDocument } from '@/engine/import/eveFitXml';
@@ -93,11 +94,16 @@ export function FittingLoadCard({
   const [xmlLoading, setXmlLoading] = useState(false);
   const [xmlDocError, setXmlDocError] = useState<FittingXmlDocumentErrorCode | null>(null);
   const [xmlList, setXmlList] = useState<FittingXmlListItem[] | null>(null);
+  // A load that threw (as opposed to one the loader reported as unreadable): usually the item data missing offline.
+  const [thrown, setThrown] = useState<'offline' | 'unknown' | null>(null);
 
   async function handleLoad() {
     setLoading(true);
+    setThrown(null);
     try {
       await onLoad(text);
+    } catch (err) {
+      setThrown(isOfflineFailure(err) ? 'offline' : 'unknown');
     } finally {
       setLoading(false);
     }
@@ -107,6 +113,7 @@ export function FittingLoadCard({
     setXmlLoading(true);
     setXmlDocError(null);
     setXmlList(null);
+    setThrown(null);
     try {
       const parsed = await parseFittingXmlFile(file);
       if (!parsed.ok) {
@@ -120,6 +127,8 @@ export function FittingLoadCard({
       } else {
         setXmlList(items);
       }
+    } catch (err) {
+      setThrown(isOfflineFailure(err) ? 'offline' : 'unknown');
     } finally {
       setXmlLoading(false);
     }
@@ -162,6 +171,13 @@ export function FittingLoadCard({
         {loadError && (
           <p role="alert" className="text-xs text-danger">
             {t(`fittings.load.loadError.${loadError}`)}
+          </p>
+        )}
+        {thrown && (
+          <p role="alert" className="text-xs text-danger">
+            {t(
+              thrown === 'offline' ? 'fittings.load.thrownOffline' : 'fittings.load.thrownUnknown'
+            )}
           </p>
         )}
         {tooLargeToShare && (

@@ -33,6 +33,8 @@ export interface PlanState {
   destinationStation: string | null;
   /** System of each pickup location, for the Route Safety link's start. */
   pickupSystems: ReadonlyMap<number, number | null>;
+  /** The haulers could not be sized (the ship data is not downloaded), so "no hauler" says nothing about the pilot's skills. */
+  haulerSizingUnavailable?: boolean;
 }
 
 interface PlanResultProps {
@@ -196,7 +198,15 @@ export function PlanResult({
               </span>
             </div>
           )}
-          {totals.totalM3 > 0 && <p className="text-text-dim">{t('assets.movePlan.noHauler')}</p>}
+          {totals.totalM3 > 0 && (
+            <p className="text-text-dim">
+              {t(
+                state.haulerSizingUnavailable
+                  ? 'assets.movePlan.haulerSizingUnavailable'
+                  : 'assets.movePlan.noHauler'
+              )}
+            </p>
+          )}
         </>
       )}
       {alternatives.length > INLINE_ALTERNATIVES && (

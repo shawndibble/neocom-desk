@@ -47,6 +47,8 @@ import { useDamageProfiles } from '@/features/fittings/damageProfiles';
 import { TargetProfilePicker } from '@/features/fittings/TargetProfilePicker';
 import { useTargetProfiles } from '@/features/fittings/targetProfiles';
 import { usePilotProfile } from '@/features/fittings/fittingPilotProfile';
+import { useDogmaEngineStatus } from '@/features/fittings/dogmaEngineStatus';
+import { useOnline } from '@/stores/network';
 import {
   fittingCompareCsvColumns,
   fittingCompareModulesCsvColumns,
@@ -122,6 +124,10 @@ export function FittingCompare() {
 
   const anyError = slots.some((slot) => slot?.shareError);
   const anyStatsFailed = stats.failed.some(Boolean);
+  // The failure is the ship data never having downloaded, and there is no connection to fetch it.
+  const online = useOnline();
+  const engineStatus = useDogmaEngineStatus();
+  const shipDataNeedsConnection = !online && engineStatus === 'failed';
   // Slots whose stats calculated. A slot that failed is left out of the table (its column shows a
   // dash) so one bad Fitting doesn't hide the rest; best/differs are worked out over these only.
   const okSlots = useMemo(
@@ -394,9 +400,18 @@ export function FittingCompare() {
                   : anyError
                     ? t('fittings.compare.fixErrorsHint')
                     : anyStatsFailed
-                      ? t('fittings.compare.statsFailedHint')
+                      ? t(
+                          shipDataNeedsConnection
+                            ? 'fittings.compare.statsOfflineHint'
+                            : 'fittings.compare.statsFailedHint'
+                        )
                       : t('fittings.stats.loadingIndeterminate')}
               </p>
+              {!profileFailed && !anyError && anyStatsFailed && (
+                <Button className="mt-2" onClick={stats.retry}>
+                  {t('fittings.stats.retry')}
+                </Button>
+              )}
               {profileFailed && (
                 <Button className="mt-2" onClick={retryProfile}>
                   {t('fittings.compare.profileRetry')}

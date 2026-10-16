@@ -237,19 +237,28 @@ export function MovePlanTab({ onClose, characterIds, activeCharacterId }: MovePl
     setDestStation(station);
   }
 
-  async function loadHulls(): Promise<MoveHull[]> {
+  /**
+   * The haulers the pilot's skills size, and whether sizing was possible at
+   * all. `sizingUnavailable` is the engine or the catalogue data missing (the
+   * ship data never downloaded, offline), which "no hauler you can fly" would
+   * misreport as the pilot's skills.
+   */
+  async function loadHulls(): Promise<{ hulls: MoveHull[]; sizingUnavailable: boolean }> {
     const { catalogue, profile } = hullSource.current;
-    if (!catalogue || !profile || !loaded) return [];
+    if (!loaded) return { hulls: [], sizingUnavailable: false };
+    if (!catalogue || !profile) return { hulls: [], sizingUnavailable: true };
     const haulers =
       buildHullCatalogue([...catalogue.groupsById.values()], catalogue.marketTypes).find(
         (c) => c.name === HAULER_CLASS
       )?.hulls ?? [];
     const todo = haulers.filter((h) => !hullHolds.current.has(h.typeId));
+    let sizingFailures = 0;
     await mapWithConcurrencyLimit(todo, HULL_CONCURRENCY, async (hull) => {
       try {
         hullHolds.current.set(hull.typeId, await hullPackHolds(hull.typeId, profile));
       } catch {
         // Not cached: a transient failure should be retried next time.
+        sizingFailures += 1;
       }
     });
     const owned = new Set(
@@ -264,7 +273,7 @@ export function MovePlanTab({ onClose, characterIds, activeCharacterId }: MovePl
         (r) => (profile.skillLevels.get(r.skillTypeID) ?? 0) >= r.level
       )
     );
-    return sized.map((h, i) => ({
+    const hulls = sized.map((h, i) => ({
       typeId: h.typeId,
       name: h.name,
       hullClass: h.group,
@@ -273,6 +282,7 @@ export function MovePlanTab({ onClose, characterIds, activeCharacterId }: MovePl
       owned: owned.has(h.typeId),
       canFly: flyable[i],
     }));
+    return { hulls, sizingUnavailable: sizingFailures > 0 && hulls.length === 0 };
   }
 
   async function showPlan() {
@@ -293,7 +303,7 @@ export function MovePlanTab({ onClose, characterIds, activeCharacterId }: MovePl
               .then((place) => place.systemId)
               .catch(() => null)
           : destSystem;
-      const hulls = await loadHulls();
+      const { hulls, sizingUnavailable } = await loadHulls();
       const base = {
         destinationLocationIds: atDestination,
         characters: selectedPlanCharacters(loaded.sources, loaded.shipTypeIds, selected),
@@ -311,6 +321,7 @@ export function MovePlanTab({ onClose, characterIds, activeCharacterId }: MovePl
           destinationStation:
             destStation !== null ? (loaded.places.get(destStation) ?? null) : null,
           pickupSystems: loaded.systems,
+          haulerSizingUnavailable: sizingUnavailable,
         });
         focusAfterCommit(planHeadingRef);
       }

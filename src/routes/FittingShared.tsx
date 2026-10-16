@@ -3,6 +3,7 @@ import { Navigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
+import { onReconnect, useOnline } from '@/stores/network';
 import {
   Button,
   EmptyState,
@@ -74,6 +75,9 @@ export function FittingShareView({
   const characterCount = useLiveQuery(() => db.characters.count());
 
   const [state, setState] = useState<LoadState>({ status: 'loading' });
+  // Bumped by Retry, and by the connection returning, to resolve the code again.
+  const [attempt, setAttempt] = useState(0);
+  const online = useOnline();
   const [typeName, setTypeName] = useState<TypeName | null>(null);
   const [copied, setCopied] = useState(false);
   // Bumped per attempt so a repeat copy is announced again.
@@ -116,7 +120,10 @@ export function FittingShareView({
     return () => {
       cancelled = true;
     };
-  }, [code, characterCount]);
+  }, [code, characterCount, attempt]);
+
+  const failed = state.status === 'failed';
+  useEffect(() => (failed ? onReconnect(() => setAttempt((n) => n + 1)) : undefined), [failed]);
 
   const readyFitting = state.status === 'ready' ? state.fitting : null;
   const readyProfile = state.status === 'ready' ? state.profile : null;
@@ -237,7 +244,10 @@ export function FittingShareView({
       {state.status === 'failed' && (
         <EmptyState
           title={t('fittingShare.loadFailedTitle')}
-          hint={t('fittingShare.loadFailedHint')}
+          hint={t(online ? 'fittingShare.loadFailedHint' : 'fittingShare.loadFailedOffline')}
+          action={
+            <Button onClick={() => setAttempt((n) => n + 1)}>{t('fittingShare.retry')}</Button>
+          }
           className="py-10"
         />
       )}

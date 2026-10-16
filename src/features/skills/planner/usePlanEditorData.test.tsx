@@ -89,4 +89,19 @@ describe('usePlanEditorData', () => {
     expect(result.current.fetchedAt).toEqual(second);
     expect(result.current.trainedSkills.get(10)?.level).toBe(4);
   });
+
+  it('sets the local catalog without waiting on the ESI reads', async () => {
+    loadCorrectedSkills.mockReturnValue(new Promise<CorrectedSkills>(() => {}));
+    const { result } = renderHook(() => usePlanEditorData(7));
+    await waitFor(() => expect(result.current.catalog).not.toBeNull());
+    expect(result.current.loaded).toBe(false);
+  });
+
+  it('finishes loading, with skills unknown, when an ESI read throws', async () => {
+    loadCorrectedSkills.mockRejectedValue(new TypeError('Failed to fetch'));
+    const { result } = renderHook(() => usePlanEditorData(7));
+    await waitFor(() => expect(result.current.loaded).toBe(true));
+    expect(result.current.trainedSkillsKnown).toBe(false);
+    expect(result.current.catalog).not.toBeNull();
+  });
 });

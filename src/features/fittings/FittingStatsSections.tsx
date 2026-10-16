@@ -4,6 +4,8 @@ import { Trans, useTranslation } from 'react-i18next';
 import { Button, Caret, IskAmount, RowMoreActions } from '@/components/ui';
 import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
+import { useDogmaEngineStatus } from './dogmaEngineStatus';
+import { useOnline } from '@/stores/network';
 import { formatSeconds } from '@/lib/duration';
 import {
   alignTimeSeconds,
@@ -383,6 +385,8 @@ interface FittingStatsSectionsProps {
   statsError: boolean;
   /** What failed, when `statsError`: the pilot's skills, or the ship data / calculation. */
   statsErrorReason?: StatsErrorReason;
+  /** False when the pilot's skills could not be read, so the figures assume none. Default true. */
+  skillsKnown?: boolean;
   /** Tries the failed load again; without it the error has no retry. */
   onRetry?: () => void;
   price: Appraisal | null;
@@ -547,6 +551,7 @@ export function FittingStatsSections({
   statsProgress,
   statsError,
   statsErrorReason = 'shipData',
+  skillsKnown = true,
   onRetry,
   price,
   typeName,
@@ -562,6 +567,10 @@ export function FittingStatsSections({
   moduleResults = null,
 }: FittingStatsSectionsProps) {
   const { t } = useTranslation();
+  // The ship data never downloaded and there is no connection to fetch it: say so, not "couldn't load".
+  const online = useOnline();
+  const engineStatus = useDogmaEngineStatus();
+  const shipDataNeedsConnection = !online && engineStatus === 'failed';
   const profileName = useDamageProfileName()(damageProfiles.selected);
   const [appraisalOpen, setAppraisalOpen] = useState(false);
   // A fit with nothing priceable totals 0 on both sides — that's "unknown",
@@ -793,7 +802,11 @@ export function FittingStatsSections({
         >
           <span>
             {t(
-              statsErrorReason === 'skills' ? 'fittings.stats.errorSkills' : 'fittings.stats.error'
+              statsErrorReason === 'skills'
+                ? 'fittings.stats.errorSkills'
+                : shipDataNeedsConnection
+                  ? 'fittings.stats.errorOffline'
+                  : 'fittings.stats.error'
             )}
           </span>
           {onRetry && (
@@ -802,6 +815,12 @@ export function FittingStatsSections({
             </Button>
           )}
         </div>
+      )}
+
+      {stats && !skillsKnown && (
+        <p className="border-b border-line px-3 py-2 text-xs text-warning">
+          {t('fittings.stats.skillsUnknown')}
+        </p>
       )}
 
       {stats &&

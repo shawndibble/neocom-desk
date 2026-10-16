@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import type { DamageProfile, Fitting, FittingStats, PilotProfile } from '@/engine/fittings/types';
 import { useCompareStats } from './useCompareStats';
 
@@ -36,5 +36,28 @@ describe('useCompareStats', () => {
     damage.selected = kinProfile;
     rerender();
     await waitFor(() => expect(result.current.values[0]).toEqual({ tag: 0.25 }));
+  });
+
+  it('calculates a failed slot again on retry, and by itself when the connection returns', async () => {
+    const fittings = [fit];
+    damage.hydrated = true;
+    damage.selected = emProfile;
+    computeFittingStats.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    const { result } = renderHook(() => useCompareStats(fittings, profile));
+    await waitFor(() => expect(result.current.failed[0]).toBe(true));
+
+    act(() => result.current.retry());
+    await waitFor(() => expect(result.current.values[0]).toEqual({ tag: 1 }));
+    expect(result.current.failed[0]).toBe(false);
+
+    computeFittingStats.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    const second = renderHook(() =>
+      useCompareStats([{ name: 'b' } as unknown as Fitting], profile)
+    );
+    await waitFor(() => expect(second.result.current.failed[0]).toBe(true));
+    act(() => {
+      window.dispatchEvent(new Event('online'));
+    });
+    await waitFor(() => expect(second.result.current.values[0]).toEqual({ tag: 1 }));
   });
 });

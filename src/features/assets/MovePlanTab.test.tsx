@@ -110,6 +110,18 @@ describe('MovePlanTab', () => {
     expect(screen.getAllByRole('link', { name: /^Route Safety/ })).toHaveLength(1);
   });
 
+  it('blames the missing hauler sizing data, not the pilot, when no hauler could be sized', async () => {
+    const user = await open();
+    await user.click(screen.getByRole('checkbox', { name: /select everything at amarr viii/i }));
+    await user.click(screen.getByRole('button', { name: 'Pick a system' }));
+    await user.click(screen.getByRole('button', { name: 'Show plan' }));
+
+    expect(
+      await screen.findByText(/Hauler sizing needs data that isn't downloaded yet/)
+    ).toBeTruthy();
+    expect(screen.queryByText('No hauler you can fly could be sized for this load.')).toBeNull();
+  });
+
   it('keeps the pickup name when the system read fails', async () => {
     failing.system = true;
     const user = await open();

@@ -18,7 +18,13 @@ import { loadAllCharactersAssets } from '@/features/character/assets';
 import { useAppraisalOwnedPref } from '@/features/market/appraisalOwnedPref';
 import { useMarketHub } from '@/features/market/hub';
 import { TRADE_HUBS, getTradeHub } from '@/market/hubs';
-import { exportFitting, fittingShareCode, type FittingExportKind } from './fittingExportText';
+import {
+  exportFitting,
+  fittingShareCode,
+  fittingShareUrl,
+  type FittingExportKind,
+} from './fittingExportText';
+import { isOnline } from '@/stores/network';
 import { useTimedToast, NOTICE_MS } from '@/components/ui/useTimedToast';
 
 const ASSETS_ENDPOINTS: readonly EsiEndpointId[] = ['getCharacterAssets'];
@@ -115,6 +121,18 @@ export function useFittingExport(fitting: Fitting, cloneImplants: readonly numbe
       return;
     }
     let url = existingShareLink('fitting', code);
+    if (url === null && !isOnline()) {
+      // The short link is a Firestore write, which hangs or fails with no
+      // connection. The permanent link carries the whole code and opens
+      // from it locally, so it can be made now.
+      try {
+        await writeToClipboard(fittingShareUrl(code));
+        setNotice(t('fittings.export.copied.permanentLinkOffline'));
+      } catch {
+        setNotice(t('fittings.export.copyFailed'));
+      }
+      return;
+    }
     if (url === null) {
       if (characterId === null || !isSyncConfigured()) {
         setNotice(t('fittings.export.shareFailed'));

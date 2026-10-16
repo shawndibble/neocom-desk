@@ -141,6 +141,23 @@ describe('FittingExportMenu', () => {
     vi.mocked(existingShareLink).mockReturnValue(null);
   });
 
+  it('copies the permanent link, and says so, when offline instead of waiting on the share store', async () => {
+    useActiveCharacter.setState({ activeCharacterId: 7 });
+    Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => false });
+    try {
+      const copied = setup();
+      await choose('Copy Share Link');
+      await waitFor(() => expect(copied).toHaveLength(1));
+      expect(copied[0]).toContain('/ships/fittings?f=');
+      expect(createShareLink).not.toHaveBeenCalled();
+      expect(await screen.findByRole('status')).toHaveTextContent(
+        'Offline: permanent link copied instead. The short Share Link needs a connection.'
+      );
+    } finally {
+      Reflect.deleteProperty(navigator, 'onLine');
+    }
+  });
+
   it('says so when the Share Link could not be stored, copying nothing', async () => {
     useActiveCharacter.setState({ activeCharacterId: 7 });
     vi.mocked(createShareLink).mockRejectedValueOnce(new Error('permission-denied'));

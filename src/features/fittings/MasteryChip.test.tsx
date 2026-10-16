@@ -158,9 +158,14 @@ describe('MasteryChip', () => {
     expect(container.querySelector('[aria-hidden="true"]:empty')).toBeNull();
   });
 
-  it('gives up the slot when the Mastery data fails to load', async () => {
+  it('offers a badge that says the Mastery data is unavailable, with Retry, when it fails to load', async () => {
     vi.mocked(loadMasteries).mockImplementationOnce(() => Promise.reject(new Error('offline')));
-    const { container } = render(<MasteryChip hullTypeId={626} hullName="Vexor" characterId={1} />);
-    await waitFor(() => expect(container).toBeEmptyDOMElement());
+    render(<MasteryChip hullTypeId={626} hullName="Vexor" characterId={1} />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Mastery' }));
+    expect(screen.getByText(/Mastery data isn't available offline yet/)).toBeVisible();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(await screen.findByText('Vexor Mastery')).toBeInTheDocument();
+    expect(await screen.findByText('Drones')).toBeInTheDocument();
   });
 });
