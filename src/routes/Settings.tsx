@@ -16,6 +16,7 @@ import {
 import { SettingsBackLink, SettingsIndex, SettingsNav } from '@/features/settings/SettingsNav';
 import { AnalyticsPanel } from '@/features/settings/AnalyticsPanel';
 import { DevicePanel } from '@/features/settings/DevicePanel';
+import { OfflineDataPanel } from '@/features/settings/OfflineDataPanel';
 import { UpdatePanel } from '@/features/settings/UpdatePanel';
 import { InstallAppPanel } from '@/features/settings/InstallAppPanel';
 import { TravelSettingsPanel } from '@/features/settings/TravelSettingsPanel';
@@ -1164,6 +1165,7 @@ export function Settings() {
               <DataAgePanel />
             </>
           )}
+          {section === 'offline' && <OfflineDataPanel />}
           {section === 'activity' && <ActivityLogPanel />}
         </div>
       </div>

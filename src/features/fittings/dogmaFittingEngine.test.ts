@@ -376,6 +376,41 @@ describe('warmDogmaEngineAssets stall detection', () => {
   });
 });
 
+describe('warmDogmaEngineAssets overlap', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('shares one download between overlapping calls', async () => {
+    const { fetchMock } = stubNetwork();
+    const { warmDogmaEngineAssets } = await freshModule();
+    await Promise.all([warmDogmaEngineAssets(), warmDogmaEngineAssets()]);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('dogmaEngineAssetsCached', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('is false until both files are in the pinned bucket, true once warmed', async () => {
+    stubNetwork();
+    const { warmDogmaEngineAssets } = await freshModule();
+    const { dogmaEngineAssetsCached } = await import('./dogmaEngineAssets');
+    await expect(dogmaEngineAssetsCached()).resolves.toBe(false);
+    await warmDogmaEngineAssets();
+    await expect(dogmaEngineAssetsCached()).resolves.toBe(true);
+  });
+
+  it('is false when Cache Storage is unavailable or throws', async () => {
+    vi.stubGlobal('caches', {
+      open: vi.fn(async () => {
+        throw new Error('SecurityError');
+      }),
+    });
+    vi.resetModules();
+    const { dogmaEngineAssetsCached } = await import('./dogmaEngineAssets');
+    await expect(dogmaEngineAssetsCached()).resolves.toBe(false);
+  });
+});
+
 describe('computeFittingStats', () => {
   afterEach(() => vi.unstubAllGlobals());
 

@@ -6,6 +6,10 @@ const mocks = vi.hoisted(() => ({
   completeLogin: vi.fn(),
   backfillAccountWideData: vi.fn(async () => false),
   scheduleSync: vi.fn(),
+  requestPersistenceOnce: vi.fn(async () => 'granted'),
+}));
+vi.mock('@/lib/persistStorage', () => ({
+  requestPersistenceOnce: mocks.requestPersistenceOnce,
 }));
 vi.mock('@/auth/session', () => ({ completeLogin: mocks.completeLogin }));
 import { IDLE_SYNC_STATUS } from '@/sync/statusFixtures';
@@ -30,6 +34,27 @@ beforeEach(async () => {
   vi.clearAllMocks();
   mocks.backfillAccountWideData.mockImplementation(async () => false);
   await db.characters.clear();
+});
+
+describe('addCharacter persistent storage', () => {
+  it('asks for persistent storage after the first Character ever added', async () => {
+    mocks.completeLogin.mockResolvedValue(characterRecord(1));
+    await addCharacter(PARAMS);
+    expect(mocks.requestPersistenceOnce).toHaveBeenCalledOnce();
+  });
+
+  it('does not ask again for a later Character', async () => {
+    await db.characters.put(characterRecord(1));
+    mocks.completeLogin.mockResolvedValue(characterRecord(2));
+    await addCharacter(PARAMS);
+    expect(mocks.requestPersistenceOnce).not.toHaveBeenCalled();
+  });
+
+  it('is not held up, or failed, by the ask', async () => {
+    mocks.requestPersistenceOnce.mockRejectedValueOnce(new Error('x'));
+    mocks.completeLogin.mockResolvedValue(characterRecord(1));
+    await expect(addCharacter(PARAMS)).resolves.toMatchObject({ firstEver: true });
+  });
 });
 
 describe('addCharacter', () => {

@@ -61,6 +61,7 @@ export const SETTINGS_TABS = definePageTabs(
     { id: 'travel', labelKey: 'settings.tabs.travel' },
     { id: 'notifications', labelKey: 'settings.tabs.notifications' },
     { id: 'dataAge', labelKey: 'settings.tabs.data' },
+    { id: 'offline', labelKey: 'settings.tabs.offline' },
     { id: 'activity', labelKey: 'settings.tabs.activity' },
   ],
   undefined,

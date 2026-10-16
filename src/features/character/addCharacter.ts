@@ -8,11 +8,16 @@
 // 7's fan-out writes one row per Character *known on this device at the time*,
 // which leaves a Character added later without the account-wide Editable Data
 // everyone else has. This is the one moment that gap can be closed.
+//
+// A side effect lives here for the same "one moment" reason: after the first
+// Character ever added, it asks the browser once for persistent storage
+// (`@/lib/persistStorage`), so the offline copy is not evicted.
 
 import { completeLogin } from '@/auth/session';
 import type { CharacterRecord } from '@/db';
 import { db } from '@/db';
 import { backfillAccountWideData, scheduleSync } from '@/sync';
+import { requestPersistenceOnce } from '@/lib/persistStorage';
 
 /**
  * Complete the SSO callback, then give a Character new to this device the
@@ -49,6 +54,10 @@ export async function addCharacter(params: {
   // Nothing known before means this is the whole roster now: one Character,
   // nothing to choose between (issue #1771).
   const firstEver = knownBefore.size === 0;
+  // The offline copy (downloaded data, saved Characters) is only worth having
+  // if the browser will not evict it: ask once, here, never again on its own.
+  // Not awaited: a prompt that never answers must not hold the sign-in.
+  if (firstEver) void requestPersistenceOnce().catch(() => undefined);
   if (knownBefore.has(character.characterId)) return { character, firstEver };
 
   try {

@@ -4,7 +4,7 @@ import { useOnline } from '@/stores/network';
 import { Tooltip } from './Tooltip';
 
 interface NeedsConnectionProps {
-  /** The one control that starts the sign-in: a `Button`, or the SSO button. */
+  /** The one control that needs the network: a `Button` (a sign-in, a download), or the SSO button. */
   children: ReactElement<{
     className?: string;
     onClick?: (event: MouseEvent<HTMLElement>) => void;
@@ -21,9 +21,13 @@ interface NeedsConnectionProps {
 /**
  * Online it leaves its child alone; offline it marks the child `aria-disabled`,
  * swallows the press and shows "Needs a connection" in a tooltip. Wrap every
- * control whose press navigates to EVE's SSO (login, re-auth, grant, add
- * character): offline, that navigation strands an installed app on the
- * browser's error page, with no way back but the system gesture.
+ * control that needs the network to do anything: one whose press navigates to
+ * EVE's SSO (login, re-auth, grant, add character), where offline the
+ * navigation strands an installed app on the browser's error page with no way
+ * back but the system gesture, and one that fetches (Settings → Offline data's
+ * "Download everything"). Pair it with a visible reason when the control is
+ * the page's main action; the tooltip alone does not reach touch or a screen
+ * reader that skips it.
  *
  * `aria-disabled` rather than `disabled`, per DESIGN.md §6c "States and
  * motion": the control keeps focus and hover, so the tooltip can say why.
