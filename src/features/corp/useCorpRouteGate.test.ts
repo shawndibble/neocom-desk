@@ -14,6 +14,8 @@ function accessOf(state: CorpAccessState, capabilities: Partial<CorpCapabilities
     capabilities: { ...NO_CORP_CAPABILITIES, ...capabilities },
     missingScopes: [],
     roles: [],
+    readFailed: false,
+    retry: () => {},
   };
 }
 
@@ -26,6 +28,13 @@ describe('useCorpRouteGate — no capability requirement', () => {
     mockedAccess.mockReturnValue(accessOf('unknown', {}));
     const { result } = renderHook(() => useCorpRouteGate());
     expect(result.current).toEqual({ status: 'loading' });
+  });
+
+  it('is failed, with a retry, once the roles read could not complete', () => {
+    const retry = vi.fn();
+    mockedAccess.mockReturnValue({ ...accessOf('unknown', {}), readFailed: true, retry });
+    const { result } = renderHook(() => useCorpRouteGate());
+    expect(result.current).toEqual({ status: 'failed', retry });
   });
 
   it('is denied when Corp Access is none', () => {

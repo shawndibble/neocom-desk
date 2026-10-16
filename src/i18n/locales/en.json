@@ -2387,6 +2387,9 @@
     "differingOnlyEmptyHint": "No differing skills — the compared characters match on everything trained."
   },
   "industry": {
+    "catalogUnavailable": "Blueprint data couldn't load",
+    "catalogUnavailableOwnedHint": "Your blueprints loaded, but they need the blueprint catalog to show. Connect once to download it. We'll try again when you're back online.",
+    "marketWideTreesUnavailable": "Market-wide build data hasn't been downloaded yet",
     "csvCharacter": "Character",
     "csvAvgMarginPct": "Avg margin (%)",
     "csvMarginPct": "Margin (%)",
@@ -4999,6 +5002,9 @@
     "loadFailedTitle": "Could not load",
     "loadFailedHint": "Something went wrong fetching this. Try Refresh.",
     "retry": "Try again",
+    "loadFailedRetryHint": "Something went wrong loading this. Try again.",
+    "needsConnection": "Needs a connection",
+    "connectOnceHint": "This is downloaded the first time it's needed. Connect once and it will be kept on this device. We'll try again when you're back online.",
     "spaceOption": {
       "highsec": "Highsec",
       "lowsec": "Lowsec",
@@ -5616,6 +5622,7 @@
       "rawSellValue": "Raw sell value",
       "refineValue": "Refined value",
       "refineValueShort": "Refined",
+      "refiningUnavailable": "Refined values are unavailable: the reprocessing data isn't downloaded yet. Connect once to see them.",
       "oreBreakdownColumn": "Ore breakdown",
       "unitsColumn": "Units",
       "pricingColumn": "Pricing",
@@ -6206,6 +6213,8 @@
       "menu": "What to do with this ore",
       "title": "What to do with {{name}} (x{{count}})",
       "loading": "Pricing this ore…",
+      "loadFailed": "Reprocessing data isn't downloaded yet",
+      "loadFailedGeneric": "Couldn't price this ore",
       "noRecipe": "This item does not refine into anything.",
       "sellRawCard": "Sell raw",
       "sellRawHint": "{{hub}} buy price, less sales tax",
@@ -8764,6 +8773,7 @@
     "reauthAction": "Log in again with EVE Online"
   },
   "loyaltyStore": {
+    "catalogUnavailable": "Blueprint data couldn't load, so blueprint offers show no build-versus-buy figures. Connect once to get them.",
     "csvIskCost": "ISK cost",
     "csvLpCost": "LP cost",
     "title": "LP Store",
@@ -9235,6 +9245,7 @@
     "backToFinder": "Back",
     "loadFailedTitle": "Couldn't load the market catalogue",
     "loadFailedHint": "Press Refresh to try again.",
+    "loadFailedOfflineHint": "The market catalogue needs a one-time download. Connect once and it will load by itself.",
     "sell": "Sell Orders",
     "buy": "Buy Orders",
     "emptySellTitle": "No sell orders",
@@ -10974,6 +10985,8 @@
     "emptyHint": "Data ages appear here once the app fetches something from EVE's servers."
   },
   "corp": {
+    "rolesUnavailable": "Can't check your corporation roles right now",
+    "rolesUnavailableHint": "Neocom Desk reads your roles from EVE, and none are saved on this device yet. Try again, or connect if you're offline. It will retry when you're back online.",
     "title": "Corporation",
     "overviewTab": "Overview",
     "membersTab": "Members",
@@ -12581,6 +12594,8 @@
       "seedHint": "Each starts with its current listed amount as its stock target. Change any of them afterwards."
     },
     "add": {
+      "searchUnavailable": "Item search needs a one-time download. Connect once to use it.",
+      "pasteUnavailable": "Item names need a one-time download before a list can be matched. Connect once to use this.",
       "open": "Add items…",
       "label": "One item per line, with how many to keep listed",
       "placeholder": "Catalyst 40\nAntimatter Charge M x 20000\nNanite Repair Paste\t1500",

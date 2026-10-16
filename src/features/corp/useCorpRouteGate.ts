@@ -1,7 +1,7 @@
 /**
  * The gate every `/corp*` route mounts behind, so the `CorpAccessState` union
  * is pattern-matched once rather than at each route. `unknown` collapses to
- * `loading`; `none` and `roles-without-grant` collapse to `denied` (corp UI
+ * `loading` (or `failed`, once the roles read has failed); `none` and `roles-without-grant` collapse to `denied` (corp UI
  * hides, it never locks — GLOSSARY.md round 35); `ready` carries the resolved
  * capabilities the caller mounts its real view with.
  *
@@ -21,15 +21,17 @@ export type CorpDenialReason = 'not-granted' | 'roles-without-grant' | 'none' | 
 
 export type CorpRouteGate =
   | { status: 'loading' }
+  /** The roles read failed (offline, nothing cached); `retry` reads again. */
+  | { status: 'failed'; retry: () => void }
   | { status: 'denied'; reason: CorpDenialReason }
   | { status: 'ready'; capabilities: CorpCapabilities };
 
 export function useCorpRouteGate(
   requires?: (capabilities: CorpCapabilities) => boolean
 ): CorpRouteGate {
-  const { state, capabilities } = useCorpAccess();
+  const { state, capabilities, readFailed, retry } = useCorpAccess();
 
-  if (state === 'unknown') return { status: 'loading' };
+  if (state === 'unknown') return readFailed ? { status: 'failed', retry } : { status: 'loading' };
   if (state !== 'ready') return { status: 'denied', reason: state };
   if (requires !== undefined && !requires(capabilities)) {
     return { status: 'denied', reason: 'capability' };

@@ -6,7 +6,7 @@
  * at each call site would mean four states re-derived four ways, so the rule is
  * settled once here and consumers branch on `state`.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   corpCapabilities,
   hasAnyCorpCapability,
@@ -16,6 +16,7 @@ import {
 import { ESI_REGISTRY, type Scope } from '@/esi/registry';
 import { useGrantedScopes } from '@/app/useGrantedScopes';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { onReconnect } from '@/stores/network';
 import { corpWideRoles, loadCharacterRoles } from './roles';
 import { missingCorpScopes } from './corpScopes';
 
@@ -54,17 +55,31 @@ export interface CorpAccess {
    * nothing here should compare a role string — that is `engine/corpRoles.ts`.
    */
   roles: readonly string[];
+  /**
+   * The roles read could not complete (no live response, nothing cached), so
+   * `state` is still `unknown` and will stay so until `retry` or the
+   * connection returns. Only a `/corp*` route says so (`useCorpRouteGate`);
+   * the nav and every other surface keep rendering `unknown` as nothing.
+   */
+  readFailed: boolean;
+  /** Reads the roles again. */
+  retry: () => void;
 }
 
-const UNKNOWN_CORP_ACCESS: CorpAccess = {
+type ResolvedCorpAccess = Omit<CorpAccess, 'readFailed' | 'retry'>;
+
+const UNKNOWN_CORP_ACCESS: ResolvedCorpAccess = {
   state: 'unknown',
   capabilities: NO_CORP_CAPABILITIES,
   missingScopes: [],
   roles: [],
 };
 
-const NO_CORP_ACCESS: CorpAccess = { ...UNKNOWN_CORP_ACCESS, state: 'none' };
-const NOT_GRANTED_CORP_ACCESS: CorpAccess = { ...UNKNOWN_CORP_ACCESS, state: 'not-granted' };
+const NO_CORP_ACCESS: ResolvedCorpAccess = { ...UNKNOWN_CORP_ACCESS, state: 'none' };
+const NOT_GRANTED_CORP_ACCESS: ResolvedCorpAccess = {
+  ...UNKNOWN_CORP_ACCESS,
+  state: 'not-granted',
+};
 
 /** Roles, tagged with the Character they belong to — see the guard in the memo below. */
 interface RolesSnapshot {
@@ -78,6 +93,16 @@ export function useCorpAccess(): CorpAccess {
   const granted = useGrantedScopes();
   const hasRolesScope = granted !== undefined && granted.includes(ROLES_SCOPE);
   const [snapshot, setSnapshot] = useState<RolesSnapshot | null>(null);
+  // The Character whose roles read last failed, so a switch never carries it over.
+  const [failedFor, setFailedFor] = useState<number | null>(null);
+  const [attempt, setAttempt] = useState(0);
+  const retry = useCallback(() => {
+    setFailedFor(null);
+    setAttempt((n) => n + 1);
+  }, []);
+  const readFailed = failedFor !== null && failedFor === activeCharacterId;
+  // A role read that failed offline is tried again when the connection returns.
+  useEffect(() => (readFailed ? onReconnect(retry) : undefined), [readFailed, retry]);
 
   useEffect(() => {
     // Without the roles scope the read is a guaranteed 403 — skip it rather
@@ -90,21 +115,25 @@ export function useCorpAccess(): CorpAccess {
     // A read that could not complete at all (no live response, nothing cached)
     // leaves the state `unknown` rather than asserting `none`: "this Character
     // holds no corp role" is a claim, and a failed read is no evidence for it.
-    // Both render nothing, so a line member sees no error either way — but a
-    // Director who cold-starts offline must not be pinned to `none` for the
-    // session by one failed request. There is deliberately no error state.
-    void loadCharacterRoles(activeCharacterId).then(
-      ({ cached }) => {
-        if (cached) settle(corpWideRoles(cached.data));
-      },
-      () => {}
-    );
+    // Both render nothing in the nav, so a line member sees no error either
+    // way — but a Director who cold-starts offline must not be pinned to `none`
+    // for the session by one failed request. `readFailed` lets a `/corp*`
+    // route they open say so, with a Retry, instead of spinning for good.
+    const fail = () => {
+      if (!cancelled) setFailedFor(activeCharacterId);
+    };
+    void loadCharacterRoles(activeCharacterId).then(({ cached, needsReauth }) => {
+      if (cached) settle(corpWideRoles(cached.data));
+      // A refused login is not "offline, try again": the app-wide re-login
+      // notice (`AuthFailureNotice`) owns that case, so no retry is offered.
+      else if (!needsReauth) fail();
+    }, fail);
     return () => {
       cancelled = true;
     };
-  }, [hydrated, activeCharacterId, hasRolesScope]);
+  }, [hydrated, activeCharacterId, hasRolesScope, attempt]);
 
-  return useMemo(() => {
+  const resolved = useMemo<ResolvedCorpAccess>(() => {
     // `useGrantedScopes` answers `undefined` while unknown and `[]` for "granted
     // nothing" — collapsing the two here would offer a re-auth prompt to a
     // Character who may already hold every scope. Keep this in step with
@@ -130,4 +159,9 @@ export function useCorpAccess(): CorpAccess {
       roles,
     };
   }, [snapshot, activeCharacterId, granted, hasRolesScope]);
+
+  return useMemo(
+    () => ({ ...resolved, readFailed: resolved.state === 'unknown' && readFailed, retry }),
+    [resolved, readFailed, retry]
+  );
 }

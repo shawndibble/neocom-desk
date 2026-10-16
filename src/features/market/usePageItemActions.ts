@@ -79,6 +79,9 @@ export function usePageItemActions({
           .then(setBlueprints)
           .catch(() => {
             // Build Plan degrades to "No blueprint options" on failure — not core functionality.
+            // Asked again on the next menu open, so one failed load (offline, a dropped
+            // connection) doesn't last the rest of the session.
+            requested.current = false;
           });
       },
     }),

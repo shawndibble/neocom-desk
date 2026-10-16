@@ -9,12 +9,17 @@
  * uses) for the per-offer "use my own materials" toggle.
  */
 import { useEffect, useMemo, useState } from 'react';
+import { useRetryableLoad } from '@/lib/useRetryableLoad';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useMarketHub } from '@/features/market/hub';
 import { getTradeHub, DEFAULT_TRADE_HUB, type TradeHub } from '@/market/hubs';
 import { useTradeHubStandings, tradeHubStanding } from '@/features/market/useTradeHubStandings';
 import { loadLoyaltyStoreOffersStatus, loadCorporationName } from './store';
-import { loadBlueprintCatalog, type BlueprintCatalog } from '@/features/industry/blueprintCatalog';
+import {
+  EMPTY_BLUEPRINT_CATALOG,
+  loadBlueprintCatalog,
+  type BlueprintCatalog,
+} from '@/features/industry/blueprintCatalog';
 import { useMarketSnapshot } from '@/features/industry/useMarketSnapshot';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import { loadCharacterLoyaltyPoints } from '@/features/character/loyalty';
@@ -43,10 +48,12 @@ export interface LoyaltyStoreResult {
   rows: LoyaltyOfferRow[];
   /** For resolving a blueprint's material names in the detail panel. */
   catalog: BlueprintCatalog | null;
+  /** The blueprint catalog couldn't load: blueprint offers list as plain items, with no build-versus-buy figures. */
+  catalogUnavailable: boolean;
   playerLp: number;
   hub: TradeHub;
   hubHydrated: boolean;
-  /** True once offers, the catalog and a market snapshot have all loaded at least once. */
+  /** True once offers, the catalog and (when there are offers to price) a market snapshot have all loaded at least once. */
   ready: boolean;
   /** The price source could not be reached, so ISK/LP and profit are unknown, not zero. */
   pricesUnreachable: boolean;
@@ -72,6 +79,13 @@ export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult
   const [offersFromCache, setOffersFromCache] = useState(false);
   const [offersError, setOffersError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  // A catalog that couldn't load lists offers without build-versus-buy figures
+  // until the connection returns, when it is fetched again.
+  const {
+    attempt: catalogAttempt,
+    fail: failCatalog,
+    clear: clearCatalogFailure,
+  } = useRetryableLoad();
   const [catalog, setCatalog] = useState<BlueprintCatalog | null>(null);
   const [playerLp, setPlayerLp] = useState(0);
   const [skills, setSkills] = useState<SkillLevels>({});
@@ -100,13 +114,22 @@ export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult
 
   useEffect(() => {
     let cancelled = false;
-    void loadBlueprintCatalog().then((cat) => {
-      if (!cancelled) setCatalog(cat);
-    });
+    clearCatalogFailure();
+    loadBlueprintCatalog().then(
+      (cat) => {
+        if (!cancelled) setCatalog(cat);
+      },
+      // Offers still list; they just carry no build-vs-buy figures.
+      () => {
+        if (cancelled) return;
+        setCatalog(EMPTY_BLUEPRINT_CATALOG);
+        failCatalog();
+      }
+    );
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [catalogAttempt, failCatalog, clearCatalogFailure]);
 
   useEffect(() => {
     if (activeCharacterId === null) return;
@@ -243,7 +266,10 @@ export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult
     playerLp,
     hub,
     hubHydrated,
-    ready: offers !== null && catalog !== null && snapshot !== null,
+    catalogUnavailable: catalog === EMPTY_BLUEPRINT_CATALOG,
+    // A store with no offers has no prices to wait for, so `snapshot` stays
+    // null for good: that is "no offers", not still loading.
+    ready: offers !== null && catalog !== null && (typeIds.length === 0 || snapshot !== null),
     pricesUnreachable: snapshot?.hubPricesUnreachable === true,
     useOwnMaterialsFor,
     toggleUseOwnMaterials,

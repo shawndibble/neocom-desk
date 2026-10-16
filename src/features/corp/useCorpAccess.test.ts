@@ -160,6 +160,49 @@ describe('useCorpAccess — a roles read that could not complete', () => {
     await act(async () => {});
     expect(result.current.state).toBe('unknown');
   });
+
+  it('reports the failure, apart from a read that is still loading', async () => {
+    mockedGrantedScopes.mockReturnValue(ALL_CORP_SCOPES);
+    mockedLoadRoles.mockRejectedValueOnce(new Error('offline'));
+    const { result } = renderHook(() => useCorpAccess());
+    expect(result.current.readFailed).toBe(false);
+    await waitFor(() => expect(result.current.readFailed).toBe(true));
+    expect(result.current.state).toBe('unknown');
+  });
+
+  it('does not offer a retry when the login itself was refused', async () => {
+    mockedGrantedScopes.mockReturnValue(ALL_CORP_SCOPES);
+    mockedLoadRoles.mockResolvedValue({ cached: null, needsReauth: true });
+    const { result } = renderHook(() => useCorpAccess());
+    await act(async () => {});
+    expect(result.current.state).toBe('unknown');
+    expect(result.current.readFailed).toBe(false);
+  });
+
+  it('reads again on retry, and resolves once the read succeeds', async () => {
+    mockedGrantedScopes.mockReturnValue(ALL_CORP_SCOPES);
+    mockedLoadRoles
+      .mockResolvedValueOnce({ cached: null, needsReauth: false })
+      .mockResolvedValue(rolesResolvingTo(['Director']));
+    const { result } = renderHook(() => useCorpAccess());
+    await waitFor(() => expect(result.current.readFailed).toBe(true));
+    act(() => result.current.retry());
+    await waitFor(() => expect(result.current.state).toBe('ready'));
+    expect(result.current.readFailed).toBe(false);
+  });
+
+  it('reads again by itself when the connection returns', async () => {
+    mockedGrantedScopes.mockReturnValue(ALL_CORP_SCOPES);
+    mockedLoadRoles
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockResolvedValue(rolesResolvingTo(['Director']));
+    const { result } = renderHook(() => useCorpAccess());
+    await waitFor(() => expect(result.current.readFailed).toBe(true));
+    act(() => {
+      window.dispatchEvent(new Event('online'));
+    });
+    await waitFor(() => expect(result.current.state).toBe('ready'));
+  });
 });
 
 describe('useCorpAccess — roles-without-grant', () => {
