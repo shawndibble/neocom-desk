@@ -1477,6 +1477,61 @@ describe('FittingStatsSections — column and side panels', () => {
     expect(screen.getByRole('dialog', { name: 'Situation' })).toBeInTheDocument();
   });
 
+  it('switches one open panel to the other trigger’s content, and Escape closes it', async () => {
+    const user = userEvent.setup();
+    renderSections(stats());
+    const before = window.history.length;
+    await openPanel('Pilot');
+    await user.click(screen.getByRole('button', { name: /^Situation/ }));
+    // Still the one panel's history entry: the switch pushed no second one for Back to step through.
+    expect(window.history.length).toBe(before + 1);
+    expect(await screen.findByRole('dialog', { name: 'Situation' })).toBeInTheDocument();
+    expect(screen.getAllByRole('dialog')).toHaveLength(1);
+    expect(screen.getByRole('checkbox', { name: 'Overheat all' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Implants & skills' })).toBeNull();
+    expect(screen.getByRole('button', { name: /^Situation/ })).toHaveAttribute(
+      'aria-expanded',
+      'true'
+    );
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('says why the Pilot panel is bare while the stats load or failed', async () => {
+    render(
+      <FittingStatsSections
+        stats={null}
+        statsProgress={null}
+        statsError
+        price={null}
+        damageProfiles={damageProfiles()}
+        targetProfiles={targetProfiles()}
+        typeName={typeName}
+      />
+    );
+    const pilot = within(await openPanel('Pilot'));
+    expect(pilot.getByText('Not available')).toBeInTheDocument();
+  });
+
+  it('shows no trigger-row total when nothing is priced', () => {
+    const price = {
+      rows: [],
+      totals: { buy: 0, sell: 0, spread: 0, unpricedRows: 0 },
+    } as unknown as Appraisal;
+    render(
+      <FittingStatsSections
+        stats={stats()}
+        statsProgress={null}
+        statsError={false}
+        price={price}
+        damageProfiles={damageProfiles()}
+        targetProfiles={targetProfiles()}
+        typeName={typeName}
+      />
+    );
+    expect(screen.queryByText(/ISK/)).toBeNull();
+  });
+
   it('reads the skills basis with no Character, and the weather on the Situation trigger', () => {
     useAbyssalWeather.setState({ weatherTypeId: 47382 });
     renderSections(stats());

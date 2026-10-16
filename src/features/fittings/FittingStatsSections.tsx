@@ -1,5 +1,5 @@
 import { HintText } from '@/components/ui/HintText';
-import { Fragment, useEffect, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { Button, Caret, IskAmount, RowMoreActions } from '@/components/ui';
 import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
@@ -305,15 +305,6 @@ type Section =
   | 'fighters'
   | 'fitting'
   | 'price';
-
-/** Sections the Pilot and Situation panels hold, under the panel's own title. */
-const PANEL_SECTIONS: ReadonlySet<Section> = new Set([
-  'assumptions',
-  'whatToTrain',
-  'yourCharacters',
-  'projected',
-  'abyssal',
-]);
 
 /** Open at first: what a pilot reads on every fit. The rest is a click away, as in the game window. */
 const OPEN_BY_DEFAULT: ReadonlySet<Section> = new Set([
@@ -686,7 +677,16 @@ export function FittingStatsSections({
   );
   // One panel at a time: both slide over the same edge.
   const [panel, setPanel] = useState<'pilot' | 'situation' | null>(null);
+  // The panel last opened: what the closing panel shows, and whose trigger
+  // takes focus back when the opener is gone (a phone/desktop swap mid-open).
+  const [shownPanel, setShownPanel] = useState<'pilot' | 'situation'>('pilot');
+  const openPanel = (which: 'pilot' | 'situation') => {
+    setShownPanel(which);
+    setPanel(which);
+  };
   const closePanel = () => setPanel(null);
+  const pilotTriggerRef = useRef<HTMLButtonElement>(null);
+  const situationTriggerRef = useRef<HTMLButtonElement>(null);
   const overheatAll = useOverheatAll((state) => state.overheatAll);
   const sessionWeather = useAbyssalWeather((state) => state.weatherTypeId);
   const weatherName = useWeatherName(
@@ -700,8 +700,9 @@ export function FittingStatsSections({
       ? tacticalModeKind(fitting.mode)
       : undefined;
 
-  // The triggers carry every condition that moves the figures below, so a
-  // non-default one reads without opening its panel.
+  // What each trigger carries with its panel shut: the skills basis and
+  // skill gaps; the weather, a non-default Tactical mode, projected ships
+  // and overheat. (Implants show only in the Pilot panel.)
   const pilotValue = (
     <>
       <StatsHeadingLabel
@@ -769,7 +770,14 @@ export function FittingStatsSections({
   const figure = (format: (s: FittingStats) => string, toneClassName?: string) =>
     stats ? <HeatFigure stats={stats} format={format} toneClassName={toneClassName} /> : undefined;
 
-  function section(id: Section, meta: ReactNode, body: ReactNode, warning?: string) {
+  function section(
+    id: Section,
+    meta: ReactNode,
+    body: ReactNode,
+    warning?: string,
+    /** `h3` for a section in a side panel, under the panel's own title. */
+    level: 'h3' | 'h4' = 'h4'
+  ) {
     return (
       <StatSection
         key={id}
@@ -778,7 +786,7 @@ export function FittingStatsSections({
         warning={warning}
         expanded={isExpanded(id)}
         onToggle={() => toggle(id)}
-        level={PANEL_SECTIONS.has(id) ? 'h3' : 'h4'}
+        level={level}
       >
         {body}
       </StatSection>
@@ -1309,20 +1317,23 @@ export function FittingStatsSections({
     <div className="rounded-xs border border-line bg-panel/85 backdrop-blur-sm">
       <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2 text-xs">
         <StatsScopeTrigger
+          ref={pilotTriggerRef}
           label={t('fittings.stats.pilot.label')}
           open={panel === 'pilot'}
-          onClick={() => setPanel('pilot')}
+          onClick={() => openPanel('pilot')}
         >
           {pilotValue}
         </StatsScopeTrigger>
         <StatsScopeTrigger
+          ref={situationTriggerRef}
           label={t('fittings.stats.situation.label')}
           open={panel === 'situation'}
-          onClick={() => setPanel('situation')}
+          onClick={() => openPanel('situation')}
         >
           {situationValue}
         </StatsScopeTrigger>
-        {price && (
+        {/* Nothing priceable is "unknown", not a free ship: no total, as the Price row shows a dash. */}
+        {price && !nothingPriced && (
           <span className="ml-auto text-text tabular-nums">{iskLabel(price.totals.sell)}</span>
         )}
       </div>
@@ -1358,67 +1369,90 @@ export function FittingStatsSections({
       {group('tank', tankSections)}
       {group('ship', shipSections)}
 
+      {/* One panel, its content switched by `panel`: swapping two open
+        panels would remount it, sending focus back to the first trigger and
+        leaving its history entry behind. */}
       <StatsScopePanel
-        open={panel === 'pilot'}
+        open={panel !== null}
         onClose={closePanel}
-        title={t('fittings.stats.pilot.label')}
+        title={t(
+          shownPanel === 'pilot' ? 'fittings.stats.pilot.label' : 'fittings.stats.situation.label'
+        )}
         subtitle={
-          <StatsHeadingLabel
-            hasCharacter={pilot !== undefined}
-            characterName={pilot?.characterName ?? null}
-          />
+          shownPanel === 'pilot' ? (
+            <StatsHeadingLabel
+              hasCharacter={pilot !== undefined}
+              characterName={pilot?.characterName ?? null}
+            />
+          ) : (
+            t('fittings.stats.situation.subtitle')
+          )
+        }
+        returnFocusFallback={() =>
+          (shownPanel === 'pilot' ? pilotTriggerRef : situationTriggerRef).current
         }
       >
-        {pilot?.notes && (
-          <div className="space-y-2 border-b border-line px-3 py-2">{pilot.notes}</div>
+        {shownPanel === 'pilot' ? (
+          <>
+            {pilot?.notes && (
+              <div className="space-y-2 border-b border-line px-3 py-2">{pilot.notes}</div>
+            )}
+            {/* Its sections wait on the stats: say why the panel is bare meanwhile. */}
+            {!stats && <div className="px-3 py-2 text-xs">{placeholder}</div>}
+            {stats &&
+              section(
+                'assumptions',
+                undefined,
+                <StatFields>
+                  {implants}
+                  <SkillOverridesControl />
+                </StatFields>,
+                undefined,
+                'h3'
+              )}
+            {stats &&
+              whatToTrain &&
+              section('whatToTrain', undefined, whatToTrain, undefined, 'h3')}
+            {stats && fitting && yourCharacters && (
+              <YourCharactersSection
+                fitting={fitting}
+                characters={yourCharacters}
+                render={(meta, body) => section('yourCharacters', meta, body, undefined, 'h3')}
+                expanded={isExpanded('yourCharacters')}
+              />
+            )}
+          </>
+        ) : (
+          <>
+            {tacticalMode && (
+              <div className="border-b border-line px-3 py-2">
+                <StatFields>{tacticalMode}</StatFields>
+              </div>
+            )}
+            {abyssal &&
+              section(
+                'abyssal',
+                <AbyssalWeatherMeta />,
+                <AbyssalRunPlanner
+                  hullGroupId={abyssal.hullGroupId}
+                  compare={abyssal.compare}
+                  typeName={typeName}
+                />,
+                undefined,
+                'h3'
+              )}
+            {section(
+              'projected',
+              projectedShips > 0
+                ? t('fittings.projected.meta', { count: projectedShips })
+                : undefined,
+              <ProjectedEffectsPanel />,
+              undefined,
+              'h3'
+            )}
+            {stats && <StatsToolbar stats={stats} />}
+          </>
         )}
-        {stats &&
-          section(
-            'assumptions',
-            undefined,
-            <StatFields>
-              {implants}
-              <SkillOverridesControl />
-            </StatFields>
-          )}
-        {stats && whatToTrain && section('whatToTrain', undefined, whatToTrain)}
-        {stats && fitting && yourCharacters && (
-          <YourCharactersSection
-            fitting={fitting}
-            characters={yourCharacters}
-            render={(meta, body) => section('yourCharacters', meta, body)}
-            expanded={isExpanded('yourCharacters')}
-          />
-        )}
-      </StatsScopePanel>
-
-      <StatsScopePanel
-        open={panel === 'situation'}
-        onClose={closePanel}
-        title={t('fittings.stats.situation.label')}
-        subtitle={t('fittings.stats.situation.subtitle')}
-      >
-        {tacticalMode && (
-          <div className="border-b border-line px-3 py-2">
-            <StatFields>{tacticalMode}</StatFields>
-          </div>
-        )}
-        {abyssal &&
-          section(
-            'abyssal',
-            <AbyssalWeatherMeta />,
-            <AbyssalRunPlanner
-              hullGroupId={abyssal.hullGroupId}
-              compare={abyssal.compare}
-              typeName={typeName}
-            />
-          )}
-        {section(
-          'projected',
-          projectedShips > 0 ? t('fittings.projected.meta', { count: projectedShips }) : undefined,
-          <ProjectedEffectsPanel />
-        )}
-        {stats && <StatsToolbar stats={stats} />}
       </StatsScopePanel>
     </div>
   );

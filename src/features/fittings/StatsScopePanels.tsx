@@ -1,7 +1,10 @@
-import type { ReactNode } from 'react';
+import type { ReactNode, Ref } from 'react';
 import { Button, Modal, SlideOver } from '@/components/ui';
+import { tappableRowClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
+import { cx } from '@/lib/cx';
 import { useIsPhone } from '@/lib/useIsPhone';
+import { STAT_EYEBROW } from './statKit';
 
 /**
  * A stats-column trigger (Pilot, Situation): its dim label, the value the
@@ -10,11 +13,13 @@ import { useIsPhone } from '@/lib/useIsPhone';
  * under, so a non-default one reads here without opening anything.
  */
 export function StatsScopeTrigger({
+  ref,
   label,
   open,
   onClick,
   children,
 }: {
+  ref?: Ref<HTMLButtonElement>;
   label: string;
   open: boolean;
   onClick: () => void;
@@ -23,11 +28,13 @@ export function StatsScopeTrigger({
 }) {
   return (
     <Button
+      ref={ref}
       size="sm"
       aria-haspopup="dialog"
       aria-expanded={open}
       onClick={onClick}
-      className="max-w-full min-w-0 gap-2"
+      // The `sm` height on a pointer, the 44px touch tier on a phone or touch screen.
+      className={cx('max-w-full min-w-0 gap-2', tappableRowClassName)}
     >
       <span className="shrink-0 text-text-dim">{label}</span>
       <span className="min-w-0 truncate">{children}</span>
@@ -47,19 +54,28 @@ export function StatsScopePanel({
   onClose,
   title,
   subtitle,
+  returnFocusFallback,
   children,
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
   subtitle?: ReactNode;
+  /** Its trigger: where focus goes on close when the opener is gone (the panel swapped form mid-open). */
+  returnFocusFallback: () => HTMLElement | null;
   children: ReactNode;
 }) {
   const isPhone = useIsPhone();
   if (isPhone)
     return (
-      <Modal open={open} onClose={onClose} title={title} placement="sheet-full">
-        {/* Full-bleed rows, as in the column: undo the sheet body's padding. */}
+      <Modal
+        open={open}
+        onClose={onClose}
+        title={title}
+        placement="sheet-full"
+        returnFocusFallback={returnFocusFallback}
+      >
+        {/* Full-bleed rows, as in the column: undo the sheet body's padding (`Modal` has no `flush`). */}
         <div className="-m-3">
           {subtitle && (
             <p className="border-b border-line px-3 py-2 text-xs text-text-dim">{subtitle}</p>
@@ -69,7 +85,14 @@ export function StatsScopePanel({
       </Modal>
     );
   return (
-    <SlideOver open={open} onClose={onClose} title={title} subtitle={subtitle} flush>
+    <SlideOver
+      open={open}
+      onClose={onClose}
+      title={title}
+      subtitle={subtitle}
+      flush
+      returnFocusFallback={returnFocusFallback}
+    >
       {children}
     </SlideOver>
   );
@@ -78,7 +101,7 @@ export function StatsScopePanel({
 /** A static small-caps label over a group of stats sections (Damage, Tank, Ship); never a toggle. */
 export function StatsGroupLabel({ children }: { children: ReactNode }) {
   return (
-    <h3 className="border-b border-line bg-panel-2/40 px-3 pt-3 pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+    <h3 className={cx('border-b border-line bg-panel-2/40 px-3 pt-3 pb-1', STAT_EYEBROW)}>
       {children}
     </h3>
   );
