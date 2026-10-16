@@ -163,44 +163,44 @@ describe('runBootUpdate', () => {
     expect(registration.update).not.toHaveBeenCalled();
   });
 
-  it('swaps a build found within the cap', async () => {
-    const postMessage = vi.fn();
-    const registration: Record<string, unknown> = reg();
-    (registration.update as ReturnType<typeof vi.fn>).mockImplementation(async () => {
-      registration.waiting = { postMessage };
+  describe('a controlled page with nothing waiting', () => {
+    it('is current at once, asking for a newer build without waiting on it', async () => {
+      const registration = reg({ update: vi.fn(() => never()) });
+      const env = makeEnv(registration);
+      await expect(runBootUpdate(env)).resolves.toBe('current');
+      expect(registration.update).toHaveBeenCalledOnce();
+      expect(env.reload).not.toHaveBeenCalled();
     });
-    const env = makeEnv(registration);
-    const done = runBootUpdate(env);
-    await vi.waitFor(() => expect(postMessage).toHaveBeenCalledWith({ type: 'SKIP_WAITING' }));
-    listeners.controllerchange();
-    await expect(done).resolves.toBe('applying');
-    expect(env.reload).toHaveBeenCalledOnce();
-  });
 
-  it('is current when the check finds nothing', async () => {
-    const env = makeEnv(reg());
-    await expect(runBootUpdate(env)).resolves.toBe('current');
-    expect(env.reload).not.toHaveBeenCalled();
-  });
+    it('leaves a build the check finds waiting for the next load', async () => {
+      const postMessage = vi.fn();
+      const registration: Record<string, unknown> = reg();
+      (registration.update as ReturnType<typeof vi.fn>).mockImplementation(async () => {
+        registration.waiting = { postMessage };
+      });
+      const env = makeEnv(registration);
+      await expect(runBootUpdate(env)).resolves.toBe('current');
+      await Promise.resolve();
+      expect(postMessage).not.toHaveBeenCalled();
+      expect(env.reload).not.toHaveBeenCalled();
+    });
 
-  it('times out at the cap, posting nothing and leaving the update waiting', async () => {
-    vi.useFakeTimers();
-    const postMessage = vi.fn();
-    const registration: Record<string, unknown> = reg({ update: vi.fn(() => never()) });
-    const env = makeEnv(registration);
-    const done = runBootUpdate(env);
-    await vi.advanceTimersByTimeAsync(BOOT_UPDATE_CHECK_CAP_MS);
-    await expect(done).resolves.toBe('timed-out');
-    registration.waiting = { postMessage };
-    await vi.advanceTimersByTimeAsync(10_000);
-    expect(postMessage).not.toHaveBeenCalled();
-    expect(env.reload).not.toHaveBeenCalled();
-  });
+    it('is current when update() rejects, without an unhandled rejection', async () => {
+      const registration = reg({ update: vi.fn().mockRejectedValue(new Error('offline')) });
+      const env = makeEnv(registration);
+      await expect(runBootUpdate(env)).resolves.toBe('current');
+      await Promise.resolve();
+      expect(env.reload).not.toHaveBeenCalled();
+    });
 
-  it('is current when update() rejects', async () => {
-    const env = makeEnv(reg({ update: vi.fn().mockRejectedValue(new Error('offline')) }));
-    await expect(runBootUpdate(env)).resolves.toBe('current');
-    expect(env.reload).not.toHaveBeenCalled();
+    it('is current when update() throws synchronously', async () => {
+      const registration = reg({
+        update: vi.fn(() => {
+          throw new Error('invalid state');
+        }),
+      });
+      await expect(runBootUpdate(makeEnv(registration))).resolves.toBe('current');
+    });
   });
 
   it('is current when the registration lookup throws', async () => {

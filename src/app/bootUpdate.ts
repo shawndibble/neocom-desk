@@ -8,19 +8,21 @@ import { activateWaitingWorker, waitForInstall } from './swUpdate';
  * the worker up to date, quietly). Never on a route change, and a
  * running tab never reloads for an update (ReloadPrompt only looks).
  *
- * The check is capped so a slow network never holds the boot; a build that
- * lands after the cap simply waits for the next load. Every await is bounded
- * and every failure ends as `'current'`/`'skipped'` — the app must boot.
+ * Only a build already waiting is applied at boot. Otherwise the check for a
+ * newer one is fired and not waited on: a build it finds installs in the
+ * background and is applied by the next load, so a normal boot never waits on
+ * the network. Every await is bounded and every failure ends as
+ * `'current'`/`'skipped'` — the app must boot.
  */
 
-/** The most a boot waits on the update check. */
+/** The most a boot waits on the registration lookup, and a worker-less page on its settle check. */
 export const BOOT_UPDATE_CHECK_CAP_MS = 3500;
 
 const SWAP_KEY = 'neocom:boot-update-at';
 /** A swap started this recently that is still pending means it did not take; do not retry. */
 const SWAP_WINDOW_MS = 30_000;
 
-export type BootUpdateOutcome = 'applying' | 'current' | 'skipped' | 'timed-out';
+export type BootUpdateOutcome = 'applying' | 'current' | 'skipped';
 
 export interface BootUpdateEnv {
   online: boolean;
@@ -90,22 +92,30 @@ async function swap(
 }
 
 /**
- * Asks for a newer build and waits for it to install, up to the cap. Resolves
- * `'cap'` when the cap passes first; a check that fails or lands late is
- * simply left to finish on its own.
+ * Asks for a newer build and waits for it to install, up to the cap. A check
+ * that fails or lands late is simply left to finish on its own. Only for a
+ * page that is not held (`settleWorker`): a held boot never waits on this.
  */
 async function checkWithinCap(
   env: BootUpdateEnv,
   registration: ServiceWorkerRegistration
-): Promise<'checked' | 'cap'> {
+): Promise<void> {
   const found = (async () => {
     await registration.update();
     await waitForInstall(registration, BOOT_UPDATE_CHECK_CAP_MS);
-    return 'checked' as const;
   })();
   // A rejection after the cap has won must not surface unhandled.
   found.catch(() => undefined);
-  return Promise.race([found, env.wait(BOOT_UPDATE_CHECK_CAP_MS).then(() => 'cap' as const)]);
+  await Promise.race([found, env.wait(BOOT_UPDATE_CHECK_CAP_MS)]);
+}
+
+/** Fires an update check and lets it finish on its own; a failure just means no build this time. */
+function lookForUpdate(registration: ServiceWorkerRegistration) {
+  try {
+    registration.update().catch(() => undefined);
+  } catch {
+    // update() can throw synchronously (an invalid registration state).
+  }
 }
 
 /**
@@ -157,9 +167,10 @@ export async function runBootUpdate(
 
     if (registration.waiting) return await swap(env, registration);
 
-    const raced = await checkWithinCap(env, registration);
-    if (raced === 'cap') return 'timed-out';
-    return registration.waiting ? await swap(env, registration) : 'current';
+    // Nothing waiting: ask, but do not wait. A build found installs in the
+    // background and is applied by the next cold start or reload.
+    lookForUpdate(registration);
+    return 'current';
   } catch {
     return 'current';
   }
