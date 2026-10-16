@@ -274,7 +274,7 @@ export function NewMailComposer({
         fullPane && viewport ? { top: viewport.offsetTop, height: viewport.height } : undefined
       }
       className={cx(
-        'mail-pane flex flex-col',
+        'flex flex-col',
         fullPane
           ? cx(
               'fixed inset-x-0 z-50 bg-bg pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]',
