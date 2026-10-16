@@ -1,3 +1,4 @@
+import { MAX_DRONE_STACKS } from '@/engine/fitting/fittingShare';
 import { describe, expect, it } from 'vitest';
 import { loadEftFitting, type EftTypeLookup } from './eftLoader';
 import type { FittingSlotAssignment } from '@/sde/types';
@@ -248,6 +249,20 @@ describe('loadEftFitting — Pyfa mutated items', () => {
       mutation: { baseTypeId: 2454, mutaplasmidTypeId: 60461, attributes: { 64: 1.9 } },
     };
     expect(result.drones).toEqual([drone, drone]);
+  });
+
+  it('caps a mutated drone line at a drone bay of stacks, however large its count', () => {
+    const result = mutaLoad(
+      [
+        '[Rifter]',
+        'Hobgoblin I x999999999 [1]',
+        '',
+        '[1] Hobgoblin I',
+        '  Exigent Light Drone Firepower Mutaplasmid',
+      ].join('\n')
+    );
+    if (result.hullTypeId === null) throw new Error('no hull');
+    expect(result.drones).toHaveLength(MAX_DRONE_STACKS);
   });
 
   it('keeps base and mutaplasmid when the block has no rolls (rolls unknown)', () => {

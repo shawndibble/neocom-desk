@@ -284,6 +284,31 @@ describe('parseEftFit — Pyfa mutated items', () => {
     ]);
   });
 
+  it('reads lines after a block with no blank line as items, not as the block', () => {
+    const fit = parseEftFit(
+      [
+        '[Rifter]',
+        'Damage Control II [1]',
+        '[1] Damage Control II',
+        '  Unstable Damage Control Mutaplasmid',
+        '  capacitorNeed 0.9',
+        'Drone Damage Amplifier II',
+        '[2] Damage Control II',
+        '  Unstable Damage Control Mutaplasmid',
+        'Overdrive Injector System II',
+      ].join('\n')
+    );
+    expect(fit.items.map((i) => i.name)).toEqual([
+      'Damage Control II',
+      'Drone Damage Amplifier II',
+      'Overdrive Injector System II',
+    ]);
+    expect(fit.mutations.map((b) => [b.ref, b.attributes])).toEqual([
+      [1, [{ name: 'capacitorNeed', value: 0.9 }]],
+      [2, []],
+    ]);
+  });
+
   it('gives a plain paste no mutations and no mutationRef', () => {
     const fit = parseEftFit('[Rifter]\nDamage Control II\n');
     expect(fit.mutations).toEqual([]);

@@ -144,6 +144,11 @@ export function normaliseMutation(
   };
 }
 
+/** Whether any module or drone in `fitting` carries a mutation. */
+export function hasMutations(fitting: Fitting): boolean {
+  return fitting.modules.some((m) => m.mutation) || fitting.drones.some((d) => d.mutation);
+}
+
 /**
  * `fitting` with every mutation run through `normaliseMutation`: rolls cut to
  * the mutaplasmid's own, and a mutation that doesn't belong to its item (a
@@ -208,9 +213,10 @@ export function mutationFromDynamicItem(
  *   no attribute line). The engine states the base module's own values.
  * - `'baseUnknown'`: an abyssal type with no mutation at all — from a
  *   killmail, an In-game Fitting or a bare `Abyssal X` EFT line, none of
- *   which carry one. The engine knows nothing of it but its slot, so it adds
- *   no CPU, powergrid or effect to the stats (decision
- *   `docs/context/decisions/*-mutated-module-rolls-in-share-code-v3.md`).
+ *   which carry one, or an asset ESI gave no rolls for in time. The engine
+ *   knows nothing of it but its slot, so it adds no CPU, powergrid or effect
+ *   to the stats (decision
+ *   `docs/context/decisions/*-mutated-module-rolls-in-fitting-share-code-v3.md`).
  */
 export type MutationStatus = 'none' | 'rolled' | 'rollsUnknown' | 'baseUnknown';
 

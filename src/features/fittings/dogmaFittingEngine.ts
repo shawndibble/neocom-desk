@@ -22,6 +22,8 @@ import { classifyRuleBreaks, type CandidateRack } from '@/engine/fittings/candid
 import type { PlanEntry } from '@/engine/types';
 import { racksWithSlots } from '@/engine/fittings/hullFitKey';
 import { fittingToDogmaFit } from '@/engine/fittings/fitMapper';
+import type { MutaplasmidLookup } from '@/engine/fittings/mutaplasmids';
+import { loadMutaplasmidLookup } from '@/features/abyssal/mutaplasmidData';
 import {
   extractCapacitorBudget,
   extractCapBoosterFigures,
@@ -171,6 +173,13 @@ async function fillEngineAssetCache(): Promise<void> {
 }
 
 let enginePromise: Promise<DogmaEngine> | null = null;
+/** Loaded with the engine; null when the data wouldn't load. */
+let readyMutaplasmids: MutaplasmidLookup | null = null;
+
+function toDogmaFit(fitting: Fitting, profile: PilotProfile, damageProfile?: DamageProfile) {
+  return fittingToDogmaFit(fitting, profile, damageProfile, readyMutaplasmids);
+}
+
 /** Set once `loadDogmaEngine` has resolved; the only way to the synchronous fit checks. */
 let readyEngine: DogmaEngine | null = null;
 const readyListeners = new Set<() => void>();
@@ -225,7 +234,8 @@ export function loadDogmaEngine(
         for (const listener of [...progressListeners]) listener(lastProgress);
       };
 
-      const [wasmBytes, sdeBytes] = await Promise.all([
+      // Mutated items' check (`fittingToDogmaFit`); without the data they go in bare.
+      const [wasmBytes, sdeBytes, mutaplasmids] = await Promise.all([
         fetchWithProgress(WASM_URL, (loaded, total) => {
           wasmLoaded = loaded;
           wasmTotal = total;
@@ -236,10 +246,12 @@ export function loadDogmaEngine(
           sdeTotal = total;
           report();
         }),
+        loadMutaplasmidLookup().catch(() => null),
       ]);
 
       await wasmInit({ module_or_path: wasmBytes });
       load_sde(new Uint8Array(sdeBytes));
+      readyMutaplasmids = mutaplasmids;
       readyEngine = dogmaEngine;
       progressListeners.clear();
       setDogmaEngineStatus('ready');
@@ -345,7 +357,7 @@ export async function computeOutgoing(
   profile: PilotProfile
 ): Promise<ProjectedEffects> {
   await loadDogmaEngine();
-  return toProjectedEffects(calculate(fittingToDogmaFit(fitting, profile)).outgoing);
+  return toProjectedEffects(calculate(toDogmaFit(fitting, profile)).outgoing);
 }
 
 /** The engine's outgoing projection in our own shape. */
@@ -407,7 +419,7 @@ export async function computeFittingStats(
   await loadDogmaEngine(onProgress);
   // The overheated recalculation below spreads this fit, so it keeps the weather too.
   const dogmaFit = withIncoming(
-    withWeather(fittingToDogmaFit(fitting, profile, damageProfile), weatherTypeId),
+    withWeather(toDogmaFit(fitting, profile, damageProfile), weatherTypeId),
     incoming
   );
   const calculation = calculate(dogmaFit);
@@ -547,7 +559,7 @@ export async function explainModule(
 ): Promise<AffectedAttribute[]> {
   await loadDogmaEngine();
   let dogmaFit = withIncoming(
-    withWeather(fittingToDogmaFit(fitting, profile, damageProfile), weatherTypeId),
+    withWeather(toDogmaFit(fitting, profile, damageProfile), weatherTypeId),
     incoming
   );
   if (overheatAll) {
@@ -580,7 +592,7 @@ export async function fittingSkillSources(
 ): Promise<number[]> {
   await loadDogmaEngine();
   const dogmaFit = withIncoming(
-    withWeather(fittingToDogmaFit(fitting, profile, damageProfile), weatherTypeId),
+    withWeather(toDogmaFit(fitting, profile, damageProfile), weatherTypeId),
     incoming
   );
   const calculation = calculate(dogmaFit, { sources: true });
@@ -908,7 +920,7 @@ function compareCharges(
       ),
     };
     // `fittingToDogmaFit` puts the modules first, so module i is items[i].
-    const dogmaFit = fittingToDogmaFit(trial, profile);
+    const dogmaFit = toDogmaFit(trial, profile);
     const { items, ship } = calculate(dogmaFit);
     const cap = extractCapBoosterFigures(dogmaFit.items, ship.attributes, items, indices);
     const mining = extractCrystalFigures(dogmaFit.items, items, indices);

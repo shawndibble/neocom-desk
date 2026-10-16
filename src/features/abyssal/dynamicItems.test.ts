@@ -119,12 +119,37 @@ describe('fetchDynamicItems', () => {
     expect([...items.keys()]).toEqual([1]);
   });
 
-  it('stops on abort', async () => {
+  it('stops asking on abort and keeps what it already has', async () => {
+    const controller = new AbortController();
+    getDogmaDynamicItem.mockImplementation(
+      async (_t: number, id: number, { signal }: { signal: AbortSignal }) => {
+        if (id === 1) return answer(id);
+        controller.abort();
+        signal.throwIfAborted();
+        return answer(id);
+      }
+    );
+    const refs = [1, 2, 3].map((itemId) => ({ typeId: NEUT, itemId }));
+
+    const items = await fetchDynamicItems(refs, { concurrency: 1, signal: controller.signal });
+
+    expect([...items.keys()]).toEqual([1]);
+    expect(getDogmaDynamicItem).toHaveBeenCalledTimes(2);
+  });
+
+  it('answers from Dexie alone when already aborted', async () => {
+    getDogmaDynamicItem.mockImplementation(async (_t: number, id: number) => answer(id));
+    await fetchDynamicItems([{ typeId: NEUT, itemId: 1 }]);
+    getDogmaDynamicItem.mockClear();
     const controller = new AbortController();
     controller.abort();
-    await expect(
-      fetchDynamicItems([{ typeId: NEUT, itemId: 1 }], { signal: controller.signal })
-    ).rejects.toThrow();
+
+    const items = await fetchDynamicItems(
+      [1, 2].map((itemId) => ({ typeId: NEUT, itemId })),
+      { signal: controller.signal }
+    );
+
+    expect([...items.keys()]).toEqual([1]);
     expect(getDogmaDynamicItem).not.toHaveBeenCalled();
   });
 });

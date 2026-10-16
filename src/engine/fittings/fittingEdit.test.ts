@@ -776,6 +776,31 @@ describe('drone counts on mutated drones', () => {
     );
   });
 
+  it('works a plain stack of the type in counts, however large (a decoded count is unbounded)', () => {
+    const mixed: Fitting = {
+      ...base,
+      drones: [
+        { typeId: LIGHT_MUTATED_DRONE, quantity: 1, state: 'online', mutation: rolls(1) },
+        { typeId: LIGHT_MUTATED_DRONE, quantity: 2_000_000_000, state: 'online' },
+      ],
+    };
+    expect(
+      setDroneCounts(mixed, LIGHT_MUTATED_DRONE, { inSpace: 2, inBay: 1_999_999_999 }).drones
+    ).toEqual([
+      { typeId: LIGHT_MUTATED_DRONE, quantity: 1, state: 'active', mutation: rolls(1) },
+      { typeId: LIGHT_MUTATED_DRONE, quantity: 1, state: 'active' },
+      { typeId: LIGHT_MUTATED_DRONE, quantity: 1_999_999_999, state: 'online' },
+    ]);
+  });
+
+  it('adds plain drones of the type past the ones the Fitting holds', () => {
+    const one: Fitting = { ...base, drones: [fit.drones[1]!] };
+    expect(setDroneCounts(one, LIGHT_MUTATED_DRONE, { inSpace: 1, inBay: 2 }).drones).toEqual([
+      { typeId: LIGHT_MUTATED_DRONE, quantity: 1, state: 'active', mutation: rolls(1) },
+      { typeId: LIGHT_MUTATED_DRONE, quantity: 2, state: 'online' },
+    ]);
+  });
+
   it('recalls them without merging, and drops from the end when the count shrinks', () => {
     const launched = setDroneCounts(fit, LIGHT_MUTATED_DRONE, { inSpace: 2, inBay: 0 });
     expect(launched.drones.filter((d) => d.mutation).map((d) => d.state)).toEqual([

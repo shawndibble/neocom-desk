@@ -49,8 +49,8 @@ async function shipMutations(items: readonly ShipAssetItem[]): Promise<Map<numbe
         ? [{ typeId: item.typeId, itemId: item.itemId }]
         : []
     );
-    // A click waits on this: past the timeout the ship opens without the rolls
-    // not yet fetched (those that were are kept, so the next open has them).
+    // A click waits on this: past the timeout the ship opens with the rolls
+    // that arrived; the rest load base unknown, and are cached for the next open.
     return refs.length === 0
       ? new Map()
       : await mutationsForItems(refs, lookup, { signal: AbortSignal.timeout(ROLLS_TIMEOUT_MS) });

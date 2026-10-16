@@ -1,10 +1,12 @@
 import { readFile } from 'node:fs/promises';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { Fitting } from '@/engine/fittings/types';
 
 const loadMutaplasmids = vi.fn();
 vi.mock('@/sde/loadSde', () => ({ loadMutaplasmids: () => loadMutaplasmids() }));
 
-const { loadMutaplasmidLookup, resetMutaplasmidLookupForTests } = await import('./mutaplasmidData');
+const { loadMutaplasmidLookup, resetMutaplasmidLookupForTests, withCheckedMutations } =
+  await import('./mutaplasmidData');
 
 async function bundled(): Promise<unknown> {
   return JSON.parse(
@@ -37,5 +39,38 @@ describe('loadMutaplasmidLookup', () => {
     const first = await loadMutaplasmidLookup();
     expect(await loadMutaplasmidLookup()).toBe(first);
     expect(loadMutaplasmids).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('withCheckedMutations', () => {
+  // Heavy Abyssal Energy Neutralizer (47832) from a Heavy Gremlin (16475), Gravid (47831).
+  const fitting = (mutation: Fitting['modules'][number]['mutation']): Fitting => ({
+    name: 'Neut',
+    shipTypeId: 17843,
+    modules: [{ slot: 'high', slotIndex: 0, typeId: 47832, state: 'active', mutation }],
+    drones: [],
+    cargo: [],
+  });
+
+  it('cuts a decoded mutation to the rolls its mutaplasmid makes', async () => {
+    loadMutaplasmids.mockImplementation(bundled);
+    const checked = await withCheckedMutations(
+      fitting({ baseTypeId: 16475, mutaplasmidTypeId: 47831, attributes: { 6: 400, 73: 1 } })
+    );
+    expect(checked.modules[0]?.mutation?.attributes).toEqual({ 6: 400 });
+  });
+
+  it('drops every mutation when the data will not load', async () => {
+    loadMutaplasmids.mockRejectedValue(new Error('offline'));
+    const checked = await withCheckedMutations(
+      fitting({ baseTypeId: 16475, mutaplasmidTypeId: 47831, attributes: { 6: 400 } })
+    );
+    expect(checked.modules[0]).not.toHaveProperty('mutation');
+  });
+
+  it('leaves a Fitting with no mutation alone, without loading the data', async () => {
+    const plain = fitting(undefined);
+    expect(await withCheckedMutations(plain)).toBe(plain);
+    expect(loadMutaplasmids).not.toHaveBeenCalled();
   });
 });

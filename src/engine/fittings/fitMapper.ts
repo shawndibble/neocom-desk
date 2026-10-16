@@ -2,6 +2,7 @@ import type { Fit, FitItem, Slot } from '@eveshipfit/dogma-engine';
 import { sideEffectsSwitchedOn } from './boosterSideEffects';
 import { fighterTubes } from './inventoryFlags';
 import { defaultTacticalMode, tacticalModesFor } from './tacticalModes';
+import { normaliseMutation, type MutaplasmidLookup } from './mutaplasmids';
 import type { DamageProfile, Fitting, FittingModule, ItemMutation, PilotProfile } from './types';
 
 /** EVE numbers implant/booster slots starting at 1, not 0 (dogma-engine's own `Slot` doc). */
@@ -9,33 +10,36 @@ const SLOT_INDEX_START = 1;
 
 /**
  * The engine's `Mutation` for a mutated item: its base, and the rolls when
- * known. The engine starts from the base type's own attributes and takes
- * each rolled value as the item's own; with no rolls it states the base
- * module unchanged (live run, 2026-10-16). It applies any attribute id it is
- * handed — a cap of 1 on a plain module included — so the rolls must already
- * be the mutaplasmid's own (`ItemMutation`'s invariant, kept by
- * `normaliseMutation` where a mutation enters the app), and an abyssal item
- * with no mutation goes in bare: the engine then knows nothing of it.
+ * known (none: the engine states the base module). The engine applies any
+ * attribute id it is handed as the item's own, so every mutation is checked
+ * against the data here, whatever its source: rolls cut to the mutaplasmid's,
+ * and one that doesn't make this item — or any, with no data loaded — goes
+ * in bare (the engine then knows nothing of the item but its slot).
  */
-function toEngineMutation(mutation: ItemMutation | undefined): Pick<FitItem, 'mutation'> {
-  if (!mutation) return {};
-  const rolled = Object.keys(mutation.attributes).length > 0;
+function toEngineMutation(
+  typeId: number,
+  mutation: ItemMutation | undefined,
+  mutaplasmids: MutaplasmidLookup | null
+): Pick<FitItem, 'mutation'> {
+  const checked = mutation && mutaplasmids && normaliseMutation(typeId, mutation, mutaplasmids);
+  if (!checked) return {};
+  const rolled = Object.keys(checked.attributes).length > 0;
   return {
     mutation: {
-      base: mutation.baseTypeId,
-      ...(rolled ? { attributes: { ...mutation.attributes } } : {}),
+      base: checked.baseTypeId,
+      ...(rolled ? { attributes: checked.attributes } : {}),
     },
   };
 }
 
-function moduleToFitItem(module: FittingModule): FitItem {
+function moduleToFitItem(module: FittingModule, mutaplasmids: MutaplasmidLookup | null): FitItem {
   const slot: Slot = { type: module.slot, index: module.slotIndex };
   return {
     type_id: module.typeId,
     slot,
     state: module.state,
     ...(module.chargeTypeId === undefined ? {} : { charge: { type_id: module.chargeTypeId } }),
-    ...toEngineMutation(module.mutation),
+    ...toEngineMutation(module.typeId, module.mutation, mutaplasmids),
   };
 }
 
@@ -86,14 +90,18 @@ function slottedItem(
  * not adapted) applies. The key is left off rather than set to `undefined` —
  * the engine rejects an explicit `environment: undefined` (live run,
  * 2026-09-24).
+ *
+ * `mutaplasmids` checks mutated items (`toEngineMutation`); without it they
+ * go in bare.
  */
 export function fittingToDogmaFit(
   fitting: Fitting,
   profile: PilotProfile,
-  damageProfile?: DamageProfile
+  damageProfile?: DamageProfile,
+  mutaplasmids: MutaplasmidLookup | null = null
 ): Fit {
   const items: FitItem[] = [
-    ...fitting.modules.map(moduleToFitItem),
+    ...fitting.modules.map((module) => moduleToFitItem(module, mutaplasmids)),
     ...fitting.drones.map((drone): FitItem => ({
       type_id: drone.typeId,
       slot: { type: 'drone_bay' },
@@ -101,7 +109,7 @@ export function fittingToDogmaFit(
       // Engine treats a drone given 'online' as launched; its in-bay state is
       // 'offline', so a bay stack ('online' here) goes in as that.
       state: drone.state === 'active' ? 'active' : 'offline',
-      ...toEngineMutation(drone.mutation),
+      ...toEngineMutation(drone.typeId, drone.mutation, mutaplasmids),
     })),
     // Launched squadrons take the tubes in order; the rest wait in the bay.
     ...launchFighters(fitting),

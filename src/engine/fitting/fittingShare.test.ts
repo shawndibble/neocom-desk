@@ -586,6 +586,14 @@ describe('mutated items (version 3)', () => {
     });
   });
 
+  it('re-encodes that pre-version-3 code byte for byte', async () => {
+    const saved =
+      '2.SynKqzGwMkrPtDKyMku1NrAyLEqxMgTR2eVWhtbWNYblZlamVqY1NWapVkXFNTXBiWWpKapGBkmpaflFqapGBmXGAA';
+    const decoded = await decodeFittingShare(saved);
+    if (!decoded.ok) throw new Error('decode failed');
+    expect(await encodeFittingShare(decoded.value)).toEqual({ ok: true, payload: saved });
+  });
+
   it('quantises a roll to 6 significant digits — finer than the game shows any attribute', () => {
     expect(quantiseRoll(419.25)).toBe(419.25);
     expect(quantiseRoll(15680)).toBe(15680);
@@ -661,6 +669,14 @@ describe('mutated items (version 3)', () => {
       );
       expect(decoded).toEqual({ ok: false, reason: 'invalid' });
     }
+    // `d00` is `d0` written longer: still the same drone.
+    const twice = await decodeFittingShare(
+      await packRawBody(
+        ['1', ';;;;', '1:1:0', '', '', '', '', '', '', 'd0:1:2:,d00:1:2:'].join('|'),
+        MUTATED_FITTING_SHARE_VERSION
+      )
+    );
+    expect(twice).toEqual({ ok: false, reason: 'invalid' });
     const stack = await decodeFittingShare(
       await packRawBody(
         ['1', ';;;;', '1:2:0', '', '', '', '', '', '', 'd0:1:2:'].join('|'),

@@ -23,19 +23,25 @@ _Recorded 2026-10-16._
   own rolls; a share code rejects a mutation on a larger stack, and EFT's
   `Drone x2 [N]` loads as two drones.
 - **Rolls are filtered to the mutaplasmid's own attributes where they enter
-  the app.** The engine takes any attribute it is handed as the item's own
-  value (a live run set a plain module's activation cost to 1 that way), and
-  ESI's dynamic item sends the item's full attribute set. So the ESI client,
-  the EFT loader and the Assets path keep only the attributes the mutaplasmid
-  rolls, and drop a mutation whose base, mutaplasmid and type do not belong
-  together. The engine mapper then passes a mutation through untouched. A
-  share code's codec checks shape only; the logged-out share view, which
-  strangers open, also checks its mutations against the data
-  (`normaliseFittingMutations`). Swapping a module for a variant drops its
+  the app, and again at the engine.** The engine takes any attribute it is
+  handed as the item's own value (a live run set a plain module's activation
+  cost to 1 that way), and ESI's dynamic item sends the item's full attribute
+  set. So the ESI client, the EFT loader and the Assets path keep only the
+  attributes the mutaplasmid rolls, and drop a mutation whose base,
+  mutaplasmid and type do not belong together. A share code's codec checks
+  shape only, so every decode of a code a stranger may have written — the
+  share view, the editor's link, Compare — checks its mutations against the
+  data too, dropping them all if the data won't load. The engine mapper
+  checks every mutation once more whatever its source, and hands mutated
+  items in bare without the data. A forged value for an attribute the
+  mutaplasmid does roll is not caught: bounding it needs the base module's
+  own value, which the data doesn't carry. Swapping a module for a variant drops its
   mutation, and drone launch and recall move mutated drones one item at a
   time, never merging them.
 - **Unknown rolls are shown as unknown, never guessed.** Killmails, In-game
-  Fittings and a bare `Abyssal …` EFT line carry no base and no rolls, and one
+  Fittings and a bare `Abyssal …` EFT line carry no base and no rolls, nor
+  does an Assets ship opened before ESI answered for its items (Open in
+  Fittings waits at most 8 s; what arrived is kept for the next open), and one
   abyssal type is made from many bases (every heavy neutralizer becomes the
   same Heavy Abyssal Energy Neutralizer), so the base cannot be worked out.
   Such an item keeps its slot but adds no CPU, powergrid or effect to the

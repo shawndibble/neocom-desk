@@ -22,8 +22,8 @@
  *   module and ends in a ` [N]` reference, after any charge and `/offline`
  *   (`Name, Charge /offline [N]`, `Drone xQty [N]`); one block per reference
  *   follows the fit, `[N] <base name>`, then the mutaplasmid's name, then
- *   `attrName value, ...` (dogma internal names), running to the next block
- *   header or blank line. A block's lines are never items — they are
+ *   `attrName value, ...` (dogma internal names); a line past those, a blank
+ *   line or the next header ends it. A block's lines are never items — they are
  *   `mutations` — so a reader that only wants names (Appraisal, the Skill
  *   Planner's import) never sees them.
  */
@@ -174,9 +174,8 @@ export function parseEftFit(text: string): EftFit {
   }
 
   const mutations: EftMutationBlock[] = [];
-  // The block being read, and how many of its lines (header included) so far.
+  // The block being read: its mutaplasmid line next, then its rolls.
   let block: EftMutationBlock | null = null;
-  let blockLines = 0;
 
   const bodyStart = headerIndex === -1 ? lines.length : headerIndex + 1;
   for (let i = bodyStart; i < lines.length; i++) {
@@ -195,16 +194,24 @@ export function parseEftFit(text: string): EftFit {
         baseName: blockHeader[2].trim(),
         attributes: [],
       };
-      blockLines = 1;
       mutations.push(block);
       continue;
     }
-    if (block) {
-      // Line 2 names the mutaplasmid, line 3 the rolls; Pyfa reads no further.
-      if (blockLines === 1) block.mutaplasmidName = trimmed;
-      else if (blockLines === 2) block.attributes = parseRolls(trimmed);
-      blockLines++;
+    if (block && block.mutaplasmidName === undefined) {
+      block.mutaplasmidName = trimmed;
       continue;
+    }
+    if (block) {
+      // The rolls, if the line reads as rolls; Pyfa reads no further. Anything
+      // else ends the block and is read as an item, so a fit pasted with no
+      // blank line after a block keeps its later lines.
+      const rolls = parseRolls(trimmed);
+      const current = block;
+      block = null;
+      if (rolls.length > 0) {
+        current.attributes = rolls;
+        continue;
+      }
     }
 
     const refMatch = MUTATION_REF_SUFFIX.exec(trimmed);

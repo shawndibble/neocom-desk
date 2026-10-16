@@ -2,7 +2,10 @@ import { readFile } from 'node:fs/promises';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { calculate } from '@eveshipfit/dogma-engine';
 import { fittingToDogmaFit } from '@/engine/fittings/fitMapper';
+import { mutaplasmidLookup, type MutaplasmidLookup } from '@/engine/fittings/mutaplasmids';
+import type { MutaplasmidData } from '@/sde/types';
 import {
+  computeFittingStats,
   toProjectedEffects,
   withIncoming,
   withWeather,
@@ -1564,6 +1567,14 @@ describe('mutated (abyssal) modules (real WASM + real pinned SDE)', () => {
     implantTypeIds: [],
     boosterTypeIds: [],
   };
+  let mutaplasmids: MutaplasmidLookup;
+  beforeAll(async () => {
+    const data = await readFile(
+      new URL('../../../public/data/mutaplasmids.json', import.meta.url),
+      'utf8'
+    );
+    mutaplasmids = mutaplasmidLookup(JSON.parse(data) as MutaplasmidData);
+  });
   const neutFit = (module: Fitting['modules'][number]): Fitting => ({
     name: 'Neut',
     shipTypeId: VEXOR_NAVY_ISSUE,
@@ -1572,7 +1583,9 @@ describe('mutated (abyssal) modules (real WASM + real pinned SDE)', () => {
     cargo: [],
   });
   const attr = (fitting: Fitting, id: number) =>
-    calculate(fittingToDogmaFit(fitting, NO_SKILLS)).items[0]?.attributes.get(id)?.value;
+    calculate(
+      fittingToDogmaFit(fitting, NO_SKILLS, undefined, mutaplasmids)
+    ).items[0]?.attributes.get(id)?.value;
 
   it('states a rolled module from its base, with the rolls in place of the base values', () => {
     const rolled = neutFit({
@@ -1621,7 +1634,9 @@ describe('mutated (abyssal) modules (real WASM + real pinned SDE)', () => {
       cargo: [],
     });
     const damage = (fitting: Fitting) =>
-      calculate(fittingToDogmaFit(fitting, NO_SKILLS)).items[0]?.attributes.get(64)?.value;
+      calculate(
+        fittingToDogmaFit(fitting, NO_SKILLS, undefined, mutaplasmids)
+      ).items[0]?.attributes.get(64)?.value;
     const plain = damage(droneFit({ typeId: 2454, quantity: 1, state: 'active' }))!;
     const rolled = damage(
       droneFit({
@@ -1644,6 +1659,21 @@ describe('mutated (abyssal) modules (real WASM + real pinned SDE)', () => {
     });
     expect(attr(bare, 50)).toBeUndefined();
     expect(attr(bare, 97)).toBeUndefined();
+  });
+
+  it('drops a forged roll the mutaplasmid does not make (the engine loads the data itself)', async () => {
+    const rolls = { 6: 419.25, 97: 591.36 };
+    const mutated = (attributes: Record<number, number>) =>
+      neutFit({
+        slot: 'high',
+        slotIndex: 0,
+        typeId: HEAVY_ABYSSAL_NEUT,
+        state: 'active',
+        mutation: { baseTypeId: HEAVY_GREMLIN_NEUT, mutaplasmidTypeId: 47831, attributes },
+      });
+    const forged = await computeFittingStats(mutated({ ...rolls, 73: 1 }), NO_SKILLS);
+    expect(forged).toEqual(await computeFittingStats(mutated(rolls), NO_SKILLS));
+    expect(forged.cpuUsed).toBeCloseTo(32, 6); // the base's own: the mutation got through
   });
 });
 

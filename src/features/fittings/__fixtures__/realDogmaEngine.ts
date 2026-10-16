@@ -1,7 +1,7 @@
 /**
  * Test-only: the real pinned engine and SDE (ADR 0016) through the real
  * `loadDogmaEngine`, with fetch and Cache Storage stubbed to serve them from
- * node_modules. Callers `vi.unstubAllGlobals()` in their own `afterAll`.
+ * node_modules (and the mutaplasmid data from public/data). Callers `vi.unstubAllGlobals()` in their own `afterAll`.
  */
 import { createRequire } from 'node:module';
 import { readFile } from 'node:fs/promises';
@@ -14,7 +14,11 @@ const require = createRequire(import.meta.url);
 async function stubEngineAssets(): Promise<void> {
   const wasmPath = require.resolve('@eveshipfit/dogma-engine/esf_dogma_engine_bg.wasm');
   const sdePath = require.resolve('@eveshipfit/sde/dist/sde.dat');
-  const [wasm, sde] = await Promise.all([readFile(wasmPath), readFile(sdePath)]);
+  const [wasm, sde, mutaplasmids] = await Promise.all([
+    readFile(wasmPath),
+    readFile(sdePath),
+    readFile(new URL('../../../../public/data/mutaplasmids.json', import.meta.url)),
+  ]);
   const respond = (bytes: Buffer, type: string) =>
     new Response(new Uint8Array(bytes), {
       headers: { 'content-type': type, 'content-length': String(bytes.byteLength) },
@@ -25,6 +29,7 @@ async function stubEngineAssets(): Promise<void> {
       const url = String(input);
       if (url.includes('.wasm')) return respond(wasm, 'application/wasm');
       if (url.includes('sde.dat')) return respond(sde, 'application/octet-stream');
+      if (url.includes('mutaplasmids.json')) return respond(mutaplasmids, 'application/json');
       throw new Error(`unexpected fetch: ${url}`);
     })
   );

@@ -4,7 +4,12 @@
  * session. The one way the feature layer reaches it.
  */
 import { useEffect, useState } from 'react';
-import { mutaplasmidLookup, type MutaplasmidLookup } from '@/engine/fittings/mutaplasmids';
+import {
+  hasMutations,
+  mutaplasmidLookup,
+  normaliseFittingMutations,
+  type MutaplasmidLookup,
+} from '@/engine/fittings/mutaplasmids';
 import { loadMutaplasmids } from '@/sde/loadSde';
 import type { Fitting } from '@/engine/fittings/types';
 import type { AttributeNameFor } from '@/engine/fittings/eftMutations';
@@ -35,13 +40,34 @@ export function loadMutaplasmidLookup(): Promise<MutaplasmidLookup> {
 export async function eftAttributeNamesFor(
   fitting: Fitting
 ): Promise<AttributeNameFor | undefined> {
-  const mutated = fitting.modules.some((m) => m.mutation) || fitting.drones.some((d) => d.mutation);
-  if (!mutated) return undefined;
+  if (!hasMutations(fitting)) return undefined;
   try {
     return (await loadMutaplasmidLookup()).attributeName;
   } catch {
     return undefined;
   }
+}
+
+/**
+ * A Fitting decoded from a share code — checked for shape only — with its
+ * mutations checked against the data (`normaliseFittingMutations`), so a
+ * forged one can't restate a module. Every mutation is dropped when the data
+ * won't load. Run on each decode of a code that may be a stranger's.
+ */
+export async function withCheckedMutations(fitting: Fitting): Promise<Fitting> {
+  if (!hasMutations(fitting)) return fitting;
+  let lookup: MutaplasmidLookup;
+  try {
+    lookup = await loadMutaplasmidLookup();
+  } catch {
+    const bare = <T extends { mutation?: unknown }>(item: T): T => {
+      const next = { ...item };
+      delete next.mutation;
+      return next;
+    };
+    return { ...fitting, modules: fitting.modules.map(bare), drones: fitting.drones.map(bare) };
+  }
+  return normaliseFittingMutations(fitting, lookup);
 }
 
 /** The lookup once loaded; null while it loads or if it failed (a later render retries). */

@@ -95,13 +95,12 @@ export async function getDynamicItem(ref: DynamicItemRef): Promise<DynamicItemRe
  * Every ref's dynamic attributes, by item id: cached rows first, then one ESI
  * call per missing id (duplicates asked once), at most `concurrency` at a
  * time. An id that fails is left out of the map rather than failing the
- * batch; an aborted `signal` rejects.
+ * batch; an aborted `signal` stops the asking and the map holds what arrived.
  */
 export async function fetchDynamicItems(
   refs: readonly DynamicItemRef[],
   { concurrency = DEFAULT_CONCURRENCY, signal }: { concurrency?: number; signal?: AbortSignal } = {}
 ): Promise<Map<number, DynamicItemRecord>> {
-  signal?.throwIfAborted();
   const unique = new Map<number, DynamicItemRef>();
   for (const ref of refs) if (!unique.has(ref.itemId)) unique.set(ref.itemId, ref);
   const ids = [...unique.keys()];
@@ -116,11 +115,14 @@ export async function fetchDynamicItems(
 
   let next = 0;
   const worker = async () => {
-    while (next < missing.length) {
-      signal?.throwIfAborted();
+    while (next < missing.length && !signal?.aborted) {
       const ref = missing[next++]!;
-      const record = await fetchOne(ref, signal);
-      if (record) found.set(ref.itemId, record);
+      try {
+        const record = await fetchOne(ref, signal);
+        if (record) found.set(ref.itemId, record);
+      } catch (err) {
+        if (!signal?.aborted) throw err;
+      }
     }
   };
   await Promise.all(

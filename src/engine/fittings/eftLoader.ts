@@ -23,7 +23,7 @@
  * stats are in (scope decision `20260925-113331`).
  */
 import { parseEftFit, type EftItem, type EftMutationBlock } from '@/engine/import/eftFit';
-import { MAX_SLOTS_PER_CATEGORY } from '@/engine/fitting/fittingShare';
+import { MAX_DRONE_STACKS, MAX_SLOTS_PER_CATEGORY } from '@/engine/fitting/fittingShare';
 import type { FittingSlotAssignment } from '@/sde/types';
 import type { LoadParts, LoadWarning } from './load';
 import {
@@ -195,7 +195,8 @@ export function loadEftFitting(
 
     if (rack === 'drone' && mutated) {
       // Each mutated drone is its own item: never one stack sharing rolls.
-      for (let n = 0; n < item.quantity; n++) {
+      // Capped at what a share code holds; a pasted count is unbounded.
+      for (let n = 0; n < Math.min(item.quantity, MAX_DRONE_STACKS); n++) {
         drones.push({ typeId, quantity: 1, state: 'online', ...mutation });
       }
     } else if (rack === 'drone') {

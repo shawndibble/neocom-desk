@@ -560,14 +560,10 @@ function attachMutations(
   drones: FittingDrone[]
 ): boolean {
   if (raw === '') return true;
-  const entries = raw.split(',');
-  const seen = new Set<string>();
-  for (const entryStr of entries) {
+  for (const entryStr of raw.split(',')) {
     const fields = entryStr.split(':');
     if (fields.length !== 4) return false;
     const [target, baseStr, mutaStr, rollsStr] = fields as [string, string, string, string];
-    if (seen.has(target)) return false;
-    seen.add(target);
     const baseTypeId = parseBase36Positive(baseStr);
     const mutaplasmidTypeId = parseBase36Positive(mutaStr);
     const index = parseBase36NonNegative(target.slice(1));
@@ -578,13 +574,13 @@ function attachMutations(
     const kind = target[0];
     if (kind === DRONE_TARGET) {
       const drone = drones[index];
-      if (!drone || drone.count !== 1) return false;
+      if (!drone || drone.count !== 1 || drone.mutation) return false;
       drone.mutation = mutation;
       continue;
     }
     const category = SLOT_CATEGORIES.find((c) => RACK_TARGETS[c] === kind);
     const entry = category === undefined ? undefined : modules[category][index];
-    if (!entry) return false;
+    if (!entry || entry.mutation) return false;
     entry.mutation = mutation;
   }
   return true;
