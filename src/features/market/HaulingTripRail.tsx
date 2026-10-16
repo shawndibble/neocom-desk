@@ -15,11 +15,11 @@ import {
   tappableRowClassName,
 } from '@/components/ui/controlStyles';
 import { FILL_BATCH_CAP, type HaulingFillStopReason } from '@/engine/market/haulingFillStop';
-import type { TripPlan } from '@/engine/market/haulingPlan';
+import { holdsCapacityM3, holdsUsedM3, type TripPlan } from '@/engine/market/haulingPlan';
 import { ROUTE_PREFERENCE_LABEL_KEYS } from '@/features/route/routePreferences';
 import { formatIsk, formatIskCompactSigned } from '@/lib/isk';
 import { useStickyClearance } from '@/lib/useStickyClearance';
-import { formatTripM3 } from './format';
+import { formatTripM3, shownUsedM3 } from './format';
 import { HaulingHoldMeters } from './HaulingHoldMeters';
 import { iskGains, signedIsk } from './signedIsk';
 import { useHubJumps } from './useHubJumps';
@@ -137,12 +137,8 @@ export function HaulingTripSummary({
   const jumps = useHubJumps(fromSystemId, toSystemId);
   const { profit, cost } = plan.totals;
   const holds = cargoSet ? plan.holds : [];
-  let capacityM3 = 0;
-  let usedM3 = 0;
-  for (const hold of holds) {
-    capacityM3 += hold.capacityM3;
-    usedM3 += hold.usedM3;
-  }
+  const capacityM3 = holdsCapacityM3(holds);
+  const usedM3 = holdsUsedM3(holds);
   const knownJumps = jumps.status === 'known' && jumps.jumps > 0 ? jumps : null;
 
   const jumpsText = knownJumps
@@ -169,7 +165,8 @@ export function HaulingTripSummary({
           <span>
             {t('market.hauling.rail.cargoValue')} <b className="text-text">{isk(cost)}</b>
           </span>
-          {cargoValueAfterFill !== null && (
+          {/* Only when the fill changes the figure as shown. */}
+          {cargoValueAfterFill !== null && isk(cargoValueAfterFill) !== isk(cost) && (
             <span>
               {t('market.hauling.rail.cargoValueAfter', { value: isk(cargoValueAfterFill) })}
             </span>
@@ -197,7 +194,7 @@ export function HaulingTripSummary({
           )}
           <span className="text-xs text-text-dim tabular-nums">
             {t('market.hauling.rail.used', {
-              used: formatTripM3(usedM3),
+              used: formatTripM3(shownUsedM3(holds)),
               total: formatTripM3(capacityM3),
             })}
           </span>
@@ -290,7 +287,7 @@ export interface HaulingFillListProps {
   /** Totals of the ticked items. */
   tickedTotals: { count: number; volumeM3: number; cost: number; profit: number };
   /** The hold once the ticked items are added; null without a Cargo Space. */
-  holdAfter: { usedM3: number; capacityM3: number } | null;
+  holdAfter: { usedM3: number; capacityM3: number; freeM3: number } | null;
 }
 
 function FillRow({
@@ -451,7 +448,7 @@ export function HaulingFillList({
                 {t('market.hauling.fill.holdAfter', {
                   used: formatTripM3(holdAfter.usedM3),
                   total: formatTripM3(holdAfter.capacityM3),
-                  free: formatTripM3(Math.max(0, holdAfter.capacityM3 - holdAfter.usedM3)),
+                  free: formatTripM3(holdAfter.freeM3),
                 })}
               </p>
             )}

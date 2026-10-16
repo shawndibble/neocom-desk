@@ -154,6 +154,11 @@ describe('HaulingTripRail', () => {
 });
 
 describe('HaulingTripSummary', () => {
+  it('says nothing of the fill when it leaves the cargo value as shown', () => {
+    renderSummary({ cargoValueAfterFill: 213_965_524.2 });
+    expect(screen.queryByText(/with the fill/)).toBeNull();
+  });
+
   it('reads the lane with its jumps by route preference, the free m³ with a meter, and per-jump profit', () => {
     renderSummary({ cargoValueAfterFill: 619_395_524 });
     expect(hubJumps.calls.at(-1)).toEqual([30002187, 30000142]);
@@ -268,7 +273,7 @@ function renderFill(props: Partial<HaulingFillListProps> = {}) {
       items={ITEMS}
       ticked={new Set([1])}
       tickedTotals={{ count: 1, volumeM3: 9_000, cost: 30_000_000, profit: 3_903_930 }}
-      holdAfter={{ usedM3: 29_038, capacityM3: 64_500 }}
+      holdAfter={{ usedM3: 29_038, capacityM3: 64_500, freeM3: 35_462 }}
       {...handlers}
       {...props}
     />

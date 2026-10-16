@@ -52,12 +52,7 @@ import { cx } from '@/lib/cx';
 import { useIsNarrow } from '@/lib/useIsNarrow';
 import { useElementNarrowerThan } from '@/lib/useElementNarrowerThan';
 import { useIsPhone } from '@/lib/useIsPhone';
-import {
-  holdsFreeM3,
-  multibuyText,
-  planTrip,
-  type TripOverride,
-} from '@/engine/market/haulingPlan';
+import { multibuyText, planTrip, type TripOverride } from '@/engine/market/haulingPlan';
 import type { DemandKind } from '@/engine/market/haulingMarket';
 import { formatIsk, formatMarketIsk, marketIskDecimals } from '@/lib/isk';
 import { writeToClipboard } from '@/lib/clipboard';
@@ -81,7 +76,7 @@ import { haulingCsvColumns } from './haulingCsv';
 import { HaulingFlagWord } from './HaulingFlagWord';
 import { HAULING_FLAG_KEY } from './haulingFlagKeys';
 import { HaulingItemActions, HaulingItemDetail } from './HaulingItemDetail';
-import { formatSignedPct, formatTripM3, formatVolume } from './format';
+import { formatSignedPct, formatTripM3, formatVolume, shownFreeM3 } from './format';
 import {
   HaulingFillList,
   HaulingTripBar,
@@ -531,7 +526,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
   );
 
   /** The room left in every hold: one figure for the summary, the fill offer and the trip bar. */
-  const freeM3 = holdsFreeM3(plan.holds);
+  const freeM3 = shownFreeM3(plan.holds);
 
   // Fill the free space: needs a Cargo Space and a fixed lane (Any hub would
   // scan every hub's books), and the category scan landed, so its rows stay out.
@@ -567,7 +562,8 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
 
   const allSelected =
     tableRows.length > 0 && tableRows.every((r) => overrides.get(r.typeId)?.selected !== false);
-  const selectedCount = tableRows.filter((r) => overrides.get(r.typeId)?.selected !== false).length;
+  // What ships, not what is ticked: a ticked row the plan sized to nothing is not in the trip.
+  const selectedCount = plan.totals.items;
 
   // A row click selects the row and shows its detail; a click on the
   // selected row clears it (DESIGN.md §6c). The rail's "‹ Trip" only leaves

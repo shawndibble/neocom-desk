@@ -298,6 +298,22 @@ describe('HaulingPanel rows select, the rail shows the detail', () => {
     );
   });
 
+  it('counts what ships, not what is ticked: a row Max spend sizes to nothing is not in the trip', () => {
+    mainState = {
+      status: 'ready',
+      scan: {
+        rows: [SCAN_ROW, { ...SCAN_ROW, typeId: 2205, name: 'Hammerhead II' }],
+        scanned: 2,
+        examinedTypeIds: [],
+        fetchedAt: 0,
+      },
+    };
+    // 70 Damage Control II at 100 each: nothing left for the second.
+    useHaulingBudget.setState({ hydrated: true, value: 7_000 });
+    renderPanel();
+    expect(screen.getByText('1 of 2 in the trip')).toBeInTheDocument();
+  });
+
   it('the Trip crumb goes back to the trip but keeps the row selected', async () => {
     const user = userEvent.setup();
     renderPanel();

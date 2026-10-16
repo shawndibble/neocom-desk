@@ -9500,7 +9500,7 @@
         "sales": "a realistic share of a week's sales",
         "supply": "all that is worth buying",
         "space": "limited by space",
-        "budget": "limited by budget",
+        "budget": "limited by Max spend",
         "edited": "you set this",
         "none": "not selected"
       },
@@ -9601,7 +9601,7 @@
         "perJump": "Profit per jump ({{jumps}})",
         "limitedSales": "Limited by sales: some items stop at a realistic share of a week's sales.",
         "limitedSpace": "The hold is full; space is the limit.",
-        "limitedBudget": "Your budget is the limit.",
+        "limitedBudget": "Your Max spend is the limit.",
         "selectHint": "Select an item to see its price math."
       },
       "fill": {

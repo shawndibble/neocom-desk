@@ -8,7 +8,6 @@ import { planFill } from '@/engine/market/haulingFill';
 import { fillCanFindMore } from '@/engine/market/haulingFillStop';
 import {
   holdsCapacityM3,
-  holdsFreeM3,
   type TripCandidate,
   type TripOverride,
   type TripPlan,
@@ -17,6 +16,7 @@ import { loadMarketTypes } from '@/sde/loadMarketSde';
 import type { MarketGroupNode } from '@/sde/marketTypes';
 import { haulingCategoryOf } from './haulingCategories';
 import type { HaulMode, HaulingScanRow } from './haulingData';
+import { shownAddedM3, shownFreeM3, shownUsedM3 } from './format';
 import type { HaulingEnd } from './haulingHubs';
 import type { HaulingFillItem, HaulingFillListProps } from './HaulingTripRail';
 import {
@@ -152,9 +152,10 @@ export function useHaulingFill({
       else next.add(typeId);
       return next;
     });
-  const markAdded = (lines: readonly { typeId: number; volumeM3: number }[]) => {
-    setAddedIds((current) => new Set([...current, ...lines.map((l) => l.typeId)]));
-    setLastAdded({ count: lines.length, volumeM3: lines.reduce((sum, l) => sum + l.volumeM3, 0) });
+  /** `volumeM3` as the shown hold figures move (`shownAddedM3`). */
+  const markAdded = (typeIds: readonly number[], volumeM3: number) => {
+    setAddedIds((current) => new Set([...current, ...typeIds]));
+    setLastAdded({ count: typeIds.length, volumeM3 });
   };
   /** Drops the fill and its added rows; returns the ids that were added, for the caller's pins. */
   const reset = useCallback((): ReadonlySet<number> => {
@@ -226,7 +227,7 @@ export function useHaulingFillOffer(
       const plan = planOf(rows);
       const after = plan?.after ?? before;
       return {
-        freeM3: holdsFreeM3(after.holds),
+        freeM3: shownFreeM3(after.holds),
         capacityM3: holdsCapacityM3(after.holds),
         binding: after.binding,
         newLines: (plan?.lines ?? []).filter((l) => batchIds.has(l.typeId) && l.profit > 0).length,
@@ -267,16 +268,19 @@ export function useHaulingFillOffer(
   });
 
   const add = () => {
-    const lines = ticked?.lines ?? [];
-    if (lines.length === 0) return;
-    fill.markAdded(lines);
+    if (ticked === null || ticked.lines.length === 0) return;
+    const { lines } = ticked;
+    fill.markAdded(
+      lines.map((l) => l.typeId),
+      shownAddedM3(before.holds, ticked.after.holds, ticked.added.volumeM3)
+    );
     pin(lines);
   };
 
   const { state } = fill;
   /** The plan once every offered item is in: what "Filled" reports and Find more is judged on. */
   const afterOffer = offer?.after ?? before;
-  const freeAfterOffer = holdsFreeM3(afterOffer.holds);
+  const freeAfterOffer = shownFreeM3(afterOffer.holds);
   const reason = state.status === 'ready' ? state.reason : null;
   const list: Omit<HaulingFillListProps, 'freeM3' | 'progressText'> = {
     status: fill.state.status,
@@ -303,14 +307,15 @@ export function useHaulingFillOffer(
     onAdd: add,
     tickedTotals: {
       count: ticked?.lines.length ?? 0,
-      volumeM3: ticked?.added.volumeM3 ?? 0,
+      volumeM3: ticked ? shownAddedM3(before.holds, ticked.after.holds, ticked.added.volumeM3) : 0,
       cost: ticked?.added.cost ?? 0,
       profit: ticked?.added.profit ?? 0,
     },
     holdAfter: ticked
       ? {
-          usedM3: ticked.after.holds.reduce((sum, h) => sum + h.usedM3, 0),
+          usedM3: shownUsedM3(ticked.after.holds),
           capacityM3: holdsCapacityM3(ticked.after.holds),
+          freeM3: shownFreeM3(ticked.after.holds),
         }
       : null,
   };

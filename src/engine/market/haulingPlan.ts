@@ -108,9 +108,8 @@ export interface HoldUse {
   usedM3: number;
 }
 
-/** The room left in every hold, an overfilled one counting none. */
-export const holdsFreeM3 = (holds: readonly HoldUse[]): number =>
-  holds.reduce((sum, h) => sum + Math.max(0, h.capacityM3 - h.usedM3), 0);
+export const holdsUsedM3 = (holds: readonly HoldUse[]): number =>
+  holds.reduce((sum, h) => sum + h.usedM3, 0);
 
 export const holdsCapacityM3 = (holds: readonly HoldUse[]): number =>
   holds.reduce((sum, h) => sum + h.capacityM3, 0);
@@ -390,7 +389,12 @@ export function planTrip(input: PlanTripInput): TripPlan {
       }
     }
 
-    const line = place(candidate, lineFor(candidate, quantity, true, limitedBy, fees));
+    let sizedLine = lineFor(candidate, quantity, true, limitedBy, fees);
+    // A lot the limit cut too small to pay (a listing's broker fee has a floor) ships nothing.
+    if (sizedLine.quantity > 0 && sizedLine.profit <= 0) {
+      sizedLine = lineFor(candidate, 0, true, limitedBy, fees);
+    }
+    const line = place(candidate, sizedLine);
     lines.set(candidate.typeId, line);
     if (remainingBudget !== null) remainingBudget -= line.cost;
   }
