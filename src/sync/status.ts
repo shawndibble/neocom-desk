@@ -44,3 +44,29 @@ export function subscribeSyncStatus(listener: (status: SyncStatus) => void): () 
 export function getSyncStatus(characterId: number): SyncStatus {
   return statusByCharacter.get(characterId) ?? { ...IDLE_STATUS, characterId };
 }
+
+// Characters with an edit scheduled (`scheduleSync`'s debounce) but not yet
+// handed to a sync. Kept here, not in planSync.ts, so the UI can read it
+// without pulling the Firebase chunk in. A sync that has started shows as
+// `state: 'syncing'` in the status above, so the two cover edit-to-push.
+const scheduled = new Set<number>();
+
+/** Only planSync.ts writes: an edit is waiting out its debounce, or it is not. */
+export function setSyncScheduled(characterId: number, isScheduled: boolean): void {
+  if (scheduled.has(characterId) === isScheduled) return;
+  if (isScheduled) scheduled.add(characterId);
+  else scheduled.delete(characterId);
+  for (const listener of listeners) listener(latestStatus);
+}
+
+/** Clear every scheduled mark (the debounces were dropped). */
+export function clearSyncScheduled(): void {
+  if (scheduled.size === 0) return;
+  scheduled.clear();
+  for (const listener of listeners) listener(latestStatus);
+}
+
+/** An edit for this Character is scheduled but has not started syncing yet. */
+export function hasPendingSync(characterId: number): boolean {
+  return scheduled.has(characterId);
+}

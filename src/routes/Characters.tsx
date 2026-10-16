@@ -96,6 +96,7 @@ import { formatCountdown, formatDuration } from '@/lib/duration';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
 import { removeCharacterAfterSync } from '@/features/character/removeCharacter';
+import { UnsyncedChangesWarning } from '@/features/character/UnsyncedChangesWarning';
 import { RemoveSharedOption } from '@/features/communities/RemoveSharedOption';
 import { CharacterRowContextMenu } from '@/features/character/CharacterRowContextMenu';
 import { updateGroups, useOverviewGroups } from '@/features/character/overviewGroups';
@@ -979,6 +980,9 @@ export function Characters() {
     id: number;
     name: string;
   } | null>(null);
+  /** The removal is running: the confirm stays open and busy until it finishes. */
+  const [removing, setRemoving] = useState(false);
+  const cancelRemoveRef = useRef<HTMLButtonElement>(null);
   /** Also delete this Character's Shared Blueprints from its Communities (issue #3600). */
   const [removeShared, setRemoveShared] = useState(true);
   /** The Character whose removal just failed — rolled back whole, so it is still listed. */
@@ -1284,11 +1288,14 @@ export function Characters() {
     const at = ids.indexOf(String(id));
     const cardButton = (cardId: string | undefined) => () =>
       cardId ? document.querySelector<HTMLElement>(`[data-character-select="${cardId}"]`) : null;
-    setRemovingCharacter(null);
+    // The dialog stays open, busy, while the last push and cleanup run (up to
+    // ~24 s offline) — closing it at once looked like the removal had finished.
+    setRemoving(true);
     try {
       await removeCharacterAfterSync(id, isSyncConfigured(), removeShared);
       useAuthFailure.getState().dismissNeedsLogin(id);
-      // The dialog has closed by now, so this isn't overridden by its focus return.
+      // Requested in the same batch as the dialog closing (`finally`), so the
+      // request outlives the dialog's own focus return, which it retries past.
       focusAfterCommit(
         cardButton(at >= 0 ? ids[at + 1] : undefined),
         cardButton(at > 0 ? ids[at - 1] : undefined),
@@ -1298,6 +1305,9 @@ export function Characters() {
       // The local removal is one transaction, so a failure left every row in
       // place — say so rather than leave the click looking ignored.
       setRemoveFailedName(name);
+    } finally {
+      setRemovingCharacter(null);
+      setRemoving(false);
     }
   }
 
@@ -1937,8 +1947,11 @@ export function Characters() {
 
       <Modal
         open={removingCharacter !== null}
-        onClose={() => setRemovingCharacter(null)}
+        onClose={() => {
+          if (!removing) setRemovingCharacter(null);
+        }}
         title={t('characters.remove')}
+        initialFocusRef={cancelRemoveRef}
       >
         <p className="text-xs text-text-dim">
           {removingCharacter && t('characters.removeConfirm', { name: removingCharacter.name })}
@@ -1950,11 +1963,27 @@ export function Characters() {
             onChange={setRemoveShared}
           />
         )}
+        {removingCharacter && (
+          <UnsyncedChangesWarning
+            characterIds={[removingCharacter.id]}
+            syncConfigured={isSyncConfigured()}
+          />
+        )}
         <div className="mt-3 flex justify-end gap-2">
-          <Button size="sm" onClick={() => setRemovingCharacter(null)}>
+          <Button
+            ref={cancelRemoveRef}
+            size="sm"
+            disabled={removing}
+            onClick={() => setRemovingCharacter(null)}
+          >
             {t('characters.cancel')}
           </Button>
-          <Button variant="danger" size="sm" onClick={() => void confirmRemoveCharacter()}>
+          <Button
+            variant="danger"
+            size="sm"
+            loading={removing}
+            onClick={() => void confirmRemoveCharacter()}
+          >
             {t('characters.remove')}
           </Button>
         </div>
