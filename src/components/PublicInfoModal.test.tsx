@@ -346,6 +346,51 @@ describe('PublicInfoModal', () => {
     await screen.findByText('Could not load');
   });
 
+  it('offers Try again on a failed tab, and stays on that tab while it re-reads', async () => {
+    mockCharacter(93, {
+      name: 'Pilot With Broken Corp',
+      corporation_id: 5,
+      birthday: '2020-01-01T00:00:00Z',
+      bloodline_id: 1,
+      gender: 'male',
+      race_id: 1,
+    });
+    server.use(http.get(`${ESI_BASE_URL}/corporations/5`, () => HttpResponse.error()));
+
+    renderModal();
+    act(() => usePublicInfoModalStore.getState().open('character', 93));
+
+    await screen.findByText('Pilot With Broken Corp');
+    const dialog = screen.getByRole('dialog');
+    within(dialog).getByRole('tab', { name: 'Corporation' }).click();
+    await screen.findByText('Could not load');
+
+    server.use(
+      http.get(`${ESI_BASE_URL}/corporations/5`, () =>
+        HttpResponse.json({
+          name: 'Fixed Corp',
+          ticker: 'FIX',
+          member_count: 3,
+          ceo_id: 93,
+          creator_id: 93,
+          tax_rate: 0.1,
+          date_founded: '2020-01-01T00:00:00Z',
+        })
+      )
+    );
+    within(dialog).getByRole('button', { name: 'Try again' }).click();
+
+    // The Corporation tab drops out while the lookups re-run, then comes back, still the open one.
+    await waitFor(() =>
+      expect(within(dialog).getByRole('tab', { name: 'Corporation' })).toHaveAttribute(
+        'aria-selected',
+        'true'
+      )
+    );
+    expect(await within(dialog).findByText(/Fixed Corp/)).toBeInTheDocument();
+    expect(screen.queryByText('Could not load')).not.toBeInTheDocument();
+  });
+
   it('switching tabs reuses already-fetched data instead of refetching', async () => {
     let corpCalls = 0;
     mockCharacter(94, {

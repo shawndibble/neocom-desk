@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { db } from '@/db';
@@ -80,6 +80,14 @@ function show(legs: RouteSafetyLeg[]) {
     </SetWaypoints>
   );
 }
+
+function setOffline() {
+  Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => false });
+}
+
+afterEach(() => {
+  Reflect.deleteProperty(navigator, 'onLine');
+});
 
 beforeEach(async () => {
   vi.clearAllMocks();
@@ -193,6 +201,66 @@ describe('SetWaypoints', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Waypoints not set: ESI gave no reason. Is the character logged in to the game?'
     );
+  });
+
+  it('says it is offline when the request never left the browser', async () => {
+    await seed([{ id: ONE, name: 'Pilot One', scopes: [WAYPOINT_SCOPE] }]);
+    postAutopilotWaypointMock.mockRejectedValue(new TypeError('Failed to fetch'));
+    show([leg([JITA, PERIMETER])]);
+
+    const button = await screen.findByRole('button', { name: 'Set waypoints in game' });
+    await waitFor(() => expect(button).toBeEnabled());
+    await userEvent.click(button);
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent("You're offline — waypoints weren't set.");
+    expect(alert).not.toHaveTextContent('ESI gave no reason');
+  });
+
+  it('says how many were set when the connection drops partway', async () => {
+    await seed([{ id: ONE, name: 'Pilot One', scopes: [WAYPOINT_SCOPE] }]);
+    postAutopilotWaypointMock
+      .mockResolvedValueOnce({ data: null })
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    show([leg([JITA, PERIMETER]), leg([PERIMETER, UEDAMA])]);
+
+    const button = await screen.findByRole('button', { name: 'Set waypoints in game' });
+    await waitFor(() => expect(button).toBeEnabled());
+    await userEvent.click(button);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      "You're offline — 1 of 2 waypoints were set"
+    );
+  });
+
+  it('does not claim the rest were not set when the request timed out after leaving', async () => {
+    await seed([{ id: ONE, name: 'Pilot One', scopes: [WAYPOINT_SCOPE] }]);
+    const { EsiTimeoutError } = await import('@/esi/errors');
+    postAutopilotWaypointMock
+      .mockResolvedValueOnce({ data: null })
+      .mockRejectedValueOnce(new EsiTimeoutError(30_000, true));
+    show([leg([JITA, PERIMETER]), leg([PERIMETER, UEDAMA])]);
+
+    const button = await screen.findByRole('button', { name: 'Set waypoints in game' });
+    await waitFor(() => expect(button).toBeEnabled());
+    await userEvent.click(button);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'At least 1 of 2 waypoints were set'
+    );
+  });
+
+  it('is disabled with a "Needs a connection" reason while offline, and sends nothing', async () => {
+    await seed([{ id: ONE, name: 'Pilot One', scopes: [WAYPOINT_SCOPE] }]);
+    setOffline();
+    show([leg([JITA, PERIMETER])]);
+
+    const button = await screen.findByRole('button', { name: 'Set waypoints in game' });
+    expect(button).toHaveAttribute('aria-disabled', 'true');
+    fireEvent.pointerMove(button);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Needs a connection');
+    await userEvent.click(button);
+    expect(postAutopilotWaypointMock).not.toHaveBeenCalled();
   });
 
   it('reports a failure plainly', async () => {

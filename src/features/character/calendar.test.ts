@@ -361,7 +361,7 @@ describe('respondToCalendarEvent', () => {
     expect(capturedBody).toEqual({ response: 'accepted' });
   });
 
-  it('resolves true rather than throwing on success', async () => {
+  it('resolves saved rather than throwing on success', async () => {
     server.use(
       http.put(
         `${ESI_BASE_URL}/characters/${CHAR_ID}/calendar/1/`,
@@ -369,17 +369,25 @@ describe('respondToCalendarEvent', () => {
       )
     );
 
-    await expect(respondToCalendarEvent(CHAR_ID, 1, 'accepted')).resolves.toBe(true);
+    await expect(respondToCalendarEvent(CHAR_ID, 1, 'accepted')).resolves.toBe('saved');
   });
 
-  it('resolves false rather than throwing when the write fails', async () => {
+  it('resolves offline, not failed, when the request never reached ESI', async () => {
+    server.use(
+      http.put(`${ESI_BASE_URL}/characters/${CHAR_ID}/calendar/1/`, () => HttpResponse.error())
+    );
+
+    await expect(respondToCalendarEvent(CHAR_ID, 1, 'declined')).resolves.toBe('offline');
+  });
+
+  it("resolves 'failed' rather than throwing when the write fails", async () => {
     server.use(
       http.put(`${ESI_BASE_URL}/characters/${CHAR_ID}/calendar/1/`, () =>
         HttpResponse.json({ error: 'missing scope' }, { status: 403 })
       )
     );
 
-    await expect(respondToCalendarEvent(CHAR_ID, 1, 'declined')).resolves.toBe(false);
+    await expect(respondToCalendarEvent(CHAR_ID, 1, 'declined')).resolves.toBe('failed');
   });
 
   it('signals the app-wide reauth banner on a 401/403 — a stale grant (a token that predates respond_calendar_events) must not fail silently', async () => {

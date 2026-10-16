@@ -15,7 +15,7 @@ import {
   type MouseEvent as ReactMouseEvent,
 } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, IconButton, Spinner, TextArea, TextInput } from '@/components/ui';
+import { Button, IconButton, NeedsConnection, Spinner, TextArea, TextInput } from '@/components/ui';
 import { activeOptionClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
@@ -26,6 +26,9 @@ import {
   type ComposeKind,
 } from '@/engine/mail';
 import { moveHighlight } from '@/lib/comboboxNav';
+import { isOfflineFailure } from '@/esi/client';
+import { EsiOfflineError, EsiTimeoutError } from '@/esi/errors';
+import { isOnline, useOnline } from '@/stores/network';
 import { sendMail } from './mail';
 import { loadDraft, saveDraft, clearDraft, type MailDraftRecipient } from './mailDrafts';
 import { loadContacts } from './contacts';
@@ -80,6 +83,7 @@ export function MailComposeBox({
   onSent,
 }: MailComposeBoxProps) {
   const { t } = useTranslation();
+  const online = useOnline();
   const [ready, setReady] = useState(false);
   const [recipients, setRecipients] = useState<RecipientChip[]>([]);
   const [subject, setSubject] = useState('');
@@ -89,6 +93,8 @@ export function MailComposeBox({
 
   const [recipientQuery, setRecipientQuery] = useState('');
   const [searchResults, setSearchResults] = useState<RecipientCandidate[]>([]);
+  /** The last live search failed (offline, or a connection that says it is up and is not). */
+  const [searchFailure, setSearchFailure] = useState<'offline' | 'error' | null>(null);
   const [contacts, setContacts] = useState<RecipientCandidate[]>([]);
   const [highlight, setHighlight] = useState<number | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -245,10 +251,12 @@ export function MailComposeBox({
       void searchMailRecipients(characterId, trimmed, controller.signal)
         .then((hits) => {
           if (ticket !== latestSearch.current) return;
+          setSearchFailure(null);
           setSearchResults(hits.map((h) => ({ characterId: h.characterId, name: h.name })));
         })
-        .catch(() => {
+        .catch((err: unknown) => {
           if (ticket !== latestSearch.current || controller.signal.aborted) return;
+          setSearchFailure(isOfflineFailure(err) ? 'offline' : 'error');
           setSearchResults([]);
         });
     }, RECIPIENT_SEARCH_DEBOUNCE_MS);
@@ -340,21 +348,41 @@ export function MailComposeBox({
       setError(t('mail.sendNoRecipients'));
       return;
     }
+    // Read before the request: a drop mid-send must not retroactively make it "never sent".
+    const wasOffline = !isOnline();
     setSending(true);
     setError(null);
     try {
-      await sendMail(
-        characterId,
-        recipients.map(({ recipient_id, recipient_type }) => ({ recipient_id, recipient_type })),
-        subject,
-        body
-      );
-      await clearDraft(characterId, header.mail_id);
+      try {
+        await sendMail(
+          characterId,
+          recipients.map(({ recipient_id, recipient_type }) => ({ recipient_id, recipient_type })),
+          subject,
+          body
+        );
+      } catch (err) {
+        // Only the send itself is classified: a failure below is not "offline".
+        // Known not to have left: offline when pressed, no token, or still queued for a permit.
+        const neverSent =
+          isOfflineFailure(err) &&
+          (wasOffline ||
+            err instanceof EsiOfflineError ||
+            (err instanceof EsiTimeoutError && !err.sent));
+        setError(
+          neverSent
+            ? t('mail.sendOffline')
+            : isOfflineFailure(err)
+              ? // It may have left and been delivered: do not invite a duplicate.
+                t('mail.sendUnconfirmed')
+              : t('mail.sendErrorPrefix', {
+                  message: err instanceof Error ? err.message : String(err),
+                })
+        );
+        return;
+      }
+      // The mail is sent; a draft that fails to clear is stale, not a failed send.
+      await clearDraft(characterId, header.mail_id).catch(() => undefined);
       onSent();
-    } catch (err) {
-      setError(
-        t('mail.sendErrorPrefix', { message: err instanceof Error ? err.message : String(err) })
-      );
     } finally {
       setSending(false);
     }
@@ -427,6 +455,7 @@ export function MailComposeBox({
             value={recipientQuery}
             onChange={(e) => {
               setRecipientQuery(e.target.value);
+              setSearchFailure(null);
               setPickerOpen(true);
               setHighlight(null);
             }}
@@ -455,7 +484,11 @@ export function MailComposeBox({
                 <li className="px-3 py-2 text-xs text-text-dim">
                   {recipientQuery.trim().length < MIN_RECIPIENT_SEARCH_LENGTH
                     ? t('mail.recipientSearchHint')
-                    : t('mail.noRecipientResults')}
+                    : !online || searchFailure === 'offline'
+                      ? t('mail.recipientSearchOffline')
+                      : searchFailure === 'error'
+                        ? t('mail.recipientSearchFailed')
+                        : t('mail.noRecipientResults')}
                 </li>
               ) : (
                 candidates.map((c, i) => (
@@ -521,15 +554,18 @@ export function MailComposeBox({
       )}
 
       <div className="flex items-center gap-2">
-        <Button variant="primary" size="sm" onClick={() => void handleSend()} disabled={sending}>
-          {sending ? (
-            <span className="flex items-center gap-1.5">
-              <Spinner size="sm" /> {t('mail.sending')}
-            </span>
-          ) : (
-            t('mail.send')
-          )}
-        </Button>
+        <NeedsConnection>
+          <Button variant="primary" size="sm" onClick={() => void handleSend()} disabled={sending}>
+            {sending ? (
+              <span className="flex items-center gap-1.5">
+                <Spinner size="sm" /> {t('mail.sending')}
+              </span>
+            ) : (
+              t('mail.send')
+            )}
+          </Button>
+        </NeedsConnection>
+        {!online && <span className="text-xs text-text-dim">{t('mail.draftSaved')}</span>}
         <Button size="sm" onClick={onClose} disabled={sending}>
           {t('mail.cancel')}
         </Button>

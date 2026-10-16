@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import type { AppraisalSnapshot } from '@/engine/market/appraisalSnapshot';
 import { loadShare } from '@/features/share/shareStore';
@@ -19,8 +19,16 @@ const SNAPSHOT: AppraisalSnapshot = {
 };
 
 function Probe({ onSeed }: { onSeed: (text: string) => void }) {
-  useSharedAppraisalSeed(onSeed);
-  return <p data-testid="search">{useLocation().search}</p>;
+  const seed = useSharedAppraisalSeed(onSeed);
+  return (
+    <>
+      <p data-testid="search">{useLocation().search}</p>
+      <p data-testid="failed">{String(seed.loadFailed)}</p>
+      <p data-testid="retrying">{String(seed.retrying)}</p>
+      <button onClick={seed.retry}>retry</button>
+      <button onClick={seed.dismiss}>dismiss</button>
+    </>
+  );
 }
 
 afterEach(() => {
@@ -58,6 +66,104 @@ describe('useSharedAppraisalSeed', () => {
 
     await waitFor(() => expect(loadShare).toHaveBeenCalled());
     expect(onSeed).not.toHaveBeenCalled();
+    // Retrying a dead link cannot help, so it is not left in the address.
+    await waitFor(() => expect(screen.getByTestId('search')).toHaveTextContent(/^$/));
+    expect(screen.getByTestId('failed')).toHaveTextContent('false');
+  });
+
+  it('keeps ?share= and reports the failure when the fetch fails, then loads on retry', async () => {
+    vi.mocked(loadShare).mockResolvedValueOnce({ ok: false, reason: 'failed' });
+    const onSeed = vi.fn();
+    render(
+      <MemoryRouter initialEntries={['/market/appraisal?hub=amarr&share=abc123XYZ']}>
+        <Probe onSeed={onSeed} />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => expect(screen.getByTestId('failed')).toHaveTextContent('true'));
+    expect(screen.getByTestId('search')).toHaveTextContent('?hub=amarr&share=abc123XYZ');
+    expect(onSeed).not.toHaveBeenCalled();
+
+    vi.mocked(loadShare).mockResolvedValueOnce({
+      ok: true,
+      share: { type: 'appraisal', payload: SNAPSHOT, expiresAt: Date.now() + 1000 },
+    });
+    await act(async () => screen.getByText('retry').click());
+
+    await waitFor(() => expect(onSeed).toHaveBeenCalledWith('Tritanium\t1000\nPyerite\t20'));
+    expect(loadShare).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(screen.getByTestId('search')).toHaveTextContent('?hub=amarr'));
+    expect(screen.getByTestId('search')).not.toHaveTextContent('share=');
+    expect(screen.getByTestId('failed')).toHaveTextContent('false');
+  });
+
+  it('keeps loadFailed set while a retry runs, and across a repeat failure', async () => {
+    vi.mocked(loadShare).mockResolvedValueOnce({ ok: false, reason: 'failed' });
+    render(
+      <MemoryRouter initialEntries={['/market/appraisal?share=abc123XYZ']}>
+        <Probe onSeed={vi.fn()} />
+      </MemoryRouter>
+    );
+    await waitFor(() => expect(screen.getByTestId('failed')).toHaveTextContent('true'));
+
+    let settle!: (result: { ok: false; reason: 'failed' }) => void;
+    vi.mocked(loadShare).mockReturnValueOnce(
+      new Promise((resolve) => {
+        settle = resolve;
+      })
+    );
+    await act(async () => screen.getByText('retry').click());
+    expect(screen.getByTestId('retrying')).toHaveTextContent('true');
+    expect(screen.getByTestId('failed')).toHaveTextContent('true');
+
+    await act(async () => settle({ ok: false, reason: 'failed' }));
+    expect(screen.getByTestId('retrying')).toHaveTextContent('false');
+    expect(screen.getByTestId('failed')).toHaveTextContent('true');
+    expect(screen.getByTestId('search')).toHaveTextContent('share=abc123XYZ');
+  });
+
+  it('ignores a retry that resolves after the pilot dismissed it', async () => {
+    vi.mocked(loadShare).mockResolvedValueOnce({ ok: false, reason: 'failed' });
+    const onSeed = vi.fn();
+    render(
+      <MemoryRouter initialEntries={['/market/appraisal?share=abc123XYZ']}>
+        <Probe onSeed={onSeed} />
+      </MemoryRouter>
+    );
+    await waitFor(() => expect(screen.getByTestId('failed')).toHaveTextContent('true'));
+
+    type Loaded = Awaited<ReturnType<typeof loadShare>>;
+    let settle!: (result: Loaded) => void;
+    vi.mocked(loadShare).mockReturnValueOnce(
+      new Promise<Loaded>((resolve) => {
+        settle = resolve;
+      })
+    );
+    await act(async () => screen.getByText('retry').click());
+    await act(async () => screen.getByText('dismiss').click());
+    await act(async () =>
+      settle({
+        ok: true,
+        share: { type: 'appraisal', payload: SNAPSHOT, expiresAt: Date.now() + 1000 },
+      })
+    );
+
+    expect(onSeed).not.toHaveBeenCalled();
+    expect(screen.getByTestId('retrying')).toHaveTextContent('false');
+    expect(screen.getByTestId('failed')).toHaveTextContent('false');
+  });
+
+  it('dismissing a failed load drops ?share=', async () => {
+    vi.mocked(loadShare).mockResolvedValue({ ok: false, reason: 'failed' });
+    render(
+      <MemoryRouter initialEntries={['/market/appraisal?share=abc123XYZ']}>
+        <Probe onSeed={vi.fn()} />
+      </MemoryRouter>
+    );
+    await waitFor(() => expect(screen.getByTestId('failed')).toHaveTextContent('true'));
+    await act(async () => screen.getByText('dismiss').click());
+    expect(screen.getByTestId('search')).toHaveTextContent(/^$/);
+    expect(screen.getByTestId('failed')).toHaveTextContent('false');
   });
 
   it('does nothing without ?share=', () => {

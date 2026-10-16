@@ -28,10 +28,12 @@ import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { OpenInEveButton } from '@/features/openInEve/OpenInEveButton';
 import { tabDomId } from '@/components/ui/tabPanel';
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
+import { useRetryFocus } from '@/lib/useRetryFocus';
 import { guarded } from '@/app/routeChunks';
 import { useTranslation } from 'react-i18next';
 import { useLocation } from 'react-router-dom';
 import {
+  Button,
   CharacterAvatar,
   EmptyState,
   Modal,
@@ -93,6 +95,23 @@ export function PublicInfoModal() {
   const [character, setCharacter] = useState<CharacterState>(IDLE);
   const [corporation, setCorporation] = useState<TabState<PublicCorporationInfo>>(IDLE);
   const [alliance, setAlliance] = useState<TabState<PublicAllianceInfo>>(IDLE);
+  // Bumped by Try again on a failed tab, to run the lookups again in place.
+  const [attempt, setAttempt] = useState(0);
+  const activeState =
+    activeTab === 'character' ? character : activeTab === 'corporation' ? corporation : alliance;
+  // Try again unmounts while the lookups re-run, so the always-mounted wrapper holds focus.
+  const [resultRef, , holdFocus] = useRetryFocus<HTMLDivElement>(
+    activeTab === 'employment' || activeState.status === 'ready' || activeState.status === 'unknown'
+      ? 'ok'
+      : activeState.status === 'error'
+        ? 'failed'
+        : 'busy',
+    request
+  );
+  const retry = () => {
+    holdFocus();
+    setAttempt((n) => n + 1);
+  };
 
   // Runs after render, so a caller must not navigate and open in one handler — the
   // open would be closed straight away. None does: every opener stays on its page.
@@ -102,11 +121,19 @@ export function PublicInfoModal() {
     clear();
   }, [pathname, clear]);
 
+  /** The request whose tab was last chosen, so a retry re-runs the lookups without jumping tabs. */
+  const tabChosenFor = useRef<typeof request>(null);
   useEffect(() => {
-    if (!request) return;
+    if (!request) {
+      tabChosenFor.current = null;
+      return;
+    }
     let cancelled = false;
     void (async () => {
-      setActiveTab(request.kind);
+      if (tabChosenFor.current !== request) {
+        tabChosenFor.current = request;
+        setActiveTab(request.kind);
+      }
       setCharacter(request.kind === 'character' ? { status: 'loading' } : IDLE);
       setCorporation(request.kind === 'corporation' ? { status: 'loading' } : IDLE);
       setAlliance(request.kind === 'alliance' ? { status: 'loading' } : IDLE);
@@ -158,7 +185,7 @@ export function PublicInfoModal() {
     return () => {
       cancelled = true;
     };
-  }, [request]);
+  }, [request, attempt]);
 
   if (!request) return null;
 
@@ -221,42 +248,53 @@ export function PublicInfoModal() {
         )}
 
         <TabPanel tabsId={tabsId} tabId={activeTab}>
-          {activeTab === 'character' && (
-            <CharacterTab
-              state={character}
-              npc={npcCharacter}
-              corporation={corporation}
-              onOpenCorporation={() => openTab('corporation')}
-              onOpenAlliance={() => openTab('alliance')}
-            />
-          )}
-          {activeTab === 'corporation' && (
-            <CorporationTab
-              state={corporation}
-              allianceId={character.status === 'ready' ? character.data.allianceId : undefined}
-              allianceName={alliance.status === 'ready' ? alliance.data.name : undefined}
-              onOpenAlliance={alliance.status !== 'idle' ? () => openTab('alliance') : undefined}
-            />
-          )}
-          {activeTab === 'alliance' && <AllianceTab state={alliance} />}
-          {activeTab === 'employment' && (
-            <Suspense
-              fallback={
-                <div className="flex justify-center py-8">
-                  <Spinner label={t('common.loading')} />
-                </div>
-              }
-            >
-              <LazyEmploymentTab characterId={request.id} />
-            </Suspense>
-          )}
+          <div ref={resultRef} tabIndex={-1} className="focus:outline-none">
+            {activeTab === 'character' && (
+              <CharacterTab
+                state={character}
+                npc={npcCharacter}
+                corporation={corporation}
+                onOpenCorporation={() => openTab('corporation')}
+                onOpenAlliance={() => openTab('alliance')}
+                onRetry={retry}
+              />
+            )}
+            {activeTab === 'corporation' && (
+              <CorporationTab
+                state={corporation}
+                allianceId={character.status === 'ready' ? character.data.allianceId : undefined}
+                allianceName={alliance.status === 'ready' ? alliance.data.name : undefined}
+                onOpenAlliance={alliance.status !== 'idle' ? () => openTab('alliance') : undefined}
+                onRetry={retry}
+              />
+            )}
+            {activeTab === 'alliance' && <AllianceTab state={alliance} onRetry={retry} />}
+            {activeTab === 'employment' && (
+              <Suspense
+                fallback={
+                  <div className="flex justify-center py-8">
+                    <Spinner label={t('common.loading')} />
+                  </div>
+                }
+              >
+                <LazyEmploymentTab characterId={request.id} />
+              </Suspense>
+            )}
+          </div>
         </TabPanel>
       </div>
     </Modal>
   );
 }
 
-function TabStatus({ status }: { status: 'loading' | 'error' }) {
+function TabStatus({
+  status,
+  onRetry,
+}: {
+  status: 'loading' | 'error';
+  /** Offered when the lookup failed. */
+  onRetry?: () => void;
+}) {
   const { t } = useTranslation();
   if (status === 'loading') {
     return (
@@ -268,8 +306,15 @@ function TabStatus({ status }: { status: 'loading' | 'error' }) {
   return (
     <EmptyState
       title={t('common.loadFailedTitle')}
-      hint={t('common.loadFailedHint')}
+      hint={onRetry ? t('publicInfo.loadFailedHint') : t('common.loadFailedHint')}
       className="py-8"
+      action={
+        onRetry && (
+          <Button size="sm" onClick={onRetry}>
+            {t('common.retry')}
+          </Button>
+        )
+      }
     />
   );
 }
@@ -280,7 +325,9 @@ function CharacterTab({
   corporation,
   onOpenCorporation,
   onOpenAlliance,
+  onRetry,
 }: {
+  onRetry: () => void;
   state: CharacterState;
   /** An NPC agent (CCP's id block): a slim card, no killboard. */
   npc: boolean;
@@ -299,7 +346,9 @@ function CharacterTab({
     );
   }
   if (state.status !== 'ready')
-    return <TabStatus status={state.status === 'idle' ? 'loading' : state.status} />;
+    return (
+      <TabStatus status={state.status === 'idle' ? 'loading' : state.status} onRetry={onRetry} />
+    );
   if (npc) {
     return (
       <NpcCharacterCard
@@ -327,7 +376,9 @@ function CorporationTab({
   allianceId: liveAllianceId,
   allianceName,
   onOpenAlliance,
+  onRetry,
 }: {
+  onRetry: () => void;
   state: TabState<PublicCorporationInfo>;
   /**
    * A character's live alliance (null: none), which wins over the cached corp
@@ -339,7 +390,9 @@ function CorporationTab({
   onOpenAlliance?: () => void;
 }) {
   if (state.status !== 'ready')
-    return <TabStatus status={state.status === 'idle' ? 'loading' : state.status} />;
+    return (
+      <TabStatus status={state.status === 'idle' ? 'loading' : state.status} onRetry={onRetry} />
+    );
   const { data } = state;
   const allianceId = liveAllianceId === undefined ? (data.alliance_id ?? null) : liveAllianceId;
   return (
@@ -355,9 +408,17 @@ function CorporationTab({
   );
 }
 
-function AllianceTab({ state }: { state: TabState<PublicAllianceInfo> }) {
+function AllianceTab({
+  state,
+  onRetry,
+}: {
+  state: TabState<PublicAllianceInfo>;
+  onRetry: () => void;
+}) {
   if (state.status !== 'ready')
-    return <TabStatus status={state.status === 'idle' ? 'loading' : state.status} />;
+    return (
+      <TabStatus status={state.status === 'idle' ? 'loading' : state.status} onRetry={onRetry} />
+    );
   return (
     <Suspense fallback={<TabStatus status="loading" />}>
       <LazyAllianceTab key={state.data.alliance_id} data={state.data} />

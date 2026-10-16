@@ -8,6 +8,7 @@ import {
   type CalendarRsvpResponse,
 } from '@/esi/endpoints';
 import { loadWithCacheStatus, readCached, writeCached, type StatusResult } from '@/esi/cache';
+import { isOfflineFailure, isUnconfirmedWrite } from '@/esi/client';
 import { reportWriteAuthFailure } from '@/esi/writeAuthFailure';
 import { parseInstant } from '@/engine/esiInstant';
 import { stillRunning, type CalendarRetentionEntry } from '@/engine/character/calendarRetention';
@@ -158,6 +159,9 @@ export function loadCalendarEvent(
   );
 }
 
+/** What an RSVP write came to: accepted, never sent (offline), or refused. */
+export type RsvpResult = 'saved' | 'offline' | 'unconfirmed' | 'failed';
+
 /**
  * Pushes an RSVP write to ESI. Errors are otherwise swallowed — same
  * contract as `mail.ts`'s `markMailReadOnEsi` — but an auth failure still
@@ -167,7 +171,8 @@ export function loadCalendarEvent(
  * #741) would otherwise fail silently on every click with no way for the
  * user to learn a re-login would fix it.
  *
- * Returns whether the write actually reached ESI — unlike
+ * Returns whether the write actually reached ESI (`saved`), never got there
+ * because the connection was down (`offline`), or was refused (`failed`) — unlike
  * `markMailReadOnEsi`'s `void`, a caller here (`EventDetailModal`) shows the
  * new response optimistically in its own local state, and must not do that
  * for a call this function silently swallowed.
@@ -188,12 +193,13 @@ export async function respondToCalendarEvent(
   characterId: number,
   eventId: number,
   response: CalendarRsvpResponse
-): Promise<boolean> {
+): Promise<RsvpResult> {
   try {
     await putCharacterCalendarResponse(characterId, eventId, response);
   } catch (err) {
+    if (isOfflineFailure(err)) return isUnconfirmedWrite(err) ? 'unconfirmed' : 'offline';
     await reportWriteAuthFailure(characterId, err, 'putCharacterCalendarResponse');
-    return false;
+    return 'failed';
   }
 
   try {
@@ -217,5 +223,5 @@ export async function respondToCalendarEvent(
     // See doc comment above: the write already succeeded, this patch didn't.
   }
 
-  return true;
+  return 'saved';
 }

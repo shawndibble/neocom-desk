@@ -120,6 +120,6 @@ describe('OrderRowDetail', () => {
       screen.getByRole('button', {
         name: 'Set destination to Jita IV - Moon 4 - Caldari Navy Assembly Plant',
       })
-    ).toBeDisabled();
+    ).toHaveAttribute('aria-disabled', 'true');
   });
 });

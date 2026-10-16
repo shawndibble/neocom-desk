@@ -154,6 +154,17 @@ export function isOfflineFailure(err: unknown): boolean {
 }
 
 /**
+ * Did a write time out after it may have left? For copy on a write that must
+ * not claim "not done": the request was sent (`EsiTimeoutError.sent`) or a raw
+ * `TimeoutError` fired, so ESI may well have acted on it. A timeout while still
+ * queued for a permit (`sent: false`) never left, and is not one.
+ */
+export function isUnconfirmedWrite(err: unknown): boolean {
+  if (err instanceof EsiTimeoutError) return err.sent;
+  return err instanceof DOMException && err.name === 'TimeoutError';
+}
+
+/**
  * The narrower question a few loaders ask: was the credential itself refused,
  * as opposed to a 403 (which for a structure market or a citadel name is an
  * ACL no re-login can fix)? A 401, or a refresh SSO answered with a failure.

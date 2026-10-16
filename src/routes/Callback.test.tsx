@@ -379,6 +379,19 @@ describe('Callback', () => {
     expect(await screen.findByText(/something went wrong signing you in/i)).toBeInTheDocument();
   });
 
+  it('on a network failure of the exchange says the connection dropped, instead of bouncing to SSO', async () => {
+    server.use(http.post('https://login.eveonline.com/v2/oauth/token', () => HttpResponse.error()));
+    stashLogin('state-1');
+    renderCallback('?code=good-code&state=state-1');
+
+    expect(await screen.findByText(/you're offline — the connection dropped/i)).toBeInTheDocument();
+    // The automatic restart would have navigated to SSO (the browser's offline page).
+    expect(assignLocation).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole('button', { name: /try again/i }));
+    await vi.waitFor(() => expect(assignLocation).toHaveBeenCalledTimes(1));
+  });
+
   it('announces the error panel to screen readers', async () => {
     exhaustedBudget();
     renderCallback('?code=good-code&state=state-1');

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation } from 'react-router-dom';
@@ -49,6 +49,10 @@ function openMenu(kind: 'information' | 'marketDetails' | 'contract', id: number
   );
   fireEvent.contextMenu(screen.getByText('row'));
 }
+
+afterEach(() => {
+  Reflect.deleteProperty(navigator, 'onLine');
+});
 
 beforeEach(async () => {
   vi.clearAllMocks();
@@ -102,6 +106,48 @@ describe('OpenInEveMenuItem', () => {
     openMenu('information', 1);
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Open in EVE' }));
     expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't open it in EVE");
+  });
+
+  it('says it is offline in the menu, not that the character is logged out of the game', async () => {
+    await seed([SCOPE]);
+    infoMock.mockRejectedValue(new TypeError('Failed to fetch'));
+    openMenu('information', 1);
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Open in EVE' }));
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent("You're offline");
+    expect(alert).not.toHaveTextContent('logged in to the game');
+  });
+
+  it('still shows the result when the connection drops mid-send', async () => {
+    await seed([SCOPE]);
+    let fail!: (err: unknown) => void;
+    infoMock.mockReturnValue(
+      new Promise((_resolve, reject) => {
+        fail = reject;
+      })
+    );
+    openMenu('information', 1);
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Open in EVE' }));
+    expect(await screen.findByText('Opening in EVE…')).toBeInTheDocument();
+
+    Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => false });
+    act(() => {
+      window.dispatchEvent(new Event('offline'));
+    });
+    expect(screen.getByText('Opening in EVE…')).toBeInTheDocument();
+    await act(async () => fail(new TypeError('Failed to fetch')));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent("You're offline");
+  });
+
+  it('is inert while offline and sends nothing', async () => {
+    await seed([SCOPE]);
+    Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => false });
+    openMenu('information', 1);
+    const item = await screen.findByRole('menuitem', { name: /Open in EVE/ });
+    expect(item).toHaveAttribute('aria-disabled', 'true');
+    await userEvent.click(item);
+    expect(infoMock).not.toHaveBeenCalled();
   });
 
   it('is inert with the reason when the character lacks the permission', async () => {
