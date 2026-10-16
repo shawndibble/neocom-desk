@@ -65,4 +65,18 @@ describe('journalTransactionLinks', () => {
   it('returns undefined for everything when no transactions are loaded', () => {
     expect(journalTransactionLinks([])(entry({}))).toBeUndefined();
   });
+
+  it("keeps two Characters' fills apart when their journal ref ids collide", () => {
+    const mine = {
+      ...txn({ transaction_id: 7, journal_ref_id: 500, type_id: 34 }),
+      characterId: 1,
+    };
+    const theirs = {
+      ...txn({ transaction_id: 8, journal_ref_id: 500, type_id: 35 }),
+      characterId: 2,
+    };
+    const linkFor = journalTransactionLinks([mine, theirs]);
+    expect(linkFor({ ...entry({ id: 500 }), characterId: 1 })).toBe(mine);
+    expect(linkFor({ ...entry({ id: 500 }), characterId: 2 })).toBe(theirs);
+  });
 });
