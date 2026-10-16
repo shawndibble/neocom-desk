@@ -147,7 +147,7 @@ export interface FittingEvaluation {
   /**
    * The open Fitting in normal space and inside Abyssal weather
    * `weatherTypeId`, both under the page's other conditions (Overheat all
-   * included); the Abyssal run planner's before/after. Null until ready.
+   * included). Null until ready.
    */
   compareWeather:
     ((weatherTypeId: number) => Promise<{ before: FittingStats; after: FittingStats }>) | null;

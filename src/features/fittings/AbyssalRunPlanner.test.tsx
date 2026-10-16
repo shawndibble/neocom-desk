@@ -73,6 +73,6 @@ describe('AbyssalRunPlanner', () => {
   it('marks an Interdictor as unconfirmed', async () => {
     const user = setup(541);
     await user.click(screen.getByRole('button', { name: /Plan an Abyssal run/ }));
-    expect(screen.getByText(/no source names this hull type/)).toBeTruthy();
+    expect(screen.getByText(/No source names this hull type/)).toBeTruthy();
   });
 });

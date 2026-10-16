@@ -1,9 +1,4 @@
-/**
- * The two answers to "Plan an Abyssal run" that the weather picker doesn't
- * hold: the filament tier and the activation system's security. The weather
- * itself stays the session's one (`useAbyssalWeather`), so the planner and the
- * rest of the page can never disagree. Not saved.
- */
+/** Planner picks the weather picker lacks: filament tier, activation security. Session-only, not saved. */
 import { create } from 'zustand';
 import type { AbyssalSecurity, AbyssalTier } from '@/engine/fittings/abyssalRun';
 

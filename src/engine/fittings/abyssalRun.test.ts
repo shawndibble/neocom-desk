@@ -58,9 +58,11 @@ describe('abyssalHullRule', () => {
     });
     expect(abyssalHullRule(1305)).toMatchObject({ shipClass: 'destroyer', confirmed: true });
   });
-  it('counts Interdictors and Command Destroyers as destroyers, unconfirmed', () => {
+  it('sizes hulls no source names by class, unconfirmed', () => {
     expect(abyssalHullRule(541)).toMatchObject({ shipClass: 'destroyer', confirmed: false });
     expect(abyssalHullRule(1534)).toMatchObject({ shipClass: 'destroyer', confirmed: false });
+    expect(abyssalHullRule(237)).toMatchObject({ shipClass: 'frigate', confirmed: false });
+    expect(abyssalHullRule(1972)).toMatchObject({ shipClass: 'cruiser', confirmed: false });
   });
   it('sends frigates in threes', () => {
     expect(abyssalHullRule(25)).toEqual({
@@ -74,6 +76,7 @@ describe('abyssalHullRule', () => {
   it('turns away anything bigger, and says so for a group it has no rule for', () => {
     expect(abyssalHullRule(419)).toEqual({ eligible: false, reason: 'tooLarge' });
     expect(abyssalHullRule(27)).toEqual({ eligible: false, reason: 'tooLarge' });
+    expect(abyssalHullRule(902)).toEqual({ eligible: false, reason: 'tooLarge' }); // jump freighter
     expect(abyssalHullRule(31)).toEqual({ eligible: false, reason: 'unlisted' });
     expect(abyssalHullRule(undefined)).toEqual({ eligible: false, reason: 'unlisted' });
   });

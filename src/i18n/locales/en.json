@@ -829,7 +829,7 @@
         "cruiser": "Cruiser: flies alone.",
         "destroyer": "Destroyer: up to 2 ships. Only a fleet can activate it, even flying alone; the activating ship carries both filaments.",
         "frigate": "Frigate: up to 3 ships. Only a fleet can activate it, even flying alone; the activating ship carries all three filaments.",
-        "unconfirmed": "Counted as a destroyer, but no source names this hull type; check in game.",
+        "unconfirmed": "No source names this hull type; check in game.",
         "tech3Cruiser": "Tech 3 cruisers can't enter Abyssal Deadspace.",
         "tooLarge": "Too big: only cruisers and smaller can enter.",
         "unlisted": "No Abyssal rule known for this hull; check in game."

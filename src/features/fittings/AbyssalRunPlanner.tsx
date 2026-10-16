@@ -20,12 +20,13 @@ import {
   abyssalTierLevels,
   weaponReachChange,
   type AbyssalSecurity,
+  type WeaponReachChange,
   type AbyssalTier,
 } from '@/engine/fittings/abyssalRun';
 import {
-  ABYSSAL_WEATHER,
   abyssalWeatherById,
-  type AbyssalWeatherKind,
+  abyssalWeatherOf,
+  type AbyssalWeather,
 } from '@/engine/fittings/abyssalWeather';
 import { diffFittingStats, type StatChange } from '@/engine/fittings/variationDelta';
 import type { FittingStats } from '@/engine/fittings/types';
@@ -40,7 +41,7 @@ type Compare = (weatherTypeId: number) => Promise<{ before: FittingStats; after:
 
 interface RunDelta {
   changes: StatChange[];
-  reach: ReturnType<typeof weaponReachChange>;
+  reach: WeaponReachChange | null;
 }
 
 /**
@@ -80,12 +81,7 @@ function useRunDelta(
     : null;
 }
 
-/**
- * "Plan an Abyssal run": pick a filament tier and a weather, and see what the
- * weather does to this fit, which filaments to buy, whether the hull may go in
- * and whether the system's security flags you. The weather is the session's
- * (`useAbyssalWeather`), so the editor's stats move with it.
- */
+/** Plan an Abyssal run for the open fit. Writes the session weather, so the editor's stats move with it. */
 export function AbyssalRunPlanner({
   hullGroupId,
   compare,
@@ -103,6 +99,7 @@ export function AbyssalRunPlanner({
   const setWeather = useAbyssalWeather((state) => state.setWeather);
   const weather = weatherTypeId === null ? undefined : abyssalWeatherById(weatherTypeId);
   const levels = abyssalTierLevels(tier);
+  const onTier = weather !== undefined && levels.includes(weather.level);
   const delta = useRunDelta(expanded ? compare : null, weather?.typeId ?? null);
 
   const hull = abyssalHullRule(hullGroupId);
@@ -122,10 +119,11 @@ export function AbyssalRunPlanner({
               value={String(tier)}
               onValueChange={(value) => {
                 const next = Number(value) as AbyssalTier;
+                const nextLevels = abyssalTierLevels(next);
                 setTier(next);
-                // Keep the weather, at the harsher strength the new tier can roll.
-                if (weather && !abyssalTierLevels(next).includes(weather.level))
-                  setWeather(pickId(weather.kind, abyssalTierLevels(next)[1]!));
+                // Off-tier strength: new tier's harsher one, kind kept.
+                if (weather && !nextLevels.includes(weather.level))
+                  setWeather(abyssalWeatherOf(weather.kind, nextLevels[1]).typeId);
               }}
             >
               <SelectTrigger
@@ -174,21 +172,19 @@ export function AbyssalRunPlanner({
 
         <ul className="space-y-1 text-xs">
           {weather && (
-            <li className={levels.includes(weather.level) ? 'text-text-dim' : 'text-warning'}>
-              {levels.includes(weather.level)
+            <li className={onTier ? 'text-text-dim' : 'text-warning'}>
+              {onTier
                 ? t('fittings.abyssalRun.strengthNote', {
                     tier,
-                    low: penaltyOf(weather.kind, levels[0]),
-                    high: penaltyOf(weather.kind, levels[1]),
+                    low: abyssalWeatherOf(weather.kind, levels[0]).penaltyPercent,
+                    high: abyssalWeatherOf(weather.kind, levels[1]).penaltyPercent,
                   })
                 : t('fittings.abyssalRun.strengthOff', { tier })}
             </li>
           )}
           {hullGroupId !== undefined && (
             <li className={hull.eligible ? 'text-text' : 'text-warning'}>
-              {hull.eligible
-                ? t(`fittings.abyssalRun.hull.${hull.shipClass}`)
-                : t(`fittings.abyssalRun.hull.${hull.reason}`)}
+              {t(`fittings.abyssalRun.hull.${hull.eligible ? hull.shipClass : hull.reason}`)}
               {hull.eligible && !hull.confirmed && (
                 <span className="text-warning"> {t('fittings.abyssalRun.hull.unconfirmed')}</span>
               )}
@@ -214,37 +210,8 @@ export function AbyssalRunPlanner({
 
         {weather === undefined ? (
           <StatNote>{t('fittings.abyssalRun.pickWeather')}</StatNote>
-        ) : delta === null ? (
-          <StatNote>{t('fittings.abyssalRun.working')}</StatNote>
-        ) : delta === 'failed' ? (
-          <StatNote tone="warning">{t('fittings.abyssalRun.failed')}</StatNote>
         ) : (
-          <div className="text-xs">
-            <div className="text-text-dim">
-              {t('fittings.abyssalRun.deltaHeading', { weather: abyssalWeatherLabel(t, weather) })}
-            </div>
-            {delta.changes.length === 0 && !delta.reach ? (
-              <div>{t('fittings.variations.noChanges')}</div>
-            ) : (
-              <ul className="space-y-0.5 tabular-nums">
-                {delta.changes.map((change) => (
-                  <li key={change.key}>{changeLabel(change, t)}</li>
-                ))}
-                {delta.reach && (
-                  <li>
-                    {t('fittings.abyssalRun.range', {
-                      weapon: typeName(delta.reach.typeId),
-                      before: kmValue(delta.reach.before.optimal),
-                      after: kmValue(delta.reach.after.optimal),
-                      // Optimal plus falloff, as the stats column and the HUD read it.
-                      fallBefore: kmValue(delta.reach.before.optimal + delta.reach.before.falloff),
-                      fallAfter: kmValue(delta.reach.after.optimal + delta.reach.after.falloff),
-                    })}
-                  </li>
-                )}
-              </ul>
-            )}
-          </div>
+          <RunDeltaNote weather={weather} delta={delta} typeName={typeName} />
         )}
         <StatNote>{t('fittings.abyssalRun.source')}</StatNote>
       </div>
@@ -252,10 +219,46 @@ export function AbyssalRunPlanner({
   );
 }
 
-function penaltyOf(kind: AbyssalWeatherKind, level: 1 | 2 | 3): number {
-  return ABYSSAL_WEATHER.find((w) => w.kind === kind && w.level === level)!.penaltyPercent;
-}
-
-function pickId(kind: AbyssalWeatherKind, level: 1 | 2 | 3): number {
-  return ABYSSAL_WEATHER.find((w) => w.kind === kind && w.level === level)!.typeId;
+function RunDeltaNote({
+  weather,
+  delta,
+  typeName,
+}: {
+  weather: AbyssalWeather;
+  delta: RunDelta | 'failed' | null;
+  typeName: (typeId: number) => string;
+}) {
+  const { t } = useTranslation();
+  if (delta === null) return <StatNote>{t('fittings.abyssalRun.working')}</StatNote>;
+  if (delta === 'failed')
+    return <StatNote tone="warning">{t('fittings.abyssalRun.failed')}</StatNote>;
+  const { changes, reach } = delta;
+  return (
+    <div className="text-xs">
+      <div className="text-text-dim">
+        {t('fittings.abyssalRun.deltaHeading', { weather: abyssalWeatherLabel(t, weather) })}
+      </div>
+      {changes.length === 0 && !reach ? (
+        <div>{t('fittings.variations.noChanges')}</div>
+      ) : (
+        <ul className="space-y-0.5 tabular-nums">
+          {changes.map((change) => (
+            <li key={change.key}>{changeLabel(change, t)}</li>
+          ))}
+          {reach && (
+            <li>
+              {t('fittings.abyssalRun.range', {
+                weapon: typeName(reach.typeId),
+                before: kmValue(reach.before.optimal),
+                after: kmValue(reach.after.optimal),
+                // Optimal plus falloff, as the stats column and the HUD read it.
+                fallBefore: kmValue(reach.before.optimal + reach.before.falloff),
+                fallAfter: kmValue(reach.after.optimal + reach.after.falloff),
+              })}
+            </li>
+          )}
+        </ul>
+      )}
+    </div>
+  );
 }
