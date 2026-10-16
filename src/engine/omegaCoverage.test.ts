@@ -105,6 +105,13 @@ describe('omegaPeriods', () => {
     expect(quarter[1]!.net).toBe(160);
   });
 
+  it('reaches back through a year of rows at any range', () => {
+    const rows = Array.from({ length: 365 }, (_, d) => row(d, 1));
+    expect(omegaPeriods(rows, NOW, [since(365)], 7)).toHaveLength(53);
+    expect(omegaPeriods(rows, NOW, [since(365)], 30)).toHaveLength(13);
+    expect(omegaPeriods(rows, NOW, [since(365)], 90)).toHaveLength(5);
+  });
+
   it('marks partial against the chosen window', () => {
     const week = omegaPeriods([row(0, 1)], NOW, [since(10)], 7);
     expect(week.map((p) => p.partial)).toEqual([true, false]);

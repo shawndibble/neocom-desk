@@ -8,13 +8,12 @@
  * ending now, so the newest is a true last-N-days figure.
  */
 import { PLEX_BOUGHT_KEY, PLEX_SOLD_KEY } from './journalNetting';
+import { ARCHIVE_DAYS } from './wallet/archiveCoverage';
 
 const DAY_MS = 86_400_000;
 export const OMEGA_PERIOD_DAYS = 30;
 /** CCP's one-month price. */
 export const DEFAULT_PLEX_PER_30_DAYS = 500;
-/** Periods drawn at most: a year of history. */
-export const MAX_PERIODS = 12;
 /** Safety cap on levels worked out (the drawn lines are stepped, see `drawnLevels`). */
 export const MAX_LEVELS = 1000;
 /** More reference lines than this bunch up, so they are stepped. */
@@ -100,7 +99,10 @@ export function omegaPeriods(
     .filter(([from, to]) => Number.isFinite(from) && Number.isFinite(to));
   const span = days * DAY_MS;
   const oldest = Math.min(...sinces);
-  const count = Math.min(MAX_PERIODS, Math.max(1, Math.ceil((now - oldest) / span)));
+  const count = Math.min(
+    Math.ceil(ARCHIVE_DAYS / days),
+    Math.max(1, Math.ceil((now - oldest) / span))
+  );
   const youngest = Math.max(...sinces);
   const periods: OmegaPeriod[] = Array.from({ length: count }, (_, i) => {
     const endMs = now - (count - 1 - i) * span;
