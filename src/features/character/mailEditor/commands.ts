@@ -1,4 +1,4 @@
-import type { FormatState } from '@/engine/mailFormat';
+import type { FormatState, LinkTarget } from '@/engine/mailFormat';
 
 export type ToggleMark = 'bold' | 'italic' | 'underline';
 
@@ -15,8 +15,12 @@ export interface MailEditorCommands {
   setColor: (color: string | null) => void;
   /** Pixels within the markup range; `null` returns to the default size. */
   setSize: (px: number | null) => void;
-  /** An http(s) address; `null` removes the link at the caret/selection. */
-  setLink: (href: string | null) => void;
+  /** What a link edit would replace now: the selection, the caret, or the link under either. */
+  linkTarget: () => LinkTarget;
+  /** Replaces `target` (what `linkTarget()` returned when the sheet opened) with `text` carrying the (already validated) http(s) `href`. */
+  setLink: (target: LinkTarget, edit: { text: string; href: string }) => void;
+  /** Removes the link in `target`, keeping its text. Absent where that cannot be done (Source). */
+  removeLink?: (target: LinkTarget) => void;
   insertTable: (rows: number, cols: number) => void;
   clearFormatting: () => void;
   /**

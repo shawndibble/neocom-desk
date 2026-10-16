@@ -29,6 +29,8 @@ import {
   buildPipeTableLines,
   emptyFormatState,
   parsePastedPipeTable,
+  planSourceLink,
+  sourceLinkAt,
   sourceTagPair,
   wrapSourceSelection,
   type SourceTag,
@@ -37,7 +39,7 @@ import { EVE_MAIL_SURFACE_CLASS } from '../MailBodyView';
 import type { MailBodyEditorProps } from '../MailBodyEditor';
 import type { MailEditorCommands, ToggleMark } from './commands';
 import { mailEditorExtensions } from './extensions';
-import { formatStateOfEditor } from './editorState';
+import { formatStateOfEditor, linkCarryMarks, linkTargetOfEditor } from './editorState';
 import { DOCKED_BAR_SPACE_CLASS, MailFormatBar } from './MailFormatBar';
 
 type Mode = 'preview' | 'source';
@@ -199,19 +201,44 @@ export default function RichMailBodyEditor({
       const chain = editor?.chain().focus();
       void (px === null ? chain?.unsetMark('eveSize') : chain?.setMark('eveSize', { px }))?.run();
     },
-    setLink: (href) => {
+    linkTarget: () =>
+      editor ? linkTargetOfEditor(editor) : { from: 0, to: 0, text: '', href: null },
+    setLink: (target, edit) => {
       if (!editor) return;
-      if (href === null) {
-        editor.chain().focus().extendMarkRange('link').unsetLink().run();
-      } else if (editor.state.selection.empty && !editor.isActive('link')) {
-        editor
-          .chain()
-          .focus()
-          .insertContent({ type: 'text', text: href, marks: [{ type: 'link', attrs: { href } }] })
-          .run();
-      } else {
-        editor.chain().focus().extendMarkRange('link').setLink({ href }).run();
+      if (target.markOnly) {
+        // Spans blocks or cells: add the mark, leave the text and structure alone.
+        const link = editor.schema.marks.link.create({ href: edit.href });
+        const { tr } = editor.state;
+        for (const [from, to] of target.ranges ?? [[target.from, target.to]]) {
+          tr.addMark(from, to, link);
+        }
+        editor.view.dispatch(tr);
+        editor.commands.focus();
+        return;
       }
+      // Keep the other marks (bold, colour, size) of the first character replaced.
+      const marks = [
+        ...linkCarryMarks(editor, target.from),
+        { type: 'link', attrs: { href: edit.href } },
+      ];
+      editor
+        .chain()
+        .focus()
+        .insertContentAt(
+          { from: target.from, to: target.to },
+          { type: 'text', text: edit.text, marks }
+        )
+        .run();
+    },
+    removeLink: (target) => {
+      if (!editor) return;
+      const link = editor.schema.marks.link;
+      const { tr } = editor.state;
+      for (const [from, to] of target.ranges ?? [[target.from, target.to]]) {
+        tr.removeMark(from, to, link);
+      }
+      editor.view.dispatch(tr);
+      editor.commands.focus();
     },
     insertTable: (rows, cols) =>
       void editor?.chain().focus().insertTable({ rows, cols, withHeaderRow: true }).run(),
@@ -225,7 +252,18 @@ export default function RichMailBodyEditor({
     toggleMark: (mark) => wrap(SOURCE_TAG[mark]),
     setColor: (color) => color !== null && wrap({ kind: 'color', color }),
     setSize: (px) => px !== null && wrap({ kind: 'size', px }),
-    setLink: (href) => href !== null && wrap({ kind: 'link', href }),
+    linkTarget: () => {
+      const el = sourceRef.current;
+      return sourceLinkAt(
+        source,
+        el?.selectionStart ?? source.length,
+        el?.selectionEnd ?? source.length
+      );
+    },
+    setLink: (target, edit) => {
+      const result = planSourceLink(source, target.from, target.to, edit);
+      editSource(result.value, [result.start, result.end]);
+    },
     insertTable: (rows, cols) => {
       const el = sourceRef.current;
       const at = el?.selectionStart ?? source.length;

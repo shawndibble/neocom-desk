@@ -16,6 +16,11 @@ if (!Range.prototype.getClientRects) {
   Range.prototype.getBoundingClientRect = () => new DOMRect();
 }
 
+// ...and no hit testing: ProseMirror's mousedown handler calls posAtCoords.
+if (!document.elementFromPoint) {
+  document.elementFromPoint = () => null;
+}
+
 function Harness({ initial = '', onValue }: { initial?: string; onValue?: (v: string) => void }) {
   const [value, setValue] = useState(initial);
   return (
@@ -31,6 +36,12 @@ function Harness({ initial = '', onValue }: { initial?: string; onValue?: (v: st
       <pre data-testid="value">{value}</pre>
     </>
   );
+}
+
+function firstText(el: Node): Node {
+  const node = document.createTreeWalker(el, NodeFilter.SHOW_TEXT).nextNode();
+  if (!node) throw new Error('no text node');
+  return node;
 }
 
 async function editor() {
@@ -173,5 +184,120 @@ describe('RichMailBodyEditor', () => {
     await user.click(screen.getByRole('textbox', { name: 'Message source (EVE markup)' }));
     await user.click(screen.getByRole('button', { name: 'Text colour' }));
     expect(await screen.findByRole('button', { name: 'Default colour' })).toBeDisabled();
+  });
+
+  it('Source: inserts an escaped tag over the selection, and replaces a whole selected tag', async () => {
+    const user = userEvent.setup();
+    const seen = vi.fn();
+    render(<Harness initial="say hi now" onValue={seen} />);
+    await editor();
+    await user.click(screen.getByRole('button', { name: 'Source' }));
+    const src = screen.getByRole('textbox', { name: 'Message source (EVE markup)' });
+    (src as HTMLTextAreaElement).setSelectionRange(4, 6);
+    await user.click(screen.getByRole('button', { name: 'Link' }));
+    let dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByLabelText('Text')).toHaveValue('hi');
+    await user.type(within(dialog).getByLabelText('Web address'), 'example.com{Enter}');
+    expect(src).toHaveValue('say <a href="https://example.com">hi</a> now');
+    expect(seen).toHaveBeenLastCalledWith('say <a href="https://example.com">hi</a> now');
+
+    (src as HTMLTextAreaElement).setSelectionRange(
+      4,
+      4 + '<a href="https://example.com">hi</a>'.length
+    );
+    await user.click(screen.getByRole('button', { name: 'Link' }));
+    dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByLabelText('Web address')).toHaveValue('https://example.com');
+    await user.clear(within(dialog).getByLabelText('Text'));
+    await user.type(within(dialog).getByLabelText('Text'), 'a <b> & c{Enter}');
+    expect(src).toHaveValue('say <a href="https://example.com">a &lt;b&gt; &amp; c</a> now');
+  });
+
+  it('Preview: rewrites the text and address of the link under the caret, keeping bold', async () => {
+    const user = userEvent.setup();
+    render(<Harness initial={'x <b><a href="https://old.example/">old</a></b> y'} />);
+    const pm = await editor();
+    const anchor = pm.querySelector('a')!;
+    await user.click(pm);
+    const sel = window.getSelection()!;
+    sel.setBaseAndExtent(firstText(anchor), 1, firstText(anchor), 1);
+    fireEvent(document, new Event('selectionchange'));
+    await user.click(screen.getByRole('button', { name: 'Link' }));
+    const dialog = await screen.findByRole('dialog');
+    await waitFor(() => expect(within(dialog).getByLabelText('Text')).toHaveValue('old'));
+    expect(within(dialog).getByLabelText('Web address')).toHaveValue('https://old.example/');
+    await user.clear(within(dialog).getByLabelText('Text'));
+    await user.type(within(dialog).getByLabelText('Text'), 'fresh');
+    await user.clear(within(dialog).getByLabelText('Web address'));
+    await user.type(within(dialog).getByLabelText('Web address'), 'https://new.example/{Enter}');
+    await waitFor(() =>
+      expect(screen.getByTestId('value').textContent).toBe(
+        'x <a href="https://new.example/"><b>fresh</b></a> y'
+      )
+    );
+  });
+
+  async function selectIn(
+    pm: HTMLElement,
+    user: ReturnType<typeof userEvent.setup>,
+    a: [Node, number],
+    b: [Node, number]
+  ) {
+    await user.click(pm);
+    window.getSelection()!.setBaseAndExtent(a[0], a[1], b[0], b[1]);
+    fireEvent(document, new Event('selectionchange'));
+  }
+
+  it('Preview: a caret at the edge of a link starts a new link; one inside edits it', async () => {
+    const user = userEvent.setup();
+    render(<Harness initial={'a <a href="https://o.example/">old</a> b'} />);
+    const pm = await editor();
+    const text = firstText(pm.querySelector('a')!);
+    for (const [offset, edit] of [
+      [0, false],
+      [3, false],
+      [1, true],
+    ] as const) {
+      await selectIn(pm, user, [text, offset], [text, offset]);
+      await user.click(screen.getByRole('button', { name: 'Link' }));
+      const dialog = await screen.findByRole('dialog');
+      await waitFor(() =>
+        expect(within(dialog).getByLabelText('Text')).toHaveValue(edit ? 'old' : '')
+      );
+      await user.keyboard('{Escape}');
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    }
+  });
+
+  it('Preview: a selection across two paragraphs only gains the link mark', async () => {
+    const user = userEvent.setup();
+    render(<Harness initial={'one\ntwo'} />);
+    const pm = await editor();
+    const ps = pm.querySelectorAll('p');
+    expect(ps).toHaveLength(2);
+    await selectIn(pm, user, [firstText(ps[0]), 1], [firstText(ps[1]), 2]);
+    await user.click(screen.getByRole('button', { name: 'Link' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByLabelText('Text')).toBeDisabled();
+    await user.type(within(dialog).getByLabelText('Web address'), 'example.com{Enter}');
+    await waitFor(() => expect(pm.querySelectorAll('p')).toHaveLength(2));
+    expect(pm.querySelectorAll('a')).toHaveLength(2);
+    expect(pm.textContent).toBe('onetwo');
+  });
+
+  it('Preview: a selection inside one table cell prefills its text and leaves the table intact', async () => {
+    const user = userEvent.setup();
+    render(<Harness initial={'| a | bcd |\n|---|---|\n| 1 | 2 |'} />);
+    const pm = await editor();
+    const cell = firstText(pm.querySelectorAll('th')[1]);
+    await selectIn(pm, user, [cell, 1], [cell, 3]);
+    await user.click(screen.getByRole('button', { name: 'Link' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByLabelText('Text')).toHaveValue('cd');
+    await user.type(within(dialog).getByLabelText('Web address'), 'example.com{Enter}');
+    await waitFor(() => expect(pm.querySelectorAll('tr')).toHaveLength(2));
+    // Cells hold plain text (no marks), so the cell keeps its text; the table is unharmed.
+    expect(pm.querySelectorAll('th')).toHaveLength(2);
+    expect(pm.querySelectorAll('th')[1].textContent).toBe('bcd');
   });
 });

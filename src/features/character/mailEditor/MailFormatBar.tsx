@@ -165,10 +165,10 @@ export function MailFormatBar({
         open={sheet === 'link'}
         onClose={() => setSheet(null)}
         phone={phone}
-        current={state.link}
+        getTarget={commands.linkTarget}
         canReset={commands.canReset}
         onApply={commands.setLink}
-        onRemove={() => commands.setLink(null)}
+        onRemove={commands.removeLink}
       />
       <TableDialog
         open={sheet === 'table'}
