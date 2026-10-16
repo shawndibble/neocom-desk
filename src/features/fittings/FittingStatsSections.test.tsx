@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Appraisal } from '@/engine/market/appraisal';
 import '@/i18n';
@@ -15,6 +15,7 @@ import { setDogmaEngineStatus } from './dogmaEngineStatus';
 import { db } from '@/db';
 import { useStatsSectionsPreference } from './statsSectionsPreference';
 import { useOverheatAll } from './statsConditions';
+import { useAbyssalWeather } from './abyssalWeatherSelection';
 import { configureClipboard } from '@/lib/clipboard';
 import { fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
@@ -1331,5 +1332,56 @@ describe('FittingStatsSections drones', () => {
     const drones = within(sectionBody('Drones'));
     expect(drones.getByText('Drone control range')).toBeInTheDocument();
     expect(drones.getByText('57.5 km')).toBeInTheDocument();
+  });
+});
+
+describe('FittingStatsSections — Abyssal', () => {
+  afterEach(() => useAbyssalWeather.setState({ weatherTypeId: null }));
+
+  function renderAbyssal(compare = vi.fn().mockResolvedValue({ before: stats(), after: stats() })) {
+    render(
+      <MemoryRouter>
+        <FittingStatsSections
+          stats={stats()}
+          statsProgress={null}
+          statsError={false}
+          price={null}
+          damageProfiles={damageProfiles()}
+          targetProfiles={targetProfiles()}
+          typeName={typeName}
+          abyssal={{ hullGroupId: 26, compare }}
+        />
+      </MemoryRouter>
+    );
+    return { compare, toggle: () => screen.getByRole('button', { name: 'Abyssal' }) };
+  }
+
+  it('is one closed row naming the weather, with no section without the prop', () => {
+    renderSections(stats());
+    expect(screen.queryByRole('button', { name: 'Abyssal' })).toBeNull();
+    cleanup();
+
+    const { toggle } = renderAbyssal();
+    expect(toggle()).toHaveAttribute('aria-expanded', 'false');
+    expect(within(sectionBody('Abyssal')).getByText('Normal space')).toBeInTheDocument();
+    act(() => useAbyssalWeather.setState({ weatherTypeId: 47382 }));
+    expect(within(sectionBody('Abyssal')).getByText('Electrical 2')).toBeInTheDocument();
+  });
+
+  it('opens flat onto the weather and the run fields, and works the delta out only while open', async () => {
+    useAbyssalWeather.setState({ weatherTypeId: 47382 });
+    const user = userEvent.setup();
+    const { compare, toggle } = renderAbyssal();
+    expect(compare).not.toHaveBeenCalled();
+
+    await user.click(toggle());
+    const body = within(sectionBody('Abyssal'));
+    expect(body.getByRole('combobox', { name: 'Abyssal weather' })).toBeInTheDocument();
+    expect(body.getByRole('combobox', { name: 'Filament tier' })).toBeInTheDocument();
+    expect(body.queryByRole('button', { name: /Plan an Abyssal run/ })).toBeNull();
+    await waitFor(() => expect(compare).toHaveBeenCalledWith(47382));
+    await waitFor(() =>
+      expect(useStatsSectionsPreference.getState().value).toEqual({ abyssal: true })
+    );
   });
 });

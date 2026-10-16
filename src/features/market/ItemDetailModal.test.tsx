@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { describe, it, expect, afterEach, beforeAll, afterAll, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
+import { NARROW_QUERY } from '@/lib/useIsNarrow';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import '@/i18n';
@@ -1081,5 +1082,73 @@ describe('ItemDetailModal — an owned abyssal module', () => {
     expect(orderReads).toBe(0);
     expect(screen.queryByRole('link', { name: 'View in Market' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Open market in EVE/ })).not.toBeInTheDocument();
+  });
+});
+
+describe('ItemDetailModal header actions on a phone', () => {
+  /** jsdom's `matchMedia` never matches; the ⋮ branch needs the narrow query to. */
+  const realMatchMedia = window.matchMedia;
+  afterEach(() => {
+    window.matchMedia = realMatchMedia;
+  });
+  function goNarrow() {
+    window.matchMedia = (media: string) =>
+      ({
+        media,
+        matches: media === NARROW_QUERY,
+        onchange: null,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        addListener: () => {},
+        removeListener: () => {},
+        dispatchEvent: () => false,
+      }) as MediaQueryList;
+  }
+
+  function LocationProbe() {
+    const { pathname, search } = useLocation();
+    return <p data-testid="location">{pathname + search}</p>;
+  }
+
+  it('folds Open market in EVE and View in Market into one ⋮, so the name keeps the room', async () => {
+    goNarrow();
+    server.use(http.get(`${ESI_BASE_URL}/universe/types/${TYPE_ID}`, () => HttpResponse.error()));
+    mockedLoadDictionary.mockReturnValue(new Promise(() => {}));
+    const onClose = vi.fn();
+    render(
+      <MemoryRouter initialEntries={['/overview']}>
+        <ItemDetailModal typeId={TYPE_ID} itemName="Rifter" onClose={onClose} showOpenInMarket />
+        <LocationProbe />
+      </MemoryRouter>
+    );
+    const more = await screen.findByRole('button', { name: 'More actions for Rifter' });
+    expect(screen.queryByRole('link', { name: 'View in Market' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Open market in EVE: Rifter' })
+    ).not.toBeInTheDocument();
+
+    const user = userEvent.setup();
+    await user.click(more);
+    expect(await screen.findByRole('menuitem', { name: /Open market in EVE/ })).toBeInTheDocument();
+    await user.click(screen.getByRole('menuitem', { name: 'View in Market' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('location')).toHaveTextContent(`/market/browser?type=${TYPE_ID}`);
+  });
+
+  it('keeps a single action as its plain button, with no ⋮', async () => {
+    goNarrow();
+    server.use(http.get(`${ESI_BASE_URL}/universe/types/${TYPE_ID}`, () => HttpResponse.error()));
+    mockedLoadDictionary.mockReturnValue(new Promise(() => {}));
+    render(
+      <MemoryRouter initialEntries={['/overview']}>
+        <ItemDetailModal typeId={TYPE_ID} itemName="Rifter" onClose={() => {}} />
+      </MemoryRouter>
+    );
+    expect(
+      await screen.findByRole('button', { name: 'Open market in EVE: Rifter' })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'More actions for Rifter' })
+    ).not.toBeInTheDocument();
   });
 });

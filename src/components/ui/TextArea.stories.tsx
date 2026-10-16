@@ -30,3 +30,15 @@ export const Invalid: Story = { args: { defaultValue: 'bad paste', 'aria-invalid
 
 /** @summary Disabled (§6c States): `opacity-40` and `cursor-not-allowed`. */
 export const Disabled: Story = { args: { disabled: true, defaultValue: 'Locked' } };
+
+/** @summary `bare`: no border, fill or padding, inset focus ring, for a field inside a frame the caller draws. */
+export const Bare: Story = {
+  args: { bare: true, mono: true, defaultValue: '<b>bold</b> text' },
+  decorators: [
+    (Story) => (
+      <div className="rounded-xs border border-line">
+        <Story />
+      </div>
+    ),
+  ],
+};

@@ -2,11 +2,13 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   DEFERRED_ENTRY_BACKSTOP_MS,
+  DEFERRED_ENTRY_HERO_IMAGE,
   DEFERRED_ENTRY_SCRIPT_ID,
   DEFERRED_ENTRY_SHELL_ATTR,
   deferEntryHtml,
 } from './deferredEntry';
 import { LANDING_SHELL_ATTR } from './landingShell';
+import shellSnapshot from '@/features/landing/landingShell.snapshot.html?raw';
 
 /** The shape Vite writes into the built `index.html` head. */
 const BUILT = `<!doctype html>
@@ -51,6 +53,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
   html.removeAttribute(LANDING_SHELL_ATTR);
   document.head.innerHTML = '';
 });
@@ -76,6 +79,13 @@ describe('deferEntryHtml', () => {
 
   it('reads the same attribute the landing-shell gate sets', () => {
     expect(DEFERRED_ENTRY_SHELL_ATTR).toBe(LANDING_SHELL_ATTR);
+  });
+
+  it("waits on the shell's own high-priority ship", () => {
+    const ship = new DOMParser()
+      .parseFromString(shellSnapshot, 'text/html')
+      .querySelector('img[fetchpriority="high"]');
+    expect(ship?.getAttribute('src')).toBe(DEFERRED_ENTRY_HERO_IMAGE);
   });
 });
 
@@ -103,23 +113,76 @@ describe('the loader', () => {
     expect(entry()?.getAttribute('src')).toBe('/assets/index-AAA.js');
   });
 
-  it('holds everything back on the landing page until load', () => {
-    html.setAttribute(LANDING_SHELL_ATTR, '');
-    runLoader();
-    expect(preloads()).toHaveLength(0);
-    expect(entry()).toBeNull();
-    window.dispatchEvent(new Event('load'));
-    expect(preloads()).toHaveLength(3);
-    expect(entry()).not.toBeNull();
-  });
+  describe('on the landing page', () => {
+    type Emit = (entries: { url?: string }[]) => void;
+    let emit: Emit | undefined;
+    let disconnected = false;
 
-  it('starts on the landing page after the backstop if load never comes, and only once', () => {
-    html.setAttribute(LANDING_SHELL_ATTR, '');
-    runLoader();
-    vi.advanceTimersByTime(DEFERRED_ENTRY_BACKSTOP_MS);
-    expect(entry()).not.toBeNull();
-    window.dispatchEvent(new Event('load'));
-    expect(document.head.querySelectorAll('script[type="module"]')).toHaveLength(1);
-    expect(preloads()).toHaveLength(3);
+    /** Chromium's LCP observer, reduced to what the loader uses. */
+    function stubLcpObserver(): void {
+      emit = undefined;
+      disconnected = false;
+      class FakeObserver {
+        static supportedEntryTypes = ['paint', 'largest-contentful-paint'];
+        constructor(callback: (list: { getEntries: () => { url?: string }[] }) => void) {
+          emit = (entries) => callback({ getEntries: () => entries });
+        }
+        observe(options: { type: string; buffered: boolean }) {
+          expect(options).toEqual({ type: 'largest-contentful-paint', buffered: true });
+        }
+        disconnect() {
+          disconnected = true;
+        }
+      }
+      vi.stubGlobal('PerformanceObserver', FakeObserver);
+    }
+
+    beforeEach(() => {
+      html.setAttribute(LANDING_SHELL_ATTR, '');
+    });
+
+    it('holds everything back until the ship paints, then starts after that frame', () => {
+      stubLcpObserver();
+      runLoader();
+      window.dispatchEvent(new Event('load'));
+      emit?.([{ url: '' }]);
+      vi.advanceTimersByTime(10);
+      expect(preloads()).toHaveLength(0);
+
+      emit?.([{ url: `https://neocomdesk.com${DEFERRED_ENTRY_HERO_IMAGE}` }]);
+      expect(disconnected).toBe(true);
+      expect(entry()).toBeNull();
+      vi.advanceTimersByTime(0);
+      expect(preloads()).toHaveLength(3);
+      expect(entry()).not.toBeNull();
+    });
+
+    it('falls back to load and two frames without an LCP observer', () => {
+      vi.stubGlobal('PerformanceObserver', undefined);
+      runLoader();
+      window.dispatchEvent(new Event('load'));
+      expect(entry()).toBeNull();
+      vi.advanceTimersByTime(100);
+      expect(entry()).not.toBeNull();
+    });
+
+    it('starts at once on a first tap, so the button works', () => {
+      stubLcpObserver();
+      runLoader();
+      window.dispatchEvent(new Event('pointerdown'));
+      expect(entry()).not.toBeNull();
+    });
+
+    it('starts after the backstop if the ship never paints, and only once', () => {
+      stubLcpObserver();
+      runLoader();
+      vi.advanceTimersByTime(DEFERRED_ENTRY_BACKSTOP_MS);
+      expect(entry()).not.toBeNull();
+      emit?.([{ url: DEFERRED_ENTRY_HERO_IMAGE }]);
+      window.dispatchEvent(new Event('keydown'));
+      vi.advanceTimersByTime(DEFERRED_ENTRY_BACKSTOP_MS);
+      expect(document.head.querySelectorAll('script[type="module"]')).toHaveLength(1);
+      expect(preloads()).toHaveLength(3);
+    });
   });
 });
