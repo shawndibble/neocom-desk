@@ -7,7 +7,7 @@
  */
 import { useEffect, useId, useRef, useState, type ComponentType } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, IconButton, NeedsConnection, Spinner, TextInput } from '@/components/ui';
+import { Button, IconButton, TextInput } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import {
   buildReplyAllRecipients,
@@ -25,6 +25,7 @@ import { MailBodyEditor, type MailBodyEditorProps } from './MailBodyEditor';
 import { loadDraft, saveDraft, clearDraft, type MailDraftRecipient } from './mailDrafts';
 import { loadContacts } from './contacts';
 import { resolveNames } from './names';
+import { MailComposeFooter } from './MailComposeFooter';
 import { MailCounter } from './MailCounter';
 import { NewMailRecipientPicker } from './NewMailRecipientPicker';
 import {
@@ -391,28 +392,17 @@ export function MailComposeBox({
         </p>
       )}
 
-      <div className="flex items-center gap-2">
-        <NeedsConnection>
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => void handleSend()}
-            disabled={sending || bodyOver}
-          >
-            {sending ? (
-              <span className="flex items-center gap-1.5">
-                <Spinner size="sm" /> {t('mail.sending')}
-              </span>
-            ) : (
-              t('mail.send')
-            )}
-          </Button>
-        </NeedsConnection>
-        {!online && <span className="text-xs text-text-dim">{t('mail.draftSaved')}</span>}
+      <MailComposeFooter
+        size="sm"
+        sending={sending}
+        blocked={bodyOver}
+        onSend={() => void handleSend()}
+      >
         <Button size="sm" onClick={onClose} disabled={sending}>
           {t('mail.cancel')}
         </Button>
-      </div>
+        {!online && <span className="text-xs text-text-dim">{t('mail.draftSaved')}</span>}
+      </MailComposeFooter>
     </div>
   );
 }
