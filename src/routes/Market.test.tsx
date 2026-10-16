@@ -664,6 +664,25 @@ describe('Market Browser', () => {
     expect(screen.queryByText("Couldn't load the market catalogue")).not.toBeInTheDocument();
   });
 
+  it('says the catalogue needs a one-time download, not "Press Refresh", when offline, and reloads on reconnect', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => false });
+    try {
+      vi.mocked(loadNpcStations).mockRejectedValueOnce(new Error('network error'));
+      render(<App />);
+
+      expect(await screen.findByText("Couldn't load the market catalogue")).toBeInTheDocument();
+      expect(screen.getByText(/needs a one-time download/)).toBeInTheDocument();
+      expect(screen.queryByText('Press Refresh to try again.')).not.toBeInTheDocument();
+
+      Reflect.deleteProperty(navigator, 'onLine');
+      window.dispatchEvent(new Event('online'));
+
+      expect(await screen.findByRole('searchbox')).toBeInTheDocument();
+    } finally {
+      Reflect.deleteProperty(navigator, 'onLine');
+    }
+  });
+
   it('a failed globalMarkets.json load reads the chosen region instead of hanging', async () => {
     vi.mocked(loadGlobalMarkets).mockRejectedValueOnce(new Error('network error'));
     server.use(ordersHandler({ count: 0 }));

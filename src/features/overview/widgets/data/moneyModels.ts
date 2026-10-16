@@ -8,7 +8,7 @@
 import { DAY_MS } from '@/lib/age';
 import type { DeadlineSeverity } from '@/engine/severity';
 import { ORDER_PROBLEMS, type OrderProblem } from '@/engine/market/orderProblems';
-import type { OpenOrderRow } from '@/features/market/openOrdersModel';
+import { notCheckedCount, type OpenOrderRow } from '@/features/market/openOrdersModel';
 import type { WalletJournalEntry } from '@/esi/endpoints';
 import { LAYER_IDS, type LayerId, type LayerValues } from '@/engine/netWorth/series';
 import { humanizeRefType } from '@/features/character/format';
@@ -202,8 +202,11 @@ export function ordersStateChart(
 ): StackChartModel | null {
   if (rows.length === 0) return null;
   const parts: StackPart[] = [];
+  // An unchecked order reads healthy only for want of data: its own part.
+  const unchecked = notCheckedCount(rows);
   for (const state of STATE_PARTS) {
-    const n = rows.filter((row) => state.problems.includes(row.problem)).length;
+    let n = rows.filter((row) => state.problems.includes(row.problem)).length;
+    if (state.key === 'healthy') n -= unchecked;
     if (n === 0) continue;
     parts.push({
       key: state.key,
@@ -211,6 +214,15 @@ export function ordersStateChart(
       value: n,
       text: String(n),
       color: state.color,
+    });
+  }
+  if (unchecked > 0) {
+    parts.splice(1, 0, {
+      key: 'notChecked',
+      label: t(`${W}.chart.ordersStates.notChecked`),
+      value: unchecked,
+      text: String(unchecked),
+      color: 's3',
     });
   }
   return {

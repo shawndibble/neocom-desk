@@ -93,6 +93,7 @@ beforeEach(() => {
     playerLp: 12_000,
     hub: TRADE_HUBS[0]!,
     ready: true,
+    pricesUnreachable: false,
     useOwnMaterialsFor: new Set<number>(),
     toggleUseOwnMaterials: () => {},
   });
@@ -234,6 +235,42 @@ describe('LoyaltyStore basis readout', () => {
 
     act(() => useLpBasis.setState({ value: 'concord' }));
     expect(readout).toHaveTextContent(`${OTHER_HUB.systemName} · Buy · CONCORD LP`);
+  });
+});
+
+describe('LoyaltyStore with an unreachable price source (offline)', () => {
+  function mockOffers(pricesUnreachable: boolean) {
+    useLoyaltyStoreOffers.mockReturnValue({
+      corpName: 'Federal Navy Academy',
+      offersFetchedAt: null,
+      offersFromCache: false,
+      offersError: false,
+      reloadOffers: () => {},
+      rows: [ITEM_ROW],
+      catalog: null,
+      playerLp: 12_000,
+      hub: TRADE_HUBS[0]!,
+      ready: true,
+      pricesUnreachable,
+      useOwnMaterialsFor: new Set<number>(),
+      toggleUseOwnMaterials: () => {},
+    });
+  }
+
+  it('says prices are unavailable offline above the offers', async () => {
+    useDesktopViewport();
+    mockOffers(true);
+    renderStore();
+    expect(await screen.findByText('Prices unavailable right now')).toBeInTheDocument();
+    expect(screen.getByText(ITEM_ROW.itemName)).toBeInTheDocument();
+  });
+
+  it('shows no such note when prices loaded', async () => {
+    useDesktopViewport();
+    mockOffers(false);
+    renderStore();
+    expect(await screen.findByText(ITEM_ROW.itemName)).toBeInTheDocument();
+    expect(screen.queryByText('Prices unavailable right now')).not.toBeInTheDocument();
   });
 });
 

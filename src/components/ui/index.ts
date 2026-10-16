@@ -28,6 +28,7 @@ export { plainTextActionClassName } from './plainTextActionClassName';
 export { entityLinkClassName } from './entityLinkClassName';
 export { iconButtonClassName } from './iconButtonClassName';
 export { ReauthBanner } from './ReauthBanner';
+export { NeedsConnection } from './NeedsConnection';
 export { SkillBar } from './SkillBar';
 export { ProgressBar } from './ProgressBar';
 export type { ProgressBarTone } from './ProgressBar';

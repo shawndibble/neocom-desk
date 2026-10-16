@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useEffect } from 'react';
 import { MemoryRouter, useNavigate, type NavigateFunction } from 'react-router-dom';
@@ -67,7 +67,15 @@ beforeEach(async () => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  Reflect.deleteProperty(navigator, 'onLine');
 });
+
+function goOffline(): void {
+  Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => false });
+  act(() => {
+    window.dispatchEvent(new Event('offline'));
+  });
+}
 
 describe('NotificationPermissionPrompt', () => {
   // issue #1788: eligibility must wait for a second route, so it never
@@ -106,6 +114,18 @@ describe('NotificationPermissionPrompt', () => {
         value: { seen: true, outcome: 'granted' },
       });
     });
+  });
+
+  it('does not guard the plain notification Enable while offline: it never leaves the app', async () => {
+    const requestPermission = stubNotification('default', 'granted');
+    const user = userEvent.setup();
+    renderPastFirstScreen();
+
+    const enable = await screen.findByRole('button', { name: /^enable$/i });
+    goOffline();
+    expect(enable).not.toHaveAttribute('aria-disabled');
+    await user.click(enable);
+    expect(requestPermission).toHaveBeenCalledTimes(1);
   });
 
   it('persists a denial too, so the explainer never returns', async () => {
@@ -187,6 +207,23 @@ describe('NotificationPermissionPrompt', () => {
       await user.click(await screen.findByRole('button', { name: /^turn on$/i }));
       expect(beginAlertsLogin).toHaveBeenCalledWith(CHAR_ID);
       expect((await db.settings.get(ALERTS_OFFER_SEEN_KEY))?.value).toBe(true);
+    });
+
+    it('disables Turn on while offline, with the reason on hover, and starts nothing', async () => {
+      stubNotification('default', 'granted');
+      const user = userEvent.setup();
+      renderPastFirstScreen();
+
+      await user.click(await screen.findByRole('button', { name: /^enable$/i }));
+      const turnOn = await screen.findByRole('button', { name: /^turn on$/i });
+      goOffline();
+      expect(turnOn).toHaveAttribute('aria-disabled', 'true');
+      await user.click(turnOn);
+      expect(beginAlertsLogin).not.toHaveBeenCalled();
+      // The click above closed any bubble; re-enter for a fresh hover.
+      await user.unhover(turnOn);
+      await user.hover(turnOn);
+      expect((await screen.findAllByText('Needs a connection')).length).toBeGreaterThan(0);
     });
 
     it('puts the offer back when the Alerts flow fails to start', async () => {

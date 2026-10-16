@@ -119,11 +119,12 @@ describe('Widget states', () => {
     expect(within(screen.getByRole('region', { name: 'Mail' })).getByText('4')).toBeInTheDocument();
   });
 
-  it('asks for the permission, with a Grant access action, when the grant lapsed', () => {
+  it('asks for the permission, with a Grant access action, when the grant lapsed and nothing was saved', () => {
     useActiveCharacter.setState({ activeCharacterId: 91, hydrated: true });
     renderWidget(model(), (store) =>
       store.set('mail', {
-        data: { ...mailData(0, 0), needsReauth: true },
+        // Nothing was ever read (no `fetchedAt`): there is no saved mail to keep on screen.
+        data: { ...mailData(0, 0), needsReauth: true, fetchedAt: null },
         error: false,
         loading: false,
       })
@@ -131,6 +132,31 @@ describe('Widget states', () => {
     const region = screen.getByRole('region', { name: 'Mail' });
     expect(within(region).getByText('Needs permission')).toBeInTheDocument();
     expect(within(region).getByRole('button', { name: 'Grant access' })).toBeInTheDocument();
+  });
+
+  it('keeps a saved wallet balance on screen, with a small sign-in note, when the grant lapsed over it', () => {
+    useActiveCharacter.setState({ activeCharacterId: 91, hydrated: true });
+    renderWidget(model({ kind: 'wallet', view: 'number' }), (store) =>
+      store.set('wallet', {
+        data: {
+          result: {
+            data: 5_000_000,
+            fetchedAt: new Date(NOW - 60_000),
+            fromCache: true,
+            truncated: false,
+          },
+          needsReauth: true,
+        },
+        error: false,
+        loading: false,
+      })
+    );
+    const region = screen.getByRole('region', { name: 'Wallet' });
+    expect(within(region).queryByText('Needs permission')).not.toBeInTheDocument();
+    expect(within(region).getByText('5,000,000 ISK')).toBeInTheDocument();
+    expect(
+      within(region).getByRole('button', { name: 'Log in again with EVE Online' })
+    ).toBeInTheDocument();
   });
 
   it('says it could not load, dims the last good value and retries from the refresh epoch', async () => {

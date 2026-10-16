@@ -8,12 +8,14 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { EmptyState, SegmentedControl, Spinner } from '@/components/ui';
+import { Button, EmptyState, SegmentedControl, Spinner } from '@/components/ui';
 import { intParam } from '@/lib/urlState';
+import { useRetryFocus } from '@/lib/useRetryFocus';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { useUrlParam } from '@/lib/useUrlState';
 import type { ShipTreeShip } from '@/sde/types';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { useOnline } from '@/stores/network';
 import { FactionBar } from './FactionBar';
 import { ShipInfoWindow } from './ShipInfoWindow';
 import { ShipTreeLadder } from './ShipTreeLadder';
@@ -33,11 +35,30 @@ const FACTION_PARAM = intParam(DEFAULT_FACTION_ID, { min: 0 });
 export function ShipTreeTab() {
   const { t } = useTranslation();
   const characterId = useActiveCharacter((state) => state.activeCharacterId);
-  const source = useShipTreeData(characterId);
+  const { source, retry } = useShipTreeData(characterId);
+  const online = useOnline();
+  // Retry unmounts while the tree loads, so the always-mounted wrapper holds focus meanwhile.
+  const [focusRef, , holdFocus] = useRetryFocus<HTMLDivElement>(
+    source === 'failed' ? 'failed' : source ? 'ok' : 'busy',
+    characterId
+  );
   return (
-    <div className="space-y-2">
+    <div ref={focusRef} tabIndex={-1} className="space-y-2 focus:outline-none">
       {source === 'failed' ? (
-        <EmptyState title={t('ships.tree.loadFailed')} hint={t('ships.tree.loadFailedHint')} />
+        <EmptyState
+          title={t('ships.tree.loadFailed')}
+          hint={t(online ? 'ships.tree.loadFailedHint' : 'ships.tree.loadFailedOffline')}
+          action={
+            <Button
+              onClick={() => {
+                holdFocus();
+                retry();
+              }}
+            >
+              {t('common.retry')}
+            </Button>
+          }
+        />
       ) : source ? (
         <ShipTree source={source} />
       ) : (
@@ -86,6 +107,14 @@ function ShipTree({ source }: { source: ShipTreeSource }) {
 
   return (
     <>
+      {source.masteriesStatus === 'unavailable' && (
+        <p className="flex flex-wrap items-center gap-2 text-xs text-text-dim">
+          <span>{t('ships.tree.masteriesUnavailable')}</span>
+          <Button size="sm" onClick={source.retryMasteries}>
+            {t('common.retry')}
+          </Button>
+        </p>
+      )}
       {(view === 'ladder' || isPhone) && (
         <FactionBar
           data={source.data}

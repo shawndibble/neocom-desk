@@ -114,6 +114,7 @@ beforeEach(async () => {
 
 afterEach(() => {
   act(() => useCommandPalette.getState().hide());
+  vi.restoreAllMocks();
 });
 
 describe('CommandPalette', () => {
@@ -273,7 +274,7 @@ describe('CommandPalette', () => {
     expect(catalogue.load).toHaveBeenCalledTimes(1);
   });
 
-  it('shows a catalogue failure inside Market Items only; the other groups keep working', async () => {
+  it('shows a catalogue failure inside Market Items only (online: the generic copy); the other groups keep working', async () => {
     installCatalogue(() => Promise.reject(new Error('offline')));
     const user = userEvent.setup();
     renderShell();
@@ -296,6 +297,19 @@ describe('CommandPalette', () => {
     expect(within(pages).getAllByRole('option')[0]).toHaveAttribute('aria-selected', 'true');
     await user.keyboard('{Enter}');
     expect(screen.getByTestId('where')).toHaveTextContent('/settings');
+  });
+
+  it('names the one-time download when the catalogue fails offline', async () => {
+    vi.spyOn(window.navigator, 'onLine', 'get').mockReturnValue(false);
+    installCatalogue(() => Promise.reject(new TypeError('Failed to fetch')));
+    const user = userEvent.setup();
+    renderShell();
+    await user.keyboard('{Control>}k{/Control}');
+    await user.type(await screen.findByRole('combobox'), 'settings');
+    const items = await screen.findByRole('group', { name: 'Market items' });
+    expect(
+      await within(items).findByText('Item search needs a one-time download — connect once.')
+    ).toBeInTheDocument();
   });
 
   it('hides the capped note from the listbox and announces it in the status region', async () => {

@@ -30,3 +30,13 @@ export const Ghost: Story = { args: { variant: 'ghost' } };
 
 /** @summary Touch tier (§3): `soleAction` raises the button to `md` when it is the only control. */
 export const SoleAction: Story = { args: { soleAction: true } };
+
+/** @summary `compact`: one wrapped line beside saved data, shown when a lapsed grant must not hide what is already on this device. */
+export const Compact: Story = {
+  args: {
+    compact: true,
+    variant: 'ghost',
+    title: 'Log in again to refresh.',
+    hint: "EVE access for this data has lapsed, so what's saved on this device is shown.",
+  },
+};

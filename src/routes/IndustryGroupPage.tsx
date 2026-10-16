@@ -3,6 +3,7 @@ import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type BuildPlanRecord } from '@/db';
+import { DataGate } from '@/components/DataGate';
 import { Spinner, TabPanel, Toast, useTimedToast } from '@/components/ui';
 import { useIndustryWorkspace } from '@/features/industry/useIndustryWorkspace';
 import { useAccountSkillLevels } from '@/features/skills/useAccountSkillLevels';
@@ -46,6 +47,8 @@ export function IndustryGroupPage() {
   const {
     activeCharacterId,
     catalog,
+    catalogFailed,
+    retryCatalog,
     pi,
     ownedBlueprints,
     pricingInputs,
@@ -175,28 +178,34 @@ export function IndustryGroupPage() {
         />
 
         <TabPanel tabsId={INDUSTRY_TABS_ID} tabId="plans" className="space-y-4">
-          {!catalog ? (
-            <div className="flex justify-center py-16">
-              <Spinner label={t('common.loading')} />
-            </div>
-          ) : (
-            <BuildGroupPanel
-              key={group.id}
-              group={group}
-              plans={plans}
-              catalog={catalog}
-              pi={pi}
-              ownedBlueprints={ownedBlueprints}
-              modifiers={modifiers}
-              pricingInputs={pricingInputs}
-              ownedStockSnapshot={ownedStockSnapshot}
-              onOpenPlan={(planId) => navigate(`/industry/plans/${planId}`)}
-              onRetarget={(target, planIds) => void handleRetargetGroup(target, planIds)}
-              onAutoBuild={(options) => handleAutoBuildGroup(options)}
-              onOwnedStockChange={(ownedStock) => void handleGroupOwnedStockChange(ownedStock)}
-              onOwnedStockScopeChange={(scope) => void handleGroupOwnedStockScopeChange(scope)}
-            />
-          )}
+          <DataGate
+            status={catalogFailed ? 'failed' : !catalog ? 'busy' : 'ok'}
+            title={t('industry.catalogUnavailable')}
+            hint={
+              ownedBlueprints.length > 0 ? t('industry.catalogUnavailableOwnedHint') : undefined
+            }
+            onRetry={retryCatalog}
+            resetKey={activeCharacterId}
+          >
+            {catalog && (
+              <BuildGroupPanel
+                key={group.id}
+                group={group}
+                plans={plans}
+                catalog={catalog}
+                pi={pi}
+                ownedBlueprints={ownedBlueprints}
+                modifiers={modifiers}
+                pricingInputs={pricingInputs}
+                ownedStockSnapshot={ownedStockSnapshot}
+                onOpenPlan={(planId) => navigate(`/industry/plans/${planId}`)}
+                onRetarget={(target, planIds) => void handleRetargetGroup(target, planIds)}
+                onAutoBuild={(options) => handleAutoBuildGroup(options)}
+                onOwnedStockChange={(ownedStock) => void handleGroupOwnedStockChange(ownedStock)}
+                onOwnedStockScopeChange={(scope) => void handleGroupOwnedStockScopeChange(scope)}
+              />
+            )}
+          </DataGate>
         </TabPanel>
       </div>
       {pasteNote && <Toast message={pasteNote} />}

@@ -276,6 +276,34 @@ describe('loadMiningYieldSnapshot', () => {
     });
   });
 
+  describe('reprocessing data missing (offline)', () => {
+    it('keeps the ledger and raw values, and flags refining as unavailable, rather than failing the snapshot', async () => {
+      sdeMock.loadReprocessing.mockRejectedValue(new Error('offline'));
+      priceHistoryMock.loadPriceHistory.mockResolvedValue({
+        points: [{ date: '2026-09-01', average: 10, volume: 1 }],
+        fetchedAt: Date.now(),
+      });
+
+      const snapshot = await loadMiningYieldSnapshot(true);
+
+      expect(snapshot.refiningUnavailable).toBe(true);
+      expect(snapshot.rows).toHaveLength(1);
+      expect(snapshot.rows[0].valuation.rawValue).toBeGreaterThan(0);
+      // Not Partial for refine data that cannot exist right now.
+      expect(snapshot.rows[0].valuation.pricedAll).toBe(true);
+      expect(skillsMock.loadCorrectedSkills).not.toHaveBeenCalled();
+    });
+
+    it('does not flag it when refining is off or the data loaded', async () => {
+      priceHistoryMock.loadPriceHistory.mockResolvedValue({
+        points: [{ date: '2026-09-01', average: 10, volume: 1 }],
+        fetchedAt: Date.now(),
+      });
+      expect((await loadMiningYieldSnapshot(false)).refiningUnavailable).toBe(false);
+      expect((await loadMiningYieldSnapshot(true)).refiningUnavailable).toBe(false);
+    });
+  });
+
   describe('price basis (issue #1279)', () => {
     const book = { buyMax: 8, sellMin: 12, buyVolume: 1, sellVolume: 1 };
 

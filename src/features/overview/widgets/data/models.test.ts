@@ -77,7 +77,11 @@ describe('buildView status', () => {
   it('is failed, with nothing to dim, when the read threw and nothing was cached', () => {
     const feeds: Feeds = { wallet: { data: null, error: true, loading: false } };
     const view = buildView('wallet', feeds, ctx());
-    expect(resolveWidget(view.status)).toEqual({ state: 'failed', showLastGood: false });
+    expect(resolveWidget(view.status)).toEqual({
+      state: 'failed',
+      showLastGood: false,
+      reauthNote: false,
+    });
   });
 
   it('keeps the last good value when a refresh failed', () => {
@@ -92,13 +96,29 @@ describe('buildView status', () => {
       },
     };
     const view = buildView('wallet', feeds, ctx());
-    expect(resolveWidget(view.status)).toEqual({ state: 'failed', showLastGood: true });
+    expect(resolveWidget(view.status)).toEqual({
+      state: 'failed',
+      showLastGood: true,
+      reauthNote: false,
+    });
     expect(view.number.iskAmount).toBe(5_000_000);
   });
 
   it('needs permission when the read says the grant lapsed', () => {
     const feeds: Feeds = { wallet: ok({ result: null, needsReauth: true }) };
     expect(stateOf(buildView('wallet', feeds, ctx()))).toBe('needsPermission');
+  });
+
+  it('keeps a saved balance, with a sign-in note, when the grant lapsed over it', () => {
+    const feeds: Feeds = {
+      wallet: ok({
+        result: { data: 5_000_000, fetchedAt: new Date(NOW), fromCache: true, truncated: false },
+        needsReauth: true,
+      }),
+    };
+    const view = buildView('wallet', feeds, ctx());
+    expect(resolveWidget(view.status)).toMatchObject({ state: 'ok', reauthNote: true });
+    expect(view.number.iskAmount).toBe(5_000_000);
   });
 });
 
@@ -870,5 +890,99 @@ describe('comingUp table', () => {
       '5h 0m',
       'overview.board.response.tentative',
     ]);
+  });
+});
+
+describe('a lapsed grant over saved data', () => {
+  const resolved = (kind: string, feeds: Feeds) =>
+    resolveWidget(buildView(kind, feeds, ctx()).status);
+  const saved = { needsReauth: true, fetchedAt: new Date(NOW) };
+  const unsaved = { needsReauth: true, fetchedAt: null };
+
+  it('keeps saved mail with a sign-in note, and asks for the grant when nothing was read', () => {
+    const mail = { unread: 3, recent: [] };
+    expect(resolved('mail', { mail: ok({ ...mail, ...saved }) })).toMatchObject({
+      state: 'ok',
+      reauthNote: true,
+    });
+    expect(resolved('mail', { mail: ok({ ...mail, ...unsaved }) })).toMatchObject({
+      state: 'needsPermission',
+      reauthNote: false,
+    });
+  });
+
+  it('keeps saved events with a sign-in note, and asks for the grant when nothing was read', () => {
+    expect(resolved('comingUp', { calendar: ok({ events: [], ...saved }) })).toMatchObject({
+      reauthNote: true,
+    });
+    expect(resolved('comingUp', { calendar: ok({ events: [], ...unsaved }) })).toMatchObject({
+      state: 'needsPermission',
+    });
+  });
+
+  it('keeps saved contracts with a sign-in note, and asks for the grant when nothing was read', () => {
+    const summary = {
+      inProgress: 2,
+      exchanges: 0,
+      outstanding: 0,
+      dueSoon: 0,
+      overdue: 0,
+      soonest: null,
+      items: [],
+      rows: [],
+    };
+    const contracts = (over: Record<string, unknown>) =>
+      ({ contracts: ok({ summary, route: null, ...over }) as never }) satisfies Feeds;
+    expect(resolved('contracts', contracts(saved))).toMatchObject({
+      state: 'ok',
+      reauthNote: true,
+    });
+    expect(resolved('contracts', contracts(unsaved))).toMatchObject({ state: 'needsPermission' });
+  });
+
+  it('keeps saved orders with a sign-in note, and asks for the grant when there are none', () => {
+    const order = {
+      order_id: 1,
+      type_id: 34,
+      region_id: 10000002,
+      location_id: 60003760,
+      is_buy_order: false,
+      is_corporation: false,
+      price: 5,
+      volume_remain: 10,
+      volume_total: 10,
+      issued: new Date(NOW - HOUR).toISOString(),
+      duration: 90,
+      range: 'station',
+    };
+    const orders = (list: unknown[]) =>
+      ({
+        orders: ok({
+          openOrders: {
+            entries: [
+              {
+                characterId: 91,
+                characterName: 'Pilot',
+                orders: list,
+                fetchedAt: list.length ? NOW : 0,
+                fromCache: true,
+                needsReauth: true,
+              },
+            ],
+            skipped: [],
+          },
+          typeNames: new Map(),
+          npcStations: new Map(),
+          stationsLoaded: true,
+          stationPrices: new Map(),
+          costBases: new Map(),
+          walletBasisGaps: new Map(),
+          problemSamples: new Map(),
+          skillsByCharacter: new Map(),
+          now: NOW,
+        }) as never,
+      }) satisfies Feeds;
+    expect(resolved('orders', orders([order]))).toMatchObject({ reauthNote: true });
+    expect(resolved('orders', orders([]))).toMatchObject({ state: 'needsPermission' });
   });
 });

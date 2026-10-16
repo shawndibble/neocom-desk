@@ -35,6 +35,18 @@ export interface BlueprintCatalog {
   typesById: TypeMap;
 }
 
+/**
+ * A catalog with nothing in it: what a view that can still show something
+ * without blueprint data (the LP Store lists its offers, just without build
+ * costs) uses when `loadBlueprintCatalog` rejects. Compare by identity.
+ */
+export const EMPTY_BLUEPRINT_CATALOG: BlueprintCatalog = {
+  entries: [],
+  byBlueprintTypeID: new Map(),
+  byProductTypeID: new Map(),
+  typesById: {},
+};
+
 let built: { blueprints: BlueprintMap; types: TypeMap; catalog: BlueprintCatalog } | null = null;
 
 export async function loadBlueprintCatalog(): Promise<BlueprintCatalog> {

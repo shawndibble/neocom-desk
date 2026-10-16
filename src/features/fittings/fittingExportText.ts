@@ -24,6 +24,17 @@ export function fittingShareUrl(payload: string): string {
   return `${window.location.origin}${base}${FITTINGS_PATH}?${query}`;
 }
 
+/**
+ * The logged-out read-only view of a Fitting Share Code (`/share/fitting?f=`):
+ * unlike the editor URL above it needs no Character, and the page decodes the
+ * code locally, so it works with no connection to the sync server.
+ */
+export function fittingShareViewUrl(payload: string): string {
+  const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+  const query = new URLSearchParams({ f: payload }).toString();
+  return `${window.location.origin}${base}/share/fitting?${query}`;
+}
+
 /** The Fitting's **Fitting Share Code**, or null when it is too large to encode. */
 export async function fittingShareCode(fitting: Fitting): Promise<string | null> {
   const encoded = await encodeFittingShare(fittingToShareInput(fitting));

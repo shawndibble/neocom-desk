@@ -21,6 +21,8 @@ interface GrantBannerProps extends GrantCopy {
   endpoints: readonly EsiEndpointId[];
   variant?: 'primary' | 'ghost';
   soleAction?: boolean;
+  /** The one-line form for a note beside saved data (`ReauthBanner`'s `compact`). */
+  compact?: boolean;
 }
 
 /**

@@ -24,6 +24,7 @@ import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { GrantBanner } from '@/app/GrantNote';
 import type { CharacterFitting } from '@/esi/endpoints';
 import type { Fitting } from '@/engine/fittings/types';
+import { useOnline } from '@/stores/network';
 import { loadInGameFittings } from './inGameFittings';
 import { clampFittingName, IN_GAME_FITTING_NAME_MAX, saveFittingToEve } from './saveToEve';
 
@@ -55,12 +56,17 @@ export function SaveToEveDialog({
   onSaveToMyFittings,
 }: SaveToEveDialogProps) {
   const { t } = useTranslation();
+  const online = useOnline();
   const [name, setName] = useState(() => clampFittingName(fitting.name));
   const [existing, setExisting] = useState<CharacterFitting[]>([]);
   const [target, setTarget] = useState<string>(NEW_TARGET);
   const [alsoSave, setAlsoSave] = useState(true);
   const [saving, setSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  /** The save failed for want of a connection (the network dropped after the dialog opened). */
+  const [offlineFailed, setOfflineFailed] = useState(false);
+  /** The request went out and timed out: the Fitting may or may not have been saved. */
+  const [unconfirmed, setUnconfirmed] = useState(false);
   /** The save was refused for want of the Fittings Permission, which a re-login can grant. */
   const [needsPermission, setNeedsPermission] = useState(false);
   /** Set when a save succeeded but the overwritten Fitting's delete failed — the pilot now has both. */
@@ -77,6 +83,8 @@ export function SaveToEveDialog({
     setName(clampFittingName(fitting.name));
     setTarget(NEW_TARGET);
     setErrorMessage(null);
+    setOfflineFailed(false);
+    setUnconfirmed(false);
     setNeedsPermission(false);
     setOverwriteFailure(null);
     setMyFittingsFailed(false);
@@ -100,8 +108,22 @@ export function SaveToEveDialog({
     if (trimmed === '') return;
     setSaving(true);
     setErrorMessage(null);
+    setOfflineFailed(false);
+    setUnconfirmed(false);
     setNeedsPermission(false);
     try {
+      if (!online) {
+        // EVE can't be reached: save only the My Fittings copy, which is local, if that was asked for.
+        if (onSaveToMyFittings && alsoSave) {
+          const saved = await onSaveToMyFittings().then(
+            (ok) => ok,
+            () => false
+          );
+          if (saved) onClose();
+          else setMyFittingsFailed(true);
+        }
+        return;
+      }
       const result = await saveFittingToEve({
         characterId,
         fitting,
@@ -110,7 +132,9 @@ export function SaveToEveDialog({
         overwriteFittingId: overwriteTarget?.fitting_id,
       });
       if (!result.ok) {
-        if (result.needsPermission) setNeedsPermission(true);
+        if (result.kind === 'offline') setOfflineFailed(true);
+        else if (result.kind === 'unconfirmed') setUnconfirmed(true);
+        else if (result.needsPermission) setNeedsPermission(true);
         else setErrorMessage(result.message);
         return;
       }
@@ -230,6 +254,26 @@ export function SaveToEveDialog({
             actionLabel={t('fittings.saveToEve.grantAction')}
           />
         )}
+        {!online ? (
+          <p role="alert" className="text-xs text-warning">
+            {t(
+              onSaveToMyFittings
+                ? 'fittings.saveToEve.needsConnectionKeepMine'
+                : 'fittings.saveToEve.needsConnection'
+            )}
+          </p>
+        ) : (
+          offlineFailed && (
+            <p role="alert" className="text-xs text-danger">
+              {t('fittings.saveToEve.offlineFailed')}
+            </p>
+          )
+        )}
+        {unconfirmed && (
+          <p role="alert" className="text-xs text-warning">
+            {t('fittings.saveToEve.unconfirmed')}
+          </p>
+        )}
         {errorMessage && (
           <p role="alert" className="text-xs text-danger">
             {t('fittings.saveToEve.errorTitle')}: {errorMessage}
@@ -242,13 +286,17 @@ export function SaveToEveDialog({
           <Button
             type="submit"
             variant={overwriteTarget ? 'danger' : 'primary'}
-            disabled={saving || name.trim() === ''}
+            disabled={
+              saving || name.trim() === '' || (!online && !(onSaveToMyFittings && alsoSave))
+            }
           >
             {saving
               ? t('fittings.saveToEve.saving')
-              : overwriteTarget
-                ? t('fittings.saveToEve.overwriteAction')
-                : t('fittings.saveToEve.saveAction')}
+              : !online
+                ? t('fittings.saveToEve.saveMineOnlyAction')
+                : overwriteTarget
+                  ? t('fittings.saveToEve.overwriteAction')
+                  : t('fittings.saveToEve.saveAction')}
           </Button>
         </div>
       </form>

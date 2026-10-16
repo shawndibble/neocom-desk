@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
@@ -275,5 +275,69 @@ describe('SaveToEveDialog', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Save' }));
     expect(await screen.findByText(/couldn't save it to My Fittings/)).toBeInTheDocument();
     expect(screen.getByText(/gone wrong/)).toBeInTheDocument();
+  });
+
+  it('shows an offline message, not "Unknown error", when the save could not reach EVE', async () => {
+    saveFittingToEveMock.mockResolvedValue({ ok: false, kind: 'offline' });
+    render(
+      <SaveToEveDialog open onClose={vi.fn()} characterId={1} fitting={FITTING} onSaved={vi.fn()} />
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Save' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't reach EVE");
+    expect(screen.queryByText(/Unknown error/)).toBeNull();
+  });
+
+  it('says the Fitting may not have saved when the request timed out after it went out', async () => {
+    saveFittingToEveMock.mockResolvedValue({ ok: false, kind: 'unconfirmed' });
+    render(
+      <SaveToEveDialog open onClose={vi.fn()} characterId={1} fitting={FITTING} onSaved={vi.fn()} />
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Save' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('may not have been saved');
+  });
+
+  describe('with no connection', () => {
+    beforeEach(() => {
+      Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => false });
+    });
+    afterEach(() => {
+      Reflect.deleteProperty(navigator, 'onLine');
+    });
+
+    it('does not try EVE, and still saves to My Fittings', async () => {
+      const onClose = vi.fn();
+      const onSaveToMyFittings = vi.fn(async () => true);
+      render(
+        <SaveToEveDialog
+          open
+          onClose={onClose}
+          characterId={1}
+          fitting={FITTING}
+          onSaved={vi.fn()}
+          onSaveToMyFittings={onSaveToMyFittings}
+        />
+      );
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'Saving to EVE needs a connection. You can still save to My Fittings.'
+      );
+      await userEvent.click(screen.getByRole('button', { name: 'Save to My Fittings' }));
+      expect(onSaveToMyFittings).toHaveBeenCalledOnce();
+      expect(saveFittingToEveMock).not.toHaveBeenCalled();
+      expect(onClose).toHaveBeenCalled();
+    });
+
+    it('has nothing to save when the My Fittings copy is not wanted either', async () => {
+      render(
+        <SaveToEveDialog
+          open
+          onClose={vi.fn()}
+          characterId={1}
+          fitting={FITTING}
+          onSaved={vi.fn()}
+        />
+      );
+      expect(await screen.findByRole('alert')).toHaveTextContent('Needs a connection.');
+      expect(screen.getByRole('button', { name: 'Save to My Fittings' })).toBeDisabled();
+    });
   });
 });

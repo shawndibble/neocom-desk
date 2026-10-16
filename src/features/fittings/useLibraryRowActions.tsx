@@ -27,6 +27,7 @@ import { writeToClipboard } from '@/lib/clipboard';
 import { exportFitting } from './fittingExportText';
 import { fittingCompareHref } from './fittingRoutes';
 import { saveFitting } from './myFittings';
+import { useOnline } from '@/stores/network';
 import { SaveToEveDialog } from './SaveToEveDialog';
 import type { LibraryRow } from './useLibraryFittings';
 import { useTimedToast, NOTICE_MS } from '@/components/ui/useTimedToast';
@@ -90,6 +91,7 @@ export function useLibraryRowActions({
   const { t } = useTranslation();
   const navigate = useNavigate();
   const canSaveToEve = useEndpointsGranted(['postCharacterFitting']);
+  const online = useOnline();
   const [notice, setNotice] = useState<string | null>(null);
   const [saving, setSaving] = useState<{ fitting: Fitting; description: string } | null>(null);
   useTimedToast(notice, () => setNotice(null), NOTICE_MS);
@@ -218,7 +220,7 @@ export function useLibraryRowActions({
         {/* An In-game Fitting is in EVE already. */}
         {saved && (
           <MenuItem
-            disabled={characterId === null || canSaveToEve !== true}
+            disabled={characterId === null || canSaveToEve !== true || !online}
             onSelect={() =>
               void withFitting(row, ({ fitting }) =>
                 setSaving({ fitting, description: saved.record.notes ?? '' })
@@ -227,6 +229,11 @@ export function useLibraryRowActions({
           >
             {t('fittings.libraryMenu.saveToEve')}
           </MenuItem>
+        )}
+        {saved && !online && (
+          <p className="max-w-64 px-3 pb-2 text-xs text-text-dim">
+            {t('fittings.saveToEve.needsConnection')}
+          </p>
         )}
         {shareItems(row)}
         {saved && (onRename || onDelete) && <MenuSeparator />}

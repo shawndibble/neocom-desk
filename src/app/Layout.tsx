@@ -12,6 +12,7 @@ import { usePrefetch, isPrefetching } from '@/stores/prefetch';
 import { isSyncConfigured } from './syncStatus';
 import { SyncStatusDot } from './SyncStatusDot';
 import { SyncErrorNote } from './SyncErrorNote';
+import { OfflineBanner } from './OfflineBanner';
 import { useSyncStatus } from './useSyncStatus';
 import {
   CharacterAvatar,
@@ -403,6 +404,7 @@ export const Layout = memo(function Layout() {
           </aside>
 
           <main className="min-w-0 flex-1 px-2 py-4 pb-[max(calc(5rem_+_env(safe-area-inset-bottom)),var(--compare-drawer-space,0px))] md:px-4 md:pb-[max(1rem,var(--compare-drawer-space,0px))]">
+            <OfflineBanner />
             <AlertCharacterSwitch />
             <AuthFailureNotice />
             <StandingsScopeNotice />

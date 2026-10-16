@@ -23,7 +23,7 @@
  * covers buy-vs-sell and compressed-vs-raw; which *day's* price to use is a
  * separate decision, recorded in this fix's own decision doc.
  */
-import { getHubPrices } from '@/market/prices';
+import { getHubPricesWithStatus } from '@/market/prices';
 import { DEFAULT_TRADE_HUB, TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import { loadCompressedOreTypeIds } from '@/sde/loadSde';
 import { oreFormTypeId } from '@/engine/miningTax/oreForm';
@@ -59,6 +59,12 @@ export interface UnitPrices {
   sellFallback: Set<number>;
   /** Which tier of `resolveTaxUnitPrice` priced each raw typeId — shown in the row detail's price breakdown. */
   sources?: Map<number, TaxPriceSource>;
+  /**
+   * The live lookup could not reach the price source (offline). Anything in
+   * `unpriced` that no saved snapshot covered is then unknown, not "nobody is
+   * bidding" — the banner and the Assign dialog say so.
+   */
+  liveUnreachable?: boolean;
 }
 
 /** The hub a Payee's `hubId` names, or Jita when it names none (or one this build does not know). */
@@ -103,9 +109,9 @@ async function resolvePricesForHubAcrossDates(
   const start = sortedDates[0];
   const end = sortedDates[sortedDates.length - 1];
 
-  const [{ saved: serverSaved, historical }, liveAggregates, dexieSaved] = await Promise.all([
+  const [{ saved: serverSaved, historical }, live, dexieSaved] = await Promise.all([
     loadHubSnapshotRange(characterId, start, end, hub),
-    getHubPrices(hub, pricingTypeIds),
+    getHubPricesWithStatus(hub, pricingTypeIds),
     // Dexie only ever holds Jita — no equivalent for the other 4 hubs.
     hub.id === DEFAULT_TRADE_HUB.id
       ? loadPriceSnapshots().catch(() => new Map<string, SnapshotDay>())
@@ -136,8 +142,8 @@ async function resolvePricesForHubAcrossDates(
         saved: mergedSaved?.get(pid),
         historical: historicalForDate?.get(pid),
         live: {
-          buy: liveAggregates.get(pid)?.buyMax ?? null,
-          sell: liveAggregates.get(pid)?.sellMin ?? null,
+          buy: live.prices.get(pid)?.buyMax ?? null,
+          sell: live.prices.get(pid)?.sellMin ?? null,
         },
       });
       const price = resolved.price ?? 0;
@@ -149,7 +155,13 @@ async function resolvePricesForHubAcrossDates(
       // pilot needs to know before sending the bill either way.
       if (price <= 0) unpriced.add(typeId);
     }
-    byDate.set(date, { prices, unpriced, sellFallback, sources });
+    byDate.set(date, {
+      prices,
+      unpriced,
+      sellFallback,
+      sources,
+      liveUnreachable: live.unreachable,
+    });
   }
   return { byDate };
 }
@@ -193,6 +205,12 @@ export interface DatedUnitPrices {
   unpriced: Set<number>;
   /** Per hub, per date, the raw typeIds valued at today's live sell for want of any buy side — see `UnitPrices.sellFallback`. */
   sellFallbackByHubAndDate: ReadonlyMap<TradeHub['id'], ReadonlyMap<string, ReadonlySet<number>>>;
+  /**
+   * Hubs whose live lookup could not reach the price source. Read with
+   * `unpricedByHub`: an unpriced type at one of these failed to load, rather
+   * than having no buy orders. Per hub, so a reachable hub keeps its own advice.
+   */
+  unreachableHubs?: ReadonlySet<TradeHub['id']>;
   /** Per hub, per date, which price tier priced each raw typeId. */
   sourcesByHubAndDate?: ReadonlyMap<
     TradeHub['id'],
@@ -297,12 +315,14 @@ export async function loadDatedUnitPricesByHub(
     TradeHub['id'],
     ReadonlyMap<string, ReadonlyMap<number, TaxPriceSource>>
   >();
+  const unreachableHubs = new Set<TradeHub['id']>();
   for (const [hubId, result] of loaded) {
     const sourcesByDate = new Map<string, ReadonlyMap<number, TaxPriceSource>>();
     const byDate = new Map<string, ReadonlyMap<number, number>>();
     const sellByDate = new Map<string, ReadonlySet<number>>();
     const hubUnpriced = new Set<number>();
     for (const [date, dayResult] of result.byDate) {
+      if (dayResult.liveUnreachable) unreachableHubs.add(hubId);
       byDate.set(date, dayResult.prices);
       sellByDate.set(date, dayResult.sellFallback);
       sourcesByDate.set(date, dayResult.sources ?? NO_SOURCES);
@@ -316,5 +336,12 @@ export async function loadDatedUnitPricesByHub(
     sourcesByHubAndDate.set(hubId, sourcesByDate);
     unpricedByHub.set(hubId, hubUnpriced);
   }
-  return { byHubAndDate, unpricedByHub, unpriced, sellFallbackByHubAndDate, sourcesByHubAndDate };
+  return {
+    byHubAndDate,
+    unpricedByHub,
+    unpriced,
+    sellFallbackByHubAndDate,
+    sourcesByHubAndDate,
+    unreachableHubs,
+  };
 }

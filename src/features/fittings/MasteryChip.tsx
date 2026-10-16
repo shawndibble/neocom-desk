@@ -15,8 +15,6 @@ import { Skills } from '@/components/ui/icons';
 import { romanLevel } from '@/engine/projection';
 import type { PlanEntry } from '@/engine/types';
 import { formatCountdown } from '@/lib/duration';
-import { loadMasteries } from '@/sde/loadSde';
-import type { MasteryMap } from '@/sde/types';
 import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
 import { cloneStateFor, useCloneStates } from '@/features/skills/cloneState';
 import { usePlanEditorData } from '@/features/skills/planner/usePlanEditorData';
@@ -32,6 +30,8 @@ import { SkillRow } from '@/features/skills/SkillRow';
 import { TargetPlanPicker } from '@/features/skills/TargetPlanPicker';
 import { targetPlanEntries, useTargetPlan } from '@/features/skills/useTargetPlan';
 import { HeaderBadgeSlot } from './HeaderBadgeSlot';
+import { useRetryFocus } from '@/lib/useRetryFocus';
+import { useMasteries } from './useMasteries';
 
 const TIERS = [0, 1, 2, 3, 4] as const;
 interface MasteryChipProps {
@@ -70,7 +70,14 @@ export function MasteryChip({
   const { t } = useTranslation();
   const dialog = presentation === 'dialog';
   const [open, setOpen] = useState(false);
-  const [masteries, setMasteries] = useState<MasteryMap | null>(null);
+  const masteryState = useMasteries();
+  const masteries = masteryState.status === 'loaded' ? masteryState.masteries : null;
+  const unavailable = masteryState.status === 'unavailable';
+  // Retry stays mounted while it runs; the result takes focus when it replaces the panel.
+  const [focusRef, armFocus] = useRetryFocus<HTMLDivElement>(
+    unavailable ? 'failed' : masteryState.status === 'loaded' ? 'ok' : 'busy',
+    hullTypeId
+  );
   const [tier, setTier] = useState(4);
   const [hideCompleted, setHideCompleted] = useState(false);
   const [added, setAdded] = useState<{
@@ -87,18 +94,13 @@ export function MasteryChip({
   }, [hydrateCloneStates]);
   const cloneState = cloneStateFor(cloneStates, characterId);
 
-  useEffect(() => {
-    // A failed load is treated as no data, so the slot below gives its place up.
-    loadMasteries()
-      .then(setMasteries)
-      .catch(() => setMasteries({}));
-  }, []);
-
   const tiers = masteries?.[String(hullTypeId)];
   const hasData = tiers !== undefined && tiers.some((bundle) => bundle.length > 0);
+  // Unavailable still offers the entry point, so it can say why there is nothing to show.
+  const offered = hasData || unavailable;
   useEffect(() => {
-    onAvailable?.(hasData);
-  }, [hasData, onAvailable]);
+    onAvailable?.(offered);
+  }, [offered, onAvailable]);
 
   const rows = useMemo(() => {
     if (!catalog || !tiers) return null;
@@ -119,10 +121,14 @@ export function MasteryChip({
     );
   }, [catalog, tiers, tier, trainedSkills, attributes, implants, cloneState]);
 
-  if (masteries === null || (hasData && !rows)) return dialog ? null : <HeaderBadgeSlot />;
-  if (!hasData || !rows) return null;
+  if (!unavailable) {
+    if (masteries === null || (hasData && !rows)) return dialog ? null : <HeaderBadgeSlot />;
+    if (!hasData || !rows) return null;
+  }
 
-  const visible = hideCompleted ? rows.filter((row) => row.status !== 'trained') : rows;
+  const visible = hideCompleted
+    ? (rows ?? []).filter((row) => row.status !== 'trained')
+    : (rows ?? []);
   const untrained = visible.filter((row) => row.status !== 'trained');
   const totalSeconds = untrained.reduce((sum, row) => sum + row.seconds, 0);
   const planEntries = targetPlanEntries(target);
@@ -136,7 +142,25 @@ export function MasteryChip({
     setAdded({ planId: result.planId, planName: result.planName, entries: result.added });
   }
 
-  const body = (
+  const unavailableBody = (
+    <div className="space-y-2 text-xs text-text-dim">
+      <p>{t('fittings.mastery.unavailable')}</p>
+      <Button
+        size="sm"
+        loading={masteryState.retrying}
+        onClick={() => {
+          armFocus();
+          masteryState.retry();
+        }}
+      >
+        {t('common.retry')}
+      </Button>
+    </div>
+  );
+
+  const content = unavailable ? (
+    unavailableBody
+  ) : (
     <div className="space-y-2">
       {!dialog && (
         <p className="text-xs font-semibold text-text">
@@ -231,6 +255,12 @@ export function MasteryChip({
           )}
         </div>
       )}
+    </div>
+  );
+
+  const body = (
+    <div ref={focusRef} tabIndex={-1} className="focus:outline-none">
+      {content}
     </div>
   );
 

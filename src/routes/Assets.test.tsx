@@ -57,7 +57,10 @@ vi.mock('@/sde/loadSde', () => ({
 
 // The Move tab reads hull capacities from the Fitting catalogue and the pilot's
 // skills; its own tests (MovePlanTab.test.tsx) cover that, this file only opens the tab.
-vi.mock('@/features/fittings/useFittingCatalogue', () => ({ useFittingCatalogue: () => null }));
+vi.mock('@/features/fittings/useFittingCatalogue', () => ({
+  useFittingCatalogue: () => null,
+  useFittingCatalogueFailed: () => false,
+}));
 vi.mock('@/features/fittings/fittingPilotProfile', () => ({
   usePilotProfile: () => ({ profile: null, failed: false, retry: () => {} }),
 }));
@@ -597,6 +600,26 @@ describe('Assets', () => {
     const user = userEvent.setup();
     render(<App />);
     expect(await screen.findByText(/showing cached data/i)).toBeInTheDocument();
+    await openLocation(user, JITA);
+    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
+  });
+
+  it('keeps the saved assets on screen, with a small log-in note, when the assets grant lapsed over them', async () => {
+    await db.esiCache.put({
+      characterId: CHAR_ID,
+      key: 'assets',
+      value: assetPage1,
+      fetchedAt: STALE_FETCHED_AT,
+    });
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>
+        HttpResponse.json({ error: 'missing scope' }, { status: 403 })
+      )
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    expect(await screen.findByText('Log in again to refresh.')).toBeInTheDocument();
+    expect(screen.queryByText('Log in again to see your assets')).not.toBeInTheDocument();
     await openLocation(user, JITA);
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
   });

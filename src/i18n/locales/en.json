@@ -76,7 +76,13 @@
     "communitiesNewRequests_one": "Communities, {{count}} new Request",
     "communitiesNewRequests_other": "Communities, {{count}} new Requests"
   },
+  "offline": {
+    "banner": "You're offline — showing data saved on this device. Changes sync when you reconnect."
+  },
   "reauth": {
+    "cachedTitle": "Log in again to refresh.",
+    "cachedHint": "EVE access for this data has lapsed, so what's saved on this device is shown.",
+    "cachedAction": "Log in again with EVE Online",
     "navLocked": "Needs a new login",
     "staleGrantTitle": "EVE access was refused",
     "staleGrantHint": "EVE turned down a request for this character's data. If you removed this app's access in EVE's third-party application list, log in again to restore it.",
@@ -102,7 +108,9 @@
     "tree": {
       "loading": "Loading the ship tree…",
       "loadFailed": "Couldn't load the ship tree",
-      "loadFailedHint": "Check your connection, then reload the page.",
+      "loadFailedHint": "Check your connection, then try again.",
+      "loadFailedOffline": "The ship tree isn't downloaded on this device yet. Connect once, then try again.",
+      "masteriesUnavailable": "Mastery badges need data that isn't downloaded on this device yet.",
       "noCharacter": "No character selected — every hull shows as untrained. Log in to see which you can fly.",
       "credit": "Ship tree icons and emblems are EVE Online artwork © CCP hf., copied from the EVE University wiki and the game. EVE Online and the EVE logo are trademarks of CCP hf.",
       "view": {
@@ -206,6 +214,8 @@
         "masteryLevel": "You have Mastery Level {{level}}",
         "masteryLevelNone": "You have no Mastery Level yet",
         "noMasteries": "No Mastery data for this hull.",
+        "masteriesUnavailable": "Mastery data isn't available offline yet. Connect once to load it.",
+        "masteriesLoading": "Loading Mastery data…",
         "tiersLabel": "Mastery tiers",
         "tier": "Tier {{tier}}",
         "tierComplete": "Tier {{tier}}, complete",
@@ -261,6 +271,8 @@
         "invalid": "That link isn't a valid Fitting.",
         "unsupported-version": "That link was made by a newer version of Neocom Desk."
       },
+      "thrownOffline": "Couldn't load this fitting. It needs item data that isn't downloaded on this device yet. Connect once and try again.",
+      "thrownUnknown": "Couldn't load this fitting. Try again.",
       "loadError": {
         "unrecognised": "That isn't something Load can read. Paste EFT fit text, an in-game fitting link or DNA string, an eveship.fit or EVE Workbench fit link, or a zKillboard killmail link.",
         "eve-workbench-not-found": "EVE Workbench has no published fit at that link. It may have been deleted or made private.",
@@ -306,6 +318,11 @@
     "saveToEve": {
       "action": "Save to EVE…",
       "needCharacter": "Log in with a Character to save Fittings to EVE.",
+      "needsConnection": "Needs a connection.",
+      "needsConnectionKeepMine": "Saving to EVE needs a connection. You can still save to My Fittings.",
+      "unconfirmed": "EVE didn't answer in time, so this may not have been saved. Check your In-game Fittings before trying again.",
+      "offlineFailed": "Couldn't reach EVE. Check your connection and try again; nothing was saved.",
+      "saveMineOnlyAction": "Save to My Fittings",
       "title": "Save to EVE",
       "nameLabel": "Name",
       "targetLabel": "Save as",
@@ -334,6 +351,7 @@
     },
     "mastery": {
       "chip": "Mastery",
+      "unavailable": "Mastery data isn't available offline yet. Connect once to load it.",
       "menuItem": "Mastery skills…",
       "tooltip": "{{name}} Mastery — the skills its tiers ask for and how long they take",
       "title": "{{name}} Mastery",
@@ -473,6 +491,9 @@
       "metaAny": "Any meta level",
       "waitingForShipData": "Ship data is still downloading. You can search now; adding, and the hull, resource and skill filters, switch on once it's ready.",
       "loadingCatalogue": "Loading items…",
+      "catalogueOffline": "Item data isn't downloaded on this device yet. Connect once to use the fitting editor.",
+      "catalogueFailed": "Couldn't load the item data.",
+      "shipDataFailed": "Couldn't download the ship data.",
       "noResults": "No matching items.",
       "hiddenByFilters_one": "{{count}} more hidden by filters — show it",
       "hiddenByFilters_other": "{{count}} more hidden by filters — show them",
@@ -839,6 +860,8 @@
       "copied": {
         "shareLink": "Share Link copied — it works for 7 days",
         "permanentLink": "Permanent link copied",
+        "permanentLinkFallback": "Couldn't make the short Share Link, so the permanent link was copied instead.",
+        "permanentLinkOffline": "Offline: permanent link copied instead. The short Share Link needs a connection.",
         "eft": "Fitting copied",
         "multibuy": "Multibuy list copied",
         "multibuyMinusOwned": "Multibuy list copied, minus what you hold in {{station}}"
@@ -851,6 +874,8 @@
     "stats": {
       "error": "Couldn't load ship data for this fit.",
       "errorSkills": "Couldn't load this Character's skills, so the stats can't be worked out.",
+      "skillsUnknown": "Pilot skills unknown: stats assume no skills.",
+      "errorOffline": "Fitting stats need a one-time ~10 MB download. Connect once to enable them.",
       "retry": "Try again",
       "unavailable": "Not available",
       "loadingIndeterminate": "Downloading ship data…",
@@ -1415,6 +1440,7 @@
       "fixErrorsHint": "Fix the Fitting with the error above to see the comparison.",
       "statsFailed": "Couldn't calculate stats",
       "statsFailedHint": "A Fitting's stats couldn't be calculated. Remove it to see the comparison.",
+      "statsOfflineHint": "Fitting stats need a one-time ~10 MB download. Connect once to enable them.",
       "profileFailed": "Couldn't load your pilot's skills and implants, so the comparison can't be calculated.",
       "profileRetry": "Try again",
       "picker": {
@@ -1549,6 +1575,7 @@
     },
     "share": {
       "shareToCommunity": "Share to Community",
+      "needsConnection": "Sharing to a Community needs a connection.",
       "shareTo": "Share to {{community}}",
       "unshareFrom": "Stop sharing in {{community}}",
       "shared": "Shared to {{community}}.",
@@ -1949,6 +1976,8 @@
     }
   },
   "plans": {
+    "catalogFailed": "Couldn't load the skill list",
+    "catalogFailedHint": "The skill data could not be read on this device. Try again.",
     "title": "Skill Plans",
     "create": "New plan",
     "newPlanOptions": "More ways to start a plan",
@@ -2364,6 +2393,9 @@
     "differingOnlyEmptyHint": "No differing skills — the compared characters match on everything trained."
   },
   "industry": {
+    "catalogUnavailable": "Blueprint data couldn't load",
+    "catalogUnavailableOwnedHint": "Your blueprints loaded, but they need the blueprint catalog to show. Connect once to download it. We'll try again when you're back online.",
+    "marketWideTreesUnavailable": "Market-wide build data hasn't been downloaded yet",
     "csvCharacter": "Character",
     "csvAvgMarginPct": "Avg margin (%)",
     "csvMarginPct": "Margin (%)",
@@ -2670,6 +2702,7 @@
     "pricesLoading": "Fetching prices…",
     "pricesUnavailableTitle": "Price data unavailable",
     "pricesUnavailableHint": "Couldn't load total job cost, profit, and the build-vs-buy verdict yet. Try again shortly. Materials and time above don't need it.",
+    "pricesUnavailableOfflineHint": "Recipes, materials and times are still shown; costs and profit need live market prices.",
     "unpricedMaterialsWarning": "{{count}} material(s) have no price on the chosen side of the market; totals below are underestimated.",
     "productUnpriced": "{{name}} has no hub sell price; no build-vs-buy verdict.",
     "acquisitionVerdictLabel": "Acquisition Verdict",
@@ -3916,6 +3949,8 @@
       "industryRunning_other": "{{count}} running",
       "industryIdle": "Nothing running",
       "ordersClear": "Nothing needs work",
+      "ordersNotChecked_one": "{{count}} order not checked for competition",
+      "ordersNotChecked_other": "{{count}} orders not checked for competition",
       "miningUnpaid": "{{isk}} unpaid",
       "miningUnassigned_one": "{{count}} entry unassigned",
       "miningUnassigned_other": "{{count}} entries unassigned",
@@ -3958,6 +3993,7 @@
         "listSummary": "{{note}}: {{items}}. Switch to Table for the figures.",
         "ordersStates": {
           "healthy": "Healthy",
+          "notChecked": "Not checked",
           "undercut": "Undercut",
           "outbid": "Outbid",
           "expiring": "Expiring",
@@ -4254,6 +4290,8 @@
         "description": "How many of your orders have been undercut",
         "empty": "You have no open orders.",
         "listed": "{{isk}} ISK listed",
+        "notChecked_one": "{{count}} order not checked",
+        "notChecked_other": "{{count}} orders not checked",
         "expired": "Expired",
         "stationUnknown": "Structure",
         "sideBuy": "Buy",
@@ -4922,7 +4960,10 @@
     }
   },
   "common": {
+    "needsConnection": "Needs a connection",
     "opensInNewTab": "(opens in a new tab)",
+    "pricesUnavailableOffline": "Prices unavailable offline",
+    "pricesUnavailable": "Prices unavailable right now",
     "iskAmountHint": "= {{amount}} ISK",
     "iskInvalid": "Not an ISK amount. Try 1.5b, 500m or 1,000,000.",
     "unknownType": "Type {{id}}",
@@ -4968,6 +5009,8 @@
     "loadFailedTitle": "Could not load",
     "loadFailedHint": "Something went wrong fetching this. Try Refresh.",
     "retry": "Try again",
+    "loadFailedRetryHint": "Something went wrong loading this. Try again.",
+    "connectOnceHint": "This is downloaded the first time it's needed. Connect once and it will be kept on this device. We'll try again when you're back online.",
     "spaceOption": {
       "highsec": "Highsec",
       "lowsec": "Lowsec",
@@ -5457,6 +5500,10 @@
     "ignoreOreAction": "Ignore",
     "unpricedTitle": "Some ore could not be priced",
     "unpricedAtHub": "{{hub}} has no buy orders for {{types}}.",
+    "unpricedOfflineAtHub": "No price could be loaded at {{hub}} for {{types}}.",
+    "unpricedOfflineHint": "Until prices load, lines billed to a payee without a saved price are valued at 0 ISK, understating the tax owed. Values update when you're back online.",
+    "assignUnpricedOfflineWarning": "Prices couldn't be loaded, so {{types}} is valued at 0 ISK, not because it's worthless. Type a value yourself, or assign anyway to save 0 ISK.",
+    "assignAnywayAction": "Assign anyway",
     "pricingGapEntries": "Open the entry to set its value by hand:",
     "pricingGapEntry": "{{date}} · {{system}} — {{types}}",
     "sellFallbackTitle": "Some ore priced at today's sell",
@@ -5581,6 +5628,7 @@
       "rawSellValue": "Raw sell value",
       "refineValue": "Refined value",
       "refineValueShort": "Refined",
+      "refiningUnavailable": "Refined values are unavailable: the reprocessing data isn't downloaded yet. Connect once to see them.",
       "oreBreakdownColumn": "Ore breakdown",
       "unitsColumn": "Units",
       "pricingColumn": "Pricing",
@@ -5966,6 +6014,8 @@
       "tripCount_one": "{{count}} trip",
       "tripCount_other": "{{count}} trips",
       "noHauler": "No hauler you can fly could be sized for this load.",
+      "haulerSizingLoading": "Hauler data is still loading. Show the plan again in a moment.",
+      "haulerSizingUnavailable": "Hauler sizing needs data that isn't downloaded yet, or your skills couldn't be read. Connect once, then plan again.",
       "routeSafety": "Route Safety",
       "volumeUnknown": "volume unknown",
       "flyIt": "Fly it",
@@ -6169,6 +6219,8 @@
       "menu": "What to do with this ore",
       "title": "What to do with {{name}} (x{{count}})",
       "loading": "Pricing this ore…",
+      "loadFailed": "Reprocessing data isn't downloaded yet",
+      "loadFailedGeneric": "Couldn't price this ore",
       "noRecipe": "This item does not refine into anything.",
       "sellRawCard": "Sell raw",
       "sellRawHint": "{{hub}} buy price, less sales tax",
@@ -7445,8 +7497,8 @@
     "esiFailedTitle": "ESI didn't answer",
     "esiFailedHint": "Your colonies could not be read, so this is not a sign you have none. Nothing is cached yet.",
     "esiRetry": "Retry",
-    "pricesFailedTitle": "Hub prices could not be fetched",
     "pricesFailedHint": "Figures that need them, ISK and haul volume, are hidden until they load. Check your connection, then refresh.",
+    "pricesFailedOfflineHint": "Figures that need them, ISK and haul volume, are hidden until you're back online.",
     "loadFailedTitle": "The planner could not load",
     "loadFailedHint": "Your colonies or planetary schematics failed to load. Refresh to try again.",
     "planFailedTitle": "No plan for these goals",
@@ -7707,6 +7759,7 @@
       "commandCenter": "Command Center",
       "free": "Free: {{cpu}} tf CPU, {{power}} MW power. Links between buildings use a little more.",
       "loadUnknown": "Load can't be read for this colony yet.",
+      "linkLoadUnknown": "Link CPU/PG unknown — planet data not downloaded yet. The figures above leave the links out, so they read low.",
       "launchpad": "Launchpad",
       "capacity": "{{m3}} m³",
       "used": "Used",
@@ -8727,6 +8780,7 @@
     "reauthAction": "Log in again with EVE Online"
   },
   "loyaltyStore": {
+    "catalogUnavailable": "Blueprint data couldn't load, so blueprint offers show no build-versus-buy figures. Connect once to get them.",
     "csvIskCost": "ISK cost",
     "csvLpCost": "LP cost",
     "title": "LP Store",
@@ -9198,6 +9252,7 @@
     "backToFinder": "Back",
     "loadFailedTitle": "Couldn't load the market catalogue",
     "loadFailedHint": "Press Refresh to try again.",
+    "loadFailedOfflineHint": "The market catalogue needs a one-time download. Connect once and it will load by itself.",
     "sell": "Sell Orders",
     "buy": "Buy Orders",
     "emptySellTitle": "No sell orders",
@@ -9831,7 +9886,10 @@
         "topBidAction": "Nothing. This one is doing fine.",
         "noCostBasis": "No cost basis",
         "noCostBasisHelp": "Nothing is linked to this order and your wallet buys don't cover it, so we can't work out your lowest safe price.",
-        "noCostBasisAction": "Link the build that made this, or let your wallet cover every unit. A build needs a build plan on the Industry page first."
+        "noCostBasisAction": "Link the build that made this, or let your wallet cover every unit. A build needs a build plan on the Industry page first.",
+        "notChecked": "Not checked",
+        "notCheckedHelp": "Market prices couldn't be loaded (prices unavailable offline), so we can't say whether anyone beats this order.",
+        "notCheckedAction": "Nothing to do. It is checked again when prices load."
       },
       "legendTitle": "What the badges mean",
       "legendOpen": "What do these badges mean?",
@@ -9878,7 +9936,9 @@
         "outbid": "Outbid buy order",
         "outbidHint": "Someone bids higher on your buy order, so sellers go to them first.",
         "healthy": "Healthy",
-        "healthyHint": "Nothing wrong here. Nobody beats your price."
+        "healthyHint": "Nothing wrong here. Nobody beats your price.",
+        "notChecked": "Not checked",
+        "notCheckedHint": "Market prices couldn't be loaded, so we can't say whether anyone beats these. They are checked again when prices load."
       },
       "floorLabel": "Never sell below",
       "floorHelp": "Change an order's price and you pay the broker fee all over again (discounted by your Relist Discount), so this is the lowest price worth editing to. Leave the order alone and it sells, the fee is already paid, so you break even a little lower.",
@@ -10140,6 +10200,7 @@
     "invalidHint": "The link may be corrupted, incomplete, or built by a newer version of Neocom Desk. Ask whoever sent it to share it again.",
     "loadFailedTitle": "Could not load this fitting",
     "loadFailedHint": "Something went wrong working out its stats. Try again.",
+    "loadFailedOffline": "This device hasn't downloaded the data to open it yet. Connect once, then try again.",
     "moduleListTitle": "Modules",
     "expiresLabel": "Expires",
     "copyEft": "Copy Fitting",
@@ -10850,6 +10911,7 @@
     "loadingGroup": "Searching…",
     "groupCapped": "Top {{count}} shown. Keep typing to narrow.",
     "groupError": "Couldn't load these results.",
+    "itemSearchNeedsDownload": "Item search needs a one-time download — connect once.",
     "resultsCount_one": "{{count}} result",
     "resultsCount_other": "{{count}} results",
     "activeCharacter": "Active",
@@ -10896,6 +10958,7 @@
     "pasteTitle": "Paste anywhere",
     "pasteHint": "Outside a text field, a pasted fit, blueprint list, skill plan, item list (inventory, cargo or contract), Local list or D-Scan opens where it belongs. Back returns you where you were.",
     "paste": "Paste",
+    "pasteOffline": "Couldn't read that paste offline — item data isn't downloaded yet.",
     "pasteDestinations": {
       "survey": {
         "label": "Survey scan",
@@ -10961,6 +11024,8 @@
     "emptyHint": "Data ages appear here once the app fetches something from EVE's servers."
   },
   "corp": {
+    "rolesUnavailable": "Can't check your corporation roles right now",
+    "rolesUnavailableHint": "Neocom Desk reads your roles from EVE, and none are saved on this device yet. Try again, or connect if you're offline. It will retry when you're back online.",
     "title": "Corporation",
     "overviewTab": "Overview",
     "membersTab": "Members",
@@ -12395,6 +12460,8 @@
         "stateFocus": "Focus-visible",
         "stateHighlighted": "Highlighted option",
         "stateDisabled": "Disabled",
+        "offlineStrip": "Slim strip with a cloud-slash glyph: you're offline, saved data below",
+        "needsConnection": "Dimmed login control with a \"Needs a connection\" tooltip",
         "stateLoading": "Loading (Button loading)",
         "stateSelected": "Selected / on (aria-pressed)",
         "stateSelectedSegment": "Selected segment",
@@ -12414,6 +12481,8 @@
         "highlighted": "Open any menu or picker with the keyboard and press ArrowDown: 2px accent outline inside the option, shown here whenever the last input was the keyboard. A pointer keeps only the fill.",
         "focus": "Press Tab: 2px accent outline, outset on boxed controls and inline links.",
         "disabled": "opacity-40. aria-disabled keeps the tooltip reachable.",
+        "offlineStrip": "In flow at the top of the page, never fixed. Polite live region; gone on reconnect.",
+        "needsConnection": "Wrap any control that starts EVE's login in NeedsConnection: offline, the press would strand an installed app.",
         "selectedToggle": "On takes the accent tint.",
         "selectedSegment": "Selected takes the accent tint and a 2px accent underline.",
         "fieldCaret": "The box is a control (§6); the caret says it opens a list."
@@ -12468,6 +12537,8 @@
         "boxed": "Boxed control",
         "disabled": "Disabled",
         "ariaDisabled": "aria-disabled",
+        "signIn": "Log in with EVE",
+        "signInOffline": "Log in with EVE (offline)",
         "saving": "Saving",
         "toggleOn": "Toggle on",
         "toggleOff": "Toggle off",
@@ -12568,6 +12639,8 @@
       "seedHint": "Each starts with its current listed amount as its stock target. Change any of them afterwards."
     },
     "add": {
+      "searchUnavailable": "Item search needs a one-time download. Connect once to use it.",
+      "pasteUnavailable": "Item names need a one-time download before a list can be matched. Connect once to use this.",
       "open": "Add items…",
       "label": "One item per line, with how many to keep listed",
       "placeholder": "Catalyst 40\nAntimatter Charge M x 20000\nNanite Repair Paste\t1500",

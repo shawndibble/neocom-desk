@@ -23,12 +23,15 @@ import {
   EmptyState,
   IconButton,
   IskAmount,
+  LiveStatus,
+  NeedsConnection,
   PageHeader,
   Panel,
   Spinner,
   type DataTableColumn,
   TabPanel,
 } from '@/components/ui';
+import { onReconnect } from '@/stores/network';
 import { HintText } from '@/components/ui/HintText';
 import * as Icon from '@/components/ui/icons';
 import { TableActionsMenu } from '@/components/ui/TableExport';
@@ -206,7 +209,16 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
 
   const characters = data?.characters ?? [];
   const showCharacterColumn = characters.length > 1;
-  const availableColumnIds = availableOverviewColumns(showRefining, showCharacterColumn);
+  // The reprocessing recipes are a lazy download: when they couldn't load, the
+  // refined side is left out and said to be unavailable rather than shown as zero.
+  const refiningUnavailable = showRefining && (data?.refiningUnavailable ?? false);
+  const refining = showRefining && !refiningUnavailable;
+  // The recipes are fetched again, and the refined side restored, when the connection returns.
+  useEffect(
+    () => (refiningUnavailable ? onReconnect(refresh) : undefined),
+    [refiningUnavailable, refresh]
+  );
+  const availableColumnIds = availableOverviewColumns(refining, showCharacterColumn);
   // `id` is already known available here, so this is just "is it checked" —
   // `visibleAvailableColumns` (below, `handleToggleColumn`'s own
   // zero-columns guard) is for narrowing the *raw stored* list, which can
@@ -221,7 +233,7 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
     // A table with zero *rendered* columns (besides the locked Date one) is
     // as good as no picker at all — guard against the filtered/available
     // count, same as Characters' table-view picker.
-    if (visibleAvailableColumns(next, showRefining, showCharacterColumn).length === 0) return;
+    if (visibleAvailableColumns(next, refining, showCharacterColumn).length === 0) return;
     void setVisibleColumns(next);
   }
 
@@ -257,11 +269,11 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
   // Each row refines under its own Character's modifiers, so the implant
   // note is per Character too — one for each shown miner lacking the grant.
   const refiningCharacters = useMemo(() => {
-    if (!showRefining) return [];
+    if (!refining) return [];
     const byId = new Map<number, string>();
     for (const row of visibleRows) byId.set(row.characterId, row.characterName);
     return [...byId].map(([characterId, characterName]) => ({ characterId, characterName }));
-  }, [showRefining, visibleRows]);
+  }, [refining, visibleRows]);
   const coverage = useMemo(() => {
     let oldestSaved: string | null = null;
     for (const row of characterRows) {
@@ -502,12 +514,12 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
     () =>
       yieldOverviewCsvColumns(t, {
         showCharacter: showCharacterColumn,
-        showRefining,
+        showRefining: refining,
         systemNames: data?.systemNames ?? new Map(),
         typeNames: data?.typeNames ?? new Map(),
         typeVolumes: data?.typeVolumes ?? new Map(),
       }),
-    [t, showCharacterColumn, showRefining, data]
+    [t, showCharacterColumn, refining, data]
   );
   const overviewExport = useTableExport({
     surface: 'mining-overview',
@@ -600,6 +612,14 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
               <p className="text-[0.6875rem] text-warning uppercase">{t('common.offlineTitle')}</p>
             )}
 
+            {refiningUnavailable && (
+              <p className="text-xs text-warning">{t('miningTax.overview.refiningUnavailable')}</p>
+            )}
+            {/* Always mounted, so the note is announced when it appears (DESIGN.md §7). */}
+            <LiveStatus>
+              {refiningUnavailable ? t('miningTax.overview.refiningUnavailable') : null}
+            </LiveStatus>
+
             {data && data.reauthCharacters.length > 0 && (
               <div
                 role="alert"
@@ -612,12 +632,14 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
                       <span>
                         {t('miningTax.reauthCharacterHint', { character: c.characterName })}
                       </span>
-                      <Button
-                        size="sm"
-                        onClick={() => void beginGrant(c.characterId, ['getCharacterMining'])}
-                      >
-                        {t('miningTax.reauthAction')}
-                      </Button>
+                      <NeedsConnection>
+                        <Button
+                          size="sm"
+                          onClick={() => void beginGrant(c.characterId, ['getCharacterMining'])}
+                        >
+                          {t('miningTax.reauthAction')}
+                        </Button>
+                      </NeedsConnection>
                     </li>
                   ))}
                 </ul>
@@ -656,7 +678,7 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
                     <p className="mt-1 text-xl font-semibold tabular-nums">
                       <IskAmount value={totals.rawValue} decimals={0} />
                     </p>
-                    {showRefining && (
+                    {refining && (
                       <p className="text-[0.6875rem] text-text-dim">
                         {t('miningTax.overview.totalValueRefinedSubtitle')}{' '}
                         <IskAmount value={totals.refineValue} decimals={0} />
@@ -739,7 +761,7 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
                     typeComparison={typeComparison}
                     typeVolumeComparison={typeVolumeComparisonPoints}
                     typeCountComparison={typeCountComparisonPoints}
-                    showRefining={showRefining}
+                    showRefining={refining}
                   />
                 </Suspense>
 
@@ -793,7 +815,7 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
             systemSecurity={data?.systemSecurity.get(detailRow.entry.solarSystemId) ?? null}
             typeNames={data?.typeNames ?? new Map()}
             typeVolumes={data?.typeVolumes ?? new Map()}
-            showRefining={showRefining}
+            showRefining={refining}
           />
         )}
       </TabPanel>

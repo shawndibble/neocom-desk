@@ -19,6 +19,8 @@ vi.mocked(useCorpAccess).mockReturnValue({
   capabilities: NO_CORP_CAPABILITIES,
   missingScopes: [],
   roles: [],
+  readFailed: false,
+  retry: () => {},
 });
 
 import { IDLE_SYNC_STATUS } from '@/sync/statusFixtures';

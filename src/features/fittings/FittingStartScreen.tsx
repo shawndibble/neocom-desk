@@ -29,7 +29,7 @@ import { filterMyFittings, groupByHull } from '@/engine/fittings/myFittings';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
-import { loadDogmaEngine } from './dogmaFittingEngine';
+import { warmDogmaEngine } from './dogmaFittingEngine';
 import { FittingPreview } from './FittingPreview';
 import { ImportFittingCard, ImportFittingDialog, NewFromHullDialog } from './FittingStartDialogs';
 import { setFittingNotes } from './myFittings';
@@ -140,9 +140,7 @@ export function FittingStartScreen({
   // Start the ship data downloading now, so a hull opened from here shows
   // its slots at once rather than after the first cold download.
   useEffect(() => {
-    void loadDogmaEngine().catch(() => {
-      // Stats report their own failure once a Fitting is open.
-    });
+    warmDogmaEngine();
   }, []);
 
   const saved = useSavedFittings(characterId);
