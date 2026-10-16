@@ -136,7 +136,9 @@ function FittingsPage() {
   // Opening Fittings online is intent to use it offline later: fetch the
   // engine now instead of waiting for the idle warm (gated inside).
   useEffect(() => {
-    void import('@/sde/warmLazySde').then(({ warmFittingAssets }) => warmFittingAssets());
+    void import('@/sde/warmLazySde')
+      .then(({ warmFittingAssets }) => warmFittingAssets())
+      .catch(() => {});
   }, []);
   const navigate = useNavigate();
   const location = useLocation();
