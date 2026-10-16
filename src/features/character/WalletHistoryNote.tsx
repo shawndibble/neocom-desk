@@ -1,58 +1,60 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button } from '@/components/ui/Button';
+import { FilterChip } from '@/components/ui/FilterChip';
+import { utcDay } from '@/engine/netWorth/snapshot';
+import { ARCHIVE_DAYS } from '@/engine/wallet/archiveCoverage';
 import type { WalletArchiveInfo } from '@/features/character/walletArchive';
 import type { WalletJournalFilter } from '@/features/character/walletJournalFilter';
-
-const DAY_MS = 86_400_000;
-
-function isoDay(ms: number): string {
-  return new Date(ms).toISOString().slice(0, 10);
-}
+import { DAY_MS } from '@/lib/age';
 
 /**
- * The Journal's archive line (issue #3909): how far back the device holds
- * history, any stretch it never saw, and 90-day / 1-year range shortcuts once
- * the archive reaches that far. Renders nothing before the first full fetch.
+ * The Journal's archive line: how far back the device holds history, any
+ * stretch it never saw, and 90-day / 1-year range shortcuts once the archive
+ * reaches that far. Renders nothing before the first stored row.
  */
 export function WalletHistoryNote({
   info,
   filter,
   onFilterChange,
-  nowMs,
 }: {
   info: WalletArchiveInfo | undefined;
   filter: WalletJournalFilter;
   onFilterChange: (next: WalletJournalFilter) => void;
-  nowMs?: number;
 }) {
   const { t } = useTranslation();
-  const [now] = useState(() => nowMs ?? Date.now());
-  if (!info || info.since === null) return null;
+  const [now] = useState(() => Date.now());
+  if (!info || (info.since === null && !info.unconfirmed)) return null;
   return (
     <div className="px-3 pt-2 text-[0.6875rem] text-text-dim">
       <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        <span>{t('wallet.history.since', { date: isoDay(info.since) })}</span>
+        <span>
+          {info.since === null
+            ? t('wallet.history.unconfirmed')
+            : t('wallet.history.since', { date: utcDay(info.since) })}
+        </span>
         {info.ranges.map((days) => {
-          const startDate = isoDay(now - days * DAY_MS);
-          const active = filter.startDate === startDate && filter.endDate === null;
+          const startDate = utcDay(now - days * DAY_MS);
           return (
-            <Button
+            <FilterChip
               key={days}
-              size="sm"
-              variant={active ? 'accent' : 'ghost'}
-              aria-pressed={active}
-              onClick={() => onFilterChange({ ...filter, startDate, endDate: null })}
-            >
-              {t(days === 365 ? 'wallet.history.range1y' : 'wallet.history.rangeDays', { days })}
-            </Button>
+              label={t(
+                days === ARCHIVE_DAYS ? 'wallet.history.range1y' : 'wallet.history.rangeDays',
+                {
+                  days,
+                }
+              )}
+              selected={filter.startDate === startDate && filter.endDate === null}
+              onToggle={() => onFilterChange({ ...filter, startDate, endDate: null })}
+            />
           );
         })}
       </p>
       {info.gaps.length > 0 && (
         <p className="text-warning">
           {t('wallet.history.gap', {
-            ranges: info.gaps.map(([from, to]) => `${isoDay(from)} – ${isoDay(to)}`).join(', '),
+            ranges: info.gaps.map(([from, to]) =>
+              t('wallet.history.gapRange', { from: utcDay(from), to: utcDay(to) })
+            ),
           })}
         </p>
       )}

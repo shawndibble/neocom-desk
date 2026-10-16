@@ -200,6 +200,7 @@ export interface RetentionGroup {
  * How long each kind of data is kept, on this device and on the server. Like
  * the store groups above, a user-facing commitment: the numbers mirror the
  * code that enforces them (`engine/miningTax/ledgerHistory.ts`,
+ * `engine/wallet/archiveCoverage.ts`,
  * `esi/cachePrune.ts`, `features/notifications/feed.ts`, `sync/merge.ts`,
  * `functions/src/purgeStaleAccounts.ts`, `functions/src/communityRequests.ts`,
  * `features/share/shareStore.ts`),

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   ARCHIVE_DAYS,
+  ESI_WALLET_CACHE_MS,
   ESI_WALLET_WINDOW_DAYS,
   addCoverage,
   archiveGaps,
@@ -14,9 +15,10 @@ const NOW = Date.UTC(2026, 9, 16, 12);
 
 describe('fetchWindow', () => {
   it('covers ESI window back from the fetch when the list is complete', () => {
+    const end = NOW - ESI_WALLET_CACHE_MS;
     expect(fetchWindow({ fetchedAt: NOW, truncated: false, oldestEntryMs: null })).toEqual([
-      NOW - ESI_WALLET_WINDOW_DAYS * DAY,
-      NOW,
+      end - ESI_WALLET_WINDOW_DAYS * DAY,
+      end,
     ]);
   });
   it('reaches the oldest entry when it is older than the window', () => {
@@ -32,7 +34,7 @@ describe('fetchWindow', () => {
     const old = NOW - 3 * DAY;
     expect(
       fetchWindow({ fetchedAt: NOW, truncated: true, oldestEntryMs: old, cursor: true })
-    ).toEqual([old, NOW]);
+    ).toEqual([old, NOW - ESI_WALLET_CACHE_MS]);
   });
   it('covers nothing for a truncated cursor walk with no rows', () => {
     expect(
@@ -80,6 +82,11 @@ describe('archive reach', () => {
   it('since is the start of the earliest window', () => {
     expect(archiveSince(cov)).toBe(NOW - 100 * DAY);
     expect(archiveSince([])).toBeNull();
+  });
+  it('adds the stretch since the last window once it is older than the cache age', () => {
+    const last = NOW - 3 * DAY;
+    expect(archiveGaps([[last - 10 * DAY, last]], NOW)).toEqual([[last, NOW]]);
+    expect(archiveGaps([[NOW - 10 * DAY, NOW - ESI_WALLET_CACHE_MS]], NOW)).toEqual([]);
   });
   it('lists the uncovered stretch between windows', () => {
     expect(archiveGaps(cov)).toEqual([[NOW - 70 * DAY, NOW - 30 * DAY]]);

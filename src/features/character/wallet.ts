@@ -21,8 +21,7 @@ import { db } from '@/db';
 import { ESI_REGISTRY } from '@/esi/registry';
 import { fanOutAllCharacters } from '@/features/character/allCharactersFanOut';
 import {
-  archiveJournal,
-  archiveTransactions,
+  archiveResult,
   journalWithArchive,
   transactionsWithArchive,
 } from '@/features/character/walletArchive';
@@ -113,18 +112,16 @@ export function totalWalletBalance(entries: readonly CharacterWalletBalance[]): 
 }
 
 /** Journal. `truncated` on the result means pages were missing. */
-export function loadWalletJournal(
+export async function loadWalletJournal(
   characterId: number
 ): Promise<CachedResult<WalletJournalEntry[]> | null> {
   const { fetchLive, conditional } = conditionalPagedFetch((options) =>
     getCharacterWalletJournal(characterId, options)
   );
-  return loadPaginatedWithCache(characterId, KEYS.journal, fetchLive, { conditional }).then(
-    async (result) => {
-      await archiveJournal(characterId, result);
-      return result;
-    }
-  );
+  const result = await loadPaginatedWithCache(characterId, KEYS.journal, fetchLive, {
+    conditional,
+  });
+  return archiveResult('journal', characterId, result);
 }
 
 /**
@@ -143,12 +140,12 @@ export async function loadWalletJournalWithStatus(
     conditional,
   });
   // The poll domain loads through here too, so background polls feed the archive.
-  await archiveJournal(characterId, status.cached);
+  await archiveResult('journal', characterId, status.cached);
   return status;
 }
 
 /**
- * The Journal page's read (issue #3909): the live fetch plus archived entries
+ * The Journal page's read: the live fetch plus archived entries
  * ESI no longer returns. Kept apart from `loadWalletJournalWithStatus`, whose
  * other readers (the poller's snapshot) want only ESI's current window.
  */
@@ -172,11 +169,11 @@ export async function loadWalletTransactions(
   const result = await loadPaginatedWithCache(characterId, KEYS.transactions, () =>
     getCharacterWalletTransactions(characterId)
   );
-  await archiveTransactions(characterId, result);
+  await archiveResult('transactions', characterId, result);
   return result && { ...result, data: uniqueTransactions(result.data) };
 }
 
-/** Transactions plus archived ones ESI no longer returns (issue #3909). */
+/** Transactions plus archived ones ESI no longer returns. */
 export async function loadWalletTransactionsHistory(
   characterId: number
 ): Promise<CachedResult<WalletTransaction[]> | null> {
@@ -198,7 +195,7 @@ export async function loadWalletTransactionsWithStatus(
     KEYS.transactions,
     () => getCharacterWalletTransactions(characterId)
   );
-  await archiveTransactions(characterId, cached);
+  await archiveResult('transactions', characterId, cached);
   return {
     cached: cached && { ...cached, data: uniqueTransactions(cached.data) },
     needsReauth,

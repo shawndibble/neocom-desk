@@ -112,7 +112,7 @@ interface Snapshot {
   journalNeedsReauth: boolean;
   /** Fewer pages came back than ESI advertised — the list below is partial. */
   journalTruncated: boolean;
-  /** What the device-kept history reaches back to (issue #3909). */
+  /** What the device-kept history reaches back to. */
   archive: WalletArchiveInfo;
   loyaltyResult: CachedResult<CharacterLoyaltyPoints[]> | null;
   /** 401/403 (or a failed token refresh) means "log in again", not "offline". */

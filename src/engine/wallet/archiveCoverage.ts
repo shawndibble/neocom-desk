@@ -1,17 +1,19 @@
 /**
- * Which stretch of time the local wallet archive (issue #3909) actually
+ * Which stretch of time the local wallet archive actually
  * covers. ESI serves ~30 days of journal; every complete fetch proves its
  * window was seen, and windows are kept as merged intervals so a gap left by
  * an app that stayed closed 30+ days shows as a gap, not as a silent zero.
  * Pure: times are epoch ms.
  */
 
+import { DAY_MS } from '@/lib/age';
+
 export const ARCHIVE_DAYS = 365;
 export const ESI_WALLET_WINDOW_DAYS = 30;
+/** ESI may serve a wallet list cached up to this long, so a fetch proves nothing newer. */
+export const ESI_WALLET_CACHE_MS = 3_600_000;
 /** Journal date-range presets, in days, offered once coverage reaches back that far. */
 export const ARCHIVE_RANGE_DAYS = [90, ARCHIVE_DAYS] as const;
-
-const DAY_MS = 86_400_000;
 
 /** `[fromMs, toMs]`, inclusive. */
 export type CoverageWindow = readonly [number, number];
@@ -32,13 +34,15 @@ export interface FetchWindowInput {
  * unknown); a truncated cursor walk covers back to its oldest row.
  */
 export function fetchWindow(input: FetchWindowInput): CoverageWindow | null {
-  const { fetchedAt, truncated, oldestEntryMs, cursor } = input;
+  const { truncated, oldestEntryMs, cursor } = input;
+  // No Last-Modified reaches the loaders, so assume the worst cache age.
+  const end = input.fetchedAt - ESI_WALLET_CACHE_MS;
   if (truncated) {
     if (!cursor || oldestEntryMs === null) return null;
-    return [Math.min(oldestEntryMs, fetchedAt), fetchedAt];
+    return [Math.min(oldestEntryMs, end), end];
   }
-  const start = fetchedAt - ESI_WALLET_WINDOW_DAYS * DAY_MS;
-  return [oldestEntryMs === null ? start : Math.min(start, oldestEntryMs), fetchedAt];
+  const start = end - ESI_WALLET_WINDOW_DAYS * DAY_MS;
+  return [oldestEntryMs === null ? start : Math.min(start, oldestEntryMs), end];
 }
 
 /** `windows` plus `added`, merged, clipped to the last 365 days before `nowMs`. */
@@ -66,12 +70,24 @@ export function archiveSince(windows: readonly CoverageWindow[]): number | null 
   return windows.length === 0 ? null : Math.min(...windows.map(([from]) => from));
 }
 
-/** Uncovered stretches between covered windows. */
-export function archiveGaps(windows: readonly CoverageWindow[]): Array<[number, number]> {
+/**
+ * Uncovered stretches between covered windows. With `nowMs`, also the stretch
+ * since the last window when it is older than the cache age: later fetches
+ * all failed a page, so that time was never seen.
+ */
+export function archiveGaps(
+  windows: readonly CoverageWindow[],
+  nowMs?: number
+): Array<[number, number]> {
   const sorted = [...windows].sort((a, b) => a[0] - b[0]);
   const gaps: Array<[number, number]> = [];
   for (let i = 1; i < sorted.length; i += 1) {
     if (sorted[i][0] > sorted[i - 1][1]) gaps.push([sorted[i - 1][1], sorted[i][0]]);
+  }
+  if (nowMs !== undefined && sorted.length > 0) {
+    // A window ends one cache age before its fetch, so a fresh one is already that old.
+    const end = Math.max(...sorted.map(([, to]) => to));
+    if (nowMs - end > 2 * ESI_WALLET_CACHE_MS) gaps.push([end, nowMs]);
   }
   return gaps;
 }

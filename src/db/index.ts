@@ -1038,7 +1038,7 @@ export interface MiningLedgerHistoryRecord {
 }
 
 /**
- * One wallet journal entry kept past ESI's 30-day window (issue #3909), up to
+ * One wallet journal entry kept past ESI's 30-day window, up to
  * 365 days. A row per ESI entry id per Character, upserted by every journal
  * fetch. Own table, not an `esiCache` row: that row is replaced whole on each
  * fetch and wiped by "clear cache". Device-local, not synced, not in the backup.
@@ -1048,6 +1048,8 @@ export type WalletJournalArchiveRecord = WalletJournalEntry & { characterId: num
 /** One wallet transaction kept the same way as `WalletJournalArchiveRecord`. */
 export type WalletTransactionArchiveRecord = WalletTransaction & { characterId: number };
 
+export type ArchiveKind = 'journal' | 'transactions';
+
 /**
  * Which windows of a Character's wallet history the archive has seen in full
  * (`engine/wallet/archiveCoverage.ts`), so the Journal can show its real
@@ -1055,9 +1057,11 @@ export type WalletTransactionArchiveRecord = WalletTransaction & { characterId: 
  */
 export interface WalletArchiveCoverageRecord {
   characterId: number;
-  kind: 'journal' | 'transactions';
+  kind: ArchiveKind;
   /** Merged `[fromMs, toMs]` windows, oldest first. */
   windows: Array<[number, number]>;
+  /** `fetchedAt` of the newest result archived; an unchanged cached result is not re-written. */
+  archivedAt?: number;
 }
 
 /**
@@ -1130,7 +1134,7 @@ export const db = new Dexie('neocom') as Dexie & {
   miningLedgerHistory: EntityTable<MiningLedgerHistoryRecord, 'characterId'>;
   walletJournalArchive: Dexie.Table<WalletJournalArchiveRecord, [number, number]>;
   walletTransactionArchive: Dexie.Table<WalletTransactionArchiveRecord, [number, number]>;
-  walletArchiveCoverage: Dexie.Table<WalletArchiveCoverageRecord, [number, string]>;
+  walletArchiveCoverage: Dexie.Table<WalletArchiveCoverageRecord, [number, ArchiveKind]>;
   industryJobHistory: EntityTable<IndustryJobHistoryRecord, 'characterId'>;
   netWorthSnapshots: EntityTable<NetWorthSnapshotRecord, 'id'>;
   jitaPriceSnapshots: EntityTable<JitaPriceSnapshotRecord, 'date'>;
@@ -1657,7 +1661,7 @@ db.version(23).stores({
   productionLosses: 'id, characterId, runId',
 });
 
-// Adds the wallet journal and transaction archives and their coverage (issue #3909).
+// Adds the wallet journal and transaction archives and their coverage.
 db.version(24).stores({
   characters: 'characterId, corporationId',
   tokens: 'characterId',
