@@ -52,4 +52,27 @@ describe('AbyssalRunPlanner', () => {
     expect(await screen.findByText(/EHP/)).toBeTruthy();
     expect(compare).toHaveBeenCalledWith(47382);
   });
+
+  it('says so when the engine fails, rather than working forever', async () => {
+    useAbyssalWeather.setState({ weatherTypeId: 47382 });
+    const user = setup(26, vi.fn().mockRejectedValue(new Error('offline')));
+    await user.click(screen.getByRole('button', { name: /Plan an Abyssal run/ }));
+    expect(await screen.findByText(/Couldn't work out this fit/)).toBeTruthy();
+  });
+
+  it('offers no filament to a hull that can not enter, and warns below 0.5', async () => {
+    useAbyssalWeather.setState({ weatherTypeId: 47382 });
+    useAbyssalRunPlan.setState({ security: 0 });
+    const user = setup(27, vi.fn().mockResolvedValue({ before: stats(1000), after: stats(900) }));
+    await user.click(screen.getByRole('button', { name: /Plan an Abyssal run/ }));
+    expect(screen.getByText(/Too big/)).toBeTruthy();
+    expect(screen.queryByText(/Buy \d filament/)).toBeNull();
+    expect(screen.getByText(/no CONCORD either/)).toBeTruthy();
+  });
+
+  it('marks an Interdictor as unconfirmed', async () => {
+    const user = setup(541);
+    await user.click(screen.getByRole('button', { name: /Plan an Abyssal run/ }));
+    expect(screen.getByText(/no source names this hull type/)).toBeTruthy();
+  });
 });

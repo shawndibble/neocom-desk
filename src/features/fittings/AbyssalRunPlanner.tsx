@@ -18,7 +18,7 @@ import {
   abyssalFilamentTypeId,
   abyssalHullRule,
   abyssalTierLevels,
-  longestWeaponRange,
+  weaponReachChange,
   type AbyssalSecurity,
   type AbyssalTier,
 } from '@/engine/fittings/abyssalRun';
@@ -29,55 +29,56 @@ import {
 } from '@/engine/fittings/abyssalWeather';
 import { diffFittingStats, type StatChange } from '@/engine/fittings/variationDelta';
 import type { FittingStats } from '@/engine/fittings/types';
-import { useAbyssalWeather } from './abyssalWeatherSelection';
+import { abyssalWeatherLabel, useAbyssalWeather } from './abyssalWeatherSelection';
 import { useAbyssalRunPlan } from './abyssalRunPlan';
 import { changeLabel } from './fittingVariationsCsv';
 import { StatField, StatFields, StatNote } from './StatFacts';
 import { STAT_FIELD_WIDTH } from './statKit';
+import { kmValue } from './rangeText';
 
 type Compare = (weatherTypeId: number) => Promise<{ before: FittingStats; after: FittingStats }>;
 
 interface RunDelta {
   changes: StatChange[];
-  range: {
-    before: { optimal: number; falloff: number };
-    after: { optimal: number; falloff: number };
-  } | null;
+  reach: ReturnType<typeof weaponReachChange>;
 }
 
-/** What the weather does to the open fit, as the page's own stats would show it. */
-function useRunDelta(compare: Compare | null, weatherTypeId: number | null): RunDelta | null {
-  const [result, setResult] = useState<{ key: number; delta: RunDelta } | null>(null);
+/**
+ * What the weather does to the open fit, as the page's own stats would show it:
+ * null while working, 'failed' if the engine threw. Keyed by `compare` too, so
+ * an edited fit never shows the old fit's delta.
+ */
+function useRunDelta(
+  compare: Compare | null,
+  weatherTypeId: number | null
+): RunDelta | 'failed' | null {
+  const [result, setResult] = useState<{
+    compare: Compare;
+    weatherTypeId: number;
+    delta: RunDelta | 'failed';
+  } | null>(null);
   useEffect(() => {
     if (compare === null || weatherTypeId === null) return;
     let cancelled = false;
-    void compare(weatherTypeId)
-      .then(({ before, after }) => {
-        if (cancelled) return;
-        const beforeRange = longestWeaponRange(before);
-        const afterRange = longestWeaponRange(after);
-        setResult({
-          key: weatherTypeId,
-          delta: {
-            changes: diffFittingStats(before, after).changes,
-            range:
-              beforeRange && afterRange && beforeRange.optimal !== afterRange.optimal
-                ? { before: beforeRange, after: afterRange }
-                : null,
-          },
-        });
-      })
-      .catch(() => {
-        if (!cancelled) setResult(null);
-      });
+    const settle = (delta: RunDelta | 'failed') => {
+      if (!cancelled) setResult({ compare, weatherTypeId, delta });
+    };
+    void compare(weatherTypeId).then(
+      ({ before, after }) =>
+        settle({
+          changes: diffFittingStats(before, after).changes,
+          reach: weaponReachChange(before, after),
+        }),
+      () => settle('failed')
+    );
     return () => {
       cancelled = true;
     };
   }, [compare, weatherTypeId]);
-  return result !== null && result.key === weatherTypeId ? result.delta : null;
+  return result !== null && result.compare === compare && result.weatherTypeId === weatherTypeId
+    ? result.delta
+    : null;
 }
-
-const km = (metres: number) => (metres / 1000).toFixed(1);
 
 /**
  * "Plan an Abyssal run": pick a filament tier and a weather, and see what the
@@ -90,7 +91,7 @@ export function AbyssalRunPlanner({
   compare,
   typeName,
 }: {
-  /** The open fit's hull's inventory group, undefined while the catalogue loads. */
+  /** The open fit's hull's inventory group; undefined while the catalogue loads hides the hull rule. */
   hullGroupId: number | undefined;
   compare: Compare | null;
   typeName: (typeId: number) => string;
@@ -135,9 +136,12 @@ export function AbyssalRunPlanner({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {ABYSSAL_TIERS.map(({ tier: value, name }) => (
+                {ABYSSAL_TIERS.map((value) => (
                   <SelectItem key={value} value={String(value)}>
-                    {t('fittings.abyssalRun.tierOption', { tier: value, name })}
+                    {t('fittings.abyssalRun.tierOption', {
+                      tier: value,
+                      name: t(`fittings.abyssalRun.tierName.${value}`),
+                    })}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -180,11 +184,16 @@ export function AbyssalRunPlanner({
                 : t('fittings.abyssalRun.strengthOff', { tier })}
             </li>
           )}
-          <li className={hull.eligible ? 'text-text' : 'text-warning'}>
-            {hull.eligible
-              ? t(`fittings.abyssalRun.hull.${hull.shipClass}`, { count: hull.ships })
-              : t(`fittings.abyssalRun.hull.${hull.reason}`)}
-          </li>
+          {hullGroupId !== undefined && (
+            <li className={hull.eligible ? 'text-text' : 'text-warning'}>
+              {hull.eligible
+                ? t(`fittings.abyssalRun.hull.${hull.shipClass}`)
+                : t(`fittings.abyssalRun.hull.${hull.reason}`)}
+              {hull.eligible && !hull.confirmed && (
+                <span className="text-warning"> {t('fittings.abyssalRun.hull.unconfirmed')}</span>
+              )}
+            </li>
+          )}
           <li className={activation === 'clear' ? 'text-text' : 'text-warning'}>
             {t(`fittings.abyssalRun.activation.${activation}`, { tier })}
           </li>
@@ -195,9 +204,9 @@ export function AbyssalRunPlanner({
               perPocket: (ABYSSAL_RUN_MINUTES / ABYSSAL_POCKETS).toFixed(1),
             })}
           </li>
-          {filamentId !== null && (
+          {filamentId !== null && hull.eligible && (
             <li>
-              {t('fittings.abyssalRun.buy', { count: hull.eligible ? hull.ships : 1 })}{' '}
+              {t('fittings.abyssalRun.buy', { count: hull.ships })}{' '}
               <ItemInfoLink typeId={filamentId}>{typeName(filamentId)}</ItemInfoLink>
             </li>
           )}
@@ -207,28 +216,29 @@ export function AbyssalRunPlanner({
           <StatNote>{t('fittings.abyssalRun.pickWeather')}</StatNote>
         ) : delta === null ? (
           <StatNote>{t('fittings.abyssalRun.working')}</StatNote>
+        ) : delta === 'failed' ? (
+          <StatNote tone="warning">{t('fittings.abyssalRun.failed')}</StatNote>
         ) : (
           <div className="text-xs">
             <div className="text-text-dim">
-              {t('fittings.abyssalRun.deltaHeading', {
-                weather: t(`fittings.weather.kind.${weather.kind}`),
-                level: weather.level,
-              })}
+              {t('fittings.abyssalRun.deltaHeading', { weather: abyssalWeatherLabel(t, weather) })}
             </div>
-            {delta.changes.length === 0 && !delta.range ? (
+            {delta.changes.length === 0 && !delta.reach ? (
               <div>{t('fittings.variations.noChanges')}</div>
             ) : (
               <ul className="space-y-0.5 tabular-nums">
                 {delta.changes.map((change) => (
                   <li key={change.key}>{changeLabel(change, t)}</li>
                 ))}
-                {delta.range && (
+                {delta.reach && (
                   <li>
                     {t('fittings.abyssalRun.range', {
-                      before: km(delta.range.before.optimal),
-                      after: km(delta.range.after.optimal),
-                      fallBefore: km(delta.range.before.falloff),
-                      fallAfter: km(delta.range.after.falloff),
+                      weapon: typeName(delta.reach.typeId),
+                      before: kmValue(delta.reach.before.optimal),
+                      after: kmValue(delta.reach.after.optimal),
+                      // Optimal plus falloff, as the stats column and the HUD read it.
+                      fallBefore: kmValue(delta.reach.before.optimal + delta.reach.before.falloff),
+                      fallAfter: kmValue(delta.reach.after.optimal + delta.reach.after.falloff),
                     })}
                   </li>
                 )}

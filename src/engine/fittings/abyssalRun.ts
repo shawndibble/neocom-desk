@@ -12,7 +12,7 @@
  * picked by hand from group names and are marked where unverified.
  */
 import type { AbyssalWeatherKind } from './abyssalWeather';
-import type { FittingStats } from './types';
+import type { FittingStats, WeaponRange, WeaponRow } from './types';
 
 export type AbyssalTier = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 export type AbyssalLevel = 1 | 2 | 3;
@@ -21,15 +21,8 @@ export type AbyssalLevel = 1 | 2 | 3;
 export const ABYSSAL_RUN_MINUTES = 20;
 export const ABYSSAL_POCKETS = 3;
 
-export const ABYSSAL_TIERS: readonly { tier: AbyssalTier; name: string }[] = [
-  { tier: 0, name: 'Tranquil' },
-  { tier: 1, name: 'Calm' },
-  { tier: 2, name: 'Agitated' },
-  { tier: 3, name: 'Fierce' },
-  { tier: 4, name: 'Raging' },
-  { tier: 5, name: 'Chaotic' },
-  { tier: 6, name: 'Cataclysmic' },
-];
+/** T0 Tranquil to T6 Cataclysmic; the names are UI copy (`fittings.abyssalRun.tierName`). */
+export const ABYSSAL_TIERS: readonly AbyssalTier[] = [0, 1, 2, 3, 4, 5, 6];
 
 /**
  * Weather strengths a tier can roll (a site rolls one): T0-T3 30% or 50%,
@@ -57,16 +50,23 @@ export function abyssalFilamentTypeId(tier: AbyssalTier, kind: AbyssalWeatherKin
 export type AbyssalShipClass = 'cruiser' | 'destroyer' | 'frigate';
 
 export type AbyssalHullRule =
-  | { eligible: true; shipClass: AbyssalShipClass; ships: 1 | 2 | 3 }
+  | {
+      eligible: true;
+      shipClass: AbyssalShipClass;
+      ships: 1 | 2 | 3;
+      /** False where no source names the hull type, only its class. */
+      confirmed: boolean;
+    }
   | { eligible: false; reason: 'tech3Cruiser' | 'tooLarge' | 'unlisted' };
 
 // SDE inventory group ids. Cruiser: Cruiser, Heavy Assault, Logistics, Force
 // Recon, Combat Recon, Heavy Interdiction.
 const CRUISER_GROUPS = new Set([26, 358, 832, 833, 906, 894]);
 const TECH3_CRUISER_GROUP = 963;
-// Destroyer, Tech 3 Destroyer, Interdictor, Command Destroyer. Interdictor and
-// Command Destroyer are destroyer hulls but not named on the wiki: unverified.
-const DESTROYER_GROUPS = new Set([420, 1305, 541, 1534]);
+// Destroyer, Tech 3 Destroyer.
+const DESTROYER_GROUPS = new Set([420, 1305]);
+// Interdictor, Command Destroyer: destroyer hulls no source names.
+const UNCONFIRMED_DESTROYER_GROUPS = new Set([541, 1534]);
 // Frigate, Assault, Interceptor, Covert Ops, Electronic Attack, Stealth Bomber,
 // Expedition, Logistics Frigate.
 const FRIGATE_GROUPS = new Set([25, 324, 831, 830, 893, 834, 1283, 1527]);
@@ -77,10 +77,15 @@ const TOO_LARGE_GROUPS = new Set([419, 1201, 540, 27, 898, 900, 30, 485, 513, 54
 /** What the hull's inventory group means for a run: how many ships go in, or why it can't. */
 export function abyssalHullRule(groupId: number | undefined): AbyssalHullRule {
   if (groupId === undefined) return { eligible: false, reason: 'unlisted' };
-  if (CRUISER_GROUPS.has(groupId)) return { eligible: true, shipClass: 'cruiser', ships: 1 };
+  if (CRUISER_GROUPS.has(groupId))
+    return { eligible: true, shipClass: 'cruiser', ships: 1, confirmed: true };
   if (groupId === TECH3_CRUISER_GROUP) return { eligible: false, reason: 'tech3Cruiser' };
-  if (DESTROYER_GROUPS.has(groupId)) return { eligible: true, shipClass: 'destroyer', ships: 2 };
-  if (FRIGATE_GROUPS.has(groupId)) return { eligible: true, shipClass: 'frigate', ships: 3 };
+  if (DESTROYER_GROUPS.has(groupId))
+    return { eligible: true, shipClass: 'destroyer', ships: 2, confirmed: true };
+  if (UNCONFIRMED_DESTROYER_GROUPS.has(groupId))
+    return { eligible: true, shipClass: 'destroyer', ships: 2, confirmed: false };
+  if (FRIGATE_GROUPS.has(groupId))
+    return { eligible: true, shipClass: 'frigate', ships: 3, confirmed: true };
   if (TOO_LARGE_GROUPS.has(groupId)) return { eligible: false, reason: 'tooLarge' };
   return { eligible: false, reason: 'unlisted' };
 }
@@ -89,44 +94,51 @@ export function abyssalHullRule(groupId: number | undefined): AbyssalHullRule {
 export type AbyssalSecurity = 0 | 5 | 6 | 7 | 8 | 9 | 10;
 export const ABYSSAL_SECURITY_BANDS: readonly AbyssalSecurity[] = [10, 9, 8, 7, 6, 5, 0];
 
-export type AbyssalActivation = 'clear' | 'suspect' | 'blocked';
+export type AbyssalActivation = 'clear' | 'suspect' | 'blocked' | 'unpoliced';
 
-/** The highest tier that activates without a flag, per security (above 0.5 only). */
+/** The highest tier that activates without a flag, per high-security band. */
 const HIGHEST_CLEAR_TIER: Readonly<Partial<Record<AbyssalSecurity, number>>> = {
   10: 0,
   9: 0,
   8: 3,
   7: 4,
   6: 5,
+  5: 6,
 };
 
 /**
  * Whether a filament of `tier` opens in a system of `security`: not at all
  * (T1+ in 1.0 and 0.9), with the suspect flag (high tiers in the lower high
- * security), or clear. Below 0.5 no one is flagged: there is no CONCORD, and
- * anyone may shoot you anyway.
+ * security), or clear. Below 0.5 no flag, but no CONCORD either: 'unpoliced'.
  */
 export function abyssalActivation(tier: AbyssalTier, security: AbyssalSecurity): AbyssalActivation {
   const highestClear = HIGHEST_CLEAR_TIER[security];
-  if (highestClear === undefined || tier <= highestClear) return 'clear';
+  if (highestClear === undefined) return 'unpoliced';
+  if (tier <= highestClear) return 'clear';
   return security >= 9 ? 'blocked' : 'suspect';
 }
 
+const sameWeapon = (a: WeaponRow, b: WeaponRow) =>
+  a.typeId === b.typeId && a.chargeTypeId === b.chargeTypeId && a.isDrone === b.isDrone;
+
 /**
- * The longest optimal and falloff among the fit's turrets and launchers, metres
- * (drones and fighters fly to their target); null with none. Dark weather cuts both.
+ * The longest-reaching weapon whose optimal or falloff moved between `before`
+ * and `after` (Dark weather cuts turrets'); null when none did. Drones skipped:
+ * they fly to their target.
  */
-export function longestWeaponRange(
-  stats: FittingStats
-): { optimal: number; falloff: number } | null {
-  let found = false;
-  let optimal = 0;
-  let falloff = 0;
-  for (const weapon of stats.offense.weapons) {
-    if (weapon.isDrone || weapon.range === undefined) continue;
-    found = true;
-    optimal = Math.max(optimal, weapon.range.optimal);
-    falloff = Math.max(falloff, weapon.range.falloff);
+export function weaponReachChange(
+  before: FittingStats,
+  after: FittingStats
+): { typeId: number; before: WeaponRange; after: WeaponRange } | null {
+  let found: { typeId: number; before: WeaponRange; after: WeaponRange } | null = null;
+  for (const row of before.offense.weapons) {
+    if (row.isDrone || row.range === undefined) continue;
+    const moved = after.offense.weapons.find((other) => sameWeapon(row, other))?.range;
+    if (moved === undefined) continue;
+    if (moved.optimal === row.range.optimal && moved.falloff === row.range.falloff) continue;
+    const reach = row.range.optimal + row.range.falloff;
+    if (found === null || reach > found.before.optimal + found.before.falloff)
+      found = { typeId: row.typeId, before: row.range, after: moved };
   }
-  return found ? { optimal, falloff } : null;
+  return found;
 }

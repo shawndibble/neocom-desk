@@ -8,17 +8,20 @@ import {
   abyssalHullRule,
 } from '@/engine/fittings/abyssalRun';
 import type { TypeMap } from '@/sde/types';
+import en from '@/i18n/locales/en.json';
 
 const types = JSON.parse(
   readFileSync(resolve(process.cwd(), 'public/data/types.json'), 'utf8')
 ) as TypeMap;
 
 describe('the Abyssal run tables against the pinned SDE', () => {
-  it('names every filament "<Tier> <Weather> Filament"', () => {
-    for (const { tier, name } of ABYSSAL_TIERS) {
+  it('names every filament "<Tier> <Weather> Filament", tier names as the UI says them', () => {
+    const tierNames: Record<string, string> = en.fittings.abyssalRun.tierName;
+    const kindNames: Record<string, string> = en.fittings.weather.kind;
+    for (const tier of ABYSSAL_TIERS) {
       for (const kind of ABYSSAL_WEATHER_KINDS) {
         const typeName = types[String(abyssalFilamentTypeId(tier, kind))]?.name;
-        expect(typeName).toBe(`${name} ${kind[0]!.toUpperCase()}${kind.slice(1)} Filament`);
+        expect(typeName).toBe(`${tierNames[tier]} ${kindNames[kind]} Filament`);
       }
     }
   });

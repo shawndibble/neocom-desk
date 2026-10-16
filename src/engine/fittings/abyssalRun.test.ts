@@ -6,8 +6,9 @@ import {
   abyssalFilamentTypeId,
   abyssalHullRule,
   abyssalTierLevels,
-  longestWeaponRange,
+  weaponReachChange,
 } from './abyssalRun';
+import { ABYSSAL_WEATHER_KINDS } from './abyssalWeather';
 import type { FittingStats } from './types';
 
 describe('abyssalTierLevels', () => {
@@ -29,9 +30,7 @@ describe('abyssalFilamentTypeId', () => {
   });
   it('has 35 distinct filaments', () => {
     const ids = ABYSSAL_TIERS.flatMap((tier) =>
-      (['dark', 'electrical', 'exotic', 'firestorm', 'gamma'] as const).map((kind) =>
-        abyssalFilamentTypeId(tier.tier, kind)
-      )
+      ABYSSAL_WEATHER_KINDS.map((kind) => abyssalFilamentTypeId(tier, kind))
     );
     expect(new Set(ids).size).toBe(35);
   });
@@ -39,18 +38,37 @@ describe('abyssalFilamentTypeId', () => {
 
 describe('abyssalHullRule', () => {
   it('lets a cruiser go alone', () => {
-    expect(abyssalHullRule(26)).toEqual({ eligible: true, shipClass: 'cruiser', ships: 1 });
+    expect(abyssalHullRule(26)).toEqual({
+      eligible: true,
+      shipClass: 'cruiser',
+      ships: 1,
+      confirmed: true,
+    });
     expect(abyssalHullRule(358)).toMatchObject({ shipClass: 'cruiser' }); // heavy assault
   });
   it('bars Tech 3 cruisers', () => {
     expect(abyssalHullRule(963)).toEqual({ eligible: false, reason: 'tech3Cruiser' });
   });
   it('sends destroyers in pairs, Tech 3 destroyers included', () => {
-    expect(abyssalHullRule(420)).toEqual({ eligible: true, shipClass: 'destroyer', ships: 2 });
-    expect(abyssalHullRule(1305)).toMatchObject({ shipClass: 'destroyer' });
+    expect(abyssalHullRule(420)).toEqual({
+      eligible: true,
+      shipClass: 'destroyer',
+      ships: 2,
+      confirmed: true,
+    });
+    expect(abyssalHullRule(1305)).toMatchObject({ shipClass: 'destroyer', confirmed: true });
+  });
+  it('counts Interdictors and Command Destroyers as destroyers, unconfirmed', () => {
+    expect(abyssalHullRule(541)).toMatchObject({ shipClass: 'destroyer', confirmed: false });
+    expect(abyssalHullRule(1534)).toMatchObject({ shipClass: 'destroyer', confirmed: false });
   });
   it('sends frigates in threes', () => {
-    expect(abyssalHullRule(25)).toEqual({ eligible: true, shipClass: 'frigate', ships: 3 });
+    expect(abyssalHullRule(25)).toEqual({
+      eligible: true,
+      shipClass: 'frigate',
+      ships: 3,
+      confirmed: true,
+    });
     expect(abyssalHullRule(831)).toMatchObject({ shipClass: 'frigate' });
   });
   it('turns away anything bigger, and says so for a group it has no rule for', () => {
@@ -76,8 +94,9 @@ describe('abyssalActivation', () => {
     expect(abyssalActivation(6, 6)).toBe('suspect');
     expect(abyssalActivation(6, 5)).toBe('clear');
   });
-  it('flags no one below 0.5', () => {
-    expect(abyssalActivation(6, 0)).toBe('clear');
+  it('flags no one below 0.5, where nothing polices the trace', () => {
+    expect(abyssalActivation(6, 0)).toBe('unpoliced');
+    expect(abyssalActivation(0, 0)).toBe('unpoliced');
   });
 });
 
@@ -85,20 +104,40 @@ it('gives a run twenty minutes', () => {
   expect(ABYSSAL_RUN_MINUTES).toBe(20);
 });
 
-describe('longestWeaponRange', () => {
+describe('weaponReachChange', () => {
   const stats = (weapons: object[]) => ({ offense: { weapons } }) as unknown as FittingStats;
-  it('takes the longest turret reach and skips drones', () => {
-    expect(
-      longestWeaponRange(
-        stats([
-          { isDrone: false, range: { optimal: 12000, falloff: 8000 } },
-          { isDrone: false, range: { optimal: 9000, falloff: 15000 } },
-          { isDrone: true, range: { optimal: 90000, falloff: 0 } },
-        ])
-      )
-    ).toEqual({ optimal: 12000, falloff: 15000 });
+  const turret = (typeId: number, optimal: number, falloff: number) => ({
+    typeId,
+    chargeTypeId: 1,
+    isDrone: false,
+    range: { optimal, falloff },
   });
-  it('is null with nothing that has a range', () => {
-    expect(longestWeaponRange(stats([{ isDrone: false }]))).toBeNull();
+  it('picks the longest-reaching weapon whose reach the weather moved', () => {
+    const launcher = { typeId: 9, isDrone: false, range: { optimal: 60000, falloff: 0 } };
+    expect(
+      weaponReachChange(
+        stats([launcher, turret(1, 5000, 8000), turret(2, 12000, 2000)]),
+        stats([launcher, turret(1, 2500, 4000), turret(2, 6000, 1000)])
+      )
+    ).toEqual({
+      typeId: 2,
+      before: { optimal: 12000, falloff: 2000 },
+      after: { optimal: 6000, falloff: 1000 },
+    });
+  });
+  it('notices a falloff-only change', () => {
+    expect(
+      weaponReachChange(stats([turret(1, 5000, 8000)]), stats([turret(1, 5000, 4000)]))
+    ).toMatchObject({ typeId: 1, after: { falloff: 4000 } });
+  });
+  it('is null when no reach moved, and skips drones', () => {
+    const drone = { typeId: 3, isDrone: true, range: { optimal: 9000, falloff: 0 } };
+    const droneAfter = { ...drone, range: { optimal: 4000, falloff: 0 } };
+    expect(
+      weaponReachChange(
+        stats([drone, turret(1, 5000, 8000)]),
+        stats([droneAfter, turret(1, 5000, 8000)])
+      )
+    ).toBeNull();
   });
 });
