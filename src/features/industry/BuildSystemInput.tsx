@@ -32,10 +32,10 @@ interface BuildSystemInputProps {
  * Which rig is *fitted* does not follow from anything, and stays its own
  * select: it is a physical module, and ESI publishes no structure fitting.
  *
- * A typed name rather than a picker: ESI's `/universe/ids` is an exact match,
- * not a search, and the app has no solar-system table to autocomplete against
- * (see the decision file for why naming all ~5000 of them is not worth six
- * posts a session). Resolution happens on commit — blur or Enter — not per
+ * A typed name rather than a picker: the name is resolved against the local
+ * solar-system table (`sde/solarSystems.ts`, ESI's `/universe/ids` only when
+ * that table cannot be read), and autocompleting against ~8,500 systems is not
+ * worth a picker. Resolution happens on commit — blur or Enter — not per
  * keystroke, so a half-typed name is never looked up.
  *
  * The typed text is kept on a miss instead of snapping back: the player is one
@@ -51,8 +51,9 @@ export function BuildSystemInput({
 }: BuildSystemInputProps) {
   const { t } = useTranslation();
   const [text, setText] = useState(systemName ?? '');
-  const [status, setStatus] = useState<'idle' | 'resolving' | 'notFound'>('idle');
+  const [status, setStatus] = useState<'idle' | 'resolving' | 'notFound' | 'unavailable'>('idle');
   const errorId = `${idPrefix}-error`;
+  const hasError = status === 'notFound' || status === 'unavailable';
 
   // Follows the plan when it changes underneath — switching plans, or a sync
   // landing an edit made on another device. Adjusted during render rather than
@@ -74,11 +75,12 @@ export function BuildSystemInput({
       return;
     }
     setStatus('resolving');
-    const system = await resolveSolarSystem(trimmed);
-    if (system === null) return setStatus('notFound');
+    const result = await resolveSolarSystem(trimmed);
+    // "Couldn't check" (offline, no local table) is not a verdict on the name.
+    if (result.status !== 'found') return setStatus(result.status);
     setStatus('idle');
-    setText(system.name);
-    onChange(system);
+    setText(result.system.name);
+    onChange(result.system);
   }
 
   return (
@@ -97,10 +99,10 @@ export function BuildSystemInput({
           value={text}
           placeholder={hubSystemName}
           aria-invalid={status === 'notFound'}
-          aria-describedby={status === 'notFound' ? errorId : undefined}
+          aria-describedby={hasError ? errorId : undefined}
           onChange={(e) => {
             setText(e.target.value);
-            if (status === 'notFound') setStatus('idle');
+            if (hasError) setStatus('idle');
           }}
           onBlur={() => void commit()}
           onKeyDown={(e) => {
@@ -115,6 +117,10 @@ export function BuildSystemInput({
       {status === 'notFound' ? (
         <span id={errorId} role="alert" className="text-danger">
           {t('industry.buildSystemNotFound')}
+        </span>
+      ) : status === 'unavailable' ? (
+        <span id={errorId} role="alert" className="text-warning">
+          {t('industry.buildSystemUnavailable')}
         </span>
       ) : (
         <span className="text-text-dim">{securityLabel}</span>

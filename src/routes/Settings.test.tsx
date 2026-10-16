@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, onTestFinished, vi } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterEach, onTestFinished, vi } from 'vitest';
 import { enableWebPush } from '@/features/notifications/webPush';
 import { clearPushFailure, usePushFailure } from '@/features/notifications/pushFailure';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
@@ -24,6 +24,7 @@ import { isEventEnabledFor } from '@/features/notifications/eventSelection';
 import { rebuildProjection } from '@/features/notifications/projectionRebuild';
 import { PROJECTION_REBUILD_DELAY_MS } from '@/features/notifications/projectionRebuildScheduler';
 import { App } from '@/app/App';
+import * as routeChunks from '@/app/routeChunks';
 import { PLAY_STORE_PACKAGE, androidNotificationSettingsUrl } from '@/lib/playStoreApp';
 import { assignLocation } from '@/app/navigation';
 import { consumeStaleStores } from '@/app/staleStoresReload';
@@ -133,6 +134,21 @@ async function openTab(user: ReturnType<typeof userEvent.setup>, name: RegExp) {
   await screen.findByRole('heading', { level: 1, name: /settings/i });
   await user.click(within(settingsNav()).getByRole('link', { name }));
 }
+
+beforeAll(async () => {
+  // One throwaway render, so no test pays for the worker's first `App` render
+  // (compiling the lazy Settings chunk, warming jsdom and React): it landed on
+  // whichever test ran first and tipped its 1 s `findBy`. Under the hook's own budget.
+  await routeChunks.loadSettings();
+  // Signed out, the app shows the landing page instead of Settings.
+  await db.characters.put({ characterId: CHAR_ID, name: 'Pilot One', ownerHash: 'oh', addedAt: 1 });
+  await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: CHAR_ID });
+  window.history.pushState({}, '', '/settings/display');
+  const { unmount } = render(<App />);
+  await screen.findByRole('heading', { level: 1, name: /settings/i }, { timeout: 25_000 });
+  unmount();
+  useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
+}, 30_000);
 
 // Rendered through <App /> rather than in isolation: /settings has a nav
 // entry now, so routing to it through the shell is part of what's asserted.
@@ -349,9 +365,49 @@ describe('Settings', () => {
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
     await user.click(screen.getByRole('button', { name: /clear cached esi data/i }));
+    // Asks first: nothing is cleared until the dialog is confirmed.
+    const dialog = await screen.findByRole('dialog', { name: /clear cached esi data\?/i });
+    expect(await db.esiCache.count()).toBe(1);
+    expect(within(dialog).queryByText(/only copy you have/i)).not.toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: 'Clear cache' }));
 
     expect(await screen.findByText(/cache cleared/i)).toBeInTheDocument();
     expect(await db.esiCache.count()).toBe(0);
+  });
+
+  it('keeps cached ESI data when the clear is cancelled', async () => {
+    const user = userEvent.setup();
+    await db.esiCache.put({
+      characterId: CHAR_ID,
+      key: 'skills',
+      value: { total_sp: 1 },
+      fetchedAt: 1,
+    });
+    window.history.pushState({}, '', '/settings/dataAge');
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
+
+    await user.click(screen.getByRole('button', { name: /clear cached esi data/i }));
+    const dialog = await screen.findByRole('dialog', { name: /clear cached esi data\?/i });
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+
+    expect(await db.esiCache.count()).toBe(1);
+  });
+
+  it('warns that the cache is the only copy when clearing it offline', async () => {
+    const user = userEvent.setup();
+    Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => false });
+    onTestFinished(() => {
+      Reflect.deleteProperty(navigator, 'onLine');
+    });
+    window.history.pushState({}, '', '/settings/dataAge');
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
+
+    await user.click(screen.getByRole('button', { name: /clear cached esi data/i }));
+    const dialog = await screen.findByRole('dialog', { name: /clear cached esi data\?/i });
+
+    expect(within(dialog).getByText(/only copy you have/i)).toBeInTheDocument();
   });
 
   it('Data Age tab shows an empty state when nothing has succeeded yet', async () => {

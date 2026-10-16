@@ -857,4 +857,29 @@ describe('ItemDetailModal best sell/buy price', () => {
     // The row shows a placeholder while the book is in flight, then drops out.
     await waitFor(() => expect(screen.queryByText('Best sell:')).not.toBeInTheDocument());
   });
+  it('still renders from a stale cached type when ESI is unreachable', async () => {
+    // A row older than the static window: the live call is attempted, fails,
+    // and the cached copy is served rather than the error state.
+    await db.esiCache.put({
+      characterId: 0,
+      key: `universeType:${TYPE_ID}`,
+      value: {
+        type_id: TYPE_ID,
+        name: 'Rifter',
+        description: 'Cached frigate.',
+        group_id: 25,
+        published: true,
+        volume: 27289,
+        dogma_attributes: [],
+      },
+      fetchedAt: 1,
+    });
+    server.use(http.get(`${ESI_BASE_URL}/universe/types/${TYPE_ID}`, () => HttpResponse.error()));
+    mockedLoadDictionary.mockResolvedValue({});
+
+    render(<ItemDetailModal typeId={TYPE_ID} itemName="Rifter" onClose={() => {}} />);
+
+    expect(await screen.findByText('Cached frigate.')).toBeInTheDocument();
+    expect(screen.queryByText("Couldn't load item info")).not.toBeInTheDocument();
+  });
 });
