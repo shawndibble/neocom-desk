@@ -1,8 +1,7 @@
 /**
  * The Hauling tab's "Sells within" / "Margin over" / "Demand" / "Max price
- * per item" filter, remembered across sessions (issue: hauling toolbar
- * redesign; Max price #3894). Max spend is remembered too, in its own
- * `haulingBudget` store (`haulingCargo.ts`), which predates this one.
+ * per item" filter, remembered across sessions. Max spend lives in the
+ * `haulingBudget` store (`haulingCargo.ts`).
  *
  * URL wins whenever present (scope decision `20260922-221531` / ADR 0015):
  * this setting is consulted only for the fields a link leaves unset.

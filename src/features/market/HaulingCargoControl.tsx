@@ -3,7 +3,7 @@
  * small popover with three ways to say how much the hauler can carry — a ship
  * (its base holds), a saved Fitting (the exact holds, skills and expanders
  * included) or a typed number of m³ in one hold of a chosen kind. The ISK
- * budget is not here: it is the Hauling filters' Max spend (#3894).
+ * budget is the Hauling filters' Max spend.
  *
  * The popover body mounts only when opened, so the catalogue and saved
  * Fittings it reads cost nothing to a visit that never picks a ship.

@@ -174,12 +174,11 @@ function haulingUrl(hubId: TradeHub['id']) {
 type HaulingUrlValues = UrlParamValues<ReturnType<typeof haulingUrl>>;
 
 /**
- * Lifts `days`/`margin`/`demand`/`maxprice` off any wider object that carries
- * them (`params`, the remembered-filter store's value) — the four travel
- * together everywhere this filter is read, so this is the one place that
+ * Lifts the remembered filter fields off any wider object that carries them
+ * (`params`, a store patch merged over its value) — the one place that
  * reassembles them rather than each call site picking fields by hand.
  */
-function pickHaulingFilter<T extends StoredHaulingFilter>(source: T): StoredHaulingFilter {
+function pickHaulingFilter(source: StoredHaulingFilter): StoredHaulingFilter {
   return {
     days: source.days,
     margin: source.margin,
@@ -276,11 +275,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
   }, [hydrateDefaultHub]);
   const haulingSchema = useMemo(() => haulingUrl(defaultHubId), [defaultHubId]);
 
-  // The filter fields (days/margin/demand/maxprice) are remembered across
-  // sessions (issue: hauling toolbar redesign), and so is Max spend, in the
-  // Trip Plan budget's own store — a link's own value always wins, and an
-  // edit is written to both the URL and its store in the same call. See
-  // `haulingFilterPref.ts`.
+  // Remembered: the filters in `haulingFilterPref.ts`, Max spend in the Trip Plan budget's store. A link's own value wins.
   const haulingFilterPref = useHaulingFilterPref((s) => s.value);
   const hydrateHaulingFilterPref = useHaulingFilterPref((s) => s.hydrate);
   const storedBudget = useHaulingBudget((s) => s.value);
@@ -291,25 +286,23 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
   }, [hydrateHaulingFilterPref, hydrateBudget]);
   const rememberedFilter: RememberedDefaults<ReturnType<typeof haulingUrl>> = useMemo(
     () => ({
-      values: { ...pickHaulingFilter(haulingFilterPref), spend: storedBudget },
-      remember: (patch: Partial<HaulingUrlValues>) => {
-        // `in`, not `??`: clearing a max price or the spend to null is an edit too.
-        if ('spend' in patch) void useHaulingBudget.getState().setValue(patch.spend ?? null);
-        if (!('days' in patch || 'margin' in patch || 'demand' in patch || 'maxprice' in patch))
-          return;
+      values: {
+        ...pickHaulingFilter(haulingFilterPref),
+        // Whole ISK, as the link holds it: the old budget field could save a fraction.
+        spend: storedBudget === null ? null : Math.round(storedBudget) || null,
+      },
+      // Called with only the remembered fields that changed.
+      remember: ({ spend, ...filter }: Partial<HaulingUrlValues>) => {
+        if (spend !== undefined) void useHaulingBudget.getState().setValue(spend);
+        if (Object.keys(filter).length === 0) return;
         const { value, setValue } = useHaulingFilterPref.getState();
-        void setValue({
-          days: patch.days ?? value.days,
-          margin: patch.margin ?? value.margin,
-          demand: patch.demand ?? value.demand,
-          maxprice: 'maxprice' in patch ? (patch.maxprice ?? null) : value.maxprice,
-        });
+        void setValue(pickHaulingFilter({ ...value, ...filter }));
       },
     }),
     [haulingFilterPref, storedBudget]
   );
   const [params, setParams] = useRememberedUrlParams(haulingSchema, rememberedFilter);
-  /** Max spend, the Trip Plan's ISK budget: the link's, else this device's own. */
+  /** Max spend. */
   const budget = params.spend;
   // Stable references (a hub from `TRADE_HUBS`, or the Any string): the scans key their effects on them.
   const from = haulingEnd(params.from);
@@ -916,7 +909,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
   // Only when Max price hid something does the hidden line name it.
   const hiddenKeySuffix = hidden.tooDear > 0 ? 'MaxPrice' : '';
   // Category and mode ride along so the narrow sheet can edit them as part of
-  // its draft; days/margin/demand/maxprice and spend are remembered (`rememberedFilter`).
+  // its draft; only `rememberedFilter`'s fields are remembered.
   const filterValue = {
     ...pickHaulingFilter(params),
     spend: params.spend,
