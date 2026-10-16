@@ -25,8 +25,8 @@ export type MarkupNode =
   | { type: 'size'; px: number; children: MarkupNode[] }
   /** `color` is `#aarrggbb` (alpha first), lowercase. */
   | { type: 'color'; color: string; children: MarkupNode[] }
-  /** `href` has passed `classifyMarkupLink`; never a raw unvalidated string. */
-  | { type: 'link'; href: string; children: MarkupNode[] };
+  /** `href` has passed `classifyMarkupLink`; `target` is that classification, parsed once. */
+  | { type: 'link'; href: string; target: MarkupLinkTarget; children: MarkupNode[] };
 
 export type InertScheme = 'fitting' | 'contract' | 'killReport' | 'joinChannel' | 'localsvc';
 
@@ -115,13 +115,15 @@ function shorthandValue(rest: string): string {
   return decode(q ? q[2] : v);
 }
 
-type Kind = 'b' | 'i' | 'u' | 'font' | 'color' | 'fontsize' | 'link';
+/** Open frames beyond this are ignored, so render and serialize recursion stay bounded. */
+export const MARKUP_MAX_DEPTH = 32;
+
 interface Frame {
-  kind: Kind;
   /** Close-tag names that end this frame. */
   closers: string[];
   wrap: (children: MarkupNode[]) => MarkupNode[];
   children: MarkupNode[];
+  isLink?: boolean;
 }
 
 const wrapWith =
@@ -134,14 +136,15 @@ function colorWrap(color: string | null) {
 function sizeWrap(px: number | null) {
   return (c: MarkupNode[]): MarkupNode[] => (px ? [{ type: 'size', px, children: c }] : c);
 }
-function linkWrap(href: string) {
+/** A link inside a link is dropped (children kept) so anchors never nest. */
+function linkWrap(href: string, nested: boolean) {
+  const target = nested ? null : classifyMarkupLink(href);
   return (c: MarkupNode[]): MarkupNode[] =>
-    classifyMarkupLink(href) ? [{ type: 'link', href: href.trim(), children: c }] : c;
+    target ? [{ type: 'link', href: href.trim(), target, children: c }] : c;
 }
 
-function openFrame(name: string, rest: string): Frame | null {
-  const frame = (kind: Kind, wrap: Frame['wrap'], closers = [name]): Frame => ({
-    kind,
+function openFrame(name: string, rest: string, insideLink: boolean): Frame | null {
+  const frame = (wrap: Frame['wrap'], closers = [name]): Frame => ({
     closers,
     wrap,
     children: [],
@@ -150,21 +153,21 @@ function openFrame(name: string, rest: string): Frame | null {
     case 'b':
     case 'i':
     case 'u':
-      return frame(name, wrapWith(name));
+      return frame(wrapWith(name));
     case 'font': {
       const a = parseAttrs(rest);
       const color = a.color === undefined ? null : parseColor(a.color);
       const px = a.size === undefined ? null : parseSize(a.size);
-      return frame('font', (c) => sizeWrap(px)(colorWrap(color)(c)));
+      return frame((c) => sizeWrap(px)(colorWrap(color)(c)));
     }
     case 'color':
-      return frame('color', colorWrap(parseColor(shorthandValue(rest))));
+      return frame(colorWrap(parseColor(shorthandValue(rest))));
     case 'fontsize':
-      return frame('fontsize', sizeWrap(parseSize(shorthandValue(rest))));
+      return frame(sizeWrap(parseSize(shorthandValue(rest))));
     case 'a':
-      return frame('link', linkWrap(parseAttrs(rest).href ?? ''), ['a']);
+      return frame(linkWrap(parseAttrs(rest).href ?? '', insideLink), ['a']);
     case 'url':
-      return frame('link', linkWrap(shorthandValue(rest)), ['url']);
+      return frame(linkWrap(shorthandValue(rest), insideLink), ['url']);
     default:
       return null;
   }
@@ -174,7 +177,8 @@ const TAG_RE = /<(\/?)([a-zA-Z][a-zA-Z0-9]*)((?:[^>"']|"[^"]*"|'[^']*')*)>/g;
 
 /** Parse an EVE mail body into the safe node tree. Never throws. */
 export function parseEveMarkup(src: string): MarkupNode[] {
-  const root: Frame = { kind: 'b', closers: [], wrap: (c) => c, children: [] };
+  const root: Frame = { closers: [], wrap: (c) => c, children: [] };
+  let linkDepth = 0;
   const stack: Frame[] = [root];
   const top = (): Frame => stack[stack.length - 1];
   let skipNewline = false;
@@ -190,6 +194,7 @@ export function parseEveMarkup(src: string): MarkupNode[] {
   };
   const pop = (): void => {
     const frame = stack.pop()!;
+    if (frame.isLink) linkDepth--;
     if (frame.children.length > 0) top().children.push(...frame.wrap(frame.children));
   };
 
@@ -216,8 +221,13 @@ export function parseEveMarkup(src: string): MarkupNode[] {
       }
       continue;
     }
-    const frame = openFrame(name, m[3]);
-    if (frame) stack.push(frame);
+    if (stack.length > MARKUP_MAX_DEPTH) continue;
+    const frame = openFrame(name, m[3], linkDepth > 0);
+    if (frame) {
+      frame.isLink = name === 'a' || name === 'url';
+      if (frame.isLink) linkDepth++;
+      stack.push(frame);
+    }
   }
   if (last < src.length) pushText(src.slice(last));
   while (stack.length > 1) pop();
@@ -288,4 +298,29 @@ export function splitMarkupLines(nodes: readonly MarkupNode[]): MarkupNode[][] {
     }
   }
   return lines;
+}
+
+/** The part of a break-free line between two plain-text offsets, formatting kept. */
+export function sliceMarkupNodes(
+  nodes: readonly MarkupNode[],
+  from: number,
+  to: number
+): MarkupNode[] {
+  const out: MarkupNode[] = [];
+  let pos = 0;
+  for (const node of nodes) {
+    const len = markupPlainText([node]).length;
+    const start = pos;
+    pos += len;
+    if (pos <= from || start >= to) continue;
+    const lo = Math.max(from - start, 0);
+    const hi = Math.min(to - start, len);
+    if (node.type === 'text') {
+      if (hi > lo) out.push({ type: 'text', text: node.text.slice(lo, hi) });
+    } else if (node.type !== 'br') {
+      const children = sliceMarkupNodes(node.children, lo, hi);
+      if (children.length > 0) out.push({ ...node, children });
+    }
+  }
+  return out;
 }

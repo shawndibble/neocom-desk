@@ -1,10 +1,7 @@
 // A hand-made table in a mail body: the sender padded columns with runs of
 // spaces (or tabs) to line up in the client's proportional font, which can't
-// be reproduced in ours. Detect those rows and let the caller render a real
-// table instead.
-
-export type MailBodyBlock =
-  { kind: 'text'; text: string } | { kind: 'table'; rows: string[][]; align: ('left' | 'right')[] };
+// be reproduced in ours, or wrote markdown-style `| a | b |` pipe rows. Detect
+// those rows and let the caller render a real table instead.
 
 const MIN_CELLS = 3;
 const MIN_PIPE_CELLS = 2;
@@ -15,28 +12,35 @@ const PIPE_SEPARATOR = /^:?-{2,}:?$/;
 /** A separator row of a markdown pipe table: carries no data. */
 const SEPARATOR = Symbol('separator');
 
-function pipeCellsOf(line: string): string[] | typeof SEPARATOR | null {
-  const trimmed = line.trim();
-  if (!trimmed.startsWith('|')) return null;
-  const cells = trimmed
-    .replace(/^\|/, '')
-    .replace(/\|$/, '')
-    .split('|')
-    .map((c) => c.trim());
+function pipeCellsOf(line: string): CellSpan[] | typeof SEPARATOR | null {
+  const lead = line.search(/\S/);
+  if (lead < 0 || line[lead] !== '|') return null;
+  const bodyStart = lead + 1;
+  let bodyEnd = line.trimEnd().length;
+  if (bodyEnd > bodyStart && line[bodyEnd - 1] === '|') bodyEnd--;
+  const cells: CellSpan[] = [];
+  let pos = bodyStart;
+  for (const piece of line.slice(bodyStart, Math.max(bodyStart, bodyEnd)).split('|')) {
+    const text = piece.trim();
+    const start = pos + (piece.length - piece.trimStart().length);
+    cells.push({ text, start, end: start + text.length });
+    pos += piece.length + 1;
+  }
   if (cells.length < MIN_PIPE_CELLS) return null;
-  return cells.every((c) => PIPE_SEPARATOR.test(c)) ? SEPARATOR : cells;
+  return cells.every((c) => PIPE_SEPARATOR.test(c.text)) ? SEPARATOR : cells;
 }
 
-function spaceCellsOf(line: string): string[] | null {
-  const cells = line
-    .trim()
-    .split(/\t+| {2,}/)
-    .map((c) => c.trim())
-    .filter((c) => c !== '');
+function spaceCellsOf(line: string): CellSpan[] | null {
+  // A cell is a run of words joined by single spaces; tabs or 2+ spaces split cells.
+  const cells = Array.from(line.matchAll(/\S+(?: \S+)*/g), (m) => ({
+    text: m[0],
+    start: m.index,
+    end: m.index + m[0].length,
+  }));
   return cells.length >= MIN_CELLS ? cells : null;
 }
 
-function cellsOf(line: string): string[] | typeof SEPARATOR | null {
+function cellsOf(line: string): CellSpan[] | typeof SEPARATOR | null {
   return pipeCellsOf(line) ?? spaceCellsOf(line);
 }
 
@@ -49,6 +53,13 @@ function alignOf(rows: string[][]): ('left' | 'right')[] {
   });
 }
 
+/** A cell's text and its `[start, end)` offsets within its line. */
+export interface CellSpan {
+  text: string;
+  start: number;
+  end: number;
+}
+
 /** A block of consecutive lines: `[start, end)` indexes into the input lines. */
 export type MailLineBlock =
   | { kind: 'text'; start: number; end: number }
@@ -57,6 +68,10 @@ export type MailLineBlock =
       start: number;
       end: number;
       rows: string[][];
+      /** Per row and cell: where the cell sits in its line, so a caller can keep its formatting. */
+      spans: CellSpan[][];
+      /** The input line index each row came from. */
+      rowLines: number[];
       align: ('left' | 'right')[];
     };
 
@@ -76,45 +91,29 @@ export function splitMailLines(lines: readonly string[]): MailLineBlock[] {
       continue;
     }
     // Gather tabular lines, tolerating blank lines between them.
-    const rows = [first];
+    const spans = [first];
+    const rowLines = [i];
     let end = i + 1; // exclusive end of the consumed lines
     for (let j = i + 1; j < lines.length; j++) {
       if (lines[j].trim() === '') continue;
       const cells = cellsOf(lines[j]);
       if (cells === null) break;
-      if (cells !== SEPARATOR) rows.push(cells);
+      if (cells !== SEPARATOR) {
+        spans.push(cells);
+        rowLines.push(j);
+      }
       end = j + 1;
     }
-    if (rows.length < MIN_ROWS) {
+    if (spans.length < MIN_ROWS) {
       i++;
       continue;
     }
     if (i > proseStart) blocks.push({ kind: 'text', start: proseStart, end: i });
-    blocks.push({ kind: 'table', start: i, end, rows, align: alignOf(rows) });
+    const rows = spans.map((r) => r.map((c) => c.text));
+    blocks.push({ kind: 'table', start: i, end, rows, spans, rowLines, align: alignOf(rows) });
     i = proseStart = end;
   }
   if (proseStart < lines.length)
     blocks.push({ kind: 'text', start: proseStart, end: lines.length });
   return blocks;
-}
-
-/** Split a stripped mail body into prose and table blocks. */
-export function splitMailBody(text: string): MailBodyBlock[] {
-  const lines = text.split('\n');
-  const blocks = splitMailLines(lines).map((b): MailBodyBlock =>
-    b.kind === 'table'
-      ? { kind: 'table', rows: b.rows, align: b.align }
-      : { kind: 'text', text: lines.slice(b.start, b.end).join('\n') }
-  );
-  return blocks.some((b) => b.kind === 'table') ? trimProseEdges(blocks) : blocks;
-}
-
-// Around a table the blocks' own spacing supplies the gap, so a prose block's
-// leading and trailing blank lines would only double it.
-function trimProseEdges(blocks: MailBodyBlock[]): MailBodyBlock[] {
-  return blocks.flatMap((b): MailBodyBlock[] => {
-    if (b.kind === 'table') return [b];
-    const text = b.text.replace(/^(?:[ \t]*\n)+|(?:\n[ \t]*)+$/g, '');
-    return text.trim() === '' ? [] : [{ kind: 'text', text }];
-  });
 }

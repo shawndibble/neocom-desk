@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveShowInfo } from './mailShowInfo';
+import { itemKindOfGroup, resolveShowInfo } from './mailShowInfo';
 
 describe('resolveShowInfo', () => {
   it('maps entity typeIDs to their kind', () => {
@@ -25,5 +25,16 @@ describe('resolveShowInfo', () => {
   it('treats a bare typeID, or an item instance, as an item type', () => {
     expect(resolveShowInfo(587, null)).toEqual({ kind: 'item', typeId: 587 });
     expect(resolveShowInfo(587, 1234567)).toEqual({ kind: 'item', typeId: 587 });
+  });
+});
+
+describe('itemKindOfGroup', () => {
+  const categories = { '255': 16, '25': 6, '18': 4 };
+  it('tells skills and ships from other items by group category', () => {
+    expect(itemKindOfGroup(255, categories)).toBe('skill');
+    expect(itemKindOfGroup(25, categories)).toBe('ship');
+    expect(itemKindOfGroup(18, categories)).toBe('item');
+    expect(itemKindOfGroup(undefined, categories)).toBe('item');
+    expect(itemKindOfGroup(999, categories)).toBe('item');
   });
 });

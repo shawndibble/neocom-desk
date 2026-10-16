@@ -1,7 +1,11 @@
-import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
+vi.mock('@/sde/loadSde', () => ({
+  loadTypes: async () => ({ '3300': { groupID: 255 }, '587': { groupID: 25 } }),
+  loadGroupCategories: async () => ({ '255': 16, '25': 6 }),
+}));
 import { MailBodyView } from './MailBodyView';
 
 function renderMarkup(markup: string) {
@@ -101,5 +105,54 @@ describe('MailBodyView', () => {
     renderMarkup('Hi<br>| Name | ISK |<br>|---|---|<br>| Olorf | 90 |');
     expect(screen.getByRole('cell', { name: 'Olorf' })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: 'Name' })).toBeInTheDocument();
+  });
+
+  it('draws the dark surface for every mail on the markup path, formatted or not', () => {
+    const { container } = renderMarkup('Just words');
+    expect(container.firstElementChild?.className).toContain('bg-[#0a0e14]');
+  });
+
+  it('keeps bold, colour and links inside table cells', () => {
+    renderMarkup('| Name | ISK |\n| <b>Olorf</b> | <font color="#ff00ff00">90</font> |');
+    expect(screen.getByText('Olorf').tagName).toBe('STRONG');
+    expect(screen.getByText('90')).toHaveStyle({ color: 'rgb(0, 255, 0)' });
+  });
+
+  it('shows the real host when link text names a different one', () => {
+    renderMarkup('<a href="https://evil.example/x">https://zkillboard.com/kill/1</a>');
+    expect(screen.getByRole('link', { name: /zkillboard/ })).toHaveAttribute(
+      'title',
+      'Opens evil.example'
+    );
+  });
+
+  it('adds no title when the text matches the host or is a plain label', () => {
+    renderMarkup(
+      '<a href="https://a.example/x">a.example</a> <a href="https://a.example/y">go</a>'
+    );
+    for (const link of screen.getAllByRole('link')) expect(link).not.toHaveAttribute('title');
+  });
+
+  it('never nests anchors', () => {
+    const { container } = renderMarkup(
+      '<a href="https://a.example">x <a href="https://b.example">y</a></a>'
+    );
+    expect(container.querySelector('a a')).toBeNull();
+  });
+
+  it('opens a skill show-info link in the skill modal', async () => {
+    renderMarkup('<a href="showinfo:3300">Gunnery</a>');
+    await waitFor(() =>
+      expect(screen.getByRole('link', { name: 'Gunnery' })).toHaveAttribute(
+        'href',
+        '/?info=skill-3300'
+      )
+    );
+  });
+
+  it('opens a ship show-info link as an item, there being no ship window by typeID', async () => {
+    renderMarkup('<a href="showinfo:587">Rifter</a>');
+    await waitFor(() => expect(screen.getByRole('link', { name: 'Rifter' })).toBeInTheDocument());
+    expect(screen.getByRole('link', { name: 'Rifter' })).toHaveAttribute('href', '/?info=type-587');
   });
 });

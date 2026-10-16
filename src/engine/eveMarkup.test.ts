@@ -8,6 +8,8 @@ import {
   parseEveMarkup,
   serializeEveMarkup,
   splitMarkupLines,
+  sliceMarkupNodes,
+  MARKUP_MAX_DEPTH,
   type MarkupNode,
 } from './eveMarkup';
 
@@ -101,7 +103,14 @@ describe('parseEveMarkup', () => {
   });
 
   it('reads <a href>, <url=> and legacy <url:>', () => {
-    const want = [{ type: 'link', href: 'https://a.example/x', children: [t('go')] }];
+    const want = [
+      {
+        type: 'link',
+        href: 'https://a.example/x',
+        target: { kind: 'http', url: 'https://a.example/x' },
+        children: [t('go')],
+      },
+    ];
     expect(parseEveMarkup('<a href="https://a.example/x">go</a>')).toEqual(want);
     expect(parseEveMarkup('<url=https://a.example/x>go</url>')).toEqual(want);
     expect(parseEveMarkup('<url:https://a.example/x>go</url>')).toEqual(want);
@@ -123,9 +132,45 @@ describe('parseEveMarkup', () => {
       'localsvc:service=x',
     ]) {
       expect(parseEveMarkup(`<a href="${href}">x</a>`)).toEqual([
-        { type: 'link', href, children: [t('x')] },
+        { type: 'link', href, target: classifyMarkupLink(href), children: [t('x')] },
       ]);
     }
+  });
+});
+
+describe('parser bounds', () => {
+  it('flattens a link nested in a link, keeping its text', () => {
+    const [outer] = parseEveMarkup(
+      '<a href="https://a.example">x <a href="https://b.example">y</a> z</a>'
+    );
+    expect(outer).toMatchObject({ type: 'link', href: 'https://a.example' });
+    const kids = (outer as Extract<MarkupNode, { type: 'link' }>).children;
+    expect(kids.some((n) => n.type === 'link')).toBe(false);
+    expect(markupPlainText([outer])).toBe('x y z');
+  });
+
+  it('ignores opens beyond the depth cap', () => {
+    const src = '<b>'.repeat(MARKUP_MAX_DEPTH + 50) + 'deep' + '</b>'.repeat(MARKUP_MAX_DEPTH + 50);
+    let depth = 0;
+    let node: MarkupNode | undefined = parseEveMarkup(src)[0];
+    while (node && 'children' in node) {
+      depth++;
+      node = node.children[0];
+    }
+    expect(depth).toBeLessThanOrEqual(MARKUP_MAX_DEPTH + 1);
+    expect(markupPlainText(parseEveMarkup(src))).toBe('deep');
+  });
+});
+
+describe('sliceMarkupNodes', () => {
+  it('cuts a line at plain-text offsets, keeping formatting', () => {
+    const line = parseEveMarkup('ab<b>cd</b>ef');
+    expect(sliceMarkupNodes(line, 1, 5)).toEqual([
+      t('b'),
+      { type: 'b', children: [t('cd')] },
+      t('e'),
+    ]);
+    expect(sliceMarkupNodes(line, 3, 3)).toEqual([]);
   });
 });
 

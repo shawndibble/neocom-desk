@@ -1173,10 +1173,11 @@ function MailView({ scope, scopeControl }: MailViewProps) {
                         </p>
                       )}
                     </div>
-                    {/* `text-sm text-text`, not `text-xs text-text-dim`: this is
-                      the one thing the pilot opened the page to read, and it
-                      shipped at the smallest size in the dimmest readable
-                      tier. `break-words` so an unbroken URL cannot push the
+                    {/* The body renders from the raw markup (`MailBodyView` parses
+                      it to a safe tree: bold, colour, links, tables) on the
+                      reader's fixed dark surface; `bodyText` is only the
+                      flattened text the compose box quotes. `break-words`
+                      inside the view keeps an unbroken URL from pushing the
                       pane sideways. */}
                     <MailBodyView text={bodyText} markup={body?.data.body ?? undefined} />
 

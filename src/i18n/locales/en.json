@@ -6478,7 +6478,8 @@
     "title": "Mail",
     "markup": {
       "openInEve": "Open this in EVE. Neocom Desk can't show it.",
-      "placeSoon": "A place view isn't available yet. Open it in EVE."
+      "placeSoon": "A place view isn't available yet. Open it in EVE.",
+      "realHost": "Opens {{host}}"
     },
     "refresh": "Refresh",
     "readingFor": "For {{name}}",

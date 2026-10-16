@@ -1,4 +1,7 @@
+import { useEffect, useState } from 'react';
 import { classifyPlaceId } from '@/features/places/classify';
+import { SHIP_CATEGORY_ID, SKILL_CATEGORY_ID } from '@/sde/categories';
+import { loadGroupCategories, loadTypes } from '@/sde/loadSde';
 
 /**
  * What a mail's `showinfo:<typeID>[//<id>]` link opens in Neocom Desk. Typed
@@ -34,4 +37,41 @@ export function resolveShowInfo(typeId: number, id: number | null): ShowInfoTarg
     if (typeId === ALLIANCE_TYPE) return { kind: 'alliance', id };
   }
   return { kind: 'item', typeId };
+}
+
+export type ItemKind = 'skill' | 'ship' | 'item';
+
+/** What an item type is, from its group's category. Unknown groups are a plain item. */
+export function itemKindOfGroup(
+  groupId: number | undefined,
+  categories: Readonly<Record<string, number>>
+): ItemKind {
+  const category = groupId === undefined ? undefined : categories[String(groupId)];
+  if (category === SKILL_CATEGORY_ID) return 'skill';
+  if (category === SHIP_CATEGORY_ID) return 'ship';
+  return 'item';
+}
+
+/**
+ * Whether a typeID is a skill, ship or other item, from the SDE (loaded once,
+ * then memoised). `'item'` until it resolves, and for a type the SDE lacks.
+ * There is no ship-by-typeID window outside the Ship Tree, so a ship opens
+ * Item Detail like any item.
+ */
+export function useItemKind(typeId: number): ItemKind {
+  const [state, setState] = useState<{ typeId: number; kind: ItemKind } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void Promise.all([loadTypes(), loadGroupCategories()])
+      .then(([types, categories]) => {
+        if (!cancelled) {
+          setState({ typeId, kind: itemKindOfGroup(types[String(typeId)]?.groupID, categories) });
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [typeId]);
+  return state?.typeId === typeId ? state.kind : 'item';
 }
