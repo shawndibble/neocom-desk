@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { newFitting } from '@/engine/fittings/fittingEdit';
 import type { Fitting, FittingModule } from '@/engine/fittings/types';
@@ -74,6 +75,10 @@ vi.mock('@/features/character/assets', () => ({
 vi.mock('@/features/abyssal/dynamicItems', () => ({
   mutationsForItems: assets.mutationsForItems,
 }));
+const scope = vi.hoisted(() => ({ lacks: false }));
+vi.mock('@/app/useGrantedScopes', () => ({
+  useCharacterLacksEndpoints: () => scope.lacks,
+}));
 
 const NAMES: Record<number, string> = {
   [GRAVID]: 'Gravid Heavy Energy Neutralizer Mutaplasmid',
@@ -89,12 +94,14 @@ const catalogue = {
 function setup(module: FittingModule, characterId: number | null = null) {
   const edit = vi.fn<(change: FittingChange, coalesceKey?: string) => void>();
   render(
-    <FittingMutationPanel
-      module={module}
-      catalogue={catalogue}
-      edit={edit}
-      characterId={characterId}
-    />
+    <MemoryRouter>
+      <FittingMutationPanel
+        module={module}
+        catalogue={catalogue}
+        edit={edit}
+        characterId={characterId}
+      />
+    </MemoryRouter>
   );
   const fitting: Fitting = { ...newFitting(1, 'Test'), modules: [module] };
   /** The module as the `n`th edit leaves it. */
@@ -114,6 +121,7 @@ const mutated: FittingModule = {
 };
 
 beforeEach(() => {
+  scope.lacks = false;
   assets.loadCharacterAssets.mockReset();
   assets.mutationsForItems.mockReset();
 });
@@ -201,6 +209,7 @@ describe('FittingMutationPanel', () => {
     };
     assets.loadCharacterAssets.mockResolvedValue({
       cached: {
+        truncated: false,
         data: [
           { type_id: ABYSSAL, item_id: 501, quantity: 1, location_flag: 'Hangar' },
           { type_id: 34, item_id: 502, quantity: 9, location_flag: 'Hangar' },
@@ -224,11 +233,34 @@ describe('FittingMutationPanel', () => {
 
   it('says so when the assets hold none', async () => {
     const user = userEvent.setup();
-    assets.loadCharacterAssets.mockResolvedValue({ cached: { data: [] }, needsReauth: false });
+    assets.loadCharacterAssets.mockResolvedValue({
+      cached: { data: [], truncated: false },
+      needsReauth: false,
+    });
     setup(plain, 90000001);
     await user.click(screen.getByRole('button', { name: 'Load rolls from my assets' }));
     expect(await screen.findByText('None of your assets is this module.')).toBeInTheDocument();
     expect(assets.mutationsForItems).not.toHaveBeenCalled();
+  });
+});
+
+describe('FittingMutationPanel, assets it cannot read', () => {
+  it('says the assets are unread, never "none", and offers a retry', async () => {
+    const user = userEvent.setup();
+    assets.loadCharacterAssets.mockResolvedValue({ cached: null, needsReauth: false });
+    setup(plain, 90000001);
+    await user.click(screen.getByRole('button', { name: 'Load rolls from my assets' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't read your assets");
+    expect(screen.queryByText('None of your assets is this module.')).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(assets.loadCharacterAssets).toHaveBeenCalledTimes(2);
+  });
+
+  it('asks for the Assets Permission instead, when the Character lacks it', () => {
+    scope.lacks = true;
+    setup(plain, 90000001);
+    expect(screen.queryByRole('button', { name: 'Load rolls from my assets' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Grant missing Permissions' })).toBeInTheDocument();
   });
 });
 
