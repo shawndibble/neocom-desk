@@ -838,11 +838,10 @@ function FittingsPage() {
                 // page aside, so the editor keeps the width rather than the stats.
                 // The Ring goes beside them from the desktop breakpoint — it is
                 // capped and square, so it fits beside 22rem of stats there (scope
-                // decision `20260925-095734`); the stats hold at 22rem until xl,
-                // since a track with a max grows to it before a 1fr one gets
-                // anything. The List's rows want the width, so it waits for xl.
-                // The Ring's track stops at 52rem (its 48rem ring and the panel
-                // around it); width past the caps becomes even gutters.
+                // decision `20260925-095734`); the stats hold at 22rem until xl.
+                // The List's rows want the width, so it waits for xl. The Ring's
+                // track stops at 52rem (its 48rem ring and the panel around it);
+                // width past the caps becomes even gutters.
                 className={`grid items-start justify-center gap-3 ${
                   addMode === 'docked'
                     ? view === 'ring'

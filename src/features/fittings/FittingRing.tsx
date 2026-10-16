@@ -90,53 +90,50 @@ import { useLiftAfterHoldGuard } from '@/components/ui/liftAfterHold';
  */
 export const RING_ROOM_ATTR = 'data-ring-room';
 
-/** Under the cargo row: the panel's bottom padding (0.75rem) and border. */
-const PANEL_FOOT_PX = 13;
-
 /**
  * The ring grows with its column up to 48rem, where a tile is 48/648 of it —
- * about 57px. In a column that sets `--ring-room` it takes the room that
- * leaves once `chrome` (px: the tabs and panel header above the ring, the
- * readouts, legend and cargo under it) is out, so once the column pins the
- * whole block is on screen. Elsewhere — the shared page, the Start preview,
- * below the desktop breakpoint — the window less 24rem (header, tabs, panel
- * header and the readouts) bounds it; `chrome` cancels out there. A short
- * window (a landscape phone) keeps at least 20rem.
+ * about 57px — but never past the window less 24rem (header, tabs, panel header
+ * and the readouts), so on first load the readouts end inside the viewport. In
+ * a column that sets `--ring-room` it is also never past that room less
+ * `chrome` (px: the tabs and panel header above the ring, the readouts under
+ * it): once the column pins, the readouts stay on screen whatever sits above
+ * the page. Legend and cargo may scroll. A short window (a landscape phone)
+ * keeps at least 20rem.
  */
 function ringMaxWidth(chrome: number): string {
   const px = `${Math.round(chrome)}px`;
-  return `max(20rem, min(48rem, calc(var(--ring-room, calc(100dvh - 24rem + ${px})) - ${px})))`;
+  return `max(20rem, min(48rem, calc(100dvh - 24rem), calc(var(--ring-room, 100dvh) - ${px} - 0.75rem)))`;
 }
 
 /**
  * The px `ringMaxWidth` leaves for the rest of the column: how far the ring
- * sits below the top of its `RING_ROOM_ATTR` column, plus the block under it.
- * Re-measured as the block or column resizes, never on scroll (offsets are
- * taken from the column's content top); 0 outside such a column.
+ * sits below the top of its `RING_ROOM_ATTR` column, plus the readouts under
+ * it. Re-measured as the readouts, the column or anything in it resizes (a
+ * wrapping panel header moves the ring without resizing a pinned column),
+ * never on scroll; 0 outside such a column or without readouts.
  */
 function useRingChrome(
-  block: RefObject<HTMLDivElement | null>,
+  readouts: RefObject<HTMLDivElement | null>,
   ring: RefObject<HTMLDivElement | null>
 ): number {
   const [chrome, setChrome] = useState(0);
   useLayoutEffect(() => {
-    const blockEl = block.current;
+    const readoutsEl = readouts.current;
     const ringEl = ring.current;
-    const column = blockEl?.closest<HTMLElement>(`[${RING_ROOM_ATTR}]`);
-    if (!blockEl || !ringEl || !column) return;
+    const column = ringEl?.closest<HTMLElement>(`[${RING_ROOM_ATTR}]`);
+    if (!readoutsEl || !ringEl || !column) return;
     const measure = () => {
       const ringBox = ringEl.getBoundingClientRect();
       const above = ringBox.top - column.getBoundingClientRect().top + column.scrollTop;
-      const below = blockEl.getBoundingClientRect().bottom - ringBox.bottom;
-      const next = Math.round(above + below + PANEL_FOOT_PX);
+      const below = readoutsEl.getBoundingClientRect().bottom - ringBox.bottom;
+      const next = Math.round(above + below);
       setChrome((prev) => (prev === next ? prev : next));
     };
     measure();
     const observer = new ResizeObserver(measure);
-    observer.observe(blockEl);
-    observer.observe(column);
+    for (const el of [readoutsEl, column, ...column.children]) observer.observe(el);
     return () => observer.disconnect();
-  }, [block, ring]);
+  }, [readouts, ring]);
   return chrome;
 }
 
@@ -970,9 +967,9 @@ export function FittingRing({
       : placed?.kind === 'load' && !!handlers.loadCharge;
   });
   const cargoTarget = useFittingDropTarget({ kind: 'cargo' });
-  const blockRef = useRef<HTMLDivElement>(null);
+  const readoutsRef = useRef<HTMLDivElement>(null);
   const ringRef = useRef<HTMLDivElement>(null);
-  const ringWidth = ringMaxWidth(useRingChrome(blockRef, ringRef));
+  const ringWidth = ringMaxWidth(useRingChrome(readoutsRef, ringRef));
   const centre = RING_VIEW / 2;
   const nameOf = (typeId: number) => typeName?.(typeId) ?? `#${typeId}`;
 
@@ -1122,7 +1119,7 @@ export function FittingRing({
   return (
     <RingFrame bare={bare} title={t('fittings.ring.title')} actions={actions}>
       {/* The block keeps the ring's own width, so cargo and the legend sit under it on a wide panel. */}
-      <div ref={blockRef} className="mx-auto w-full max-w-[48rem] space-y-3">
+      <div className="mx-auto w-full max-w-[48rem] space-y-3">
         <div
           ref={ringRef}
           className="relative mx-auto aspect-square w-full"
@@ -1233,7 +1230,11 @@ export function FittingRing({
 
         {/* Laid out as the rim is: calibration and powergrid on the left, bandwidth and CPU on the right. */}
         {!compact && (
-          <div className="mx-auto grid grid-cols-2 gap-x-4 gap-y-2" style={{ maxWidth: ringWidth }}>
+          <div
+            ref={readoutsRef}
+            className="mx-auto grid grid-cols-2 gap-x-4 gap-y-2"
+            style={{ maxWidth: ringWidth }}
+          >
             <Readout gauge="calibration" budget={budgets.calibration} align="start" />
             {dronesShown ? (
               <Readout gauge="droneBandwidth" budget={budgets.droneBandwidth} align="end" />

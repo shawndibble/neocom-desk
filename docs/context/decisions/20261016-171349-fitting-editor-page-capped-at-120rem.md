@@ -10,9 +10,12 @@ _Recorded 2026-10-16 · issue #3976._
   the same page cap: its rows want the width.
 - **The Ring's block (Ring, readouts, legend, cargo) keeps the Ring's 48rem
   width**, centred in its panel.
-- **From the desktop breakpoint the Ring fits its sticky editor column**: it
-  takes the column's pinned height (`100vh − 2.5rem`) less what the column
-  shows above it (tabs, panel header) and under it (readouts, legend, cargo),
-  measured. A banner above the page no longer pushes the readouts out of the
-  pinned column. The 20rem floor and 48rem cap stay. The shared Fitting page,
-  the Start preview and the stacked layout keep the window − 24rem bound.
+- **From the desktop breakpoint the Ring also fits its sticky editor column**
+  (amends the window-height bound of `20261003-083902`): it is never larger
+  than the column's pinned height (`100vh − 2.5rem`) less what the column
+  shows above it (tabs, panel header) and the readouts under it, measured.
+  The old window − 24rem bound stays as well, so the first load is unchanged;
+  once the column pins, a banner above the page can't push the readouts out.
+  Legend and cargo may scroll in the column. The 20rem floor and 48rem cap
+  stay. The shared Fitting page, the Start preview and the stacked layout
+  keep only the window − 24rem bound.
