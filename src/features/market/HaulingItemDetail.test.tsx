@@ -27,7 +27,10 @@ const FEES = {
 const AMARR = TRADE_HUBS.find((h) => h.id === 'amarr')!;
 const JITA = TRADE_HUBS.find((h) => h.id === 'jita')!;
 
-function listRow(sale: Partial<ListHaulingScanRow['sale']> = {}): HaulingViewRow {
+function listRow(
+  sale: Partial<ListHaulingScanRow['sale']> = {},
+  buyPrice = 10_460_000
+): HaulingViewRow {
   const row: ListHaulingScanRow = {
     mode: 'list',
     typeId: 2048,
@@ -37,7 +40,7 @@ function listRow(sale: Partial<ListHaulingScanRow['sale']> = {}): HaulingViewRow
     groupId: 60,
     categoryId: 7,
     unitVolumeM3: 5,
-    buyLadder: [{ price: 10_460_000, units: 50, orders: 3 }],
+    buyLadder: [{ price: buyPrice, units: 50, orders: 3 }],
     destLadder: [
       { price: 23_170_000, units: 1, orders: 1 },
       { price: 23_280_000, units: 3, orders: 2 },
@@ -194,6 +197,16 @@ describe('HaulingItemDetail — listing', () => {
     ]) {
       expect(await screen.findByRole('menuitem', { name })).toBeInTheDocument();
     }
+  });
+});
+
+describe('HaulingItemDetail — nothing worth buying', () => {
+  it('says so instead of a zero profit', () => {
+    renderDetail(listRow({}, 30_000_000));
+    expect(
+      screen.getByText("No unit in Amarr keeps a 5% margin at today's prices.")
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/profit each/)).not.toBeInTheDocument();
   });
 });
 

@@ -13,7 +13,7 @@ const FLAG_KEY: Record<HaulingFlag, 'thin' | 'crowded' | 'outlier' | 'lowMargin'
 /**
  * A Hauling row's heads-up as a word ("Thin market", "Crowded") in small
  * warning-coloured text, its meaning behind the dotted underline (`HintText`).
- * Shared by the table and the item detail (issue #3878).
+ * Its own component so the table can show the same words as the item detail.
  */
 export function HaulingFlagWord({ flag }: { flag: HaulingFlag }) {
   const { t } = useTranslation();

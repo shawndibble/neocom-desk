@@ -1,6 +1,6 @@
 /**
  * One Hauling row's detail, shown in the trip rail (desktop) or a full-height
- * sheet (phone) when the row is selected (issue #3878). Replaces the inline
+ * sheet (phone) when the row is selected. Replaces the inline
  * `HaulingRowDetail`. Leads with what a hauler checks — the most to pay, the
  * destination's sell orders with the user's own listing among them, Days to
  * Sell — and folds the price derivation and fee math behind "Show the math".
@@ -51,10 +51,8 @@ export interface HaulingItemDetailProps {
 const signed = (value: number) => `${value >= 0 ? '+' : '−'}${formatMarketIsk(Math.abs(value))}`;
 const signedPct = (value: number) => `${value >= 0 ? '+' : '−'}${Math.abs(value).toFixed(1)}%`;
 
-/** Units the plan brings, or the load the row's figures are worked on when it brings none. */
-function unitsOf(row: HaulingViewRow, line: TripLine | undefined): number {
-  return line && line.quantity > 0 ? line.quantity : row.suggestedUnits;
-}
+const plannedUnits = (line: TripLine | undefined) =>
+  line && line.quantity > 0 ? line.quantity : undefined;
 
 export function HaulingItemDetail({
   row,
@@ -133,7 +131,7 @@ function Label({ children }: { children: ReactNode }) {
   );
 }
 
-/** Pay at most, then profit each and margin. Full ISK on every screen: it is the figure typed into EVE. */
+/** Full ISK on every screen, never shorthand: it is the figure typed into EVE. */
 function PayAtMost({ row }: { row: HaulingViewRow }) {
   const { t } = useTranslation();
   const limit = maxBuyPrice(row.candidate, row.fees);
@@ -155,20 +153,23 @@ function PayAtMost({ row }: { row: HaulingViewRow }) {
           </span>
         </>
       )}
-      <span
-        className={cx(
-          'flex flex-wrap gap-x-1.5 pt-1 text-sm font-semibold tabular-nums',
-          row.profitPerUnit >= 0 ? 'text-success' : 'text-danger'
-        )}
-      >
-        <span className="whitespace-nowrap">
-          {t('market.hauling.itemDetail.profitEach', { isk: signed(row.profitPerUnit) })}
+      {/* No unit worth buying: a "+0 profit each" would read as a real figure. */}
+      {row.suggestedUnits > 0 && (
+        <span
+          className={cx(
+            'flex flex-wrap gap-x-1.5 pt-1 text-sm font-semibold tabular-nums',
+            row.profitPerUnit >= 0 ? 'text-success' : 'text-danger'
+          )}
+        >
+          <span className="whitespace-nowrap">
+            {t('market.hauling.itemDetail.profitEach', { isk: signed(row.profitPerUnit) })}
+          </span>
+          <span aria-hidden="true">·</span>
+          <span className="whitespace-nowrap">
+            {t('market.hauling.itemDetail.margin', { pct: signedPct(row.marginPct) })}
+          </span>
         </span>
-        <span aria-hidden="true">·</span>
-        <span className="whitespace-nowrap">
-          {t('market.hauling.itemDetail.margin', { pct: signedPct(row.marginPct) })}
-        </span>
-      </span>
+      )}
     </div>
   );
 }
@@ -237,12 +238,27 @@ function OrderTable({
   );
 }
 
-/** Your listing goes after every order at or under its price: those were there first. */
+/**
+ * The cheapest orders with your listing among them, after every order at or
+ * under its price (those were there first). Orders past `ORDER_LEVELS` show
+ * only when your listing sits behind them.
+ */
 function withYourListing(ladder: readonly LadderLevel[], price: number, units: number): OrderRow[] {
-  const levels = ladder.slice(0, ORDER_LEVELS).map((l) => ({ ...l, marked: false }));
-  const at = levels.findIndex((level) => level.price > price);
-  const yours = { price, units, marked: true };
-  return at === -1 ? [...levels, yours] : [...levels.slice(0, at), yours, ...levels.slice(at)];
+  const found = ladder.findIndex((level) => level.price > price);
+  const at = found === -1 ? ladder.length : found;
+  const levels = ladder.map(({ price, units }) => ({ price, units, marked: false }));
+  const rows = [...levels.slice(0, at), { price, units, marked: true }, ...levels.slice(at)];
+  return rows.slice(0, Math.max(ORDER_LEVELS, at) + 1);
+}
+
+/** The dearest buy orders, marked where `units` sold in order would fill them. */
+function soldInto(ladder: readonly LadderLevel[], units: number): OrderRow[] {
+  let before = 0;
+  return ladder.slice(0, ORDER_LEVELS).map((level) => {
+    const marked = before < units;
+    before += level.units;
+    return { price: level.price, units: level.units, marked };
+  });
 }
 
 function LedgerLine({
@@ -277,7 +293,6 @@ function LedgerLine({
   );
 }
 
-/** The unit volume, and how much the Trip Plan brings and what capped it. */
 function PlanNote({
   row,
   line,
@@ -291,10 +306,11 @@ function PlanNote({
   const volume = t('market.hauling.volumeEach', {
     m3: row.unitVolumeM3.toLocaleString(undefined, { maximumFractionDigits: 3 }),
   });
-  if (!line || line.quantity === 0) return <p className="text-xs text-text-dim">{volume}</p>;
+  const planned = plannedUnits(line);
+  if (planned === undefined) return <p className="text-xs text-text-dim">{volume}</p>;
   const units = t('market.hauling.itemDetail.planUnits', {
-    count: line.quantity,
-    units: line.quantity.toLocaleString(),
+    count: planned,
+    units: planned.toLocaleString(),
   });
   return (
     <p className="text-xs text-text-dim">
@@ -306,9 +322,34 @@ function PlanNote({
   );
 }
 
-function MathDisclosure({ children }: { children: ReactNode }) {
+type Lot = ReturnType<typeof lotEconomics>;
+
+/**
+ * Per unit of the load the row's figures are worked on, so the ledger adds up
+ * to the row's profit each.
+ */
+function TheMath({
+  row,
+  line,
+  loadNote,
+  lot,
+  sellLabel,
+  sellEach,
+  noneProfitable,
+  children,
+}: {
+  row: HaulingViewRow;
+  line: TripLine | undefined;
+  loadNote: string | undefined;
+  lot: Lot;
+  sellLabel: string;
+  sellEach: number;
+  noneProfitable: string;
+  children: ReactNode;
+}) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
+  const per = (value: number) => (lot.filled > 0 ? value / lot.filled : 0);
   return (
     <Disclosure
       label={t('market.hauling.itemDetail.showMath')}
@@ -316,7 +357,41 @@ function MathDisclosure({ children }: { children: ReactNode }) {
       onToggle={() => setOpen((was) => !was)}
       className="border-y border-line"
     >
-      <div className="flex flex-col gap-1.5 p-3">{children}</div>
+      <div className="flex flex-col gap-1.5 p-3">
+        {lot.filled === 0 ? (
+          <p className="text-xs text-text-dim">{noneProfitable}</p>
+        ) : (
+          <>
+            <LedgerLine
+              label={t('market.hauling.detail.buyIn', { hub: row.fromHub.systemName })}
+              amount={`−${formatMarketIsk(per(lot.cost))}`}
+            />
+            <LedgerLine label={sellLabel} amount={`+${formatMarketIsk(sellEach)}`} />
+            <LedgerLine
+              label={t('market.hauling.detail.tax')}
+              note={`${lot.salesTaxPct.toFixed(2)}%`}
+              amount={`−${formatMarketIsk(per(lot.salesTax))}`}
+            />
+            {row.mode === 'list' && (
+              <LedgerLine
+                label={t('market.hauling.detail.broker')}
+                note={`${lot.brokerFeePct.toFixed(2)}%`}
+                amount={`−${formatMarketIsk(per(lot.brokerFee))}`}
+              />
+            )}
+            <div className="border-t border-line pt-1.5">
+              <LedgerLine
+                strong
+                tone={row.profitPerUnit >= 0 ? 'success' : 'danger'}
+                label={t('market.hauling.itemDetail.profitEachLine')}
+                amount={signed(row.profitPerUnit)}
+              />
+            </div>
+          </>
+        )}
+        <PlanNote row={row} line={line} loadNote={loadNote} />
+        {children}
+      </div>
     </Disclosure>
   );
 }
@@ -344,22 +419,20 @@ function ListingBody({
   loadNote: string | undefined;
 }) {
   const { t } = useTranslation();
-  const { sale, fromHub: from, toHub: to } = row;
-  // The same load `toViewRows` priced, so the ledger adds up to the row's profit each.
+  const { sale, toHub: to } = row;
   const lot = lotEconomics({
     buyLadder: row.buyLadder,
     expectedPrice: sale.price,
     quantity: row.suggestedUnits,
     fees: row.fees,
   });
-  const per = (value: number) => (lot.filled > 0 ? value / lot.filled : 0);
 
   return (
     <>
       <PayAtMost row={row} />
       <OrderTable
         title={t('market.hauling.detail.ordersTitle', { hub: to.systemName })}
-        rows={withYourListing(row.destLadder, sale.price, unitsOf(row, line))}
+        rows={withYourListing(row.destLadder, sale.price, plannedUnits(line) ?? row.suggestedUnits)}
         markLabel={t('market.hauling.itemDetail.yourListing')}
       />
       <div className="flex flex-col gap-0.5">
@@ -381,40 +454,15 @@ function ListingBody({
           </span>
         </span>
       </div>
-      <MathDisclosure>
-        {lot.filled === 0 ? (
-          <p className="text-xs text-text-dim">{t('market.hauling.itemDetail.noneProfitable')}</p>
-        ) : (
-          <>
-            <LedgerLine
-              label={t('market.hauling.detail.buyIn', { hub: from.systemName })}
-              amount={`−${formatMarketIsk(per(lot.cost))}`}
-            />
-            <LedgerLine
-              label={t('market.hauling.detail.sellIn', { hub: to.systemName })}
-              amount={`+${formatMarketIsk(sale.price)}`}
-            />
-            <LedgerLine
-              label={t('market.hauling.detail.tax')}
-              note={`${lot.salesTaxPct.toFixed(2)}%`}
-              amount={`−${formatMarketIsk(per(lot.salesTax))}`}
-            />
-            <LedgerLine
-              label={t('market.hauling.detail.broker')}
-              note={`${lot.brokerFeePct.toFixed(2)}%`}
-              amount={`−${formatMarketIsk(per(lot.brokerFee))}`}
-            />
-            <div className="border-t border-line pt-1.5">
-              <LedgerLine
-                strong
-                tone={row.profitPerUnit >= 0 ? 'success' : 'danger'}
-                label={t('market.hauling.itemDetail.profitEachLine')}
-                amount={signed(row.profitPerUnit)}
-              />
-            </div>
-          </>
-        )}
-        <PlanNote row={row} line={line} loadNote={loadNote} />
+      <TheMath
+        row={row}
+        line={line}
+        loadNote={loadNote}
+        lot={lot}
+        sellLabel={t('market.hauling.detail.sellIn', { hub: to.systemName })}
+        sellEach={sale.price}
+        noneProfitable={t('market.hauling.itemDetail.noneProfitable')}
+      >
         <p className="pt-1.5 text-xs text-text-dim">
           <b className="text-text">
             {t('market.hauling.itemDetail.whyLead', { price: formatMarketIsk(sale.price) })}
@@ -427,7 +475,7 @@ function ListingBody({
         <p className="text-xs text-text-dim">
           {t('market.hauling.detail.regionNote', { hub: to.systemName })}
         </p>
-      </MathDisclosure>
+      </TheMath>
     </>
   );
 }
@@ -442,7 +490,7 @@ function InstantBody({
   loadNote: string | undefined;
 }) {
   const { t } = useTranslation();
-  const { fromHub: from, toHub: to } = row;
+  const { toHub: to } = row;
   const lot = lotEconomics({
     buyLadder: row.buyLadder,
     expectedPrice: 0,
@@ -450,13 +498,8 @@ function InstantBody({
     fees: row.fees,
     destBuyLadder: row.destBuyLadder,
   });
-  const per = (value: number) => (lot.filled > 0 ? value / lot.filled : 0);
-  // The orders the load sells into, dearest first, are the marked ones.
-  const units = lot.filled > 0 ? unitsOf(row, line) : 0;
-  const orders = row.destBuyLadder.slice(0, ORDER_LEVELS).reduce<OrderRow[]>((acc, level) => {
-    const before = acc.reduce((sum, l) => sum + l.units, 0);
-    return [...acc, { price: level.price, units: level.units, marked: before < units }];
-  }, []);
+  // The plan's quantity when it brings some, else what the row's figures sell.
+  const orders = soldInto(row.destBuyLadder, plannedUnits(line) ?? lot.filled);
 
   return (
     <>
@@ -466,39 +509,19 @@ function InstantBody({
         rows={orders}
         note={t('market.hauling.itemDetail.buyOrdersNote')}
       />
-      <MathDisclosure>
-        {lot.filled === 0 ? (
-          <p className="text-xs text-text-dim">{t('market.hauling.detail.noneProfitable')}</p>
-        ) : (
-          <>
-            <LedgerLine
-              label={t('market.hauling.detail.buyIn', { hub: from.systemName })}
-              amount={`−${formatMarketIsk(per(lot.cost))}`}
-            />
-            <LedgerLine
-              label={t('market.hauling.detail.sellInto', { hub: to.systemName })}
-              amount={`+${formatMarketIsk(per(lot.revenue))}`}
-            />
-            <LedgerLine
-              label={t('market.hauling.detail.tax')}
-              note={`${lot.salesTaxPct.toFixed(2)}%`}
-              amount={`−${formatMarketIsk(per(lot.salesTax))}`}
-            />
-            <div className="border-t border-line pt-1.5">
-              <LedgerLine
-                strong
-                tone={row.profitPerUnit >= 0 ? 'success' : 'danger'}
-                label={t('market.hauling.itemDetail.profitEachLine')}
-                amount={signed(row.profitPerUnit)}
-              />
-            </div>
-          </>
-        )}
-        <PlanNote row={row} line={line} loadNote={loadNote} />
+      <TheMath
+        row={row}
+        line={line}
+        loadNote={loadNote}
+        lot={lot}
+        sellLabel={t('market.hauling.detail.sellInto', { hub: to.systemName })}
+        sellEach={lot.filled > 0 ? lot.revenue / lot.filled : 0}
+        noneProfitable={t('market.hauling.detail.noneProfitable')}
+      >
         <p className="text-xs text-text-dim">
           {t('market.hauling.detail.instantNote', { hub: to.systemName })}
         </p>
-      </MathDisclosure>
+      </TheMath>
     </>
   );
 }
