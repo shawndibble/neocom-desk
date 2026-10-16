@@ -65,7 +65,7 @@ export {
   type NotificationPreferencesValue,
 } from './preferencesStore';
 export type { CharacterEventThresholds } from './eventThresholdFields';
-/** Re-exported: the threshold field specs live in `eventThresholdFields.ts`, so callers that already import preferences need not reach there. */
+/** Re-export so preferences importers needn't reach `eventThresholdFields.ts`. */
 export {
   STRUCTURE_FUEL_LOW_DAY_OPTIONS,
   EXTRACTOR_EXPIRING_LEAD_HOUR_OPTIONS,

@@ -10,6 +10,12 @@ export function formatVolume(value: number): string {
   return VOLUME_FORMAT.format(value);
 }
 
+/** A signed percentage ("+12.5%", "-3.0%"); a figure that rounds to zero takes no sign. */
+export function formatSignedPct(value: number, digits: number): string {
+  const rounded = Number(value.toFixed(digits));
+  return `${rounded > 0 ? '+' : ''}${rounded.toFixed(digits)}%`;
+}
+
 /** Below this a summed volume is float residue, not cargo. */
 const M3_EPSILON = 1e-6;
 

@@ -16,17 +16,16 @@ import {
 } from '@/components/ui/controlStyles';
 import type { TripPlan } from '@/engine/market/haulingPlan';
 import { ROUTE_PREFERENCE_LABEL_KEYS } from '@/features/route/routePreferences';
-import { clampIskZero, formatIsk, formatIskCompactSigned } from '@/lib/isk';
+import { formatIsk, formatIskCompactSigned } from '@/lib/isk';
 import { useStickyClearance } from '@/lib/useStickyClearance';
 import { formatTripM3 } from './format';
 import { HaulingHoldMeters } from './HaulingHoldMeters';
-import { signedIsk } from './signedIsk';
-import type { HubJumps } from './useHubJumps';
+import { iskGains, signedIsk } from './signedIsk';
+import { useHubJumps } from './useHubJumps';
 
 const isk = (value: number) => formatIsk(value, 0);
 const signed = (value: number) => signedIsk(value, 0);
-/** The same zero test `signedIsk` uses, so the green and the "+" always agree. */
-const gains = (value: number) => clampIskZero(value, 0) > 0;
+const gains = (value: number) => iskGains(value, 0);
 
 /** Literal keys, so the locale split finds them. */
 const BINDING_KEYS = {
@@ -102,13 +101,15 @@ export interface HaulingTripSummaryProps {
   cargoSet: boolean;
   /** "Amarr to Jita"; null with Any hub at an end. */
   laneLabel: string | null;
-  jumps: HubJumps;
+  /** The lane's two Trade Hub systems, for the jump count; null with Any hub at an end. */
+  fromSystemId: number | null;
+  toSystemId: number | null;
   /** The panel's `HaulingCargoControl`. */
   cargoControl: ReactNode;
   /** Cargo value (plan spend) once the ticked fill items are added; null with nothing ticked. */
   cargoValueAfterFill: number | null;
-  /** The free m³ to print, so it matches the fill offer's; defaults to the room left in every hold. */
-  freeM3?: number;
+  /** The free m³ to print: the same figure the fill offer and the trip bar show. */
+  freeM3: number;
 }
 
 function SummaryRow({ label, children }: { label: string; children: ReactNode }) {
@@ -124,23 +125,23 @@ export function HaulingTripSummary({
   plan,
   cargoSet,
   laneLabel,
-  jumps,
+  fromSystemId,
+  toSystemId,
   cargoControl,
   cargoValueAfterFill,
-  freeM3: freeM3Given,
+  freeM3,
 }: HaulingTripSummaryProps) {
   const { t } = useTranslation();
+  // Here, not in the panel: route data loads only once the trip shows.
+  const jumps = useHubJumps(fromSystemId, toSystemId);
   const { profit, cost } = plan.totals;
   const holds = cargoSet ? plan.holds : [];
   let capacityM3 = 0;
   let usedM3 = 0;
-  let roomM3 = 0;
   for (const hold of holds) {
     capacityM3 += hold.capacityM3;
     usedM3 += hold.usedM3;
-    roomM3 += Math.max(0, hold.capacityM3 - hold.usedM3);
   }
-  const freeM3 = freeM3Given ?? roomM3;
   const knownJumps = jumps.status === 'known' && jumps.jumps > 0 ? jumps : null;
 
   const jumpsText = knownJumps
@@ -191,10 +192,7 @@ export function HaulingTripSummary({
               size="md"
             />
           ) : (
-            // Its bars hide in an @container under 26rem; inside one, the rail would lose them.
-            <div className="[&_[role=img]]:!block">
-              <HaulingHoldMeters holds={holds} bindingText={null} />
-            </div>
+            <HaulingHoldMeters holds={holds} />
           )}
           <span className="text-xs text-text-dim tabular-nums">
             {t('market.hauling.rail.used', {
@@ -436,9 +434,7 @@ export function HaulingTripBar({ freeM3, profit, onOpenTrip, copyButton }: Hauli
           {freeM3 !== null && (
             <>{t('market.hauling.tripBar.free', { m3: formatTripM3(freeM3) })} · </>
           )}
-          <span className={profitText.startsWith('+') ? 'text-success' : undefined}>
-            {profitText}
-          </span>
+          <span className={gains(profit) ? 'text-success' : undefined}>{profitText}</span>
         </span>
         <span className="text-xs text-accent">{t('market.hauling.tripBar.details')}</span>
       </button>

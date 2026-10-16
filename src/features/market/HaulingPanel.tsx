@@ -1,5 +1,5 @@
 /**
- * The Travel page's Hauling tab (moved from Market, #3526): what is worth
+ * The Travel page's Hauling tab: what is worth
  * buying at one Trade Hub to sell at another, priced at what a hauler can expect to actually get rather than
  * at today's cheapest listing, and sized to a hold.
  *
@@ -49,15 +49,9 @@ import { cx } from '@/lib/cx';
 import { useIsNarrow } from '@/lib/useIsNarrow';
 import { useElementNarrowerThan } from '@/lib/useElementNarrowerThan';
 import { useIsPhone } from '@/lib/useIsPhone';
-import { planFill } from '@/engine/market/haulingFill';
-import {
-  multibuyText,
-  planTrip,
-  type TripCandidate,
-  type TripOverride,
-} from '@/engine/market/haulingPlan';
-import type { DemandKind, HaulingFlag } from '@/engine/market/haulingMarket';
-import { clampIskZero, formatIsk, formatMarketIsk, marketIskDecimals } from '@/lib/isk';
+import { multibuyText, planTrip, type TripOverride } from '@/engine/market/haulingPlan';
+import type { DemandKind } from '@/engine/market/haulingMarket';
+import { formatIsk, formatMarketIsk, marketIskDecimals } from '@/lib/isk';
 import { writeToClipboard } from '@/lib/clipboard';
 import { createColumnVisibilitySetting, useColumnVisibility } from '@/lib/columnVisibility';
 import { createLocalSetting } from '@/lib/useLocalSetting';
@@ -68,7 +62,7 @@ import {
   type UrlParamValues,
 } from '@/lib/useUrlState';
 import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
-import { loadMarketGroups, loadMarketTypes } from '@/sde/loadMarketSde';
+import { loadMarketGroups } from '@/sde/loadMarketSde';
 import type { MarketGroupNode } from '@/sde/marketTypes';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { HAULING_THRESHOLDS } from '@/engine/market/haulingMarket';
@@ -77,14 +71,14 @@ import { useTableExport } from '@/components/ui/useTableExport';
 import { HaulingCargoControl } from './HaulingCargoControl';
 import { haulingCsvColumns } from './haulingCsv';
 import { HaulingFlagWord } from './HaulingFlagWord';
+import { HAULING_FLAG_KEY } from './haulingFlagKeys';
 import { HaulingItemDetail } from './HaulingItemDetail';
-import { formatTripM3, formatVolume } from './format';
+import { formatSignedPct, formatTripM3, formatVolume } from './format';
 import {
   HaulingFillList,
   HaulingTripBar,
   HaulingTripRail,
   HaulingTripSummary,
-  type HaulingFillItem,
 } from './HaulingTripRail';
 import { useHaulingBudget, useHaulingCargo } from './haulingCargo';
 import {
@@ -97,7 +91,6 @@ import {
   EVERYTHING_CATEGORY_ID,
   DEFAULT_HAULING_CATEGORY_ID,
   HAULING_CATEGORY_OPTIONS,
-  haulingCategoryByType,
   isHaulingCategoryId,
 } from './haulingCategories';
 import {
@@ -119,10 +112,9 @@ import {
   type HaulingHubChoice,
 } from './haulingHubs';
 import { rememberHaulingSummary, summarizeHaulingRows } from './haulingSummary';
-import { signedIsk } from './signedIsk';
+import { iskGains, signedIsk } from './signedIsk';
 import { useHaulingFees, useHaulingScan } from './useHaulingScan';
-import { useHaulingFillScan } from './useHaulingFillScan';
-import { useHubJumps } from './useHubJumps';
+import { useHaulingFill, useHaulingFillOffer } from './useHaulingFill';
 import {
   HAUL_MODES,
   MAX_BOOK_CANDIDATES,
@@ -142,7 +134,7 @@ const TABLE_WIDTHS = {
   oneHub: { compact: 45, cards: 42.5 },
   anyHub: { compact: 50.5, cards: 48 },
 } as const;
-/** The rail's 20rem and the 1rem gap beside it: the rail shows only where the table keeps its full figures beside it. */
+/** Rail 20rem + 1rem gap; rail only where table keeps full figures beside it. */
 const RAIL_REM = 21;
 const RAIL_GRID = { gridTemplateColumns: 'minmax(0, 1fr) 20rem' } as const;
 const MARGIN_CHOICES = [0, 3, 5, 10] as const;
@@ -235,12 +227,7 @@ const DEMAND_MARK: Record<DemandKind, string> = {
   rarely: 'rounded-[1px] bg-danger',
 };
 
-function signed(value: number, fractionDigits: number): string {
-  return `${value >= 0 ? '+' : ''}${value.toFixed(fractionDigits)}`;
-}
-
 const NO_OVERRIDES: ReadonlyMap<number, TripOverride> = new Map();
-const NO_IDS: ReadonlySet<number> = new Set();
 
 /** What the page header needs to render Hauling's reload button and Data Age beside the page title. */
 export interface HaulingRefreshInfo {
@@ -320,9 +307,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     widths.compact + RAIL_REM,
   ]);
   const railShown = !isPhone && !layoutNarrow;
-  // A narrow table goes compact: its full figures (`12,080,000.00`) left
-  // the Item column no room and scrolled the page sideways. Narrower than
-  // even the compact columns, the rows become the phone's cards.
+  // Narrow table → compact figures (full ones starve Item, scroll page); narrower still → cards.
   const [tableRef, [tableNarrow = false, tableCards = false]] =
     useElementNarrowerThan<HTMLDivElement>([widths.compact, widths.cards]);
   // The table's `stacked`, and every cell class that would otherwise follow
@@ -427,9 +412,6 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
   // The user's edits belong to one scan: a new route, category or mode starts
   // a fresh plan — the fill and the items added from it included.
   const [overrides, setOverrides] = useState<ReadonlyMap<number, TripOverride>>(NO_OVERRIDES);
-  const [fillRequested, setFillRequested] = useState(false);
-  const [addedIds, setAddedIds] = useState<ReadonlySet<number>>(NO_IDS);
-  const [unticked, setUnticked] = useState<ReadonlySet<number>>(NO_IDS);
   const [selectedTypeId, setSelectedTypeId] = useState<number | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [tripOpen, setTripOpen] = useState(false);
@@ -445,195 +427,89 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
   if (overridesFor !== scanKey) {
     setOverridesFor(scanKey);
     setOverrides(NO_OVERRIDES);
-    setFillRequested(false);
-    setAddedIds(NO_IDS);
-    setUnticked(NO_IDS);
     setSelectedTypeId(null);
     setDetailOpen(false);
   }
 
-  // A reload re-prices the lane: the fill's offer and the rows added from it
-  // were priced from the old books, so they go and the user asks again.
+  const fill = useHaulingFill({
+    from,
+    to,
+    categoryId,
+    mode,
+    laneKey: scanKey,
+    feesAt: fees.at,
+    filters: rowFilters,
+    groups,
+  });
+  // A reload re-prices the lane: the fill and the rows added from it were
+  // priced from the old books, so they go, and with them Add's pins.
+  const resetFill = fill.reset;
   const reload = useCallback(() => {
     refresh();
-    setFillRequested(false);
-    setAddedIds(NO_IDS);
-    setUnticked(NO_IDS);
-    // Their quantities were pinned on Add; left behind, Fill hold would stay on with nothing edited.
-    setOverrides((current) => {
-      const next = new Map([...current].filter(([typeId]) => !addedIds.has(typeId)));
-      return next.size === current.size ? current : next;
-    });
-  }, [refresh, addedIds]);
+    const dropped = resetFill();
+    if (dropped.size === 0) return;
+    setOverrides((current) => new Map([...current].filter(([id]) => !dropped.has(id))));
+  }, [refresh, resetFill]);
   useEffect(() => {
     onRefreshInfoChange?.({ refresh: reload, disabled: refreshDisabled, fetchedAt });
     return () => onRefreshInfoChange?.(null);
   }, [onRefreshInfoChange, reload, refreshDisabled, fetchedAt]);
+
+  const tableRows = useMemo(
+    () => (fill.addedRows.length === 0 ? shown : [...shown, ...fill.addedRows]),
+    [shown, fill.addedRows]
+  );
+  const tableCandidates = useMemo(() => tableRows.map((r) => r.candidate), [tableRows]);
+
+  // Every candidate carries its own destination's fees; `fees` here is only the fallback.
+  const planBase = useMemo(
+    () => ({ holds: cargo?.holds ?? null, budgetIsk: budget, fees: fees.at(TRADE_HUBS[0]!) }),
+    [cargo, budget, fees]
+  );
+  const plan = useMemo(
+    () => planTrip({ ...planBase, candidates: tableCandidates, overrides }),
+    [planBase, tableCandidates, overrides]
+  );
+  const lineOf = useMemo(() => new Map(plan.lines.map((l) => [l.typeId, l])), [plan]);
+  // The Profit column sorts by the suggestion, not the edited plan: unticking
+  // a row or typing in Bring must not move the row out from under the pointer.
+  // Unedited, the suggestion is the plan itself.
+  const noEdits = overrides.size === 0;
+  const suggestion = useMemo(
+    () =>
+      noEdits
+        ? null
+        : planTrip({ ...planBase, candidates: tableCandidates, overrides: NO_OVERRIDES }),
+    [noEdits, planBase, tableCandidates]
+  );
+  const suggestedProfitOf = useMemo(
+    () => new Map((suggestion ?? plan).lines.map((l) => [l.typeId, l.profit])),
+    [suggestion, plan]
+  );
+
+  /** The room left in every hold: one figure for the summary, the fill offer and the trip bar. */
+  const freeM3 = plan.holds.reduce((sum, h) => sum + Math.max(0, h.capacityM3 - h.usedM3), 0);
 
   // Fill the free space: on demand only (the scan costs ESI budget), never for
   // Everything (no other category left), only once a Cargo Space binds the plan,
   // and on a fixed lane only: with Any hub at an end it would scan every hub's books.
   const fillOffered =
     categoryId !== EVERYTHING_CATEGORY_ID && cargoSet && anyEnd === null && !sameHub;
-  const fill = useHaulingFillScan(from, to, categoryId, mode, fillRequested);
-  const fillShown = useMemo(
-    () =>
-      fill.state.status === 'ready'
-        ? filterHaulingRows(toViewRows(fill.state.scan.rows, fees.at), rowFilters).shown
-        : [],
-    [fill.state, fees, rowFilters]
-  );
-  // Each fill row's Hauling category, for "Fuel Blocks · 9,000 m³". Loaded
-  // once a fill is ready: the scan has just read the same file, so it is cached.
-  const [categoryByType, setCategoryByType] = useState<ReadonlyMap<number, number> | null>(null);
-  const fillReady = fill.state.status === 'ready';
-  useEffect(() => {
-    if (!fillReady || groups === null || categoryByType !== null) return;
-    let cancelled = false;
-    void loadMarketTypes()
-      .then((types) => {
-        if (!cancelled) setCategoryByType(haulingCategoryByType(groups, types));
-      })
-      .catch(() => {
-        // The rows still show; only their category line is empty.
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [fillReady, groups, categoryByType]);
-  const fillCategoryName = (typeId: number) => {
-    const id = categoryByType?.get(typeId);
-    return id === undefined ? '' : categoryName(id);
-  };
-
-  // The table: the scanned rows, then any the user added from the fill.
-  const tableRows = useMemo(() => {
-    if (addedIds.size === 0) return shown;
-    return [...shown, ...fillShown.filter((r) => addedIds.has(r.typeId))];
-  }, [shown, fillShown, addedIds]);
-  const tableCandidates = useMemo(() => tableRows.map((r) => r.candidate), [tableRows]);
-
-  const holds = cargo?.holds ?? null;
-  // Every candidate carries its own destination's fees; this is only the fallback.
-  const fallbackFees = useMemo(() => fees.at(TRADE_HUBS[0]!), [fees]);
-  const plan = useMemo(
-    () =>
-      planTrip({
-        candidates: tableCandidates,
-        holds,
-        budgetIsk: budget,
-        fees: fallbackFees,
-        overrides,
+  const fillOffer = useHaulingFillOffer(fill, {
+    offered: fillOffered,
+    current: tableCandidates,
+    overrides,
+    before: plan,
+    base: planBase,
+    categoryName,
+    pin: (lines) =>
+      setOverrides((current) => {
+        const next = new Map(current);
+        for (const line of lines)
+          next.set(line.typeId, { selected: true, quantity: line.quantity });
+        return next;
       }),
-    [tableCandidates, holds, budget, fallbackFees, overrides]
-  );
-  const lineOf = useMemo(() => new Map(plan.lines.map((l) => [l.typeId, l])), [plan]);
-  // The Profit column sorts by the suggestion, not the edited plan: unticking
-  // a row or typing in Bring must not move the row out from under the pointer.
-  const suggestedProfitOf = useMemo(() => {
-    const suggestion = planTrip({
-      candidates: tableCandidates,
-      holds,
-      budgetIsk: budget,
-      fees: fallbackFees,
-      overrides: NO_OVERRIDES,
-    });
-    return new Map(suggestion.lines.map((l) => [l.typeId, l.profit]));
-  }, [tableCandidates, holds, budget, fallbackFees]);
-
-  /** The room left in every hold: one figure for the summary, the fill offer and the trip bar. */
-  const freeM3 = plan.holds.reduce((sum, h) => sum + Math.max(0, h.capacityM3 - h.usedM3), 0);
-
-  // What the fill offers: every other-category row not yet added, sized into
-  // the space and ISK the current plan leaves (`planFill` pins the plan).
-  const fillExtras = useMemo(
-    () => (fillOffered ? fillShown.filter((r) => !addedIds.has(r.typeId)) : []),
-    [fillOffered, fillShown, addedIds]
-  );
-  const fillPlanOf = useCallback(
-    (extras: readonly TripCandidate[]) =>
-      extras.length === 0
-        ? null
-        : planFill({
-            current: tableCandidates,
-            overrides,
-            extras,
-            holds,
-            budgetIsk: budget,
-            fees: fallbackFees,
-          }),
-    [tableCandidates, overrides, holds, budget, fallbackFees]
-  );
-  const fillPlan = useMemo(
-    () => fillPlanOf(fillExtras.map((r) => r.candidate)),
-    [fillPlanOf, fillExtras]
-  );
-  const fillLines = useMemo(() => fillPlan?.lines ?? [], [fillPlan]);
-  // Every offered item starts ticked; the user unticks what they don't want.
-  // The ticked ones are sized again on their own (an unticked item frees room
-  // for the rest), so each line and the Add button show exactly what Add loads.
-  const tickedPlan = useMemo(() => {
-    if (!fillLines.some((l) => unticked.has(l.typeId))) return fillPlan;
-    const offered = new Set(fillLines.map((l) => l.typeId));
-    return fillPlanOf(
-      fillExtras
-        .filter((r) => offered.has(r.typeId) && !unticked.has(r.typeId))
-        .map((r) => r.candidate)
-    );
-  }, [fillPlanOf, fillPlan, fillLines, fillExtras, unticked]);
-  const tickedLineOf = new Map((tickedPlan?.lines ?? []).map((l) => [l.typeId, l]));
-  const fillItems: HaulingFillItem[] = fillLines.map((offered) => {
-    const line = tickedLineOf.get(offered.typeId) ?? offered;
-    return {
-      typeId: line.typeId,
-      name: line.name,
-      categoryName: fillCategoryName(line.typeId),
-      quantity: line.quantity,
-      volumeM3: line.volumeM3,
-      cost: line.cost,
-      profit: line.profit,
-    };
   });
-  const ticked = new Set(fillLines.filter((l) => !unticked.has(l.typeId)).map((l) => l.typeId));
-  const tickedTotals = {
-    count: tickedPlan?.lines.length ?? 0,
-    volumeM3: tickedPlan?.added.volumeM3 ?? 0,
-    cost: tickedPlan?.added.cost ?? 0,
-    profit: tickedPlan?.added.profit ?? 0,
-  };
-  const holdAfter = tickedPlan
-    ? tickedPlan.after.holds.reduce(
-        (sum, h) => ({ usedM3: sum.usedM3 + h.usedM3, capacityM3: sum.capacityM3 + h.capacityM3 }),
-        { usedM3: 0, capacityM3: 0 }
-      )
-    : null;
-
-  function findFill() {
-    // The hook scans when asked the first time; after that (a retry) it re-scans on `refresh`.
-    if (fillRequested) fill.refresh();
-    else setFillRequested(true);
-  }
-
-  /** Adds the ticked fill lines pinned at the quantities shown, so the plan already shipped stays as it was. */
-  function addFill() {
-    const lines = tickedPlan?.lines ?? [];
-    if (lines.length === 0) return;
-    setAddedIds((current) => new Set([...current, ...lines.map((l) => l.typeId)]));
-    setOverrides((current) => {
-      const next = new Map(current);
-      for (const line of lines) next.set(line.typeId, { selected: true, quantity: line.quantity });
-      return next;
-    });
-  }
-
-  function toggleFill(typeId: number, on: boolean) {
-    setUnticked((current) => {
-      const next = new Set(current);
-      if (on) next.delete(typeId);
-      else next.add(typeId);
-      return next;
-    });
-  }
 
   function patchOverride(typeId: number, patch: TripOverride | null) {
     setOverrides((current) => {
@@ -718,38 +594,19 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     return `${unit}${holdsText}${t(`market.hauling.limit.${line.limitedBy}`)}`;
   };
 
-  const flagLabel = useMemo<Record<HaulingFlag, { text: string; tip: string }>>(
-    () => ({
-      crowded: {
-        text: t('market.hauling.flags.crowded'),
-        tip: t('market.hauling.flags.crowdedTip'),
-      },
-      thin: { text: t('market.hauling.flags.thin'), tip: t('market.hauling.flags.thinTip') },
-      outlier: {
-        text: t('market.hauling.flags.outlier'),
-        tip: t('market.hauling.flags.outlierTip'),
-      },
-      'low-margin': {
-        text: t('market.hauling.flags.lowMargin'),
-        tip: t('market.hauling.flags.lowMarginTip'),
-      },
-    }),
-    [t]
-  );
-
   const csvColumns = useMemo(
     () =>
       haulingCsvColumns(t, {
         mode,
         anyEnd,
-        flagText: (flag) => flagLabel[flag].text,
+        flagText: (flag) => t(`market.hauling.flags.${HAULING_FLAG_KEY[flag]}`),
         bringFor: (row) => {
           const line = lineOf.get(row.typeId);
           if (!line || overrides.get(row.typeId)?.selected === false) return null;
           return line.quantity;
         },
       }),
-    [t, mode, anyEnd, flagLabel, lineOf, overrides]
+    [t, mode, anyEnd, lineOf, overrides]
   );
   const tableExport = useTableExport({ surface: 'hauling', rows: tableRows, columns: csvColumns });
 
@@ -787,7 +644,10 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       sortValue: (row) => row.name.toLowerCase(),
       render: (row) => {
         // The name is the row's handle, not a link: the row click is its action (§6c).
-        const added = addedIds.has(row.typeId) ? fillCategoryName(row.typeId) : null;
+        const addedCategory = fill.addedIds.has(row.typeId)
+          ? fill.categoryOf?.get(row.typeId)
+          : undefined;
+        const added = addedCategory === undefined ? null : categoryName(addedCategory);
         if (cards) {
           return (
             <span className="flex min-w-0 items-center gap-2">
@@ -888,7 +748,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       // The phone card's headline figure, on the title line.
       cardCorner: true,
       cellClassName: (row) =>
-        (lineOf.get(row.typeId)?.profit ?? 0) > 0 ? 'text-success' : 'text-text-dim',
+        iskGains(lineOf.get(row.typeId)?.profit ?? 0, 0) ? 'text-success' : 'text-text-dim',
       sortValue: (row) => suggestedProfitOf.get(row.typeId) ?? 0,
       render: (row) => {
         const line = lineOf.get(row.typeId);
@@ -897,7 +757,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
             '—'
           ) : compact ? (
             <>
-              {line.profit > 0 ? '+' : ''}
+              {iskGains(line.profit, 0) ? '+' : ''}
               <IskAmount value={line.profit} />
             </>
           ) : (
@@ -908,7 +768,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
           <span className="flex flex-col items-end leading-tight">
             <span className="font-semibold">{profit}</span>
             <span className="text-[0.6875rem] text-text-dim">
-              {t('market.hauling.itemDetail.margin', { pct: `${signed(row.marginPct, 1)}%` })}
+              {t('market.hauling.itemDetail.margin', { pct: formatSignedPct(row.marginPct, 1) })}
             </span>
           </span>
         );
@@ -926,7 +786,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       cellClassName: (row) =>
         row.marginPct >= HAULING_THRESHOLDS.lowMarginPct ? 'text-success' : 'text-text-dim',
       sortValue: (row) => row.marginPct,
-      render: (row) => `${signed(row.marginPct, 1)}%`,
+      render: (row) => formatSignedPct(row.marginPct, 1),
     },
     {
       id: 'iskPerM3',
@@ -1038,10 +898,6 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
   const filterValue = { ...pickHaulingFilter(params), cat: categoryId, mode };
 
   // With Any hub at an end each row has its own lane: no one label, no one jump count.
-  const jumps = useHubJumps(
-    anyEnd === null && from !== ANY_HUB ? from.systemId : null,
-    anyEnd === null && to !== ANY_HUB ? to.systemId : null
-  );
   const laneLabel =
     from !== ANY_HUB && to !== ANY_HUB
       ? t('market.hauling.itemDetail.lane', { from: from.systemName, to: to.systemName })
@@ -1082,10 +938,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       <p className="flex items-baseline gap-2 text-sm tabular-nums">
         {cargoSet && <b>{t('market.hauling.tripBar.free', { m3: formatTripM3(freeM3) })}</b>}
         <span
-          className={cx(
-            'ml-auto font-semibold',
-            clampIskZero(plan.totals.profit, 0) > 0 && 'text-success'
-          )}
+          className={cx('ml-auto font-semibold', iskGains(plan.totals.profit, 0) && 'text-success')}
         >
           {signedIsk(plan.totals.profit, 0)}
         </span>
@@ -1102,7 +955,8 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
         plan={plan}
         cargoSet={cargoSet}
         laneLabel={laneLabel}
-        jumps={jumps}
+        fromSystemId={from !== ANY_HUB && to !== ANY_HUB ? from.systemId : null}
+        toSystemId={from !== ANY_HUB && to !== ANY_HUB ? to.systemId : null}
         cargoControl={
           <HaulingCargoControl
             characterId={activeCharacterId}
@@ -1112,24 +966,15 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
             onBudgetChange={(next) => void setBudget(next)}
           />
         }
-        cargoValueAfterFill={tickedPlan ? tickedPlan.after.totals.cost : null}
+        cargoValueAfterFill={fillOffer.cargoValueAfterFill}
         freeM3={freeM3}
       />
       {/* A full hold has nothing to offer until the user asks (or has asked). */}
-      {fillOffered && (fillRequested || freeM3 >= 1) && (
+      {fillOffered && (fill.requested || freeM3 >= 1) && (
         <HaulingFillList
+          {...fillOffer.list}
           freeM3={freeM3}
-          status={fill.state.status}
-          progressText={
-            fill.state.status === 'loading' ? progressText(fill.state.progress) : undefined
-          }
-          items={fillItems}
-          ticked={ticked}
-          onToggle={toggleFill}
-          onFind={findFill}
-          onAdd={addFill}
-          tickedTotals={tickedTotals}
-          holdAfter={holdAfter}
+          progressText={fill.status === 'loading' ? progressText(fill.progress) : undefined}
         />
       )}
     </div>
@@ -1360,30 +1205,10 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       {/* No title bar: the Hauling tab right above already names the panel. */}
       <Panel padded={false}>
         {/*
-          `search` is documented as the route's search box (DESIGN.md §4b) —
-          Hauling has none. It carries the From/To/Category controls instead,
-          a deliberate deviation: putting them in a sibling row alongside
-          `FilterBar` (rather than inside it) was tried first and rejected —
-          `FilterBar` manages its own two-line box (trigger row, then the
-          opened controls below), so a *shared* flex row reflows the siblings
-          when the box opens: `FilterBar` growing taller pushes a sibling row's
-          own cross-axis alignment around with it. Nesting these controls in
-          `search` avoids that — opening the box only ever adds a second row
-          *below* this one inside `FilterBar` itself, never resizing it — at
-          the cost of the slot's own contract. No table in this codebase has
-          filters with no search box yet; if a second one shows up, that's the
-          signal to give `FilterBar` a real "leading toolbar" slot instead of
-          overloading `search` a second time.
-
-          The controls carry no caption: the `→` between From and To and each
-          select's own value say what they are, and the caption row doubled the
-          bar's height. Each keeps its name as its `aria-label`.
-
-          Category and Sell by sit in the row only where it has the width; on a
-          narrow screen they move into the filter sheet (same `useIsNarrow`
-          breakpoint `FilterBar` itself switches on, so they are never in both
-          places or neither), and a one-line summary under the bar keeps the
-          choice visible.
+          Route controls ride in `search` (no search box here; DESIGN.md §4b): a sibling row
+          would reflow when FilterBar opens. Uncaptioned, `aria-label` names each. Category
+          and Sell by move into the filter sheet below `useIsNarrow` (FilterBar's own
+          breakpoint), with a one-line summary under the bar.
         */}
         <FilterBar
           value={filterValue}

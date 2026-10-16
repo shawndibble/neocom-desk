@@ -1,17 +1,10 @@
 /**
- * One Hauling row's detail, shown in the trip rail (desktop) or a full-height
- * sheet (phone) when the row is selected. Leads with what a hauler checks — the most to pay, the
- * destination's sell orders with the user's own listing among them, Days to
- * Sell — and folds the price derivation and fee math behind "Show the math".
- * Its header carries the item's `ItemMoreActions` ⋮, the home of every
- * action the row's ⋮ and right-click menu used to hold.
- *
- * Sold into buy orders (instant), there is no listing and no Days to Sell: the
- * destination's buy orders the load sells into take the sell orders' place,
- * and the math has sales tax only.
- *
- * Built for a ~20rem rail and a 390px sheet: every figure is a whole token
- * that never breaks mid-number, and labels give way before amounts do.
+ * A selected Hauling row's detail, in the trip rail or a phone sheet: the
+ * most to pay, the destination's sell orders with the user's listing, Days to
+ * Sell, and the math folded behind "Show the math". Sold into buy orders,
+ * the buy orders it fills replace the sell orders and Days to Sell.
+ * Header's `ItemMoreActions` ⋮ carries the item's actions. Sized for a ~20rem
+ * rail and a 390px sheet: figures never break mid-number.
  */
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -20,15 +13,16 @@ import { Disclosure, TypeIcon } from '@/components/ui';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
-import { formatMarketIsk } from '@/lib/isk';
+import { formatMarketIsk, marketIskDecimals } from '@/lib/isk';
 import { HAULING_THRESHOLDS, lotEconomics, type LadderLevel } from '@/engine/market/haulingMarket';
 import { maxBuyPrice, type TripLine } from '@/engine/market/haulingPlan';
 import { ItemInfoLink } from '@/features/entities';
 import { routeToHref } from '@/features/route/routeSafetyLink';
+import { formatSignedPct } from './format';
 import { HaulingFlagWord } from './HaulingFlagWord';
 import { ItemMoreActions } from './ItemContextMenu';
-import { useItemActions } from './itemActions';
 import { MarketItemLink } from './MarketItemLink';
+import { signedIsk } from './signedIsk';
 import type { InstantHaulingScanRow, ListHaulingScanRow } from './haulingData';
 import { formatDaysToSell, type HaulingViewRow } from './haulingView';
 
@@ -48,8 +42,7 @@ export interface HaulingItemDetailProps {
   showTitle?: boolean;
 }
 
-const signed = (value: number) => `${value >= 0 ? '+' : '−'}${formatMarketIsk(Math.abs(value))}`;
-const signedPct = (value: number) => `${value >= 0 ? '+' : '−'}${Math.abs(value).toFixed(1)}%`;
+const signed = (value: number) => signedIsk(value, marketIskDecimals(value));
 
 const plannedUnits = (line: TripLine | undefined) =>
   line && line.quantity > 0 ? line.quantity : undefined;
@@ -75,16 +68,8 @@ export function HaulingItemDetail({
 
 function Header({ row, showTitle }: { row: HaulingViewRow; showTitle: boolean }) {
   const { t } = useTranslation();
-  const { requestBlueprints } = useItemActions();
-  // The row menu loads the blueprint catalog as it opens; this ⋮ has no open
-  // hook, so the first press on it asks instead, and Build Plan is ready (or
-  // "checking…" for a moment) when the menu draws.
   const actions = (
-    <span
-      className="ml-auto shrink-0"
-      onPointerDownCapture={requestBlueprints}
-      onKeyDownCapture={requestBlueprints}
-    >
+    <span className="ml-auto shrink-0">
       <ItemMoreActions typeId={row.typeId} itemName={row.name} />
     </span>
   );
@@ -166,7 +151,7 @@ function PayAtMost({ row }: { row: HaulingViewRow }) {
           </span>
           <span aria-hidden="true">·</span>
           <span className="whitespace-nowrap">
-            {t('market.hauling.itemDetail.margin', { pct: signedPct(row.marginPct) })}
+            {t('market.hauling.itemDetail.margin', { pct: formatSignedPct(row.marginPct, 1) })}
           </span>
         </span>
       )}

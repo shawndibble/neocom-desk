@@ -9461,8 +9461,6 @@
         "days_other": "{{count}} days"
       },
       "plan": {
-        "holdAria": "{{used}} of {{total}} cubic metres used",
-        "holdUsed": "{{used}} of {{total}} m³",
         "holdNamed": "{{name}} {{used}} of {{total}} m³",
         "holdNamedAria": "{{name}}: {{used}} of {{total}} cubic metres used",
         "inHolds": "in {{holds}}"

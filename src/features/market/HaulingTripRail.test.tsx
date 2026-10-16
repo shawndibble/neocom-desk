@@ -4,6 +4,7 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import type { HoldUse, TripPlan } from '@/engine/market/haulingPlan';
+import type { HubJumps } from './useHubJumps';
 import {
   HaulingFillList,
   HaulingTripBar,
@@ -13,6 +14,17 @@ import {
   type HaulingFillListProps,
   type HaulingTripSummaryProps,
 } from './HaulingTripRail';
+
+const hubJumps = vi.hoisted(() => ({
+  calls: [] as [number | null, number | null][],
+  next: null as HubJumps | null,
+}));
+vi.mock('./useHubJumps', () => ({
+  useHubJumps: (from: number | null, to: number | null): HubJumps => {
+    hubJumps.calls.push([from, to]);
+    return hubJumps.next ?? { status: 'known', jumps: 45, preference: 'prefer-highsec' };
+  },
+}));
 
 function plan(holds: HoldUse[], overrides: Partial<TripPlan> = {}): TripPlan {
   return {
@@ -26,13 +38,19 @@ function plan(holds: HoldUse[], overrides: Partial<TripPlan> = {}): TripPlan {
 
 const GENERAL: HoldUse[] = [{ kind: 'general', capacityM3: 64_500, usedM3: 20_038 }];
 
-function renderSummary(props: Partial<HaulingTripSummaryProps> = {}) {
+function renderSummary(
+  props: Partial<HaulingTripSummaryProps> = {},
+  jumps: HubJumps | null = null
+) {
+  hubJumps.next = jumps;
   return render(
     <HaulingTripSummary
       plan={plan(GENERAL)}
       cargoSet
       laneLabel="Amarr to Jita"
-      jumps={{ status: 'known', jumps: 45, preference: 'prefer-highsec' }}
+      fromSystemId={30002187}
+      toSystemId={30000142}
+      freeM3={64_500 - 20_038}
       cargoControl={<button type="button">Mastodon</button>}
       cargoValueAfterFill={null}
       {...props}
@@ -138,6 +156,7 @@ describe('HaulingTripRail', () => {
 describe('HaulingTripSummary', () => {
   it('reads the lane with its jumps by route preference, the free m³ with a meter, and per-jump profit', () => {
     renderSummary({ cargoValueAfterFill: 619_395_524 });
+    expect(hubJumps.calls.at(-1)).toEqual([30002187, 30000142]);
     expect(screen.getByText('Amarr to Jita · 45 jumps (Prefer safer)')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Mastodon' })).toBeInTheDocument();
     expect(screen.getByText('213,965,524', { selector: 'b' })).toBeInTheDocument();
@@ -159,7 +178,7 @@ describe('HaulingTripSummary', () => {
     { status: 'unknown' as const },
     { status: 'none' as const },
   ])('shows no jump figure and no per-jump profit while jumps are $status', ({ status }) => {
-    renderSummary({ jumps: { status } });
+    renderSummary({}, { status });
     expect(screen.getByText('Amarr to Jita')).toBeInTheDocument();
     expect(screen.queryByText(/jumps/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Profit per jump/)).not.toBeInTheDocument();
@@ -179,7 +198,11 @@ describe('HaulingTripSummary', () => {
   });
 
   it('reads a hold full to float residue as 0 free, not <1', () => {
-    renderSummary({ plan: plan([{ kind: 'general', capacityM3: 1, usedM3: 0.7 + 0.2 + 0.1 }]) });
+    const used = 0.7 + 0.2 + 0.1;
+    renderSummary({
+      plan: plan([{ kind: 'general', capacityM3: 1, usedM3: used }]),
+      freeM3: 1 - used,
+    });
     expect(screen.getByText('0 m³')).toBeInTheDocument();
   });
 
@@ -189,6 +212,7 @@ describe('HaulingTripSummary', () => {
         { kind: 'general', capacityM3: 1_000, usedM3: 400 },
         { kind: 'ammo', capacityM3: 500, usedM3: 500 },
       ]),
+      freeM3: 600,
     });
     expect(
       screen.getByRole('img', { name: 'Cargo hold: 400 of 1,000 cubic metres used' })

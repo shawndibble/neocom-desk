@@ -92,15 +92,27 @@ function typeIdsInCategories(
     .sort((a, b) => a - b);
 }
 
-/** Each offered type id's Hauling category: what a fill row names as where it comes from. */
-export function haulingCategoryByType(
+/** The Hauling category each of `typeIds` sits under, found by walking up its market group's parents. */
+export function haulingCategoryOf(
+  typeIds: readonly number[],
   groups: readonly MarketGroupNode[],
   types: readonly MarketTypeEntry[]
 ): Map<number, number> {
+  const wanted = new Set(typeIds);
+  const parentOf = new Map(groups.map((g) => [g.id, g.parentId]));
+  const roots = new Set<number>(HAULING_CATEGORY_IDS);
   const byType = new Map<number, number>();
-  for (const categoryId of HAULING_CATEGORY_IDS) {
-    for (const typeId of typeIdsInCategory(categoryId, groups, types)) {
-      if (!byType.has(typeId)) byType.set(typeId, categoryId);
+  for (const type of types) {
+    if (!wanted.has(type.typeId)) continue;
+    for (
+      let id: number | null | undefined = type.marketGroupId;
+      id != null;
+      id = parentOf.get(id)
+    ) {
+      if (roots.has(id)) {
+        byType.set(type.typeId, id);
+        break;
+      }
     }
   }
   return byType;

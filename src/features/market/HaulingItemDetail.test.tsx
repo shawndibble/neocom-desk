@@ -185,7 +185,7 @@ describe('HaulingItemDetail — listing', () => {
     const user = userEvent.setup();
     const actions = renderDetail(listRow());
     await user.click(screen.getByRole('button', { name: 'More actions for Damage Control II' }));
-    // Pressing the ⋮ loads the blueprint catalog, as the row menu did on opening.
+    // Opening the ⋮ loads the blueprint catalog, so Build Plan can show.
     expect(actions.requestBlueprints).toHaveBeenCalled();
     for (const name of [
       'Add to Quickbar',

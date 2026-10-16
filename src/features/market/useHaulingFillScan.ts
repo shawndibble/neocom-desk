@@ -4,11 +4,9 @@
  * other Hauling category on the lane, run only once `enabled` turns true (the
  * user asked) and never when the category is already Everything.
  *
- * An ask is for one lane: the route, category and mode `enabled` turned on
- * for. Any of them changing abandons the scan in flight and goes back to idle
- * even while `enabled` stays true — the scan costs ESI budget, so it never
- * re-runs on its own. The user asks again by `enabled` going false then true,
- * or by `refresh`, which re-scans the lane already asked for afresh.
+ * One ask = one lane: route/category/mode change aborts → idle even if
+ * `enabled` stays true (scan costs ESI budget; never self-reruns). Re-ask:
+ * toggle `enabled` or `refresh`.
  */
 import { useCallback, useEffect, useState } from 'react';
 import { EVERYTHING_CATEGORY_ID, typeIdsOutsideHaulingCategory } from './haulingCategories';
@@ -19,7 +17,7 @@ import type { HaulingScanState } from './useHaulingScan';
 
 export type HaulingFillScanState = { status: 'idle' } | HaulingScanState;
 
-/** The fill's cache scope: a string, so it never shares an entry with a category scan's numeric one. */
+/** String: never collides with a category's numeric scope. */
 export const haulingFillScope = (categoryId: number): string => `fill-${categoryId}`;
 
 /** One ask from the user for one lane; a refresh is a new ask, so it re-runs. */

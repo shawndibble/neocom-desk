@@ -1,17 +1,7 @@
 /**
- * Fill the free space: what items from other categories would
- * add to a Trip Plan whose own lines stay as they are.
- *
- * The current plan is pinned first — every line it ships keeps its quantity
- * (through `planTrip` overrides), an unticked line stays out — and the extra
- * candidates share only the space and ISK that is left. The result is what
- * adding each extra would load, so the rail can show m³, spend and profit
- * that adding it would actually bring.
- *
- * Every current line is pinned, a line at 0 included: left unpinned it would
- * be sized again beside the extras and the current plan could change.
- *
- * Pure: no fetch/DOM/Dexie.
+ * Fill the free space: pin every current line (ticked → its qty, unticked →
+ * out, 0 included so it isn't re-sized beside extras), then size
+ * other-category extras into the m³/ISK left. Pure.
  */
 import type { CargoHold } from './cargoHolds';
 import type { AppraisalNetFees } from './appraisal';
@@ -33,6 +23,8 @@ export interface PlanFillInput {
   holds: readonly CargoHold[] | null;
   budgetIsk: number | null;
   fees: AppraisalNetFees;
+  /** The current plan when the caller already has it (same inputs); saves planning it again. */
+  before?: TripPlan;
 }
 
 export interface PlanFill {
@@ -47,7 +39,8 @@ export interface PlanFill {
 
 export function planFill(input: PlanFillInput): PlanFill {
   const { current, overrides, holds, budgetIsk, fees } = input;
-  const before = planTrip({ candidates: current, overrides, holds, budgetIsk, fees });
+  const before =
+    input.before ?? planTrip({ candidates: current, overrides, holds, budgetIsk, fees });
 
   const pinned = new Map<number, TripOverride>(
     before.lines.map((line) => [

@@ -193,6 +193,17 @@ describe('planFill', () => {
     );
   });
 
+  it('uses a `before` it is given instead of planning the current lines again', () => {
+    const current = [candidate({ typeId: 1, demandCapUnits: 60 })];
+    const extras = [candidate({ typeId: 2, demandCapUnits: 500 })];
+    const holds = anyHold(100);
+    const planned = fill({ current, extras, holds });
+    const given = fill({ current, extras, holds, before: planned.before });
+
+    expect(given.before).toBe(planned.before);
+    expect(given).toEqual(planned);
+  });
+
   it('sizes the extras by sales alone with no Cargo Space', () => {
     const current = [candidate({ typeId: 1, demandCapUnits: 30 })];
     const extras = [candidate({ typeId: 2, demandCapUnits: 700, unitVolumeM3: 50 })];

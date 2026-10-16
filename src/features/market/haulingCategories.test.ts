@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   EVERYTHING_CATEGORY_ID,
-  haulingCategoryByType,
+  haulingCategoryOf,
   isHaulingCategoryId,
   typeIdsInCategory,
   typeIdsInHaulingCategory,
@@ -69,14 +69,16 @@ describe('isHaulingCategoryId', () => {
   });
 });
 
-describe('haulingCategoryByType', () => {
-  it('maps each offered type to the Hauling category it sits under, at any depth', () => {
-    const byType = haulingCategoryByType(groups, types);
+describe('haulingCategoryOf', () => {
+  it('maps each asked type to the Hauling category it sits under, at any depth', () => {
+    const byType = haulingCategoryOf([10, 30, 20], groups, types);
     expect(byType.get(10)).toBe(11);
     expect(byType.get(30)).toBe(11);
     expect(byType.get(20)).toBe(9);
   });
-  it('leaves out types outside every offered category', () => {
-    expect(haulingCategoryByType(groups, types).has(40)).toBe(false);
+  it('leaves out types outside every offered category, and types not asked for', () => {
+    const byType = haulingCategoryOf([40, 10], groups, types);
+    expect(byType.has(40)).toBe(false);
+    expect(byType.has(30)).toBe(false);
   });
 });
