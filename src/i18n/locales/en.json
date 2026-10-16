@@ -10,7 +10,7 @@
     "tips": {
       "commandPalette": "Press Ctrl+K (Cmd+K on a Mac) to open Go to… and jump to any page from anywhere.",
       "shortcutsList": "Press ? outside a text box to see every keyboard shortcut.",
-      "pageKeys": "Single keys jump between pages: O for Overview, M for Market, I for Industry, W for Wallet.",
+      "pageKeys": "Jump between pages with G then a letter: G O for Overview, G M for Market, G I for Industry, G W for Wallet.",
       "pasteFit": "Paste a fit or an item list outside a text box and Neocom Desk opens it in Fittings or Appraisal.",
       "pasteLocal": "Paste a Local list or a D-Scan outside a text box to check the pilots in Pilot Lookup.",
       "pasteBack": "After a paste takes you to a page, the browser's Back button returns you to where you were.",
@@ -10949,6 +10949,9 @@
     },
     "displayTitle": "Display",
     "fontScaleLabel": "Text size",
+    "singleKeyShortcutsLabel": "Single-key shortcuts",
+    "singleKeyShortcutsHint": "G then a letter jumps between pages, and ? lists them, anywhere outside a text field. Turn them off if you set them off by accident, for example with speech input. Stays on this device.",
+    "singleKeyShortcutsOffNote": "Single-key shortcuts are off. Esc still closes an open dialog, and the command palette still opens from its key. Stays on this device.",
     "fontScaleHint": "Scales text and controls together. Applies immediately and stays on this device.",
     "fontScaleSmall": "Small",
     "fontScaleDefault": "Default",
@@ -11287,6 +11290,8 @@
     "goToMiningTax": "Go to Mining tax",
     "openSettings": "Open Settings",
     "showShortcuts": "Show this shortcut list",
+    "then": "then",
+    "offNote": "Single-key shortcuts are off, so only Esc and the command palette key respond. Turn them on in Settings › Display.",
     "close": "Close the open dialog",
     "onPageTitle": "On a page",
     "onPageHint": "These work inside text boxes too. Every fitting edit is in the address bar, so your browser's Back button is undo.",
@@ -11306,10 +11311,6 @@
       "fitting": {
         "label": "EFT fitting",
         "opens": "Opens in Fittings"
-      },
-      "chatLink": {
-        "label": "Chat link",
-        "opens": "Opens the item or system page"
       },
       "dscan": {
         "label": "D-Scan",

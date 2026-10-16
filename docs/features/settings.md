@@ -34,7 +34,7 @@ Section order/grouping: `src/features/settings/sections.ts:15`. A section added 
 - **Top jobs (ranked):** 1. "Set the assumptions my pages start from, once, for every device" (Defaults, `20260907-221425`). 2. "Choose which events reach me, and how" (Notifications). 3. "Fix, move or leave" (clear cache, backup, delete all data).
 - **Device and cadence:** desktop primary (owner, 2026-10-11), occasional. Phone parity: its own list-then-drill layout with value summaries (`20260925-120313`); footer page with `mobileTab: false`.
 - **Above the fold:** desktop: the grouped section rail and Display; phone: the grouped list with each section's current value.
-- **Not for:** a page's own settings mid-task (the page settings modal opens the same form, `20261004-155006`); shortcuts, FAQ and support (`/help`).
+- **Not for:** a page's own settings mid-task (the page settings modal opens the same form, `20261004-155006`); the shortcut list, FAQ and support (`/help`); only the "Single-key shortcuts" off switch lives here, in Display (`useSingleKeyShortcuts`, device-local).
 - **Sources:** owner, 2026-10-11 (desktop primary); decisions listed under "Decisions and ADRs" below, chiefly `20260907-221425`, `20260925-084119`, `20260925-120313`, `20261004-155006`; ADR 0014.
 - **Unconfirmed:** the job ranking and visit cadence.
 

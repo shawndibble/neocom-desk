@@ -112,9 +112,9 @@ export function isTypingTarget(target: EventTarget | null): boolean {
 
 /**
  * Ctrl+K / Cmd+K, the Command Palette (#2318). Not a `SHORTCUTS` row: that
- * table is single unmodified keys, dispatched by a listener that ignores
- * modifiers and is switched off entirely with single-key shortcuts (WCAG
- * 2.1.4). A modified chord is not what that criterion is about, so this one
+ * table is unmodified keys, dispatched by a listener that ignores
+ * modifiers and is switched off with the Settings "Single-key shortcuts"
+ * switch (WCAG 2.1.4). A modified chord is not what that criterion is about, so this one
  * stays live regardless — its listener is `CommandPaletteHost`'s
  * (`features/commandPalette`), and it fires from inside a text field too.
  *
@@ -174,6 +174,13 @@ export interface ShortcutDef {
   readonly id: string;
   /** Matches `KeyboardEvent.key` exactly. Ctrl/Meta/Alt never reach a match; Shift does, via `allowsShift`. */
   readonly key: string;
+  /**
+   * True for a key pressed after the `g` prefix ("g then o"), so a stray
+   * letter or a spoken one fires nothing on its own. `?` and Escape stay
+   * single keys. Both kinds answer to the Settings off switch except Escape,
+   * which has no `run`.
+   */
+  readonly sequence?: true;
   /** What the key looks like on screen — kept separate from `key` since `key` must match the DOM event verbatim ('Escape', not 'Esc'). */
   readonly displayKey: string;
   /**
@@ -184,7 +191,7 @@ export interface ShortcutDef {
    * the same character without Shift reaches the same shortcut.
    */
   readonly allowsShift?: true;
-  /** i18next key for the action's description, shown in the Settings shortcut list. */
+  /** i18next key for the action's description, shown in the Help › Shortcuts list. */
   readonly descriptionKey: string;
   /**
    * Absent for a shortcut whose behaviour already exists elsewhere — Escape
@@ -205,6 +212,7 @@ export const SHORTCUTS: readonly ShortcutDef[] = [
     id: 'switch-character',
     key: 'c',
     displayKey: 'C',
+    sequence: true,
     descriptionKey: 'shortcuts.switchCharacter',
     run: (navigate) => navigate('/characters'),
   },
@@ -212,6 +220,7 @@ export const SHORTCUTS: readonly ShortcutDef[] = [
     id: 'go-to-overview',
     key: 'o',
     displayKey: 'O',
+    sequence: true,
     descriptionKey: 'shortcuts.goToOverview',
     run: (navigate) => navigate('/overview'),
   },
@@ -219,6 +228,7 @@ export const SHORTCUTS: readonly ShortcutDef[] = [
     id: 'go-to-market',
     key: 'm',
     displayKey: 'M',
+    sequence: true,
     descriptionKey: 'shortcuts.goToMarket',
     run: (navigate) => navigate('/market'),
   },
@@ -226,6 +236,7 @@ export const SHORTCUTS: readonly ShortcutDef[] = [
     id: 'go-to-industry',
     key: 'i',
     displayKey: 'I',
+    sequence: true,
     descriptionKey: 'shortcuts.goToIndustry',
     run: (navigate) => navigate('/industry'),
   },
@@ -233,6 +244,7 @@ export const SHORTCUTS: readonly ShortcutDef[] = [
     id: 'go-to-wallet',
     key: 'w',
     displayKey: 'W',
+    sequence: true,
     descriptionKey: 'shortcuts.goToWallet',
     run: (navigate) => navigate('/wallet'),
   },
@@ -240,6 +252,7 @@ export const SHORTCUTS: readonly ShortcutDef[] = [
     id: 'go-to-planetary-industry',
     key: 'p',
     displayKey: 'P',
+    sequence: true,
     descriptionKey: 'shortcuts.goToPlanetaryIndustry',
     run: (navigate) => navigate('/planetary-industry'),
   },
@@ -247,6 +260,7 @@ export const SHORTCUTS: readonly ShortcutDef[] = [
     id: 'go-to-alerts',
     key: 'a',
     displayKey: 'A',
+    sequence: true,
     descriptionKey: 'shortcuts.goToAlerts',
     run: (navigate) => navigate('/alerts'),
   },
@@ -254,13 +268,15 @@ export const SHORTCUTS: readonly ShortcutDef[] = [
     id: 'go-to-mining-tax',
     key: 't',
     displayKey: 'T',
+    sequence: true,
     descriptionKey: 'shortcuts.goToMiningTax',
     run: (navigate) => navigate('/mining/tax'),
   },
   {
     id: 'open-settings',
-    key: ',',
-    displayKey: ',',
+    key: 's',
+    displayKey: 'S',
+    sequence: true,
     descriptionKey: 'shortcuts.openSettings',
     run: (navigate) => navigate('/settings'),
   },
