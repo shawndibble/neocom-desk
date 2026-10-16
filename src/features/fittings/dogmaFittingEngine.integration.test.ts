@@ -1553,6 +1553,75 @@ const SUPPORT_SKILL_IDS = Array.from({ length: 200 }, (_, i) => 3300 + i);
 const MINING_SKILL_IDS = [...SUPPORT_SKILL_IDS, 17940, 22551];
 
 // Runs on the engine and SDE loaded once for the whole file.
+describe('mutated (abyssal) modules (real WASM + real pinned SDE)', () => {
+  // Heavy Abyssal Energy Neutralizer (47832) made from a Heavy Gremlin
+  // Compact Energy Neutralizer (16475) with a Gravid mutaplasmid (47831) —
+  // the rolls of a live ESI dynamic item (contract item 1054645434634).
+  const HEAVY_GREMLIN_NEUT = 16475;
+  const HEAVY_ABYSSAL_NEUT = 47832;
+  const NO_SKILLS = {
+    skillLevels: new Map<number, number>(),
+    implantTypeIds: [],
+    boosterTypeIds: [],
+  };
+  const neutFit = (module: Fitting['modules'][number]): Fitting => ({
+    name: 'Neut',
+    shipTypeId: VEXOR_NAVY_ISSUE,
+    modules: [module],
+    drones: [],
+    cargo: [],
+  });
+  const attr = (fitting: Fitting, id: number) =>
+    calculate(fittingToDogmaFit(fitting, NO_SKILLS)).items[0]?.attributes.get(id)?.value;
+
+  it('states a rolled module from its base, with the rolls in place of the base values', () => {
+    const rolled = neutFit({
+      slot: 'high',
+      slotIndex: 0,
+      typeId: HEAVY_ABYSSAL_NEUT,
+      state: 'active',
+      mutation: {
+        baseTypeId: HEAVY_GREMLIN_NEUT,
+        mutaplasmidTypeId: 47831,
+        attributes: { 6: 419.25, 54: 15680, 97: 591.36 },
+      },
+    });
+    expect(attr(rolled, 6)).toBeCloseTo(419.25, 6); // capacitorNeed, rolled
+    expect(attr(rolled, 97)).toBeCloseTo(591.36, 6); // energyNeutralizerAmount, rolled
+    // Not rolled here: the Heavy Gremlin's own 32 tf.
+    expect(attr(rolled, 50)).toBeCloseTo(32, 6);
+  });
+
+  it('states the base module when the rolls are unknown', () => {
+    const baseOnly = neutFit({
+      slot: 'high',
+      slotIndex: 0,
+      typeId: HEAVY_ABYSSAL_NEUT,
+      state: 'active',
+      mutation: { baseTypeId: HEAVY_GREMLIN_NEUT, mutaplasmidTypeId: 47831, attributes: {} },
+    });
+    const base = neutFit({
+      slot: 'high',
+      slotIndex: 0,
+      typeId: HEAVY_GREMLIN_NEUT,
+      state: 'active',
+    });
+    expect(attr(baseOnly, 97)).toBeCloseTo(attr(base, 97)!, 6);
+    expect(attr(baseOnly, 6)).toBeCloseTo(attr(base, 6)!, 6);
+  });
+
+  it('knows nothing of an abyssal module with no base: no CPU, no neut amount (badged baseUnknown)', () => {
+    const bare = neutFit({
+      slot: 'high',
+      slotIndex: 0,
+      typeId: HEAVY_ABYSSAL_NEUT,
+      state: 'active',
+    });
+    expect(attr(bare, 50)).toBeUndefined();
+    expect(attr(bare, 97)).toBeUndefined();
+  });
+});
+
 describe('hull fit pre-filter (real WASM + real pinned SDE)', () => {
   // A Rifter (frigate), a Loki (Tech 3: no hi/med/low slots until subsystems
   // are fitted) and a Bestower (an industrial).
