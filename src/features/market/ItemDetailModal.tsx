@@ -308,7 +308,8 @@ export function ItemDetailModal({
       title={itemName}
       titleActions={
         <>
-          <OpenInEveButton kind="marketDetails" id={typeId} name={itemName} />
+          {/* An abyssal type has no market group, so no in-game market window either. */}
+          {abyssal !== true && <OpenInEveButton kind="marketDetails" id={typeId} name={itemName} />}
           {showOpenInMarket && abyssal === false && (
             <OpenInMarketLink typeId={typeId} onNavigate={leave} replace={onLeave !== undefined} />
           )}
