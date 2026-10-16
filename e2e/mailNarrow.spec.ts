@@ -139,3 +139,24 @@ test('reading pane: Reply/Forward meet the 44px touch target floor at 390px', as
   expect(replyDesktopBox!.height).toBeCloseTo(28, 0);
   expect(forwardDesktopBox!.height).toBeCloseTo(28, 0);
 });
+
+test('New Mail: a tap in the empty middle of the message box focuses the editor at 390px', async ({
+  page,
+}) => {
+  // Only the first line used to be editable: the rest of the box was a wrapper
+  // the tap landed on, so the field could not be entered by touch.
+  await seedLongMail(page);
+  await page.setViewportSize(PHONE);
+  await signInAndGoto(page, './mail');
+
+  await page.getByRole('button', { name: 'Compose' }).click();
+  const dialog = page.getByRole('dialog', { name: 'New mail' });
+  const card = dialog.locator('[data-mail-card]');
+  await expect(card).toBeVisible();
+  // The format bar is the card's top strip, shown before the editor has focus.
+  await expect(card.getByRole('toolbar')).toBeVisible();
+
+  const box = (await card.boundingBox())!;
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await expect(dialog.getByRole('textbox', { name: 'Message' })).toBeFocused();
+});

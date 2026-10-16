@@ -3,10 +3,9 @@
  * colour, size, link, table and clear formatting, as one row of flat icon
  * buttons split into groups by hairlines, with the Source toggle at the right
  * end. Inline it is the top strip of the editor's card (the card owns the
- * frame; the bar draws only a hairline under itself). On a phone with the
- * keyboard up it docks above it as an edge-to-edge strip and scrolls sideways;
- * on a wide screen it wraps. Colour, size, link and table open a sheet rather
- * than crowding the row.
+ * frame; the bar draws only a hairline under itself), on a phone too: there it
+ * is one row that scrolls sideways, on a wide screen it wraps. Colour, size,
+ * link and table open a sheet rather than crowding the row.
  *
  * It only calls `MailEditorCommands`, so it works the same over the Preview
  * (Tiptap) and the Source textarea. Buttons never take focus from the writing
@@ -21,9 +20,6 @@ import { markupColorToCss } from '@/engine/eveMarkup';
 import type { MailEditorCommands } from './commands';
 import { ColorDialog, LinkDialog, SizeDialog, TableDialog } from './FormatDialogs';
 
-/** Height reserved under the writing surface so the docked bar never covers the last line. */
-export const DOCKED_BAR_SPACE_CLASS = 'pb-(--mail-format-bar-space)';
-
 /** The game's default mail text colour, `#bfffffff`. */
 const GAME_DEFAULT_TEXT_COLOR = '#bfffffff';
 
@@ -33,12 +29,6 @@ interface MailFormatBarProps {
   commands: MailEditorCommands;
   /** Phone layout: the sheets are bottom sheets. */
   phone: boolean;
-  /** `keyboard`: fixed above the on-screen keyboard. `inline`: in the flow above the surface. */
-  dock: 'keyboard' | 'inline';
-  /** Hidden while the writing surface has no focus (a sheet that is open keeps it shown). */
-  visible: boolean;
-  /** The keyboard's height over the layout viewport; where a `keyboard` dock sits. */
-  keyboardInset?: number;
   disabled?: boolean;
   /** Source toggle at the right end; absent = no toggle. */
   sourceActive?: boolean;
@@ -52,9 +42,6 @@ const Divider = () => <span aria-hidden className="mx-1 h-5 w-px shrink-0 self-c
 export function MailFormatBar({
   commands,
   phone,
-  dock,
-  visible,
-  keyboardInset = 0,
   disabled,
   sourceActive = false,
   onToggleSource,
@@ -63,7 +50,6 @@ export function MailFormatBar({
   const { t } = useTranslation();
   const [sheet, setSheet] = useState<'color' | 'size' | 'link' | 'table' | null>(null);
   const { state } = commands;
-  const shown = visible || sheet !== null;
 
   const button = (
     key: string,
@@ -111,16 +97,7 @@ export function MailFormatBar({
       <div
         role="toolbar"
         aria-label={t('mail.format.barLabel')}
-        data-mail-format-bar={dock === 'keyboard' && shown ? 'docked' : undefined}
-        style={dock === 'keyboard' ? { bottom: keyboardInset } : undefined}
-        className={cx(
-          shown ? 'flex' : 'hidden',
-          'items-center',
-          dock === 'keyboard'
-            ? 'fixed inset-x-0 z-40 border-t border-line bg-panel px-2 py-1 pb-[max(0.25rem,env(safe-area-inset-bottom))]'
-            : 'border-b border-line px-1 py-0.5',
-          className
-        )}
+        className={cx('flex items-center border-b border-line px-1 py-0.5', className)}
       >
         <div
           className={cx(
