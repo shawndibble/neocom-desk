@@ -47,6 +47,7 @@ import { useDamageProfiles } from '@/features/fittings/damageProfiles';
 import { TargetProfilePicker } from '@/features/fittings/TargetProfilePicker';
 import { useTargetProfiles } from '@/features/fittings/targetProfiles';
 import { usePilotProfile } from '@/features/fittings/fittingPilotProfile';
+import { useShipDataNeedsConnection } from '@/features/fittings/useDogmaEngineStatus';
 import {
   fittingCompareCsvColumns,
   fittingCompareModulesCsvColumns,
@@ -66,6 +67,7 @@ export function FittingCompare() {
   const {
     profile,
     failed: profileFailed,
+    skillsKnown,
     retry: retryProfile,
   } = usePilotProfile(activeCharacterId);
   const allCharacters = useLiveQuery(() => db.characters.toArray(), [], []);
@@ -122,6 +124,8 @@ export function FittingCompare() {
 
   const anyError = slots.some((slot) => slot?.shareError);
   const anyStatsFailed = stats.failed.some(Boolean);
+  // The failure is the ship data never having downloaded, and there is no connection to fetch it.
+  const shipDataNeedsConnection = useShipDataNeedsConnection();
   // Slots whose stats calculated. A slot that failed is left out of the table (its column shows a
   // dash) so one bad Fitting doesn't hide the rest; best/differs are worked out over these only.
   const okSlots = useMemo(
@@ -377,6 +381,9 @@ export function FittingCompare() {
           )}
 
           {isPhone && differencesToggle}
+          {!skillsKnown && (
+            <p className="text-xs text-warning">{t('fittings.stats.skillsUnknown')}</p>
+          )}
           {!statsReady ? (
             <Panel title={t('fittings.compare.statsTitle')}>
               <div className="flex flex-wrap justify-end gap-3">
@@ -394,9 +401,18 @@ export function FittingCompare() {
                   : anyError
                     ? t('fittings.compare.fixErrorsHint')
                     : anyStatsFailed
-                      ? t('fittings.compare.statsFailedHint')
+                      ? t(
+                          shipDataNeedsConnection
+                            ? 'fittings.compare.statsOfflineHint'
+                            : 'fittings.compare.statsFailedHint'
+                        )
                       : t('fittings.stats.loadingIndeterminate')}
               </p>
+              {!profileFailed && !anyError && anyStatsFailed && (
+                <Button className="mt-2" onClick={stats.retry}>
+                  {t('common.retry')}
+                </Button>
+              )}
               {profileFailed && (
                 <Button className="mt-2" onClick={retryProfile}>
                   {t('fittings.compare.profileRetry')}

@@ -18,8 +18,7 @@ import {
   type AlertsGrantOutcome,
 } from '@/features/notifications/alertsGrant';
 import { beginAddCharacterLogin, retryLastLogin, retryLastLoginOnce } from '@/app/loginFlow';
-import { NeedsConnection } from '@/components/NeedsConnection';
-import { Button, Panel, Spinner } from '@/components/ui';
+import { Button, NeedsConnection, Panel, Spinner } from '@/components/ui';
 import { isOfflineFailure } from '@/esi/client';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 
@@ -162,24 +161,21 @@ export function Callback() {
           <div role="alert" className="space-y-3">
             <p className="text-sm text-danger">{t(MESSAGE_KEY[errorKind])}</p>
             <NeedsConnection>
-              {(offline) => (
-                <Button
-                  variant="primary"
-                  size="sm"
-                  aria-disabled={offline || undefined}
-                  onClick={() => {
-                    // A user-initiated retry is not one of the automatic ones.
-                    clearRetryBudget();
-                    // Add Character only when this tab has no record of what the
-                    // failed login was for.
-                    void retryLastLogin()
-                      .then((restarted) => (restarted ? undefined : beginAddCharacterLogin()))
-                      .catch(() => setErrorKind('generic'));
-                  }}
-                >
-                  {t('callback.retry')}
-                </Button>
-              )}
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => {
+                  // A user-initiated retry is not one of the automatic ones.
+                  clearRetryBudget();
+                  // Add Character only when this tab has no record of what the
+                  // failed login was for.
+                  void retryLastLogin()
+                    .then((restarted) => (restarted ? undefined : beginAddCharacterLogin()))
+                    .catch(() => setErrorKind('generic'));
+                }}
+              >
+                {t('callback.retry')}
+              </Button>
             </NeedsConnection>
           </div>
         </Panel>

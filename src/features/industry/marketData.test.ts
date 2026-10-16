@@ -72,6 +72,29 @@ describe('loadMarketSnapshot', () => {
     expect(snapshot.hubBuyPrices[587]).toBeUndefined();
     expect(snapshot.adjustedPrices).toEqual({ 34: 4.2 });
     expect(snapshot.systemCostIndex).toBe(0.0464);
+    expect(snapshot.hubPricesUnreachable).toBe(false);
+  });
+
+  it('flags hubPricesUnreachable when Fuzzwork cannot be reached, so "no price" is not read as "no orders"', async () => {
+    server.use(
+      http.get(FUZZWORK_AGGREGATES_URL, () => HttpResponse.error()),
+      adjustedPricesHandler(),
+      costIndexHandler()
+    );
+
+    const snapshot = await loadMarketSnapshot(DEFAULT_TRADE_HUB, [34]);
+
+    expect(snapshot.hubPrices).toEqual({});
+    expect(snapshot.hubPricesUnreachable).toBe(true);
+  });
+
+  it('does not flag a hub that answered with no orders as unreachable', async () => {
+    server.use(fuzzworkHandler(), adjustedPricesHandler(), costIndexHandler());
+
+    const snapshot = await loadMarketSnapshot(DEFAULT_TRADE_HUB, [587]);
+
+    expect(snapshot.hubPrices).toEqual({});
+    expect(snapshot.hubPricesUnreachable).toBe(false);
   });
 
   it("reads the cost index of the build system when one is named, not the hub's", async () => {
@@ -115,6 +138,8 @@ describe('loadMarketSnapshot', () => {
     expect(snapshot.systemCostIndex).toBeNull();
     // Offline is not "no entry": the page must keep saying prices are unavailable.
     expect(snapshot.systemCostIndexMissing).toBe(false);
+    // Only ESI failed: the hub prices are fine, so they are not reported unreachable.
+    expect(snapshot.hubPricesUnreachable).toBe(false);
   });
 
   it('caches the cost index across calls within the TTL, refetching only after clearing', async () => {

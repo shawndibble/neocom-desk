@@ -32,6 +32,7 @@ import {
 import * as Icon from '@/components/ui/icons';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { GrantBanner } from '@/app/GrantNote';
+import { ReauthCachedNote } from '@/app/ReauthCachedNote';
 import { cx } from '@/lib/cx';
 import { formatAge } from '@/lib/age';
 import { useTicker } from '@/lib/ticker';
@@ -270,7 +271,7 @@ function WidgetFrame({
   const characterId = useActiveCharacter((state) => state.activeCharacterId);
   const now = useTicker(TICK_MS);
   const scope = scopePresentation(widget.kind, widget.scope);
-  const { state, showLastGood } = resolveWidget(view.status);
+  const { state, showLastGood, reauthNote } = resolveWidget(view.status);
 
   // The grid only draws kinds it knows; a widget rendered alone without one has no title to show.
   if (!kind) return null;
@@ -357,6 +358,20 @@ function WidgetFrame({
       ) : (
         <NumberBody model={view.number} />
       );
+  }
+
+  // A lapsed grant over saved data: the figures stay, with a small note to log in again.
+  if (reauthNote && characterId !== null && kind.endpoints.length > 0) {
+    body = (
+      <>
+        {body}
+        <ReauthCachedNote
+          className="px-3 pb-3"
+          characterId={characterId}
+          endpoints={kind.endpoints}
+        />
+      </>
+    );
   }
 
   if (state === 'ok' && view.grantEndpoints !== undefined && characterId !== null) {

@@ -60,6 +60,8 @@ function accessOf(state: CorpAccessState, capabilities: Partial<CorpCapabilities
     capabilities: { ...NO_CORP_CAPABILITIES, ...capabilities },
     missingScopes: [],
     roles: [],
+    readFailed: false,
+    retry: () => {},
   };
 }
 
@@ -148,7 +150,7 @@ describe('access (AC2)', () => {
   it('waits rather than deciding while corp access is still resolving', () => {
     mockedAccess.mockReturnValue(accessOf('unknown', {}));
     renderAssets();
-    expect(screen.getByRole('status')).toBeInTheDocument();
+    expect(screen.getByRole('status', { name: 'Loading' })).toBeInTheDocument();
     expect(mocked.loadCorporationAssets).not.toHaveBeenCalled();
   });
 

@@ -1,4 +1,5 @@
 import { Button } from './Button';
+import { NeedsConnection } from './NeedsConnection';
 
 interface ReauthBannerProps {
   title: string;
@@ -29,6 +30,13 @@ interface ReauthBannerProps {
    * locked route matching them is the outcome to want.
    */
   soleAction?: boolean;
+  /**
+   * One wrapped line — warning title, hint, ghost action — in a hairline box,
+   * for a note that sits *beside* a view's saved data rather than replacing
+   * it (a lapsed grant must not hide what is already on this device). The
+   * full stacked banner stays for a view with nothing to show.
+   */
+  compact?: boolean;
 }
 
 export function ReauthBanner({
@@ -38,14 +46,33 @@ export function ReauthBanner({
   onLogin,
   variant = 'primary',
   soleAction = false,
+  compact = false,
 }: ReauthBannerProps) {
+  if (compact) {
+    return (
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 rounded-xs border border-line px-3 py-1.5">
+        <p className="min-w-0 flex-1 text-xs">
+          <span className="font-semibold text-warning">{title}</span>{' '}
+          <span className="text-text-dim">{hint}</span>
+        </p>
+        <NeedsConnection>
+          <Button variant="ghost" size="sm" onClick={onLogin}>
+            {actionLabel}
+          </Button>
+        </NeedsConnection>
+      </div>
+    );
+  }
   return (
     <div className="space-y-2 py-2">
       <p className="text-xs font-semibold tracking-widest text-warning uppercase">{title}</p>
       <p className="text-xs text-text-dim">{hint}</p>
-      <Button variant={variant} size={soleAction ? 'md' : 'sm'} onClick={onLogin}>
-        {actionLabel}
-      </Button>
+      {/* Every caller's `onLogin` goes to EVE's SSO, which needs a connection. */}
+      <NeedsConnection>
+        <Button variant={variant} size={soleAction ? 'md' : 'sm'} onClick={onLogin}>
+          {actionLabel}
+        </Button>
+      </NeedsConnection>
     </div>
   );
 }

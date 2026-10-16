@@ -13,7 +13,11 @@
 import { severityForRemaining, type DeadlineSeverity } from '@/engine/severity';
 import { soonestCalendarDeadline, upcomingCommittedEvents } from '@/engine/calendarDeadline';
 import { extractableSp, extractorCount } from '@/engine/spExtraction';
-import { buildOpenOrderRows, openOrderProblemCounts } from '@/features/market/openOrdersModel';
+import {
+  buildOpenOrderRows,
+  notCheckedCount,
+  openOrderProblemCounts,
+} from '@/features/market/openOrdersModel';
 import { stockBoardSeverity } from '@/features/stockTargets/stockBoard';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { formatCountdown, formatDuration } from '@/lib/duration';
@@ -164,7 +168,11 @@ const wallet: Builder = (feeds, { t, now, range }) => {
   const series = walletSeries(feeds, now, range, balance);
   const journal = feeds.journal?.data?.result?.data;
   return {
-    ...blank('/wallet', statusOf(feed, { needsPermission: data.needsReauth })),
+    // A lapsed grant over a saved balance keeps the balance (with a sign-in note).
+    ...blank(
+      '/wallet',
+      statusOf(feed, { needsPermission: data.needsReauth, hasStaleData: balance !== null })
+    ),
     fetchedAt: data.result?.fetchedAt ?? null,
     fromCache: data.result?.fromCache ?? false,
     number:
@@ -198,7 +206,14 @@ const training: Builder = (feeds, { t, now, notTrainingAlert }) => {
   const nameOf = (skillId: number) =>
     data.catalog.bySkillTypeID.get(skillId)?.name ?? `#${skillId}`;
   const base = {
-    ...blank(to, statusOf(feed, { needsPermission: data.queueNeedsReauth })),
+    ...blank(
+      to,
+      // A lapsed grant over a saved queue keeps the queue (with a sign-in note).
+      statusOf(feed, {
+        needsPermission: data.queueNeedsReauth,
+        hasStaleData: data.queueResult !== null,
+      })
+    ),
     fetchedAt: data.queueResult?.fetchedAt ?? null,
     fromCache: data.queueResult?.fromCache ?? false,
   };
@@ -365,7 +380,12 @@ const comingUp: Builder = (feeds, { t, now }) => {
   return {
     ...blank(
       to,
-      statusOf(feed, { needsPermission: data.needsReauth, isEmpty: upcoming.length === 0 })
+      statusOf(feed, {
+        needsPermission: data.needsReauth,
+        isEmpty: upcoming.length === 0,
+        // A read time means the events came from a real (cached) read.
+        hasStaleData: data.fetchedAt !== null,
+      })
     ),
     fetchedAt: data.fetchedAt,
     number: next
@@ -418,7 +438,10 @@ const mail: Builder = (feeds, { t, now }) => {
   const to = '/mail';
   if (!data) return blank(to, statusOf(feed));
   return {
-    ...blank(to, statusOf(feed, { needsPermission: data.needsReauth })),
+    ...blank(
+      to,
+      statusOf(feed, { needsPermission: data.needsReauth, hasStaleData: data.fetchedAt !== null })
+    ),
     fetchedAt: data.fetchedAt,
     number: {
       value: count(data.unread),
@@ -471,19 +494,32 @@ const orders: Builder = (feeds, { t, now, activeCharacterId, scopeAll }) => {
   const undercut = counts.undercutStation + counts.undercutSystem + counts.undercutRegion;
   const maxOrders = feeds.skills?.data?.maxOrders ?? null;
   const listed = ordersListed(rows);
+  const unchecked = notCheckedCount(rows);
   const severity = ordersSeverity(rows, needsReauth);
   return {
-    ...blank(to, statusOf(feed, { needsPermission: needsReauth, isEmpty: rows.length === 0 })),
+    ...blank(
+      to,
+      statusOf(feed, {
+        needsPermission: needsReauth,
+        isEmpty: rows.length === 0,
+        // Saved orders for this view's Characters are still worth showing.
+        hasStaleData: rows.length > 0,
+      })
+    ),
     // The snapshot's own clock: when its orders were read, not when this view was built.
     fetchedAt: new Date(snapshot.now),
     number: {
       value: count(undercut),
       unit: t('overview.board.undercut'),
       // What is on the market is the fact the undercut count lacks; the slots sit under the table.
+      // Unchecked orders come first: "0 undercut" must not read as all-clear
+      // when the competition behind it was never looked at.
       secondary:
-        listed > 0
-          ? { text: t('overview.widgets.orders.listed', { isk: formatIskCompact(listed) }) }
-          : undefined,
+        unchecked > 0
+          ? { text: t('overview.widgets.orders.notChecked', { count: unchecked }) }
+          : listed > 0
+            ? { text: t('overview.widgets.orders.listed', { isk: formatIskCompact(listed) }) }
+            : undefined,
       tone: undercut === 0 && severity !== 'critical' ? 'clear' : (severity ?? 'clear'),
     },
     rows: [],
@@ -573,7 +609,10 @@ const contracts: Builder = (feeds, { t, now }) => {
         tone,
       };
   return {
-    ...blank(to, statusOf(feed, { needsPermission: data.needsReauth })),
+    ...blank(
+      to,
+      statusOf(feed, { needsPermission: data.needsReauth, hasStaleData: data.fetchedAt !== null })
+    ),
     fetchedAt: data.fetchedAt,
     number,
     rows: list,

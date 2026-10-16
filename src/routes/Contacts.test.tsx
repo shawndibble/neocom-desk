@@ -470,6 +470,24 @@ describe('Contacts', () => {
     expect(screen.getByText(/showing cached data/i)).toBeInTheDocument();
   });
 
+  it('keeps the saved contacts on screen, with a small log-in note, when the contacts grant lapsed over them', async () => {
+    await db.esiCache.put({
+      characterId: CHAR_ID,
+      key: 'contacts',
+      value: contactsPayload,
+      fetchedAt: STALE_FETCHED_AT,
+    });
+    server.use(
+      http.get(`${ESI}/characters/${CHAR_ID}/contacts`, () =>
+        HttpResponse.json({ error: 'missing scope' }, { status: 403 })
+      )
+    );
+    render(<App />);
+    expect(await screen.findByText('Log in again to refresh.')).toBeInTheDocument();
+    expect(screen.queryByText('Log in again to see your contacts')).not.toBeInTheDocument();
+    expect(await screen.findByText('Good Friend')).toBeInTheDocument();
+  });
+
   it('shows the empty state when there is no data at all', async () => {
     server.use(http.get(`${ESI}/characters/${CHAR_ID}/contacts`, () => HttpResponse.error()));
     render(<App />);

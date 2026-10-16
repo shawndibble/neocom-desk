@@ -42,6 +42,7 @@ vi.mock('@/features/market/appraisalData', () => ({
     refinesOreOrIce: false,
     accountingLevel: null,
     brokerRelationsLevel: null,
+    pricesUnreachable: false,
   })),
   compareHubs: vi.fn(async () => []),
   loadAppraisalCatalogue: vi.fn(async () => new Map()),
@@ -168,6 +169,7 @@ describe('Market Appraisal tab navigation', () => {
       refinesOreOrIce: false,
       accountingLevel: null,
       brokerRelationsLevel: null,
+      pricesUnreachable: false,
     });
     renderAt('/market/appraisal');
 

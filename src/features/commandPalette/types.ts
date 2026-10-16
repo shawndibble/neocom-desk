@@ -25,6 +25,12 @@ export interface PaletteProvider {
   /** Fixed group order, ascending. */
   readonly order: number;
   /**
+   * What the group's error row says when its search rejects, where that has a
+   * known cause worth naming (Market Items: its catalogue was never
+   * downloaded). Absent, the shared `commandPalette.groupError` reads.
+   */
+  readonly errorKey?: string;
+  /**
    * Which Characters the group covers, read out beside its heading (#2846).
    * Absent for a group that is not per-Character.
    */

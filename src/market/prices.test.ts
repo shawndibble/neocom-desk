@@ -8,6 +8,8 @@ import { DEFAULT_TRADE_HUB } from './hubs';
 import {
   getHubPrices,
   getStationPrices,
+  getStationPricesWithStatus,
+  getHubPricesWithStatus,
   getAdjustedPrices,
   getRegionSellPrices,
   clearMarketPriceCache,
@@ -256,6 +258,67 @@ describe('getStationPrices', () => {
     const second = await getStationPrices(DEFAULT_TRADE_HUB.stationId, [34], clock);
     expect(second.get(34)).toEqual({ sellMin: null, buyMax: null, sellVolume: 0, buyVolume: 0 });
     expect(attempt).toBe(2);
+  });
+});
+
+describe('price status (unreachable)', () => {
+  it('reports unreachable: false for a successful fetch and for a cache hit', async () => {
+    server.use(fuzzworkHandler({ count: 0 }));
+    const clock = () => 1_000_000;
+
+    const first = await getHubPricesWithStatus(DEFAULT_TRADE_HUB, [34], clock);
+    expect(first.unreachable).toBe(false);
+    expect(first.prices.get(34)?.sellMin).toBe(3.8);
+
+    const second = await getStationPricesWithStatus(DEFAULT_TRADE_HUB.stationId, [34], clock);
+    expect(second.unreachable).toBe(false);
+  });
+
+  it('a genuine no-orders answer is not unreachable', async () => {
+    server.use(http.get(FUZZWORK_AGGREGATES_URL, () => HttpResponse.json({})));
+
+    const { prices, unreachable } = await getHubPricesWithStatus(DEFAULT_TRADE_HUB, [34]);
+
+    expect(unreachable).toBe(false);
+    expect(prices.get(34)).toEqual({ sellMin: null, buyMax: null, sellVolume: 0, buyVolume: 0 });
+  });
+
+  it('reports unreachable: true, with null prices, when Fuzzwork cannot be reached', async () => {
+    server.use(http.get(FUZZWORK_AGGREGATES_URL, () => HttpResponse.error()));
+
+    const { prices, unreachable } = await getHubPricesWithStatus(DEFAULT_TRADE_HUB, [34, 35]);
+
+    expect(unreachable).toBe(true);
+    expect(prices.get(34)?.sellMin).toBeNull();
+    expect(prices.get(35)?.sellMin).toBeNull();
+  });
+
+  it('a caller that joins a failing in-flight request also sees unreachable', async () => {
+    server.use(
+      http.get(FUZZWORK_AGGREGATES_URL, async () => {
+        await delay(20);
+        return HttpResponse.error();
+      })
+    );
+
+    const [a, b] = await Promise.all([
+      getHubPricesWithStatus(DEFAULT_TRADE_HUB, [34]),
+      getStationPricesWithStatus(DEFAULT_TRADE_HUB.stationId, [34]),
+    ]);
+
+    expect(a.unreachable).toBe(true);
+    expect(b.unreachable).toBe(true);
+  });
+
+  it('is unreachable when only some of the requested types failed to load', async () => {
+    server.use(fuzzworkHandler({ count: 0 }));
+    await getHubPrices(DEFAULT_TRADE_HUB, [34]); // 34 cached
+    server.use(http.get(FUZZWORK_AGGREGATES_URL, () => HttpResponse.error()));
+
+    const { prices, unreachable } = await getHubPricesWithStatus(DEFAULT_TRADE_HUB, [34, 35]);
+
+    expect(unreachable).toBe(true);
+    expect(prices.get(34)?.sellMin).toBe(3.8);
   });
 });
 

@@ -43,6 +43,7 @@ import {
   type ContactsCharacterColumnId,
 } from './contactsColumns';
 import { GrantBanner } from '@/app/GrantNote';
+import { ReauthCachedNote } from '@/app/ReauthCachedNote';
 import { contactLabelNames, loadContactLabels, loadContacts } from '@/features/character/contacts';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport, type UseTableExport } from '@/components/ui/useTableExport';
@@ -811,7 +812,7 @@ export function Contacts() {
   if (activeCharacterId !== lastGoodCharacterId) {
     setLastGoodCharacterId(activeCharacterId);
     setLastGoodCounts(null);
-  } else if (contactsResult && !contactsNeedsReauth && lastGoodCounts !== counts) {
+  } else if (contactsResult && lastGoodCounts !== counts) {
     setLastGoodCounts(counts);
   }
 
@@ -1174,7 +1175,9 @@ export function Contacts() {
                 onTruncatedChange={setAcrossTruncated}
                 tableExport={acrossExport}
               />
-            ) : contactsNeedsReauth ? (
+            ) : contactsNeedsReauth && (!contactsResult || contacts.length === 0) ? (
+              // A lapsed grant with no saved contacts: the full banner. With
+              // saved contacts the table stays and a small note sits above it.
               <GrantBanner
                 characterId={activeCharacterId}
                 endpoints={['getCharacterContacts']}
@@ -1193,6 +1196,13 @@ export function Contacts() {
               />
             ) : (
               <Panel padded={false}>
+                {contactsNeedsReauth && (
+                  <ReauthCachedNote
+                    className="border-b border-line p-3"
+                    characterId={activeCharacterId}
+                    endpoints={['getCharacterContacts']}
+                  />
+                )}
                 {contactsResult.fromCache && (
                   <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
                     {t('common.offlineTitle')}

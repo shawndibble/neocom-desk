@@ -15,7 +15,7 @@ import {
   type MouseEvent as ReactMouseEvent,
 } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, IconButton, Spinner, TextArea, TextInput } from '@/components/ui';
+import { Button, IconButton, NeedsConnection, Spinner, TextArea, TextInput } from '@/components/ui';
 import { activeOptionClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
@@ -28,7 +28,6 @@ import {
 import { moveHighlight } from '@/lib/comboboxNav';
 import { isOfflineFailure } from '@/esi/client';
 import { EsiTimeoutError } from '@/esi/errors';
-import { NeedsConnection } from '@/components/NeedsConnection';
 import { useOnline } from '@/stores/network';
 import { sendMail } from './mail';
 import { loadDraft, saveDraft, clearDraft, type MailDraftRecipient } from './mailDrafts';
@@ -546,23 +545,15 @@ export function MailComposeBox({
 
       <div className="flex items-center gap-2">
         <NeedsConnection>
-          {(offline) => (
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => void handleSend()}
-              disabled={sending}
-              aria-disabled={offline || undefined}
-            >
-              {sending ? (
-                <span className="flex items-center gap-1.5">
-                  <Spinner size="sm" /> {t('mail.sending')}
-                </span>
-              ) : (
-                t('mail.send')
-              )}
-            </Button>
-          )}
+          <Button variant="primary" size="sm" onClick={() => void handleSend()} disabled={sending}>
+            {sending ? (
+              <span className="flex items-center gap-1.5">
+                <Spinner size="sm" /> {t('mail.sending')}
+              </span>
+            ) : (
+              t('mail.send')
+            )}
+          </Button>
         </NeedsConnection>
         {!online && <span className="text-xs text-text-dim">{t('mail.draftSaved')}</span>}
         <Button size="sm" onClick={onClose} disabled={sending}>

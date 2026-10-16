@@ -13,11 +13,13 @@ import {
   CharacterAvatar,
   EmptyState,
   EveSsoButton,
+  NeedsConnection,
   LogoMark,
   Panel,
   Spinner,
 } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
+import { NeedsConnectionButton } from '@/features/communities/NeedsConnectionButton';
 import { db } from '@/db';
 import { CharacterSharePicker } from '@/features/communities/SharePicker';
 import { publishSharedLibrary } from '@/features/communities/libraryPush';
@@ -276,9 +278,11 @@ export function CommunityJoin() {
                               <span id={`needs-${character.characterId}`} className="text-text-dim">
                                 {t('communities.join.needsPermission')}
                               </span>
-                              <Button size="sm" onClick={() => grant(character.characterId)}>
-                                {t('communities.join.grant')}
-                              </Button>
+                              <NeedsConnection>
+                                <Button size="sm" onClick={() => grant(character.characterId)}>
+                                  {t('communities.join.grant')}
+                                </Button>
+                              </NeedsConnection>
                             </>
                           )}
                           {result && (
@@ -307,17 +311,19 @@ export function CommunityJoin() {
                   })}
                 </ul>
                 <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <Button
+                  <NeedsConnectionButton
                     variant="primary"
                     loading={working}
                     disabled={chosen.length === 0}
                     onClick={() => void join()}
                   >
                     {t('communities.join.joinAction', { count: totalShared })}
-                  </Button>
-                  <Button onClick={logIn} disabled={loggingIn || working}>
-                    {t('communities.join.another')}
-                  </Button>
+                  </NeedsConnectionButton>
+                  <NeedsConnection>
+                    <Button onClick={logIn} disabled={loggingIn || working}>
+                      {t('communities.join.another')}
+                    </Button>
+                  </NeedsConnection>
                   {anyJoined && (
                     <Link to="/communities" className="text-xs underline">
                       {t('communities.join.open')}

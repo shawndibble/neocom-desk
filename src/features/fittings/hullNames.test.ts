@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { hullNamesFrom } from './hullNames';
+import { hullNamesFrom, hullNamesFromTypes } from './hullNames';
 
 const GROUPS = [
   { id: 4, name: 'Ships', parentId: null, hasTypes: false },
@@ -27,5 +27,22 @@ describe('hullNamesFrom', () => {
 
   it('skips a type whose market group is unknown', () => {
     expect(hullNamesFrom([type(1, 'Orphan', 99999)], GROUPS).size).toBe(0);
+  });
+});
+
+describe('hullNamesFromTypes', () => {
+  const types = {
+    '587': { name: 'Rifter', groupID: 25, volume: 1 },
+    '2048': { name: 'Damage Control II', groupID: 60, volume: 1 },
+    '9999': { name: 'No Category', groupID: 777, volume: 1 },
+  };
+
+  it('keeps the types whose group is in the Ship category, lower-cased', () => {
+    const names = hullNamesFromTypes(types, { '25': 6, '60': 7 });
+    expect([...names]).toEqual(['rifter']);
+  });
+
+  it('skips a type whose group has no category', () => {
+    expect(hullNamesFromTypes(types, {}).size).toBe(0);
   });
 });

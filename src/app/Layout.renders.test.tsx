@@ -108,6 +108,8 @@ beforeEach(() => {
     capabilities: NO_CORP_CAPABILITIES,
     missingScopes: [],
     roles: [],
+    readFailed: false,
+    retry: () => {},
   });
   useMobileTabs.setState({ value: DEFAULT_MOBILE_TABS, hydrated: true });
 });

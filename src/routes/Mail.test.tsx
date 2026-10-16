@@ -312,6 +312,24 @@ describe('Mail', () => {
     expect(screen.getByText(/showing cached data/i)).toBeInTheDocument();
   });
 
+  it('keeps the saved mail on screen, with a small log-in note, when the mail grant lapsed over it', async () => {
+    await db.esiCache.put({
+      characterId: CHAR_ID,
+      key: 'mail:headers',
+      value: headers,
+      fetchedAt: STALE_FETCHED_AT,
+    });
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail`, () =>
+        HttpResponse.json({ error: 'missing scope' }, { status: 403 })
+      )
+    );
+    render(<App />);
+    expect(await screen.findByText('Log in again to refresh.')).toBeInTheDocument();
+    expect(screen.queryByText('Log in again to see your mail')).not.toBeInTheDocument();
+    expect(await screen.findByText('Fleet up!')).toBeInTheDocument();
+  });
+
   it('shows the empty state when there is no data at all', async () => {
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail`, () => HttpResponse.error())

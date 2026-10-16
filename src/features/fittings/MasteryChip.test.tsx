@@ -158,9 +158,35 @@ describe('MasteryChip', () => {
     expect(container.querySelector('[aria-hidden="true"]:empty')).toBeNull();
   });
 
-  it('gives up the slot when the Mastery data fails to load', async () => {
+  it('offers a badge that says the Mastery data is unavailable, with Retry, when it fails to load', async () => {
     vi.mocked(loadMasteries).mockImplementationOnce(() => Promise.reject(new Error('offline')));
-    const { container } = render(<MasteryChip hullTypeId={626} hullName="Vexor" characterId={1} />);
-    await waitFor(() => expect(container).toBeEmptyDOMElement());
+    render(<MasteryChip hullTypeId={626} hullName="Vexor" characterId={1} />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Mastery' }));
+    expect(screen.getByText(/Mastery data isn't available offline yet/)).toBeVisible();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(await screen.findByText('Vexor Mastery')).toBeInTheDocument();
+    expect(await screen.findByText('Drones')).toBeInTheDocument();
+  });
+
+  it('keeps the unavailable panel, with Retry busy and focused, while a retry runs', async () => {
+    vi.mocked(loadMasteries).mockImplementationOnce(() => Promise.reject(new Error('offline')));
+    render(<MasteryChip hullTypeId={626} hullName="Vexor" characterId={1} />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Mastery' }));
+
+    let release: (value: MasteryMap) => void = () => {};
+    vi.mocked(loadMasteries).mockImplementationOnce(
+      () => new Promise<MasteryMap>((resolve) => (release = resolve))
+    );
+    const retry = screen.getByRole('button', { name: 'Try again' });
+    retry.focus();
+    await userEvent.click(retry);
+
+    // Still the same panel and the same button, not a blank slot: focus has not been dropped.
+    expect(screen.getByText(/Mastery data isn't available offline yet/)).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Try again' })).toHaveFocus();
+
+    release({ '626': [[{ skillTypeID: 3300, level: 2 }], [], [], [], []] });
+    expect(await screen.findByText('Vexor Mastery')).toBeInTheDocument();
   });
 });

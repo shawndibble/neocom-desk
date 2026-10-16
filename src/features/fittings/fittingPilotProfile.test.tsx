@@ -32,4 +32,20 @@ describe('usePilotProfile', () => {
     await waitFor(() => expect(result.current.profile).not.toBeNull());
     expect(result.current.failed).toBe(false);
   });
+
+  it('marks the skills unknown when /skills could not be read at all, known when it was', async () => {
+    loadCharacterImplants.mockResolvedValue(null);
+    loadCorrectedSkills.mockResolvedValueOnce({ effective: new Map(), skillsResult: null });
+    const unknown = renderHook(() => usePilotProfile(1));
+    await waitFor(() => expect(unknown.result.current.profile).not.toBeNull());
+    expect(unknown.result.current.skillsKnown).toBe(false);
+
+    loadCorrectedSkills.mockResolvedValueOnce({
+      effective: new Map([[3300, 5]]),
+      skillsResult: { data: { skills: [] } },
+    });
+    const known = renderHook(() => usePilotProfile(2));
+    await waitFor(() => expect(known.result.current.profile).not.toBeNull());
+    expect(known.result.current.skillsKnown).toBe(true);
+  });
 });

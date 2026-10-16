@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, FieldError, TextInput } from '@/components/ui';
+import { FieldError, TextInput } from '@/components/ui';
 import type { DeliveryFlag } from '@/engine/communities/delivery';
 import {
   STALE_PLEDGE_DAYS,
@@ -14,6 +14,7 @@ import {
 import { cx } from '@/lib/cx';
 import { PledgeBar } from './PledgeBar';
 import { formatQuantity } from './requestFormat';
+import { NeedsConnectionButton } from './NeedsConnectionButton';
 
 /** A delivered amount typed in: a whole number from 0 (clears it) up to the Pledge. */
 function parseDelivered(text: string, max: number): number | null {
@@ -138,18 +139,18 @@ export function PledgeRow({
               if (e.key === 'Enter' && parsed !== null && !busy) onPledge(parsed);
             }}
           />
-          <Button
+          <NeedsConnectionButton
             size="sm"
             disabled={parsed === null}
             loading={busy}
             onClick={() => parsed !== null && onPledge(parsed)}
           >
             {own ? t('communities.board.updatePledge') : t('communities.board.pledge')}
-          </Button>
+          </NeedsConnectionButton>
           {own && own.delivered === 0 && (
-            <Button size="sm" variant="ghost" disabled={busy} onClick={onWithdraw}>
+            <NeedsConnectionButton size="sm" variant="ghost" disabled={busy} onClick={onWithdraw}>
               {t('communities.board.withdraw')}
-            </Button>
+            </NeedsConnectionButton>
           )}
         </div>
       )}
@@ -173,7 +174,7 @@ export function PledgeRow({
                 onSaveDelivered(deliveredAmount);
             }}
           />
-          <Button
+          <NeedsConnectionButton
             size="sm"
             variant="ghost"
             disabled={deliveredAmount === null || deliveredText.trim() === ''}
@@ -181,7 +182,7 @@ export function PledgeRow({
             onClick={() => deliveredAmount !== null && onSaveDelivered(deliveredAmount)}
           >
             {t('communities.board.saveDelivered')}
-          </Button>
+          </NeedsConnectionButton>
         </div>
       )}
       {deliveredInvalid && (

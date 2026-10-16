@@ -69,3 +69,31 @@ test('shows cached character and skills after external hosts go unreachable', as
   await expect(page.getByText('Small Hybrid Turret', { exact: true })).toBeVisible();
   await expect(page.locator('time')).toBeVisible();
 });
+
+/**
+ * The shell's offline strip follows the browser's connection state at every
+ * width. `setOffline` on an already-loaded page is safe here (unlike the
+ * reload specs above): nothing needs the dev server again, and the page gets
+ * the real `offline` / `online` events and `navigator.onLine`.
+ */
+test('shows the offline banner while the browser is offline and drops it on reconnect', async ({
+  page,
+  context,
+}) => {
+  await signInAndGoto(page);
+  // Wait for the shell itself, not just the page load: `Layout` is its own lazy
+  // chunk, and cutting the network while it is still downloading is a cold chunk
+  // failing offline (the full-page Reload screen, no shell, so no strip), not
+  // the already-running app this spec is about. The rail's pinned Character link
+  // exists only once `Layout` has rendered.
+  await expect(page.getByRole('link', { name: CHARACTER_NAME })).toBeVisible();
+  // The strip by test id: its sentence is also in a screen-reader-only live region, so text alone matches twice.
+  const banner = page.getByTestId('offline-banner');
+  await expect(banner).toHaveCount(0);
+
+  await context.setOffline(true);
+  await expect(banner).toBeVisible();
+
+  await context.setOffline(false);
+  await expect(banner).toHaveCount(0);
+});

@@ -516,6 +516,28 @@ describe('Characters', () => {
     expect(beginAddCharacterLogin).toHaveBeenCalledTimes(1);
   });
 
+  it('disables Add character while offline, with the reason beside its own tooltip, and starts no login', async () => {
+    const { beginAddCharacterLogin } = await import('@/app/loginFlow');
+    vi.mocked(beginAddCharacterLogin).mockClear();
+    Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => false });
+    try {
+      const user = userEvent.setup();
+      renderCharacters();
+      const add = await screen.findByRole('button', { name: 'Add character' });
+      expect(add).toHaveAttribute('aria-disabled', 'true');
+      await user.click(add);
+      expect(beginAddCharacterLogin).not.toHaveBeenCalled();
+      // The click above closed any bubble; re-enter for a fresh hover.
+      await user.unhover(add);
+      await user.hover(add);
+      const bubble = (await screen.findAllByRole('tooltip')).at(-1);
+      expect(bubble).toHaveTextContent('Add character');
+      expect(bubble).toHaveTextContent('Needs a connection');
+    } finally {
+      Reflect.deleteProperty(navigator, 'onLine');
+    }
+  });
+
   it('opens the Customize permissions dialog, pre-filled from the remembered selection, from the Add Character split button', async () => {
     const user = userEvent.setup();
     renderCharacters();

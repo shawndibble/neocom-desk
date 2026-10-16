@@ -208,6 +208,17 @@ describe('orderBadgeFor', () => {
     expect(orderBadgeFor(row)?.detail).toBeUndefined();
   });
 
+  it('badges an unchecked healthy row as notChecked, never as best or noCostBasis', () => {
+    const badge = orderBadgeFor({
+      ...BASE_ROW,
+      problem: 'healthy',
+      competitionUnchecked: true,
+      costBasis: null,
+      station: { bestPrice: null, beatsMe: false, gapIsk: 0, gapPct: 0 },
+    });
+    expect(badge?.kind).toBe('notChecked');
+  });
+
   it('badges a healthy sell row with no linked cost basis as noCostBasis', () => {
     const row: OpenOrderRow = {
       ...BASE_ROW,

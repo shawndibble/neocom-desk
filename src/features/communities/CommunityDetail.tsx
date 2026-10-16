@@ -24,6 +24,9 @@ import { NOTICE_MS } from '@/components/ui/useTimedToast';
 import { writeToClipboard } from '@/lib/clipboard';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { uidForCharacter } from '@/sync/uid';
+import { useOnline, useReconnectCount } from '@/stores/network';
+import { deleteCommunitySnapshot, loadWithSnapshot } from './communityCache';
+import { NeedsConnectionButton } from './NeedsConnectionButton';
 import { CommunityHeader } from './CommunityHeader';
 import { CommunityLibrary } from './CommunityLibrary';
 import { CommunitySharedFittings } from './CommunitySharedFittings';
@@ -110,6 +113,10 @@ export function CommunityDetail({
   const [now] = useState(() => Date.now());
   const [members, setMembers] = useState<CommunityMember[] | null>(null);
   const [membersFailed, setMembersFailed] = useState(false);
+  // The roster is the last one read while online (`communityCache.ts`).
+  const [membersCached, setMembersCached] = useState(false);
+  const online = useOnline();
+  const reconnects = useReconnectCount();
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const [panel, setPanel] = useState<ManagePanel | null>(initialPanel ?? null);
   const [copied, setCopied] = useState<string | null>(null);
@@ -158,10 +165,18 @@ export function CommunityDetail({
     let cancelled = false;
     (async () => {
       try {
-        const loaded = await loadCommunityMembers(characterId, community.id);
+        // Offline, the saved roster answers; a refusal (removed from the
+        // Community) shows as a failure, never as stale data.
+        const { value, cached } = await loadWithSnapshot({
+          characterId,
+          kind: 'members',
+          communityId: community.id,
+          live: () => loadCommunityMembers(characterId, community.id),
+        });
         if (cancelled) return;
-        setMembers(loaded);
+        setMembers(value);
         setMembersFailed(false);
+        setMembersCached(cached);
       } catch {
         if (!cancelled) setMembersFailed(true);
       }
@@ -169,7 +184,7 @@ export function CommunityDetail({
     return () => {
       cancelled = true;
     };
-  }, [characterId, community.id, community.memberCount, reload]);
+  }, [characterId, community.id, community.memberCount, reload, reconnects]);
 
   // The admin's waiting list. A failed read (a backend not yet updated) is an empty list.
   const [requestsReload, setRequestsReload] = useState(0);
@@ -234,7 +249,12 @@ export function CommunityDetail({
         admin={admin}
         members={members}
         actions={
-          admin && (
+          admin &&
+          (!online ? (
+            <NeedsConnectionButton size="sm">
+              {t('communities.manage.trigger')}
+            </NeedsConnectionButton>
+          ) : (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button size="sm">
@@ -266,7 +286,7 @@ export function CommunityDetail({
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-          )
+          ))
         }
       />
       <div>
@@ -327,10 +347,20 @@ export function CommunityDetail({
             />
           ) : (
             <Panel>
-              {membersFailed ? (
-                <p role="alert" className="text-xs text-danger">
-                  {t('communities.membersLoadFailed')}
+              {membersCached && (
+                <p role="status" className="mb-2 text-[0.6875rem] text-warning uppercase">
+                  {t('common.offlineTitle')}
                 </p>
+              )}
+              {membersFailed ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <p role="alert" className="min-w-0 flex-1 text-xs text-danger">
+                    {t('communities.membersLoadFailed')}
+                  </p>
+                  <Button size="sm" onClick={() => setReload((n) => n + 1)}>
+                    {t('communities.retry')}
+                  </Button>
+                </div>
               ) : members === null ? (
                 <Spinner size="sm" label={t('communities.loading')} />
               ) : (
@@ -476,6 +506,7 @@ export function CommunityDetail({
         onClose={close}
         onConfirm={async () => {
           await leaveCommunity(characterId, community.id);
+          await deleteCommunitySnapshot(characterId, community.id);
           onGone();
         }}
       />
@@ -487,6 +518,7 @@ export function CommunityDetail({
         onClose={close}
         onConfirm={async () => {
           await deleteCommunity(characterId, community.id);
+          await deleteCommunitySnapshot(characterId, community.id);
           onGone();
         }}
       />

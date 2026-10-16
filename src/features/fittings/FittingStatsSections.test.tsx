@@ -11,6 +11,7 @@ import type { DamageProfiles } from './damageProfiles';
 import type { TargetProfiles } from './targetProfiles';
 import type { OverlayFitting } from './useOverlayFitting';
 import { FittingStatsSections } from './FittingStatsSections';
+import { setDogmaEngineStatus } from './dogmaEngineStatus';
 import { db } from '@/db';
 import { useStatsSectionsPreference } from './statsSectionsPreference';
 import { useOverheatAll } from './statsConditions';
@@ -781,11 +782,53 @@ describe('FittingStatsSections — a failed calculation', () => {
     expect(onRetry).toHaveBeenCalledOnce();
   });
 
+  afterEach(() => {
+    Reflect.deleteProperty(navigator, 'onLine');
+    setDogmaEngineStatus('idle');
+  });
+
+  it('offline with the ship data never downloaded: says it needs a one-time download', () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => false });
+    setDogmaEngineStatus('failed');
+    renderFailed('shipData');
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Fitting stats need a one-time ~10 MB download. Connect once to enable them.'
+    );
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy();
+  });
+
   it('names the Character’s skills when those are what failed', () => {
     renderFailed('skills');
     expect(screen.getByRole('alert')).toHaveTextContent(
       "Couldn't load this Character's skills, so the stats can't be worked out."
     );
+  });
+});
+
+describe('FittingStatsSections — pilot skills unknown', () => {
+  function renderWith(skillsKnown: boolean) {
+    return render(
+      <FittingStatsSections
+        stats={stats()}
+        statsProgress={null}
+        statsError={false}
+        skillsKnown={skillsKnown}
+        price={null}
+        damageProfiles={damageProfiles()}
+        targetProfiles={targetProfiles()}
+        typeName={typeName}
+      />
+    );
+  }
+
+  it('notes that the stats assume no skills when the skills could not be read', () => {
+    renderWith(false);
+    expect(screen.getByText('Pilot skills unknown: stats assume no skills.')).toBeTruthy();
+  });
+
+  it('says nothing when the skills are known', () => {
+    renderWith(true);
+    expect(screen.queryByText(/Pilot skills unknown/)).toBeNull();
   });
 });
 

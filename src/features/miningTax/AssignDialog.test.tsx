@@ -70,7 +70,8 @@ function renderDialog(
   payees: PayeeRecord[],
   onAddPayee?: () => void,
   targetRow: MoonMiningTaxRow = row,
-  onAssigned = vi.fn()
+  onAssigned = vi.fn(),
+  extra: { unreachableHubs?: ReadonlySet<string>; pricesFor?: typeof pricesFor } = {}
 ) {
   render(
     <MemoryRouter>
@@ -84,7 +85,8 @@ function renderDialog(
             [VELDSPAR, 'Veldspar'],
           ])
         }
-        pricesFor={pricesFor}
+        pricesFor={extra.pricesFor ?? pricesFor}
+        unreachableHubs={extra.unreachableHubs}
         busy={false}
         onAssigned={onAssigned}
         onCancel={vi.fn()}
@@ -221,5 +223,45 @@ describe('AssignDialog — saving', () => {
 
     expect(onAssigned).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+});
+
+describe('AssignDialog — prices unreachable (offline)', () => {
+  const unpriced = () => new Map<number, number>([[ZEOLITES, 0]]);
+
+  it('warns before saving a 0 ISK line that is unpriced because the fetch failed, and still allows Assign', async () => {
+    const onAssigned = vi.fn();
+    renderDialog([payee()], undefined, row, onAssigned, {
+      unreachableHubs: new Set(['hek']),
+      pricesFor: unpriced,
+    });
+
+    expect(screen.getByRole('status')).toHaveTextContent(/Prices couldn't be loaded.*Zeolites/);
+    await userEvent.click(screen.getByRole('button', { name: 'Assign anyway' }));
+
+    expect(mockedCreate).toHaveBeenCalledWith(expect.objectContaining({ estimatedValue: 0 }));
+    expect(onAssigned).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not warn when every line has a price', async () => {
+    renderDialog([payee()], undefined, row, vi.fn(), { unreachableHubs: new Set(['hek']) });
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it("does not warn when only another hub is unreachable (the Payee's own hub answered)", () => {
+    renderDialog([payee()], undefined, row, vi.fn(), {
+      unreachableHubs: new Set(['jita']),
+      pricesFor: unpriced,
+    });
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('stops warning once the pilot types a value of their own', async () => {
+    renderDialog([payee()], undefined, row, vi.fn(), {
+      unreachableHubs: new Set(['hek']),
+      pricesFor: unpriced,
+    });
+    await userEvent.type(screen.getByLabelText('Estimated value'), '5000');
+    expect(screen.queryByText(/Prices couldn't be loaded/)).not.toBeInTheDocument();
   });
 });

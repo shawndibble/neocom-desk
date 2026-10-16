@@ -1,3 +1,4 @@
+import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
 import type { ReactElement, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, IskAmount, Panel, Spinner } from '@/components/ui';
@@ -86,6 +87,8 @@ export function BpcCoverageWarning({
 interface PlanVerdictHeroProps {
   result: BuildResult;
   pricesReady: boolean;
+  /** The price source could not be reached: the no-price line says so rather than "No price data yet". */
+  pricesUnreachable?: boolean;
   pricesLoading: boolean;
   productName: string;
   /** The product's typeID, for the heading's item context menu; null when the blueprint has no product. */
@@ -142,6 +145,7 @@ export interface ReactionLocationBlock {
 export function PlanVerdictHero({
   result,
   pricesReady,
+  pricesUnreachable = false,
   pricesLoading,
   productName,
   productTypeID,
@@ -163,6 +167,7 @@ export function PlanVerdictHero({
   locationBlock,
 }: PlanVerdictHeroProps) {
   const { t } = useTranslation();
+  const pricesUnavailableLabel = usePricesUnavailableLabel();
 
   const profit = pricesReady ? result.profit : null;
   const qualifiers = pricesReady
@@ -247,7 +252,9 @@ export function PlanVerdictHero({
                 {pricesLoading
                   ? ''
                   : !pricesReady || profit === null
-                    ? t('industry.heroNoPrices')
+                    ? pricesUnreachable
+                      ? pricesUnavailableLabel
+                      : t('industry.heroNoPrices')
                     : qualifiers.join(' · ')}
               </p>
             )}

@@ -12,9 +12,15 @@
  */
 import { ExternalMark } from '@/components/ui/ExternalLink';
 import { useEffect, useState } from 'react';
-import { NeedsConnection } from '@/components/NeedsConnection';
 import { useTranslation } from 'react-i18next';
-import { Button, EmptyState, Modal, Spinner, type ButtonVariant } from '@/components/ui';
+import {
+  Button,
+  EmptyState,
+  Modal,
+  NeedsConnection,
+  Spinner,
+  type ButtonVariant,
+} from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { KIND_FILL, KIND_TEXT } from '@/components/ui/kindTone';
 import { loadCalendarEvent, respondToCalendarEvent } from '@/features/character/calendar';
@@ -215,19 +221,16 @@ export function EventDetailModal({
                 const active = state.detail.data.response === response;
                 return (
                   <NeedsConnection key={response}>
-                    {(offline) => (
-                      <Button
-                        size="md"
-                        variant={active ? RSVP_ACTIVE_VARIANT[response] : 'ghost'}
-                        aria-pressed={active}
-                        disabled={saving}
-                        aria-disabled={offline || undefined}
-                        onClick={() => void respond(response)}
-                      >
-                        <OptionIcon size={Icon.ICON_SIZE.sm} aria-hidden="true" />
-                        {t(labelKey)}
-                      </Button>
-                    )}
+                    <Button
+                      size="md"
+                      variant={active ? RSVP_ACTIVE_VARIANT[response] : 'ghost'}
+                      aria-pressed={active}
+                      disabled={saving}
+                      onClick={() => void respond(response)}
+                    >
+                      <OptionIcon size={Icon.ICON_SIZE.sm} aria-hidden="true" />
+                      {t(labelKey)}
+                    </Button>
                   </NeedsConnection>
                 );
               })}

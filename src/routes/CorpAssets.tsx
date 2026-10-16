@@ -48,6 +48,7 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { useCorpRouteGate } from '@/features/corp/useCorpRouteGate';
+import { CorpRolesGate } from '@/features/corp/CorpRolesGate';
 import { CorpDenied } from '@/features/corp/CorpDenied';
 import { CorpSubNav } from '@/features/corp/CorpSubNav';
 import { loadCorporationId } from '@/features/corp/boardData';
@@ -926,10 +927,8 @@ export function CorpAssets() {
   const { t } = useTranslation();
   const gate = useCorpRouteGate((capabilities) => capabilities.canReadAssets);
 
-  if (gate.status === 'loading') return <Spinner />;
-
-  if (gate.status === 'denied') {
-    return (
+  const content =
+    gate.status === 'denied' ? (
       <div className="mx-auto max-w-6xl space-y-4">
         <PageHeader title={t('corp.assets.title')} />
         <CorpDenied
@@ -938,9 +937,12 @@ export function CorpAssets() {
           hint={t('corp.assets.noAccessHint')}
         />
       </div>
-    );
-  }
+    ) : gate.status === 'ready' ? (
+      <CorpAssetsView
+        key={String(gate.capabilities.canReadBlueprints)}
+        canReadBlueprints={gate.capabilities.canReadBlueprints}
+      />
+    ) : null;
 
-  const { canReadBlueprints } = gate.capabilities;
-  return <CorpAssetsView key={String(canReadBlueprints)} canReadBlueprints={canReadBlueprints} />;
+  return <CorpRolesGate gate={gate}>{content}</CorpRolesGate>;
 }
