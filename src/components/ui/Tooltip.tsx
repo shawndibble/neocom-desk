@@ -258,7 +258,7 @@ export function Tooltip({ content, children, openOnTap = false, className = '' }
     <TooltipPrimitive.Provider delayDuration={0}>
       <TooltipPrimitive.Root
         // No content, no bubble: a caller keeps one stable tree and passes
-        // nothing while it has nothing to say (`NeedsConnectionButton`).
+        // nothing while it has nothing to say.
         open={(hoverOpen || touchOpen) && hasContent}
         onOpenChange={handleOpenChange}
       >

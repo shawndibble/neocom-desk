@@ -37,6 +37,8 @@ export interface FannedOutCharacterAssets extends OtherCharacterAssets {
   truncated: boolean;
   /** When this Character's list was read from ESI, so a total can say how old it is. */
   fetchedAt?: Date;
+  /** This Character's list is the saved copy: ESI could not be reached. */
+  fromCache?: boolean;
 }
 
 /** A Character whose assets could not be read at all: no scope, nothing cached, or a failed call. */
@@ -72,6 +74,7 @@ async function loadFannedOutAssets(character: {
     assets: cached.data,
     truncated: cached.truncated,
     fetchedAt: cached.fetchedAt,
+    fromCache: cached.fromCache,
   };
 }
 
@@ -79,6 +82,8 @@ async function loadFannedOutAssets(character: {
 export interface OtherCharactersAssetsRead {
   entries: OtherCharacterAssets[];
   skipped: SkippedCharacterAssets[];
+  /** When the oldest saved-copy list was read (ms), or null when every list came from ESI just now. */
+  cachedAt: number | null;
 }
 
 /**
@@ -106,9 +111,13 @@ export async function loadOtherCharactersAssetsDetailed(
   });
   // Narrowed back to this function's own shape: the filter has no use for the
   // completeness detail, and its callers compare these objects wholesale.
+  const cachedTimes = entries.flatMap((e) =>
+    e.fromCache && e.fetchedAt ? [e.fetchedAt.getTime()] : []
+  );
   return {
     entries: entries.map(({ characterId, name, assets }) => ({ characterId, name, assets })),
     skipped,
+    cachedAt: cachedTimes.length > 0 ? Math.min(...cachedTimes) : null,
   };
 }
 

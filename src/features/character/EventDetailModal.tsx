@@ -18,6 +18,7 @@ import {
   EmptyState,
   Modal,
   NeedsConnection,
+  CachedNotice,
   Spinner,
   type ButtonVariant,
 } from '@/components/ui';
@@ -182,6 +183,7 @@ export function EventDetailModal({
         <div className="space-y-3 text-xs">
           {/* Kind-colour bar, bled to the modal's edges: the same hue the Coming Up Rail and Calendar Map use for `calendarEvent`, so the popup carries the identity a plain dialog otherwise loses. */}
           <div className={`-mx-3 -mt-3 h-1 ${KIND_FILL.calendarEvent}`} />
+          {state.detail.fromCache && <CachedNotice fetchedAt={state.detail.fetchedAt} />}
           <p className="flex items-center gap-1.5 text-text-dim">
             <Icon.CalendarEvent
               className={`size-4 shrink-0 ${KIND_TEXT.calendarEvent}`}

@@ -37,6 +37,7 @@ import {
   SelectTrigger,
   SelectValue,
   Spinner,
+  CachedNotice,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { useCorpRouteGate } from '@/features/corp/useCorpRouteGate';
@@ -143,6 +144,8 @@ interface MembersSnapshot {
    * fallback must not age the badge for everyone.
    */
   fetchedAt: Date | null;
+  /** Either of those two reads fell back to its saved copy. */
+  fromCache: boolean;
   /** Captured in the loader: `Date.now()` in render is impure. */
   loadedAt: number;
 }
@@ -154,6 +157,7 @@ const EMPTY_SNAPSHOT: MembersSnapshot = {
   labels: EMPTY_MEMBER_LABELS,
   diff: EMPTY_ROSTER_DIFF,
   fetchedAt: null,
+  fromCache: false,
   loadedAt: 0,
 };
 
@@ -211,7 +215,9 @@ async function loadMembersSnapshot(
       ? null
       : fetchedAts.reduce((oldest, date) => (date < oldest ? date : oldest));
 
-  return { corporationId, members, roles, labels, diff, fetchedAt, loadedAt };
+  const fromCache = [roster, tracking].some((result) => result.cached?.fromCache);
+
+  return { corporationId, members, roles, labels, diff, fetchedAt, fromCache, loadedAt };
 }
 
 /** Mounted only once Corp Access is `ready` — see the `/corp` loader note. */
@@ -340,6 +346,9 @@ function CorpMembersView() {
         busy={<Spinner />}
       >
         <div className="space-y-2">
+          {data?.fromCache && (
+            <CachedNotice fetchedAt={data.fetchedAt} refreshFailed={snapshot.refreshCount > 0} />
+          )}
           <FilterBar
             value={rosterFilter}
             onChange={(next) => setFilterParams(next)}

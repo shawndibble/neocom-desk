@@ -88,6 +88,28 @@ describe('PriceHistoryPanel', () => {
     expect(screen.getByTestId('chart')).toHaveTextContent('Tritanium: 1 points');
   });
 
+  it('says the series is a saved copy, with its age, only when the read fell back to the cache', async () => {
+    const points = [historyPoint({ date: '2026-08-01', average: 5, volume: 50 })];
+    mockedLoad.mockResolvedValueOnce({
+      points,
+      fetchedAt: Date.now() - 3 * 3_600_000 - 60_000,
+      fromCache: true,
+    });
+    const { unmount } = render(
+      <PriceHistoryPanel regionId={10000002} typeId={34} itemName="Tritanium" now={FIXED_NOW} />
+    );
+    expect(await screen.findByText('Showing cached data')).toBeInTheDocument();
+    expect(screen.getByText('3h ago')).toBeInTheDocument();
+    unmount();
+
+    mockedLoad.mockResolvedValueOnce({ points, fetchedAt: Date.now(), fromCache: false });
+    render(
+      <PriceHistoryPanel regionId={10000002} typeId={34} itemName="Tritanium" now={FIXED_NOW} />
+    );
+    await waitFor(() => expect(screen.getByTestId('chart')).toBeInTheDocument());
+    expect(screen.queryByText('Showing cached data')).not.toBeInTheDocument();
+  });
+
   it('re-fetches when the region or type changes', async () => {
     mockedLoad.mockResolvedValue({ points: [], fetchedAt: 1_000_000 });
     const { rerender } = render(
@@ -382,6 +404,19 @@ describe('PriceHistoryPanel', () => {
           'Tritanium: 1 points, 0 ma points primary=The Forge [Domain:error:0] [Sinq Laison:loading:0]'
         )
       );
+    });
+
+    it('says the chart is cached when only a compared region came from the saved copy', async () => {
+      mockedLoad.mockImplementation((regionId) =>
+        Promise.resolve(
+          regionId === 10000043
+            ? { ...ONE_DAY, fetchedAt: Date.now() - 2 * 3_600_000 - 60_000, fromCache: true }
+            : { ...ONE_DAY, fetchedAt: Date.now(), fromCache: false }
+        )
+      );
+      renderCompared([10000043]);
+      expect(await screen.findByText('Showing cached data')).toBeInTheDocument();
+      expect(screen.getByText('2h ago')).toBeInTheDocument();
     });
 
     it('adds a picked region through the Compare regions control', async () => {

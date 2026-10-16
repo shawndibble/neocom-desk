@@ -39,6 +39,7 @@ import {
   SelectValue,
   STAT_CHIP_TONE_TEXT_CLASS,
   MenuItem,
+  CachedNotice,
 } from '@/components/ui';
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { DataGate } from '@/components/DataGate';
@@ -232,14 +233,14 @@ export function OpportunitiesPanel({
     oldestFetchedAt: Date | null;
     /** Selected Characters whose blueprint read came back with nothing (offline, ESI down, nothing cached). */
     failedCount: number;
-    /** At least one Character's blueprints are a cached copy rather than a fresh read. */
-    anyFromCache: boolean;
+    /** When the oldest cached-copy blueprint list was read (ms); null when every list is a fresh read. */
+    cachedAt: number | null;
   }>({
     ownedByCharacter: new Map(),
     loading: true,
     oldestFetchedAt: null,
     failedCount: 0,
-    anyFromCache: false,
+    cachedAt: null,
   });
   const [retryTick, setRetryTick] = useState(0);
 
@@ -254,7 +255,7 @@ export function OpportunitiesPanel({
         loading: false,
         oldestFetchedAt: null,
         failedCount: 0,
-        anyFromCache: false,
+        cachedAt: null,
       });
       return;
     }
@@ -265,13 +266,16 @@ export function OpportunitiesPanel({
       const map = new Map<number, CharacterBlueprint[]>();
       let oldestFetchedAt: Date | null = null;
       let failedCount = 0;
-      let anyFromCache = false;
+      let cachedAt: number | null = null;
       results.forEach((result, index) => {
         map.set(characterIds[index]!, result.cached?.data ?? []);
         // `null` is "nothing came back", which is not the same as a Character
         // who owns no blueprints (`[]`).
         if (result.cached === null) failedCount += 1;
-        else if (result.cached.fromCache) anyFromCache = true;
+        else if (result.cached.fromCache) {
+          const at = result.cached.fetchedAt.getTime();
+          if (cachedAt === null || at < cachedAt) cachedAt = at;
+        }
         const fetchedAt = result.cached?.fetchedAt;
         if (fetchedAt && (!oldestFetchedAt || fetchedAt < oldestFetchedAt))
           oldestFetchedAt = fetchedAt;
@@ -281,7 +285,7 @@ export function OpportunitiesPanel({
         loading: false,
         oldestFetchedAt,
         failedCount,
-        anyFromCache,
+        cachedAt,
       });
     });
     return () => {
@@ -293,7 +297,7 @@ export function OpportunitiesPanel({
     loading: blueprintsLoading,
     oldestFetchedAt,
     failedCount,
-    anyFromCache,
+    cachedAt,
   } = blueprintsState;
   /** Every selected Character came back with nothing: "no blueprints" would be a guess. */
   const allBlueprintsFailed = characterIds.length > 0 && failedCount === characterIds.length;
@@ -838,13 +842,14 @@ export function OpportunitiesPanel({
             ? t('industry.opportunitiesSomeFailed', { count: failedCount })
             : ''}
         </LiveStatus>
-        {!allBlueprintsFailed && (anyFromCache || failedCount > 0) && (
-          <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
-            {failedCount > 0
-              ? t('industry.opportunitiesSomeFailed', { count: failedCount })
-              : t('common.offlineTitle')}
-          </p>
-        )}
+        {!allBlueprintsFailed &&
+          (failedCount > 0 ? (
+            <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
+              {t('industry.opportunitiesSomeFailed', { count: failedCount })}
+            </p>
+          ) : (
+            cachedAt !== null && <CachedNotice className="px-3 pt-2" fetchedAt={cachedAt} />
+          ))}
         {candidates.length === 0 ? (
           <EmptyState
             title={t('industry.opportunitiesEmptyTitle')}

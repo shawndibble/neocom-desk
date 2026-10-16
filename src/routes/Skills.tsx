@@ -13,6 +13,7 @@ import {
   StatChips,
   IconButton,
   LiveStatus,
+  CachedNotice,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { GrantBanner } from '@/app/GrantNote';
@@ -376,9 +377,7 @@ export function Skills() {
           {skillsNeedsReauth && (
             <ReauthCachedNote characterId={activeCharacterId} endpoints={['getCharacterSkills']} />
           )}
-          {skillsResult.fromCache && (
-            <p className="text-[0.6875rem] text-warning uppercase">{t('skills.offlineTitle')}</p>
-          )}
+          {skillsResult.fromCache && <CachedNotice fetchedAt={fetchedAt} />}
 
           <Panel title={t('skills.attributes')}>
             <AttributeChips

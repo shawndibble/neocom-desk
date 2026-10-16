@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Checkbox } from '@/components/ui';
+import { Button, Checkbox, NeedsConnection } from '@/components/ui';
 import { useOnline } from '@/stores/network';
-import { NeedsConnectionButton } from './NeedsConnectionButton';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { MailInvitePanel } from './MailInvitePanel';
 import { communityInviteUrl, setRequireApproval, type CommunitySummary } from './communityStore';
@@ -86,20 +85,26 @@ export function CommunityInvites({
               >
                 {t('communities.copyLink')}
               </Button>
-              <NeedsConnectionButton size="sm" onClick={onRegenerate}>
-                {t('communities.regenerate')}
-              </NeedsConnectionButton>
-              <NeedsConnectionButton size="sm" onClick={onRevoke}>
-                {t('communities.revoke')}
-              </NeedsConnectionButton>
+              <NeedsConnection>
+                <Button size="sm" onClick={onRegenerate}>
+                  {t('communities.regenerate')}
+                </Button>
+              </NeedsConnection>
+              <NeedsConnection>
+                <Button size="sm" onClick={onRevoke}>
+                  {t('communities.revoke')}
+                </Button>
+              </NeedsConnection>
             </div>
           </>
         ) : (
           <div className="flex flex-wrap items-center gap-2">
             <p className="text-xs text-text-dim">{t('communities.inviteOff')}</p>
-            <NeedsConnectionButton size="sm" data-invite-focus="" onClick={onRegenerate}>
-              {t('communities.regenerate')}
-            </NeedsConnectionButton>
+            <NeedsConnection>
+              <Button size="sm" data-invite-focus="" onClick={onRegenerate}>
+                {t('communities.regenerate')}
+              </Button>
+            </NeedsConnection>
           </div>
         )}
       </section>

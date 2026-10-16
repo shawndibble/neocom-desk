@@ -28,6 +28,7 @@ import {
   useTabsId,
   Tooltip,
   type DataTableColumn,
+  CachedNotice,
 } from '@/components/ui';
 import { HintText } from '@/components/ui/HintText';
 import * as Icon from '@/components/ui/icons';
@@ -1204,9 +1205,7 @@ export function Contacts() {
                   />
                 )}
                 {contactsResult.fromCache && (
-                  <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
-                    {t('common.offlineTitle')}
-                  </p>
+                  <CachedNotice className="px-3 pt-2" fetchedAt={contactsResult.fetchedAt} />
                 )}
                 {contactsTruncated && (
                   <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">

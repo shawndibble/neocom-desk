@@ -542,10 +542,6 @@ export function ColoniesTab({
             names={assumedCustomsNames(advice?.colonies ?? [], (id) => t('pi.planetLabel', { id }))}
           />
 
-          {planetsResult?.fromCache && (
-            <p className="text-[0.6875rem] text-warning uppercase">{t('common.offlineTitle')}</p>
-          )}
-
           <Panel
             title={t('pi.colonies.panelTitle', {
               count: ownRows.length + (showAltColonies ? roster.colonies.length : 0),
