@@ -35,7 +35,10 @@ Skillplans, EVEMon Pilot Progression, EVEMon Certificates Enhanced — no licens
 so their data is unusable; surfaced #2390). EVE Ledger (hiram-git/eve-ledger,
 live local desktop wallet accountant: activity split, own-alt netting, journal
 archive, ratting ISK/h, loss replacement matching, doctrine view — surfaced
-#3908–#3910; the rest is Killed).
+#3908–#3910; the rest is Killed). EVE Motor Market / MoMa (PeanutMotor,
+GPL-3 Windows desktop, live, weekly releases: build planner with run planner,
+invention, order-book ladder, Daytrade/Swing/Regional/Firesales scanners,
+Order update work-through, FIFO Profits — surfaced #3985–#3995).
 EVE Omni, Canopus, Eve-Omnitool, Eve Deep Industry, SNOW//OPS, New Eden Command,
 eve-hub.ru, Telescope, EVE Killmap, The Bounty Bid, PI Nexus, sde-deltas (all
 closed classes 1-3 or intel/dev infra; Slipway Jobs view + slot deduction is
@@ -268,6 +271,9 @@ Numbering is stable — later runs cite these by number. Append, never renumber.
 47. **A rate divided by a guessed duration is a typed-in estimate** — tick
     counts and session gaps are not time played; show per-day totals
     (`20261006-085420`).
+48. **The public contract snapshot drops asked-for lines** (only PLEX survives
+    as `requestedPlex`) — any value-vs-asking ranking ranks item-swap bait
+    first until #3986's `requestsItems` flag lands.
 
 ## Filed candidates
 
@@ -329,10 +335,30 @@ transactions archived 365 days device-only, poll-fed, gaps shown. #3910 NARROW
 skills, training time; chips + search for 20+ Characters (owner: a popover
 was the wrong place).
 
+**MoMa batch, ready-for-agent by owner override** (shapes settled in an owner
+interview, then reviewed): #3991 NARROW — Open Orders work-through, controls in
+the current row, Next re-reads the book, phone drops copy. #3985 NARROW —
+slot-aware schedule and done-by, one job per node; #3988 decision ticket
+(ready-for-human) for multi-Character / multi-copy splits. #3992 NARROW — group
+member Use assets offer subtracts sibling claims; overlay kept. #3993 NARROW —
+order-book walk on plan/group pages for need ≥ 1% of listed. #3986 → #3989
+below-market contracts (first shape KILLed by kill-test 48; revived behind the
+snapshot flag). #3994 NARROW — vs 90d, region average vs region average. #3995
+NARROW — History margin/broker totals, By day, All characters FIFO, Trading
+profit widget. #3987 → #3990 NARROW — invention reopened (SDE kept only
+activities 1/11) as a Blueprint Acquisition tier per decryptor.
+
 ## Killed / dropped candidates (never filed)
 
 Grouped by the test that killed them; the reason is what stops a re-pitch.
 
+- **MoMa leftovers:** station-trading flip finder (owner: needed a new tab —
+  no new pages; Hauling's 3-pass scan is the feasible shape if
+  revived inline). Compressed-ore buying (structure refine rates are out,
+  `20260906-180034`). Optimizer score (47 — made-up 45/25/15/15 weights).
+  Swing below-average scanner and recovery days (47; residue #3994). Guided
+  tutorial (not a capability gap). Merging the Group Owned Overlay into member
+  claims (reverses `20260909-212724`; residue #3992).
 - **EVE Ledger leftovers:** Omega self-funding / "does it cover its PLEX" (13 —
   the Omega price in PLEX is in neither ESI nor the SDE and varies by term;
   Omega is per Account, which has no identity; residue is #3908's PLEX row).
@@ -430,8 +456,8 @@ invention-planning.md`, #2848 not planned — only the Market-Wide label
   %-change stat — thin-volume days. Build Plan → PI colony link — Dexie-only
   cache. Mining-ledger opportunity finder — the shape of #819. PI Colony Layout
   Template — superseded by the Advisor's fitted plan. Reopening research/copying
-  (~10 researched BPOs region-wide) and invention (gated on reversing
-  BOM-rollup). No-buyout auction exclusion — 0 of 8,000 live Forge contracts.
+  (~10 researched BPOs region-wide); invention since reopened as #3990.
+  No-buyout auction exclusion — 0 of 8,000 live Forge contracts.
   Reprocessing implant — false precision against a labelled 50% assumption.
   Housekeeping only: Mining Yield's `specialisationLevel: 0`, dead i18n keys.
 - **Order-problem alerts** (undercut / below-floor; prior art Iron Whales'

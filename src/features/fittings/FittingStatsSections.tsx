@@ -1,5 +1,5 @@
 import { HintText } from '@/components/ui/HintText';
-import { useEffect, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { Button, Caret, IskAmount, RowMoreActions } from '@/components/ui';
 import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
@@ -58,12 +58,21 @@ import { MiningFacts } from './FittingMiningStats';
 import { FleetBoostFacts } from './FittingFleetBoostStats';
 import { hasFleetSupport } from '@/engine/fittings/fleetSupport';
 import { ProjectedEffectsPanel } from './ProjectedEffectsPanel';
-import { useProjectedSources } from './statsConditions';
+import { useOverheatAll, useProjectedSources } from './statsConditions';
 import type { TargetProfiles } from './targetProfiles';
 import type { OverlayFitting } from './useOverlayFitting';
 import { FittingItemMenu, WeaponMenuItems } from './FittingItemMenu';
 import { kmValue, rangeLines } from './rangeText';
 import { useFittingItemActions } from './fittingItemActions';
+import { AbyssalRunPlanner, AbyssalWeatherMeta, type WeatherCompare } from './AbyssalRunPlanner';
+import { useAbyssalWeather, useWeatherName } from './abyssalWeatherSelection';
+import { StatsHeadingLabel } from './StatsHeadingLabel';
+import { StatsGroupLabel, StatsScopePanel, StatsScopeTrigger } from './StatsScopePanels';
+import {
+  defaultTacticalMode,
+  tacticalModeKind,
+  tacticalModesFor,
+} from '@/engine/fittings/tacticalModes';
 
 const DMG_FILL_CLASS = {
   em: 'bg-dmg-em',
@@ -289,6 +298,7 @@ type Section =
   | 'mining'
   | 'fleetBoosts'
   | 'projected'
+  | 'abyssal'
   | 'targeting'
   | 'navigation'
   | 'drones'
@@ -317,6 +327,7 @@ function StatSection({
   warning,
   expanded,
   onToggle,
+  level: Heading,
   children,
 }: {
   title: string;
@@ -326,13 +337,15 @@ function StatSection({
   warning?: string;
   expanded: boolean;
   onToggle: () => void;
+  /** `h4` under a column group label; `h3` in a side panel, under its title. */
+  level: 'h3' | 'h4';
   children: ReactNode;
 }) {
   return (
     <section className="border-b border-line last:border-b-0">
       {/* Every section's row looks alike, open or shut: its small-caps title, the headline figure beside. Hover fills it `panel-2`, so it rests unfilled. */}
       <div className={cx('flex items-center gap-2 pr-3', rowInteractiveClassName)}>
-        <h3 className="min-w-0 flex-1">
+        <Heading className="min-w-0 flex-1">
           <button
             type="button"
             aria-expanded={expanded}
@@ -345,7 +358,7 @@ function StatSection({
             <Caret expanded={expanded} />
             {title}
           </button>
-        </h3>
+        </Heading>
         {/* Status text, never boxed: a box would read as a control (DESIGN.md §6). */}
         {warning && <span className={`shrink-0 text-warning ${STAT_EYEBROW_TYPE}`}>{warning}</span>}
         {meta && <span className="shrink-0 text-sm font-semibold tabular-nums">{meta}</span>}
@@ -418,10 +431,34 @@ interface FittingStatsSectionsProps {
   targetProfiles: TargetProfiles;
   /** A saved Fitting to overlay on the applied-DPS graphs; absent without a Character. */
   overlay?: OverlayFitting;
-  /** A line above the sections — whose skills the numbers are worked out under. */
-  heading?: ReactNode;
-  /** Controls for the conditions every section is worked out in — implants, Tactical mode, Abyssal weather, missing skills — under the heading. */
-  conditions?: ReactNode;
+  /**
+   * Who flies it, for the Pilot trigger and panel. Absent: no Character, so
+   * the trigger reads the skills basis alone (All skills V).
+   */
+  pilot?: {
+    /** Null while it loads. */
+    characterName: string | null;
+    /** Skills the Character lacks for the fit: "· N missing" on the trigger. */
+    missingSkills?: number;
+    /** The fit's skill requirements could not be read. */
+    skillsUnknown?: boolean;
+    /** Top of the Pilot panel: the missing-skills chip, the skills-unknown note. */
+    notes?: ReactNode;
+  };
+  /**
+   * The Abyssal weather the figures on screen were worked out in, for the
+   * Situation trigger: it lags a new pick until they land. Absent: the
+   * session weather.
+   */
+  statsWeatherTypeId?: number | null;
+  /** The Tactical mode picker, top of the Situation panel — absent where the hull has no modes. */
+  tacticalMode?: ReactNode;
+  /**
+   * The Abyssal section — the session weather and a run planned in it
+   * (`AbyssalRunPlanner`). Its body mounts only while open, which is what keeps
+   * the weather's delta from being worked out while it is shut.
+   */
+  abyssal?: { hullGroupId: number | undefined; compare: WeatherCompare | null };
   /** The implant controls, grouped with the skills override under "Implants & skills" — absent where a Fitting has no implants to choose. */
   implants?: ReactNode;
   /** "What to train" (`FittingWhatToTrainPanel`) — absent where there's no Character to train. Collapsed by default: it only works anything out once opened. */
@@ -566,7 +603,9 @@ function OffenseRows({
 /**
  * The stats column (scope decision `20260924-215855`, mockup A): one panel
  * of collapsible sections, each row carrying its headline number, laid out
- * like the game's fitting window. Every section keeps what its ticket put
+ * like the game's fitting window. Only the ship's numbers sit in it, under
+ * Damage, Tank and Ship labels; who flies it and what it flies in sit behind
+ * the Pilot and Situation triggers on top, in side panels (#3978). Every section keeps what its ticket put
  * there — per-weapon offense and heat (#1548), damage profiles and the
  * adapted RAH (#1545), target profiles and applied-DPS graphs (#1546).
  */
@@ -582,8 +621,10 @@ export function FittingStatsSections({
   damageProfiles,
   targetProfiles,
   overlay,
-  heading,
-  conditions,
+  pilot,
+  statsWeatherTypeId,
+  tacticalMode,
+  abyssal,
   implants,
   whatToTrain,
   yourCharacters,
@@ -634,6 +675,66 @@ export function FittingStatsSections({
   const projectedShips = useProjectedSources((state) =>
     state.sources.reduce((sum, source) => sum + source.count, 0)
   );
+  // One panel at a time: both slide over the same edge.
+  const [panel, setPanel] = useState<'pilot' | 'situation' | null>(null);
+  // The panel last opened: what the closing panel shows, and whose trigger
+  // takes focus back when the opener is gone (a phone/desktop swap mid-open).
+  const [shownPanel, setShownPanel] = useState<'pilot' | 'situation'>('pilot');
+  const openPanel = (which: 'pilot' | 'situation') => {
+    setShownPanel(which);
+    setPanel(which);
+  };
+  const closePanel = () => setPanel(null);
+  const pilotTriggerRef = useRef<HTMLButtonElement>(null);
+  const situationTriggerRef = useRef<HTMLButtonElement>(null);
+  const overheatAll = useOverheatAll((state) => state.overheatAll);
+  const sessionWeather = useAbyssalWeather((state) => state.weatherTypeId);
+  const weatherName = useWeatherName(
+    statsWeatherTypeId === undefined ? sessionWeather : statsWeatherTypeId
+  );
+  // A Fitting in its hull's default mode carries no `mode` (TacticalModePicker's `withMode`).
+  const mode =
+    fitting?.mode !== undefined &&
+    tacticalModesFor(fitting.shipTypeId).includes(fitting.mode) &&
+    fitting.mode !== defaultTacticalMode(fitting.shipTypeId)
+      ? tacticalModeKind(fitting.mode)
+      : undefined;
+
+  // What each trigger carries with its panel shut: the skills basis and
+  // skill gaps; the weather, a non-default Tactical mode, projected ships
+  // and overheat. (Implants show only in the Pilot panel.)
+  const pilotValue = (
+    <>
+      <StatsHeadingLabel
+        hasCharacter={pilot !== undefined}
+        characterName={pilot?.characterName ?? null}
+        short
+      />
+      {pilot?.missingSkills ? (
+        <span className="text-warning">
+          {' · '}
+          {t('fittings.stats.pilot.missing', { count: pilot.missingSkills })}
+        </span>
+      ) : null}
+      {pilot?.skillsUnknown || (stats && !skillsKnown) ? (
+        <span className="text-warning"> · {t('fittings.stats.pilot.skillsUnknown')}</span>
+      ) : null}
+    </>
+  );
+  const situationValue = (
+    <>
+      {[
+        weatherName ?? t('fittings.weather.none'),
+        mode && t(`fittings.mode.kind.${mode}`),
+        projectedShips > 0 && t('fittings.stats.situation.projected', { count: projectedShips }),
+      ]
+        .filter(Boolean)
+        .join(' · ')}
+      {overheatAll && (
+        <span className="text-warning"> · {t('fittings.stats.situation.overheated')}</span>
+      )}
+    </>
+  );
   const toggle = (section: Section) =>
     // From the store's current value, never this render's possibly stale copy.
     void setSections(
@@ -669,7 +770,14 @@ export function FittingStatsSections({
   const figure = (format: (s: FittingStats) => string, toneClassName?: string) =>
     stats ? <HeatFigure stats={stats} format={format} toneClassName={toneClassName} /> : undefined;
 
-  function section(id: Section, meta: ReactNode, body: ReactNode, warning?: string) {
+  function section(
+    id: Section,
+    meta: ReactNode,
+    body: ReactNode,
+    warning?: string,
+    /** `h3` for a section in a side panel, under the panel's own title. */
+    level: 'h3' | 'h4' = 'h4'
+  ) {
     return (
       <StatSection
         key={id}
@@ -678,9 +786,22 @@ export function FittingStatsSections({
         warning={warning}
         expanded={isExpanded(id)}
         onToggle={() => toggle(id)}
+        level={level}
       >
         {body}
       </StatSection>
+    );
+  }
+
+  /** A column group: its label over the sections it shows, nothing when it shows none. */
+  function group(id: 'damage' | 'tank' | 'ship', sections: ReactNode[]) {
+    const shown = sections.filter(Boolean);
+    if (shown.length === 0) return null;
+    return (
+      <Fragment key={id}>
+        <StatsGroupLabel>{t(`fittings.stats.group.${id}`)}</StatsGroupLabel>
+        {shown}
+      </Fragment>
     );
   }
 
@@ -809,15 +930,413 @@ export function FittingStatsSections({
     return facts;
   }
 
+  const damageSections = [
+    section(
+      'offense',
+      stats && stats.offense.weapons.length > 0
+        ? figure((s) => t('fittings.stats.weaponDps', { value: s.offense.dps.toFixed(1) }))
+        : undefined,
+      stats ? (
+        stats.offense.weapons.length > 0 ? (
+          <OffenseRows
+            stats={stats}
+            typeName={typeName}
+            fitting={fitting}
+            moduleResults={moduleResults}
+          />
+        ) : stats.offense.chargelessWeaponCount > 0 ? (
+          <StatNote>
+            {t('fittings.stats.offenseNoCharge', { count: stats.offense.chargelessWeaponCount })}
+          </StatNote>
+        ) : (
+          <StatNote>{t('fittings.stats.offenseNone')}</StatNote>
+        )
+      ) : (
+        placeholder
+      )
+    ),
+    section(
+      'appliedDps',
+      undefined,
+      stats ? (
+        <AppliedDpsPanel
+          applied={stats.applied}
+          unheatedApplied={stats.unheated?.applied ?? null}
+          chargelessWeaponCount={stats.offense.chargelessWeaponCount}
+          targetProfiles={targetProfiles}
+          overlay={overlay}
+        />
+      ) : (
+        placeholder
+      )
+    ),
+    showDrones &&
+      section(
+        'drones',
+        figure((s) => t('fittings.stats.weaponDps', { value: s.droneDps.toFixed(1) })),
+        stats ? (
+          <Facts
+            items={[
+              {
+                label: t('fittings.stats.fact.droneDps'),
+                value: figure((s) => s.droneDps.toFixed(1)),
+              },
+              {
+                label: t('fittings.stats.fact.bandwidth'),
+                value: figure((s) =>
+                  t('fittings.stats.unit.bandwidth', {
+                    used: s.droneBandwidthUsed.toFixed(0),
+                    total: s.droneBandwidthTotal.toFixed(0),
+                  })
+                ),
+              },
+              {
+                label: t('fittings.stats.fact.droneBay'),
+                value: figure((s) =>
+                  t('fittings.stats.unit.cubicMetres', {
+                    value: s.droneCapacity.toFixed(0),
+                  })
+                ),
+              },
+              {
+                label: t('fittings.stats.fact.maxActiveDrones'),
+                value: figure((s) => String(s.maxActiveDrones)),
+              },
+              {
+                label: t('fittings.stats.fact.droneControlRange'),
+                value: figure((s) =>
+                  t('fittings.stats.unit.km', { value: kmValue(s.applied.droneControlRange) })
+                ),
+              },
+            ]}
+          />
+        ) : (
+          placeholder
+        )
+      ),
+    stats &&
+      stats.fighters.tubes.total > 0 &&
+      section(
+        'fighters',
+        figure((s) => t('fittings.stats.weaponDps', { value: s.fighters.dps.toFixed(1) })),
+        <Facts
+          items={[
+            {
+              label: t('fittings.stats.fact.fighterDps'),
+              value: figure((s) => s.fighters.dps.toFixed(1)),
+            },
+            {
+              label: t('fittings.stats.fact.fighterTubes'),
+              value: figure((s) =>
+                t('fittings.stats.unit.usedOfTotal', {
+                  used: s.fighters.tubes.used.toFixed(0),
+                  total: s.fighters.tubes.total.toFixed(0),
+                })
+              ),
+            },
+            {
+              label: t('fittings.stats.fact.fighterBay'),
+              value: figure((s) =>
+                t('fittings.stats.unit.cubicMetresUsed', {
+                  used: s.fighters.bay.used.toFixed(0),
+                  total: s.fighters.bay.total.toFixed(0),
+                })
+              ),
+            },
+          ]}
+        />
+      ),
+  ];
+  const tankSections = [
+    section(
+      'defense',
+      figure((s) => t('fittings.stats.defenseEhp', { value: formatEhp(s.ehp) })),
+      <>
+        <StatFields>
+          <DamageProfilePicker damageProfiles={damageProfiles} field />
+        </StatFields>
+        {stats ? (
+          <>
+            <ResistTable rows={resistRows(stats)} />
+            {adaptedHardeners.length > 0 && (
+              <StatNote>{t('fittings.stats.armorIncludesRah', { profile: profileName })}</StatNote>
+            )}
+            <TankFacts stats={stats} typeName={typeName} />
+          </>
+        ) : (
+          placeholder
+        )}
+      </>
+    ),
+    section(
+      'capacitor',
+      figure(
+        (s) =>
+          s.capacitor.stable
+            ? t('fittings.stats.capacitorStable', {
+                pct: s.capacitor.stablePercentage.toFixed(0),
+              })
+            : t('fittings.stats.capacitorDepletes', {
+                time: formatSeconds(s.capacitor.depletesInSeconds),
+              }),
+        stats ? CAPACITOR_TONE_CLASS[capacitorTone(stats.capacitor)] : undefined
+      ),
+      stats ? <CapacitorFacts stats={stats} /> : placeholder
+    ),
+  ];
+  const shipSections = [
+    section(
+      'navigation',
+      figure((s) =>
+        t('fittings.stats.maxVelocityMeta', { value: s.navigation.maxVelocity.toFixed(0) })
+      ),
+      stats ? (
+        <Facts
+          items={[
+            {
+              label: t('fittings.stats.fact.maxVelocity'),
+              value: figure((s) =>
+                t('fittings.stats.maxVelocityMeta', {
+                  value: s.navigation.maxVelocity.toFixed(0),
+                })
+              ),
+            },
+            {
+              label: t('fittings.stats.fact.align'),
+              value: figure((s) =>
+                t('fittings.stats.unit.seconds', {
+                  value: alignTimeSeconds(s.navigation.mass, s.navigation.agility).toFixed(1),
+                })
+              ),
+            },
+            {
+              label: t('fittings.stats.fact.agility'),
+              value: figure((s) => s.navigation.agility.toFixed(3)),
+            },
+            {
+              label: t('fittings.stats.fact.mass'),
+              value: figure((s) =>
+                t('fittings.stats.unit.tonnes', {
+                  value: (s.navigation.mass / 1000).toFixed(0),
+                })
+              ),
+            },
+            {
+              label: t('fittings.stats.fact.warpSpeed'),
+              value: figure((s) =>
+                t('fittings.stats.unit.auPerSecond', {
+                  value: s.navigation.warpSpeed.toFixed(1),
+                })
+              ),
+            },
+          ]}
+        />
+      ) : (
+        placeholder
+      )
+    ),
+    section(
+      'targeting',
+      figure((s) =>
+        t('fittings.stats.unit.km', {
+          value: kmValue(s.targeting.maxTargetRange),
+        })
+      ),
+      stats ? (
+        <Facts
+          items={[
+            {
+              label: t('fittings.stats.fact.targetRange'),
+              value: figure((s) =>
+                t('fittings.stats.unit.km', {
+                  value: kmValue(s.targeting.maxTargetRange),
+                })
+              ),
+            },
+            {
+              label: t('fittings.stats.fact.lockedTargets'),
+              value: figure((s) =>
+                s.lockedTargets.ship === s.lockedTargets.pilot
+                  ? String(s.targeting.maxLockedTargets)
+                  : t('fittings.stats.lockedTargetsValue', { ...s.lockedTargets })
+              ),
+            },
+            {
+              label: t('fittings.stats.fact.scanResolution'),
+              value: figure((s) =>
+                t('fittings.stats.unit.mm', {
+                  value: s.targeting.scanResolution.toFixed(0),
+                })
+              ),
+            },
+            {
+              label: t('fittings.stats.fact.signature'),
+              value: figure((s) =>
+                t('fittings.stats.unit.metres', {
+                  value: s.targeting.signatureRadius.toFixed(0),
+                })
+              ),
+            },
+          ]}
+        />
+      ) : (
+        placeholder
+      )
+    ),
+    section(
+      'fitting',
+      figure((s) =>
+        t('fittings.stats.fittingMeta', {
+          cpu: pctOf(s.cpuUsed, s.cpuTotal).toFixed(0),
+          pg: pctOf(s.powergridUsed, s.powergridTotal).toFixed(0),
+        })
+      ),
+      stats ? (
+        <>
+          <Facts
+            items={[
+              {
+                label: t('fittings.stats.fact.cpu'),
+                value: figure((s) =>
+                  t('fittings.stats.unit.usedOfTotal', {
+                    used: s.cpuUsed.toFixed(1),
+                    total: s.cpuTotal.toFixed(1),
+                  })
+                ),
+              },
+              {
+                label: t('fittings.stats.fact.powergrid'),
+                value: figure((s) =>
+                  t('fittings.stats.unit.usedOfTotal', {
+                    used: s.powergridUsed.toFixed(1),
+                    total: s.powergridTotal.toFixed(1),
+                  })
+                ),
+              },
+              {
+                label: t('fittings.stats.fact.calibration'),
+                value: figure((s) =>
+                  t('fittings.stats.unit.usedOfTotal', {
+                    used: s.calibrationUsed.toFixed(0),
+                    total: s.calibrationTotal.toFixed(0),
+                  })
+                ),
+              },
+              ...resourceFacts(stats),
+            ]}
+          />
+          {stats.unknownItemTypeIds.length > 0 && (
+            <StatNote tone="warning">
+              {/* Which items, one per line — on hover, focus or a tap. */}
+              <HintText content={unknownItemsList(stats.unknownItemTypeIds, typeName, t)}>
+                {t('fittings.stats.unknownItems', { count: stats.unknownItemTypeIds.length })}
+              </HintText>
+            </StatNote>
+          )}
+        </>
+      ) : (
+        placeholder
+      ),
+      stats && stats.unknownItemTypeIds.length > 0 ? t('fittings.stats.incomplete') : undefined
+    ),
+    stats &&
+      stats.support.rows.length > 0 &&
+      section('support', figure(supportMeta), <SupportFacts stats={stats} typeName={typeName} />),
+    stats &&
+      stats.mining.rows.length > 0 &&
+      section(
+        'mining',
+        figure((s) =>
+          t('fittings.stats.unit.cubicMetresPerSecond', {
+            value: s.mining.perSecond.toFixed(1),
+          })
+        ),
+        <MiningFacts stats={stats} typeName={typeName} />
+      ),
+    stats &&
+      hasFleetSupport(stats.fleetSupport) &&
+      section(
+        'fleetBoosts',
+        figure(fleetBoostsMeta),
+        <FleetBoostFacts stats={stats} typeName={typeName} />
+      ),
+    section(
+      'price',
+      price ? (nothingPriced ? '—' : iskLabel(price.totals.sell)) : undefined,
+      price ? (
+        <>
+          <StatFields>
+            <StatField label={t('fittings.stats.priceHub')}>
+              <PriceHubSelect size="sm" bare />
+              <Button size="sm" onClick={() => setAppraisalOpen(true)}>
+                {t('fittings.appraisal.open')}
+              </Button>
+            </StatField>
+          </StatFields>
+          <FittingAppraisalModal
+            open={appraisalOpen}
+            onClose={() => setAppraisalOpen(false)}
+            price={namedPrice!}
+          />
+          <Facts
+            items={[
+              {
+                label: t('fittings.stats.fact.sell'),
+                value: nothingPriced ? '—' : iskLabel(price.totals.sell),
+              },
+              {
+                label: t('fittings.stats.fact.buy'),
+                value: nothingPriced ? '—' : iskLabel(price.totals.buy),
+              },
+            ]}
+          />
+          {price.totals.unpricedRows > 0 && (
+            <StatNote tone="warning">
+              <p>{t('fittings.stats.priceUnpriced', { count: price.totals.unpricedRows })}</p>
+              <ul className="mt-0.5 list-disc pl-4">
+                {namedPrice!.rows
+                  .filter((row) => row.buyTotal === null || row.sellTotal === null)
+                  .map((row) => (
+                    <li key={row.typeId}>
+                      {row.name}
+                      {row.quantity > 1 && ` ×${row.quantity}`}
+                    </li>
+                  ))}
+              </ul>
+            </StatNote>
+          )}
+        </>
+      ) : (
+        <StatNote>{t('fittings.stats.priceLoading')}</StatNote>
+      ),
+      price && price.totals.unpricedRows > 0 ? t('fittings.stats.incomplete') : undefined
+    ),
+  ];
+
   return (
     <div className="rounded-xs border border-line bg-panel/85 backdrop-blur-sm">
-      {heading && (
-        <div className="flex items-center justify-between gap-2 border-b border-line px-3 py-2 text-xs text-text-dim">
-          {heading}
-        </div>
-      )}
-      {conditions && <div className="border-b border-line px-3 py-2">{conditions}</div>}
-      {stats && <StatsToolbar stats={stats} />}
+      <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2 text-xs">
+        <StatsScopeTrigger
+          ref={pilotTriggerRef}
+          label={t('fittings.stats.pilot.label')}
+          open={panel === 'pilot'}
+          onClick={() => openPanel('pilot')}
+        >
+          {pilotValue}
+        </StatsScopeTrigger>
+        <StatsScopeTrigger
+          ref={situationTriggerRef}
+          label={t('fittings.stats.situation.label')}
+          open={panel === 'situation'}
+          onClick={() => openPanel('situation')}
+        >
+          {situationValue}
+        </StatsScopeTrigger>
+        {/* Nothing priceable is "unknown", not a free ship: no total, as the Price row shows a dash. */}
+        {price && !nothingPriced && (
+          <span className="ml-auto text-text tabular-nums">{iskLabel(price.totals.sell)}</span>
+        )}
+      </div>
       {statsError && (
         <div
           role="alert"
@@ -846,423 +1365,95 @@ export function FittingStatsSections({
         </p>
       )}
 
-      {stats &&
-        section(
-          'assumptions',
-          undefined,
-          <StatFields>
-            {implants}
-            <SkillOverridesControl />
-          </StatFields>
+      {group('damage', damageSections)}
+      {group('tank', tankSections)}
+      {group('ship', shipSections)}
+
+      {/* One panel, its content switched by `panel`: swapping two open
+        panels would remount it, sending focus back to the first trigger and
+        leaving its history entry behind. */}
+      <StatsScopePanel
+        open={panel !== null}
+        onClose={closePanel}
+        title={t(
+          shownPanel === 'pilot' ? 'fittings.stats.pilot.label' : 'fittings.stats.situation.label'
         )}
-
-      {stats && whatToTrain && section('whatToTrain', undefined, whatToTrain)}
-
-      {stats && fitting && yourCharacters && (
-        <YourCharactersSection
-          fitting={fitting}
-          characters={yourCharacters}
-          render={(meta, body) => section('yourCharacters', meta, body)}
-          expanded={isExpanded('yourCharacters')}
-        />
-      )}
-
-      {section(
-        'offense',
-        stats && stats.offense.weapons.length > 0
-          ? figure((s) => t('fittings.stats.weaponDps', { value: s.offense.dps.toFixed(1) }))
-          : undefined,
-        stats ? (
-          stats.offense.weapons.length > 0 ? (
-            <OffenseRows
-              stats={stats}
-              typeName={typeName}
-              fitting={fitting}
-              moduleResults={moduleResults}
+        subtitle={
+          shownPanel === 'pilot' ? (
+            <StatsHeadingLabel
+              hasCharacter={pilot !== undefined}
+              characterName={pilot?.characterName ?? null}
             />
-          ) : stats.offense.chargelessWeaponCount > 0 ? (
-            <StatNote>
-              {t('fittings.stats.offenseNoCharge', { count: stats.offense.chargelessWeaponCount })}
-            </StatNote>
           ) : (
-            <StatNote>{t('fittings.stats.offenseNone')}</StatNote>
+            t('fittings.stats.situation.subtitle')
           )
-        ) : (
-          placeholder
-        )
-      )}
-
-      {section(
-        'appliedDps',
-        undefined,
-        stats ? (
-          <AppliedDpsPanel
-            applied={stats.applied}
-            unheatedApplied={stats.unheated?.applied ?? null}
-            chargelessWeaponCount={stats.offense.chargelessWeaponCount}
-            targetProfiles={targetProfiles}
-            overlay={overlay}
-          />
-        ) : (
-          placeholder
-        )
-      )}
-
-      {section(
-        'defense',
-        figure((s) => t('fittings.stats.defenseEhp', { value: formatEhp(s.ehp) })),
-        <>
-          <StatFields>
-            <DamageProfilePicker damageProfiles={damageProfiles} field />
-          </StatFields>
-          {stats ? (
-            <>
-              <ResistTable rows={resistRows(stats)} />
-              {adaptedHardeners.length > 0 && (
-                <StatNote>
-                  {t('fittings.stats.armorIncludesRah', { profile: profileName })}
-                </StatNote>
+        }
+        returnFocusFallback={() =>
+          (shownPanel === 'pilot' ? pilotTriggerRef : situationTriggerRef).current
+        }
+      >
+        {shownPanel === 'pilot' ? (
+          <>
+            {pilot?.notes && (
+              <div className="space-y-2 border-b border-line px-3 py-2">{pilot.notes}</div>
+            )}
+            {/* Its sections wait on the stats: say why the panel is bare meanwhile. */}
+            {!stats && <div className="px-3 py-2 text-xs">{placeholder}</div>}
+            {stats &&
+              section(
+                'assumptions',
+                undefined,
+                <StatFields>
+                  {implants}
+                  <SkillOverridesControl />
+                </StatFields>,
+                undefined,
+                'h3'
               )}
-              <TankFacts stats={stats} typeName={typeName} />
-            </>
-          ) : (
-            placeholder
-          )}
-        </>
-      )}
-
-      {section(
-        'capacitor',
-        figure(
-          (s) =>
-            s.capacitor.stable
-              ? t('fittings.stats.capacitorStable', {
-                  pct: s.capacitor.stablePercentage.toFixed(0),
-                })
-              : t('fittings.stats.capacitorDepletes', {
-                  time: formatSeconds(s.capacitor.depletesInSeconds),
-                }),
-          stats ? CAPACITOR_TONE_CLASS[capacitorTone(stats.capacitor)] : undefined
-        ),
-        stats ? <CapacitorFacts stats={stats} /> : placeholder
-      )}
-
-      {stats &&
-        stats.support.rows.length > 0 &&
-        section('support', figure(supportMeta), <SupportFacts stats={stats} typeName={typeName} />)}
-
-      {stats &&
-        stats.mining.rows.length > 0 &&
-        section(
-          'mining',
-          figure((s) =>
-            t('fittings.stats.unit.cubicMetresPerSecond', {
-              value: s.mining.perSecond.toFixed(1),
-            })
-          ),
-          <MiningFacts stats={stats} typeName={typeName} />
-        )}
-
-      {stats &&
-        hasFleetSupport(stats.fleetSupport) &&
-        section(
-          'fleetBoosts',
-          figure(fleetBoostsMeta),
-          <FleetBoostFacts stats={stats} typeName={typeName} />
-        )}
-
-      {section(
-        'projected',
-        projectedShips > 0 ? t('fittings.projected.meta', { count: projectedShips }) : undefined,
-        <ProjectedEffectsPanel />
-      )}
-
-      {section(
-        'targeting',
-        figure((s) =>
-          t('fittings.stats.unit.km', {
-            value: kmValue(s.targeting.maxTargetRange),
-          })
-        ),
-        stats ? (
-          <Facts
-            items={[
-              {
-                label: t('fittings.stats.fact.targetRange'),
-                value: figure((s) =>
-                  t('fittings.stats.unit.km', {
-                    value: kmValue(s.targeting.maxTargetRange),
-                  })
-                ),
-              },
-              {
-                label: t('fittings.stats.fact.lockedTargets'),
-                value: figure((s) =>
-                  s.lockedTargets.ship === s.lockedTargets.pilot
-                    ? String(s.targeting.maxLockedTargets)
-                    : t('fittings.stats.lockedTargetsValue', { ...s.lockedTargets })
-                ),
-              },
-              {
-                label: t('fittings.stats.fact.scanResolution'),
-                value: figure((s) =>
-                  t('fittings.stats.unit.mm', {
-                    value: s.targeting.scanResolution.toFixed(0),
-                  })
-                ),
-              },
-              {
-                label: t('fittings.stats.fact.signature'),
-                value: figure((s) =>
-                  t('fittings.stats.unit.metres', {
-                    value: s.targeting.signatureRadius.toFixed(0),
-                  })
-                ),
-              },
-            ]}
-          />
-        ) : (
-          placeholder
-        )
-      )}
-
-      {section(
-        'navigation',
-        figure((s) =>
-          t('fittings.stats.maxVelocityMeta', { value: s.navigation.maxVelocity.toFixed(0) })
-        ),
-        stats ? (
-          <Facts
-            items={[
-              {
-                label: t('fittings.stats.fact.maxVelocity'),
-                value: figure((s) =>
-                  t('fittings.stats.maxVelocityMeta', {
-                    value: s.navigation.maxVelocity.toFixed(0),
-                  })
-                ),
-              },
-              {
-                label: t('fittings.stats.fact.align'),
-                value: figure((s) =>
-                  t('fittings.stats.unit.seconds', {
-                    value: alignTimeSeconds(s.navigation.mass, s.navigation.agility).toFixed(1),
-                  })
-                ),
-              },
-              {
-                label: t('fittings.stats.fact.agility'),
-                value: figure((s) => s.navigation.agility.toFixed(3)),
-              },
-              {
-                label: t('fittings.stats.fact.mass'),
-                value: figure((s) =>
-                  t('fittings.stats.unit.tonnes', {
-                    value: (s.navigation.mass / 1000).toFixed(0),
-                  })
-                ),
-              },
-              {
-                label: t('fittings.stats.fact.warpSpeed'),
-                value: figure((s) =>
-                  t('fittings.stats.unit.auPerSecond', {
-                    value: s.navigation.warpSpeed.toFixed(1),
-                  })
-                ),
-              },
-            ]}
-          />
-        ) : (
-          placeholder
-        )
-      )}
-
-      {showDrones &&
-        section(
-          'drones',
-          figure((s) => t('fittings.stats.weaponDps', { value: s.droneDps.toFixed(1) })),
-          stats ? (
-            <Facts
-              items={[
-                {
-                  label: t('fittings.stats.fact.droneDps'),
-                  value: figure((s) => s.droneDps.toFixed(1)),
-                },
-                {
-                  label: t('fittings.stats.fact.bandwidth'),
-                  value: figure((s) =>
-                    t('fittings.stats.unit.bandwidth', {
-                      used: s.droneBandwidthUsed.toFixed(0),
-                      total: s.droneBandwidthTotal.toFixed(0),
-                    })
-                  ),
-                },
-                {
-                  label: t('fittings.stats.fact.droneBay'),
-                  value: figure((s) =>
-                    t('fittings.stats.unit.cubicMetres', {
-                      value: s.droneCapacity.toFixed(0),
-                    })
-                  ),
-                },
-                {
-                  label: t('fittings.stats.fact.maxActiveDrones'),
-                  value: figure((s) => String(s.maxActiveDrones)),
-                },
-                {
-                  label: t('fittings.stats.fact.droneControlRange'),
-                  value: figure((s) =>
-                    t('fittings.stats.unit.km', { value: kmValue(s.applied.droneControlRange) })
-                  ),
-                },
-              ]}
-            />
-          ) : (
-            placeholder
-          )
-        )}
-
-      {stats &&
-        stats.fighters.tubes.total > 0 &&
-        section(
-          'fighters',
-          figure((s) => t('fittings.stats.weaponDps', { value: s.fighters.dps.toFixed(1) })),
-          <Facts
-            items={[
-              {
-                label: t('fittings.stats.fact.fighterDps'),
-                value: figure((s) => s.fighters.dps.toFixed(1)),
-              },
-              {
-                label: t('fittings.stats.fact.fighterTubes'),
-                value: figure((s) =>
-                  t('fittings.stats.unit.usedOfTotal', {
-                    used: s.fighters.tubes.used.toFixed(0),
-                    total: s.fighters.tubes.total.toFixed(0),
-                  })
-                ),
-              },
-              {
-                label: t('fittings.stats.fact.fighterBay'),
-                value: figure((s) =>
-                  t('fittings.stats.unit.cubicMetresUsed', {
-                    used: s.fighters.bay.used.toFixed(0),
-                    total: s.fighters.bay.total.toFixed(0),
-                  })
-                ),
-              },
-            ]}
-          />
-        )}
-
-      {section(
-        'fitting',
-        figure((s) =>
-          t('fittings.stats.fittingMeta', {
-            cpu: pctOf(s.cpuUsed, s.cpuTotal).toFixed(0),
-            pg: pctOf(s.powergridUsed, s.powergridTotal).toFixed(0),
-          })
-        ),
-        stats ? (
-          <>
-            <Facts
-              items={[
-                {
-                  label: t('fittings.stats.fact.cpu'),
-                  value: figure((s) =>
-                    t('fittings.stats.unit.usedOfTotal', {
-                      used: s.cpuUsed.toFixed(1),
-                      total: s.cpuTotal.toFixed(1),
-                    })
-                  ),
-                },
-                {
-                  label: t('fittings.stats.fact.powergrid'),
-                  value: figure((s) =>
-                    t('fittings.stats.unit.usedOfTotal', {
-                      used: s.powergridUsed.toFixed(1),
-                      total: s.powergridTotal.toFixed(1),
-                    })
-                  ),
-                },
-                {
-                  label: t('fittings.stats.fact.calibration'),
-                  value: figure((s) =>
-                    t('fittings.stats.unit.usedOfTotal', {
-                      used: s.calibrationUsed.toFixed(0),
-                      total: s.calibrationTotal.toFixed(0),
-                    })
-                  ),
-                },
-                ...resourceFacts(stats),
-              ]}
-            />
-            {stats.unknownItemTypeIds.length > 0 && (
-              <StatNote tone="warning">
-                {/* Which items, one per line — on hover, focus or a tap. */}
-                <HintText content={unknownItemsList(stats.unknownItemTypeIds, typeName, t)}>
-                  {t('fittings.stats.unknownItems', { count: stats.unknownItemTypeIds.length })}
-                </HintText>
-              </StatNote>
+            {stats &&
+              whatToTrain &&
+              section('whatToTrain', undefined, whatToTrain, undefined, 'h3')}
+            {stats && fitting && yourCharacters && (
+              <YourCharactersSection
+                fitting={fitting}
+                characters={yourCharacters}
+                render={(meta, body) => section('yourCharacters', meta, body, undefined, 'h3')}
+                expanded={isExpanded('yourCharacters')}
+              />
             )}
           </>
         ) : (
-          placeholder
-        ),
-        stats && stats.unknownItemTypeIds.length > 0 ? t('fittings.stats.incomplete') : undefined
-      )}
-
-      {section(
-        'price',
-        price ? (nothingPriced ? '—' : iskLabel(price.totals.sell)) : undefined,
-        price ? (
           <>
-            <StatFields>
-              <StatField label={t('fittings.stats.priceHub')}>
-                <PriceHubSelect size="sm" bare />
-                <Button size="sm" onClick={() => setAppraisalOpen(true)}>
-                  {t('fittings.appraisal.open')}
-                </Button>
-              </StatField>
-            </StatFields>
-            <FittingAppraisalModal
-              open={appraisalOpen}
-              onClose={() => setAppraisalOpen(false)}
-              price={namedPrice!}
-            />
-            <Facts
-              items={[
-                {
-                  label: t('fittings.stats.fact.sell'),
-                  value: nothingPriced ? '—' : iskLabel(price.totals.sell),
-                },
-                {
-                  label: t('fittings.stats.fact.buy'),
-                  value: nothingPriced ? '—' : iskLabel(price.totals.buy),
-                },
-              ]}
-            />
-            {price.totals.unpricedRows > 0 && (
-              <StatNote tone="warning">
-                <p>{t('fittings.stats.priceUnpriced', { count: price.totals.unpricedRows })}</p>
-                <ul className="mt-0.5 list-disc pl-4">
-                  {namedPrice!.rows
-                    .filter((row) => row.buyTotal === null || row.sellTotal === null)
-                    .map((row) => (
-                      <li key={row.typeId}>
-                        {row.name}
-                        {row.quantity > 1 && ` ×${row.quantity}`}
-                      </li>
-                    ))}
-                </ul>
-              </StatNote>
+            {tacticalMode && (
+              <div className="border-b border-line px-3 py-2">
+                <StatFields>{tacticalMode}</StatFields>
+              </div>
             )}
+            {abyssal &&
+              section(
+                'abyssal',
+                <AbyssalWeatherMeta />,
+                <AbyssalRunPlanner
+                  hullGroupId={abyssal.hullGroupId}
+                  compare={abyssal.compare}
+                  typeName={typeName}
+                />,
+                undefined,
+                'h3'
+              )}
+            {section(
+              'projected',
+              projectedShips > 0
+                ? t('fittings.projected.meta', { count: projectedShips })
+                : undefined,
+              <ProjectedEffectsPanel />,
+              undefined,
+              'h3'
+            )}
+            {stats && <StatsToolbar stats={stats} />}
           </>
-        ) : (
-          <StatNote>{t('fittings.stats.priceLoading')}</StatNote>
-        ),
-        price && price.totals.unpricedRows > 0 ? t('fittings.stats.incomplete') : undefined
-      )}
+        )}
+      </StatsScopePanel>
     </div>
   );
 }

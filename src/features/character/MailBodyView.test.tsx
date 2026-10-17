@@ -85,13 +85,28 @@ describe('MailBodyView', () => {
     expect(screen.getByRole('link', { name: 'Rifter' })).toHaveAttribute('href', '/?info=type-587');
   });
 
-  it('renders region, station and fitting links as non-clickable text', () => {
+  it('opens region, station and structure links in Place Info', () => {
     renderMarkup(
-      '<a href="showinfo:3//10000002">The Forge</a> <a href="showinfo:1529//60003760">Station</a> <a href="fitting:588:1">Fit</a>'
+      '<a href="showinfo:3//10000002">The Forge</a> <a href="showinfo:1529//60003760">Station</a> <a href="showinfo:35832//1030000000000">Fort</a>'
     );
+    expect(screen.getByRole('link', { name: 'The Forge' })).toHaveAttribute(
+      'href',
+      '/?info=place-10000002'
+    );
+    expect(screen.getByRole('link', { name: 'Station' })).toHaveAttribute(
+      'href',
+      '/?info=place-60003760'
+    );
+    expect(screen.getByRole('link', { name: 'Fort' })).toHaveAttribute(
+      'href',
+      '/?info=place-1030000000000'
+    );
+  });
+
+  it('renders constellation and fitting links as non-clickable text', () => {
+    renderMarkup('<a href="showinfo:4//20000020">Kimotoro</a> <a href="fitting:588:1">Fit</a>');
     expect(screen.queryByRole('link')).toBeNull();
-    expect(screen.getByText('The Forge')).toBeInTheDocument();
-    expect(screen.getByText('Station')).toBeInTheDocument();
+    expect(screen.getByText('Kimotoro')).toBeInTheDocument();
     expect(screen.getByText('Fit')).toBeInTheDocument();
   });
 

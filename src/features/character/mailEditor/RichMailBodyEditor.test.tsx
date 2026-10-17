@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { StrictMode, useState } from 'react';
 import { render, screen, waitFor, fireEvent, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
@@ -58,7 +58,7 @@ describe('RichMailBodyEditor', () => {
     const pm = await editor();
     expect(pm.querySelector('strong')?.textContent).toBe('bold');
     expect(pm.querySelector('[data-eve-color="#ffff0000"]')?.textContent).toBe('red');
-    expect(pm.parentElement?.parentElement?.className).toContain('bg-[#0a0e14]');
+    expect(pm.closest('[data-mail-card]')?.className).toContain('bg-[#0a0e14]');
   });
 
   it('renders a pipe table as a real table', async () => {
@@ -72,10 +72,10 @@ describe('RichMailBodyEditor', () => {
     const user = userEvent.setup();
     render(<Harness initial={'<b>hi</b>'} />);
     await editor();
-    await user.click(screen.getByRole('button', { name: 'Source' }));
+    await user.click(screen.getByRole('button', { name: 'Edit source' }));
     const src = screen.getByRole('textbox', { name: 'Message source (EVE markup)' });
     expect(src).toHaveValue('<b>hi</b>');
-    await user.click(screen.getByRole('button', { name: 'Preview' }));
+    await user.click(screen.getByRole('button', { name: 'Edit source' }));
     expect((await editor()).querySelector('strong')?.textContent).toBe('hi');
   });
 
@@ -84,12 +84,12 @@ describe('RichMailBodyEditor', () => {
     const seen = vi.fn();
     render(<Harness onValue={seen} />);
     await editor();
-    await user.click(screen.getByRole('button', { name: 'Source' }));
+    await user.click(screen.getByRole('button', { name: 'Edit source' }));
     const src = screen.getByRole('textbox', { name: 'Message source (EVE markup)' });
     fireEvent.change(src, { target: { value: 'a<script>x</script><b>b</b> < c' } });
     expect(seen).toHaveBeenLastCalledWith('ax<b>b</b> &lt; c');
     expect(screen.getByTestId('value')).toHaveTextContent('ax<b>b</b> &lt; c');
-    await user.click(screen.getByRole('button', { name: 'Preview' }));
+    await user.click(screen.getByRole('button', { name: 'Edit source' }));
     expect(screen.getByRole('status')).toHaveTextContent("EVE can't show it");
   });
 
@@ -97,12 +97,15 @@ describe('RichMailBodyEditor', () => {
     const user = userEvent.setup();
     render(<Harness initial="hello world" />);
     await editor();
-    await user.click(screen.getByRole('button', { name: 'Source' }));
+    await user.click(screen.getByRole('button', { name: 'Edit source' }));
     const src = screen.getByRole('textbox', { name: 'Message source (EVE markup)' });
     (src as HTMLTextAreaElement).setSelectionRange(6, 11);
     await user.click(screen.getByRole('button', { name: 'Bold' }));
     expect(src).toHaveValue('hello <b>world</b>');
-    expect(screen.getByRole('button', { name: 'Clear formatting' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Clear formatting' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
   });
 
   it('inserts a table from the dialog and emits pipe rows', async () => {
@@ -142,7 +145,7 @@ describe('RichMailBodyEditor', () => {
     expect(document.querySelectorAll('#body')).toHaveLength(1);
     await user.click(screen.getByText('Message'));
     await waitFor(() => expect(pm).toHaveFocus());
-    await user.click(screen.getByRole('button', { name: 'Source' }));
+    await user.click(screen.getByRole('button', { name: 'Edit source' }));
     expect(document.querySelectorAll('#body')).toHaveLength(1);
     expect(document.getElementById('body')).toBe(
       screen.getByRole('textbox', { name: 'Message source (EVE markup)' })
@@ -155,7 +158,7 @@ describe('RichMailBodyEditor', () => {
     const user = userEvent.setup();
     render(<Harness />);
     await editor();
-    await user.click(screen.getByRole('button', { name: 'Source' }));
+    await user.click(screen.getByRole('button', { name: 'Edit source' }));
     const src = screen.getByRole('textbox', { name: 'Message source (EVE markup)' });
     fireEvent.change(src, { target: { value: 'a<script>x</script>' } });
     expect(screen.getByRole('status')).toHaveTextContent('will be removed');
@@ -180,7 +183,7 @@ describe('RichMailBodyEditor', () => {
     const user = userEvent.setup();
     render(<Harness initial="x" />);
     await editor();
-    await user.click(screen.getByRole('button', { name: 'Source' }));
+    await user.click(screen.getByRole('button', { name: 'Edit source' }));
     await user.click(screen.getByRole('textbox', { name: 'Message source (EVE markup)' }));
     await user.click(screen.getByRole('button', { name: 'Text colour' }));
     expect(await screen.findByRole('button', { name: 'Default colour' })).toBeDisabled();
@@ -191,7 +194,7 @@ describe('RichMailBodyEditor', () => {
     const seen = vi.fn();
     render(<Harness initial="say hi now" onValue={seen} />);
     await editor();
-    await user.click(screen.getByRole('button', { name: 'Source' }));
+    await user.click(screen.getByRole('button', { name: 'Edit source' }));
     const src = screen.getByRole('textbox', { name: 'Message source (EVE markup)' });
     (src as HTMLTextAreaElement).setSelectionRange(4, 6);
     await user.click(screen.getByRole('button', { name: 'Link' }));
@@ -285,19 +288,87 @@ describe('RichMailBodyEditor', () => {
     expect(pm.textContent).toBe('onetwo');
   });
 
-  it('Preview: a selection inside one table cell prefills its text and leaves the table intact', async () => {
+  it('Preview: Link is disabled with a reason inside a table cell', async () => {
     const user = userEvent.setup();
     render(<Harness initial={'| a | bcd |\n|---|---|\n| 1 | 2 |'} />);
     const pm = await editor();
     const cell = firstText(pm.querySelectorAll('th')[1]);
     await selectIn(pm, user, [cell, 1], [cell, 3]);
-    await user.click(screen.getByRole('button', { name: 'Link' }));
-    const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getByLabelText('Text')).toHaveValue('cd');
-    await user.type(within(dialog).getByLabelText('Web address'), 'example.com{Enter}');
-    await waitFor(() => expect(pm.querySelectorAll('tr')).toHaveLength(2));
-    // Cells hold plain text (no marks), so the cell keeps its text; the table is unharmed.
-    expect(pm.querySelectorAll('th')).toHaveLength(2);
-    expect(pm.querySelectorAll('th')[1].textContent).toBe('bcd');
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Link' })).toHaveAttribute('aria-disabled', 'true')
+    );
+  });
+
+  it('has no Preview/Source SegmentedControl; one pressed-state toggle switches modes', async () => {
+    const user = userEvent.setup();
+    render(<Harness initial="x" />);
+    await editor();
+    expect(screen.queryByRole('radiogroup')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Preview' })).not.toBeInTheDocument();
+    const toggle = screen.getByRole('button', { name: 'Edit source' });
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    // The bar is inside the one card, with the writing surface.
+    const card = document.querySelector('[data-mail-card]') as HTMLElement;
+    expect(within(card).getByRole('toolbar')).toBeInTheDocument();
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('textbox', { name: 'Message source (EVE markup)' })).toHaveClass(
+      'font-mono'
+    );
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('keeps the bar and toggle available after switching to Source, and back', async () => {
+    const user = userEvent.setup();
+    render(<Harness initial="x" />);
+    await editor();
+    await user.click(screen.getByRole('button', { name: 'Edit source' }));
+    const src = screen.getByRole('textbox', { name: 'Message source (EVE markup)' });
+    expect(src).toHaveFocus();
+    expect(screen.getByRole('toolbar')).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Edit source' }));
+    expect(screen.getByRole('toolbar')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Edit source' })).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    );
+    await waitFor(() => expect(document.querySelector('.ProseMirror')).toHaveFocus());
+  });
+
+  it('mounts under StrictMode and survives a value change from outside', async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const { rerender } = render(
+      <StrictMode>
+        <RichMailBodyEditor id="body" value="<b>one</b>" onChange={() => undefined} />
+      </StrictMode>
+    );
+    const pm = await editor();
+    expect(pm.querySelector('strong')?.textContent).toBe('one');
+    expect(pm).not.toHaveFocus();
+    rerender(
+      <StrictMode>
+        <RichMailBodyEditor id="body" value="two" onChange={() => undefined} />
+      </StrictMode>
+    );
+    await waitFor(() => expect(pm.textContent).toBe('two'));
+    expect(errors).not.toHaveBeenCalled();
+    errors.mockRestore();
+  });
+
+  it('puts the counter inside the card', async () => {
+    render(
+      <RichMailBodyEditor
+        id="body"
+        value="x"
+        onChange={() => undefined}
+        counter={<span>1 / 10000</span>}
+      />
+    );
+    await editor();
+    const card = document.querySelector('[data-mail-card]') as HTMLElement;
+    const counter = within(card).getByText('1 / 10000');
+    expect(counter.parentElement).toHaveClass('justify-end');
+    expect(card.lastElementChild).toBe(counter.parentElement);
   });
 });

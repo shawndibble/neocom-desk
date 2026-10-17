@@ -46,8 +46,7 @@ export function MailComposeFooter({ children, pinned = false, ...send }: MailCom
     <footer
       className={cx(
         'flex shrink-0 items-center justify-between gap-2',
-        // `.mail-footer` lifts above a keyboard-docked format bar (rule in styles/index.css).
-        pinned && 'mail-footer border-t border-line bg-bg px-3 py-2'
+        pinned && 'border-t border-line bg-bg px-3 py-2'
       )}
     >
       <div className="flex min-w-0 items-center gap-2">{children}</div>

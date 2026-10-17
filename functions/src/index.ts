@@ -138,7 +138,9 @@ import {
   type StoredHubPrice,
 } from './marketSnapshot.js';
 import {
-  accumulateRequestedPlex,
+  accumulateRequestedSide,
+  applyRequestedSide,
+  emptyRequestedSide,
   chunkDocId,
   buildContractOfferIndex,
   chunkDocData,
@@ -1292,14 +1294,14 @@ export const syncPublicContractOffers = onSchedule(
     const rows: PublicContractOfferRow[] = [];
     const courierRows: PublicCourierContractRow[] = [];
     // Keyed the same as `eligibleContracts` (raw CSV `contract_id`), and just
-    // as small — a running total per PLEX-requesting contract, not a second
-    // copy of `contract_items.csv`. `contract_items.csv` is a single stream
-    // (see publicContractsArchive.ts), so a requested-PLEX line can arrive
+    // as small — an entry per contract asking for something in return, not a
+    // second copy of `contract_items.csv`. `contract_items.csv` is a single
+    // stream (see publicContractsArchive.ts), so a requested line can arrive
     // before or after the same contract's offered line; folding every line
-    // into this map as it passes and patching `rows` once the stream ends
-    // (below) gets `requestedPlexByContract`'s answer without a second pass
-    // or buffering the line-by-line records.
-    const requestedPlexTotals = new Map<string, number>();
+    // as it passes and patching `rows` once the stream ends (below) gets
+    // `requestedSideByContract`'s answer without a second pass or buffering
+    // the line-by-line records.
+    const requestedSide = emptyRequestedSide();
     let outstandingCourierContracts = 0;
 
     await streamPublicContractsCsvs({
@@ -1314,7 +1316,7 @@ export const syncPublicContractOffers = onSchedule(
         if (courier) courierRows.push(courier);
       },
       onItem: (record) => {
-        accumulateRequestedPlex(record, eligibleContracts, requestedPlexTotals);
+        accumulateRequestedSide(record, eligibleContracts, requestedSide);
         const contract = eligibleContracts.get(record.contract_id);
         if (!contract) return;
         const row = compactContractOfferRow(record, contract);
@@ -1322,12 +1324,7 @@ export const syncPublicContractOffers = onSchedule(
       },
     });
 
-    if (requestedPlexTotals.size > 0) {
-      for (const row of rows) {
-        const requestedPlex = requestedPlexTotals.get(String(row.contractId));
-        if (requestedPlex) row.requestedPlex = requestedPlex;
-      }
-    }
+    applyRequestedSide(rows, requestedSide);
 
     // `outstandingCourierContracts` against `courierRowCount` is the only
     // thing that tells an empty courier snapshot apart from one whose rows were

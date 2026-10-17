@@ -19,7 +19,7 @@ describe('scopePresentation', () => {
   });
 
   it('falls back to the header Character, and says so, for a kind that cannot sum', () => {
-    expect(scopePresentation('industry', 'all')).toEqual({
+    expect(scopePresentation('mail', 'all')).toEqual({
       scopeAll: false,
       chip: false,
       fallbackNote: true,

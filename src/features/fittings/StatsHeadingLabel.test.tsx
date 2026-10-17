@@ -17,29 +17,37 @@ describe('StatsHeadingLabel', () => {
 
   it("says the pilot's own skills only when those are what the stats use", () => {
     renderWith(NO_SKILL_OVERRIDES, 'Test Pilot');
-    expect(screen.getByText('Stats as Test Pilot, own skills')).toBeInTheDocument();
+    expect(screen.getByText('Test Pilot, own skills')).toBeInTheDocument();
   });
 
   it('says All V or All 0 when the Skills control is set to it', () => {
     const { unmount } = renderWith({ base: 'allV', levels: {} }, 'Test Pilot');
-    expect(screen.getByText('Stats as Test Pilot, all skills V')).toBeInTheDocument();
+    expect(screen.getByText('Test Pilot, all skills V')).toBeInTheDocument();
     unmount();
     renderWith({ base: 'all0', levels: {} }, 'Test Pilot');
-    expect(screen.getByText('Stats as Test Pilot, all skills 0')).toBeInTheDocument();
+    expect(screen.getByText('Test Pilot, all skills 0')).toBeInTheDocument();
   });
 
   it('counts single skills set on top', () => {
     renderWith({ base: 'character', levels: { 3300: 5, 3301: 0 } }, 'Test Pilot');
-    expect(
-      screen.getByText('Stats as Test Pilot, own skills · 2 skills set by hand')
-    ).toBeInTheDocument();
+    expect(screen.getByText('Test Pilot, own skills · 2 skills set by hand')).toBeInTheDocument();
+  });
+
+  it('short form (the Pilot trigger): just the name on own skills, the basis otherwise', () => {
+    useSkillOverrides.setState({ skills: NO_SKILL_OVERRIDES });
+    const { unmount } = render(<StatsHeadingLabel hasCharacter characterName="Test Pilot" short />);
+    expect(screen.getByText('Test Pilot')).toBeInTheDocument();
+    unmount();
+    useSkillOverrides.setState({ skills: { base: 'allV', levels: { 3300: 5 } } });
+    render(<StatsHeadingLabel hasCharacter characterName="Test Pilot" short />);
+    expect(screen.getByText('Test Pilot, all V · 1 set by hand')).toBeInTheDocument();
   });
 
   it('reads All V with no Character, unless the control says All 0', () => {
     const { unmount } = renderWith(NO_SKILL_OVERRIDES, null);
-    expect(screen.getByText('Stats at all skills V')).toBeInTheDocument();
+    expect(screen.getByText('All skills V')).toBeInTheDocument();
     unmount();
     renderWith({ base: 'all0', levels: { 3300: 3 } }, null);
-    expect(screen.getByText('Stats at all skills 0 · 1 skill set by hand')).toBeInTheDocument();
+    expect(screen.getByText('All skills 0 · 1 skill set by hand')).toBeInTheDocument();
   });
 });

@@ -6,13 +6,12 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useOnline } from '@/stores/network';
-import { Trans, useTranslation } from 'react-i18next';
+import { useTranslation } from 'react-i18next';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import type { FittingLoadState } from '@/lib/shortcuts';
 import {
   Button,
   Disclosure,
-  IskAmount,
   LiveStatus,
   Modal,
   Panel,
@@ -26,11 +25,7 @@ import {
 } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { AddRow } from '@/components/ui/icons';
-import { AbyssalRunPlanner } from '@/features/fittings/AbyssalRunPlanner';
-import { AbyssalWeatherPicker } from '@/features/fittings/AbyssalWeatherPicker';
 import { SkillsUnknownNote } from '@/features/fittings/FittingPreviewPanels';
-import { StatFields } from '@/features/fittings/StatFacts';
-import { useWeatherName } from '@/features/fittings/abyssalWeatherSelection';
 import { useEndpointsGranted } from '@/app/useGrantedScopes';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import { useIsPhone } from '@/lib/useIsPhone';
@@ -76,15 +71,14 @@ import {
   ModuleRow,
   RackSlots,
 } from '@/features/fittings/FittingRackList';
-import { FittingRing } from '@/features/fittings/FittingRing';
+import { FittingRing, RING_ROOM_ATTR } from '@/features/fittings/FittingRing';
 import { FittingStatsSections } from '@/features/fittings/FittingStatsSections';
 import { FittingVariationsPanel } from '@/features/fittings/FittingVariationsPanel';
 import { FittingMutationPanel } from '@/features/fittings/FittingMutationPanel';
 import { FittingAffectedByPanel } from '@/features/fittings/FittingAffectedByPanel';
 import { FittingFightersPanel } from '@/features/fittings/FittingFightersPanel';
-import { StatsHeadingLabel } from '@/features/fittings/StatsHeadingLabel';
 import { TacticalModePicker } from '@/features/fittings/TacticalModePicker';
-import { tacticalModeKind } from '@/engine/fittings/tacticalModes';
+import { tacticalModeKind, tacticalModesFor } from '@/engine/fittings/tacticalModes';
 import { ImplantSetControl } from '@/features/fittings/ImplantSetControl';
 import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
 import {
@@ -211,8 +205,6 @@ function FittingsPage() {
   const gaps = useFittingSkillGaps(workspace.fitting, activeCharacterId);
   const alpha = useFittingAlpha(workspace.fitting);
   const hardpoints = useFittingHardpoints(workspace.fitting);
-  // The weather the numbers on screen are in — which lags a new pick until they land.
-  const weatherName = useWeatherName(workspace.statsWeatherTypeId);
   const [saveToEveOpen, setSaveToEveOpen] = useState(false);
   const [saveAsNewOpen, setSaveAsNewOpen] = useState(false);
   const [saveAsNewName, setSaveAsNewName] = useState('');
@@ -601,6 +593,11 @@ function FittingsPage() {
     </div>
   );
 
+  // What the stats column's Pilot and Situation panels hold beyond its own sections.
+  const hasModes = tacticalModesFor(fitting.shipTypeId).length > 0;
+  const showMissingSkills = gaps !== null && gaps.missing.length > 0 && activeCharacterId !== null;
+  const showSkillsUnknown = gaps?.unknown === true && activeCharacterId !== null;
+
   const statsSections = (
     <FittingStatsSections
       stats={stats}
@@ -644,45 +641,33 @@ function FittingsPage() {
           )}
         </>
       }
-      conditions={
-        <div className="space-y-2">
-          <StatFields>
-            <TacticalModePicker fitting={fitting} onChange={edit} />
-            <AbyssalWeatherPicker field />
-          </StatFields>
-          <AbyssalRunPlanner
-            hullGroupId={catalogue?.types[String(fitting.shipTypeId)]?.groupID}
-            compare={workspace.compareWeather}
-            typeName={typeName}
-          />
-          {gaps && gaps.missing.length > 0 && activeCharacterId !== null && (
-            <MissingSkillsChip
-              entries={gaps.missing}
-              characterId={activeCharacterId}
-              fittingName={fitting.name}
-            />
-          )}
-          {gaps?.unknown && activeCharacterId !== null && <SkillsUnknownNote />}
-        </div>
-      }
-      heading={
-        <>
-          <span>
-            <StatsHeadingLabel
-              hasCharacter={activeCharacterId !== null}
-              characterName={characterName ?? null}
-            />
-            {weatherName && ` · ${t('fittings.weather.in', { weather: weatherName })}`}
-          </span>
-          {workspace.price && (
-            <span className="text-text tabular-nums">
-              <Trans
-                i18nKey="fittings.stats.unit.iskAmount"
-                components={{ isk: <IskAmount value={workspace.price.totals.sell} /> }}
-              />
-            </span>
-          )}
-        </>
+      abyssal={{
+        hullGroupId: catalogue?.types[String(fitting.shipTypeId)]?.groupID,
+        compare: workspace.compareWeather,
+      }}
+      statsWeatherTypeId={workspace.statsWeatherTypeId}
+      tacticalMode={hasModes ? <TacticalModePicker fitting={fitting} onChange={edit} /> : undefined}
+      pilot={
+        activeCharacterId === null
+          ? undefined
+          : {
+              characterName: characterName ?? null,
+              missingSkills: gaps?.missing.length,
+              skillsUnknown: gaps?.unknown === true,
+              notes:
+                showMissingSkills || showSkillsUnknown ? (
+                  <>
+                    {showMissingSkills && (
+                      <MissingSkillsChip
+                        entries={gaps.missing}
+                        characterId={activeCharacterId}
+                        fittingName={fitting.name}
+                      />
+                    )}
+                    {showSkillsUnknown && <SkillsUnknownNote />}
+                  </>
+                ) : undefined,
+            }
       }
     />
   );
@@ -705,7 +690,11 @@ function FittingsPage() {
     // mid-drag instead: moving or hiding a drag's source element cancels it.)
     <ItemActionsProvider page={pageItemActions}>
       <FittingItemActionsProvider value={itemActions}>
-        <div className={`space-y-3 ${addOpen && addMode === 'slideOut' ? 'pl-[26rem]' : ''}`}>
+        {/* Capped and centred, so a wide screen gets even gutters rather than an empty Ring
+        panel (scope decision `20261016-171349`). */}
+        <div
+          className={`mx-auto max-w-[120rem] space-y-3 ${addOpen && addMode === 'slideOut' ? 'pl-[26rem]' : ''}`}
+        >
           <FittingHeader
             fitting={fitting}
             subtitle={subtitle}
@@ -828,16 +817,19 @@ function FittingsPage() {
                 // page aside, so the editor keeps the width rather than the stats.
                 // The Ring goes beside them from the desktop breakpoint — it is
                 // capped and square, so it fits beside 22rem of stats there (scope
-                // decision `20260925-095734`); the stats hold at 22rem until xl,
-                // since a track with a max grows to it before a 1fr one gets
-                // anything. The List's rows want the width, so it waits for xl.
-                className={`grid items-start gap-3 ${
+                // decision `20260925-095734`); the stats hold at 22rem until xl.
+                // The List's rows want the width, so it waits for xl. The Ring's
+                // track stops at 52rem (its 48rem ring and the panel around it);
+                // width past the caps becomes even gutters.
+                className={`grid items-start justify-center gap-3 ${
                   addMode === 'docked'
-                    ? 'grid-cols-[20rem_minmax(0,1fr)_minmax(22rem,26rem)]'
+                    ? view === 'ring'
+                      ? 'grid-cols-[20rem_minmax(0,52rem)_minmax(22rem,26rem)]'
+                      : 'grid-cols-[20rem_minmax(0,1fr)_minmax(22rem,26rem)]'
                     : addOpen
                       ? 'grid-cols-1'
                       : view === 'ring'
-                        ? 'grid-cols-1 lg:grid-cols-[minmax(0,1fr)_22rem] xl:grid-cols-[minmax(0,1fr)_minmax(22rem,28rem)]'
+                        ? 'grid-cols-1 lg:grid-cols-[minmax(0,52rem)_22rem] xl:grid-cols-[minmax(0,52rem)_minmax(22rem,28rem)]'
                         : 'grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(22rem,28rem)]'
                 }`}
               >
@@ -853,12 +845,14 @@ function FittingsPage() {
                 {/* The Ring stays in view while the tall stats column is read (lg+). The List
                   needs the width and the stacked layout has nothing beside it. At its max
                   height the column also clears the page's bottom padding, so at the page's
-                  end, where it rests on the grid's bottom, its top is still on screen. */}
+                  end, where it rests on the grid's bottom, its top is still on screen. The
+                  Ring sizes itself to that max height (`--ring-room`). */}
                 <div
                   data-testid="fitting-editor-column"
+                  {...{ [RING_ROOM_ATTR]: '' }}
                   className={`min-w-0 space-y-3 ${
                     view === 'ring' && (addMode === 'docked' || !addOpen)
-                      ? 'lg:sticky lg:top-3 lg:max-h-[calc(100vh-2.5rem)] lg:overflow-y-auto'
+                      ? 'lg:sticky lg:top-3 lg:max-h-(--ring-room) lg:overflow-y-auto lg:[--ring-room:calc(100vh-2.5rem)]'
                       : ''
                   }`}
                 >

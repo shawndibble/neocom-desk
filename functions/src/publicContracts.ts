@@ -214,13 +214,20 @@ export interface PublicContractOfferRow {
   /**
    * How much PLEX the contract's issuer wants in return, when any — the sum
    * of PLEX quantity across the contract's *requested* (`is_included:
-   * false`) lines, computed by `requestedPlexByContract`. The same value on
+   * false`) lines, set by `applyRequestedSide`. The same value on
    * every offer row of one contract, since the requested side belongs to the
    * whole contract, not to any one for-sale line. Absent, not zero, when the
    * contract asks for nothing PLEX — the same omit-don't-zero rule ME/TE/runs
    * already follow.
    */
   requestedPlex?: number;
+  /**
+   * Issuer wants at least one non-PLEX item in return (issue #3986); per
+   * contract, like `requestedPlex`. Only yes/no is kept: enough for a value
+   * comparison to drop the contract (items for 1 ISK that also asks for items
+   * is bait, not a deal). Absent, not false, otherwise.
+   */
+  requestsItems?: true;
   /** Epoch ms. */
   dateExpired: number;
 }
@@ -234,16 +241,14 @@ export interface PublicContractOfferRow {
  * offer another). That filter stays: this snapshot answers "what can I buy",
  * and a line the issuer is asking for is not an offer at any price. Issue
  * #906 generalizes the *item type* — the `is_blueprint_copy` gate — not the
- * direction of the exchange. `requestedPlex`, from the requested side of the
- * very same contract, rides along on the *offer* rows this function does
- * publish (issue #1080's PLEX-for-item barter): a caller precomputes it per
- * contract (`requestedPlexByContract`) since answering it needs every item
- * line of the contract, not the one this call is narrowing.
+ * direction of the exchange. What the issuer asks for in return rides along
+ * on the offer rows this function publishes, patched on afterwards by
+ * `applyRequestedSide`, since answering it needs every item line of the
+ * contract, not the one this call is narrowing.
  */
 export function compactContractOfferRow(
   item: ContractItemRecord,
-  contract: EligibleContract,
-  requestedPlex?: number
+  contract: EligibleContract
 ): PublicContractOfferRow | null {
   if (item.is_included !== 'true') return null;
 
@@ -264,54 +269,75 @@ export function compactContractOfferRow(
     ...(me === undefined ? {} : { me }),
     ...(te === undefined ? {} : { te }),
     ...(runs === undefined || runs < 0 ? {} : { runs }),
-    ...(requestedPlex ? { requestedPlex } : {}),
     dateExpired: contract.dateExpired,
   };
 }
 
 /**
- * Folds one `contract_items.csv` line into a running per-contract PLEX-requested
- * total, keyed by `contract_id` (the raw CSV string, matching
- * `eligibleContracts`' own keys). A no-op unless the line is on the requested
- * (`is_included: false`) side, names PLEX, and belongs to an already-eligible
- * contract — an ineligible or lapsed contract publishes no offer rows for this
- * to ride along on anyway.
- *
- * Exposed on its own (rather than only via `requestedPlexByContract` below) so
- * the production sync's single streaming pass over `contract_items.csv`
- * (`index.ts`'s `syncPublicContractOffers`, which cannot hold the whole
- * `items` array the way this module's fixture-driven join can — see
- * `publicContractsArchive.ts`'s doc comment) can fold every line into the same
- * small running map as it streams past, instead of needing a second pass
- * `requestedPlexByContract` would require.
+ * What eligible contracts ask for in return, keyed by raw CSV `contract_id`
+ * (matching `eligibleContracts`' own keys): PLEX quantity per contract (issue
+ * #1080's PLEX-for-item barter), and which contracts ask for any non-PLEX item.
  */
-export function accumulateRequestedPlex(
-  item: ContractItemRecord,
-  eligibleContracts: ReadonlyMap<string, EligibleContract>,
-  totals: Map<string, number>
-): void {
-  if (item.is_included === 'true') return;
-  if (Number(item.type_id) !== PLEX_TYPE_ID) return;
-  if (!eligibleContracts.has(item.contract_id)) return;
-  const quantity = Number(item.quantity);
-  if (!Number.isFinite(quantity) || quantity <= 0) return;
-  totals.set(item.contract_id, (totals.get(item.contract_id) ?? 0) + quantity);
+export interface RequestedSide {
+  plex: Map<string, number>;
+  items: Set<string>;
+}
+
+export function emptyRequestedSide(): RequestedSide {
+  return { plex: new Map(), items: new Set() };
 }
 
 /**
- * Total PLEX quantity requested per contract, over every item line up front —
- * the same shape `distinctTypeCountByContract` (`contractOffers.ts`,
- * client-side) uses for its own contract-wide tally, since a contract's
- * requested lines are not guaranteed to sit next to its offered ones in the
- * CSV.
+ * Folds one `contract_items.csv` line into `side`. A no-op unless the line is
+ * on the requested (`is_included: false`) side of an already-eligible contract
+ * — an ineligible or lapsed contract publishes no offer rows to carry it.
+ *
+ * Exposed on its own so the production sync's single streaming pass over
+ * `contract_items.csv` (`index.ts`'s `syncPublicContractOffers`, which cannot
+ * hold the whole `items` array — see `publicContractsArchive.ts`'s doc
+ * comment) can fold every line as it streams past instead of a second pass.
  */
-export function requestedPlexByContract(
+export function accumulateRequestedSide(
+  item: ContractItemRecord,
+  eligibleContracts: ReadonlyMap<string, EligibleContract>,
+  side: RequestedSide
+): void {
+  if (item.is_included === 'true') return;
+  if (!eligibleContracts.has(item.contract_id)) return;
+  if (Number(item.type_id) !== PLEX_TYPE_ID) {
+    side.items.add(item.contract_id);
+    return;
+  }
+  const quantity = Number(item.quantity);
+  if (!Number.isFinite(quantity) || quantity <= 0) return;
+  side.plex.set(item.contract_id, (side.plex.get(item.contract_id) ?? 0) + quantity);
+}
+
+/**
+ * The requested side over every item line up front — a contract's requested
+ * lines are not guaranteed to sit next to its offered ones in the CSV.
+ */
+export function requestedSideByContract(
   items: readonly ContractItemRecord[],
   eligibleContracts: ReadonlyMap<string, EligibleContract>
-): Map<string, number> {
-  const totals = new Map<string, number>();
-  for (const item of items) accumulateRequestedPlex(item, eligibleContracts, totals);
-  return totals;
+): RequestedSide {
+  const side = emptyRequestedSide();
+  for (const item of items) accumulateRequestedSide(item, eligibleContracts, side);
+  return side;
+}
+
+/**
+ * Stamps `requestedPlex` and `requestsItems` onto every offer row of the
+ * contracts `side` names, in place. Absent, not zero/false, on the rest.
+ */
+export function applyRequestedSide(rows: PublicContractOfferRow[], side: RequestedSide): void {
+  if (side.plex.size === 0 && side.items.size === 0) return;
+  for (const row of rows) {
+    const contractId = String(row.contractId);
+    const requestedPlex = side.plex.get(contractId);
+    if (requestedPlex) row.requestedPlex = requestedPlex;
+    if (side.items.has(contractId)) row.requestsItems = true;
+  }
 }
 
 /** One CSV column as a number, or absent when it is blank or unparsable. */
@@ -423,15 +449,15 @@ export function filterAndCompactPublicContractOffers(
     const eligible = eligibleContractFrom(contract, nowMs);
     if (eligible) eligibleContracts.set(contract.contract_id, eligible);
   }
-  const requestedPlex = requestedPlexByContract(items, eligibleContracts);
 
   const rows: PublicContractOfferRow[] = [];
   for (const item of items) {
     const contract = eligibleContracts.get(item.contract_id);
     if (!contract) continue;
-    const row = compactContractOfferRow(item, contract, requestedPlex.get(item.contract_id));
+    const row = compactContractOfferRow(item, contract);
     if (row) rows.push(row);
   }
+  applyRequestedSide(rows, requestedSideByContract(items, eligibleContracts));
 
   return sortContractOfferRows(rows);
 }

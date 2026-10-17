@@ -3,16 +3,14 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import '@/i18n';
 import { emptyFormatState, type FormatState } from '@/engine/mailFormat';
-import { keyboardInset } from '@/lib/useVisualViewportBox';
 import type { MailEditorCommands } from './commands';
-import { readFileSync } from 'node:fs';
-import footerSource from '../MailComposeFooter.tsx?raw';
-import { DOCKED_BAR_SPACE_CLASS, MailFormatBar } from './MailFormatBar';
+import { MailFormatBar } from './MailFormatBar';
 
 function commands(state: Partial<FormatState> = {}, over: Partial<MailEditorCommands> = {}) {
   const c: MailEditorCommands = {
     state: { ...emptyFormatState, ...state },
     canClear: true,
+    canLink: true,
     canReset: true,
     toggleMark: vi.fn(),
     setColor: vi.fn(),
@@ -33,8 +31,6 @@ describe('MailFormatBar', () => {
       <MailFormatBar
         commands={commands({ bold: true, link: 'https://a.example/' })}
         phone={false}
-        dock="inline"
-        visible
       />
     );
     expect(screen.getByRole('button', { name: 'Bold' })).toHaveAttribute('aria-pressed', 'true');
@@ -44,7 +40,7 @@ describe('MailFormatBar', () => {
 
   it('toggles marks and never takes focus from the editor', async () => {
     const c = commands();
-    render(<MailFormatBar commands={c} phone={false} dock="inline" visible />);
+    render(<MailFormatBar commands={c} phone={false} />);
     const bold = screen.getByRole('button', { name: 'Bold' });
     expect(fireEvent.pointerDown(bold)).toBe(false); // default prevented
     expect(fireEvent.mouseDown(bold)).toBe(false);
@@ -52,22 +48,20 @@ describe('MailFormatBar', () => {
     expect(c.toggleMark).toHaveBeenCalledWith('bold');
   });
 
-  it('disables clear formatting with a reason in Source', () => {
-    render(
-      <MailFormatBar
-        commands={commands({}, { canClear: false })}
-        phone={false}
-        dock="inline"
-        visible
-      />
-    );
-    expect(screen.getByRole('button', { name: 'Clear formatting' })).toBeDisabled();
+  it('disables clear formatting with a reason in Source', async () => {
+    render(<MailFormatBar commands={commands({}, { canClear: false })} phone={false} />);
+    const clear = screen.getByRole('button', { name: 'Clear formatting' });
+    expect(clear).toHaveAttribute('aria-disabled', 'true');
+    const user = userEvent.setup();
+    await user.click(clear);
+    clear.focus();
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Not available in Source view');
   });
 
   it('applies a swatch, always opaque', async () => {
     const c = commands();
     const user = userEvent.setup();
-    render(<MailFormatBar commands={c} phone dock="inline" visible />);
+    render(<MailFormatBar commands={c} phone />);
     await user.click(screen.getByRole('button', { name: 'Text colour' }));
     const dialog = await screen.findByRole('dialog');
     await user.click(within(dialog).getByRole('button', { name: 'Colour ff5555' }));
@@ -77,7 +71,7 @@ describe('MailFormatBar', () => {
   it('takes a custom hex as opaque and rejects junk', async () => {
     const c = commands();
     const user = userEvent.setup();
-    render(<MailFormatBar commands={c} phone dock="inline" visible />);
+    render(<MailFormatBar commands={c} phone />);
     await user.click(screen.getByRole('button', { name: 'Text colour' }));
     const dialog = await screen.findByRole('dialog');
     const field = within(dialog).getByLabelText('Custom colour (hex)');
@@ -92,7 +86,7 @@ describe('MailFormatBar', () => {
   it('picks a size preset, normal clears the size', async () => {
     const c = commands();
     const user = userEvent.setup();
-    render(<MailFormatBar commands={c} phone dock="inline" visible />);
+    render(<MailFormatBar commands={c} phone />);
     await user.click(screen.getByRole('button', { name: 'Text size' }));
     await user.click(await screen.findByRole('button', { name: 'Large' }));
     expect(c.setSize).toHaveBeenCalledWith(16);
@@ -107,7 +101,7 @@ describe('MailFormatBar', () => {
       { linkTarget: () => ({ from: 1, to: 4, text: 'old', href: 'https://old.example/' }) }
     );
     const user = userEvent.setup();
-    render(<MailFormatBar commands={c} phone dock="inline" visible />);
+    render(<MailFormatBar commands={c} phone />);
     await user.click(screen.getByRole('button', { name: 'Link' }));
     const dialog = await screen.findByRole('dialog');
     const text = within(dialog).getByLabelText('Text');
@@ -128,7 +122,7 @@ describe('MailFormatBar', () => {
   it('prefills the selected text, focuses Text for a bare caret, and refuses other schemes', async () => {
     const c = commands({}, { linkTarget: () => ({ from: 1, to: 3, text: 'hi', href: null }) });
     const user = userEvent.setup();
-    const { unmount } = render(<MailFormatBar commands={c} phone dock="inline" visible />);
+    const { unmount } = render(<MailFormatBar commands={c} phone />);
     await user.click(screen.getByRole('button', { name: 'Link' }));
     let dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByLabelText('Text')).toHaveValue('hi');
@@ -143,7 +137,7 @@ describe('MailFormatBar', () => {
     unmount();
 
     const caret = commands();
-    render(<MailFormatBar commands={caret} phone dock="inline" visible />);
+    render(<MailFormatBar commands={caret} phone />);
     await user.click(screen.getByRole('button', { name: 'Link' }));
     dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByLabelText('Text')).toHaveValue('');
@@ -161,7 +155,7 @@ describe('MailFormatBar', () => {
       { linkTarget: () => ({ from: 1, to: 4, text: 'old', href: 'https://old.example/' }) }
     );
     const user = userEvent.setup();
-    render(<MailFormatBar commands={c} phone dock="inline" visible />);
+    render(<MailFormatBar commands={c} phone />);
     await user.click(screen.getByRole('button', { name: 'Link' }));
     const dialog = await screen.findByRole('dialog');
     fireEvent.change(within(dialog).getByLabelText('Text'), { target: { value: 'a'.repeat(201) } });
@@ -176,7 +170,7 @@ describe('MailFormatBar', () => {
     const long = 'a'.repeat(300);
     const c = commands({}, { linkTarget: () => ({ from: 1, to: 301, text: long, href: null }) });
     const user = userEvent.setup();
-    render(<MailFormatBar commands={c} phone dock="inline" visible />);
+    render(<MailFormatBar commands={c} phone />);
     await user.click(screen.getByRole('button', { name: 'Link' }));
     const dialog = await screen.findByRole('dialog');
     await user.type(within(dialog).getByLabelText('Web address'), 'example.com{Enter}');
@@ -192,7 +186,7 @@ describe('MailFormatBar', () => {
       { linkTarget: () => ({ from: 1, to: 9, text: '', href: null, markOnly: true }) }
     );
     const user = userEvent.setup();
-    render(<MailFormatBar commands={c} phone dock="inline" visible />);
+    render(<MailFormatBar commands={c} phone />);
     await user.click(screen.getByRole('button', { name: 'Link' }));
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByLabelText('Text')).toBeDisabled();
@@ -207,7 +201,7 @@ describe('MailFormatBar', () => {
   it('inserts a table of the chosen size', async () => {
     const c = commands();
     const user = userEvent.setup();
-    render(<MailFormatBar commands={c} phone dock="inline" visible />);
+    render(<MailFormatBar commands={c} phone />);
     await user.click(screen.getByRole('button', { name: 'Insert table' }));
     const dialog = await screen.findByRole('dialog');
     await user.click(within(dialog).getByRole('button', { name: 'More rows' }));
@@ -217,23 +211,18 @@ describe('MailFormatBar', () => {
 });
 
 describe('MailFormatBar placement and Source', () => {
-  it('is hidden until the editor has focus, but a hidden bar stays mounted for its sheets', () => {
-    render(<MailFormatBar commands={commands()} phone dock="inline" visible={false} />);
-    expect(screen.getByRole('toolbar', { hidden: true })).toHaveClass('hidden');
-  });
-
-  it('docks at the keyboard inset', () => {
-    render(
-      <MailFormatBar commands={commands()} phone dock="keyboard" visible keyboardInset={310} />
-    );
-    expect(screen.getByRole('toolbar')).toHaveStyle({ bottom: '310px' });
+  // The bar is the card's top strip on a phone too, never `fixed`: inside the
+  // reader Panel (`backdrop-filter`) a fixed bar was placed against the Panel.
+  it('is shown in the flow on a phone, with no editor focus', () => {
+    render(<MailFormatBar commands={commands()} phone />);
+    const bar = screen.getByRole('toolbar');
+    expect(bar).toBeVisible();
+    expect(bar.className).not.toMatch(/(^|\s)fixed(\s|$)/);
   });
 
   it('disables the "back to default" controls where they would do nothing', async () => {
     const user = userEvent.setup();
-    render(
-      <MailFormatBar commands={commands({}, { canReset: false })} phone dock="inline" visible />
-    );
+    render(<MailFormatBar commands={commands({}, { canReset: false })} phone />);
     await user.click(screen.getByRole('button', { name: 'Text colour' }));
     expect(await screen.findByRole('button', { name: 'Default colour' })).toBeDisabled();
     await user.keyboard('{Escape}');
@@ -242,41 +231,37 @@ describe('MailFormatBar placement and Source', () => {
   });
 });
 
-describe('keyboardInset', () => {
-  it('is how much the keyboard covers of the layout viewport', () => {
-    expect(keyboardInset(800, { height: 500, offsetTop: 0 })).toBe(300);
-    expect(keyboardInset(800, { height: 500, offsetTop: 40 })).toBe(260);
-    expect(keyboardInset(800, { height: 800, offsetTop: 0 })).toBe(0);
-    expect(keyboardInset(800, null)).toBe(0);
-  });
-});
-
-describe('docked bar contract with the pinned footer', () => {
-  const bar = (dock: 'keyboard' | 'inline', visible: boolean) => (
-    <MailFormatBar commands={commands()} phone dock={dock} visible={visible} keyboardInset={300} />
-  );
-
-  it('marks itself docked only when fixed above the keyboard and shown', () => {
-    const { rerender } = render(bar('keyboard', true));
-    expect(screen.getByRole('toolbar')).toHaveAttribute('data-mail-format-bar', 'docked');
-    rerender(bar('inline', true));
-    expect(screen.getByRole('toolbar')).not.toHaveAttribute('data-mail-format-bar');
-    rerender(bar('keyboard', false));
-    expect(screen.getByRole('toolbar', { hidden: true })).not.toHaveAttribute(
-      'data-mail-format-bar'
+describe('bar structure', () => {
+  it('is borderless, grouped by three hairlines, with Source pinned outside the scroller', () => {
+    const { container } = render(
+      <MailFormatBar
+        commands={commands()}
+        phone
+        sourceActive={false}
+        onToggleSource={() => undefined}
+      />
     );
+    const bold = screen.getByRole('button', { name: 'Bold' });
+    expect(bold.className).not.toMatch(/(^|\s)border(\s|$)/);
+    const toolbar = screen.getByRole('toolbar');
+    // Three dividers between the four groups inside the scroller, one before the pinned Source.
+    const scroller = bold.closest('.overflow-x-auto') as HTMLElement;
+    expect(scroller.querySelectorAll('span[aria-hidden].w-px')).toHaveLength(3);
+    const source = screen.getByRole('button', { name: 'Edit source' });
+    expect(scroller.contains(source)).toBe(false);
+    expect(toolbar.contains(source)).toBe(true);
+    expect(container).toBeTruthy();
   });
 
-  // Read from disk: the CSS pipeline stubs a `?raw` import of a stylesheet to ''.
-  const indexCss = readFileSync('src/styles/index.css', 'utf-8');
-
-  it('has a stylesheet rule that lifts the footer, from the same variable as the editor reserve', () => {
-    expect(indexCss).toMatch(
-      /\.mail-pane:has\(\[data-mail-format-bar='docked'\]\) \.mail-footer\s*\{\s*margin-bottom: var\(--mail-format-bar-space\);/
-    );
-    expect(indexCss).toContain('--mail-format-bar-space:');
-    expect(DOCKED_BAR_SPACE_CLASS).toBe('pb-(--mail-format-bar-space)');
-    // The footer carries the class the rule targets, as a whole literal token.
-    expect(footerSource).toContain("'mail-footer ");
+  it('keeps the Link click a no-op and explains why while it is aria-disabled', async () => {
+    const c = commands({}, { canLink: false });
+    const user = userEvent.setup();
+    render(<MailFormatBar commands={c} phone={false} />);
+    const link = screen.getByRole('button', { name: 'Link' });
+    expect(link).toHaveAttribute('aria-disabled', 'true');
+    await user.click(link);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    link.focus();
+    expect(await screen.findByRole('tooltip')).toHaveTextContent("can't carry a link");
   });
 });

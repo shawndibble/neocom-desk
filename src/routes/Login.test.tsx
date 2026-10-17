@@ -62,9 +62,9 @@ const BASE_GRANT_PHRASES: Record<string, string> = {
   ...WRITE_SCOPE_PHRASES,
 };
 
-function renderLogin() {
+function renderLogin(url = '/login') {
   return render(
-    <MemoryRouter initialEntries={['/login']}>
+    <MemoryRouter initialEntries={[url]}>
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/characters" element={<p>character list</p>} />
@@ -123,13 +123,15 @@ describe('Login', () => {
       })
     ).toBeInTheDocument();
     expect(screen.getByText('Neocom Desk')).toBeInTheDocument();
+    // The closing call to action mounts just after the hero (`useBelowFold`).
+    await screen.findByRole('contentinfo');
     const buttons = screen.getAllByRole('button', { name: /log in with eve online/i });
     expect(buttons.length).toBeGreaterThanOrEqual(2);
   });
 
   it('exposes banner and contentinfo landmarks and hides decorative icons', async () => {
     const { container } = renderLogin();
-    await screen.findByRole('heading', { name: /answers, not api dumps/i });
+    await screen.findByRole('contentinfo');
 
     // Panel headers match 'banner' in jsdom; only a header outside <main> is one in a browser.
     const main = container.querySelector('main');
@@ -141,10 +143,7 @@ describe('Login', () => {
 
   it('links the footer "Free & open source" text to the repo', async () => {
     renderLogin();
-    await screen.findByRole('heading', {
-      name: /answers, not api dumps/i,
-    });
-    expect(screen.getByRole('link', { name: /free & open source/i })).toHaveAttribute(
+    expect(await screen.findByRole('link', { name: /free & open source/i })).toHaveAttribute(
       'href',
       'https://github.com/shawndibble/neocom-desk'
     );
@@ -408,6 +407,20 @@ describe('Login', () => {
     }
   });
 
+  it('scrolls a cold load straight to the section its hash names', async () => {
+    const scrollIntoView = vi.spyOn(Element.prototype, 'scrollIntoView');
+    // The hook reads the hash off the address bar, as BrowserRouter's would be.
+    window.history.replaceState({}, '', '/login#login-faq');
+    try {
+      renderLogin('/login#login-faq');
+      const faq = await screen.findByRole('region', { name: /quick answers/i });
+      expect(scrollIntoView).toHaveBeenCalledTimes(1);
+      expect(scrollIntoView.mock.contexts[0]).toBe(faq);
+    } finally {
+      window.history.replaceState({}, '', '/');
+    }
+  });
+
   it('links the permissions note to the privacy policy', async () => {
     renderLogin();
     const trust = within(
@@ -501,7 +514,8 @@ describe('Login', () => {
     try {
       renderLogin();
       const name = { name: /log in with eve online/i };
-      const before = (await screen.findAllByRole('button', name)).length;
+      await screen.findByRole('contentinfo');
+      const before = screen.getAllByRole('button', name).length;
       // Only the hero's wrapper is watched: the closing call to action does not hide the header's button.
       expect(observed).toHaveLength(1);
       expect(within(screen.getByRole('banner')).queryByRole('button', name)).toBeNull();

@@ -13,7 +13,8 @@ bullets still stand._
   floating Compose button over the list opens it (Gmail/Outlook pattern). Close
   top-left, Send top-right (superseded: see
   `20261016-150102-mail-composer-action-layout.md`). The format bar docks above the keyboard as one
-  horizontally scrolling row; colour and size open a sheet (swatches, size
+  horizontally scrolling row (superseded: see
+  `20261016-183802-mail-format-bar-sits-at-the-top-of.md`); colour and size open a sheet (swatches, size
   steps) rather than crowding the row.
 
 - **Recipients: characters, corporations, alliances and joined mailing lists**,

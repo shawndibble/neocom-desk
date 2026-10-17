@@ -1,6 +1,7 @@
 /**
  * The rich mail body editor: Tiptap (ProseMirror) over a schema that can only
- * say what EVE markup can, a format bar, and a Preview ⇄ Source switch.
+ * say what EVE markup can, and one card: format bar on top (with the Source
+ * toggle), the writing surface, the character counter in the corner.
  * Loaded lazily (`MailBodyEditor.tsx`) so the Mail page pays nothing for it
  * until a composer opens. docs/adr/0022-tiptap-for-the-mail-body-editor.md.
  *
@@ -14,10 +15,9 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { EditorContent, useEditor, useEditorState } from '@tiptap/react';
 import type { Editor } from '@tiptap/core';
 import { useTranslation } from 'react-i18next';
-import { SegmentedControl, TextArea } from '@/components/ui';
+import { TextArea } from '@/components/ui';
 import { cx } from '@/lib/cx';
 import { useIsDesktop } from '@/lib/useIsDesktop';
-import { useKeyboardInset } from '@/lib/useVisualViewportBox';
 import {
   droppedMarkup,
   docToMarkup,
@@ -35,12 +35,12 @@ import {
   wrapSourceSelection,
   type SourceTag,
 } from '@/engine/mailFormat';
-import { EVE_MAIL_SURFACE_CLASS } from '../MailBodyView';
+import { EVE_MAIL_SURFACE_FRAME_CLASS } from '../MailBodyView';
 import type { MailBodyEditorProps } from '../MailBodyEditor';
 import type { MailEditorCommands, ToggleMark } from './commands';
 import { mailEditorExtensions } from './extensions';
 import { formatStateOfEditor, linkCarryMarks, linkTargetOfEditor } from './editorState';
-import { DOCKED_BAR_SPACE_CLASS, MailFormatBar } from './MailFormatBar';
+import { MailFormatBar } from './MailFormatBar';
 
 type Mode = 'preview' | 'source';
 
@@ -58,12 +58,10 @@ export default function RichMailBodyEditor({
   'aria-invalid': invalid,
   disabled,
   className,
+  counter,
 }: MailBodyEditorProps) {
   const { t } = useTranslation();
   const phone = !useIsDesktop();
-  const [focused, setFocused] = useState(false);
-  const keyboardInset = useKeyboardInset(phone && focused);
-  const keyboardUp = keyboardInset > 0;
   const [mode, setMode] = useState<Mode>('preview');
   const [source, setSource] = useState(value);
   const [dropped, setDropped] = useState(false);
@@ -94,7 +92,7 @@ export default function RichMailBodyEditor({
         'aria-label': t('mail.bodyLabel'),
         ...(describedBy ? { 'aria-describedby': describedBy } : {}),
         ...(invalid ? { 'aria-invalid': 'true' } : {}),
-        class: 'min-h-full outline-none',
+        class: 'flex-1 outline-none',
       },
       // Pasted HTML is parsed through the schema above (only the safe subset
       // exists in it). A markdown pipe table is the one markdown we read.
@@ -129,7 +127,7 @@ export default function RichMailBodyEditor({
     };
   }, [editor, id, mode]);
   useEffect(() => {
-    editor?.setEditable(!disabled);
+    if (editor && !editor.isDestroyed) editor.setEditable(!disabled);
   }, [editor, disabled]);
 
   // A value the editor did not produce replaces what it shows.
@@ -137,7 +135,9 @@ export default function RichMailBodyEditor({
     if (value === lastEmitted.current) return;
     lastEmitted.current = value;
     setSource(value);
-    editor?.commands.setContent(markupToDoc(value), { emitUpdate: false });
+    if (editor && !editor.isDestroyed) {
+      editor.commands.setContent(markupToDoc(value), { emitUpdate: false });
+    }
   }, [value, editor]);
 
   useLayoutEffect(() => {
@@ -150,10 +150,24 @@ export default function RichMailBodyEditor({
     }
   }, [source]);
 
-  const previewState = useEditorState({
+  const { fmt: previewState, inTable } = useEditorState({
     editor,
-    selector: ({ editor: ed }) => (ed ? formatStateOfEditor(ed) : emptyFormatState),
+    selector: ({ editor: ed }) => ({
+      fmt: ed ? formatStateOfEditor(ed) : emptyFormatState,
+      inTable: ed ? ed.isActive('table') : false,
+    }),
   });
+
+  // Switching moves focus into the new surface, so the focus-gated bar (and the toggle) stays.
+  // Compared against the mode last seen, not a "first run" flag: StrictMode runs effects twice on
+  // mount, and mount must not steal focus (the editor may even be mid-recreate then).
+  const seenMode = useRef(mode);
+  useEffect(() => {
+    if (seenMode.current === mode) return;
+    seenMode.current = mode;
+    if (mode === 'source') sourceRef.current?.focus();
+    else if (editor && !editor.isDestroyed) editor.commands.focus();
+  }, [mode, editor]);
 
   function switchMode(next: Mode) {
     if (next === mode) return;
@@ -162,7 +176,9 @@ export default function RichMailBodyEditor({
       setDropped(droppedMarkup(source));
       lastEmitted.current = clean;
       onChangeRef.current(clean);
-      editor?.commands.setContent(markupToDoc(clean), { emitUpdate: false });
+      if (editor && !editor.isDestroyed) {
+        editor.commands.setContent(markupToDoc(clean), { emitUpdate: false });
+      }
     } else {
       setSource(value);
       setDropped(false);
@@ -189,6 +205,7 @@ export default function RichMailBodyEditor({
   const previewCommands: MailEditorCommands = {
     state: previewState,
     canClear: true,
+    canLink: !inTable,
     canReset: true,
     toggleMark: (mark) => void editor?.chain().focus().toggleMark(mark).run(),
     setColor: (color) => {
@@ -204,7 +221,7 @@ export default function RichMailBodyEditor({
     linkTarget: () =>
       editor ? linkTargetOfEditor(editor) : { from: 0, to: 0, text: '', href: null },
     setLink: (target, edit) => {
-      if (!editor) return;
+      if (!editor || editor.isDestroyed) return;
       if (target.markOnly) {
         // Spans blocks or cells: add the mark, leave the text and structure alone.
         const link = editor.schema.marks.link.create({ href: edit.href });
@@ -231,7 +248,7 @@ export default function RichMailBodyEditor({
         .run();
     },
     removeLink: (target) => {
-      if (!editor) return;
+      if (!editor || editor.isDestroyed) return;
       const link = editor.schema.marks.link;
       const { tr } = editor.state;
       for (const [from, to] of target.ranges ?? [[target.from, target.to]]) {
@@ -248,6 +265,7 @@ export default function RichMailBodyEditor({
   const sourceCommands: MailEditorCommands = {
     state: emptyFormatState,
     canClear: false,
+    canLink: true,
     canReset: false,
     toggleMark: (mark) => wrap(SOURCE_TAG[mark]),
     setColor: (color) => color !== null && wrap({ kind: 'color', color }),
@@ -279,29 +297,9 @@ export default function RichMailBodyEditor({
   };
 
   const inSource = mode === 'source';
-  const barVisible = !phone || focused;
-  const dock = phone && keyboardUp ? 'keyboard' : 'inline';
-  const reserveSpace = dock === 'keyboard' && barVisible;
 
   return (
-    <div
-      className="flex min-h-0 flex-1 flex-col gap-2"
-      onFocus={() => setFocused(true)}
-      onBlur={(e) => {
-        if (!e.currentTarget.contains(e.relatedTarget)) setFocused(false);
-      }}
-    >
-      <div className="flex items-center justify-between gap-2">
-        <SegmentedControl
-          label={t('mail.format.viewLabel')}
-          options={[
-            { value: 'preview', label: t('mail.format.preview') },
-            { value: 'source', label: t('mail.format.source') },
-          ]}
-          value={mode}
-          onChange={switchMode}
-        />
-      </div>
+    <div className="flex min-h-0 flex-1 flex-col gap-2">
       {dropped && !inSource && (
         <p role="status" className="text-xs text-text-dim">
           {t('mail.format.sourceDropped')}
@@ -312,45 +310,54 @@ export default function RichMailBodyEditor({
           {t('mail.format.sourceWillDrop')}
         </p>
       )}
-      {/* One bar: `fixed` over the keyboard on a phone, otherwise in the flow right here. */}
-      <MailFormatBar
-        commands={inSource ? sourceCommands : previewCommands}
-        phone={phone}
-        dock={dock}
-        visible={barVisible}
-        keyboardInset={keyboardInset}
-        disabled={disabled}
-      />
+      {/* One card: the bar is its top strip, then the surface. */}
       <div
-        className={cx(
-          EVE_MAIL_SURFACE_CLASS,
-          'min-h-0 flex-1 overflow-y-auto text-xs leading-normal break-words whitespace-pre-wrap',
-          reserveSpace && DOCKED_BAR_SPACE_CLASS,
-          inSource && 'hidden',
-          className
-        )}
-        onClick={(e) => {
-          if (e.target === e.currentTarget) editor?.commands.focus('end');
-        }}
+        data-mail-card
+        className={cx(EVE_MAIL_SURFACE_FRAME_CLASS, 'flex min-h-0 flex-1 flex-col', className)}
       >
-        <EditorContent editor={editor} className="min-h-full" />
-      </div>
-      {inSource && (
-        <TextArea
-          ref={sourceRef}
-          id={id}
-          aria-label={t('mail.format.sourceLabel')}
-          aria-describedby={describedBy}
-          aria-invalid={invalid}
-          value={source}
+        <MailFormatBar
+          commands={inSource ? sourceCommands : previewCommands}
+          phone={phone}
           disabled={disabled}
-          onChange={(e) => editSource(e.target.value)}
-          spellCheck={false}
-          autoCapitalize="none"
-          autoCorrect="off"
-          className={cx('font-mono text-xs', reserveSpace && DOCKED_BAR_SPACE_CLASS, className)}
+          sourceActive={inSource}
+          onToggleSource={() => switchMode(inSource ? 'preview' : 'source')}
         />
-      )}
+        <div
+          className={cx(
+            'min-h-0 flex-1 overflow-y-auto p-3 text-xs leading-normal break-words whitespace-pre-wrap',
+            inSource ? 'hidden' : 'flex flex-col'
+          )}
+          // Editable fills the box via flex, not `min-h-full` (Reply's card has no
+          // definite height), so a tap lands in it natively and the keyboard opens.
+          onClick={(e) => {
+            if (!editor || editor.isDestroyed || !(e.target instanceof Node)) return;
+            if (editor.view.dom.contains(e.target)) return;
+            if (editor.view.hasFocus() && !editor.state.selection.empty) return;
+            editor.commands.focus('end');
+          }}
+        >
+          <EditorContent editor={editor} className="flex flex-1 flex-col" />
+        </div>
+        {inSource && (
+          <TextArea
+            bare
+            mono
+            ref={sourceRef}
+            id={id}
+            aria-label={t('mail.format.sourceLabel')}
+            aria-describedby={describedBy}
+            aria-invalid={invalid}
+            value={source}
+            disabled={disabled}
+            onChange={(e) => editSource(e.target.value)}
+            spellCheck={false}
+            autoCapitalize="none"
+            autoCorrect="off"
+            className="min-h-0 flex-1 resize-none p-3 text-xs"
+          />
+        )}
+        {counter && <div className="flex shrink-0 justify-end px-3 pb-1.5">{counter}</div>}
+      </div>
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { formatEveDateTime } from './eveTime';
+import { eveWhen, formatEveDateTime } from './eveTime';
 
 const ORIGINAL_TZ = process.env.TZ;
 afterEach(() => {
@@ -19,5 +19,17 @@ describe('formatEveDateTime', () => {
     process.env.TZ = 'America/Los_Angeles';
     expect(formatEveDateTime(date)).toBe(east);
     expect(east).toBe('01-01 00:30');
+  });
+});
+
+const NOW = Date.UTC(2026, 9, 15, 12, 0); // Thu 12:00
+
+describe('eveWhen', () => {
+  it('reads a weekday and EVE time inside the coming week', () => {
+    expect(eveWhen(NOW + 26.5 * 3_600_000, NOW)).toBe('Fri 14:30');
+  });
+
+  it('falls back to the date once the weekday would repeat', () => {
+    expect(eveWhen(NOW + 8 * 86_400_000, NOW)).toBe('10-23 12:00');
   });
 });
