@@ -2,7 +2,7 @@ import { createColumnVisibilitySetting } from '@/lib/columnVisibility';
 
 /**
  * The optional columns, in table order. Product, ISK/hour, ISK/day and the
- * PLAN button always show. Blueprint source, Time and Depth start unticked: at
+ * PLAN button always show. Blueprint source, vs 90d, Time and Depth start unticked: at
  * 1024px the table otherwise scrolls sideways and pushes PLAN, the row's main
  * action, off-screen. A source worth knowing (anything but the NPC market)
  * still shows as a dim note beside the product while its column is off.
@@ -10,6 +10,7 @@ import { createColumnVisibilitySetting } from '@/lib/columnVisibility';
 export const MARKET_WIDE_COLUMN_IDS = [
   'blueprintSource',
   'margin',
+  'vs90d',
   'duration',
   'buildCost',
   'orderDepth',

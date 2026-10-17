@@ -85,6 +85,8 @@ export interface MarketWideResultRow extends MarketWideRow {
 export interface MarketWideDayRow extends MarketWideResultRow {
   /** Null while sales are unread/unknown, or the product doesn't sell. */
   iskPerDay: number | null;
+  /** The product's latest price vs its 90-day median in the hub's region, in percent; null when blank, absent while still being read. */
+  vs90d?: number | null;
 }
 
 /** Every product typeID `marketWideTrees.json` carries a tree for. */

@@ -2528,6 +2528,7 @@
     "csvCharacter": "Character",
     "csvAvgMarginPct": "Avg margin (%)",
     "csvMarginPct": "Margin (%)",
+    "csvVs90dPct": "vs 90d (%)",
     "csvTimeSeconds": "Time (seconds)",
     "title": "Build Plans",
     "moreActionsLabel": "More actions for {{name}}",
@@ -3284,6 +3285,7 @@
     "heroMargin": "{{value}} margin",
     "heroIskPerHour": "{{value}} ISK/hour",
     "heroBreakEven": "break-even {{value}}/unit",
+    "heroVs90dSpike": "Sell price is {{value}} above its 90-day median",
     "heroNoPrices": "No price data yet",
     "bpcCoverageWarning": "{{name}}: your BPC covers {{covered}} of {{needed}} runs",
     "bpcCoverageSetRuns": "Set runs to {{count}}",
@@ -3351,6 +3353,8 @@
     "opportunitiesRankLabel": "Rank {{rank}}",
     "opportunitiesBlueprint": "Blueprint",
     "opportunitiesUnitMargin": "Unit margin",
+    "vs90d": "vs 90d",
+    "vs90dTooltip": "The latest full day's average price in the hub's region against the median of its daily averages over the last {{windowDays}} days. Amber from +{{spikePct}}%: a profit that rests on a short spike may be gone by the time the build lands. Blank when the item traded on fewer than {{minDays}} of those days.",
     "opportunitiesStockCovers": "Stock covers",
     "opportunitiesStillToBuy": "Still to buy",
     "opportunitiesUseMyStock": "Use my stock",
@@ -4551,7 +4555,8 @@
           "item": "Item",
           "gap": "Gap",
           "now": "Now",
-          "target": "Target"
+          "target": "Target",
+          "vs90d": "vs 90d"
         }
       },
       "stock": {

@@ -9,6 +9,11 @@ import { stockCoverage, unitMargin } from './opportunityMetrics';
  * `62.5%`); unpriced figures are blank, never "Unknown".
  */
 
+/** The table's whole percent ("+35%" exports `35`); blank while unread or too thin to say. */
+function vs90dCsv(value: number | null | undefined): number | null {
+  return value === null || value === undefined ? null : Math.round(value);
+}
+
 /** Build Opportunities (owned blueprints). The character and runs, chips in the table, get their own columns. */
 export function opportunitiesCsvColumns(t: CsvTranslate): CsvColumn<OpportunityRow>[] {
   return [
@@ -25,6 +30,7 @@ export function opportunitiesCsvColumns(t: CsvTranslate): CsvColumn<OpportunityR
     },
     { header: t('industry.opportunitiesUnitMargin'), value: (row) => unitMargin(row) },
     { header: t('industry.csvMarginPct'), value: (row) => row.result.marginPct },
+    { header: t('industry.csvVs90dPct'), value: (row) => vs90dCsv(row.vs90d) },
     {
       header: t('industry.opportunitiesStockCovers'),
       value: (row) => stockCoverage(row)?.coveredPct ?? null,
@@ -51,6 +57,7 @@ export function marketWideOpportunitiesCsvColumns(t: CsvTranslate): CsvColumn<Ma
       value: (row) => t(`industry.marketOpportunitiesBlueprintSources.${row.blueprintSource}`),
     },
     { header: t('industry.csvMarginPct'), value: (row) => row.marginPct },
+    { header: t('industry.csvVs90dPct'), value: (row) => vs90dCsv(row.vs90d) },
     { header: t('industry.csvTimeSeconds'), value: (row) => row.seconds },
     { header: t('industry.iskPerHour'), value: (row) => row.iskPerHour },
     { header: t('industry.iskPerDay'), value: (row) => row.iskPerDay },

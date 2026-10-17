@@ -20,6 +20,7 @@ import { iskToneClass } from '@/features/character/format';
 import { cx } from '@/lib/cx';
 import { formatDuration } from '@/lib/duration';
 import { formatPercent } from './format';
+import { vs90dReadout } from './vs90d';
 import type { MarketWideDayRow, MarketWideResultRow } from './marketWideOpportunities';
 import { MobileSortToolbar } from './MobileSortToolbar';
 import { ORDER_DEPTH_TONE } from './opportunityMetrics';
@@ -48,6 +49,7 @@ type SortFieldId =
   | 'iskPerHour'
   | 'iskPerDay'
   | 'margin'
+  | 'vs90d'
   | 'duration'
   | 'buildCost'
   | 'product'
@@ -57,6 +59,7 @@ const SORT_FIELD_ORDER: readonly SortFieldId[] = [
   'iskPerHour',
   'iskPerDay',
   'margin',
+  'vs90d',
   'duration',
   'buildCost',
   'product',
@@ -65,17 +68,19 @@ const SORT_FIELD_ORDER: readonly SortFieldId[] = [
 ];
 
 /** The fields with a figure to show; a sort by any other leads with ISK/hour. */
-type FigureId = 'iskPerHour' | 'iskPerDay' | 'margin' | 'duration' | 'buildCost';
+type FigureId = 'iskPerHour' | 'iskPerDay' | 'margin' | 'vs90d' | 'duration' | 'buildCost';
 const FIGURE_ORDER: readonly FigureId[] = [
   'iskPerHour',
   'iskPerDay',
   'margin',
+  'vs90d',
   'duration',
   'buildCost',
 ];
 
 interface Figure {
-  node: ReactNode;
+  /** Null: blank — left out as a secondary readout, "Unknown" as the hero. */
+  node: ReactNode | null;
   toneClassName?: string;
 }
 
@@ -112,6 +117,8 @@ function figureFor(id: FigureId, row: MarketWideDayRow, unknown: string): Figure
             node: `${row.marginPct > 0 ? '+' : ''}${formatPercent(row.marginPct)}`,
             toneClassName: iskToneClass(row.marginPct),
           };
+    case 'vs90d':
+      return vs90dReadout(row.vs90d) ?? { node: null };
     case 'duration':
       return { node: formatDuration(row.seconds) };
     case 'buildCost':
@@ -138,6 +145,7 @@ export function MobileMarketWideList({
     iskPerHour: t('industry.iskPerHour'),
     iskPerDay: t('industry.iskPerDay'),
     margin: t('industry.margin'),
+    vs90d: t('industry.vs90d'),
     duration: t('industry.time'),
     buildCost: t('industry.buildCost'),
     product: t('industry.product'),
@@ -235,6 +243,7 @@ export function MobileMarketWideList({
                 <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[0.6875rem] text-text-dim tabular-nums">
                   {FIGURE_ORDER.filter((id) => id !== heroId).map((id) => {
                     const figure = figureFor(id, row, unknown);
+                    if (figure.node === null) return null;
                     return (
                       <span key={id} className={figure.toneClassName}>
                         {fieldLabel[id]}: {figure.node}
@@ -261,7 +270,7 @@ export function MobileMarketWideList({
                       hero.toneClassName
                     )}
                   >
-                    {hero.node}
+                    {hero.node ?? unknown}
                     {heroId === 'iskPerHour' && row.priceCapped && (
                       <InfoTooltip
                         label={t('industry.marketOpportunitiesPriceCapped')}

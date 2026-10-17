@@ -68,14 +68,19 @@ export interface PriceHistorySummary {
   meanOrderCount: number;
 }
 
+/** The middle value; an even count averages the two middle ones. NaN for an empty list. */
+export function medianOf(values: readonly number[]): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+}
+
 /** Range hi/lo, median day, total volume and mean daily order count. Null for an empty range — never a fabricated 0. */
 export function summarizePriceHistory(
   points: readonly MarketHistoryPoint[]
 ): PriceHistorySummary | null {
   if (points.length === 0) return null;
-  const sorted = points.map((p) => p.average).sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  const median = sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+  const median = medianOf(points.map((p) => p.average));
   let totalVolume = 0;
   let totalOrderCount = 0;
   // `Math.min`/`Math.max` rather than a seeded comparison: a comparison seeded

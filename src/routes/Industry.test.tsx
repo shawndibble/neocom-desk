@@ -27,6 +27,8 @@ import { DEFAULT_TRADE_HUB } from '@/market/hubs';
 import { loadBlueprints, loadMarketWideTrees } from '@/sde/loadSde';
 import type { BlueprintMap, TypeMap } from '@/sde/types';
 
+// The "vs 90d" figures read market history; nothing here is about them.
+vi.mock('@/features/market/priceVsMedian', () => ({ loadPriceVsMedian: async () => null }));
 vi.mock('virtual:pwa-register/react', () => ({
   useRegisterSW: () => ({
     needRefresh: [false, vi.fn()],

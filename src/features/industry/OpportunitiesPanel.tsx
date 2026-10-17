@@ -82,6 +82,9 @@ import {
 } from './opportunities';
 import { SkillGateMarker } from './SkillGateMarker';
 import { useOpportunities } from './useOpportunities';
+import { priceVsMedianFor, usePriceVsMedian } from './usePriceVsMedian';
+import { Vs90dFigure } from './Vs90dFigure';
+import { vs90dTooltip } from './vs90d';
 import { StartPlanButton } from './StartPlanButton';
 import { opportunitiesCsvColumns } from './opportunitiesCsv';
 import { TableActionsMenu } from '@/components/ui/TableExport';
@@ -140,6 +143,7 @@ const SORT_VALUE = {
     row.candidate.blueprint.runs === -1 ? Number.MAX_SAFE_INTEGER : row.candidate.blueprint.runs,
   unitMargin: (row: OpportunityRow) => unitMargin(row) ?? undefined,
   margin: (row: OpportunityRow) => row.result.marginPct ?? undefined,
+  vs90d: (row: OpportunityRow) => row.vs90d ?? undefined,
   stockCovers: (row: OpportunityRow) => stockCoverage(row)?.coveredPct,
   stillToBuy: (row: OpportunityRow) => stockCoverage(row)?.stillToBuyIsk,
   duration: (row: OpportunityRow) => row.result.seconds,
@@ -364,9 +368,33 @@ export function OpportunitiesPanel({
     assumedMe,
   });
 
+  // Each product's history in its own row's hub region, for "vs 90d". Held while
+  // ranking streams partial rows (each batch would restart the fan-out), and
+  // never for All owned, which has no such column.
+  const vs90dTargets = useMemo(
+    () =>
+      view === 'owned' || loading
+        ? []
+        : allRows.flatMap((row) => {
+            const typeId = row.candidate.catalogEntry.productTypeID;
+            return typeId === null ? [] : [{ hubId: row.hub.id, typeId }];
+          }),
+    [allRows, view, loading]
+  );
+  const priceVsMedian = usePriceVsMedian(vs90dTargets);
   const rows = useMemo(
-    () => allRows.filter((row) => matchesStockFilter(row, stockFilter)),
-    [allRows, stockFilter]
+    () =>
+      allRows
+        .filter((row) => matchesStockFilter(row, stockFilter))
+        .map((row) => ({
+          ...row,
+          vs90d: priceVsMedianFor(
+            priceVsMedian,
+            row.hub.id,
+            row.candidate.catalogEntry.productTypeID
+          ),
+        })),
+    [allRows, stockFilter, priceVsMedian]
   );
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
   function toggleSelected(id: string) {
@@ -400,10 +428,10 @@ export function OpportunitiesPanel({
     return verdicts;
   }, [rows, accountSkills]);
 
-  // Mounting `PriceHistoryPanel` is what fetches the item's market history
-  // (`loadPriceHistory`) — kept out of the row tree entirely until a pilot
-  // asks for one, so rendering the ranked list never issues a market-history
-  // request and opening exactly one row issues exactly one.
+  // Mounting `PriceHistoryPanel` reads the item's market history
+  // (`loadPriceHistory`) for the chart — kept out of the row tree until a
+  // pilot asks for one. The "vs 90d" column already read the same series
+  // through the shared cache, so opening a row costs no new request.
   const [historyItem, setHistoryItem] = useState<{
     typeId: number;
     itemName: string;
@@ -546,6 +574,15 @@ export function OpportunitiesPanel({
       className: 'tabular-nums',
       sortValue: SORT_VALUE.margin,
       render: (row) => numericCell(row.result.marginPct, formatPercent, unknown),
+    },
+    {
+      id: 'vs90d',
+      header: t('industry.vs90d'),
+      headerTooltip: vs90dTooltip(t),
+      align: 'right',
+      className: 'tabular-nums',
+      sortValue: SORT_VALUE.vs90d,
+      render: (row) => <Vs90dFigure value={row.vs90d} />,
     },
     {
       id: 'stockCovers',

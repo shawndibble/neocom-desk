@@ -374,3 +374,20 @@ describe('PlanVerdictHero reaction location warning (issue #2908)', () => {
     expect(screen.queryByText("Can't run as planned")).toBeNull();
   });
 });
+
+describe('PlanVerdictHero 90-day median note', () => {
+  it('ends the qualifier line with an amber note when the sell price is 20% or more above its median', () => {
+    renderHero({ vs90dPct: 35.2 });
+    expect(screen.getByText('Sell price is 35% above its 90-day median')).toHaveClass(
+      'text-warning'
+    );
+  });
+
+  it('says nothing below the threshold or when the median is unknown', () => {
+    const { unmount } = renderHero({ vs90dPct: 12 });
+    expect(screen.queryByText(/90-day median/)).not.toBeInTheDocument();
+    unmount();
+    renderHero({ vs90dPct: null });
+    expect(screen.queryByText(/90-day median/)).not.toBeInTheDocument();
+  });
+});

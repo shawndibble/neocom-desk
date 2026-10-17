@@ -11,6 +11,7 @@ import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 import { iskToneClass } from '@/features/character/format';
 import { formatPercent } from './format';
+import { isPriceSpike } from '@/engine/market/priceVsMedian';
 import { CalculationBreakdown, type BreakdownContext } from './CalculationBreakdown';
 import type { ItemMenuFor } from '@/features/market/ItemContextMenu';
 import { SkillGateMarker } from './SkillGateMarker';
@@ -93,6 +94,12 @@ interface PlanVerdictHeroProps {
   productName: string;
   /** The product's typeID, for the heading's item context menu; null when the blueprint has no product. */
   productTypeID?: number | null;
+  /**
+   * The product's latest price vs its 90-day median at the plan's hub, in
+   * percent; null or omitted when unknown. At the spike threshold or above,
+   * the qualifier line ends with an amber note that the revenue may not last.
+   */
+  vs90dPct?: number | null;
   /** Wraps the product heading in the item context menu; omitted where the caller has none to offer. */
   itemMenuFor?: ItemMenuFor;
   /**
@@ -168,6 +175,7 @@ export function PlanVerdictHero({
   planSeconds,
   slotLine,
   locationBlock,
+  vs90dPct = null,
 }: PlanVerdictHeroProps) {
   const { t } = useTranslation();
   const pricesUnavailableLabel = usePricesUnavailableLabel();
@@ -259,6 +267,15 @@ export function PlanVerdictHero({
                       ? pricesUnavailableLabel
                       : t('industry.heroNoPrices')
                     : qualifiers.join(' · ')}
+                {!pricesLoading &&
+                  pricesReady &&
+                  profit !== null &&
+                  vs90dPct !== null &&
+                  isPriceSpike(vs90dPct) && (
+                    <span className="mt-1 block text-warning">
+                      {t('industry.heroVs90dSpike', { value: `${Math.round(vs90dPct)}%` })}
+                    </span>
+                  )}
               </p>
             )}
             {locationBlock && (

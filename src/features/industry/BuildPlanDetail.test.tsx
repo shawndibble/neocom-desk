@@ -47,6 +47,8 @@ const loadMarketSnapshot = vi.hoisted(() =>
     systemCostIndexMissing: false,
   }))
 );
+// The "vs 90d" figures read market history; nothing here is about them.
+vi.mock('@/features/market/priceVsMedian', () => ({ loadPriceVsMedian: async () => null }));
 vi.mock('./marketData', () => ({ loadMarketSnapshot }));
 
 // The build-system field resolves a typed name through ESI. Mocked here for the

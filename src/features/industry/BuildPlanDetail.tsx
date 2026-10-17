@@ -112,6 +112,7 @@ import { materialPriceBasisOf } from './priceBasis';
 import { useDepthPrices } from './depthPriceLoader';
 import { depthCandidates, depthPriceMap } from '@/engine/industry/depthPrice';
 import { useMarketSnapshot } from './useMarketSnapshot';
+import { priceVsMedianFor, usePriceVsMedian } from './usePriceVsMedian';
 import { formatDuration } from '@/lib/duration';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { TableActionsMenu } from '@/components/ui/TableExport';
@@ -338,6 +339,12 @@ export function BuildPlanDetail({
   const blueprint = useMemo(() => (entry ? toIndustryBlueprint(entry.blueprint) : null), [entry]);
   const activity = blueprint ? industryActivityOf(blueprint) : 'manufacturing';
   const hub = useMemo(() => getTradeHub(plan.hubId) ?? DEFAULT_TRADE_HUB, [plan.hubId]);
+  const productTypeID = entry?.productTypeID ?? null;
+  const vs90dTargets = useMemo(
+    () => (productTypeID === null ? [] : [{ hubId: hub.id, typeId: productTypeID }]),
+    [hub.id, productTypeID]
+  );
+  const productVs90d = priceVsMedianFor(usePriceVsMedian(vs90dTargets), hub.id, productTypeID);
   // This plan's share of the pricing inputs, for its own Trade Hub: the
   // assumed ME every unowned sub-build is quoted at, whether Blueprint
   // Acquisition's cost counts toward profit, the corp's blueprints, the
@@ -1534,6 +1541,7 @@ export function BuildPlanDetail({
           nameForCharacter={(characterId) => characterNames.get(characterId) ?? t('common.unknown')}
           planSeconds={planSeconds}
           slotLine={planSchedule && <PlanScheduleLine plan={planSchedule} />}
+          vs90dPct={productVs90d ?? null}
         />
       )}
       {result && !error && result.revenue !== null && (

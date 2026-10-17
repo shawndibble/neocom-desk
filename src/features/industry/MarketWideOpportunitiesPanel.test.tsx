@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import i18n from '@/i18n';
@@ -9,7 +9,11 @@ import type { TradeHub } from '@/market/hubs';
 import type { BlueprintCatalog } from './blueprintCatalog';
 import type { MarketWideResultRow } from './marketWideOpportunities';
 import { MarketWideOpportunitiesPanel } from './MarketWideOpportunitiesPanel';
-import { MARKET_WIDE_COLUMN_IDS, useVisibleMarketWideColumns } from './marketWideColumns';
+import {
+  MARKET_WIDE_COLUMN_IDS,
+  MARKET_WIDE_DEFAULT_COLUMNS,
+  useVisibleMarketWideColumns,
+} from './marketWideColumns';
 import { useSalesShare } from './salesSharePref';
 import { fakeItemActions, withItemActions } from '@/features/market/__fixtures__/itemActions';
 
@@ -62,6 +66,16 @@ vi.mock('./useDailySales', () => ({
         ])
       : new Map(),
     pending: 0,
+  }),
+}));
+// Beta's price sits 25% over its 90-day median; Gamma's history is too thin to say.
+vi.mock('./usePriceVsMedian', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./usePriceVsMedian')>()),
+  usePriceVsMedian: () => ({
+    values: new Map([
+      ['jita:200', 25],
+      ['jita:300', null],
+    ]),
   }),
 }));
 vi.mock('./useMarketWideOpportunities', () => ({
@@ -132,6 +146,17 @@ function renderPanel(
 }
 
 describe('MarketWideOpportunitiesPanel row context menu', () => {
+  it('shows each product against its 90-day median once ticked, amber from +20%', () => {
+    renderPanel();
+    expect(screen.queryByRole('columnheader', { name: /vs 90d/ })).not.toBeInTheDocument();
+    act(() =>
+      useVisibleMarketWideColumns.setState({ value: [...MARKET_WIDE_DEFAULT_COLUMNS, 'vs90d'] })
+    );
+    expect(screen.getByRole('columnheader', { name: /vs 90d/ })).toBeInTheDocument();
+    expect(screen.getByText('+25%')).toHaveClass('text-warning');
+    act(() => useVisibleMarketWideColumns.setState({ value: MARKET_WIDE_DEFAULT_COLUMNS }));
+  });
+
   it('shows the product name as plain text: the row click is Start plan', () => {
     renderPanel();
     expect(screen.queryByRole('link', { name: 'Widget Beta' })).not.toBeInTheDocument();

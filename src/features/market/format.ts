@@ -16,6 +16,15 @@ export function formatSignedPct(value: number, digits: number): string {
   return `${rounded > 0 ? '+' : ''}${rounded.toFixed(digits)}%`;
 }
 
+/**
+ * A price's distance from its 90-day median as a whole percent: "+35%",
+ * "−12%" (a real minus sign), "0%" when it rounds to nothing.
+ */
+export function formatVsMedianPct(pct: number): string {
+  const rounded = Math.round(pct);
+  return `${rounded > 0 ? '+' : rounded < 0 ? '\u2212' : ''}${Math.abs(rounded)}%`;
+}
+
 /** Below this a summed volume is float residue, not cargo. */
 const M3_EPSILON = 1e-6;
 

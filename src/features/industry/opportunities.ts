@@ -233,6 +233,8 @@ export interface UnrankedOpportunityRow {
 
 export interface OpportunityRow extends UnrankedOpportunityRow {
   orderDepth: OrderDepthLevel;
+  /** The product's latest price vs its 90-day median at `hub`, in percent (`priceVsMedianPct`); null when blank, absent while still being read. */
+  vs90d?: number | null;
 }
 
 /** What produces a material, for the auto make-or-buy depth pass and for costing whatever it picks. */
