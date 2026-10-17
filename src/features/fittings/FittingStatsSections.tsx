@@ -604,7 +604,7 @@ function OffenseRows({
  * The stats column (scope decision `20260924-215855`, mockup A): one panel
  * of collapsible sections, each row carrying its headline number, laid out
  * like the game's fitting window. Only the ship's numbers sit in it, under
- * Damage, Tank and Ship labels; who flies it and what it flies in sit behind
+ * Damage & Tank and Ship labels; who flies it and what it flies in sit behind
  * the Pilot and Situation triggers on top, in side panels (#3978). Every section keeps what its ticket put
  * there — per-weapon offense and heat (#1548), damage profiles and the
  * adapted RAH (#1545), target profiles and applied-DPS graphs (#1546).
@@ -700,27 +700,18 @@ export function FittingStatsSections({
       ? tacticalModeKind(fitting.mode)
       : undefined;
 
-  // What each trigger carries with its panel shut: the skills basis and
-  // skill gaps; the weather, a non-default Tactical mode, projected ships
-  // and overheat. (Implants show only in the Pilot panel.)
-  const pilotValue = (
-    <>
-      <StatsHeadingLabel
-        hasCharacter={pilot !== undefined}
-        characterName={pilot?.characterName ?? null}
-        short
-      />
-      {pilot?.missingSkills ? (
-        <span className="text-warning">
-          {' · '}
-          {t('fittings.stats.pilot.missing', { count: pilot.missingSkills })}
-        </span>
-      ) : null}
-      {pilot?.skillsUnknown || (stats && !skillsKnown) ? (
-        <span className="text-warning"> · {t('fittings.stats.pilot.skillsUnknown')}</span>
-      ) : null}
-    </>
-  );
+  // What each trigger carries with its panel shut: skill gaps only (the
+  // Character and skills basis read in the Pilot panel, so the trigger fits
+  // one line on a phone); the weather, a non-default Tactical mode,
+  // projected ships and overheat.
+  const pilotWarnings = [
+    pilot?.missingSkills && t('fittings.stats.pilot.missing', { count: pilot.missingSkills }),
+    (pilot?.skillsUnknown || (stats && !skillsKnown)) && t('fittings.stats.pilot.skillsUnknown'),
+  ].filter(Boolean);
+  const pilotValue =
+    pilotWarnings.length > 0 ? (
+      <span className="text-warning">{pilotWarnings.join(' · ')}</span>
+    ) : null;
   const situationValue = (
     <>
       {[
@@ -794,7 +785,7 @@ export function FittingStatsSections({
   }
 
   /** A column group: its label over the sections it shows, nothing when it shows none. */
-  function group(id: 'damage' | 'tank' | 'ship', sections: ReactNode[]) {
+  function group(id: 'damageTank' | 'ship', sections: ReactNode[]) {
     const shown = sections.filter(Boolean);
     if (shown.length === 0) return null;
     return (
@@ -1068,6 +1059,8 @@ export function FittingStatsSections({
         )}
       </>
     ),
+  ];
+  const shipSections = [
     section(
       'capacitor',
       figure(
@@ -1083,8 +1076,6 @@ export function FittingStatsSections({
       ),
       stats ? <CapacitorFacts stats={stats} /> : placeholder
     ),
-  ];
-  const shipSections = [
     section(
       'navigation',
       figure((s) =>
@@ -1332,10 +1323,6 @@ export function FittingStatsSections({
         >
           {situationValue}
         </StatsScopeTrigger>
-        {/* Nothing priceable is "unknown", not a free ship: no total, as the Price row shows a dash. */}
-        {price && !nothingPriced && (
-          <span className="ml-auto text-text tabular-nums">{iskLabel(price.totals.sell)}</span>
-        )}
       </div>
       {statsError && (
         <div
@@ -1365,8 +1352,7 @@ export function FittingStatsSections({
         </p>
       )}
 
-      {group('damage', damageSections)}
-      {group('tank', tankSections)}
+      {group('damageTank', [...damageSections, ...tankSections])}
       {group('ship', shipSections)}
 
       {/* One panel, its content switched by `panel`: swapping two open
