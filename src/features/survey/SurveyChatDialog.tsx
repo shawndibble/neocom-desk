@@ -156,7 +156,7 @@ function Toggle({
 }: {
   label: string;
   hint?: string;
-  /** A compact control at the row's end; it must fit the row's height. */
+  /** A compact control right after the label, so it reads as that label's; it must fit the row's height. */
   trailing?: ReactNode;
   checked: boolean;
   disabled?: boolean;
@@ -171,7 +171,7 @@ function Toggle({
       />
       <span>{label}</span>
       {hint !== undefined && <span className="ml-auto text-xs text-text-dim">{hint}</span>}
-      {trailing !== undefined && <span className="ml-auto">{trailing}</span>}
+      {trailing !== undefined && <span className="ml-1">{trailing}</span>}
     </label>
   );
 }
