@@ -44,12 +44,6 @@ describe('workThroughQueue', () => {
     ]);
     expect(workThroughQueue(groups).map((r) => r.orderId)).toEqual([2, 4, 3, 1]);
   });
-
-  it('uses a group’s own row order when one is given', () => {
-    const groups = groupOpenOrders([undercut(3), undercut(1), belowFloor(2)]);
-    const rowOrder = new Map([['undercutStation', [1, 3]] as const]);
-    expect(workThroughQueue(groups, rowOrder).map((r) => r.orderId)).toEqual([2, 1, 3]);
-  });
 });
 
 describe('workThroughProgress', () => {

@@ -40,25 +40,11 @@ const OUTSIDE_QUEUE: ReadonlySet<OrderGroupKey> = new Set(['healthy', 'notChecke
 
 /**
  * Every order that needs a fix, in the page's group order (worst first), then
- * row order inside each group. `rowOrder` carries a group's on-screen order
- * (order ids) when its table was re-sorted by a header click; a group without
- * one keeps the page sort its rows already arrive in.
+ * the row order each group arrives in — the caller hands over groups already
+ * sorted the way their tables show them.
  */
-export function workThroughQueue(
-  groups: readonly OrderGroup[],
-  rowOrder: ReadonlyMap<OrderGroupKey, readonly number[]> = new Map()
-): OpenOrderRow[] {
-  return groups
-    .filter((group) => !OUTSIDE_QUEUE.has(group.problem))
-    .flatMap((group) => {
-      const order = rowOrder.get(group.problem);
-      if (order === undefined) return group.rows;
-      const rank = new Map(order.map((id, i) => [id, i]));
-      const last = order.length;
-      return [...group.rows].sort(
-        (a, b) => (rank.get(a.orderId) ?? last) - (rank.get(b.orderId) ?? last)
-      );
-    });
+export function workThroughQueue(groups: readonly OrderGroup[]): OpenOrderRow[] {
+  return groups.filter((group) => !OUTSIDE_QUEUE.has(group.problem)).flatMap((group) => group.rows);
 }
 
 export interface WorkThroughProgress {

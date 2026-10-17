@@ -3,9 +3,11 @@ import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
 import {
   Fragment,
+  useCallback,
   useDeferredValue,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactElement,
   type ReactNode,
@@ -38,7 +40,9 @@ import {
   Spinner,
   textActionClassName,
   type DataTableColumn,
+  type DataTableSort,
   CachedNotice,
+  sortRows,
 } from '@/components/ui';
 import { useColumnVisibility } from '@/lib/columnVisibility';
 import * as Icon from '@/components/ui/icons';
@@ -86,6 +90,7 @@ import {
   buildOpenOrderRows,
   needsAttentionCount,
   openOrderProblemCounts,
+  orderGroupKey,
   type OpenOrderGroupSummary,
   type OpenOrderRow,
   type OrderGroupKey,
@@ -115,6 +120,16 @@ import { useOrderDetail } from './useOrderDetail';
 import { useStructureFees } from './structureFees';
 import { SetWaypointMenuItem } from '@/features/travel/SetWaypointMenuItem';
 import { itemKey } from './orderDetailView';
+import { requiredScopesForEndpoints } from '@/esi/registry';
+import { OPEN_IN_EVE_ENDPOINTS } from '@/features/openInEve/sendOpenInEve';
+import { workThroughQueue } from './workThrough';
+import { useWorkThrough, useWorkThroughStartParam } from './useWorkThrough';
+import {
+  WorkThroughListSlot,
+  WorkThroughSummaryTail,
+  WorkThroughTableSlot,
+} from './WorkThroughControls';
+import { WorkThroughContext, type WorkThroughContextValue } from './workThroughContext';
 import {
   OPEN_ORDER_COLUMN_IDS,
   useVisibleOpenOrderColumns,
@@ -254,6 +269,12 @@ export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
   const highlightId = useHighlightParam();
   const isPhone = useIsPhone();
   const [detailOrderId, setDetailOrderId] = useState<number | null>(null);
+  /** Set only by a work-through row's "See exits": the detail opens at its exits. */
+  const [detailAtExits, setDetailAtExits] = useState(false);
+  /** Each group table's own header-click sort, held here so the work-through queue walks rows in the order they show. */
+  const [groupSorts, setGroupSorts] = useState<ReadonlyMap<OrderGroupKey, DataTableSort>>(
+    () => new Map()
+  );
   const [legendOpen, setLegendOpen] = useState(false);
   /** Groups the player has folded away by hand. `healthy` is never in here — see the toggle below. */
   const [collapsedGroups, setCollapsedGroups] = useState<ReadonlySet<OrderGroupKey>>(
@@ -550,7 +571,10 @@ export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
                 return (
                   <span className="flex flex-col items-start gap-1">
                     {badge && <OrderProblemBadge kind={badge.kind} detail={badge.detail} />}
-                    <OrderRowSummaryText row={row} summary={summary} copyRelistPrice />
+                    <WorkThroughTableSlot
+                      row={row}
+                      fallback={<OrderRowSummaryText row={row} summary={summary} copyRelistPrice />}
+                    />
                   </span>
                 );
               },
@@ -587,6 +611,80 @@ export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
           ],
     [isPhone, t, showCharacterStrip]
   );
+
+  /*
+   * Work through (issue #3991). The queue is re-formed every render from the
+   * filtered groups, in the order each group's table shows them, so a sort
+   * or filter change while running re-forms what is left of it.
+   */
+  const sortedGroups = useMemo(
+    () =>
+      groups.map((group) => {
+        const sort = groupSorts.get(group.problem);
+        const column = sort && columns.find((c) => c.id === sort.columnId);
+        return column && sort
+          ? { ...group, rows: sortRows(group.rows, column, sort.direction) }
+          : group;
+      }),
+    [groups, groupSorts, columns]
+  );
+  const workQueue = useMemo(() => workThroughQueue(sortedGroups), [sortedGroups]);
+  // Only the answer leaves the query, never a `TokenRecord` (ADR 0001).
+  const openInEveCharacterIds = useLiveQuery(async () => {
+    const required = requiredScopesForEndpoints(OPEN_IN_EVE_ENDPOINTS);
+    const tokens = await db.tokens.toArray();
+    return new Set(
+      tokens
+        .filter((token) => required.every((scope) => token.scopes.includes(scope)))
+        .map((token) => token.characterId)
+    );
+  }, []);
+  const canOpenInEve = useCallback(
+    (characterId: number) => openInEveCharacterIds?.has(characterId) ?? false,
+    [openInEveCharacterIds]
+  );
+  // Every Character's orders, before any narrowing: never undercut an alt.
+  const ownOrderIds = useMemo(
+    () => new Set(data?.openOrders.entries.flatMap((e) => e.orders.map((o) => o.order_id)) ?? []),
+    [data]
+  );
+  const fetchedAtByCharacter = useMemo(
+    () => new Map((snapshot?.openOrders.entries ?? []).map((e) => [e.characterId, e.fetchedAt])),
+    [snapshot]
+  );
+  const workThrough = useWorkThrough({
+    queue: workQueue,
+    isPhone,
+    ownOrderIds,
+    canOpenInEve,
+    ordersById: ordersByOrderId,
+    fetchedAtByCharacter,
+  });
+  const workCurrent = workThrough.running ? workThrough.progress.current : null;
+  const workCurrentId = workCurrent?.orderId ?? null;
+  const startRequested = useWorkThroughStartParam();
+  const startedFromLink = useRef(false);
+  const { start: startWorkThrough } = workThrough;
+  useEffect(() => {
+    if (!startRequested || startedFromLink.current || allRows.length === 0) return;
+    startedFromLink.current = true;
+    startWorkThrough();
+  }, [startRequested, allRows.length, startWorkThrough]);
+  useEffect(() => {
+    if (workCurrentId === null) return;
+    document
+      .querySelector(`[data-row-key="${workCurrentId}"]`)
+      ?.scrollIntoView?.({ block: 'nearest' });
+  }, [workCurrentId]);
+  const workThroughContext: WorkThroughContextValue = {
+    workThrough,
+    canOpenInEve,
+    manyOwners: new Set(workQueue.map((row) => row.characterId)).size > 1,
+    onSeeExits: (row) => {
+      setDetailAtExits(true);
+      setDetailOrderId(row.orderId);
+    },
+  };
 
   const headerChrome = (
     <PageHeaderPortals
@@ -654,6 +752,7 @@ export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
 
   // The modal loads what the order needs as it opens (`useOpenOrderDetail`).
   function openDetails(row: OpenOrderRow) {
+    setDetailAtExits(false);
     setDetailOrderId(row.orderId);
   }
 
@@ -748,519 +847,537 @@ export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
     <>
       {headerChrome}
       <Panel padded={false}>
-        <div className="space-y-2 px-3 pt-2">
-          {viewedCharacterId !== undefined && (
-            <div className="flex items-center gap-3">
-              <WalletOriginCrumb />
-              {viewedCharacter && (
-                <CharacterScopeReadout
-                  scope="one"
-                  characterId={viewedCharacter.characterId}
-                  characterName={viewedCharacter.name}
+        <WorkThroughContext.Provider value={workThroughContext}>
+          <div className="space-y-2 px-3 pt-2">
+            {viewedCharacterId !== undefined && (
+              <div className="flex items-center gap-3">
+                <WalletOriginCrumb />
+                {viewedCharacter && (
+                  <CharacterScopeReadout
+                    scope="one"
+                    characterId={viewedCharacter.characterId}
+                    characterName={viewedCharacter.name}
+                  />
+                )}
+              </div>
+            )}
+            {viewedCharacterId !== undefined &&
+              viewedLacksOrdersScope &&
+              !reauthEntries.some((e) => e.characterId === viewedCharacterId) && (
+                <GrantBanner
+                  characterId={viewedCharacterId}
+                  characterName={viewedCharacter?.name}
+                  endpoints={['getCharacterOrders']}
+                  variant="ghost"
+                  title={t('orders.reauthTitle')}
+                  hint={t('orders.reauthHint')}
+                  actionLabel={t('orders.reauthAction')}
                 />
               )}
-            </div>
-          )}
-          {viewedCharacterId !== undefined &&
-            viewedLacksOrdersScope &&
-            !reauthEntries.some((e) => e.characterId === viewedCharacterId) && (
+            {allRows.length > 0 && (
+              <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-text-dim">
+                <span>
+                  {[
+                    showCharacterStrip
+                      ? t('market.orders.headerCharacters', { count: entriesWithOrders.length })
+                      : null,
+                    t('market.orders.headerSummary', { count: allRows.length }),
+                    t('market.orders.headerAttention', { count: attentionCount }),
+                  ]
+                    .filter((part): part is string => part !== null)
+                    .join(' \u00b7 ')}
+                </span>
+                <WorkThroughSummaryTail />
+              </div>
+            )}
+            {reauthEntries.map((entry) => (
               <GrantBanner
-                characterId={viewedCharacterId}
-                characterName={viewedCharacter?.name}
+                key={entry.characterId}
+                characterId={entry.characterId}
+                characterName={entry.characterName}
                 endpoints={['getCharacterOrders']}
                 variant="ghost"
                 title={t('orders.reauthTitle')}
                 hint={t('orders.reauthHint')}
                 actionLabel={t('orders.reauthAction')}
               />
-            )}
-          {allRows.length > 0 && (
-            <p className="text-xs text-text-dim">
-              {[
-                showCharacterStrip
-                  ? t('market.orders.headerCharacters', { count: entriesWithOrders.length })
-                  : null,
-                t('market.orders.headerSummary', { count: allRows.length }),
-                t('market.orders.headerAttention', { count: attentionCount }),
-              ]
-                .filter((part): part is string => part !== null)
-                .join(' \u00b7 ')}
-            </p>
-          )}
-          {reauthEntries.map((entry) => (
-            <GrantBanner
-              key={entry.characterId}
-              characterId={entry.characterId}
-              characterName={entry.characterName}
-              endpoints={['getCharacterOrders']}
-              variant="ghost"
-              title={t('orders.reauthTitle')}
-              hint={t('orders.reauthHint')}
-              actionLabel={t('orders.reauthAction')}
-            />
-          ))}
-          {floorCharacterIds.map((characterId) => (
-            <AssumesBaseStandingsNote
-              key={characterId}
-              characterId={characterId}
-              characterName={characterNamesById.get(characterId)}
-              hint={t('market.orders.assumesBaseStandingsHint')}
-            />
-          ))}
-          {fromCacheAny && <CachedNotice fetchedAt={oldestFetchedAt} />}
-          {skipped.map((s) => (
-            <p key={s.characterId} className="text-xs text-text-dim">
-              {s.name} — {t('market.orders.characterNotShared')}
-            </p>
-          ))}
-        </div>
+            ))}
+            {floorCharacterIds.map((characterId) => (
+              <AssumesBaseStandingsNote
+                key={characterId}
+                characterId={characterId}
+                characterName={characterNamesById.get(characterId)}
+                hint={t('market.orders.assumesBaseStandingsHint')}
+              />
+            ))}
+            {fromCacheAny && <CachedNotice fetchedAt={oldestFetchedAt} />}
+            {skipped.map((s) => (
+              <p key={s.characterId} className="text-xs text-text-dim">
+                {s.name} — {t('market.orders.characterNotShared')}
+              </p>
+            ))}
+          </div>
 
-        {reauthEntries.length === 0 && allRows.length === 0 ? (
-          // Every Character skipped: the "hasn't shared" notes above already say why.
-          skipped.length > 0 && snapshot.openOrders.entries.length === 0 ? null : (
-            <CachedEmptyState
-              result={{ fromCache: fromCacheAny }}
-              title={t('orders.emptyTitle')}
-              hint={t('orders.emptyHint')}
-              fetchedTitle={t('orders.emptyFetchedTitle')}
-              className="py-8"
-            />
-          )
-        ) : (
-          <>
-            <div className="border-b border-line px-3 py-2">
-              <FilterBar
-                value={filter}
-                onChange={setFilter}
-                // The active chips stay outside the funnel box, where they can
-                // be seen and dropped.
-                activeCount={visibleChips.length}
-                actions={
-                  // `OpenOrdersList` (below, on a phone) ignores column
-                  // visibility entirely, so the picker would have nothing to
-                  // act on there — and `columnsById` is empty on a phone besides.
-                  !isPhone && (
-                    <ColumnPickerMenu
-                      available={availableColumns}
-                      visible={visibleColumnIds}
-                      columnsById={columnsById}
-                      onToggle={toggleColumn}
-                      buttonLabel={t('common.columnsButton')}
-                      menuTitle={t('common.columnsMenuTitle')}
-                      onReset={resetColumns}
-                      resetLabel={t('common.resetColumns')}
+          {reauthEntries.length === 0 && allRows.length === 0 ? (
+            // Every Character skipped: the "hasn't shared" notes above already say why.
+            skipped.length > 0 && snapshot.openOrders.entries.length === 0 ? null : (
+              <CachedEmptyState
+                result={{ fromCache: fromCacheAny }}
+                title={t('orders.emptyTitle')}
+                hint={t('orders.emptyHint')}
+                fetchedTitle={t('orders.emptyFetchedTitle')}
+                className="py-8"
+              />
+            )
+          ) : (
+            <>
+              <div className="border-b border-line px-3 py-2">
+                <FilterBar
+                  value={filter}
+                  onChange={setFilter}
+                  // The active chips stay outside the funnel box, where they can
+                  // be seen and dropped.
+                  activeCount={visibleChips.length}
+                  actions={
+                    // `OpenOrdersList` (below, on a phone) ignores column
+                    // visibility entirely, so the picker would have nothing to
+                    // act on there — and `columnsById` is empty on a phone besides.
+                    !isPhone && (
+                      <ColumnPickerMenu
+                        available={availableColumns}
+                        visible={visibleColumnIds}
+                        columnsById={columnsById}
+                        onToggle={toggleColumn}
+                        buttonLabel={t('common.columnsButton')}
+                        menuTitle={t('common.columnsMenuTitle')}
+                        onReset={resetColumns}
+                        resetLabel={t('common.resetColumns')}
+                      />
+                    )
+                  }
+                  search={
+                    <SearchInput
+                      value={filter.text}
+                      onChange={(event) => setFilter({ ...filter, text: event.target.value })}
+                      placeholder={t('orders.searchPlaceholder')}
+                      className="min-w-48 flex-1"
                     />
-                  )
-                }
-                search={
-                  <SearchInput
-                    value={filter.text}
-                    onChange={(event) => setFilter({ ...filter, text: event.target.value })}
-                    placeholder={t('orders.searchPlaceholder')}
-                    className="min-w-48 flex-1"
-                  />
-                }
-              >
-                {(draft, setDraft) => (
-                  <>
-                    <FilterChip
-                      label={t('orders.buy')}
-                      selected={draft.side === 'buy'}
-                      onToggle={() =>
-                        setDraft({ ...draft, side: draft.side === 'buy' ? null : 'buy' })
-                      }
-                    />
-                    <FilterChip
-                      label={t('orders.sell')}
-                      selected={draft.side === 'sell'}
-                      onToggle={() =>
-                        setDraft({ ...draft, side: draft.side === 'sell' ? null : 'sell' })
-                      }
-                    />
-                    {PROBLEM_FILTER_OPTIONS.map((problem) => {
-                      const count = problemCounts[problem];
-                      const selected = draft.problems.includes(problem);
-                      return (
-                        <FilterChip
-                          key={problem}
-                          label={t(`market.orders.group.${problem}`)}
-                          count={count}
-                          selected={selected}
-                          // A zero-count problem still renders, still a real
-                          // focusable button, so the player can see it's clean
-                          // rather than wonder where it went — the `0` itself
-                          // is the cue; no `opacity-50` fade below AA on top of
-                          // it (issue #1491).
-                          onToggle={() =>
-                            setDraft({
-                              ...draft,
-                              problems: selected
-                                ? draft.problems.filter((p) => p !== problem)
-                                : [...draft.problems, problem],
-                            })
-                          }
-                        />
-                      );
-                    })}
-                    <FilterChip
-                      label={t('market.orders.filter.costBasisLinked')}
-                      selected={draft.costBasis === 'linked'}
-                      onToggle={() =>
-                        setDraft({
-                          ...draft,
-                          costBasis: draft.costBasis === 'linked' ? null : 'linked',
-                        })
-                      }
-                    />
-                    <FilterChip
-                      label={t('market.orders.filter.costBasisMissing')}
-                      selected={draft.costBasis === 'missing'}
-                      onToggle={() =>
-                        setDraft({
-                          ...draft,
-                          costBasis: draft.costBasis === 'missing' ? null : 'missing',
-                        })
-                      }
-                    />
-                    <Select
-                      value={
-                        draft.expiringWithinDays === null ? 'any' : String(draft.expiringWithinDays)
-                      }
-                      onValueChange={(value) =>
-                        setDraft({
-                          ...draft,
-                          expiringWithinDays: value === 'any' ? null : Number(value),
-                        })
-                      }
-                    >
-                      <SelectTrigger
-                        size="sm"
-                        aria-label={t('market.orders.filter.expiringWithin')}
-                        className="w-36"
-                      >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="any">{t('market.orders.filter.anyExpiry')}</SelectItem>
-                        {EXPIRING_WITHIN_DAY_OPTIONS.map((days) => (
-                          <SelectItem key={days} value={String(days)}>
-                            {t('market.orders.filter.expiringWithinOption', { count: days })}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Select
-                      value={draft.minIskTiedUp === null ? 'any' : String(draft.minIskTiedUp)}
-                      onValueChange={(value) =>
-                        setDraft({ ...draft, minIskTiedUp: value === 'any' ? null : Number(value) })
-                      }
-                    >
-                      <SelectTrigger
-                        size="sm"
-                        aria-label={t('market.orders.filter.minIskTiedUp')}
-                        className="w-36"
-                      >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="any">{t('market.orders.filter.anySize')}</SelectItem>
-                        {MIN_ISK_TIED_UP_OPTIONS.map((amount) => (
-                          <SelectItem key={amount} value={String(amount)}>
-                            {t('market.orders.filter.minIskTiedUpOption', {
-                              amount: formatIskCompact(amount),
-                            })}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {showLocationFilter && (
-                      <MultiSelect
-                        label={t('market.orders.filter.location')}
-                        trigger={
-                          <Button size="sm">
-                            {draft.locationIds.length === 0
-                              ? t('market.orders.filter.allLocations')
-                              : t('market.orders.filter.selectedLocationsCount', {
-                                  count: draft.locationIds.length,
-                                })}
-                          </Button>
+                  }
+                >
+                  {(draft, setDraft) => (
+                    <>
+                      <FilterChip
+                        label={t('orders.buy')}
+                        selected={draft.side === 'buy'}
+                        onToggle={() =>
+                          setDraft({ ...draft, side: draft.side === 'buy' ? null : 'buy' })
                         }
-                        options={locationOptions.map((option) => ({
-                          id: option.locationId,
-                          label: option.label,
-                        }))}
-                        selected={new Set(draft.locationIds)}
-                        onToggle={(locationId) =>
+                      />
+                      <FilterChip
+                        label={t('orders.sell')}
+                        selected={draft.side === 'sell'}
+                        onToggle={() =>
+                          setDraft({ ...draft, side: draft.side === 'sell' ? null : 'sell' })
+                        }
+                      />
+                      {PROBLEM_FILTER_OPTIONS.map((problem) => {
+                        const count = problemCounts[problem];
+                        const selected = draft.problems.includes(problem);
+                        return (
+                          <FilterChip
+                            key={problem}
+                            label={t(`market.orders.group.${problem}`)}
+                            count={count}
+                            selected={selected}
+                            // A zero-count problem still renders, still a real
+                            // focusable button, so the player can see it's clean
+                            // rather than wonder where it went — the `0` itself
+                            // is the cue; no `opacity-50` fade below AA on top of
+                            // it (issue #1491).
+                            onToggle={() =>
+                              setDraft({
+                                ...draft,
+                                problems: selected
+                                  ? draft.problems.filter((p) => p !== problem)
+                                  : [...draft.problems, problem],
+                              })
+                            }
+                          />
+                        );
+                      })}
+                      <FilterChip
+                        label={t('market.orders.filter.costBasisLinked')}
+                        selected={draft.costBasis === 'linked'}
+                        onToggle={() =>
                           setDraft({
                             ...draft,
-                            locationIds: draft.locationIds.includes(locationId)
-                              ? draft.locationIds.filter((id) => id !== locationId)
-                              : [...draft.locationIds, locationId],
+                            costBasis: draft.costBasis === 'linked' ? null : 'linked',
                           })
                         }
-                        searchPlaceholder={t('market.orders.filter.locationSearchPlaceholder')}
-                        noResultsLabel={t('market.orders.filter.locationNoResults')}
-                        extraContent={(close) => (
-                          <div className="border-b border-line p-1">
-                            <Button
-                              variant="ghost"
-                              align="start"
-                              size="sm"
-                              className="w-full"
-                              onClick={() => {
-                                setDraft({ ...draft, locationIds: [] });
-                                close();
-                              }}
-                            >
-                              {t('market.orders.filter.allLocations')}
-                            </Button>
-                          </div>
-                        )}
                       />
-                    )}
-                    <Select
-                      value={draft.sort}
-                      onValueChange={(value) =>
-                        setDraft({ ...draft, sort: value as OpenOrdersSort })
-                      }
-                    >
-                      <SelectTrigger
-                        size="sm"
-                        aria-label={t('market.orders.filter.sort')}
-                        className="w-40"
+                      <FilterChip
+                        label={t('market.orders.filter.costBasisMissing')}
+                        selected={draft.costBasis === 'missing'}
+                        onToggle={() =>
+                          setDraft({
+                            ...draft,
+                            costBasis: draft.costBasis === 'missing' ? null : 'missing',
+                          })
+                        }
+                      />
+                      <Select
+                        value={
+                          draft.expiringWithinDays === null
+                            ? 'any'
+                            : String(draft.expiringWithinDays)
+                        }
+                        onValueChange={(value) =>
+                          setDraft({
+                            ...draft,
+                            expiringWithinDays: value === 'any' ? null : Number(value),
+                          })
+                        }
                       >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {SORTS.map((sort) => (
-                          <SelectItem key={sort} value={sort}>
-                            {t(`market.orders.filter.sort${sort[0].toUpperCase()}${sort.slice(1)}`)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {/*
+                        <SelectTrigger
+                          size="sm"
+                          aria-label={t('market.orders.filter.expiringWithin')}
+                          className="w-36"
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="any">{t('market.orders.filter.anyExpiry')}</SelectItem>
+                          {EXPIRING_WITHIN_DAY_OPTIONS.map((days) => (
+                            <SelectItem key={days} value={String(days)}>
+                              {t('market.orders.filter.expiringWithinOption', { count: days })}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Select
+                        value={draft.minIskTiedUp === null ? 'any' : String(draft.minIskTiedUp)}
+                        onValueChange={(value) =>
+                          setDraft({
+                            ...draft,
+                            minIskTiedUp: value === 'any' ? null : Number(value),
+                          })
+                        }
+                      >
+                        <SelectTrigger
+                          size="sm"
+                          aria-label={t('market.orders.filter.minIskTiedUp')}
+                          className="w-36"
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="any">{t('market.orders.filter.anySize')}</SelectItem>
+                          {MIN_ISK_TIED_UP_OPTIONS.map((amount) => (
+                            <SelectItem key={amount} value={String(amount)}>
+                              {t('market.orders.filter.minIskTiedUpOption', {
+                                amount: formatIskCompact(amount),
+                              })}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {showLocationFilter && (
+                        <MultiSelect
+                          label={t('market.orders.filter.location')}
+                          trigger={
+                            <Button size="sm">
+                              {draft.locationIds.length === 0
+                                ? t('market.orders.filter.allLocations')
+                                : t('market.orders.filter.selectedLocationsCount', {
+                                    count: draft.locationIds.length,
+                                  })}
+                            </Button>
+                          }
+                          options={locationOptions.map((option) => ({
+                            id: option.locationId,
+                            label: option.label,
+                          }))}
+                          selected={new Set(draft.locationIds)}
+                          onToggle={(locationId) =>
+                            setDraft({
+                              ...draft,
+                              locationIds: draft.locationIds.includes(locationId)
+                                ? draft.locationIds.filter((id) => id !== locationId)
+                                : [...draft.locationIds, locationId],
+                            })
+                          }
+                          searchPlaceholder={t('market.orders.filter.locationSearchPlaceholder')}
+                          noResultsLabel={t('market.orders.filter.locationNoResults')}
+                          extraContent={(close) => (
+                            <div className="border-b border-line p-1">
+                              <Button
+                                variant="ghost"
+                                align="start"
+                                size="sm"
+                                className="w-full"
+                                onClick={() => {
+                                  setDraft({ ...draft, locationIds: [] });
+                                  close();
+                                }}
+                              >
+                                {t('market.orders.filter.allLocations')}
+                              </Button>
+                            </div>
+                          )}
+                        />
+                      )}
+                      <Select
+                        value={draft.sort}
+                        onValueChange={(value) =>
+                          setDraft({ ...draft, sort: value as OpenOrdersSort })
+                        }
+                      >
+                        <SelectTrigger
+                          size="sm"
+                          aria-label={t('market.orders.filter.sort')}
+                          className="w-40"
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {SORTS.map((sort) => (
+                            <SelectItem key={sort} value={sort}>
+                              {t(
+                                `market.orders.filter.sort${sort[0].toUpperCase()}${sort.slice(1)}`
+                              )}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {/*
                     On a phone the character strip below (outside the funnel)
                     is hidden, so its picker lives here instead — the active
                     selection still surfaces as chips in the row below this
                     sheet, same as every other filter field (decision
                     20260924-020211 "Open Orders gets a compact phone list").
                   */}
-                    {isPhone && showCharacterStrip && (
-                      <div className="w-full border-t border-line pt-2">
-                        <CharacterFilterControl
-                          activeCharacterId={activeCharacterId}
-                          value={characterFilterValueOf(draft.characterIds)}
-                          onChange={characterFilterOnChange((characterIds) =>
-                            setDraft({ ...draft, characterIds })
-                          )}
-                        />
-                      </div>
-                    )}
-                  </>
-                )}
-              </FilterBar>
-            </div>
-
-            {visibleChips.length > 0 && (
-              <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
-                {visibleChips.map((chip) => (
-                  <FilterChip key={chip.id} label={chip.label} selected onToggle={chip.clear} />
-                ))}
-                <button
-                  type="button"
-                  className={textActionClassName()}
-                  onClick={() => setFilter(DEFAULT_FILTER)}
-                >
-                  {t('market.orders.filter.clearAll')}
-                </button>
-              </div>
-            )}
-
-            {showCharacterStrip && !isPhone && (
-              <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
-                <CharacterFilterControl
-                  activeCharacterId={activeCharacterId}
-                  value={characterFilterValueOf(filter.characterIds)}
-                  onChange={characterFilterOnChange((characterIds) =>
-                    setFilter({ ...filter, characterIds })
+                      {isPhone && showCharacterStrip && (
+                        <div className="w-full border-t border-line pt-2">
+                          <CharacterFilterControl
+                            activeCharacterId={activeCharacterId}
+                            value={characterFilterValueOf(draft.characterIds)}
+                            onChange={characterFilterOnChange((characterIds) =>
+                              setDraft({ ...draft, characterIds })
+                            )}
+                          />
+                        </div>
+                      )}
+                    </>
                   )}
-                />
+                </FilterBar>
               </div>
-            )}
 
-            {/*
+              {visibleChips.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
+                  {visibleChips.map((chip) => (
+                    <FilterChip key={chip.id} label={chip.label} selected onToggle={chip.clear} />
+                  ))}
+                  <button
+                    type="button"
+                    className={textActionClassName()}
+                    onClick={() => setFilter(DEFAULT_FILTER)}
+                  >
+                    {t('market.orders.filter.clearAll')}
+                  </button>
+                </div>
+              )}
+
+              {showCharacterStrip && !isPhone && (
+                <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
+                  <CharacterFilterControl
+                    activeCharacterId={activeCharacterId}
+                    value={characterFilterValueOf(filter.characterIds)}
+                    onChange={characterFilterOnChange((characterIds) =>
+                      setFilter({ ...filter, characterIds })
+                    )}
+                  />
+                </div>
+              )}
+
+              {/*
             Rows hidden only by the Healthy fold are not a failed match: when
             everything that matches is folded away, "0 of N orders match"
             would read as a broken filter, so the count steps aside and the
             folded Healthy group speaks for itself.
           */}
-            <LiveStatus>
-              {matchCountVisible
-                ? t('market.orders.filter.matchCount', {
+              <LiveStatus>
+                {matchCountVisible
+                  ? t('market.orders.filter.matchCount', {
+                      count: visibleRows.length,
+                      total: allRows.length,
+                    })
+                  : groups.length === 0 && t('orders.noResults')}
+              </LiveStatus>
+
+              {matchCountVisible && (
+                <p aria-hidden="true" className="px-3 pt-2 text-xs text-text-dim">
+                  {t('market.orders.filter.matchCount', {
                     count: visibleRows.length,
                     total: allRows.length,
-                  })
-                : groups.length === 0 && t('orders.noResults')}
-            </LiveStatus>
+                  })}
+                </p>
+              )}
 
-            {matchCountVisible && (
-              <p aria-hidden="true" className="px-3 pt-2 text-xs text-text-dim">
-                {t('market.orders.filter.matchCount', {
-                  count: visibleRows.length,
-                  total: allRows.length,
-                })}
-              </p>
-            )}
-
-            {groups.length === 0 ? (
-              <EmptyState title={t('orders.noResults')} className="py-8" />
-            ) : (
-              groups.map((group) => {
-                // Healthy folds through `hideHealthy` rather than
-                // `collapsedGroups`: that flag is also what the "N of M orders
-                // match" count reads, so two mechanisms would let the caret and
-                // the count disagree about whether healthy orders are showing.
-                // `isGroupFolded` reads `highlightedRow` live rather than a
-                // `setFilter`/`setCollapsedGroups` write, so it never races
-                // `useHighlightParam`'s own URL write on first render.
-                const folded = isGroupFolded(
-                  group.problem,
-                  highlightedRow,
-                  filter,
-                  collapsedGroups
-                );
-                const toggle = () => {
-                  if (group.problem === 'healthy') {
-                    setFilter({ ...filter, hideHealthy: !filter.hideHealthy });
-                    return;
-                  }
-                  setCollapsedGroups((was) => {
-                    const next = new Set(was);
-                    if (next.has(group.problem)) next.delete(group.problem);
-                    else next.add(group.problem);
-                    return next;
-                  });
-                };
-                const groupTitle = t(`market.orders.group.${group.problem}`);
-                return (
-                  <div key={group.problem} data-testid={`order-group-${group.problem}`}>
-                    <div
-                      className={cx(
-                        'flex flex-col border-l-2 bg-panel-2',
-                        GROUP_ACCENT[group.problem]
-                      )}
-                    >
-                      <div className="flex items-center justify-between gap-2 pr-3">
-                        {/*
+              {groups.length === 0 ? (
+                <EmptyState title={t('orders.noResults')} className="py-8" />
+              ) : (
+                groups.map((group) => {
+                  // Healthy folds through `hideHealthy` rather than
+                  // `collapsedGroups`: that flag is also what the "N of M orders
+                  // match" count reads, so two mechanisms would let the caret and
+                  // the count disagree about whether healthy orders are showing.
+                  // `isGroupFolded` reads `highlightedRow` live rather than a
+                  // `setFilter`/`setCollapsedGroups` write, so it never races
+                  // `useHighlightParam`'s own URL write on first render.
+                  // The work-through's current order opens its own group too.
+                  const folded =
+                    isGroupFolded(group.problem, highlightedRow, filter, collapsedGroups) &&
+                    !(workCurrent !== null && orderGroupKey(workCurrent) === group.problem);
+                  const toggle = () => {
+                    if (group.problem === 'healthy') {
+                      setFilter({ ...filter, hideHealthy: !filter.hideHealthy });
+                      return;
+                    }
+                    setCollapsedGroups((was) => {
+                      const next = new Set(was);
+                      if (next.has(group.problem)) next.delete(group.problem);
+                      else next.add(group.problem);
+                      return next;
+                    });
+                  };
+                  const groupTitle = t(`market.orders.group.${group.problem}`);
+                  return (
+                    <div key={group.problem} data-testid={`order-group-${group.problem}`}>
+                      <div
+                        className={cx(
+                          'flex flex-col border-l-2 bg-panel-2',
+                          GROUP_ACCENT[group.problem]
+                        )}
+                      >
+                        <div className="flex items-center justify-between gap-2 pr-3">
+                          {/*
                         Only the caret and the title are inside the button, so
                         its accessible name stays the group's name. The
                         summary line below carries character names, which
                         would otherwise land in the button's name and collide
                         with the character strip's own chips.
                       */}
-                        <button
-                          type="button"
-                          aria-expanded={!folded}
-                          onClick={toggle}
-                          className={cx(
-                            'flex min-h-11 flex-1 items-center gap-1.5 px-3 py-2 text-left text-xs font-semibold tracking-widest text-text-dim uppercase md:min-h-0',
-                            rowInteractiveClassName,
-                            focusRingInsetClassName
-                          )}
-                        >
-                          <Caret expanded={!folded} />
-                          {groupTitle} · {group.rows.length}
-                        </button>
-                        <span className="flex items-center gap-3">
-                          {group.problem === 'healthy' && (
-                            <button
-                              type="button"
-                              className={textActionClassName()}
-                              onClick={toggle}
-                            >
-                              {t(
-                                filter.hideHealthy
-                                  ? 'market.orders.showHealthy'
-                                  : 'market.orders.hideHealthy'
-                              )}
-                            </button>
-                          )}
-                          {!folded && (
-                            <IconButton
-                              size="sm"
-                              variant="plain"
-                              icon={<Icon.Refresh />}
-                              label={t('market.orders.checkDeeperGroup', { group: groupTitle })}
-                              tooltip={t('market.orders.checkDeeper')}
-                              onClick={() => orderDetail.checkDeeper(group.rows)}
-                            />
-                          )}
-                        </span>
-                      </div>
-                      {/*
+                          <button
+                            type="button"
+                            aria-expanded={!folded}
+                            onClick={toggle}
+                            className={cx(
+                              'flex min-h-11 flex-1 items-center gap-1.5 px-3 py-2 text-left text-xs font-semibold tracking-widest text-text-dim uppercase md:min-h-0',
+                              rowInteractiveClassName,
+                              focusRingInsetClassName
+                            )}
+                          >
+                            <Caret expanded={!folded} />
+                            {groupTitle} · {group.rows.length}
+                          </button>
+                          <span className="flex items-center gap-3">
+                            {group.problem === 'healthy' && (
+                              <button
+                                type="button"
+                                className={textActionClassName()}
+                                onClick={toggle}
+                              >
+                                {t(
+                                  filter.hideHealthy
+                                    ? 'market.orders.showHealthy'
+                                    : 'market.orders.hideHealthy'
+                                )}
+                              </button>
+                            )}
+                            {!folded && (
+                              <IconButton
+                                size="sm"
+                                variant="plain"
+                                icon={<Icon.Refresh />}
+                                label={t('market.orders.checkDeeperGroup', { group: groupTitle })}
+                                tooltip={t('market.orders.checkDeeper')}
+                                onClick={() => orderDetail.checkDeeper(group.rows)}
+                              />
+                            )}
+                          </span>
+                        </div>
+                        {/*
                       What the group holds, said in the header rather than
                       inside a "?" tooltip, so a folded or long group can be
                       judged without opening it: what the group means, then
                       the ISK at stake, the worst gap in it, and whose orders
                       they are.
                     */}
-                      <p className="px-3 pb-2 pl-8 text-[0.6875rem] text-text-dim">
-                        {groupHeaderLine(group.problem, groupSummaries.get(group.problem), {
-                          showCharacters: showCharacterStrip,
-                          t,
-                        })}
-                      </p>
+                        <p className="px-3 pb-2 pl-8 text-[0.6875rem] text-text-dim">
+                          {groupHeaderLine(group.problem, groupSummaries.get(group.problem), {
+                            showCharacters: showCharacterStrip,
+                            t,
+                          })}
+                        </p>
+                      </div>
+                      {folded ? null : isPhone ? (
+                        <OpenOrdersList
+                          rows={group.rows}
+                          label={`${groupTitle} · ${group.rows.length}`}
+                          showCharacter={showCharacterStrip}
+                          showFloor={hasFloorData}
+                          highlightId={highlightId}
+                          selectedId={workCurrentId}
+                          rowExtra={(row) => <WorkThroughListSlot row={row} />}
+                          onOpen={openDetails}
+                          rowContextMenu={rowContextMenu}
+                        />
+                      ) : (
+                        <DataTable
+                          {...ordersExport.tableProps}
+                          columns={visibleColumns}
+                          rows={group.rows}
+                          rowKey={(row) => row.orderId}
+                          rowContextMenu={rowContextMenu}
+                          rowMoreActions
+                          onRowClick={openDetails}
+                          label={`${groupTitle} · ${group.rows.length}`}
+                          highlightRowKey={highlightId}
+                          selectedRowKey={workCurrentId}
+                          sort={groupSorts.get(group.problem) ?? null}
+                          onSortChange={(sort) =>
+                            setGroupSorts((was) => new Map(was).set(group.problem, sort))
+                          }
+                        />
+                      )}
                     </div>
-                    {folded ? null : isPhone ? (
-                      <OpenOrdersList
-                        rows={group.rows}
-                        label={`${groupTitle} · ${group.rows.length}`}
-                        showCharacter={showCharacterStrip}
-                        showFloor={hasFloorData}
-                        highlightId={highlightId}
-                        onOpen={openDetails}
-                        rowContextMenu={rowContextMenu}
-                      />
-                    ) : (
-                      <DataTable
-                        {...ordersExport.tableProps}
-                        columns={visibleColumns}
-                        rows={group.rows}
-                        rowKey={(row) => row.orderId}
-                        rowContextMenu={rowContextMenu}
-                        rowMoreActions
-                        onRowClick={(row) => setDetailOrderId(row.orderId)}
-                        label={`${groupTitle} · ${group.rows.length}`}
-                        highlightRowKey={highlightId}
-                      />
-                    )}
-                  </div>
-                );
-              })
-            )}
+                  );
+                })
+              )}
 
-            <div className="flex flex-wrap items-center gap-3 px-3 py-2">
-              <Button size="sm" onClick={() => setLegendOpen(true)}>
-                {t('market.orders.legendOpen')}
-              </Button>
-            </div>
-          </>
-        )}
+              <div className="flex flex-wrap items-center gap-3 px-3 py-2">
+                <Button size="sm" onClick={() => setLegendOpen(true)}>
+                  {t('market.orders.legendOpen')}
+                </Button>
+              </div>
+            </>
+          )}
 
-        {detailRow && (
-          <OrderDetailModal
-            // Keyed by orderId so the modal remounts (and its folded-section
-            // state resets) between orders, rather than reusing one instance
-            // across every row (issue #1428).
-            key={detailRow.orderId}
-            row={detailRow}
-            snapshot={snapshot}
-            detail={orderDetail}
-            onClose={() => setDetailOrderId(null)}
-          />
-        )}
-        <OrderBadgeLegend open={legendOpen} onClose={() => setLegendOpen(false)} />
+          {detailRow && (
+            <OrderDetailModal
+              // Keyed by orderId so the modal remounts (and its folded-section
+              // state resets) between orders, rather than reusing one instance
+              // across every row (issue #1428).
+              key={detailRow.orderId}
+              row={detailRow}
+              snapshot={snapshot}
+              detail={orderDetail}
+              initialSection={detailAtExits ? 'exits' : undefined}
+              onClose={() => setDetailOrderId(null)}
+            />
+          )}
+          <OrderBadgeLegend open={legendOpen} onClose={() => setLegendOpen(false)} />
+        </WorkThroughContext.Provider>
       </Panel>
     </>
   );
