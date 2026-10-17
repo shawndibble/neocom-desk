@@ -1399,7 +1399,7 @@ describe('AppraisalPanel — shopping list (#2868)', () => {
     await seedAssetsGrant();
     loadAllCharactersAssets.mockResolvedValue({ entries: [], skipped: [] });
     renderPanel({ controller: controller({ result: LIST_OUTCOME }) });
-    const box = await screen.findByRole('checkbox', { name: 'Minus what I own' });
+    const box = await screen.findByRole('checkbox', { name: 'Minus what I own at' });
     await waitFor(() => expect(box).toBeEnabled());
     await userEvent.click(box);
     await waitFor(async () =>
@@ -1417,7 +1417,7 @@ describe('AppraisalPanel — shopping list (#2868)', () => {
     });
     renderPanel({ controller: controller({ result: LIST_OUTCOME }) });
     expect(await screen.findByText('Grant Assets permission')).toBeInTheDocument();
-    expect(screen.getByRole('checkbox', { name: 'Minus what I own' })).toBeDisabled();
+    expect(screen.getByRole('checkbox', { name: 'Minus what I own at' })).toBeDisabled();
   });
 
   it('shows Need with owned beneath, dims covered lines, and copies net quantities', async () => {

@@ -200,7 +200,7 @@ function comparisonCell(
 /** `lg` up to (not including) `xl`: paste card and results share a row but the results card is narrow. A min-and-max pair never matches under the test `matchMedia` stub, so tests see the full default. */
 const COMPACT_RESULTS_QUERY = '(min-width: 64rem) and (max-width: 79.999rem)';
 /** The "Minus owned" picker's value for every location, apart from any station id. */
-const OWNED_EVERYWHERE = 'all';
+const OWNED_EVERYWHERE = 'all' as const;
 
 const COMPACT_OFF_BY_DEFAULT: readonly AppraisalColumnId[] = ['buyEach', 'sellEach', 'volume'];
 
@@ -287,7 +287,10 @@ export function AppraisalPanel({
   const minusOwned = ownedPref.enabled && !lacksAssets && characterId !== null;
   const ownedStationId = ownedPref.stationId ?? hub.stationId;
   const ownedStation = TRADE_HUBS.find((h) => h.stationId === ownedStationId) ?? hub;
-  const { owned } = useOwnedAtStation(minusOwned, ownedPref.everywhere ? 'all' : ownedStationId);
+  const { owned } = useOwnedAtStation(
+    minusOwned,
+    ownedPref.everywhere ? OWNED_EVERYWHERE : ownedStationId
+  );
 
   const storedColumns = useVisibleAppraisalColumns((state) => state.value);
   // Side by side below `xl` the results card is only ~500px wide, so with no
@@ -825,18 +828,20 @@ export function AppraisalPanel({
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <label className="flex min-h-9 items-center gap-2 text-xs">
-                <Checkbox
-                  checked={minusOwned}
-                  disabled={lacksAssets || characterId === null}
-                  onChange={(event) =>
-                    void setOwnedPref({ ...ownedPref, enabled: event.target.checked })
-                  }
-                />
-                {t('market.appraisal.minusOwned')}
-              </label>
-              {ownedPref.enabled && !lacksAssets && characterId !== null && (
+              {/* One sentence: "Minus what I own at [Jita]". The picker stays put, disabled, while the box is unticked. */}
+              <div className="flex flex-wrap items-center gap-x-2">
+                <label className="flex min-h-9 items-center gap-2 text-xs">
+                  <Checkbox
+                    checked={minusOwned}
+                    disabled={lacksAssets || characterId === null}
+                    onChange={(event) =>
+                      void setOwnedPref({ ...ownedPref, enabled: event.target.checked })
+                    }
+                  />
+                  {t('market.appraisal.minusOwned')}
+                </label>
                 <Select
+                  disabled={!minusOwned}
                   value={ownedPref.everywhere ? OWNED_EVERYWHERE : String(ownedStationId)}
                   onValueChange={(value) =>
                     void setOwnedPref(
@@ -846,7 +851,11 @@ export function AppraisalPanel({
                     )
                   }
                 >
-                  <SelectTrigger size="sm" aria-label={t('market.appraisal.minusOwnedStation')}>
+                  <SelectTrigger
+                    size="sm"
+                    className="w-auto"
+                    aria-label={t('market.appraisal.minusOwnedStation')}
+                  >
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -861,7 +870,7 @@ export function AppraisalPanel({
                     ))}
                   </SelectContent>
                 </Select>
-              )}
+              </div>
               {lacksAssets && (
                 <GrantNote
                   endpoints={ASSETS_ENDPOINTS}
