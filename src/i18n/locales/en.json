@@ -5803,7 +5803,7 @@
       "left": "Left: {ores}",
       "more": "{count} other",
       "cleared": "Field cleared in {duration}",
-      "location": "At: {place}",
+      "location": "{place}",
       "pace": "Pace: {pace} m³/s",
       "percent": "{percent}%",
       "value": "{isk} ISK",

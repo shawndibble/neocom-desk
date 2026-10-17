@@ -22,7 +22,7 @@ const labels: SurveyMessageLabels = {
   left: 'Left: {ores}',
   more: '{count} other',
   cleared: 'Field cleared in {duration}',
-  location: 'At: {place}',
+  location: '{place}',
   percent: '{percent}%',
   pace: 'Pace: {pace} m³/s',
   value: '{isk} ISK',
@@ -355,8 +355,10 @@ describe('chat message options', () => {
     const off = withOptions({}, 'Efa IV').box.join('\n');
     for (const word of ['Efa', 'Pace', 'Duration', 'ISK', 'm³']) expect(off).not.toContain(word);
     const { box } = withOptions({ location: true, pace: true, elapsed: true }, 'Efa IV');
+    // The place takes the top rail and the ETA moves into the body.
+    expect(box[0]).toMatch(/^┌─*\[ Efa IV \]─*╌┄┈$/);
     expect(box[2]).toMatch(/^│ Left: /);
-    expect(box[3]).toBe('│ At: Efa IV');
+    expect(box[3]).toMatch(/^│ ETA: /);
     // Short facts share a row.
     expect(box[4]).toMatch(/^│ Pace: \d+ m³\/s · Duration: 10m$/);
   });
