@@ -14,6 +14,8 @@ import { DEFAULT_LP_VALUE, useLpValue } from '@/features/loyalty/lpValue';
 import { ItemContextMenu, ItemMoreActions } from '@/features/market/ItemContextMenu';
 import { FakeItemActions } from '@/features/market/__fixtures__/itemActions';
 import { BlueprintAcquisitionModal, type AcquisitionOwnedCopy } from './BlueprintAcquisitionModal';
+import { inventionQuote } from '@/engine/industry/invention';
+import type { InventionQuoteResult } from './inventionSources';
 
 vi.mock('@/features/market/appraisalLpAcquisition', () => ({ findLpOfferMatches: vi.fn() }));
 // Sisters of EVE LP sells for 1,000 ISK on the market, Other Corp's for 500; any other store has no rate.
@@ -24,6 +26,11 @@ vi.mock('@/features/loyalty/marketLpValue', () => ({
   ),
 }));
 vi.mock('@/features/market/orderBook', () => ({ getOrderBook: vi.fn() }));
+vi.mock('@/features/character/typeNames', () => ({
+  loadTypeName: vi.fn(async (id: number) =>
+    id === 20418 ? 'Datacore - Mechanical Engineering' : `Type #${id}`
+  ),
+}));
 vi.mock('@/sde/loadMarketSde', () => ({ loadGlobalMarkets: vi.fn() }));
 vi.mock('@/features/bpcContracts/syncedContracts', () => ({ loadPublicBpcContracts: vi.fn() }));
 vi.mock('@/features/bpcContracts/blueprintLocation', () => ({
@@ -576,5 +583,103 @@ describe('BlueprintAcquisitionModal — title actions button (issue #1498)', () 
       .sort();
 
     expect(buttonMenuItems).toEqual(contextMenuItems);
+  });
+});
+
+describe('BlueprintAcquisitionModal — Invent (issue #3990)', () => {
+  function invention(copyJobFee: number | null): {
+    result: InventionQuoteResult;
+    t1BlueprintName: string;
+  } {
+    const skills = { science: [4, 4], encryption: 3 };
+    return {
+      t1BlueprintName: 'Gyrostabilizer I Blueprint',
+      result: {
+        hasT1Original: copyJobFee !== null,
+        skills,
+        recipe: {
+          t1BlueprintTypeID: 1,
+          baseProbability: 0.34,
+          baseRuns: 10,
+          datacores: [{ typeID: 20418, quantity: 8 }],
+          scienceSkills: [
+            { typeID: 11452, name: 'Mechanical Engineering' },
+            { typeID: 11445, name: 'Minmatar Starship Engineering' },
+          ],
+          encryptionSkill: { typeID: 21791, name: 'Minmatar Encryption Methods' },
+        },
+        quote: inventionQuote({
+          baseProbability: 0.34,
+          baseRuns: 10,
+          skills,
+          datacores: [{ typeID: 20418, quantity: 8, unitPrice: 500_000 }],
+          copyJobFee,
+          inventionJobFee: 520_000,
+          decryptors: [
+            {
+              typeID: 34207,
+              name: 'Optimized Attainment Decryptor',
+              probabilityMultiplier: 1.9,
+              me: 1,
+              te: -2,
+              runs: 2,
+              unitPrice: 2_400_000,
+            },
+          ],
+        }),
+      },
+    };
+  }
+
+  it('has no Invent section for a blueprint nothing invents', () => {
+    renderModal();
+    expect(screen.queryByRole('heading', { name: 'Invent' })).toBeNull();
+  });
+
+  it('lists every input line and an expected cost per run for each decryptor choice', async () => {
+    renderModal({ invention: invention(20_000) });
+    const invent = section('Invent');
+    expect(
+      await within(invent).findByText(/Datacore - Mechanical Engineering × 8 × 500,000/)
+    ).toBeTruthy();
+    expect(within(invent).getByText(/20,000 ISK · Gyrostabilizer I Blueprint, 1 run/)).toBeTruthy();
+    expect(within(invent).getByText('520,000 ISK')).toBeTruthy();
+    expect(within(invent).getByText('45.6%')).toBeTruthy();
+    expect(within(invent).getByText(/4,540,000 ISK, before a decryptor/)).toBeTruthy();
+    const rows = within(invent)
+      .getAllByRole('listitem')
+      .map((li) => li.textContent);
+    expect(rows.some((r) => r?.startsWith('No decryptor · 45.6% · ME 2% / TE 4% · 10 runs'))).toBe(
+      true
+    );
+    expect(
+      rows.some((r) =>
+        /Optimized Attainment Decryptor \(2,400,000 ISK\) · 86\.7% · ME 3% \/ TE 2% · 12 runs · Expected cost per run/.test(
+          r ?? ''
+        )
+      )
+    ).toBe(true);
+  });
+
+  it('writes a picked tier at its expected cost per copy and sets the copy’s runs', async () => {
+    const user = userEvent.setup();
+    const onPickRuns = vi.fn();
+    const props = renderModal({ invention: invention(20_000), onPickRuns });
+    await user.click(
+      within(section('Invent')).getByRole('button', { name: /Use this blueprint: No decryptor/ })
+    );
+    const [[, patch]] = vi.mocked(props.onSourcingChange).mock.calls;
+    expect(patch.acquisitionTierOverride).toEqual({ me: 2, te: 4 });
+    expect(patch.overridePrice).toBeCloseTo(4_540_000 / (0.34 * (1 + 8 / 30 + 3 / 40)), 4);
+    expect(onPickRuns).toHaveBeenCalledWith(10);
+  });
+
+  it('says the copy job is unavailable without a T1 original, and offers no pick', () => {
+    renderModal({ invention: invention(null) });
+    const invent = section('Invent');
+    expect(within(invent).getByText(/no character owns Gyrostabilizer I Blueprint/)).toBeTruthy();
+    for (const button of within(invent).getAllByRole('button', { name: /Use this blueprint/ })) {
+      expect((button as HTMLButtonElement).disabled).toBe(true);
+    }
   });
 });

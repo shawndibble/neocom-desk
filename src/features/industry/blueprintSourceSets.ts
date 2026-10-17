@@ -1,8 +1,9 @@
 /**
  * Loads `BlueprintSourceSets` for the market-wide scan: which blueprints the
  * account owns, which are on the NPC market, which are on public contract,
- * and which an LP store the account holds points with sells. The scan drops
- * any product whose blueprint none of these carry.
+ * which an LP store the account holds points with sells, and which the
+ * account can invent from a T1 original it owns. The scan drops any product
+ * whose blueprint none of these carry.
  *
  * Every source is best-effort. One that can't be read (sync not configured,
  * a revoked scope, offline and uncached) contributes nothing and is named in
@@ -20,6 +21,7 @@ import { loadPublicBpcContracts } from '@/features/bpcContracts/syncedContracts'
 import { loadCharacterLoyaltyPoints, PARAGON_CORPORATION_ID } from '@/features/character/loyalty';
 import { loadLoyaltyStoreOffers } from '@/features/loyalty/store';
 import { loadVariations } from '@/sde/loadMarketSde';
+import { loadInvention } from '@/sde/loadSde';
 import { loadMarketTypesById } from '@/sde/marketTypesById';
 import { loadCharacterBlueprints } from './data';
 
@@ -33,15 +35,22 @@ type SourceResult = { ids: Set<number>; ok: boolean };
 
 const FAILED: SourceResult = { ids: new Set(), ok: false };
 
-async function ownedBlueprints(characterIds: readonly number[]): Promise<SourceResult> {
+/** Owned blueprints, plus which of them are originals (invention's copy job needs one). */
+type OwnedResult = SourceResult & { originals: Set<number> };
+
+async function ownedBlueprints(characterIds: readonly number[]): Promise<OwnedResult> {
   const results = await Promise.all(characterIds.map((id) => loadCharacterBlueprints(id)));
   const ids = new Set<number>();
+  const originals = new Set<number>();
   let ok = true;
   for (const result of results) {
     if (!result.cached) ok = false;
-    for (const blueprint of result.cached?.data ?? []) ids.add(blueprint.type_id);
+    for (const blueprint of result.cached?.data ?? []) {
+      ids.add(blueprint.type_id);
+      if (blueprint.runs === -1) originals.add(blueprint.type_id);
+    }
   }
-  return { ids, ok };
+  return { ids, originals, ok };
 }
 
 /** A blueprint and the product it builds. */
@@ -107,8 +116,24 @@ async function lpStoreBlueprints(characterIds: readonly number[]): Promise<Sourc
   return { ids, ok };
 }
 
-function settle(load: Promise<SourceResult>): Promise<SourceResult> {
-  return load.catch(() => FAILED);
+/** The blueprints in `blueprints` invented from one of `originals` (`invention.json`). */
+async function inventionBlueprints(
+  blueprints: readonly BlueprintProduct[],
+  originals: ReadonlySet<number>
+): Promise<SourceResult> {
+  if (originals.size === 0) return { ids: new Set(), ok: true };
+  const data = await loadInvention();
+  const inventable = new Set<number>();
+  for (const [t1, research] of Object.entries(data.blueprints)) {
+    if (!originals.has(Number(t1))) continue;
+    for (const product of research.invention?.products ?? []) inventable.add(product.typeID);
+  }
+  const ids = new Set(blueprints.map((b) => b.blueprintTypeID).filter((id) => inventable.has(id)));
+  return { ids, ok: true };
+}
+
+function settle<T extends SourceResult>(load: Promise<T>, failed: T): Promise<T> {
+  return load.catch(() => failed);
 }
 
 /**
@@ -119,19 +144,22 @@ export async function loadBlueprintSourceSets(
   characterIds: readonly number[],
   blueprints: readonly BlueprintProduct[]
 ): Promise<LoadedBlueprintSources> {
-  const [owned, market, contract, lpStore] = await Promise.all([
-    settle(ownedBlueprints(characterIds)),
-    settle(marketBlueprints(blueprints)),
-    settle(contractBlueprints(characterIds)),
-    settle(lpStoreBlueprints(characterIds)),
+  const owning = settle(ownedBlueprints(characterIds), { ...FAILED, originals: new Set<number>() });
+  const [owned, market, contract, lpStore, invention] = await Promise.all([
+    owning,
+    settle(marketBlueprints(blueprints), FAILED),
+    settle(contractBlueprints(characterIds), FAILED),
+    settle(lpStoreBlueprints(characterIds), FAILED),
+    owning.then((result) => settle(inventionBlueprints(blueprints, result.originals), FAILED)),
   ]);
-  const bySource = { owned, market, contract, lpStore };
+  const bySource = { owned, market, contract, lpStore, invention };
   return {
     sets: {
       owned: owned.ids,
       market: market.ids,
       contract: contract.ids,
       lpStore: lpStore.ids,
+      invention: invention.ids,
     },
     unavailable: (Object.keys(bySource) as BlueprintSource[]).filter(
       (source) => !bySource[source].ok

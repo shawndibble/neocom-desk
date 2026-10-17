@@ -98,7 +98,12 @@ import {
   type BlueprintCatalog,
 } from './blueprintCatalog';
 import { breakEvenRuns } from '@/engine/industry/breakEvenRuns';
-import { planOwnedBlueprints, resolveBuildPlan } from './resolveBuildPlan';
+import {
+  inventionPricingContextFor,
+  planOwnedBlueprints,
+  resolveBuildPlan,
+} from './resolveBuildPlan';
+import { inventionQuoteFor } from './inventionSources';
 import { buildPlanTypeIds, recipeForLookup } from './recipes';
 import { materialPriceBasisOf } from './priceBasis';
 import { useMarketSnapshot } from './useMarketSnapshot';
@@ -362,8 +367,11 @@ export function BuildPlanDetail({
   // Region market and LP Store offers for every blueprint in the tree, so a
   // blueprint the hub station doesn't sell still gets a price.
   const blueprintTypeIds = useMemo(() => blueprintTypeIdsIn(typeIds, catalog), [typeIds, catalog]);
-  const { offersFor: blueprintPurchaseOffersFor, ready: blueprintOffersReady } =
-    useBlueprintPurchaseOffers(plan.characterId, hub, blueprintTypeIds);
+  const {
+    offersFor: blueprintPurchaseOffersFor,
+    inventionMarket,
+    ready: blueprintOffersReady,
+  } = useBlueprintPurchaseOffers(plan.characterId, hub, blueprintTypeIds);
 
   // Started on mount so the remembered locations are usually in hand before
   // `toggleIncludeReactions` reads them; it still awaits them itself. Both
@@ -720,6 +728,7 @@ export function BuildPlanDetail({
           bpcOffersFor,
           bpcLastResortOffersFor,
           blueprintPurchaseOffersFor,
+          inventionMarket,
           communityOffersFor,
         },
         { snapshot, reactionSystemCostIndex: reactionSnapshot?.systemCostIndex }
@@ -735,6 +744,7 @@ export function BuildPlanDetail({
       bpcOffersFor,
       bpcLastResortOffersFor,
       blueprintPurchaseOffersFor,
+      inventionMarket,
       communityOffersFor,
       snapshot,
       reactionSnapshot?.systemCostIndex,
@@ -960,6 +970,29 @@ export function BuildPlanDetail({
             .map((b) => ({ me: b.material_efficiency, te: b.time_efficiency, runs: b.runs })),
     [acquisitionPickerTypeId, effectiveOwnedBlueprints]
   );
+  // The Invent section's numbers, priced exactly as automatic selection
+  // priced the blueprint (issue #3990).
+  const acquisitionPickerInvention = useMemo(() => {
+    if (acquisitionPickerTypeId === null) return null;
+    const ctx = inventionPricingContextFor(
+      plan,
+      { catalog, inventionMarket, ownedBlueprints, corpBlueprints, modifiers },
+      snapshot
+    );
+    const result = ctx ? inventionQuoteFor(acquisitionPickerTypeId, ctx) : null;
+    return result
+      ? { result, t1BlueprintName: nameForType(catalog, result.recipe.t1BlueprintTypeID) }
+      : null;
+  }, [
+    acquisitionPickerTypeId,
+    plan,
+    catalog,
+    inventionMarket,
+    ownedBlueprints,
+    corpBlueprints,
+    modifiers,
+    snapshot,
+  ]);
 
   const openRecipe = useMemo(() => {
     const row = visibleMaterials.find((material) => material.typeID === recipeTypeId);
@@ -2123,6 +2156,7 @@ export function BuildPlanDetail({
                   }
                   onSearchBpcSourcing={onSearchBpcSourcing}
                   planHubId={plan.hubId}
+                  invention={acquisitionPickerInvention}
                 />
               )}
               {/*

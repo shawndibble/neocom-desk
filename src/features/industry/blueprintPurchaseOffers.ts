@@ -34,6 +34,7 @@ import { getHubPrices, getRegionSellPrices } from '@/market/prices';
 import type { TradeHub } from '@/market/hubs';
 import { lpPickPrice } from './blueprintAcquisitionSources';
 import type { BlueprintCatalog } from './blueprintCatalog';
+import { loadInventionMarket, type InventionMarket } from './inventionSources';
 import { EMPTY_OWNED_STOCK_SNAPSHOT, loadOwnedStockSnapshot } from './ownedStockDetection';
 
 /** Every purchase offer for one blueprint type the loader found. */
@@ -221,12 +222,14 @@ export async function lpBlueprintPickPrice(
 /** `useBlueprintPurchaseOffers`' result: the offers, and whether they are the ones for the current inputs. */
 export interface BlueprintPurchaseOffersState {
   offersFor: BlueprintOffersLookup;
+  /** Invention recipes and prices for the same blueprints (issue #3990); null when none is invented. */
+  inventionMarket: InventionMarket | null;
   /** False until the load for the current inputs lands — the plan's blueprint prices are provisional until then. */
   ready: boolean;
 }
 
 /**
- * `loadBlueprintPurchaseOffers` for a page. Reloads when the Character, hub,
+ * `loadBlueprintPurchaseOffers` (and `loadInventionMarket`) for a page. Reloads when the Character, hub,
  * blueprints or LP Value change; until the new load lands it keeps serving
  * the last one (so a price doesn't blank and come back) but reports
  * `ready: false`.
@@ -239,15 +242,20 @@ export function useBlueprintPurchaseOffers(
   const rate = useLpValue((state) => state.value);
   const idsKey = [...new Set(blueprintTypeIds)].sort((a, b) => a - b).join(',');
   const key = `${characterId ?? ''}|${hub.id}|${rate}|${idsKey}`;
-  const [loaded, setLoaded] = useState<{ key: string; lookup: BlueprintOffersLookup } | null>(null);
+  const [loaded, setLoaded] = useState<{
+    key: string;
+    lookup: BlueprintOffersLookup;
+    inventionMarket: InventionMarket | null;
+  } | null>(null);
   const ids = useMemo(() => (idsKey === '' ? [] : idsKey.split(',').map(Number)), [idsKey]);
   useEffect(() => {
     let cancelled = false;
-    void loadBlueprintPurchaseOffers(characterId, hub, ids)
-      .catch(() => NO_BLUEPRINT_PURCHASE_OFFERS)
-      .then((lookup) => {
-        if (!cancelled) setLoaded({ key, lookup });
-      });
+    void Promise.all([
+      loadBlueprintPurchaseOffers(characterId, hub, ids).catch(() => NO_BLUEPRINT_PURCHASE_OFFERS),
+      loadInventionMarket(hub, ids).catch(() => null),
+    ]).then(([lookup, inventionMarket]) => {
+      if (!cancelled) setLoaded({ key, lookup, inventionMarket });
+    });
     return () => {
       cancelled = true;
     };
@@ -256,6 +264,7 @@ export function useBlueprintPurchaseOffers(
   return useMemo(
     () => ({
       offersFor: loaded?.lookup ?? NO_BLUEPRINT_PURCHASE_OFFERS,
+      inventionMarket: loaded?.inventionMarket ?? null,
       ready: loaded?.key === key,
     }),
     [loaded, key]

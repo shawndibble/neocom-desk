@@ -49,6 +49,11 @@ import type { MarketSnapshot } from './marketData';
 import { facilityContextFor, reactionPlanFacilityContextFor } from './planFacilityContext';
 import { materialPricesFor } from './priceBasis';
 import {
+  inventionOffersLookup,
+  type InventionMarket,
+  type InventionPricingContext,
+} from './inventionSources';
+import {
   acquisitionForLookup,
   cloneBlueprintPools,
   recipeForLookup,
@@ -87,6 +92,8 @@ export interface BuildPlanSources {
   blueprintPurchaseOffersFor?: (blueprintTypeID: number) => readonly BpcOffer[];
   /** Community Offers (issue #3603): free Shared Blueprints, named for the Member. */
   communityOffersFor?: (blueprintTypeID: number) => readonly BpcOffer[];
+  /** Invention recipes and hub prices (issue #3990, `loadInventionMarket`); absent = no invention tiers. */
+  inventionMarket?: InventionMarket | null;
 }
 
 /** The plan's prices, as fetched for its own hub/build system. */
@@ -187,6 +194,62 @@ function resolveTopLevelTier(
   return { me: acquisition?.me ?? plan.me, te: acquisition?.te ?? plan.te, acquisition };
 }
 
+/**
+ * What pricing an invented copy of any blueprint in `plan` reads (issue
+ * #3990): the copy and invention jobs run where the plan's own job runs, at
+ * that system's copying and invention indices. Null until those indices and
+ * the adjusted prices land, or with no invention market — no tier is offered
+ * then, rather than one with a fee-free attempt.
+ */
+export function inventionPricingContextFor(
+  plan: BuildPlanRecord,
+  sources: Pick<
+    BuildPlanSources,
+    'catalog' | 'inventionMarket' | 'ownedBlueprints' | 'corpBlueprints' | 'modifiers'
+  >,
+  snapshot: MarketSnapshot | null
+): InventionPricingContext | null {
+  const market = sources.inventionMarket;
+  const copyingCostIndex = snapshot?.copyingCostIndex;
+  const inventionCostIndex = snapshot?.inventionCostIndex;
+  if (
+    !market ||
+    !snapshot?.adjustedPrices ||
+    copyingCostIndex == null ||
+    inventionCostIndex == null
+  ) {
+    return null;
+  }
+  const { facility, facilityTaxPct } = facilityContextFor(plan);
+  return {
+    market,
+    catalog: sources.catalog,
+    ownedBlueprints: planOwnedBlueprints(plan, sources.ownedBlueprints, sources.corpBlueprints),
+    skills: sources.modifiers.skills,
+    facility,
+    facilityTaxPct,
+    adjustedPrices: snapshot.adjustedPrices,
+    copyingCostIndex,
+    inventionCostIndex,
+  };
+}
+
+/** Region market and LP Store offers, plus the plan's invention tiers when it can price them. */
+function extraOffersFor(
+  plan: BuildPlanRecord,
+  sources: BuildPlanSources,
+  snapshot: MarketSnapshot | null
+): ((blueprintTypeID: number) => readonly BpcOffer[]) | undefined {
+  const purchase = sources.blueprintPurchaseOffersFor;
+  const inventionCtx = inventionPricingContextFor(plan, sources, snapshot);
+  if (!inventionCtx) return purchase;
+  const invented = inventionOffersLookup(inventionCtx);
+  return (blueprintTypeID) => [
+    ...(purchase?.(blueprintTypeID) ?? []),
+    ...invented(blueprintTypeID),
+  ];
+}
+
 /** Everything both entry points derive from a plan's sources and prices before any blueprint is touched. */
 function prepareResolution(
   plan: BuildPlanRecord,
@@ -208,7 +271,7 @@ function prepareResolution(
     assumedMeForUnowned: sources.assumedMe,
     blueprintAcquisition: {
       offersFor: sources.bpcOffersFor,
-      extraOffersFor: sources.blueprintPurchaseOffersFor,
+      extraOffersFor: extraOffersFor(plan, sources, snapshot),
       lastResortOffersFor: sources.bpcLastResortOffersFor,
       communityOffersFor: sources.communityOffersFor,
       hubPrices: snapshot?.hubPrices ?? {},

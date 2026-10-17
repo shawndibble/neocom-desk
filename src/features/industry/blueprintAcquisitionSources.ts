@@ -15,6 +15,7 @@ import {
   iskPerRun,
   type BpcContractRow,
 } from '@/engine/contracts/bpcSearch';
+import type { InventionQuote } from '@/engine/industry/invention';
 import type { MaterialSourcing } from '@/engine/industry/types';
 import type { RegionOrder } from '@/esi/endpoints';
 import type { LpOfferMatch } from '@/features/market/appraisalLpAcquisition';
@@ -345,8 +346,60 @@ export function ownedTierRows(copies: readonly AcquisitionOwnedCopy[]): OwnedTie
   return [...byTier.values()].sort((a, b) => b.me - a.me || b.te - a.te);
 }
 
+/**
+ * One way to invent this blueprint (issue #3990): no decryptor, or one
+ * decryptor. `price` is the expected cost of one successful copy — what a
+ * pick writes, the same one-copy unit a contract copy's price is.
+ */
+export interface InventTierRow {
+  kind: 'invent';
+  /** `null` = no decryptor. */
+  decryptor: { typeID: number; name: string; unitPrice: number | null } | null;
+  chance: number;
+  me: number;
+  te: number;
+  runs: number;
+  /** Expected cost per copy; 0 when unpriced (then not pickable). */
+  price: number;
+  expectedCostPerRun: number | null;
+  /** False when any part of the attempt has no price (or the copy job can't run). */
+  pickable: boolean;
+}
+
+/** Every invention tier as a row: no decryptor first, then decryptors by name. */
+export function inventTierRows(quote: InventionQuote): InventTierRow[] {
+  return quote.tiers
+    .map((tier): InventTierRow => ({
+      kind: 'invent',
+      decryptor: tier.decryptor,
+      chance: tier.chance,
+      me: tier.me,
+      te: tier.te,
+      runs: tier.runs,
+      price: tier.expectedCostPerCopy ?? 0,
+      expectedCostPerRun: tier.expectedCostPerRun,
+      pickable: tier.expectedCostPerCopy !== null,
+    }))
+    .sort(
+      (a, b) =>
+        Number(a.decryptor !== null) - Number(b.decryptor !== null) ||
+        (a.decryptor?.name ?? '').localeCompare(b.decryptor?.name ?? '')
+    );
+}
+
+/** The invent row with the lowest expected cost per run, or null when none is priced. */
+export function cheapestInventRow(rows: readonly InventTierRow[]): InventTierRow | null {
+  let best: InventTierRow | null = null;
+  for (const row of rows) {
+    if (row.expectedCostPerRun === null) continue;
+    if (best === null || row.expectedCostPerRun < best.expectedCostPerRun!) best = row;
+  }
+  return best;
+}
+
 /** Any row the modal can offer as "Use this blueprint". */
-export type AcquisitionSourceRow = OwnedTierRow | ContractOfferRow | MarketSellRow | LpOfferRow;
+export type AcquisitionSourceRow =
+  OwnedTierRow | ContractOfferRow | MarketSellRow | LpOfferRow | InventTierRow;
 
 /**
  * The `MaterialSourcing` patch picking `row` writes, keyed by the blueprint's
@@ -365,7 +418,7 @@ export type AcquisitionSourceRow = OwnedTierRow | ContractOfferRow | MarketSellR
  * one unit, quantity 1 — and one override applies at every node resolving
  * this blueprint. So it is set to one purchase of the row: a contract
  * listing's whole ask (every copy it bundles), one market order's price, one
- * LP redemption. Exact for an original. For a copy it is *not* scaled to the
+ * LP redemption, one invented copy's expected cost. Exact for an original. For a copy it is *not* scaled to the
  * runs a node needs: a listing whose runs × quantity fall short of the need
  * is underpriced, unlike automatic selection's `shortfallCost`. The modal
  * shows runs and ISK/run beside the price so the pilot can judge that, and
@@ -397,6 +450,8 @@ export function runsForPickedRow(row: AcquisitionSourceRow): number | null {
       return 1;
     case 'lp':
       return null;
+    case 'invent':
+      return row.runs;
   }
 }
 

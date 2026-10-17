@@ -10,6 +10,7 @@ import type { MarketSnapshot } from './marketData';
 import { makeOrBuy } from '@/engine/industry/makeOrBuy';
 import { materialRecipe } from './recipes';
 import { resolveBuildPlan, resolveMakeOrBuy, type BuildPlanSources } from './resolveBuildPlan';
+import type { InventionMarket } from './inventionSources';
 
 function entry(
   blueprintTypeID: number,
@@ -311,6 +312,74 @@ describe('resolveBuildPlan', () => {
     expect(acquisitionRows(resolved.result, 100)).toEqual([
       expect.objectContaining({ remainingQuantity: 0 }),
     ]);
+  });
+});
+
+describe('invention as a blueprint source (issue #3990)', () => {
+  // T2 bp 100 (product 1) is invented from T1 bp 50 (product 5): one datacore
+  // at 1,000 ISK, 50% base chance, 10 runs a copy.
+  const catalog = catalogOf([
+    entry(50, 5, [{ typeID: 34, quantity: 10 }]),
+    entry(100, 1, [{ typeID: 34, quantity: 10 }]),
+  ]);
+  const inventionMarket: InventionMarket = {
+    recipeFor: (id) =>
+      id === 100
+        ? {
+            t1BlueprintTypeID: 50,
+            baseProbability: 0.5,
+            baseRuns: 10,
+            datacores: [{ typeID: 900, quantity: 1 }],
+            scienceSkills: [],
+            encryptionSkill: null,
+          }
+        : null,
+    decryptors: [],
+    unitPriceFor: (id) => (id === 900 ? 1_000 : null),
+  };
+  const market = {
+    snapshot: { ...snapshot({ 1: 1000, 34: 5 }), copyingCostIndex: 0, inventionCostIndex: 0 },
+  };
+
+  it('prices a T2 plan with no owned copy end to end from an owned T1 original', () => {
+    const resolved = resolveBuildPlan(
+      plan(),
+      sources(catalog, { ownedBlueprints: [owned(50, -1, 0)], inventionMarket }),
+      market
+    );
+    // Each job fee: 2% × EIV 10 × (0.25% NPC tax + 4% SCC) = 0.0085.
+    // Expected cost per copy = (1,000 + 2 × 0.0085) ÷ 50%.
+    const [row] = acquisitionRows(resolved.result, 100);
+    expect(row!.unitPrice).toBeCloseTo(2_000.034, 6);
+    expect(row!.acquisitionTier).toMatchObject({ me: 2, te: 4, invented: true });
+    expect(resolved.resolvedMe).toBe(2);
+    expect(resolved.result!.totalCost).toBeGreaterThan(2_000);
+  });
+
+  it('offers no invention without an owned T1 original', () => {
+    const resolved = resolveBuildPlan(
+      plan(),
+      sources(catalog, { ownedBlueprints: [owned(50, 5, 0)], inventionMarket }),
+      market
+    );
+    const [row] = acquisitionRows(resolved.result, 100);
+    expect(row!.unitPrice).toBeNull();
+    expect(row!.acquisitionTier?.invented).toBeUndefined();
+  });
+
+  it('loses to a cheaper contract copy', () => {
+    const resolved = resolveBuildPlan(
+      plan(),
+      sources(catalog, {
+        ownedBlueprints: [owned(50, -1, 0)],
+        inventionMarket,
+        bpcOffersFor: () => [{ me: 2, te: 4, runs: 10, quantity: 1, price: 500 }],
+      }),
+      market
+    );
+    const [row] = acquisitionRows(resolved.result, 100);
+    expect(row!.unitPrice).toBe(500);
+    expect(row!.acquisitionTier?.invented).toBeUndefined();
   });
 });
 

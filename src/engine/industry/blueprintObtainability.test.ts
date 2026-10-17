@@ -11,6 +11,7 @@ const NONE: BlueprintSourceSets = {
   market: new Set(),
   contract: new Set(),
   lpStore: new Set(),
+  invention: new Set(),
 };
 
 describe('blueprintSource', () => {
@@ -23,23 +24,31 @@ describe('blueprintSource', () => {
     ['market', { ...NONE, market: new Set([501]) }],
     ['contract', { ...NONE, contract: new Set([501]) }],
     ['lpStore', { ...NONE, lpStore: new Set([501]) }],
+    ['invention', { ...NONE, invention: new Set([501]) }],
   ] as const)('names %s when only that source carries it', (expected, sets) => {
     expect(blueprintSource(501, sets)).toBe(expected);
   });
 
   it('prefers owned over every way to buy it, then market, contract, LP store', () => {
     const all = new Set([501]);
-    expect(blueprintSource(501, { owned: all, market: all, contract: all, lpStore: all })).toBe(
-      'owned'
-    );
+    expect(
+      blueprintSource(501, { owned: all, market: all, contract: all, lpStore: all, invention: all })
+    ).toBe('owned');
     expect(blueprintSource(501, { ...NONE, market: all, contract: all, lpStore: all })).toBe(
       'market'
     );
     expect(blueprintSource(501, { ...NONE, contract: all, lpStore: all })).toBe('contract');
+    expect(blueprintSource(501, { ...NONE, lpStore: all, invention: all })).toBe('lpStore');
   });
 
   it('ranks sources in the order blueprintSource prefers them', () => {
-    expect(BLUEPRINT_SOURCE_RANK).toEqual({ owned: 0, market: 1, contract: 2, lpStore: 3 });
+    expect(BLUEPRINT_SOURCE_RANK).toEqual({
+      owned: 0,
+      market: 1,
+      contract: 2,
+      lpStore: 3,
+      invention: 4,
+    });
   });
 
   it('ignores other blueprints in a source', () => {

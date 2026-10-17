@@ -697,6 +697,8 @@ export type AcquisitionTier = {
   me: number;
   te: number;
   community?: AcquisitionCommunitySource;
+  /** The tier is an invented copy (issue #3990): its price is an expected cost. */
+  invented?: true;
   pool?: BlueprintRunPool;
 };
 
@@ -712,6 +714,8 @@ export interface AcquisitionLine {
   pool?: BlueprintRunPool;
   /** Set when the tier is a Community Offer: free, from this Member. */
   community?: AcquisitionCommunitySource;
+  /** Set when the tier is invented (issue #3990): `unitPrice` is the expected cost of one copy. */
+  invented?: true;
 }
 
 /**

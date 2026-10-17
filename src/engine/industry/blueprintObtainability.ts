@@ -6,7 +6,7 @@
  */
 
 /** Where a blueprint can come from, in the order `blueprintSource` prefers them. */
-export type BlueprintSource = 'owned' | 'market' | 'contract' | 'lpStore';
+export type BlueprintSource = 'owned' | 'market' | 'contract' | 'lpStore' | 'invention';
 
 /** Blueprint typeIDs each source carries. */
 export interface BlueprintSourceSets {
@@ -18,9 +18,21 @@ export interface BlueprintSourceSets {
   contract: ReadonlySet<number>;
   /** Offered by an LP store the account holds points with. */
   lpStore: ReadonlySet<number>;
+  /**
+   * Invented from a T1 original some Character on the account owns (issue
+   * #3990) — the copy job Blueprint Acquisition prices an invention attempt
+   * with needs that original.
+   */
+  invention: ReadonlySet<number>;
 }
 
-const PREFERENCE: readonly BlueprintSource[] = ['owned', 'market', 'contract', 'lpStore'];
+const PREFERENCE: readonly BlueprintSource[] = [
+  'owned',
+  'market',
+  'contract',
+  'lpStore',
+  'invention',
+];
 
 /** Every source, in `blueprintSource`'s preference order. */
 export const BLUEPRINT_SOURCES = PREFERENCE;
@@ -33,7 +45,8 @@ export const BLUEPRINT_SOURCE_RANK = Object.fromEntries(
 /**
  * The first source carrying `blueprintTypeID`, or null when none does. Owned
  * wins (it costs nothing more), then the NPC market (a fixed, always-stocked
- * price), then contracts, then LP stores.
+ * price), then contracts, then LP stores, then invention (a gamble on the
+ * success chance).
  */
 export function blueprintSource(
   blueprintTypeID: number,
