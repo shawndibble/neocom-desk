@@ -491,7 +491,7 @@ export function MapBoard(props: MapBoardProps) {
                     : figure.whatIf
                       ? t('piMap.add.chainsTip')
                       : figure.chain
-                        ? t('piMap.chainTip')
+                        ? t('piMap.chainTip', { context: touchCtx })
                         : null,
                 ]
                   .filter(Boolean)
