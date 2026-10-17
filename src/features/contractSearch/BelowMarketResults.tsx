@@ -65,7 +65,7 @@ export function BelowMarketResults({
         primary: true,
         sortValue: (row) => belowMarketItemLabel(row.lead, typeNames, t),
         render: (row) => (
-          // Plain: the row opens the contract modal, whose item lines link to Market.
+          // Span, not a Link: the row opens the contract modal, whose lines link to Market.
           <span>
             <span className={entityLinkClassName()}>
               {belowMarketItemLabel(row.lead, typeNames, t)}
@@ -169,6 +169,8 @@ export function BelowMarketResults({
   );
 
   const hubName = state.status === 'ready' ? state.hub.systemName : null;
+  /** Contracts exist; the bar's filters leave none. */
+  const filteredOut = state.status === 'ready' && state.contracts.length > 0;
   // The header's Data Age badge is hidden on a phone; this line is not.
   const note =
     lastSyncedAt === null
@@ -201,14 +203,14 @@ export function BelowMarketResults({
       ) : contracts.length === 0 ? (
         <EmptyState
           title={t('contractSearch.belowMarket.emptyTitle')}
-          hint={
-            state.contracts.length > 0
-              ? t('contractSearch.noFilterMatchesHint')
-              : t('contractSearch.belowMarket.emptyHint')
-          }
+          hint={t(
+            filteredOut
+              ? 'contractSearch.noFilterMatchesHint'
+              : 'contractSearch.belowMarket.emptyHint'
+          )}
           className="py-8"
           action={
-            state.contracts.length > 0 ? (
+            filteredOut ? (
               <Button size="sm" onClick={onResetFilters}>
                 {t('common.resetFilters')}
               </Button>

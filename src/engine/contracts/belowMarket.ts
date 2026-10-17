@@ -14,7 +14,7 @@
  * never split (decision 20260915-093419).
  */
 import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
-import { isUnpricedOffer, offerAskingPrice } from '@/engine/contracts/contractSearch';
+import { buyoutOf, isUnpricedOffer, offerAskingPrice } from '@/engine/contracts/contractSearch';
 
 /** How many other offers must back a contract-priced line before it counts. */
 export const MIN_COMPARABLE_OFFERS = 3;
@@ -36,7 +36,7 @@ export interface BelowMarketContract {
   contractId: number;
   /** The most valuable line: the row the Item cell names and the detail modal opens on. */
   lead: PublicContractOfferRow;
-  /** Every for-sale line of the contract. */
+  /** For-sale line count. */
   lines: number;
   value: number;
   asking: number;
@@ -55,11 +55,11 @@ export function isBelowMarketCandidate(
   plexPrice: number | null
 ): boolean {
   if (row.requestsItems) return false;
-  if (row.isAuction && !(row.buyout != null && row.buyout > 0)) return false;
+  if (row.isAuction && buyoutOf(row) === null) return false;
   return !isUnpricedOffer(row, plexPrice);
 }
 
-/** A copy is never valued at its blueprint type's market price, which is the original's. */
+/** Copies and abyssal lines take no market price; a copy's type price is the original's. */
 function isMarketPriceable(row: PublicContractOfferRow, isAbyssalType: (id: number) => boolean) {
   return !row.isBlueprintCopy && !isAbyssalType(row.typeId);
 }

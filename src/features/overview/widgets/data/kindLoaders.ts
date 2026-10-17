@@ -14,6 +14,7 @@ import { ESI_REGISTRY, requiredScopesForEndpoints } from '@/esi/registry';
 import { layerValues, type LayerValues } from '@/engine/netWorth/series';
 import type { HistoryCoverage } from '@/engine/omegaCoverage';
 import type { PlexQuote } from '@/features/market/plexPrice';
+import type { BelowMarketSummaryContract } from '@/features/contractSearch/belowMarketSummary';
 import type { SurveySummary } from '@/engine/survey/series';
 import type { RouteKillSystem } from '@/engine/route/routeKillTrend';
 import type { NetWorthSnapshotRow } from '@/engine/netWorth/snapshot';
@@ -461,15 +462,10 @@ export async function loadHaulingWidget(): Promise<HaulingWidgetData> {
 
 // --- Below-market contracts -------------------------------------------------------
 
-export interface BelowMarketWidgetContract {
-  contractId: number;
-  /** The lead line and how many others: "Rifter" + 12. */
-  item: string;
-  more: number;
-  profit: number;
+export type BelowMarketWidgetContract = Omit<BelowMarketSummaryContract, 'systemId'> & {
   /** Stargate jumps from the Character's Current System; null when unknown. */
   jumps: number | null;
-}
+};
 
 export interface BelowMarketWidgetData {
   /** False until Item search's Below market view has run on this device. */
@@ -490,11 +486,8 @@ const NO_BELOW_MARKET_VIEW: BelowMarketWidgetData = {
 };
 
 /**
- * The last Below market view Item search showed (#3989). Only the stored
- * summary is read: valuing the snapshot downloads every contract and prices
- * thousands of types at the hub, which the Overview must not start on every
- * load — the Hauling widget's rule. Jumps are from the header Character's
- * Current System over the local stargate graph.
+ * Reads the stored summary only (see `belowMarketSummary.ts`). Jumps: the
+ * header Character's Current System over the local stargate graph.
  */
 export async function loadBelowMarketWidget(characterId: number): Promise<BelowMarketWidgetData> {
   const { useBelowMarketSummary } = await import('@/features/contractSearch/belowMarketSummary');
@@ -506,27 +499,22 @@ export async function loadBelowMarketWidget(characterId: number): Promise<BelowM
     import('@/features/route/jumpBasis'),
     import('@/features/route/localRoute'),
   ]);
-  let jumps: ReadonlyMap<number, number> | null = null;
-  const origin = await loadCurrentSystemId(characterId).catch(() => null);
-  if (origin !== null) {
-    // An unreadable graph leaves jumps unknown; the contracts still show.
-    const distances = await loadJumpBasis()
-      .then((basis) => localJumpDistances(origin, basis.rules, basis.network))
-      .catch(() => null);
-    if (distances?.kind === 'known') jumps = distances.jumps;
-  }
+  // An unreadable graph leaves jumps unknown; the contracts still show.
+  const [origin, basis] = await Promise.all([
+    loadCurrentSystemId(characterId).catch(() => null),
+    loadJumpBasis().catch(() => null),
+  ]);
+  const distances =
+    origin === null || basis === null
+      ? null
+      : await localJumpDistances(origin, basis.rules, basis.network).catch(() => null);
+  const jumps = distances?.kind === 'known' ? distances.jumps : null;
   return {
     hasView: true,
     count: summary.count,
-    contracts: summary.contracts.map((contract) => ({
-      contractId: contract.contractId,
-      item: contract.item,
-      more: contract.more,
-      profit: contract.profit,
-      jumps:
-        contract.systemId === null || jumps === null
-          ? null
-          : (jumps.get(contract.systemId) ?? null),
+    contracts: summary.contracts.map(({ systemId, ...contract }) => ({
+      ...contract,
+      jumps: systemId === null || jumps === null ? null : (jumps.get(systemId) ?? null),
     })),
     fetchedAt: new Date(summary.fetchedAt),
   };

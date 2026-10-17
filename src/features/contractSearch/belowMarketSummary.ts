@@ -24,7 +24,7 @@ export function belowMarketItemLabel(
 
 export interface BelowMarketSummaryContract {
   contractId: number;
-  /** The lead line, as the Item cell reads it ("Damage Control II ×40"). */
+  /** `belowMarketItemLabel` of the lead line. */
   item: string;
   /** Other lines in the contract. */
   more: number;
@@ -36,7 +36,7 @@ export interface BelowMarketSummaryContract {
 export interface BelowMarketSummary {
   /** When the contract snapshot behind it was published, ms since the epoch. */
   fetchedAt: number;
-  /** Every contract below market at that time, not only the ones kept below. */
+  /** Total below market, not just those kept in `contracts`. */
   count: number;
   /** Best profit first, at most `MAX_SUMMARY_CONTRACTS`. */
   contracts: BelowMarketSummaryContract[];

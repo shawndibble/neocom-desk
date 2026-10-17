@@ -69,9 +69,9 @@ vi.mock('@/features/abyssal/mutaplasmidData', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/features/abyssal/mutaplasmidData')>()),
   loadMutaplasmidLookup: async () => ({ isAbyssalType: () => false }),
 }));
-vi.mock('@/features/character/characterModifiers', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@/features/character/characterModifiers')>()),
-  loadCharacterModifiers: async () => ({ skills: {} }),
+vi.mock('@/features/pi/salesTaxRate', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/features/pi/salesTaxRate')>()),
+  loadAccountingLevel: async () => 0,
 }));
 
 const loadPublicCourierContracts = vi.fn();

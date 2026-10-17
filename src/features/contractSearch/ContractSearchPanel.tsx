@@ -196,7 +196,7 @@ const ITEMS_FILTER_PARAMS = {
   'items.hidePlex': boolParam(),
   'items.jumps': enumParam(JUMP_RANGES, DEFAULT_JUMP_RANGE),
   'items.type': optionalIdParam(),
-  /** Below market (#3989): one row per contract, valued at the hub. A view, not a filter. */
+  /** Below market (#3989): one row per contract, valued at the hub. */
   'items.belowMarket': boolParam(),
 };
 const ITEMS_SORT = { columnId: 'price', direction: 'asc' } as const;
@@ -490,6 +490,7 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
     }),
     [itemsParams]
   );
+  const belowMarket = itemsParams['items.belowMarket'];
   /** The type the user picked out of the suggestion list, pinning the search to exactly one item. */
   const selectedTypeId = itemsParams['items.type'];
   /**
@@ -497,7 +498,6 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
    * asks for a search instead of rendering ~370k offers, while the snapshot
    * keeps downloading behind it so the first search usually finds it landed.
    */
-  const belowMarket = itemsParams['items.belowMarket'];
   // Below market needs no search: it is already a narrowing of the snapshot.
   const searchActive = belowMarket || isItemsSearchActive(uiFilter, selectedTypeId);
   const downloadProgress = useChunkProgress(OFFERS_CACHE_KEY);
@@ -570,7 +570,8 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
     !haveFull &&
     early.rows === null &&
     !early.failed &&
-    !(typesKnown && typeIds !== null && typeIds.size === 0);
+    // Below market reads every type, so a query matching none still awaits rows.
+    !(!belowMarket && typesKnown && typeIds !== null && typeIds.size === 0);
 
   const { value: endpoints } = useCourierEndpoints(courierRows);
   // Synchronous, so the haul list never empties while its ends are being
@@ -757,13 +758,12 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
    * put the row asking for goods at the very top of the default view — the
    * harm this fix exists to remove.
    */
-  const displayRows = useMemo(
-    () =>
-      filterContractOffers(nonTypeRows, { typeIds }).sort(
-        (a, b) => sortablePrice(a, plexPrice) - sortablePrice(b, plexPrice)
-      ),
-    [nonTypeRows, typeIds, plexPrice]
-  );
+  const displayRows = useMemo(() => {
+    const filtered = filterContractOffers(nonTypeRows, { typeIds });
+    // Below market only reads which contracts pass; the offer table is not shown.
+    if (belowMarket) return filtered;
+    return filtered.sort((a, b) => sortablePrice(a, plexPrice) - sortablePrice(b, plexPrice));
+  }, [nonTypeRows, typeIds, plexPrice, belowMarket]);
 
   const suggestions = useMemo<Suggestion[]>(() => {
     if (selectedTypeId !== null || uiFilter.typeQuery.trim() === '') return [];
