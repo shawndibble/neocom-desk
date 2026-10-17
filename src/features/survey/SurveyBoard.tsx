@@ -22,6 +22,7 @@ import { useTranslation } from 'react-i18next';
 import { DataAgeBadge, EmptyState, Panel, Spinner, textActionClassName } from '@/components/ui';
 import { canFinishSurvey } from '@/engine/survey/finish';
 import { surveyChatMessage, type SurveyMessageLabels } from '@/engine/survey/chatMessage';
+import { availableChartViews, type SurveyChartView } from '@/engine/survey/chartViews';
 import { priceScans } from '@/engine/survey/pricing';
 import {
   countedScans,
@@ -39,6 +40,7 @@ import { SurveyOres } from './SurveyOres';
 import { SurveyHowTo } from './SurveyHowTo';
 import { SurveyScanList } from './SurveyScanList';
 import { SurveyStats } from './SurveyStats';
+import { SurveyViewSelect } from './SurveyViewSelect';
 import { useSurveyChatOptions } from './surveyPref';
 import { useOrePrices } from './useOrePrices';
 
@@ -129,6 +131,10 @@ export function SurveyBoard({
   }, [hydrateChatOptions]);
   const [configuring, setConfiguring] = useState(false);
   const [finishing, setFinishing] = useState<'idle' | 'busy' | 'failed'>('idle');
+  const [view, setView] = useState<SurveyChartView>('ore');
+  const views = summary === null ? ['ore' as const] : availableChartViews(summary);
+  // A hub change can leave nothing priced; the chart falls back to Ore left.
+  const effectiveView = views.includes(view) ? view : 'ore';
 
   // Every scan, so a removed one can be restored; the chart and totals use `scans`.
   const scanList = onSetIgnored !== undefined && allScans.length > 0 && (
@@ -235,7 +241,10 @@ export function SurveyBoard({
 
           {scans.length > 1 && (
             <>
-              <SurveyLegend summary={summary} />
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <SurveyLegend summary={summary} showRate={effectiveView === 'ore'} />
+                <SurveyViewSelect value={effectiveView} onChange={setView} views={views} />
+              </div>
               <Suspense
                 fallback={
                   <div className="flex h-56 items-center justify-center">
@@ -243,7 +252,11 @@ export function SurveyBoard({
                   </div>
                 }
               >
-                <LazySurveyCharts summary={summary} onRemoveScan={removeAt} />
+                <LazySurveyCharts
+                  summary={summary}
+                  view={effectiveView}
+                  onRemoveScan={effectiveView === 'ore' ? removeAt : undefined}
+                />
               </Suspense>
             </>
           )}

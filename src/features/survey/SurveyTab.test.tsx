@@ -38,7 +38,9 @@ vi.mock('./SurveyInfoPanel', () => ({
     tax === null ? null : <div data-testid="tax-readout">{tax.name}</div>,
 }));
 // Its own test covers the ledger read; here it would reach for ESI.
-vi.mock('./SurveyCharts', () => ({ SurveyCharts: () => <div data-testid="charts" /> }));
+vi.mock('./SurveyCharts', () => ({
+  SurveyCharts: ({ view }: { view?: string }) => <div data-testid="charts" data-view={view} />,
+}));
 
 import { SurveyTab } from './SurveyTab';
 
@@ -400,6 +402,20 @@ Blue Ice	10	1,000 m3	1.00 ISK	5 km`;
         { id: 'a', at: Date.UTC(2026, 9, 8, 18), rocks: parseSurveyScan(SCAN)! },
         { id: 'b', at: Date.UTC(2026, 9, 8, 18, 5), rocks: parseSurveyScan(SHRUNK)! },
       ],
+    });
+
+    it('starts on Ore left again when another survey is opened', async () => {
+      loadSurvey.mockResolvedValue(twoScans('Shawn Dibble'));
+      await useCurrentSurveyId.getState().setValue(ID);
+      renderTab();
+      await screen.findByTestId('charts');
+      fireEvent.click(screen.getByRole('combobox', { name: 'Chart view' }));
+      fireEvent.click(await screen.findByRole('option', { name: 'Depletion by ore' }));
+      expect(screen.getByTestId('charts').getAttribute('data-view')).toBe('depletion');
+      await act(() => useCurrentSurveyId.getState().setValue('other456'));
+      await waitFor(() =>
+        expect(screen.getByTestId('charts').getAttribute('data-view')).toBe('ore')
+      );
     });
 
     it("lets the survey's owner remove a scan, storing it on the survey and reloading", async () => {

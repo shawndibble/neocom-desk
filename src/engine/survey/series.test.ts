@@ -40,8 +40,8 @@ describe('summarizeSurvey', () => {
     ])!;
     expect(s.percent).toBe(60);
     expect(s.intervals).toEqual([
-      { from: T0, to: T0 + 5 * MIN, mined: 300, added: 0, rate: 1 },
-      { from: T0 + 5 * MIN, to: T0 + 10 * MIN, mined: 300, added: 0, rate: 1 },
+      { from: T0, to: T0 + 5 * MIN, mined: 300, added: 0, rate: 1, minedIsk: 0 },
+      { from: T0 + 5 * MIN, to: T0 + 10 * MIN, mined: 300, added: 0, rate: 1, minedIsk: 0 },
     ]);
     expect(s.pace).toBe(1);
     expect(s.etaAt).toBe(T0 + 10 * MIN + 400 * 1000);
@@ -89,8 +89,8 @@ describe('summarizeSurvey', () => {
   it('gives each scan as a point with its volume left per ore', () => {
     const s = summarizeSurvey([scan(0, ['A', 500], ['B', 300]), scan(5, ['A', 400], ['B', 300])])!;
     expect(s.points).toEqual([
-      { at: T0, total: 800, byOre: { A: 500, B: 300 } },
-      { at: T0 + 5 * MIN, total: 700, byOre: { A: 400, B: 300 } },
+      { at: T0, total: 800, byOre: { A: 500, B: 300 }, iskByOre: { A: 0, B: 0 } },
+      { at: T0 + 5 * MIN, total: 700, byOre: { A: 400, B: 300 }, iskByOre: { A: 0, B: 0 } },
     ]);
     expect(s.oreNames).toEqual(['A', 'B']);
   });
@@ -258,5 +258,38 @@ describe('countedScans', () => {
     expect(s.startVolume).toBe(1000);
     expect(s.leftVolume).toBe(700);
     expect(s.percent).toBe(30);
+  });
+});
+
+describe('ISK per ore and ISK mined', () => {
+  it("sums each scan's rock ISK per ore (unpriced rocks count 0)", () => {
+    const s = summarizeSurvey([
+      iskScan(0, ['A', 100, 1000], ['A', 100, 500], ['B', 50, 200]),
+      scan(5, ['A', 100]),
+    ])!;
+    expect(s.points[0].iskByOre).toEqual({ A: 1500, B: 200 });
+    expect(s.points[1].iskByOre).toEqual({ A: 0 });
+  });
+
+  it("values m3 mined at the earlier scan's ISK per m3, per ore", () => {
+    // A: 10 ISK/m3, B: 2 ISK/m3. A loses 40 m3 (400), B loses 50 m3 (100).
+    const s = summarizeSurvey([
+      iskScan(0, ['A', 100, 1000], ['B', 100, 200]),
+      iskScan(5, ['A', 60, 600], ['B', 50, 100]),
+    ])!;
+    expect(s.intervals[0].minedIsk).toBeCloseTo(500, 6);
+  });
+
+  it('a rock that came into range does not count as mined ISK', () => {
+    const s = summarizeSurvey([
+      iskScan(0, ['A', 100, 1000]),
+      iskScan(5, ['A', 100, 1000], ['A', 400, 4000]),
+    ])!;
+    expect(s.intervals[0]).toMatchObject({ mined: 0, added: 400, minedIsk: 0 });
+  });
+
+  it('is 0 for an unpriced ore', () => {
+    const s = summarizeSurvey([scan(0, ['A', 100]), scan(5, ['A', 40])])!;
+    expect(s.intervals[0].minedIsk).toBe(0);
   });
 });

@@ -54,6 +54,20 @@ describe('SurveyShareScreen', () => {
     expect(screen.getByText(/Paste a Survey Scanner copy anywhere on this page/)).toBeTruthy();
   });
 
+  it('offers the chart view select on the public page', async () => {
+    loadSurvey.mockResolvedValue({
+      ok: true,
+      ignored: new Set(),
+      expiresAt: EXPIRES,
+      scans: [
+        { at: Date.UTC(2026, 9, 8, 18), rocks: parseSurveyScan(SCAN)! },
+        { at: Date.UTC(2026, 9, 8, 18, 10), rocks: parseSurveyScan(SHRUNK)! },
+      ],
+    });
+    renderScreen();
+    expect(await screen.findByRole('combobox', { name: 'Chart view' })).toBeTruthy();
+  });
+
   it('names the page once, and puts the way in in the header', async () => {
     renderScreen();
     await screen.findByText('0% mined');

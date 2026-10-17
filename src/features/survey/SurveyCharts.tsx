@@ -10,7 +10,7 @@
  * rule every other categorical series follows, so no new palette.
  */
 import { scalePx } from '@/lib/fontScale';
-import { useMemo, useState, type ReactElement } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Area,
@@ -21,18 +21,23 @@ import {
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
-  XAxis,
-  YAxis,
   type TooltipContentProps,
 } from 'recharts';
 import { ChartTooltipShell } from '@/components/ui/ChartTooltipShell';
 import { DataTable, type DataTableColumn } from '@/components/ui';
 import { formatEveClock } from '@/engine/survey/chatMessage';
 import { spacedLabels } from '@/engine/survey/labelSpacing';
-import { timeTicks } from '@/engine/survey/timeTicks';
 import type { SurveySummary } from '@/engine/survey/series';
 import { formatCompactNumber } from '@/lib/compactNumber';
-import { SurveyScanNode } from './SurveyScanNode';
+import {
+  FULL_HEIGHT,
+  MARGIN,
+  makeScanDot,
+  timeAxis,
+  yAxis,
+  Y_AXIS_WIDTH,
+} from './surveyChartParts';
+import { DepletionChart, IskChart } from './SurveyViewCharts';
 import { oreTone } from './surveyTones';
 
 interface ScanTableRow {
@@ -42,12 +47,6 @@ interface ScanTableRow {
   byOre: Record<string, number>;
 }
 
-/** Left edge shared by both charts so their time axes line up. */
-const Y_AXIS_WIDTH = 52;
-const COMPACT_Y_AXIS_WIDTH = 36;
-/** The Survey tab's volume chart height, px (Tailwind h-56). */
-const FULL_HEIGHT = 224;
-const MARGIN = { top: 16, right: 12, bottom: 0, left: 0 };
 /** Room a label needs, in px: "301.8K" and "1,116" at 10px. */
 const DELTA_LABEL_GAP = 46;
 const RATE_LABEL_GAP = 34;
@@ -76,17 +75,11 @@ function volumeRows(summary: SurveySummary): VolumeRow[] {
   return rows;
 }
 
-/** What Recharts hands a custom dot. */
-interface NodeDotProps {
-  cx?: number;
-  cy?: number;
-  payload?: { at?: number };
-}
-
 export function SurveyCharts({
   summary,
   onRemoveScan,
   compactHeight,
+  view = 'ore',
 }: {
   summary: SurveySummary;
   /** Offered to the survey's owner: the right-click menu on a scan's node removes it. */
@@ -96,14 +89,16 @@ export function SurveyCharts({
    * survey widget does: its own time axis, no scan nodes or labels, no rate chart.
    */
   compactHeight?: number;
+  /**
+   * Which chart the volume slot shows: `ore` (default, the stacked ore volume),
+   * `depletion` or `isk`. Ignored when `compactHeight` is set.
+   */
+  view?: 'ore' | 'depletion' | 'isk';
 }) {
   const { t } = useTranslation();
   const compact = compactHeight !== undefined;
   const [plotWidth, setPlotWidth] = useState(0);
-  // A little past the finish, so its marker and label sit inside the plot.
-  const end = summary.etaAt ?? summary.lastAt;
-  const domain: [number, number] = [summary.firstAt, end + (end - summary.firstAt) * 0.07];
-  const ticks = timeTicks(domain[0], domain[1]);
+  const { domain, xAxis } = timeAxis(summary);
   const rows = volumeRows(summary);
   // The rate is one flat block per pair of scans, from the earlier scan to the
   // later: a step area drawn from each interval's start, closed at the last
@@ -135,20 +130,6 @@ export function SurveyCharts({
   );
   const chartRows = rows.map((r, i) => (deltaShown.has(i) ? { ...r, totalLabel: r.total } : r));
   const shownRateLabels = rateLabels.filter((_, i) => rateShown.has(i));
-  // Both charts share this axis so their times line up; only the lower one shows it.
-  const xAxis = (hide: boolean) => (
-    <XAxis
-      dataKey="at"
-      type="number"
-      scale="time"
-      domain={domain}
-      ticks={ticks}
-      tickFormatter={formatEveClock}
-      stroke="var(--color-line-bright)"
-      tick={{ fill: 'var(--color-text-dim)', fontSize: '0.6875rem' }}
-      hide={hide}
-    />
-  );
 
   const scanRows = useMemo<ScanTableRow[]>(
     () =>
@@ -247,17 +228,7 @@ export function SurveyCharts({
     );
   }
 
-  function nodeDot({ cx, cy, payload }: NodeDotProps): ReactElement<SVGElement> {
-    const at = payload?.at;
-    if (typeof cx !== 'number' || typeof cy !== 'number' || at === undefined) {
-      return <g key={`empty-${at ?? 'x'}`} />;
-    }
-    return (
-      <g key={at}>
-        <SurveyScanNode at={at} cx={cx} cy={cy} onRemove={onRemoveScan} />
-      </g>
-    );
-  }
+  const nodeDot = makeScanDot(onRemoveScan);
 
   const plot = (
     <div className="w-full" style={{ height: compactHeight ?? FULL_HEIGHT }}>
@@ -266,12 +237,7 @@ export function SurveyCharts({
         <ComposedChart key={summary.oreNames.join('|')} data={chartRows} margin={MARGIN}>
           <CartesianGrid stroke="var(--color-line)" vertical={false} />
           {xAxis(!compact)}
-          <YAxis
-            width={scalePx(compact ? COMPACT_Y_AXIS_WIDTH : Y_AXIS_WIDTH)}
-            tickFormatter={formatCompactNumber}
-            stroke="var(--color-line-bright)"
-            tick={{ fill: 'var(--color-text-dim)', fontSize: '0.6875rem' }}
-          />
+          {yAxis({ compact })}
           {/* Stacked bottom-up, so the most valuable ore (first) is drawn last, on top. */}
           {summary.oreNames
             .map((ore, i) => ({ ore, i }))
@@ -341,6 +307,9 @@ export function SurveyCharts({
     </div>
   );
 
+  if (!compact && view === 'depletion') return <DepletionChart summary={summary} />;
+  if (!compact && view === 'isk') return <IskChart summary={summary} />;
+
   if (compact) return plot;
 
   return (
@@ -367,19 +336,15 @@ export function SurveyCharts({
               <ComposedChart data={rateSteps} margin={{ ...MARGIN, top: 20 }}>
                 <CartesianGrid stroke="var(--color-line)" vertical={false} />
                 {xAxis(false)}
-                <YAxis
-                  width={scalePx(Y_AXIS_WIDTH)}
-                  tickFormatter={formatCompactNumber}
-                  stroke="var(--color-line-bright)"
-                  tick={{ fill: 'var(--color-text-dim)', fontSize: '0.6875rem' }}
-                  label={{
+                {yAxis({
+                  label: {
                     value: t('survey.chartRateAxis'),
                     position: 'insideTopLeft',
                     offset: 8,
                     fill: 'var(--color-text-dim)',
                     fontSize: '0.625rem',
-                  }}
-                />
+                  },
+                })}
                 <Area
                   data={rateSteps}
                   dataKey="rate"
