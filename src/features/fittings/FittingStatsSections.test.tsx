@@ -1408,18 +1408,17 @@ describe('FittingStatsSections — Abyssal', () => {
 describe('FittingStatsSections — column and side panels', () => {
   afterEach(() => useAbyssalWeather.setState({ weatherTypeId: null }));
 
-  it('labels Damage, Tank and Ship over their sections, in that order', () => {
+  it('labels Damage & Tank and Ship over their sections, in that order', () => {
     renderSections(stats());
     const headings = screen.getAllByRole('heading').map((h) => h.textContent);
     expect(headings).toEqual([
-      'Damage',
+      'Damage & Tank',
       'Offense',
       'Applied DPS',
       'Drones',
-      'Tank',
       'Defense',
-      'Capacitor',
       'Ship',
+      'Capacitor',
       'Navigation',
       'Targeting',
       'Fitting',
@@ -1452,7 +1451,8 @@ describe('FittingStatsSections — column and side panels', () => {
     }
     expect(screen.queryByRole('checkbox', { name: 'Overheat all' })).toBeNull();
     const pilotTrigger = screen.getByRole('button', { name: /^Pilot/ });
-    expect(pilotTrigger).toHaveTextContent('Test Pilot · 3 missing');
+    // Just the label and any skill gap: the name reads in the panel.
+    expect(pilotTrigger).toHaveTextContent(/^Pilot3 missing$/);
     expect(pilotTrigger).toHaveAttribute('aria-haspopup', 'dialog');
 
     const pilot = within(await openPanel('Pilot'));
@@ -1512,29 +1512,10 @@ describe('FittingStatsSections — column and side panels', () => {
     expect(pilot.getByText('Not available')).toBeInTheDocument();
   });
 
-  it('shows no trigger-row total when nothing is priced', () => {
-    const price = {
-      rows: [],
-      totals: { buy: 0, sell: 0, spread: 0, unpricedRows: 0 },
-    } as unknown as Appraisal;
-    render(
-      <FittingStatsSections
-        stats={stats()}
-        statsProgress={null}
-        statsError={false}
-        price={price}
-        damageProfiles={damageProfiles()}
-        targetProfiles={targetProfiles()}
-        typeName={typeName}
-      />
-    );
-    expect(screen.queryByText(/ISK/)).toBeNull();
-  });
-
-  it('reads the skills basis with no Character, and the weather on the Situation trigger', () => {
+  it('shows just Pilot on its trigger, and the weather on the Situation trigger', () => {
     useAbyssalWeather.setState({ weatherTypeId: 47382 });
     renderSections(stats());
-    expect(screen.getByRole('button', { name: /^Pilot/ })).toHaveTextContent('All skills V');
+    expect(screen.getByRole('button', { name: /^Pilot/ })).toHaveTextContent(/^Pilot$/);
     expect(screen.getByRole('button', { name: /^Situation/ })).toHaveTextContent('Electrical 2');
   });
 

@@ -1000,22 +1000,14 @@
         "allV": "{{name}}, all skills V",
         "all0": "{{name}}, all skills 0"
       },
-      "headingCharacterShort": {
-        "character": "{{name}}",
-        "allV": "{{name}}, all V",
-        "all0": "{{name}}, all 0"
-      },
       "headingNoCharacter": {
         "allV": "All skills V",
         "all0": "All skills 0"
       },
       "headingSkillsSet_one": "{{count}} skill set by hand",
       "headingSkillsSet_other": "{{count}} skills set by hand",
-      "headingSkillsSetShort_one": "{{count}} set by hand",
-      "headingSkillsSetShort_other": "{{count}} set by hand",
       "group": {
-        "damage": "Damage",
-        "tank": "Tank",
+        "damageTank": "Damage & Tank",
         "ship": "Ship"
       },
       "pilot": {
