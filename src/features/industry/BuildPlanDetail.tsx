@@ -781,7 +781,7 @@ export function BuildPlanDetail({
   );
   const topOfBook = useMemo(() => resolveWith(plan), [resolveWith, plan]);
   const depthNeeds = useMemo(() => depthNeedsOf(plan, topOfBook), [depthNeedsOf, plan, topOfBook]);
-  const { depth, walk: walkDepth } = useDepthPrices(hub, depthNeeds);
+  const { depth, walk: walkDepth } = useDepthPrices(hub, depthNeeds, fetchedAt?.getTime());
   const resolved = useMemo(
     () => (depth.size > 0 ? resolveWith(plan, depthPriceMap(depth)) : topOfBook),
     [depth, resolveWith, plan, topOfBook]

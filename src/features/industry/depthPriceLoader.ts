@@ -62,11 +62,17 @@ export interface PlanDepthPrices {
 
 /**
  * The plan page's Depth Prices for `needs` at `hub`. Books are fetched per
- * set of types and walked on every need change, so editing runs re-prices
+ * set of types (and again whenever the plan's prices refresh; `getOrderBook`'s
+ * 300 s cache decides whether that hits the network) and walked on every need change, so editing runs re-prices
  * without a fetch. While a changed set loads, the books already held keep
  * pricing the types they cover rather than every row dropping to lowest sell.
  */
-export function useDepthPrices(hub: TradeHub, needs: ReadonlyMap<number, number>): PlanDepthPrices {
+export function useDepthPrices(
+  hub: TradeHub,
+  needs: ReadonlyMap<number, number>,
+  /** Changes when the plan's prices refresh, so the books refresh with them. */
+  pricesFetchedAt: number | undefined
+): PlanDepthPrices {
   const typeIds = [...needs.keys()].sort((a, b) => a - b);
   const booksKey = typeIds.join(',');
   const [loaded, setLoaded] = useState<{ regionId: number; books: Books } | null>(null);
@@ -82,7 +88,7 @@ export function useDepthPrices(hub: TradeHub, needs: ReadonlyMap<number, number>
     };
     // `booksKey` carries the types by value; the array changes identity every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hub.regionId, booksKey]);
+  }, [hub.regionId, booksKey, pricesFetchedAt]);
 
   const books = loaded?.regionId === hub.regionId ? loaded.books : null;
   const walk = useCallback(
