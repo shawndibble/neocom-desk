@@ -86,6 +86,23 @@ describe('DangerBanner', () => {
     expect(screen.getByTestId('path')).toHaveTextContent('/corp');
   });
 
+  it('View also dismisses the alert when Dismiss on View is on', async () => {
+    useNotificationPreferences.setState({
+      value: { ...DEFAULT_NOTIFICATION_PREFERENCES, dismissOnView: true },
+      hydrated: true,
+    });
+    await db.notificationFeed.put(attack('a', Date.now()));
+    renderBanner();
+    await userEvent.click(await screen.findByRole('button', { name: /^View/ }));
+    expect(screen.getByTestId('path')).toHaveTextContent('/corp');
+    await waitFor(async () => {
+      const live = (await db.notificationFeed.toArray()).filter(
+        (row) => row.dismissedAt === undefined
+      );
+      expect(live).toEqual([]);
+    });
+  });
+
   it('Acknowledge dismisses the alert and the banner goes away', async () => {
     await db.notificationFeed.bulkPut([attack('a', Date.now()), attack('b', Date.now() - 1000)]);
     renderBanner();

@@ -24,6 +24,7 @@ import { useNow } from '@/lib/useNow';
 import { alertGroupKey } from './alertGroups';
 import { alertViewPath, isDangerEntry, selectDangerBanner } from './dangerAlert';
 import { dismissFeedEntriesAndSync } from './feedSync';
+import { isDismissOnView, useNotificationPreferences } from './preferences';
 import { useVisibleAlertEntries } from './useUnreadAlertCount';
 
 /** Which banner instance announced each danger entry this session (module-level: it outlives a route change). */
@@ -35,6 +36,7 @@ export function DangerBanner() {
   const phone = useIsPhone();
   const now = useNow();
   const entries = useVisibleAlertEntries();
+  const dismissOnView = useNotificationPreferences((state) => isDismissOnView(state.value));
   const entry = selectDangerBanner(entries);
   const focusAfterCommit = useFocusAfterCommit();
   const entryId = entry?.id;
@@ -48,6 +50,7 @@ export function DangerBanner() {
 
   const key = alertGroupKey(entry);
   const size = phone ? 'md' : 'sm';
+  const dangerEntries = entries.filter((row) => isDangerEntry(row) && alertGroupKey(row) === key);
   return (
     <div
       role={fresh ? 'alert' : 'status'}
@@ -65,7 +68,10 @@ export function DangerBanner() {
           size={size}
           variant="primary"
           aria-label={t('alerts.panel.viewLabel', { title: entry.title })}
-          onClick={() => navigate(alertViewPath(key))}
+          onClick={() => {
+            if (dismissOnView) void dismissFeedEntriesAndSync(dangerEntries);
+            navigate(alertViewPath(key));
+          }}
         >
           {t('alerts.panel.view')}
         </Button>
@@ -75,9 +81,7 @@ export function DangerBanner() {
           onClick={() => {
             // The strip may hand over to the next danger type (button stays) or vanish (heading).
             focusAfterCommit(() => document.querySelector<HTMLElement>('h1'));
-            void dismissFeedEntriesAndSync(
-              entries.filter((row) => isDangerEntry(row) && alertGroupKey(row) === key)
-            );
+            void dismissFeedEntriesAndSync(dangerEntries);
           }}
         >
           {t('alerts.panel.acknowledge')}
