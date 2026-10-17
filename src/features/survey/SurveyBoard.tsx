@@ -151,6 +151,7 @@ export function SurveyBoard({
     cleared: t('survey.message.cleared'),
     location: t('survey.message.location'),
     pace: t('survey.message.pace'),
+    percent: t('survey.message.percent'),
     value: t('survey.message.value'),
     volume: t('survey.message.volume'),
     elapsed: t('survey.message.elapsed'),

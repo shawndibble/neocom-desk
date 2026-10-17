@@ -23,6 +23,7 @@ const labels: SurveyMessageLabels = {
   more: '{count} other',
   cleared: 'Field cleared in {duration}',
   location: 'At: {place}',
+  percent: '{percent}%',
   pace: 'Pace: {pace} m³/s',
   value: '{isk} ISK',
   volume: '{left} m³',
@@ -380,6 +381,13 @@ describe('chat message options', () => {
       volumeLeft: true,
     });
     expect(text).toMatch(/│ Left: 1 A · 1 B · 7M ISK · 7 m³/);
+  });
+
+  it('shows the percent left on the Left line with the bar off', () => {
+    const { box } = withOptions({ bar: false, ores: 'off', percentLeft: true });
+    expect(box).toHaveLength(3);
+    expect(box[1]).toMatch(/^│ Left: \d+%$/);
+    expect(box.join('')).not.toContain('█');
   });
 
   it('has no Left line when nothing that is left is chosen', () => {

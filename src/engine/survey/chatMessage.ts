@@ -27,6 +27,8 @@ export interface SurveyMessageLabels {
   location: string;
   /** `{pace}` is m³ mined per second. */
   pace: string;
+  /** `{percent}` is the whole percent of the field still unmined; a fact on the "Left:" line. */
+  percent: string;
   /** `{isk}` is the compact ISK value of what is left; one of the facts on the "Left:" line. */
   value: string;
   /** `{left}` is the m³ left. */
@@ -50,6 +52,8 @@ export interface SurveyChatOptions {
   rockCounts: boolean;
   location: boolean;
   pace: boolean;
+  /** The share of the field not yet mined, on the "Left:" line; the bar keeps its own percent mined. */
+  percentLeft: boolean;
   iskLeft: boolean;
   volumeLeft: boolean;
   elapsed: boolean;
@@ -63,6 +67,7 @@ export const DEFAULT_SURVEY_CHAT_OPTIONS: SurveyChatOptions = {
   rockCounts: true,
   location: false,
   pace: false,
+  percentLeft: false,
   iskLeft: false,
   volumeLeft: false,
   elapsed: false,
@@ -88,6 +93,7 @@ export function parseSurveyChatOptions(raw: unknown): SurveyChatOptions | null {
     rockCounts: flag('rockCounts'),
     location: flag('location'),
     pace: flag('pace'),
+    percentLeft: flag('percentLeft'),
     iskLeft: flag('iskLeft'),
     volumeLeft: flag('volumeLeft'),
     elapsed: flag('elapsed'),
@@ -313,6 +319,9 @@ export function surveyChatMessage(
   const sidePx = textWidth(frame.side);
   // Everything that is "left" shares one line, each fact with its own unit; no facts, no "Left:".
   const leftItems = [
+    ...(options.percentLeft
+      ? [fill(labels.percent, { percent: Math.max(0, 100 - summary.percent) })]
+      : []),
     ...(options.ores === 'off' ? [] : oreItems(present, labels, options, sidePx)),
     ...(options.iskLeft && summary.iskLeft !== null
       ? [fill(labels.value, { isk: formatCompactNumber(summary.iskLeft) })]

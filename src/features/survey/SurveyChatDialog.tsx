@@ -28,10 +28,17 @@ interface SurveyChatDialogProps {
   onClose: () => void;
 }
 
-type FlagKey = 'location' | 'pace' | 'iskLeft' | 'volumeLeft' | 'elapsed';
+type FlagKey = 'location' | 'pace' | 'percentLeft' | 'iskLeft' | 'volumeLeft' | 'elapsed';
 /** The drawn borders; the checkbox beside them is `none`. */
 const LINE_STYLES = ['single', 'double'] as const;
-const FLAGS: readonly FlagKey[] = ['location', 'pace', 'iskLeft', 'volumeLeft', 'elapsed'];
+const FLAGS: readonly FlagKey[] = [
+  'location',
+  'pace',
+  'percentLeft',
+  'iskLeft',
+  'volumeLeft',
+  'elapsed',
+];
 
 export function SurveyChatDialog({
   summary,
@@ -156,7 +163,7 @@ function Toggle({
 }: {
   label: string;
   hint?: string;
-  /** A compact control at the row's end; it must fit the row's height. */
+  /** A compact control right after the label, so it reads as that label's; it must fit the row's height. */
   trailing?: ReactNode;
   checked: boolean;
   disabled?: boolean;
@@ -171,7 +178,7 @@ function Toggle({
       />
       <span>{label}</span>
       {hint !== undefined && <span className="ml-auto text-xs text-text-dim">{hint}</span>}
-      {trailing !== undefined && <span className="ml-auto">{trailing}</span>}
+      {trailing !== undefined && <span className="ml-1">{trailing}</span>}
     </label>
   );
 }
