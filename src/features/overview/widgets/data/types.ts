@@ -34,6 +34,7 @@ import type {
   LocationWidgetData,
   LpWidgetData,
   HaulingWidgetData,
+  BelowMarketWidgetData,
   JumpTimersWidgetData,
   SurveyWidgetData,
   MiningYieldWidgetData,
@@ -236,6 +237,7 @@ export interface FeedMap {
   lp: LpWidgetData;
   survey: SurveyWidgetData;
   hauling: HaulingWidgetData;
+  belowMarket: BelowMarketWidgetData;
   clones: ClonesWidgetData;
   jumpTimers: JumpTimersWidgetData;
   location: LocationWidgetData;

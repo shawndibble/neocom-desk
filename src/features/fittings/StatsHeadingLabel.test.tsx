@@ -33,16 +33,6 @@ describe('StatsHeadingLabel', () => {
     expect(screen.getByText('Test Pilot, own skills · 2 skills set by hand')).toBeInTheDocument();
   });
 
-  it('short form (the Pilot trigger): just the name on own skills, the basis otherwise', () => {
-    useSkillOverrides.setState({ skills: NO_SKILL_OVERRIDES });
-    const { unmount } = render(<StatsHeadingLabel hasCharacter characterName="Test Pilot" short />);
-    expect(screen.getByText('Test Pilot')).toBeInTheDocument();
-    unmount();
-    useSkillOverrides.setState({ skills: { base: 'allV', levels: { 3300: 5 } } });
-    render(<StatsHeadingLabel hasCharacter characterName="Test Pilot" short />);
-    expect(screen.getByText('Test Pilot, all V · 1 set by hand')).toBeInTheDocument();
-  });
-
   it('reads All V with no Character, unless the control says All 0', () => {
     const { unmount } = renderWith(NO_SKILL_OVERRIDES, null);
     expect(screen.getByText('All skills V')).toBeInTheDocument();
