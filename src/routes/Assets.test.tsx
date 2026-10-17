@@ -1,3 +1,4 @@
+import { useCompareSet } from '@/features/market/compareSet';
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, within, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -9,7 +10,6 @@ import { STALE_FETCHED_AT } from '@/esi/cacheFixtures';
 import { clearMarketPriceCache } from '@/market/prices';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
-import { useCompareSet } from '@/features/market/compareSet';
 import { DEFAULT_ASSET_SORT, useAssetSort } from '@/features/character/assetSortPreference';
 import { useDefaultCharacterFilter } from '@/features/character/defaultCharacterFilter';
 import { useCharacterFilterPicks } from '@/features/character/characterFilterPicks';
@@ -2141,7 +2141,7 @@ describe('multi-select and bulk actions (issue #90)', () => {
     });
   });
 
-  it('adds every selected item to the Compare set via the bulk action bar', async () => {
+  it('has no bulk Add to Compare, and Appraise opens the appraisal with the selection', async () => {
     const user = userEvent.setup();
     render(<App />);
     await openLocation(user, JITA);
@@ -2149,9 +2149,10 @@ describe('multi-select and bulk actions (issue #90)', () => {
 
     await clickTool(user, 'Select');
     await user.click(screen.getByRole('checkbox', { name: 'Select Tritanium' }));
-    await user.click(screen.getByRole('button', { name: 'Add to Compare' }));
+    expect(screen.queryByRole('button', { name: 'Add to Compare' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Appraise' }));
 
-    expect(useCompareSet.getState().items).toEqual([{ typeId: 34, itemName: 'Tritanium' }]);
+    expect(window.location.pathname).toBe('/market/appraisal');
   });
 
   it('copies every selected item’s name, newline-separated, to the clipboard', async () => {

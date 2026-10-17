@@ -41,9 +41,10 @@ import {
   CachedNotice,
 } from '@/components/ui';
 import { usePageTab } from '@/lib/usePageTab';
-import { tabBarTabs } from '@/lib/pageTabs';
+import { tabBarTabs, tabPath } from '@/lib/pageTabs';
+import type { MarketAppraiseState } from '@/lib/shortcuts';
 import { rootFontScale } from '@/lib/fontScale';
-import { ASSETS_TABS } from '@/app/pageTabs';
+import { ASSETS_TABS, MARKET_TABS } from '@/app/pageTabs';
 import * as Icon from '@/components/ui/icons';
 import type { EsiEndpointId } from '@/esi/registry';
 import { GrantBanner, GrantNote } from '@/app/GrantNote';
@@ -154,7 +155,6 @@ import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
 import { useItemActions } from '@/features/market/itemActions';
 import { usePageItemActions } from '@/features/market/usePageItemActions';
 import { addQuickbarItem } from '@/features/market/quickbar';
-import { useCompareSet } from '@/features/market/compareSet';
 import { writeToClipboard } from '@/lib/clipboard';
 import {
   buildPlansByMaterialTypeID,
@@ -1432,10 +1432,7 @@ export function Assets() {
   }
 
   // Bulk actions (issue #90): the three actions the item context menu already
-  // offers per row, applied to every selected item_id at once. Quickbar and
-  // Compare have different lifetimes (GLOSSARY.md) — bulk-adding to Quickbar
-  // schedules a sync, like a single row's Add to Quickbar; bulk-adding to
-  // Compare does not, matching `ItemContextMenu`'s own single-item path.
+  // offers per row, applied to every selected item_id at once.
   function handleBulkAddToQuickbar() {
     if (activeCharacterId === null) return;
     let items = itemActions.quickbar.items;
@@ -1448,14 +1445,11 @@ export function Assets() {
     }
     void itemActions.quickbar.write(items);
   }
-  function handleBulkAddToCompare() {
-    const addToCompare = useCompareSet.getState().add;
-    for (const id of selectedIds) {
-      const asset = assetsByItemId.get(id);
-      if (!asset) continue;
-      const name = mergedTypeNames.get(asset.type_id) ?? `Type #${asset.type_id}`;
-      addToCompare({ typeId: asset.type_id, itemName: name });
-    }
+  function handleBulkAppraise() {
+    const lines = quantityLinesForSelection([...selectedIds], assetsByItemId, mergedTypeNames);
+    navigate(tabPath(MARKET_TABS, 'appraisal'), {
+      state: { appraiseText: lines.join('\n') } satisfies MarketAppraiseState,
+    });
   }
   function handleBulkCopyNames() {
     const names = namesForSelection([...selectedIds], assetsByItemId, mergedTypeNames);
@@ -1784,8 +1778,8 @@ export function Assets() {
                   >
                     {t('assets.select.addToQuickbar')}
                   </Button>
-                  <Button size="sm" onClick={handleBulkAddToCompare}>
-                    {t('assets.select.addToCompare')}
+                  <Button size="sm" onClick={handleBulkAppraise}>
+                    {t('assets.select.appraise')}
                   </Button>
                   <Button size="sm" onClick={handleBulkCopyNames}>
                     {t('assets.select.copyNames')}
