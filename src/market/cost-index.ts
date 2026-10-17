@@ -9,6 +9,9 @@ import { getIndustrySystemCostIndices } from '@/esi/endpoints';
 import type { SystemCostIndices } from '@/esi/endpoints';
 import type { IndustryActivity } from '@/engine/industry/types';
 
+/** A plan's manufacturing/reaction index, plus copying/invention for invented-copy fees (issue #3990). Research indices unused. */
+export type CostIndexActivity = IndustryActivity | 'copying' | 'invention';
+
 /**
  * Every system's cost indices, every activity, straight off ESI — one call
  * answers a manufacturing plan's index and a reaction plan's alike, so a
@@ -25,12 +28,11 @@ export async function fetchSystemCostIndices(): Promise<SystemCostIndices[]> {
 /**
  * Narrows the raw per-system rows to one activity's index, keyed by solar
  * system ID. Pure and cheap — call it fresh per activity against one cached
- * `fetchSystemCostIndices()` result rather than re-fetching. Other ESI
- * activities (invention, copying, researching_*) are out of v1 scope.
+ * `fetchSystemCostIndices()` result rather than re-fetching.
  */
 export function systemCostIndexByActivity(
   raw: readonly SystemCostIndices[],
-  activity: IndustryActivity
+  activity: CostIndexActivity
 ): Map<number, number> {
   const indices = new Map<number, number>();
   for (const entry of raw) {

@@ -42,6 +42,24 @@ describe('selectBlueprintTier', () => {
     expect(result).toEqual({ me: 10, te: 20, line: null });
   });
 
+  it('marks the line invented when an invention tier wins (issue #3990)', () => {
+    const result = selectBlueprintTier({
+      ownedCopies: [],
+      neededRuns: 12,
+      materialCostAtMe: costAtMe,
+      bpcOffers: [{ me: 2, te: 4, runs: 10, quantity: 1, price: 900_000 }],
+      bpoSellPrice: null,
+      extraOffers: [{ me: 3, te: 2, runs: 12, quantity: 1, price: 800_000, invented: true }],
+      assumedMeForUnowned: 0,
+    });
+    // One 12-run invented copy beats two 10-run contract copies.
+    expect(result).toMatchObject({
+      me: 3,
+      te: 2,
+      line: { unitPrice: 800_000, owned: false, invented: true },
+    });
+  });
+
   it('picks a cheaper purchasable tier over a worse owned BPO', () => {
     const owned: OwnedBlueprintCopy[] = [{ me: 0, te: 0, runs: -1 }];
     const result = selectBlueprintTier({

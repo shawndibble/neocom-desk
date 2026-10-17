@@ -54,7 +54,11 @@ function costIndexHandler() {
       },
       {
         solar_system_id: BUILD_SYSTEM_ID,
-        cost_indices: [{ activity: 'manufacturing', cost_index: 0.0272 }],
+        cost_indices: [
+          { activity: 'manufacturing', cost_index: 0.0272 },
+          { activity: 'copying', cost_index: 0.011 },
+          { activity: 'invention', cost_index: 0.033 },
+        ],
       },
     ])
   );
@@ -114,6 +118,19 @@ describe('loadMarketSnapshot', () => {
 
     expect(snapshot.systemCostIndex).toBe(0);
     expect(snapshot.systemCostIndexMissing).toBe(true);
+  });
+
+  it("reads the build system's copying and invention indices off the same response", async () => {
+    server.use(fuzzworkHandler(), adjustedPricesHandler(), costIndexHandler());
+
+    const built = await loadMarketSnapshot(DEFAULT_TRADE_HUB, [34], BUILD_SYSTEM_ID);
+    expect(built.copyingCostIndex).toBe(0.011);
+    expect(built.inventionCostIndex).toBe(0.033);
+
+    // The hub's system lists neither: 0, like a missing manufacturing index.
+    const atHub = await loadMarketSnapshot(DEFAULT_TRADE_HUB, [34]);
+    expect(atHub.copyingCostIndex).toBe(0);
+    expect(atHub.inventionCostIndex).toBe(0);
   });
 
   it('does not flag a system ESI does have an index for', async () => {

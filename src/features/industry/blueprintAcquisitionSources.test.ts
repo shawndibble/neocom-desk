@@ -2,11 +2,14 @@ import { describe, it, expect } from 'vitest';
 import type { BpcContractRow } from '@/engine/contracts/bpcSearch';
 import type { LoyaltyStoreOffer, RegionOrder } from '@/esi/endpoints';
 import type { LpOfferMatch } from '@/features/market/appraisalLpAcquisition';
+import { inventionQuote } from '@/engine/industry/invention';
 import {
+  cheapestInventRow,
   cheapestRow,
   contractOfferRows,
   groupContractOffers,
   groupMarketSells,
+  inventTierRows,
   isCurrentPick,
   lpOfferRows,
   lpPickPrice,
@@ -545,5 +548,76 @@ describe('isCurrentPick', () => {
   it('matches nothing without an override', () => {
     expect(isCurrentPick(owned, undefined)).toBe(false);
     expect(isCurrentPick(market, { overridePrice: 7_500_000 })).toBe(false);
+  });
+});
+
+describe('inventTierRows', () => {
+  const quote = inventionQuote({
+    baseProbability: 0.34,
+    baseRuns: 10,
+    skills: { science: [4, 4], encryption: 3 },
+    datacores: [{ typeID: 20418, quantity: 8, unitPrice: 500_000 }],
+    copyJobFee: 20_000,
+    inventionJobFee: 500_000,
+    decryptors: [
+      {
+        typeID: 2,
+        name: 'Parity Decryptor',
+        probabilityMultiplier: 1.5,
+        me: 1,
+        te: -2,
+        runs: 3,
+        unitPrice: 1_600_000,
+      },
+      {
+        typeID: 1,
+        name: 'Attainment Decryptor',
+        probabilityMultiplier: 1.8,
+        me: -1,
+        te: 4,
+        runs: 4,
+        unitPrice: null,
+      },
+    ],
+  });
+  const rows = inventTierRows(quote);
+
+  it('lists no decryptor first, then decryptors by name', () => {
+    expect(rows.map((r) => r.decryptor?.name ?? null)).toEqual([
+      null,
+      'Attainment Decryptor',
+      'Parity Decryptor',
+    ]);
+  });
+
+  it('prices a row at its expected cost per copy, unpickable when unpriced', () => {
+    expect(rows[0]).toMatchObject({ kind: 'invent', me: 2, te: 4, runs: 10, pickable: true });
+    expect(rows[0]!.price).toBeCloseTo(quote.tiers[0]!.expectedCostPerCopy!, 6);
+    expect(rows[1]).toMatchObject({ pickable: false, price: 0, expectedCostPerRun: null });
+  });
+
+  it('marks the lowest expected cost per run as cheapest', () => {
+    const cheapest = cheapestInventRow(rows);
+    const priced = rows.filter((r) => r.expectedCostPerRun !== null);
+    expect(cheapest!.expectedCostPerRun).toBe(
+      Math.min(...priced.map((r) => r.expectedCostPerRun!))
+    );
+  });
+
+  it('writes the tier marked invented with its runs, no price, and sets the copy’s runs', () => {
+    const patch = overridePatchFor(rows[2]!);
+    expect(patch).toEqual({
+      acquisitionTierOverride: { me: 3, te: 2, invented: { runs: 13 } },
+      overridePrice: undefined,
+    });
+    expect(runsForPickedRow(rows[2]!)).toBe(13);
+    expect(isCurrentPick(rows[2]!, patch)).toBe(true);
+  });
+
+  it('never reads an invent pick as a same-tier pick of another source, or the reverse', () => {
+    const [owned] = ownedTierRows([{ me: 2, te: 4, runs: 10 }]);
+    const inventPick = overridePatchFor(rows[0]!);
+    expect(isCurrentPick(owned!, inventPick)).toBe(false);
+    expect(isCurrentPick(rows[0]!, overridePatchFor(owned!))).toBe(false);
   });
 });

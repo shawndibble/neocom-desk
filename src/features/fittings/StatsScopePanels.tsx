@@ -23,8 +23,8 @@ export function StatsScopeTrigger({
   label: string;
   open: boolean;
   onClick: () => void;
-  /** The current value, with any notes. */
-  children: ReactNode;
+  /** The current value, with any notes; none shows the label alone. */
+  children?: ReactNode;
 }) {
   return (
     <Button
@@ -37,7 +37,7 @@ export function StatsScopeTrigger({
       className={cx('max-w-full min-w-0 gap-2', tappableRowClassName)}
     >
       <span className="shrink-0 text-text-dim">{label}</span>
-      <span className="min-w-0 truncate">{children}</span>
+      {children && <span className="min-w-0 truncate">{children}</span>}
       <Icon.GoTo aria-hidden="true" size={Icon.ICON_SIZE.sm} className="shrink-0 text-text-faint" />
     </Button>
   );
@@ -98,7 +98,7 @@ export function StatsScopePanel({
   );
 }
 
-/** A static small-caps label over a group of stats sections (Damage, Tank, Ship); never a toggle. */
+/** A static small-caps label over a group of stats sections (Damage & Tank, Ship); never a toggle. */
 export function StatsGroupLabel({ children }: { children: ReactNode }) {
   return (
     <h3 className={cx('border-b border-line bg-panel-2/40 px-3 pt-3 pb-1', STAT_EYEBROW)}>

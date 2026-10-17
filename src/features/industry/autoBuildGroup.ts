@@ -199,6 +199,7 @@ export async function applyGroupAutoBuild(
       const snapshot = await snapshots[index]!.snapshot;
       const reactionSnapshot = await snapshots[index]!.reactionSnapshot;
       const blueprintPurchaseOffersFor = await snapshots[index]!.blueprintOffers;
+      const inventionMarket = await snapshots[index]!.inventionMarket;
       const hub = getTradeHub(member.plan.hubId) ?? DEFAULT_TRADE_HUB;
       // A member whose prices never landed resolves to null and is left
       // untouched: without real fees every verdict would read "build".
@@ -214,6 +215,7 @@ export async function applyGroupAutoBuild(
           bpcOffersFor: offersForRegion(bpcRows, hub.regionId),
           bpcLastResortOffersFor: offersForRegion(bpcRows, hub.regionId, true),
           blueprintPurchaseOffersFor,
+          inventionMarket,
           communityOffersFor: communityOffersForRows(communityRows),
         },
         { snapshot, reactionSystemCostIndex: reactionSnapshot?.systemCostIndex }

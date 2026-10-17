@@ -34,6 +34,7 @@ const NO_SOURCES: BlueprintSourceSets = {
   market: new Set(),
   contract: new Set(),
   lpStore: new Set(),
+  invention: new Set(),
 };
 const ON_MARKET = Promise.resolve({ ...NO_SOURCES, market: new Set([501]) });
 const CATALOG = { byBlueprintTypeID: new Map(), typesById: {} } as unknown as BlueprintCatalog;

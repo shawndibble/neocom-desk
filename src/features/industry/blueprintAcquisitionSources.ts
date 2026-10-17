@@ -15,6 +15,7 @@ import {
   iskPerRun,
   type BpcContractRow,
 } from '@/engine/contracts/bpcSearch';
+import type { InventionQuote, InventionTier } from '@/engine/industry/invention';
 import type { MaterialSourcing } from '@/engine/industry/types';
 import type { RegionOrder } from '@/esi/endpoints';
 import type { LpOfferMatch } from '@/features/market/appraisalLpAcquisition';
@@ -345,8 +346,39 @@ export function ownedTierRows(copies: readonly AcquisitionOwnedCopy[]): OwnedTie
   return [...byTier.values()].sort((a, b) => b.me - a.me || b.te - a.te);
 }
 
+/**
+ * One way to invent this blueprint (issue #3990): no decryptor, or one
+ * decryptor. `price` is the expected cost per copy, 0 when unpriced.
+ */
+export type InventTierRow = InventionTier & { kind: 'invent'; price: number; pickable: boolean };
+
+/** Every invention tier as a row: no decryptor first, then decryptors by name. */
+export function inventTierRows(quote: InventionQuote): InventTierRow[] {
+  const [none, ...decrypted] = quote.tiers.map((tier): InventTierRow => ({
+    ...tier,
+    kind: 'invent',
+    price: tier.expectedCostPerCopy ?? 0,
+    pickable: tier.expectedCostPerCopy !== null,
+  }));
+  return [
+    ...(none ? [none] : []),
+    ...decrypted.sort((a, b) => a.decryptor!.name.localeCompare(b.decryptor!.name)),
+  ];
+}
+
+/** The invent row with the lowest expected cost per run, or null when none is priced. */
+export function cheapestInventRow(rows: readonly InventTierRow[]): InventTierRow | null {
+  let best: InventTierRow | null = null;
+  for (const row of rows) {
+    if (row.expectedCostPerRun === null) continue;
+    if (best === null || row.expectedCostPerRun < best.expectedCostPerRun!) best = row;
+  }
+  return best;
+}
+
 /** Any row the modal can offer as "Use this blueprint". */
-export type AcquisitionSourceRow = OwnedTierRow | ContractOfferRow | MarketSellRow | LpOfferRow;
+export type AcquisitionSourceRow =
+  OwnedTierRow | ContractOfferRow | MarketSellRow | LpOfferRow | InventTierRow;
 
 /**
  * The `MaterialSourcing` patch picking `row` writes, keyed by the blueprint's
@@ -354,6 +386,8 @@ export type AcquisitionSourceRow = OwnedTierRow | ContractOfferRow | MarketSellR
  *
  * An owned tier sets no price: `acquisitionForLookup` (recipes.ts) finds that
  * tier among its own `tierOptions` and costs any shortfall itself.
+ *
+ * An invent row sets no price — see `acquisitionTierOverride.invented`.
  *
  * Every other row forces its tier *and* its price. Automatic selection
  * weighs the same sources, but it prices each tier by whichever offer covers
@@ -372,6 +406,12 @@ export type AcquisitionSourceRow = OwnedTierRow | ContractOfferRow | MarketSellR
  * Manual entry covers a multi-listing buy.
  */
 export function overridePatchFor(row: AcquisitionSourceRow): MaterialSourcing {
+  if (row.kind === 'invent') {
+    return {
+      acquisitionTierOverride: { me: row.me, te: row.te, invented: { runs: row.runs } },
+      overridePrice: undefined,
+    };
+  }
   return {
     acquisitionTierOverride: { me: row.me, te: row.te },
     overridePrice: row.kind === 'owned' ? undefined : row.price,
@@ -397,14 +437,17 @@ export function runsForPickedRow(row: AcquisitionSourceRow): number | null {
       return 1;
     case 'lp':
       return null;
+    case 'invent':
+      return row.runs;
   }
 }
 
 /**
  * Whether `sourcing` is exactly what picking `row` wrote. Tier alone is not
  * enough — an owned ME0 original, a market BPO and an LP copy all share
- * ME0/TE0 — so a priced row also matches on price, and an owned row only
- * when no price was forced alongside the tier.
+ * ME0/TE0 — so a priced row also matches on price, an owned row only
+ * when no price was forced alongside the tier, and an invent row on its
+ * runs per copy.
  */
 export function isCurrentPick(
   row: AcquisitionSourceRow,
@@ -412,5 +455,6 @@ export function isCurrentPick(
 ): boolean {
   const override = sourcing?.acquisitionTierOverride;
   if (!override || override.me !== row.me || override.te !== row.te) return false;
-  return sourcing.overridePrice === overridePatchFor(row).overridePrice;
+  if (row.kind === 'invent') return override.invented?.runs === row.runs;
+  return !override.invented && sourcing.overridePrice === overridePatchFor(row).overridePrice;
 }
