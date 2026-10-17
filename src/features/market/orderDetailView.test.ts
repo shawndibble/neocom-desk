@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   assembleOrderDetailView,
-  orderDetailCall,
+  verdictFigures,
   type OrderDetailCacheContents,
   type OrderDetailSnapshot,
 } from './orderDetailView';
@@ -354,8 +354,8 @@ describe('assembleOrderDetailView', () => {
   });
 });
 
-describe('orderDetailCall', () => {
-  const call = (row: ReturnType<typeof openOrderRow>) => orderDetailCall(row, adviseOrder(row));
+describe('verdictFigures', () => {
+  const call = (row: ReturnType<typeof openOrderRow>) => verdictFigures(row, adviseOrder(row));
   const UNDERCUT = {
     problem: 'undercutStation' as const,
     problems: ['undercutStation' as const],
@@ -373,14 +373,17 @@ describe('orderDetailCall', () => {
     expect(keepPerUnit).toBeCloseTo(adviseOrder(row).verdict!.amount!, 6);
   });
 
-  it('copies the rounded-up floor when the call is to put the price up, and keeps what holding nets', () => {
+  it('copies the rounded-up floor when the call is to put the price up, and keeps the loss the verdict states', () => {
+    // Between fill and relist: holding nets a little, but the verdict judges
+    // against relist, so the fact must not read as a green gain beside it.
     const row = openOrderRow({
       problem: 'belowFloor',
       problems: ['belowFloor'],
       belowFloor: true,
-      floor: { relist: 700, fill: 600 },
+      floor: { relist: 520, fill: 490 },
     });
-    expect(call(row)).toEqual({ copyPrice: 700, keepPerUnit: 500 - 600 });
+    expect(call(row)).toEqual({ copyPrice: 520, keepPerUnit: -20 });
+    expect(call(row).keepPerUnit).toBe(-adviseOrder(row).verdict!.amount!);
   });
 
   it('copies nothing when the call is to hold: "let it go" and "leave it alone" keep your own price', () => {

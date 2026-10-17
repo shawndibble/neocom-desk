@@ -156,7 +156,7 @@ describe('OrderDetailModal', () => {
     expect(fact('Cheapest here')).toHaveTextContent('You');
     // Holding nets price - fill: 500 - 520.
     expect(fact('You keep a unit')).toHaveTextContent('-20.00');
-    expect(fact('You keep a unit')).toHaveClass('text-danger');
+    expect(fact('You keep a unit')?.firstElementChild).toHaveClass('text-isk-neg');
   });
 
   it('keeps the floor, remaining and expiry one fold away', () => {
@@ -1213,7 +1213,7 @@ describe('OrderDetailModal', () => {
         const [copy, ...others] = screen.getAllByRole('button', { name: /^Copy / });
         expect(others).toHaveLength(0);
         expect(copy).toHaveAccessibleName('Copy 449.90');
-        expect(copy.parentElement).toHaveClass('sticky', 'bottom-0');
+        expect(copy.parentElement).toHaveClass('sticky');
         // View in Market stays with the verdict.
         expect(screen.getByRole('link', { name: 'View in Market' })).toBeInTheDocument();
       } finally {

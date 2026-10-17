@@ -54,7 +54,7 @@ import { OrderRowSummaryText } from './OrderRowSummaryText';
 import { adviseOrder } from './orderAdvice';
 import { orderExits, hubHaulGaps, type OrderExitKind } from './orderExits';
 import { useOpenOrderDetail, type OrderDetail } from './useOrderDetail';
-import { orderDetailCall, type OrderDetailSnapshot, type OrderDetailView } from './orderDetailView';
+import { verdictFigures, type OrderDetailSnapshot, type OrderDetailView } from './orderDetailView';
 import { isOffHubStation } from './hubStation';
 import { BASE_STATION_REPROCESSING_RATE } from '@/engine/industry/reprocessing';
 import {
@@ -144,7 +144,7 @@ function signedIsk(amount: number): string {
   return `${amount >= 0 ? '+' : ''}${formatMarketIsk(amount)}`;
 }
 
-/** Short label for an exit's kind in the "Is there a better exit?" disclosure's trailing read — distinct from the exit's own full sentence, which states the price rather than the net. */
+/** Short label for an exit's kind in the "Other ways out" disclosure's trailing read — distinct from the exit's own full sentence, which states the price rather than the net. */
 const EXIT_SHORT_KEY: Record<OrderExitKind, string> = {
   hold: 'exitShortHold',
   undercutStation: 'exitShortUndercutStation',
@@ -234,20 +234,6 @@ function deepScopeState(
   return { kind: 'clear' };
 }
 
-/**
- * One scope's line in the "who is cheaper, and where" table.
- *
- * The seller cell carries the station, the ISK gap and the distance, because
- * the three scopes routinely carry the SAME rival — one seller at your own
- * station is, by construction, also the cheapest in your system and can be
- * the cheapest in the region too. Three identical ISK figures on three bare
- * rows read as a bug; the same three beside where they sit, the gap, and the
- * distance read as what they are.
- *
- * A state that isn't a rival (not checked, clear, structure) has nothing to
- * put in the seller and price columns, so it spans them rather than printing
- * dashes.
- */
 /** Scope pill colours: the same station/system/region ladder the row badges use. */
 const SCOPE_PILL: Record<UndercutScope, string> = {
   station: 'bg-danger/15 text-danger',
@@ -312,6 +298,20 @@ function scopeCsvRow(
   };
 }
 
+/**
+ * One scope's line in the "Who is cheaper" table.
+ *
+ * The seller cell carries the station, the ISK gap and the distance, because
+ * the three scopes routinely carry the SAME rival — one seller at your own
+ * station is, by construction, also the cheapest in your system and can be
+ * the cheapest in the region too. Three identical ISK figures on three bare
+ * rows read as a bug; the same three beside where they sit, the gap, and the
+ * distance read as what they are.
+ *
+ * A state that isn't a rival (not checked, clear, structure) has nothing to
+ * put in the seller and price columns, so it spans them rather than printing
+ * dashes.
+ */
 function ScopeRow({
   scope,
   state,
@@ -508,7 +508,7 @@ export function OrderDetailContent({
 
   const advice = adviseOrder(row);
   const { badge, summary, verdict } = advice;
-  const { copyPrice, keepPerUnit } = orderDetailCall(row, advice);
+  const { copyPrice, keepPerUnit } = verdictFigures(row, advice);
   const station =
     location === 'structure'
       ? structureStationScopeState(row, structureMarket)
@@ -675,7 +675,7 @@ export function OrderDetailContent({
                 "let this one go", so the badge's generic advice is the
                 fallback below — the common case, not the exception.
               */}
-              <p className="mt-2 text-2xl font-semibold text-text">
+              <p className="mt-2 text-xl font-semibold text-text">
                 {t(`market.orders.verdict.${verdict.kind}`, {
                   price: verdict.price === null ? '' : formatMarketIsk(verdict.price),
                 })}
@@ -689,7 +689,7 @@ export function OrderDetailContent({
             </>
           ) : (
             <>
-              <p className="mt-2 text-lg font-semibold text-text">
+              <p className="mt-2 text-base font-semibold text-text">
                 {badge
                   ? t(`market.orders.badge.${badge.kind}Action`)
                   : t('market.orders.scopeNotChecked')}
@@ -703,7 +703,7 @@ export function OrderDetailContent({
           )}
           <div className="mt-3 flex flex-wrap gap-2">
             {/* The exact price to type, plain digits on the clipboard. Only a
-                price the call recommends (`orderDetailCall`); on a phone it
+                price the call recommends (`verdictFigures`); on a phone it
                 is pinned to the sheet's foot instead. */}
             {!isPhone && copyPrice !== null && <CopyPriceButton price={copyPrice} />}
             {/*
@@ -734,8 +734,12 @@ export function OrderDetailContent({
           {keepPerUnit !== null && (
             <StatChip
               label={t('market.orders.detail.chipYouKeep')}
-              tone={keepPerUnit >= 0 ? 'success' : 'danger'}
-              value={formatMarketIsk(keepPerUnit)}
+              // Money, not status: the ISK delta tokens, with the sign (DESIGN.md §1).
+              value={
+                <span className={keepPerUnit >= 0 ? 'text-isk-pos' : 'text-isk-neg'}>
+                  {signedIsk(keepPerUnit)}
+                </span>
+              }
             />
           )}
         </StatChips>
@@ -967,7 +971,7 @@ export function OrderDetailContent({
                       t('common.unknown')
                     ) : (
                       <span className="tabular-nums">
-                        <span className={netIfSellsAsListed >= 0 ? 'text-success' : 'text-danger'}>
+                        <span className={netIfSellsAsListed >= 0 ? 'text-isk-pos' : 'text-isk-neg'}>
                           {signedIsk(netIfSellsAsListed)}
                         </span>{' '}
                         <span className="text-text-dim">
@@ -1191,7 +1195,7 @@ export function OrderDetailContent({
       {isPhone && copyPrice !== null && (
         // Pinned to the sheet's bottom edge while the body scrolls: the one
         // action stays under the thumb. Same footer as `FilterBar`'s sheet.
-        <div className="sticky bottom-0 -mx-3 -mb-[calc(0.75rem_+_env(safe-area-inset-bottom))] mt-3 border-t border-line bg-panel px-3 pt-2 pb-[calc(0.5rem_+_env(safe-area-inset-bottom))]">
+        <div className="sticky bottom-[calc(-0.75rem_-_env(safe-area-inset-bottom))] -mx-3 -mb-[calc(0.75rem_+_env(safe-area-inset-bottom))] mt-3 border-t border-line bg-panel px-3 pt-2 pb-[calc(0.5rem_+_env(safe-area-inset-bottom))]">
           <CopyPriceButton price={copyPrice} className="w-full" />
         </div>
       )}

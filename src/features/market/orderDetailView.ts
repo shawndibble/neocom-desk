@@ -150,7 +150,7 @@ export function relistFees(
 }
 
 /** The verdict block's two figures: what its Copy button copies, and the "You keep a unit" fact. */
-export interface OrderDetailCall {
+export interface VerdictFigures {
   /**
    * The exact price to type into the order, or null when the call asks for
    * no new price. Only a price the call recommends: never the cheapest rival
@@ -158,14 +158,15 @@ export interface OrderDetailCall {
    */
   copyPrice: number | null;
   /**
-   * ISK a unit, after fees, if you follow the call: the margin left after
-   * undercutting when the call is to match them, otherwise what holding at
-   * your price nets once it sells. Null without an Order Floor.
+   * ISK a unit, after fees: the margin left after undercutting when the call
+   * is to match them; against the relist floor when the call is to put the
+   * price up (the loss the verdict sentence states); otherwise what holding
+   * at your price nets once it sells. Null without an Order Floor.
    */
   keepPerUnit: number | null;
 }
 
-export function orderDetailCall(row: OpenOrderRow, advice: OrderAdvice): OrderDetailCall {
+export function verdictFigures(row: OpenOrderRow, advice: OrderAdvice): VerdictFigures {
   const { next, summary, verdict } = advice;
   const copyPrice =
     next.kind === 'raisePrice' || next.kind === 'matchThem'
@@ -178,7 +179,9 @@ export function orderDetailCall(row: OpenOrderRow, advice: OrderAdvice): OrderDe
       ? null
       : verdict?.kind === 'matchThem' && verdict.amount !== null
         ? verdict.amount
-        : row.price - row.floor.fill;
+        : verdict?.kind === 'raisePrice'
+          ? row.price - row.floor.relist
+          : row.price - row.floor.fill;
   return { copyPrice, keepPerUnit };
 }
 
