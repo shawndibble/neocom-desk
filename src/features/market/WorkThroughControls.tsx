@@ -7,7 +7,7 @@
 import { useContext, type ReactNode } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import { Button, IskAmount, textActionClassName } from '@/components/ui';
+import { Button, IskAmount, NeedsConnection, textActionClassName } from '@/components/ui';
 import { formatMarketIsk } from '@/lib/isk';
 import type { OpenOrderRow } from './openOrdersModel';
 import type { WorkThroughPrice } from './useWorkThrough';
@@ -171,22 +171,46 @@ function ListControls({ row, context }: { row: OpenOrderRow; context: WorkThroug
       <div className="flex flex-wrap items-center gap-x-1.5">
         {canOpenInEve(row.characterId) && (
           <>
-            <TextAction onClick={workThrough.openCurrent}>
-              {t('market.orders.workThrough.openInEve')}
-            </TextAction>
-            {workThrough.currentSent && (
-              <span className="text-xs text-success">{t('market.orders.workThrough.sent')}</span>
-            )}
+            <NeedsConnection>
+              <button
+                type="button"
+                className={textActionClassName('inline-flex whitespace-nowrap')}
+                onClick={workThrough.openCurrent}
+              >
+                {t('openInEve.marketDetails')}
+              </button>
+            </NeedsConnection>
+            {workThrough.currentSent && <SentMark />}
             <Dot />
           </>
         )}
-        <TextAction onClick={workThrough.next}>{t('market.orders.workThrough.next')}</TextAction>
+        {/* Not before the price shows: a phone's Next records the price the pilot saw. */}
+        <TextAction onClick={workThrough.next} disabled={price === null}>
+          {t('market.orders.workThrough.next')}
+        </TextAction>
         <Dot />
         <TextAction onClick={workThrough.skip}>{t('market.orders.workThrough.skip')}</TextAction>
       </div>
+      {workThrough.currentOpenFailed !== null && (
+        <p className="text-xs text-danger">
+          {t('openInEve.failed', {
+            message: workThrough.currentOpenFailed.message ?? t('openInEve.unknownError'),
+          })}
+        </p>
+      )}
       <LossLine row={row} price={price} />
       <OwnerNote row={row} />
     </div>
+  );
+}
+
+/** "Sent", its check mark kept from the accessible name. */
+function SentMark() {
+  const { t } = useTranslation();
+  return (
+    <span className="text-xs text-success">
+      <span>{t('market.orders.workThrough.sent')}</span> <span aria-hidden="true">✓</span>
+    </span>
   );
 }
 
@@ -210,9 +234,11 @@ function RowStatus({ orderId, context }: { orderId: number; context: WorkThrough
       </span>
     );
   } else if (handled.sent) {
+    parts.push(<SentMark key="status" />);
+  } else if (handled.openError !== undefined) {
     parts.push(
-      <span key="status" className="text-success">
-        {t('market.orders.workThrough.sent')}
+      <span key="status" className="text-danger">
+        {t('openInEve.failed', { message: handled.openError ?? t('openInEve.unknownError') })}
       </span>
     );
   }
@@ -231,8 +257,9 @@ function RowStatus({ orderId, context }: { orderId: number; context: WorkThrough
 
 /**
  * A desktop row's work-through content in place of its summary sentence:
- * the current row's controls, or a passed row's status. Anything else (or
- * not running) renders `fallback`.
+ * the current row's controls, or a passed row's status — kept after Stop, so
+ * a later orders read can still say "Not changed". Anything else renders
+ * `fallback`.
  */
 export function WorkThroughTableSlot({
   row,
@@ -242,8 +269,11 @@ export function WorkThroughTableSlot({
   fallback: ReactNode;
 }) {
   const context = useContext(WorkThroughContext);
-  if (context === null || !context.workThrough.running) return <>{fallback}</>;
-  if (context.workThrough.progress.current?.orderId === row.orderId) {
+  if (context === null) return <>{fallback}</>;
+  if (
+    context.workThrough.running &&
+    context.workThrough.progress.current?.orderId === row.orderId
+  ) {
     return <TableControls row={row} context={context} />;
   }
   if (context.workThrough.handled.has(row.orderId)) {
@@ -255,8 +285,11 @@ export function WorkThroughTableSlot({
 /** A phone row's work-through content, below the row's own button (buttons don't nest). */
 export function WorkThroughListSlot({ row }: { row: OpenOrderRow }) {
   const context = useContext(WorkThroughContext);
-  if (context === null || !context.workThrough.running) return null;
-  if (context.workThrough.progress.current?.orderId === row.orderId) {
+  if (context === null) return null;
+  if (
+    context.workThrough.running &&
+    context.workThrough.progress.current?.orderId === row.orderId
+  ) {
     return <ListControls row={row} context={context} />;
   }
   if (context.workThrough.handled.has(row.orderId)) {

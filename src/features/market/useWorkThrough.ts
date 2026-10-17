@@ -5,7 +5,7 @@
  * progress and "Not changed" rules are `workThrough.ts`'s; this hook only
  * holds what the pilot did and talks to ESI.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import type { CompetingOrder } from '@/engine/market/undercut';
 import { isNpcStationId } from '@/esi/locationIds';
@@ -42,7 +42,8 @@ async function readStationBook(
 ): Promise<readonly CompetingOrder[] | null> {
   try {
     if (!isNpcStationId(row.locationId)) {
-      return (await loadStructureCompetition(row.characterId, row.locationId))?.competitors ?? null;
+      const book = await loadStructureCompetition(row.characterId, row.locationId, { fresh });
+      return book?.competitors ?? null;
     }
     if (fresh) clearOrderBookCache(row.regionId, row.typeId);
     return (await loadRegionCompetition(row.regionId, row.typeId)).competitors;
@@ -88,6 +89,8 @@ export interface WorkThrough {
   pendingId: number | null;
   /** Phone only: the current order was sent to EVE by its own button. */
   currentSent: boolean;
+  /** Phone only: the current order's Open in EVE failed, with ESI's words when it gave any. */
+  currentOpenFailed: { message: string | null } | null;
   start: () => void;
   stop: () => void;
   next: () => void;
@@ -108,7 +111,13 @@ export function useWorkThrough({
   const [state, setState] = useState<WorkThroughState>(EMPTY_WORK_THROUGH);
   const [pendingId, setPendingId] = useState<number | null>(null);
   const [preview, setPreview] = useState<{ orderId: number; price: WorkThroughPrice } | null>(null);
-  const [sentCurrentId, setSentCurrentId] = useState<number | null>(null);
+  const [currentOpen, setCurrentOpen] = useState<{
+    orderId: number;
+    ok: boolean;
+    message: string | null;
+  } | null>(null);
+  /** Bumped by Start and Stop, so a Next still in flight from an ended run lands nowhere. */
+  const runRef = useRef(0);
 
   const progress = useMemo(() => workThroughProgress(queue, state), [queue, state]);
   const current = running ? progress.current : null;
@@ -142,13 +151,16 @@ export function useWorkThrough({
   }, [state.handled, ordersById, fetchedAtByCharacter]);
 
   const start = useCallback(() => {
+    runRef.current++;
     setState(EMPTY_WORK_THROUGH);
     setPreview(null);
-    setSentCurrentId(null);
+    setCurrentOpen(null);
+    setPendingId(null);
     setRunning(true);
   }, []);
 
   const stop = useCallback(() => {
+    runRef.current++;
     setRunning(false);
     setPendingId(null);
   }, []);
@@ -176,10 +188,11 @@ export function useWorkThrough({
         ...base,
         newPrice: shown?.kind === 'price' ? shown.price : null,
         copied: false,
-        sent: sentCurrentId === row.orderId,
+        sent: currentOpen?.orderId === row.orderId && currentOpen.ok,
       });
       return;
     }
+    const run = runRef.current;
     setPendingId(row.orderId);
     const price = readPrice(row, ownOrderIds, true);
     // Started inside the click, before any await (`writeToClipboardLater`).
@@ -193,20 +206,26 @@ export function useWorkThrough({
       () => false
     );
     void (async () => {
-      const read = await price;
-      const copied = await copy;
-      const sent = canOpenInEve(row.characterId)
-        ? (await openInEve(row.characterId, { kind: 'marketDetails', id: row.typeId })).ok
-        : false;
-      markHandled({
-        ...base,
-        newPrice: read.kind === 'price' ? read.price : null,
-        copied,
-        sent,
-      });
-      setPendingId(null);
+      try {
+        const read = await price;
+        const copied = await copy;
+        if (runRef.current !== run) return;
+        const opened = canOpenInEve(row.characterId)
+          ? await openInEve(row.characterId, { kind: 'marketDetails', id: row.typeId })
+          : null;
+        if (runRef.current !== run) return;
+        markHandled({
+          ...base,
+          newPrice: read.kind === 'price' ? read.price : null,
+          copied,
+          sent: opened?.ok === true,
+          openError: opened !== null && !opened.ok ? opened.message : undefined,
+        });
+      } finally {
+        if (runRef.current === run) setPendingId(null);
+      }
     })();
-  }, [current, pendingId, isPhone, preview, sentCurrentId, ownOrderIds, canOpenInEve, markHandled]);
+  }, [current, pendingId, isPhone, preview, currentOpen, ownOrderIds, canOpenInEve, markHandled]);
 
   const skip = useCallback(() => {
     if (current === null || pendingId !== null) return;
@@ -217,9 +236,9 @@ export function useWorkThrough({
     if (current === null || !canOpenInEve(current.characterId)) return;
     const orderId = current.orderId;
     void openInEve(current.characterId, { kind: 'marketDetails', id: current.typeId }).then(
-      (result) => {
-        if (result.ok) setSentCurrentId(orderId);
-      }
+      (result) =>
+        setCurrentOpen({ orderId, ok: result.ok, message: result.ok ? null : result.message }),
+      () => setCurrentOpen({ orderId, ok: false, message: null })
     );
   }, [current, canOpenInEve]);
 
@@ -231,7 +250,11 @@ export function useWorkThrough({
     notChangedIds,
     preview: preview !== null && preview.orderId === currentId ? preview.price : null,
     pendingId,
-    currentSent: currentId !== null && sentCurrentId === currentId,
+    currentSent: currentId !== null && currentOpen?.orderId === currentId && currentOpen.ok,
+    currentOpenFailed:
+      currentId !== null && currentOpen?.orderId === currentId && !currentOpen.ok
+        ? { message: currentOpen.message }
+        : null,
     start,
     stop,
     next,

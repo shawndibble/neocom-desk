@@ -3,6 +3,7 @@ import { openOrderRow } from './__fixtures__/openOrderRow';
 import { groupOpenOrders } from './openOrdersModel';
 import {
   EMPTY_WORK_THROUGH,
+  ORDERS_CACHE_MS,
   clickTimePrice,
   isNotChanged,
   workThroughLoss,
@@ -121,11 +122,16 @@ describe('clickTimePrice', () => {
     expect(clickTimePrice(row, book, new Set([1, 2]))).toEqual({ kind: 'price', price: 594.9 });
   });
 
-  it('prices up to one tick under the cheapest rival when the order already leads', () => {
+  it('keeps the price of an order already leading at its station', () => {
     const row = openOrderRow({ orderId: 1, price: 500, locationId: station });
     expect(clickTimePrice(row, [sell(1, 500), sell(2, 520)], new Set([1]))).toEqual({
       kind: 'price',
-      price: 519.9,
+      price: 500,
+    });
+    const bid = openOrderRow({ orderId: 1, isBuyOrder: true, price: 5, locationId: station });
+    expect(clickTimePrice(bid, [buy(1, 5), buy(2, 4)], new Set([1]))).toEqual({
+      kind: 'price',
+      price: 5,
     });
   });
 
@@ -150,23 +156,26 @@ describe('clickTimePrice', () => {
 
 describe('isNotChanged', () => {
   const sent = handled(1, { previousPrice: 500, issued: '2026-10-01T00:00:00Z', sentAt: 1_000 });
+  const after = 1_000 + ORDERS_CACHE_MS;
 
-  it('is true only for an orders read fetched after the press with the same price and issued time', () => {
-    expect(isNotChanged(sent, { price: 500, issued: '2026-10-01T00:00:00Z' }, 2_000)).toBe(true);
+  it('is true only for an orders read that postdates the press with the same price and issued time', () => {
+    expect(isNotChanged(sent, { price: 500, issued: '2026-10-01T00:00:00Z' }, after)).toBe(true);
   });
 
-  it('is false for an orders read fetched before the press, even when nothing changed', () => {
-    expect(isNotChanged(sent, { price: 500, issued: '2026-10-01T00:00:00Z' }, 1_000)).toBe(false);
-    expect(isNotChanged(sent, { price: 500, issued: '2026-10-01T00:00:00Z' }, 500)).toBe(false);
+  it('is false for a read that could still be ESI’s cached body from before the press', () => {
+    const same = { price: 500, issued: '2026-10-01T00:00:00Z' };
+    expect(isNotChanged(sent, same, 500)).toBe(false);
+    expect(isNotChanged(sent, same, 2_000)).toBe(false);
+    expect(isNotChanged(sent, same, after - 1)).toBe(false);
   });
 
   it('is false once the price or the issued time moved', () => {
-    expect(isNotChanged(sent, { price: 499, issued: '2026-10-01T00:00:00Z' }, 2_000)).toBe(false);
-    expect(isNotChanged(sent, { price: 500, issued: '2026-10-02T00:00:00Z' }, 2_000)).toBe(false);
+    expect(isNotChanged(sent, { price: 499, issued: '2026-10-01T00:00:00Z' }, after)).toBe(false);
+    expect(isNotChanged(sent, { price: 500, issued: '2026-10-02T00:00:00Z' }, after)).toBe(false);
   });
 
   it('is false when the order is gone', () => {
-    expect(isNotChanged(sent, undefined, 2_000)).toBe(false);
+    expect(isNotChanged(sent, undefined, after)).toBe(false);
   });
 });
 

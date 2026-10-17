@@ -25,6 +25,8 @@ export interface HandledOrder {
   copied: boolean;
   /** Open in EVE answered ok. */
   sent: boolean;
+  /** Set only when Open in EVE was tried and failed: ESI's words, or null when it gave none. */
+  openError?: string | null;
   /** When the press happened (ms). Only an orders read fetched after this can say "Not changed". */
   sentAt: number;
 }
@@ -80,12 +82,12 @@ export type ClickTimePrice = { kind: 'price'; price: number } | { kind: 'noRival
  * The one-tick price against the order's own station, from a book read at
  * click time: one tick under the cheapest other seller for a sell order, one
  * tick over the highest other bid for a buy order. The player's own orders,
- * on any Character, are never treated as rivals. This can raise the price as
- * well as lower it — an order already leading is priced up to just under the
- * next seller.
+ * on any Character, are never treated as rivals. Never moves an order the
+ * wrong way: one already leading at its station (queued for a cheaper seller
+ * elsewhere, or for expiring) keeps its own price.
  */
 export function clickTimePrice(
-  row: Pick<OpenOrderRow, 'locationId' | 'isBuyOrder'>,
+  row: Pick<OpenOrderRow, 'locationId' | 'isBuyOrder' | 'price'>,
   book: readonly Pick<CompetingOrder, 'orderId' | 'price' | 'locationId' | 'isBuyOrder'>[],
   ownOrderIds: ReadonlySet<number>
 ): ClickTimePrice {
@@ -101,21 +103,28 @@ export function clickTimePrice(
   const price = row.isBuyOrder
     ? outbidPrice(Math.max(...rivals))
     : undercutPrice(Math.min(...rivals));
-  return price === null ? { kind: 'noRival' } : { kind: 'price', price };
+  if (price === null) return { kind: 'noRival' };
+  return {
+    kind: 'price',
+    price: row.isBuyOrder ? Math.max(price, row.price) : Math.min(price, row.price),
+  };
 }
+
+/** ESI's cache window on a Character's orders: a body fetched sooner after the press can predate it. */
+export const ORDERS_CACHE_MS = 1_200_000;
 
 /**
  * A row the pilot was sent to comes back "Not changed" only from an orders
- * read fetched AFTER the press that still shows the same price AND the same
- * issued time. A read from before the press (the orders endpoint is cached
- * for minutes) proves nothing, and an order that is gone was not left alone.
+ * read that must postdate the press — fetched a full ESI cache window after
+ * it — and still shows the same price AND the same issued time. An order
+ * that is gone was not left alone.
  */
 export function isNotChanged(
   handled: Pick<HandledOrder, 'previousPrice' | 'issued' | 'sentAt'>,
   order: { price: number; issued: string } | undefined,
   fetchedAt: number
 ): boolean {
-  if (order === undefined || fetchedAt <= handled.sentAt) return false;
+  if (order === undefined || fetchedAt < handled.sentAt + ORDERS_CACHE_MS) return false;
   return order.price === handled.previousPrice && order.issued === handled.issued;
 }
 

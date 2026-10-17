@@ -22,6 +22,7 @@ import { loadAllCharactersOpenOrders, type CharacterOpenOrders } from './openOrd
 import { loadOrderCostBases } from './orderCostBasis';
 import { loadRegionCompetition, loadStationBestPrices } from './orderCompetition';
 import { stationPriceKey } from './stationPriceKey';
+import { ORDERS_CACHE_MS } from './workThrough';
 
 vi.mock('./openOrdersData', () => ({ loadAllCharactersOpenOrders: vi.fn() }));
 vi.mock('./orderCostBasis', () => ({
@@ -216,7 +217,7 @@ describe('Open Orders work through', () => {
     expect(vi.mocked(loadRegionCompetition)).toHaveBeenCalledWith(REGION, 34);
     const passed = document.querySelector('[data-row-key="101"]') as HTMLElement;
     expect(within(passed).getByText('448.90 copied')).toBeInTheDocument();
-    expect(within(passed).getByText('Sent ✓')).toBeInTheDocument();
+    expect(within(passed).getByText('Sent')).toBeInTheDocument();
     expect(within(summaryLine()).getByText('2 of 2')).toBeInTheDocument();
     expect(
       await within(current()).findByText('No other order at this station')
@@ -262,7 +263,74 @@ describe('Open Orders work through', () => {
     await waitFor(() => expect(current()).toHaveAttribute('data-row-key', '201'));
     expect(copied).toHaveBeenCalledWith('448.90');
     expect(openInEve).not.toHaveBeenCalled();
-    expect(screen.queryByText('Sent ✓')).toBeNull();
+    expect(screen.queryByText('Sent')).toBeNull();
+  });
+
+  it('marks a sent row "Not changed" once an orders read from after the press shows it untouched, and keeps it after Stop', async () => {
+    const user = userEvent.setup();
+    vi.mocked(loadAllCharactersOpenOrders).mockResolvedValue({
+      entries: [entry([UNDERCUT, EXPIRING])],
+      skipped: [],
+    });
+    renderPanel();
+    await user.click(await screen.findByRole('button', { name: 'Work through (2)' }));
+    const current = () => document.querySelector('[aria-current="true"]') as HTMLElement;
+    await waitFor(() => expect(current()).toHaveAttribute('data-row-key', '101'));
+    await user.click(within(current()).getByRole('button', { name: 'Next' }));
+    await waitFor(() => expect(current()).toHaveAttribute('data-row-key', '201'));
+    await user.click(within(summaryLine()).getByRole('button', { name: 'Stop' }));
+
+    const row = () => document.querySelector('[data-row-key="101"]') as HTMLElement;
+    expect(within(row()).getByText('Sent')).toBeInTheDocument();
+    vi.mocked(loadAllCharactersOpenOrders).mockResolvedValue({
+      entries: [entry([UNDERCUT, EXPIRING], Date.now() + ORDERS_CACHE_MS + 1)],
+      skipped: [],
+    });
+    await user.click(screen.getByRole('button', { name: /^Refresh orders/ }));
+    expect(await within(row()).findByText('Not changed')).toBeInTheDocument();
+  });
+
+  it('warns what a below-floor order loses at the new price, with See exits', async () => {
+    const user = userEvent.setup();
+    vi.mocked(loadCorrectedSkills).mockResolvedValue({
+      skillsResult: null,
+      skillsNeedsReauth: false,
+      queueResult: null,
+      queueNeedsReauth: false,
+      completedLevels: new Map(),
+      trained: new Map([
+        [16622, { level: 5, sp: 0 }],
+        [3446, { level: 5, sp: 0 }],
+      ]),
+      effective: new Map([
+        [16622, 5],
+        [3446, 5],
+      ]),
+      completedSp: 0,
+      totalSp: null,
+      fetchedAt: null,
+    });
+    vi.mocked(loadOrderCostBases).mockResolvedValue(
+      new Map([
+        [101, { unitCost: 600, runId: 'run-1', runQuantity: 10, materialCost: 3000, jobFee: 1200 }],
+      ])
+    );
+    vi.mocked(loadAllCharactersOpenOrders).mockResolvedValue({
+      entries: [entry([UNDERCUT])],
+      skipped: [],
+    });
+    renderPanel();
+    await user.click(await screen.findByRole('button', { name: 'Work through (1)' }));
+    const current = () => document.querySelector('[aria-current="true"]') as HTMLElement;
+    await waitFor(() => expect(current()).toHaveAttribute('data-row-key', '101'));
+    await waitFor(() =>
+      expect(
+        within(current()).getByRole('button', { name: 'See exits' }).parentElement
+      ).toHaveTextContent(/^Loses .* at 448\.90See exits$/)
+    );
+
+    await user.click(within(current()).getByRole('button', { name: 'See exits' }));
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
   });
 
   it('starts the queue on arrival from the Overview link', async () => {
@@ -309,7 +377,7 @@ describe('Open Orders work through — phone', () => {
     await waitFor(() => expect(current()).toHaveAttribute('data-row-key', '101'));
     expect(await within(current()).findByText('448.90')).toBeInTheDocument();
 
-    await user.click(within(current()).getByRole('button', { name: 'Open in EVE' }));
+    await user.click(within(current()).getByRole('button', { name: 'Open market in EVE' }));
     await waitFor(() =>
       expect(openInEve).toHaveBeenCalledWith(1, { kind: 'marketDetails', id: 34 })
     );
@@ -318,6 +386,6 @@ describe('Open Orders work through — phone', () => {
     await waitFor(() => expect(current()).toHaveAttribute('data-row-key', '201'));
     expect(copied).not.toHaveBeenCalled();
     const passed = document.querySelector('[data-row-key="101"]') as HTMLElement;
-    expect(within(passed).getByText('Sent ✓')).toBeInTheDocument();
+    expect(within(passed).getByText('Sent')).toBeInTheDocument();
   });
 });

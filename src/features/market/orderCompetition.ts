@@ -150,7 +150,9 @@ function structureMarketCacheKey(structureId: number): string {
  */
 export async function loadStructureCompetition(
   characterId: number,
-  structureId: number
+  structureId: number,
+  /** Skip the stale window and read the book live (a work-through Next press). */
+  { fresh = false }: { fresh?: boolean } = {}
 ): Promise<StructureCompetition | null> {
   const { fetchLive, conditional } = conditionalPagedFetch((options) =>
     getStructureMarketOrders(characterId, structureId, options)
@@ -161,7 +163,7 @@ export async function loadStructureCompetition(
     fetchLive,
     {
       conditional,
-      staleAfterMs: STRUCTURE_MARKET_STALE_AFTER_MS,
+      staleAfterMs: fresh ? 0 : STRUCTURE_MARKET_STALE_AFTER_MS,
       detectAuthFailure: isCredentialFailure,
     }
   );
