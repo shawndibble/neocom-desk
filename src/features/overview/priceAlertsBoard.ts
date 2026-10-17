@@ -19,7 +19,7 @@ export interface BoardPriceAlert {
   /** The poller's last hub price, or null when it has none for this exact target yet. */
   price: number | null;
   crossed: boolean;
-  /** The latest price vs its 90-day median at the Market hub, in percent; null when unknown. */
+  /** The latest price vs its 90-day median at the Trade Hub Quickbar prices at, in percent; null when unknown. */
   vs90d?: number | null;
 }
 

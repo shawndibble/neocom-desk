@@ -368,14 +368,16 @@ export function OpportunitiesPanel({
     assumedMe,
   });
 
-  // Each product's history in its own row's hub region, for "vs 90d".
+  // Each product's history in its own row's hub region, for "vs 90d"; All owned never shows it.
   const vs90dTargets = useMemo(
     () =>
-      allRows.flatMap((row) => {
-        const typeId = row.candidate.catalogEntry.productTypeID;
-        return typeId === null ? [] : [{ hubId: row.hub.id, typeId }];
-      }),
-    [allRows]
+      view === 'owned'
+        ? []
+        : allRows.flatMap((row) => {
+            const typeId = row.candidate.catalogEntry.productTypeID;
+            return typeId === null ? [] : [{ hubId: row.hub.id, typeId }];
+          }),
+    [allRows, view]
   );
   const priceVsMedian = usePriceVsMedian(vs90dTargets);
   const rows = useMemo(

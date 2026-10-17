@@ -494,7 +494,7 @@ export interface PriceAlertsBoardData {
 /**
  * The Quickbar's targets, priced from the poller's last reading
  * (`priceAlertsBoard.ts`), each with its price vs 90-day median in the
- * region of the Market hub the poller prices at.
+ * region of the Trade Hub the poller prices at.
  */
 export async function loadPriceAlertsBoard(characterId: number): Promise<PriceAlertsBoardData> {
   const [record, snapshot] = await Promise.all([

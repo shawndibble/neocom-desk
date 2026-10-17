@@ -1,5 +1,4 @@
-import { isPriceSpike } from '@/engine/market/priceVsMedian';
-import { formatVsMedianPct } from '@/features/market/format';
+import { vs90dReadout } from './vs90d';
 
 /**
  * A "vs 90d" figure for the Build Opportunities tables: "+35%" in amber from
@@ -7,11 +6,6 @@ import { formatVsMedianPct } from '@/features/market/format';
  * days, and a dim "…" while its history is still being read.
  */
 export function Vs90dFigure({ value }: { value: number | null | undefined }) {
-  if (value === undefined) return <span className="text-text-dim">…</span>;
-  if (value === null) return null;
-  return (
-    <span className={isPriceSpike(value) ? 'text-warning' : undefined}>
-      {formatVsMedianPct(value)}
-    </span>
-  );
+  const readout = vs90dReadout(value);
+  return readout && <span className={readout.toneClassName}>{readout.node}</span>;
 }

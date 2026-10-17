@@ -17,10 +17,7 @@ export function vs90dTooltip(t: TFunction): string {
   });
 }
 
-/**
- * The phone cards' "vs 90d" readout: the figure and its tone, "…" while still
- * being read, or null when blank — a card leaves a blank readout out.
- */
+/** A "vs 90d" figure and its tone: "…" while still being read, null when blank (a card leaves it out). */
 export function vs90dReadout(
   value: number | null | undefined
 ): { node: string; toneClassName?: string } | null {
