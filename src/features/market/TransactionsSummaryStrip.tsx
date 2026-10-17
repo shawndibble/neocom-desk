@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Tooltip } from '@/components/ui';
 import { cx } from '@/lib/cx';
 import { formatDateOnly } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
@@ -7,15 +8,19 @@ import { iskToneClass } from '@/features/character/format';
 import type { WalletTransaction } from '@/esi/endpoints';
 import { signedIsk } from './signedIsk';
 import { summarizeTransactions } from './transactionDays';
+import type { TradingSummary } from './tradingSummary';
 
 interface TransactionsSummaryStripProps {
   transactions: readonly WalletTransaction[];
+  /** Margin, matched count and broker fees over the same fills; omitted while they can't be worked out. */
+  trading?: TradingSummary;
   className?: string;
 }
 
 /** The Sold / Bought / Net card over the fills shown, above Market History's table. */
 export function TransactionsSummaryStrip({
   transactions,
+  trading,
   className,
 }: TransactionsSummaryStripProps) {
   const { t } = useTranslation();
@@ -54,6 +59,29 @@ export function TransactionsSummaryStrip({
           className={cx('items-end', iskToneClass(summary.net))}
         />
       </dl>
+      {trading && (
+        <dl className="grid grid-cols-3 gap-3 tabular-nums">
+          <SummaryFigure
+            label={t('wallet.tradingMargin')}
+            value={trading.matched > 0 ? signedIsk(trading.margin, 0) : '—'}
+            note={t('wallet.tradingMatched', { matched: trading.matched, count: trading.sales })}
+            className={trading.matched > 0 ? iskToneClass(trading.margin) : 'text-text-dim'}
+          />
+          <SummaryFigure
+            label={t('wallet.brokerFees')}
+            tooltip={t('wallet.brokerFeesTooltip')}
+            value={signedIsk(-trading.brokerFees, 0)}
+            className={trading.brokerFees > 0 ? 'text-isk-neg' : 'text-text'}
+          />
+        </dl>
+      )}
+      {trading?.archiveSince != null && (
+        <p className="text-xs text-text-dim">
+          {t('wallet.archiveSince', {
+            date: formatDateOnly(new Date(trading.archiveSince), timeZone),
+          })}
+        </p>
+      )}
     </section>
   );
 }
@@ -61,18 +89,29 @@ export function TransactionsSummaryStrip({
 function SummaryFigure({
   label,
   value,
+  note,
+  tooltip,
   className,
 }: {
   label: string;
   value: string;
+  note?: string;
+  tooltip?: string;
   className: string;
 }) {
   return (
     <div className={cx('flex flex-col gap-0.5', className)}>
       <dt className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-        {label}
+        {tooltip ? (
+          <Tooltip content={tooltip}>
+            <span>{label}</span>
+          </Tooltip>
+        ) : (
+          label
+        )}
       </dt>
       <dd className="text-sm font-semibold">{value}</dd>
+      {note && <dd className="text-[0.6875rem] font-normal text-text-dim">{note}</dd>}
     </div>
   );
 }

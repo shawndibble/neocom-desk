@@ -18,7 +18,7 @@ import type { BelowMarketSummaryContract } from '@/features/contractSearch/below
 import type { SurveySummary } from '@/engine/survey/series';
 import type { RouteKillSystem } from '@/engine/route/routeKillTrend';
 import type { NetWorthSnapshotRow } from '@/engine/netWorth/snapshot';
-import type { WalletJournalEntry } from '@/esi/endpoints';
+import type { WalletJournalEntry, WalletTransaction } from '@/esi/endpoints';
 import type { CachedResult } from '@/esi/cache';
 import { summarizeProductionRun } from '@/features/industry/productionRunSummary';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
@@ -773,5 +773,52 @@ export async function loadOmegaWidget(): Promise<OmegaWidgetData> {
     truncated: snapshot.loaded.some((c) => c.truncated),
     skippedCount: snapshot.skipped.length,
     loadedIds: snapshot.loaded.map((c) => c.characterId),
+  };
+}
+
+// --- Trading profit ------------------------------------------------------------------
+
+export interface TradingProfitCharacter {
+  characterId: number;
+  name: string;
+  transactions: WalletTransaction[];
+  journal: WalletJournalEntry[];
+}
+
+export interface TradingProfitWidgetData {
+  /** Every loaded Character's fills and journal; the builder pools or narrows them. */
+  characters: TradingProfitCharacter[];
+  /** Item names, keyed by type id. */
+  names: Map<number, string>;
+  /** Some Character's fills stopped at the page cap, so margins near the oldest edge may be missing. */
+  truncated: boolean;
+  /** Wallet-scoped Characters whose journal did not load. */
+  skippedCount: number;
+  fetchedAt: Date;
+}
+
+/** Every Character's fills and journal (the local history), behind `import()` like the other journal reads. */
+export async function loadTradingProfitWidget(): Promise<TradingProfitWidgetData> {
+  const { loadAllCharactersJournals, loadWalletScopedCharacterIds } =
+    await import('@/features/character/walletJournalAll');
+  const [snapshot, scopedIds] = await Promise.all([
+    loadAllCharactersJournals(),
+    loadWalletScopedCharacterIds(),
+  ]);
+  if (snapshot.loaded.length === 0 && scopedIds.length > 0) {
+    throw new Error('The wallet journal could not be read');
+  }
+  const reads = snapshot.loaded.map((c) => c.fetchedAt.getTime());
+  return {
+    characters: snapshot.loaded.map((c) => ({
+      characterId: c.characterId,
+      name: c.name,
+      transactions: c.transactions,
+      journal: c.journal,
+    })),
+    names: snapshot.typeNames,
+    truncated: snapshot.loaded.some((c) => c.fillsTruncated),
+    skippedCount: snapshot.skipped.length,
+    fetchedAt: new Date(reads.length === 0 ? Date.now() : Math.min(...reads)),
   };
 }

@@ -36,13 +36,14 @@ const ALL_IDS = [
   'hauling',
   'kills',
   'omega',
+  'tradingProfit',
   'comingUp',
   'contracts',
   'mail',
 ];
 
 describe('widget kind catalogue', () => {
-  it('holds exactly the 29 kinds the mockups define', () => {
+  it('holds exactly the 30 kinds the mockups define', () => {
     expect(WIDGET_KINDS.map((k) => k.id).sort()).toEqual([...ALL_IDS].sort());
   });
 
@@ -159,6 +160,7 @@ describe('widget kind catalogue', () => {
       'miningYield',
       'omega',
       'profit',
+      'tradingProfit',
       'wallet',
       'walletFlow',
     ]);

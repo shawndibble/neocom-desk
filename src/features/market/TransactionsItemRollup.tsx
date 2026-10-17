@@ -6,8 +6,9 @@ import type { WalletTransaction } from '@/esi/endpoints';
 import { iskToneClass } from '@/features/character/format';
 import { formatDateOnly } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
+import { marginsByDay, type DayMargin } from '@/engine/market/tradingProfit';
 import { signedIsk } from './signedIsk';
-import { summarizeTransactions } from './transactionDays';
+import { dayKeyOf, summarizeTransactions } from './transactionDays';
 import { rankItemMargins, rollupMarginsByItem, type ItemMarginRow } from './transactionItemMargins';
 
 interface TransactionsItemRollupProps {
@@ -22,6 +23,7 @@ interface TransactionsItemRollupProps {
 }
 
 const itemRowKey = (row: ItemMarginRow) => row.typeId;
+const dayRowKey = (row: DayMargin) => row.dayKey;
 
 /** Market History's "By item" disclosure: the Margin column summed per item over the fills shown. */
 export function TransactionsItemRollup({
@@ -35,10 +37,25 @@ export function TransactionsItemRollup({
   const timeZone = useTimeZone();
   const [expanded, setExpanded] = useState(false);
   const [order, setOrder] = useState<'best' | 'worst'>('best');
+  const [view, setView] = useState<'item' | 'day'>('item');
 
   const rows = useMemo(
     () => rankItemMargins(rollupMarginsByItem(transactions, margins), order),
     [transactions, margins, order]
+  );
+  const dayRows = useMemo(
+    () =>
+      marginsByDay(
+        transactions.map((txn) => ({
+          transactionId: txn.transaction_id,
+          date: txn.date,
+          typeId: txn.type_id,
+          isBuy: txn.is_buy,
+        })),
+        margins,
+        (date) => dayKeyOf(date, timeZone)
+      ).reverse(),
+    [transactions, margins, timeZone]
   );
   const range = useMemo(() => summarizeTransactions(transactions), [transactions]);
 
@@ -72,6 +89,29 @@ export function TransactionsItemRollup({
     [t, nameFor]
   );
 
+  const dayColumns = useMemo<DataTableColumn<DayMargin>[]>(
+    () => [
+      { id: 'day', header: t('wallet.day'), stickyStart: true, render: (r) => r.dayKey },
+      {
+        id: 'sales',
+        header: t('wallet.salesCount'),
+        align: 'right',
+        className: 'tabular-nums',
+        render: (r) => r.sales.toLocaleString(),
+      },
+      {
+        id: 'margin',
+        header: t('wallet.netMargin'),
+        headerTooltip: t('wallet.marginTooltip'),
+        align: 'right',
+        className: 'tabular-nums',
+        cellClassName: (r) => (r.matched === 0 ? 'text-text-dim' : iskToneClass(r.margin)),
+        render: (r) => (r.matched === 0 ? '—' : signedIsk(r.margin, 0)),
+      },
+    ],
+    [t]
+  );
+
   return (
     <Disclosure
       label={t('wallet.byItem')}
@@ -89,26 +129,51 @@ export function TransactionsItemRollup({
               })}
             </p>
           )}
-          <SegmentedControl
-            label={t('wallet.byItemOrder')}
-            size="sm"
-            value={order}
-            onChange={setOrder}
-            options={[
-              { value: 'best', label: t('wallet.bestFirst') },
-              { value: 'worst', label: t('wallet.worstFirst') },
-            ]}
-          />
+          <div className="flex flex-wrap items-center gap-2">
+            <SegmentedControl
+              label={t('wallet.rollupView')}
+              size="sm"
+              value={view}
+              onChange={setView}
+              options={[
+                { value: 'item', label: t('wallet.byItem') },
+                { value: 'day', label: t('wallet.byDay') },
+              ]}
+            />
+            {view === 'item' && (
+              <SegmentedControl
+                label={t('wallet.byItemOrder')}
+                size="sm"
+                value={order}
+                onChange={setOrder}
+                options={[
+                  { value: 'best', label: t('wallet.bestFirst') },
+                  { value: 'worst', label: t('wallet.worstFirst') },
+                ]}
+              />
+            )}
+          </div>
         </div>
-        <DataTable
-          label={t('wallet.byItem')}
-          density="compact"
-          responsive="table"
-          columns={columns}
-          rows={rows}
-          rowKey={itemRowKey}
-          onRowClick={(row) => onSelectItem(nameFor(row.typeId))}
-        />
+        {view === 'item' ? (
+          <DataTable
+            label={t('wallet.byItem')}
+            density="compact"
+            responsive="table"
+            columns={columns}
+            rows={rows}
+            rowKey={itemRowKey}
+            onRowClick={(row) => onSelectItem(nameFor(row.typeId))}
+          />
+        ) : (
+          <DataTable
+            label={t('wallet.byDay')}
+            density="compact"
+            responsive="table"
+            columns={dayColumns}
+            rows={dayRows}
+            rowKey={dayRowKey}
+          />
+        )}
       </div>
     </Disclosure>
   );

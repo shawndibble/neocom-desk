@@ -152,6 +152,14 @@ const SPECS: Record<string, Spec> = {
     range: true,
     endpoints: ['getCharacterWalletJournal', 'getCharacterWalletTransactions'],
   },
+  tradingProfit: {
+    category: 'money',
+    views: NCT,
+    view: 'number',
+    size: 'M',
+    range: true,
+    endpoints: ['getCharacterWalletJournal', 'getCharacterWalletTransactions'],
+  },
   lp: {
     category: 'money',
     views: NCT,

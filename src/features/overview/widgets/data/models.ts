@@ -140,6 +140,8 @@ const SUMS_ACROSS = new Set([
   'kills',
   // Every Character's journal, classified together; the builder narrows to the header Character.
   'omega',
+  // Every Character's fills and journal, pooled or narrowed to the header Character in the builder.
+  'tradingProfit',
   // Every Character's jobs and job slots; the builder narrows to the header Character.
   'industry',
 ]);

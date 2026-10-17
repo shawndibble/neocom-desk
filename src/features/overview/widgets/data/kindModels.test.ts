@@ -12,6 +12,7 @@ import type {
   OmegaWidgetData,
   RouteSafetyWidgetData,
   SurveyWidgetData,
+  TradingProfitWidgetData,
 } from './kindLoaders';
 import type { BuildContext, FeedState, Feeds } from './types';
 
@@ -1294,5 +1295,77 @@ describe('omega coverage', () => {
     if (view.chart?.kind !== 'omega') throw new Error('omega');
     expect(view.chart.lines.length).toBeLessThanOrEqual(6);
     expect(view.chart.lines[0]!.value).toBe(7 * B);
+  });
+});
+
+describe('trading profit', () => {
+  const fill = (id: number, over: Record<string, unknown>) => ({
+    transaction_id: id,
+    date: iso(NOW - 2 * DAY),
+    location_id: 1,
+    type_id: 34,
+    unit_price: 100,
+    quantity: 10,
+    client_id: 1,
+    is_buy: true,
+    journal_ref_id: id,
+    is_personal: true,
+    ...over,
+  });
+  const tax = (txn: number, amount: number) => ({
+    id: 900 + txn,
+    date: iso(NOW - DAY),
+    ref_type: 'transaction_tax',
+    description: '',
+    amount,
+    context_id: txn,
+    context_id_type: 'market_transaction_id',
+  });
+  const fee = {
+    id: 777,
+    date: iso(NOW - DAY),
+    ref_type: 'brokers_fee',
+    description: '',
+    amount: -50,
+  };
+  // The alt (92) bought; the main (91) sold.
+  const data = (): TradingProfitWidgetData => ({
+    characters: [
+      {
+        characterId: 91,
+        name: 'Main',
+        transactions: [
+          fill(1, { is_buy: false, date: iso(NOW - DAY), unit_price: 150, quantity: 4 }),
+        ],
+        journal: [tax(1, -20), fee],
+      },
+      { characterId: 92, name: 'Alt', transactions: [fill(1, {})], journal: [] },
+    ],
+    names: new Map([[34, 'Tritanium']]),
+    truncated: false,
+    skippedCount: 0,
+    fetchedAt: new Date(NOW),
+  });
+  const build = (over: Partial<BuildContext> = {}) =>
+    buildView('tradingProfit', { tradingProfit: ok(data()) }, ctx(over));
+
+  it('reads its own feed', () => {
+    expect(KIND_FEEDS.tradingProfit).toEqual(['tradingProfit']);
+  });
+
+  it("pools every Character's buys under All characters, and leaves the header Character's sale unmatched", () => {
+    const all = build({ scopeAll: true });
+    // 4 x 150 - 4 x 100 - 20 tax.
+    expect(all.number?.iskAmount).toBe(180);
+    expect(all.number?.notes?.join(' ')).toContain('tradingProfit.matched{"matched":1,"count":1}');
+    expect(all.number?.notes?.join(' ')).toContain('"amount":"50"');
+    const single = build();
+    expect(single.number?.iskAmount).toBeUndefined();
+    expect(single.number?.value).toBe('—');
+  });
+
+  it('lists margin per item in the table', () => {
+    const view = build({ scopeAll: true });
+    expect(view.table?.rows.map((r) => r.cells[0])).toEqual(['Tritanium']);
   });
 });

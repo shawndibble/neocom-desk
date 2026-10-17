@@ -11,10 +11,11 @@ import { journalTransactionLinks } from '@/features/character/journalTransaction
 import { realizedMargins, type RealizedMargin } from '@/engine/market/realizedMargin';
 import { toWalletTrade } from './orderCostBasis';
 
-export function transactionMargins(
+/** Each sale's sales tax (positive ISK) from the journal's `transaction_tax` lines, keyed by transaction id. */
+function salesTaxByTransaction(
   transactions: readonly WalletTransaction[],
   journal: readonly WalletJournalEntry[]
-): Map<number, RealizedMargin> {
+): Map<number, number> {
   const linkFor = journalTransactionLinks(transactions);
   const salesTax = new Map<number, number>();
   const seen = new Set<number>();
@@ -29,5 +30,59 @@ export function transactionMargins(
       (salesTax.get(txn.transaction_id) ?? 0) + Math.abs(entry.amount)
     );
   }
-  return realizedMargins(transactions.map(toWalletTrade), salesTax);
+  return salesTax;
+}
+
+export function transactionMargins(
+  transactions: readonly WalletTransaction[],
+  journal: readonly WalletJournalEntry[]
+): Map<number, RealizedMargin> {
+  return realizedMargins(
+    transactions.map(toWalletTrade),
+    salesTaxByTransaction(transactions, journal)
+  );
+}
+
+export interface CharacterFills {
+  characterId: number;
+  name: string;
+  transactions: readonly WalletTransaction[];
+  journal: readonly WalletJournalEntry[];
+}
+
+/** A fill of the All characters view: its id is unique across the pool. */
+export type PooledTransaction = WalletTransaction & {
+  characterId: number;
+  characterName: string;
+};
+
+/**
+ * All characters (issue #3995): every Character's fills in one FIFO pool, so a
+ * sale by one of an alt's buys gets a margin. Two Characters' wallets can carry
+ * the same `transaction_id` (a trade between them is on both), so each fill is
+ * renumbered to be unique across the pool; its sales tax is still linked inside
+ * its own Character's journal first.
+ */
+export function pooledTransactionMargins(sources: readonly CharacterFills[]): {
+  rows: PooledTransaction[];
+  margins: Map<number, RealizedMargin>;
+} {
+  const rows: PooledTransaction[] = [];
+  const salesTax = new Map<number, number>();
+  let nextId = 1;
+  for (const source of sources) {
+    const tax = salesTaxByTransaction(source.transactions, source.journal);
+    for (const txn of source.transactions) {
+      const id = nextId++;
+      const owed = tax.get(txn.transaction_id);
+      if (owed !== undefined) salesTax.set(id, owed);
+      rows.push({
+        ...txn,
+        transaction_id: id,
+        characterId: source.characterId,
+        characterName: source.name,
+      });
+    }
+  }
+  return { rows, margins: realizedMargins(rows.map(toWalletTrade), salesTax) };
 }

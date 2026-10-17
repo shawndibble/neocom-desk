@@ -24,6 +24,7 @@ export const CHARACTER_FILTER_PAGES = [
   'jobs',
   'opportunities',
   'orders',
+  'transactions',
 ] as const;
 export type CharacterFilterPage = (typeof CHARACTER_FILTER_PAGES)[number];
 

@@ -4239,6 +4239,16 @@
           "noteDaily": "ISK profit per day; a loss hangs below the axis",
           "noteWeekly": "ISK profit per week; a loss hangs below the axis"
         },
+        "tradingProfit": {
+          "summary": "Trading profit {{total}} from {{matched}} of {{count}} sales in the last {{range}} days.",
+          "note": "Margin per day; a loss hangs below the axis. Broker fees aren't taken off.",
+          "truncated": "Older fills weren't loaded, so some sales have no margin.",
+          "skipped_one": "{{count}} Character's journal couldn't be read.",
+          "skipped_other": "{{count}} Characters' journals couldn't be read.",
+          "tip": {
+            "margin": "Margin"
+          }
+        },
         "miningYield": {
           "summary": "Averaging {{average}} ISK a day over the last {{range}} days, {{days}} of them with mining, {{total}} in all.",
           "note": "ISK mined per day",
@@ -4393,6 +4403,12 @@
           "unit_one": "kill or loss",
           "unit_other": "kills and losses",
           "secondary": "Kills {{kills}} · Losses {{losses}}"
+        },
+        "tradingProfit": {
+          "unit": "{{count}} days",
+          "fees": "Broker fees {{amount}}",
+          "matched_one": "{{matched}} of {{count}} sale matched",
+          "matched_other": "{{matched}} of {{count}} sales matched"
         },
         "omega": {
           "covers_one": "Covers {{count}} account",
@@ -4624,7 +4640,7 @@
         }
       },
       "profit": {
-        "title": "Realized profit",
+        "title": "Build profit",
         "description": "What your builds earned",
         "empty": "No production has been logged yet.",
         "vsPrevious_one": "{{delta}} vs the previous day",
@@ -4634,6 +4650,16 @@
           "profit": "Profit",
           "built": "Built",
           "perUnit": "Per unit"
+        }
+      },
+      "tradingProfit": {
+        "title": "Trading profit",
+        "description": "What your market sales made, against the buys behind them",
+        "empty": "No sales in your wallet history for this range.",
+        "col": {
+          "item": "Item",
+          "sales": "Sales",
+          "margin": "Margin"
         }
       },
       "miningYield": {
@@ -5050,6 +5076,9 @@
         "profit": {
           "note": "This month · +18%"
         },
+        "tradingProfit": {
+          "note": "41 of 45 sales matched"
+        },
         "miningYield": {
           "note": "Average over the range"
         },
@@ -5384,6 +5413,18 @@
     "fills": "Fills",
     "unitsSold": "Units sold",
     "netMargin": "Net margin",
+    "tradingMargin": "Margin",
+    "tradingMatched_one": "{{matched}} of {{count}} sale matched",
+    "tradingMatched_other": "{{matched}} of {{count}} sales matched",
+    "brokerFees": "Broker fees",
+    "brokerFeesTooltip": "Broker fees paid over the same dates, from your journal. They aren't taken off the margin — a fee can't be tied to a sale.",
+    "archiveSince": "Since {{date}} — your wallet archive starts there.",
+    "rollupView": "Roll up by",
+    "byDay": "By day",
+    "day": "Day",
+    "salesCount": "Sales",
+    "character": "Character",
+    "characterFilterLabel": "Characters",
     "reauthTitle": "Log in again to see your wallet",
     "reauthHint": "Log in again to fetch this character's wallet balance.",
     "reauthAction": "Log in again with EVE Online",
