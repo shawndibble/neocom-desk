@@ -5,7 +5,7 @@
  */
 import { Fragment, type ReactNode } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
-import { Button, IskAmount, textActionClassName } from '@/components/ui';
+import { Button, IskAmount, NeedsConnection, textActionClassName } from '@/components/ui';
 import { HintText } from '@/components/ui/HintText';
 import { beginGrant } from '@/app/grantAction';
 import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
@@ -94,8 +94,7 @@ export function HealthyFold({
 
 /**
  * One Character's "fees assume base standings" note, only once its grant is
- * known to lack standings (`GrantNote`'s rule), with the Grant as a text
- * action.
+ * known to lack standings (`GrantNote`'s rule), with its Grant.
  */
 function StandingsAssumed({ characterId, name }: { characterId: number; name: string }) {
   const { t } = useTranslation();
@@ -106,30 +105,30 @@ function StandingsAssumed({ characterId, name }: { characterId: number; name: st
       <HintText content={t('market.orders.assumesBaseStandingsHint')}>
         {t('market.orders.fixList.standingsAssumed', { name })}
       </HintText>
-      <button
-        type="button"
-        className={textActionClassName()}
-        onClick={() => void beginGrant(characterId, STANDINGS_ENDPOINTS)}
-      >
-        {t('reauth.standingsAssumedAction')}
-      </button>
+      <NeedsConnection>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => void beginGrant(characterId, STANDINGS_ENDPOINTS)}
+        >
+          {t('reauth.standingsAssumedAction')}
+        </Button>
+      </NeedsConnection>
     </span>
   );
 }
 
 /**
  * The notices that qualify the list, as one quiet line at its foot: fees
- * priced at base standings, cached data, and Characters that have not shared
- * their orders. Empty, it takes no room.
+ * priced at base standings, and Characters that have not shared their orders.
+ * Empty, it takes no room.
  */
 export function ListNotes({
   floorCharacters,
-  fromCache,
   notShared,
 }: {
   /** Characters whose sell orders on screen carry a floor, priced with their standings. */
   floorCharacters: readonly { characterId: number; name: string }[];
-  fromCache: boolean;
   notShared: readonly { characterId: number; name: string }[];
 }) {
   const { t } = useTranslation();
@@ -138,7 +137,6 @@ export function ListNotes({
       {floorCharacters.map((c) => (
         <StandingsAssumed key={c.characterId} characterId={c.characterId} name={c.name} />
       ))}
-      {fromCache && <span>{t('common.offlineTitle')}</span>}
       {notShared.map((c) => (
         <span key={c.characterId}>{t('market.orders.fixList.notShared', { name: c.name })}</span>
       ))}

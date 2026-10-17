@@ -594,6 +594,30 @@ describe('OpenOrdersPanel', () => {
       ).not.toBeInTheDocument();
     });
 
+    it('drops a header sort once its column is hidden, back to worst first', async () => {
+      const user = userEvent.setup();
+      useVisibleOpenOrderColumns.setState({ value: ['price'], hydrated: true });
+      mockedLoadAll.mockResolvedValue(snapshot([entry([BELOW_FLOOR_ORDER, EXPIRING_ORDER])]));
+      mockedCostBases.mockResolvedValue(new Map([[101, costBasis(600)]]));
+      renderPanel();
+
+      const firstItem = () =>
+        within(screen.getByRole('table', NEEDS_YOU_TABLE)).getAllByRole('row')[1].textContent;
+      await screen.findByRole('table', NEEDS_YOU_TABLE);
+      expect(firstItem()).toContain('Tritanium');
+      await user.click(
+        within(screen.getByRole('table', NEEDS_YOU_TABLE)).getByRole('button', {
+          name: /^Your price/,
+        })
+      );
+      expect(firstItem()).toContain('Mexallon');
+
+      await openColumns(user);
+      await user.click(screen.getByRole('menuitemcheckbox', { name: 'Your price' }));
+      await user.keyboard('{Escape}');
+      expect(firstItem()).toContain('Tritanium');
+    });
+
     it('shows "—" for a floor nobody linked, and the floor rounded up to a legal price, in danger colour when the price is under it (issue #1421)', async () => {
       useVisibleOpenOrderColumns.setState({ value: ['floor'], hydrated: true });
       mockedLoadAll.mockResolvedValue(snapshot([entry([BELOW_FLOOR_ORDER, EXPIRING_ORDER])]));
@@ -725,7 +749,7 @@ describe('OpenOrdersPanel', () => {
     expect(await screen.findByRole('row', { name: /Tritanium/ })).toBeInTheDocument();
   });
 
-  it("folds the notices into one quiet line at the list's foot", async () => {
+  it("folds the notices into one quiet line at the list's foot, the cached notice above it", async () => {
     mockedLoadAll.mockResolvedValue(
       snapshot([entry([EXPIRING_ORDER], { fromCache: true })], [{ characterId: 2, name: 'Bravo' }])
     );
@@ -733,7 +757,11 @@ describe('OpenOrdersPanel', () => {
     renderPanel();
 
     const line = (await screen.findByText("Bravo hasn't shared their orders")).closest('p');
-    expect(line).toHaveTextContent('Showing cached data');
+    const table = screen.getByRole('table', NEEDS_YOU_TABLE);
+    expect(table.compareDocumentPosition(line!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // The cached notice keeps its own line above the list, age included (DESIGN.md).
+    const cached = screen.getByText(/Showing cached data/);
+    expect(cached.compareDocumentPosition(table) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   describe('funnel filter controls', () => {
@@ -758,7 +786,9 @@ describe('OpenOrdersPanel', () => {
       const user = userEvent.setup();
       renderMixedFixture();
       // Needs you: belowFloor + expiringOrStale; the healthy order is Fine.
-      await findMatchCount('2 of 3 orders match');
+      expect(await screen.findByRole('button', { name: 'Needs you (2)' })).toBeInTheDocument();
+      // A segment hiding the rest is not a failed match: nothing announced.
+      expect(screen.queryByText(/orders match/)).not.toBeInTheDocument();
 
       await openFunnel(user);
       await user.click(screen.getByRole('button', { name: 'Priced below cost1' }));
@@ -769,7 +799,7 @@ describe('OpenOrdersPanel', () => {
     it('keeps the whole control set behind the funnel until it is opened', async () => {
       const user = userEvent.setup();
       renderMixedFixture();
-      await findMatchCount('2 of 3 orders match');
+      await screen.findByRole('table', NEEDS_YOU_TABLE);
 
       expect(screen.queryByRole('combobox', { name: 'Expires within' })).not.toBeInTheDocument();
       await openFunnel(user);
@@ -815,7 +845,8 @@ describe('OpenOrdersPanel', () => {
       it('shows only that Character, states whose data it is, and leaves the active one alone', async () => {
         renderPanel('/market/orders?char=2');
         expect(await screen.findByText('Bravo only')).toBeInTheDocument();
-        await findMatchCount('1 of 1 orders match');
+        expect(await screen.findByRole('row', { name: /Mexallon/ })).toBeInTheDocument();
+        expect(screen.queryByText('Tritanium')).not.toBeInTheDocument();
         expect(useActiveCharacter.getState().activeCharacterId).toBe(1);
       });
 
@@ -910,7 +941,7 @@ describe('OpenOrdersPanel', () => {
       // The chip row is the only thing telling the reader why they are seeing
       // one order out of three, and the only way back to all of them.
       await user.click(screen.getByRole('button', { name: /^Problem: Expiring or stale$/i }));
-      await findMatchCount('2 of 3 orders match');
+      expect(await screen.findByRole('button', { name: 'Needs you (2)' })).toBeInTheDocument();
     });
 
     it('opens on the segment the link names, and says when it is empty', async () => {
@@ -924,13 +955,16 @@ describe('OpenOrdersPanel', () => {
 
     it('ignores a param it cannot read instead of showing an empty page', async () => {
       renderMixedFixture('/market/orders?orders.problems=nonsense&orders.view=nonsense');
-      await findMatchCount('2 of 3 orders match');
+      expect(await screen.findByRole('button', { name: 'Needs you (2)' })).toHaveAttribute(
+        'aria-pressed',
+        'true'
+      );
     });
 
     it('still renders a zero-count problem chip, at full contrast', async () => {
       const user = userEvent.setup();
       renderMixedFixture();
-      await findMatchCount('2 of 3 orders match');
+      await screen.findByRole('table', NEEDS_YOU_TABLE);
       await openFunnel(user);
 
       // Nothing in this fixture is undercut at the station tier. The `0`
@@ -943,18 +977,19 @@ describe('OpenOrdersPanel', () => {
     it('narrows the list with the cost-basis chip pair', async () => {
       const user = userEvent.setup();
       renderMixedFixture();
-      await findMatchCount('2 of 3 orders match');
+      await screen.findByRole('table', NEEDS_YOU_TABLE);
 
-      // Of the two that need you, only the expiring order has no cost basis.
+      // The expiring and the healthy order have no cost basis.
       await openFunnel(user);
       await user.click(screen.getByRole('button', { name: 'No cost basis' }));
-      await findMatchCount('1 of 3 orders match');
+      await findMatchCount('2 of 3 orders match');
+      expect(screen.getByRole('button', { name: 'Needs you (1)' })).toBeInTheDocument();
     });
 
     it('narrows the list with the "expires within" select', async () => {
       const user = userEvent.setup();
       renderMixedFixture();
-      await findMatchCount('2 of 3 orders match');
+      await screen.findByRole('table', NEEDS_YOU_TABLE);
 
       // The below-floor order expires in 60 days; only the expiring order (5
       // days left) is inside a 7-day window.
@@ -967,7 +1002,7 @@ describe('OpenOrdersPanel', () => {
     it('narrows the list with the "ISK tied up over" select, down to an honest no-match', async () => {
       const user = userEvent.setup();
       renderMixedFixture();
-      await findMatchCount('2 of 3 orders match');
+      await screen.findByRole('table', NEEDS_YOU_TABLE);
 
       // Every order ties up well under 10M ISK.
       await openFunnel(user);

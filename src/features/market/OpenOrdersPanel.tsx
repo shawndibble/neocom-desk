@@ -15,6 +15,7 @@ import {
   DataAgeBadge,
   DataTable,
   CachedEmptyState,
+  CachedNotice,
   EmptyState,
   FilterBar,
   FilterChip,
@@ -414,13 +415,17 @@ export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
     [tableColumns, visibleColumnIds]
   );
 
-  /** Every row the funnel matched, in the table's order: the header sort when one is set. */
-  const sortedRows = useMemo(() => {
-    const column = tableSort && columns.find((c) => c.id === tableSort.columnId);
-    return column && tableSort
-      ? sortRows(fixList.matching, column, tableSort.direction)
-      : fixList.matching;
-  }, [fixList.matching, tableSort, columns]);
+  /** The header sort, dropped once the Columns menu hides its column. */
+  const sortColumn = tableSort && columns.find((c) => c.id === tableSort.columnId);
+  const activeSort = sortColumn ? tableSort : null;
+  /** Every row the funnel matched, in the table's order. */
+  const sortedRows = useMemo(
+    () =>
+      sortColumn && activeSort
+        ? sortRows(fixList.matching, sortColumn, activeSort.direction)
+        : fixList.matching,
+    [fixList.matching, sortColumn, activeSort]
+  );
 
   // Every row the funnel matched, whichever segment shows, exported as the ESI
   // orders behind them — hence `source: 'rows'`.
@@ -724,6 +729,8 @@ export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
             />
           ))}
 
+          {fromCacheAny && <CachedNotice fetchedAt={oldestFetchedAt} />}
+
           {noOrders ? (
             // Every Character skipped: the "hasn't shared" note below already says why.
             notShared.length > 0 && snapshot.openOrders.entries.length === 0 ? null : (
@@ -1006,11 +1013,16 @@ export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
                 </div>
               )}
 
+              {/*
+                Only a funnel filter narrows: a segment hiding the rest is not
+                a failed match (issue #2032), and its count is on its button.
+              */}
               <LiveStatus>
                 {fixList.matching.length === 0
                   ? t('orders.noResults')
-                  : t('market.orders.filter.matchCount', {
-                      count: viewRows.length,
+                  : visibleChips.length > 0 &&
+                    t('market.orders.filter.matchCount', {
+                      count: fixList.matching.length,
                       total: allRows.length,
                     })}
               </LiveStatus>
@@ -1055,7 +1067,7 @@ export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
                     label={tableLabel}
                     highlightRowKey={highlightId}
                     selectedRowKey={workCurrentId}
-                    sort={tableSort}
+                    sort={activeSort}
                     onSortChange={setTableSort}
                   />
                 </div>
@@ -1070,11 +1082,7 @@ export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
             </>
           )}
 
-          <ListNotes
-            floorCharacters={floorCharacters}
-            fromCache={fromCacheAny}
-            notShared={notShared}
-          />
+          <ListNotes floorCharacters={floorCharacters} notShared={notShared} />
 
           {detailRow && (
             <OrderDetailModal
