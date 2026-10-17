@@ -9395,7 +9395,6 @@
     "assumesBaseStandingsHint": "Broker fees on sell-order profits are calculated at 0 standing. Grant Character details for this character's actual faction and corporation standings."
   },
   "orders": {
-    "openTab": "Open",
     "emptyTitle": "No open orders cached",
     "emptyHint": "Couldn't load this character's orders yet. Try again shortly.",
     "emptyFetchedTitle": "No open orders",
@@ -10498,8 +10497,6 @@
       },
       "offHub": "Off hub",
       "offHubHelp": "This order is not at one of the five NPC trade hubs, so fewer buyers pass it.",
-      "noBuildLinked": "No build linked",
-      "buildLinked": "Linked to a build",
       "legendColourRule": "Colour marks distance only — station, system, region. Everything else is grey. Every badge also carries its own words.",
       "group": {
         "belowFloor": "Priced below cost",
@@ -10513,7 +10510,6 @@
       },
       "floorLabel": "Never sell below",
       "floorHelp": "Change an order's price and you pay the broker fee all over again (discounted by your Relist Discount), so this is the lowest price worth editing to. Leave the order alone and it sells, the fee is already paid, so you break even a little lower.",
-      "floorFillLabel": "If you leave it and it sells",
       "costPerUnit": "Cost per unit",
       "relistBrokerFee": "Broker fee (relist discount applied)",
       "noCostBasisTitle": "We don't know what this cost you",
@@ -10531,9 +10527,7 @@
       "fillsIn": "Fills in",
       "fillsInHelp": "Units left to buy divided by the item's average daily volume in the region, shared by your place in the queue.",
       "sellsOutPastExpiry": "Runs past the day this order expires",
-      "expiresIn": "Expires in",
       "details": "Details",
-      "needsAttention": "Needs attention",
       "allCharacters": "All characters",
       "onlySeller": "You are the only seller here",
       "scopeTheirPrice": "Their price",

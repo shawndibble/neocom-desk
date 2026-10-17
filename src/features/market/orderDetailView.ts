@@ -154,7 +154,11 @@ export interface VerdictFigures {
   /**
    * The exact price to type into the order, or null when the call asks for
    * no new price. Only a price the call recommends: never the cheapest rival
-   * on its own (a fact, not advice), never your current price.
+   * on its own (a fact, not advice), never your current price, never a
+   * `letGo` verdict's price (only there to make its sentence add up).
+   * `matchThem` copies the verdict's own price, already the legal one-tick-
+   * under price (issue #1421), so Copy can't disagree with the sentence; a
+   * verdict whose price is null (a degenerate floor) copies nothing.
    */
   copyPrice: number | null;
   /**
@@ -165,10 +169,10 @@ export interface VerdictFigures {
 }
 
 export function verdictFigures(row: OpenOrderRow, advice: OrderAdvice): VerdictFigures {
-  const { next, summary, verdict } = advice;
+  const { summary, verdict } = advice;
   const copyPrice =
-    next.kind === 'raisePrice' || next.kind === 'matchThem'
-      ? next.price
+    (verdict?.kind === 'raisePrice' || verdict?.kind === 'matchThem') && verdict.price !== null
+      ? verdict.price
       : row.isBuyOrder && summary?.kind === 'outbid'
         ? summary.suggestedPrice
         : null;
