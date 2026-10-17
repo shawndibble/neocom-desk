@@ -182,11 +182,12 @@ export function isBrowserChannelEnabled(value: NotificationPreferencesValue): bo
   return value.browserEnabled ?? true;
 }
 
-/** The Overview's Notification Feed. Absent means on. */
+/** The Alerts popover's View button also dismisses the alert. Absent means off. */
 export function isDismissOnView(value: NotificationPreferencesValue): boolean {
   return value.dismissOnView ?? false;
 }
 
+/** The Overview's Notification Feed. Absent means on. */
 export function isFeedChannelEnabled(value: NotificationPreferencesValue): boolean {
   return value.feedEnabled ?? true;
 }
