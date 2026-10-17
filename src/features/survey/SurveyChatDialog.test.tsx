@@ -23,6 +23,7 @@ const labels = {
   cleared: i18n.t('survey.message.cleared'),
   location: i18n.t('survey.message.location'),
   pace: i18n.t('survey.message.pace'),
+  percent: i18n.t('survey.message.percent'),
   value: i18n.t('survey.message.value'),
   volume: i18n.t('survey.message.volume'),
   elapsed: i18n.t('survey.message.elapsed'),

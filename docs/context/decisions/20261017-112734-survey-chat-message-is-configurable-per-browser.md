@@ -10,7 +10,7 @@ _Recorded 2026-10-17._
     taper and brackets go, and the ETA and link are plain rows;
   - the ETA, the progress bar, and the ore line (none, top 2, top 3, all; with
     or without rock counts);
-  - one "Left:" line, directly under the bar, holding the ores, the ISK value
+  - one "Left:" line, directly under the bar, holding the percent left, the ores, the ISK value
     and the volume, the last two as just a number and unit;
   - optional location, pace and duration rows; short facts share a row when
     they fit.

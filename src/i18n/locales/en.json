@@ -5653,6 +5653,7 @@
       "flags": {
         "location": "Location",
         "pace": "Mining pace",
+        "percentLeft": "Percent left",
         "iskLeft": "Value",
         "volumeLeft": "Volume",
         "elapsed": "Duration"
@@ -5792,6 +5793,7 @@
       "cleared": "Field cleared in {duration}",
       "location": "At: {place}",
       "pace": "Pace: {pace} m³/s",
+      "percent": "{percent}%",
       "value": "{isk} ISK",
       "volume": "{left} m³",
       "elapsed": "Duration: {duration}"

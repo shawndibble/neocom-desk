@@ -28,10 +28,17 @@ interface SurveyChatDialogProps {
   onClose: () => void;
 }
 
-type FlagKey = 'location' | 'pace' | 'iskLeft' | 'volumeLeft' | 'elapsed';
+type FlagKey = 'location' | 'pace' | 'percentLeft' | 'iskLeft' | 'volumeLeft' | 'elapsed';
 /** The drawn borders; the checkbox beside them is `none`. */
 const LINE_STYLES = ['single', 'double'] as const;
-const FLAGS: readonly FlagKey[] = ['location', 'pace', 'iskLeft', 'volumeLeft', 'elapsed'];
+const FLAGS: readonly FlagKey[] = [
+  'location',
+  'pace',
+  'percentLeft',
+  'iskLeft',
+  'volumeLeft',
+  'elapsed',
+];
 
 export function SurveyChatDialog({
   summary,
