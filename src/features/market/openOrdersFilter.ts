@@ -377,7 +377,12 @@ export interface OpenOrdersLinkTarget {
   /** OR'd, the way the filter's own `problems` are. */
   problems?: readonly OrderProblem[];
   characterIds?: readonly number[];
+  /** Opens with the work-through queue already started. */
+  workThrough?: boolean;
 }
+
+/** The one-shot param that opens Open Orders with the work-through queue started; spent on arrival. */
+export const WORK_THROUGH_PARAM = 'orders.workThrough';
 
 /**
  * A link to the Orders page already narrowed to what the linker counted.
@@ -393,7 +398,11 @@ export interface OpenOrdersLinkTarget {
  * reads live, so a link the board builds and a page that has since changed
  * its own params can never silently disagree about the shape of the URL.
  */
-export function openOrdersHref({ problems, characterIds }: OpenOrdersLinkTarget): string {
+export function openOrdersHref({
+  problems,
+  characterIds,
+  workThrough,
+}: OpenOrdersLinkTarget): string {
   const params = new URLSearchParams();
   const problemsRaw = OPEN_ORDERS_FILTER_PARAMS['orders.problems'].serialize(problems ?? []);
   if (problemsRaw !== null) params.set('orders.problems', problemsRaw);
@@ -401,6 +410,7 @@ export function openOrdersHref({ problems, characterIds }: OpenOrdersLinkTarget)
     characterIds ?? []
   );
   if (charactersRaw !== null) params.set('orders.characters', charactersRaw);
+  if (workThrough) params.set(WORK_THROUGH_PARAM, '1');
   const query = params.toString();
   return query === '' ? ORDERS_PATH : `${ORDERS_PATH}?${query}`;
 }

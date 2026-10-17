@@ -1,7 +1,11 @@
-import { Fragment, useRef, type ReactElement } from 'react';
+import { Fragment, useRef, type ReactElement, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { RowMoreActions } from '@/components/ui';
-import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
+import {
+  focusRingInsetClassName,
+  rowInteractiveClassName,
+  selectedRowClassName,
+} from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { formatIskAuto } from '@/lib/isk';
 import { useScrollToRowKey } from '@/lib/useScrollToRowKey';
@@ -23,6 +27,10 @@ interface OpenOrdersListProps {
   showFloor: boolean;
   /** The row a notification pointed at (`useHighlightParam`): scrolled to and pulsed. */
   highlightId: number | null;
+  /** The selected row (the work-through's current order): accent edge and `aria-current`. */
+  selectedId?: number | null;
+  /** Content under a row's button, outside it — buttons don't nest (the work-through controls). */
+  rowExtra?: (row: OpenOrderRow) => ReactNode;
   onOpen: (row: OpenOrderRow) => void;
   /** Wraps a row, e.g. the item context menu. Same contract as `DataTable`'s. */
   rowContextMenu?: (row: OpenOrderRow, el: ReactElement) => ReactElement;
@@ -31,7 +39,7 @@ interface OpenOrdersListProps {
 /**
  * Open Orders below `sm`: three lines per order — item/character/price,
  * the problem badge with its sentence, then remaining (and floor, off-hub)
- * — tapping anywhere on the row opens `OrderDetailModal`.
+ * — tapping anywhere on the row opens `OrderDetailModal`; `rowExtra` sits below, outside the button.
  *
  * The item name is the card's accent cue (§6c), not a `MarketItemLink`, and the badge
  * renders with `interactive={false}` (no "?" trigger): both are otherwise
@@ -46,6 +54,8 @@ export function OpenOrdersList({
   showCharacter,
   showFloor,
   highlightId,
+  selectedId = null,
+  rowExtra,
   onOpen,
   rowContextMenu,
 }: OpenOrdersListProps) {
@@ -59,46 +69,61 @@ export function OpenOrdersList({
         const { badge, summary } = adviseOrder(row);
         const offHub = isOffHubStation(row.stationName, row.locationId);
         const listRow = (
-          <li data-row-key={row.orderId} className="flex items-start">
-            <button
-              type="button"
-              onClick={() => onOpen(row)}
-              className={cx(
-                'flex min-h-11 min-w-0 flex-1 flex-col gap-1 px-3 py-2 text-left',
-                rowInteractiveClassName,
-                focusRingInsetClassName,
-                row.orderId === highlightId && 'row-pulse'
-              )}
-            >
-              <span className="flex items-start justify-between gap-2">
-                <span className="flex min-w-0 flex-wrap items-center gap-1">
-                  <span className="truncate text-sm text-accent">{row.typeName}</span>
-                  {showCharacter && <CharacterBadge characterName={row.characterName} />}
-                </span>
-                <span className="shrink-0 text-sm font-semibold text-text tabular-nums">
-                  {formatIskAuto(row.price)}
-                </span>
-              </span>
-              <span className="flex flex-wrap items-center gap-1.5">
-                {badge && (
-                  <OrderProblemBadge kind={badge.kind} detail={badge.detail} interactive={false} />
+          <li
+            data-row-key={row.orderId}
+            aria-current={row.orderId === selectedId ? 'true' : undefined}
+            className={cx(
+              'flex flex-col',
+              row.orderId === selectedId ? selectedRowClassName : 'border-l-2 border-l-transparent'
+            )}
+          >
+            <div className="flex items-start">
+              <button
+                type="button"
+                onClick={() => onOpen(row)}
+                className={cx(
+                  'flex min-h-11 min-w-0 flex-1 flex-col gap-1 px-3 py-2 text-left',
+                  rowInteractiveClassName,
+                  focusRingInsetClassName,
+                  row.orderId === highlightId && 'row-pulse'
                 )}
-                <OrderRowSummaryText row={row} summary={summary} interactive={false} />
-              </span>
-              <span className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-text-dim tabular-nums">
-                <span>
-                  {t('orders.remaining')}: {formatOrderRemaining(row.volumeRemain, row.volumeTotal)}
-                </span>
-                {showFloor && row.floor && (
-                  <span>
-                    {t('market.orders.floorLabel')}: {formatOrderFloorPrice(row.floor)}
+              >
+                <span className="flex items-start justify-between gap-2">
+                  <span className="flex min-w-0 flex-wrap items-center gap-1">
+                    <span className="truncate text-sm text-accent">{row.typeName}</span>
+                    {showCharacter && <CharacterBadge characterName={row.characterName} />}
                   </span>
-                )}
-                {offHub && <span className="text-warning">{t('market.orders.offHub')}</span>}
-              </span>
-            </button>
-            {/* Beside the button, not in it — buttons don't nest. */}
-            <RowMoreActions className="mt-1.5 mr-1 shrink-0" />
+                  <span className="shrink-0 text-sm font-semibold text-text tabular-nums">
+                    {formatIskAuto(row.price)}
+                  </span>
+                </span>
+                <span className="flex flex-wrap items-center gap-1.5">
+                  {badge && (
+                    <OrderProblemBadge
+                      kind={badge.kind}
+                      detail={badge.detail}
+                      interactive={false}
+                    />
+                  )}
+                  <OrderRowSummaryText row={row} summary={summary} interactive={false} />
+                </span>
+                <span className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-text-dim tabular-nums">
+                  <span>
+                    {t('orders.remaining')}:{' '}
+                    {formatOrderRemaining(row.volumeRemain, row.volumeTotal)}
+                  </span>
+                  {showFloor && row.floor && (
+                    <span>
+                      {t('market.orders.floorLabel')}: {formatOrderFloorPrice(row.floor)}
+                    </span>
+                  )}
+                  {offHub && <span className="text-warning">{t('market.orders.offHub')}</span>}
+                </span>
+              </button>
+              {/* Beside the button, not in it — buttons don't nest. */}
+              <RowMoreActions className="mt-1.5 mr-1 shrink-0" />
+            </div>
+            {rowExtra?.(row)}
           </li>
         );
         return (

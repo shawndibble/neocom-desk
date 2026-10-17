@@ -75,6 +75,8 @@ export interface NumberModel {
   notes?: string[];
   /** The severity ladder's tone; `clear` draws plain. */
   tone: DeadlineSeverity;
+  /** A follow-on link under the figure, the Number view only (Open orders' "Work through (N)"). */
+  link?: { label: string; to: string };
 }
 
 export interface ListRow {
