@@ -67,7 +67,7 @@ describe('SurveyChatDialog', () => {
     await user.click(screen.getByRole('checkbox', { name: /Progress bar/ }));
     expect(preview).not.toHaveTextContent('█');
     await user.click(screen.getByRole('checkbox', { name: /Location/ }));
-    expect(preview).toHaveTextContent('At: Efa IV');
+    expect(preview).toHaveTextContent('[ Efa IV ]');
   });
 
   it('remembers the choices in the browser', async () => {

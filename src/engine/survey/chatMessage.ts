@@ -293,10 +293,11 @@ export function surveyChatMessage(
   // spot and the box starts underneath it instead of beside the name.
   const lead = `${labels.heading}\n`;
   const frame = FRAMES[options.border];
-  const placeRows =
+  const place =
     options.location && location !== null && location !== ''
-      ? [fill(labels.location, { place: location })]
-      : [];
+      ? fill(labels.location, { place: location })
+      : null;
+  const placeRows = place === null ? [] : [place];
 
   if (summary.finished) {
     const headline = fill(labels.cleared, { duration: formatDuration(summary.elapsedMs) });
@@ -338,17 +339,19 @@ export function surveyChatMessage(
       ? [fill(labels.elapsed, { duration: formatDuration(summary.elapsedMs) })]
       : []),
   ];
+  // A place takes the top rail; the ETA then moves into the body.
+  const etaRows = options.eta && place !== null ? [timing] : [];
   return (
     lead +
     box(frame, {
-      headline: options.eta ? timing : '',
+      headline: place ?? (options.eta ? timing : ''),
       // One scan: nothing mined yet, so a bar would be empty.
       bar:
         options.bar && summary.points.length > 1
           ? { percent: summary.percent, finished: false }
           : null,
       // What is left comes straight under the bar, which is a share of it.
-      rows: [...leftRows, ...placeRows, ...packRows(stats, sidePx)],
+      rows: [...leftRows, ...etaRows, ...packRows(stats, sidePx)],
       url,
     }).join('\n')
   );

@@ -22,7 +22,7 @@ const labels: SurveyMessageLabels = {
   left: 'Left: {ores}',
   more: '{count} other',
   cleared: 'Field cleared in {duration}',
-  location: 'At: {place}',
+  location: '{place}',
   percent: '{percent}%',
   pace: 'Pace: {pace} m³/s',
   value: '{isk} ISK',
@@ -355,10 +355,21 @@ describe('chat message options', () => {
     const off = withOptions({}, 'Efa IV').box.join('\n');
     for (const word of ['Efa', 'Pace', 'Duration', 'ISK', 'm³']) expect(off).not.toContain(word);
     const { box } = withOptions({ location: true, pace: true, elapsed: true }, 'Efa IV');
+    // The place takes the top rail and the ETA moves into the body.
+    expect(box[0]).toMatch(/^┌─*\[ Efa IV \]─*╌┄┈$/);
     expect(box[2]).toMatch(/^│ Left: /);
-    expect(box[3]).toBe('│ At: Efa IV');
+    expect(box[3]).toMatch(/^│ ETA: /);
     // Short facts share a row.
     expect(box[4]).toMatch(/^│ Pace: \d+ m³\/s · Duration: 10m$/);
+  });
+
+  it('keeps the place as the top line with no border or no ETA', () => {
+    const bare = withOptions({ location: true, border: 'none' }, 'Efa IV').box;
+    expect(bare[0]).toBe('Efa IV');
+    expect(bare.join('\n')).toContain('ETA: ');
+    const noEta = withOptions({ location: true, eta: false }, 'Efa IV').box.join('\n');
+    expect(noEta).toContain('[ Efa IV ]');
+    expect(noEta).not.toContain('ETA');
   });
 
   it('puts value and volume on the Left line, right under the bar, with just their units', () => {
