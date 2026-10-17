@@ -127,6 +127,22 @@ describe('bakeInvention', () => {
       })
     ).toThrow(/691.*11401/);
   });
+
+  it('fails the bake when a success chance is zero or unreadable', () => {
+    for (const probability of [0, NaN]) {
+      expect(() =>
+        bakeInvention({
+          ...rifterRows,
+          probabilities: [
+            rifterRows.probabilities[0],
+            { ...rifterRows.probabilities[1], probability },
+          ],
+          isBlueprint: allPublished,
+          isPublished: allPublished,
+        })
+      ).toThrow(/691.*11401/);
+    }
+  });
 });
 
 describe('bakeDecryptors', () => {

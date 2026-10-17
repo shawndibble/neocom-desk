@@ -8,6 +8,7 @@
 // see lib/ccpStaticData.mjs.
 
 import { mkdir, readFile, rm, writeFile, stat } from 'node:fs/promises';
+import { isDeepStrictEqual } from 'node:util';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { flattenMarketWideTree, MARKET_WIDE_MAX_DEPTH } from './lib/flattenMarketWideTree.mjs';
@@ -172,15 +173,32 @@ const BLUEPRINT_CATEGORY_ID = 9;
 // invention.json plausibility (issue #3987), counted against dump
 // 3607705_20261012_133001: 1,003 T1 blueprints that invent, 3,518 that copy, 8
 // generic decryptors. A broken join lands at 0. Rifter Blueprint (691) invents
-// the Wolf Blueprint (11372); Accelerant Decryptor (34201) is 1.2 / +2 ME /
-// +10 TE / +1 run in game (EVE University wiki, Invention).
+// the Wolf Blueprint (11372). Decryptor controls are the in-game values
+// (EVE University wiki, Invention): chance multiplier, ME, TE, runs.
 const INVENTION_BLUEPRINTS_MIN = 800;
 const INVENTION_BLUEPRINTS_MAX = 1300;
 const COPYING_BLUEPRINTS_MIN = 3000;
 const COPYING_BLUEPRINTS_MAX = 5000;
 const INVENTION_CONTROL_BLUEPRINT = 691;
 const INVENTION_CONTROL_PRODUCT = 11372;
-const DECRYPTOR_CONTROL = { typeID: 34201, probabilityMultiplier: 1.2, me: 2, te: 10, runs: 1 };
+const DECRYPTOR_CONTROLS = [
+  {
+    typeID: 34201,
+    name: 'Accelerant Decryptor',
+    probabilityMultiplier: 1.2,
+    me: 2,
+    te: 10,
+    runs: 1,
+  },
+  {
+    typeID: 34202,
+    name: 'Attainment Decryptor',
+    probabilityMultiplier: 1.8,
+    me: -1,
+    te: 4,
+    runs: 4,
+  },
+];
 // Mastery tiers: certMasteries.csv's masteryLevel is 0-4 (5 tiers, I-V);
 // certSkills.csv's certLevelInt is 1-5 for the same tiers, so
 // certLevelInt = masteryLevel + 1 is the join key between the two files.
@@ -1075,7 +1093,13 @@ async function main() {
       const out = [];
       for (let i = 1; i < rows.length; i++) {
         const row = {};
-        for (const c of cols) row[c] = Number(rows[i][h[c]]);
+        for (const c of cols) {
+          row[c] = Number(rows[i][h[c]]);
+          // A renamed column or blank cell would otherwise bake as NaN/0.
+          if (rows[i][h[c]] === '' || !Number.isFinite(row[c])) {
+            throw new Error(`${fileName} row ${i}: '${c}' is not a number`);
+          }
+        }
         out.push(row);
       }
       return out;
@@ -2324,13 +2348,14 @@ async function main() {
       );
       process.exitCode = 1;
     }
-    const { typeID: decryptorId, ...expected } = DECRYPTOR_CONTROL;
-    const { name: _name, ...actual } = inventionData.decryptors[decryptorId] ?? {};
-    if (JSON.stringify(actual) !== JSON.stringify(expected)) {
-      console.error(
-        `  FAIL: Accelerant Decryptor (${decryptorId}) reads ${JSON.stringify(actual)}, expected ${JSON.stringify(expected)}`
-      );
-      process.exitCode = 1;
+    for (const { typeID: decryptorId, ...expected } of DECRYPTOR_CONTROLS) {
+      const actual = inventionData.decryptors[decryptorId];
+      if (!isDeepStrictEqual(actual, expected)) {
+        console.error(
+          `  FAIL: ${expected.name} (${decryptorId}) reads ${JSON.stringify(actual)}, expected ${JSON.stringify(expected)}`
+        );
+        process.exitCode = 1;
+      }
     }
   }
   console.log(`  types map entries: ${Object.keys(typeMap).length}`);

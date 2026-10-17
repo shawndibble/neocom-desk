@@ -154,7 +154,7 @@ export interface InventionRecipe {
 }
 
 /** The copying and invention halves of one blueprint (issue #3987). */
-export interface BlueprintResearch {
+export interface BlueprintCopyInvention {
   /** base time in seconds to copy one run (SDE activity 5) */
   copyTime?: number;
   invention?: InventionRecipe;
@@ -179,7 +179,7 @@ export interface Decryptor {
  */
 export interface InventionData {
   /** blueprint typeID -> its copying/invention data */
-  blueprints: Record<string, BlueprintResearch>;
+  blueprints: Record<string, BlueprintCopyInvention>;
   /** decryptor typeID -> its modifiers */
   decryptors: Record<string, Decryptor>;
 }

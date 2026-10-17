@@ -19,7 +19,7 @@ const ME_MODIFIER_ATTR = 1113; // inventionMEModifier
 const TE_MODIFIER_ATTR = 1114; // inventionTEModifier
 const MAX_RUN_MODIFIER_ATTR = 1124; // inventionMaxRunModifier
 
-function groupByType(rows) {
+function inventionRowsByType(rows) {
   const map = new Map();
   for (const r of rows) {
     if (r.activityID !== INVENTION_ACTIVITY_ID) continue;
@@ -36,8 +36,8 @@ function groupByType(rows) {
 /**
  * `{ blueprintTypeId: { copyTime?, invention? } }` for blueprints that copy or
  * invent. An invention product's `quantity` is the invented copy's base runs.
- * Throws when a kept product has no success chance: a recipe without one
- * can't be priced, and the SDE has always carried it.
+ * Throws when a kept product has no positive success chance: a recipe without
+ * one can't be priced, and the SDE has always carried it.
  * @param {{
  *   activities: {typeID:number,activityID:number,time:number}[],
  *   materials: {typeID:number,activityID:number,materialTypeID:number,quantity:number}[],
@@ -57,9 +57,9 @@ export function bakeInvention({
   isBlueprint,
   isPublished,
 }) {
-  const materialsByType = groupByType(materials);
-  const productsByType = groupByType(products);
-  const skillsByType = groupByType(skills);
+  const materialsByType = inventionRowsByType(materials);
+  const productsByType = inventionRowsByType(products);
+  const skillsByType = inventionRowsByType(skills);
   const probability = new Map();
   for (const r of probabilities) {
     if (r.activityID !== INVENTION_ACTIVITY_ID) continue;
@@ -92,9 +92,9 @@ export function bakeInvention({
         })),
         products: invented.map((p) => {
           const chance = probability.get(`${typeID}:${p.productTypeID}`);
-          if (chance == null) {
+          if (!(chance > 0)) {
             throw new Error(
-              `blueprint ${typeID} invents ${p.productTypeID} with no industryActivityProbabilities row`
+              `blueprint ${typeID} invents ${p.productTypeID} with no positive industryActivityProbabilities chance`
             );
           }
           return { typeID: p.productTypeID, quantity: p.quantity, probability: chance };
