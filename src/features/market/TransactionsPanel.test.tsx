@@ -320,6 +320,36 @@ describe('TransactionsPanel — margin', () => {
     );
     expect(screen.getByTestId('location-search').textContent).not.toMatch(/txn\.(side|start|end)/);
   });
+
+  it('totals the margin of the matched sales and the broker fees over the same dates', async () => {
+    load([
+      taxFor(2, -49_766.4),
+      taxFor(3, -100),
+      {
+        id: 777,
+        date: '2026-09-15T12:00:00Z',
+        ref_type: 'brokers_fee',
+        description: '',
+        amount: -8_104_550,
+      },
+    ]);
+    renderPanel('/market/history?txn.start=2026-09-01');
+    const strip = await screen.findByRole('region', { name: /Totals/ });
+    expect(strip).toHaveTextContent('+132,634');
+    expect(strip).toHaveTextContent('1 of 2 sales matched');
+    expect(strip).toHaveTextContent('-8,104,550');
+  });
+
+  it('rolls the margin up by day when By day is picked', async () => {
+    load([taxFor(2, -49_766.4), taxFor(3, -100)]);
+    renderPanel();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: /By item/ }));
+    await user.click(screen.getByRole('button', { name: 'By day' }));
+    const table = screen.getByRole('table', { name: 'By day' });
+    expect(within(table).getByRole('row', { name: /2026-09-20/ })).toHaveTextContent('+132,634');
+    expect(within(table).getByRole('row', { name: /2026-09-21/ })).toHaveTextContent('—');
+  });
 });
 
 describe('TransactionsPanel — phone', () => {

@@ -1,4 +1,5 @@
 import { useCallback, useMemo } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -44,11 +45,25 @@ import {
   walletTransactionsCsvColumns,
 } from '@/features/character/walletTransactionsCsv';
 import type { WalletJournalEntry, WalletTransaction } from '@/esi/endpoints';
-import { transactionMargins } from './transactionMargins';
+import { db } from '@/db';
+import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
+import { useRememberedCharacterFilter } from '@/features/character/characterFilterPicks';
+import { characterFilterParam } from '@/features/character/characterFilterUrlParam';
+import { useResolvedCharacterFilter } from '@/features/character/characterFilterValue';
+import { useRememberedUrlParams } from '@/lib/useUrlState';
+import {
+  pooledTransactionMargins,
+  transactionMargins,
+  type PooledTransaction,
+} from './transactionMargins';
+import { summarizeTrading } from './tradingSummary';
+import { useAllCharacterFills, useArchiveSince } from './useAllCharacterFills';
 import { PageHeaderPortals } from './PageHeaderPortals';
 import type { PageHeaderSlots } from './pageHeaderSlots';
 import { useHighlightParam } from '@/lib/useHighlightParam';
 import { highlightedTransactionId } from './transactionHighlight';
+
+const HISTORY_CHARACTER_PARAMS = { 'txn.chars': characterFilterParam('current') };
 
 /** Stable identity, so the fallback doesn't invalidate the column memo every render. */
 const NO_TYPE_NAMES: ReadonlyMap<number, string> = new Map();
@@ -108,22 +123,70 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
   const { data, error, loading, hydrated, activeCharacterId, refreshCount, refresh } =
     useRouteSnapshot(loadTransactionsSnapshot, undefined, { cacheKey: 'market:transactions' });
   const highlightTypeId = useHighlightParam();
+
+  // This Character / All characters (issue #3995). Hidden for a one-Character account.
+  const rememberedCharacterFilter = useRememberedCharacterFilter<typeof HISTORY_CHARACTER_PARAMS>(
+    'transactions',
+    'txn.chars'
+  );
+  const [characterValues, setCharacterValues] = useRememberedUrlParams(
+    HISTORY_CHARACTER_PARAMS,
+    rememberedCharacterFilter
+  );
+  const characterFilter = characterValues['txn.chars'];
+  const resolvedCharacterFilter = useResolvedCharacterFilter(characterFilter, activeCharacterId);
+  const storedCharacters = useLiveQuery(() => db.characters.toArray(), [], []);
+  const characterCount = storedCharacters?.length ?? 0;
+  const showCharacterFilter = characterCount > 1;
+  const allScope = showCharacterFilter && resolvedCharacterFilter === 'all';
+  const allFills = useAllCharacterFills(allScope, refreshCount);
+  const singleArchiveSince = useArchiveSince(activeCharacterId);
+  const pooled = useMemo(
+    () => (allFills.status === 'ready' ? pooledTransactionMargins(allFills.data.fills) : null),
+    [allFills]
+  );
   const transactionsResult = data?.transactionsResult ?? null;
   const transactionsNeedsReauth = data?.transactionsNeedsReauth ?? false;
-  const transactionsTruncated = data?.transactionsTruncated ?? false;
-  const typeNames = data?.typeNames ?? NO_TYPE_NAMES;
+  const transactionsTruncated = allScope
+    ? allFills.status === 'ready' && allFills.data.truncated
+    : (data?.transactionsTruncated ?? false);
+  const typeNames =
+    (allScope ? (allFills.status === 'ready' ? allFills.data.typeNames : null) : data?.typeNames) ??
+    NO_TYPE_NAMES;
   const nameFor = useCallback(
     (typeId: number) => typeNames.get(typeId) ?? `Type #${typeId}`,
     [typeNames]
   );
 
-  const transactions = useMemo(
-    () => [...(transactionsResult?.data ?? [])].sort((a, b) => b.date.localeCompare(a.date)),
-    [transactionsResult]
+  const transactions = useMemo<WalletTransaction[]>(
+    () =>
+      [...(allScope ? (pooled?.rows ?? []) : (transactionsResult?.data ?? []))].sort((a, b) =>
+        b.date.localeCompare(a.date)
+      ),
+    [allScope, pooled, transactionsResult]
   );
-  const journal = data?.journal ?? NO_JOURNAL;
+  const journal = useMemo(
+    () =>
+      allScope
+        ? allFills.status === 'ready'
+          ? allFills.data.fills.flatMap((f) => f.journal)
+          : NO_JOURNAL
+        : (data?.journal ?? NO_JOURNAL),
+    [allScope, allFills, data]
+  );
   // Worked out over every fill, not the filtered rows — a filter must not change what a sale cost.
-  const margins = useMemo(() => transactionMargins(transactions, journal), [transactions, journal]);
+  const margins = useMemo(
+    () =>
+      allScope && pooled
+        ? pooled.margins
+        : transactionMargins(allScope ? [] : transactions, journal),
+    [allScope, pooled, transactions, journal]
+  );
+  const archiveSince = allScope
+    ? allFills.status === 'ready'
+      ? allFills.data.archiveSince
+      : null
+    : singleArchiveSince;
 
   // One filter bar on this tab, so the scope key never changes and the
   // filter never needs `useUrlFilter`'s scope-reset.
@@ -136,6 +199,10 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
   const filteredTransactions = useMemo(
     () => filterWalletTransactions(transactions, rowsFilter, nameFor),
     [transactions, rowsFilter, nameFor]
+  );
+  const trading = useMemo(
+    () => summarizeTrading(filteredTransactions, margins, journal, rowsFilter, archiveSince),
+    [filteredTransactions, margins, journal, rowsFilter, archiveSince]
   );
   const csvColumns = useMemo(() => walletTransactionsCsvColumns(t, nameFor), [t, nameFor]);
   const transactionsExport = useTableExport({
@@ -164,6 +231,18 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
         render: (txn) => formatTimestamp(new Date(txn.date), timeZone),
         sortValue: (txn) => txn.date,
       },
+      ...(allScope
+        ? [
+            {
+              id: 'character',
+              header: t('wallet.character'),
+              phoneHidden: true,
+              className: 'whitespace-nowrap',
+              render: (txn: WalletTransaction) => (txn as PooledTransaction).characterName,
+              sortValue: (txn: WalletTransaction) => (txn as PooledTransaction).characterName,
+            } satisfies DataTableColumn<WalletTransaction>,
+          ]
+        : []),
       {
         id: 'item',
         header: t('wallet.item'),
@@ -237,7 +316,7 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
         sortValue: (txn) => margins.get(txn.transaction_id)?.margin,
       },
     ],
-    [t, typeNames, timeZone, nameFor, margins]
+    [t, typeNames, timeZone, nameFor, margins, allScope]
   );
 
   const headerChrome = (
@@ -271,6 +350,16 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
   }
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
 
+  if (allScope && allFills.status === 'loading') {
+    return (
+      <>
+        {headerChrome}
+        <div className="flex justify-center py-16">
+          <Spinner label={t('common.loading')} />
+        </div>
+      </>
+    );
+  }
   if (loading && !data) {
     return (
       <>
@@ -281,7 +370,7 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
       </>
     );
   }
-  if (error) {
+  if (error || (allScope && allFills.status === 'failed')) {
     return (
       <>
         {headerChrome}
@@ -290,14 +379,23 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
     );
   }
 
-  const hasRows = !transactionsNeedsReauth && transactions.length > 0;
+  const hasRows = (allScope || !transactionsNeedsReauth) && transactions.length > 0;
+  const characterControl = showCharacterFilter ? (
+    <CharacterFilterControl
+      size="md"
+      activeCharacterId={activeCharacterId}
+      value={characterFilter}
+      characterCount={characterCount}
+      onChange={(next) => setCharacterValues({ 'txn.chars': next })}
+    />
+  ) : undefined;
 
   return (
     <div className="space-y-4">
       {headerChrome}
       {hasRows && filteredTransactions.length > 0 && (
         <div className="space-y-2">
-          <TransactionsSummaryStrip transactions={filteredTransactions} />
+          <TransactionsSummaryStrip transactions={filteredTransactions} trading={trading} />
           <TransactionsItemRollup
             transactions={filteredTransactions}
             margins={margins}
@@ -308,7 +406,7 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
         </div>
       )}
       <Panel padded={false}>
-        {transactionsNeedsReauth ? (
+        {!allScope && transactionsNeedsReauth ? (
           <div className="px-3 py-2">
             <GrantBanner
               characterId={activeCharacterId}
@@ -318,9 +416,9 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
               actionLabel={t('wallet.reauthAction')}
             />
           </div>
-        ) : !transactionsResult || !hasRows ? (
+        ) : !(allScope || transactionsResult) || !hasRows ? (
           <CachedEmptyState
-            result={transactionsResult}
+            result={allScope ? null : transactionsResult}
             title={t('wallet.transactionsEmptyTitle')}
             hint={t('wallet.transactionsEmptyHint')}
             fetchedTitle={t('wallet.transactionsEmptyFetchedTitle')}
@@ -328,7 +426,7 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
           />
         ) : (
           <>
-            {transactionsResult.fromCache && (
+            {!allScope && transactionsResult?.fromCache && (
               <CachedNotice
                 className="px-3 pt-2"
                 fetchedAt={transactionsResult.fetchedAt}
@@ -340,7 +438,11 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
                 {t('common.incompleteTitle')} — {t('wallet.transactionsTruncatedHint')}
               </p>
             )}
-            <TransactionsFilterBar filter={filter} onChange={setFilter} />
+            <TransactionsFilterBar
+              filter={filter}
+              onChange={setFilter}
+              actions={characterControl}
+            />
             {filteredTransactions.length === 0 ? (
               <EmptyState
                 title={t('wallet.transactionsNoFilterMatches')}

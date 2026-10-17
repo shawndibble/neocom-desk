@@ -350,6 +350,27 @@ function buildSamples(t: TFunction): Record<string, Sample> {
         xEnd: t('overview.widgets.chart.thisWeek'),
       },
     },
+    tradingProfit: {
+      value: '+132M',
+      isk: 132_000_000,
+      unit: t('overview.widgets.data.tradingProfit.unit', { count: 30 }),
+      note: t('overview.gallery.samples.tradingProfit.note'),
+      rows: [
+        ['Damage Control II', '', '+58M'],
+        ['Tritanium', '', '+41M'],
+        ['Gila', '', '+33M'],
+      ],
+      chart: {
+        kind: 'bars',
+        summary: '',
+        values: [20, 35, -10, 48, 39],
+        gains: true,
+        barLabels: ['+20M', '+35M', '-10M', '+48M', '+39M'],
+        max: '48M',
+        xStart: t('overview.widgets.chart.daysAgo', { count: 5 }),
+        xEnd: t('overview.widgets.chart.today'),
+      },
+    },
     miningYield: {
       value: '58M',
       unit: t('overview.widgets.data.miningYield.unit'),

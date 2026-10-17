@@ -54,6 +54,7 @@ import {
   loadRouteSafetyWidget,
   loadKillsWidget,
   loadOmegaWidget,
+  loadTradingProfitWidget,
   loadSurveyWidget,
 } from './kindLoaders';
 import { feedsFor } from './models';
@@ -265,6 +266,15 @@ function Source({ feed }: { feed: FeedId }) {
     case 'omega':
       return (
         <SnapshotSource feed="omega" load={loadOmegaWidget} cacheKey="overview:omega" accountWide />
+      );
+    case 'tradingProfit':
+      return (
+        <SnapshotSource
+          feed="tradingProfit"
+          load={loadTradingProfitWidget}
+          cacheKey="overview:trading-profit"
+          accountWide
+        />
       );
     case 'incursions':
       return <IncursionsSource />;

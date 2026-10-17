@@ -22,7 +22,7 @@ export interface TransactionDay<T> {
 }
 
 /** `en-CA` for a sortable `YYYY-MM-DD`. Built per call so a test toggling TZ re-resolves. */
-function dayKeyOf(date: string, timeZone: string | undefined): string {
+export function dayKeyOf(date: string, timeZone: string | undefined): string {
   return new Date(date).toLocaleDateString('en-CA', {
     year: 'numeric',
     month: '2-digit',
