@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ownedAtStation, subtractOwned } from './appraisalOwned';
+import { ownedAnywhere, ownedAtStation, subtractOwned } from './appraisalOwned';
 
 const asset = (
   type_id: number,
@@ -45,5 +45,16 @@ describe('subtractOwned', () => {
   it('leaves need equal to quantity when nothing is owned', () => {
     const [, , none] = subtractOwned(items, new Map());
     expect(none).toMatchObject({ owned: 0, need: 5 });
+  });
+});
+
+describe('ownedAnywhere', () => {
+  it('sums every Character stock wherever it sits: stations, containers, structures', () => {
+    const owned = ownedAnywhere([
+      [asset(34, 100, 1), asset(34, 7, 2, 'item'), asset(35, 5, 3, 'item')],
+      [asset(34, 50, 9)],
+    ]);
+    expect(owned.get(34)).toBe(157);
+    expect(owned.get(35)).toBe(5);
   });
 });

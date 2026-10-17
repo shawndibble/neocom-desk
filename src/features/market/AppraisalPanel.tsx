@@ -199,6 +199,9 @@ function comparisonCell(
 
 /** `lg` up to (not including) `xl`: paste card and results share a row but the results card is narrow. A min-and-max pair never matches under the test `matchMedia` stub, so tests see the full default. */
 const COMPACT_RESULTS_QUERY = '(min-width: 64rem) and (max-width: 79.999rem)';
+/** The "Minus owned" picker's value for every location, apart from any station id. */
+const OWNED_EVERYWHERE = 'all';
+
 const COMPACT_OFF_BY_DEFAULT: readonly AppraisalColumnId[] = ['buyEach', 'sellEach', 'volume'];
 
 export function AppraisalPanel({
@@ -284,7 +287,7 @@ export function AppraisalPanel({
   const minusOwned = ownedPref.enabled && !lacksAssets && characterId !== null;
   const ownedStationId = ownedPref.stationId ?? hub.stationId;
   const ownedStation = TRADE_HUBS.find((h) => h.stationId === ownedStationId) ?? hub;
-  const { owned } = useOwnedAtStation(minusOwned, ownedStationId);
+  const { owned } = useOwnedAtStation(minusOwned, ownedPref.everywhere ? 'all' : ownedStationId);
 
   const storedColumns = useVisibleAppraisalColumns((state) => state.value);
   // Side by side below `xl` the results card is only ~500px wide, so with no
@@ -834,15 +837,23 @@ export function AppraisalPanel({
               </label>
               {ownedPref.enabled && !lacksAssets && characterId !== null && (
                 <Select
-                  value={String(ownedStationId)}
+                  value={ownedPref.everywhere ? OWNED_EVERYWHERE : String(ownedStationId)}
                   onValueChange={(value) =>
-                    void setOwnedPref({ ...ownedPref, stationId: Number(value) })
+                    void setOwnedPref(
+                      value === OWNED_EVERYWHERE
+                        ? { ...ownedPref, everywhere: true }
+                        : { ...ownedPref, everywhere: false, stationId: Number(value) }
+                    )
                   }
                 >
                   <SelectTrigger size="sm" aria-label={t('market.appraisal.minusOwnedStation')}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value={OWNED_EVERYWHERE}>
+                      {t('market.appraisal.minusOwnedEverywhere')}
+                    </SelectItem>
+                    <SelectSeparator />
                     {TRADE_HUBS.map((h) => (
                       <SelectItem key={h.id} value={String(h.stationId)}>
                         {h.systemName}
@@ -1004,7 +1015,9 @@ export function AppraisalPanel({
               <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
                 {minusOwned && (
                   <span className="w-full text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                    {t('market.appraisal.minusOwnedChip', { station: ownedStation.systemName })}
+                    {ownedPref.everywhere
+                      ? t('market.appraisal.minusOwnedChipEverywhere')
+                      : t('market.appraisal.minusOwnedChip', { station: ownedStation.systemName })}
                   </span>
                 )}
                 <AppraisalHeaderStats

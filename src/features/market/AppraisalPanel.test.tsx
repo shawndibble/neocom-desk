@@ -1422,7 +1422,10 @@ describe('AppraisalPanel — shopping list (#2868)', () => {
 
   it('shows Need with owned beneath, dims covered lines, and copies net quantities', async () => {
     await seedAssetsGrant();
-    useAppraisalOwnedPref.setState({ value: { enabled: true, stationId: null }, hydrated: true });
+    useAppraisalOwnedPref.setState({
+      value: { enabled: true, stationId: null, everywhere: false },
+      hydrated: true,
+    });
     loadAllCharactersAssets.mockResolvedValue({
       entries: [
         {
@@ -1460,6 +1463,29 @@ describe('AppraisalPanel — shopping list (#2868)', () => {
     await userEvent.click(screen.getByRole('button', { name: /Appraisal/ }));
     await userEvent.click(await screen.findByRole('menuitem', { name: /^Multibuy/ }));
     expect(written).toEqual(['Damage Control II\t2']);
+  });
+
+  it('counts stock held anywhere, containers included, under All locations', async () => {
+    await seedAssetsGrant();
+    useAppraisalOwnedPref.setState({
+      value: { enabled: true, stationId: null, everywhere: true },
+      hydrated: true,
+    });
+    loadAllCharactersAssets.mockResolvedValue({
+      entries: [
+        {
+          characterId: 1,
+          name: 'A',
+          truncated: false,
+          assets: [{ type_id: 999, quantity: 9, location_id: 123456, location_type: 'item' }],
+        },
+      ],
+      skipped: [],
+    });
+    renderPanel({ controller: controller({ result: LIST_OUTCOME }) });
+    const covered = screen.getByRole('row', { name: /Civilian Gatling Railgun/ });
+    expect(await within(covered).findByText('4 owned')).toBeInTheDocument();
+    expect(screen.getByText('Minus owned · all locations')).toBeInTheDocument();
   });
 
   it('reloads a Recent paste', async () => {
