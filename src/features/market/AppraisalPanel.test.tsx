@@ -1140,6 +1140,38 @@ describe('AppraisalPanel — the row as an item', () => {
     expect(actions.showInfo).toHaveBeenCalledWith(2048, 'Damage Control II');
   });
 
+  describe('Remove', () => {
+    const TEXT = 'Damage Control II\t3\nCivilian Gatling Railgun 1';
+
+    it('drops the item from the text box and prices what is left, no confirmation', async () => {
+      const ctl = controller({ text: TEXT, result: outcome() });
+      renderPanel({ controller: ctl });
+      fireEvent.contextMenu(screen.getByRole('row', { name: /Damage Control II/ }));
+      fireEvent.click(await screen.findByRole('menuitem', { name: 'Remove' }));
+
+      expect(ctl.appraiseText).toHaveBeenCalledWith('Civilian Gatling Railgun 1');
+      expect(ctl.clear).not.toHaveBeenCalled();
+    });
+
+    it('clears the form when the last item goes', async () => {
+      const ctl = controller({ text: 'Damage Control II\t3', result: outcome() });
+      renderPanel({ controller: ctl });
+      fireEvent.contextMenu(screen.getByRole('row', { name: /Damage Control II/ }));
+      fireEvent.click(await screen.findByRole('menuitem', { name: 'Remove' }));
+
+      expect(ctl.clear).toHaveBeenCalled();
+      expect(ctl.appraiseText).not.toHaveBeenCalled();
+    });
+
+    it('is not offered for a pasted fit, whose lines are not one item each', async () => {
+      const ctl = controller({ text: '[Rifter, Test]\nDamage Control II', result: outcome() });
+      renderPanel({ controller: ctl });
+      fireEvent.contextMenu(screen.getByRole('row', { name: /Damage Control II/ }));
+      await screen.findByRole('menuitem', { name: 'Show info' });
+      expect(screen.queryByRole('menuitem', { name: 'Remove' })).not.toBeInTheDocument();
+    });
+  });
+
   /** Without this the Build Plan action sits on "Checking…" forever. */
   it('asks for the blueprint catalog the first time a row menu opens', () => {
     const { actions } = renderPanel({

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   countPasteLines,
+  removeItemFromPaste,
   parseAppraisalPaste,
   parseAppraisalPasteDetailed,
   pasteBoxRows,
@@ -316,5 +317,31 @@ describe('parseAppraisalPaste — EFT fits', () => {
       { name: 'Tritanium', quantity: 100, lines: [1] },
       { name: '[Empty High slot]', quantity: 1, lines: [2] },
     ]);
+  });
+});
+
+describe('removeItemFromPaste', () => {
+  it('drops every line naming the item, keeping the rest and their order', () => {
+    const text = 'Tritanium\t100\nPyerite\t5\ntritanium 20\nIsogen 7';
+    expect(removeItemFromPaste(text, 'Tritanium')).toBe('Pyerite\t5\nIsogen 7');
+  });
+
+  it('keeps blank lines and line endings of what stays', () => {
+    expect(removeItemFromPaste('Pyerite 5\r\n\r\nTritanium 1\r\nIsogen 2', 'Tritanium')).toBe(
+      'Pyerite 5\r\n\r\nIsogen 2'
+    );
+  });
+
+  it('answers an empty string when it removed the last item', () => {
+    expect(removeItemFromPaste('Tritanium\t100', 'Tritanium')).toBe('');
+  });
+
+  it('leaves the text as it was when no line names the item', () => {
+    expect(removeItemFromPaste('Pyerite 5', 'Tritanium')).toBe('Pyerite 5');
+  });
+
+  it('answers null for an EFT fit, whose lines are not one item each', () => {
+    const fit = '[Rifter, Test]\nDamage Control II\n\nTritanium x5';
+    expect(removeItemFromPaste(fit, 'Tritanium')).toBeNull();
   });
 });

@@ -28,6 +28,7 @@ import {
   EmptyState,
   IconButton,
   MenuItem,
+  MenuSeparator,
   IskAmount,
   Panel,
   Select,
@@ -65,7 +66,8 @@ import {
   refineBeatsSellAsIs,
   type AppraisalRow,
 } from '@/engine/market/appraisal';
-import { countPasteLines, pasteBoxRows } from '@/engine/market/appraisalPaste';
+import { looksLikeEftFit } from '@/engine/import/eftFit';
+import { countPasteLines, pasteBoxRows, removeItemFromPaste } from '@/engine/market/appraisalPaste';
 import {
   appraisalSnapshotReuseKey,
   buildAppraisalSnapshot,
@@ -612,9 +614,31 @@ export function AppraisalPanel({
   // The Item Detail modal (Market's `ItemActionsProvider`) and `CompareDrawer`
   // sit outside Market's section guards, so Show Info and Add to Compare work
   // from this tab without a second copy of either.
+  // Takes the item's lines out of the text box and prices what is left. Gone
+  // is gone, with no confirmation: pasting the list again brings it back. A
+  // fit has no such thing as one item's lines, so it carries no Remove.
+  const canRemoveRows = !looksLikeEftFit(text);
+  function removeRow(name: string) {
+    const next = removeItemFromPaste(text, name);
+    if (next === null) return;
+    if (next.trim() === '') controller.clear();
+    else controller.appraiseText(next);
+  }
+  function removeItem(row: OwnedRow) {
+    if (!canRemoveRows) return undefined;
+    return (
+      <>
+        <MenuSeparator />
+        <MenuItem className="text-danger" onSelect={() => removeRow(row.name)}>
+          {t('market.appraisal.removeRow')}
+        </MenuItem>
+      </>
+    );
+  }
+
   function rowContextMenu(row: OwnedRow, tr: ReactElement) {
     return (
-      <ItemContextMenu typeId={row.typeId} itemName={row.name}>
+      <ItemContextMenu typeId={row.typeId} itemName={row.name} extraItems={removeItem(row)}>
         {tr}
       </ItemContextMenu>
     );

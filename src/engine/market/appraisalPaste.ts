@@ -287,3 +287,29 @@ export function parseAppraisalPasteDetailed(text: string): {
 export function parseAppraisalPaste(text: string): AppraisalPasteEntry[] {
   return parseAppraisalPasteDetailed(text).entries;
 }
+
+/**
+ * The paste with every line naming `itemName` taken out, line endings of what
+ * stays untouched — what the Appraisal's row "Remove" does to the text box.
+ * Names are compared the way the catalogue does (trimmed, case-insensitive).
+ * Answers the text unchanged when no line names the item, and null for an EFT
+ * fit: its lines are a hull, slots and charges, so deleting "one item" from it
+ * would break the fit rather than shorten a list.
+ */
+export function removeItemFromPaste(text: string, itemName: string): string | null {
+  if (looksLikeEftFit(text)) return null;
+  const target = itemName.trim().toLowerCase();
+  const entry = parseAppraisalPaste(text).find((e) => e.name.trim().toLowerCase() === target);
+  if (!entry) return text;
+
+  const removed = new Set(entry.lines);
+  // Odd indexes are the line breaks the split kept, so each line owns the break after it.
+  const parts = text.split(/(\r\n|\r|\n)/);
+  let kept = '';
+  for (let i = 0; i < parts.length; i += 2) {
+    if (removed.has(i / 2 + 1)) continue;
+    kept += parts[i] + (parts[i + 1] ?? '');
+  }
+  // Dropping the last line leaves the break before it hanging.
+  return /(\r\n|\r|\n)$/.test(text) ? kept : kept.replace(/(\r\n|\r|\n)$/, '');
+}

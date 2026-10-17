@@ -298,6 +298,7 @@ Paste panel
 - Lines chip: count of paste lines (`countPasteLines`), differs from row count because repeats merge.
 - Price Percent number field (0-1000, default 100, `pricePercent.ts:19-27`), device-local setting `useMarketPricePercent`; field holds typed string, writes only when in range (`AppraisalPanel.tsx:268`). `?percent=` URL param overrides for one visit (`Market.tsx:304`), cleared when user types.
 - Appraise (primary, disabled when empty/loading), Clear (disabled when empty).
+- Row menu (right-click and ⋮) ends with a divider and a danger "Remove": no confirmation, takes that item's lines out of the paste box (`removeItemFromPaste`) and re-prices the rest, clearing the form when it was the last. Not offered for a pasted EFT fit.
 - Unmatched box: names that resolved to no market type, listed with source line numbers (`market.appraisal.unmatchedLine`), plus lines whose stated quantity could not be read (`12.5`, `5 m3`) rather than pricing them as 1. Quantities grouped with `.`, space, no-break space or `'` (`124.500`) parse as whole numbers (`appraisalPaste.ts`).
 - Changing hub or percent after a result exists re-prices automatically (effect deps in `useAppraisal.ts`).
 
