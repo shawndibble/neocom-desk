@@ -25,5 +25,6 @@ PNG exports of the chosen mockups for ready tickets. Delete a folder (and its ro
 | [stock-targets](stock-targets/index.html) | Issue #3521 | revised: Market › Stock, one list per market (station picked), listed vs hangar; HTML, not PNGs |
 | [wallet-journal-all-characters](wallet-journal-all-characters/README.md) | Issues #3908, #3914, #3915 | revised: side panel that filters the Journal, hideable daily chart, phone day-grouped list |
 | [fitting-can-fly-by-character](fitting-can-fly-by-character/README.md) | Issue #3910 | revised: Your Characters section in the stats column, chips + search + closest-first table |
+| [open-orders](open-orders/README.md) | none yet | three forms (A fix list, B table + side panel, C triage inbox); pick one |
 
 First draft mockup; sample data. The ticket's Agent Brief text wins over the picture where they differ.
