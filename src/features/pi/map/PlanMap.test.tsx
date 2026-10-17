@@ -84,16 +84,6 @@ function stubPhone(phone: boolean) {
     }) as unknown as MediaQueryList) as typeof window.matchMedia;
 }
 
-function stubCoarse() {
-  window.matchMedia = ((media: string) =>
-    ({
-      media,
-      matches: media.includes('pointer: coarse'),
-      addEventListener: () => {},
-      removeEventListener: () => {},
-    }) as unknown as MediaQueryList) as typeof window.matchMedia;
-}
-
 beforeEach(() => {
   localStorage.clear();
   observers.length = 0;
@@ -775,27 +765,12 @@ describe('PlanMap: starting state follows the data until the pilot acts', () => 
   });
 });
 
-describe('PlanMap: how-to line', () => {
-  it('keeps the what-if hint above the board, with no dismiss button and no how-to sentence', async () => {
-    const user = userEvent.setup();
+describe('PlanMap: what-if row', () => {
+  it('draws no what-if row or hint button until a planet type is hovered or ticked', () => {
     renderMap();
-    const line = screen.getByTestId('map-whatif');
-    await user.hover(
-      within(line).getByRole('button', { name: 'About planet types you do not have' })
-    );
-    expect(
-      (await screen.findAllByText(/^Hover or focus a type you don't have \(/)).length
-    ).toBeGreaterThan(0);
-    expect(screen.queryByRole('button', { name: 'Got it' })).toBeNull();
-  });
-
-  it('says Tap, not Click or Hover, on a coarse pointer', async () => {
-    const user = userEvent.setup();
-    stubCoarse();
-    renderMap();
-    await user.hover(screen.getByRole('button', { name: 'About planet types you do not have' }));
-    expect((await screen.findAllByText(/^Tap a type you don't have \(/)).length).toBeGreaterThan(0);
-    expect(screen.queryByText(/Hover|Click/)).toBeNull();
+    expect(screen.getByTestId('map-whatif')).toBeEmptyDOMElement();
+    expect(screen.queryByRole('button', { name: 'About planet types you do not have' })).toBeNull();
+    expect(screen.queryByText(/to filter, or a product to trace it/)).toBeNull();
   });
 
   it('explains the tile marks in a legend beside the title, only the marks the board draws', () => {

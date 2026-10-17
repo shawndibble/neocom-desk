@@ -49,15 +49,7 @@
 import { withArticle } from '../article';
 import { AssumedCustomsNote } from '../AssumedCustomsNote';
 import { assumedCustomsNames } from '../colonyCustoms';
-import {
-  Fragment,
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { onPlanLinkClick } from '@/features/industry/planLinkClick';
@@ -128,8 +120,6 @@ export interface MapColony {
 const listFormat = new Intl.ListFormat('en', { style: 'long', type: 'conjunction' });
 
 export interface PlanMapProps {
-  /** The colony read failed: `colonies` is empty because it is unknown, not because there are none. */
-  coloniesUnknown?: boolean;
   /** Hub prices could not be read: `advice` is unpriced, so "your planets already make their best" cannot be said. */
   pricesFailed?: boolean;
   graph: MapGraph;
@@ -154,7 +144,6 @@ export function PlanMap({
   adviceWithWhatIf,
   colonies,
   finder,
-  coloniesUnknown = false,
   pricesFailed = false,
   chainOf = NO_CHAINS,
   pi = null,
@@ -405,17 +394,6 @@ export function PlanMap({
     () => (activeWhatIf.size > 0 ? unlockedBy(graph, activeWhatIf, ticked) : null),
     [graph, activeWhatIf, ticked]
   );
-  // Sizing only: every missing type's preview, and all of them ticked together, are laid out
-  // invisibly so the box fits the tallest.
-  const sizingUnlocks = useMemo(() => {
-    const missing = graph.planetTypes.filter((type) => !isHave(type));
-    const sets = missing.map((type) => [type]);
-    if (missing.length > 1) sets.push(missing);
-    return sets.map((types) => ({
-      types,
-      unlock: unlockedBy(graph, new Set(types), ticked),
-    }));
-  }, [graph, isHave, ticked]);
   const haulBetween = usePiSettings((state) => state.value.haulBetweenPlanets === true);
   const chainsOn = haulBetween && pi !== null && !pricesFailed;
   const whatIfChainKey = chainsOn && whatIfTypes.length > 0 ? whatIfKey(whatIfTypes) : null;
@@ -871,88 +849,44 @@ export function PlanMap({
     </div>
   );
 
-  const missingTypes = graph.planetTypes.filter((type) => !isHave(type));
   const whatIfLine = (() => {
-    // Placeholder and active states share one grid cell, so the box is as tall as the taller of the
-    // two and hovering never shifts the page (#2796). The idle one stays laid out but invisible.
-    const layer =
-      'col-start-1 row-start-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 px-3 py-1.5 min-h-10';
     const active = activeWhatIf.size > 0 && unlock ? [...activeWhatIf].sort() : null;
-    // `ghost` sizes the box without a second copy of the text in the DOM: the strings come from CSS.
-    const preview = (
-      types: readonly PlanetType[],
-      un: NonNullable<typeof unlock>,
-      bestText: string,
-      ghost = false
-    ) => {
-      const text = (s: string, cls?: string) =>
-        ghost ? (
-          <span data-text={s} className={cx(cls, 'after:content-[attr(data-text)]')} />
-        ) : (
-          <span className={cls}>{s}</span>
-        );
-      return (
-        <div
-          className={cx(layer, 'text-text', ghost && 'invisible')}
-          aria-hidden={ghost || undefined}
-        >
-          {types.map((type) => (
-            <PlanetImage key={type} type={type} size={28} />
-          ))}
-          {text(
-            types.length === 1
-              ? t('piMap.whatIfTitle', { aType: withArticle(planetName(t, types[0])) })
-              : t('piMap.whatIfTitleMany', {
-                  types: listFormat.format(types.map((type) => planetName(t, type))),
-                }),
-            'text-[0.6875rem] font-semibold tracking-widest text-map-whatif uppercase'
-          )}
-          {text(
-            (un.productIds.length === 0
-              ? t('piMap.whatIfNothing')
-              : t('piMap.whatIfUnlocks', { count: un.productIds.length })) + bestText
-          )}
-          <span aria-hidden="true" className="flex flex-wrap gap-0.5">
-            {un.productIds.slice(0, 12).map((id) => (
-              <TypeIcon key={id} typeId={id} size={32} width={22} height={22} />
-            ))}
-          </span>
-        </div>
-      );
-    };
     const best = whatIfRecipe ? ` ${t('piMap.whatIfBest', { name: whatIfRecipe.name })}` : '';
+    // Nothing shows until a what-if type is ticked or hovered. A hover floats over the board's top
+    // edge instead of taking a row, so hovering never shifts the page (#2796).
     return (
-      <div
-        className="grid border-b border-line text-xs text-text-dim"
-        aria-live="polite"
-        data-testid="map-whatif"
-      >
-        <div
-          className={cx(layer, active !== null && 'invisible')}
-          aria-hidden={active ? true : undefined}
-        >
-          {noColonies ? (
-            <span>
-              {t(coloniesUnknown ? 'piMap.whatIfUnknownColonies' : 'piMap.whatIfNoColonies')}
+      <div className="relative text-xs text-text-dim" aria-live="polite" data-testid="map-whatif">
+        {active && unlock ? (
+          <div
+            className={cx(
+              'flex flex-wrap items-center gap-x-2.5 gap-y-1 border-b border-line px-3 py-1.5 text-text',
+              previewed !== null &&
+                'absolute inset-x-0 top-0 z-20 bg-panel shadow-lg shadow-black/50'
+            )}
+          >
+            {active.map((type) => (
+              <PlanetImage key={type} type={type} size={28} />
+            ))}
+            <span className="text-[0.6875rem] font-semibold tracking-widest text-map-whatif uppercase">
+              {active.length === 1
+                ? t('piMap.whatIfTitle', { aType: withArticle(planetName(t, active[0])) })
+                : t('piMap.whatIfTitleMany', {
+                    types: listFormat.format(active.map((type) => planetName(t, type))),
+                  })}
             </span>
-          ) : (
-            <InfoTooltip
-              label={t('piMap.whatIfHintLabel')}
-              content={
-                missingTypes.length > 0
-                  ? t('piMap.whatIfHint', {
-                      types: missingTypes.map((type) => planetName(t, type)).join(', '),
-                      context,
-                    })
-                  : t('piMap.whatIfAll')
-              }
-            />
-          )}
-        </div>
-        {active && unlock ? preview(active, unlock, previewed === null ? best : '') : null}
-        {sizingUnlocks.map((g) => (
-          <Fragment key={g.types.join('+')}>{preview(g.types, g.unlock, best, true)}</Fragment>
-        ))}
+            <span>
+              {(unlock.productIds.length === 0
+                ? t('piMap.whatIfNothing')
+                : t('piMap.whatIfUnlocks', { count: unlock.productIds.length })) +
+                (previewed === null ? best : '')}
+            </span>
+            <span aria-hidden="true" className="flex flex-wrap gap-0.5">
+              {unlock.productIds.slice(0, 12).map((id) => (
+                <TypeIcon key={id} typeId={id} size={32} width={22} height={22} />
+              ))}
+            </span>
+          </div>
+        ) : null}
       </div>
     );
   })();
@@ -1032,7 +966,7 @@ export function PlanMap({
               onPlanet={clickPlanet}
               onProduct={toggleProduct}
               productHref={productHref}
-              between={<div className="-mx-3 border-y border-line">{whatIfLine}</div>}
+              between={<div className="-mx-3">{whatIfLine}</div>}
               fullMap={board}
             />
           ) : (
