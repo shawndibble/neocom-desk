@@ -661,7 +661,7 @@ describe('BlueprintAcquisitionModal — Invent (issue #3990)', () => {
     ).toBe(true);
   });
 
-  it('writes a picked tier at its expected cost per copy and sets the copy’s runs', async () => {
+  it('writes a picked tier marked invented, priced live, and sets the copy’s runs', async () => {
     const user = userEvent.setup();
     const onPickRuns = vi.fn();
     const props = renderModal({ invention: invention(20_000), onPickRuns });
@@ -669,8 +669,10 @@ describe('BlueprintAcquisitionModal — Invent (issue #3990)', () => {
       within(section('Invent')).getByRole('button', { name: /Use this blueprint: No decryptor/ })
     );
     const [[, patch]] = vi.mocked(props.onSourcingChange).mock.calls;
-    expect(patch.acquisitionTierOverride).toEqual({ me: 2, te: 4 });
-    expect(patch.overridePrice).toBeCloseTo(4_540_000 / (0.34 * (1 + 8 / 30 + 3 / 40)), 4);
+    expect(patch).toEqual({
+      acquisitionTierOverride: { me: 2, te: 4, invented: { runs: 10 } },
+      overridePrice: undefined,
+    });
     expect(onPickRuns).toHaveBeenCalledWith(10);
   });
 

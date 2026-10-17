@@ -66,8 +66,8 @@ export interface InventionMarket {
 
 /**
  * The recipes inventing any of `blueprintTypeIds`, keyed by the invented
- * blueprint. Skills are sorted by name: "… Encryption Methods" is the
- * encryption skill, every other Science skill is a science skill.
+ * blueprint. "… Encryption Methods" is the encryption skill, every other
+ * Science-group skill a science skill; production skills don't count.
  */
 export function inventionRecipes(
   data: InventionData,

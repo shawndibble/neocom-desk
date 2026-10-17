@@ -11,6 +11,7 @@ import type {
   AcquisitionResolution,
   HubPrices,
   IndustryBlueprint,
+  MaterialSourcing,
   MaterialSourcingMap,
   QuantityEntry,
 } from '@/engine/industry/types';
@@ -306,9 +307,10 @@ export function acquisitionForLookup(
     // the forced me/te with no line price — `overridePrice` on the same
     // sourcing entry is what prices it, in `materialResolution.ts`.
     const override = acquisitionSources.sourcing?.[blueprintTypeID]?.acquisitionTierOverride;
+    const resolveInputs = override ? inputsForOverride(tierInputs, override) : tierInputs;
     let resolved;
     if (override) {
-      const matched = tierOptions(tierInputs).find(
+      const matched = tierOptions(resolveInputs).find(
         (o) => o.me === override.me && o.te === override.te
       );
       resolved = matched
@@ -320,7 +322,7 @@ export function acquisitionForLookup(
     // The runs behind the line, so a Build Group can pool this blueprint
     // across its members (`groupRollup.ts`) rather than buy a copy per plan.
     const tier = resolved.line
-      ? tierOptions(tierInputs).find((o) => o.me === resolved.me && o.te === resolved.te)
+      ? tierOptions(resolveInputs).find((o) => o.me === resolved.me && o.te === resolved.te)
       : undefined;
     const line = tier
       ? {
@@ -342,6 +344,31 @@ export function acquisitionForLookup(
       line,
       coverage: resolved.coverage,
     };
+  };
+}
+
+/**
+ * A forced tier's sources, narrowed to the kind the pilot picked: an
+ * invention pick to the invention tier with its runs per copy, any other
+ * pick away from invention — sources of both kinds can share one ME/TE.
+ */
+function inputsForOverride(
+  inputs: SelectBlueprintTierInputs,
+  override: NonNullable<MaterialSourcing['acquisitionTierOverride']>
+): SelectBlueprintTierInputs {
+  const invented = override.invented;
+  if (!invented) {
+    return { ...inputs, extraOffers: inputs.extraOffers?.filter((offer) => !offer.invented) };
+  }
+  return {
+    ...inputs,
+    bpcOffers: [],
+    bpoSellPrice: null,
+    lastResortOffers: [],
+    communityOffers: [],
+    extraOffers: inputs.extraOffers?.filter(
+      (offer) => offer.invented && offer.runs === invented.runs
+    ),
   };
 }
 

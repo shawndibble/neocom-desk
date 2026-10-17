@@ -86,10 +86,8 @@ here — they go one per file in `docs/context/decisions/`.
   **Acquisition Verdict** can flip to build; the row reads "from <name>" and
   shows stale. Ranking: an owned BPO beats a Community Offer, which beats any
   priced contract offer. A reaction-activity node only ever considers a BPO,
-  and a **Member**'s reaction formula is never a source. A Tech II blueprint
-  can also be invented: one tier per decryptor choice, priced at its expected
-  cost per copy (attempt cost ÷ success chance), offered only when the T1
-  original is owned.
+  and a **Member**'s reaction formula is never a source. A Tech II
+  blueprint's sources include invention, at its expected cost per copy.
 - **Boot Update**: A new app build (a waiting service worker) applied behind
   the boot screen on a cold start or browser reload, never mid-session: no
   route-change reload, and no "update ready" indicator.

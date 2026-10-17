@@ -604,11 +604,20 @@ describe('inventTierRows', () => {
     );
   });
 
-  it('writes the tier and expected cost per copy, and sets the copy’s runs', () => {
-    expect(overridePatchFor(rows[2]!)).toEqual({
-      acquisitionTierOverride: { me: 3, te: 2 },
-      overridePrice: rows[2]!.price,
+  it('writes the tier marked invented with its runs, no price, and sets the copy’s runs', () => {
+    const patch = overridePatchFor(rows[2]!);
+    expect(patch).toEqual({
+      acquisitionTierOverride: { me: 3, te: 2, invented: { runs: 13 } },
+      overridePrice: undefined,
     });
     expect(runsForPickedRow(rows[2]!)).toBe(13);
+    expect(isCurrentPick(rows[2]!, patch)).toBe(true);
+  });
+
+  it('never reads an invent pick as a same-tier pick of another source, or the reverse', () => {
+    const [owned] = ownedTierRows([{ me: 2, te: 4, runs: 10 }]);
+    const inventPick = overridePatchFor(rows[0]!);
+    expect(isCurrentPick(owned!, inventPick)).toBe(false);
+    expect(isCurrentPick(rows[0]!, overridePatchFor(owned!))).toBe(false);
   });
 });

@@ -616,7 +616,17 @@ export interface MaterialSourcing {
    * private contract or in-person trade) — that case pairs this with
    * `overridePrice` for its cost, since nothing here priced it.
    */
-  acquisitionTierOverride?: { me: number; te: number };
+  acquisitionTierOverride?: {
+    me: number;
+    te: number;
+    /**
+     * An invention pick (issue #3990): resolve among invention tiers only,
+     * the one bringing `runs` per copy — two decryptors, or an invention tier
+     * and a contract copy, can share one ME/TE. Priced live, so no
+     * `overridePrice` goes with it.
+     */
+    invented?: { runs: number };
+  };
 }
 
 /** Sourcing overrides keyed by material typeID. Missing key = no overrides. */

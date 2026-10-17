@@ -408,6 +408,9 @@ export type AcquisitionSourceRow =
  * An owned tier sets no price: `acquisitionForLookup` (recipes.ts) finds that
  * tier among its own `tierOptions` and costs any shortfall itself.
  *
+ * An invent row forces its tier, marked invented with its runs per copy,
+ * and no price: the plan keeps pricing it live at its expected cost.
+ *
  * Every other row forces its tier *and* its price. Automatic selection
  * weighs the same sources, but it prices each tier by whichever offer covers
  * a node's runs cheapest — a pick is the pilot choosing one specific listing,
@@ -418,13 +421,19 @@ export type AcquisitionSourceRow =
  * one unit, quantity 1 — and one override applies at every node resolving
  * this blueprint. So it is set to one purchase of the row: a contract
  * listing's whole ask (every copy it bundles), one market order's price, one
- * LP redemption, one invented copy's expected cost. Exact for an original. For a copy it is *not* scaled to the
+ * LP redemption. Exact for an original. For a copy it is *not* scaled to the
  * runs a node needs: a listing whose runs × quantity fall short of the need
  * is underpriced, unlike automatic selection's `shortfallCost`. The modal
  * shows runs and ISK/run beside the price so the pilot can judge that, and
  * Manual entry covers a multi-listing buy.
  */
 export function overridePatchFor(row: AcquisitionSourceRow): MaterialSourcing {
+  if (row.kind === 'invent') {
+    return {
+      acquisitionTierOverride: { me: row.me, te: row.te, invented: { runs: row.runs } },
+      overridePrice: undefined,
+    };
+  }
   return {
     acquisitionTierOverride: { me: row.me, te: row.te },
     overridePrice: row.kind === 'owned' ? undefined : row.price,
@@ -458,8 +467,9 @@ export function runsForPickedRow(row: AcquisitionSourceRow): number | null {
 /**
  * Whether `sourcing` is exactly what picking `row` wrote. Tier alone is not
  * enough — an owned ME0 original, a market BPO and an LP copy all share
- * ME0/TE0 — so a priced row also matches on price, and an owned row only
- * when no price was forced alongside the tier.
+ * ME0/TE0 — so a priced row also matches on price, an owned row only
+ * when no price was forced alongside the tier, and an invent row on its
+ * runs per copy.
  */
 export function isCurrentPick(
   row: AcquisitionSourceRow,
@@ -467,5 +477,6 @@ export function isCurrentPick(
 ): boolean {
   const override = sourcing?.acquisitionTierOverride;
   if (!override || override.me !== row.me || override.te !== row.te) return false;
-  return sourcing.overridePrice === overridePatchFor(row).overridePrice;
+  if (row.kind === 'invent') return override.invented?.runs === row.runs;
+  return !override.invented && sourcing.overridePrice === overridePatchFor(row).overridePrice;
 }

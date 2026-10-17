@@ -367,6 +367,49 @@ describe('invention as a blueprint source (issue #3990)', () => {
     expect(row!.acquisitionTier?.invented).toBeUndefined();
   });
 
+  it('resolves an invention pick to the decryptor with its runs, though another shares its tier', () => {
+    const decrypted: InventionMarket = {
+      ...inventionMarket,
+      decryptors: [
+        { typeID: 1, name: 'Parity', probabilityMultiplier: 1.5, me: 1, te: -2, runs: 3 },
+        { typeID: 2, name: 'Opt. Attainment', probabilityMultiplier: 1.9, me: 1, te: -2, runs: 2 },
+      ],
+      unitPriceFor: (id) => (id === 900 ? 1_000 : 100),
+    };
+    const resolved = resolveBuildPlan(
+      plan({
+        materialSourcing: {
+          100: { acquisitionTierOverride: { me: 3, te: 2, invented: { runs: 13 } } },
+        },
+      }),
+      sources(catalog, { ownedBlueprints: [owned(50, -1, 0)], inventionMarket: decrypted }),
+      market
+    );
+    const [row] = acquisitionRows(resolved.result, 100);
+    // Parity: (1,000 + 100 + 2 × 0.0085) ÷ (50% × 1.5), not the cheaper Opt. Attainment.
+    expect(row!.unitPrice).toBeCloseTo(1_100.017 / 0.75, 6);
+    expect(row!.acquisitionTier).toMatchObject({ me: 3, te: 2, invented: true });
+  });
+
+  it('keeps a contract pick off a cheaper invention tier at the same ME/TE', () => {
+    const resolved = resolveBuildPlan(
+      plan({
+        materialSourcing: {
+          100: { acquisitionTierOverride: { me: 2, te: 4 }, overridePrice: 5_000 },
+        },
+      }),
+      sources(catalog, {
+        ownedBlueprints: [owned(50, -1, 0)],
+        inventionMarket,
+        bpcOffersFor: () => [{ me: 2, te: 4, runs: 10, quantity: 1, price: 5_000 }],
+      }),
+      market
+    );
+    const [row] = acquisitionRows(resolved.result, 100);
+    expect(row!.unitPrice).toBe(5_000);
+    expect(row!.acquisitionTier?.invented).toBeUndefined();
+  });
+
   it('loses to a cheaper contract copy', () => {
     const resolved = resolveBuildPlan(
       plan(),

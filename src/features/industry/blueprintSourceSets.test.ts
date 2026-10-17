@@ -183,6 +183,6 @@ describe('loadBlueprintSourceSets', () => {
       needsReauth: true,
     } as unknown as Resolved<typeof loadCharacterBlueprints>);
     const { unavailable } = await loadBlueprintSourceSets([1], []);
-    expect(unavailable).toEqual(['owned']);
+    expect(unavailable).toEqual(['owned', 'invention']);
   });
 });

@@ -152,7 +152,14 @@ export async function loadBlueprintSourceSets(
     settle(lpStoreBlueprints(characterIds), FAILED),
     owning.then((result) => settle(inventionBlueprints(blueprints, result.originals), FAILED)),
   ]);
-  const bySource = { owned, market, contract, lpStore, invention };
+  // Unread owned blueprints leave invention unknown too, not empty.
+  const bySource = {
+    owned,
+    market,
+    contract,
+    lpStore,
+    invention: { ...invention, ok: invention.ok && owned.ok },
+  };
   return {
     sets: {
       owned: owned.ids,
