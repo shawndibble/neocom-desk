@@ -100,7 +100,7 @@ import { AppraisalHeaderStats } from './AppraisalHeaderStats';
 import { AppraisalHoldBar } from './AppraisalHoldBar';
 import { useHaulingCargo } from './haulingCargo';
 import { useOwnedAtStation } from './useOwnedAtStation';
-import { appraisalVolumeColumn } from './appraisalVolume';
+import { appraisalIskPerM3Column, appraisalVolumeColumn } from './appraisalVolume';
 import { formatVolume } from './format';
 import { HubCompareCards } from './HubCompareCards';
 import { ItemContextMenu } from './ItemContextMenu';
@@ -598,6 +598,7 @@ export function AppraisalPanel({
       sortValue: (row) => row.lpIskCost ?? undefined,
     },
     volume: appraisalVolumeColumn(t),
+    iskPerM3: { ...appraisalIskPerM3Column(t), phoneHidden: true },
   };
   const availableColumns = APPRAISAL_COLUMN_IDS.filter(
     (id) => (id !== 'refineTotal' || hasRefine) && (id !== 'lpTotal' || hasLpOption)

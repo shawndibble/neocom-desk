@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   appraisalNet,
+  iskPerM3,
   appraisalUndercut,
   compareMargin,
   buildAppraisal,
@@ -690,5 +691,31 @@ describe('compareMargin (issue #1745)', () => {
 
   it('leaves the percentage null when the best buy is zero', () => {
     expect(compareMargin(10, 0, fees).spreadPct).toBeNull();
+  });
+});
+
+describe('iskPerM3', () => {
+  const base: AppraisalRow = {
+    typeId: 34,
+    name: 'Tritanium',
+    quantity: 100,
+    buyEach: 5,
+    sellEach: 6,
+    buyTotal: 500,
+    sellTotal: 600,
+    volume: 3,
+  };
+
+  it('is the sell total over the packaged volume', () => {
+    expect(iskPerM3(base)).toBe(200);
+  });
+
+  it('is null when the volume is unknown or zero, never infinite', () => {
+    expect(iskPerM3({ ...base, volume: null })).toBeNull();
+    expect(iskPerM3({ ...base, volume: 0 })).toBeNull();
+  });
+
+  it('is null when nobody sells it, rather than a free cargo', () => {
+    expect(iskPerM3({ ...base, sellTotal: null })).toBeNull();
   });
 });

@@ -16,12 +16,17 @@ export const APPRAISAL_COLUMN_IDS = [
   'refineTotal',
   'lpTotal',
   'volume',
+  'iskPerM3',
 ] as const;
 
 export type AppraisalColumnId = (typeof APPRAISAL_COLUMN_IDS)[number];
 
-/** Every column shown today, so shipping the picker changes nothing on its own. */
-export const DEFAULT_VISIBLE_APPRAISAL_COLUMNS: readonly AppraisalColumnId[] = APPRAISAL_COLUMN_IDS;
+/**
+ * Every column shown before ISK/m³ existed, so adding that one changes nothing
+ * on its own: it is there to tick in the picker, not on screen by default.
+ */
+export const DEFAULT_VISIBLE_APPRAISAL_COLUMNS: readonly AppraisalColumnId[] =
+  APPRAISAL_COLUMN_IDS.filter((id) => id !== 'iskPerM3');
 
 function isAppraisalColumnId(raw: unknown): raw is AppraisalColumnId {
   return typeof raw === 'string' && (APPRAISAL_COLUMN_IDS as readonly string[]).includes(raw);

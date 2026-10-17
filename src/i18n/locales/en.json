@@ -10197,6 +10197,7 @@
       "columnRefineTotal": "Refine total",
       "columnLpTotal": "LP store",
       "columnVolume": "Volume (m³)",
+      "columnIskPerM3": "ISK/m³",
       "volumeUnit": "m³",
       "totalVolume": "Volume",
       "totalVolumeValue": "{{value}} m³",

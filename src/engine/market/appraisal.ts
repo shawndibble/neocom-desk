@@ -114,6 +114,17 @@ export interface AppraisalRow {
   volume: number | null;
 }
 
+/**
+ * What the pile costs to buy per m³ of cargo it fills — the row's sell total
+ * over its packaged volume, so it scales with Price Percent like the total does.
+ * Null where either side is unknown (no sell orders, no catalogue volume) or the
+ * volume is zero: a missing figure is not a free or an infinitely dense cargo.
+ */
+export function iskPerM3(row: Pick<AppraisalRow, 'sellTotal' | 'volume'>): number | null {
+  if (row.sellTotal === null || row.volume === null || !(row.volume > 0)) return null;
+  return row.sellTotal / row.volume;
+}
+
 export interface AppraisalTotals {
   /** Summed over rows with a buy price. */
   buy: number;

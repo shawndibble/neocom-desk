@@ -286,6 +286,23 @@ describe('AppraisalPanel', () => {
       expect(within(row).getAllByText('—')).toHaveLength(3);
       expect(screen.getByText('≈ 15 m³')).toBeInTheDocument();
     });
+
+    it('offers ISK per m³ in the picker, a dash where the volume is unknown', async () => {
+      const unknown: Appraisal = {
+        ...APPRAISAL,
+        rows: APPRAISAL.rows.map((row) => (row.typeId === 999 ? { ...row, volume: null } : row)),
+      };
+      renderPanel({ controller: controller({ result: outcome({ appraisal: unknown }) }) });
+      expect(screen.queryByRole('columnheader', { name: 'ISK/m³' })).not.toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole('button', { name: 'Columns' }));
+      await userEvent.click(await screen.findByRole('menuitemcheckbox', { name: 'ISK/m³' }));
+      await userEvent.keyboard('{Escape}');
+
+      expect(screen.getByRole('columnheader', { name: 'ISK/m³' })).toBeInTheDocument();
+      const row = screen.getByRole('row', { name: /Civilian Gatling Railgun/ });
+      expect(within(row).getAllByText('—')).toHaveLength(4);
+    });
   });
 
   it('says how many rows were left out of a total', () => {

@@ -308,7 +308,7 @@ Entry points into Appraisal besides typing: Fitting Export menu and page-level p
 Result panel
 
 - Header meta chip: hub name + "at N%".
-- Actions: ColumnPickerMenu (optional columns, device-local `appraisalVisibleColumns`), Share, Copy sell list, TableActionsMenu (CSV).
+- Actions: ColumnPickerMenu (optional columns, ISK/m³ off by default, device-local `appraisalVisibleColumns`), Share, Copy sell list, TableActionsMenu (CSV).
 - StatChips: Sell total (accent), Buy total, Instant net, List net, Spread, Refine total (only if any row has refine), Cheapest buy (only if any row has an LP option), Total volume (`AppraisalVolumeChip`), Items count. Sell/Buy use `FullIskTotal`; others `IskAmount` shorthand with exact on tap/hover.
 - Notes above table (conditional): "net always at 100%" when percent != 100; assumes-base-standings note; refine assumes no implants (ore/ice only); unpriced rows count (warning); refine-unpriced count; "cheapest buy via LP" count.
 - Table (`DataTable`, rowKey typeId, `stackColumns={2}`, `mobileSort`, `rowMoreActions`, `rowContextMenu` = `ItemContextMenu`):
@@ -319,7 +319,7 @@ Result panel
 - States: loading spinner (first result only), `failed` (catalogue load) EmptyState, empty (no result), no-matches EmptyState; a re-price shows an inline small spinner in the chip row.
 - Mobile: paste panel stacks above result; table becomes 2-column stacked cards; sort via mobile sort control.
 
-CSV (`appraisalCsv.ts`, surface `market-appraisal`): Quantity, Item, Buy each, Sell each, Buy total, Sell total, Volume. Raw numbers at chosen percent; null exports empty. Refine and LP columns are not exported.
+CSV (`appraisalCsv.ts`, surface `market-appraisal`): Quantity, Item, Buy each, Sell each, Buy total, Sell total, Volume, ISK/m³ (CSV always includes it). Raw numbers at chosen percent; null exports empty. Refine and LP columns are not exported.
 
 Copy sell list (`appraisalSellListText.ts`): one line per item `name<TAB>price`, price = one tick under hub's cheapest sell (`appraisalUndercut`, `priceClipboardText`); no quantity (Import Prices matches by name); items nobody sells or already at 0.01 are skipped; button disabled if none.
 
