@@ -8,6 +8,7 @@
  * no i18n); a label's `{placeholders}` are filled here.
  */
 import type { SurveySummary } from './series';
+import { formatCompactNumber } from '@/lib/compactNumber';
 import { textWidth } from './chatFont';
 
 export interface SurveyMessageLabels {
@@ -22,6 +23,75 @@ export interface SurveyMessageLabels {
   more: string;
   /** `{duration}` is the whole mining time. */
   cleared: string;
+  /** `{place}` is the survey's location. */
+  location: string;
+  /** `{pace}` is m³ mined per second. */
+  pace: string;
+  /** `{isk}` is the compact ISK value of what is left. */
+  value: string;
+  /** `{left}` and `{total}` are m³ left and m³ the scans have shown. */
+  volume: string;
+  /** `{duration}` is the mining time so far. */
+  elapsed: string;
+}
+
+export type SurveyChatBorder = 'single' | 'double' | 'none';
+export type SurveyChatOres = 'off' | 'top2' | 'top3' | 'all';
+
+/** What the pilot chose to put in the message. The heading and the link row are never optional. */
+export interface SurveyChatOptions {
+  border: SurveyChatBorder;
+  /** The ETA in the top rail; off leaves the rail bare. A cleared field always says so. */
+  eta: boolean;
+  /** The progress bar. A survey with a single scan has nothing to show, so it never gets one. */
+  bar: boolean;
+  ores: SurveyChatOres;
+  /** Rock counts before the ore names. */
+  rockCounts: boolean;
+  location: boolean;
+  pace: boolean;
+  iskLeft: boolean;
+  volumeLeft: boolean;
+  elapsed: boolean;
+}
+
+export const DEFAULT_SURVEY_CHAT_OPTIONS: SurveyChatOptions = {
+  border: 'single',
+  eta: true,
+  bar: true,
+  ores: 'top2',
+  rockCounts: true,
+  location: false,
+  pace: false,
+  iskLeft: false,
+  volumeLeft: false,
+  elapsed: false,
+};
+
+const BORDERS: readonly SurveyChatBorder[] = ['single', 'double', 'none'];
+const ORES: readonly SurveyChatOres[] = ['off', 'top2', 'top3', 'all'];
+
+/** A stored value read back: unknown or missing fields fall to the default, so an old save survives a new option. */
+export function parseSurveyChatOptions(raw: unknown): SurveyChatOptions | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const r = raw as Record<string, unknown>;
+  const d = DEFAULT_SURVEY_CHAT_OPTIONS;
+  const flag = (key: keyof SurveyChatOptions): boolean =>
+    typeof r[key] === 'boolean' ? (r[key] as boolean) : (d[key] as boolean);
+  return {
+    border: BORDERS.includes(r.border as SurveyChatBorder)
+      ? (r.border as SurveyChatBorder)
+      : d.border,
+    ores: ORES.includes(r.ores as SurveyChatOres) ? (r.ores as SurveyChatOres) : d.ores,
+    eta: flag('eta'),
+    bar: flag('bar'),
+    rockCounts: flag('rockCounts'),
+    location: flag('location'),
+    pace: flag('pace'),
+    iskLeft: flag('iskLeft'),
+    volumeLeft: flag('volumeLeft'),
+    elapsed: flag('elapsed'),
+  };
 }
 
 /**
@@ -36,15 +106,23 @@ export interface SurveyMessageLabels {
  * outruns the rails. Lengths are measured in pixels with the widths in
  * `chatFont.ts` (an `i` is 4px, an `m` 10px), not counted in characters.
  */
-const SIDE = '│ ';
-const SIDE_PX = textWidth(SIDE);
-const RAIL_CHAR = '─';
-const RAIL_PX = textWidth(RAIL_CHAR);
+interface Frame {
+  top: string;
+  bottom: string;
+  rail: string;
+  /** What a row starts with, beside the rail. */
+  side: string;
+}
+
+const FRAMES: Record<SurveyChatBorder, Frame> = {
+  single: { top: '┌', bottom: '└', rail: '─', side: '│ ' },
+  double: { top: '╔', bottom: '╚', rail: '═', side: '║ ' },
+  // No side to hang a corner on: bare rails over the rows.
+  none: { top: '', bottom: '', rail: '─', side: '' },
+};
 const BLOCK_PX = textWidth('█');
 const SPACE_PX = textWidth(' ');
 const TAPER = '╌┄┈';
-/** A rail without its fill or label: the corner, the label's brackets with a space inside each, the taper. */
-const RAIL_FRAME_PX = textWidth('┌[  ]' + TAPER);
 /** Fewest cells the bar may shrink to. */
 const MIN_BAR_CELLS = 10;
 
@@ -52,25 +130,32 @@ const MIN_BAR_CELLS = 10;
 const unitsFor = (gap: number, unit: number, round: (n: number) => number): number =>
   Math.max(0, round(gap / unit));
 
-/** `┌───[ label ]───╌┄┈`, at least `width` px long and under a character more, label centred. */
-function rail(corner: string, label: string, width: number): string {
-  const fill = unitsFor(width - RAIL_FRAME_PX - textWidth(label), RAIL_PX, Math.ceil);
+/** A rail without its fill: the corner, the label's brackets with a space inside each (none when bare), the taper. */
+const railFramePx = (frame: Frame, label: string): number =>
+  textWidth(frame.top + (label === '' ? '' : '[  ]') + TAPER);
+
+/** `┌───[ label ]───╌┄┈`, at least `width` px long and under a character more, label centred. A bare rail has no label. */
+function rail(frame: Frame, corner: string, label: string, width: number): string {
+  const railPx = textWidth(frame.rail);
+  const framePx = textWidth(corner + (label === '' ? '' : '[  ]') + TAPER);
+  const fill = unitsFor(width - framePx - textWidth(label), railPx, Math.ceil);
   const before = Math.floor(fill / 2);
-  return `${corner}${RAIL_CHAR.repeat(before)}[ ${label} ]${RAIL_CHAR.repeat(fill - before)}${TAPER}`;
+  const shown = label === '' ? '' : `[ ${label} ]`;
+  return `${corner}${frame.rail.repeat(before)}${shown}${frame.rail.repeat(fill - before)}${TAPER}`;
 }
 
 /**
  * The bar row: the bar fills the box's width once the percent after it has its
  * room. No end caps: they indent the bar and read thin next to the blocks.
  */
-function barRow(percent: number, finished: boolean, width: number): string {
+function barRow(frame: Frame, percent: number, finished: boolean, width: number): string {
   const tail = `${percent}%`;
   const cells = Math.max(
-    unitsFor(width - SIDE_PX - SPACE_PX - textWidth(tail), BLOCK_PX, Math.floor),
+    unitsFor(width - textWidth(frame.side) - SPACE_PX - textWidth(tail), BLOCK_PX, Math.floor),
     MIN_BAR_CELLS
   );
   const filled = finished ? cells : Math.floor((percent * cells) / 100);
-  return `${SIDE}${'█'.repeat(filled)}${'░'.repeat(cells - filled)} ${tail}`;
+  return `${frame.side}${'█'.repeat(filled)}${'░'.repeat(cells - filled)} ${tail}`;
 }
 
 /**
@@ -177,26 +262,50 @@ export function formatDuration(ms: number): string {
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
-/** How many ores the "Left:" line names before grouping the rest. */
-const MAX_NAMED_ORES = 2;
+const NAMED_ORES = { top2: 2, top3: 3 } as const;
 
 /**
- * "Left: 5 Scordite · 4 Kernite · 35 other": the two ores with the dearest unit price
- * (the order the page lists them in), each with its rock count, and the rocks
- * of every other ore grouped into one count. `ores` arrives dearest first, and
- * fewer than two are named if a longer line would wrap.
+ * "Left: 5 Scordite · 4 Kernite · 35 other": the dearest ores by unit price (the
+ * order the page lists them in), each with its rock count, and the rocks of
+ * every other ore grouped into one count. `ores` arrives dearest first, and
+ * fewer are named if a longer line would wrap. `all` names every ore instead,
+ * over as many rows as the width needs.
  */
-function oreLine(
-  ores: SurveySummary['ores'],
+function oreRows(
+  ores: SurveyChatSummaryOres,
   short: Record<string, string>,
-  labels: SurveyMessageLabels
-): string {
-  const rocksIn = (list: SurveySummary['ores']): number => list.reduce((n, o) => n + o.rocks, 0);
-  const prefixPx = SIDE_PX + textWidth(fill(labels.left, { ores: '' }));
+  labels: SurveyMessageLabels,
+  options: SurveyChatOptions,
+  sidePx: number
+): string[] {
+  const rocksIn = (list: SurveyChatSummaryOres): number => list.reduce((n, o) => n + o.rocks, 0);
+  const entryFor = (ore: SurveyChatSummaryOres[number]): string =>
+    options.rockCounts ? `${ore.rocks} ${short[ore.ore]}` : short[ore.ore];
+  const prefixPx = sidePx + textWidth(fill(labels.left, { ores: '' }));
+
+  if (options.ores === 'all') {
+    const rows: string[] = [];
+    let row: string[] = [];
+    for (const ore of ores) {
+      const next = [...row, entryFor(ore)].join(SEPARATOR);
+      if (
+        row.length > 0 &&
+        (rows.length === 0 ? prefixPx : sidePx) + textWidth(next) > MAX_ROW_PX
+      ) {
+        rows.push(row.join(SEPARATOR));
+        row = [];
+      }
+      row.push(entryFor(ore));
+    }
+    if (row.length > 0) rows.push(row.join(SEPARATOR));
+    return rows.map((r, i) => (i === 0 ? fill(labels.left, { ores: r }) : r));
+  }
+
+  const limit = NAMED_ORES[options.ores as 'top2' | 'top3'];
   const listed: string[] = [];
   let named = 0;
-  for (const ore of ores.slice(0, MAX_NAMED_ORES)) {
-    const entry = `${ore.rocks} ${short[ore.ore]}`;
+  for (const ore of ores.slice(0, limit)) {
+    const entry = entryFor(ore);
     const rest = rocksIn(ores.slice(named + 1));
     const other = rest > 0 ? [fill(labels.more, { count: rest })] : [];
     const px = prefixPx + textWidth([...listed, entry, ...other].join(SEPARATOR));
@@ -206,31 +315,36 @@ function oreLine(
   }
   const other = rocksIn(ores.slice(named));
   if (other > 0) listed.push(fill(labels.more, { count: other }));
-  return fill(labels.left, { ores: listed.join(SEPARATOR) });
+  return [fill(labels.left, { ores: listed.join(SEPARATOR) })];
+}
+
+type SurveyChatSummaryOres = SurveySummary['ores'];
+
+interface BoxContent {
+  /** The top rail's label; '' leaves it bare. */
+  headline: string;
+  bar: { percent: number; finished: boolean } | null;
+  rows: string[];
+  url: string;
 }
 
 /**
- * The box's rows (three for a cleared field, which has no ore line), all as long
- * as the longest of: the ore row, and each rail holding its label.
+ * The box's rows, all as long as the longest of: the content rows, the bar's
+ * least width, and each rail holding its label.
  */
-function box(
-  headline: string,
-  percent: number,
-  finished: boolean,
-  ore: string | null,
-  url: string
-): string[] {
+function box(frame: Frame, { headline, bar, rows, url }: BoxContent): string[] {
+  const side = textWidth(frame.side);
   const width = Math.max(
-    RAIL_FRAME_PX + textWidth(headline),
-    RAIL_FRAME_PX + textWidth(url),
-    SIDE_PX + SPACE_PX + textWidth(`${percent}%`) + MIN_BAR_CELLS * BLOCK_PX,
-    ore === null ? 0 : SIDE_PX + textWidth(ore)
+    railFramePx(frame, headline) + textWidth(headline),
+    railFramePx(frame, url) + textWidth(url),
+    bar === null ? 0 : side + SPACE_PX + textWidth(`${bar.percent}%`) + MIN_BAR_CELLS * BLOCK_PX,
+    ...rows.map((r) => side + textWidth(r))
   );
   return [
-    rail('┌', headline, width),
-    barRow(percent, finished, width),
-    ...(ore === null ? [] : [SIDE + ore]),
-    rail('└', url, width),
+    rail(frame, frame.top, headline, width),
+    ...(bar === null ? [] : [barRow(frame, bar.percent, bar.finished, width)]),
+    ...rows.map((r) => frame.side + r),
+    rail(frame, frame.bottom, url, width),
   ];
 }
 
@@ -239,15 +353,24 @@ export function surveyChatMessage(
   url: string,
   labels: SurveyMessageLabels,
   // The time "left" counts from here: the same clock the page shows, so a copy matches the screen.
-  now: number = summary.lastAt
+  now: number = summary.lastAt,
+  options: SurveyChatOptions = DEFAULT_SURVEY_CHAT_OPTIONS,
+  /** The survey's location, when it has one; shown only if the options ask. */
+  location: string | null = null
 ): string {
   // Chat puts the speaker's name before the first line, so a heading line takes that
   // spot and the box starts underneath it instead of beside the name.
   const lead = `${labels.heading}\n`;
+  const frame = FRAMES[options.border];
+  const placeRows =
+    options.location && location !== null && location !== ''
+      ? [fill(labels.location, { place: location })]
+      : [];
 
   if (summary.finished) {
     const headline = fill(labels.cleared, { duration: formatDuration(summary.elapsedMs) });
-    return lead + box(headline, 100, true, null, url).join('\n');
+    const bar = options.bar ? { percent: 100, finished: true } : null;
+    return lead + box(frame, { headline, bar, rows: placeRows, url }).join('\n');
   }
 
   const timing =
@@ -260,6 +383,47 @@ export function surveyChatMessage(
 
   // Dearest unit first, as the page lists them.
   const present = summary.ores.filter((o) => o.rocks > 0);
-  const ore = oreLine(present, shortOreNames(present.map((o) => o.ore)), labels);
-  return lead + box(timing, summary.percent, false, ore, url).join('\n');
+  const oresRows =
+    options.ores === 'off'
+      ? []
+      : oreRows(
+          present,
+          shortOreNames(present.map((o) => o.ore)),
+          labels,
+          options,
+          textWidth(frame.side)
+        );
+  const num = (n: number): string => Math.round(n).toLocaleString('en-US');
+  const extras = [
+    ...(options.pace && summary.pace !== null
+      ? [fill(labels.pace, { pace: num(summary.pace) })]
+      : []),
+    ...(options.iskLeft && summary.iskLeft !== null
+      ? [fill(labels.value, { isk: formatCompactNumber(summary.iskLeft) })]
+      : []),
+    ...(options.volumeLeft
+      ? [
+          fill(labels.volume, {
+            left: num(summary.leftVolume),
+            total: num(summary.startVolume),
+          }),
+        ]
+      : []),
+    ...(options.elapsed && summary.elapsedMs > 0
+      ? [fill(labels.elapsed, { duration: formatDuration(summary.elapsedMs) })]
+      : []),
+  ];
+  return (
+    lead +
+    box(frame, {
+      headline: options.eta ? timing : '',
+      // One scan: nothing mined yet, so a bar would only say 0%.
+      bar:
+        options.bar && summary.points.length > 1
+          ? { percent: summary.percent, finished: false }
+          : null,
+      rows: [...placeRows, ...oresRows, ...extras],
+      url,
+    }).join('\n')
+  );
 }

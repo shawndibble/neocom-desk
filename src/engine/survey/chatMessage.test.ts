@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { textWidth } from './chatFont';
 import {
+  DEFAULT_SURVEY_CHAT_OPTIONS,
   MAX_ROW_PX,
+  parseSurveyChatOptions,
+  type SurveyChatOptions,
   surveyChatMessage,
   shortOreNames,
   type SurveyMessageLabels,
@@ -20,6 +23,11 @@ const labels: SurveyMessageLabels = {
   left: 'Left: {ores}',
   more: '{count} other',
   cleared: 'Field cleared in {duration}',
+  location: 'At: {place}',
+  pace: 'Pace: {pace} m³/s',
+  value: 'Value left: {isk} ISK',
+  volume: 'Volume left: {left} of {total} m³',
+  elapsed: 'Mining for {duration}',
 };
 
 function scan(minutes: number, ...rocks: [string, number][]): SurveyScan {
@@ -155,10 +163,12 @@ describe('surveyChatMessage', () => {
     expect(box[0]).toContain('(~2h 37m)');
   });
 
-  it('with one scan says it is waiting for a second', () => {
+  it('with one scan says it is waiting for a second and has no bar row', () => {
     const { box } = message([scan(0, ['A', 10_000])]);
+    expect(box).toHaveLength(3);
     expect(box[0]).toContain('waiting for a second scan');
-    expect(box[1]).toMatch(/ 0%$/);
+    expect(box[1]).toBe('│ Left: 1 A');
+    expect(box.join('\n')).not.toMatch(/[█░]/);
   });
 
   it('fills the bar by progress', () => {
@@ -171,7 +181,7 @@ describe('surveyChatMessage', () => {
 
   it('names the two biggest ores and counts the rocks of the rest as one group', () => {
     const { box } = message([scan(0, ['A', 5], ['B', 4], ['C', 3], ['D', 2], ['E', 1], ['E', 1])]);
-    expect(box[2]).toBe('│ Left: 1 A · 1 B · 4 other');
+    expect(box[1]).toBe('│ Left: 1 A · 1 B · 4 other');
   });
 
   it('calls out the two ores with the dearest unit price, with how many rocks each has', () => {
@@ -198,7 +208,7 @@ describe('surveyChatMessage', () => {
         ['Veldspar', 50],
       ])
     );
-    expect(box[2]).toBe('│ Left: 5 Scordite · 4 Kernite · 35 other');
+    expect(box[1]).toBe('│ Left: 5 Scordite · 4 Kernite · 35 other');
   });
 
   it('a cleared field is a heading and three rows, the full bar and the time in the top rail', () => {
@@ -259,11 +269,155 @@ describe('chat message width', () => {
     const { box } = message([
       scan(0, ['Scordite', 90_000], ['Veldspar', 80_000], ['Kernite', 70_000]),
     ]);
-    expect(box[2]).toMatch(/^│ Left: \d+ Scordite · \d+ Veldspar · \d+ other$/);
+    expect(box[1]).toMatch(/^│ Left: \d+ Scordite · \d+ Veldspar · \d+ other$/);
   });
 
   it('never drops the biggest ore, even when its name alone is long', () => {
     const { box } = message([scan(0, ['An Extremely Long Ore Name Indeed Mercoxit II-Grade', 5])]);
-    expect(box[2]).toContain('Extremely');
+    expect(box[1]).toContain('Extremely');
+  });
+});
+
+describe('chat message options', () => {
+  const two = [
+    scan(0, ['Scordite', 9000], ['Kernite', 7000], ['Veldspar', 30000], ['Pyroxeres', 100]),
+    scan(10, ['Scordite', 6000], ['Kernite', 5000], ['Veldspar', 22000], ['Pyroxeres', 80]),
+  ];
+  const withOptions = (changes: Partial<SurveyChatOptions>, location: string | null = null) =>
+    parts(
+      surveyChatMessage(
+        summarizeSurvey(two)!,
+        URL,
+        labels,
+        undefined,
+        { ...DEFAULT_SURVEY_CHAT_OPTIONS, ...changes },
+        location
+      )
+    );
+
+  it('draws a double border with ║ and ═', () => {
+    const { box } = withOptions({ border: 'double' });
+    expect(box[0]).toMatch(/^╔═*\[ ETA: .* \]═*╌┄┈$/);
+    expect(box[1]).toMatch(/^║ █+░+ \d+%$/);
+    expect(box[2]).toMatch(/^║ Left: /);
+    expect(box[3]).toMatch(/^╚═*\[ https:.* \]═*╌┄┈$/);
+  });
+
+  it('with no border leaves the rows bare between two rails', () => {
+    const { box } = withOptions({ border: 'none' });
+    expect(box[0]).toMatch(/^─*\[ ETA: .* \]─*╌┄┈$/);
+    expect(box[1]).toMatch(/^█+░+ \d+%$/);
+    expect(box[2]).toMatch(/^Left: /);
+    expect(box[3]).toMatch(/^─*\[ https:.* \]─*╌┄┈$/);
+  });
+
+  it('always keeps the heading and the link row', () => {
+    const { heading, box } = withOptions({
+      eta: false,
+      bar: false,
+      ores: 'off',
+    });
+    expect(heading).toBe('Neocom Desk Report');
+    expect(box).toHaveLength(2);
+    expect(box[0]).toMatch(/^┌─+╌┄┈$/);
+    expect(box[1]).toContain(URL);
+  });
+
+  it('drops the bar and keeps the ETA when asked', () => {
+    const { box } = withOptions({ bar: false });
+    expect(box).toHaveLength(3);
+    expect(box[0]).toContain('ETA:');
+    expect(box.join('')).not.toContain('█');
+  });
+
+  it('names the top three ores, or every ore', () => {
+    const short = summarizeSurvey([scan(0, ['A', 5], ['B', 4], ['C', 3], ['D', 2], ['E', 1])])!;
+    const top3 = surveyChatMessage(short, URL, labels, undefined, {
+      ...DEFAULT_SURVEY_CHAT_OPTIONS,
+      ores: 'top3',
+    });
+    expect(top3).toContain('│ Left: 1 A · 1 B · 1 C · 2 other');
+    const all = withOptions({ ores: 'all' }).box.join('\n');
+    for (const ore of ['Scordite', 'Veldspar', 'Kernite', 'Pyroxeres']) expect(all).toContain(ore);
+    expect(all).not.toContain('other');
+  });
+
+  it('wraps an all-ores list onto more rows rather than past the width', () => {
+    const many: [string, number][] = [
+      'Veldspar',
+      'Scordite',
+      'Pyroxeres',
+      'Plagioclase',
+      'Omber',
+      'Kernite',
+      'Jaspet',
+      'Hemorphite',
+    ].map((ore, i) => [ore, 1000 + i]);
+    const summary = summarizeSurvey([
+      scan(0, ...many),
+      scan(5, ...many.map(([o, v]): [string, number] => [o, v - 100])),
+    ])!;
+    const { box } = parts(
+      surveyChatMessage(summary, URL, labels, undefined, {
+        ...DEFAULT_SURVEY_CHAT_OPTIONS,
+        ores: 'all',
+      })
+    );
+    const rows = box.slice(2, -1);
+    expect(rows.length).toBeGreaterThan(1);
+    for (const row of rows) expect(textWidth(row)).toBeLessThanOrEqual(MAX_ROW_PX);
+  });
+
+  it('lists ore names without rock counts', () => {
+    expect(withOptions({ rockCounts: false }).box[2]).toBe('│ Left: Veldspar · Scordite · 2 other');
+  });
+
+  it('adds the location, pace, value, volume and elapsed rows only when chosen', () => {
+    const off = withOptions({}, 'Efa IV').box.join('\n');
+    for (const word of ['Efa', 'Pace', 'Value', 'Volume', 'Mining for'])
+      expect(off).not.toContain(word);
+    const { box } = withOptions(
+      { location: true, pace: true, iskLeft: false, volumeLeft: true, elapsed: true },
+      'Efa IV'
+    );
+    expect(box[2]).toBe('│ At: Efa IV');
+    expect(box.join('\n')).toMatch(/Pace: \d+ m³\/s/);
+    expect(box.join('\n')).toContain('Volume left: 33,080 of 46,100 m³');
+    expect(box.join('\n')).toContain('Mining for 10m');
+  });
+
+  it('skips the location row when the survey has none', () => {
+    expect(withOptions({ location: true }, null).box).toHaveLength(4);
+  });
+
+  it('a cleared field keeps its headline and loses the bar when the bar is off', () => {
+    const summary = summarizeSurvey([scan(0, ['A', 1000]), scan(176)])!;
+    const { box } = parts(
+      surveyChatMessage(summary, URL, labels, undefined, {
+        ...DEFAULT_SURVEY_CHAT_OPTIONS,
+        bar: false,
+        eta: false,
+      })
+    );
+    expect(box).toHaveLength(2);
+    expect(box[0]).toContain('Field cleared in 2h 56m');
+  });
+});
+
+describe('parseSurveyChatOptions', () => {
+  it('fills what a saved value lacks from the defaults', () => {
+    expect(parseSurveyChatOptions({ border: 'double', pace: true })).toEqual({
+      ...DEFAULT_SURVEY_CHAT_OPTIONS,
+      border: 'double',
+      pace: true,
+    });
+  });
+
+  it('ignores values of the wrong kind and rejects non-objects', () => {
+    expect(parseSurveyChatOptions({ border: 'round', bar: 'yes', ores: 7 })).toEqual(
+      DEFAULT_SURVEY_CHAT_OPTIONS
+    );
+    expect(parseSurveyChatOptions('x')).toBeNull();
+    expect(parseSurveyChatOptions(null)).toBeNull();
   });
 });

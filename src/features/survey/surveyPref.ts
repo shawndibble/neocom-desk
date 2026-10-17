@@ -4,6 +4,11 @@
  * Local, not synced: a Survey is a link anyone can open, so remembering it on
  * one device is a convenience, and "New survey" just forgets it.
  */
+import {
+  DEFAULT_SURVEY_CHAT_OPTIONS,
+  parseSurveyChatOptions,
+  type SurveyChatOptions,
+} from '@/engine/survey/chatMessage';
 import { isShareId } from '@/engine/share/shareId';
 import { db } from '@/db';
 import { TIME_FORMATS, TIME_FORMAT_SETTING_KEY, type TimeFormat } from '@/lib/timeFormat';
@@ -54,4 +59,15 @@ export const useSurveyPriceHub = createLocalSetting<TradeHub['id']>({
   key: 'miningSurveyPriceHub',
   defaultValue: DEFAULT_TRADE_HUB.id,
   parse: (raw) => (typeof raw === 'string' && getTradeHub(raw) ? (raw as TradeHub['id']) : null),
+});
+
+/**
+ * What the Survey chat message says and how it is drawn, as chosen in the copy
+ * menu's "Configure chat message…". Device-local like the price hub: it is a
+ * taste about the pilot's own channel, not part of any survey.
+ */
+export const useSurveyChatOptions = createLocalSetting<SurveyChatOptions>({
+  key: 'miningSurveyChatOptions',
+  defaultValue: DEFAULT_SURVEY_CHAT_OPTIONS,
+  parse: parseSurveyChatOptions,
 });
