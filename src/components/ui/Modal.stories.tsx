@@ -87,7 +87,7 @@ export const WithTitleActions: Story = {
 
 /**
  * @summary `footer`: an action bar pinned to the dialog's foot, outside the scrolling body, which
- * scrolls above it. The bar takes the bottom safe-area inset; never hand-build it as a sticky div.
+ * scrolls above it.
  */
 export const WithFooter: Story = {
   args: {

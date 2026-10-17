@@ -35,11 +35,8 @@ interface ModalProps {
   titleActions?: ReactNode;
   children: ReactNode;
   /**
-   * An action bar at the dialog's foot (Apply / Cancel, Copy). Rendered after
-   * the scrolling body, not inside it, so it stays pinned to the bottom edge
-   * while the body scrolls above it, at every placement, and comes after the
-   * body in focus order. It takes the bottom safe-area inset in place of the
-   * body. Never build this bar as a sticky div inside `children`.
+   * @summary Action bar at the dialog's foot (Apply / Cancel, Copy), pinned below the scrolling body.
+   * Never a sticky div inside `children`. On a sheet it takes the safe-area inset in place of the body.
    */
   footer?: ReactNode;
   /**
@@ -172,10 +169,10 @@ export function Modal({
   }, [open, initialFocusRef]);
 
   const { dialogClass, heightClass } = PLACEMENT_CLASSES[placement];
-  // `false` too, so a `cond && <Bar />` footer that is off renders no empty bar.
-  const hasFooter = footer != null && footer !== false;
-  // A footer sits below the scroller and takes the safe-area inset itself, so
-  // the body drops its own: one inset, never two.
+  // Booleans and '' too, so a `cond && <Bar />` footer that is off renders no empty bar.
+  const hasFooter = footer != null && typeof footer !== 'boolean' && footer !== '';
+  // A footer sits below the scroller and takes the safe-area inset itself: the
+  // body drops its inset and scroll padding (one inset, never two).
   const bodyBottomClass =
     isSheet && !hasFooter ? ' scroll-pb-20 pb-[calc(0.75rem_+_env(safe-area-inset-bottom))]' : '';
 
@@ -242,22 +239,24 @@ export function Modal({
               index.css: a native dialog does not lock the page behind it, so
               on a phone a scroll that starts over the sheet would otherwise
               chain straight into the page underneath. */}
-            {/* Without a `footer`, the scroll padding keeps a control focused
-              near a sheet's bottom edge clear of anything sticky in its
-              content (WCAG 2.4.11). A `footer` sits outside the scroller,
-              so it never covers a focused control and needs none. */}
-            <div
-              ref={bodyRef}
-              tabIndex={-1}
-              className={`min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 outline-none${bodyBottomClass}`}
-            >
-              <RowTappableContext.Provider value={false}>{children}</RowTappableContext.Provider>
-            </div>
-            {hasFooter && (
-              <div className="shrink-0 border-t border-line bg-panel px-3 pt-2 pb-[calc(0.5rem_+_env(safe-area-inset-bottom))]">
-                <RowTappableContext.Provider value={false}>{footer}</RowTappableContext.Provider>
+            {/* No footer: scroll padding keeps a control focused near a
+              sheet's bottom clear of sticky content (WCAG 2.4.11). */}
+            <RowTappableContext.Provider value={false}>
+              <div
+                ref={bodyRef}
+                tabIndex={-1}
+                className={`min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 outline-none${bodyBottomClass}`}
+              >
+                {children}
               </div>
-            )}
+              {hasFooter && (
+                <div
+                  className={`shrink-0 border-t border-line bg-panel px-3 pt-2 ${isSheet ? 'pb-[calc(0.5rem_+_env(safe-area-inset-bottom))]' : 'pb-2'}`}
+                >
+                  {footer}
+                </div>
+              )}
+            </RowTappableContext.Provider>
           </div>
         </PortalContainerProvider>
       )}
