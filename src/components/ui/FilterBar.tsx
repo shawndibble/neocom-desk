@@ -1,4 +1,12 @@
-import { useEffect, useId, useRef, useState, type ComponentProps, type ReactNode } from 'react';
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type ComponentProps,
+  type ReactNode,
+  type RefObject,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { cx } from '@/lib/cx';
 import { useIsNarrow } from '@/lib/useIsNarrow';
@@ -456,17 +464,20 @@ function FilterSheet<T>({
 
   const promptId = useId();
   const keepEditingRef = useRef<HTMLButtonElement>(null);
-  const focusBeforePrompt = useRef<Element | null>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  const applyRef = useRef<HTMLButtonElement>(null);
+  // What held focus as the prompt opened, set in `requestClose`. Draft
+  // controls stay mounted (hidden) under the prompt; the footer unmounts, so
+  // a footer button is kept as its ref and refocuses its remount.
+  const focusBeforePrompt = useRef<RefObject<Element | null> | null>(null);
   // Focus follows the prompt in and back out: onto "Keep editing" (the safe
-  // choice) when it appears, and to whatever held focus before it when
-  // dismissed. The draft stays mounted (hidden) under the prompt so that
-  // element still exists.
+  // choice) when it appears, and to what held focus before it when dismissed.
   useEffect(() => {
     if (confirming) {
-      focusBeforePrompt.current = document.activeElement;
       keepEditingRef.current?.focus();
-    } else if (focusBeforePrompt.current instanceof HTMLElement) {
-      if (focusBeforePrompt.current.isConnected) focusBeforePrompt.current.focus();
+    } else if (focusBeforePrompt.current) {
+      const target = focusBeforePrompt.current.current;
+      if (target instanceof HTMLElement) target.focus();
       focusBeforePrompt.current = null;
     }
   }, [confirming]);
@@ -480,7 +491,13 @@ function FilterSheet<T>({
   const requestClose = () => {
     if (confirming) setConfirming(false);
     else if (sameFilters(draft, value)) closeSheet();
-    else setConfirming(true);
+    else {
+      const active = document.activeElement;
+      focusBeforePrompt.current = [cancelRef, applyRef].find((ref) => ref.current === active) ?? {
+        current: active,
+      };
+      setConfirming(true);
+    }
   };
 
   return (
@@ -521,6 +538,28 @@ function FilterSheet<T>({
         onClose={requestClose}
         title={title ?? t('filters.title')}
         placement="sheet"
+        footer={
+          // Gone while the discard prompt asks: Apply beside "Discard
+          // changes?" would answer a question nobody asked.
+          !confirming && (
+            <div className="flex gap-2">
+              <Button ref={cancelRef} className="flex-1" onClick={closeSheet}>
+                {t('filters.cancel')}
+              </Button>
+              <Button
+                ref={applyRef}
+                variant="primary"
+                className="flex-1"
+                onClick={() => {
+                  onChange(draft);
+                  closeSheet();
+                }}
+              >
+                {t('filters.apply')}
+              </Button>
+            </div>
+          )
+        }
       >
         {confirming && (
           <div
@@ -554,26 +593,6 @@ function FilterSheet<T>({
           */}
             <div className="flex flex-col items-start gap-3">{children(draft, setDraft)}</div>
           </FilterSurfaceContext.Provider>
-          {/*
-          Sticky rather than a `Modal` footer prop: the sheet's body is the
-          scroller, and five filters on a phone push a static Apply below the
-          fold. The negative margins let the bar span the body's own padding.
-        */}
-          <div className="sticky bottom-0 -mx-3 -mb-[calc(0.75rem_+_env(safe-area-inset-bottom))] mt-3 flex gap-2 border-t border-line bg-panel px-3 pt-2 pb-[calc(0.5rem_+_env(safe-area-inset-bottom))]">
-            <Button className="flex-1" onClick={closeSheet}>
-              {t('filters.cancel')}
-            </Button>
-            <Button
-              variant="primary"
-              className="flex-1"
-              onClick={() => {
-                onChange(draft);
-                closeSheet();
-              }}
-            >
-              {t('filters.apply')}
-            </Button>
-          </div>
         </div>
       </Modal>
     </>

@@ -84,3 +84,31 @@ export const Media: Story = {
 export const WithTitleActions: Story = {
   args: { titleActions: <Button size="sm">More</Button> },
 };
+
+/**
+ * @summary `footer`: an action bar pinned to the dialog's foot, outside the scrolling body, which
+ * scrolls above it.
+ */
+export const WithFooter: Story = {
+  args: {
+    placement: 'sheet',
+    title: 'Filters',
+    children: (
+      <ul className="text-sm">
+        {Array.from({ length: 30 }, (_, i) => (
+          <li key={i} className="border-b border-line py-2">
+            {`Filter option ${i + 1}`}
+          </li>
+        ))}
+      </ul>
+    ),
+    footer: (
+      <div className="flex gap-2">
+        <Button className="flex-1">Cancel</Button>
+        <Button variant="primary" className="flex-1">
+          Apply
+        </Button>
+      </div>
+    ),
+  },
+};

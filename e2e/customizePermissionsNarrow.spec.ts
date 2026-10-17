@@ -1,9 +1,9 @@
 /**
  * The Customize permissions dialog's Submit/Cancel stay reachable on a phone
  * (issue #1774). The dialog is 13 Permission checkboxes long, so at 390×844 its
- * scroll region overflows; the action bar is `sticky` at the bottom of that
- * region, so it must sit inside the viewport without scrolling and be a 44px
- * touch target.
+ * scroll region overflows; the action bar is the Modal `footer`, pinned below
+ * that region, so it must sit inside the viewport without scrolling and be a
+ * 44px touch target.
  */
 import { test, expect } from './support/testBase';
 

@@ -133,6 +133,7 @@ describe('FilterBar sheet dismissal', () => {
   it('pads the Apply bar by the safe-area inset', async () => {
     await openSheet();
     const apply = screen.getByRole('button', { name: 'Apply' });
-    expect(apply.parentElement?.className).toContain('env(safe-area-inset-bottom)');
+    // The Modal footer bar wraps the button row and carries the inset.
+    expect(apply.closest('[class*="env(safe-area-inset-bottom)"]')).not.toBeNull();
   });
 });
