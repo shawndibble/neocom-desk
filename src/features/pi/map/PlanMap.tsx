@@ -860,7 +860,8 @@ export function PlanMap({
           <div
             className={cx(
               'flex flex-wrap items-center gap-x-2.5 gap-y-1 border-b border-line px-3 py-1.5 text-text',
-              previewed !== null && 'absolute inset-x-0 top-0 z-20 bg-panel shadow-lg'
+              previewed !== null &&
+                'absolute inset-x-0 top-0 z-20 bg-panel shadow-lg shadow-black/50'
             )}
           >
             {active.map((type) => (

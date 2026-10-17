@@ -765,7 +765,7 @@ describe('PlanMap: starting state follows the data until the pilot acts', () => 
   });
 });
 
-describe('PlanMap: how-to line', () => {
+describe('PlanMap: what-if row', () => {
   it('draws no what-if row or hint button until a planet type is hovered or ticked', () => {
     renderMap();
     expect(screen.getByTestId('map-whatif')).toBeEmptyDOMElement();
