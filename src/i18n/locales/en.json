@@ -4374,8 +4374,8 @@
         "belowMarket": {
           "unit": "below market",
           "secondary": "best +{{profit}} · {{jumps}} jumps away",
-          "item_one": "{{item}} + {{count}} more",
-          "item_other": "{{item}} + {{count}} more",
+          "secondaryNoJumps": "best +{{profit}}",
+          "item": "{{item}} + {{count}} more",
           "summary_one": "{{count}} public contract worth more than it asks at the trade hub, from the last time you opened Below market on Item search.",
           "summary_other": "{{count}} public contracts worth more than they ask at the trade hub, from the last time you opened Below market on Item search."
         }
@@ -11989,7 +11989,7 @@
       "chip": "Below market",
       "chipTooltip": "One row per contract, valued at the trade hub's best buy, sorted by profit",
       "note": "Contract snapshot from {{age}} · valued at {{hub}} best buy minus sales tax · contracts that ask for items, and auctions with no buyout, are left out",
-      "pricesUnreachable": "some hub prices could not be read, so those items count as 0",
+      "pricesUnreachable": "some hub prices could not be read, so those items are valued from other contracts, or at 0",
       "pricing": "Pricing contract contents at the trade hub…",
       "failedTitle": "Couldn't value these contracts",
       "failedHint": "The item data needed to value them could not be read. Try Refresh.",

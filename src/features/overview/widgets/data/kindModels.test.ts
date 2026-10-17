@@ -960,6 +960,14 @@ describe('belowMarket', () => {
     expect(view.fetchedAt).toEqual(new Date(NOW));
   });
 
+  it('drops the jumps from the headline when the best contract has none', () => {
+    const [, tengu] = data().contracts;
+    const view = buildView('belowMarket', { belowMarket: ok(data({ contracts: [tengu] })) }, ctx());
+    expect(view.number.secondary?.text).toBe(
+      'overview.widgets.data.belowMarket.secondaryNoJumps{"profit":"18.6M"}'
+    );
+  });
+
   it('is empty before Below market has run, or when nothing was below market', () => {
     const none = data({ hasView: false, count: 0, contracts: [], fetchedAt: null });
     expect(stateOf(buildView('belowMarket', { belowMarket: ok(none) }, ctx()))).toBe('empty');

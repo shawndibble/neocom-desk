@@ -415,10 +415,13 @@ const belowMarket: Builder = (feeds, { t }) => {
           value: data.count.toLocaleString(),
           unit: t(`${D}.belowMarket.unit`),
           secondary: {
-            text: t(`${D}.belowMarket.secondary`, {
-              profit: formatIskCompact(best.profit),
-              jumps: jumps(best),
-            }),
+            text:
+              best.jumps === null
+                ? t(`${D}.belowMarket.secondaryNoJumps`, { profit: formatIskCompact(best.profit) })
+                : t(`${D}.belowMarket.secondary`, {
+                    profit: formatIskCompact(best.profit),
+                    jumps: String(best.jumps),
+                  }),
             tone: 'good',
           },
           tone: 'clear',

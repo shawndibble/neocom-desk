@@ -20,7 +20,7 @@ import { useMarketHub } from '@/features/market/hub';
 import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
 import { getHubPricesWithStatus } from '@/market/prices';
 
-export interface BelowMarketPricingRead {
+interface BelowMarketPricingRead {
   pricing: BelowMarketPricing;
   hub: TradeHub;
   /** Fuzzwork did not answer for some types: those lines count as no market. */
@@ -34,7 +34,7 @@ async function accountingLevel(characterId: number | null): Promise<number> {
   return modifiers?.skills[SKILL_IDS.accounting] ?? 0;
 }
 
-export async function loadBelowMarketPricing(
+async function loadBelowMarketPricing(
   rows: readonly PublicContractOfferRow[],
   characterId: number | null,
   plexPrice: number | null
@@ -66,14 +66,24 @@ export type BelowMarketState =
       contracts: readonly BelowMarketContract[];
       hub: TradeHub;
       unreachable: boolean;
+      /** False while a re-price of newer rows is still running behind these contracts. */
+      current: boolean;
     };
 
 const IDLE: BelowMarketState = { status: 'idle' };
+const PRICING: BelowMarketState = { status: 'pricing' };
+const FAILED: BelowMarketState = { status: 'failed' };
+
+interface PricedRows {
+  rows: readonly PublicContractOfferRow[];
+  plexPrice: number | null;
+  result: BelowMarketPricingRead;
+}
 
 /**
  * The Below market contracts of `rows`, which must be the whole snapshot.
- * Re-priced whenever the rows or the PLEX price change; the hub price cache
- * makes a re-read after a revalidation cheap.
+ * Re-priced whenever the rows or the PLEX price change; the last answer stays
+ * on screen until the next lands, and through a failed re-price.
  */
 export function useBelowMarket(
   rows: readonly PublicContractOfferRow[],
@@ -81,11 +91,7 @@ export function useBelowMarket(
   characterId: number | null,
   plexPrice: number | null
 ): BelowMarketState {
-  const [read, setRead] = useState<{
-    rows: readonly PublicContractOfferRow[];
-    plexPrice: number | null;
-    result: BelowMarketPricingRead | null;
-  } | null>(null);
+  const [read, setRead] = useState<PricedRows | 'failed' | null>(null);
 
   useEffect(() => {
     if (!enabled || rows.length === 0) return;
@@ -95,7 +101,7 @@ export function useBelowMarket(
         if (!cancelled) setRead({ rows, plexPrice, result });
       },
       () => {
-        if (!cancelled) setRead({ rows, plexPrice, result: null });
+        if (!cancelled) setRead((last) => (last !== null && last !== 'failed' ? last : 'failed'));
       }
     );
     return () => {
@@ -104,18 +110,26 @@ export function useBelowMarket(
   }, [enabled, rows, characterId, plexPrice]);
 
   const contracts = useMemo(
-    () => (read?.result ? belowMarketContracts(read.rows, read.result.pricing) : null),
+    () =>
+      read !== null && read !== 'failed'
+        ? belowMarketContracts(read.rows, read.result.pricing)
+        : null,
     [read]
   );
+  const current =
+    read !== null && read !== 'failed' && read.rows === rows && read.plexPrice === plexPrice;
 
-  if (!enabled) return IDLE;
-  // A re-price after a revalidation keeps the last answer on screen until it lands.
-  if (read === null) return { status: 'pricing' };
-  if (read.result === null || contracts === null) return { status: 'failed' };
-  return {
-    status: 'ready',
-    contracts,
-    hub: read.result.hub,
-    unreachable: read.result.unreachable,
-  };
+  return useMemo<BelowMarketState>(() => {
+    if (!enabled) return IDLE;
+    // No rows reach here only when a read came back empty-handed: nothing to price.
+    if (rows.length === 0 || read === 'failed') return FAILED;
+    if (read === null || contracts === null) return PRICING;
+    return {
+      status: 'ready',
+      contracts,
+      hub: read.result.hub,
+      unreachable: read.result.unreachable,
+      current,
+    };
+  }, [enabled, rows.length, read, contracts, current]);
 }

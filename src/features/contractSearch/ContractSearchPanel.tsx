@@ -804,7 +804,9 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
   }, [belowMarketState, displayRows]);
   // What the Overview's Below-market widget reads, so it never prices the snapshot itself.
   useEffect(() => {
-    if (belowMarketState.status !== 'ready' || namingTypes || lastSyncedAt === null) return;
+    // Only once these contracts are the current rows', so the age stored is theirs.
+    if (belowMarketState.status !== 'ready' || !belowMarketState.current) return;
+    if (namingTypes || lastSyncedAt === null) return;
     const all = belowMarketState.contracts;
     rememberBelowMarketSummary({
       fetchedAt: lastSyncedAt,

@@ -509,9 +509,11 @@ export async function loadBelowMarketWidget(characterId: number): Promise<BelowM
   let jumps: ReadonlyMap<number, number> | null = null;
   const origin = await loadCurrentSystemId(characterId).catch(() => null);
   if (origin !== null) {
-    const basis = await loadJumpBasis();
-    const distances = await localJumpDistances(origin, basis.rules, basis.network);
-    if (distances.kind === 'known') jumps = distances.jumps;
+    // An unreadable graph leaves jumps unknown; the contracts still show.
+    const distances = await loadJumpBasis()
+      .then((basis) => localJumpDistances(origin, basis.rules, basis.network))
+      .catch(() => null);
+    if (distances?.kind === 'known') jumps = distances.jumps;
   }
   return {
     hasView: true,
