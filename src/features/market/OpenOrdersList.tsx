@@ -39,7 +39,7 @@ interface OpenOrdersListProps {
 /**
  * Open Orders below `sm`: three lines per order — item/character/price,
  * the problem badge with its sentence, then remaining (and floor, off-hub)
- * — tapping anywhere on the row opens `OrderDetailModal`.
+ * — tapping anywhere on the row opens `OrderDetailModal`; `rowExtra` sits below, outside the button.
  *
  * The item name is the card's accent cue (§6c), not a `MarketItemLink`, and the badge
  * renders with `interactive={false}` (no "?" trigger): both are otherwise

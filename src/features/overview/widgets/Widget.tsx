@@ -103,16 +103,7 @@ function SecondaryLine({ secondary }: { secondary: NumberSecondary }) {
   );
 }
 
-function NumberBody({
-  model,
-  dimmed = false,
-  showLink = false,
-}: {
-  model: NumberModel;
-  dimmed?: boolean;
-  /** The Number view only: the figure's follow-on link. */
-  showLink?: boolean;
-}) {
+function NumberBody({ model, dimmed = false }: { model: NumberModel; dimmed?: boolean }) {
   const toned = model.tone !== 'clear';
   return (
     <div className={cx('grid gap-1 px-3 py-2.5', dimmed && 'opacity-45')}>
@@ -140,7 +131,7 @@ function NumberBody({
           {note}
         </p>
       ))}
-      {showLink && model.link && (
+      {model.link && (
         <Link
           to={model.link.to}
           className={entityLinkClassName('flex w-fit items-center gap-0.5 text-xs')}
@@ -168,7 +159,9 @@ function TableViewBody({
   return (
     <div>
       {/* The headline stays on screen in every view; its secondary line is the table's job here. */}
-      <NumberBody model={{ ...view.number, secondary: undefined, notes: undefined }} />
+      <NumberBody
+        model={{ ...view.number, secondary: undefined, notes: undefined, link: undefined }}
+      />
       <TableBody
         table={tableOf(view)}
         columnsFor={size}
@@ -202,7 +195,7 @@ function ChartBody({
   const beside = table !== null && table.rows.length > 0;
   return (
     <div>
-      <NumberBody model={{ ...view.number, notes: undefined }} />
+      <NumberBody model={{ ...view.number, notes: undefined, link: undefined }} />
       <div className={cx(beside && 'md:flex md:items-start')}>
         <Chart
           model={view.chart}
@@ -340,7 +333,7 @@ function WidgetFrame({
               ? t('overview.widgets.failed.lastGoodUndated')
               : t('overview.widgets.failed.nothing')}
         </span>
-        {showLastGood && <NumberBody model={view.number} dimmed />}
+        {showLastGood && <NumberBody model={{ ...view.number, link: undefined }} dimmed />}
         <span>
           <Button size="sm" onClick={refresh}>
             {t('overview.widgets.failed.retry')}
@@ -380,7 +373,7 @@ function WidgetFrame({
       ) : widget.view === 'chart' ? (
         <ChartBody view={view} size={widget.size} title={title} />
       ) : (
-        <NumberBody model={view.number} showLink />
+        <NumberBody model={view.number} />
       );
   }
 

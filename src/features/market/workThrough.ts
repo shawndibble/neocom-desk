@@ -1,5 +1,5 @@
 /**
- * Open Orders' work-through mode (issue #3991): the queue of orders that need
+ * Open Orders' work-through mode: the queue of orders that need
  * a fix, where the walk through it stands, the price a Next press copies,
  * and when a row a pilot was sent to comes back "Not changed".
  *
@@ -128,7 +128,7 @@ export function isNotChanged(
   return order.price === handled.previousPrice && order.issued === handled.issued;
 }
 
-export type WorkThroughLoss = { kind: 'loss'; amount: number } | { kind: 'costUnknown' };
+type WorkThroughLoss = { kind: 'loss'; amount: number } | { kind: 'costUnknown' };
 
 /**
  * What selling the units left at `newPrice` loses against the order's floor.

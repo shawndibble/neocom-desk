@@ -612,11 +612,6 @@ export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
     [isPhone, t, showCharacterStrip]
   );
 
-  /*
-   * Work through (issue #3991). The queue is re-formed every render from the
-   * filtered groups, in the order each group's table shows them, so a sort
-   * or filter change while running re-forms what is left of it.
-   */
   const sortedGroups = useMemo(
     () =>
       groups.map((group) => {
@@ -660,8 +655,8 @@ export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
     ordersById: ordersByOrderId,
     fetchedAtByCharacter,
   });
-  const workCurrent = workThrough.running ? workThrough.progress.current : null;
-  const workCurrentId = workCurrent?.orderId ?? null;
+  const workCurrentId = workThrough.currentId;
+  const workCurrent = workCurrentId === null ? null : workThrough.progress.current;
   const startRequested = useWorkThroughStartParam();
   const startedFromLink = useRef(false);
   const { start: startWorkThrough } = workThrough;
@@ -676,15 +671,22 @@ export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
       .querySelector(`[data-row-key="${workCurrentId}"]`)
       ?.scrollIntoView?.({ block: 'nearest' });
   }, [workCurrentId]);
-  const workThroughContext: WorkThroughContextValue = {
-    workThrough,
-    canOpenInEve,
-    manyOwners: new Set(workQueue.map((row) => row.characterId)).size > 1,
-    onSeeExits: (row) => {
-      setDetailAtExits(true);
-      setDetailOrderId(row.orderId);
-    },
-  };
+  const manyOwners = useMemo(
+    () => new Set(workQueue.map((row) => row.characterId)).size > 1,
+    [workQueue]
+  );
+  const workThroughContext = useMemo<WorkThroughContextValue>(
+    () => ({
+      workThrough,
+      canOpenInEve,
+      manyOwners,
+      onSeeExits: (row) => {
+        setDetailAtExits(true);
+        setDetailOrderId(row.orderId);
+      },
+    }),
+    [workThrough, canOpenInEve, manyOwners]
+  );
 
   const headerChrome = (
     <PageHeaderPortals

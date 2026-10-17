@@ -108,7 +108,6 @@ type ScopeState =
 
 /** The four folding sections of the detail modal (issue #1428). `numbers` only ever folds on a phone; the rest fold at every width. */
 export type OrderDetailSectionId = 'numbers' | 'whoCheaper' | 'costBasis' | 'exits';
-type SectionId = OrderDetailSectionId;
 
 /** The tightest scope carrying a rival, for the "Who is cheaper" disclosure's trailing read — or `'clear'`/`'notChecked'` when none of the three do. */
 function tightestRivalScope(
@@ -492,7 +491,7 @@ export function OrderDetailContent({
   // one order to the next. `numbers` only ever folds on a phone (owner
   // decision, issue #1428) but stays in the same map for uniform toggling.
   // A pilot's own toggle is recorded here and wins over the default.
-  const [manualSections, setManualSections] = useState<Map<SectionId, boolean>>(
+  const [manualSections, setManualSections] = useState<Map<OrderDetailSectionId, boolean>>(
     () => new Map(initialSection ? [[initialSection, true]] : [])
   );
 
@@ -566,9 +565,9 @@ export function OrderDetailContent({
   // Open on arrival only where the section has something to say: a rival is
   // cheaper. "Clear" and "not checked" stay folded behind their trailing read.
   const hasUndercut = typeof tightestRivalScope(station, system, region) === 'object';
-  const isExpanded = (id: SectionId) =>
+  const isExpanded = (id: OrderDetailSectionId) =>
     manualSections.get(id) ?? (id === 'whoCheaper' && hasUndercut);
-  const toggleSection = (id: SectionId) =>
+  const toggleSection = (id: OrderDetailSectionId) =>
     setManualSections((prev) => new Map(prev).set(id, !isExpanded(id)));
 
   const costBasisTrailing = row.costBasis

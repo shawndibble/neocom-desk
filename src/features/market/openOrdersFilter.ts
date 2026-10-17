@@ -377,7 +377,7 @@ export interface OpenOrdersLinkTarget {
   /** OR'd, the way the filter's own `problems` are. */
   problems?: readonly OrderProblem[];
   characterIds?: readonly number[];
-  /** Opens with the work-through queue already started (issue #3991). */
+  /** Opens with the work-through queue already started. */
   workThrough?: boolean;
 }
 

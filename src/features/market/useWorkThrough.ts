@@ -1,5 +1,5 @@
 /**
- * Open Orders' work-through mode, wired to the network (issue #3991): reads
+ * Open Orders' work-through mode, wired to the network: reads
  * the station's book for the current order, and on Next copies the one-tick
  * price, sends Open in EVE as the order's owner, and moves on. The queue,
  * progress and "Not changed" rules are `workThrough.ts`'s; this hook only
@@ -62,7 +62,7 @@ async function readPrice(
 }
 
 export interface UseWorkThroughOptions {
-  /** Today's queue, re-formed every render (`workThroughQueue`). */
+  /** Re-formed every render (`workThroughQueue`). */
   queue: readonly OpenOrderRow[];
   isPhone: boolean;
   /** Every open order id on every Character — never undercut. */
@@ -77,6 +77,8 @@ export interface UseWorkThroughOptions {
 
 export interface WorkThrough {
   running: boolean;
+  /** The order the walk stands on; null when not running or finished. */
+  currentId: number | null;
   /** Orders that would be walked if started now. */
   queueCount: number;
   progress: WorkThroughProgress;
@@ -242,25 +244,45 @@ export function useWorkThrough({
     );
   }, [current, canOpenInEve]);
 
-  return {
-    running,
-    queueCount: queue.length,
-    progress,
-    handled: state.handled,
-    notChangedIds,
-    preview: preview !== null && preview.orderId === currentId ? preview.price : null,
-    pendingId,
-    currentSent: currentId !== null && currentOpen?.orderId === currentId && currentOpen.ok,
-    currentOpenFailed:
-      currentId !== null && currentOpen?.orderId === currentId && !currentOpen.ok
-        ? { message: currentOpen.message }
-        : null,
-    start,
-    stop,
-    next,
-    skip,
-    openCurrent,
-  };
+  // Memoized: every table row reads this through context.
+  return useMemo(
+    () => ({
+      running,
+      currentId,
+      queueCount: queue.length,
+      progress,
+      handled: state.handled,
+      notChangedIds,
+      preview: preview !== null && preview.orderId === currentId ? preview.price : null,
+      pendingId,
+      currentSent: currentId !== null && currentOpen?.orderId === currentId && currentOpen.ok,
+      currentOpenFailed:
+        currentId !== null && currentOpen?.orderId === currentId && !currentOpen.ok
+          ? { message: currentOpen.message }
+          : null,
+      start,
+      stop,
+      next,
+      skip,
+      openCurrent,
+    }),
+    [
+      running,
+      currentId,
+      queue.length,
+      progress,
+      state.handled,
+      notChangedIds,
+      preview,
+      pendingId,
+      currentOpen,
+      start,
+      stop,
+      next,
+      skip,
+      openCurrent,
+    ]
+  );
 }
 
 /**

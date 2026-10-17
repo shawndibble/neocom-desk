@@ -1,4 +1,4 @@
-/** Hands the work-through state to rows rendered by the panel's memoized table columns (issue #3991). */
+/** Hands the work-through state to rows inside the panel's memoized table columns, which would otherwise hold stale state. */
 import { createContext } from 'react';
 import type { OpenOrderRow } from './openOrdersModel';
 import type { WorkThrough } from './useWorkThrough';

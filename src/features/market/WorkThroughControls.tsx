@@ -1,8 +1,7 @@
 /**
- * Open Orders' work-through mode, on screen (issue #3991). No bar or row of
- * its own: the start action and progress end the page's summary line, and
- * the current order's controls sit inside its own row. Rows reach the state
- * through context, so the panel's memoized table columns never go stale.
+ * Open Orders' work-through mode, on screen. No bar or row of its own: the
+ * start action and progress end the page's summary line; the current order's
+ * controls sit in its row.
  */
 import { useContext, type ReactNode } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
@@ -60,12 +59,12 @@ export function WorkThroughSummaryTail() {
       </>
     );
   }
-  const { current, position, total } = workThrough.progress;
+  const { position, total } = workThrough.progress;
   return (
     <>
       <Dot />
       <span className="tabular-nums text-text">
-        {current === null
+        {workThrough.currentId === null
           ? t('market.orders.workThrough.done', { total })
           : t('market.orders.workThrough.progress', { position, total })}
       </span>
@@ -84,10 +83,10 @@ function priceLine(price: WorkThroughPrice | null, t: TFunction) {
 }
 
 /** The red line a below-floor order carries: what the new price loses, or that the cost is unknown. */
-function LossLine({ row, price }: { row: OpenOrderRow; price: WorkThroughPrice | null }) {
+function LossLine({ row, context }: { row: OpenOrderRow; context: WorkThroughContextValue }) {
   const { t } = useTranslation();
-  const context = useContext(WorkThroughContext);
-  if (price?.kind !== 'price' || context === null) return null;
+  const price = context.workThrough.preview;
+  if (price?.kind !== 'price') return null;
   const loss = workThroughLoss(row, price.price);
   if (loss === null) return null;
   return (
@@ -112,12 +111,9 @@ function LossLine({ row, price }: { row: OpenOrderRow; price: WorkThroughPrice |
   );
 }
 
-function OwnerNote({ row }: { row: OpenOrderRow }) {
+function OwnerNote({ row, context }: { row: OpenOrderRow; context: WorkThroughContextValue }) {
   const { t } = useTranslation();
-  const context = useContext(WorkThroughContext);
-  if (context === null || !context.manyOwners || !context.canOpenInEve(row.characterId)) {
-    return null;
-  }
+  if (!context.manyOwners || !context.canOpenInEve(row.characterId)) return null;
   return (
     <span className="text-xs text-text-dim">
       {t('market.orders.workThrough.logInAs', { name: row.characterName })}
@@ -143,8 +139,8 @@ function TableControls({ row, context }: { row: OpenOrderRow; context: WorkThrou
           {t('market.orders.workThrough.skip')}
         </TextAction>
       </span>
-      <LossLine row={row} price={workThrough.preview} />
-      <OwnerNote row={row} />
+      <LossLine row={row} context={context} />
+      <OwnerNote row={row} context={context} />
     </span>
   );
 }
@@ -198,8 +194,8 @@ function ListControls({ row, context }: { row: OpenOrderRow; context: WorkThroug
           })}
         </p>
       )}
-      <LossLine row={row} price={price} />
-      <OwnerNote row={row} />
+      <LossLine row={row} context={context} />
+      <OwnerNote row={row} context={context} />
     </div>
   );
 }
@@ -255,11 +251,19 @@ function RowStatus({ orderId, context }: { orderId: number; context: WorkThrough
   );
 }
 
+/** Where a row stands in the walk: the current one, one already passed, or neither. */
+function useRowWorkThrough(row: OpenOrderRow) {
+  const context = useContext(WorkThroughContext);
+  if (context === null) return null;
+  if (context.workThrough.currentId === row.orderId) return { context, current: true };
+  if (context.workThrough.handled.has(row.orderId)) return { context, current: false };
+  return null;
+}
+
 /**
  * A desktop row's work-through content in place of its summary sentence:
- * the current row's controls, or a passed row's status — kept after Stop, so
- * a later orders read can still say "Not changed". Anything else renders
- * `fallback`.
+ * current row's controls, or a passed row's status — kept after Stop so a
+ * later orders read can still say "Not changed".
  */
 export function WorkThroughTableSlot({
   row,
@@ -268,36 +272,24 @@ export function WorkThroughTableSlot({
   row: OpenOrderRow;
   fallback: ReactNode;
 }) {
-  const context = useContext(WorkThroughContext);
-  if (context === null) return <>{fallback}</>;
-  if (
-    context.workThrough.running &&
-    context.workThrough.progress.current?.orderId === row.orderId
-  ) {
-    return <TableControls row={row} context={context} />;
-  }
-  if (context.workThrough.handled.has(row.orderId)) {
-    return <RowStatus orderId={row.orderId} context={context} />;
-  }
-  return <>{fallback}</>;
+  const place = useRowWorkThrough(row);
+  if (place === null) return <>{fallback}</>;
+  return place.current ? (
+    <TableControls row={row} context={place.context} />
+  ) : (
+    <RowStatus orderId={row.orderId} context={place.context} />
+  );
 }
 
 /** A phone row's work-through content, below the row's own button (buttons don't nest). */
 export function WorkThroughListSlot({ row }: { row: OpenOrderRow }) {
-  const context = useContext(WorkThroughContext);
-  if (context === null) return null;
-  if (
-    context.workThrough.running &&
-    context.workThrough.progress.current?.orderId === row.orderId
-  ) {
-    return <ListControls row={row} context={context} />;
-  }
-  if (context.workThrough.handled.has(row.orderId)) {
-    return (
-      <div className="px-3 pb-2">
-        <RowStatus orderId={row.orderId} context={context} />
-      </div>
-    );
-  }
-  return null;
+  const place = useRowWorkThrough(row);
+  if (place === null) return null;
+  return place.current ? (
+    <ListControls row={row} context={place.context} />
+  ) : (
+    <div className="px-3 pb-2">
+      <RowStatus orderId={row.orderId} context={place.context} />
+    </div>
+  );
 }

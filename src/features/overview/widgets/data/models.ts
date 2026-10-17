@@ -525,7 +525,6 @@ const orders: Builder = (feeds, { t, now, activeCharacterId, scopeAll }) => {
             ? { text: t('overview.widgets.orders.listed', { isk: formatIskCompact(listed) }) }
             : undefined,
       tone: undercut === 0 && severity !== 'critical' ? 'clear' : (severity ?? 'clear'),
-      // Opens Open Orders with the work-through queue started, for this view's Characters.
       link:
         needFix > 0
           ? {
