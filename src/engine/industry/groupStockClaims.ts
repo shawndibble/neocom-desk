@@ -71,21 +71,21 @@ export function groupStockClaims(
   members: readonly GroupClaimMember[],
   stock: DetectedOwnedStockMap
 ): (typeID: number) => GroupStockClaims | null {
-  const mine = filterStockByScope(stock, plan.ownedStockScope);
+  const scopedStock = filterStockByScope(stock, plan.ownedStockScope);
   const siblings = members
     .filter((m) => m.id !== plan.id)
     .sort(compareGroupMembers)
     .map((sibling) => ({
       sibling,
-      ahead: compareGroupMembers(sibling, plan) < 0,
-      shared: filterStockByScope(mine, sibling.ownedStockScope),
+      isAhead: compareGroupMembers(sibling, plan) < 0,
+      shared: filterStockByScope(scopedStock, sibling.ownedStockScope),
     }));
 
   return (typeID) => {
     const ahead: SiblingClaim[] = [];
     let aheadTotal = 0;
     let siblingTotal = 0;
-    for (const { sibling, ahead: isAhead, shared } of siblings) {
+    for (const { sibling, isAhead, shared } of siblings) {
       const quantity = Math.min(claimed(sibling, typeID), shared.get(typeID)?.quantity ?? 0);
       if (quantity <= 0) continue;
       siblingTotal += quantity;
@@ -95,12 +95,14 @@ export function groupStockClaims(
       }
     }
     if (siblingTotal === 0) return null;
-    const scoped = mine.get(typeID)?.quantity ?? 0;
-    const own = claimed(plan, typeID);
+    const scoped = scopedStock.get(typeID)?.quantity ?? 0;
+    // A Have past the scoped stock may be typed for stock elsewhere; only
+    // what it takes from this scope can collide with a sibling.
+    const ownClaim = Math.min(claimed(plan, typeID), scoped);
     return {
       ahead,
       free: Math.max(0, scoped - aheadTotal),
-      overClaim: own > 0 ? Math.max(0, own + siblingTotal - scoped) : 0,
+      overClaim: ownClaim > 0 ? Math.max(0, ownClaim + siblingTotal - scoped) : 0,
     };
   };
 }

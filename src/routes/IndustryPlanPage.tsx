@@ -166,7 +166,13 @@ export function IndustryPlanPage() {
                 onChange={(change) => void applyBuildPlanChange(plan.id, change)}
                 groupSnapshot={groupSnapshot}
                 group={planGroup}
-                groupMembers={planGroup ? groupMembers : undefined}
+                // A group change keeps the previous group's rows until the
+                // query reruns; never price this plan against them.
+                groupMembers={
+                  planGroup
+                    ? groupMembers?.filter((p) => p.buildGroupId === planGroup.id)
+                    : undefined
+                }
                 onSearchBpcSourcing={(typeId) => navigate(bpcSourcingHref(typeId))}
                 pendingLogProduction={pendingLogProduction}
                 pendingLogProductionKey={location.key}

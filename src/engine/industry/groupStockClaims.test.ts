@@ -119,6 +119,14 @@ describe('groupStockClaims', () => {
     expect(groupStockClaims(b, [a, b], STOCK)(TRITANIUM)?.overClaim).toBe(2_000);
   });
 
+  it("counts only the part of this plan's Have its scoped stock could cover", () => {
+    // B typed 5,000 against Jita's 500 Pyerite; A claims 100 of it. Only 500
+    // of B's Have can collide with A, so the group is 100 over, not 4,600.
+    const a = member('a', { [PYERITE]: 100 });
+    const b = member('b', { [PYERITE]: 5_000 });
+    expect(groupStockClaims(b, [a, b], STOCK)(PYERITE)?.overClaim).toBe(100);
+  });
+
   it('does not flag a member that claims nothing itself', () => {
     const a = member('a', { [TRITANIUM]: 6_000 });
     const b = member('b', { [TRITANIUM]: 6_000 });
