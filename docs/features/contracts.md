@@ -86,6 +86,7 @@ User goal by tab:
 
 - Shared `chunkedSnapshot.ts`: reads `meta` doc + N chunk docs of `rows`, cached under `GLOBAL_CACHE_CHARACTER_ID`, `allowStaleServe: true` so a lapsed row renders while the new read runs (issue #963). `fromCache` marks a failed revalidation (warning copy); `revalidating` shows "Refreshing in the background…" (`role=status`). Manual Refresh cannot beat the 30-min window by design (nothing newer exists); decision `20260912-160012-each-contract-search-board-loads-on-its-own`.
 - R2 path (ADR 0019, #3746): Items reads `index.json`, then only the type objects a search names (`useEarlyOffers`); `loadPublicContractOffers` returns no rows, just `lastSyncedAt`. A search naming no type reads every listed type. R2 unreachable or index invalid → the Firestore chunk read above; a type object failing → full Firestore snapshot, narrowed.
+- Offer rows carry `requestedPlex` (PLEX asked in return) and `requestsItems: true` (any non-PLEX item asked in return, #3986) on every row of that contract; both absent otherwise. The requested items themselves are not stored. No surface reads `requestsItems` yet.
 - Each board has its own `useRouteSnapshot` so Courier never waits for ~370k offer rows (#963).
 - Rate limiting: no ESI call per row on any search surface (local snapshots), by design to stay under the 100-errors/min budget; structure name probes are per modal open.
 

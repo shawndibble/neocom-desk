@@ -1,15 +1,16 @@
 /**
  * The `info` search param: which entity's Show Info (or Skill) modal a URL
  * has open — `?info=character-<id>`, `corporation-<id>`, `alliance-<id>` or
- * `skill-<typeId>`, `type-<typeId>` (Item Detail) or `type-<typeId>-<itemId>`
- * (one Mutated module's Rolls). It rides on the *current* location, so a link to an
+ * `skill-<typeId>`, `type-<typeId>` (Item Detail), `type-<typeId>-<itemId>`
+ * (one Mutated module's Rolls) or `place-<id>` (Place Info: a region, station
+ * or structure). It rides on the *current* location, so a link to an
  * entity is a real, shareable `<a href>` that opens the modal over whatever
  * page the pilot is on (DESIGN.md §6c "Entities").
  *
  * Pure: no router, DOM or store imports.
  */
 
-export type EntityInfoKind = 'character' | 'corporation' | 'alliance' | 'skill' | 'type';
+export type EntityInfoKind = 'character' | 'corporation' | 'alliance' | 'skill' | 'type' | 'place';
 
 export interface EntityInfoTarget {
   kind: EntityInfoKind;
@@ -20,7 +21,7 @@ export interface EntityInfoTarget {
 
 export const ENTITY_INFO_PARAM = 'info';
 
-const INFO_PATTERN = /^(character|corporation|alliance|skill|type)-(\d+)(?:-(\d+))?$/;
+const INFO_PATTERN = /^(character|corporation|alliance|skill|type|place)-(\d+)(?:-(\d+))?$/;
 
 function positiveId(raw: string): number | null {
   const id = Number(raw);

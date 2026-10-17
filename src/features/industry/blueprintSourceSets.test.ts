@@ -11,6 +11,7 @@ vi.mock('@/features/character/loyalty', () => ({
 vi.mock('@/features/loyalty/store', () => ({ loadLoyaltyStoreOffers: vi.fn() }));
 vi.mock('@/sde/marketTypesById', () => ({ loadMarketTypesById: vi.fn() }));
 vi.mock('@/sde/loadMarketSde', () => ({ loadVariations: vi.fn() }));
+vi.mock('@/sde/loadSde', () => ({ loadInvention: vi.fn() }));
 
 import { loadCharacterBlueprints } from './data';
 import { isSyncConfigured } from '@/app/syncStatus';
@@ -19,6 +20,7 @@ import { loadCharacterLoyaltyPoints } from '@/features/character/loyalty';
 import { loadLoyaltyStoreOffers } from '@/features/loyalty/store';
 import { loadMarketTypesById } from '@/sde/marketTypesById';
 import { loadVariations } from '@/sde/loadMarketSde';
+import { loadInvention } from '@/sde/loadSde';
 
 type Resolved<F extends (...args: never[]) => unknown> = Awaited<ReturnType<F>>;
 
@@ -67,6 +69,27 @@ beforeEach(() => {
   vi.mocked(loadLoyaltyStoreOffers).mockResolvedValue({
     data: [{ type_id: 40 }],
   } as unknown as Resolved<typeof loadLoyaltyStoreOffers>);
+  vi.mocked(loadInvention).mockResolvedValue({
+    blueprints: {
+      10: {
+        invention: {
+          time: 1,
+          materials: [],
+          skills: [],
+          products: [{ typeID: 23, quantity: 10, probability: 0.34 }],
+        },
+      },
+      20: {
+        invention: {
+          time: 1,
+          materials: [],
+          skills: [],
+          products: [{ typeID: 24, quantity: 10, probability: 0.34 }],
+        },
+      },
+    },
+    decryptors: {},
+  });
 });
 
 describe('loadBlueprintSourceSets', () => {
@@ -76,7 +99,29 @@ describe('loadBlueprintSourceSets', () => {
     expect(sets.market).toEqual(new Set([20]));
     expect(sets.contract).toEqual(new Set([30, 31]));
     expect(sets.lpStore).toEqual(new Set([40]));
+    expect(sets.invention).toEqual(new Set());
     expect(unavailable).toEqual([]);
+  });
+
+  it('counts a T2 blueprint as inventable only from an owned T1 original', async () => {
+    vi.mocked(loadCharacterBlueprints).mockResolvedValue({
+      cached: {
+        data: [
+          { type_id: 10, runs: -1 },
+          { type_id: 20, runs: 5 },
+        ],
+      },
+      needsReauth: false,
+    } as unknown as Resolved<typeof loadCharacterBlueprints>);
+    const { sets } = await loadBlueprintSourceSets(
+      [1],
+      [
+        { blueprintTypeID: 23, productTypeID: 123 },
+        { blueprintTypeID: 24, productTypeID: 124 },
+      ]
+    );
+    // 24 is invented from 20, owned only as a copy.
+    expect(sets.invention).toEqual(new Set([23]));
   });
 
   it('leaves a market-grouped blueprint off the NPC market when its product is not Tech I', async () => {
@@ -138,6 +183,6 @@ describe('loadBlueprintSourceSets', () => {
       needsReauth: true,
     } as unknown as Resolved<typeof loadCharacterBlueprints>);
     const { unavailable } = await loadBlueprintSourceSets([1], []);
-    expect(unavailable).toEqual(['owned']);
+    expect(unavailable).toEqual(['owned', 'invention']);
   });
 });

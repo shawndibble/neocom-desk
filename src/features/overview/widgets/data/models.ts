@@ -138,6 +138,8 @@ const SUMS_ACROSS = new Set([
   'kills',
   // Every Character's journal, classified together; the builder narrows to the header Character.
   'omega',
+  // Every Character's jobs and job slots; the builder narrows to the header Character.
+  'industry',
 ]);
 
 export function kindSumsAcrossCharacters(kind: string): boolean {

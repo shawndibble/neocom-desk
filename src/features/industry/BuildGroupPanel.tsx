@@ -68,8 +68,8 @@ import {
   typeIdsFromKey,
 } from './planMaterialsView';
 import { useOwnedStockBulk } from './useOwnedStockBulk';
-import { GroupSlotLine } from './PlanSlotLine';
-import { countJobsByCategory } from './planJobSlots';
+import { PlanScheduleLine } from './PlanScheduleLine';
+import { planJobNodes, usePlanSchedule } from './planJobSlots';
 import { hasShoppingList, shoppingListText } from './shoppingList';
 import { useComparedBuildResults } from './useComparedBuildResults';
 import { useDetectedOwnedStock } from './useDetectedOwnedStock';
@@ -301,24 +301,24 @@ export function BuildGroupPanel({
     [buyRows, catalog]
   );
 
-  // Slot demand of the whole group: every member's own job plus each sub-job
-  // beneath it, by pool — what `GroupSlotLine` sets against free slots.
-  const groupJobCounts = useMemo(() => {
-    const counts = { manufacturing: 0, science: 0, reaction: 0 };
+  // The whole group's job tree — every member's own job plus each sub-job
+  // beneath it — scheduled together on the first member's character's slots.
+  const groupJobNodes = useMemo(() => {
     const byId = new Map(plans.map((p) => [p.id, p]));
-    for (const member of members) {
+    return members.flatMap((member, i) => {
       const plan = byId.get(member.planId);
       const activity = plan
         ? (catalog.byBlueprintTypeID.get(plan.blueprintTypeID)?.blueprint.activity ??
           'manufacturing')
         : 'manufacturing';
-      const memberCounts = countJobsByCategory(activity, member.result.materials, catalog);
-      counts.manufacturing += memberCounts.manufacturing;
-      counts.science += memberCounts.science;
-      counts.reaction += memberCounts.reaction;
-    }
-    return counts;
+      return planJobNodes(
+        { activity, seconds: member.result.seconds, materials: member.result.materials },
+        catalog,
+        `${i}:`
+      );
+    });
   }, [members, plans, catalog]);
+  const groupSchedule = usePlanSchedule(plans[0]?.characterId ?? null, groupJobNodes);
 
   // The verdict band's sub-line: percent + hub only when there's a real
   // comparison to state (buyCost known and non-zero on the relevant side);
@@ -633,9 +633,9 @@ export function BuildGroupPanel({
           {rollup.unpriceable && (
             <p className="basis-full text-xs text-warning">{t('industry.groupUnpriceable')}</p>
           )}
-          {plans.length > 0 && (
+          {plans.length > 0 && groupSchedule && (
             <div className="basis-full">
-              <GroupSlotLine characterId={plans[0].characterId} counts={groupJobCounts} />
+              <PlanScheduleLine plan={groupSchedule} />
             </div>
           )}
         </div>

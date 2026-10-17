@@ -47,7 +47,7 @@ export interface ContractOfferFilter {
  * unconditionally would price every fixed-ask contract at zero — which is
  * both the wrong number to show and, as a ceiling, the wrong row to keep.
  */
-function buyoutOf(row: PublicContractOfferRow): number | null {
+export function buyoutOf(row: PublicContractOfferRow): number | null {
   if (!row.isAuction) return null;
   // `> 0`, not just present: the sync writes whatever the archive's `buyout`
   // column parses to and only treats a blank as absent, so a zero reaches

@@ -9,6 +9,8 @@
  * - `ItemInfoLink` opens an item's Item Detail (Show info) the same way
  *   (`?info=type-<typeId>`). It is the default for an item name; the Market
  *   browser link (`MarketItemLink`) is for pages whose context is market.
+ * - `PlaceLink` opens a region's, station's or structure's Place Info
+ *   (`?info=place-<id>`).
  * - `SystemLink` goes to Route Safety with the system as the destination.
  *
  * Every one forwards its ref and spreads extra anchor props, so a `Tooltip`
@@ -130,6 +132,13 @@ export const ItemInfoLink = forwardRef<
     />
   );
 });
+
+/** A region, station or structure name that opens its Place Info over the current page. */
+export const PlaceLink = forwardRef<HTMLAnchorElement, EntityLinkProps & { id: number }>(
+  function PlaceLink({ id, ...rest }, ref) {
+    return <InfoLink {...rest} ref={ref} entity={{ kind: 'place', id }} />;
+  }
+);
 
 export const SystemLink = forwardRef<HTMLAnchorElement, EntityLinkProps & { systemId: number }>(
   function SystemLink({ systemId, className, children, ...rest }, ref) {

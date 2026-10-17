@@ -96,7 +96,7 @@ Layout (`THREE_COLUMN_QUERY` 100rem):
 - Header badges: Alpha chip (`AlphaCloneChip`: Alpha OK / Omega only by skill caps, with tooltip listing blockers), Mastery chip (`MasteryChip`: hull Mastery tiers, hide completed, suggested note, total time), Missing skills chip (`MissingSkillsChip`: count + train time, opens skill list with add-to-plan).
 - Skill basis control (`SkillOverridesControl`): Own skills / All 0 / All V / Set levels... (per-skill overrides, search). Stats only; "can fly" still uses real skills.
 - Implants control (`ImplantSetControl`): stats use the clone's implants until changed, then a Fitting-own set (implants + combat boosters, saved with Fitting/share code); Use my clone resets; booster side effects shown; Implant Finder ("Find by goal" / "Your set" tabs: tries every implant on this fit, ranks by goal, LP-store/hub price, cheapest fixes when over CPU/PG; `ImplantFinder.tsx`, `engine/fittings/implantFinder.ts`). `ImplantsAssumedNote` when Character details scope missing.
-- Abyssal weather picker (`AbyssalWeatherPicker`): Normal space or kind x level; shown as "in <weather>".
+- Abyssal stats section (`abyssal`, closed by default; row meta = weather name or "Normal space"): weather picker (`AbyssalWeatherPicker`: Normal space or kind x level; heading shows "in <weather>") + run planner fields flat (`AbyssalRunPlanner`: filament tier, activate in, hull rule, timer, filament to buy, weather delta on the fit, computed only while the section is open).
 - Tactical mode picker (`TacticalModePicker`) for Tactical Destroyers / Strategic Cruisers subsystems modes.
 - Price hub select (`PriceHubSelect`), Manage.
 
@@ -185,7 +185,7 @@ Unconfirmed: whether the Variations "Fits" column counts CPU and PG or hull/slot
 
 - `/share/fitting?f=<code>` permanent URL; `/share/:shareId` short Share Link wraps same code (`routes/SharedLink.tsx` uses `FittingShareView`, shows expiry date). Outside `RequireCharacter`/`ScopeGate`.
 - Visitor with a Character is redirected into the editor on the code.
-- Logged out: banner "Shown at every skill level V, with no clone"; Fitting's own implant set applied if present (`resolveFittingShareView.ts`); read-only Ring, module list, stats sections, abyssal weather picker, target profiles.
+- Logged out: banner "Shown at every skill level V, with no clone"; Fitting's own implant set applied if present (`resolveFittingShareView.ts`); read-only Ring, module list, stats sections (incl. Abyssal section), target profiles.
 - Renders in `ShareShell` (Log in + Choose permissions at the top); Copy Fitting in its actions slot (EFT, copied/failed feedback).
 - States: loading, invalid link, newer-version link, load failed.
 

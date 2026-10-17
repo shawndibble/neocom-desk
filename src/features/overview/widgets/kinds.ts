@@ -159,6 +159,13 @@ const SPECS: Record<string, Spec> = {
     size: 'M',
     endpoints: ['getCharacterLoyaltyPoints'],
   },
+  belowMarket: {
+    category: 'money',
+    views: NT,
+    view: 'number',
+    size: 'S',
+    endpoints: [],
+  },
   miningTax: {
     category: 'industry',
     views: NT,

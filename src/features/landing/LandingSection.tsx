@@ -45,7 +45,8 @@ export function LandingBackdrop({
           loading={eager ? 'eager' : 'lazy'}
           // The hero's ship is the landing page's largest paint (#3926).
           fetchPriority={eager ? 'high' : undefined}
-          decoding="async"
+          // The eager ship is the largest paint: decode it with the frame, not after (#3950).
+          decoding={eager ? undefined : 'async'}
           className={cx('lp-ship', SHIP_CLASS[ship.side])}
         />
       )}

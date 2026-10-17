@@ -616,7 +616,17 @@ export interface MaterialSourcing {
    * private contract or in-person trade) — that case pairs this with
    * `overridePrice` for its cost, since nothing here priced it.
    */
-  acquisitionTierOverride?: { me: number; te: number };
+  acquisitionTierOverride?: {
+    me: number;
+    te: number;
+    /**
+     * An invention pick (issue #3990): resolve among invention tiers only,
+     * the one bringing `runs` per copy — two decryptors, or an invention tier
+     * and a contract copy, can share one ME/TE. Priced live, so no
+     * `overridePrice` goes with it.
+     */
+    invented?: { runs: number };
+  };
 }
 
 /** Sourcing overrides keyed by material typeID. Missing key = no overrides. */
@@ -697,6 +707,8 @@ export type AcquisitionTier = {
   me: number;
   te: number;
   community?: AcquisitionCommunitySource;
+  /** The tier is an invented copy (issue #3990): its price is an expected cost. */
+  invented?: true;
   pool?: BlueprintRunPool;
 };
 
@@ -712,6 +724,8 @@ export interface AcquisitionLine {
   pool?: BlueprintRunPool;
   /** Set when the tier is a Community Offer: free, from this Member. */
   community?: AcquisitionCommunitySource;
+  /** Set when the tier is invented (issue #3990): `unitPrice` is the expected cost of one copy. */
+  invented?: true;
 }
 
 /**

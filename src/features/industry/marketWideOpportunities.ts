@@ -94,8 +94,8 @@ export function marketWideProductTypeIds(trees: MarketWideTreeMap): number[] {
 
 /**
  * Runs the whole opt-in scan: liquidity pass over every candidate whose
- * blueprint the pilot owns or can buy, then a material-price pass over only
- * the survivors, then ranking. Returns an empty list — never a throw — when
+ * blueprint the pilot owns, can buy or can invent, then a material-price pass
+ * over only the survivors, then ranking. Returns an empty list — never a throw — when
  * nothing clears the liquidity floor; the caller reads that as "show the
  * empty state", not an error.
  *

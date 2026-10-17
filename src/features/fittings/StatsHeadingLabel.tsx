@@ -1,8 +1,8 @@
 /**
- * The stats heading's "whose skills" line: the Character and the skills the
- * stats are really worked out under — its own, All V or All 0 from the
- * Skills control, plus how many single skills are set on top. With no
- * Character the pilot is All V (unless the control says All 0).
+ * Whose skills the stats are worked out under: the Character and the skills
+ * really used — its own, All V or All 0 from the Skills control, plus how
+ * many single skills are set on top. With no Character the pilot is All V
+ * (unless the control says All 0). The Pilot panel's subtitle.
  */
 import { useTranslation } from 'react-i18next';
 import { useSkillOverrides } from './statsConditions';

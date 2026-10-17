@@ -22,6 +22,7 @@ const ALL_IDS = [
   'priceWatch',
   'stock',
   'lp',
+  'belowMarket',
   'miningTax',
   'industry',
   'profit',
@@ -41,7 +42,7 @@ const ALL_IDS = [
 ];
 
 describe('widget kind catalogue', () => {
-  it('holds exactly the 28 kinds the mockup defines', () => {
+  it('holds exactly the 29 kinds the mockups define', () => {
     expect(WIDGET_KINDS.map((k) => k.id).sort()).toEqual([...ALL_IDS].sort());
   });
 

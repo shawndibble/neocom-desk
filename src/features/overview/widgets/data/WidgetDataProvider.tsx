@@ -49,6 +49,7 @@ import {
   loadNetWorthWidget,
   loadProfitWidget,
   loadHaulingWidget,
+  loadBelowMarketWidget,
   loadJumpTimersWidget,
   loadRouteSafetyWidget,
   loadKillsWidget,
@@ -211,6 +212,14 @@ function Source({ feed }: { feed: FeedId }) {
       return <SnapshotSource feed="hauling" load={loadHaulingWidget} cacheKey="overview:hauling" />;
     case 'survey':
       return <SnapshotSource feed="survey" load={loadSurveyWidget} cacheKey="overview:survey" />;
+    case 'belowMarket':
+      return (
+        <SnapshotSource
+          feed="belowMarket"
+          load={loadBelowMarketWidget}
+          cacheKey="overview:below-market"
+        />
+      );
     case 'journal':
       return <SnapshotSource feed="journal" load={loadJournalPanel} cacheKey="overview:journal" />;
     case 'netWorth':

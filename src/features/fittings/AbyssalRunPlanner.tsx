@@ -1,13 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  Disclosure,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui';
 import { ItemInfoLink } from '@/features/entities';
 import {
   ABYSSAL_POCKETS,
@@ -31,14 +24,17 @@ import {
 } from '@/engine/fittings/abyssalWeather';
 import { diffFittingStats, type StatChange } from '@/engine/fittings/variationDelta';
 import type { FittingStats } from '@/engine/fittings/types';
-import { abyssalWeatherLabel, useAbyssalWeather } from './abyssalWeatherSelection';
+import { abyssalWeatherLabel, useAbyssalWeather, useWeatherName } from './abyssalWeatherSelection';
+import { AbyssalWeatherPicker } from './AbyssalWeatherPicker';
 import { useAbyssalRunPlan } from './abyssalRunPlan';
 import { changeLabel } from './fittingVariationsCsv';
 import { StatField, StatFields, StatNote } from './StatFacts';
 import { STAT_FIELD_WIDTH } from './statKit';
 import { kmValue } from './rangeText';
 
-type Compare = (weatherTypeId: number) => Promise<{ before: FittingStats; after: FittingStats }>;
+export type WeatherCompare = (
+  weatherTypeId: number
+) => Promise<{ before: FittingStats; after: FittingStats }>;
 
 interface RunDelta {
   changes: StatChange[];
@@ -51,11 +47,11 @@ interface RunDelta {
  * an edited fit never shows the old fit's delta.
  */
 function useRunDelta(
-  compare: Compare | null,
+  compare: WeatherCompare | null,
   weatherTypeId: number | null
 ): RunDelta | 'failed' | null {
   const [result, setResult] = useState<{
-    compare: Compare;
+    compare: WeatherCompare;
     weatherTypeId: number;
     delta: RunDelta | 'failed';
   } | null>(null);
@@ -82,7 +78,19 @@ function useRunDelta(
     : null;
 }
 
-/** Plan an Abyssal run for the open fit. Writes the session weather, so the editor's stats move with it. */
+/** What the stats column's Abyssal row says closed: the session weather's name, else normal space. */
+export function AbyssalWeatherMeta() {
+  const { t } = useTranslation();
+  const weatherTypeId = useAbyssalWeather((state) => state.weatherTypeId);
+  return useWeatherName(weatherTypeId) ?? t('fittings.weather.none');
+}
+
+/**
+ * The stats column's Abyssal section body, flat: the session weather, then a
+ * run for the open fit in it. Writes the session weather, so the editor's
+ * stats move with it. Mount it only while it is shown: mounting is what
+ * starts working out the weather's delta on the fit.
+ */
 export function AbyssalRunPlanner({
   hullGroupId,
   compare,
@@ -90,121 +98,115 @@ export function AbyssalRunPlanner({
 }: {
   /** The open fit's hull's inventory group; undefined while the catalogue loads hides the hull rule. */
   hullGroupId: number | undefined;
-  compare: Compare | null;
+  compare: WeatherCompare | null;
   typeName: (typeId: number) => string;
 }) {
   const { t } = useTranslation();
-  const [expanded, setExpanded] = useState(false);
   const { tier, security, setTier, setSecurity } = useAbyssalRunPlan();
   const weatherTypeId = useAbyssalWeather((state) => state.weatherTypeId);
   const setWeather = useAbyssalWeather((state) => state.setWeather);
   const weather = weatherTypeId === null ? undefined : abyssalWeatherById(weatherTypeId);
-  const delta = useRunDelta(expanded ? compare : null, weather?.typeId ?? null);
+  const delta = useRunDelta(compare, weather?.typeId ?? null);
 
   const hull = abyssalHullRule(hullGroupId);
   const activation = abyssalActivation(tier, security);
   const filamentId = weather ? abyssalFilamentTypeId(tier, weather.kind) : null;
 
   return (
-    <Disclosure
-      label={t('fittings.abyssalRun.title')}
-      expanded={expanded}
-      onToggle={() => setExpanded((open) => !open)}
-    >
-      <div className="space-y-2 pt-2">
-        <StatFields>
-          <StatField label={t('fittings.abyssalRun.tier')}>
-            <Select
-              value={String(tier)}
-              onValueChange={(value) => {
-                const next = Number(value) as AbyssalTier;
-                const nextLevels = abyssalTierLevels(next);
-                setTier(next);
-                // Off-tier strength: new tier's harsher one, kind kept.
-                if (weather && !nextLevels.includes(weather.level))
-                  setWeather(abyssalWeatherOf(weather.kind, nextLevels[1]).typeId);
-              }}
+    <div className="space-y-2">
+      <StatFields>
+        <AbyssalWeatherPicker field />
+        <StatField label={t('fittings.abyssalRun.tier')}>
+          <Select
+            value={String(tier)}
+            onValueChange={(value) => {
+              const next = Number(value) as AbyssalTier;
+              const nextLevels = abyssalTierLevels(next);
+              setTier(next);
+              // Off-tier strength: new tier's harsher one, kind kept.
+              if (weather && !nextLevels.includes(weather.level))
+                setWeather(abyssalWeatherOf(weather.kind, nextLevels[1]).typeId);
+            }}
+          >
+            <SelectTrigger
+              aria-label={t('fittings.abyssalRun.tier')}
+              size="sm"
+              className={STAT_FIELD_WIDTH}
             >
-              <SelectTrigger
-                aria-label={t('fittings.abyssalRun.tier')}
-                size="sm"
-                className={STAT_FIELD_WIDTH}
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {ABYSSAL_TIERS.map((value) => (
-                  <SelectItem key={value} value={String(value)}>
-                    {t('fittings.abyssalRun.tierOption', {
-                      tier: value,
-                      name: t(`fittings.abyssalRun.tierName.${value}`),
-                    })}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </StatField>
-          <StatField label={t('fittings.abyssalRun.security')}>
-            <Select
-              value={String(security)}
-              onValueChange={(value) => setSecurity(Number(value) as AbyssalSecurity)}
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {ABYSSAL_TIERS.map((value) => (
+                <SelectItem key={value} value={String(value)}>
+                  {t('fittings.abyssalRun.tierOption', {
+                    tier: value,
+                    name: t(`fittings.abyssalRun.tierName.${value}`),
+                  })}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </StatField>
+        <StatField label={t('fittings.abyssalRun.security')}>
+          <Select
+            value={String(security)}
+            onValueChange={(value) => setSecurity(Number(value) as AbyssalSecurity)}
+          >
+            <SelectTrigger
+              aria-label={t('fittings.abyssalRun.security')}
+              size="sm"
+              className={STAT_FIELD_WIDTH}
             >
-              <SelectTrigger
-                aria-label={t('fittings.abyssalRun.security')}
-                size="sm"
-                className={STAT_FIELD_WIDTH}
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {ABYSSAL_SECURITY_BANDS.map((band) => (
-                  <SelectItem key={band} value={String(band)}>
-                    {band === 0
-                      ? t('fittings.abyssalRun.securityBelow')
-                      : t('fittings.abyssalRun.securityOption', { value: (band / 10).toFixed(1) })}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </StatField>
-        </StatFields>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {ABYSSAL_SECURITY_BANDS.map((band) => (
+                <SelectItem key={band} value={String(band)}>
+                  {band === 0
+                    ? t('fittings.abyssalRun.securityBelow')
+                    : t('fittings.abyssalRun.securityOption', { value: (band / 10).toFixed(1) })}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </StatField>
+      </StatFields>
 
-        <ul className="space-y-1 text-xs">
-          {weather && <StrengthNote tier={tier} weather={weather} />}
-          {hullGroupId !== undefined && (
-            <li className={hull.eligible ? 'text-text' : 'text-warning'}>
-              {t(`fittings.abyssalRun.hull.${hull.eligible ? hull.shipClass : hull.reason}`)}
-              {hull.eligible && !hull.confirmed && (
-                <span className="text-warning"> {t('fittings.abyssalRun.hull.unconfirmed')}</span>
-              )}
-            </li>
-          )}
-          <li className={activation === 'clear' ? 'text-text' : 'text-warning'}>
-            {t(`fittings.abyssalRun.activation.${activation}`, { tier })}
+      <ul className="space-y-1 text-xs">
+        {weather && <StrengthNote tier={tier} weather={weather} />}
+        {hullGroupId !== undefined && (
+          <li className={hull.eligible ? 'text-text' : 'text-warning'}>
+            {t(`fittings.abyssalRun.hull.${hull.eligible ? hull.shipClass : hull.reason}`)}
+            {hull.eligible && !hull.confirmed && (
+              <span className="text-warning"> {t('fittings.abyssalRun.hull.unconfirmed')}</span>
+            )}
           </li>
-          <li className="text-text-dim">
-            {t('fittings.abyssalRun.timer', {
-              minutes: ABYSSAL_RUN_MINUTES,
-              pockets: ABYSSAL_POCKETS,
-              perPocket: (ABYSSAL_RUN_MINUTES / ABYSSAL_POCKETS).toFixed(1),
-            })}
-          </li>
-          {filamentId !== null && hull.eligible && (
-            <li>
-              {t('fittings.abyssalRun.buy', { count: hull.ships })}{' '}
-              <ItemInfoLink typeId={filamentId}>{typeName(filamentId)}</ItemInfoLink>
-            </li>
-          )}
-        </ul>
-
-        {weather === undefined ? (
-          <StatNote>{t('fittings.abyssalRun.pickWeather')}</StatNote>
-        ) : (
-          <RunDeltaNote weather={weather} delta={delta} typeName={typeName} />
         )}
-        <StatNote>{t('fittings.abyssalRun.source')}</StatNote>
-      </div>
-    </Disclosure>
+        <li className={activation === 'clear' ? 'text-text' : 'text-warning'}>
+          {t(`fittings.abyssalRun.activation.${activation}`, { tier })}
+        </li>
+        <li className="text-text-dim">
+          {t('fittings.abyssalRun.timer', {
+            minutes: ABYSSAL_RUN_MINUTES,
+            pockets: ABYSSAL_POCKETS,
+            perPocket: (ABYSSAL_RUN_MINUTES / ABYSSAL_POCKETS).toFixed(1),
+          })}
+        </li>
+        {filamentId !== null && hull.eligible && (
+          <li>
+            {t('fittings.abyssalRun.buy', { count: hull.ships })}{' '}
+            <ItemInfoLink typeId={filamentId}>{typeName(filamentId)}</ItemInfoLink>
+          </li>
+        )}
+      </ul>
+
+      {weather === undefined ? (
+        <StatNote>{t('fittings.abyssalRun.pickWeather')}</StatNote>
+      ) : (
+        <RunDeltaNote weather={weather} delta={delta} typeName={typeName} />
+      )}
+      <StatNote>{t('fittings.abyssalRun.source')}</StatNote>
+    </div>
   );
 }
 

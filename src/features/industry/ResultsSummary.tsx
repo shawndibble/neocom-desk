@@ -367,7 +367,7 @@ export function ResultsSummary({
               : formatVolume(totalVolume.volume)
           }
         />
-        <CostRow label={t('industry.time')} value={formatDuration(result.seconds)} />
+        <CostRow label={t('industry.jobTime')} value={formatDuration(result.seconds)} />
         {systemCostIndex !== null && (
           <CostRow
             label={t('industry.costIndexWithSystem', { system: costIndexSystemName })}

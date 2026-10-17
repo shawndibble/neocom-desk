@@ -133,6 +133,54 @@ export interface BlueprintType {
 /** public/data/blueprints.json: blueprint/formula typeID -> BlueprintType */
 export type BlueprintMap = Record<string, BlueprintType>;
 
+/** One blueprint an invention job can produce, with its base odds. */
+export interface InventionProduct {
+  /** the invented (T2) blueprint */
+  typeID: number;
+  /** runs on the invented copy, before a decryptor */
+  quantity: number;
+  /** base success chance, 0–1, before skills and decryptor */
+  probability: number;
+}
+
+/** A T1 blueprint's invention job (SDE activity 8). */
+export interface InventionRecipe {
+  /** base job time in seconds */
+  time: number;
+  /** datacores consumed per attempt */
+  materials: BlueprintQuantity[];
+  products: InventionProduct[];
+  skills: BlueprintSkill[];
+}
+
+/** The copying and invention halves of one blueprint (issue #3987). */
+export interface BlueprintCopyInvention {
+  /** base time in seconds to copy one run (SDE activity 5) */
+  copyTime?: number;
+  invention?: InventionRecipe;
+}
+
+/** A generic decryptor's effect on an invention job. */
+export interface Decryptor {
+  name: string;
+  /** scales the base chance: 1.2 is +20% */
+  probabilityMultiplier: number;
+  /** added to the invented copy's ME */
+  me: number;
+  /** added to the invented copy's TE */
+  te: number;
+  /** added to the invented copy's runs */
+  runs: number;
+}
+
+/** public/data/invention.json (see scripts/lib/invention.mjs). */
+export interface InventionData {
+  /** blueprint typeID -> its copying/invention data */
+  blueprints: Record<string, BlueprintCopyInvention>;
+  /** decryptor typeID -> its modifiers */
+  decryptors: Record<string, Decryptor>;
+}
+
 /** One value in public/data/types.json. */
 export interface TypeInfo {
   name: string;

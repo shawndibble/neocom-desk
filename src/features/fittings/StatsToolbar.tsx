@@ -4,7 +4,7 @@ import type { FittingStats } from '@/engine/fittings/types';
 import { useOverheatAll } from './statsConditions';
 
 /**
- * The row above the stats sections: the "Overheat all" switch — every figure
+ * The Situation panel's last row: the "Overheat all" switch — every figure
  * on the page (and in Compare) switches to its overheated value, in amber.
  * (Copy stats lives in the header's ⋮ menu.)
  */

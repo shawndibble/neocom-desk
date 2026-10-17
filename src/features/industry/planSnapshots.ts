@@ -21,6 +21,7 @@ import {
   NO_BLUEPRINT_PURCHASE_OFFERS,
   type BlueprintOffersLookup,
 } from './blueprintPurchaseOffers';
+import { loadInventionMarket, type InventionMarket } from './inventionSources';
 
 export interface PlanSnapshots {
   snapshot: Promise<MarketSnapshot>;
@@ -28,6 +29,8 @@ export interface PlanSnapshots {
   reactionSnapshot: Promise<MarketSnapshot> | null;
   /** Region market and LP Store offers for the plan's blueprints; never rejects. */
   blueprintOffers: Promise<BlueprintOffersLookup>;
+  /** Invention recipes and prices for the same blueprints (issue #3990); never rejects. */
+  inventionMarket: Promise<InventionMarket | null>;
 }
 
 /** Returns one entry per `members` item, in order. */
@@ -68,6 +71,7 @@ export function loadPlanSnapshots(
   });
   const snapshots = loadMarketSnapshots(requests);
   const offers = new Map<string, Promise<BlueprintOffersLookup>>();
+  const inventionMarkets = new Map<string, Promise<InventionMarket | null>>();
   for (const [key, group] of offerGroups) {
     offers.set(
       key,
@@ -75,10 +79,12 @@ export function loadPlanSnapshots(
         () => NO_BLUEPRINT_PURCHASE_OFFERS
       )
     );
+    inventionMarkets.set(key, loadInventionMarket(group.hub, [...group.ids]));
   }
   return indexes.map(({ primary, reaction, offerKey }) => ({
     snapshot: snapshots[primary]!,
     reactionSnapshot: reaction === null ? null : snapshots[reaction]!,
     blueprintOffers: offers.get(offerKey)!,
+    inventionMarket: inventionMarkets.get(offerKey)!,
   }));
 }
