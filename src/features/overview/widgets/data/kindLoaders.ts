@@ -14,6 +14,7 @@ import { ESI_REGISTRY, requiredScopesForEndpoints } from '@/esi/registry';
 import { layerValues, type LayerValues } from '@/engine/netWorth/series';
 import type { HistoryCoverage } from '@/engine/omegaCoverage';
 import type { PlexQuote } from '@/features/market/plexPrice';
+import type { BelowMarketSummaryContract } from '@/features/contractSearch/belowMarketSummary';
 import type { SurveySummary } from '@/engine/survey/series';
 import type { RouteKillSystem } from '@/engine/route/routeKillTrend';
 import type { NetWorthSnapshotRow } from '@/engine/netWorth/snapshot';
@@ -457,6 +458,66 @@ export async function loadHaulingWidget(): Promise<HaulingWidgetData> {
     })
   );
   return { hasScan: true, routes: routes.flat(), fetchedAt: new Date(summary.fetchedAt) };
+}
+
+// --- Below-market contracts -------------------------------------------------------
+
+export type BelowMarketWidgetContract = Omit<BelowMarketSummaryContract, 'systemId'> & {
+  /** Stargate jumps from the Character's Current System; null when unknown. */
+  jumps: number | null;
+};
+
+export interface BelowMarketWidgetData {
+  /** False until Item search's Below market view has run on this device. */
+  hasView: boolean;
+  /** Every contract below market in that view. */
+  count: number;
+  /** Best profit first. */
+  contracts: BelowMarketWidgetContract[];
+  /** When the contract snapshot behind it was published. */
+  fetchedAt: Date | null;
+}
+
+const NO_BELOW_MARKET_VIEW: BelowMarketWidgetData = {
+  hasView: false,
+  count: 0,
+  contracts: [],
+  fetchedAt: null,
+};
+
+/**
+ * Reads the stored summary only (see `belowMarketSummary.ts`). Jumps: the
+ * header Character's Current System over the local stargate graph.
+ */
+export async function loadBelowMarketWidget(characterId: number): Promise<BelowMarketWidgetData> {
+  const { useBelowMarketSummary } = await import('@/features/contractSearch/belowMarketSummary');
+  await useBelowMarketSummary.getState().hydrate();
+  const summary = useBelowMarketSummary.getState().value;
+  if (summary === null) return NO_BELOW_MARKET_VIEW;
+  const [{ loadCurrentSystemId }, { loadJumpBasis }, { localJumpDistances }] = await Promise.all([
+    import('@/features/route/currentSystem'),
+    import('@/features/route/jumpBasis'),
+    import('@/features/route/localRoute'),
+  ]);
+  // An unreadable graph leaves jumps unknown; the contracts still show.
+  const [origin, basis] = await Promise.all([
+    loadCurrentSystemId(characterId).catch(() => null),
+    loadJumpBasis().catch(() => null),
+  ]);
+  const distances =
+    origin === null || basis === null
+      ? null
+      : await localJumpDistances(origin, basis.rules, basis.network).catch(() => null);
+  const jumps = distances?.kind === 'known' ? distances.jumps : null;
+  return {
+    hasView: true,
+    count: summary.count,
+    contracts: summary.contracts.map(({ systemId, ...contract }) => ({
+      ...contract,
+      jumps: systemId === null || jumps === null ? null : (jumps.get(systemId) ?? null),
+    })),
+    fetchedAt: new Date(summary.fetchedAt),
+  };
 }
 
 // --- Route safety --------------------------------------------------------------

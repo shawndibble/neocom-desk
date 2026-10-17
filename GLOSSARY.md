@@ -77,6 +77,11 @@ here — they go one per file in `docs/context/decisions/`.
   same number of planets on their best one-planet picks. It never enters a
   pick, a **Quick win** or a total. Distinct from a **Chain estimate**, the
   bare figure shown for every P3/P4 everywhere.
+- **Below market**: Contract Search's Item search view (a chip, not a
+  filter) that lists one row per public item-exchange contract worth more
+  than it asks: each line at the default **Trade Hub**'s best buy minus sales
+  tax, a line with no market at the cheapest of at least three other offers.
+  Contracts that ask for items, and auctions with no buyout, are left out.
 - **Blueprint Acquisition**: A Build Plan materials-table row — the
   blueprint's own type ID, distinct from the product's — priced whenever a
   buildable node isn't fully covered by an owned **BPO**. It takes whichever

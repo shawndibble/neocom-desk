@@ -50,6 +50,7 @@ export const KIND_FEED_LISTS: Readonly<Record<string, readonly FeedId[]>> = {
   location: ['location'],
   survey: ['survey'],
   hauling: ['hauling'],
+  belowMarket: ['belowMarket'],
   routeSafety: ['routeSafety'],
   kills: ['kills'],
   omega: ['omega'],
@@ -390,6 +391,55 @@ const hauling: Builder = (feeds, { t }) => {
       })),
     },
     summary: t(`${D}.hauling.summary`),
+  };
+};
+
+// --- Below-market contracts ---------------------------------------------------------
+
+const BELOW_MARKET_PATH = '/contracts/search/items?items.belowMarket=1';
+
+const belowMarket: Builder = (feeds, { t }) => {
+  const feed = feeds.belowMarket;
+  const data = feed?.data ?? null;
+  if (!data) return blank(BELOW_MARKET_PATH, statusOf(feed));
+  const best = data.contracts[0];
+  const item = (c: { item: string; more: number }) =>
+    c.more > 0 ? t(`${D}.belowMarket.item`, { item: c.item, count: c.more }) : c.item;
+  const jumps = (c: { jumps: number | null }) => (c.jumps === null ? UNKNOWN : String(c.jumps));
+  return {
+    ...blank(BELOW_MARKET_PATH, statusOf(feed, { isEmpty: best === undefined })),
+    emptyLinkLabel: t(`${W}.belowMarket.emptyLink`),
+    fetchedAt: data.fetchedAt,
+    number: best
+      ? {
+          value: data.count.toLocaleString(),
+          unit: t(`${D}.belowMarket.unit`),
+          secondary: {
+            text:
+              best.jumps === null
+                ? t(`${D}.belowMarket.secondaryNoJumps`, { profit: formatIskCompact(best.profit) })
+                : t(`${D}.belowMarket.secondary`, {
+                    profit: formatIskCompact(best.profit),
+                    jumps: String(best.jumps),
+                  }),
+            tone: 'good',
+          },
+          tone: 'clear',
+        }
+      : NEUTRAL_NUMBER,
+    rows: [],
+    table: {
+      columns: [
+        { key: 'item', label: t(`${W}.belowMarket.col.item`), priority: 0, nameFloor: true },
+        { key: 'profit', label: t(`${W}.belowMarket.col.profit`), align: 'end', priority: 1 },
+        { key: 'jumps', label: t(`${W}.belowMarket.col.jumps`), align: 'end', priority: 2 },
+      ],
+      rows: data.contracts.map((c) => ({
+        key: String(c.contractId),
+        cells: [item(c), `+${formatIskCompact(c.profit)}`, jumps(c)],
+      })),
+    },
+    summary: t(`${D}.belowMarket.summary`, { count: data.count }),
   };
 };
 
@@ -833,6 +883,7 @@ export const KIND_BUILDERS: Readonly<Record<string, Builder>> = {
   location,
   survey,
   hauling,
+  belowMarket,
   jumpTimers,
   routeSafety,
   kills,
