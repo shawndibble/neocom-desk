@@ -989,16 +989,16 @@ export function MaterialsTable({
     );
   }
 
+  function depthOf(material: MaterialTableRow): DepthPrice | undefined {
+    return material.subBuilds.length > 0 ? undefined : depthFor?.(material.typeID);
+  }
+
   /**
    * The price field and what kind of price it holds. A built row has no
    * purchase price at all. `inline` is the phone row's form: "@ [field]" on
    * one line with its tag beside it rather than stacked under it, and no tier
    * caption, which the phone row prints beside Change tier instead.
    */
-  function depthOf(material: MaterialTableRow): DepthPrice | undefined {
-    return material.subBuilds.length > 0 ? undefined : depthFor?.(material.typeID);
-  }
-
   function renderPrice(material: MaterialTableRow, inline = false, autoFocus = false) {
     const name = nameFor(material.typeID);
     if (material.subBuilds.length > 0) {
@@ -1012,6 +1012,7 @@ export function MaterialsTable({
     }
     const state = materialRowState(material, sourcing, pricesReady);
     const overridden = state.priceSource === 'override';
+    const depth = inline || overridden ? undefined : depthOf(material);
     const unpriced = !overridden && state.unitPrice === null && !state.fullyOwned;
     // No tag on a plain hub price — that is what every row is unless
     // something says otherwise.
@@ -1076,9 +1077,7 @@ export function MaterialsTable({
             )}
           </span>
         )}
-        {!inline && !overridden && depthOf(material) && (
-          <DepthPriceLine depth={depthOf(material)!} />
-        )}
+        {depth && <DepthPriceLine depth={depth} />}
         {!inline && material.acquisitionTier && (
           <span className="text-[0.6875rem] text-text-dim">
             {material.acquisitionTier.community
@@ -1125,7 +1124,7 @@ export function MaterialsTable({
   // Rebuilt every render, deliberately: the cell renderers close over the
   // hold and toggle machinery above, and a stale closure there would commit
   // an edit through an outdated sourcing map.
-  const anyDepth = depthFor !== undefined && materials.some((m) => depthOf(m) !== undefined);
+  const anyDepth = materials.some((m) => depthOf(m) !== undefined);
   const columns: DataTableColumn<MaterialTableRow>[] = [
     {
       id: 'material',

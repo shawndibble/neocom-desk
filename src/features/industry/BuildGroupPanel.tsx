@@ -14,6 +14,8 @@
  * question this view cannot answer and must not appear to.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { DepthPrice } from '@/engine/industry/depthPrice';
+import { DepthPriceLine } from './DepthPriceLine';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import { useTranslation } from 'react-i18next';
 import {
@@ -260,6 +262,17 @@ export function BuildGroupPanel({
     [detected, group.ownedStockScope, t]
   );
 
+  // Depth Price walks per material, for the buy table's Still-to-buy line. A
+  // mixed-hub group keeps the first hub's walk for a type both hubs buy.
+  const depthByType = useMemo(() => {
+    const byType = new Map<number, DepthPrice>();
+    for (const row of rows) {
+      for (const [typeID, walk] of row.depth ?? [])
+        if (!byType.has(typeID)) byType.set(typeID, walk);
+    }
+    return byType;
+  }, [rows]);
+
   const ownedStockMap = useMemo(
     () =>
       new Map(Object.entries(group.ownedStock ?? {}).map(([typeID, qty]) => [Number(typeID), qty])),
@@ -480,11 +493,14 @@ export function BuildGroupPanel({
             {material.unpriced && material.buyToShow > 0 && (
               <span className="text-[0.6875rem] text-warning">{t('industry.unpriced')}</span>
             )}
+            {material.buyToShow > 0 && depthByType.has(material.typeID) && (
+              <DepthPriceLine depth={depthByType.get(material.typeID)!} />
+            )}
           </span>
         ),
       },
     ],
-    [t, catalog, ownedStockMap, detection, setOwnedQuantity]
+    [t, catalog, ownedStockMap, detection, setOwnedQuantity, depthByType]
   );
 
   const buyMaterialsCsv = useMemo(

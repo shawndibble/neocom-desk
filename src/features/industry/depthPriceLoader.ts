@@ -1,13 +1,13 @@
 /**
- * Loads Depth Prices (issue #3993): each candidate material's region Order
- * Book (`getOrderBook`, 300 s cache), walked at the hub station for the need.
+ * Loads Depth Prices: each candidate material's region Order Book
+ * (`getOrderBook`, 300 s cache), walked at the hub station for the need.
  * Which materials are candidates is `depthCandidates`/`summedDepthNeeds`'
  * call — this only fetches and walks.
  *
  * A book that fails to load drops that material back to the lowest sell: an
  * Order Book outage must not leave a plan unpriced.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { walkSellBook, type DepthPrice } from '@/engine/industry/depthPrice';
 import type { HubOrder } from '@/engine/market/haulingMarket';
 import { mapWithConcurrencyLimit } from '@/lib/concurrency';
@@ -15,14 +15,12 @@ import type { TradeHub } from '@/market/hubs';
 import { getOrderBook, ORDER_BOOK_FANOUT_CONCURRENCY } from '@/features/market/orderBook';
 
 export type DepthPrices = ReadonlyMap<number, DepthPrice>;
+type Books = ReadonlyMap<number, readonly HubOrder[]>;
 
-export const NO_DEPTH_PRICES: DepthPrices = new Map();
+const NO_DEPTH_PRICES: DepthPrices = new Map();
 
 /** Each type's region Order Book; a type whose book failed to load is absent. */
-async function loadBooks(
-  regionId: number,
-  typeIds: readonly number[]
-): Promise<Map<number, readonly HubOrder[]>> {
+async function loadBooks(regionId: number, typeIds: readonly number[]): Promise<Books> {
   const books = new Map<number, readonly HubOrder[]>();
   await mapWithConcurrencyLimit(typeIds, ORDER_BOOK_FANOUT_CONCURRENCY, async (typeID) => {
     try {
@@ -35,7 +33,7 @@ async function loadBooks(
 }
 
 function walkBooks(
-  books: ReadonlyMap<number, readonly HubOrder[]>,
+  books: Books,
   stationId: number,
   needs: ReadonlyMap<number, number>
 ): Map<number, DepthPrice> {
@@ -55,36 +53,43 @@ export async function loadDepthPrices(
   return walkBooks(await loadBooks(hub.regionId, [...needs.keys()]), hub.stationId, needs);
 }
 
+export interface PlanDepthPrices {
+  /** `needs` walked; empty until their books land. */
+  depth: DepthPrices;
+  /** Walks other needs (Break Even's trial run counts) through the books already loaded. */
+  walk: (needs: ReadonlyMap<number, number>) => DepthPrices;
+}
+
 /**
  * The plan page's Depth Prices for `needs` at `hub`. Books are fetched per
  * set of types and walked on every need change, so editing runs re-prices
- * without a fetch. Empty until the books land (the plan shows lowest sells
- * meanwhile) and whenever there are no needs, which fetches nothing.
+ * without a fetch. While a changed set loads, the books already held keep
+ * pricing the types they cover rather than every row dropping to lowest sell.
  */
-export function useDepthPrices(hub: TradeHub, needs: ReadonlyMap<number, number>): DepthPrices {
+export function useDepthPrices(hub: TradeHub, needs: ReadonlyMap<number, number>): PlanDepthPrices {
   const typeIds = [...needs.keys()].sort((a, b) => a - b);
-  const booksKey = `${hub.regionId}|${typeIds.join(',')}`;
-  const [loaded, setLoaded] = useState<{
-    key: string;
-    books: ReadonlyMap<number, readonly HubOrder[]>;
-  } | null>(null);
+  const booksKey = typeIds.join(',');
+  const [loaded, setLoaded] = useState<{ regionId: number; books: Books } | null>(null);
 
   useEffect(() => {
     if (typeIds.length === 0) return;
     let cancelled = false;
     void loadBooks(hub.regionId, typeIds).then((books) => {
-      if (!cancelled) setLoaded({ key: booksKey, books });
+      if (!cancelled) setLoaded({ regionId: hub.regionId, books });
     });
     return () => {
       cancelled = true;
     };
-    // `booksKey` carries the region and types by value; the arrays change identity every render.
+    // `booksKey` carries the types by value; the array changes identity every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [booksKey]);
+  }, [hub.regionId, booksKey]);
 
-  const books = loaded?.key === booksKey ? loaded.books : null;
-  return useMemo(
-    () => (books && needs.size > 0 ? walkBooks(books, hub.stationId, needs) : NO_DEPTH_PRICES),
-    [books, hub.stationId, needs]
+  const books = loaded?.regionId === hub.regionId ? loaded.books : null;
+  const walk = useCallback(
+    (wanted: ReadonlyMap<number, number>) =>
+      books && wanted.size > 0 ? walkBooks(books, hub.stationId, wanted) : NO_DEPTH_PRICES,
+    [books, hub.stationId]
   );
+  const depth = useMemo(() => walk(needs), [walk, needs]);
+  return { depth, walk };
 }

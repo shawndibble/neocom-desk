@@ -486,6 +486,8 @@ describe('useComparedBuildResults', () => {
       const priced = mockedCompute.mock.calls.filter(([args]) => args.materialPrices?.[34] !== 4);
       expect(priced.length).toBeGreaterThan(0);
       for (const [args] of priced) expect(args.materialPrices?.[34]).toBeCloseTo(52 / 12);
+      // The walk rides on each row, for the group buy table's Still-to-buy line.
+      expect(result.current[0]?.depth?.get(34)).toMatchObject({ need: 12, covered: true });
     });
 
     it('fetches no book for the plan list or Compare', async () => {

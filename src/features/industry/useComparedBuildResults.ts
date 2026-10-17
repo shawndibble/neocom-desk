@@ -46,7 +46,7 @@ import type { CharacterBlueprint } from '@/esi/endpoints';
 import type { PiData } from '@/sde/types';
 import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
 import { toIndustryBlueprint, type BlueprintCatalog } from './blueprintCatalog';
-import { loadDepthPrices } from './depthPrices';
+import { loadDepthPrices, type DepthPrices } from './depthPriceLoader';
 import { loadPlanSnapshots, type PlanSnapshots } from './planSnapshots';
 import { shoppingListMaterials } from './subBuildPlan';
 import { resolveBuildPlan, type BuildPlanSources } from './resolveBuildPlan';
@@ -74,6 +74,8 @@ export interface ComparedBuildRow {
   groupResult: BuildResult | null;
   /** Null once resolved successfully; a message when the plan couldn't be priced. */
   error: string | null;
+  /** The group-wide Depth Price walks at this plan's hub, when `groupDepthPrices` walked any. */
+  depth?: DepthPrices;
 }
 
 export interface UseComparedBuildResultsArgs {
@@ -179,11 +181,11 @@ async function computeRow(
  * summed per hub and walked once per material. A hub with nothing to walk
  * is absent.
  */
-async function groupDepthPricesFor(
+async function groupDepthFor(
   plans: readonly BuildPlanRecord[],
   rows: readonly ComparedBuildRow[],
   pricedByPlanId: ReadonlyMap<string, PlanSnapshots>
-): Promise<Map<TradeHub['id'], HubPrices>> {
+): Promise<Map<TradeHub['id'], DepthPrices>> {
   const members = await Promise.all(
     plans.map(async (plan, i) => {
       const resolved = rows[i]?.groupResult ?? rows[i]?.result;
@@ -192,7 +194,7 @@ async function groupDepthPricesFor(
       const snapshot = await priced.snapshot.catch(() => null);
       if (!snapshot) return null;
       return {
-        hubId: (getTradeHub(plan.hubId) ?? DEFAULT_TRADE_HUB).id,
+        hubId: hubIdOf(plan),
         lines: shoppingListMaterials(resolved.materials),
         sellVolumes: snapshot.hubSellVolumes,
         sourcing: plan.materialSourcing,
@@ -201,16 +203,18 @@ async function groupDepthPricesFor(
     })
   );
   const needsByHub = summedDepthNeeds(members.filter((m) => m !== null));
-  const result = new Map<TradeHub['id'], HubPrices>();
+  const result = new Map<TradeHub['id'], DepthPrices>();
   await Promise.all(
     [...needsByHub].map(async ([hubId, needs]) => {
       const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
       const depth = await loadDepthPrices(hub, needs);
-      if (depth.size > 0) result.set(hub.id, depthPriceMap(depth));
+      if (depth.size > 0) result.set(hub.id, depth);
     })
   );
   return result;
 }
+
+const hubIdOf = (plan: BuildPlanRecord) => (getTradeHub(plan.hubId) ?? DEFAULT_TRADE_HUB).id;
 
 export function useComparedBuildResults({
   plans,
@@ -290,14 +294,23 @@ export function useComparedBuildResults({
     if (groupDepthPrices) {
       void (async () => {
         const firstPass = await Promise.all(currentPlans.map((plan) => rowFor(plan)));
-        const depthByHub = await groupDepthPricesFor(currentPlans, firstPass, pricedByPlanId);
         if (cancelled) return;
-        const rows = await Promise.all(
-          currentPlans.map((plan, i) => {
-            const prices = depthByHub.get(getTradeHub(plan.hubId)?.id ?? DEFAULT_TRADE_HUB.id);
-            return prices ? rowFor(plan, prices) : firstPass[i]!;
-          })
-        );
+        // Anything failing past here leaves the group at lowest sells, never stuck loading.
+        let rows = firstPass;
+        try {
+          const depthByHub = await groupDepthFor(currentPlans, firstPass, pricedByPlanId);
+          if (cancelled) return;
+          rows = await Promise.all(
+            currentPlans.map(async (plan, i) => {
+              const depth = depthByHub.get(hubIdOf(plan));
+              return depth
+                ? { ...(await rowFor(plan, depthPriceMap(depth))), depth }
+                : firstPass[i]!;
+            })
+          );
+        } catch {
+          // Lowest sells stand.
+        }
         rows.forEach(show);
       })();
     } else {

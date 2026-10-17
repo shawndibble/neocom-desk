@@ -39,7 +39,7 @@ export interface BreakdownContext {
   /** The plan's wall-clock time on its character's free slots; absent without slot data. */
   planSeconds?: number;
   /** Materials costed at a Depth Price (issue #3993), each with its book walk. */
-  depthRows?: readonly { name: string; walk: DepthPrice }[];
+  depthRows?: readonly { typeID: number; name: string; walk: DepthPrice }[];
 }
 
 interface CalculationBreakdownProps {
@@ -61,13 +61,12 @@ export function Section({ title, children }: { title: string; children: ReactNod
   );
 }
 
+const FORMULA_BOX =
+  'rounded-xs border border-line bg-panel-2 px-2 py-1 font-mono text-[0.6875rem] text-text-dim tabular-nums';
+
 /** A worked line: the formula with this plan's own numbers substituted in. */
 export function Formula({ children }: { children: ReactNode }) {
-  return (
-    <p className="overflow-x-auto rounded-xs border border-line bg-panel-2 px-2 py-1 font-mono text-[0.6875rem] whitespace-nowrap text-text-dim tabular-nums">
-      {children}
-    </p>
-  );
+  return <p className={`overflow-x-auto whitespace-nowrap ${FORMULA_BOX}`}>{children}</p>;
 }
 
 /**
@@ -145,8 +144,8 @@ export function CalculationBreakdown({
               })}{' '}
               {t('industry.breakdown.depthProduct', { product: context.productName })}
             </p>
-            {context.depthRows.map(({ name, walk }) => (
-              <div key={name} className="space-y-1">
+            {context.depthRows.map(({ typeID, name, walk }) => (
+              <div key={typeID} className="space-y-1">
                 <p className="font-semibold">
                   {t('industry.breakdown.depthRow', {
                     material: name,
@@ -154,7 +153,7 @@ export function CalculationBreakdown({
                     avg: formatIsk(walk.avg, 2),
                   })}
                 </p>
-                <ul className="rounded-xs border border-line bg-panel-2 px-2 py-1 font-mono text-[0.6875rem] text-text-dim tabular-nums">
+                <ul className={FORMULA_BOX}>
                   {walk.levels.map((level) => (
                     <li key={level.price}>
                       {t(

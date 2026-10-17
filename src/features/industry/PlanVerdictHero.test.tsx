@@ -216,7 +216,7 @@ describe('PlanVerdictHero: calculation breakdown', () => {
       ],
     };
     renderHero({
-      breakdown: { ...BREAKDOWN, depthRows: [{ name: 'Tritanium', walk }] },
+      breakdown: { ...BREAKDOWN, depthRows: [{ typeID: 34, name: 'Tritanium', walk }] },
       openBreakdown: true,
     });
 
