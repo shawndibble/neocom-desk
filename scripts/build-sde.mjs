@@ -27,6 +27,7 @@ import { bakeSystemPositions } from './lib/systemPositions.mjs';
 import { bakeTypeInfoShards, typeInfoBucketOf } from './lib/typeInfo.mjs';
 import { bakeMutaplasmids, dogmaAttributeInfo } from './lib/mutaplasmids.mjs';
 import { ccpBuildFromSdeJsonl, fetchFuzzworkDump, FUZZWORK_DUMP_URL } from './lib/sdeBuild.mjs';
+import { bakeDecryptors, bakeInvention, GENERIC_DECRYPTOR_GROUP_ID } from './lib/invention.mjs';
 
 // The build this bake used, for the nightly refresh's "is there a newer one"
 // check (.github/workflows/sde-refresh.yml).
@@ -53,6 +54,8 @@ const FILES = [
   'industryActivityMaterials.csv',
   'industryActivityProducts.csv',
   'industryActivitySkills.csv',
+  // Invention success chance per product (issue #3987); see `invention.json`.
+  'industryActivityProbabilities.csv',
   'invMarketGroups.csv',
   'invMetaTypes.csv',
   'planetSchematics.csv',
@@ -165,6 +168,19 @@ const CHAR_ATTR_NAMES = {
 };
 const SKILL_CATEGORY_ID = 16;
 const SHIP_CATEGORY_ID = 6;
+const BLUEPRINT_CATEGORY_ID = 9;
+// invention.json plausibility (issue #3987), counted against dump
+// 3607705_20261012_133001: 1,003 T1 blueprints that invent, 3,518 that copy, 8
+// generic decryptors. A broken join lands at 0. Rifter Blueprint (691) invents
+// the Wolf Blueprint (11372); Accelerant Decryptor (34201) is 1.2 / +2 ME /
+// +10 TE / +1 run in game (EVE University wiki, Invention).
+const INVENTION_BLUEPRINTS_MIN = 800;
+const INVENTION_BLUEPRINTS_MAX = 1300;
+const COPYING_BLUEPRINTS_MIN = 3000;
+const COPYING_BLUEPRINTS_MAX = 5000;
+const INVENTION_CONTROL_BLUEPRINT = 691;
+const INVENTION_CONTROL_PRODUCT = 11372;
+const DECRYPTOR_CONTROL = { typeID: 34201, probabilityMultiplier: 1.2, me: 2, te: 10, runs: 1 };
 // Mastery tiers: certMasteries.csv's masteryLevel is 0-4 (5 tiers, I-V);
 // certSkills.csv's certLevelInt is 1-5 for the same tiers, so
 // certLevelInt = masteryLevel + 1 is the join key between the two files.
@@ -773,7 +789,8 @@ async function main() {
         typeID !== PI_LINK_TYPE_ID &&
         !refinableTypeIds.has(typeID) &&
         !shipTypeIds.has(typeID) &&
-        types.get(typeID)?.groupID !== WORMHOLE_GROUP_ID
+        types.get(typeID)?.groupID !== WORMHOLE_GROUP_ID &&
+        types.get(typeID)?.groupID !== GENERIC_DECRYPTOR_GROUP_ID
       )
         continue;
       const value = r[iInt] !== '' ? Number(r[iInt]) : num(r[iFloat]);
@@ -1047,6 +1064,56 @@ async function main() {
       activity: bpActivity.get(typeID),
     };
   }
+
+  // --- invention.json: copying time and invention recipes (issue #3987), plus
+  // decryptor modifiers. Its own file so blueprints.json stays as it was; see
+  // lib/invention.mjs.
+  const inventionData = (() => {
+    const rowsOf = (fileName, cols) => {
+      const rows = raw[fileName];
+      const h = indexHeader(rows);
+      const out = [];
+      for (let i = 1; i < rows.length; i++) {
+        const row = {};
+        for (const c of cols) row[c] = Number(rows[i][h[c]]);
+        out.push(row);
+      }
+      return out;
+    };
+    const isPublished = (typeID) => types.get(typeID)?.published === true;
+    return {
+      blueprints: bakeInvention({
+        activities: rowsOf('industryActivity.csv', ['typeID', 'activityID', 'time']),
+        materials: rowsOf('industryActivityMaterials.csv', [
+          'typeID',
+          'activityID',
+          'materialTypeID',
+          'quantity',
+        ]),
+        products: rowsOf('industryActivityProducts.csv', [
+          'typeID',
+          'activityID',
+          'productTypeID',
+          'quantity',
+        ]),
+        probabilities: rowsOf('industryActivityProbabilities.csv', [
+          'typeID',
+          'activityID',
+          'productTypeID',
+          'probability',
+        ]),
+        skills: rowsOf('industryActivitySkills.csv', ['typeID', 'activityID', 'skillID', 'level']),
+        isBlueprint: (typeID) =>
+          isPublished(typeID) &&
+          groups.get(types.get(typeID).groupID)?.categoryID === BLUEPRINT_CATEGORY_ID,
+        isPublished,
+      }),
+      decryptors: bakeDecryptors(
+        [...types].map(([typeID, t]) => ({ typeID, ...t })),
+        attrsByType
+      ),
+    };
+  })();
 
   // --- marketWideTrees.json: flattened manufacturing material trees for the
   // market-wide Build Opportunities scan (issue #819) ---
@@ -2139,6 +2206,8 @@ async function main() {
     ['certificates.json', certificates],
     ['skillAttributeModifiers.json', skillAttributeModifiers],
     ['blueprints.json', blueprints],
+    // Lazy: only invention pricing reads it.
+    ['invention.json', inventionData],
     ['marketWideTrees.json', marketWideTrees],
     ['reprocessing.json', reprocessing],
     ['types.json', typeMap],
@@ -2225,6 +2294,44 @@ async function main() {
     console.log(
       `  blueprints: ${Object.keys(blueprints).length} (manufacturing ${byActivity.manufacturing}, reaction ${byActivity.reaction})`
     );
+  }
+  {
+    const entries = Object.values(inventionData.blueprints);
+    const inventing = entries.filter((e) => e.invention).length;
+    const copying = entries.filter((e) => e.copyTime != null).length;
+    const decryptorCount = Object.keys(inventionData.decryptors).length;
+    console.log(
+      `  invention: ${inventing} blueprints invent, ${copying} copy; ${decryptorCount} decryptors`
+    );
+    if (
+      inventing < INVENTION_BLUEPRINTS_MIN ||
+      inventing > INVENTION_BLUEPRINTS_MAX ||
+      copying < COPYING_BLUEPRINTS_MIN ||
+      copying > COPYING_BLUEPRINTS_MAX
+    ) {
+      console.error(
+        `  FAIL: invention.json counts out of band (invent ${INVENTION_BLUEPRINTS_MIN}-${INVENTION_BLUEPRINTS_MAX}, copy ${COPYING_BLUEPRINTS_MIN}-${COPYING_BLUEPRINTS_MAX})`
+      );
+      process.exitCode = 1;
+    }
+    const control = inventionData.blueprints[INVENTION_CONTROL_BLUEPRINT]?.invention;
+    if (
+      !control?.products.some((p) => p.typeID === INVENTION_CONTROL_PRODUCT && p.probability > 0) ||
+      control.materials.length === 0
+    ) {
+      console.error(
+        `  FAIL: Rifter Blueprint (${INVENTION_CONTROL_BLUEPRINT}) lost its Wolf invention recipe`
+      );
+      process.exitCode = 1;
+    }
+    const { typeID: decryptorId, ...expected } = DECRYPTOR_CONTROL;
+    const { name: _name, ...actual } = inventionData.decryptors[decryptorId] ?? {};
+    if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+      console.error(
+        `  FAIL: Accelerant Decryptor (${decryptorId}) reads ${JSON.stringify(actual)}, expected ${JSON.stringify(expected)}`
+      );
+      process.exitCode = 1;
+    }
   }
   console.log(`  types map entries: ${Object.keys(typeMap).length}`);
   {
