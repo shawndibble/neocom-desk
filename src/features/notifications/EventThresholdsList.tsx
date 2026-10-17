@@ -32,7 +32,11 @@ export function EventThresholdsList({
   if (characters.length === 0) return null;
   return (
     <Disclosure
-      label={t('settings.notifications.warnAheadTimes', { count: characters.length })}
+      label={
+        thresholds.headingKey === undefined
+          ? t('settings.notifications.warnAheadTimes', { count: characters.length })
+          : t(thresholds.headingKey)
+      }
       expanded={open}
       onToggle={() => setOpen((value) => !value)}
     >
@@ -40,9 +44,12 @@ export function EventThresholdsList({
         {thresholds.hintKey !== null && (
           <p className="text-[0.6875rem] text-text-dim">{t(thresholds.hintKey)}</p>
         )}
-        <ul className="space-y-2">
+        <ul className="grid grid-cols-[minmax(0,max-content)_1fr] items-center gap-x-4 gap-y-2">
           {characters.map((character) => (
-            <li key={character.characterId} className="space-y-1">
+            <li
+              key={character.characterId}
+              className="col-span-2 grid grid-cols-subgrid items-center"
+            >
               <p className="text-xs text-text">{character.name}</p>
               <ThresholdControls
                 characterId={character.characterId}

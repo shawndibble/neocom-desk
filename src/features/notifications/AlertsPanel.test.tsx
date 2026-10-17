@@ -188,20 +188,33 @@ describe('AlertsPanel', () => {
     expect(onClose).toHaveBeenCalled();
   });
 
+  it('View leaves the alert in place by default, and dismisses it with Dismiss on View on', async () => {
+    await db.notificationFeed.bulkPut([MAIL]);
+    const first = renderPanel();
+    await userEvent.click(await screen.findByRole('button', { name: /^View/ }));
+    expect(first.onClose).toHaveBeenCalled();
+    expect(await liveIds()).toEqual(['mail']);
+
+    useNotificationPreferences.setState({
+      value: { ...DEFAULT_NOTIFICATION_PREFERENCES, dismissOnView: true },
+      hydrated: true,
+    });
+    await userEvent.click(await screen.findByRole('button', { name: /^View/ }));
+    await waitFor(async () => expect(await liveIds()).toEqual([]));
+  });
+
   it('Close closes the popover, and the footer points at the notification settings', async () => {
     const { onClose } = renderPanel();
     await userEvent.click(await screen.findByRole('button', { name: 'Close' }));
     expect(onClose).toHaveBeenCalled();
 
     expect(screen.queryByRole('link', { name: /Older alerts/ })).toBeNull();
-    expect(screen.getByRole('link', { name: 'Notify me about…' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Manage Notification Settings' })).toHaveAttribute(
       'href',
       '/settings/notifications'
     );
     expect(screen.getByText('Push on this device: Off')).toBeInTheDocument();
-    expect(
-      screen.getByText('Danger alerts also appear as a banner on the Overview')
-    ).toBeInTheDocument();
+    expect(screen.queryByText(/appear as a banner/)).toBeNull();
   });
 
   it('as a sheet it leaves Close to the sheet and uses 44px buttons', async () => {
