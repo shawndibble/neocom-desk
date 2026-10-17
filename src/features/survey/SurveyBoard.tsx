@@ -122,6 +122,11 @@ export function SurveyBoard({
   const [outcome, setOutcome] = useCopyOutcome();
   const now = useNow();
   const chatOptions = useSurveyChatOptions((state) => state.value);
+  const hydrateChatOptions = useSurveyChatOptions((state) => state.hydrate);
+  // Copying happens outside the config dialog, so the saved choices load with the board.
+  useEffect(() => {
+    void hydrateChatOptions();
+  }, [hydrateChatOptions]);
   const [configuring, setConfiguring] = useState(false);
   const [finishing, setFinishing] = useState<'idle' | 'busy' | 'failed'>('idle');
 
