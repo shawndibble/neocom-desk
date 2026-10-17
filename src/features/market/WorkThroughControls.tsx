@@ -1,6 +1,6 @@
 /**
  * Open Orders' work-through mode, on screen. No bar or row of its own: the
- * start action and progress end the page's summary line; the current order's
+ * start action and progress end the headline's quiet line; the current order's
  * controls sit in its row.
  */
 import { useContext, type ReactNode } from 'react';
@@ -42,7 +42,7 @@ function TextAction({
   );
 }
 
-/** "Work through (12)" at the end of the summary line, or "3 of 12 · Stop" while running. */
+/** "Work through (12)" at the end of the headline's quiet line, or "3 of 12 · Stop" while running. */
 export function WorkThroughSummaryTail() {
   const { t } = useTranslation();
   const context = useContext(WorkThroughContext);

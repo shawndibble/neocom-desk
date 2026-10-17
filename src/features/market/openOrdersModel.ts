@@ -427,7 +427,6 @@ export function buildOpenOrderRows(input: BuildRowsInput): OpenOrderRow[] {
  */
 export type OrderGroupKey = OrderProblem | 'notChecked';
 
-/** The group a row is filed under. */
 export function orderGroupKey(row: OpenOrderRow): OrderGroupKey {
   return row.problem === 'healthy' && row.competitionUnchecked === true
     ? 'notChecked'

@@ -8,23 +8,22 @@ import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { IskAmount, type DataTableColumn } from '@/components/ui';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
-import { roundPriceUp } from '@/engine/market/priceTick';
+import { DEFAULT_PROBLEM_THRESHOLDS } from '@/engine/market/orderProblems';
 import { formatMarketIsk } from '@/lib/isk';
 import { CharacterBadge } from '@/features/character/assetBrowserRows';
 import type { OpenOrderRow } from './openOrdersModel';
 import { OPEN_ORDER_COLUMN_IDS, type OpenOrderColumnId } from './openOrdersColumns';
 import { OrderProblemBadge } from './OrderProblemBadge';
-import { adviseOrder } from './orderAdvice';
-import { orderDoThis } from './orderDoThis';
+import { rowFixCall } from './orderDoThis';
 import { OrderDoThisText } from './OrderDoThisText';
-import { formatOrderRemaining } from './orderRowFormat';
+import { formatOrderFloorPrice, formatOrderRemaining } from './orderRowFormat';
 import { WorkThroughTableSlot } from './WorkThroughControls';
 
-/** Days left at or under this read in the warning colour. */
-const EXPIRES_SOON_DAYS = 7;
+/** Expiry reads in the warning colour from the day the order files as expiring. */
+const EXPIRES_SOON_DAYS = DEFAULT_PROBLEM_THRESHOLDS.expiringWithinDays;
 
 /** "Jita IV - Moon 4 - Caldari Navy Assembly Plant" -> "Jita IV"; the full name is in the detail. */
-export function stationShortName(name: string): string {
+function stationShortName(name: string): string {
   const dashIndex = name.indexOf(' - ');
   return dashIndex === -1 ? name : name.slice(0, dashIndex);
 }
@@ -38,20 +37,22 @@ const figure = {
 } as const;
 
 export interface OpenOrderTableColumns {
-  /** Every column in table order for the optional ones that are on. */
-  columns: (visible: readonly OpenOrderColumnId[]) => DataTableColumn<OpenOrderRow>[];
+  /** Fixed + visible optional columns, table order. */
+  columns: DataTableColumn<OpenOrderRow>[];
   /** The optional columns, for `ColumnPickerMenu`'s labels. */
   optional: Record<OpenOrderColumnId, DataTableColumn<OpenOrderRow>>;
 }
 
 export function useOpenOrderTableColumns({
   showCharacter,
+  visible,
 }: {
   /** More than one Character has orders: tag each row with its owner. */
   showCharacter: boolean;
+  visible: readonly OpenOrderColumnId[];
 }): OpenOrderTableColumns {
   const { t } = useTranslation();
-  return useMemo(() => {
+  const defs = useMemo(() => {
     const fixed: DataTableColumn<OpenOrderRow>[] = [
       {
         id: 'item',
@@ -80,10 +81,9 @@ export function useOpenOrderTableColumns({
       {
         id: 'problem',
         header: t('market.orders.fixList.colProblem'),
-        cardCorner: true,
         className: 'whitespace-nowrap',
         render: (row) => {
-          const { badge } = adviseOrder(row);
+          const { badge } = rowFixCall(row).advice;
           return (
             badge && (
               <OrderProblemBadge kind={badge.kind} detail={badge.detail} interactive={false} />
@@ -95,15 +95,9 @@ export function useOpenOrderTableColumns({
         id: 'doThis',
         header: t('market.orders.fixList.colDoThis'),
         className: 'font-semibold',
-        render: (row) => {
-          const advice = adviseOrder(row);
-          return (
-            <WorkThroughTableSlot
-              row={row}
-              fallback={<OrderDoThisText call={orderDoThis(row, advice)} badge={advice.badge} />}
-            />
-          );
-        },
+        render: (row) => (
+          <WorkThroughTableSlot row={row} fallback={<OrderDoThisText row={row} />} />
+        ),
       },
     ];
 
@@ -143,7 +137,7 @@ export function useOpenOrderTableColumns({
         render: (row) =>
           row.floor ? (
             <span className={row.price < row.floor.relist ? 'text-isk-neg' : undefined}>
-              {formatMarketIsk(roundPriceUp(row.floor.relist) ?? row.floor.relist)}
+              {formatOrderFloorPrice(row.floor)}
             </span>
           ) : (
             dash
@@ -177,21 +171,23 @@ export function useOpenOrderTableColumns({
       header: t('market.orders.fixList.colIskTiedUp'),
       ...figure,
       sortValue: (row) => row.iskTiedUp,
-      render: (row) => (
-        // Off the phone card: line two is the call, and the detail has it.
-        <span data-dense-omit>
-          <IskAmount value={row.iskTiedUp} />
-        </span>
-      ),
+      render: (row) => <IskAmount value={row.iskTiedUp} />,
     };
 
-    return {
-      optional,
-      columns: (visible) => [
-        ...fixed,
-        ...OPEN_ORDER_COLUMN_IDS.filter((id) => visible.includes(id)).map((id) => optional[id]),
-        tiedUp,
-      ],
-    };
+    return { fixed, optional, tiedUp };
   }, [t, showCharacter]);
+
+  return useMemo(
+    () => ({
+      optional: defs.optional,
+      columns: [
+        ...defs.fixed,
+        ...OPEN_ORDER_COLUMN_IDS.filter((id) => visible.includes(id)).map(
+          (id) => defs.optional[id]
+        ),
+        defs.tiedUp,
+      ],
+    }),
+    [defs, visible]
+  );
 }

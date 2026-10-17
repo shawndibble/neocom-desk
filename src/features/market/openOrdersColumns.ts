@@ -1,13 +1,7 @@
 /**
- * Open Orders' optional-column catalog and device-local visible-columns
- * preference (`columnVisibility.ts`). The fix list's four columns (Item,
- * What's wrong, Do this, ISK tied up) are always on and not here; these five
- * sit between Do this and ISK tied up when the Columns menu turns them on,
- * and are all off until it does.
- *
- * A new key, not the grouped page's `openOrdersVisibleColumns`: a pick saved
- * there (say price, floor, remaining, expires) is valid under these ids and
- * would switch four of them on for a pilot who never chose them here.
+ * Open Orders' optional-column catalog + device-local pref (`columnVisibility.ts`).
+ * New key: picks saved under `openOrdersVisibleColumns` share these ids and
+ * would switch columns on unasked.
  */
 import { createColumnVisibilitySetting } from '@/lib/columnVisibility';
 

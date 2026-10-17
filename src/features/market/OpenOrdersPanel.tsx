@@ -88,8 +88,7 @@ import { useCharacterFilterPick } from '@/features/character/characterFilterPick
 import { useOpenOrdersLocationFilterPref } from './openOrdersLocationFilterPref';
 import { buildOpenOrdersView, shownView } from './openOrdersView';
 import { rowInView, type OpenOrdersView } from './orderUrgency';
-import { adviseOrder } from './orderAdvice';
-import { doThisPrice, orderDoThis } from './orderDoThis';
+import { doThisPrice, rowFixCall } from './orderDoThis';
 import { OrderBadgeLegend } from './OrderBadgeLegend';
 import { priceClipboardText } from './priceClipboardText';
 import { writeToClipboard } from '@/lib/clipboard';
@@ -249,7 +248,6 @@ export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
     void useStructureFees.getState().hydrate();
   }, []);
 
-  /** The Columns menu's picks: the optional columns, all off until turned on. */
   const {
     visible: visibleColumnIds,
     toggle: toggleColumn,
@@ -409,11 +407,10 @@ export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
     return m;
   }, [snapshot]);
 
-  const tableColumns = useOpenOrderTableColumns({ showCharacter: showCharacterStrip });
-  const columns = useMemo(
-    () => tableColumns.columns(visibleColumnIds),
-    [tableColumns, visibleColumnIds]
-  );
+  const { columns, optional: optionalColumns } = useOpenOrderTableColumns({
+    showCharacter: showCharacterStrip,
+    visible: visibleColumnIds,
+  });
 
   /** The header sort, dropped once the Columns menu hides its column. */
   const sortColumn = tableSort && columns.find((c) => c.id === tableSort.columnId);
@@ -421,10 +418,10 @@ export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
   /** Every row the funnel matched, in the table's order. */
   const sortedRows = useMemo(
     () =>
-      sortColumn && activeSort
-        ? sortRows(fixList.matching, sortColumn, activeSort.direction)
+      sortColumn && tableSort
+        ? sortRows(fixList.matching, sortColumn, tableSort.direction)
         : fixList.matching,
-    [fixList.matching, sortColumn, activeSort]
+    [fixList.matching, sortColumn, tableSort]
   );
 
   // Every row the funnel matched, whichever segment shows, exported as the ESI
@@ -450,8 +447,8 @@ export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
     source: 'rows',
   });
 
-  // Whoever has a floor on screen: each note checks that character's own
-  // grant, since each floor prices with that character's standings.
+  // Whoever has a floor on any matched order: each note checks that
+  // character's own grant, since each floor prices with its standings.
   const floorCharacters = useMemo(
     () =>
       [...new Set(fixList.matching.filter((row) => row.floor).map((row) => row.characterId))].map(
@@ -640,10 +637,7 @@ export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
     clear: () => setFilter(chip.clear(filter)),
   }));
 
-  const notShared = snapshot.openOrders.skipped.map((s) => ({
-    characterId: s.characterId,
-    name: s.name,
-  }));
+  const notShared = snapshot.openOrders.skipped;
 
   // The modal loads what the order needs as it opens (`useOpenOrderDetail`).
   function openDetails(row: OpenOrderRow) {
@@ -659,7 +653,7 @@ export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
   /** Same menu Transactions carries — an order row names an item like any other. */
   function rowContextMenu(row: OpenOrderRow, tr: ReactElement) {
     // The price "Do this" names, so the menu and the cell never disagree.
-    const newPrice = doThisPrice(orderDoThis(row, adviseOrder(row)));
+    const newPrice = doThisPrice(rowFixCall(row).call);
     return (
       <ItemContextMenu
         typeId={row.typeId}
@@ -789,7 +783,7 @@ export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
                       <ColumnPickerMenu
                         available={OPEN_ORDER_COLUMN_IDS}
                         visible={visibleColumnIds}
-                        columnsById={tableColumns.optional}
+                        columnsById={optionalColumns}
                         onToggle={toggleColumn}
                         buttonLabel={t('common.columnsButton')}
                         menuTitle={t('market.orders.fixList.columnsMenuTitle')}
@@ -1049,15 +1043,13 @@ export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
                 />
               ) : (
                 // Many columns on: the table scrolls sideways in its own frame,
-                // never the page. `relative` holds the header's `sr-only` sort
-                // labels inside that frame too: without a positioned ancestor
-                // they resolve against the page and widen it.
-                <div className="relative min-w-0 overflow-x-auto">
+                // never the page.
+                <div className="min-w-0 overflow-x-auto">
                   <DataTable
                     {...ordersExport.tableProps}
+                    // The ⋮ in the text colour, as the order book's.
                     className="dt-actions-pinned-only"
                     density="compact"
-                    stackLayout="dense"
                     columns={columns}
                     rows={viewRows}
                     rowKey={(row) => row.orderId}

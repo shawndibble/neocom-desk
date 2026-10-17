@@ -1,27 +1,27 @@
 /**
- * The fix list's "Do this" cell: `orderDoThis`'s call in words, the exact
- * price as a `CopyablePrice` when there is one. The phone card passes
- * `interactive={false}`: its whole row is a `<button>`, which a copy button
- * cannot sit inside, so the price shows as plain text there.
+ * The fix list's "Do this": the row's call in words, the exact price as a
+ * `CopyablePrice`. `interactive={false}` keeps the price plain text, for the
+ * phone card's own `<button>`.
  */
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatMarketIsk } from '@/lib/isk';
 import { CopyablePrice } from './CopyablePrice';
-import type { OrderBadgeChoice } from './orderBadgeKind';
-import type { OrderDoThis } from './orderDoThis';
+import type { OpenOrderRow } from './openOrdersModel';
+import { rowFixCall } from './orderDoThis';
 
 export function OrderDoThisText({
-  call,
-  badge,
+  row,
   interactive = true,
 }: {
-  call: OrderDoThis;
-  /** The row's badge: its action text is the fallback call. */
-  badge: OrderBadgeChoice | null;
+  row: OpenOrderRow;
   interactive?: boolean;
 }): ReactElement | null {
   const { t } = useTranslation();
+  const {
+    call,
+    advice: { badge },
+  } = rowFixCall(row);
   const priced = (text: string, price: number) =>
     interactive ? <CopyablePrice price={price}>{text}</CopyablePrice> : <span>{text}</span>;
 

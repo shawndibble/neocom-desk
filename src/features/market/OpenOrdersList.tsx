@@ -9,8 +9,7 @@ import { cx } from '@/lib/cx';
 import { useScrollToRowKey } from '@/lib/useScrollToRowKey';
 import type { OpenOrderRow } from './openOrdersModel';
 import { OrderProblemBadge } from './OrderProblemBadge';
-import { adviseOrder } from './orderAdvice';
-import { orderDoThis } from './orderDoThis';
+import { rowFixCall } from './orderDoThis';
 import { OrderDoThisText } from './OrderDoThisText';
 
 interface OpenOrdersListProps {
@@ -55,8 +54,7 @@ export function OpenOrdersList({
   return (
     <ul ref={listRef} aria-label={label} className="divide-y divide-line">
       {rows.map((row) => {
-        const advice = adviseOrder(row);
-        const { badge } = advice;
+        const { badge } = rowFixCall(row).advice;
         const listRow = (
           <li
             data-row-key={row.orderId}
@@ -91,11 +89,7 @@ export function OpenOrdersList({
                   )}
                 </span>
                 <span className="text-xs font-semibold text-text">
-                  <OrderDoThisText
-                    call={orderDoThis(row, advice)}
-                    badge={badge}
-                    interactive={false}
-                  />
+                  <OrderDoThisText row={row} interactive={false} />
                 </span>
               </button>
               {/* Beside the button, not in it — buttons don't nest. */}

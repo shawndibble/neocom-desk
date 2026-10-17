@@ -298,7 +298,7 @@ describe('OpenOrdersPanel', () => {
     expect(row).toHaveTextContent('Jita IV');
     expect(row).toHaveTextContent('Below floor');
     expect(within(row).getByRole('button', { name: /^Put the price up: / })).toBeInTheDocument();
-    // The sentence and its copy button moved to the detail.
+    // Sentence and copy button live in the detail.
     expect(row).not.toHaveTextContent('Selling at this price loses');
   });
 

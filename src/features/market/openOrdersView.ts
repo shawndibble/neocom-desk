@@ -18,26 +18,21 @@ export interface OpenOrdersFixList {
   actIskTiedUp: number;
 }
 
-const URGENCY_RANK: Record<OrderUrgency, number> = { act: 0, watch: 1, fine: 2 };
-
 export function buildOpenOrdersView(
   rows: readonly OpenOrderRow[],
   filter: OpenOrdersFilter
 ): OpenOrdersFixList {
   const sorted = sortOpenOrders(filterOpenOrders(rows, filter), filter.sort);
-  // Worst first means Needs you first: problem precedence alone would list a
-  // region undercut (Watch) above an expiring order (Needs you). Stable, so
-  // each bucket keeps its worst-first order. A sort the pilot picked holds.
-  const matching =
-    filter.sort === 'worstFirst'
-      ? sorted.sort((a, b) => URGENCY_RANK[orderUrgency(a)] - URGENCY_RANK[orderUrgency(b)])
-      : sorted;
-  const act = matching.filter((row) => orderUrgency(row) === 'act');
+  const buckets: Record<OrderUrgency, OpenOrderRow[]> = { act: [], watch: [], fine: [] };
+  for (const row of sorted) buckets[orderUrgency(row)].push(row);
+  const { act, watch, fine } = buckets;
   return {
-    matching,
+    // Worst first means Needs you first: problem precedence alone would list a
+    // region undercut (Watch) above an expiring order. A picked sort holds.
+    matching: filter.sort === 'worstFirst' ? [...act, ...watch, ...fine] : sorted,
     act,
-    watch: matching.filter((row) => orderUrgency(row) === 'watch'),
-    fine: matching.filter((row) => orderUrgency(row) === 'fine'),
+    watch,
+    fine,
     actIskTiedUp: act.reduce((sum, row) => sum + row.iskTiedUp, 0),
   };
 }

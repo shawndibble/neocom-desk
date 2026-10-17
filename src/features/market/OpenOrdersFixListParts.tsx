@@ -12,6 +12,7 @@ import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
 import type { EsiEndpointId } from '@/esi/registry';
 import { WorkThroughSummaryTail } from './WorkThroughControls';
 
+/** As `AssumesBaseStandingsNote`'s. */
 const STANDINGS_ENDPOINTS: readonly EsiEndpointId[] = ['getCharacterStandings'];
 
 /** "5 orders need you", then "600.8M ISK tied up in them · 3 to watch · 9 fine" and the work-through. */
@@ -127,7 +128,7 @@ export function ListNotes({
   floorCharacters,
   notShared,
 }: {
-  /** Characters whose sell orders on screen carry a floor, priced with their standings. */
+  /** Characters with a floor on any matched order: each floor prices with their standings. */
   floorCharacters: readonly { characterId: number; name: string }[];
   notShared: readonly { characterId: number; name: string }[];
 }) {

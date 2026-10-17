@@ -1,14 +1,12 @@
 /**
  * The fix list's "Do this" call: one short thing to do about an order, with
- * the exact price to type when there is one.
- *
- * Read off `adviseOrder`, so it never disagrees with the Order Detail modal:
- * a verdict, when the order has a floor to weigh it, wins outright. Without
- * one (no cost basis linked, the common case) a station undercut still names
- * the one-tick-under price the row has always offered to copy, and an
- * outbid buy order the one-tick-over bid.
+ * the exact price to type when there is one. Read off `adviseOrder`, so it
+ * never disagrees with the Order Detail: a verdict (needs a floor) wins.
+ * Without one (no cost basis, the common case): station undercut → one tick
+ * under; outbid buy → one tick over.
  */
 import { adviseOrder, type OrderAdvice, type OrderAdviceInput } from './orderAdvice';
+import type { OpenOrderRow } from './openOrdersModel';
 
 export type OrderDoThis =
   | { kind: 'raisePrice'; price: number | null }
@@ -54,13 +52,27 @@ export function orderDoThis(
         : { kind: 'badgeAdvice' };
     case 'expiringOrStale':
       return { kind: 'relist' };
-    case 'undercutSystem':
-    case 'undercutRegion':
-      return { kind: 'leaveItAlone' };
-    case 'healthy':
     default:
       return { kind: 'leaveItAlone' };
   }
+}
+
+export interface RowFixCall {
+  advice: OrderAdvice;
+  call: OrderDoThis;
+}
+
+const fixCalls = new WeakMap<OpenOrderRow, RowFixCall>();
+
+/** A row's advice and call, worked out once per row object: its cells, card and menu all read it. */
+export function rowFixCall(row: OpenOrderRow): RowFixCall {
+  let entry = fixCalls.get(row);
+  if (!entry) {
+    const advice = adviseOrder(row);
+    entry = { advice, call: orderDoThis(row, advice) };
+    fixCalls.set(row, entry);
+  }
+  return entry;
 }
 
 /** The exact price the call names, for "Copy new price" and the work-through. */

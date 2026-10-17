@@ -75,7 +75,9 @@ export function IskAmount({ value, decimals = 2, className = '', note }: IskAmou
         tabIndex={inGroup ? -1 : 0}
         data-isk-figure={inGroup ? '' : undefined}
         className={cx(
-          'cursor-help rounded-xs focus-visible:outline-2 focus-visible:outline-accent',
+          // `relative`: holds the `sr-only` exact figure (absolute) inside this
+          // box, so in a sideways-scrolling table it can't widen the page.
+          'relative cursor-help rounded-xs focus-visible:outline-2 focus-visible:outline-accent',
           className
         )}
       >
