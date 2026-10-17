@@ -5635,6 +5635,31 @@
     "copiedChat": "Copied",
     "copyFailed": "Couldn't copy",
     "copyLink": "Copy link",
+    "configureChat": "Configure chat message…",
+    "chatConfig": {
+      "title": "Configure chat message",
+      "preview": "Preview",
+      "previewHint": "Approximate: the game's chat font is not monospaced, so the edges line up better there.",
+      "border": "Border",
+      "borders": { "single": "Single │", "double": "Double ║", "none": "None" },
+      "ores": "Ores",
+      "oreModes": { "off": "None", "top2": "Top 2", "top3": "Top 3", "all": "All" },
+      "rows": "Rows",
+      "eta": "ETA",
+      "bar": "Progress bar",
+      "barOneScan": "Needs a second scan",
+      "rockCounts": "Rock counts",
+      "flags": {
+        "location": "Location",
+        "pace": "Mining pace",
+        "iskLeft": "ISK left",
+        "volumeLeft": "Volume left",
+        "elapsed": "Time mining"
+      },
+      "noLocation": "No location set",
+      "fixed": "The Neocom Desk Report heading and the link are always included.",
+      "reset": "Reset to default"
+    },
     "moreCopy": "More copy options",
     "priceHub": "Price ore at market hub",
     "copiedLink": "Link copied",
@@ -5763,7 +5788,12 @@
       "waiting": "waiting for a second scan",
       "left": "Left: {ores}",
       "more": "{count} other",
-      "cleared": "Field cleared in {duration}"
+      "cleared": "Field cleared in {duration}",
+      "location": "At: {place}",
+      "pace": "Pace: {pace} m³/s",
+      "value": "Value left: {isk} ISK",
+      "volume": "Volume left: {left} of {total} m³",
+      "elapsed": "Mining for {duration}"
     }
   },
   "miningTax": {

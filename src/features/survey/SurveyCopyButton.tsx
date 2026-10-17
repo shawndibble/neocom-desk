@@ -14,16 +14,22 @@ export type CopyOutcome = { what: 'chat' | 'link'; result: 'copied' | 'failed' }
 interface SurveyCopyButtonProps {
   onCopyChat: () => void;
   onCopyLink: () => void;
+  onConfigure: () => void;
   outcome: CopyOutcome;
 }
 
 /**
  * "Copy chat message" as one split button, like Save in Fittings: the button
  * is the everyday copy, and its caret lists the same link on its own, for a
- * pilot who wants the URL without the message around it. The message already
- * carries the link, so the menu holds nothing else.
+ * pilot who wants the URL without the message around it, and the dialog that
+ * configures the message.
  */
-export function SurveyCopyButton({ onCopyChat, onCopyLink, outcome }: SurveyCopyButtonProps) {
+export function SurveyCopyButton({
+  onCopyChat,
+  onCopyLink,
+  onConfigure,
+  outcome,
+}: SurveyCopyButtonProps) {
   const { t } = useTranslation();
   const label =
     outcome === null
@@ -57,6 +63,7 @@ export function SurveyCopyButton({ onCopyChat, onCopyLink, outcome }: SurveyCopy
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="min-w-44">
+          <DropdownMenuItem onSelect={onConfigure}>{t('survey.configureChat')}</DropdownMenuItem>
           <DropdownMenuItem onSelect={onCopyLink}>{t('survey.copyLink')}</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

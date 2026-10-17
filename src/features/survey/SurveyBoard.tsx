@@ -32,12 +32,14 @@ import {
 import { writeToClipboard } from '@/lib/clipboard';
 import { useNow } from '@/lib/useNow';
 import { SurveyHubSelect } from './SurveyHubSelect';
+import { SurveyChatDialog } from './SurveyChatDialog';
 import { SurveyCopyButton, type CopyOutcome } from './SurveyCopyButton';
 import { SurveyLegend } from './SurveyLegend';
 import { SurveyOres } from './SurveyOres';
 import { SurveyHowTo } from './SurveyHowTo';
 import { SurveyScanList } from './SurveyScanList';
 import { SurveyStats } from './SurveyStats';
+import { useSurveyChatOptions } from './surveyPref';
 import { useOrePrices } from './useOrePrices';
 
 const NONE: ReadonlySet<string> = new Set();
@@ -52,6 +54,8 @@ interface SurveyBoardProps {
   ignored?: ReadonlySet<string>;
   /** Offered to the survey's owner only: sets a scan aside or takes it back. Absent, the board is read-only. */
   onSetIgnored?: (scanId: string, ignored: boolean) => void;
+  /** Where the survey is mined, for the chat message's location row; null when none is set. */
+  location?: string | null;
   /** The survey's short link; null until it has been stored. */
   url: string | null;
   /** Epoch ms the link stops working; null until stored. */
@@ -99,6 +103,7 @@ export function SurveyBoard({
   onFinish,
   owned = false,
   url,
+  location = null,
   expiresAt,
   footerActions,
   afterPanel,
@@ -116,6 +121,8 @@ export function SurveyBoard({
   );
   const [outcome, setOutcome] = useCopyOutcome();
   const now = useNow();
+  const chatOptions = useSurveyChatOptions((state) => state.value);
+  const [configuring, setConfiguring] = useState(false);
   const [finishing, setFinishing] = useState<'idle' | 'busy' | 'failed'>('idle');
 
   // Every scan, so a removed one can be restored; the chart and totals use `scans`.
@@ -137,6 +144,11 @@ export function SurveyBoard({
     left: t('survey.message.left'),
     more: t('survey.message.more'),
     cleared: t('survey.message.cleared'),
+    location: t('survey.message.location'),
+    pace: t('survey.message.pace'),
+    value: t('survey.message.value'),
+    volume: t('survey.message.volume'),
+    elapsed: t('survey.message.elapsed'),
   };
 
   async function finish() {
@@ -159,8 +171,11 @@ export function SurveyBoard({
       <SurveyHubSelect />
       <SurveyCopyButton
         outcome={outcome}
-        onCopyChat={() => copy('chat', surveyChatMessage(current, link, labels, now))}
+        onCopyChat={() =>
+          copy('chat', surveyChatMessage(current, link, labels, now, chatOptions, location))
+        }
         onCopyLink={() => copy('link', link)}
+        onConfigure={() => setConfiguring(true)}
       />
     </div>
   );
@@ -184,6 +199,16 @@ export function SurveyBoard({
         meta={<DataAgeBadge date={new Date(summary.lastAt)} />}
         actions={url !== null && copyButton(summary, url)}
       >
+        {configuring && url !== null && (
+          <SurveyChatDialog
+            summary={summary}
+            url={url}
+            labels={labels}
+            now={now}
+            location={location}
+            onClose={() => setConfiguring(false)}
+          />
+        )}
         <div className="space-y-4">
           <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
             <span className="text-3xl font-semibold tabular-nums">

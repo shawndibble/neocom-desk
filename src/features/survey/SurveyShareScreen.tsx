@@ -164,6 +164,7 @@ export function SurveyShareScreen({ shareId }: { shareId: string }) {
             ignored={state.ignored}
             onFinish={finish}
             url={shareUrl(shareId)}
+            location={state.info?.location?.name ?? null}
             expiresAt={state.expiresAt}
             afterPanel={(summary) => (
               <SurveyInfoIfAny info={state.info} tax={state.tax} oreNames={summary.oreNames} />

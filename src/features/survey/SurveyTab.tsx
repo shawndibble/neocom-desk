@@ -323,6 +323,7 @@ export function SurveyTab({ tabBar, tabsId }: SurveyTabProps) {
               // `canFinishSurvey`'s call, inside the board.
               onFinish={currentId !== null && state.status === 'ready' ? finish : undefined}
               owned={owned}
+              location={state.status === 'ready' ? (state.info?.location?.name ?? null) : null}
               panelTitle={currentId !== null ? <SurveyNameTitle id={currentId} /> : undefined}
               afterPanel={(summary) =>
                 characterId !== null && (
