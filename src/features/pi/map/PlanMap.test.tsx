@@ -776,13 +776,10 @@ describe('PlanMap: starting state follows the data until the pilot acts', () => 
 });
 
 describe('PlanMap: how-to line', () => {
-  it('says what a click does on the one line above the board, with no dismiss button', async () => {
+  it('keeps the what-if hint above the board, with no dismiss button and no how-to sentence', async () => {
     const user = userEvent.setup();
     renderMap();
     const line = screen.getByTestId('map-whatif');
-    expect(
-      within(line).getByText('Click a planet type to filter, or a product to trace it.')
-    ).toBeInTheDocument();
     await user.hover(
       within(line).getByRole('button', { name: 'About planet types you do not have' })
     );
@@ -796,9 +793,6 @@ describe('PlanMap: how-to line', () => {
     const user = userEvent.setup();
     stubCoarse();
     renderMap();
-    expect(
-      screen.getByText('Tap a planet type to filter, or a product to trace it.')
-    ).toBeInTheDocument();
     await user.hover(screen.getByRole('button', { name: 'About planet types you do not have' }));
     expect((await screen.findAllByText(/^Tap a type you don't have \(/)).length).toBeGreaterThan(0);
     expect(screen.queryByText(/Hover|Click/)).toBeNull();

@@ -46,7 +46,6 @@ import { formatIskCompact } from '@/lib/isk';
 import { useTouchContext } from '@/lib/useMediaQuery';
 import { PlanetImage } from '../PlanetImage';
 import { ChainTileFigure } from './ChainTileFigure';
-import { chainAssumptions } from '../chainEstimateText';
 import {
   comparisonSentence,
   figureSentence,
@@ -58,6 +57,7 @@ import {
 } from './mapText';
 import {
   tileChainIsk,
+  traceProduct,
   type MapGraph,
   type MapTier,
   type ProductFigure,
@@ -132,6 +132,17 @@ export function MapBoard(props: MapBoardProps) {
   const [wires, setWires] = useState<Wire[]>([]);
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [layoutVersion, setLayoutVersion] = useState(0);
+
+  // Hovering a product lights its whole chain back to the planets, as a click would trace it.
+  const hover = useMemo(() => {
+    const id = aim?.startsWith('p:') ? Number(aim.slice(2)) : null;
+    if (id === null || !graph.byId.has(id)) return null;
+    const chain = traceProduct(graph, id, { owned, ticked });
+    return {
+      edges: new Set(chain.edges.map(([from, to]) => `${from}>${to}`)),
+      planetEdges: new Set(chain.planetEdges.map(([type, raw]) => `${type}>${raw}`)),
+    };
+  }, [aim, graph, owned, ticked]);
 
   const visible = useCallback(
     (typeId: number) => litIds.has(typeId) || newIds.has(typeId),
@@ -212,7 +223,10 @@ export function MapBoard(props: MapBoardProps) {
         if (!a || !b) continue;
         const key = `${input}>${product.typeId}`;
         const mine =
-          aim !== null && (aim === productKey(input) || aim === productKey(product.typeId));
+          aim !== null &&
+          (aim === productKey(input) ||
+            aim === productKey(product.typeId) ||
+            ((hover?.edges.has(key) ?? false) && visible(input) && visible(product.typeId)));
         // A wire that jumps a column crosses tiles: dashed, so it reads as a skip.
         const skips =
           (graph.byId.get(input)?.tier ?? 0) + 1 < product.tier ? '[stroke-dasharray:6_4]' : '';
@@ -252,8 +266,10 @@ export function MapBoard(props: MapBoardProps) {
         const a = spot(planetKey(type));
         if (!a) continue;
         const key = `${type}>${raw.typeId}`;
-        const mine = aim !== null && (aim === planetKey(type) || aim === productKey(raw.typeId));
-        if (mine && (ticked.has(type) || tracePlanetEdges.has(key))) {
+        const chained = (hover?.planetEdges.has(key) ?? false) && visible(raw.typeId);
+        const mine =
+          aim !== null && (aim === planetKey(type) || aim === productKey(raw.typeId) || chained);
+        if (mine && (ticked.has(type) || tracePlanetEdges.has(key) || chained)) {
           top.push({ d: curve(a, b), cls: 'stroke-warning stroke-[3]', ends: ends(a, b) });
         } else if (tracePlanetEdges.has(key)) {
           top.push({
@@ -282,6 +298,7 @@ export function MapBoard(props: MapBoardProps) {
     aim,
     props.whatIfTypes,
     visible,
+    hover,
     layoutVersion,
   ]);
 
@@ -474,10 +491,11 @@ export function MapBoard(props: MapBoardProps) {
                     : figure.whatIf
                       ? t('piMap.add.chainsTip')
                       : figure.chain
-                        ? chainAssumptions(t, figure.chain)
+                        ? t('piMap.chainTip')
                         : null,
                 ]
                   .filter(Boolean)
+                  .map((line) => `• ${line}`)
                   .join('\n');
                 const unlockedBy = isNew
                   ? [...props.whatIfTypes].filter(
@@ -503,7 +521,7 @@ export function MapBoard(props: MapBoardProps) {
                         onKeyDown={(e) => clickOnSpace(e) || move(key, e)}
                         onClick={onPlanLinkClick(() => props.onProduct(product.typeId))}
                         className={cx(
-                          'grid h-11 w-full md:h-[2.125rem] touch:h-11 grid-cols-[1.5rem_minmax(0,1fr)_auto] items-center gap-x-1.5 rounded-xs border py-0 pr-[0.3125rem] pl-[0.1875rem] text-left text-xs',
+                          'grid min-h-11 w-full md:min-h-[2.125rem] touch:min-h-11 grid-cols-[1.5rem_minmax(0,1fr)_auto] items-center gap-x-1.5 rounded-xs border py-0.5 pr-[0.3125rem] pl-[0.1875rem] text-left text-xs',
                           interactiveClassName,
                           focusRingClassName,
                           goal

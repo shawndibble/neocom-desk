@@ -24,6 +24,10 @@ function Sample({ className, children }: { className: string; children?: React.R
   );
 }
 
+function Line({ className }: { className: string }) {
+  return <span aria-hidden="true" className={`inline-block w-7 flex-none ${className}`} />;
+}
+
 export function MapHelp() {
   const { t } = useTranslation();
   const context = useTouchContext();
@@ -76,6 +80,18 @@ export function MapHelp() {
         <li className="flex items-center gap-2.5">
           <Sample className="border-dashed border-line" />
           {t('piMap.help.legend.ghost')}
+        </li>
+        <li className="flex items-center gap-2.5">
+          <Line className="border-t-2 border-solid border-accent" />
+          {t('piMap.help.legend.wire')}
+        </li>
+        <li className="flex items-center gap-2.5">
+          <Line className="border-t-2 border-dashed border-accent" />
+          {t('piMap.help.legend.wireSkip')}
+        </li>
+        <li className="flex items-center gap-2.5">
+          <Line className="border-t-2 border-solid border-warning" />
+          {t('piMap.help.legend.wirePlanet')}
         </li>
       </ul>
       <p className="mt-3 leading-snug">{t('piMap.help.numbers')}</p>
