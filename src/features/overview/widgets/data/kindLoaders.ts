@@ -459,6 +459,77 @@ export async function loadHaulingWidget(): Promise<HaulingWidgetData> {
   return { hasScan: true, routes: routes.flat(), fetchedAt: new Date(summary.fetchedAt) };
 }
 
+// --- Below-market contracts -------------------------------------------------------
+
+export interface BelowMarketWidgetContract {
+  contractId: number;
+  /** The lead line and how many others: "Rifter" + 12. */
+  item: string;
+  more: number;
+  profit: number;
+  /** Stargate jumps from the Character's Current System; null when unknown. */
+  jumps: number | null;
+}
+
+export interface BelowMarketWidgetData {
+  /** False until Item search's Below market view has run on this device. */
+  hasView: boolean;
+  /** Every contract below market in that view. */
+  count: number;
+  /** Best profit first. */
+  contracts: BelowMarketWidgetContract[];
+  /** When the contract snapshot behind it was published. */
+  fetchedAt: Date | null;
+}
+
+const NO_BELOW_MARKET_VIEW: BelowMarketWidgetData = {
+  hasView: false,
+  count: 0,
+  contracts: [],
+  fetchedAt: null,
+};
+
+/**
+ * The last Below market view Item search showed (#3989). Only the stored
+ * summary is read: valuing the snapshot downloads every contract and prices
+ * thousands of types at the hub, which the Overview must not start on every
+ * load — the Hauling widget's rule. Jumps are from the header Character's
+ * Current System over the local stargate graph.
+ */
+export async function loadBelowMarketWidget(characterId: number): Promise<BelowMarketWidgetData> {
+  const { useBelowMarketSummary } = await import('@/features/contractSearch/belowMarketSummary');
+  await useBelowMarketSummary.getState().hydrate();
+  const summary = useBelowMarketSummary.getState().value;
+  if (summary === null) return NO_BELOW_MARKET_VIEW;
+  const [{ loadCurrentSystemId }, { loadJumpBasis }, { localJumpDistances }] = await Promise.all([
+    import('@/features/route/currentSystem'),
+    import('@/features/route/jumpBasis'),
+    import('@/features/route/localRoute'),
+  ]);
+  let jumps: ReadonlyMap<number, number> | null = null;
+  const origin = await loadCurrentSystemId(characterId).catch(() => null);
+  if (origin !== null) {
+    const basis = await loadJumpBasis();
+    const distances = await localJumpDistances(origin, basis.rules, basis.network);
+    if (distances.kind === 'known') jumps = distances.jumps;
+  }
+  return {
+    hasView: true,
+    count: summary.count,
+    contracts: summary.contracts.map((contract) => ({
+      contractId: contract.contractId,
+      item: contract.item,
+      more: contract.more,
+      profit: contract.profit,
+      jumps:
+        contract.systemId === null || jumps === null
+          ? null
+          : (jumps.get(contract.systemId) ?? null),
+    })),
+    fetchedAt: new Date(summary.fetchedAt),
+  };
+}
+
 // --- Route safety --------------------------------------------------------------
 
 export interface RouteSafetyWidgetData {

@@ -4370,6 +4370,14 @@
           "netOnly": "net {{net}} ISK / {{days}} days",
           "noPriceHint": "Can't count accounts without PLEX's price. Try Refresh.",
           "plexPrice": "PLEX {{price}} ISK each, {{plex}} PLEX per account per 30 days."
+        },
+        "belowMarket": {
+          "unit": "below market",
+          "secondary": "best +{{profit}} · {{jumps}} jumps away",
+          "item_one": "{{item}} + {{count}} more",
+          "item_other": "{{item}} + {{count}} more",
+          "summary_one": "{{count}} public contract worth more than it asks at the trade hub, from the last time you opened Below market on Item search.",
+          "summary_other": "{{count}} public contracts worth more than they ask at the trade hub, from the last time you opened Below market on Item search."
         }
       },
       "training": {
@@ -4823,6 +4831,17 @@
           "net": "Net income",
           "accounts": "Accounts"
         }
+      },
+      "belowMarket": {
+        "title": "Below-market contracts",
+        "description": "Public contracts worth more than they ask",
+        "empty": "Not valued yet",
+        "emptyLink": "Open Below market",
+        "col": {
+          "item": "Item",
+          "profit": "Profit",
+          "jumps": "Jumps"
+        }
       }
     },
     "header": {
@@ -5056,6 +5075,9 @@
         },
         "kills": {
           "note": "Your latest kills and losses"
+        },
+        "belowMarket": {
+          "note": "From your last Below market view"
         }
       }
     },
@@ -11962,7 +11984,33 @@
     "routeExposureCrossed_other": "Route crosses {{count}} systems at 0.5 security or below.",
     "routeExposureNoRoute": "No stargate route between these ends, so none was measured.",
     "routeExposureUnknown": "Route not worked out — one end is unplaced, or the map could not be read.",
-    "routeExposureChokepoints": "Route runs through {{systems}}, where haulers are most often killed."
+    "routeExposureChokepoints": "Route runs through {{systems}}, where haulers are most often killed.",
+    "belowMarket": {
+      "chip": "Below market",
+      "chipTooltip": "One row per contract, valued at the trade hub's best buy, sorted by profit",
+      "note": "Contract snapshot from {{age}} · valued at {{hub}} best buy minus sales tax · contracts that ask for items, and auctions with no buyout, are left out",
+      "pricesUnreachable": "some hub prices could not be read, so those items count as 0",
+      "pricing": "Pricing contract contents at the trade hub…",
+      "failedTitle": "Couldn't value these contracts",
+      "failedHint": "The item data needed to value them could not be read. Try Refresh.",
+      "emptyTitle": "No contracts below market",
+      "emptyHint": "No public contract in this snapshot is worth more than it asks at the trade hub.",
+      "tableLabel": "Below-market contracts",
+      "count_one": "{{count}} contract below market",
+      "count_other": "{{count}} contracts below market",
+      "more_one": "+ {{count}} more",
+      "more_other": "+ {{count}} more",
+      "copyItem_one": "{{name}} (copy, {{count}} run)",
+      "copyItem_other": "{{name}} (copy, {{count}} runs)",
+      "valueColumn": "Value",
+      "valueAffix": "Value ",
+      "askingColumn": "Asking",
+      "askingAffix": "Asking ",
+      "profitColumn": "Profit",
+      "sourceMarket": "market",
+      "sourceOffers_one": "from {{count}} contract",
+      "sourceOffers_other": "from {{count}} contracts"
+    }
   },
   "jumpRange": {
     "systemsFailed": "System list couldn't load",

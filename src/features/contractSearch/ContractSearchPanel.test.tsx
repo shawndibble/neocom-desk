@@ -56,6 +56,24 @@ vi.mock('@/features/market/plexPrice', () => ({
   usePlexPrice: () => usePlexPrice(),
 }));
 
+// Below market (#3989) prices at the hub; no test reaches Fuzzwork.
+const NO_HUB_PRICES = { prices: new Map(), unreachable: false };
+const getHubPricesWithStatus = vi.fn<(...args: unknown[]) => Promise<typeof NO_HUB_PRICES>>(
+  async () => NO_HUB_PRICES
+);
+vi.mock('@/market/prices', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/market/prices')>()),
+  getHubPricesWithStatus: (...args: unknown[]) => getHubPricesWithStatus(...args),
+}));
+vi.mock('@/features/abyssal/mutaplasmidData', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/features/abyssal/mutaplasmidData')>()),
+  loadMutaplasmidLookup: async () => ({ isAbyssalType: () => false }),
+}));
+vi.mock('@/features/character/characterModifiers', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/features/character/characterModifiers')>()),
+  loadCharacterModifiers: async () => ({ skills: {} }),
+}));
+
 const loadPublicCourierContracts = vi.fn();
 vi.mock('@/features/contractSearch/publicCourierContracts', () => ({
   loadPublicCourierContracts: (...args: unknown[]) => loadPublicCourierContracts(...args),
@@ -2295,5 +2313,64 @@ describe("ContractSearchPanel — a row's primary action beats its name links (�
     const rows = await bodyRows();
     expect(within(rows[0]).queryByRole('link', { name: 'Tritanium' })).not.toBeInTheDocument();
     expect(within(rows[0]).getByText('Tritanium')).toBeInTheDocument();
+  });
+});
+
+describe('ContractSearchPanel — Below market (#3989)', () => {
+  const buy = (buyMax: number) => ({ sellMin: null, buyMax, sellVolume: 0, buyVolume: 0 });
+  const WANTS_ITEMS = row({
+    contractId: 9,
+    typeId: 35,
+    price: 1,
+    quantity: 10,
+    requestsItems: true,
+  });
+
+  afterEach(() => {
+    getHubPricesWithStatus.mockImplementation(async () => NO_HUB_PRICES);
+  });
+
+  beforeEach(() => {
+    // Tritanium 8,000 and Pyerite 300,000 at best buy; 7.5% tax at Accounting 0.
+    getHubPricesWithStatus.mockResolvedValue({
+      prices: new Map([
+        [34, buy(8_000)],
+        [35, buy(300_000)],
+      ]),
+      unreachable: false,
+    });
+    loadPublicContractOffers.mockResolvedValue(
+      cachedSnapshot([TRIT_FORGE, TRIT_DOMAIN, PYERITE_AUCTION, WANTS_ITEMS])
+    );
+  });
+
+  it('shows one row per contract worth more than it asks, best profit first, with no search', async () => {
+    renderWithRouter(['/?items.belowMarket=1']);
+    const table = await screen.findByRole('table', { name: 'Below-market contracts' });
+    await waitFor(() => {});
+    const [, body] = within(table).getAllByRole('rowgroup');
+    const rows = within(body).getAllByRole('row');
+    // Pyerite: 10 × 300k × 0.925 − 2M buyout = 775k. Tritanium in Domain:
+    // 100 × 8k × 0.925 − 500k = 240k. The Forge's 1M ask and the contract
+    // that wants items are left out.
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toHaveTextContent('Pyerite');
+    expect(rows[0]).toHaveTextContent('775,000');
+    expect(rows[0]).toHaveTextContent('market');
+    expect(rows[1]).toHaveTextContent('Tritanium');
+    expect(rows[1]).toHaveTextContent('240,000');
+    expect(screen.getByText(/valued at Jita best buy minus sales tax/)).toBeInTheDocument();
+  });
+
+  it('toggles from the offer table through the chip', async () => {
+    const user = userEvent.setup();
+    renderWithRouter();
+    await screen.findByRole('table', { name: 'Contract Search' });
+    await user.click(screen.getByRole('button', { name: /Below market/ }));
+    expect(
+      await screen.findByRole('table', { name: 'Below-market contracts' })
+    ).toBeInTheDocument();
+    // The column picker acts on the offer table, which this view replaces.
+    expect(screen.queryByRole('button', { name: /columns/i })).not.toBeInTheDocument();
   });
 });

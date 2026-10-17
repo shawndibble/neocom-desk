@@ -5,6 +5,7 @@ import { resolveWidget } from '../state';
 import { buildView, feedsFor, KIND_FEEDS } from './models';
 import { humanizeRefType } from './kindModels';
 import type {
+  BelowMarketWidgetData,
   JumpTimersWidgetData,
   HaulingWidgetData,
   KillsWidgetData,
@@ -922,6 +923,48 @@ describe('hauling', () => {
     expect(resolved.state).toBe('failed');
     expect(resolved.showLastGood).toBe(true);
     expect(failed.number.value).toBe('48M');
+  });
+});
+
+describe('belowMarket', () => {
+  const data = (over: Partial<BelowMarketWidgetData> = {}): BelowMarketWidgetData => ({
+    hasView: true,
+    count: 5,
+    contracts: [
+      { contractId: 1, item: 'Rifter', more: 12, profit: 42_000_000, jumps: 3 },
+      { contractId: 2, item: 'Tengu', more: 0, profit: 18_600_000, jumps: null },
+    ],
+    fetchedAt: new Date(NOW),
+    ...over,
+  });
+
+  it('reads from its own feed and links to Item search with Below market on', () => {
+    expect(KIND_FEEDS.belowMarket).toEqual(['belowMarket']);
+    expect(buildView('belowMarket', { belowMarket: ok(data()) }, ctx()).to).toBe(
+      '/contracts/search/items?items.belowMarket=1'
+    );
+  });
+
+  it('counts the contracts, names the best profit and its jumps, and tables each', () => {
+    const view = buildView('belowMarket', { belowMarket: ok(data()) }, ctx());
+    expect(stateOf(view)).toBe('ok');
+    expect(view.number.value).toBe('5');
+    expect(view.number.secondary).toEqual({
+      text: 'overview.widgets.data.belowMarket.secondary{"profit":"42M","jumps":"3"}',
+      tone: 'good',
+    });
+    expect(view.table?.rows.map((r) => r.cells)).toEqual([
+      ['overview.widgets.data.belowMarket.item{"item":"Rifter","count":12}', '+42M', '3'],
+      ['Tengu', '+18.6M', '—'],
+    ]);
+    expect(view.fetchedAt).toEqual(new Date(NOW));
+  });
+
+  it('is empty before Below market has run, or when nothing was below market', () => {
+    const none = data({ hasView: false, count: 0, contracts: [], fetchedAt: null });
+    expect(stateOf(buildView('belowMarket', { belowMarket: ok(none) }, ctx()))).toBe('empty');
+    const nothing = data({ count: 0, contracts: [] });
+    expect(stateOf(buildView('belowMarket', { belowMarket: ok(nothing) }, ctx()))).toBe('empty');
   });
 });
 

@@ -73,6 +73,13 @@ import { loadPublicContractOffers } from '@/features/contractSearch/publicContra
 import { OFFERS_CACHE_KEY, useChunkProgress } from '@/features/contractSearch/chunkedSnapshot';
 import { isItemsSearchActive } from '@/features/contractSearch/itemsSearchActive';
 import { useEarlyOffers, useOfferIndex } from '@/features/contractSearch/useIndexedOffers';
+import { useBelowMarket } from '@/features/contractSearch/belowMarketData';
+import { BelowMarketResults } from '@/features/contractSearch/BelowMarketResults';
+import {
+  MAX_SUMMARY_CONTRACTS,
+  belowMarketItemLabel,
+  rememberBelowMarketSummary,
+} from '@/features/contractSearch/belowMarketSummary';
 import { loadPublicCourierContracts } from '@/features/contractSearch/publicCourierContracts';
 import { CourierResults } from '@/features/contractSearch/CourierResults';
 import { useOfferLocations } from '@/features/contractSearch/offerLocations';
@@ -189,6 +196,8 @@ const ITEMS_FILTER_PARAMS = {
   'items.hidePlex': boolParam(),
   'items.jumps': enumParam(JUMP_RANGES, DEFAULT_JUMP_RANGE),
   'items.type': optionalIdParam(),
+  /** Below market (#3989): one row per contract, valued at the hub. A view, not a filter. */
+  'items.belowMarket': boolParam(),
 };
 const ITEMS_SORT = { columnId: 'price', direction: 'asc' } as const;
 
@@ -488,7 +497,9 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
    * asks for a search instead of rendering ~370k offers, while the snapshot
    * keeps downloading behind it so the first search usually finds it landed.
    */
-  const searchActive = isItemsSearchActive(uiFilter, selectedTypeId);
+  const belowMarket = itemsParams['items.belowMarket'];
+  // Below market needs no search: it is already a narrowing of the snapshot.
+  const searchActive = belowMarket || isItemsSearchActive(uiFilter, selectedTypeId);
   const downloadProgress = useChunkProgress(OFFERS_CACHE_KEY);
 
   // The index and, for a search naming a few types, just those types' chunks
@@ -537,9 +548,11 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
     );
   }, [selectedTypeId, deferredTypeQuery, typeOptions]);
 
+  // Below market reads every type whatever the search: a contract's other
+  // lines and the comparable offers behind a copy's value are of other types.
   const early = useEarlyOffers(
     offerIndex,
-    typeIds,
+    belowMarket ? null : typeIds,
     activeCharacterId,
     mode === 'items' && !haveFull && searchActive
   );
@@ -773,6 +786,39 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
     [selectedTypeId, displayRows, plexPrice]
   );
 
+  const belowMarketState = useBelowMarket(
+    rows,
+    mode === 'items' && belowMarket && !awaitingRows,
+    activeCharacterId,
+    plexPrice
+  );
+  /**
+   * The bar's filters at contract grain: every field but quantity and type is
+   * the contract's own, so a contract passes when any of its lines does —
+   * which is also how a search names a contract by one of its items.
+   */
+  const belowMarketRows = useMemo(() => {
+    if (belowMarketState.status !== 'ready') return [];
+    const passing = new Set(displayRows.map((row) => row.contractId));
+    return belowMarketState.contracts.filter((contract) => passing.has(contract.contractId));
+  }, [belowMarketState, displayRows]);
+  // What the Overview's Below-market widget reads, so it never prices the snapshot itself.
+  useEffect(() => {
+    if (belowMarketState.status !== 'ready' || namingTypes || lastSyncedAt === null) return;
+    const all = belowMarketState.contracts;
+    rememberBelowMarketSummary({
+      fetchedAt: lastSyncedAt,
+      count: all.length,
+      contracts: all.slice(0, MAX_SUMMARY_CONTRACTS).map((contract) => ({
+        contractId: contract.contractId,
+        item: belowMarketItemLabel(contract.lead, typeNames, t),
+        more: contract.lines - 1,
+        profit: contract.profit,
+        systemId: offerLocations.get(contract.lead.locationId)?.systemId ?? null,
+      })),
+    });
+  }, [belowMarketState, namingTypes, lastSyncedAt, typeNames, offerLocations, t]);
+
   function changeFilter(next: UiFilter) {
     // Typing anything other than the pinned type's own name un-pins it —
     // otherwise editing the box would leave a search that no longer says what
@@ -802,6 +848,19 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
 
   function clearType() {
     setItemsParams({ 'items.type': null, 'items.q': '' });
+  }
+
+  function resetFilters() {
+    changeFilter({
+      typeQuery: '',
+      regionId: null,
+      maxPrice: '',
+      minQuantity: '',
+      saleKind: null,
+      hideAuctions: false,
+      hidePlex: false,
+      jumps: DEFAULT_JUMP_RANGE,
+    });
   }
 
   /**
@@ -1167,19 +1226,32 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
                   currentSystem={currentSystem}
                   actions={
                     <>
-                      <ColumnPickerMenu
-                        available={CONTRACT_SEARCH_ITEMS_COLUMN_IDS}
-                        visible={visibleItemsColumns}
-                        columnsById={itemsColumnsById}
-                        onToggle={toggleItemsColumn}
-                        buttonLabel={t('contractSearch.columnsButton')}
-                        menuTitle={t('contractSearch.columnsMenuTitle')}
-                      />
-                      <TableActionsMenu
-                        name={t('contractSearch.title')}
-                        tableExport={itemsExport}
+                      {/* A view control, not a filter: it changes the rows and columns at once (§4b). */}
+                      <FilterChip
+                        label={t('contractSearch.belowMarket.chip')}
                         size="md"
+                        selected={belowMarket}
+                        onToggle={() => setItemsParams({ 'items.belowMarket': !belowMarket })}
+                        tooltip={t('contractSearch.belowMarket.chipTooltip')}
                       />
+                      {/* Both act on the offer table, which Below market replaces. */}
+                      {!belowMarket && (
+                        <>
+                          <ColumnPickerMenu
+                            available={CONTRACT_SEARCH_ITEMS_COLUMN_IDS}
+                            visible={visibleItemsColumns}
+                            columnsById={itemsColumnsById}
+                            onToggle={toggleItemsColumn}
+                            buttonLabel={t('contractSearch.columnsButton')}
+                            menuTitle={t('contractSearch.columnsMenuTitle')}
+                          />
+                          <TableActionsMenu
+                            name={t('contractSearch.title')}
+                            tableExport={itemsExport}
+                            size="md"
+                          />
+                        </>
+                      )}
                     </>
                   }
                 />
@@ -1243,7 +1315,7 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
                   </div>
                 )}
 
-                {summary !== null && (
+                {summary !== null && !belowMarket && (
                   <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
                     <StatChips>
                       <StatChip
@@ -1306,6 +1378,17 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
                       />
                     )}
                   </div>
+                ) : belowMarket ? (
+                  <BelowMarketResults
+                    state={belowMarketState}
+                    contracts={belowMarketRows}
+                    lastSyncedAt={lastSyncedAt}
+                    typeNames={typeNames}
+                    offerLocations={offerLocations}
+                    offerJumps={offerJumps}
+                    onOpen={setSelectedRow}
+                    onResetFilters={resetFilters}
+                  />
                 ) : displayRows.length === 0 ? (
                   namingTypes && uiFilter.typeQuery.trim() !== '' ? (
                     // Every type still reads `#34` until the market catalogue
@@ -1321,21 +1404,7 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
                       hint={t('contractSearch.noFilterMatchesHint')}
                       className="py-8"
                       action={
-                        <Button
-                          size="sm"
-                          onClick={() =>
-                            changeFilter({
-                              typeQuery: '',
-                              regionId: null,
-                              maxPrice: '',
-                              minQuantity: '',
-                              saleKind: null,
-                              hideAuctions: false,
-                              hidePlex: false,
-                              jumps: DEFAULT_JUMP_RANGE,
-                            })
-                          }
-                        >
+                        <Button size="sm" onClick={resetFilters}>
                           {t('common.resetFilters')}
                         </Button>
                       }

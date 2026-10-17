@@ -378,6 +378,16 @@ function buildSamples(t: TFunction): Record<string, Sample> {
         ['Amarr → Jita', '12 jumps', '22M'],
       ],
     },
+    belowMarket: {
+      value: '5',
+      unit: t('overview.widgets.data.belowMarket.unit'),
+      note: t('overview.gallery.samples.belowMarket.note'),
+      rows: [
+        ['Rifter + 12 more', '3 jumps', '+42M'],
+        ['Tengu', '7 jumps', '+18.6M'],
+        ['Hulk + 4 more', '12 jumps', '+11.2M'],
+      ],
+    },
     survey: {
       value: '2h 14m',
       unit: t('overview.widgets.data.survey.unit'),
