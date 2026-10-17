@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { countPasteLines, parseAppraisalPaste, pasteBoxRows } from '@/engine/market/appraisalPaste';
+import {
+  countPasteLines,
+  parseAppraisalPaste,
+  parseAppraisalPasteDetailed,
+  pasteBoxRows,
+} from '@/engine/market/appraisalPaste';
 
 describe('countPasteLines', () => {
   it('counts the lines the parser would read, skipping blanks', () => {
@@ -143,6 +148,62 @@ describe('parseAppraisalPaste', () => {
     expect(parseAppraisalPaste('Pyerite\t-5')).toEqual([
       { name: 'Pyerite', quantity: 1, lines: [1] },
     ]);
+  });
+
+  it('reads dot, space, thin-space and apostrophe grouped quantities (issue #4022)', () => {
+    expect(parseAppraisalPaste('Tritanium\t124.500')).toEqual([
+      { name: 'Tritanium', quantity: 124500, lines: [1] },
+    ]);
+    expect(parseAppraisalPaste('Tritanium\t1 234 567')).toEqual([
+      { name: 'Tritanium', quantity: 1234567, lines: [1] },
+    ]);
+    expect(parseAppraisalPaste('Tritanium\t1\u00a0234\u00a0567')).toEqual([
+      { name: 'Tritanium', quantity: 1234567, lines: [1] },
+    ]);
+    expect(parseAppraisalPaste("Tritanium\t1'234'567")).toEqual([
+      { name: 'Tritanium', quantity: 1234567, lines: [1] },
+    ]);
+    expect(parseAppraisalPaste('Tritanium 124.500')).toEqual([
+      { name: 'Tritanium', quantity: 124500, lines: [1] },
+    ]);
+    expect(parseAppraisalPaste('Tritanium x 1.200')).toEqual([
+      { name: 'Tritanium', quantity: 1200, lines: [1] },
+    ]);
+  });
+
+  it('does not read a decimal as a grouped quantity', () => {
+    expect(parseAppraisalPaste('Tritanium\t12.5')).toEqual([]);
+    expect(parseAppraisalPaste('Tritanium\t12.50')).toEqual([]);
+    expect(parseAppraisalPaste('Tritanium 12.5')).toEqual([]);
+    expect(parseAppraisalPaste('Tritanium x12.5')).toEqual([]);
+  });
+
+  it('reports a quantity it cannot read against its source line instead of using one', () => {
+    expect(
+      parseAppraisalPasteDetailed('Pyerite\t5\nTritanium\t12.5\nIsogen\t5 m3\nTritanium\t12.5')
+    ).toEqual({
+      entries: [{ name: 'Pyerite', quantity: 5, lines: [1] }],
+      unreadable: [
+        { name: 'Tritanium\t12.5', lines: [2, 4] },
+        { name: 'Isogen\t5 m3', lines: [3] },
+      ],
+    });
+  });
+
+  it('leaves names that end in a number or a model number alone', () => {
+    expect(parseAppraisalPaste('Quafe Zero 10')).toEqual([
+      { name: 'Quafe Zero', quantity: 10, lines: [1] },
+    ]);
+    expect(parseAppraisalPaste("Zainou 'Gnome' Shield Management SM-703")).toEqual([
+      { name: "Zainou 'Gnome' Shield Management SM-703", quantity: 1, lines: [1] },
+    ]);
+    expect(parseAppraisalPaste('Quafe Zero\t10')).toEqual([
+      { name: 'Quafe Zero', quantity: 10, lines: [1] },
+    ]);
+  });
+
+  it('reports nothing unreadable for an EFT fit or a plain paste', () => {
+    expect(parseAppraisalPasteDetailed('Tritanium\t124,500').unreadable).toEqual([]);
   });
 
   it('returns nothing for empty or whitespace-only text', () => {

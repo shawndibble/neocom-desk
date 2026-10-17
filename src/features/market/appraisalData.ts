@@ -50,7 +50,7 @@ import {
   type AppraisalCatalogue,
   type AppraisalUnmatched,
 } from '@/engine/market/appraisalMatch';
-import { parseAppraisalPaste } from '@/engine/market/appraisalPaste';
+import { parseAppraisalPaste, parseAppraisalPasteDetailed } from '@/engine/market/appraisalPaste';
 import {
   appliedRefiningImplantPct,
   refiningImplantApplies,
@@ -161,7 +161,7 @@ export async function appraisePaste(
   characterId: number | null = null,
   { force = false }: AppraiseOptions = {}
 ): Promise<AppraisalOutcome> {
-  const entries = parseAppraisalPaste(text);
+  const { entries, unreadable } = parseAppraisalPasteDetailed(text);
   const [catalogue, typesById] = await Promise.all([
     loadAppraisalCatalogue(),
     loadMarketTypesById(),
@@ -170,9 +170,13 @@ export async function appraisePaste(
   const { matched } = matchResult;
   const abyssalNames =
     matchResult.unmatched.length === 0 ? null : await loadAbyssalTypeNames().catch(() => null);
-  const { abyssal, unmatched } = abyssalNames
+  const split = abyssalNames
     ? splitAbyssalUnmatched(matchResult.unmatched, abyssalNames)
     : { abyssal: [], unmatched: matchResult.unmatched };
+  const { abyssal } = split;
+  // A line whose quantity couldn't be read is reported with the unmatched ones,
+  // in source order, after the abyssal split so it can never read as abyssal.
+  const unmatched = [...split.unmatched, ...unreadable].sort((a, b) => a.lines[0] - b.lines[0]);
   const typeIds = matched.map((match) => match.typeId);
 
   const [reprocessingMap, modifiers, lpMatches] =
