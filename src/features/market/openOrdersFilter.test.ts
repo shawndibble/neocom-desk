@@ -177,28 +177,14 @@ describe('filterOpenOrders', () => {
     ).toEqual([2]);
   });
 
-  it('hideHealthy drops only healthy rows', () => {
+  it('ignores the view: the segment splits what the funnel matched', () => {
     const rows = [
       makeRow({ orderId: 1, problem: 'healthy' }),
-      makeRow({ orderId: 2, problem: 'undercutStation' }),
+      makeRow({ orderId: 2, problem: 'undercutRegion' }),
     ];
     expect(
-      filterOpenOrders(rows, { ...EMPTY_OPEN_ORDERS_FILTER, hideHealthy: true }).map(
-        (r) => r.orderId
-      )
-    ).toEqual([2]);
-  });
-
-  it('hideHealthy keeps an unchecked row, which is not known to be healthy', () => {
-    const rows = [
-      makeRow({ orderId: 1, problem: 'healthy' }),
-      makeRow({ orderId: 2, problem: 'healthy', competitionUnchecked: true }),
-    ];
-    expect(
-      filterOpenOrders(rows, { ...EMPTY_OPEN_ORDERS_FILTER, hideHealthy: true }).map(
-        (r) => r.orderId
-      )
-    ).toEqual([2]);
+      filterOpenOrders(rows, { ...EMPTY_OPEN_ORDERS_FILTER, view: 'act' }).map((r) => r.orderId)
+    ).toEqual([1, 2]);
   });
 
   it('combines constraints with AND', () => {
@@ -354,12 +340,12 @@ describe('activeFilterChips / activeFilterCount', () => {
       expiringWithinDays: 7,
       costBasis: 'linked',
       minIskTiedUp: 1000,
-      hideHealthy: true,
+      view: 'watch',
       sort: 'item',
     };
     const chips = activeFilterChips(filter);
-    // Every constraint present should have produced a chip.
-    expect(chips.length).toBe(9);
+    // Every constraint present should have produced a chip; `view` is not one.
+    expect(chips.length).toBe(8);
 
     for (const chip of chips) {
       const cleared = chip.clear(filter);
@@ -398,10 +384,6 @@ describe('activeFilterChips / activeFilterCount', () => {
           expect(cleared.minIskTiedUp).toBeNull();
           delete untouched.minIskTiedUp;
           break;
-        case 'hideHealthy':
-          expect(cleared.hideHealthy).toBe(false);
-          delete untouched.hideHealthy;
-          break;
         default:
           throw new Error(`unexpected chip id ${chip.id}`);
       }
@@ -415,10 +397,10 @@ describe('activeFilterChips / activeFilterCount', () => {
     const filter: OpenOrdersFilter = {
       ...EMPTY_OPEN_ORDERS_FILTER,
       side: 'buy',
-      hideHealthy: true,
+      view: 'all',
     };
     expect(activeFilterCount(filter)).toBe(activeFilterChips(filter).length);
-    expect(activeFilterCount(filter)).toBe(2);
+    expect(activeFilterCount(filter)).toBe(1);
   });
 });
 
@@ -476,9 +458,9 @@ describe('the deep-link vocabulary', () => {
 
   /*
    * `healthy` is a real word in this vocabulary and still not one this
-   * endpoint can honour: the page folds healthy orders away by default
-   * (`hideHealthy`), so a filter naming it matches rows that the same filter
-   * then hides — nought of N, with a chip the reader cannot reason about. The
+   * endpoint can honour: healthy orders sit under the All segment, so a filter
+   * naming it empties the default Needs you segment — nought, with a chip the
+   * reader cannot reason about. The
    * funnel already cannot produce that state (`PROBLEM_FILTER_OPTIONS` leaves
    * `healthy` out); only a URL can.
    */
@@ -497,6 +479,14 @@ describe('the deep-link vocabulary', () => {
     const parsed = parseHref(href);
     expect(parsed.problems).toEqual([...UNDERCUT_PROBLEMS]);
     expect(parsed.characterIds).toEqual([91]);
+  });
+
+  it('opens on the segment that holds the problems it names', () => {
+    const view = (href: string) =>
+      new URLSearchParams(href.slice(href.indexOf('?') + 1)).get('orders.view');
+    expect(view(openOrdersHref({ problems: ['belowFloor'] }))).toBeNull();
+    expect(view(openOrdersHref({ problems: ['undercutRegion'] }))).toBe('watch');
+    expect(view(openOrdersHref({ problems: UNDERCUT_PROBLEMS }))).toBe('all');
   });
 
   it('is the plain Orders page when there is nothing to narrow by', () => {

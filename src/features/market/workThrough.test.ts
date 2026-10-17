@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { openOrderRow } from './__fixtures__/openOrderRow';
-import { groupOpenOrders } from './openOrdersModel';
 import {
   EMPTY_WORK_THROUGH,
   ORDERS_CACHE_MS,
@@ -34,16 +33,20 @@ function handled(orderId: number, overrides: Partial<HandledOrder> = {}): Handle
 }
 
 describe('workThroughQueue', () => {
-  it('visits groups worst first, keeping row order inside each group, and leaves out healthy and not-checked orders', () => {
-    const groups = groupOpenOrders([
+  const regionUndercut = (orderId: number) =>
+    openOrderRow({ orderId, problem: 'undercutRegion', problems: ['undercutRegion'] });
+
+  it('keeps the table order, Needs you before Watch, and leaves out healthy and not-checked orders', () => {
+    const rows = [
+      belowFloor(2),
+      regionUndercut(5),
       undercut(3),
       healthy(9),
-      belowFloor(2),
       notChecked(8),
       undercut(1),
       belowFloor(4),
-    ]);
-    expect(workThroughQueue(groups).map((r) => r.orderId)).toEqual([2, 4, 3, 1]);
+    ];
+    expect(workThroughQueue(rows).map((r) => r.orderId)).toEqual([2, 3, 1, 4, 5]);
   });
 });
 

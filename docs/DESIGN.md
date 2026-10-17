@@ -414,8 +414,8 @@ shape has to be carried into them by hand.
   `rounded-full` only for avatars, dots, spinners. Never `rounded-md`+ on rectangles.
 - Borders: always 1px (`border`), never 2px. The one exception is a **state
   stripe** — the 2px edge that marks an active tab (`tabItemClassName`'s
-  `border-b-2`), a grouped order's severity (`OpenOrdersPanel`'s
-  `GROUP_ACCENT`) or the selected mail (`Mail.tsx`). Those are not the box's
+  `border-b-2`), the work-through's current order (Open Orders) or the
+  selected mail (`Mail.tsx`). Those are not the box's
   border; they are a selection marker that happens to be drawn as one, and at
   1px they disappear into the hairlines around them.
 

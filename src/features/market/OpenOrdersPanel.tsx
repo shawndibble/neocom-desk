@@ -1,8 +1,4 @@
-import { HintText } from '@/components/ui/HintText';
-import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
-import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
 import {
-  Fragment,
   useCallback,
   useDeferredValue,
   useEffect,
@@ -10,13 +6,11 @@ import {
   useRef,
   useState,
   type ReactElement,
-  type ReactNode,
 } from 'react';
 import { Navigate } from 'react-router-dom';
-import { Trans, useTranslation } from 'react-i18next';
+import { useTranslation } from 'react-i18next';
 import {
   Button,
-  Caret,
   ColumnPickerMenu,
   DataAgeBadge,
   DataTable,
@@ -25,13 +19,11 @@ import {
   FilterBar,
   FilterChip,
   IconButton,
-  InfoTooltip,
-  IskAmount,
   MenuItem,
   MultiSelect,
   LiveStatus,
-  Panel,
   SearchInput,
+  SegmentedControl,
   Select,
   SelectContent,
   SelectItem,
@@ -39,9 +31,7 @@ import {
   SelectValue,
   Spinner,
   textActionClassName,
-  type DataTableColumn,
   type DataTableSort,
-  CachedNotice,
   sortRows,
 } from '@/components/ui';
 import { useColumnVisibility } from '@/lib/columnVisibility';
@@ -53,8 +43,6 @@ import { db } from '@/db';
 import { useViewedCharacterId } from '@/features/character/viewedCharacter';
 import { WalletOriginCrumb } from '@/features/character/WalletOriginCrumb';
 import { CharacterScopeReadout } from '@/features/character/CharacterScopeReadout';
-import { CharacterBadge } from '@/features/character/assetBrowserRows';
-import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
 import {
   resolveCharacterFilter,
@@ -69,8 +57,7 @@ import {
   useRememberedUrlParams,
   type UrlParamValues,
 } from '@/lib/useUrlState';
-import { cx } from '@/lib/cx';
-import { formatIskAuto, formatIskCompact } from '@/lib/isk';
+import { formatIskCompact } from '@/lib/isk';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { PageHeaderPortals } from './PageHeaderPortals';
 import type { PageHeaderSlots } from './pageHeaderSlots';
@@ -81,20 +68,10 @@ import type { MarketOrder } from '@/esi/endpoints';
 import type { CompetingOrder } from '@/engine/market/undercut';
 import { ItemContextMenu } from './ItemContextMenu';
 import { OpenOrdersList } from './OpenOrdersList';
-import { isOffHubStation } from './hubStation';
-import { formatOrderFloorPrice, formatOrderRemaining } from './orderRowFormat';
 import { loadOpenOrdersSnapshot } from './openOrdersPageSnapshot';
 import { recordOrderProblemSamples, sampleableCharacterIds } from './orderProblemSamples';
 import { sampledProblem } from '@/engine/market/orderProblemHistory';
-import {
-  buildOpenOrderRows,
-  needsAttentionCount,
-  openOrderProblemCounts,
-  orderGroupKey,
-  type OpenOrderGroupSummary,
-  type OpenOrderRow,
-  type OrderGroupKey,
-} from './openOrdersModel';
+import { buildOpenOrderRows, openOrderProblemCounts, type OpenOrderRow } from './openOrdersModel';
 import {
   EMPTY_OPEN_ORDERS_FILTER,
   FILTERABLE_PROBLEMS,
@@ -108,11 +85,11 @@ import {
 } from './openOrdersFilter';
 import { useCharacterFilterPick } from '@/features/character/characterFilterPicks';
 import { useOpenOrdersLocationFilterPref } from './openOrdersLocationFilterPref';
-import { buildOpenOrdersView, isGroupFolded } from './openOrdersView';
-import { OrderProblemBadge } from './OrderProblemBadge';
+import { buildOpenOrdersView, shownView } from './openOrdersView';
+import { rowInView, type OpenOrdersView } from './orderUrgency';
 import { adviseOrder } from './orderAdvice';
+import { doThisPrice, orderDoThis } from './orderDoThis';
 import { OrderBadgeLegend } from './OrderBadgeLegend';
-import { OrderRowSummaryText } from './OrderRowSummaryText';
 import { priceClipboardText } from './priceClipboardText';
 import { writeToClipboard } from '@/lib/clipboard';
 import { OrderDetailModal } from './OrderDetailModal';
@@ -124,20 +101,18 @@ import { requiredScopesForEndpoints } from '@/esi/registry';
 import { OPEN_IN_EVE_ENDPOINTS } from '@/features/openInEve/sendOpenInEve';
 import { workThroughQueue } from './workThrough';
 import { useWorkThrough, useWorkThroughStartParam } from './useWorkThrough';
-import {
-  WorkThroughListSlot,
-  WorkThroughSummaryTail,
-  WorkThroughTableSlot,
-} from './WorkThroughControls';
+import { WorkThroughListSlot } from './WorkThroughControls';
 import { WorkThroughContext, type WorkThroughContextValue } from './workThroughContext';
 import {
   OPEN_ORDER_COLUMN_IDS,
+  OPEN_ORDER_DEFAULT_COLUMNS,
   useVisibleOpenOrderColumns,
-  type OpenOrderColumnId,
 } from './openOrdersColumns';
+import { useOpenOrderTableColumns } from './openOrdersTableColumns';
+import { FixListSummary, HealthyFold, ListNotes } from './OpenOrdersFixListParts';
 
-/** Healthy orders start collapsed (GLOSSARY.md redesign) — the `showHealthy` toggle is the way back, not the funnel filter. */
-const DEFAULT_FILTER: OpenOrdersFilter = { ...EMPTY_OPEN_ORDERS_FILTER, hideHealthy: true };
+/** A bare visit opens on Needs you, every funnel field clear. */
+const DEFAULT_FILTER: OpenOrdersFilter = EMPTY_OPEN_ORDERS_FILTER;
 
 const SORTS: readonly OpenOrdersSort[] = OPEN_ORDERS_SORTS;
 
@@ -149,32 +124,14 @@ const SORTS: readonly OpenOrdersSort[] = OPEN_ORDERS_SORTS;
  */
 const PROBLEM_FILTER_OPTIONS = FILTERABLE_PROBLEMS;
 
-/**
- * The left edge stripe on a group header, by how bad the group is. Same
- * severity ladder the badges use (`OrderProblemBadge`'s `KIND_TONE`), so a
- * group and the badges inside it can never disagree about how alarming they
- * look. Colour is never the only signal here — the header always carries its
- * own words and count (DESIGN.md §7).
- */
-const GROUP_ACCENT: Record<OrderGroupKey, string> = {
-  belowFloor: 'border-l-danger',
-  undercutStation: 'border-l-danger',
-  undercutSystem: 'border-l-warning',
-  undercutRegion: 'border-l-accent',
-  expiringOrStale: 'border-l-line',
-  outbid: 'border-l-line',
-  notChecked: 'border-l-line',
-  healthy: 'border-l-success',
-};
-
 const EXPIRING_WITHIN_DAY_OPTIONS = [3, 7, 14, 30] as const;
 const MIN_ISK_TIED_UP_OPTIONS = [10_000_000, 100_000_000, 1_000_000_000] as const;
 
-/** "Jita 4 - Moon 4 - Caldari Navy Assembly Plant" -> "Jita 4"; the full name still shows on hover. */
-function stationShortName(name: string): string {
-  const dashIndex = name.indexOf(' - ');
-  return dashIndex === -1 ? name : name.slice(0, dashIndex);
-}
+const TABLE_LABEL_KEY: Record<OpenOrdersView, string> = {
+  act: 'market.orders.fixList.tableAct',
+  watch: 'market.orders.fixList.tableWatch',
+  all: 'market.orders.fixList.tableAll',
+};
 
 interface ActiveChipDisplay {
   id: string;
@@ -186,7 +143,11 @@ interface OpenOrdersPanelProps {
   headerSlots: PageHeaderSlots;
 }
 
-/** Market's Open Orders tab: every selling character's open market orders, worklisted by problem. */
+/**
+ * Market's Open Orders tab: every selling character's open market orders as a
+ * fix list — the orders that need the pilot, worst first, in one flat table
+ * that says what is wrong and what to do, with Watch and All one segment away.
+ */
 export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
   const { t } = useTranslation();
   const viewedCharacterId = useViewedCharacterId();
@@ -199,9 +160,9 @@ export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
   /*
    * The whole filter lives in the URL (ADR 0015), one `orders.*` key per
    * field — a deep link (an Overview Orders widget's row, `openOrdersHref`)
-   * narrows it on arrival, and every chip, select and search keystroke from
-   * here on writes straight back to it, so a reload or a shared link always
-   * reopens exactly what was on screen.
+   * narrows it on arrival, and every chip, select, segment and search
+   * keystroke from here on writes straight back to it, so a reload or a
+   * shared link always reopens exactly what was on screen.
    *
    * `orders.locations` is the one exception: a bare `/market/orders` visit
    * (no query string at all — every app relaunch) falls back to the
@@ -267,19 +228,15 @@ export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
    * row that prompted the click, decision `20260908-123516`.
    */
   const highlightId = useHighlightParam();
+  /** A segment click ends the highlighted row's hold on the segment shown. */
+  const [viewPicked, setViewPicked] = useState(false);
   const isPhone = useIsPhone();
   const [detailOrderId, setDetailOrderId] = useState<number | null>(null);
   /** Set only by a work-through row's "See exits": the detail opens at its exits. */
   const [detailAtExits, setDetailAtExits] = useState(false);
-  /** Each group table's own header-click sort, held here so the work-through queue walks rows in the order they show. */
-  const [groupSorts, setGroupSorts] = useState<ReadonlyMap<OrderGroupKey, DataTableSort>>(
-    () => new Map()
-  );
+  /** The table's header-click sort, held here so the work-through walks rows in the order they show. */
+  const [tableSort, setTableSort] = useState<DataTableSort | null>(null);
   const [legendOpen, setLegendOpen] = useState(false);
-  /** Groups the player has folded away by hand. `healthy` is never in here — see the toggle below. */
-  const [collapsedGroups, setCollapsedGroups] = useState<ReadonlySet<OrderGroupKey>>(
-    () => new Set()
-  );
   /**
    * The Order Detail modal's loading, page-level: its caches outlive any one
    * modal, and its region and structure books also reclassify the rows below
@@ -291,13 +248,12 @@ export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
     void useStructureFees.getState().hydrate();
   }, []);
 
-  /** One column-visibility setting shared by every per-problem-group table below. */
+  /** The Columns menu's picks: the optional columns, all off until turned on. */
   const {
     visible: visibleColumnIds,
-    isVisible: isColumnVisible,
     toggle: toggleColumn,
     reset: resetColumns,
-  } = useColumnVisibility(useVisibleOpenOrderColumns, OPEN_ORDER_COLUMN_IDS);
+  } = useColumnVisibility(useVisibleOpenOrderColumns, OPEN_ORDER_DEFAULT_COLUMNS);
 
   // A Character named in the URL narrows the whole page to that Character —
   // its rows, grant notes and skipped note — and is stated by the readout.
@@ -369,12 +325,10 @@ export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
   ]);
 
   /**
-   * The highlighted row, found across every group before any fold/filter
-   * narrows the screen — null when nothing matches is harmless (decision
-   * `20260908-123516`). Read off `allRows`, not `groupingRows`: this only
-   * forces open the row's own fold state, never an active content filter
-   * (search/problem/character) — narrowing that too is an open judgment call
-   * (see the scope decision file).
+   * The highlighted row, found before any segment or filter narrows the
+   * screen — null when nothing matches is harmless (decision
+   * `20260908-123516`). It only widens the segment shown (`shownView`), never
+   * an active content filter (search/problem/character).
    */
   const highlightedRow = useMemo(
     () => (highlightId === null ? null : (allRows.find((r) => r.orderId === highlightId) ?? null)),
@@ -412,12 +366,7 @@ export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
 
   const problemCounts = useMemo(() => openOrderProblemCounts(allRows), [allRows]);
 
-  const { visibleRows, groupingRows, groups, groupSummaries, matchCountVisible } = useMemo(
-    () => buildOpenOrdersView(allRows, rowsFilter),
-    [allRows, rowsFilter]
-  );
-
-  const attentionCount = useMemo(() => needsAttentionCount(allRows), [allRows]);
+  const fixList = useMemo(() => buildOpenOrdersView(allRows, rowsFilter), [allRows, rowsFilter]);
 
   const entriesWithOrders = useMemo(
     () => snapshot?.openOrders.entries.filter((e) => e.orders.length > 0) ?? [],
@@ -459,12 +408,25 @@ export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
     return m;
   }, [snapshot]);
 
-  // Every group's visible rows (folded groups included), exported as the ESI
-  // orders behind them — hence `source: 'rows'`, and one export shared by
-  // every group's DataTable.
+  const tableColumns = useOpenOrderTableColumns({ showCharacter: showCharacterStrip });
+  const columns = useMemo(
+    () => tableColumns.columns(visibleColumnIds),
+    [tableColumns, visibleColumnIds]
+  );
+
+  /** Every row the funnel matched, in the table's order: the header sort when one is set. */
+  const sortedRows = useMemo(() => {
+    const column = tableSort && columns.find((c) => c.id === tableSort.columnId);
+    return column && tableSort
+      ? sortRows(fixList.matching, column, tableSort.direction)
+      : fixList.matching;
+  }, [fixList.matching, tableSort, columns]);
+
+  // Every row the funnel matched, whichever segment shows, exported as the ESI
+  // orders behind them — hence `source: 'rows'`.
   const csvRows = useMemo(
-    () => visibleRows.filter((row) => ordersByOrderId.has(row.orderId)),
-    [visibleRows, ordersByOrderId]
+    () => sortedRows.filter((row) => ordersByOrderId.has(row.orderId)),
+    [sortedRows, ordersByOrderId]
   );
   const csvColumns = useMemo<CsvColumn<OpenOrderRow>[]>(
     () =>
@@ -483,12 +445,17 @@ export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
     source: 'rows',
   });
 
-  // Whoever has a floor on screen (same rows the floor column follows): each
-  // note checks that character's own grant, since each floor prices with
-  // that character's standings.
-  const floorCharacterIds = useMemo(
-    () => [...new Set(groupingRows.filter((row) => row.floor).map((row) => row.characterId))],
-    [groupingRows]
+  // Whoever has a floor on screen: each note checks that character's own
+  // grant, since each floor prices with that character's standings.
+  const floorCharacters = useMemo(
+    () =>
+      [...new Set(fixList.matching.filter((row) => row.floor).map((row) => row.characterId))].map(
+        (characterId) => ({
+          characterId,
+          name: characterNamesById.get(characterId) ?? '',
+        })
+      ),
+    [fixList.matching, characterNamesById]
   );
 
   const reauthEntries = useMemo(
@@ -504,126 +471,7 @@ export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
   const detailRow =
     detailOrderId !== null ? (allRows.find((r) => r.orderId === detailOrderId) ?? null) : null;
 
-  // On a phone `OpenOrdersList` renders instead of `DataTable` and none of
-  // this is used — the ternary short-circuits so the array (8 columns'
-  // worth of render closures, rebuilt every render otherwise) is never
-  // actually constructed there. Memoized so the render closures (and the
-  // `sortValue`s `DataTable` keys its sort on) keep their identity across
-  // renders; above the early returns below, as a hook must be.
-  const columns = useMemo<DataTableColumn<OpenOrderRow>[]>(
-    () =>
-      isPhone
-        ? []
-        : [
-            {
-              id: 'item',
-              header: t('orders.item'),
-              primary: true,
-              sortValue: (row) => row.typeName,
-              render: (row) => (
-                <span className="flex flex-wrap items-center gap-1">
-                  <span className={entityLinkClassName()}>{row.typeName}</span>
-                  {showCharacterStrip && <CharacterBadge characterName={row.characterName} />}
-                </span>
-              ),
-            },
-            {
-              id: 'where',
-              header: t('market.location'),
-              className: 'text-text-dim',
-              sortValue: (row) => row.stationName ?? undefined,
-              render: (row) => (
-                <span className="flex flex-col gap-0.5">
-                  <span>
-                    {row.stationName === null ? (
-                      t('market.unknownStructure')
-                    ) : (
-                      <HintText content={row.stationName}>
-                        {stationShortName(row.stationName)}
-                      </HintText>
-                    )}
-                  </span>
-                  {isOffHubStation(row.stationName, row.locationId) && (
-                    <span className="flex items-center gap-1 text-[0.6875rem] text-warning">
-                      {t('market.orders.offHub')}
-                      <InfoTooltip
-                        label={t('common.aboutLabel', { label: t('market.orders.offHub') })}
-                        content={t('market.orders.offHubHelp')}
-                      />
-                    </span>
-                  )}
-                </span>
-              ),
-            },
-            {
-              id: 'price',
-              header: t('orders.price'),
-              align: 'right',
-              className: 'tabular-nums',
-              sortValue: (row) => row.price,
-              render: (row) => formatIskAuto(row.price),
-            },
-            {
-              id: 'problem',
-              header: t('market.orders.filter.problem'),
-              render: (row) => {
-                const { badge, summary } = adviseOrder(row);
-                return (
-                  <span className="flex flex-col items-start gap-1">
-                    {badge && <OrderProblemBadge kind={badge.kind} detail={badge.detail} />}
-                    <WorkThroughTableSlot
-                      row={row}
-                      fallback={<OrderRowSummaryText row={row} summary={summary} copyRelistPrice />}
-                    />
-                  </span>
-                );
-              },
-            },
-            {
-              id: 'floor',
-              header: t('market.orders.floorLabel'),
-              align: 'right',
-              className: 'tabular-nums',
-              // Sorted by the EXACT break-even, unaffected by the rounded-up figure
-              // the cell itself renders (issue #1421) — no copy button here, no room
-              // in the row (see `OrderDetailModal.tsx` for the copyable version).
-              sortValue: (row) => row.floor?.relist,
-              render: (row) => (row.floor ? formatOrderFloorPrice(row.floor) : t('common.unknown')),
-            },
-            {
-              id: 'remaining',
-              header: t('orders.remaining'),
-              align: 'right',
-              className: 'tabular-nums',
-              sortValue: (row) => row.volumeRemain,
-              render: (row) => formatOrderRemaining(row.volumeRemain, row.volumeTotal),
-            },
-            {
-              id: 'expires',
-              header: t('orders.expires'),
-              className: 'whitespace-nowrap text-text-dim',
-              sortValue: (row) => row.expiry?.expiresAt,
-              render: (row) =>
-                row.expiry
-                  ? new Date(row.expiry.expiresAt).toLocaleDateString()
-                  : t('common.unknown'),
-            },
-          ],
-    [isPhone, t, showCharacterStrip]
-  );
-
-  const sortedGroups = useMemo(
-    () =>
-      groups.map((group) => {
-        const sort = groupSorts.get(group.problem);
-        const column = sort && columns.find((c) => c.id === sort.columnId);
-        return column && sort
-          ? { ...group, rows: sortRows(group.rows, column, sort.direction) }
-          : group;
-      }),
-    [groups, groupSorts, columns]
-  );
-  const workQueue = useMemo(() => workThroughQueue(sortedGroups), [sortedGroups]);
+  const workQueue = useMemo(() => workThroughQueue(sortedRows), [sortedRows]);
   // Only the answer leaves the query, never a `TokenRecord` (ADR 0001).
   const openInEveCharacterIds = useLiveQuery(async () => {
     const required = requiredScopesForEndpoints(OPEN_IN_EVE_ENDPOINTS);
@@ -688,12 +536,51 @@ export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
     [workThrough, canOpenInEve, manyOwners]
   );
 
+  /**
+   * The segment on screen: the picked one, widened to All while the
+   * work-through's current order, or (until the pilot picks a segment) the
+   * highlighted one, sits outside it — the walk takes in Watch's system and
+   * region undercuts too.
+   */
+  const view = shownView(filter.view, workCurrent ?? (viewPicked ? null : highlightedRow));
+  const viewRows = useMemo(
+    () => (view === 'all' ? sortedRows : sortedRows.filter((row) => rowInView(row, view))),
+    [sortedRows, view]
+  );
+
+  /**
+   * `CharacterFilterControl`'s `value`: `'current'` only for the exact
+   * single-id array `characterFilterOnChange` itself writes for that literal
+   * value (`[activeCharacterId]`), everything else `'all'` — the closest this
+   * narrowed picker can still say honestly. That covers a legacy hand-picked
+   * subset link and the Overview Orders widget's deep link naming one *other*
+   * alt the same way: the label reads "All characters" rather than lying that
+   * it is "This character", while the table itself keeps filtering to
+   * whatever `characterIds` holds (`matchesCharacterIds` reads it directly).
+   */
+  const characterFilterValue: CharacterFilterValue =
+    filter.characterIds.length === 1 && filter.characterIds[0] === activeCharacterId
+      ? 'current'
+      : 'all';
+
   const headerChrome = (
     <PageHeaderPortals
       slots={headerSlots}
       meta={oldestFetchedAt !== null && <DataAgeBadge date={new Date(oldestFetchedAt)} />}
       actions={
         <>
+          {showCharacterStrip && (
+            <CharacterFilterControl
+              size="md"
+              activeCharacterId={activeCharacterId}
+              value={characterFilterValue}
+              characterCount={entriesWithOrders.length}
+              onChange={(next) => {
+                const resolved = resolveCharacterFilter(next, activeCharacterId);
+                setFilter({ ...filter, characterIds: resolved === 'all' ? [] : [...resolved] });
+              }}
+            />
+          )}
           <IconButton
             icon={<Icon.Refresh />}
             label={t('market.orders.refreshOrders')}
@@ -742,15 +629,16 @@ export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
     );
   }
 
-  const visibleChips: ActiveChipDisplay[] = activeFilterChips(filter)
-    .filter((chip) => chip.id !== 'hideHealthy')
-    .map((chip) => ({
-      id: chip.id,
-      label: chipLabel(chip, characterNamesById, locationNamesById, t),
-      clear: () => setFilter(chip.clear(filter)),
-    }));
+  const visibleChips: ActiveChipDisplay[] = activeFilterChips(filter).map((chip) => ({
+    id: chip.id,
+    label: chipLabel(chip, characterNamesById, locationNamesById, t),
+    clear: () => setFilter(chip.clear(filter)),
+  }));
 
-  const skipped = snapshot.openOrders.skipped;
+  const notShared = snapshot.openOrders.skipped.map((s) => ({
+    characterId: s.characterId,
+    name: s.name,
+  }));
 
   // The modal loads what the order needs as it opens (`useOpenOrderDetail`).
   function openDetails(row: OpenOrderRow) {
@@ -758,56 +646,26 @@ export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
     setDetailOrderId(row.orderId);
   }
 
-  /**
-   * `CharacterFilterControl`'s `value` prop, derived the same way from either
-   * `filter.characterIds` (desktop strip) or `draft.characterIds` (phone
-   * funnel sheet). Reads `'current'` only for the exact single-id array
-   * `characterFilterOnChange` itself would write for that literal value
-   * (`[activeCharacterId]`) — everything else reads `'all'`, the closest this
-   * narrowed picker can still say honestly. That covers two different single-
-   * id cases the same way: a legacy hand-picked-subset link (from before the
-   * current/all narrowing) naming some other Character — there's no
-   * principled way to know which one id, if any, the pilot who made it would
-   * have meant, so this never guesses `'current'` for it (mirrors
-   * `characterFilterValue.ts`'s `fromStoredCharacterFilterValue`) — and the
-   * Overview Orders widget (`overview/widgets`),
-   * which can deep-link here with exactly one *other* alt's id on purpose, live
-   * traffic rather than anything stale. Either way the label falls back to
-   * "All characters" rather than lying that it's "This character," but the
-   * table itself keeps filtering to whatever `characterIds` actually holds —
-   * this function only ever feeds the picker's display, never the row filter
-   * (`matchesCharacterIds` reads `filter.characterIds` directly), so an
-   * Overview widget's narrowed view still opens narrowed; only its label can no
-   * longer name the one alt it's showing.
-   */
-  function characterFilterValueOf(characterIds: readonly number[]): CharacterFilterValue {
-    return characterIds.length === 1 && characterIds[0] === activeCharacterId ? 'current' : 'all';
-  }
-
-  /** `CharacterFilterControl`'s `onChange`, resolving its selection back to `characterIds` and handing it to whichever setter owns them — `setFilter` (commits immediately) or `setDraft` (committed on the funnel's Apply). */
-  function characterFilterOnChange(setCharacterIds: (ids: readonly number[]) => void) {
-    return (next: CharacterFilterValue) => {
-      const resolved = resolveCharacterFilter(next, activeCharacterId);
-      setCharacterIds(resolved === 'all' ? [] : [...resolved]);
-    };
+  function pickView(next: OpenOrdersView) {
+    setViewPicked(true);
+    setFilter({ ...filter, view: next });
   }
 
   /** Same menu Transactions carries — an order row names an item like any other. */
   function rowContextMenu(row: OpenOrderRow, tr: ReactElement) {
-    const { summary } = adviseOrder(row);
-    const relistPrice =
-      summary?.kind === 'undercut' || summary?.kind === 'outbid' ? summary.suggestedPrice : null;
+    // The price "Do this" names, so the menu and the cell never disagree.
+    const newPrice = doThisPrice(orderDoThis(row, adviseOrder(row)));
     return (
       <ItemContextMenu
         typeId={row.typeId}
         extraItems={
           <>
-            {relistPrice !== null && (
-              <MenuItem onSelect={() => void writeToClipboard(priceClipboardText(relistPrice))}>
+            {newPrice !== null && (
+              <MenuItem onSelect={() => void writeToClipboard(priceClipboardText(newPrice))}>
                 {t('market.orders.copyNewPrice')}
               </MenuItem>
             )}
-            {/* Only where the Location column names it: an unnamed structure has nothing to show. */}
+            {/* Only where the station is named: an unnamed structure has nothing to show. */}
             {row.stationName !== null && (
               <SetWaypointMenuItem locationId={row.locationId} placeName={row.stationName} />
             )}
@@ -820,109 +678,55 @@ export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
     );
   }
 
-  // No VISIBLE order carries a floor (nothing has a linked build), so the
-  // whole column would be a wall of dashes — dropped rather than shown
-  // empty. Reads `groupingRows`, not `allRows`: a filter (search, problem
-  // chip, character) can narrow what's on screen to rows with no floor
-  // while some filtered-out row elsewhere still has one, and the column
-  // must track what's actually visible, not the character's full order set.
-  const hasFloorData = groupingRows.some((row) => row.floor !== null);
-  // `floor` only ever offers itself as a picker toggle once there is data
-  // behind it — same rule Appraisal's Refine/LP columns follow — so a
-  // checked-but-invisible toggle never appears in the menu.
-  const availableColumns = OPEN_ORDER_COLUMN_IDS.filter((id) => id !== 'floor' || hasFloorData);
-  const visibleColumns = columns.filter(
-    (column) =>
-      (column.id !== 'floor' || hasFloorData) &&
-      (column.id === 'item' || isColumnVisible(column.id as OpenOrderColumnId))
-  );
-  // Only for `ColumnPickerMenu`'s labels — built from the same definitions
-  // `columns` already carries, not a second copy of them. Empty on a phone
-  // (`columns` is `[]` there), which is fine: the picker itself only renders
-  // at `!isPhone` below.
-  const columnsById = Object.fromEntries(columns.map((column) => [column.id, column])) as Record<
-    OpenOrderColumnId,
-    DataTableColumn<OpenOrderRow>
-  >;
+  const tableLabel = t(TABLE_LABEL_KEY[view]);
+  const noOrders = reauthEntries.length === 0 && allRows.length === 0;
 
   return (
     <>
       {headerChrome}
-      <Panel padded={false}>
-        <WorkThroughContext.Provider value={workThroughContext}>
-          <div className="space-y-2 px-3 pt-2">
-            {viewedCharacterId !== undefined && (
-              <div className="flex items-center gap-3">
-                <WalletOriginCrumb />
-                {viewedCharacter && (
-                  <CharacterScopeReadout
-                    scope="one"
-                    characterId={viewedCharacter.characterId}
-                    characterName={viewedCharacter.name}
-                  />
-                )}
-              </div>
-            )}
-            {viewedCharacterId !== undefined &&
-              viewedLacksOrdersScope &&
-              !reauthEntries.some((e) => e.characterId === viewedCharacterId) && (
-                <GrantBanner
-                  characterId={viewedCharacterId}
-                  characterName={viewedCharacter?.name}
-                  endpoints={['getCharacterOrders']}
-                  variant="ghost"
-                  title={t('orders.reauthTitle')}
-                  hint={t('orders.reauthHint')}
-                  actionLabel={t('orders.reauthAction')}
+      <WorkThroughContext.Provider value={workThroughContext}>
+        <div className="min-w-0 space-y-3">
+          {viewedCharacterId !== undefined && (
+            <div className="flex items-center gap-3">
+              <WalletOriginCrumb />
+              {viewedCharacter && (
+                <CharacterScopeReadout
+                  scope="one"
+                  characterId={viewedCharacter.characterId}
+                  characterName={viewedCharacter.name}
                 />
               )}
-            {allRows.length > 0 && (
-              <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-text-dim">
-                <span>
-                  {[
-                    showCharacterStrip
-                      ? t('market.orders.headerCharacters', { count: entriesWithOrders.length })
-                      : null,
-                    t('market.orders.headerSummary', { count: allRows.length }),
-                    t('market.orders.headerAttention', { count: attentionCount }),
-                  ]
-                    .filter((part): part is string => part !== null)
-                    .join(' \u00b7 ')}
-                </span>
-                <WorkThroughSummaryTail />
-              </div>
-            )}
-            {reauthEntries.map((entry) => (
+            </div>
+          )}
+          {viewedCharacterId !== undefined &&
+            viewedLacksOrdersScope &&
+            !reauthEntries.some((e) => e.characterId === viewedCharacterId) && (
               <GrantBanner
-                key={entry.characterId}
-                characterId={entry.characterId}
-                characterName={entry.characterName}
+                characterId={viewedCharacterId}
+                characterName={viewedCharacter?.name}
                 endpoints={['getCharacterOrders']}
                 variant="ghost"
                 title={t('orders.reauthTitle')}
                 hint={t('orders.reauthHint')}
                 actionLabel={t('orders.reauthAction')}
               />
-            ))}
-            {floorCharacterIds.map((characterId) => (
-              <AssumesBaseStandingsNote
-                key={characterId}
-                characterId={characterId}
-                characterName={characterNamesById.get(characterId)}
-                hint={t('market.orders.assumesBaseStandingsHint')}
-              />
-            ))}
-            {fromCacheAny && <CachedNotice fetchedAt={oldestFetchedAt} />}
-            {skipped.map((s) => (
-              <p key={s.characterId} className="text-xs text-text-dim">
-                {s.name} — {t('market.orders.characterNotShared')}
-              </p>
-            ))}
-          </div>
+            )}
+          {reauthEntries.map((entry) => (
+            <GrantBanner
+              key={entry.characterId}
+              characterId={entry.characterId}
+              characterName={entry.characterName}
+              endpoints={['getCharacterOrders']}
+              variant="ghost"
+              title={t('orders.reauthTitle')}
+              hint={t('orders.reauthHint')}
+              actionLabel={t('orders.reauthAction')}
+            />
+          ))}
 
-          {reauthEntries.length === 0 && allRows.length === 0 ? (
-            // Every Character skipped: the "hasn't shared" notes above already say why.
-            skipped.length > 0 && snapshot.openOrders.entries.length === 0 ? null : (
+          {noOrders ? (
+            // Every Character skipped: the "hasn't shared" note below already says why.
+            notShared.length > 0 && snapshot.openOrders.entries.length === 0 ? null : (
               <CachedEmptyState
                 result={{ fromCache: fromCacheAny }}
                 title={t('orders.emptyTitle')}
@@ -933,27 +737,58 @@ export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
             )
           ) : (
             <>
-              <div className="border-b border-line px-3 py-2">
+              <FixListSummary
+                actCount={fixList.act.length}
+                actIskTiedUp={fixList.actIskTiedUp}
+                watchCount={fixList.watch.length}
+                fineCount={fixList.fine.length}
+              />
+
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <SegmentedControl<OpenOrdersView>
+                  label={t('market.orders.fixList.views')}
+                  uppercase={false}
+                  fill
+                  value={view}
+                  onChange={pickView}
+                  options={[
+                    {
+                      value: 'act',
+                      label: t('market.orders.fixList.viewAct', { count: fixList.act.length }),
+                    },
+                    {
+                      value: 'watch',
+                      label: t('market.orders.fixList.viewWatch', { count: fixList.watch.length }),
+                    },
+                    {
+                      value: 'all',
+                      label: t('market.orders.fixList.viewAll', {
+                        count: fixList.matching.length,
+                      }),
+                    },
+                  ]}
+                />
                 <FilterBar
+                  className="min-w-0 flex-1"
                   value={filter}
                   onChange={setFilter}
                   // The active chips stay outside the funnel box, where they can
                   // be seen and dropped.
                   activeCount={visibleChips.length}
                   actions={
-                    // `OpenOrdersList` (below, on a phone) ignores column
-                    // visibility entirely, so the picker would have nothing to
-                    // act on there — and `columnsById` is empty on a phone besides.
+                    // The phone cards ignore column choices, so the picker
+                    // would have nothing to act on there.
                     !isPhone && (
                       <ColumnPickerMenu
-                        available={availableColumns}
+                        available={OPEN_ORDER_COLUMN_IDS}
                         visible={visibleColumnIds}
-                        columnsById={columnsById}
+                        columnsById={tableColumns.optional}
                         onToggle={toggleColumn}
                         buttonLabel={t('common.columnsButton')}
-                        menuTitle={t('common.columnsMenuTitle')}
+                        menuTitle={t('market.orders.fixList.columnsMenuTitle')}
                         onReset={resetColumns}
                         resetLabel={t('common.resetColumns')}
+                        showLabel
                       />
                     )
                   }
@@ -962,7 +797,7 @@ export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
                       value={filter.text}
                       onChange={(event) => setFilter({ ...filter, text: event.target.value })}
                       placeholder={t('orders.searchPlaceholder')}
-                      className="min-w-48 flex-1"
+                      className="min-w-40 flex-1"
                     />
                   }
                 >
@@ -1151,219 +986,95 @@ export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
                           ))}
                         </SelectContent>
                       </Select>
-                      {/*
-                    On a phone the character strip below (outside the funnel)
-                    is hidden, so its picker lives here instead — the active
-                    selection still surfaces as chips in the row below this
-                    sheet, same as every other filter field (decision
-                    20260924-020211 "Open Orders gets a compact phone list").
-                  */}
-                      {isPhone && showCharacterStrip && (
-                        <div className="w-full border-t border-line pt-2">
-                          <CharacterFilterControl
-                            activeCharacterId={activeCharacterId}
-                            value={characterFilterValueOf(draft.characterIds)}
-                            onChange={characterFilterOnChange((characterIds) =>
-                              setDraft({ ...draft, characterIds })
-                            )}
-                          />
-                        </div>
-                      )}
                     </>
                   )}
                 </FilterBar>
               </div>
 
               {visibleChips.length > 0 && (
-                <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
+                <div className="flex flex-wrap items-center gap-2">
                   {visibleChips.map((chip) => (
                     <FilterChip key={chip.id} label={chip.label} selected onToggle={chip.clear} />
                   ))}
                   <button
                     type="button"
                     className={textActionClassName()}
-                    onClick={() => setFilter(DEFAULT_FILTER)}
+                    onClick={() => setFilter({ ...DEFAULT_FILTER, view: filter.view })}
                   >
                     {t('market.orders.filter.clearAll')}
                   </button>
                 </div>
               )}
 
-              {showCharacterStrip && !isPhone && (
-                <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
-                  <CharacterFilterControl
-                    activeCharacterId={activeCharacterId}
-                    value={characterFilterValueOf(filter.characterIds)}
-                    onChange={characterFilterOnChange((characterIds) =>
-                      setFilter({ ...filter, characterIds })
-                    )}
+              <LiveStatus>
+                {fixList.matching.length === 0
+                  ? t('orders.noResults')
+                  : t('market.orders.filter.matchCount', {
+                      count: viewRows.length,
+                      total: allRows.length,
+                    })}
+              </LiveStatus>
+
+              {fixList.matching.length === 0 ? (
+                <EmptyState title={t('orders.noResults')} className="py-8" />
+              ) : viewRows.length === 0 ? (
+                <p className="py-4 text-sm text-text-dim">
+                  {t(
+                    view === 'watch'
+                      ? 'market.orders.fixList.emptyWatch'
+                      : 'market.orders.fixList.emptyAct'
+                  )}
+                </p>
+              ) : isPhone ? (
+                <OpenOrdersList
+                  rows={viewRows}
+                  label={tableLabel}
+                  highlightId={highlightId}
+                  selectedId={workCurrentId}
+                  rowExtra={(row) => <WorkThroughListSlot row={row} />}
+                  onOpen={openDetails}
+                  rowContextMenu={rowContextMenu}
+                />
+              ) : (
+                // Many columns on: the table scrolls sideways in its own frame,
+                // never the page. `relative` holds the header's `sr-only` sort
+                // labels inside that frame too: without a positioned ancestor
+                // they resolve against the page and widen it.
+                <div className="relative min-w-0 overflow-x-auto">
+                  <DataTable
+                    {...ordersExport.tableProps}
+                    className="dt-actions-pinned-only"
+                    density="compact"
+                    stackLayout="dense"
+                    columns={columns}
+                    rows={viewRows}
+                    rowKey={(row) => row.orderId}
+                    rowContextMenu={rowContextMenu}
+                    rowMoreActions
+                    onRowClick={openDetails}
+                    label={tableLabel}
+                    highlightRowKey={highlightId}
+                    selectedRowKey={workCurrentId}
+                    sort={tableSort}
+                    onSortChange={setTableSort}
                   />
                 </div>
               )}
 
-              {/*
-            Rows hidden only by the Healthy fold are not a failed match: when
-            everything that matches is folded away, "0 of N orders match"
-            would read as a broken filter, so the count steps aside and the
-            folded Healthy group speaks for itself.
-          */}
-              <LiveStatus>
-                {matchCountVisible
-                  ? t('market.orders.filter.matchCount', {
-                      count: visibleRows.length,
-                      total: allRows.length,
-                    })
-                  : groups.length === 0 && t('orders.noResults')}
-              </LiveStatus>
-
-              {matchCountVisible && (
-                <p aria-hidden="true" className="px-3 pt-2 text-xs text-text-dim">
-                  {t('market.orders.filter.matchCount', {
-                    count: visibleRows.length,
-                    total: allRows.length,
-                  })}
-                </p>
-              )}
-
-              {groups.length === 0 ? (
-                <EmptyState title={t('orders.noResults')} className="py-8" />
-              ) : (
-                groups.map((group) => {
-                  // Healthy folds through `hideHealthy` rather than
-                  // `collapsedGroups`: that flag is also what the "N of M orders
-                  // match" count reads, so two mechanisms would let the caret and
-                  // the count disagree about whether healthy orders are showing.
-                  // `isGroupFolded` reads `highlightedRow` live rather than a
-                  // `setFilter`/`setCollapsedGroups` write, so it never races
-                  // `useHighlightParam`'s own URL write on first render.
-                  // The work-through's current order opens its own group too.
-                  const folded =
-                    isGroupFolded(group.problem, highlightedRow, filter, collapsedGroups) &&
-                    !(workCurrent !== null && orderGroupKey(workCurrent) === group.problem);
-                  const toggle = () => {
-                    if (group.problem === 'healthy') {
-                      setFilter({ ...filter, hideHealthy: !filter.hideHealthy });
-                      return;
-                    }
-                    setCollapsedGroups((was) => {
-                      const next = new Set(was);
-                      if (next.has(group.problem)) next.delete(group.problem);
-                      else next.add(group.problem);
-                      return next;
-                    });
-                  };
-                  const groupTitle = t(`market.orders.group.${group.problem}`);
-                  return (
-                    <div key={group.problem} data-testid={`order-group-${group.problem}`}>
-                      <div
-                        className={cx(
-                          'flex flex-col border-l-2 bg-panel-2',
-                          GROUP_ACCENT[group.problem]
-                        )}
-                      >
-                        <div className="flex items-center justify-between gap-2 pr-3">
-                          {/*
-                        Only the caret and the title are inside the button, so
-                        its accessible name stays the group's name. The
-                        summary line below carries character names, which
-                        would otherwise land in the button's name and collide
-                        with the character strip's own chips.
-                      */}
-                          <button
-                            type="button"
-                            aria-expanded={!folded}
-                            onClick={toggle}
-                            className={cx(
-                              'flex min-h-11 flex-1 items-center gap-1.5 px-3 py-2 text-left text-xs font-semibold tracking-widest text-text-dim uppercase md:min-h-0',
-                              rowInteractiveClassName,
-                              focusRingInsetClassName
-                            )}
-                          >
-                            <Caret expanded={!folded} />
-                            {groupTitle} · {group.rows.length}
-                          </button>
-                          <span className="flex items-center gap-3">
-                            {group.problem === 'healthy' && (
-                              <button
-                                type="button"
-                                className={textActionClassName()}
-                                onClick={toggle}
-                              >
-                                {t(
-                                  filter.hideHealthy
-                                    ? 'market.orders.showHealthy'
-                                    : 'market.orders.hideHealthy'
-                                )}
-                              </button>
-                            )}
-                            {!folded && (
-                              <IconButton
-                                size="sm"
-                                variant="plain"
-                                icon={<Icon.Refresh />}
-                                label={t('market.orders.checkDeeperGroup', { group: groupTitle })}
-                                tooltip={t('market.orders.checkDeeper')}
-                                onClick={() => orderDetail.checkDeeper(group.rows)}
-                              />
-                            )}
-                          </span>
-                        </div>
-                        {/*
-                      What the group holds, said in the header rather than
-                      inside a "?" tooltip, so a folded or long group can be
-                      judged without opening it: what the group means, then
-                      the ISK at stake, the worst gap in it, and whose orders
-                      they are.
-                    */}
-                        <p className="px-3 pb-2 pl-8 text-[0.6875rem] text-text-dim">
-                          {groupHeaderLine(group.problem, groupSummaries.get(group.problem), {
-                            showCharacters: showCharacterStrip,
-                            t,
-                          })}
-                        </p>
-                      </div>
-                      {folded ? null : isPhone ? (
-                        <OpenOrdersList
-                          rows={group.rows}
-                          label={`${groupTitle} · ${group.rows.length}`}
-                          showCharacter={showCharacterStrip}
-                          showFloor={hasFloorData}
-                          highlightId={highlightId}
-                          selectedId={workCurrentId}
-                          rowExtra={(row) => <WorkThroughListSlot row={row} />}
-                          onOpen={openDetails}
-                          rowContextMenu={rowContextMenu}
-                        />
-                      ) : (
-                        <DataTable
-                          {...ordersExport.tableProps}
-                          columns={visibleColumns}
-                          rows={group.rows}
-                          rowKey={(row) => row.orderId}
-                          rowContextMenu={rowContextMenu}
-                          rowMoreActions
-                          onRowClick={openDetails}
-                          label={`${groupTitle} · ${group.rows.length}`}
-                          highlightRowKey={highlightId}
-                          selectedRowKey={workCurrentId}
-                          sort={groupSorts.get(group.problem) ?? null}
-                          onSortChange={(sort) =>
-                            setGroupSorts((was) => new Map(was).set(group.problem, sort))
-                          }
-                        />
-                      )}
-                    </div>
-                  );
-                })
-              )}
-
-              <div className="flex flex-wrap items-center gap-3 px-3 py-2">
-                <Button size="sm" onClick={() => setLegendOpen(true)}>
-                  {t('market.orders.legendOpen')}
-                </Button>
-              </div>
+              <HealthyFold
+                fineCount={fixList.fine.length}
+                folded={view !== 'all'}
+                onShow={() => pickView('all')}
+                onLegend={() => setLegendOpen(true)}
+              />
             </>
           )}
+
+          <ListNotes
+            floorCharacters={floorCharacters}
+            fromCache={fromCacheAny}
+            notShared={notShared}
+          />
 
           {detailRow && (
             <OrderDetailModal
@@ -1379,8 +1090,8 @@ export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
             />
           )}
           <OrderBadgeLegend open={legendOpen} onClose={() => setLegendOpen(false)} />
-        </WorkThroughContext.Provider>
-      </Panel>
+        </div>
+      </WorkThroughContext.Provider>
     </>
   );
 }
@@ -1409,45 +1120,4 @@ function chipLabel(
   }
   if (chip.value !== undefined) return `${label}: ${chip.value}`;
   return label;
-}
-
-/**
- * The group header's one-line description: what the group means, how much
- * ISK it holds, the worst gap any row in it carries, and — only when more
- * than one character has orders — who those rows belong to.
- *
- * A missing summary (a group whose rows were filtered out from under it)
- * drops the numbers rather than printing zeroes, and a group with nothing
- * undercut in it drops the gap clause rather than claiming "worst -0.0%".
- */
-function groupHeaderLine(
-  problem: OrderGroupKey,
-  summary: OpenOrderGroupSummary | undefined,
-  {
-    showCharacters,
-    t,
-  }: { showCharacters: boolean; t: (key: string, options?: Record<string, unknown>) => string }
-): ReactNode {
-  const parts: ReactNode[] = [t(`market.orders.group.${problem}Hint`)];
-  if (summary) {
-    parts.push(
-      <Trans
-        key="isk"
-        i18nKey="market.orders.groupSummaryIsk"
-        components={{ isk: <IskAmount value={summary.iskTiedUp} /> }}
-      />
-    );
-    if (summary.worstGapPct !== null) {
-      parts.push(t('market.orders.groupSummaryWorst', { pct: summary.worstGapPct.toFixed(1) }));
-    }
-    if (showCharacters && summary.byCharacter.length > 0) {
-      parts.push(summary.byCharacter.map((s) => `${s.characterName} ${s.count}`).join(', '));
-    }
-  }
-  return parts.map((part, index) => (
-    <Fragment key={index}>
-      {index > 0 && ' \u00b7 '}
-      {part}
-    </Fragment>
-  ));
 }

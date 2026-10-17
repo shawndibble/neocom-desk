@@ -24,12 +24,12 @@ import {
 import { loadTypeNames } from '@/features/character/typeNames';
 import { loadNpcStations } from '@/sde/loadMarketSde';
 import { loadCorrectedSkills, type CorrectedSkills } from '@/features/skills/correctedSkills';
-import { ESI_FANOUT_CONCURRENCY } from '@/lib/concurrency';
 import type { MarketOrder } from '@/esi/endpoints';
 import { historyPoint } from '@/engine/market/__fixtures__/priceHistory';
 import { orderFloor } from '@/engine/market/orderFloor';
 import { roundPriceUp } from '@/engine/market/priceTick';
-import { formatIskAuto } from '@/lib/isk';
+import { formatMarketIsk } from '@/lib/isk';
+import { useVisibleOpenOrderColumns } from './openOrdersColumns';
 
 vi.mock('./openOrdersData', () => ({ loadAllCharactersOpenOrders: vi.fn() }));
 vi.mock('./orderCostBasis', () => ({
@@ -210,34 +210,40 @@ beforeEach(() => {
   // on-demand only — the fake never resolves either, so a test that doesn't
   // care about them never has to wait on them.
   loaders = fakeOrderDetailLoaders();
+  useVisibleOpenOrderColumns.setState({ value: [], hydrated: true });
 });
 
-/** The visible count line; the sr-only `LiveStatus` repeats the same text. */
+/** The sr-only `LiveStatus` count. */
 async function findMatchCount(text: string) {
-  const matches = await screen.findAllByText(text);
-  return matches.find((el) => el.getAttribute('role') !== 'status') as HTMLElement;
+  await waitFor(() =>
+    expect(screen.getAllByRole('status').some((el) => el.textContent === text)).toBe(true)
+  );
 }
+
+function entry(
+  orders: MarketOrder[],
+  overrides: Partial<OpenOrdersSnapshot['entries'][number]> = {}
+): OpenOrdersSnapshot['entries'][number] {
+  return {
+    characterId: 1,
+    characterName: 'Alpha',
+    orders,
+    fetchedAt: Date.now(),
+    fromCache: false,
+    needsReauth: false,
+    ...overrides,
+  };
+}
+
+/** The table on screen, by the segment it shows. */
+const NEEDS_YOU_TABLE = { name: 'Orders that need you' } as const;
 
 describe('OpenOrdersPanel', () => {
   it("grants for the lapsed Character's own grant, not the active one's, and names them", async () => {
     mockedLoadAll.mockResolvedValue(
       snapshot([
-        {
-          characterId: 1,
-          characterName: 'Alpha',
-          orders: [EXPIRING_ORDER],
-          fetchedAt: Date.now(),
-          fromCache: false,
-          needsReauth: false,
-        },
-        {
-          characterId: 2,
-          characterName: 'Bravo',
-          orders: [],
-          fetchedAt: 0,
-          fromCache: false,
-          needsReauth: true,
-        },
+        entry([EXPIRING_ORDER]),
+        entry([], { characterId: 2, characterName: 'Bravo', fetchedAt: 0, needsReauth: true }),
       ])
     );
     const user = userEvent.setup();
@@ -249,201 +255,109 @@ describe('OpenOrdersPanel', () => {
   });
 
   it('carries the item context menu on order rows and asks for the blueprint catalog on open', async () => {
-    mockedLoadAll.mockResolvedValue(
-      snapshot([
-        {
-          characterId: 1,
-          characterName: 'Alpha',
-          orders: [EXPIRING_ORDER],
-          fetchedAt: Date.now(),
-          fromCache: false,
-          needsReauth: false,
-        },
-      ])
-    );
+    mockedLoadAll.mockResolvedValue(snapshot([entry([EXPIRING_ORDER])]));
     renderPanel();
 
-    const group = await screen.findByTestId('order-group-expiringOrStale');
+    const row = await screen.findByRole('row', { name: /Mexallon/ });
     expect(actions.requestBlueprints).not.toHaveBeenCalled();
-    fireEvent.contextMenu(within(group).getAllByRole('row')[1]);
+    fireEvent.contextMenu(row);
 
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Show info' }));
     expect(actions.showInfo).toHaveBeenCalledWith(36, 'Mexallon');
     expect(actions.requestBlueprints).toHaveBeenCalled();
   });
 
-  it('renders groups worst-first, each with its row count', async () => {
-    mockedLoadAll.mockResolvedValue(
-      snapshot([
-        {
-          characterId: 1,
-          characterName: 'Alpha',
-          orders: [BELOW_FLOOR_ORDER, EXPIRING_ORDER],
-          fetchedAt: Date.now(),
-          fromCache: false,
-          needsReauth: false,
-        },
-      ])
-    );
+  it('lists what needs you worst first in one flat table, with no group headers', async () => {
+    mockedLoadAll.mockResolvedValue(snapshot([entry([EXPIRING_ORDER, BELOW_FLOOR_ORDER])]));
     mockedCostBases.mockResolvedValue(new Map([[101, costBasis(600)]]));
 
     renderPanel();
 
-    const belowFloorGroup = await screen.findByTestId('order-group-belowFloor');
-    const expiringGroup = screen.getByTestId('order-group-expiringOrStale');
-
-    expect(belowFloorGroup).toHaveTextContent('· 1');
-    expect(expiringGroup).toHaveTextContent('· 1');
-    // Worst-first: belowFloor precedes expiringOrStale in document order.
-    expect(
-      belowFloorGroup.compareDocumentPosition(expiringGroup) & Node.DOCUMENT_POSITION_FOLLOWING
-    ).toBeTruthy();
-    // Healthy hasn't appeared — nothing here is healthy in this fixture, but confirms no stray group renders.
-    expect(screen.queryByTestId('order-group-healthy')).not.toBeInTheDocument();
-  });
-
-  it('states what is happening on the row, not just the badge', async () => {
-    mockedLoadAll.mockResolvedValue(
-      snapshot([
-        {
-          characterId: 1,
-          characterName: 'Alpha',
-          orders: [BELOW_FLOOR_ORDER, NO_COST_BASIS_ORDER],
-          fetchedAt: Date.now(),
-          fromCache: false,
-          needsReauth: false,
-        },
-      ])
-    );
-    mockedCostBases.mockResolvedValue(new Map([[101, costBasis(600)]]));
-
-    renderPanel();
-
-    // The below-floor row says the loss in ISK a unit, not only "-x%".
-    const belowFloorGroup = await screen.findByTestId('order-group-belowFloor');
-    expect(belowFloorGroup).toHaveTextContent(/Selling at this price loses .* a unit/);
-  });
-
-  it('folds a group away from its own header, keeping the summary on screen', async () => {
-    const user = userEvent.setup();
-    mockedLoadAll.mockResolvedValue(
-      snapshot([
-        {
-          characterId: 1,
-          characterName: 'Alpha',
-          orders: [BELOW_FLOOR_ORDER],
-          fetchedAt: Date.now(),
-          fromCache: false,
-          needsReauth: false,
-        },
-      ])
-    );
-    mockedCostBases.mockResolvedValue(new Map([[101, costBasis(600)]]));
-
-    renderPanel();
-
-    const header = await screen.findByRole('button', { name: 'Priced below cost · 1' });
-    expect(header).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByRole('table', { name: 'Priced below cost · 1' })).toBeInTheDocument();
-
-    await user.click(header);
-    expect(header).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.queryByRole('table', { name: 'Priced below cost · 1' })).not.toBeInTheDocument();
-    // The header still answers what the group holds while it is folded.
-    expect(screen.getByTestId('order-group-belowFloor')).toHaveTextContent('ISK listed');
-  });
-
-  it('summarises each group in its own header', async () => {
-    mockedLoadAll.mockResolvedValue(
-      snapshot([
-        {
-          characterId: 1,
-          characterName: 'Alpha',
-          orders: [BELOW_FLOOR_ORDER],
-          fetchedAt: Date.now(),
-          fromCache: false,
-          needsReauth: false,
-        },
-      ])
-    );
-    mockedCostBases.mockResolvedValue(new Map([[101, costBasis(600)]]));
-
-    renderPanel();
-
-    const group = await screen.findByTestId('order-group-belowFloor');
-    // What the group means, on screen rather than inside a tooltip...
-    expect(group).toHaveTextContent('These lose money every time one sells');
-    // ...and what it is holding: 500 x 10 units.
-    expect(group).toHaveTextContent('ISK listed');
-  });
-
-  it('marks an order that is not at a trade hub', async () => {
-    // Not one of the five NPC trade hub stations in `@/market/hubs`.
-    const OFF_HUB_STATION = 60011867;
-    mockedNpcStations.mockResolvedValue([
-      { id: STATION_A, name: 'Jita IV - Moon 4', systemId: 30000142 },
-      { id: OFF_HUB_STATION, name: 'Osmon II - Moon 1', systemId: 30000049 },
+    const table = await screen.findByRole('table', NEEDS_YOU_TABLE);
+    const rows = within(table).getAllByRole('row').slice(1);
+    expect(rows.map((row) => within(row).getAllByRole('cell')[0].textContent)).toEqual([
+      expect.stringContaining('Tritanium'),
+      expect.stringContaining('Mexallon'),
     ]);
+    expect(
+      within(table)
+        .getAllByRole('columnheader')
+        .map((th) => th.textContent)
+    ).toEqual(expect.arrayContaining(['Item', "What's wrong", 'Do this', 'ISK tied up']));
+    expect(screen.queryByText('Priced below cost')).not.toBeInTheDocument();
+    expect(screen.queryByText('Expiring or stale')).not.toBeInTheDocument();
+  });
+
+  it('says what to do with the exact price to copy, and the short station under the item', async () => {
+    mockedLoadAll.mockResolvedValue(snapshot([entry([BELOW_FLOOR_ORDER])]));
+    mockedCostBases.mockResolvedValue(new Map([[101, costBasis(600)]]));
+
+    renderPanel();
+
+    const row = await screen.findByRole('row', { name: /Tritanium/ });
+    expect(row).toHaveTextContent('Jita IV');
+    expect(row).toHaveTextContent('Below floor');
+    expect(within(row).getByRole('button', { name: /^Put the price up: / })).toBeInTheDocument();
+    // The sentence and its copy button moved to the detail.
+    expect(row).not.toHaveTextContent('Selling at this price loses');
+  });
+
+  it('heads the list with what needs you, the ISK in it, and what is left', async () => {
     mockedLoadAll.mockResolvedValue(
-      snapshot([
-        {
-          characterId: 1,
-          characterName: 'Alpha',
-          orders: [{ ...BELOW_FLOOR_ORDER, location_id: OFF_HUB_STATION }],
-          fetchedAt: Date.now(),
-          fromCache: false,
-          needsReauth: false,
-        },
-      ])
+      snapshot([entry([BELOW_FLOOR_ORDER, EXPIRING_ORDER, NO_COST_BASIS_ORDER])])
     );
     mockedCostBases.mockResolvedValue(new Map([[101, costBasis(600)]]));
 
     renderPanel();
 
-    expect(await screen.findByTestId('order-group-belowFloor')).toHaveTextContent('Off hub');
+    expect(await screen.findByRole('heading', { name: '2 orders need you' })).toBeInTheDocument();
+    // 500 x 10 + 300 x 5.
+    const line = screen.getByText(/ISK tied up in them/).closest('p');
+    expect(line).toHaveTextContent('6.5K');
+    expect(line).toHaveTextContent(/ISK tied up in them · 0 to watch · 1 fine/);
+    expect(screen.getByRole('button', { name: 'Needs you (2)' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    expect(screen.getByRole('button', { name: 'Watch (0)' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'All (3)' })).toBeInTheDocument();
   });
 
-  it('has no character strip and no per-row character marker with one character', async () => {
-    mockedLoadAll.mockResolvedValue(
-      snapshot([
-        {
-          characterId: 1,
-          characterName: 'Alpha',
-          orders: [BELOW_FLOOR_ORDER],
-          fetchedAt: Date.now(),
-          fromCache: false,
-          needsReauth: false,
-        },
-      ])
-    );
+  it('shows Watch and All one segment away, and remembers the pick in the URL', async () => {
+    const user = userEvent.setup();
+    mockedStationPrices.mockResolvedValue(new Map());
+    mockedLoadAll.mockResolvedValue(snapshot([entry([EXPIRING_ORDER, NO_COST_BASIS_ORDER])]));
+
+    renderPanelWithLocation('/market/orders');
+
+    await screen.findByRole('table', NEEDS_YOU_TABLE);
+    await user.click(screen.getByRole('button', { name: 'Watch (1)' }));
+    const watch = await screen.findByRole('table', { name: 'Orders to watch' });
+    expect(within(watch).getByRole('row', { name: /Pyerite/ })).toBeInTheDocument();
+    expect(within(watch).queryByRole('row', { name: /Mexallon/ })).not.toBeInTheDocument();
+    expect(screen.getByTestId('location-search').textContent).toContain('orders.view=watch');
+
+    await user.click(screen.getByRole('button', { name: 'All (2)' }));
+    const all = await screen.findByRole('table', { name: 'All orders' });
+    expect(within(all).getAllByRole('row')).toHaveLength(3);
+  });
+
+  it('has no character control and no per-row character marker with one character', async () => {
+    mockedLoadAll.mockResolvedValue(snapshot([entry([BELOW_FLOOR_ORDER])]));
     mockedCostBases.mockResolvedValue(new Map([[101, costBasis(600)]]));
 
     renderPanel();
 
-    await screen.findByTestId('order-group-belowFloor');
-    expect(screen.queryByText('All characters')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /^Alpha/ })).not.toBeInTheDocument();
+    await screen.findByRole('table', NEEDS_YOU_TABLE);
+    expect(screen.queryByText(/All characters/)).not.toBeInTheDocument();
+    expect(screen.queryByText('Alpha')).not.toBeInTheDocument();
   });
 
-  it('offers the CharacterFilterControl once more than one character has orders, and narrows the table on a pick', async () => {
+  it('puts the character filter in the page header once more than one character has orders, and narrows the table on a pick', async () => {
     mockedLoadAll.mockResolvedValue(
       snapshot([
-        {
-          characterId: 1,
-          characterName: 'Alpha',
-          orders: [BELOW_FLOOR_ORDER],
-          fetchedAt: Date.now(),
-          fromCache: false,
-          needsReauth: false,
-        },
-        {
-          characterId: 2,
-          characterName: 'Bravo',
-          orders: [EXPIRING_ORDER],
-          fetchedAt: Date.now(),
-          fromCache: false,
-          needsReauth: false,
-        },
+        entry([BELOW_FLOOR_ORDER]),
+        entry([EXPIRING_ORDER], { characterId: 2, characterName: 'Bravo' }),
       ])
     );
     mockedCostBases.mockImplementation(async (characterId: number) =>
@@ -453,18 +367,17 @@ describe('OpenOrdersPanel', () => {
     const user = userEvent.setup();
     renderPanel();
 
-    await screen.findByTestId('order-group-belowFloor');
-    // Defaults to "All characters" — the picker itself, not a chip per
-    // character (issue #607's UI-space audit).
-    const trigger = screen.getByRole('button', { name: 'All characters' });
-    expect(trigger).toBeInTheDocument();
+    const table = await screen.findByRole('table', NEEDS_YOU_TABLE);
+    // Each row names its owner.
+    expect(within(table).getByRole('row', { name: /Mexallon/ })).toHaveTextContent('Bravo');
+    const trigger = within(screen.getByRole('banner')).getByRole('button', {
+      name: 'All characters · 2',
+    });
 
     await user.click(trigger);
     // The active Character (from `useActiveCharacter`) is Alpha (id 1).
     await user.click(screen.getByRole('menuitemradio', { name: 'This character' }));
 
-    // Narrowed to Alpha's own order (Tritanium, type 34); Bravo's (Mexallon,
-    // type 36) is gone. Both groups were on screen before the pick.
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
     expect(screen.queryByText('Mexallon')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'This character' })).toBeInTheDocument();
@@ -473,22 +386,8 @@ describe('OpenOrdersPanel', () => {
   it('opens on the Settings default when nothing is remembered, then on the last pick', async () => {
     mockedLoadAll.mockResolvedValue(
       snapshot([
-        {
-          characterId: 1,
-          characterName: 'Alpha',
-          orders: [BELOW_FLOOR_ORDER],
-          fetchedAt: Date.now(),
-          fromCache: false,
-          needsReauth: false,
-        },
-        {
-          characterId: 2,
-          characterName: 'Bravo',
-          orders: [EXPIRING_ORDER],
-          fetchedAt: Date.now(),
-          fromCache: false,
-          needsReauth: false,
-        },
+        entry([BELOW_FLOOR_ORDER]),
+        entry([EXPIRING_ORDER], { characterId: 2, characterName: 'Bravo' }),
       ])
     );
     useDefaultCharacterFilter.setState({ value: 'current', hydrated: true });
@@ -498,69 +397,43 @@ describe('OpenOrdersPanel', () => {
     // First visit: the Settings default seeds the page.
     expect(await screen.findByRole('button', { name: 'This character' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'This character' }));
-    await user.click(screen.getByRole('menuitemradio', { name: 'All characters' }));
+    await user.click(screen.getByRole('menuitemradio', { name: 'All characters · 2' }));
     expect(await screen.findByText('Mexallon')).toBeInTheDocument();
     first.unmount();
 
     // A fresh visit (no query string) reopens the last pick, not the default.
     renderPanel();
-    expect(await screen.findByRole('button', { name: 'All characters' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'All characters · 2' })).toBeInTheDocument();
     expect(await screen.findByText('Mexallon')).toBeInTheDocument();
   });
 
-  it('folds the healthy group (header and count, no table) until "Show healthy orders" is pressed', async () => {
+  it('folds healthy orders to one line under the list until Show is pressed', async () => {
     const user = userEvent.setup();
-    mockedLoadAll.mockResolvedValue(
-      snapshot([
-        {
-          characterId: 1,
-          characterName: 'Alpha',
-          orders: [NO_COST_BASIS_ORDER],
-          fetchedAt: Date.now(),
-          fromCache: false,
-          needsReauth: false,
-        },
-      ])
-    );
+    mockedLoadAll.mockResolvedValue(snapshot([entry([EXPIRING_ORDER, NO_COST_BASIS_ORDER])]));
 
     renderPanel();
 
-    const group = await screen.findByTestId('order-group-healthy');
-    // Folded, not filtered out: the heading and count still show...
-    expect(group).toHaveTextContent('Healthy');
-    expect(group).toHaveTextContent('· 1');
-    // ...but no row is actually listed.
-    expect(within(group).queryByRole('table')).not.toBeInTheDocument();
-    expect(within(group).queryByText('Pyerite')).not.toBeInTheDocument();
+    const table = await screen.findByRole('table', NEEDS_YOU_TABLE);
+    expect(within(table).queryByText('Pyerite')).not.toBeInTheDocument();
+    expect(screen.getByText('1 healthy order')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Show healthy orders' }));
-    expect(
-      within(await screen.findByTestId('order-group-healthy')).getByRole('table')
-    ).toBeInTheDocument();
-    expect(
-      within(screen.getByTestId('order-group-healthy')).getByText('Pyerite')
-    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Show' }));
+    const all = await screen.findByRole('table', { name: 'All orders' });
+    expect(within(all).getByText('Pyerite')).toBeInTheDocument();
+    expect(screen.queryByText('1 healthy order')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'What do these badges mean?' })).toBeInTheDocument();
   });
 
-  it('exports every group from the page-header menu as one file', async () => {
+  it('exports every order the funnel matched, any segment, from the page-header menu', async () => {
     const spy = vi.spyOn(download, 'downloadTextFile').mockImplementation(() => {});
     const user = userEvent.setup();
     mockedLoadAll.mockResolvedValue(
-      snapshot([
-        {
-          characterId: 1,
-          characterName: 'Alpha',
-          orders: [BELOW_FLOOR_ORDER, EXPIRING_ORDER],
-          fetchedAt: Date.now(),
-          fromCache: false,
-          needsReauth: false,
-        },
-      ])
+      snapshot([entry([BELOW_FLOOR_ORDER, EXPIRING_ORDER, NO_COST_BASIS_ORDER])])
     );
     mockedCostBases.mockResolvedValue(new Map([[101, costBasis(600)]]));
 
     renderPanel();
-    await screen.findByTestId('order-group-belowFloor');
+    await screen.findByRole('table', NEEDS_YOU_TABLE);
 
     const header = screen.getByRole('banner');
     expect(
@@ -579,132 +452,80 @@ describe('OpenOrdersPanel', () => {
     const csv = spy.mock.calls[0][1] as string;
     expect(csv).toContain('"Tritanium","Sell",500,');
     expect(csv).toContain(`"${TYPE_NAMES.get(EXPIRING_ORDER.type_id)}","Sell",`);
+    expect(csv).toContain(`"${TYPE_NAMES.get(NO_COST_BASIS_ORDER.type_id)}","Sell",`);
     spy.mockRestore();
   });
 
-  it('files an order under Not checked, not Healthy, when station prices could not be fetched', async () => {
+  it('files an order nobody could check under Watch, never Fine', async () => {
+    const user = userEvent.setup();
     mockedStationPrices.mockResolvedValue(new Map());
-    mockedLoadAll.mockResolvedValue(
-      snapshot([
-        {
-          characterId: 1,
-          characterName: 'Alpha',
-          orders: [NO_COST_BASIS_ORDER],
-          fetchedAt: Date.now(),
-          fromCache: false,
-          needsReauth: false,
-        },
-      ])
-    );
+    mockedLoadAll.mockResolvedValue(snapshot([entry([NO_COST_BASIS_ORDER])]));
 
     renderPanel();
 
-    // Not behind the Healthy fold, and the Healthy heading is not there at all.
-    const group = await screen.findByTestId('order-group-notChecked');
-    expect(screen.queryByTestId('order-group-healthy')).not.toBeInTheDocument();
-    expect(within(group).getByText(/Not checked · 1/)).toBeInTheDocument();
-    expect(within(group).getByText(/Market prices couldn't be loaded/)).toBeInTheDocument();
-    expect(within(group).queryByText(/Nobody beats your price/)).not.toBeInTheDocument();
-    const row = within(group).getByRole('row', { name: /Pyerite/ });
+    expect(await screen.findByText(/1 to watch · 0 fine/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Watch (1)' }));
+    const row = within(await screen.findByRole('table', { name: 'Orders to watch' })).getByRole(
+      'row',
+      { name: /Pyerite/ }
+    );
     expect(within(row).getByText('Not checked')).toBeInTheDocument();
+    expect(within(row).getByText('Nothing to do yet')).toBeInTheDocument();
     expect(within(row).queryByText('Best price')).not.toBeInTheDocument();
   });
 
-  it('all-healthy: no "0 of N orders match" line, and the healthy sentence shows once', async () => {
-    mockedLoadAll.mockResolvedValue(
-      snapshot([
-        {
-          characterId: 1,
-          characterName: 'Alpha',
-          orders: [NO_COST_BASIS_ORDER],
-          fetchedAt: Date.now(),
-          fromCache: false,
-          needsReauth: false,
-        },
-      ])
-    );
+  it('all healthy: says nothing needs you, with the healthy fold, not a failed match', async () => {
+    mockedLoadAll.mockResolvedValue(snapshot([entry([NO_COST_BASIS_ORDER])]));
 
     renderPanel();
 
-    await screen.findByTestId('order-group-healthy');
-    expect(screen.queryByText(/orders match/)).not.toBeInTheDocument();
-    expect(screen.getAllByText(/Nothing wrong here/)).toHaveLength(1);
+    expect(await screen.findByRole('heading', { name: 'Nothing needs you' })).toBeInTheDocument();
+    expect(screen.getByText('Nothing needs you right now.')).toBeInTheDocument();
+    expect(screen.getByText('1 healthy order')).toBeInTheDocument();
+    expect(screen.queryByText('No orders match your filters.')).not.toBeInTheDocument();
   });
 
   // issue #1423: a marketOrderUndercut (or marketOrderFilled) notification
   // deep-links here with `?highlight=<orderId>`, per decision
-  // `20260908-123516` — the row must land expanded and pulsed even when its
-  // group is the healthy one, folded by default.
+  // `20260908-123516` — the row must land on screen and pulsed even when it
+  // is a healthy order the default segment leaves out.
   describe('?highlight= deep link (issue #1423)', () => {
-    it('expands the healthy group and pulses the highlighted row, without touching Show healthy orders', async () => {
+    it('opens All and pulses the highlighted row, until the pilot picks a segment', async () => {
+      const user = userEvent.setup();
       const scrollIntoView = vi
         .spyOn(Element.prototype, 'scrollIntoView')
         .mockImplementation(() => {});
-      mockedLoadAll.mockResolvedValue(
-        snapshot([
-          {
-            characterId: 1,
-            characterName: 'Alpha',
-            orders: [NO_COST_BASIS_ORDER],
-            fetchedAt: Date.now(),
-            fromCache: false,
-            needsReauth: false,
-          },
-        ])
-      );
+      mockedLoadAll.mockResolvedValue(snapshot([entry([EXPIRING_ORDER, NO_COST_BASIS_ORDER])]));
 
       renderPanel('/market/orders?highlight=103');
 
-      const group = await screen.findByTestId('order-group-healthy');
-      // Expanded on arrival, with no click on "Show healthy orders" — the
-      // toggle still reads "Show healthy orders" (untouched: the URL's
-      // `hideHealthy` default was never flipped), but the table is visible
-      // anyway.
-      expect(screen.getByRole('button', { name: 'Show healthy orders' })).toBeInTheDocument();
-      expect(within(group).getByRole('table')).toBeInTheDocument();
-      const pulsed = within(group).getByText('Pyerite').closest('[data-row-key]');
+      const table = await screen.findByRole('table', { name: 'All orders' });
+      expect(screen.getByRole('button', { name: 'All (2)' })).toHaveAttribute(
+        'aria-pressed',
+        'true'
+      );
+      const pulsed = within(table).getByText('Pyerite').closest('[data-row-key]');
       expect(pulsed).toHaveAttribute('data-row-key', '103');
       expect(pulsed?.className).toContain('row-pulse');
       expect(scrollIntoView.mock.instances).toContain(pulsed);
       scrollIntoView.mockRestore();
+
+      await user.click(screen.getByRole('button', { name: 'Needs you (1)' }));
+      expect(await screen.findByRole('table', NEEDS_YOU_TABLE)).toBeInTheDocument();
     });
 
     it('is harmless when the highlighted id matches no order — a stale link, or an order since closed', async () => {
-      mockedLoadAll.mockResolvedValue(
-        snapshot([
-          {
-            characterId: 1,
-            characterName: 'Alpha',
-            orders: [NO_COST_BASIS_ORDER],
-            fetchedAt: Date.now(),
-            fromCache: false,
-            needsReauth: false,
-          },
-        ])
-      );
+      mockedLoadAll.mockResolvedValue(snapshot([entry([EXPIRING_ORDER, NO_COST_BASIS_ORDER])]));
 
       renderPanel('/market/orders?highlight=999999');
 
-      // The healthy group stays folded, same as with no highlight at all —
-      // nothing forces it open for an id that matches nothing on screen.
-      const group = await screen.findByTestId('order-group-healthy');
-      expect(within(group).queryByRole('table')).not.toBeInTheDocument();
+      // Needs you, same as with no highlight at all.
+      expect(await screen.findByRole('table', NEEDS_YOU_TABLE)).toBeInTheDocument();
     });
 
     it('spends the highlight param on arrival, matched or not', async () => {
       vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {});
-      mockedLoadAll.mockResolvedValue(
-        snapshot([
-          {
-            characterId: 1,
-            characterName: 'Alpha',
-            orders: [NO_COST_BASIS_ORDER],
-            fetchedAt: Date.now(),
-            fromCache: false,
-            needsReauth: false,
-          },
-        ])
-      );
+      mockedLoadAll.mockResolvedValue(snapshot([entry([NO_COST_BASIS_ORDER])]));
 
       renderPanelWithLocation('/market/orders?highlight=103');
 
@@ -713,170 +534,111 @@ describe('OpenOrdersPanel', () => {
     });
   });
 
-  it('shows the noCostBasis badge and drops the floor column when nothing has one', async () => {
-    const user = userEvent.setup();
-    mockedLoadAll.mockResolvedValue(
-      snapshot([
-        {
-          characterId: 1,
-          characterName: 'Alpha',
-          orders: [NO_COST_BASIS_ORDER],
-          fetchedAt: Date.now(),
-          fromCache: false,
-          needsReauth: false,
-        },
-      ])
-    );
+  describe('Columns', () => {
+    const OPTIONAL = ['Your price', 'Station cheapest', 'Never sell below', 'Remaining', 'Expires'];
 
-    renderPanel();
-    // `findBy`, not `waitFor(loadAll called)` then a synchronous `getBy`:
-    // the loader HAVING BEEN CALLED does not mean its resolved promise has
-    // flushed into state, so the old gate let the click run while the panel
-    // still showed its spinner — a race that only lost on a slow CI runner.
-    // Every other click on this control in the suite already waits this way.
-    await user.click(await screen.findByRole('button', { name: 'Show healthy orders' }));
+    async function openColumns(user: ReturnType<typeof userEvent.setup>) {
+      fireEvent.pointerDown(await screen.findByRole('button', { name: 'Columns' }), {
+        button: 0,
+        pointerType: 'mouse',
+      });
+      await screen.findByRole('menu');
+      void user;
+    }
 
-    const group = await screen.findByTestId('order-group-healthy');
-    const row = within(group).getByRole('row', { name: /Pyerite/ });
-    expect(within(row).getByText('No cost basis')).toBeInTheDocument();
-    // Not one order here has a floor, so the whole column is dropped rather
-    // than shown as a wall of dashes.
-    expect(screen.queryByText('Never sell below')).not.toBeInTheDocument();
-    expect(row.querySelector('td[data-label="Never sell below"]')).toBeNull();
-  });
+    it('lists the five optional columns, all off by default', async () => {
+      const user = userEvent.setup();
+      mockedLoadAll.mockResolvedValue(snapshot([entry([BELOW_FLOOR_ORDER])]));
+      mockedCostBases.mockResolvedValue(new Map([[101, costBasis(600)]]));
+      renderPanel();
 
-  it('keeps the floor column when at least one visible order has one', async () => {
-    mockedLoadAll.mockResolvedValue(
-      snapshot([
-        {
-          characterId: 1,
-          characterName: 'Alpha',
-          orders: [BELOW_FLOOR_ORDER, NO_COST_BASIS_ORDER],
-          fetchedAt: Date.now(),
-          fromCache: false,
-          needsReauth: false,
-        },
-      ])
-    );
-    mockedCostBases.mockResolvedValue(new Map([[101, costBasis(600)]]));
-
-    renderPanel();
-
-    const belowFloorGroup = await screen.findByTestId('order-group-belowFloor');
-    expect(within(belowFloorGroup).getByText('Never sell below')).toBeInTheDocument();
-  });
-
-  it('rounds the floor column up to a legal price, same as the modal, text only (issue #1421)', async () => {
-    mockedLoadAll.mockResolvedValue(
-      snapshot([
-        {
-          characterId: 1,
-          characterName: 'Alpha',
-          orders: [BELOW_FLOOR_ORDER],
-          fetchedAt: Date.now(),
-          fromCache: false,
-          needsReauth: false,
-        },
-      ])
-    );
-    // unitCost 1000 (vs. BELOW_FLOOR_ORDER's 500 price) lands the exact
-    // break-even ("relist") at a fractional, non-legal price whose rounded-up
-    // figure changes even the whole-ISK digits shown (formatIskAuto drops to
-    // 0 decimals above 100 ISK) — a fixture where the fix is actually visible
-    // on screen, not just in the cents place.
-    mockedCostBases.mockResolvedValue(new Map([[101, costBasis(1000)]]));
-
-    renderPanel();
-
-    const belowFloorGroup = await screen.findByTestId('order-group-belowFloor');
-    const floor = orderFloor({
-      unitCost: 1000,
-      remainingQuantity: BELOW_FLOOR_ORDER.volume_remain,
-      accountingLevel: 5,
-      brokerRelationsLevel: 5,
-      advancedBrokerRelationsLevel: 0,
+      const table = await screen.findByRole('table', NEEDS_YOU_TABLE);
+      for (const name of OPTIONAL) {
+        expect(within(table).queryByRole('columnheader', { name })).not.toBeInTheDocument();
+      }
+      await openColumns(user);
+      const items = screen.getAllByRole('menuitemcheckbox');
+      expect(items.map((item) => item.textContent)).toEqual(OPTIONAL);
+      for (const item of items) expect(item).toHaveAttribute('aria-checked', 'false');
     });
-    if (!floor) throw new Error('expected a floor for this fixture');
-    const rounded = roundPriceUp(floor.relist) ?? floor.relist;
-    expect(formatIskAuto(rounded)).not.toBe(formatIskAuto(floor.relist));
 
-    // The column shows the rounded, legal figure — never the exact break-even.
-    expect(within(belowFloorGroup).getByText(formatIskAuto(rounded))).toBeInTheDocument();
-    expect(
-      within(belowFloorGroup).queryByText(formatIskAuto(floor.relist))
-    ).not.toBeInTheDocument();
-  });
+    it('turns one on between Do this and ISK tied up, keeps the pick, and Reset turns it off', async () => {
+      const user = userEvent.setup();
+      mockedLoadAll.mockResolvedValue(snapshot([entry([BELOW_FLOOR_ORDER])]));
+      mockedCostBases.mockResolvedValue(new Map([[101, costBasis(600)]]));
+      renderPanel();
 
-  it('drops the floor column once a filter narrows the visible rows to ones with no floor, even though a filtered-out row still has one', async () => {
-    const user = userEvent.setup();
-    mockedLoadAll.mockResolvedValue(
-      snapshot([
-        {
-          characterId: 1,
-          characterName: 'Alpha',
-          orders: [BELOW_FLOOR_ORDER, NO_COST_BASIS_ORDER],
-          fetchedAt: Date.now(),
-          fromCache: false,
-          needsReauth: false,
-        },
-      ])
-    );
-    mockedCostBases.mockResolvedValue(new Map([[101, costBasis(600)]]));
+      await screen.findByRole('table', NEEDS_YOU_TABLE);
+      await openColumns(user);
+      await user.click(screen.getByRole('menuitemcheckbox', { name: 'Your price' }));
+      await user.keyboard('{Escape}');
 
-    renderPanel();
-    await screen.findByTestId('order-group-belowFloor');
-    await user.click(screen.getByRole('button', { name: 'Show healthy orders' }));
-    // Both groups' tables carry the column at this point.
-    expect(screen.getAllByText('Never sell below').length).toBeGreaterThan(0);
+      const headers = within(screen.getByRole('table', NEEDS_YOU_TABLE))
+        .getAllByRole('columnheader')
+        .map((th) => th.textContent?.trim());
+      expect(headers.indexOf('Your price')).toBe(headers.indexOf('Do this') + 1);
+      expect(headers.indexOf('ISK tied up')).toBe(headers.indexOf('Your price') + 1);
+      expect(
+        within(screen.getByRole('row', { name: /Tritanium/ })).getByText(formatMarketIsk(500))
+      ).toBeInTheDocument();
+      await waitFor(async () =>
+        expect((await db.settings.get('openOrdersOptionalColumns'))?.value).toEqual(['price'])
+      );
 
-    // Narrows the visible set to Pyerite (no floor) only — Tritanium (which
-    // has one) is filtered out, not just folded.
-    await user.type(screen.getByPlaceholderText('Search by item…'), 'Pyerite');
+      await openColumns(user);
+      await user.click(screen.getByRole('menuitem', { name: 'Reset to default' }));
+      expect(
+        within(screen.getByRole('table', NEEDS_YOU_TABLE)).queryByRole('columnheader', {
+          name: 'Your price',
+        })
+      ).not.toBeInTheDocument();
+    });
 
-    await waitFor(() =>
-      expect(screen.queryByTestId('order-group-belowFloor')).not.toBeInTheDocument()
-    );
-    expect(screen.queryByText('Never sell below')).not.toBeInTheDocument();
+    it('shows "—" for a floor nobody linked, and the floor rounded up to a legal price, in danger colour when the price is under it (issue #1421)', async () => {
+      useVisibleOpenOrderColumns.setState({ value: ['floor'], hydrated: true });
+      mockedLoadAll.mockResolvedValue(snapshot([entry([BELOW_FLOOR_ORDER, EXPIRING_ORDER])]));
+      // unitCost 1000 (vs. BELOW_FLOOR_ORDER's 500 price) lands the exact
+      // break-even ("relist") at a fractional, non-legal price.
+      mockedCostBases.mockResolvedValue(new Map([[101, costBasis(1000)]]));
+
+      renderPanel();
+
+      const below = await screen.findByRole('row', { name: /Tritanium/ });
+      const floor = orderFloor({
+        unitCost: 1000,
+        remainingQuantity: BELOW_FLOOR_ORDER.volume_remain,
+        accountingLevel: 5,
+        brokerRelationsLevel: 5,
+        advancedBrokerRelationsLevel: 0,
+      });
+      if (!floor) throw new Error('expected a floor for this fixture');
+      const rounded = roundPriceUp(floor.relist) ?? floor.relist;
+      expect(formatMarketIsk(rounded)).not.toBe(formatMarketIsk(floor.relist));
+      const cell = within(below).getByText(formatMarketIsk(rounded));
+      expect(cell).toHaveClass('text-isk-neg');
+      expect(within(below).queryByText(formatMarketIsk(floor.relist))).not.toBeInTheDocument();
+
+      const expiring = screen.getByRole('row', { name: /Mexallon/ });
+      expect(expiring.querySelector('td[data-label="Never sell below"]')).toHaveTextContent('—');
+    });
   });
 
   it('opens the detail modal by clicking the row', async () => {
     const user = userEvent.setup();
-    mockedLoadAll.mockResolvedValue(
-      snapshot([
-        {
-          characterId: 1,
-          characterName: 'Alpha',
-          orders: [BELOW_FLOOR_ORDER],
-          fetchedAt: Date.now(),
-          fromCache: false,
-          needsReauth: false,
-        },
-      ])
-    );
+    mockedLoadAll.mockResolvedValue(snapshot([entry([BELOW_FLOOR_ORDER])]));
     mockedCostBases.mockResolvedValue(new Map([[101, costBasis(600)]]));
 
     renderPanel();
     const row = await screen.findByRole('row', { name: /Tritanium/ });
     await user.click(within(row).getByText(/Tritanium|Pyerite|Mexallon/));
 
-    expect(await screen.findByRole('dialog', { name: 'Tritanium' })).toBeInTheDocument();
-    expect(screen.getByText('Put the price up')).toBeInTheDocument();
+    const dialog = await screen.findByRole('dialog', { name: 'Tritanium' });
+    expect(within(dialog).getByText('Put the price up')).toBeInTheDocument();
   });
 
   it('opens the detail modal when the item name is clicked, with the name not a link', async () => {
     const user = userEvent.setup();
-    mockedLoadAll.mockResolvedValue(
-      snapshot([
-        {
-          characterId: 1,
-          characterName: 'Alpha',
-          orders: [BELOW_FLOOR_ORDER],
-          fetchedAt: Date.now(),
-          fromCache: false,
-          needsReauth: false,
-        },
-      ])
-    );
+    mockedLoadAll.mockResolvedValue(snapshot([entry([BELOW_FLOOR_ORDER])]));
     mockedCostBases.mockResolvedValue(new Map([[101, costBasis(600)]]));
 
     renderPanel();
@@ -894,18 +656,7 @@ describe('OpenOrdersPanel', () => {
     // prop-level tests — is what would catch a promised feature silently
     // regressing back to dead scaffolding.
     const user = userEvent.setup();
-    mockedLoadAll.mockResolvedValue(
-      snapshot([
-        {
-          characterId: 1,
-          characterName: 'Alpha',
-          orders: [BELOW_FLOOR_ORDER],
-          fetchedAt: Date.now(),
-          fromCache: false,
-          needsReauth: false,
-        },
-      ])
-    );
+    mockedLoadAll.mockResolvedValue(snapshot([entry([BELOW_FLOOR_ORDER])]));
     mockedCostBases.mockResolvedValue(new Map([[101, costBasis(600)]]));
     loaders.priceHistory.mockResolvedValue({
       points: Array.from({ length: 3 }, (_, i) =>
@@ -936,18 +687,7 @@ describe('OpenOrdersPanel', () => {
 
   it('shows an unchecked scope as unchecked rather than clean', async () => {
     const user = userEvent.setup();
-    mockedLoadAll.mockResolvedValue(
-      snapshot([
-        {
-          characterId: 1,
-          characterName: 'Alpha',
-          orders: [BELOW_FLOOR_ORDER],
-          fetchedAt: Date.now(),
-          fromCache: false,
-          needsReauth: false,
-        },
-      ])
-    );
+    mockedLoadAll.mockResolvedValue(snapshot([entry([BELOW_FLOOR_ORDER])]));
     mockedCostBases.mockResolvedValue(new Map([[101, costBasis(600)]]));
     // The region book comes back with no orders at all — my own order can't
     // be found in it, so `system` cannot be resolved (must read as "not
@@ -978,22 +718,22 @@ describe('OpenOrdersPanel', () => {
     // fail on a first offline visit — that must not take the whole loader
     // down with it (it used to, via an unguarded `Promise.all`).
     mockedNpcStations.mockRejectedValue(new Error('offline'));
-    mockedLoadAll.mockResolvedValue(
-      snapshot([
-        {
-          characterId: 1,
-          characterName: 'Alpha',
-          orders: [BELOW_FLOOR_ORDER],
-          fetchedAt: Date.now(),
-          fromCache: false,
-          needsReauth: false,
-        },
-      ])
-    );
+    mockedLoadAll.mockResolvedValue(snapshot([entry([BELOW_FLOOR_ORDER])]));
     mockedCostBases.mockResolvedValue(new Map([[101, costBasis(600)]]));
 
     renderPanel();
     expect(await screen.findByRole('row', { name: /Tritanium/ })).toBeInTheDocument();
+  });
+
+  it("folds the notices into one quiet line at the list's foot", async () => {
+    mockedLoadAll.mockResolvedValue(
+      snapshot([entry([EXPIRING_ORDER], { fromCache: true })], [{ characterId: 2, name: 'Bravo' }])
+    );
+
+    renderPanel();
+
+    const line = (await screen.findByText("Bravo hasn't shared their orders")).closest('p');
+    expect(line).toHaveTextContent('Showing cached data');
   });
 
   describe('funnel filter controls', () => {
@@ -1008,16 +748,7 @@ describe('OpenOrdersPanel', () => {
 
     function renderMixedFixture(initialEntry?: string) {
       mockedLoadAll.mockResolvedValue(
-        snapshot([
-          {
-            characterId: 1,
-            characterName: 'Alpha',
-            orders: [BELOW_FLOOR_ORDER, EXPIRING_ORDER, NO_COST_BASIS_ORDER],
-            fetchedAt: Date.now(),
-            fromCache: false,
-            needsReauth: false,
-          },
-        ])
+        snapshot([entry([BELOW_FLOOR_ORDER, EXPIRING_ORDER, NO_COST_BASIS_ORDER])])
       );
       mockedCostBases.mockResolvedValue(new Map([[101, costBasis(600)]]));
       return renderPanel(initialEntry);
@@ -1026,21 +757,13 @@ describe('OpenOrdersPanel', () => {
     it('narrows the list with a problem chip', async () => {
       const user = userEvent.setup();
       renderMixedFixture();
-      // Default (hideHealthy on): belowFloor + expiringOrStale match, the
-      // healthy no-cost-basis order is folded out of the count.
-      expect(await findMatchCount('2 of 3 orders match')).toBeInTheDocument();
-      // The same count reaches screen readers through the status region (issue #3354).
-      await waitFor(() =>
-        expect(
-          screen.getAllByRole('status').some((el) => el.textContent === '2 of 3 orders match')
-        ).toBe(true)
-      );
+      // Needs you: belowFloor + expiringOrStale; the healthy order is Fine.
+      await findMatchCount('2 of 3 orders match');
 
-      // Anchored to the chip's own accessible name (label + count), not the
-      // group header button, which carries the same words plus a separator.
       await openFunnel(user);
       await user.click(screen.getByRole('button', { name: 'Priced below cost1' }));
-      expect(await findMatchCount('1 of 3 orders match')).toBeInTheDocument();
+      await findMatchCount('1 of 3 orders match');
+      expect(screen.getByRole('button', { name: 'Needs you (1)' })).toBeInTheDocument();
     });
 
     it('keeps the whole control set behind the funnel until it is opened', async () => {
@@ -1061,8 +784,7 @@ describe('OpenOrdersPanel', () => {
      */
     it('opens narrowed to the problem the link names', async () => {
       renderMixedFixture('/market/orders?orders.problems=expiringOrStale');
-      // One of the three, where the page's own default matches two.
-      expect(await findMatchCount('1 of 3 orders match')).toBeInTheDocument();
+      await findMatchCount('1 of 3 orders match');
     });
 
     describe('opened for a chosen Character (issue #2936)', () => {
@@ -1080,22 +802,8 @@ describe('OpenOrdersPanel', () => {
         });
         mockedLoadAll.mockResolvedValue(
           snapshot([
-            {
-              characterId: 1,
-              characterName: 'Alpha',
-              orders: [BELOW_FLOOR_ORDER],
-              fetchedAt: Date.now(),
-              fromCache: false,
-              needsReauth: false,
-            },
-            {
-              characterId: 2,
-              characterName: 'Bravo',
-              orders: [EXPIRING_ORDER],
-              fetchedAt: Date.now(),
-              fromCache: false,
-              needsReauth: false,
-            },
+            entry([BELOW_FLOOR_ORDER]),
+            entry([EXPIRING_ORDER], { characterId: 2, characterName: 'Bravo' }),
           ])
         );
       });
@@ -1107,7 +815,7 @@ describe('OpenOrdersPanel', () => {
       it('shows only that Character, states whose data it is, and leaves the active one alone', async () => {
         renderPanel('/market/orders?char=2');
         expect(await screen.findByText('Bravo only')).toBeInTheDocument();
-        expect(await findMatchCount('1 of 1 orders match')).toBeInTheDocument();
+        await findMatchCount('1 of 1 orders match');
         expect(useActiveCharacter.getState().activeCharacterId).toBe(1);
       });
 
@@ -1152,49 +860,27 @@ describe('OpenOrdersPanel', () => {
     it('opens narrowed to the character the link names', async () => {
       mockedLoadAll.mockResolvedValue(
         snapshot([
-          {
-            characterId: 1,
-            characterName: 'Alpha',
-            orders: [BELOW_FLOOR_ORDER, EXPIRING_ORDER],
-            fetchedAt: Date.now(),
-            fromCache: false,
-            needsReauth: false,
-          },
-          {
+          entry([BELOW_FLOOR_ORDER, EXPIRING_ORDER]),
+          entry([order({ order_id: 301, type_id: 36, price: 300, duration: 5 })], {
             characterId: 2,
             characterName: 'Beta',
-            orders: [order({ order_id: 301, type_id: 36, price: 300, duration: 5 })],
-            fetchedAt: Date.now(),
-            fromCache: false,
-            needsReauth: false,
-          },
+          }),
         ])
       );
       mockedCostBases.mockResolvedValue(new Map([[101, costBasis(600)]]));
       renderPanel('/market/orders?orders.characters=1');
 
-      expect(await findMatchCount('2 of 3 orders match')).toBeInTheDocument();
+      await findMatchCount('2 of 3 orders match');
     });
 
     it('labels a link naming an alt other than the active Character "All characters", without widening the table it still narrows', async () => {
       mockedLoadAll.mockResolvedValue(
         snapshot([
-          {
-            characterId: 1,
-            characterName: 'Alpha',
-            orders: [BELOW_FLOOR_ORDER, EXPIRING_ORDER],
-            fetchedAt: Date.now(),
-            fromCache: false,
-            needsReauth: false,
-          },
-          {
+          entry([BELOW_FLOOR_ORDER, EXPIRING_ORDER]),
+          entry([order({ order_id: 301, type_id: 36, price: 300, duration: 5 })], {
             characterId: 2,
             characterName: 'Beta',
-            orders: [order({ order_id: 301, type_id: 36, price: 300, duration: 5 })],
-            fetchedAt: Date.now(),
-            fromCache: false,
-            needsReauth: false,
-          },
+          }),
         ])
       );
       mockedCostBases.mockResolvedValue(new Map([[101, costBasis(600)]]));
@@ -1209,7 +895,7 @@ describe('OpenOrdersPanel', () => {
       // regardless, exactly as the tile that built this link intended.
       renderPanel('/market/orders?orders.characters=2');
 
-      expect(await screen.findByRole('button', { name: 'All characters' })).toBeInTheDocument();
+      expect(await screen.findByRole('button', { name: 'All characters · 2' })).toBeInTheDocument();
       // Beta's own item (Mexallon, type 36) shows; Alpha's (Tritanium, type
       // 34) does not — the table stayed narrowed to Beta despite the label.
       expect(await screen.findByText('Mexallon')).toBeInTheDocument();
@@ -1223,15 +909,22 @@ describe('OpenOrdersPanel', () => {
 
       // The chip row is the only thing telling the reader why they are seeing
       // one order out of three, and the only way back to all of them.
-      // "Problem: " is the chip's own prefix (`chipLabel`) — the group header
-      // below carries the same words without it.
       await user.click(screen.getByRole('button', { name: /^Problem: Expiring or stale$/i }));
-      expect(await findMatchCount('2 of 3 orders match')).toBeInTheDocument();
+      await findMatchCount('2 of 3 orders match');
+    });
+
+    it('opens on the segment the link names, and says when it is empty', async () => {
+      renderMixedFixture('/market/orders?orders.view=watch');
+      expect(await screen.findByRole('button', { name: 'Watch (0)' })).toHaveAttribute(
+        'aria-pressed',
+        'true'
+      );
+      expect(screen.getByText('Nothing to watch right now.')).toBeInTheDocument();
     });
 
     it('ignores a param it cannot read instead of showing an empty page', async () => {
-      renderMixedFixture('/market/orders?orders.problems=nonsense');
-      expect(await findMatchCount('2 of 3 orders match')).toBeInTheDocument();
+      renderMixedFixture('/market/orders?orders.problems=nonsense&orders.view=nonsense');
+      await findMatchCount('2 of 3 orders match');
     });
 
     it('still renders a zero-count problem chip, at full contrast', async () => {
@@ -1252,10 +945,10 @@ describe('OpenOrdersPanel', () => {
       renderMixedFixture();
       await findMatchCount('2 of 3 orders match');
 
-      // Only the expiring order (visible by default) has no cost basis linked.
+      // Of the two that need you, only the expiring order has no cost basis.
       await openFunnel(user);
       await user.click(screen.getByRole('button', { name: 'No cost basis' }));
-      expect(await findMatchCount('1 of 3 orders match')).toBeInTheDocument();
+      await findMatchCount('1 of 3 orders match');
     });
 
     it('narrows the list with the "expires within" select', async () => {
@@ -1268,97 +961,20 @@ describe('OpenOrdersPanel', () => {
       await openFunnel(user);
       await user.click(screen.getByRole('combobox', { name: 'Expires within' }));
       await user.click(screen.getByRole('option', { name: '7 days' }));
-      expect(await findMatchCount('1 of 3 orders match')).toBeInTheDocument();
+      await findMatchCount('1 of 3 orders match');
     });
 
-    it('narrows the list with the "ISK tied up over" select', async () => {
+    it('narrows the list with the "ISK tied up over" select, down to an honest no-match', async () => {
       const user = userEvent.setup();
       renderMixedFixture();
       await findMatchCount('2 of 3 orders match');
 
-      // Both visible orders tie up well under 10M ISK.
+      // Every order ties up well under 10M ISK.
       await openFunnel(user);
       await user.click(screen.getByRole('combobox', { name: 'ISK tied up over' }));
       await user.click(screen.getByRole('option', { name: '10M ISK' }));
-      expect(await findMatchCount('0 of 3 orders match')).toBeInTheDocument();
-    });
-  });
-
-  describe('"check system and region" for a whole group', () => {
-    it('caps the region-book fan-out at ESI_FANOUT_CONCURRENCY distinct items, never firing every item at once', async () => {
-      const user = userEvent.setup();
-      // More distinct items than the concurrency cap, all in one
-      // never-folded group (each expires in 5 days -> expiringOrStale).
-      const itemCount = ESI_FANOUT_CONCURRENCY + 4;
-      const orders = Array.from({ length: itemCount }, (_, i) =>
-        order({
-          order_id: 900 + i,
-          type_id: 900 + i,
-          price: 100,
-          issued: new Date().toISOString(),
-          duration: 5,
-          volume_remain: 1,
-          volume_total: 1,
-        })
-      );
-      mockedLoadAll.mockResolvedValue(
-        snapshot([
-          {
-            characterId: 1,
-            characterName: 'Alpha',
-            orders,
-            fetchedAt: Date.now(),
-            fromCache: false,
-            needsReauth: false,
-          },
-        ])
-      );
-      mockedCostBases.mockResolvedValue(new Map());
-      // Never resolves, so the in-flight call count is directly observable.
-      loaders.regionCompetition.mockImplementation(() => new Promise(() => {}));
-
-      renderPanel();
-      const group = await screen.findByTestId('order-group-expiringOrStale');
-      expect(group).toHaveTextContent(`· ${itemCount}`);
-
-      await user.click(
-        within(group).getByRole('button', { name: /^Refresh system & region prices for / })
-      );
-
-      expect(loaders.regionCompetition).toHaveBeenCalledTimes(ESI_FANOUT_CONCURRENCY);
-    });
-
-    it('does not double-fetch an item already checked from its own row', async () => {
-      const user = userEvent.setup();
-      mockedLoadAll.mockResolvedValue(
-        snapshot([
-          {
-            characterId: 1,
-            characterName: 'Alpha',
-            orders: [BELOW_FLOOR_ORDER],
-            fetchedAt: Date.now(),
-            fromCache: false,
-            needsReauth: false,
-          },
-        ])
-      );
-      mockedCostBases.mockResolvedValue(new Map([[101, costBasis(600)]]));
-      loaders.regionCompetition.mockImplementation(() => new Promise(() => {}));
-
-      renderPanel();
-      const row = await screen.findByRole('row', { name: /Tritanium/ });
-      await user.click(within(row).getByText(/Tritanium|Pyerite|Mexallon/));
-      await screen.findByRole('dialog', { name: 'Tritanium' });
-      await user.click(screen.getByRole('button', { name: 'Close' }));
-      expect(loaders.regionCompetition).toHaveBeenCalledTimes(1);
-
-      const group = screen.getByTestId('order-group-belowFloor');
-      await user.click(
-        within(group).getByRole('button', { name: /^Refresh system & region prices for / })
-      );
-      // Still in flight from opening the row's own detail view — the group
-      // check must not fire a second request for the same item.
-      expect(loaders.regionCompetition).toHaveBeenCalledTimes(1);
+      await findMatchCount('No orders match your filters.');
+      expect(screen.queryByRole('table')).not.toBeInTheDocument();
     });
   });
 });
@@ -1383,46 +999,26 @@ describe('OpenOrdersPanel — phone', () => {
     window.matchMedia = original;
   });
 
-  it('renders an expanded group as a compact tap-to-open list, not a table', async () => {
-    mockedLoadAll.mockResolvedValue(
-      snapshot([
-        {
-          characterId: 1,
-          characterName: 'Alpha',
-          orders: [BELOW_FLOOR_ORDER],
-          fetchedAt: Date.now(),
-          fromCache: false,
-          needsReauth: false,
-        },
-      ])
-    );
+  it('renders two-line tap-to-open cards, not a table: item and badge, then what to do', async () => {
+    mockedLoadAll.mockResolvedValue(snapshot([entry([BELOW_FLOOR_ORDER])]));
     mockedCostBases.mockResolvedValue(new Map([[101, costBasis(600)]]));
 
     renderPanel();
-    await screen.findByTestId('order-group-belowFloor');
 
+    const row = await screen.findByRole('button', { name: /^Tritanium/ });
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
-    const row = screen.getByRole('button', { name: /^Tritanium/ });
-    expect(row).toBeInTheDocument();
-    // The row's own sentence — the plain-English half of the badge (decision
-    // 20260906-170442) — stays even in the compact list.
-    expect(row).toHaveTextContent('Selling at this price loses');
+    expect(row).toHaveTextContent('Below floor');
+    expect(row).toHaveTextContent(/Put the price up: /);
+    // Station and remaining live in the detail.
+    expect(row).not.toHaveTextContent('Jita');
+    expect(row).not.toHaveTextContent('10 / 10');
+    // No column picker: the cards ignore it.
+    expect(screen.queryByRole('button', { name: 'Columns' })).not.toBeInTheDocument();
   });
 
   it('opens the detail modal by tapping the row, same order as clicking a desktop row', async () => {
     const user = userEvent.setup();
-    mockedLoadAll.mockResolvedValue(
-      snapshot([
-        {
-          characterId: 1,
-          characterName: 'Alpha',
-          orders: [BELOW_FLOOR_ORDER],
-          fetchedAt: Date.now(),
-          fromCache: false,
-          needsReauth: false,
-        },
-      ])
-    );
+    mockedLoadAll.mockResolvedValue(snapshot([entry([BELOW_FLOOR_ORDER])]));
     mockedCostBases.mockResolvedValue(new Map([[101, costBasis(600)]]));
 
     renderPanel();
@@ -1432,71 +1028,11 @@ describe('OpenOrdersPanel — phone', () => {
     expect(await screen.findByRole('dialog', { name: 'Tritanium' })).toBeInTheDocument();
   });
 
-  it('drops the floor line when no visible row carries one', async () => {
-    // `EXPIRING_ORDER` has no cost basis linked, so no row has a floor — and
-    // `expiringOrStale` (unlike `healthy`) starts expanded, so the row is on
-    // screen without an extra toggle click.
-    mockedLoadAll.mockResolvedValue(
-      snapshot([
-        {
-          characterId: 1,
-          characterName: 'Alpha',
-          orders: [EXPIRING_ORDER],
-          fetchedAt: Date.now(),
-          fromCache: false,
-          needsReauth: false,
-        },
-      ])
-    );
-
-    renderPanel();
-    await screen.findByRole('button', { name: /^Mexallon/ });
-
-    expect(screen.queryByText(/Never sell below/)).not.toBeInTheDocument();
-  });
-
-  it('folding a group still hides its compact rows', async () => {
-    const user = userEvent.setup();
-    mockedLoadAll.mockResolvedValue(
-      snapshot([
-        {
-          characterId: 1,
-          characterName: 'Alpha',
-          orders: [EXPIRING_ORDER],
-          fetchedAt: Date.now(),
-          fromCache: false,
-          needsReauth: false,
-        },
-      ])
-    );
-
-    renderPanel();
-    const row = await screen.findByRole('button', { name: /^Mexallon/ });
-    expect(row).toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: 'Expiring or stale · 1' }));
-
-    expect(screen.queryByRole('button', { name: /^Mexallon/ })).not.toBeInTheDocument();
-  });
-
-  it("renders the undercut row's match clause as plain text, not a nested focusable tooltip trigger", async () => {
-    // A cheap station rival beating my price, plus a cost basis, is what
-    // makes `orderRowSummary` return a `match` — the one clause that,
-    // on desktop, renders as its own `Tooltip` trigger (`tabIndex={0}`
-    // nested in the row). Nested inside this row's own `<button>` that
-    // would be invalid HTML and a focus/tap trap (issue #1429 code review).
-    mockedLoadAll.mockResolvedValue(
-      snapshot([
-        {
-          characterId: 1,
-          characterName: 'Alpha',
-          orders: [{ ...BELOW_FLOOR_ORDER, price: 1000 }],
-          fetchedAt: Date.now(),
-          fromCache: false,
-          needsReauth: false,
-        },
-      ])
-    );
+  it('shows the price to type as plain text inside the card, never a nested copy button', async () => {
+    // A cheap station rival beating my price, plus a cost basis: the call is
+    // "Undercut to …", a copy button on desktop. Nested inside this card's own
+    // `<button>` that would be invalid HTML and a focus/tap trap.
+    mockedLoadAll.mockResolvedValue(snapshot([entry([{ ...BELOW_FLOOR_ORDER, price: 1000 }])]));
     mockedCostBases.mockResolvedValue(new Map([[101, costBasis(100)]]));
     mockedStationPrices.mockResolvedValue(
       new Map([
@@ -1509,7 +1045,7 @@ describe('OpenOrdersPanel — phone', () => {
 
     renderPanel();
     const row = await screen.findByRole('button', { name: /^Tritanium/ });
-    expect(row).toHaveTextContent('still clears');
+    expect(row).toHaveTextContent(/Undercut to 899/);
     expect(within(row).queryByRole('button')).not.toBeInTheDocument();
     expect(row.querySelector('[tabindex]')).toBeNull();
   });

@@ -1,44 +1,37 @@
 /**
- * Open Orders problem-group disclosure row and Healthy toggle touch targets
- * (issue #1064): both were bare `<button>`s with no height class at all —
- * the group-header row that expands/collapses a problem group (e.g.
- * "Expiring or stale") rendered around 32px tall, and the Healthy group's
- * inline "Show/Hide healthy orders" link beside it was smaller still. Fixed
- * with `min-h-11 ... md:min-h-0`, the same precedent `src/app/Layout.tsx`'s
- * `NAV_LINK` already ships (see `git diff` on `OpenOrdersPanel.tsx`).
+ * Open Orders fix list at narrow widths: the Needs you / Watch / All segments
+ * and the healthy fold's "Show" text action meet the 44px touch floor on a
+ * phone, the page never scrolls sideways (390px, and 768px with every
+ * optional column on — the table scrolls inside its own frame instead), and
+ * the compact phone card opens its detail.
  *
  * Orders are seeded via a `page.route` override on
- * `GET /characters/{id}/orders`, registered before `loginAndSelectCharacter`
- * — the same pattern `mailNarrow.spec.ts` uses for the boot-time `/mail`
- * prefetch. `mockEsi.ts`'s `PREFETCHED_EMPTY` set answers this same endpoint
- * empty by default, and the app's own boot prefetch (`app/prefetch.ts`)
- * calls it immediately after login; overriding the route (rather than
- * seeding the `esiCache` Dexie row directly, as `miningTaxNarrow.spec.ts`
- * does for a key nothing else writes) means the boot prefetch itself
- * receives and caches these fixture orders, so there is no race between a
- * direct IndexedDB write and prefetch's own live write to the same
- * `[characterId, 'orders']` row.
+ * `GET /characters/{id}/orders`, registered before `signInAndGoto` — the same
+ * pattern `mailNarrow.spec.ts` uses for the boot-time `/mail` prefetch.
+ * `mockEsi.ts`'s `PREFETCHED_EMPTY` set answers this same endpoint empty by
+ * default, and the app's own boot prefetch (`app/prefetch.ts`) calls it
+ * immediately after login; overriding the route (rather than seeding the
+ * `esiCache` Dexie row directly) means the boot prefetch itself receives and
+ * caches these fixture orders, so there is no race between a direct IndexedDB
+ * write and prefetch's own live write to the same `[characterId, 'orders']`
+ * row.
  *
  * Two orders, matching `OpenOrdersPanel.test.tsx`'s own fixtures exactly
- * (`NO_COST_BASIS_ORDER` / `EXPIRING_ORDER`) so the problem classification
- * is already proven by unit test, not guessed here: one lands in
- * `expiringOrStale` (issued today, 5-day duration — no cost basis or
- * competition data needed for that problem to fire), the other in
- * `healthy` (30 days old, 90-day duration, no cost basis linked). No
- * station-price/cost-basis/skills seeding at all: with none supplied,
- * `buildOpenOrderRows` correctly leaves both orders' competition/floor
- * checks at "not beaten" / "no floor", so the only thing that can make the
- * expiring order unhealthy is its own expiry — exactly the lever this test
- * wants.
+ * (`NO_COST_BASIS_ORDER` / `EXPIRING_ORDER`) so the classification is already
+ * proven by unit test, not guessed here: one is `expiringOrStale` (issued
+ * today, 5-day duration — Needs you), the other `healthy` (Fine, folded under
+ * the list). No cost-basis or skills seeding: with none supplied the only
+ * thing that can make the expiring order need the pilot is its own expiry.
  */
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID } from './support/fixtureData';
+import { expectNoPageOverflow } from './support/overflow';
 import type { MarketOrder } from '../src/esi/endpoints';
 
 const PHONE = { width: 390, height: 844 };
-const DESKTOP = { width: 1280, height: 800 };
+const TABLET = { width: 768, height: 900 };
 
 const REGION = 10000002;
 /** Jita 4-4 — a real NPC station id, so `stationName` resolution never has to guess. */
@@ -93,62 +86,45 @@ async function seedOpenOrders(page: Page): Promise<void> {
   );
 }
 
-/**
- * Locates both controls and reads their rendered heights. Exact-match names:
- * the disclosure's accessible name is its group title plus row count
- * ("Expiring or stale · 1"), so a future second expiring order can't
- * silently keep this passing against the wrong count. The Healthy toggle
- * reliably reads "Show healthy orders" on first load since Healthy starts
- * folded (`DEFAULT_FILTER.hideHealthy`).
- */
-async function getHeights(page: Page) {
-  const disclosure = page.getByRole('button', { name: 'Expiring or stale · 1', exact: true });
-  await expect(disclosure).toBeVisible();
-  const healthyToggle = page.getByRole('button', { name: 'Show healthy orders', exact: true });
-  await expect(healthyToggle).toBeVisible();
+const height = (locator: Locator) => locator.evaluate((el) => el.getBoundingClientRect().height);
 
-  const [disclosureHeight, healthyToggleHeight] = await Promise.all([
-    disclosure.evaluate((el) => el.getBoundingClientRect().height),
-    healthyToggle.evaluate((el) => el.getBoundingClientRect().height),
-  ]);
-
-  return { disclosure, disclosureHeight, healthyToggleHeight };
-}
-
-test.describe('Open Orders — problem-group disclosure row and Healthy toggle touch targets', () => {
-  test.beforeEach(async ({ page }) => {
-    await seedOpenOrders(page);
-    await signInAndGoto(page);
-  });
-
-  test('group-header disclosure and Healthy toggle both meet the 44px floor at 390px', async ({
+test.describe('Open Orders — fix list at narrow widths', () => {
+  test('the segments and the healthy fold meet the 44px floor at 390px, with no sideways scroll', async ({
     page,
   }) => {
+    await seedOpenOrders(page);
+    await signInAndGoto(page);
     await page.setViewportSize(PHONE);
     await page.goto('./market/orders');
 
-    const { disclosure, disclosureHeight, healthyToggleHeight } = await getHeights(page);
-    await expect(disclosure).toHaveAttribute('aria-expanded', 'true');
-
-    expect(disclosureHeight).toBeGreaterThanOrEqual(44);
-    expect(healthyToggleHeight).toBeGreaterThanOrEqual(44);
+    const needsYou = page.getByRole('button', { name: 'Needs you (1)', exact: true });
+    await expect(needsYou).toHaveAttribute('aria-pressed', 'true');
+    const show = page.getByRole('button', { name: 'Show', exact: true });
+    await expect(show).toBeVisible();
+    // The joined segments are one 44px control; its border is the box's own.
+    expect(await height(page.getByRole('group', { name: 'Which orders' }))).toBeGreaterThanOrEqual(
+      44
+    );
+    expect(await height(show)).toBeGreaterThanOrEqual(44);
+    await expectNoPageOverflow(page);
   });
 
-  test('both revert to their compact height at and above md (1280px)', async ({ page }) => {
-    await page.setViewportSize(DESKTOP);
+  test('every optional column on at 768px: the table scrolls in its own frame, never the page', async ({
+    page,
+  }) => {
+    await seedOpenOrders(page);
+    await signInAndGoto(page, './overview', undefined, [
+      {
+        key: 'openOrdersOptionalColumns',
+        value: ['price', 'stationCheapest', 'floor', 'remaining', 'expires'],
+      },
+    ]);
+    await page.setViewportSize(TABLET);
     await page.goto('./market/orders');
 
-    const { disclosureHeight, healthyToggleHeight } = await getHeights(page);
-
-    // Pinned to the real measured compact heights (`min-h-0` reverts to the
-    // content box: 32px for the padded disclosure row, 16.5px for the
-    // padding-less Healthy link's text line-height), not just "< 44" — a
-    // loose upper bound would not catch a partial regression back toward
-    // the touch-tier height.
-    expect(disclosureHeight).toBeGreaterThanOrEqual(28);
-    expect(disclosureHeight).toBeLessThanOrEqual(36);
-    expect(healthyToggleHeight).toBeGreaterThanOrEqual(12);
-    expect(healthyToggleHeight).toBeLessThanOrEqual(21);
+    const table = page.getByRole('table', { name: 'Orders that need you' });
+    await expect(table.getByRole('columnheader', { name: /Never sell below/ })).toBeVisible();
+    await expectNoPageOverflow(page);
   });
 });
 

@@ -158,11 +158,11 @@ describe('Market top-level tabs', () => {
     await screen.findByRole('tab', { name: 'Market' });
 
     await user.click(screen.getByRole('tab', { name: 'Open' }));
-    // The fixture order has no problems, so it lands in the Healthy group,
-    // which starts folded — reveal it to see the row.
-    await user.click(await screen.findByRole('button', { name: 'Show healthy orders' }));
+    // The fixture order has no problems, so it is Fine, folded under the
+    // Needs you list — Show opens All to see the row.
+    await user.click(await screen.findByRole('button', { name: 'Show' }));
     expect(
-      within(screen.getByRole('table', { name: 'Healthy · 1' })).getByText('Tritanium')
+      within(screen.getByRole('table', { name: 'All orders' })).getByText('Tritanium')
     ).toBeInTheDocument();
     // The filter controls sit behind the funnel button on this tab.
     await user.click(screen.getByRole('button', { name: /^Filters/ }));
@@ -189,8 +189,8 @@ describe('Market top-level tabs', () => {
     await screen.findByRole('tab', { name: 'Market' });
 
     await user.click(screen.getByRole('tab', { name: 'Open' }));
-    // The fixture order is healthy, so it's folded until revealed.
-    await user.click(await screen.findByRole('button', { name: 'Show healthy orders' }));
+    // The fixture order is healthy (Fine), so it's folded until revealed.
+    await user.click(await screen.findByRole('button', { name: 'Show' }));
 
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Open' })).toHaveAttribute('aria-selected', 'true');
@@ -201,8 +201,8 @@ describe('Market top-level tabs', () => {
     const user = userEvent.setup();
     render(<App />);
 
-    // The fixture order is healthy, so it's folded until revealed.
-    await user.click(await screen.findByRole('button', { name: 'Show healthy orders' }));
+    // The fixture order is healthy (Fine), so it's folded until revealed.
+    await user.click(await screen.findByRole('button', { name: 'Show' }));
     // The name is the row's own click, not a link.
     expect(screen.queryByRole('link', { name: 'Tritanium' })).not.toBeInTheDocument();
     await user.click(await screen.findByText('Tritanium'));
@@ -235,11 +235,11 @@ describe('Market Open Orders tab', () => {
     window.history.pushState({}, '', '/market/orders');
     const user = userEvent.setup();
     render(<App />);
-    // The fixture order has no problems, so it lands in the Healthy group,
-    // which starts folded — reveal it to see the resolved item name.
-    await user.click(await screen.findByRole('button', { name: 'Show healthy orders' }));
+    // The fixture order has no problems, so it is Fine, folded under the
+    // Needs you list — Show opens All to see the resolved item name.
+    await user.click(await screen.findByRole('button', { name: 'Show' }));
     expect(
-      within(screen.getByRole('table', { name: 'Healthy · 1' })).getByText('Tritanium')
+      within(screen.getByRole('table', { name: 'All orders' })).getByText('Tritanium')
     ).toBeInTheDocument();
     // The filter controls sit behind the funnel button on this tab.
     await user.click(screen.getByRole('button', { name: /^Filters/ }));
@@ -259,9 +259,9 @@ describe('Market Open Orders tab', () => {
     window.history.pushState({}, '', '/market/orders');
     const user = userEvent.setup();
     render(<App />);
-    await user.click(await screen.findByRole('button', { name: 'Show healthy orders' }));
+    await user.click(await screen.findByRole('button', { name: 'Show' }));
     expect(
-      within(screen.getByRole('table', { name: 'Healthy · 1' })).getByText('Tritanium')
+      within(screen.getByRole('table', { name: 'All orders' })).getByText('Tritanium')
     ).toBeInTheDocument();
     expect(screen.getByText(/showing cached data/i)).toBeInTheDocument();
   });

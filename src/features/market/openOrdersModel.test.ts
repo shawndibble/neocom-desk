@@ -2,13 +2,12 @@ import { describe, expect, it } from 'vitest';
 import {
   buildOpenOrderRows,
   compareOpenOrderRowsWorstFirst,
-  groupOpenOrders,
+  orderGroupKey,
   needsAttentionCount,
   notCheckedCount,
   openOrderProblemCounts,
   type BuildRowsInput,
   type OpenOrderRow,
-  summariseOrderGroup,
   type CharacterSkills,
   type StructureCompetitor,
 } from './openOrdersModel';
@@ -760,7 +759,7 @@ describe('buildOpenOrderRows — misc fields', () => {
   });
 });
 
-describe('sorting, grouping, counting', () => {
+describe('sorting, filing, counting', () => {
   it('sorts worst-problem-first, then by iskTiedUp descending, then by orderId', () => {
     const snapshot = makeSnapshot([
       makeEntry({
@@ -795,29 +794,6 @@ describe('sorting, grouping, counting', () => {
     expect(sorted.map((r) => r.orderId)).toEqual(rows.map((r) => r.orderId));
   });
 
-  it('groups by problem in ORDER_PROBLEMS order and drops empty groups', () => {
-    const snapshot = makeSnapshot([
-      makeEntry({
-        orders: [
-          makeOrder({ order_id: 1, duration: 90 }), // healthy
-          makeOrder({ order_id: 2, duration: 5 }), // expiringOrStale
-        ],
-      }),
-    ]);
-    const rows = buildOpenOrderRows(
-      baseInput({
-        snapshot,
-        // The station answered (no orders on my side), so healthy is a real reading.
-        stationPrices: new Map([
-          ['60003760:100', { sellMin: null, buyMax: null, sellVolume: 0, buyVolume: 0 }],
-        ]),
-      })
-    );
-    const groups = groupOpenOrders(rows);
-    expect(groups.map((g) => g.problem)).toEqual(['expiringOrStale', 'healthy']);
-    expect(groups.every((g) => g.rows.length > 0)).toBe(true);
-  });
-
   it('files an unchecked healthy order under Not checked, apart from the checked Healthy ones', () => {
     const snapshot = makeSnapshot([
       makeEntry({
@@ -840,10 +816,9 @@ describe('sorting, grouping, counting', () => {
         ]),
       })
     );
-    const groups = groupOpenOrders(rows);
-    expect(groups.map((g) => [g.problem, g.rows.map((r) => r.orderId)])).toEqual([
-      ['notChecked', [2]],
-      ['healthy', [1]],
+    expect(rows.map((r) => [r.orderId, orderGroupKey(r)])).toEqual([
+      [1, 'healthy'],
+      [2, 'notChecked'],
     ]);
   });
 
@@ -863,93 +838,6 @@ describe('sorting, grouping, counting', () => {
     ]);
     const rows = buildOpenOrderRows(baseInput({ snapshot }));
     expect(needsAttentionCount(rows)).toBe(1);
-  });
-});
-
-const SUMMARY_BASE_ROW: OpenOrderRow = {
-  orderId: 1,
-  characterId: 10,
-  characterName: 'Alpha',
-  typeId: 34,
-  typeName: 'Tritanium',
-  isBuyOrder: false,
-  price: 100,
-  volumeRemain: 5,
-  volumeTotal: 5,
-  locationId: 60003760,
-  regionId: 10000002,
-  stationName: 'Jita IV - Moon 4',
-  issued: new Date().toISOString(),
-  durationDays: 90,
-  expiry: null,
-  floor: null,
-  costBasis: null,
-  station: { bestPrice: null, beatsMe: false, gapIsk: 0, gapPct: 0 },
-  deepUndercut: null,
-  worstScope: null,
-  problem: 'undercutStation',
-  problems: ['undercutStation'],
-  iskTiedUp: 500,
-  belowFloor: false,
-  frequentlyUndercut: false,
-};
-
-describe('summariseOrderGroup', () => {
-  it('totals the ISK, takes the worst gap, and splits the group by character', () => {
-    const summary = summariseOrderGroup([
-      { ...SUMMARY_BASE_ROW, station: { bestPrice: 95, beatsMe: true, gapIsk: 5, gapPct: 5 } },
-      {
-        ...SUMMARY_BASE_ROW,
-        orderId: 2,
-        iskTiedUp: 1500,
-        station: { bestPrice: 88, beatsMe: true, gapIsk: 12, gapPct: 12 },
-      },
-      {
-        ...SUMMARY_BASE_ROW,
-        orderId: 3,
-        characterId: 20,
-        characterName: 'Beta',
-        iskTiedUp: 1000,
-        station: { bestPrice: 97, beatsMe: true, gapIsk: 3, gapPct: 3 },
-      },
-    ]);
-    expect(summary.iskTiedUp).toBe(3000);
-    expect(summary.worstGapPct).toBe(12);
-    expect(summary.byCharacter).toEqual([
-      { characterId: 10, characterName: 'Alpha', count: 2 },
-      { characterId: 20, characterName: 'Beta', count: 1 },
-    ]);
-  });
-
-  it('leaves the worst gap null when nothing in the group is undercut', () => {
-    const summary = summariseOrderGroup([
-      { ...SUMMARY_BASE_ROW, problem: 'expiringOrStale', problems: ['expiringOrStale'] },
-    ]);
-    expect(summary.worstGapPct).toBeNull();
-  });
-
-  it('reads the gap off the deep rival once the region book has been fetched', () => {
-    const summary = summariseOrderGroup([
-      {
-        ...SUMMARY_BASE_ROW,
-        station: { bestPrice: 95, beatsMe: true, gapIsk: 5, gapPct: 5 },
-        deepUndercut: {
-          worst: {
-            scope: 'region',
-            price: 80,
-            gapIsk: 20,
-            gapPct: 20,
-            volumeRemain: 3,
-            locationId: 60003761,
-            systemId: 30000142,
-            ordersBeatingMe: 1,
-            unitsBeatingMe: 3,
-          },
-          byScope: {},
-        },
-      },
-    ]);
-    expect(summary.worstGapPct).toBe(20);
   });
 });
 
