@@ -173,10 +173,7 @@ export interface Decryptor {
   runs: number;
 }
 
-/**
- * public/data/invention.json. Kept apart from blueprints.json so manufacturing
- * and reaction consumers load exactly what they did before.
- */
+/** public/data/invention.json (see scripts/lib/invention.mjs). */
 export interface InventionData {
   /** blueprint typeID -> its copying/invention data */
   blueprints: Record<string, BlueprintCopyInvention>;

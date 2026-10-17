@@ -109,11 +109,7 @@ export function bakeInvention({
 
   const out = {};
   for (const typeID of [...byType.keys()].sort((a, b) => a - b)) {
-    const { copyTime, invention } = byType.get(typeID);
-    out[typeID] = {
-      ...(copyTime != null ? { copyTime } : {}),
-      ...(invention ? { invention } : {}),
-    };
+    out[typeID] = byType.get(typeID);
   }
   return out;
 }

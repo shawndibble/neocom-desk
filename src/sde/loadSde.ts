@@ -45,7 +45,7 @@ export const loadSkillAttributeModifiers = cached<SkillAttributeModifierMap>(
   'skillAttributeModifiers.json'
 );
 export const loadBlueprints = cached<BlueprintMap>('blueprints.json');
-/** See `InventionData`. Lazy (~350 KB): only invention pricing reads it. */
+/** See `InventionData`. Lazy: only invention pricing reads it. */
 export const loadInvention = cached<InventionData>('invention.json');
 export const loadTypes = cached<TypeMap>('types.json');
 /** A type's name, or a `Type {id}` placeholder for one the pinned SDE doesn't have. */

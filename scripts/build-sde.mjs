@@ -171,10 +171,8 @@ const SKILL_CATEGORY_ID = 16;
 const SHIP_CATEGORY_ID = 6;
 const BLUEPRINT_CATEGORY_ID = 9;
 // invention.json plausibility (issue #3987), counted against dump
-// 3607705_20261012_133001: 1,003 T1 blueprints that invent, 3,518 that copy, 8
-// generic decryptors. A broken join lands at 0. Rifter Blueprint (691) invents
-// the Wolf Blueprint (11372). Decryptor controls are the in-game values
-// (EVE University wiki, Invention): chance multiplier, ME, TE, runs.
+// 3607705_20261012_133001: 1,003 blueprints invent, 3,518 copy. A broken join
+// lands at 0. Decryptor controls: in-game values (EVE University wiki, Invention).
 const INVENTION_BLUEPRINTS_MIN = 800;
 const INVENTION_BLUEPRINTS_MAX = 1300;
 const COPYING_BLUEPRINTS_MIN = 3000;
@@ -1083,9 +1081,9 @@ async function main() {
     };
   }
 
-  // --- invention.json: copying time and invention recipes (issue #3987), plus
-  // decryptor modifiers. Its own file so blueprints.json stays as it was; see
-  // lib/invention.mjs.
+  // --- invention.json: copy time, invention recipes and decryptors (issue
+  // #3987); see lib/invention.mjs ---
+  const typeRows = [...types].map(([typeID, t]) => ({ typeID, ...t }));
   const inventionData = (() => {
     const rowsOf = (fileName, cols) => {
       const rows = raw[fileName];
@@ -1132,10 +1130,7 @@ async function main() {
           groups.get(types.get(typeID).groupID)?.categoryID === BLUEPRINT_CATEGORY_ID,
         isPublished,
       }),
-      decryptors: bakeDecryptors(
-        [...types].map(([typeID, t]) => ({ typeID, ...t })),
-        attrsByType
-      ),
+      decryptors: bakeDecryptors(typeRows, attrsByType),
     };
   })();
 
@@ -2184,7 +2179,6 @@ async function main() {
   const typeNames = bakeTypeNames([...types.values()].map((t) => t.name));
 
   // --- wormholeMass.json / shipMass.json: Route Safety's mass check (issue #2906) ---
-  const typeRows = [...types].map(([typeID, t]) => ({ typeID, ...t }));
   const wormholeMass = bakeWormholeMass(typeRows, attrsByType);
   const shipMass = bakeShipMass(
     typeRows,
@@ -2230,7 +2224,6 @@ async function main() {
     ['certificates.json', certificates],
     ['skillAttributeModifiers.json', skillAttributeModifiers],
     ['blueprints.json', blueprints],
-    // Lazy: only invention pricing reads it.
     ['invention.json', inventionData],
     ['marketWideTrees.json', marketWideTrees],
     ['reprocessing.json', reprocessing],
