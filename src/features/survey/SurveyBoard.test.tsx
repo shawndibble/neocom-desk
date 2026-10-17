@@ -144,7 +144,7 @@ describe('SurveyBoard', () => {
     expect(heading).toBe('Neocom Desk Report');
     expect(lines).toHaveLength(4);
     expect(lines[0]).toMatch(/^┌─*\[ ETA: \d\d:\d\d EVE \(~.*\]─*╌┄┈$/);
-    expect(lines[1]).toMatch(/^│ █+░+ 13%$/);
+    expect(lines[1]).toMatch(/^│ █+░+$/);
     expect(lines[2]).toBe('│ Left: 5 Clear Icicle');
     expect(lines[3]).toContain(`[ ${URL} ]`);
     // The link's rail can run past the cap (a link cannot be shortened); the ore line cannot.

@@ -52,7 +52,7 @@ export interface SurveyChatOptions {
   rockCounts: boolean;
   location: boolean;
   pace: boolean;
-  /** The share of the field not yet mined, on the "Left:" line; the bar keeps its own percent mined. */
+  /** The share of the field not yet mined, on the "Left:" line; the bar itself carries no number. */
   percentLeft: boolean;
   iskLeft: boolean;
   volumeLeft: boolean;
@@ -124,7 +124,6 @@ const FRAMES: Record<SurveyChatBorder, Frame> = {
   none: { top: '', bottom: '', rail: '', side: '', rails: false },
 };
 const BLOCK_PX = textWidth('█');
-const SPACE_PX = textWidth(' ');
 const TAPER = '╌┄┈';
 /** Fewest cells the bar may shrink to. */
 const MIN_BAR_CELLS = 10;
@@ -156,17 +155,17 @@ function rail(frame: Frame, corner: string, label: string, width: number): strin
 }
 
 /**
- * The bar row: the bar fills the box's width once the percent after it has its
- * room. No end caps: they indent the bar and read thin next to the blocks.
+ * The bar row: only a visual aid, filling the box's width (the percent mined is
+ * not written: the "Left:" line can carry the percent left). No end caps: they
+ * indent the bar and read thin next to the blocks.
  */
 function barRow(frame: Frame, percent: number, finished: boolean, width: number): string {
-  const tail = `${percent}%`;
   const cells = Math.max(
-    unitsFor(width - textWidth(frame.side) - SPACE_PX - textWidth(tail), BLOCK_PX, Math.floor),
+    unitsFor(width - textWidth(frame.side), BLOCK_PX, Math.floor),
     MIN_BAR_CELLS
   );
   const filled = finished ? cells : Math.floor((percent * cells) / 100);
-  return `${frame.side}${'█'.repeat(filled)}${'░'.repeat(cells - filled)} ${tail}`;
+  return `${frame.side}${'█'.repeat(filled)}${'░'.repeat(cells - filled)}`;
 }
 
 /**
@@ -252,7 +251,7 @@ function box(frame: Frame, { headline, bar, rows, url }: BoxContent): string[] {
   const width = Math.max(
     railChromePx(frame, frame.top, headline) + textWidth(headline),
     railChromePx(frame, frame.top, url) + textWidth(url),
-    bar === null ? 0 : side + SPACE_PX + textWidth(`${bar.percent}%`) + MIN_BAR_CELLS * BLOCK_PX,
+    bar === null ? 0 : side + MIN_BAR_CELLS * BLOCK_PX,
     ...rows.map((r) => side + textWidth(r))
   );
   const top = frame.rails ? rail(frame, frame.top, headline, width) : headline;
@@ -343,7 +342,7 @@ export function surveyChatMessage(
     lead +
     box(frame, {
       headline: options.eta ? timing : '',
-      // One scan: nothing mined yet, so a bar would only say 0%.
+      // One scan: nothing mined yet, so a bar would be empty.
       bar:
         options.bar && summary.points.length > 1
           ? { percent: summary.percent, finished: false }
