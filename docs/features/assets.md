@@ -20,7 +20,7 @@ Corp assets (`/corp/assets`, `routes/CorpAssets.tsx`) reuse the same row compone
 | Station Pins                                               | `stationPins.ts`, `LocationRow`             | 3-state cycle, synced Editable Data                                                                                                                                                            |
 | Jumps away + security                                      | `Assets.tsx:1237-1466`                      | lazy, bounded to pinned/visible/open locations                                                                                                                                                 |
 | Route preference select                                    | `Assets.tsx:1905`                           | this-view override of Travel default                                                                                                                                                           |
-| Select mode + bulk actions                                 | `Assets.tsx:1658`                           | Quickbar, Compare, copy names, select all                                                                                                                                                      |
+| Select mode + bulk actions                                 | `Assets.tsx:1658`                           | Quickbar, Appraise, copy names, select all                                                                                                                                                     |
 | Item context menu                                          | `features/market/ItemContextMenu.tsx`       | right-click / long-press / More actions                                                                                                                                                        |
 | Item name link                                             | `assetBrowserRows.tsx` `ItemRow`            | name → Show info (Item Detail)                                                                                                                                                                 |
 | Value estimates + totals                                   | `engine/assetTree.ts`                       | average price; BPC from contract listings                                                                                                                                                      |
@@ -150,8 +150,8 @@ Toggle (`?all=1`). Same flat list as search with every item across every locatio
 ## Select mode and bulk actions
 
 - Toggle off clears the selection. Checkboxes (tri-state; checking a node cascades to every descendant item id; `assetSelection.ts`) on location, container and item rows.
-- Bar: "N items selected" (when >0), **Select all in view** (every leaf in the rows currently on screen: results, a level's children, or whole locations at root), **Deselect all** (disabled when none), and when >0: **Add to Quickbar** (disabled without active Character; schedules sync), **Add to Compare** (Compare Set, no sync), **Copy names** (newline-separated to clipboard).
-- Bulk acts on merged assets, so items from other Characters selected in cross-character search are included in Quickbar/Compare/Copy.
+- Bar: "N items selected" (when >0), **Select all in view** (every leaf in the rows currently on screen: results, a level's children, or whole locations at root), **Deselect all** (disabled when none), and when >0: **Add to Quickbar** (disabled without active Character; schedules sync), **Appraise** (opens Market's Appraisal tab with the selection as `Name xQty` lines), **Copy names** (newline-separated to clipboard).
+- Bulk acts on merged assets, so items from other Characters selected in cross-character search are included in Quickbar/Appraise/Copy.
 
 ## Item context menu (`ItemContextMenu`, shared across the app)
 
@@ -246,7 +246,7 @@ Item name link: `ItemInfoLink` → opens Show info (`?info=type-<id>` modal, `fe
 
 ## Test-covered behaviours (`src/routes/Assets.test.tsx`)
 
-Root list and drill-in; total value chip (#1617); focus to heading (#1485); system/container/structure labelling; orphans; search across locations; offline; truncation + retry; re-login; jumps-away note (#1590); virtualization (#86); sibling sort; ship bays; stale link; pins (cycle, sort, scoping, account-wide); Show info link; BPO badge; item menu actions (Quickbar, Market, Industry as material); All-items; min value incl. shorthand (#2227); flat sort remembered; URL state (garbage fallback, drops defaults, query kept through drill); cross-character (no reach until All, badge, cache reuse, CSV note, CSV scope); jumps-away cases; route preference; location sort remembered; select mode (cascade, bulk Quickbar/Compare/copy, select all in view, deselect).
+Root list and drill-in; total value chip (#1617); focus to heading (#1485); system/container/structure labelling; orphans; search across locations; offline; truncation + retry; re-login; jumps-away note (#1590); virtualization (#86); sibling sort; ship bays; stale link; pins (cycle, sort, scoping, account-wide); Show info link; BPO badge; item menu actions (Quickbar, Market, Industry as material); All-items; min value incl. shorthand (#2227); flat sort remembered; URL state (garbage fallback, drops defaults, query kept through drill); cross-character (no reach until All, badge, cache reuse, CSV note, CSV scope); jumps-away cases; route preference; location sort remembered; select mode (cascade, bulk Quickbar/Appraise/copy, select all in view, deselect).
 
 ## Interview Q&A
 
