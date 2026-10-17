@@ -363,6 +363,15 @@ describe('chat message options', () => {
     expect(box[4]).toMatch(/^│ Pace: \d+ m³\/s · Duration: 10m$/);
   });
 
+  it('keeps the place as the top line with no border or no ETA', () => {
+    const bare = withOptions({ location: true, border: 'none' }, 'Efa IV').box;
+    expect(bare[0]).toBe('Efa IV');
+    expect(bare.join('\n')).toContain('ETA: ');
+    const noEta = withOptions({ location: true, eta: false }, 'Efa IV').box.join('\n');
+    expect(noEta).toContain('[ Efa IV ]');
+    expect(noEta).not.toContain('ETA');
+  });
+
   it('puts value and volume on the Left line, right under the bar, with just their units', () => {
     const { box } = withOptions({ ores: 'off', volumeLeft: true, iskLeft: false });
     expect(box[1]).toMatch(/^│ █+░+$/);
