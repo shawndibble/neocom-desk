@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { db } from '@/db';
@@ -58,6 +58,11 @@ describe('SurveyChatDialog', () => {
 
     await user.click(screen.getByRole('button', { name: /Double/ }));
     expect(preview).toHaveTextContent('╔');
+    await user.click(screen.getByRole('checkbox', { name: /^Border/ }));
+    expect(preview).not.toHaveTextContent('╔');
+    expect(preview).not.toHaveTextContent('┌');
+    await user.click(screen.getByRole('checkbox', { name: /^Border/ }));
+    expect(preview).toHaveTextContent('╔');
     await user.click(screen.getByRole('checkbox', { name: /Progress bar/ }));
     expect(preview).not.toHaveTextContent('█');
     await user.click(screen.getByRole('checkbox', { name: /Location/ }));
@@ -67,11 +72,7 @@ describe('SurveyChatDialog', () => {
   it('remembers the choices in the browser', async () => {
     const user = userEvent.setup();
     open();
-    await user.click(
-      within(await screen.findByRole('group', { name: 'Border' })).getByRole('button', {
-        name: 'None',
-      })
-    );
+    await user.click(await screen.findByRole('checkbox', { name: /^Border/ }));
     await waitFor(async () =>
       expect(
         ((await db.settings.get('miningSurveyChatOptions'))?.value as { border: string }).border
