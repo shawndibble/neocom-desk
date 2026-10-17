@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { Tooltip, textActionClassName } from '@/components/ui';
+import type { SiblingClaim } from '@/engine/industry/groupStockClaims';
 import type { OwnedStockDetection } from './ownedStockDetection';
 
 interface OwnedStockHintProps {
@@ -12,6 +13,11 @@ interface OwnedStockHintProps {
   materialName: string;
   /** What the "use" action writes — the row's owned-stock offer (`ownedStockOffer`). */
   suggestion: number;
+  /**
+   * Stock Build Group members ahead of this plan already claimed (issue
+   * #3992), already taken out of `suggestion`. Empty or absent: no claim.
+   */
+  claimedAhead?: readonly SiblingClaim[];
   onApply: () => void;
 }
 
@@ -46,6 +52,11 @@ interface OwnedStockHintProps {
  * leaves this out once it answers `null` — by then the quantity is in the
  * input beside it, which is the thing the plan actually uses.
  *
+ * Inside a Build Group, stock a member ahead of this plan already claimed is
+ * named beside the offer — "6,000 in Plan A · Use 4,000" — and the offer says
+ * its number, since Need no longer says how much the click covers once a
+ * sibling's claim is taken out (issue #3992).
+ *
  * When any Character's asset list was short or unreadable the total is rendered
  * as a lower bound. Under-reporting owned stock inflates the plan's buy list
  * and cost, so a possibly-short number must never look exact.
@@ -55,6 +66,7 @@ export function OwnedStockHint({
   detection,
   materialName,
   suggestion,
+  claimedAhead = [],
   onApply,
 }: OwnedStockHintProps) {
   const { t } = useTranslation();
@@ -66,24 +78,50 @@ export function OwnedStockHint({
   const detected = detection.lowerBound
     ? t('industry.detectedOwnedAtLeast', { quantity })
     : t('industry.detectedOwned', { quantity });
+  const claimedQuantity = claimedAhead.reduce((sum, claim) => sum + claim.quantity, 0);
+  const claim =
+    claimedAhead.length === 0
+      ? null
+      : claimedAhead.length === 1
+        ? t('industry.groupClaimedIn', {
+            quantity: claimedQuantity.toLocaleString(),
+            plan: claimedAhead[0].name,
+          })
+        : t('industry.groupClaimedInPlans', {
+            quantity: claimedQuantity.toLocaleString(),
+            count: claimedAhead.length,
+          });
+  const owned = claim === null ? detected : `${detected} · ${claim}`;
 
-  return (
-    <Tooltip content={detected}>
+  const offer = (
+    <Tooltip content={owned}>
       <button
         type="button"
         onClick={onApply}
         aria-label={t('industry.useDetectedFor', {
           quantity: suggestion.toLocaleString(),
           material: materialName,
-          detected,
+          detected: owned,
         })}
         className={textActionClassName('justify-end')}
       >
         {/* Not the number: it made the Have column wrap, and Need beside the
             field plus this tooltip already say how much. The accessible name
             above still carries what a click will write. */}
-        {t('industry.useDetected')}
+        {claim === null
+          ? t('industry.useDetected')
+          : t('industry.useDetectedQuantity', { quantity: suggestion.toLocaleString() })}
       </button>
     </Tooltip>
+  );
+  if (claim === null) return offer;
+  return (
+    <span className="flex flex-wrap items-baseline justify-end gap-x-1">
+      <span className="text-[0.6875rem] text-text-dim">
+        {claim}
+        <span aria-hidden="true"> ·</span>
+      </span>
+      {offer}
+    </span>
   );
 }

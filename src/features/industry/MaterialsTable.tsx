@@ -44,6 +44,7 @@ import {
   undoOwnedStockChanges,
   type OwnedStockChange,
 } from '@/engine/industry/ownedStockOffer';
+import type { GroupStockClaims } from '@/engine/industry/groupStockClaims';
 import { OwnedStockHint } from './OwnedStockHint';
 import type { OwnedStockDetection } from './ownedStockDetection';
 import { buildRecipe, type MaterialTableRow } from './subBuildPlan';
@@ -80,6 +81,12 @@ interface MaterialsTableProps {
   ref?: Ref<MaterialsTableHandle>;
   /** ESI-detected owned stock (issue #181); omitted where no detection ran. Never written by itself. */
   detection?: OwnedStockDetection;
+  /**
+   * What other members of this plan's Build Group claimed of each material's
+   * scoped stock (issue #3992); `null` where none did. Omitted for a
+   * standalone plan and on the group page, whose offers stay as they were.
+   */
+  groupClaimsFor?: (typeID: number) => GroupStockClaims | null;
   /** Make-or-buy verdicts by material typeID. A material with no entry has no advice to show; omitted entirely where the caller can't price recipes. */
   makeOrBuy?: ReadonlyMap<number, MakeOrBuy>;
   /**
@@ -657,6 +664,7 @@ export function MaterialsTable({
   onOwnedStockChange,
   ref,
   detection,
+  groupClaimsFor,
   makeOrBuy,
   canBuildHere,
   onToggleBuildHere,
@@ -685,6 +693,10 @@ export function MaterialsTable({
   const groups = useMemo(() => editSessionGroups(held, materials), [held, materials]);
   const shown = useMemo(() => shownSections(groups), [groups]);
   const ownedFor = useCallback((typeID: number) => sourcing?.[typeID]?.ownedQuantity, [sourcing]);
+  // The stock a row's offer and "Use all" may draw on: the scoped stock, less
+  // what group members ahead of this plan already claimed.
+  const offerQuantityFor = (typeID: number) =>
+    groupClaimsFor?.(typeID)?.free ?? detection?.scopedQuantityFor(typeID) ?? 0;
 
   // Owned-quantity writes the session makes (bulk, and every Undo) go out as
   // one batch where the caller takes one.
@@ -725,11 +737,7 @@ export function MaterialsTable({
   }
 
   useImperativeHandle(ref, () => ({
-    fillAll: () =>
-      applyBulk(
-        'all',
-        takeEveryOffer(materials, ownedFor, detection?.scopedQuantityFor ?? (() => 0))
-      ),
+    fillAll: () => applyBulk('all', takeEveryOffer(materials, ownedFor, offerQuantityFor)),
     clearAll: () => applyBulk('none', clearEveryOwned(materials, ownedFor)),
   }));
 
@@ -900,27 +908,42 @@ export function MaterialsTable({
    * The detected-stock offer ("Use assets") for a row, or nothing. Its own
    * piece so the phone row can put it on the line under the subtraction
    * instead of inside it, where it split Need − Have = To buy over two lines.
+   *
+   * Inside a Build Group it also carries the over-claim warning (issue
+   * #3992), shown whether or not the row still has an offer: a member whose
+   * Have already fills its need has none, and is exactly the one to warn.
+   * Not on a lower-bound count, which may simply be short.
    */
   function renderOwnedHint(material: MaterialTableRow) {
-    if (!detection) return null;
+    if (!detection || material.acquisitionTier) return null;
     // Whether the row offers anything, and what, is the owned-stock offer's
     // call (`ownedStockOffer.ts`) — the same rule "Use all" applies. It
     // respects the plan's owned-stock scope (issue #454).
-    const scopedQuantity = detection.scopedQuantityFor(material.typeID);
+    const claims = groupClaimsFor?.(material.typeID) ?? null;
     const offer = ownedStockOffer(
       material,
-      scopedQuantity,
+      offerQuantityFor(material.typeID),
       sourcing?.[material.typeID]?.ownedQuantity
     );
-    if (offer === null) return null;
+    const overClaim = claims && !detection.lowerBound ? claims.overClaim : 0;
     return (
-      <OwnedStockHint
-        scopedQuantity={scopedQuantity}
-        detection={detection}
-        materialName={nameFor(material.typeID)}
-        suggestion={offer}
-        onApply={() => commitOwned(material.typeID, offer)}
-      />
+      <>
+        {overClaim > 0 && (
+          <span className="text-[0.6875rem] text-warning">
+            {t('industry.groupOverClaim', { quantity: overClaim.toLocaleString() })}
+          </span>
+        )}
+        {offer !== null && (
+          <OwnedStockHint
+            scopedQuantity={detection.scopedQuantityFor(material.typeID)}
+            detection={detection}
+            materialName={nameFor(material.typeID)}
+            suggestion={offer}
+            claimedAhead={claims?.ahead}
+            onApply={() => commitOwned(material.typeID, offer)}
+          />
+        )}
+      </>
     );
   }
 
