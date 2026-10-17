@@ -987,3 +987,60 @@ describe('a lapsed grant over saved data', () => {
     expect(resolved('orders', orders([]))).toMatchObject({ state: 'needsPermission' });
   });
 });
+
+describe('orders widget', () => {
+  const ordersFeed = (list: unknown[]) =>
+    ({
+      orders: ok({
+        openOrders: {
+          entries: [
+            {
+              characterId: 91,
+              characterName: 'Pilot',
+              orders: list,
+              fetchedAt: NOW,
+              fromCache: false,
+              needsReauth: false,
+            },
+          ],
+          skipped: [],
+        },
+        typeNames: new Map(),
+        npcStations: new Map(),
+        stationsLoaded: true,
+        stationPrices: new Map(),
+        costBases: new Map(),
+        walletBasisGaps: new Map(),
+        problemSamples: new Map(),
+        skillsByCharacter: new Map(),
+        now: NOW,
+      }) as never,
+    }) satisfies Feeds;
+  const order = (duration: number) => ({
+    order_id: duration,
+    type_id: 34,
+    region_id: 10000002,
+    location_id: 60003760,
+    is_buy_order: false,
+    is_corporation: false,
+    price: 5,
+    volume_remain: 10,
+    volume_total: 10,
+    issued: new Date(NOW - HOUR).toISOString(),
+    duration,
+    range: 'station',
+  });
+
+  it('links its number to Open Orders with the work-through queue started, for its own Character', () => {
+    const view = buildView('orders', ordersFeed([order(2), order(90)]), ctx());
+    expect(view.number?.link).toEqual({
+      label: 'overview.widgets.orders.workThrough{"total":1}',
+      to: '/market/orders?orders.characters=91&orders.workThrough=1',
+    });
+  });
+
+  it('has no work-through link when nothing needs a fix', () => {
+    const view = buildView('orders', ordersFeed([order(90)]), ctx());
+    expect(view.number?.link).toBeUndefined();
+  });
+});

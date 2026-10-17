@@ -103,7 +103,16 @@ function SecondaryLine({ secondary }: { secondary: NumberSecondary }) {
   );
 }
 
-function NumberBody({ model, dimmed = false }: { model: NumberModel; dimmed?: boolean }) {
+function NumberBody({
+  model,
+  dimmed = false,
+  showLink = false,
+}: {
+  model: NumberModel;
+  dimmed?: boolean;
+  /** The Number view only: the figure's follow-on link. */
+  showLink?: boolean;
+}) {
   const toned = model.tone !== 'clear';
   return (
     <div className={cx('grid gap-1 px-3 py-2.5', dimmed && 'opacity-45')}>
@@ -131,6 +140,15 @@ function NumberBody({ model, dimmed = false }: { model: NumberModel; dimmed?: bo
           {note}
         </p>
       ))}
+      {showLink && model.link && (
+        <Link
+          to={model.link.to}
+          className={entityLinkClassName('flex w-fit items-center gap-0.5 text-xs')}
+        >
+          {model.link.label}
+          <Icon.Descend size={Icon.ICON_SIZE.sm} aria-hidden="true" className="shrink-0" />
+        </Link>
+      )}
     </div>
   );
 }
@@ -362,7 +380,7 @@ function WidgetFrame({
       ) : widget.view === 'chart' ? (
         <ChartBody view={view} size={widget.size} title={title} />
       ) : (
-        <NumberBody model={view.number} />
+        <NumberBody model={view.number} showLink />
       );
   }
 

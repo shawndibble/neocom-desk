@@ -4492,6 +4492,7 @@
         "listed": "{{isk}} ISK listed",
         "notChecked_one": "{{count}} order not checked",
         "notChecked_other": "{{count}} orders not checked",
+        "workThrough": "Work through ({{total}})",
         "expired": "Expired",
         "stationUnknown": "Structure",
         "sideBuy": "Buy",

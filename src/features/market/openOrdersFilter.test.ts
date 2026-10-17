@@ -502,4 +502,8 @@ describe('the deep-link vocabulary', () => {
   it('is the plain Orders page when there is nothing to narrow by', () => {
     expect(openOrdersHref({})).toBe('/market/orders');
   });
+
+  it('asks the page to start the work-through queue', () => {
+    expect(openOrdersHref({ workThrough: true })).toBe('/market/orders?orders.workThrough=1');
+  });
 });

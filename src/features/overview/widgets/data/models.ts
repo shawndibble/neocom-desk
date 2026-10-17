@@ -15,9 +15,11 @@ import { soonestCalendarDeadline, upcomingCommittedEvents } from '@/engine/calen
 import { extractableSp, extractorCount } from '@/engine/spExtraction';
 import {
   buildOpenOrderRows,
+  needsAttentionCount,
   notCheckedCount,
   openOrderProblemCounts,
 } from '@/features/market/openOrdersModel';
+import { openOrdersHref } from '@/features/market/openOrdersFilter';
 import { stockBoardSeverity } from '@/features/stockTargets/stockBoard';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { formatCountdown, formatDuration } from '@/lib/duration';
@@ -497,6 +499,7 @@ const orders: Builder = (feeds, { t, now, activeCharacterId, scopeAll }) => {
   const listed = ordersListed(rows);
   const unchecked = notCheckedCount(rows);
   const severity = ordersSeverity(rows, needsReauth);
+  const needFix = needsAttentionCount(rows);
   return {
     ...blank(
       to,
@@ -522,6 +525,18 @@ const orders: Builder = (feeds, { t, now, activeCharacterId, scopeAll }) => {
             ? { text: t('overview.widgets.orders.listed', { isk: formatIskCompact(listed) }) }
             : undefined,
       tone: undercut === 0 && severity !== 'critical' ? 'clear' : (severity ?? 'clear'),
+      // Opens Open Orders with the work-through queue started, for this view's Characters.
+      link:
+        needFix > 0
+          ? {
+              label: t('overview.widgets.orders.workThrough', { total: needFix }),
+              to: openOrdersHref({
+                characterIds:
+                  everyone || activeCharacterId === null ? undefined : [activeCharacterId],
+                workThrough: true,
+              }),
+            }
+          : undefined,
     },
     rows: [],
     table: ordersTable(

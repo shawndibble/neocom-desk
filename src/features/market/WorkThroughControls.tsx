@@ -8,7 +8,7 @@ import { useContext, type ReactNode } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { Button, IskAmount, textActionClassName } from '@/components/ui';
-import { formatIskAuto } from '@/lib/isk';
+import { formatMarketIsk } from '@/lib/isk';
 import type { OpenOrderRow } from './openOrdersModel';
 import type { WorkThroughPrice } from './useWorkThrough';
 import { WorkThroughContext, type WorkThroughContextValue } from './workThroughContext';
@@ -78,7 +78,7 @@ export function WorkThroughSummaryTail() {
 function priceLine(price: WorkThroughPrice | null, t: TFunction) {
   if (price === null) return t('market.orders.workThrough.reading');
   if (price.kind === 'price')
-    return t('market.orders.workThrough.newPrice', { price: formatIskAuto(price.price) });
+    return t('market.orders.workThrough.newPrice', { price: formatMarketIsk(price.price) });
   if (price.kind === 'noRival') return t('market.orders.workThrough.noRival');
   return t('market.orders.workThrough.unavailable');
 }
@@ -99,7 +99,7 @@ function LossLine({ row, price }: { row: OpenOrderRow; price: WorkThroughPrice |
           <span className="tabular-nums">
             <Trans
               i18nKey="market.orders.workThrough.loses"
-              values={{ price: formatIskAuto(price.price) }}
+              values={{ price: formatMarketIsk(price.price) }}
               components={{ isk: <IskAmount value={loss.amount} /> }}
             />
           </span>
@@ -162,7 +162,7 @@ function ListControls({ row, context }: { row: OpenOrderRow; context: WorkThroug
         </p>
         {price?.kind === 'price' ? (
           <p className="text-2xl font-semibold text-text tabular-nums">
-            {formatIskAuto(price.price)}
+            {formatMarketIsk(price.price)}
           </p>
         ) : (
           <p className="text-sm text-text-dim">{priceLine(price, t)}</p>
@@ -199,7 +199,7 @@ function RowStatus({ orderId, context }: { orderId: number; context: WorkThrough
   if (handled.copied && handled.newPrice !== null) {
     parts.push(
       <span key="copied" className="tabular-nums text-text-dim">
-        {t('market.orders.workThrough.copied', { price: formatIskAuto(handled.newPrice) })}
+        {t('market.orders.workThrough.copied', { price: formatMarketIsk(handled.newPrice) })}
       </span>
     );
   }
