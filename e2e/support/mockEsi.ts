@@ -241,6 +241,11 @@ export async function installEsiMock(page: Page): Promise<void> {
       });
     }
 
+    // A region Order Book, empty. A Build Plan whose need crosses 1% of the
+    // Fuzzwork fixture's listed units walks it for a Depth Price; empty keeps
+    // the lowest sell. A market spec that needs real orders overrides this.
+    if (/^\/markets\/\d+\/orders\/?$/.test(path)) return json([]);
+
     // BPC Sourcing's region lookup (Industry's `sourcing` tab, getUniverseRegion).
     const regionMatch = /^\/universe\/regions\/(\d+)$/.exec(path);
     if (regionMatch) {

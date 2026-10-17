@@ -47,7 +47,7 @@ import { computeBuildPlan } from './computeBuildPlan';
 import type { CorpOwnedBlueprintsState } from './corpOwnedBlueprints';
 import type { MarketSnapshot } from './marketData';
 import { facilityContextFor, reactionPlanFacilityContextFor } from './planFacilityContext';
-import { materialPricesFor } from './priceBasis';
+import { materialPriceBasisOf, materialPricesFor } from './priceBasis';
 import {
   inventionOffersLookup,
   type InventionMarket,
@@ -102,6 +102,12 @@ export interface BuildPlanPrices {
   snapshot: MarketSnapshot | null;
   /** The Reaction Location's own system cost index; null/absent until that fetch lands. */
   reactionSystemCostIndex?: number | null;
+  /**
+   * Depth Prices: order-book-walked unit prices for the
+   * materials whose need is large against what is listed. Layered over the
+   * sell basis only; the product and blueprint prices never read them.
+   */
+  depthPrices?: HubPrices;
 }
 
 export interface ResolveBuildPlanOptions {
@@ -279,7 +285,11 @@ function prepareResolution(
     },
   };
   const recipeFor = recipeForLookup(recipeSources);
-  const materialPrices = materialPricesFor(snapshot, plan.materialPriceBasis);
+  const basePrices = materialPricesFor(snapshot, plan.materialPriceBasis);
+  const materialPrices =
+    prices.depthPrices && materialPriceBasisOf(plan.materialPriceBasis) === 'sell'
+      ? { ...basePrices, ...prices.depthPrices }
+      : basePrices;
   const reactionFacility = reactionFacilityFor(plan, prices.reactionSystemCostIndex);
   // Null until real fees land: a fee-free quote would call almost everything worth building.
   const makeOrBuyContext: MakeOrBuyContext | null =

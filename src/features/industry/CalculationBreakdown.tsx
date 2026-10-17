@@ -4,6 +4,8 @@ import { Modal } from '@/components/ui';
 import { brokerFeePct, salesTaxPct } from '@/engine/industry/fees';
 import type { BuildResult, MaterialPriceBasis } from '@/engine/industry/types';
 import type { ResolvedStandings } from '@/engine/market/standings';
+import type { DepthPrice } from '@/engine/industry/depthPrice';
+import { formatCompactNumber } from '@/lib/compactNumber';
 import { formatDuration } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
 import { formatCostIndex, formatPercent } from './format';
@@ -36,6 +38,8 @@ export interface BreakdownContext {
   productUnitPrice: number | null;
   /** The plan's wall-clock time on its character's free slots; absent without slot data. */
   planSeconds?: number;
+  /** Materials costed at a Depth Price, each with its book walk. */
+  depthRows?: readonly { typeID: number; name: string; walk: DepthPrice }[];
 }
 
 interface CalculationBreakdownProps {
@@ -57,13 +61,12 @@ export function Section({ title, children }: { title: string; children: ReactNod
   );
 }
 
+const FORMULA_BOX =
+  'rounded-xs border border-line bg-panel-2 px-2 py-1 font-mono text-[0.6875rem] text-text-dim tabular-nums';
+
 /** A worked line: the formula with this plan's own numbers substituted in. */
 export function Formula({ children }: { children: ReactNode }) {
-  return (
-    <p className="overflow-x-auto rounded-xs border border-line bg-panel-2 px-2 py-1 font-mono text-[0.6875rem] whitespace-nowrap text-text-dim tabular-nums">
-      {children}
-    </p>
-  );
+  return <p className={`overflow-x-auto whitespace-nowrap ${FORMULA_BOX}`}>{children}</p>;
 }
 
 /**
@@ -82,7 +85,7 @@ export function CalculationBreakdown({
   result,
   context,
 }: CalculationBreakdownProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const taxPct = salesTaxPct(context.accountingLevel);
   const brokerPct = brokerFeePct(
     context.brokerRelationsLevel,
@@ -127,6 +130,57 @@ export function CalculationBreakdown({
             })}
           </Formula>
         </Section>
+
+        {context.depthRows && context.depthRows.length > 0 && (
+          <Section title={t('industry.breakdown.depthTitle')}>
+            <p>
+              {t('industry.breakdown.depthIntro', {
+                materials: new Intl.ListFormat(i18n.language, {
+                  style: 'long',
+                  type: 'conjunction',
+                }).format(context.depthRows.map((row) => row.name)),
+                count: context.depthRows.length,
+                hub: context.hubName,
+              })}{' '}
+              {t('industry.breakdown.depthProduct', { product: context.productName })}
+            </p>
+            {context.depthRows.map(({ typeID, name, walk }) => (
+              <div key={typeID} className="space-y-1">
+                <p className="font-semibold">
+                  {t('industry.breakdown.depthRow', {
+                    material: name,
+                    need: formatCompactNumber(walk.need),
+                    avg: formatIsk(walk.avg, 2),
+                  })}
+                </p>
+                <ul className={FORMULA_BOX}>
+                  {walk.levels.map((level) => (
+                    <li key={level.price}>
+                      {t(
+                        level.units < level.listed
+                          ? 'industry.breakdown.depthLevelPartial'
+                          : 'industry.breakdown.depthLevel',
+                        {
+                          price: formatIsk(level.price, 2),
+                          units: level.units.toLocaleString(),
+                          listed: level.listed.toLocaleString(),
+                        }
+                      )}
+                    </li>
+                  ))}
+                </ul>
+                {!walk.covered && (
+                  <p className="text-warning">
+                    {t('industry.breakdown.depthShort', {
+                      listed: walk.listed.toLocaleString(),
+                      need: walk.need.toLocaleString(),
+                    })}
+                  </p>
+                )}
+              </div>
+            ))}
+          </Section>
+        )}
 
         <Section title={t('industry.breakdown.jobFeeTitle')}>
           <p>

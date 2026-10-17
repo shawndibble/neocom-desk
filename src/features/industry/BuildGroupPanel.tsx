@@ -14,6 +14,8 @@
  * question this view cannot answer and must not appear to.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { DepthPrice } from '@/engine/industry/depthPrice';
+import { DepthPriceLine } from './DepthPriceLine';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import { useTranslation } from 'react-i18next';
 import {
@@ -168,6 +170,8 @@ export function BuildGroupPanel({
     modifiers,
     pricingInputs,
     computeGroupResult: true,
+    // Depth Prices walked on the group's summed need, never per member.
+    groupDepthPrices: true,
   });
 
   // The same inputs `useComparedBuildResults` prices these members against —
@@ -257,6 +261,16 @@ export function BuildGroupPanel({
     () => ownedStockView({ ...detected, scope: group.ownedStockScope }, t),
     [detected, group.ownedStockScope, t]
   );
+
+  // First hub's walk wins for a type a mixed-hub group buys at both.
+  const depthByType = useMemo(() => {
+    const byType = new Map<number, DepthPrice>();
+    for (const row of rows) {
+      for (const [typeID, walk] of row.depth ?? [])
+        if (!byType.has(typeID)) byType.set(typeID, walk);
+    }
+    return byType;
+  }, [rows]);
 
   const ownedStockMap = useMemo(
     () =>
@@ -478,11 +492,14 @@ export function BuildGroupPanel({
             {material.unpriced && material.buyToShow > 0 && (
               <span className="text-[0.6875rem] text-warning">{t('industry.unpriced')}</span>
             )}
+            {material.buyToShow > 0 && depthByType.get(material.typeID) && (
+              <DepthPriceLine depth={depthByType.get(material.typeID)!} />
+            )}
           </span>
         ),
       },
     ],
-    [t, catalog, ownedStockMap, detection, setOwnedQuantity]
+    [t, catalog, ownedStockMap, detection, setOwnedQuantity, depthByType]
   );
 
   const buyMaterialsCsv = useMemo(

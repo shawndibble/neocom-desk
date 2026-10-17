@@ -37,6 +37,8 @@ import { maskNumber, unmaskNumber } from '@/lib/numberMask';
 import { ItemInfoLink } from '@/features/entities';
 import { formatVolume } from './format';
 import { materialRowState } from './materialRow';
+import { DepthPriceLine } from './DepthPriceLine';
+import type { DepthPrice } from '@/engine/industry/depthPrice';
 import {
   clearEveryOwned,
   ownedStockOffer,
@@ -71,6 +73,8 @@ interface MaterialsTableProps {
   sourcing: MaterialSourcingMap | undefined;
   /** False when the market snapshot couldn't be fetched — hub prices fall back to placeholder text. */
   pricesReady: boolean;
+  /** A material's Depth Price walk; absent for a row priced at the lowest sell. */
+  depthFor?: (typeID: number) => DepthPrice | undefined;
   onSourcingChange: (typeID: number, patch: MaterialSourcing) => void;
   /**
    * Writes several rows' owned quantities as one change — "Use all", "Use
@@ -673,6 +677,7 @@ export function MaterialsTable({
   skillGates,
   characterNameFor,
   exportProps,
+  depthFor,
 }: MaterialsTableProps) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
@@ -984,6 +989,10 @@ export function MaterialsTable({
     );
   }
 
+  function depthOf(material: MaterialTableRow): DepthPrice | undefined {
+    return material.subBuilds.length > 0 ? undefined : depthFor?.(material.typeID);
+  }
+
   /**
    * The price field and what kind of price it holds. A built row has no
    * purchase price at all. `inline` is the phone row's form: "@ [field]" on
@@ -1003,6 +1012,7 @@ export function MaterialsTable({
     }
     const state = materialRowState(material, sourcing, pricesReady);
     const overridden = state.priceSource === 'override';
+    const depth = inline || overridden ? undefined : depthOf(material);
     const unpriced = !overridden && state.unitPrice === null && !state.fullyOwned;
     // No tag on a plain hub price — that is what every row is unless
     // something says otherwise.
@@ -1067,6 +1077,7 @@ export function MaterialsTable({
             )}
           </span>
         )}
+        {depth && <DepthPriceLine depth={depth} />}
         {!inline && material.acquisitionTier && (
           <span className="text-[0.6875rem] text-text-dim">
             {material.acquisitionTier.community
@@ -1113,6 +1124,7 @@ export function MaterialsTable({
   // Rebuilt every render, deliberately: the cell renderers close over the
   // hold and toggle machinery above, and a stale closure there would commit
   // an edit through an outdated sourcing map.
+  const anyDepth = materials.some((m) => depthOf(m) !== undefined);
   const columns: DataTableColumn<MaterialTableRow>[] = [
     {
       id: 'material',
@@ -1157,7 +1169,8 @@ export function MaterialsTable({
       id: 'price',
       header: t('industry.price'),
       align: 'right',
-      headerCellClassName: 'w-28',
+      // Wider only while a row carries a Depth Price's second line.
+      headerCellClassName: anyDepth ? 'w-44' : 'w-28',
       render: renderPrice,
     },
     {
@@ -1424,27 +1437,39 @@ export function MaterialsTable({
       );
     }
     const overridden = state.priceSource === 'override';
+    const depth = overridden ? undefined : depthOf(material);
     return (
-      <button
-        type="button"
-        onClick={() => setEditingPrice(material.typeID)}
-        className={cx(
-          editableValueClassName,
-          'text-xs tabular-nums',
-          overridden ? 'text-accent' : 'text-text'
-        )}
-      >
-        <span className="sr-only">
-          {t('industry.priceFor', { material: nameFor(material.typeID) })}:{' '}
-        </span>
-        {t('industry.errands.atPrice', { price: maskNumber(state.unitPrice) })}
-        {overridden && (
-          <span className="ml-1.5 text-[0.6875rem] no-underline">
-            {t('industry.priceSourceOverride')}
+      <>
+        <button
+          type="button"
+          onClick={() => setEditingPrice(material.typeID)}
+          className={cx(
+            editableValueClassName,
+            'text-xs tabular-nums',
+            overridden ? 'text-accent' : 'text-text'
+          )}
+        >
+          <span className="sr-only">
+            {t('industry.priceFor', { material: nameFor(material.typeID) })}:{' '}
+          </span>
+          {t('industry.errands.atPrice', { price: maskNumber(state.unitPrice) })}
+          {overridden && (
+            <span className="ml-1.5 text-[0.6875rem] no-underline">
+              {t('industry.priceSourceOverride')}
+            </span>
+          )}
+          <Icon.Rename
+            size={Icon.ICON_SIZE.sm}
+            aria-hidden="true"
+            className={editPencilClassName}
+          />
+        </button>
+        {depth && (
+          <span className="mt-0.5 block text-right">
+            <DepthPriceLine depth={depth} />
           </span>
         )}
-        <Icon.Rename size={Icon.ICON_SIZE.sm} aria-hidden="true" className={editPencilClassName} />
-      </button>
+      </>
     );
   }
 

@@ -43,6 +43,7 @@ import { craftScope } from '@/engine/industry/craftScope';
 import { ownedStockSale, sellableMaterials } from '@/engine/industry/ownedStockSale';
 import type {
   FacilityKind,
+  HubPrices,
   MaterialPriceBasis,
   MaterialSourcing,
   RigKind,
@@ -103,10 +104,13 @@ import {
   inventionPricingContextFor,
   planOwnedBlueprints,
   resolveBuildPlan,
+  type ResolvedBuildPlan,
 } from './resolveBuildPlan';
 import { inventionQuoteFor } from './inventionSources';
 import { buildPlanTypeIds, recipeForLookup } from './recipes';
 import { materialPriceBasisOf } from './priceBasis';
+import { useDepthPrices } from './depthPriceLoader';
+import { depthCandidates, depthPriceMap } from '@/engine/industry/depthPrice';
 import { useMarketSnapshot } from './useMarketSnapshot';
 import { formatDuration } from '@/lib/duration';
 import { useTableExport } from '@/components/ui/useTableExport';
@@ -720,10 +724,10 @@ export function BuildPlanDetail({
    * claims share it, and a re-run of this memo starts from nothing rather
    * than re-claiming against copies a previous run already took.
    */
-  // One resolver for the page's own plan and for Break Even's trial run counts,
-  // so a trial can never price a plan differently from what the page shows.
-  const resolveAt = useCallback(
-    (candidate: BuildPlanRecord) =>
+  // One resolver for the page's own plan and for Break Even's trial run counts
+  // (each walking its own Depth Prices), so a trial prices as the page would.
+  const resolveWith = useCallback(
+    (candidate: BuildPlanRecord, depthPrices?: HubPrices) =>
       resolveBuildPlan(
         candidate,
         {
@@ -740,7 +744,7 @@ export function BuildPlanDetail({
           inventionMarket,
           communityOffersFor,
         },
-        { snapshot, reactionSystemCostIndex: reactionSnapshot?.systemCostIndex }
+        { snapshot, reactionSystemCostIndex: reactionSnapshot?.systemCostIndex, depthPrices }
       ),
     [
       catalog,
@@ -759,7 +763,38 @@ export function BuildPlanDetail({
       reactionSnapshot?.systemCostIndex,
     ]
   );
-  const resolved = useMemo(() => resolveAt(plan), [resolveAt, plan]);
+  // Depth Prices: the lowest-sell pass says what the plan has to buy;
+  // materials whose need is large against what the hub lists walk the hub's
+  // book, and the plan resolves once more at those prices. One re-resolve,
+  // never iterated: a need is read off the lowest-sell pass only.
+  const depthNeedsOf = useCallback(
+    (candidate: BuildPlanRecord, lowestSell: ResolvedBuildPlan) =>
+      lowestSell.result
+        ? depthCandidates(
+            shoppingListMaterials(lowestSell.result.materials),
+            snapshot?.hubSellVolumes ?? {},
+            candidate.materialSourcing,
+            candidate.materialPriceBasis
+          )
+        : new Map<number, number>(),
+    [snapshot?.hubSellVolumes]
+  );
+  const topOfBook = useMemo(() => resolveWith(plan), [resolveWith, plan]);
+  const depthNeeds = useMemo(() => depthNeedsOf(plan, topOfBook), [depthNeedsOf, plan, topOfBook]);
+  const { depth, walk: walkDepth } = useDepthPrices(hub, depthNeeds, fetchedAt?.getTime());
+  const resolved = useMemo(
+    () => (depth.size > 0 ? resolveWith(plan, depthPriceMap(depth)) : topOfBook),
+    [depth, resolveWith, plan, topOfBook]
+  );
+  // Break Even's trials walk the books for their own run count, as the page would at that count.
+  const resolveAt = useCallback(
+    (candidate: BuildPlanRecord) => {
+      const lowestSell = resolveWith(candidate);
+      const trialDepth = walkDepth(depthNeedsOf(candidate, lowestSell));
+      return trialDepth.size > 0 ? resolveWith(candidate, depthPriceMap(trialDepth)) : lowestSell;
+    },
+    [resolveWith, walkDepth, depthNeedsOf]
+  );
   const { result, error, makeOrBuyContext, resolvedMe, resolvedTe, materialPrices, bpcCoverage } =
     resolved;
 
@@ -1026,6 +1061,11 @@ export function BuildPlanDetail({
     () => (result ? shoppingListMaterials(result.materials) : []),
     [result]
   );
+  // A dearer walked price can flip a material to built; its walk then explains nothing here.
+  const boughtDepth = useMemo(() => {
+    const bought = new Set(shoppingMaterials.map((m) => m.typeID));
+    return new Map([...depth].filter(([typeID]) => bought.has(typeID)));
+  }, [depth, shoppingMaterials]);
 
   const anySubBuilds = useMemo(() => (result ? hasSubBuilds(result.materials) : false), [result]);
 
@@ -1398,6 +1438,11 @@ export function BuildPlanDetail({
       entry.productTypeID !== null ? (snapshot?.hubPrices[entry.productTypeID] ?? null) : null,
     standing,
     planSeconds,
+    depthRows: [...boughtDepth].map(([typeID, walk]) => ({
+      typeID,
+      name: nameForType(catalog, typeID),
+      walk,
+    })),
   };
 
   // Read-only summary of the setup: plain label-over-value pairs, not chips —
@@ -2148,6 +2193,7 @@ export function BuildPlanDetail({
                 onOpenAcquisitionPicker={setAcquisitionPickerTypeId}
                 skillGates={skillGates}
                 characterNameFor={detection.characterNameFor}
+                depthFor={(typeID) => boughtDepth.get(typeID)}
               />
               <BuildRecipeModal
                 recipe={openRecipe}

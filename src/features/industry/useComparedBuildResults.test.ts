@@ -14,12 +14,18 @@ import type { BuildResult } from '@/engine/industry/types';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import type { CorpOwnedBlueprintsState } from './corpOwnedBlueprints';
 import { PRICING_INPUTS_FIXTURE as PRICING_INPUTS } from './pricingInputsFixtures';
+import { getOrderBook, type OrderBookResult } from '@/features/market/orderBook';
 
 vi.mock('./computeBuildPlan', () => ({ computeBuildPlan: vi.fn() }));
 vi.mock('./marketData', () => ({ loadMarketSnapshots: vi.fn() }));
+vi.mock('@/features/market/orderBook', () => ({
+  getOrderBook: vi.fn(),
+  ORDER_BOOK_FANOUT_CONCURRENCY: 4,
+}));
 
 const mockedCompute = vi.mocked(computeBuildPlan);
 const mockedSnapshots = vi.mocked(loadMarketSnapshots);
+const mockedOrderBook = vi.mocked(getOrderBook);
 
 function plan(overrides: Partial<BuildPlanRecord> & { id: string }): BuildPlanRecord {
   return {
@@ -107,6 +113,7 @@ const baseArgs: Omit<UseComparedBuildResultsArgs, 'plans' | 'catalog'> = {
 beforeEach(() => {
   mockedCompute.mockReset();
   mockedSnapshots.mockReset();
+  mockedOrderBook.mockReset();
   mockedSnapshots.mockImplementation((requests) => requests.map(() => Promise.resolve(SNAPSHOT)));
   mockedCompute.mockReturnValue({ result: RESULT, error: null });
 });
@@ -417,6 +424,83 @@ describe('useComparedBuildResults', () => {
     expect(result.current[0]?.groupResult).toEqual(GROUP_RESULT);
     expect(mockedCompute).toHaveBeenCalledTimes(2);
     expect(mockedCompute.mock.calls.some(([args]) => args.ignoreOwnedStock === true)).toBe(true);
+  });
+
+  describe('group Depth Prices (issue #3993)', () => {
+    const JITA_STATION = 60003760;
+    // Each member buys 6 Tritanium; 1,000 are listed, so neither reaches 1%
+    // alone and the group's 12 does.
+    const bought: BuildResult = {
+      ...RESULT,
+      materials: [
+        {
+          typeID: 34,
+          baseQuantity: 6,
+          quantity: 6,
+          ownedQuantity: 0,
+          remainingQuantity: 6,
+          unitPrice: 4,
+          lineCost: 24,
+          unpriced: false,
+        },
+      ],
+    };
+    const book = (): Promise<OrderBookResult> =>
+      Promise.resolve({
+        orders: [
+          { price: 4, volume_remain: 10, location_id: JITA_STATION, is_buy_order: false },
+          { price: 6, volume_remain: 990, location_id: JITA_STATION, is_buy_order: false },
+        ] as OrderBookResult['orders'],
+        truncated: false,
+        fetchedAt: 0,
+      });
+
+    beforeEach(() => {
+      mockedSnapshots.mockImplementation((requests) =>
+        requests.map(() =>
+          Promise.resolve({ ...SNAPSHOT, hubPrices: { 34: 4 }, hubSellVolumes: { 34: 1000 } })
+        )
+      );
+      mockedCompute.mockReturnValue({ result: bought, error: null });
+      mockedOrderBook.mockImplementation(book);
+    });
+
+    it("walks the group's summed need once per material and reprices every member at it", async () => {
+      const catalog = catalogWith([entry({ blueprintTypeID: 100 })]);
+      const plans = [plan({ id: 'a', runs: 2 }), plan({ id: 'b', runs: 3 })];
+
+      const { result } = renderHook(() =>
+        useComparedBuildResults({
+          plans,
+          catalog,
+          ...baseArgs,
+          computeGroupResult: true,
+          groupDepthPrices: true,
+        })
+      );
+      await waitFor(() => expect(result.current.every((row) => !row.loading)).toBe(true));
+
+      expect(mockedOrderBook).toHaveBeenCalledTimes(1);
+      expect(mockedOrderBook).toHaveBeenCalledWith(10000002, 34);
+      // 10 at 4 + 2 at 6, over 12.
+      const priced = mockedCompute.mock.calls.filter(([args]) => args.materialPrices?.[34] !== 4);
+      expect(priced.length).toBeGreaterThan(0);
+      for (const [args] of priced) expect(args.materialPrices?.[34]).toBeCloseTo(52 / 12);
+      // The walk rides on each row, for the group buy table's Still-to-buy line.
+      expect(result.current[0]?.depth?.get(34)).toMatchObject({ need: 12, covered: true });
+    });
+
+    it('fetches no book for the plan list or Compare', async () => {
+      const catalog = catalogWith([entry({ blueprintTypeID: 100 })]);
+      const plans = [plan({ id: 'a' }), plan({ id: 'b' })];
+
+      const { result } = renderHook(() =>
+        useComparedBuildResults({ plans, catalog, ...baseArgs, computeGroupResult: true })
+      );
+      await waitFor(() => expect(result.current.every((row) => !row.loading)).toBe(true));
+
+      expect(mockedOrderBook).not.toHaveBeenCalled();
+    });
   });
 
   it("surfaces the group computation's own error on the row when the primary computation succeeds but the group one fails (issue #697)", async () => {
