@@ -106,6 +106,8 @@ export type ThresholdControl =
       readonly kind: 'iskAmount';
       readonly labelKey: string;
       readonly inputIdPrefix: string;
+      /** Keep the label as the accessible name only; the row's heading already says what the field is. */
+      readonly labelHidden?: boolean;
     };
 
 export interface ThresholdField<K extends ThresholdKey = ThresholdKey> {
@@ -205,6 +207,7 @@ export const THRESHOLD_FIELDS: { readonly [K in ThresholdKey]: ThresholdField<K>
       kind: 'iskAmount',
       labelKey: 'settings.notifications.walletBalanceChangedThresholdLabel',
       inputIdPrefix: 'wallet-balance-changed-threshold',
+      labelHidden: true,
     },
   },
   incursionNearbyJumps: {

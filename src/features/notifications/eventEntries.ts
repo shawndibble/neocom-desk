@@ -251,6 +251,8 @@ export interface EventThresholds {
   readonly fields: readonly [ThresholdField, ...ThresholdField[]];
   /** A caveat shown under the controls, or null. */
   readonly hintKey: string | null;
+  /** i18n key of the disclosure heading when the generic "Warn-ahead times" doesn't fit. */
+  readonly headingKey?: string;
 }
 
 /** One Event Entry, as written. `defineEvent` checks it against its source's types. */
@@ -493,6 +495,7 @@ export const NOTIFICATION_EVENT_ENTRIES = {
     thresholds: {
       fields: [THRESHOLD_FIELDS.walletBalanceChangedThresholdIsk],
       hintKey: 'settings.notifications.walletBalanceChangedThresholdHint',
+      headingKey: 'settings.notifications.minimumIskChangeAlert',
     },
     rowHintKey: null,
   }),

@@ -62,6 +62,7 @@ export {
   characterEveTypePrefs,
   isBrowserChannelEnabled,
   isFeedChannelEnabled,
+  isDismissOnView,
   type NotificationPreferencesValue,
 } from './preferencesStore';
 export type { CharacterEventThresholds } from './eventThresholdFields';
@@ -222,6 +223,13 @@ export function withFeedEnabled(
   feedEnabled: boolean
 ): NotificationPreferencesValue {
   return { ...value, feedEnabled };
+}
+
+export function withDismissOnView(
+  value: NotificationPreferencesValue,
+  dismissOnView: boolean
+): NotificationPreferencesValue {
+  return { ...value, dismissOnView };
 }
 
 export function withMasterEnabled(

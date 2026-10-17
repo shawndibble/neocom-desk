@@ -54,6 +54,7 @@ import { dismissFeedEntriesAndSync } from './feedSync';
 import { dedupeCharacterName } from './notificationBody';
 import { notificationUrlForSubject } from './notificationOptions';
 import { useNotificationPermission } from './permission';
+import { isDismissOnView, useNotificationPreferences } from './preferences';
 import { pruneExpired, snooze, useSnoozeStore } from './snooze';
 import { useVisibleAlertEntries } from './useUnreadAlertCount';
 
@@ -69,6 +70,7 @@ export function AlertsPanel({ variant, onClose }: AlertsPanelRenderProps) {
   const entries = useVisibleAlertEntries();
   const snoozeMap = useSnoozeStore((state) => state.value);
   const { permission } = useNotificationPermission();
+  const dismissOnView = useNotificationPreferences((state) => isDismissOnView(state.value));
   const [selectedChip, setSelectedChip] = useState<AlertChip>('all');
   /** Group key → how many of its fires are listed; absent means collapsed. */
   const [opened, setOpened] = useState<ReadonlyMap<string, number>>(new Map());
@@ -239,6 +241,7 @@ export function AlertsPanel({ variant, onClose }: AlertsPanelRenderProps) {
                     variant={danger ? 'primary' : 'ghost'}
                     aria-label={t('alerts.panel.viewLabel', { title: label })}
                     onClick={() => {
+                      if (dismissOnView) void dismissFeedEntriesAndSync(group.entries);
                       navigate(alertViewPath(group.key));
                       onClose();
                     }}
@@ -336,7 +339,6 @@ export function AlertsPanel({ variant, onClose }: AlertsPanelRenderProps) {
         <span>
           {permission === 'granted' ? t('alerts.panel.pushOn') : t('alerts.panel.pushOff')}
         </span>
-        <span>{t('alerts.panel.bannerNote')}</span>
       </div>
     </div>
   );

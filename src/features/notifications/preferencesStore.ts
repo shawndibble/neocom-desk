@@ -41,6 +41,8 @@ export interface NotificationPreferencesValue {
    */
   browserEnabled?: boolean;
   feedEnabled?: boolean;
+  /** The Alerts popover's View button also dismisses the alert. Absent means off. */
+  dismissOnView?: boolean;
   perCharacter: Record<number, EventEnabledMap>;
   /**
    * Per-`type` opt-out underneath the single `eveNotification` event (issue
@@ -122,6 +124,7 @@ function isNotificationPreferencesValue(raw: unknown): raw is NotificationPrefer
     typeof r.masterEnabled === 'boolean' &&
     isOptionalBoolean(r.browserEnabled) &&
     isOptionalBoolean(r.feedEnabled) &&
+    isOptionalBoolean(r.dismissOnView) &&
     isPerCharacterMap(r.perCharacter) &&
     (r.eveNotificationTypesByCharacter === undefined ||
       isEveNotificationTypesByCharacter(r.eveNotificationTypesByCharacter)) &&
@@ -177,6 +180,11 @@ export function characterEventPrefs(
 /** Browser (OS) notifications on this device. Absent means on. */
 export function isBrowserChannelEnabled(value: NotificationPreferencesValue): boolean {
   return value.browserEnabled ?? true;
+}
+
+/** The Alerts popover's View button also dismisses the alert. Absent means off. */
+export function isDismissOnView(value: NotificationPreferencesValue): boolean {
+  return value.dismissOnView ?? false;
 }
 
 /** The Overview's Notification Feed. Absent means on. */

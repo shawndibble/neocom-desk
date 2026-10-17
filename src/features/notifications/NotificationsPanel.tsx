@@ -43,6 +43,8 @@ import {
   withFeedEnabled,
   isBrowserChannelEnabled,
   isFeedChannelEnabled,
+  isDismissOnView,
+  withDismissOnView,
 } from './preferences';
 import { extraEveTypes } from './eventSelection';
 import { filterNotificationEvents } from './notificationSearch';
@@ -413,6 +415,25 @@ export function NotificationsPanel() {
               </span>
             </span>
           </fieldset>
+          <span className="flex items-center gap-1.5">
+            <label className={`flex items-center gap-2 text-xs text-text ${tappableRowClassName}`}>
+              <Checkbox
+                checked={isDismissOnView(prefsValue)}
+                onChange={() =>
+                  void setDeviceNotificationPrefs(
+                    withDismissOnView(prefsValue, !isDismissOnView(prefsValue))
+                  )
+                }
+              />
+              {t('settings.notifications.dismissOnViewLabel')}
+            </label>
+            <InfoTooltip
+              label={t('settings.notifications.channelInfoLabel', {
+                channel: t('settings.notifications.dismissOnViewLabel'),
+              })}
+              content={t('settings.notifications.dismissOnViewHint')}
+            />
+          </span>
         </div>
 
         {characterList.length === 0 ? (

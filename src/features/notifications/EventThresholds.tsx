@@ -72,6 +72,7 @@ function ThresholdFieldControl({
       <ThresholdAmountInput
         id={`${control.inputIdPrefix}-${characterId}`}
         label={t(control.labelKey)}
+        labelHidden={control.labelHidden === true}
         value={value}
         onCommit={onChange}
       />
@@ -111,11 +112,13 @@ function ThresholdFieldControl({
 function ThresholdAmountInput({
   id,
   label,
+  labelHidden,
   value,
   onCommit,
 }: {
   id: string;
   label: string;
+  labelHidden: boolean;
   value: number;
   onCommit: (value: number) => void;
 }) {
@@ -143,7 +146,7 @@ function ThresholdAmountInput({
 
   return (
     <label htmlFor={id} className="flex items-center gap-2 text-[0.6875rem] text-text-dim">
-      {label}
+      {labelHidden ? <span className="sr-only">{label}</span> : label}
       <TextInput
         id={id}
         size="sm"
