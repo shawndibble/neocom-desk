@@ -17,6 +17,19 @@ in the proposal. "Today" is the real page, seeded through the e2e fixture
 routes: 1 Character and 12 orders. The forms use 2 Characters and 17 orders, so
 compare layout, not density.
 
+## Chosen: Form A, plus a Columns button
+
+Owner picked **Form A** and added a **Columns** button beside Filters (desktop).
+Optional columns, all off by default: Your price, Station cheapest, Never sell
+below, Remaining, Expires. ISK tied up stays last.
+
+| Columns menu | All optional columns on (1440) | All on (768) |
+|---|---|---|
+| ![](form-a/columns-menu-1440.png) | ![](form-a/all-columns-1440.png) | ![](form-a/all-columns-768.png) |
+
+At 768 with every column on, the mockup widens the page. The build keeps the
+page fixed and lets the table scroll sideways inside its own frame.
+
 ## The three forms
 
 | | Page | Detail | Phone detail |

@@ -2,6 +2,7 @@ import { useState, type ReactElement, type ReactNode } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import {
   Button,
+  ColumnPickerMenu,
   DataTable,
   Disclosure,
   Field,
@@ -28,6 +29,7 @@ import { CharacterFilterControl } from '@/features/character/CharacterFilterCont
 import { CopyablePrice } from '@/features/market/CopyablePrice';
 import { OrderProblemBadge, type OrderBadgeKind } from '@/features/market/OrderProblemBadge';
 import { formatIsk, formatMarketIsk } from '@/lib/isk';
+import { useIsPhone } from '@/lib/useIsPhone';
 import { NewComponent } from './NewComponent';
 import { OpenOrdersChrome } from './OpenOrdersChrome';
 import { ACT, FINE, FOCUS, OPEN_ORDERS_SHELL, WATCH, type MockOrder } from './openOrdersSample';
@@ -71,7 +73,9 @@ import { ACT, FINE, FOCUS, OPEN_ORDERS_SHELL, WATCH, type MockOrder } from './op
  * - Buy/Sell side: "Buy order" on the station line for buy rows; the subtitle.
  * - Phone card: station and Character badge drop off the two-line card; both
  *   are in the detail subtitle.
- * - Column picker: dropped; four fixed columns, everything else in detail.
+ * - Column picker: a "Columns" button beside Filters (desktop). Four fixed
+ *   columns; Your price, Station cheapest, Never sell below, Remaining and
+ *   Expires are optional and off by default. Phone cards ignore the choice.
  * - Filter list (side, problem, cost basis, expiring within, min ISK tied
  *   up, location, sort): inside the FilterBar funnel, not on the page.
  * - Character filter, Refresh and Export: the PageHeader actions.
@@ -118,7 +122,7 @@ function DoThis({ order }: { order: MockOrder }) {
   );
 }
 
-const columns: DataTableColumn<MockOrder>[] = [
+const fixedColumns: DataTableColumn<MockOrder>[] = [
   {
     id: 'item',
     header: 'Item',
@@ -154,20 +158,103 @@ const columns: DataTableColumn<MockOrder>[] = [
     className: 'font-semibold',
     render: (o) => <DoThis order={o} />,
   },
-  {
-    id: 'tied',
-    header: 'ISK tied up',
+];
+
+const tiedUpColumn: DataTableColumn<MockOrder> = {
+  id: 'tied',
+  header: 'ISK tied up',
+  align: 'right',
+  headerClassName: 'whitespace-nowrap',
+  className: 'tabular-nums whitespace-nowrap',
+  sortValue: (o) => o.iskTiedUp,
+  render: (o) => (
+    <span data-dense-omit>
+      <IskAmount value={o.iskTiedUp} />
+    </span>
+  ),
+};
+
+/** The station's cheapest sell (or top bid, for a buy order), when one beats you. */
+const stationRival = (o: MockOrder) => o.rivals.find((r) => r.scope === 'Station' && r.price > 0);
+
+const dim = <span className="text-text-dim">—</span>;
+
+/** Off by default; the Columns button next to Filters turns each on. */
+const optionalColumns = {
+  price: {
+    id: 'price',
+    header: 'Your price',
     align: 'right',
     headerClassName: 'whitespace-nowrap',
     className: 'tabular-nums whitespace-nowrap',
-    sortValue: (o) => o.iskTiedUp,
+    sortValue: (o) => o.price,
+    render: (o) => formatMarketIsk(o.price),
+  },
+  cheapest: {
+    id: 'cheapest',
+    header: 'Station cheapest',
+    align: 'right',
+    headerClassName: 'whitespace-nowrap',
+    className: 'tabular-nums whitespace-nowrap',
+    sortValue: (o) => stationRival(o)?.price,
+    render: (o) => {
+      const rival = stationRival(o);
+      if (!rival) return dim;
+      return (
+        <span>
+          {formatMarketIsk(rival.price)}
+          {o.side === 'buy' && <span className="text-text-dim"> bid</span>}
+        </span>
+      );
+    },
+  },
+  floor: {
+    id: 'floor',
+    header: 'Never sell below',
+    align: 'right',
+    headerClassName: 'whitespace-nowrap',
+    className: 'tabular-nums whitespace-nowrap',
+    sortValue: (o) => o.floor,
+    render: (o) =>
+      o.floor === undefined ? (
+        dim
+      ) : (
+        <span className={o.price < o.floor ? 'text-isk-neg' : undefined}>
+          {formatMarketIsk(o.floor)}
+        </span>
+      ),
+  },
+  remaining: {
+    id: 'remaining',
+    header: 'Remaining',
+    align: 'right',
+    className: 'tabular-nums whitespace-nowrap',
+    sortValue: (o) => o.remain / o.total,
+    render: (o) => `${o.remain.toLocaleString('en-US')} / ${o.total.toLocaleString('en-US')}`,
+  },
+  expires: {
+    id: 'expires',
+    header: 'Expires',
+    align: 'right',
+    className: 'tabular-nums whitespace-nowrap',
+    sortValue: (o) => o.expiresDays,
     render: (o) => (
-      <span data-dense-omit>
-        <IskAmount value={o.iskTiedUp} />
-      </span>
+      <span className={o.expiresDays <= 7 ? 'text-warning' : undefined}>{o.expiresDays}d</span>
     ),
   },
-];
+} satisfies Record<string, DataTableColumn<MockOrder>>;
+
+type OptionalColumnId = keyof typeof optionalColumns;
+const OPTIONAL_IDS = Object.keys(optionalColumns) as OptionalColumnId[];
+
+/** Fixed columns, then the optional ones that are on, then ISK tied up last. */
+function tableColumns(visible: readonly OptionalColumnId[]): DataTableColumn<MockOrder>[] {
+  return [
+    ...fixedColumns,
+    ...OPTIONAL_IDS.filter((id) => visible.includes(id)).map((id) => optionalColumns[id]),
+    tiedUpColumn,
+  ];
+}
 
 function rowMenu(order: MockOrder, tr: ReactElement) {
   return (
@@ -204,8 +291,18 @@ function FixListSummary() {
   );
 }
 
-function OrderFilters() {
+function OrderFilters({
+  visible,
+  onToggle,
+  onReset,
+}: {
+  visible: readonly OptionalColumnId[];
+  onToggle: (id: OptionalColumnId) => void;
+  onReset: () => void;
+}) {
   const [value, setValue] = useState({ text: '' });
+  // Phone cards ignore column choices, as the phone list does today.
+  const isPhone = useIsPhone();
   return (
     <FilterBar
       className="min-w-0 flex-1"
@@ -213,6 +310,21 @@ function OrderFilters() {
       onChange={setValue}
       activeCount={0}
       triggerLabel
+      actions={
+        !isPhone && (
+          <ColumnPickerMenu
+            available={OPTIONAL_IDS}
+            visible={visible}
+            columnsById={optionalColumns}
+            onToggle={onToggle}
+            buttonLabel="Columns"
+            menuTitle="Show columns"
+            onReset={onReset}
+            resetLabel="Reset to default"
+            showLabel
+          />
+        )
+      }
       search={
         <SearchInput
           className="min-w-40 flex-1"
@@ -288,8 +400,17 @@ function ListNotes() {
   );
 }
 
-function OrdersPage({ detail }: { detail?: ModalPlacement }) {
+function OrdersPage({
+  detail,
+  initialColumns = [],
+}: {
+  detail?: ModalPlacement;
+  initialColumns?: readonly OptionalColumnId[];
+}) {
   const [view, setView] = useState<View>('act');
+  const [visible, setVisible] = useState<readonly OptionalColumnId[]>(initialColumns);
+  const toggleColumn = (id: OptionalColumnId) =>
+    setVisible((on) => (on.includes(id) ? on.filter((x) => x !== id) : [...on, id]));
   return (
     <div className="space-y-3 px-4 py-4">
       <OpenOrdersChrome
@@ -317,12 +438,12 @@ function OrdersPage({ detail }: { detail?: ModalPlacement }) {
             { value: 'all', label: `All (${ACT.length + WATCH.length + FINE.length})` },
           ]}
         />
-        <OrderFilters />
+        <OrderFilters visible={visible} onToggle={toggleColumn} onReset={() => setVisible([])} />
       </div>
       <DataTable
         label="Orders that need you"
         className="dt-actions-pinned-only"
-        columns={columns}
+        columns={tableColumns(visible)}
         rows={ACT}
         rowKey={(o) => o.id}
         density="compact"
@@ -569,6 +690,11 @@ type Story = StoryObj<typeof meta>;
 
 /** @summary Fix list: headline count, Needs you / Watch / All, one flat worst-first table of item, what's wrong, do this (exact price to copy) and ISK tied up. New components: FixListSummary, HealthyFold, ListNotes. */
 export const Page: Story = {};
+
+/** @summary Every optional column turned on from the Columns button: Your price, Station cheapest, Never sell below, Remaining, Expires. All are off by default. */
+export const PageAllColumns: Story = {
+  render: () => <OrdersPage initialColumns={OPTIONAL_IDS} />,
+};
 
 /** @summary Phone: the same headline and segments, the list as dense two-line cards (item + badge, then the verdict with the price to copy). */
 export const PagePhone: Story = {
