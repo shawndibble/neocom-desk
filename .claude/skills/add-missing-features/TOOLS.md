@@ -348,10 +348,22 @@ NARROW — History margin/broker totals, By day, All characters FIFO, Trading
 profit widget. #3987 → #3990 NARROW — invention reopened (SDE kept only
 activities 1/11) as a Blueprint Acquisition tier per decryptor.
 
+**Janice open GitHub issues (appraisal sweep):** #4022 NARROW — Appraisal paste
+reads dot/space/apostrophe-grouped quantities and flags unreadable ones instead
+of pricing them as 1 (Janice #34/#28/#22).
+
 ## Killed / dropped candidates (never filed)
 
 Grouped by the test that killed them; the reason is what stops a re-pitch.
 
+- **Janice-issue seeds, Appraisal:** already shipped — remembered hub and Price
+  Percent plus `?hub=`/`?percent=` (#33/#24/#48), Price % as the multiplier
+  (#26), 5 Trade Hubs (#25), Clear, refine leftover hint (#43), Moon Mining
+  Tax/Survey (#44). Hostile KILL: ISK/m³ column (#32/#46; volume column and
+  total exist, courier decision `20260912-143620` ranks ISK/m³ secondary),
+  compress-ore action (#18; Ore Form setting and decision `20261006-185915`
+  cover it, widest build for the narrowest reach), per-row exclude (#35;
+  deleting a paste line does the same and the paste is the share-link source).
 - **MoMa leftovers:** station-trading flip finder (owner: needed a new tab —
   no new pages; Hauling's 3-pass scan is the feasible shape if
   revived inline). Compressed-ore buying (structure refine rates are out,
