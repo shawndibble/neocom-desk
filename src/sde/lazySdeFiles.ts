@@ -26,6 +26,7 @@ export const LAZY_SDE_FILES: readonly string[] = [
   'pi-system-planets.json',
   'reprocessing.json',
   'marketWideTrees.json',
+  'invention.json',
 ];
 
 /**
