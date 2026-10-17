@@ -734,9 +734,14 @@ export function OrderDetailContent({
               )}
             </>
           )}
-          <div className="mt-3 flex flex-wrap gap-2">
-            {/* Only a price the call recommends (`verdictFigures`). */}
-            {!isPhone && copyPrice !== null && <CopyPriceButton price={copyPrice} />}
+          {/* Only a price the call recommends (`verdictFigures`). On a phone it is the sheet's footer. */}
+          {!isPhone && copyPrice !== null && (
+            <div className="mt-3">
+              <CopyPriceButton price={copyPrice} />
+            </div>
+          )}
+          {/* The two ways to the item's market share a line of their own, under the one action. */}
+          <div className="mt-2 flex flex-wrap gap-2">
             {/*
               The phone list's row is plain text, not `MarketItemLink` (a
               link nested in the row's own tap target would be nested
