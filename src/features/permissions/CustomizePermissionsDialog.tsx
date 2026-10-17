@@ -103,6 +103,18 @@ export function CustomizePermissionsDialog({
       onClose={handleClose}
       title={title ?? t('permissions.customize.title')}
       placement="wide"
+      footer={
+        <div className="flex flex-wrap gap-2">
+          <NeedsConnection>
+            <Button variant="primary" disabled={locked} onClick={() => void submit()}>
+              {t('permissions.customize.submit')}
+            </Button>
+          </NeedsConnection>
+          <Button onClick={handleClose} disabled={submitting}>
+            {t('common.cancel')}
+          </Button>
+        </div>
+      }
     >
       <div className="space-y-4 text-sm">
         <p className="text-text-dim">{t('permissions.customize.intro')}</p>
@@ -168,21 +180,6 @@ export function CustomizePermissionsDialog({
               </label>
             );
           })}
-        </div>
-
-        {/* Sticky inside the Modal's own scroll region: the negative margins
-          cancel the body's `p-3` so the bar spans edge to edge, flush with the
-          bottom. It only visibly differs once the checklist actually scrolls
-          (a phone); buttons stay at the default `md` 44px touch tier. */}
-        <div className="sticky -bottom-3 -mx-3 -mb-3 flex flex-wrap gap-2 border-t border-line bg-panel px-3 py-2">
-          <NeedsConnection>
-            <Button variant="primary" disabled={locked} onClick={() => void submit()}>
-              {t('permissions.customize.submit')}
-            </Button>
-          </NeedsConnection>
-          <Button onClick={handleClose} disabled={submitting}>
-            {t('common.cancel')}
-          </Button>
         </div>
       </div>
     </Modal>
