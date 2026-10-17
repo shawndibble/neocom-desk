@@ -740,7 +740,13 @@ export function OrderDetailContent({
             </MarketItemLink>
             {/* Where the order is edited. An abyssal type has no market window. */}
             <MarketOnly typeId={row.typeId}>
-              <OpenInEveButton kind="marketDetails" id={row.typeId} name={row.typeName} />
+              <OpenInEveButton
+                kind="marketDetails"
+                id={row.typeId}
+                name={row.typeName}
+                size="md"
+                inRow
+              />
             </MarketOnly>
           </div>
         </div>

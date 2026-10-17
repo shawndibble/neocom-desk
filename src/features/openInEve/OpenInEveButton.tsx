@@ -6,7 +6,7 @@
  */
 import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button } from '@/components/ui';
+import { Button, type ButtonSize } from '@/components/ui';
 import type { OpenInEveTarget } from './sendOpenInEve';
 import { useOpenInEve, type OpenInEveLookup } from './useOpenInEve';
 
@@ -15,11 +15,21 @@ export function OpenInEveButton({
   id,
   name,
   lookup,
+  size = 'sm',
+  inRow = false,
 }: OpenInEveTarget & {
   /** What is being opened, for the button's accessible name. */
   name?: string;
   /** The id isn't known yet: find it when pressed (`id` is then ignored). */
   lookup?: OpenInEveLookup;
+  /** Match the buttons beside it; `sm` for a header. */
+  size?: ButtonSize;
+  /**
+   * The button and its reason or outcome join the parent's flex row as
+   * separate items, so a message that appears wraps alone instead of taking
+   * the button to a new line under the pointer.
+   */
+  inRow?: boolean;
 }) {
   const { t } = useTranslation();
   const { blockedReason, sending, outcome, send } = useOpenInEve({ kind, id }, lookup);
@@ -27,9 +37,9 @@ export function OpenInEveButton({
   const reasonId = useId();
 
   return (
-    <span className="inline-flex flex-wrap items-center gap-2">
+    <span className={inRow ? 'contents' : 'inline-flex flex-wrap items-center gap-2'}>
       <Button
-        size="sm"
+        size={size}
         // Stays focusable with its reason linked, rather than the native attribute (DESIGN §6c Disabled).
         aria-disabled={blockedReason !== null || undefined}
         aria-describedby={blockedReason !== null ? reasonId : undefined}
@@ -40,14 +50,14 @@ export function OpenInEveButton({
         {label}
       </Button>
       {blockedReason !== null && (
-        <span id={reasonId} className="text-[0.6875rem] text-text-dim">
+        <span id={reasonId} className="self-center text-[0.6875rem] text-text-dim">
           {blockedReason}
         </span>
       )}
       {outcome && (
         <span
           role={outcome.tone}
-          className={outcome.tone === 'alert' ? 'text-xs text-danger' : 'text-xs text-success'}
+          className={`self-center text-xs ${outcome.tone === 'alert' ? 'text-danger' : 'text-success'}`}
         >
           {outcome.text}
         </span>
