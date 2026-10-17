@@ -368,16 +368,18 @@ export function OpportunitiesPanel({
     assumedMe,
   });
 
-  // Each product's history in its own row's hub region, for "vs 90d"; All owned never shows it.
+  // Each product's history in its own row's hub region, for "vs 90d". Held while
+  // ranking streams partial rows (each batch would restart the fan-out), and
+  // never for All owned, which has no such column.
   const vs90dTargets = useMemo(
     () =>
-      view === 'owned'
+      view === 'owned' || loading
         ? []
         : allRows.flatMap((row) => {
             const typeId = row.candidate.catalogEntry.productTypeID;
             return typeId === null ? [] : [{ hubId: row.hub.id, typeId }];
           }),
-    [allRows, view]
+    [allRows, view, loading]
   );
   const priceVsMedian = usePriceVsMedian(vs90dTargets);
   const rows = useMemo(
