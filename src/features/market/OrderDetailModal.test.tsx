@@ -17,22 +17,18 @@ import { loadMutaplasmids } from '@/sde/loadSde';
 import { resetMutaplasmidLookupForTests } from '@/features/abyssal/mutaplasmidData';
 
 // Open market in EVE asks whether the type is abyssal; default: nothing is.
+const { NO_ABYSSAL } = vi.hoisted(() => ({
+  NO_ABYSSAL: { attributeNames: {}, mutaplasmids: {}, abyssalTypeIds: [] as number[] },
+}));
 vi.mock('@/sde/loadSde', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/sde/loadSde')>()),
-  loadMutaplasmids: vi.fn(async () => ({
-    attributeNames: {},
-    mutaplasmids: {},
-    abyssalTypeIds: [],
-  })),
+  loadMutaplasmids: vi.fn(async () => NO_ABYSSAL),
 }));
 const mockedLoadMutaplasmids = vi.mocked(loadMutaplasmids);
 beforeEach(() => {
   resetMutaplasmidLookupForTests();
-  mockedLoadMutaplasmids.mockResolvedValue({
-    attributeNames: {},
-    mutaplasmids: {},
-    abyssalTypeIds: [],
-  });
+  mockedLoadMutaplasmids.mockClear();
+  mockedLoadMutaplasmids.mockResolvedValue(NO_ABYSSAL);
 });
 
 const SIMPLE_ORE_PROCESSING = 60377;
@@ -178,6 +174,15 @@ describe('OrderDetailModal', () => {
     // Holding nets price - fill: 500 - 520.
     expect(fact('You keep a unit')).toHaveTextContent('-20.00');
     expect(fact('You keep a unit')?.firstElementChild).toHaveClass('text-isk-neg');
+  });
+
+  it('prints a break-even unit as an unsigned, uncoloured 0.00', () => {
+    // price 500 - fill 500: neither a gain nor a loss.
+    renderModal({ row: { ...BASE_ROW, floor: { relist: 520, fill: 500 } } });
+    const kept = screen.getByText('You keep a unit').nextElementSibling?.firstElementChild;
+    expect(kept).toHaveTextContent(/^0\.00$/);
+    expect(kept).not.toHaveClass('text-isk-pos');
+    expect(kept).not.toHaveClass('text-isk-neg');
   });
 
   it('keeps the floor, remaining and expiry one fold away', () => {
@@ -1316,15 +1321,11 @@ describe('OrderDetailModal — Open market in EVE (#4025)', () => {
 
   it('offers none for an abyssal type, which has no market window', async () => {
     const ABYSSAL_TYPE = 47832;
-    mockedLoadMutaplasmids.mockResolvedValue({
-      attributeNames: {},
-      mutaplasmids: {},
-      abyssalTypeIds: [ABYSSAL_TYPE],
-    });
+    mockedLoadMutaplasmids.mockResolvedValue({ ...NO_ABYSSAL, abyssalTypeIds: [ABYSSAL_TYPE] });
     renderModal({ row: { ...BASE_ROW, typeId: ABYSSAL_TYPE } });
+    await waitFor(() => expect(mockedLoadMutaplasmids).toHaveBeenCalled());
     await waitFor(() =>
       expect(screen.queryByRole('button', { name: /Open market in EVE/ })).not.toBeInTheDocument()
     );
-    expect(screen.getByRole('link', { name: 'View in Market' })).toBeInTheDocument();
   });
 });

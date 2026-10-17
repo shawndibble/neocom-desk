@@ -39,7 +39,7 @@ import { useTableExport } from '@/components/ui/useTableExport';
 import { cx } from '@/lib/cx';
 import { buttonClassName } from '@/components/ui/buttonClassName';
 import { Link } from 'react-router-dom';
-import { formatIsk, formatMarketIsk, marketIskDecimals } from '@/lib/isk';
+import { formatIsk, formatMarketIsk } from '@/lib/isk';
 import type { JumpsAwayResult } from '@/engine/jumpsAway';
 import { JumpsAwayText } from '@/features/character/assetBrowserRows';
 import type { UndercutRival, UndercutScope } from '@/engine/market/undercut';
@@ -65,9 +65,9 @@ import {
 } from '@/engine/industry/characterModifiers';
 import { roundPriceUp } from '@/engine/market/priceTick';
 import { CopyablePrice, CopyPriceButton } from './CopyablePrice';
-import { signedIsk } from './signedIsk';
+import { marketIskTone, signedMarketIsk } from './signedIsk';
 import { OpenInEveButton } from '@/features/openInEve/OpenInEveButton';
-import { useIsAbyssalType } from '@/features/abyssal/mutaplasmidData';
+import { MarketOnly } from '@/features/abyssal/MarketOnly';
 import { MarketItemLink } from './MarketItemLink';
 import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
 import { StructureFeeLine } from './StructureFeeLine';
@@ -144,14 +144,9 @@ function tightestRivalScope(
     : 'clear';
 }
 
-/** `signedIsk` at Market precision — `+30.00`, `-30.10`. */
-const signedMarketIsk = (amount: number) => signedIsk(amount, marketIskDecimals(amount));
-
 /** Money, not status: the ISK delta tokens, with the sign (DESIGN.md §1). */
 function IskDelta({ amount }: { amount: number }) {
-  return (
-    <span className={amount >= 0 ? 'text-isk-pos' : 'text-isk-neg'}>{signedMarketIsk(amount)}</span>
-  );
+  return <span className={marketIskTone(amount)}>{signedMarketIsk(amount)}</span>;
 }
 
 /** Short label for an exit's kind in the "Other ways out" disclosure's trailing read — distinct from the exit's own full sentence, which states the price rather than the net. */
@@ -493,8 +488,6 @@ export function OrderDetailContent({
 }: OrderDetailContentProps) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
-  // Null while the lookup loads; shown then, as Show info does.
-  const abyssal = useIsAbyssalType(row.typeId);
   // All folded: verdict, Copy and the facts are the answer, each trailing read
   // its summary. Remounts per orderId, so nothing carries between orders.
   const [openSections, setOpenSections] = useState<ReadonlySet<OrderDetailSectionId>>(
@@ -746,9 +739,9 @@ export function OrderDetailContent({
               {t('orders.viewInMarket')}
             </MarketItemLink>
             {/* Where the order is edited. An abyssal type has no market window. */}
-            {abyssal !== true && (
+            <MarketOnly typeId={row.typeId}>
               <OpenInEveButton kind="marketDetails" id={row.typeId} name={row.typeName} />
-            )}
+            </MarketOnly>
           </div>
         </div>
 
@@ -1095,10 +1088,7 @@ export function OrderDetailContent({
                             )}
                           </span>
                           <span
-                            className={cx(
-                              'shrink-0 tabular-nums',
-                              exit.netPerUnit >= 0 ? 'text-isk-pos' : 'text-isk-neg'
-                            )}
+                            className={cx('shrink-0 tabular-nums', marketIskTone(exit.netPerUnit))}
                           >
                             {t('market.orders.exitPerUnit', {
                               amount: signedMarketIsk(exit.netPerUnit),

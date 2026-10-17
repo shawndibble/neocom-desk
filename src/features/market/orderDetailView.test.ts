@@ -412,6 +412,7 @@ describe('verdictFigures', () => {
   it('copies nothing for a price-up verdict whose price is null, never a price its sentence lacks', () => {
     // A degenerate floor `roundPriceUp` rejects leaves the verdict priceless.
     const row = openOrderRow({ ...UNDERCUT, floor: { relist: 400, fill: 390 } });
+    // Without the override this row copies 449.90 (the matchThem case above).
     const advice = {
       ...adviseOrder(row),
       verdict: { kind: 'raisePrice' as const, amount: 200, price: null },

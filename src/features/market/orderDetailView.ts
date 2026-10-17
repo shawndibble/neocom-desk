@@ -152,13 +152,9 @@ export function relistFees(
 /** The verdict block's two figures: what its Copy button copies, and the "You keep a unit" fact. */
 export interface VerdictFigures {
   /**
-   * The exact price to type into the order, or null when the call asks for
-   * no new price. Only a price the call recommends: never the cheapest rival
-   * on its own (a fact, not advice), never your current price, never a
-   * `letGo` verdict's price (only there to make its sentence add up).
-   * `matchThem` copies the verdict's own price, already the legal one-tick-
-   * under price (issue #1421), so Copy can't disagree with the sentence; a
-   * verdict whose price is null (a degenerate floor) copies nothing.
+   * The price to type, or null. Only a recommended one: never the cheapest rival, your
+   * current price or a `letGo` price (its sentence's illustration). `matchThem` reuses the
+   * verdict's legal one-tick-under price (#1421); a null verdict price copies nothing.
    */
   copyPrice: number | null;
   /**
