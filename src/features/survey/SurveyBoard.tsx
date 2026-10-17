@@ -31,6 +31,7 @@ import {
 } from '@/engine/survey/series';
 import { writeToClipboard } from '@/lib/clipboard';
 import { useNow } from '@/lib/useNow';
+import { SurveyHubSelect } from './SurveyHubSelect';
 import { SurveyCopyButton, type CopyOutcome } from './SurveyCopyButton';
 import { SurveyLegend } from './SurveyLegend';
 import { SurveyOres } from './SurveyOres';
@@ -154,11 +155,14 @@ export function SurveyBoard({
 
   // The copy button sits in the panel header, on a phone too.
   const copyButton = (current: SurveySummary, link: string) => (
-    <SurveyCopyButton
-      outcome={outcome}
-      onCopyChat={() => copy('chat', surveyChatMessage(current, link, labels, now))}
-      onCopyLink={() => copy('link', link)}
-    />
+    <div className="flex items-center gap-2">
+      <SurveyHubSelect />
+      <SurveyCopyButton
+        outcome={outcome}
+        onCopyChat={() => copy('chat', surveyChatMessage(current, link, labels, now))}
+        onCopyLink={() => copy('link', link)}
+      />
+    </div>
   );
 
   if (summary === null) {
