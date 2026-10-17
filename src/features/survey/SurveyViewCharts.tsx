@@ -55,13 +55,13 @@ function ViewFigure({
   table,
 }: {
   label: string;
-  chart: ReactNode;
+  chart: ReactElement;
   table: ReactNode;
 }) {
   return (
     <figure aria-label={label} className="m-0">
       <div className="w-full" style={{ height: FULL_HEIGHT }}>
-        <ResponsiveContainer>{chart as ReactElement}</ResponsiveContainer>
+        <ResponsiveContainer>{chart}</ResponsiveContainer>
       </div>
       <figcaption className="sr-only">{label}</figcaption>
       {/* On a wrapper: a <table> ignores sr-only's clip and still stretches the page. */}

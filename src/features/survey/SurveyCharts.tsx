@@ -28,6 +28,7 @@ import { DataTable, type DataTableColumn } from '@/components/ui';
 import { formatEveClock } from '@/engine/survey/chatMessage';
 import { spacedLabels } from '@/engine/survey/labelSpacing';
 import type { SurveySummary } from '@/engine/survey/series';
+import type { SurveyChartView } from '@/engine/survey/chartViews';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import {
   FULL_HEIGHT,
@@ -93,7 +94,7 @@ export function SurveyCharts({
    * Which chart the volume slot shows: `ore` (default, the stacked ore volume),
    * `depletion` or `isk`. Ignored when `compactHeight` is set.
    */
-  view?: 'ore' | 'depletion' | 'isk';
+  view?: SurveyChartView;
 }) {
   const { t } = useTranslation();
   const compact = compactHeight !== undefined;

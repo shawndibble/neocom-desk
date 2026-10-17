@@ -10,7 +10,7 @@ export type SurveyChartView = 'ore' | 'depletion' | 'isk';
 /** ISK view needs ISK on the rows and at least one ore with a market price. */
 export function availableChartViews(summary: SurveySummary): SurveyChartView[] {
   const views: SurveyChartView[] = ['ore', 'depletion'];
-  if (!(summary.iskLeft === null || summary.ores.every((o) => o.unitPrice === null))) {
+  if (summary.iskLeft !== null && summary.ores.some((o) => o.unitPrice !== null)) {
     views.push('isk');
   }
   return views;

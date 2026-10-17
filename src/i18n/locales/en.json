@@ -5692,7 +5692,6 @@
     "tableRate": "Mining rate",
     "tableIskTotal": "ISK left",
     "tableIskMined": "ISK mined",
-    "tablePercent": "% left",
     "oresTitle": "Left of each ore",
     "oreRocks_one": "{{count}} rock",
     "oreRocks_other": "{{count}} rocks",
