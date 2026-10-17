@@ -7,7 +7,13 @@ import { useTranslation } from 'react-i18next';
 import type { SurveySummary } from '@/engine/survey/series';
 import { oreTone } from './surveyTones';
 
-export function SurveyLegend({ summary }: { summary: SurveySummary }) {
+export function SurveyLegend({
+  summary,
+  showRate = true,
+}: {
+  summary: SurveySummary;
+  showRate?: boolean;
+}) {
   const { t } = useTranslation();
   return (
     <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-dim">
@@ -21,10 +27,12 @@ export function SurveyLegend({ summary }: { summary: SurveySummary }) {
           {ore}
         </li>
       ))}
-      <li className="flex items-center gap-1.5">
-        <span aria-hidden="true" className="size-2.5 rounded-xs bg-accent-dim" />
-        {t('survey.legendRate')}
-      </li>
+      {showRate && (
+        <li className="flex items-center gap-1.5">
+          <span aria-hidden="true" className="size-2.5 rounded-xs bg-accent-dim" />
+          {t('survey.legendRate')}
+        </li>
+      )}
     </ul>
   );
 }

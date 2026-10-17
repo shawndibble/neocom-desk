@@ -38,3 +38,49 @@ describe('SurveyCharts text version', () => {
     expect(rate.closest('[role="img"]')).toBeNull();
   });
 });
+
+describe('SurveyCharts views', () => {
+  const priced = (at: number, rows: [string, number, number | undefined][]): SurveyScan => ({
+    at,
+    rocks: rows.map(([ore, volume, isk]) => ({ ore, volume, isk })),
+  });
+  const summary = summarizeSurvey(
+    [
+      priced(0, [
+        ['Veldspar', 1000, 1000],
+        ['Scordite', 500, undefined],
+      ]),
+      priced(60_000, [
+        ['Veldspar', 800, 800],
+        ['Scordite', 400, undefined],
+      ]),
+    ],
+    new Map([['Veldspar', 1]])
+  )!;
+
+  it('depletion view draws a percent table per scan, with an All ore column', () => {
+    render(<SurveyCharts summary={summary} view="depletion" />);
+    const table = screen.getByRole('table', { name: /ore left by percent/i });
+    expect(within(table).getAllByRole('row')).toHaveLength(1 + 2);
+    expect(within(table).getByRole('columnheader', { name: 'All ore' })).toBeInTheDocument();
+    expect(within(table).getByRole('columnheader', { name: 'Scordite' })).toBeInTheDocument();
+    expect(table.closest('figure')).not.toBeNull();
+    expect(screen.queryByRole('table', { name: /mining rate/i })).toBeNull();
+  });
+
+  it('isk view tabulates priced ores only', () => {
+    render(<SurveyCharts summary={summary} view="isk" />);
+    const table = screen.getByRole('table', { name: /isk left/i });
+    expect(within(table).getAllByRole('row')).toHaveLength(1 + 2);
+    expect(within(table).getByRole('columnheader', { name: 'Veldspar' })).toBeInTheDocument();
+    expect(within(table).queryByRole('columnheader', { name: 'Scordite' })).toBeNull();
+    expect(within(table).getByRole('columnheader', { name: 'ISK mined' })).toBeInTheDocument();
+    expect(screen.queryByRole('table', { name: /mining rate/i })).toBeNull();
+  });
+
+  it('default view keeps the Ore left tables', () => {
+    render(<SurveyCharts summary={summary} />);
+    expect(screen.getByRole('table', { name: /volume left/i })).toBeInTheDocument();
+    expect(screen.queryByRole('table', { name: /isk left/i })).toBeNull();
+  });
+});

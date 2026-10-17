@@ -314,6 +314,8 @@ export function SurveyTab({ tabBar, tabsId }: SurveyTabProps) {
               </p>
             )}
             <SurveyBoard
+              // Opening another Survey starts its chart back on Ore left.
+              key={currentId ?? 'none'}
               scans={scans}
               ignored={state.status === 'ready' ? state.ignored : undefined}
               onSetIgnored={

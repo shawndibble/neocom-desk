@@ -10,9 +10,11 @@ function sourceFiles(dir: string): string[] {
   });
 }
 
-const chartFiles = sourceFiles(__dirname).filter((path) =>
-  /from 'recharts'/.test(readFileSync(path, 'utf8'))
-);
+// A recharts helper file with no `<Tooltip>` of its own (shared axes, dots) has no bubble to wrap.
+const chartFiles = sourceFiles(__dirname).filter((path) => {
+  const source = readFileSync(path, 'utf8');
+  return /from 'recharts'/.test(source) && /<Tooltip\b/.test(source);
+});
 
 describe('chart tooltip shell', () => {
   it('finds the chart files', () => {

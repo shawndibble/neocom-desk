@@ -15,19 +15,24 @@ import { useSurveyChatOptions } from './surveyPref';
 // Recharts needs a real layout; the chart has its own concerns.
 vi.mock('@/lib/useIsPhone', () => ({ useIsPhone: vi.fn(() => false) }));
 // Rocks are valued at market; the hook's own lookup has its own concerns.
+const priced = vi.hoisted(() => ({ on: true }));
 vi.mock('./useOrePrices', () => ({
   useOrePrices: () => ({
-    prices: new Map([
-      ['Clear Icicle', 200_000],
-      ['Scordite', 100],
-      ['Veldspar', 80],
-      ['Pyroxeres', 40],
-    ]),
+    prices: priced.on
+      ? new Map([
+          ['Clear Icicle', 200_000],
+          ['Scordite', 100],
+          ['Veldspar', 80],
+          ['Pyroxeres', 40],
+        ])
+      : new Map<string, number>(),
     hub: { id: 'jita', name: 'Jita IV - Moon 4', systemName: 'Jita' },
     compressed: true,
   }),
 }));
-vi.mock('./SurveyCharts', () => ({ SurveyCharts: () => <div data-testid="charts" /> }));
+vi.mock('./SurveyCharts', () => ({
+  SurveyCharts: ({ view }: { view?: string }) => <div data-testid="charts" data-view={view} />,
+}));
 
 const FIRST = [
   'Clear Icicle\t25\t25,000 m3\t5,120,000.00 ISK\t28 km',
@@ -50,6 +55,7 @@ const URL = 'https://neocomdesk.test/share/abc123XYZ';
 
 afterEach(async () => {
   cleanup();
+  priced.on = true;
   await db.settings.clear();
   useSurveyChatOptions.setState({ value: DEFAULT_SURVEY_CHAT_OPTIONS, hydrated: false });
   vi.mocked(useIsPhone).mockReturnValue(false);
@@ -372,5 +378,41 @@ describe('SurveyBoard', () => {
       await userEvent.click(screen.getByRole('button', { name: BUTTON }));
       expect((await screen.findByRole('alert')).textContent).toMatch(/Couldn't mark/);
     });
+  });
+});
+
+describe('SurveyBoard chart view', () => {
+  const view = () => screen.getByRole('combobox', { name: 'Chart view' });
+
+  it('shows the select with two scans, starting on Ore left with the rate swatch', async () => {
+    render(<SurveyBoard scans={SCANS} url={URL} expiresAt={Date.UTC(2026, 9, 15)} />);
+    expect((await screen.findByTestId('charts')).getAttribute('data-view')).toBe('ore');
+    expect(view().textContent).toContain('Ore left');
+    expect(screen.getByText('Mining rate')).toBeTruthy();
+  });
+
+  it('has no select with a single scan', () => {
+    render(<SurveyBoard scans={SCANS.slice(0, 1)} url={URL} expiresAt={Date.UTC(2026, 9, 15)} />);
+    expect(screen.queryByRole('combobox', { name: 'Chart view' })).toBeNull();
+  });
+
+  it('passes Depletion by ore to the chart and drops the rate swatch', async () => {
+    const user = userEvent.setup();
+    render(<SurveyBoard scans={SCANS} url={URL} expiresAt={Date.UTC(2026, 9, 15)} />);
+    await screen.findByTestId('charts');
+    await user.click(view());
+    await user.click(await screen.findByRole('option', { name: 'Depletion by ore' }));
+    expect(screen.getByTestId('charts').getAttribute('data-view')).toBe('depletion');
+    expect(screen.queryByText('Mining rate')).toBeNull();
+  });
+
+  it('offers no ISK option when no ore has a price', async () => {
+    priced.on = false;
+    const user = userEvent.setup();
+    render(<SurveyBoard scans={SCANS} url={URL} expiresAt={Date.UTC(2026, 9, 15)} />);
+    await screen.findByTestId('charts');
+    await user.click(view());
+    expect(await screen.findByRole('option', { name: 'Depletion by ore' })).toBeTruthy();
+    expect(screen.queryByRole('option', { name: /ISK/ })).toBeNull();
   });
 });

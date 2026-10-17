@@ -36,6 +36,8 @@ export interface SurveyInterval {
   added: number;
   /** m³/s over the interval. */
   rate: number;
+  /** ISK mined: per ore, the m³ mined times that ore's ISK per m³ at the earlier scan. */
+  minedIsk: number;
 }
 
 export interface SurveyOre {
@@ -58,6 +60,8 @@ export interface SurveyPoint {
   total: number;
   /** Volume left per ore, m³. */
   byOre: Record<string, number>;
+  /** The scanner's ISK value left per ore (hub-priced rocks); unpriced rocks count 0. */
+  iskByOre: Record<string, number>;
   by?: string;
 }
 
@@ -93,6 +97,20 @@ export interface SurveySummary {
 /** How many of the latest intervals the pace is averaged over. */
 export const PACE_INTERVALS = 2;
 
+/** Volume and scanner ISK left per ore in a scan. */
+function oreTotals(scan: SurveyScan): {
+  byOre: Record<string, number>;
+  iskByOre: Record<string, number>;
+} {
+  const byOre: Record<string, number> = {};
+  const iskByOre: Record<string, number> = {};
+  for (const rock of scan.rocks) {
+    byOre[rock.ore] = (byOre[rock.ore] ?? 0) + rock.volume;
+    iskByOre[rock.ore] = (iskByOre[rock.ore] ?? 0) + (rock.isk ?? 0);
+  }
+  return { byOre, iskByOre };
+}
+
 const total = (scan: SurveyScan): number => scan.rocks.reduce((sum, r) => sum + r.volume, 0);
 
 /**
@@ -105,7 +123,12 @@ const total = (scan: SurveyScan): number => scan.rocks.reduce((sum, r) => sum + 
 function diffScans(
   before: SurveyScan,
   after: SurveyScan
-): { mined: number; added: number; addedByOre: Record<string, number> } {
+): {
+  mined: number;
+  added: number;
+  addedByOre: Record<string, number>;
+  minedByOre: Record<string, number>;
+} {
   const unused = new Map<string, number[]>();
   for (const r of before.rocks) unused.set(r.ore, [...(unused.get(r.ore) ?? []), r.volume]);
   for (const list of unused.values()) list.sort((a, b) => a - b);
@@ -113,6 +136,11 @@ function diffScans(
   let mined = 0;
   let added = 0;
   const addedByOre: Record<string, number> = {};
+  const minedByOre: Record<string, number> = {};
+  const mine = (ore: string, v: number) => {
+    mined += v;
+    minedByOre[ore] = (minedByOre[ore] ?? 0) + v;
+  };
   for (const rock of [...after.rocks].sort((a, b) => b.volume - a.volume)) {
     const list = unused.get(rock.ore) ?? [];
     const at = list.findIndex((v) => v >= rock.volume);
@@ -120,12 +148,12 @@ function diffScans(
       added += rock.volume;
       addedByOre[rock.ore] = (addedByOre[rock.ore] ?? 0) + rock.volume;
     } else {
-      mined += list[at] - rock.volume;
+      mine(rock.ore, list[at] - rock.volume);
       list.splice(at, 1);
     }
   }
-  for (const list of unused.values()) for (const v of list) mined += v;
-  return { mined, added, addedByOre };
+  for (const [ore, list] of unused) for (const v of list) mine(ore, v);
+  return { mined, added, addedByOre, minedByOre };
 }
 
 /**
@@ -176,7 +204,13 @@ export function summarizeSurvey(
   const startByOre: Record<string, number> = {};
   for (const rock of first.rocks) startByOre[rock.ore] = (startByOre[rock.ore] ?? 0) + rock.volume;
   for (let i = 1; i < scans.length; i++) {
-    const { mined, added, addedByOre } = diffScans(scans[i - 1], scans[i]);
+    const { mined, added, addedByOre, minedByOre } = diffScans(scans[i - 1], scans[i]);
+    const earlier = oreTotals(scans[i - 1]);
+    let minedIsk = 0;
+    for (const [ore, volume] of Object.entries(minedByOre)) {
+      const had = earlier.byOre[ore] ?? 0;
+      if (had > 0) minedIsk += volume * ((earlier.iskByOre[ore] ?? 0) / had);
+    }
     for (const [ore, volume] of Object.entries(addedByOre)) {
       startByOre[ore] = (startByOre[ore] ?? 0) + volume;
     }
@@ -187,18 +221,19 @@ export function summarizeSurvey(
       mined,
       added,
       rate: mined / seconds,
+      minedIsk,
     });
   }
 
   const startVolume = total(first) + intervals.reduce((sum, i) => sum + i.added, 0);
 
   const points: SurveyPoint[] = scans.map((scan) => {
-    const byOre: Record<string, number> = {};
-    for (const rock of scan.rocks) byOre[rock.ore] = (byOre[rock.ore] ?? 0) + rock.volume;
+    const { byOre, iskByOre } = oreTotals(scan);
     return {
       at: scan.at,
       total: total(scan),
       byOre,
+      iskByOre,
       ...(scan.by === undefined ? {} : { by: scan.by }),
     };
   });
