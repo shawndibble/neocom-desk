@@ -7,6 +7,7 @@ import { isShareId } from '@/engine/share/shareId';
 import { db } from '@/db';
 import { TIME_FORMATS, TIME_FORMAT_SETTING_KEY, type TimeFormat } from '@/lib/timeFormat';
 import { createLocalSetting } from '@/lib/useLocalSetting';
+import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
 import { useLiveQuery } from 'dexie-react-hooks';
 
 export const useCurrentSurveyId = createLocalSetting<string | null>({
@@ -41,3 +42,15 @@ export function useDoneAtClock(): TimeFormat | null {
   if (override) return override;
   return chosen === undefined ? null : (chosen ?? 'eve');
 }
+
+/**
+ * The Trade Hub a Survey's ISK figures are priced at. Its own, device-local
+ * choice, Jita until the pilot picks another: a Survey is mostly opened to
+ * estimate a field's worth, and nearly everyone wants Jita for that whatever
+ * hub they trade from (Settings' "Default Trade Hub" is not read here).
+ */
+export const useSurveyPriceHub = createLocalSetting<TradeHub['id']>({
+  key: 'miningSurveyPriceHub',
+  defaultValue: DEFAULT_TRADE_HUB.id,
+  parse: (raw) => (typeof raw === 'string' && getTradeHub(raw) ? (raw as TradeHub['id']) : null),
+});

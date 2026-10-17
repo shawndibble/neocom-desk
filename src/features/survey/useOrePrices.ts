@@ -1,13 +1,13 @@
 /**
- * ISK per unit for the ores a Survey shows, from the pilot's default Trade
- * Hub (Jita unless they chose another): the highest buy order of the ore's
+ * ISK per unit for the ores a Survey shows, from the Survey's price hub
+ * (`useSurveyPriceHub`: Jita unless the pilot chose another on this device): the highest buy order of the ore's
  * Compressed form where it has one, as the Moon Mining Tax ledger prices ore
  * (`features/miningTax/pricing.ts`). Works for a visitor with no session too:
- * the hub setting falls back to Jita and Fuzzwork needs no login.
+ * the hub falls back to Jita and Fuzzwork needs no login.
  */
 import { useEffect, useMemo, useState } from 'react';
 import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
-import { useMarketHub } from '@/features/market/hub';
+import { useSurveyPriceHub } from './surveyPref';
 import { loadOrePrices } from './orePrices';
 
 export interface OrePrices {
@@ -18,9 +18,9 @@ export interface OrePrices {
 }
 
 export function useOrePrices(oreNames: readonly string[]): OrePrices {
-  const hubId = useMarketHub((s) => s.value);
-  const hydrated = useMarketHub((s) => s.hydrated);
-  const hydrate = useMarketHub((s) => s.hydrate);
+  const hubId = useSurveyPriceHub((s) => s.value);
+  const hydrated = useSurveyPriceHub((s) => s.hydrated);
+  const hydrate = useSurveyPriceHub((s) => s.hydrate);
   useEffect(() => {
     void hydrate();
   }, [hydrate]);
