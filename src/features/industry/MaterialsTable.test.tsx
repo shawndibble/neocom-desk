@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -22,7 +22,8 @@ import { FACILITY_PRESETS } from '@/engine/industry/types';
 import type { SkillGateVerdict } from '@/engine/industry/skillGate';
 import { resolveMaterial } from '@/engine/industry/materialResolution';
 import { applySourcingPatch } from './sourcingEdits';
-import { MaterialsTable } from './MaterialsTable';
+import { MaterialsTable, type MaterialsTableHandle } from './MaterialsTable';
+import type { GroupStockClaims } from '@/engine/industry/groupStockClaims';
 import { PHONE_QUERY } from '@/lib/useIsPhone';
 import type { MaterialTableRow } from './subBuildPlan';
 import type { OwnedStockDetection } from './ownedStockDetection';
@@ -69,6 +70,7 @@ interface HarnessProps {
   pricesReady?: boolean;
   onChange?: (typeID: number, patch: MaterialSourcing) => void;
   detection?: OwnedStockDetection;
+  groupClaimsFor?: (typeID: number) => GroupStockClaims | null;
 }
 
 /**
@@ -82,11 +84,18 @@ function Harness({
   pricesReady = true,
   onChange,
   detection,
+  groupClaimsFor,
 }: HarnessProps) {
   const [sourcing, setSourcing] = useState<MaterialSourcingMap | undefined>(initial);
+  const table = useRef<MaterialsTableHandle>(null);
   return (
     <MemoryRouter>
+      <button type="button" onClick={() => table.current?.fillAll()}>
+        Harness use all
+      </button>
       <MaterialsTable
+        ref={table}
+        groupClaimsFor={groupClaimsFor}
         materials={asRows(materialCostLines(MATERIALS, hubPrices, sourcing))}
         nameFor={nameFor}
         volumeFor={volumeFor}
@@ -934,6 +943,102 @@ describe('MaterialsTable detected owned stock (issue #181)', () => {
     render(<Harness detection={detectionOf(TRIT_STOCK, { scopedQuantityFor: () => 0 })} />);
 
     expect(queryUseOffer('Tritanium')).not.toBeInTheDocument();
+  });
+
+  describe('inside a Build Group (issue #3992)', () => {
+    // 9,000 detected; Plan A, ahead in member order, already claimed 8,600.
+    const claimsOf =
+      (claims: Partial<GroupStockClaims>) =>
+      (typeID: number): GroupStockClaims | null =>
+        typeID === 34
+          ? {
+              ahead: [{ planId: 'a', name: 'Plan A', quantity: 8600 }],
+              free: 400,
+              overClaim: 0,
+              ...claims,
+            }
+          : null;
+
+    it('names the sibling claim and offers only the free remainder', async () => {
+      const user = userEvent.setup();
+      const onChange = vi.fn();
+      render(
+        <Harness
+          detection={detectionOf(TRIT_STOCK)}
+          groupClaimsFor={claimsOf({})}
+          onChange={onChange}
+        />
+      );
+
+      const offer = useOffer('Tritanium');
+      expect(within(row('Tritanium')).getByText('8,600 in Plan A')).toBeInTheDocument();
+      expect(offer).toHaveTextContent(/^Use 400$/);
+      expect(offer).toHaveAccessibleName(/^Use assets: 400 of the Tritanium you own/);
+      expect(await tooltipOf(offer)).toHaveTextContent('You own 9,000 · 8,600 in Plan A');
+
+      await user.click(offer);
+      expect(onChange).toHaveBeenCalledWith(34, { ownedQuantity: 400 });
+    });
+
+    it('caps Use all at the free remainder too', async () => {
+      const user = userEvent.setup();
+      const onChange = vi.fn();
+      render(
+        <Harness
+          detection={detectionOf(TRIT_STOCK)}
+          groupClaimsFor={claimsOf({})}
+          onChange={onChange}
+        />
+      );
+
+      await user.click(screen.getByRole('button', { name: 'Harness use all' }));
+      expect(onChange).toHaveBeenCalledWith(34, { ownedQuantity: 400 });
+    });
+
+    it('sums several claims ahead into one clause', () => {
+      render(
+        <Harness
+          detection={detectionOf(TRIT_STOCK)}
+          groupClaimsFor={claimsOf({
+            ahead: [
+              { planId: 'a', name: 'Plan A', quantity: 5000 },
+              { planId: 'b', name: 'Plan B', quantity: 3600 },
+            ],
+          })}
+        />
+      );
+
+      expect(within(row('Tritanium')).getByText('8,600 in 2 group plans')).toBeInTheDocument();
+    });
+
+    it('warns on a row whose Have the group over-claims, with no offer left', () => {
+      render(
+        <Harness
+          initial={{ 34: { ownedQuantity: 1000 } }}
+          detection={detectionOf(TRIT_STOCK)}
+          groupClaimsFor={claimsOf({ free: 1000, overClaim: 600 })}
+        />
+      );
+      expandHave();
+
+      expect(queryUseOffer('Tritanium')).not.toBeInTheDocument();
+      expect(
+        within(row('Tritanium')).getByText('Group plans claim 600 more than you own')
+      ).toBeInTheDocument();
+    });
+
+    it('does not warn on a lower-bound count, which may only be short', () => {
+      render(
+        <Harness
+          initial={{ 34: { ownedQuantity: 1000 } }}
+          detection={detectionOf(TRIT_STOCK, { lowerBound: true })}
+          groupClaimsFor={claimsOf({ free: 1000, overClaim: 600 })}
+        />
+      );
+      expandHave();
+
+      expect(screen.queryByText(/more than you own/)).not.toBeInTheDocument();
+    });
   });
 });
 

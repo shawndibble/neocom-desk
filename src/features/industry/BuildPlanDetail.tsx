@@ -32,6 +32,7 @@ import {
   setRigSlot,
 } from '@/engine/industry/types';
 import { makeOrBuy, type MakeOrBuy } from '@/engine/industry/makeOrBuy';
+import { groupStockClaims, type GroupClaimMember } from '@/engine/industry/groupStockClaims';
 import { totalVolume } from '@/engine/industry/materialVolume';
 import {
   autoBuildHere,
@@ -202,6 +203,8 @@ const clearedReactionBuildLocation = {
   reactionBuildLocationName: undefined,
 } satisfies PlanPatch;
 
+const NO_GROUP_MEMBERS: readonly GroupClaimMember[] = [];
+
 interface BuildPlanDetailProps {
   plan: BuildPlanRecord;
   catalog: BlueprintCatalog;
@@ -244,6 +247,11 @@ interface BuildPlanDetailProps {
   groupSnapshot: BuildGroupSnapshot | null;
   /** This plan's Build Group (name, id, owned-stock ledger) for the owned-total-differs hint, or null when ungrouped. */
   group?: (Pick<BuildGroup, 'id' | 'name'> & { ownedStock?: Record<number, number> }) | null;
+  /**
+   * Every plan in `group`, this one included (issue #3992): their Haves are
+   * claims this plan's "Use assets" offer leaves out. Empty when ungrouped.
+   */
+  groupMembers?: readonly GroupClaimMember[];
   /**
    * The picker/override modal's "search BPC Sourcing" action (issue #839) —
    * navigates to `bpcSourcingHref(<typeID>)`. A prop rather
@@ -310,6 +318,7 @@ export function BuildPlanDetail({
   onChange,
   groupSnapshot,
   group = null,
+  groupMembers = NO_GROUP_MEMBERS,
   onSearchBpcSourcing,
   pendingLogProduction,
   pendingLogProductionKey,
@@ -932,6 +941,15 @@ export function BuildPlanDetail({
       corpOwnedStock.corporationName,
       t,
     ]
+  );
+
+  // Sibling members' Haves, against the same stock this plan's offer reads.
+  const groupClaimsFor = useMemo(
+    () =>
+      group !== null && groupMembers.length > 1
+        ? groupStockClaims(plan, groupMembers, detectedStock)
+        : undefined,
+    [group, plan, groupMembers, detectedStock]
   );
 
   // "Use all" / "Use none" run inside the Materials table over every row on
@@ -2077,6 +2095,7 @@ export function BuildPlanDetail({
                 onOwnedStockChange={(changes) => changeSourcing(planSourcingPatches(changes))}
                 ref={materialsTable}
                 detection={detection}
+                groupClaimsFor={groupClaimsFor}
                 makeOrBuy={materialAdvice}
                 canBuildHere={canBuildHere}
                 onToggleBuildHere={toggleBuildHere}

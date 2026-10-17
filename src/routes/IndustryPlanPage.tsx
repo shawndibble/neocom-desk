@@ -83,6 +83,18 @@ export function IndustryPlanPage() {
     if (planId === undefined) return undefined;
     return { plan: await db.buildPlans.get(planId) };
   }, [planId]);
+  // The plan's Build Group siblings (issue #3992), whose Haves its "Use
+  // assets" offer leaves out. Keyed on the group id, read before the early
+  // returns so the hook order never changes.
+  const buildGroupId = planQuery?.plan?.buildGroupId;
+  const groupMembers = useLiveQuery(async () => {
+    if (activeCharacterId === null || buildGroupId === undefined) return [];
+    return db.buildPlans
+      .where('characterId')
+      .equals(activeCharacterId)
+      .filter((p) => p.buildGroupId === buildGroupId)
+      .toArray();
+  }, [activeCharacterId, buildGroupId]);
 
   if (!workspace.hydrated || planQuery === undefined) {
     return (
@@ -154,6 +166,7 @@ export function IndustryPlanPage() {
                 onChange={(change) => void applyBuildPlanChange(plan.id, change)}
                 groupSnapshot={groupSnapshot}
                 group={planGroup}
+                groupMembers={planGroup ? groupMembers : undefined}
                 onSearchBpcSourcing={(typeId) => navigate(bpcSourcingHref(typeId))}
                 pendingLogProduction={pendingLogProduction}
                 pendingLogProductionKey={location.key}
