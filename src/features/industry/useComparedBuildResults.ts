@@ -27,17 +27,28 @@
  * are all wired there, once, so this hook's totals (the Industry index's
  * Profit column, Compare, and every Build Group rollup) cannot drift from the
  * plan's own page. This hook only batches the fetches that feed it.
+ *
+ * `groupDepthPrices` (a Build Group page only, issue #3993) prices bulk
+ * materials at Depth Prices walked for the whole group's need: every member
+ * resolves at lowest sells first, each hub's need is summed across members,
+ * the books are walked once per material, and the members resolve again at
+ * those prices. Rows are held until that second pass, so a rollup never
+ * shows lowest-sell totals and then jumps. The plan list and Compare keep
+ * lowest sells.
  */
 import { useEffect, useRef, useState } from 'react';
+import { depthPriceMap, summedDepthNeeds } from '@/engine/industry/depthPrice';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import i18n from '@/i18n';
 import type { BuildPlanRecord } from '@/db';
-import type { BuildResult } from '@/engine/industry/types';
+import type { BuildResult, HubPrices } from '@/engine/industry/types';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import type { PiData } from '@/sde/types';
 import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
 import { toIndustryBlueprint, type BlueprintCatalog } from './blueprintCatalog';
+import { loadDepthPrices } from './depthPrices';
 import { loadPlanSnapshots, type PlanSnapshots } from './planSnapshots';
+import { shoppingListMaterials } from './subBuildPlan';
 import { resolveBuildPlan, type BuildPlanSources } from './resolveBuildPlan';
 import {
   isPricingReady,
@@ -81,6 +92,8 @@ export interface UseComparedBuildResultsArgs {
   pricingInputs: BuildPlanPricingInputs;
   /** @see ComparedBuildRow.groupResult */
   computeGroupResult?: boolean;
+  /** Price bulk materials at Depth Prices summed across every plan here — see the module doc. */
+  groupDepthPrices?: boolean;
 }
 
 function productNameFor(plan: BuildPlanRecord, catalog: BlueprintCatalog): string {
@@ -112,7 +125,8 @@ async function computeRow(
   priced: PlanSnapshots | null,
   sources: Omit<BuildPlanSources, 'catalog' | keyof HubPricingSources>,
   pricing: HubPricingSourceArgs,
-  computeGroupResult: boolean
+  computeGroupResult: boolean,
+  depthPrices?: HubPrices
 ): Promise<ComparedBuildRow> {
   const base = {
     planId: plan.id,
@@ -141,7 +155,7 @@ async function computeRow(
         inventionMarket,
         catalog,
       },
-      { snapshot, reactionSystemCostIndex: reactionSnapshot?.systemCostIndex },
+      { snapshot, reactionSystemCostIndex: reactionSnapshot?.systemCostIndex, depthPrices },
       { withGroupResult: computeGroupResult }
     );
     // The group pass's own error surfaces on the row too (only reachable
@@ -159,6 +173,45 @@ async function computeRow(
   }
 }
 
+/**
+ * Each hub's Depth Prices for a group: what every member still has to buy
+ * (its group pass, owned stock not deducted, as the rollup itself sums),
+ * summed per hub and walked once per material. A hub with nothing to walk
+ * is absent.
+ */
+async function groupDepthPricesFor(
+  plans: readonly BuildPlanRecord[],
+  rows: readonly ComparedBuildRow[],
+  pricedByPlanId: ReadonlyMap<string, PlanSnapshots>
+): Promise<Map<TradeHub['id'], HubPrices>> {
+  const members = await Promise.all(
+    plans.map(async (plan, i) => {
+      const resolved = rows[i]?.groupResult ?? rows[i]?.result;
+      const priced = pricedByPlanId.get(plan.id);
+      if (!resolved || !priced) return null;
+      const snapshot = await priced.snapshot.catch(() => null);
+      if (!snapshot) return null;
+      return {
+        hubId: (getTradeHub(plan.hubId) ?? DEFAULT_TRADE_HUB).id,
+        lines: shoppingListMaterials(resolved.materials),
+        sellVolumes: snapshot.hubSellVolumes,
+        sourcing: plan.materialSourcing,
+        basis: plan.materialPriceBasis,
+      };
+    })
+  );
+  const needsByHub = summedDepthNeeds(members.filter((m) => m !== null));
+  const result = new Map<TradeHub['id'], HubPrices>();
+  await Promise.all(
+    [...needsByHub].map(async ([hubId, needs]) => {
+      const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
+      const depth = await loadDepthPrices(hub, needs);
+      if (depth.size > 0) result.set(hub.id, depthPriceMap(depth));
+    })
+  );
+  return result;
+}
+
 export function useComparedBuildResults({
   plans,
   catalog,
@@ -167,6 +220,7 @@ export function useComparedBuildResults({
   modifiers,
   pricingInputs,
   computeGroupResult = false,
+  groupDepthPrices = false,
 }: UseComparedBuildResultsArgs): ComparedBuildRow[] {
   const [rows, setRows] = useState<ComparedBuildRow[]>([]);
 
@@ -212,12 +266,11 @@ export function useComparedBuildResults({
     const snapshots = loadPlanSnapshots(priceable, { catalog, pi });
     const pricedByPlanId = new Map(priceable.map(({ plan }, i) => [plan.id, snapshots[i]!]));
 
-    for (const plan of currentPlans) {
-      const priced = pricedByPlanId.get(plan.id) ?? null;
-      void computeRow(
+    const rowFor = (plan: BuildPlanRecord, depthPrices?: HubPrices) =>
+      computeRow(
         plan,
         catalog,
-        priced,
+        pricedByPlanId.get(plan.id) ?? null,
         { pi, ownedBlueprints, modifiers },
         {
           assumedMe,
@@ -226,11 +279,29 @@ export function useComparedBuildResults({
           bpcRows,
           communityRows,
         },
-        computeGroupResult
-      ).then((row) => {
+        computeGroupResult,
+        depthPrices
+      );
+    const show = (row: ComparedBuildRow) => {
+      if (cancelled) return;
+      setRows((prev) => prev.map((r) => (r.planId === row.planId ? row : r)));
+    };
+
+    if (groupDepthPrices) {
+      void (async () => {
+        const firstPass = await Promise.all(currentPlans.map((plan) => rowFor(plan)));
+        const depthByHub = await groupDepthPricesFor(currentPlans, firstPass, pricedByPlanId);
         if (cancelled) return;
-        setRows((prev) => prev.map((r) => (r.planId === plan.id ? row : r)));
-      });
+        const rows = await Promise.all(
+          currentPlans.map((plan, i) => {
+            const prices = depthByHub.get(getTradeHub(plan.hubId)?.id ?? DEFAULT_TRADE_HUB.id);
+            return prices ? rowFor(plan, prices) : firstPass[i]!;
+          })
+        );
+        rows.forEach(show);
+      })();
+    } else {
+      for (const plan of currentPlans) void rowFor(plan).then(show);
     }
 
     return () => {
@@ -249,6 +320,7 @@ export function useComparedBuildResults({
     communityRows,
     modifiers,
     computeGroupResult,
+    groupDepthPrices,
   ]);
 
   return rows;

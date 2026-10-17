@@ -27,6 +27,7 @@ import type { GroupStockClaims } from '@/engine/industry/groupStockClaims';
 import { PHONE_QUERY } from '@/lib/useIsPhone';
 import type { MaterialTableRow } from './subBuildPlan';
 import type { OwnedStockDetection } from './ownedStockDetection';
+import type { DepthPrice } from '@/engine/industry/depthPrice';
 
 /** `MaterialsTable` rows carry the jobs producing them; a plain cost line has none. */
 function asRows(materials: readonly MaterialCostLine[]): MaterialTableRow[] {
@@ -71,6 +72,7 @@ interface HarnessProps {
   onChange?: (typeID: number, patch: MaterialSourcing) => void;
   detection?: OwnedStockDetection;
   groupClaimsFor?: (typeID: number) => GroupStockClaims | null;
+  depthFor?: (typeID: number) => DepthPrice | undefined;
 }
 
 /**
@@ -85,6 +87,7 @@ function Harness({
   onChange,
   detection,
   groupClaimsFor,
+  depthFor,
 }: HarnessProps) {
   const [sourcing, setSourcing] = useState<MaterialSourcingMap | undefined>(initial);
   const table = useRef<MaterialsTableHandle>(null);
@@ -102,6 +105,7 @@ function Harness({
         sourcing={sourcing}
         pricesReady={pricesReady}
         detection={detection}
+        depthFor={depthFor}
         onSourcingChange={(typeID, patch) => {
           onChange?.(typeID, patch);
           setSourcing((current) => applySourcingPatch(current, typeID, patch));
@@ -1702,5 +1706,36 @@ describe('MaterialsTable skill-gate marker (issue #1015)', () => {
     });
 
     expect(within(row('Mechanical Parts')).queryByText('Industry V')).toBeNull();
+  });
+});
+
+describe('MaterialsTable Depth Prices (issue #3993)', () => {
+  const walk: DepthPrice = {
+    best: 4.12,
+    avg: 4.31,
+    need: 2_000_000,
+    filled: 2_000_000,
+    listed: 120_000_000,
+    covered: true,
+    levels: [],
+  };
+
+  it("shows a walked row's lowest sell beside the average it is costed at", () => {
+    render(<Harness depthFor={(typeID) => (typeID === 34 ? walk : undefined)} />);
+    expect(within(row('Tritanium')).getByText('4.12 best · 4.31 avg for 2M')).toBeTruthy();
+    expect(within(row('Pyerite')).queryByText(/avg for/)).toBeNull();
+  });
+
+  it('flags a row the hub lists too few units for', () => {
+    const short = { ...walk, filled: 1_200_000, listed: 1_200_000, covered: false };
+    render(<Harness depthFor={(typeID) => (typeID === 34 ? short : undefined)} />);
+    expect(within(row('Tritanium')).getByText('only 1.2M listed').className).toContain(
+      'text-warning'
+    );
+  });
+
+  it('drops the line from a row the pilot priced', () => {
+    render(<Harness initial={{ 34: { overridePrice: 3 } }} depthFor={() => walk} />);
+    expect(within(row('Tritanium')).queryByText(/avg for/)).toBeNull();
   });
 });

@@ -304,6 +304,7 @@ here — they go one per file in `docs/context/decisions/`.
 - **Data Owner** (retired): Whose rows a page's table showed — `personal` or
   `corporation` — picked by a Personal / Corporation switch. No page has one
   any more: corp data lives only on corp routes.
+- **Depth Price**: A Build Plan material's unit price when its need is large against what its **Trade Hub** lists (at least 1% of the units for sale): the average paid walking the hub station's sell orders, cheapest first, until the need is filled, instead of the lowest sell. Sell **Material Price Basis** only, on the plan and Build Group pages only; the product is never walked. A Build Group walks its members' summed need.
 - **Detected Accelerator** — a cerebral accelerator inferred from a base sheet
   that is over budget, by the size of the excess. Prefilled into the Booster
   control; not a separate mechanism.

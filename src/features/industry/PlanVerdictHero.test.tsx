@@ -202,6 +202,40 @@ describe('PlanVerdictHero: calculation breakdown', () => {
     expect(within(dialog).getByText(/Rifter: always Jita lowest sell/i)).toBeTruthy();
   });
 
+  it('lists the order book levels each Depth Price walked, and keeps the product on lowest sell (issue #3993)', () => {
+    const walk = {
+      best: 4,
+      avg: 4.5,
+      need: 300,
+      filled: 300,
+      listed: 1000,
+      covered: true,
+      levels: [
+        { price: 4, units: 150, listed: 150 },
+        { price: 5, units: 150, listed: 850 },
+      ],
+    };
+    renderHero({
+      breakdown: { ...BREAKDOWN, depthRows: [{ name: 'Tritanium', walk }] },
+      openBreakdown: true,
+    });
+
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText('Order book depth')).toBeTruthy();
+    expect(within(dialog).getByText(/Tritanium needs at least 1% .* Jita/)).toBeTruthy();
+    expect(
+      within(dialog).getByText(/Rifter's own sale price is still the lowest sell/)
+    ).toBeTruthy();
+    expect(within(dialog).getByText('Tritanium: 300 needed · 4.50 avg')).toBeTruthy();
+    expect(within(dialog).getByText('4.00 ISK × 150')).toBeTruthy();
+    expect(within(dialog).getByText('5.00 ISK × 150 (of 850 listed)')).toBeTruthy();
+  });
+
+  it('has no order book section when nothing walked the book', () => {
+    renderHero({ openBreakdown: true });
+    expect(within(screen.getByRole('dialog')).queryByText('Order book depth')).toBeNull();
+  });
+
   it("names the buy-order basis when that is the plan's basis", async () => {
     renderHero({ breakdown: { ...BREAKDOWN, materialPriceBasis: 'buy' }, openBreakdown: true });
 

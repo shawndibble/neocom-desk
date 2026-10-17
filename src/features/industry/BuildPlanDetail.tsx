@@ -43,6 +43,7 @@ import { craftScope } from '@/engine/industry/craftScope';
 import { ownedStockSale, sellableMaterials } from '@/engine/industry/ownedStockSale';
 import type {
   FacilityKind,
+  HubPrices,
   MaterialPriceBasis,
   MaterialSourcing,
   RigKind,
@@ -107,6 +108,8 @@ import {
 import { inventionQuoteFor } from './inventionSources';
 import { buildPlanTypeIds, recipeForLookup } from './recipes';
 import { materialPriceBasisOf } from './priceBasis';
+import { useDepthPrices } from './depthPrices';
+import { depthCandidates, depthPriceMap } from '@/engine/industry/depthPrice';
 import { useMarketSnapshot } from './useMarketSnapshot';
 import { formatDuration } from '@/lib/duration';
 import { useTableExport } from '@/components/ui/useTableExport';
@@ -722,8 +725,8 @@ export function BuildPlanDetail({
    */
   // One resolver for the page's own plan and for Break Even's trial run counts,
   // so a trial can never price a plan differently from what the page shows.
-  const resolveAt = useCallback(
-    (candidate: BuildPlanRecord) =>
+  const resolveWith = useCallback(
+    (candidate: BuildPlanRecord, depthPrices?: HubPrices) =>
       resolveBuildPlan(
         candidate,
         {
@@ -740,7 +743,7 @@ export function BuildPlanDetail({
           inventionMarket,
           communityOffersFor,
         },
-        { snapshot, reactionSystemCostIndex: reactionSnapshot?.systemCostIndex }
+        { snapshot, reactionSystemCostIndex: reactionSnapshot?.systemCostIndex, depthPrices }
       ),
     [
       catalog,
@@ -759,7 +762,33 @@ export function BuildPlanDetail({
       reactionSnapshot?.systemCostIndex,
     ]
   );
-  const resolved = useMemo(() => resolveAt(plan), [resolveAt, plan]);
+  // Depth Prices (issue #3993): the lowest-sell pass says what the plan has
+  // to buy; materials whose need is large against what the hub lists walk
+  // the hub's book, and the plan resolves once more at those prices. One
+  // re-resolve, never iterated: a need is read off the lowest-sell pass only.
+  const topOfBook = useMemo(() => resolveWith(plan), [resolveWith, plan]);
+  const depthNeeds = useMemo(
+    () =>
+      topOfBook.result
+        ? depthCandidates(
+            shoppingListMaterials(topOfBook.result.materials),
+            snapshot?.hubSellVolumes ?? {},
+            plan.materialSourcing,
+            plan.materialPriceBasis
+          )
+        : new Map<number, number>(),
+    [topOfBook.result, snapshot?.hubSellVolumes, plan.materialSourcing, plan.materialPriceBasis]
+  );
+  const depth = useDepthPrices(hub, depthNeeds);
+  const resolveAt = useCallback(
+    (candidate: BuildPlanRecord) =>
+      resolveWith(candidate, depth.size > 0 ? depthPriceMap(depth) : undefined),
+    [resolveWith, depth]
+  );
+  const resolved = useMemo(
+    () => (depth.size > 0 ? resolveAt(plan) : topOfBook),
+    [depth.size, resolveAt, plan, topOfBook]
+  );
   const { result, error, makeOrBuyContext, resolvedMe, resolvedTe, materialPrices, bpcCoverage } =
     resolved;
 
@@ -1398,6 +1427,7 @@ export function BuildPlanDetail({
       entry.productTypeID !== null ? (snapshot?.hubPrices[entry.productTypeID] ?? null) : null,
     standing,
     planSeconds,
+    depthRows: [...depth].map(([typeID, walk]) => ({ name: nameForType(catalog, typeID), walk })),
   };
 
   // Read-only summary of the setup: plain label-over-value pairs, not chips —
@@ -2148,6 +2178,7 @@ export function BuildPlanDetail({
                 onOpenAcquisitionPicker={setAcquisitionPickerTypeId}
                 skillGates={skillGates}
                 characterNameFor={detection.characterNameFor}
+                depthFor={(typeID) => depth.get(typeID)}
               />
               <BuildRecipeModal
                 recipe={openRecipe}

@@ -293,6 +293,40 @@ describe('resolveBuildPlan', () => {
     expect(resolved.resolvedMe).toBe(0);
   });
 
+  describe('depth prices (issue #3993)', () => {
+    const src = sources(catalogOf([entry(100, 1, [{ typeID: 34, quantity: 10 }])]), {
+      ownedBlueprints: [owned(100, 1)],
+    });
+    const prices = { ...snapshot({ 1: 1000, 34: 5 }), hubBuyPrices: { 1: 900, 34: 4 } };
+
+    it('costs a material at its depth price on the sell basis, leaving revenue at the lowest sell', () => {
+      const top = resolveBuildPlan(plan(), src, { snapshot: prices }).result;
+      const deep = resolveBuildPlan(plan(), src, {
+        snapshot: prices,
+        depthPrices: { 34: 7 },
+      }).result;
+      expect(deep?.materials.find((m) => m.typeID === 34)?.unitPrice).toBe(7);
+      expect(deep?.revenue).toBe(top?.revenue);
+    });
+
+    it('ignores depth prices on the buy basis', () => {
+      const resolved = resolveBuildPlan(plan({ materialPriceBasis: 'buy' }), src, {
+        snapshot: prices,
+        depthPrices: { 34: 7 },
+      });
+      expect(resolved.result?.materials.find((m) => m.typeID === 34)?.unitPrice).toBe(4);
+    });
+
+    it("keeps the pilot's own price over a depth price", () => {
+      const resolved = resolveBuildPlan(
+        plan({ materialSourcing: { 34: { overridePrice: 2 } } }),
+        src,
+        { snapshot: prices, depthPrices: { 34: 7 } }
+      );
+      expect(resolved.result?.materials.find((m) => m.typeID === 34)?.unitPrice).toBe(2);
+    });
+  });
+
   it('reports a missing blueprint instead of throwing', () => {
     const resolved = resolveBuildPlan(plan({ blueprintTypeID: 999 }), sources(catalogOf([])), {
       snapshot: null,

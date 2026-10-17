@@ -168,6 +168,8 @@ export function BuildGroupPanel({
     modifiers,
     pricingInputs,
     computeGroupResult: true,
+    // Bulk materials at Depth Prices walked for the whole group's need (issue #3993).
+    groupDepthPrices: true,
   });
 
   // The same inputs `useComparedBuildResults` prices these members against —
