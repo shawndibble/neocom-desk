@@ -5,8 +5,8 @@
  * the error-prone step this exists to remove.
  *
  * The price text itself is the control — no separate copy icon beside it. A
- * caller whose sentence already states the figure (e.g.
- * `market.orders.outbidAt`, the "→ price" relist hint) passes that sentence
+ * caller whose sentence already states the figure (e.g. an exit's
+ * "Undercut the station at …", the "→ price" relist hint) passes that sentence
  * as `children` so the whole bold phrase is the tap target; otherwise the
  * formatted price is. The visible text stays the accessible name (WCAG 2.5.3
  * Label in Name); "Copy <price>" rides along as a `Tooltip`, which reaches
@@ -21,7 +21,7 @@
  */
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Tooltip } from '@/components/ui';
+import { Button, Tooltip } from '@/components/ui';
 import { Toast } from '@/components/ui/Toast';
 import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
 import { writeToClipboard } from '@/lib/clipboard';
@@ -31,15 +31,8 @@ import { priceClipboardText } from './priceClipboardText';
 /** How long the "copied" toast stays up — matches `CopyableTotal`'s own feedback window. */
 const COPIED_FEEDBACK_MS = 2000;
 
-export function CopyablePrice({
-  price,
-  children,
-}: {
-  price: number;
-  /** The visible, clickable text — defaults to the formatted price. */
-  children?: ReactNode;
-}) {
-  const { t } = useTranslation();
+/** Plain digits to the clipboard, then the "copied" toast for a couple of seconds. */
+function useCopyPrice(price: number): { copied: boolean; copy: () => Promise<void> } {
   const [copied, setCopied] = useState(false);
   const resetTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
@@ -51,6 +44,20 @@ export function CopyablePrice({
     clearTimeout(resetTimer.current);
     resetTimer.current = setTimeout(() => setCopied(false), COPIED_FEEDBACK_MS);
   }
+
+  return { copied, copy };
+}
+
+export function CopyablePrice({
+  price,
+  children,
+}: {
+  price: number;
+  /** The visible, clickable text — defaults to the formatted price. */
+  children?: ReactNode;
+}) {
+  const { t } = useTranslation();
+  const { copied, copy } = useCopyPrice(price);
 
   const formatted = formatMarketIsk(price);
 
@@ -70,6 +77,24 @@ export function CopyablePrice({
           {children ?? formatted}
         </button>
       </Tooltip>
+      {copied && <Toast message={t('market.orders.priceCopied')} />}
+    </>
+  );
+}
+
+/**
+ * The same copy as a `primary` button reading "Copy 4,479,900": Order
+ * Detail's one action, where the price to type is the whole point of the
+ * view rather than a figure inside a sentence.
+ */
+export function CopyPriceButton({ price, className }: { price: number; className?: string }) {
+  const { t } = useTranslation();
+  const { copied, copy } = useCopyPrice(price);
+  return (
+    <>
+      <Button variant="primary" className={className} onClick={() => void copy()}>
+        {t('market.orders.copyPrice', { price: formatMarketIsk(price) })}
+      </Button>
       {copied && <Toast message={t('market.orders.priceCopied')} />}
     </>
   );

@@ -1,6 +1,6 @@
 /**
- * The one thing to actually type into the order — the detail modal's "Next
- * step" line (issue #1428).
+ * The one thing to actually type into the order — what Order Detail's Copy
+ * button copies (`verdictFigures` reads `raisePrice` / `matchThem`).
  *
  * Deliberately distinct from `orderVerdict`'s own `price`: that field exists
  * only to make the verdict SENTENCE add up, so a `letGo` verdict's price is

@@ -1,7 +1,7 @@
 /**
  * The one badge choice for an Open Orders row (GLOSSARY.md's redesigned
  * Market > Open Orders tab) — pulled out of `OpenOrdersPanel` (the row's own
- * badge column) and `OrderDetailModal` (its "quick answer" header), which
+ * badge column) and `OrderDetailModal` (its verdict block), which
  * used to each carry their own copy of this switch. Two copies "must agree"
  * is exactly the duplication this repo's architecture rules forbid; this is
  * the one place the mapping is written, so the row and the modal it opens

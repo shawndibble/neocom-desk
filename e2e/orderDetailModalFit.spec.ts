@@ -1,9 +1,7 @@
 /**
- * Order detail modal at in-between widths (issue #2988): on a foldable's
- * unfolded inner screen (~900 CSS px) the `wide` modal grew past the viewport,
- * pushing its close button off screen. Asserts invariants only — the dialog
- * fits the viewport, its close button is inside it and works, and the body
- * does not scroll sideways — never pixel values, since CI's fonts differ.
+ * Order detail at in-between widths (a foldable's ~900px inner screen once
+ * pushed Close off screen) and on a phone (bottom sheet): it fits the viewport,
+ * Close is visible and works, no sideways scroll. Invariants only; CI fonts differ.
  */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
@@ -12,6 +10,7 @@ import { CHARACTER_ID } from './support/fixtureData';
 import type { MarketOrder } from '../src/esi/endpoints';
 
 const WIDTHS = [700, 800, 900, 1000];
+const PHONE = { width: 390, height: 844 };
 
 const ORDER: MarketOrder = {
   order_id: 201,
@@ -51,11 +50,14 @@ async function seed(page: Page): Promise<void> {
   );
 }
 
-for (const width of WIDTHS) {
+for (const { width, height, sheet } of [
+  ...WIDTHS.map((width) => ({ width, height: 900, sheet: false })),
+  { ...PHONE, sheet: true },
+]) {
   test(`order detail modal fits a ${width}px viewport and closes`, async ({ page }) => {
     await seed(page);
     await signInAndGoto(page);
-    await page.setViewportSize({ width, height: 900 });
+    await page.setViewportSize({ width, height });
     await page.goto('./market/orders');
 
     // Below `lg` the list may be tap rows; above it a table whose row click opens the detail.
@@ -68,12 +70,17 @@ for (const width of WIDTHS) {
 
     const box = await dialog.evaluate((el) => {
       const r = el.getBoundingClientRect();
-      return { left: r.left, right: r.right };
+      return { left: r.left, right: r.right, top: r.top, bottom: r.bottom };
     });
     expect(box.left).toBeGreaterThanOrEqual(0);
     expect(box.right).toBeLessThanOrEqual(width);
+    expect(box.top).toBeGreaterThanOrEqual(0);
+    // A phone gets a bottom sheet, its foot on the viewport's bottom edge.
+    if (sheet) expect(Math.round(box.bottom)).toBe(height);
+    else expect(box.bottom).toBeLessThanOrEqual(height);
 
     const close = dialog.getByRole('button', { name: 'Close' });
+    await expect(close).toBeInViewport();
     const closeRight = await close.evaluate((el) => el.getBoundingClientRect().right);
     expect(closeRight).toBeLessThanOrEqual(width);
 
