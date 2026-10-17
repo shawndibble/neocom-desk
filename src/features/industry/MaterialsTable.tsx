@@ -73,7 +73,7 @@ interface MaterialsTableProps {
   sourcing: MaterialSourcingMap | undefined;
   /** False when the market snapshot couldn't be fetched — hub prices fall back to placeholder text. */
   pricesReady: boolean;
-  /** A material's Depth Price walk (issue #3993); absent for a row priced at the lowest sell. */
+  /** A material's Depth Price walk; absent for a row priced at the lowest sell. */
   depthFor?: (typeID: number) => DepthPrice | undefined;
   onSourcingChange: (typeID: number, patch: MaterialSourcing) => void;
   /**

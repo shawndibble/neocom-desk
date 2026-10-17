@@ -103,7 +103,7 @@ export interface BuildPlanPrices {
   /** The Reaction Location's own system cost index; null/absent until that fetch lands. */
   reactionSystemCostIndex?: number | null;
   /**
-   * Depth Prices (issue #3993): order-book-walked unit prices for the
+   * Depth Prices: order-book-walked unit prices for the
    * materials whose need is large against what is listed. Layered over the
    * sell basis only; the product and blueprint prices never read them.
    */

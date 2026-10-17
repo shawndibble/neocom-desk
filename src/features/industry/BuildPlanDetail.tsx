@@ -724,8 +724,8 @@ export function BuildPlanDetail({
    * claims share it, and a re-run of this memo starts from nothing rather
    * than re-claiming against copies a previous run already took.
    */
-  // One resolver for the page's own plan and for Break Even's trial run counts,
-  // so a trial can never price a plan differently from what the page shows.
+  // One resolver for the page's own plan and for Break Even's trial run counts
+  // (each walking its own Depth Prices), so a trial prices as the page would.
   const resolveWith = useCallback(
     (candidate: BuildPlanRecord, depthPrices?: HubPrices) =>
       resolveBuildPlan(
@@ -1061,8 +1061,7 @@ export function BuildPlanDetail({
     () => (result ? shoppingListMaterials(result.materials) : []),
     [result]
   );
-  // Only walks the priced plan still buys: a dearer walked price can flip a
-  // material to built, and its walk then explains nothing on the page.
+  // A dearer walked price can flip a material to built; its walk then explains nothing here.
   const boughtDepth = useMemo(() => {
     const bought = new Set(shoppingMaterials.map((m) => m.typeID));
     return new Map([...depth].filter(([typeID]) => bought.has(typeID)));

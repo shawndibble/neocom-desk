@@ -170,7 +170,7 @@ export function BuildGroupPanel({
     modifiers,
     pricingInputs,
     computeGroupResult: true,
-    // Bulk materials at Depth Prices walked for the whole group's need (issue #3993).
+    // Depth Prices walked on the group's summed need, never per member.
     groupDepthPrices: true,
   });
 
@@ -262,8 +262,7 @@ export function BuildGroupPanel({
     [detected, group.ownedStockScope, t]
   );
 
-  // Depth Price walks per material, for the buy table's Still-to-buy line. A
-  // mixed-hub group keeps the first hub's walk for a type both hubs buy.
+  // First hub's walk wins for a type a mixed-hub group buys at both.
   const depthByType = useMemo(() => {
     const byType = new Map<number, DepthPrice>();
     for (const row of rows) {
@@ -493,7 +492,7 @@ export function BuildGroupPanel({
             {material.unpriced && material.buyToShow > 0 && (
               <span className="text-[0.6875rem] text-warning">{t('industry.unpriced')}</span>
             )}
-            {material.buyToShow > 0 && depthByType.has(material.typeID) && (
+            {material.buyToShow > 0 && depthByType.get(material.typeID) && (
               <DepthPriceLine depth={depthByType.get(material.typeID)!} />
             )}
           </span>

@@ -4,7 +4,7 @@ import { formatCompactNumber } from '@/lib/compactNumber';
 import { formatIsk } from '@/lib/isk';
 
 /**
- * A walked material's Price-cell second line (issue #3993): the lowest sell
+ * A walked material's Price-cell second line: the lowest sell
  * beside the average the row is costed at, or a warning when the hub lists
  * fewer units than the plan needs.
  */

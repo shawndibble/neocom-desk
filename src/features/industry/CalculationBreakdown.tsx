@@ -38,7 +38,7 @@ export interface BreakdownContext {
   productUnitPrice: number | null;
   /** The plan's wall-clock time on its character's free slots; absent without slot data. */
   planSeconds?: number;
-  /** Materials costed at a Depth Price (issue #3993), each with its book walk. */
+  /** Materials costed at a Depth Price, each with its book walk. */
   depthRows?: readonly { typeID: number; name: string; walk: DepthPrice }[];
 }
 

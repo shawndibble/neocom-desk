@@ -1,5 +1,5 @@
 /**
- * Depth Price (issue #3993): a material bought in bulk priced at what
+ * Depth Price: a material bought in bulk priced at what
  * buying that many actually costs at the Trade Hub, walking its sell orders
  * cheapest first, instead of at the lowest sell alone.
  *

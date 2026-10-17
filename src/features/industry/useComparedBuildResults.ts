@@ -28,7 +28,7 @@
  * Profit column, Compare, and every Build Group rollup) cannot drift from the
  * plan's own page. This hook only batches the fetches that feed it.
  *
- * `groupDepthPrices` (a Build Group page only, issue #3993) prices bulk
+ * `groupDepthPrices` (a Build Group page only) prices bulk
  * materials at Depth Prices walked for the whole group's need: every member
  * resolves at lowest sells first, each hub's need is summed across members,
  * the books are walked once per material, and the members resolve again at
@@ -175,6 +175,8 @@ async function computeRow(
   }
 }
 
+const hubIdOf = (plan: BuildPlanRecord) => (getTradeHub(plan.hubId) ?? DEFAULT_TRADE_HUB).id;
+
 /**
  * Each hub's Depth Prices for a group: what every member still has to buy
  * (its group pass, owned stock not deducted, as the rollup itself sums),
@@ -213,8 +215,6 @@ async function groupDepthFor(
   );
   return result;
 }
-
-const hubIdOf = (plan: BuildPlanRecord) => (getTradeHub(plan.hubId) ?? DEFAULT_TRADE_HUB).id;
 
 export function useComparedBuildResults({
   plans,
@@ -296,11 +296,11 @@ export function useComparedBuildResults({
         const firstPass = await Promise.all(currentPlans.map((plan) => rowFor(plan)));
         if (cancelled) return;
         // Anything failing past here leaves the group at lowest sells, never stuck loading.
-        let rows = firstPass;
+        let shown = firstPass;
         try {
           const depthByHub = await groupDepthFor(currentPlans, firstPass, pricedByPlanId);
           if (cancelled) return;
-          rows = await Promise.all(
+          shown = await Promise.all(
             currentPlans.map(async (plan, i) => {
               const depth = depthByHub.get(hubIdOf(plan));
               return depth
@@ -311,7 +311,7 @@ export function useComparedBuildResults({
         } catch {
           // Lowest sells stand.
         }
-        rows.forEach(show);
+        shown.forEach(show);
       })();
     } else {
       for (const plan of currentPlans) void rowFor(plan).then(show);
