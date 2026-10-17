@@ -5652,9 +5652,9 @@
       "flags": {
         "location": "Location",
         "pace": "Mining pace",
-        "iskLeft": "ISK left",
-        "volumeLeft": "Volume left",
-        "elapsed": "Time mining"
+        "iskLeft": "Value",
+        "volumeLeft": "Volume",
+        "elapsed": "Duration"
       },
       "noLocation": "No location set",
       "fixed": "The Neocom Desk Report heading and the link are always included.",
@@ -5791,9 +5791,9 @@
       "cleared": "Field cleared in {duration}",
       "location": "At: {place}",
       "pace": "Pace: {pace} m³/s",
-      "value": "Value left: {isk} ISK",
-      "volume": "Volume left: {left} of {total} m³",
-      "elapsed": "Mining for {duration}"
+      "value": "{isk} ISK",
+      "volume": "{left} m³",
+      "elapsed": "Duration: {duration}"
     }
   },
   "miningTax": {

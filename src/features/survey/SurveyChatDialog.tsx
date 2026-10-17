@@ -4,6 +4,7 @@
  * choices. The heading and the link row are fixed; everything between is the
  * pilot's call, kept in the browser (`useSurveyChatOptions`).
  */
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Checkbox, Modal, SegmentedControl } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
@@ -70,17 +71,6 @@ export function SurveyChatDialog({
           }))}
           uppercase={false}
         />
-        <SegmentedControl
-          label={t('survey.chatConfig.ores')}
-          value={options.ores}
-          onChange={(ores) => change({ ores })}
-          options={SURVEY_CHAT_ORES.map((value) => ({
-            value,
-            label: t(`survey.chatConfig.oreModes.${value}`),
-          }))}
-          uppercase={false}
-        />
-
         <fieldset className="flex flex-col gap-1">
           <legend className="mb-1 text-xs text-text-dim">{t('survey.chatConfig.rows')}</legend>
           <Toggle
@@ -100,6 +90,19 @@ export function SurveyChatDialog({
             checked={options.rockCounts}
             disabled={options.ores === 'off'}
             onChange={(rockCounts) => change({ rockCounts })}
+            trailing={
+              <SegmentedControl
+                label={t('survey.chatConfig.ores')}
+                value={options.ores}
+                onChange={(ores) => change({ ores })}
+                options={SURVEY_CHAT_ORES.map((value) => ({
+                  value,
+                  label: t(`survey.chatConfig.oreModes.${value}`),
+                }))}
+                uppercase={false}
+                size="sm"
+              />
+            }
           />
           {FLAGS.map((key) => (
             <Toggle
@@ -130,12 +133,15 @@ export function SurveyChatDialog({
 function Toggle({
   label,
   hint,
+  trailing,
   checked,
   disabled,
   onChange,
 }: {
   label: string;
   hint?: string;
+  /** A compact control at the row's end; it must fit the row's height. */
+  trailing?: ReactNode;
   checked: boolean;
   disabled?: boolean;
   onChange: (checked: boolean) => void;
@@ -149,6 +155,7 @@ function Toggle({
       />
       <span>{label}</span>
       {hint !== undefined && <span className="ml-auto text-xs text-text-dim">{hint}</span>}
+      {trailing !== undefined && <span className="ml-auto">{trailing}</span>}
     </label>
   );
 }

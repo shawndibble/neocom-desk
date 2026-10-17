@@ -24,9 +24,9 @@ const labels: SurveyMessageLabels = {
   cleared: 'Field cleared in {duration}',
   location: 'At: {place}',
   pace: 'Pace: {pace} m³/s',
-  value: 'Value left: {isk} ISK',
-  volume: 'Volume left: {left} of {total} m³',
-  elapsed: 'Mining for {duration}',
+  value: '{isk} ISK',
+  volume: '{left} m³',
+  elapsed: 'Duration: {duration}',
 };
 
 function scan(minutes: number, ...rocks: [string, number][]): SurveyScan {
@@ -279,12 +279,13 @@ describe('chat message options', () => {
     expect(box[3]).toMatch(/^╚═*\[ https:.* \]═*╌┄┈$/);
   });
 
-  it('with no border leaves the rows bare between two rails', () => {
+  it('with no border drops the rails, the taper and the brackets', () => {
     const { box } = withOptions({ border: 'none' });
-    expect(box[0]).toMatch(/^─*\[ ETA: .* \]─*╌┄┈$/);
+    expect(box[0]).toMatch(/^ETA: .*\(~\d+m\)$/);
     expect(box[1]).toMatch(/^█+░+ \d+%$/);
     expect(box[2]).toMatch(/^Left: /);
-    expect(box[3]).toMatch(/^─*\[ https:.* \]─*╌┄┈$/);
+    expect(box[3]).toBe(URL);
+    expect(box.join('')).not.toMatch(/[─═┌└╔╚╌┄┈[\]]/);
   });
 
   it('always keeps the heading and the link row', () => {
@@ -348,20 +349,44 @@ describe('chat message options', () => {
     expect(withOptions({ rockCounts: false }).box[2]).toBe('│ Left: Veldspar · Scordite · 2 other');
   });
 
-  it('adds the location, pace, value, volume and elapsed rows only when chosen', () => {
+  it('adds the location, pace and duration rows only when chosen', () => {
     const off = withOptions({}, 'Efa IV').box.join('\n');
-    for (const word of ['Efa', 'Pace', 'Value', 'Volume', 'Mining for'])
-      expect(off).not.toContain(word);
-    const { box } = withOptions(
-      { location: true, pace: true, iskLeft: false, volumeLeft: true, elapsed: true },
-      'Efa IV'
-    );
-    expect(box[2]).toBe('│ At: Efa IV');
-    expect(box.join('\n')).toMatch(/Pace: \d+ m³\/s/);
-    expect(box.join('\n')).toContain('Volume left: 33,080 of 46,100 m³');
-    expect(box.join('\n')).toContain('Mining for 10m');
+    for (const word of ['Efa', 'Pace', 'Duration', 'ISK', 'm³']) expect(off).not.toContain(word);
+    const { box } = withOptions({ location: true, pace: true, elapsed: true }, 'Efa IV');
+    expect(box[2]).toMatch(/^│ Left: /);
+    expect(box[3]).toBe('│ At: Efa IV');
+    // Short facts share a row.
+    expect(box[4]).toMatch(/^│ Pace: \d+ m³\/s · Duration: 10m$/);
   });
 
+  it('puts value and volume on the Left line, right under the bar, with just their units', () => {
+    const { box } = withOptions({ ores: 'off', volumeLeft: true, iskLeft: false });
+    expect(box[1]).toMatch(/^│ █+░+ \d+%$/);
+    expect(box[2]).toBe('│ Left: 33,080 m³');
+  });
+
+  it('continues the Left line with the ores first, then value, then volume', () => {
+    const rocks = (a: number, b: number) => ({
+      at: T0 + (a === 5 ? 0 : 5 * MIN),
+      rocks: [
+        { ore: 'A', volume: a, isk: a * 1_000_000 },
+        { ore: 'B', volume: b, isk: b * 1_000_000 },
+      ],
+    });
+    const summary = summarizeSurvey([rocks(5, 4), rocks(4, 3)])!;
+    const text = surveyChatMessage(summary, URL, labels, undefined, {
+      ...DEFAULT_SURVEY_CHAT_OPTIONS,
+      iskLeft: true,
+      volumeLeft: true,
+    });
+    expect(text).toMatch(/│ Left: 1 A · 1 B · 7M ISK · 7 m³/);
+  });
+
+  it('has no Left line when nothing that is left is chosen', () => {
+    const { box } = withOptions({ ores: 'off' });
+    expect(box.join('\n')).not.toContain('Left:');
+    expect(box).toHaveLength(3);
+  });
   it('skips the location row when the survey has none', () => {
     expect(withOptions({ location: true }, null).box).toHaveLength(4);
   });
