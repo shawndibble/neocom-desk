@@ -1056,7 +1056,12 @@ export function MaterialsTable({
                     name: material.acquisitionTier.community.memberName,
                   }
                 )
-              : t('industry.blueprintAcquisitionTier', material.acquisitionTier)}
+              : t(
+                  material.acquisitionTier.invented
+                    ? 'industry.blueprintAcquisitionTierInvented'
+                    : 'industry.blueprintAcquisitionTier',
+                  material.acquisitionTier
+                )}
           </span>
         )}
       </span>

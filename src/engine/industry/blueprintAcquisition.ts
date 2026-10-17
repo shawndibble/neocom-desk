@@ -36,6 +36,8 @@ export interface BpcOffer {
   isMultiType?: boolean;
   /** Set on a Community Offer (issue #3603): the Member who shares it. Its `price` is always 0. */
   community?: AcquisitionCommunitySource;
+  /** Set on an invention tier (issue #3990): `price` is the expected cost of one successful copy. */
+  invented?: true;
 }
 
 /** `AcquisitionResolution` minus `blueprintTypeID` — this module has no typeID of its own to report, only the caller (`recipes.ts`) knows it. */
@@ -66,9 +68,9 @@ export interface SelectBlueprintTierInputs {
   /** The BPO's ordinary sell price at the node's hub; null if unpriced there. */
   bpoSellPrice: number | null;
   /**
-   * Every other way to buy this blueprint the app can see — contract
-   * originals, region market sell orders, LP Store redemptions — shaped as
-   * offers. They compete on total cost with the listings above; absent is
+   * Every other way to get this blueprint the app can see — contract
+   * originals, region market sell orders, LP Store redemptions, invention
+   * tiers at their expected cost — shaped as offers. They compete on total cost with the listings above; absent is
    * the same as none.
    */
   extraOffers?: readonly BpcOffer[];
@@ -99,11 +101,12 @@ interface Candidate {
   extend: Extend | null;
 }
 
-/** What buying more at one tier brings: its runs, its price, and who shares it when it is a Community Offer. */
+/** What buying more at one tier brings, carried over from its `BpcOffer`. */
 interface Extend {
   capacityRuns: number;
   price: number;
   community?: AcquisitionCommunitySource;
+  invented?: true;
 }
 
 /**
@@ -156,6 +159,7 @@ function offerToExtend(offer: BpcOffer): Extend {
     capacityRuns: offer.runs === -1 ? INFINITE_RUNS : offer.runs * offer.quantity,
     price: offer.price,
     ...(offer.community ? { community: offer.community } : {}),
+    ...(offer.invented ? { invented: true as const } : {}),
   };
 }
 
@@ -344,6 +348,7 @@ export function resolveTierOption(option: TierOption, neededRuns: number): Bluep
       owned: false,
       ...(copies !== null && copies > 1 ? { quantity: copies } : {}),
       ...(option.extend?.community ? { community: option.extend.community } : {}),
+      ...(option.extend?.invented ? { invented: true as const } : {}),
     },
     coverage,
     ...(purchasedRuns !== undefined ? { purchasedRuns } : {}),

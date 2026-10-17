@@ -91,7 +91,8 @@ here — they go one per file in `docs/context/decisions/`.
   **Acquisition Verdict** can flip to build; the row reads "from <name>" and
   shows stale. Ranking: an owned BPO beats a Community Offer, which beats any
   priced contract offer. A reaction-activity node only ever considers a BPO,
-  and a **Member**'s reaction formula is never a source.
+  and a **Member**'s reaction formula is never a source. A Tech II
+  blueprint's sources include invention, at its expected cost per copy.
 - **Boot Update**: A new app build (a waiting service worker) applied behind
   the boot screen on a cold start or browser reload, never mid-session: no
   route-change reload, and no "update ready" indicator.
@@ -138,8 +139,9 @@ here — they go one per file in `docs/context/decisions/`.
 - **Build Plan**: An industry plan for one blueprint or reaction formula:
   materials needed, costs, fees/taxes, time, and two independent verdicts — an
   **Acquisition Verdict** and a **Sale Profitability** read. Covers
-  manufacturing and reactions; invention and research/copying are out of
-  scope. Which activity a plan runs is derived from the picked blueprint or
+  manufacturing and reactions. Invention prices a Tech II copy as a
+  **Blueprint Acquisition** source, not a plan of its own; research and
+  copying plans are out of scope. Which activity a plan runs is derived from the picked blueprint or
   formula, never a separate field.
 - **Build Strategy**: Which rule an **Auto Build** pass applies to every
   material it reaches within its **Craft Scope** — `buy` (force buy),

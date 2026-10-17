@@ -68,6 +68,7 @@ function mergedTier(
       me: existing.me,
       te: existing.te,
       ...(existing.community ? { community: existing.community } : {}),
+      ...(existing.invented ? { invented: existing.invented } : {}),
     };
   }
   if (!existing.pool || !line.pool) return existing;

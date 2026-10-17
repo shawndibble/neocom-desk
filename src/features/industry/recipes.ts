@@ -11,6 +11,7 @@ import type {
   AcquisitionResolution,
   HubPrices,
   IndustryBlueprint,
+  MaterialSourcing,
   MaterialSourcingMap,
   QuantityEntry,
 } from '@/engine/industry/types';
@@ -70,7 +71,7 @@ export interface BlueprintAcquisitionSources {
    * Hub concept this module stays decoupled from.
    */
   offersFor: (blueprintTypeID: number) => readonly BpcOffer[];
-  /** Every other way to buy it the app can see — region market, LP Store — as offers. Absent = none. */
+  /** Every other way to get it the app can see — region market, LP Store, invention — as offers. Absent = none. */
   extraOffersFor?: (blueprintTypeID: number) => readonly BpcOffer[];
   /** Offers priced from only when nothing else prices the blueprint (other regions' contracts). */
   lastResortOffersFor?: (blueprintTypeID: number) => readonly BpcOffer[];
@@ -304,11 +305,13 @@ export function acquisitionForLookup(
     // owned/shortfall cost like automatic selection would; when it matches
     // nothing the app can see (a private contract, in-person trade), report
     // the forced me/te with no line price — `overridePrice` on the same
-    // sourcing entry is what prices it, in `materialResolution.ts`.
+    // sourcing entry is what prices it, in `materialResolution.ts` (an
+    // invention pick has none: unpriced until its tier prices again).
     const override = acquisitionSources.sourcing?.[blueprintTypeID]?.acquisitionTierOverride;
+    const resolveInputs = override ? inputsForOverride(tierInputs, override) : tierInputs;
     let resolved;
     if (override) {
-      const matched = tierOptions(tierInputs).find(
+      const matched = tierOptions(resolveInputs).find(
         (o) => o.me === override.me && o.te === override.te
       );
       resolved = matched
@@ -320,7 +323,7 @@ export function acquisitionForLookup(
     // The runs behind the line, so a Build Group can pool this blueprint
     // across its members (`groupRollup.ts`) rather than buy a copy per plan.
     const tier = resolved.line
-      ? tierOptions(tierInputs).find((o) => o.me === resolved.me && o.te === resolved.te)
+      ? tierOptions(resolveInputs).find((o) => o.me === resolved.me && o.te === resolved.te)
       : undefined;
     const line = tier
       ? {
@@ -342,6 +345,31 @@ export function acquisitionForLookup(
       line,
       coverage: resolved.coverage,
     };
+  };
+}
+
+/**
+ * A forced tier's sources, narrowed to the kind the pilot picked: an
+ * invention pick to the invention tier with its runs per copy, any other
+ * pick away from invention — sources of both kinds can share one ME/TE.
+ */
+function inputsForOverride(
+  inputs: SelectBlueprintTierInputs,
+  override: NonNullable<MaterialSourcing['acquisitionTierOverride']>
+): SelectBlueprintTierInputs {
+  const invented = override.invented;
+  if (!invented) {
+    return { ...inputs, extraOffers: inputs.extraOffers?.filter((offer) => !offer.invented) };
+  }
+  return {
+    ...inputs,
+    bpcOffers: [],
+    bpoSellPrice: null,
+    lastResortOffers: [],
+    communityOffers: [],
+    extraOffers: inputs.extraOffers?.filter(
+      (offer) => offer.invented && offer.runs === invented.runs
+    ),
   };
 }
 

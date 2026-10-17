@@ -22,7 +22,11 @@ import {
   HUB_PRICE_TTL_MS,
   type PricesWithStatus,
 } from '@/market/prices';
-import { fetchSystemCostIndices, systemCostIndexByActivity } from '@/market/cost-index';
+import {
+  fetchSystemCostIndices,
+  systemCostIndexByActivity,
+  type CostIndexActivity,
+} from '@/market/cost-index';
 import { GLOBAL_CACHE_CHARACTER_ID, readCachedEntries, writeCachedMany } from '@/esi/cache';
 import type { SystemCostIndices } from '@/esi/endpoints';
 import type { TradeHub } from '@/market/hubs';
@@ -60,6 +64,13 @@ export interface MarketSnapshot {
   systemCostIndex: number | null;
   /** True only when ESI answered but has no index for the system — never for the offline null. */
   systemCostIndexMissing?: boolean;
+  /**
+   * Same system's copying/invention indices (issue #3990), for invented-copy
+   * fees; same cached ESI response. null = failed, 0 = none; absent for a
+   * reaction plan.
+   */
+  copyingCostIndex?: number | null;
+  inventionCostIndex?: number | null;
   /**
    * True when the Fuzzwork hub lookup failed. Every hub price above is then
    * "unknown", not "no orders": a view says "Prices unavailable" instead of
@@ -106,7 +117,7 @@ export function clearCostIndexCache(): void {
 }
 
 async function loadSystemCostIndices(
-  activity: IndustryActivity,
+  activity: CostIndexActivity,
   now: () => number = Date.now
 ): Promise<Map<number, number> | null> {
   const nowMs = now();
@@ -227,11 +238,12 @@ export function loadMarketSnapshots(
   // Distinct activities can resolve side by side: `loadSystemCostIndices`
   // shares one in-flight fetch of the raw ESI response, so two activities on
   // a cold cache still cost one request.
-  const costIndices = new Map<IndustryActivity, Promise<Map<number, number> | null>>();
-  for (const request of requests) {
-    const activity = request.activity ?? 'manufacturing';
+  const costIndices = new Map<CostIndexActivity, Promise<Map<number, number> | null>>();
+  const indicesFor = (activity: CostIndexActivity) => {
     if (!costIndices.has(activity)) costIndices.set(activity, loadSystemCostIndices(activity));
-  }
+    return costIndices.get(activity)!;
+  };
+  for (const request of requests) indicesFor(request.activity ?? 'manufacturing');
 
   return requests.map(async (request) => {
     const { prices: hubAggregates, unreachable } = await hubBatches.get(request.hub.stationId)!;
@@ -246,10 +258,21 @@ export function loadMarketSnapshots(
       hubSellVolumes[typeId] = aggregate.sellVolume;
     }
 
-    const indices = await costIndices.get(request.activity ?? 'manufacturing')!;
-    const found = indices?.get(request.costIndexSystemId ?? request.hub.systemId);
+    const activity = request.activity ?? 'manufacturing';
+    const systemId = request.costIndexSystemId ?? request.hub.systemId;
+    const indexIn = async (forActivity: CostIndexActivity) => {
+      const indices = await indicesFor(forActivity);
+      return indices == null ? null : (indices.get(systemId) ?? 0);
+    };
+    const indices = await indicesFor(activity);
+    const found = indices?.get(systemId);
     const systemCostIndexMissing = indices != null && found === undefined;
     const systemCostIndex = indices == null ? null : (found ?? 0);
+    // Only a manufacturing plan builds a blueprint that can be invented.
+    const [copyingCostIndex, inventionCostIndex] =
+      activity === 'manufacturing'
+        ? await Promise.all([indexIn('copying'), indexIn('invention')])
+        : [undefined, undefined];
 
     const adjusted = await adjustedPrices;
     return {
@@ -259,6 +282,7 @@ export function loadMarketSnapshots(
       adjustedPrices: adjusted,
       systemCostIndex,
       systemCostIndexMissing,
+      ...(copyingCostIndex !== undefined ? { copyingCostIndex, inventionCostIndex } : {}),
       hubPricesUnreachable: unreachable,
     };
   });

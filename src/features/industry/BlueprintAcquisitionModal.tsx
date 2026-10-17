@@ -2,15 +2,20 @@
  * The Blueprint Acquisition modal (issues #839, #1240): opened from an icon on
  * any Blueprint Acquisition row (the top-level plan or any nested sub-build),
  * it lays every way to get this blueprint side by side — Owned tiers, public
- * Contracts (copies and originals), Market sell orders, LP Store offers and a
- * Manual entry — each row with a "Use this blueprint" button.
+ * Contracts (copies and originals), Market sell orders, LP Store offers,
+ * Invent (issue #3990) and a Manual entry — each row with a "Use this
+ * blueprint" button.
  *
  * Picking writes `MaterialSourcing.acquisitionTierOverride` (+ `overridePrice`
- * for anything but an owned tier), keyed by the blueprint's own typeID, via
+ * except for an owned or invent row), keyed by the blueprint's own typeID, via
  * the caller's `onSourcingChange` — `acquisitionForLookup` (`recipes.ts`)
  * then honors it at every node that resolves this blueprint. What each row
  * writes, and why a picked price is one purchase of that row, lives in
  * `blueprintAcquisitionSources.ts`'s `overridePatchFor`.
+ *
+ * Invent's numbers come from the caller (`inventionQuoteFor`), priced as
+ * automatic selection prices them — at the plan's own hub and build system,
+ * not this modal's hub picker.
  *
  * Contracts and Market read one Trade Hub's region — the Build Plan's own by
  * default; Market reads the whole region (not just the hub station), unless
@@ -51,8 +56,11 @@ import {
   Spinner,
   TextInput,
 } from '@/components/ui';
+import { HintText } from '@/components/ui/HintText';
 import * as Icon from '@/components/ui/icons';
 import type { MaterialSourcing } from '@/engine/industry/types';
+import { romanLevel } from '@/engine/projection';
+import { loadTypeName } from '@/features/character/typeNames';
 import { loadPublicBpcContracts } from '@/features/bpcContracts/syncedContracts';
 import { loadContractLocationInfo } from '@/features/bpcContracts/blueprintLocation';
 import { loadRegionName } from '@/features/bpcContracts/regionNames';
@@ -71,10 +79,12 @@ import { DEFAULT_TRADE_HUB, getTradeHub, TRADE_HUBS, type TradeHub } from '@/mar
 import { unmaskNumber } from '@/lib/numberMask';
 import { formatIsk } from '@/lib/isk';
 import {
+  cheapestInventRow,
   cheapestRow,
   contractOfferRows,
   groupContractOffers,
   groupMarketSells,
+  inventTierRows,
   isCurrentPick,
   lpOfferRows,
   marketSellRows,
@@ -85,11 +95,14 @@ import {
   type AcquisitionOwnedCopy,
   type AcquisitionSourceRow,
   type ContractOfferRow,
+  type InventTierRow,
   type LpOfferRow,
   type MarketSellRow,
   type OfferGroup,
 } from './blueprintAcquisitionSources';
 import { loadLpTurnInPricer } from './blueprintPurchaseOffers';
+import { formatPercent } from './format';
+import type { InventionQuoteResult } from './inventionSources';
 
 export type { AcquisitionOwnedCopy } from './blueprintAcquisitionSources';
 
@@ -126,6 +139,12 @@ interface BlueprintAcquisitionModalProps {
   onSearchBpcSourcing: (blueprintTypeID: number) => void;
   /** The Build Plan's own Trade Hub — the modal's starting hub. */
   planHubId: TradeHub['id'];
+  /**
+   * How inventing this blueprint prices for the plan (issue #3990), and the
+   * T1 blueprint it is invented from. Absent/null: nothing invents it, or its
+   * prices haven't landed — no Invent section.
+   */
+  invention?: { result: InventionQuoteResult; t1BlueprintName: string } | null;
   /** Wraps the title (the blueprint's own name) in the item context menu; omitted where the caller has none to offer. */
   itemMenuFor?: ItemMenuFor;
   /**
@@ -210,6 +229,7 @@ export function BlueprintAcquisitionModal({
   onPickRuns,
   onSearchBpcSourcing,
   planHubId,
+  invention,
   itemMenuFor,
   itemActionsFor,
 }: BlueprintAcquisitionModalProps) {
@@ -319,6 +339,14 @@ export function BlueprintAcquisitionModal({
     [lp, lpValue, marketLpValues, turnIns]
   );
   const lpSection = sectionRows(lpRows, (r) => r.pickable);
+  const inventRows = useMemo(
+    () => (invention ? inventTierRows(invention.result.quote) : []),
+    [invention]
+  );
+  const datacoreNames = useNames(
+    invention?.result.recipe.datacores.map((d) => d.typeID) ?? [],
+    loadTypeName
+  );
   const contractRows = contractSection.shown.map((g) => g.row);
   const marketRows = marketSection.shown.map((g) => g.row);
 
@@ -427,6 +455,26 @@ export function BlueprintAcquisitionModal({
     return parts.join(' · ');
   }
 
+  function inventSummary(row: InventTierRow): string {
+    const decryptor = row.decryptor;
+    return [
+      decryptor === null
+        ? t('industry.bpAcqInventNoDecryptor')
+        : decryptor.unitPrice === null
+          ? t('industry.bpAcqInventDecryptorUnpriced', { name: decryptor.name })
+          : t('industry.bpAcqInventDecryptor', {
+              name: decryptor.name,
+              isk: formatIsk(decryptor.unitPrice),
+            }),
+      formatPercent(row.chance * 100),
+      tier(row),
+      t('industry.bpAcqInventRuns', { count: row.runs }),
+      row.expectedCostPerRun === null
+        ? t('industry.bpAcqInventUnpriced')
+        : t('industry.bpAcqInventExpectedPerRun', { isk: formatIsk(row.expectedCostPerRun) }),
+    ].join(' · ');
+  }
+
   /**
    * One row: its facts, any tags, and the pick button. A plain render
    * function, not a nested component — a component defined in render would
@@ -483,6 +531,7 @@ export function BlueprintAcquisitionModal({
   const cheapestContract = cheapestRow(contractRows);
   const cheapestMarket = cheapestRow(marketRows);
   const cheapestLp = cheapestRow(lpSection.shown);
+  const cheapestInvent = cheapestInventRow(inventRows);
 
   const groupCount = (group: OfferGroup<unknown>, key: string) =>
     group.count > 1 ? [t(key, { count: group.count })] : [];
@@ -494,6 +543,96 @@ export function BlueprintAcquisitionModal({
       <p className="text-text-dim">
         {t('industry.bpAcqShowingOf', { shown: section.shown.length, count: section.total })}
       </p>
+    );
+  }
+
+  function renderInventSection({
+    result,
+    t1BlueprintName,
+  }: {
+    result: InventionQuoteResult;
+    t1BlueprintName: string;
+  }) {
+    const { quote, recipe } = result;
+    const skills = [
+      ...recipe.scienceSkills.map((skill, i) => ({ ...skill, level: result.skills.science[i] })),
+      ...(recipe.encryptionSkill
+        ? [{ ...recipe.encryptionSkill, level: result.skills.encryption }]
+        : []),
+    ]
+      .map((skill) =>
+        t('industry.bpAcqInventSkillLevel', {
+          name: skill.name,
+          level: romanLevel(skill.level ?? 0),
+        })
+      )
+      .join(', ');
+    const fact = (label: string, value: ReactNode) => (
+      <>
+        <dt className="text-text-dim">{label}</dt>
+        <dd className="min-w-0 break-words tabular-nums">{value}</dd>
+      </>
+    );
+    return (
+      <section className={SECTION_CLASS}>
+        <h3 className={HEADING_CLASS}>{t('industry.bpAcqInventHeading')}</h3>
+        <p className="text-text-dim">
+          {t('industry.bpAcqInventHint', { blueprint: t1BlueprintName })}
+        </p>
+        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+          {fact(
+            t('industry.bpAcqInventDatacores'),
+            <ul className="flex flex-col">
+              {quote.datacores.map((d) => {
+                const name = datacoreNames.get(d.typeID) ?? `#${d.typeID}`;
+                return (
+                  <li key={d.typeID}>
+                    {d.unitPrice === null || d.lineCost === null
+                      ? t('industry.bpAcqInventDatacoreUnpriced', { name, quantity: d.quantity })
+                      : t('industry.bpAcqInventDatacoreLine', {
+                          name,
+                          quantity: d.quantity,
+                          price: formatIsk(d.unitPrice),
+                          total: formatIsk(d.lineCost),
+                        })}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          {fact(
+            t('industry.bpAcqInventCopyJob'),
+            quote.copyJobFee === null
+              ? t('industry.bpAcqInventNoOriginal', { blueprint: t1BlueprintName })
+              : t('industry.bpAcqInventCopyJobValue', {
+                  isk: formatIsk(quote.copyJobFee),
+                  blueprint: t1BlueprintName,
+                })
+          )}
+          {fact(t('industry.bpAcqInventFee'), isk(quote.inventionJobFee))}
+          {fact(
+            t('industry.bpAcqInventChance'),
+            <>
+              {formatPercent(quote.chance * 100)}{' '}
+              <HintText content={skills}>{t('industry.bpAcqInventFromSkills')}</HintText>
+            </>
+          )}
+          {fact(
+            t('industry.bpAcqInventAttempt'),
+            quote.attemptCost === null
+              ? t('industry.bpAcqInventUnpriced')
+              : t('industry.bpAcqInventAttemptValue', { isk: formatIsk(quote.attemptCost) })
+          )}
+        </dl>
+        <ul className="flex flex-col gap-1">
+          {inventRows.map((row) =>
+            renderRow(row.decryptor?.typeID ?? 'none', row, inventSummary(row), {
+              cheapest: row === cheapestInvent,
+            })
+          )}
+        </ul>
+        <p className="text-text-dim">{t('industry.bpAcqInventFeesNote')}</p>
+      </section>
     );
   }
 
@@ -694,6 +833,8 @@ export function BlueprintAcquisitionModal({
           )}
           {capNote(lpSection)}
         </section>
+
+        {invention && renderInventSection(invention)}
 
         <section className={SECTION_CLASS}>
           <h3 className={HEADING_CLASS}>{t('industry.blueprintAcquisitionManualHeading')}</h3>
