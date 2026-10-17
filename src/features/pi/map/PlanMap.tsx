@@ -931,8 +931,6 @@ export function PlanMap({
           className={cx(layer, active !== null && 'invisible')}
           aria-hidden={active ? true : undefined}
         >
-          {/* The one line that says what each click does: filter, trace, what-if. */}
-          <span className="text-text">{t('piMap.hint', { context })}</span>
           {noColonies ? (
             <span>
               {t(coloniesUnknown ? 'piMap.whatIfUnknownColonies' : 'piMap.whatIfNoColonies')}

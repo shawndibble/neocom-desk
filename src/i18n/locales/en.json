@@ -7113,8 +7113,8 @@
     "helpShort": "Help",
     "picksNoteLabel": "About these picks",
     "whatIfHintLabel": "About planet types you do not have",
-    "hint": "Click a planet type to filter, or a product to trace it.",
-    "hint_touch": "Tap a planet type to filter, or a product to trace it.",
+    "chainTip": "Click for the planets, haul and assumptions.",
+    "chainTip_touch": "Tap for the planets, haul and assumptions.",
     "boardLabel": "Planet map: planet types, then raw, processed, refined, specialized and advanced products",
     "planetsTitle": "Planets",
     "planetsSub": "Tick yours",
@@ -7347,7 +7347,10 @@
         "pick": "#1 to #3: the Plan tab's picks for your planets",
         "chain": "The chain of the traced product",
         "whatIf": "Unlocked by a planet type you don't have (the + mark)",
-        "ghost": "A gap in a column: your ticked planets can't make it"
+        "ghost": "A gap in a column: your ticked planets can't make it",
+        "wire": "Solid line: an input feeds the product in the next column",
+        "wireSkip": "Dashed line: the input skips a column, passing behind the tiles between",
+        "wirePlanet": "Amber line: a planet type that yields the raw resource"
       },
       "numbers": "Numbers are ISK a day for one planet, after customs and sales tax, at your sell market. Only products one planet can make have one: specialized and advanced products need several planets.",
       "learnHeading": "New to PI?",
