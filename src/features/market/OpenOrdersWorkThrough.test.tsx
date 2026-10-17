@@ -179,8 +179,9 @@ beforeEach(async () => {
 
 afterEach(() => configureClipboard(null));
 
+/** The headline's quiet line, which the work-through ends. */
 function summaryLine() {
-  return screen.getByText(/^2 orders · /).parentElement as HTMLElement;
+  return screen.getByText(/ISK tied up in them/).closest('p') as HTMLElement;
 }
 
 describe('Open Orders work through', () => {
@@ -195,7 +196,7 @@ describe('Open Orders work through', () => {
     ).toBeInTheDocument();
   });
 
-  it('walks the queue worst group first: Next copies the click-time price, opens it in EVE as the owner and moves on', async () => {
+  it('walks the queue worst first: Next copies the click-time price, opens it in EVE as the owner and moves on', async () => {
     const user = userEvent.setup();
     vi.mocked(loadAllCharactersOpenOrders).mockResolvedValue({
       entries: [entry([EXPIRING, UNDERCUT])],

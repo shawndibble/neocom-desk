@@ -4,13 +4,14 @@
  * and when a row a pilot was sent to comes back "Not changed".
  *
  * Pure and view-free. The queue is never frozen at Start: it is re-formed
- * from the page's filtered groups on every render, so a sort or filter change
+ * from the page's filtered rows on every render, so a sort or filter change
  * while running re-forms what is left of it. Only what the pilot did (handled
  * and skipped order ids) is state.
  */
 import type { CompetingOrder } from '@/engine/market/undercut';
 import { outbidPrice, undercutPrice } from '@/engine/market/priceTick';
-import type { OpenOrderRow, OrderGroup, OrderGroupKey } from './openOrdersModel';
+import { orderGroupKey, type OpenOrderRow, type OrderGroupKey } from './openOrdersModel';
+import { orderUrgency } from './orderUrgency';
 
 /** What one Next press did for one order. */
 export interface HandledOrder {
@@ -41,12 +42,16 @@ export const EMPTY_WORK_THROUGH: WorkThroughState = { handled: new Map(), skippe
 const OUTSIDE_QUEUE: ReadonlySet<OrderGroupKey> = new Set(['healthy', 'notChecked']);
 
 /**
- * Every order that needs a fix, in the page's group order (worst first), then
- * the row order each group arrives in — the caller hands over groups already
- * sorted the way their tables show them.
+ * Every order that needs a fix, Needs you first and then Watch (system and
+ * region undercuts), each in the order the fix list shows it: the caller
+ * hands over rows already sorted the way the table shows them.
  */
-export function workThroughQueue(groups: readonly OrderGroup[]): OpenOrderRow[] {
-  return groups.filter((group) => !OUTSIDE_QUEUE.has(group.problem)).flatMap((group) => group.rows);
+export function workThroughQueue(rows: readonly OpenOrderRow[]): OpenOrderRow[] {
+  const queued = rows.filter((row) => !OUTSIDE_QUEUE.has(orderGroupKey(row)));
+  return [
+    ...queued.filter((row) => orderUrgency(row) === 'act'),
+    ...queued.filter((row) => orderUrgency(row) !== 'act'),
+  ];
 }
 
 export interface WorkThroughProgress {

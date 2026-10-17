@@ -9,6 +9,7 @@ import type { OpenOrderRow } from './openOrdersModel';
 import { openOrderRow } from './__fixtures__/openOrderRow';
 import type { CharacterSkills } from './openOrdersModel';
 import { NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
+import { ESI_FANOUT_CONCURRENCY } from '@/lib/concurrency';
 
 const REGION = 10000002;
 const JITA_STATION = 60003760;
@@ -296,6 +297,26 @@ describe('useOrderDetail', () => {
       expect(loaders.regionCompetition).toHaveBeenCalledTimes(2);
       expect(loaders.regionCompetition).toHaveBeenCalledWith(REGION, 34);
       expect(loaders.regionCompetition).toHaveBeenCalledWith(REGION, 35);
+    });
+
+    it('caps the region-book fan-out at ESI_FANOUT_CONCURRENCY distinct items, never firing every item at once', () => {
+      const loaders = fakeOrderDetailLoaders();
+      // Never resolves, so the in-flight call count is directly observable.
+      loaders.regionCompetition.mockImplementation(() => new Promise(() => {}));
+      const { result } = renderHook(() => useOrderDetail(), {
+        wrapper: ({ children }: { children: ReactNode }) =>
+          withOrderDetailLoaders(children, loaders),
+      });
+
+      act(() =>
+        result.current.checkDeeper(
+          Array.from({ length: ESI_FANOUT_CONCURRENCY + 4 }, (_, i) =>
+            openOrderRow({ orderId: 900 + i, typeId: 900 + i })
+          )
+        )
+      );
+
+      expect(loaders.regionCompetition).toHaveBeenCalledTimes(ESI_FANOUT_CONCURRENCY);
     });
   });
 });

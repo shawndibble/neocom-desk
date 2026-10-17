@@ -1,16 +1,13 @@
 /**
- * Open Orders' optional-column catalog and device-local visible-columns
- * preference (`columnVisibility.ts`) — one setting shared by every
- * per-problem-group table on the page, since they all render the same column
- * set. `item` (the row's identity) and `details` (the button that opens the
- * modal) are not here: neither is ever optional.
+ * Open Orders' optional-column catalog + device-local pref (`columnVisibility.ts`).
+ * New key: picks saved under `openOrdersVisibleColumns` share these ids and
+ * would switch columns on unasked.
  */
 import { createColumnVisibilitySetting } from '@/lib/columnVisibility';
 
 export const OPEN_ORDER_COLUMN_IDS = [
-  'where',
   'price',
-  'problem',
+  'stationCheapest',
   'floor',
   'remaining',
   'expires',
@@ -18,7 +15,10 @@ export const OPEN_ORDER_COLUMN_IDS = [
 
 export type OpenOrderColumnId = (typeof OPEN_ORDER_COLUMN_IDS)[number];
 
+export const OPEN_ORDER_DEFAULT_COLUMNS: readonly OpenOrderColumnId[] = [];
+
 export const useVisibleOpenOrderColumns = createColumnVisibilitySetting({
-  key: 'openOrdersVisibleColumns',
+  key: 'openOrdersOptionalColumns',
   ids: OPEN_ORDER_COLUMN_IDS,
+  defaultVisible: OPEN_ORDER_DEFAULT_COLUMNS,
 });

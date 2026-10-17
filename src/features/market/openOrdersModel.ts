@@ -420,38 +420,17 @@ export function buildOpenOrderRows(input: BuildRowsInput): OpenOrderRow[] {
 }
 
 /**
- * A group's heading: every `OrderProblem`, plus `notChecked` for orders that
- * read healthy only because nothing could check their competition — kept out
- * of the Healthy group so that heading holds only orders actually checked.
+ * What a row is filed under: every `OrderProblem`, plus `notChecked` for
+ * orders that read healthy only because nothing could check their
+ * competition — kept apart from healthy so Fine (`orderUrgency.ts`) holds
+ * only orders actually checked.
  */
 export type OrderGroupKey = OrderProblem | 'notChecked';
 
-export interface OrderGroup {
-  /** The group's key; named `problem` for every group but `notChecked`, which is not a problem. */
-  problem: OrderGroupKey;
-  rows: OpenOrderRow[];
-}
-
-/** The group a row is filed under. */
 export function orderGroupKey(row: OpenOrderRow): OrderGroupKey {
   return row.problem === 'healthy' && row.competitionUnchecked === true
     ? 'notChecked'
     : row.problem;
-}
-
-/** Worst first, `notChecked` just above `healthy`. */
-const GROUP_ORDER: readonly OrderGroupKey[] = ORDER_PROBLEMS.flatMap((problem) =>
-  problem === 'healthy' ? (['notChecked', 'healthy'] as const) : [problem]
-);
-
-/** Groups by `orderGroupKey` in worst-first order. Empty groups are dropped. */
-export function groupOpenOrders(rows: readonly OpenOrderRow[]): OrderGroup[] {
-  const groups: OrderGroup[] = [];
-  for (const problem of GROUP_ORDER) {
-    const groupRows = rows.filter((row) => orderGroupKey(row) === problem);
-    if (groupRows.length > 0) groups.push({ problem, rows: groupRows });
-  }
-  return groups;
 }
 
 /** Count per problem across `problems` (not `problem`), for filter chips, which overlap. Every OrderProblem key is present, even at 0. */
@@ -481,59 +460,4 @@ export function notCheckedCount(rows: readonly OpenOrderRow[]): number {
 /** Orders that are not `healthy`. */
 export function needsAttentionCount(rows: readonly OpenOrderRow[]): number {
   return rows.filter((row) => row.problem !== 'healthy').length;
-}
-
-/** One character's share of a group, for the group header's split line. */
-export interface GroupCharacterShare {
-  characterId: number;
-  characterName: string;
-  count: number;
-}
-
-/**
- * What a group header states in its own right, so the reader can judge a
- * folded group without opening it: how much ISK it holds, how badly the
- * worst row in it is beaten, and which characters it belongs to.
- *
- * `worstGapPct` is read off the same tier the row's own badge reads — the
- * deep rival when the region book has been fetched for that row, the
- * station aggregate otherwise — so the header can never quote a percentage
- * no row on screen shows. Null when no row in the group is undercut at all
- * (an `expiringOrStale` or `healthy` group), never 0, which would read as
- * "beaten by nothing".
- */
-export interface OpenOrderGroupSummary {
-  iskTiedUp: number;
-  worstGapPct: number | null;
-  /** Descending by count, then by name, so the header's order is stable across refreshes. */
-  byCharacter: GroupCharacterShare[];
-}
-
-function rowGapPct(row: OpenOrderRow): number | null {
-  const deep = row.deepUndercut?.worst;
-  if (deep) return deep.gapPct;
-  return row.station.beatsMe ? row.station.gapPct : null;
-}
-
-export function summariseOrderGroup(rows: readonly OpenOrderRow[]): OpenOrderGroupSummary {
-  let iskTiedUp = 0;
-  let worstGapPct: number | null = null;
-  const shares = new Map<number, GroupCharacterShare>();
-  for (const row of rows) {
-    iskTiedUp += row.iskTiedUp;
-    const gap = rowGapPct(row);
-    if (gap !== null && (worstGapPct === null || gap > worstGapPct)) worstGapPct = gap;
-    const share = shares.get(row.characterId);
-    if (share) share.count++;
-    else
-      shares.set(row.characterId, {
-        characterId: row.characterId,
-        characterName: row.characterName,
-        count: 1,
-      });
-  }
-  const byCharacter = [...shares.values()].sort(
-    (a, b) => b.count - a.count || a.characterName.localeCompare(b.characterName)
-  );
-  return { iskTiedUp, worstGapPct, byCharacter };
 }

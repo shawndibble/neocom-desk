@@ -15,8 +15,8 @@
 import type { OpenOrderRow } from './openOrdersModel';
 import { compareOpenOrderRowsWorstFirst } from './openOrdersModel';
 import { ORDER_PROBLEMS, type OrderProblem } from '@/engine/market/orderProblems';
+import { OPEN_ORDERS_VIEWS, viewForProblems, type OpenOrdersView } from './orderUrgency';
 import {
-  boolParam,
   defineUrlFilter,
   enumParam,
   idListParam,
@@ -51,7 +51,8 @@ export interface OpenOrdersFilter {
   costBasis: 'linked' | 'missing' | null;
   /** Null means any. */
   minIskTiedUp: number | null;
-  hideHealthy: boolean;
+  /** The Needs you / Watch / All segment. Not a removable constraint: there is always one. */
+  view: OpenOrdersView;
   sort: OpenOrdersSort;
 }
 
@@ -64,7 +65,7 @@ export const EMPTY_OPEN_ORDERS_FILTER: OpenOrdersFilter = {
   expiringWithinDays: null,
   costBasis: null,
   minIskTiedUp: null,
-  hideHealthy: false,
+  view: 'act',
   sort: 'worstFirst',
 };
 
@@ -113,23 +114,15 @@ function matchesMinIskTiedUp(row: OpenOrderRow, min: number | null): boolean {
   return row.iskTiedUp >= min;
 }
 
-function matchesHideHealthy(row: OpenOrderRow, hideHealthy: boolean): boolean {
-  if (!hideHealthy) return true;
-  // An unchecked row is not known to be healthy, so the healthy fold keeps it.
-  return row.problem !== 'healthy' || row.competitionUnchecked === true;
-}
-
 /**
  * Every problem a filter may name — that is, every `OrderProblem` except
  * `healthy`.
  *
- * `hideHealthy` is a separate axis and is on by default (the page folds
- * healthy orders away; the "show healthy" toggle is the way back, not the
- * funnel). So a filter naming `healthy` selects exactly the rows the same
- * filter then hides: nought of N, under a chip that reads as though it should
- * have matched something. It is a real word in this vocabulary and still not
- * one a filter can honour, which is why it is excluded here rather than left
- * to each caller to remember.
+ * Healthy orders are the Fine bucket, reached through the All segment
+ * (`view`), not the funnel. A funnel chip for `healthy` would empty the
+ * default Needs you segment under a chip that reads as though it should have
+ * matched something, which is why it is excluded here rather than left to
+ * each caller to remember.
  */
 export const FILTERABLE_PROBLEMS: readonly OrderProblem[] = ORDER_PROBLEMS.filter(
   (problem) => problem !== 'healthy'
@@ -179,8 +172,7 @@ export function filterOpenOrders(
       matchesProblems(row, filter.problems) &&
       matchesExpiringWithinDays(row, filter.expiringWithinDays) &&
       matchesCostBasis(row, filter.costBasis) &&
-      matchesMinIskTiedUp(row, filter.minIskTiedUp) &&
-      matchesHideHealthy(row, filter.hideHealthy)
+      matchesMinIskTiedUp(row, filter.minIskTiedUp)
   );
 }
 
@@ -237,8 +229,9 @@ function withoutArrayValue<T>(values: readonly T[], value: T): T[] {
 }
 
 /**
- * `sort` is not a removable constraint (there is always exactly one active
- * sort) and is deliberately excluded here.
+ * `sort` and `view` are not removable constraints (there is always exactly
+ * one of each) and are deliberately excluded here. `filterOpenOrders` never
+ * reads `view` either: the segment splits what the funnel matched.
  */
 export function activeFilterChips(filter: OpenOrdersFilter): ActiveFilterChip[] {
   const chips: ActiveFilterChip[] = [];
@@ -315,14 +308,6 @@ export function activeFilterChips(filter: OpenOrdersFilter): ActiveFilterChip[] 
     });
   }
 
-  if (filter.hideHealthy) {
-    chips.push({
-      id: 'hideHealthy',
-      labelKey: 'market.orders.filter.hideHealthy',
-      clear: (f) => ({ ...f, hideHealthy: false }),
-    });
-  }
-
   return chips;
 }
 
@@ -369,7 +354,7 @@ export const {
     codec: optionalEnumParam<'linked' | 'missing'>(['linked', 'missing']),
   },
   minIskTiedUp: { key: 'orders.minIsk', codec: optionalIdParam() },
-  hideHealthy: { key: 'orders.hideHealthy', codec: boolParam(true) },
+  view: { key: 'orders.view', codec: enumParam(OPEN_ORDERS_VIEWS, 'act') },
   sort: { key: 'orders.sort', codec: enumParam(OPEN_ORDERS_SORTS, 'worstFirst') },
 });
 
@@ -406,6 +391,11 @@ export function openOrdersHref({
   const params = new URLSearchParams();
   const problemsRaw = OPEN_ORDERS_FILTER_PARAMS['orders.problems'].serialize(problems ?? []);
   if (problemsRaw !== null) params.set('orders.problems', problemsRaw);
+  // Opens on the segment holding what the link names (Needs you is the default).
+  const viewRaw = OPEN_ORDERS_FILTER_PARAMS['orders.view'].serialize(
+    viewForProblems(problems ?? [])
+  );
+  if (viewRaw !== null) params.set('orders.view', viewRaw);
   const charactersRaw = OPEN_ORDERS_FILTER_PARAMS['orders.characters'].serialize(
     characterIds ?? []
   );

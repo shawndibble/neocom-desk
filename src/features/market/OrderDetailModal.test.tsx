@@ -1184,6 +1184,8 @@ describe('OrderDetailModal', () => {
       };
       renderModal({ row });
       expect(screen.queryByRole('button', { name: /^Copy / })).not.toBeInTheDocument();
+      // The fix list's short call heads it; the badge's advice sits under.
+      expect(screen.getByText('Relist it')).toBeInTheDocument();
       expect(
         screen.getByText('Relist it, or move the stock somewhere it sells.')
       ).toBeInTheDocument();

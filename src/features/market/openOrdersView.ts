@@ -1,60 +1,48 @@
 /**
- * What the Open Orders panel renders: the visible/grouping row splits, the
- * groups, their summaries, whether the match-count line shows, and whether
- * a given group is folded. One testable shape for the panel to render.
+ * What the Open Orders fix list renders: the rows the funnel matched, split
+ * into the Needs you / Watch / Fine buckets the segments show and count. One
+ * testable shape for the panel to render.
  */
-import { groupOpenOrders, orderGroupKey, summariseOrderGroup } from './openOrdersModel';
-import type {
-  OpenOrderGroupSummary,
-  OpenOrderRow,
-  OrderGroup,
-  OrderGroupKey,
-} from './openOrdersModel';
+import type { OpenOrderRow } from './openOrdersModel';
 import { filterOpenOrders, sortOpenOrders } from './openOrdersFilter';
 import type { OpenOrdersFilter } from './openOrdersFilter';
+import { orderUrgency, rowInView, type OpenOrdersView, type OrderUrgency } from './orderUrgency';
 
-export interface OpenOrdersView {
-  /** Every row matching the filter as given, sorted. What the match-count line counts. */
-  visibleRows: OpenOrderRow[];
-  /**
-   * Every row matching the filter except `hideHealthy`, sorted. Healthy
-   * orders are FOLDED, not filtered out (GLOSSARY.md): grouping always sees
-   * them so the healthy group's own heading and count still render — just
-   * without its table — while `hideHealthy` is on.
-   */
-  groupingRows: OpenOrderRow[];
-  groups: OrderGroup[];
-  groupSummaries: Map<OrderGroupKey, OpenOrderGroupSummary>;
-  /** False only when rows are hidden by the healthy fold alone — that's not a failed match (issue #2032). */
-  matchCountVisible: boolean;
-}
-
-function sortedFilter(rows: readonly OpenOrderRow[], filter: OpenOrdersFilter): OpenOrderRow[] {
-  return sortOpenOrders(filterOpenOrders(rows, filter), filter.sort);
+export interface OpenOrdersFixList {
+  /** Every row matching the funnel (any segment), sorted. What All shows. */
+  matching: OpenOrderRow[];
+  act: OpenOrderRow[];
+  watch: OpenOrderRow[];
+  fine: OpenOrderRow[];
+  /** ISK tied up in the Needs you rows: the headline's quiet line. */
+  actIskTiedUp: number;
 }
 
 export function buildOpenOrdersView(
   rows: readonly OpenOrderRow[],
   filter: OpenOrdersFilter
-): OpenOrdersView {
-  const visibleRows = sortedFilter(rows, filter);
-  const groupingRows = sortedFilter(rows, { ...filter, hideHealthy: false });
-  const groups = groupOpenOrders(groupingRows);
-  const groupSummaries = new Map(
-    groups.map((group) => [group.problem, summariseOrderGroup(group.rows)])
-  );
-  const matchCountVisible = visibleRows.length > 0 || groupingRows.length === 0;
-  return { visibleRows, groupingRows, groups, groupSummaries, matchCountVisible };
+): OpenOrdersFixList {
+  const sorted = sortOpenOrders(filterOpenOrders(rows, filter), filter.sort);
+  const buckets: Record<OrderUrgency, OpenOrderRow[]> = { act: [], watch: [], fine: [] };
+  for (const row of sorted) buckets[orderUrgency(row)].push(row);
+  const { act, watch, fine } = buckets;
+  return {
+    // Worst first means Needs you first: problem precedence alone would list a
+    // region undercut (Watch) above an expiring order. A picked sort holds.
+    matching: filter.sort === 'worstFirst' ? [...act, ...watch, ...fine] : sorted,
+    act,
+    watch,
+    fine,
+    actIskTiedUp: act.reduce((sum, row) => sum + row.iskTiedUp, 0),
+  };
 }
 
-/** The highlighted row's own group always wins over either fold mechanism (decision `20260924-...`, step 9). */
-export function isGroupFolded(
-  problem: OrderGroupKey,
-  highlightedRow: OpenOrderRow | null,
-  filter: OpenOrdersFilter,
-  collapsedGroups: ReadonlySet<OrderGroupKey>
-): boolean {
-  if (highlightedRow !== null && problem === orderGroupKey(highlightedRow)) return false;
-  if (problem === 'healthy') return filter.hideHealthy;
-  return collapsedGroups.has(problem);
+/**
+ * The segment actually on screen: the picked one, widened to All while a row
+ * the page must show (a notification's `?highlight=`, the work-through's
+ * current order) sits outside it. Derived, never written to the URL, so it
+ * cannot race `useHighlightParam`'s own URL write.
+ */
+export function shownView(view: OpenOrdersView, reveal: OpenOrderRow | null): OpenOrdersView {
+  return reveal !== null && !rowInView(reveal, view) ? 'all' : view;
 }

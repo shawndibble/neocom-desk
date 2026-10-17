@@ -55,6 +55,8 @@ import { adviseOrder } from './orderAdvice';
 import { orderExits, hubHaulGaps, type OrderExitKind } from './orderExits';
 import { useOpenOrderDetail, type OrderDetail } from './useOrderDetail';
 import { verdictFigures, type OrderDetailSnapshot, type OrderDetailView } from './orderDetailView';
+import { doThisPrice, rowFixCall } from './orderDoThis';
+import { OrderDoThisText } from './OrderDoThisText';
 import { isOffHubStation } from './hubStation';
 import { BASE_STATION_REPROCESSING_RATE } from '@/engine/industry/reprocessing';
 import {
@@ -510,6 +512,11 @@ export function OrderDetailContent({
   const advice = adviseOrder(row);
   const { badge, summary, verdict } = advice;
   const { copyPrice, keepPerUnit } = verdictFigures(row, advice);
+  // Without a verdict, a priceless "Do this" call ("Leave it alone",
+  // "Relist it") is the short headline. A priced one never is: with no floor
+  // the rival is a fact, not advice to match (decision 20260924-013535).
+  const { call: fixCall } = rowFixCall(row);
+  const shortCall = doThisPrice(fixCall) === null && fixCall.kind !== 'badgeAdvice';
   const station =
     location === 'structure'
       ? structureStationScopeState(row, structureMarket)
@@ -686,6 +693,26 @@ export function OrderDetailContent({
                   price: verdict.price === null ? '' : formatMarketIsk(verdict.price),
                 })}
               </p>
+            </>
+          ) : shortCall ? (
+            <>
+              {/*
+                No floor, so no verdict: the fix list's own short call heads
+                it, as the row says it; the badge's longer advice sits under.
+              */}
+              <p className="mt-2 text-xl font-semibold text-text">
+                <OrderDoThisText row={row} interactive={false} />
+              </p>
+              {badge && (
+                <p className="mt-1 text-sm text-text-dim">
+                  {t(`market.orders.badge.${badge.kind}Action`)}
+                </p>
+              )}
+              {summary && (
+                <p className="mt-1">
+                  <OrderRowSummaryText row={row} summary={summary} />
+                </p>
+              )}
             </>
           ) : (
             <>

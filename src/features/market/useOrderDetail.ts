@@ -6,8 +6,7 @@
  * runs once per page, for the page's lifetime: the modal remounts per order
  * (and unmounts on close), and reopening an order must not refetch what is
  * already in hand. The region and structure books also reclassify the
- * worklist's own rows, and the group "check system and region" button fills
- * the same region-book cache. `useOpenOrderDetail` runs inside the modal, for
+ * fix list's own rows. `useOpenOrderDetail` runs inside the modal, for
  * the one order on screen: it asks for what that order needs and assembles
  * its view.
  */
@@ -94,10 +93,9 @@ export interface OrderDetail {
   /** Re-arms a structure that failed, and asks again. */
   retryStructure: (characterId: number, locationId: number) => void;
   /**
-   * The group header's "check system and region": the region book for every
-   * DISTINCT item among `rows` (several characters can each hold an order on
-   * the same item), at most `ESI_FANOUT_CONCURRENCY` at a time — a large
-   * "expiring or stale" group can easily hold dozens of distinct items.
+   * "Refresh system & region prices": the region book for every DISTINCT item
+   * among `rows` (several characters can hold an order on one item), at most
+   * `ESI_FANOUT_CONCURRENCY` at a time.
    */
   checkDeeper: (rows: readonly OpenOrderRow[]) => void;
 }
