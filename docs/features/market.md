@@ -298,17 +298,18 @@ Paste panel
 - Lines chip: count of paste lines (`countPasteLines`), differs from row count because repeats merge.
 - Price Percent number field (0-1000, default 100, `pricePercent.ts:19-27`), device-local setting `useMarketPricePercent`; field holds typed string, writes only when in range (`AppraisalPanel.tsx:268`). `?percent=` URL param overrides for one visit (`Market.tsx:304`), cleared when user types.
 - Appraise (primary, disabled when empty/loading), Clear (disabled when empty).
-- Unmatched box: names that resolved to no market type, listed with source line numbers (`market.appraisal.unmatchedLine`).
+- Row menu (right-click and ⋮) ends with a divider and a danger "Remove": no confirmation, takes that item's lines out of the paste box (`removeItemFromPaste`) and re-prices the rest, clearing the form when it was the last. Not offered for a pasted EFT fit.
+- Unmatched box: names that resolved to no market type, listed with source line numbers (`market.appraisal.unmatchedLine`), plus lines whose stated quantity could not be read (`12.5`, `5 m3`) rather than pricing them as 1. Quantities grouped with `.`, space, no-break space or `'` (`124.500`) parse as whole numbers (`appraisalPaste.ts`).
 - Changing hub or percent after a result exists re-prices automatically (effect deps in `useAppraisal.ts`).
 
-Accepted paste shapes (`src/engine/market/appraisalPaste.ts`): inventory copy `Name<TAB>Qty[...]`, multibuy `Name Qty` / `Name xQty`, bare name (=1), EFT fit (header `[Ship, Fit]`; hull priced, charges priced separately, empty slots dropped; via `engine/import/eftFit`). Thousands separators stripped. Trailing digits only split off when no tab and digits-only token. Duplicate names merge. Name matching `appraisalMatch.ts`, catalogue `loadAppraisalCatalogue` (first type id wins on duplicate names, `appraisalData.ts`).
+Accepted paste shapes (`src/engine/market/appraisalPaste.ts`): inventory copy `Name<TAB>Qty[...]`, multibuy `Name Qty` / `Name xQty`, bare name (=1), EFT fit (header `[Ship, Fit]`; hull priced, charges priced separately, empty slots dropped; via `engine/import/eftFit`). Grouped quantities read as whole numbers (`,` `.` space `'`). Trailing digits only split off when no tab and digits-only token. Duplicate names merge. Name matching `appraisalMatch.ts`, catalogue `loadAppraisalCatalogue` (first type id wins on duplicate names, `appraisalData.ts`).
 
 Entry points into Appraisal besides typing: Fitting Export menu and page-level paste send `location.state.appraiseText` (`Market.tsx:480`); Quickbar "View in Appraisal" (opens Compare Hubs expanded, `Market.tsx:351`); Shared Appraisal "Open Neocom Desk" (`?share=<id>&hub=&percent=`, `sharedAppraisalSeed.ts`; param stripped after read).
 
 Result panel
 
 - Header meta chip: hub name + "at N%".
-- Actions: ColumnPickerMenu (optional columns, device-local `appraisalVisibleColumns`), Share, Copy sell list, TableActionsMenu (CSV).
+- Actions: ColumnPickerMenu (optional columns, ISK/m³ off by default, device-local `appraisalVisibleColumns`), Share, Copy sell list, TableActionsMenu (CSV).
 - StatChips: Sell total (accent), Buy total, Instant net, List net, Spread, Refine total (only if any row has refine), Cheapest buy (only if any row has an LP option), Total volume (`AppraisalVolumeChip`), Items count. Sell/Buy use `FullIskTotal`; others `IskAmount` shorthand with exact on tap/hover.
 - Notes above table (conditional): "net always at 100%" when percent != 100; assumes-base-standings note; refine assumes no implants (ore/ice only); unpriced rows count (warning); refine-unpriced count; "cheapest buy via LP" count.
 - Table (`DataTable`, rowKey typeId, `stackColumns={2}`, `mobileSort`, `rowMoreActions`, `rowContextMenu` = `ItemContextMenu`):
@@ -319,7 +320,7 @@ Result panel
 - States: loading spinner (first result only), `failed` (catalogue load) EmptyState, empty (no result), no-matches EmptyState; a re-price shows an inline small spinner in the chip row.
 - Mobile: paste panel stacks above result; table becomes 2-column stacked cards; sort via mobile sort control.
 
-CSV (`appraisalCsv.ts`, surface `market-appraisal`): Quantity, Item, Buy each, Sell each, Buy total, Sell total, Volume. Raw numbers at chosen percent; null exports empty. Refine and LP columns are not exported.
+CSV (`appraisalCsv.ts`, surface `market-appraisal`): Quantity, Item, Buy each, Sell each, Buy total, Sell total, Volume, ISK/m³ (CSV always includes it). Raw numbers at chosen percent; null exports empty. Refine and LP columns are not exported.
 
 Copy sell list (`appraisalSellListText.ts`): one line per item `name<TAB>price`, price = one tick under hub's cheapest sell (`appraisalUndercut`, `priceClipboardText`); no quantity (Import Prices matches by name); items nobody sells or already at 0.01 are skipped; button disabled if none.
 

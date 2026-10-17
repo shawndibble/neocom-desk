@@ -172,6 +172,23 @@ describe('appraisePaste', () => {
     expect(up.pricesUnreachable).toBe(false);
   });
 
+  it('reports a line whose quantity cannot be read instead of pricing it as one (issue #4022)', async () => {
+    server.use(aggregates(PRICED));
+
+    const text = ['Tritanium\t124.500', 'Damage Control II\t12.5', 'Nanite Repair Past\t2'].join(
+      '\n'
+    );
+    const outcome = await appraisePaste(text, DEFAULT_TRADE_HUB, 100);
+
+    expect(outcome.appraisal.rows.map((row) => [row.name, row.quantity])).toEqual([
+      ['Tritanium', 124500],
+    ]);
+    expect(outcome.unmatched).toEqual([
+      { name: 'Damage Control II\t12.5', lines: [2] },
+      { name: 'Nanite Repair Past', lines: [3] },
+    ]);
+  });
+
   it('makes no price request for a paste that matches nothing', async () => {
     let hits = 0;
     server.use(

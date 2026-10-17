@@ -52,44 +52,72 @@ export interface AppraisalPasteEntry {
  * also hand-typed as `x N`. Without the optional space the plain
  * trailing-number rule reads `Tritanium x 1000` as 1000 of "Tritanium x".
  */
-const X_SUFFIX = /^(.*\S)\s+x\s*([\d,]+)$/i;
+const X_SUFFIX = /^(.*\S)\s+x\s*(\d[\d.,']*)$/i;
 
-/** A trailing standalone number: digits and thousands separators, nothing else. */
-const TRAILING_QUANTITY = /^(.*\S)\s+([\d,]+)$/;
+/** A trailing standalone number: digits and grouping marks, nothing else. */
+const TRAILING_QUANTITY = /^(.*\S)\s+(\d[\d.,']*)$/;
 
 /**
- * `124,500` -> 124500. Answers null for anything that is not a positive whole
- * number, which is what makes a non-quantity fall back to "one of these"
- * rather than silently appraising a stack as empty.
+ * Digits grouped in threes by one repeated mark: a dot, an apostrophe, a space,
+ * a no-break space, a thin space or a narrow no-break space — what a non-English client or
+ * OS writes where English writes a comma. Every group after the first must be
+ * exactly three digits, so `124.500` is 124500 while `12.5` is not a grouping.
+ */
+const GROUPED_QUANTITY = /^\d{1,3}([.' \u00a0\u2009\u202f])\d{3}(?:\1\d{3})*$/;
+
+/**
+ * `124,500` -> 124500, and so are `124.500`, `124 500` and `124'500`. Answers
+ * null for anything that is not a positive whole number, so the caller decides
+ * whether that is "one of these" or a line to report.
  */
 function parseQuantity(raw: string): number | null {
-  const digits = raw.replace(/,/g, '').trim();
-  if (!/^\d+$/.test(digits)) return null;
+  const token = raw.trim();
+  let digits: string;
+  if (/^[\d,]+$/.test(token)) digits = token.replace(/,/g, '');
+  else if (GROUPED_QUANTITY.test(token)) digits = token.replace(/\D/g, '');
+  else return null;
   const value = Number(digits);
   return Number.isSafeInteger(value) && value > 0 ? value : null;
 }
 
-/** Splits one non-blank line into its name and quantity. Never fails. */
-function parseLine(text: string): { name: string; quantity: number } {
+/**
+ * A token that begins like a number but is not one the parser can read — a
+ * decimal (`12.5`), a unit (`5 m3`), a malformed grouping (`1.2.3`). Plain
+ * digits and commas that fail (`0`, an overflow) are not this: they keep the
+ * "one of these" fallback, since they are whole numbers that are merely
+ * unusable. Reporting beats guessing: a wrong total with no warning is worse
+ * than a line the pilot is told to fix.
+ */
+function isUnreadableQuantity(raw: string): boolean {
+  const token = raw.trim();
+  return /^\d/.test(token) && !/^[\d,]+$/.test(token);
+}
+
+/** A line whose stated quantity could not be read; it is reported, not priced. */
+interface UnreadableLine {
+  unreadable: true;
+}
+
+/** Splits one non-blank line into its name and quantity, or flags it unreadable. */
+function parseLine(text: string): { name: string; quantity: number } | UnreadableLine {
   if (text.includes('\t')) {
-    const [name, quantity] = text.split('\t');
+    const [name, quantity = ''] = text.split('\t');
     const trimmedName = name.trim();
     // A tab-led line with nothing before the tab is not a name; keep the
     // whole line so it surfaces as unmatched rather than vanishing.
     if (trimmedName === '') return { name: text.trim(), quantity: 1 };
-    return { name: trimmedName, quantity: parseQuantity(quantity ?? '') ?? 1 };
+    const parsed = parseQuantity(quantity);
+    if (parsed === null && isUnreadableQuantity(quantity)) return { unreadable: true };
+    return { name: trimmedName, quantity: parsed ?? 1 };
   }
 
-  const xMatch = X_SUFFIX.exec(text);
-  if (xMatch) {
-    const quantity = parseQuantity(xMatch[2]);
-    if (quantity !== null) return { name: xMatch[1], quantity };
-  }
-
-  const trailing = TRAILING_QUANTITY.exec(text);
-  if (trailing) {
-    const quantity = parseQuantity(trailing[2]);
-    if (quantity !== null) return { name: trailing[1], quantity };
+  for (const pattern of [X_SUFFIX, TRAILING_QUANTITY]) {
+    const match = pattern.exec(text);
+    if (!match) continue;
+    const quantity = parseQuantity(match[2]);
+    if (quantity !== null) return { name: match[1], quantity };
+    // `Tritanium 12.5`: a trailing decimal is a mis-stated quantity, not a name.
+    if (/[.']/.test(match[2])) return { unreadable: true };
   }
 
   return { name: text, quantity: 1 };
@@ -147,17 +175,22 @@ function countOf(quantity: number): number {
   return Number.isSafeInteger(quantity) && quantity > 0 ? quantity : 1;
 }
 
-/** One row per non-blank line, read as inventory copy, multibuy or a bare name. */
-function itemRows(text: string): PasteRow[] {
+/**
+ * One row per non-blank line, read as inventory copy, multibuy or a bare name.
+ * A line whose quantity cannot be read comes back separately, as its own text.
+ */
+function itemRows(text: string): { rows: PasteRow[]; unreadable: PasteRow[] } {
   const rows: PasteRow[] = [];
+  const unreadable: PasteRow[] = [];
   const lines = text.split(LINE_BREAK);
   for (let i = 0; i < lines.length; i++) {
     const trimmed = lines[i].trim();
     if (trimmed === '') continue;
-    const { name, quantity } = parseLine(trimmed);
-    rows.push({ name, quantity, line: i + 1 });
+    const parsed = parseLine(trimmed);
+    if ('unreadable' in parsed) unreadable.push({ name: trimmed, quantity: 1, line: i + 1 });
+    else rows.push({ name: parsed.name, quantity: parsed.quantity, line: i + 1 });
   }
-  return rows;
+  return { rows, unreadable };
 }
 
 /**
@@ -198,12 +231,12 @@ function eftRows(text: string): PasteRow[] {
   return rows.sort((a, b) => a.line - b.line);
 }
 
-/** Parse pasted item text. Never throws — an unreadable line becomes a name. */
-export function parseAppraisalPaste(text: string): AppraisalPasteEntry[] {
+/** Merges same-named rows (case-insensitively) into one entry each, in first-seen order. */
+function mergeRows(rows: PasteRow[]): AppraisalPasteEntry[] {
   const entries: AppraisalPasteEntry[] = [];
   const byName = new Map<string, AppraisalPasteEntry>();
 
-  for (const row of looksLikeEftFit(text) ? eftRows(text) : itemRows(text)) {
+  for (const row of rows) {
     const key = row.name.toLowerCase();
     const existing = byName.get(key);
     if (existing) {
@@ -221,4 +254,62 @@ export function parseAppraisalPaste(text: string): AppraisalPasteEntry[] {
   }
 
   return entries;
+}
+
+/** A pasted line whose quantity could not be read, as the text the pilot typed. */
+export interface AppraisalUnreadableLine {
+  name: string;
+  /** 1-indexed source lines carrying exactly this text. */
+  lines: number[];
+}
+
+/**
+ * Parse pasted item text, and say which lines had a quantity it could not read.
+ * Those lines are left out of `entries`: the caller reports them rather than
+ * pricing them as one of the thing. Never throws.
+ */
+export function parseAppraisalPasteDetailed(text: string): {
+  entries: AppraisalPasteEntry[];
+  unreadable: AppraisalUnreadableLine[];
+} {
+  if (looksLikeEftFit(text)) return { entries: mergeRows(eftRows(text)), unreadable: [] };
+  const { rows, unreadable } = itemRows(text);
+  return {
+    entries: mergeRows(rows),
+    unreadable: mergeRows(unreadable).map(({ name, lines }) => ({ name, lines })),
+  };
+}
+
+/**
+ * Parse pasted item text into entries. Never throws. A line whose quantity
+ * can't be read is left out here; `parseAppraisalPasteDetailed` says which.
+ */
+export function parseAppraisalPaste(text: string): AppraisalPasteEntry[] {
+  return parseAppraisalPasteDetailed(text).entries;
+}
+
+/**
+ * The paste with every line naming `itemName` taken out, line endings of what
+ * stays untouched — what the Appraisal's row "Remove" does to the text box.
+ * Names are compared the way the catalogue does (trimmed, case-insensitive).
+ * Answers the text unchanged when no line names the item, and null for an EFT
+ * fit: its lines are a hull, slots and charges, so deleting "one item" from it
+ * would break the fit rather than shorten a list.
+ */
+export function removeItemFromPaste(text: string, itemName: string): string | null {
+  if (looksLikeEftFit(text)) return null;
+  const target = itemName.trim().toLowerCase();
+  const entry = parseAppraisalPaste(text).find((e) => e.name.trim().toLowerCase() === target);
+  if (!entry) return text;
+
+  const removed = new Set(entry.lines);
+  // Odd indexes are the line breaks the split kept, so each line owns the break after it.
+  const parts = text.split(/(\r\n|\r|\n)/);
+  let kept = '';
+  for (let i = 0; i < parts.length; i += 2) {
+    if (removed.has(i / 2 + 1)) continue;
+    kept += parts[i] + (parts[i + 1] ?? '');
+  }
+  // Dropping the last line leaves the break before it hanging.
+  return /(\r\n|\r|\n)$/.test(text) ? kept : kept.replace(/(\r\n|\r|\n)$/, '');
 }

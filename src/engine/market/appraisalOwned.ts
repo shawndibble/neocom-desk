@@ -3,7 +3,7 @@
  * pilot already holds at one station is taken off. Pure — the caller fetches
  * the assets. Fittings' Copy multibuy reuses `subtractOwned` (#2829).
  *
- * Scope is station hangars only: an asset whose `location_type` is `station`
+ * `ownedAtStation` is station hangars only: an asset whose `location_type` is `station`
  * and whose `location_id` is the chosen station. Containers and corp hangars
  * are out of v1.
  */
@@ -24,6 +24,23 @@ export function ownedAtStation(
   for (const assets of assetLists) {
     for (const asset of assets) {
       if (asset.location_type !== 'station' || asset.location_id !== stationId) continue;
+      owned.set(asset.type_id, (owned.get(asset.type_id) ?? 0) + asset.quantity);
+    }
+  }
+  return owned;
+}
+
+/**
+ * Quantity per type id held anywhere — station hangars, containers, structures,
+ * ships — summed over every Character's asset list. Every asset row is one
+ * stack of one type (a container's contents are rows of their own), so adding
+ * them up counts nothing twice. The "All locations" choice of Minus owned, for
+ * a pile pasted from the pilot's own assets, wherever those sit.
+ */
+export function ownedAnywhere(assetLists: readonly (readonly OwnedAsset[])[]): Map<number, number> {
+  const owned = new Map<number, number>();
+  for (const assets of assetLists) {
+    for (const asset of assets) {
       owned.set(asset.type_id, (owned.get(asset.type_id) ?? 0) + asset.quantity);
     }
   }

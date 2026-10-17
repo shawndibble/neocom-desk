@@ -286,6 +286,23 @@ describe('AppraisalPanel', () => {
       expect(within(row).getAllByText('—')).toHaveLength(3);
       expect(screen.getByText('≈ 15 m³')).toBeInTheDocument();
     });
+
+    it('offers ISK per m³ in the picker, a dash where the volume is unknown', async () => {
+      const unknown: Appraisal = {
+        ...APPRAISAL,
+        rows: APPRAISAL.rows.map((row) => (row.typeId === 999 ? { ...row, volume: null } : row)),
+      };
+      renderPanel({ controller: controller({ result: outcome({ appraisal: unknown }) }) });
+      expect(screen.queryByRole('columnheader', { name: 'ISK/m³' })).not.toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole('button', { name: 'Columns' }));
+      await userEvent.click(await screen.findByRole('menuitemcheckbox', { name: 'ISK/m³' }));
+      await userEvent.keyboard('{Escape}');
+
+      expect(screen.getByRole('columnheader', { name: 'ISK/m³' })).toBeInTheDocument();
+      const row = screen.getByRole('row', { name: /Civilian Gatling Railgun/ });
+      expect(within(row).getAllByText('—')).toHaveLength(4);
+    });
   });
 
   it('says how many rows were left out of a total', () => {
@@ -1123,6 +1140,38 @@ describe('AppraisalPanel — the row as an item', () => {
     expect(actions.showInfo).toHaveBeenCalledWith(2048, 'Damage Control II');
   });
 
+  describe('Remove', () => {
+    const TEXT = 'Damage Control II\t3\nCivilian Gatling Railgun 1';
+
+    it('drops the item from the text box and prices what is left, no confirmation', async () => {
+      const ctl = controller({ text: TEXT, result: outcome() });
+      renderPanel({ controller: ctl });
+      fireEvent.contextMenu(screen.getByRole('row', { name: /Damage Control II/ }));
+      fireEvent.click(await screen.findByRole('menuitem', { name: 'Remove' }));
+
+      expect(ctl.appraiseText).toHaveBeenCalledWith('Civilian Gatling Railgun 1');
+      expect(ctl.clear).not.toHaveBeenCalled();
+    });
+
+    it('clears the form when the last item goes', async () => {
+      const ctl = controller({ text: 'Damage Control II\t3', result: outcome() });
+      renderPanel({ controller: ctl });
+      fireEvent.contextMenu(screen.getByRole('row', { name: /Damage Control II/ }));
+      fireEvent.click(await screen.findByRole('menuitem', { name: 'Remove' }));
+
+      expect(ctl.clear).toHaveBeenCalled();
+      expect(ctl.appraiseText).not.toHaveBeenCalled();
+    });
+
+    it('is not offered for a pasted fit, whose lines are not one item each', async () => {
+      const ctl = controller({ text: '[Rifter, Test]\nDamage Control II', result: outcome() });
+      renderPanel({ controller: ctl });
+      fireEvent.contextMenu(screen.getByRole('row', { name: /Damage Control II/ }));
+      await screen.findByRole('menuitem', { name: 'Show info' });
+      expect(screen.queryByRole('menuitem', { name: 'Remove' })).not.toBeInTheDocument();
+    });
+  });
+
   /** Without this the Build Plan action sits on "Checking…" forever. */
   it('asks for the blueprint catalog the first time a row menu opens', () => {
     const { actions } = renderPanel({
@@ -1350,7 +1399,7 @@ describe('AppraisalPanel — shopping list (#2868)', () => {
     await seedAssetsGrant();
     loadAllCharactersAssets.mockResolvedValue({ entries: [], skipped: [] });
     renderPanel({ controller: controller({ result: LIST_OUTCOME }) });
-    const box = await screen.findByRole('checkbox', { name: 'Minus what I own' });
+    const box = await screen.findByRole('checkbox', { name: 'Minus what I own at' });
     await waitFor(() => expect(box).toBeEnabled());
     await userEvent.click(box);
     await waitFor(async () =>
@@ -1368,12 +1417,15 @@ describe('AppraisalPanel — shopping list (#2868)', () => {
     });
     renderPanel({ controller: controller({ result: LIST_OUTCOME }) });
     expect(await screen.findByText('Grant Assets permission')).toBeInTheDocument();
-    expect(screen.getByRole('checkbox', { name: 'Minus what I own' })).toBeDisabled();
+    expect(screen.getByRole('checkbox', { name: 'Minus what I own at' })).toBeDisabled();
   });
 
   it('shows Need with owned beneath, dims covered lines, and copies net quantities', async () => {
     await seedAssetsGrant();
-    useAppraisalOwnedPref.setState({ value: { enabled: true, stationId: null }, hydrated: true });
+    useAppraisalOwnedPref.setState({
+      value: { enabled: true, stationId: null, everywhere: false },
+      hydrated: true,
+    });
     loadAllCharactersAssets.mockResolvedValue({
       entries: [
         {
@@ -1411,6 +1463,29 @@ describe('AppraisalPanel — shopping list (#2868)', () => {
     await userEvent.click(screen.getByRole('button', { name: /Appraisal/ }));
     await userEvent.click(await screen.findByRole('menuitem', { name: /^Multibuy/ }));
     expect(written).toEqual(['Damage Control II\t2']);
+  });
+
+  it('counts stock held anywhere, containers included, under All locations', async () => {
+    await seedAssetsGrant();
+    useAppraisalOwnedPref.setState({
+      value: { enabled: true, stationId: null, everywhere: true },
+      hydrated: true,
+    });
+    loadAllCharactersAssets.mockResolvedValue({
+      entries: [
+        {
+          characterId: 1,
+          name: 'A',
+          truncated: false,
+          assets: [{ type_id: 999, quantity: 9, location_id: 123456, location_type: 'item' }],
+        },
+      ],
+      skipped: [],
+    });
+    renderPanel({ controller: controller({ result: LIST_OUTCOME }) });
+    const covered = screen.getByRole('row', { name: /Civilian Gatling Railgun/ });
+    expect(await within(covered).findByText('4 owned')).toBeInTheDocument();
+    expect(screen.getByText('Minus owned · all locations')).toBeInTheDocument();
   });
 
   it('reloads a Recent paste', async () => {

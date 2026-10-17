@@ -1,5 +1,5 @@
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
-import type { AppraisalRow } from '@/engine/market/appraisal';
+import { iskPerM3, type AppraisalRow } from '@/engine/market/appraisal';
 
 /**
  * CSV columns for the Appraisal tab. Prices are raw numbers already scaled to
@@ -20,5 +20,6 @@ export function appraisalCsvColumns(t: CsvTranslate): CsvColumn<AppraisalRow>[] 
     { header: t('market.appraisal.columnSellTotal'), value: (row) => row.sellTotal },
     // Packaged m³ (issue #2337); unknown exports empty, the same as an unpriced side.
     { header: t('market.appraisal.columnVolume'), value: (row) => row.volume },
+    { header: t('market.appraisal.columnIskPerM3'), value: (row) => iskPerM3(row) },
   ];
 }

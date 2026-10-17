@@ -28,6 +28,7 @@ import {
   EmptyState,
   IconButton,
   MenuItem,
+  MenuSeparator,
   IskAmount,
   Panel,
   Select,
@@ -65,7 +66,8 @@ import {
   refineBeatsSellAsIs,
   type AppraisalRow,
 } from '@/engine/market/appraisal';
-import { countPasteLines, pasteBoxRows } from '@/engine/market/appraisalPaste';
+import { looksLikeEftFit } from '@/engine/import/eftFit';
+import { countPasteLines, pasteBoxRows, removeItemFromPaste } from '@/engine/market/appraisalPaste';
 import {
   appraisalSnapshotReuseKey,
   buildAppraisalSnapshot,
@@ -100,7 +102,7 @@ import { AppraisalHeaderStats } from './AppraisalHeaderStats';
 import { AppraisalHoldBar } from './AppraisalHoldBar';
 import { useHaulingCargo } from './haulingCargo';
 import { useOwnedAtStation } from './useOwnedAtStation';
-import { appraisalVolumeColumn } from './appraisalVolume';
+import { appraisalIskPerM3Column, appraisalVolumeColumn } from './appraisalVolume';
 import { formatVolume } from './format';
 import { HubCompareCards } from './HubCompareCards';
 import { ItemContextMenu } from './ItemContextMenu';
@@ -197,6 +199,9 @@ function comparisonCell(
 
 /** `lg` up to (not including) `xl`: paste card and results share a row but the results card is narrow. A min-and-max pair never matches under the test `matchMedia` stub, so tests see the full default. */
 const COMPACT_RESULTS_QUERY = '(min-width: 64rem) and (max-width: 79.999rem)';
+/** The "Minus owned" picker's value for every location, apart from any station id. */
+const OWNED_EVERYWHERE = 'all' as const;
+
 const COMPACT_OFF_BY_DEFAULT: readonly AppraisalColumnId[] = ['buyEach', 'sellEach', 'volume'];
 
 export function AppraisalPanel({
@@ -282,7 +287,10 @@ export function AppraisalPanel({
   const minusOwned = ownedPref.enabled && !lacksAssets && characterId !== null;
   const ownedStationId = ownedPref.stationId ?? hub.stationId;
   const ownedStation = TRADE_HUBS.find((h) => h.stationId === ownedStationId) ?? hub;
-  const { owned } = useOwnedAtStation(minusOwned, ownedStationId);
+  const { owned } = useOwnedAtStation(
+    minusOwned,
+    ownedPref.everywhere ? OWNED_EVERYWHERE : ownedStationId
+  );
 
   const storedColumns = useVisibleAppraisalColumns((state) => state.value);
   // Side by side below `xl` the results card is only ~500px wide, so with no
@@ -598,6 +606,7 @@ export function AppraisalPanel({
       sortValue: (row) => row.lpIskCost ?? undefined,
     },
     volume: appraisalVolumeColumn(t),
+    iskPerM3: appraisalIskPerM3Column(t),
   };
   const availableColumns = APPRAISAL_COLUMN_IDS.filter(
     (id) => (id !== 'refineTotal' || hasRefine) && (id !== 'lpTotal' || hasLpOption)
@@ -611,9 +620,31 @@ export function AppraisalPanel({
   // The Item Detail modal (Market's `ItemActionsProvider`) and `CompareDrawer`
   // sit outside Market's section guards, so Show Info and Add to Compare work
   // from this tab without a second copy of either.
+  // Takes the item's lines out of the text box and prices what is left. Gone
+  // is gone, with no confirmation: pasting the list again brings it back. A
+  // fit has no such thing as one item's lines, so it carries no Remove.
+  const canRemoveRows = !looksLikeEftFit(text);
+  function removeRow(name: string) {
+    const next = removeItemFromPaste(text, name);
+    if (next === null) return;
+    if (next.trim() === '') controller.clear();
+    else controller.appraiseText(next);
+  }
+  function removeItem(row: OwnedRow) {
+    if (!canRemoveRows) return undefined;
+    return (
+      <>
+        <MenuSeparator />
+        <MenuItem className="text-danger" onSelect={() => removeRow(row.name)}>
+          {t('market.appraisal.removeRow')}
+        </MenuItem>
+      </>
+    );
+  }
+
   function rowContextMenu(row: OwnedRow, tr: ReactElement) {
     return (
-      <ItemContextMenu typeId={row.typeId} itemName={row.name}>
+      <ItemContextMenu typeId={row.typeId} itemName={row.name} extraItems={removeItem(row)}>
         {tr}
       </ItemContextMenu>
     );
@@ -797,27 +828,41 @@ export function AppraisalPanel({
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <label className="flex min-h-9 items-center gap-2 text-xs">
-                <Checkbox
-                  checked={minusOwned}
-                  disabled={lacksAssets || characterId === null}
-                  onChange={(event) =>
-                    void setOwnedPref({ ...ownedPref, enabled: event.target.checked })
-                  }
-                />
-                {t('market.appraisal.minusOwned')}
-              </label>
-              {ownedPref.enabled && !lacksAssets && characterId !== null && (
+              {/* One sentence: "Minus what I own at [Jita]". The picker stays put, disabled, while the box is unticked. */}
+              <div className="flex flex-wrap items-center gap-x-2">
+                <label className="flex min-h-9 items-center gap-2 text-xs">
+                  <Checkbox
+                    checked={minusOwned}
+                    disabled={lacksAssets || characterId === null}
+                    onChange={(event) =>
+                      void setOwnedPref({ ...ownedPref, enabled: event.target.checked })
+                    }
+                  />
+                  {t('market.appraisal.minusOwned')}
+                </label>
                 <Select
-                  value={String(ownedStationId)}
+                  disabled={!minusOwned}
+                  value={ownedPref.everywhere ? OWNED_EVERYWHERE : String(ownedStationId)}
                   onValueChange={(value) =>
-                    void setOwnedPref({ ...ownedPref, stationId: Number(value) })
+                    void setOwnedPref(
+                      value === OWNED_EVERYWHERE
+                        ? { ...ownedPref, everywhere: true }
+                        : { ...ownedPref, everywhere: false, stationId: Number(value) }
+                    )
                   }
                 >
-                  <SelectTrigger size="sm" aria-label={t('market.appraisal.minusOwnedStation')}>
+                  <SelectTrigger
+                    size="sm"
+                    className="w-auto"
+                    aria-label={t('market.appraisal.minusOwnedStation')}
+                  >
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value={OWNED_EVERYWHERE}>
+                      {t('market.appraisal.minusOwnedEverywhere')}
+                    </SelectItem>
+                    <SelectSeparator />
                     {TRADE_HUBS.map((h) => (
                       <SelectItem key={h.id} value={String(h.stationId)}>
                         {h.systemName}
@@ -825,7 +870,7 @@ export function AppraisalPanel({
                     ))}
                   </SelectContent>
                 </Select>
-              )}
+              </div>
               {lacksAssets && (
                 <GrantNote
                   endpoints={ASSETS_ENDPOINTS}
@@ -979,7 +1024,9 @@ export function AppraisalPanel({
               <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
                 {minusOwned && (
                   <span className="w-full text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                    {t('market.appraisal.minusOwnedChip', { station: ownedStation.systemName })}
+                    {ownedPref.everywhere
+                      ? t('market.appraisal.minusOwnedChipEverywhere')
+                      : t('market.appraisal.minusOwnedChip', { station: ownedStation.systemName })}
                   </span>
                 )}
                 <AppraisalHeaderStats

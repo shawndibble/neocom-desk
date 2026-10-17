@@ -3,7 +3,7 @@
  * owned". Cache-first via `loadAllCharactersAssets`; idle (null) when off.
  */
 import { useEffect, useState } from 'react';
-import { ownedAtStation } from '@/engine/market/appraisalOwned';
+import { ownedAnywhere, ownedAtStation } from '@/engine/market/appraisalOwned';
 import { loadAllCharactersAssets } from '@/features/character/assets';
 
 export interface OwnedAtStation {
@@ -12,8 +12,11 @@ export interface OwnedAtStation {
   loading: boolean;
 }
 
-export function useOwnedAtStation(enabled: boolean, stationId: number): OwnedAtStation {
-  const [state, setState] = useState<{ stationId: number; owned: Map<number, number> } | null>(
+/** One station's hangars, or `'all'` for everything held anywhere. */
+export type OwnedScope = number | 'all';
+
+export function useOwnedAtStation(enabled: boolean, scope: OwnedScope): OwnedAtStation {
+  const [state, setState] = useState<{ scope: OwnedScope; owned: Map<number, number> } | null>(
     null
   );
 
@@ -23,22 +26,20 @@ export function useOwnedAtStation(enabled: boolean, stationId: number): OwnedAtS
     void loadAllCharactersAssets()
       .then(({ entries }) => {
         if (cancelled) return;
+        const lists = entries.map((entry) => entry.assets);
         setState({
-          stationId,
-          owned: ownedAtStation(
-            entries.map((entry) => entry.assets),
-            stationId
-          ),
+          scope,
+          owned: scope === 'all' ? ownedAnywhere(lists) : ownedAtStation(lists, scope),
         });
       })
       .catch(() => {
-        if (!cancelled) setState({ stationId, owned: new Map() });
+        if (!cancelled) setState({ scope, owned: new Map() });
       });
     return () => {
       cancelled = true;
     };
-  }, [enabled, stationId]);
+  }, [enabled, scope]);
 
-  const ready = enabled && state !== null && state.stationId === stationId;
+  const ready = enabled && state !== null && state.scope === scope;
   return { owned: ready ? state.owned : null, loading: enabled && !ready };
 }
