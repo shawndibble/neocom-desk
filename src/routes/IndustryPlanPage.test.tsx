@@ -24,6 +24,8 @@ import {
 } from '@/features/industry/reactionFacilityDefaults';
 import type { BlueprintMap, TypeMap } from '@/sde/types';
 
+// The "vs 90d" figures read market history; nothing here is about them.
+vi.mock('@/features/market/priceVsMedian', () => ({ loadPriceVsMedian: async () => null }));
 vi.mock('virtual:pwa-register/react', () => ({
   useRegisterSW: () => ({
     needRefresh: [false, vi.fn()],

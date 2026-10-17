@@ -33,6 +33,9 @@ import { resolveNames } from '@/features/character/names';
 import { db } from '@/db';
 import { lastPriceAlertSnapshot } from '@/features/notifications/pollDomains';
 import { buildPriceAlertRows, type BoardPriceAlert } from './priceAlertsBoard';
+import { useMarketHub } from '@/features/market/hub';
+import { loadPriceVsMedian } from '@/features/market/priceVsMedian';
+import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { payeesOwed, type PayeeOwed } from './miningTaxPayees';
 import type { BoardStructureSource, CorpBoardItem } from '@/engine/corp/board';
 import type { BoardClockSource } from '@/engine/character/board';
@@ -488,14 +491,26 @@ export interface PriceAlertsBoardData {
   checkedAt: number | null;
 }
 
-/** The Quickbar's targets, priced from the poller's last reading (`priceAlertsBoard.ts`). */
+/**
+ * The Quickbar's targets, priced from the poller's last reading
+ * (`priceAlertsBoard.ts`), each with its price vs 90-day median in the
+ * region of the Market hub the poller prices at.
+ */
 export async function loadPriceAlertsBoard(characterId: number): Promise<PriceAlertsBoardData> {
   const [record, snapshot] = await Promise.all([
     db.quickbars.get(String(characterId)),
     lastPriceAlertSnapshot(characterId),
+    useMarketHub.getState().hydrate(),
   ]);
+  const alerts = buildPriceAlertRows(record?.items ?? [], snapshot);
+  const hub = getTradeHub(useMarketHub.getState().value) ?? DEFAULT_TRADE_HUB;
+  const typeIds = [...new Set(alerts.map((alert) => alert.typeId))];
+  const vs90d = new Map<number, number | null>();
+  await mapWithConcurrencyLimit(typeIds, ESI_FANOUT_CONCURRENCY, async (typeId) => {
+    vs90d.set(typeId, await loadPriceVsMedian(hub.regionId, typeId));
+  });
   return {
-    alerts: buildPriceAlertRows(record?.items ?? [], snapshot),
+    alerts: alerts.map((alert) => ({ ...alert, vs90d: vs90d.get(alert.typeId) ?? null })),
     checkedAt: snapshot?.nowMs ?? null,
   };
 }

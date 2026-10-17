@@ -91,6 +91,9 @@ import { MobileMarketWideList } from './MobileMarketWideList';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import { RARELY_SOLD_PER_DAY, isRarelySold } from '@/engine/industry/marketWideSanity';
 import { useDailySales } from './useDailySales';
+import { priceVsMedianFor, usePriceVsMedian } from './usePriceVsMedian';
+import { Vs90dFigure } from './Vs90dFigure';
+import { vs90dTooltip } from './vs90d';
 import { marketWideOpportunitiesCsvColumns } from './opportunitiesCsv';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
@@ -230,6 +233,7 @@ const SORT_VALUE = {
   product: (row: MarketWideDayRow) => row.productName,
   blueprintSource: (row: MarketWideDayRow) => BLUEPRINT_SOURCE_RANK[row.blueprintSource],
   margin: (row: MarketWideDayRow) => row.marginPct ?? undefined,
+  vs90d: (row: MarketWideDayRow) => row.vs90d ?? undefined,
   duration: (row: MarketWideDayRow) => row.seconds,
   iskPerHour: (row: MarketWideDayRow) => row.iskPerHour ?? undefined,
   buildCost: (row: MarketWideDayRow) => row.buildCost,
@@ -365,6 +369,13 @@ export function MarketWideOpportunitiesPanel({
   const rowTypeIds = useMemo(() => rows.map((row) => row.productTypeID), [rows]);
   // Always fetched: ISK/day needs every ranked row's volume, not only the filter's.
   const dailySales = useDailySales(rowTypeIds, hasRun);
+  // The scanned hub's region is one of the regions daily sales reads, so
+  // this shares those requests through the history cache rather than adding any.
+  const vs90dTargets = useMemo(
+    () => (hasRun ? rowTypeIds.map((typeId) => ({ hubId: hub.id, typeId })) : []),
+    [hasRun, rowTypeIds, hub.id]
+  );
+  const priceVsMedian = usePriceVsMedian(vs90dTargets);
   const sharePct = Number(filter.salesShare);
   const dayRows = useMemo<MarketWideDayRow[]>(
     () =>
@@ -377,8 +388,9 @@ export function MarketWideOpportunitiesPanel({
           averageDailyVolume: dailySales.sales.get(row.productTypeID),
           sharePct,
         }),
+        vs90d: priceVsMedianFor(priceVsMedian, hub.id, row.productTypeID),
       })),
-    [rows, dailySales.sales, sharePct]
+    [rows, dailySales.sales, sharePct, priceVsMedian, hub.id]
   );
   const visibleRows = useMemo(
     () =>
@@ -493,6 +505,15 @@ export function MarketWideOpportunitiesPanel({
       className: 'tabular-nums',
       sortValue: SORT_VALUE.margin,
       render: (row) => numericCell(row.marginPct, formatPercent, t('common.unknown')),
+    },
+    {
+      id: 'vs90d',
+      header: t('industry.vs90d'),
+      headerTooltip: vs90dTooltip(t),
+      align: 'right',
+      className: 'tabular-nums',
+      sortValue: SORT_VALUE.vs90d,
+      render: (row) => <Vs90dFigure value={row.vs90d} />,
     },
     {
       // The whole tree's TE-0 job time: ISK/hour's denominator, not a wall-clock promise.

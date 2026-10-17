@@ -51,6 +51,7 @@ import type { BlueprintCatalogEntry } from './blueprintCatalog';
 import { groupIdentical, identicalBlueprintKey } from './identicalBlueprints';
 import { ORDER_DEPTH_TONE, stockCoverage, unitMargin } from './opportunityMetrics';
 import { formatPercent } from './format';
+import { vs90dReadout } from './vs90d';
 import type { OpportunityRow } from './opportunities';
 import { MobileSortToolbar } from './MobileSortToolbar';
 import { SkillGateMarker } from './SkillGateMarker';
@@ -75,10 +76,11 @@ interface MobileOpportunityListProps {
 }
 
 type SortFieldId =
-  'iskPerHour' | 'unitMargin' | 'margin' | 'stockCovers' | 'stillToBuy' | 'duration';
+  'iskPerHour' | 'unitMargin' | 'margin' | 'vs90d' | 'stockCovers' | 'stillToBuy' | 'duration';
 
 interface HeroValue {
-  node: ReactNode;
+  /** Null: nothing to say, so a secondary readout is left out. */
+  node: ReactNode | null;
   toneClassName?: string;
 }
 
@@ -144,6 +146,11 @@ function sortFields(t: ReturnType<typeof useTranslation>['t']): Record<
         };
       },
     },
+    vs90d: {
+      label: t('industry.vs90d'),
+      sortValue: (row) => row.vs90d ?? undefined,
+      hero: (row) => vs90dReadout(row.vs90d) ?? { node: null },
+    },
     stockCovers: {
       label: t('industry.opportunitiesStockCovers'),
       sortValue: (row) => stockCoverage(row)?.coveredPct,
@@ -172,6 +179,7 @@ const SORT_FIELD_ORDER: readonly SortFieldId[] = [
   'iskPerHour',
   'unitMargin',
   'margin',
+  'vs90d',
   'stockCovers',
   'stillToBuy',
   'duration',
@@ -290,7 +298,7 @@ export function MobileOpportunityList({
                   </div>
                   <span className="flex shrink-0 flex-col items-end text-right leading-tight tabular-nums">
                     <span className={cx('text-sm font-semibold', hero.toneClassName)}>
-                      {hero.node}
+                      {hero.node ?? unknown}
                     </span>
                     <span className="text-[0.6875rem] tracking-widest text-text-dim uppercase">
                       {fields[activeFieldId].label}
@@ -310,6 +318,7 @@ export function MobileOpportunityList({
                   />
                   {SORT_FIELD_ORDER.filter((id) => id !== activeFieldId).map((id) => {
                     const secondary = fields[id].hero(row);
+                    if (secondary.node === null) return null;
                     return (
                       <span key={id} className={secondary.toneClassName}>
                         {fields[id].label}: {secondary.node}

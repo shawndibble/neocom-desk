@@ -630,12 +630,13 @@ describe('price watch', () => {
     direction: 'above' | 'below',
     targetPrice: number,
     price: number | null,
-    crossed = false
-  ) => ({ typeId: name.length, name, direction, targetPrice, price, crossed });
+    crossed = false,
+    vs90d: number | null = null
+  ) => ({ typeId: name.length, name, direction, targetPrice, price, crossed, vs90d });
 
-  it('is Item, Gap, Now, Target with the gap kept longest', () => {
+  it('is Item, Gap, Now, Target, vs 90d with the gap kept longest', () => {
     const table = priceWatchTable(t, []);
-    expect(table.columns.map((c) => c.key)).toEqual(['item', 'gap', 'now', 'target']);
+    expect(table.columns.map((c) => c.key)).toEqual(['item', 'gap', 'now', 'target', 'vs90d']);
     expect(table.columns.find((c) => c.priority === 1)!.key).toBe('gap');
   });
 
@@ -656,6 +657,7 @@ describe('price watch', () => {
       { text: '+5%', tone: 'caution' },
       { text: '105', iskAmount: 105 },
       'overview.widgets.priceWatch.target.below{"isk":"100"}',
+      '',
     ]);
     const [far] = priceWatchTable(t, [alert('Far', 'above', 100, 50)]).rows;
     expect(far!.cells[1]).toBe('-50%');
@@ -671,6 +673,15 @@ describe('price watch', () => {
     ]).rows;
     expect(rows[1]!.cells.slice(1, 3)).toEqual(['—', '—']);
     expect(rows.map((r) => r.tone)).toEqual(['warning', 'clear']);
+  });
+
+  it('shows the price against its 90-day median, amber from +20%, blank when unknown', () => {
+    const vs90d = (value: number | null) =>
+      priceWatchTable(t, [alert('A', 'above', 100, 50, false, value)]).rows[0]!.cells[4];
+    expect(vs90d(35.2)).toEqual({ text: '+35%', tone: 'caution' });
+    expect(vs90d(19.6)).toEqual({ text: '+20%', tone: 'caution' });
+    expect(vs90d(-12)).toBe('\u221212%');
+    expect(vs90d(null)).toBe('');
   });
 });
 

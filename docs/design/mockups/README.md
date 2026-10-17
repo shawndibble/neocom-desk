@@ -29,7 +29,6 @@ PNG exports of the chosen mockups for ready tickets. Delete a folder (and its ro
 | [market-history-trading-profit](market-history-trading-profit/README.md) | Issue #3995 | strip Margin + Broker fees, By item / By day, All characters filter |
 | [plan-slot-schedule](plan-slot-schedule/README.md) | Issue #3985 | slot line "Uses N slots · done by", Show plan expands in-line |
 | [plan-order-book-depth](plan-order-book-depth/README.md) | Issue #3993 | Price cell "best · avg for N", Calculation Breakdown levels |
-| [price-vs-90d](price-vs-90d/README.md) | Issue #3994 | vs 90d column in Opportunities, amber plan note |
 | [blueprint-acquisition-invent](blueprint-acquisition-invent/README.md) | Issue #3990 | Invent section, one tier per decryptor |
 | [contracts-below-market](contracts-below-market/README.md) | Issue #3989 | Below market chip, one row per contract |
 | [overview-market-industry-widgets](overview-market-industry-widgets/README.md) | Issues #3985, #3989, #3991, #3994, #3995 | Overview widget changes and two new widgets |

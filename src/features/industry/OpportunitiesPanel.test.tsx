@@ -31,6 +31,13 @@ const stub = vi.hoisted(() => ({
 
 vi.mock('@/lib/useIsDesktop', () => ({ useIsDesktop: () => true }));
 
+// No market-history reads in this test; each case sets the figures it wants.
+const vs90d = vi.hoisted(() => ({ values: new Map<string, number | null>() }));
+vi.mock('./usePriceVsMedian', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./usePriceVsMedian')>()),
+  usePriceVsMedian: () => vs90d,
+}));
+
 // Stubbed out so this test isolates the panel's own blueprint-loading effect
 // — the real hook does a market fetch and holds state of its own, neither of
 // which is what the assertion below is about. The counter doubles as a
@@ -72,6 +79,7 @@ const SNAPSHOT: OwnedStockSnapshot = {
 beforeEach(async () => {
   loop.count = 0;
   stub.rows = [];
+  vs90d.values = new Map();
   stub.manualRefreshOnly = false;
   stub.needsRefresh = false;
   loadCharacterBlueprints.mockReset();
@@ -212,6 +220,7 @@ describe('OpportunitiesPanel', () => {
             revenue: null,
           },
           orderDepth: 'deep',
+          hub: { id: 'jita', regionId: 10000002 },
         },
       ];
       const actions = fakeItemActions();
@@ -252,6 +261,15 @@ describe('OpportunitiesPanel', () => {
       act(() => useVisibleOpportunitiesColumns.setState({ value: ['duration'] }));
       expect(await within(table).findByRole('columnheader', { name: /Time/ })).toBeInTheDocument();
       act(() => useVisibleOpportunitiesColumns.setState({ value: OPPORTUNITIES_DEFAULT_COLUMNS }));
+    });
+
+    it('shows the product price against its 90-day median, amber from +20%', async () => {
+      vs90d.values = new Map([['jita:1000', 35.2]]);
+      const { row } = await renderWithRow(1000);
+      expect(
+        within(row.closest('table')!).getByRole('columnheader', { name: /vs 90d/ })
+      ).toBeInTheDocument();
+      expect(within(row).getByText('+35%')).toHaveClass('text-warning');
     });
 
     it('clicking the product name starts the plan, like the Plan button', async () => {
@@ -356,6 +374,7 @@ describe('OpportunitiesPanel', () => {
           revenue: null,
         },
         orderDepth: 'deep',
+        hub: { id: 'jita', regionId: 10000002 },
       };
     }
 

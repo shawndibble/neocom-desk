@@ -64,6 +64,16 @@ vi.mock('./useDailySales', () => ({
     pending: 0,
   }),
 }));
+// Beta's price sits 25% over its 90-day median; Gamma's history is too thin to say.
+vi.mock('./usePriceVsMedian', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./usePriceVsMedian')>()),
+  usePriceVsMedian: () => ({
+    values: new Map([
+      ['jita:200', 25],
+      ['jita:300', null],
+    ]),
+  }),
+}));
 vi.mock('./useMarketWideOpportunities', () => ({
   useMarketWideOpportunities: () => ({
     rows: (hookState.rows as MarketWideResultRow[] | null) ?? [
@@ -132,6 +142,12 @@ function renderPanel(
 }
 
 describe('MarketWideOpportunitiesPanel row context menu', () => {
+  it('shows each product against its 90-day median, amber from +20%, blank when too thin', () => {
+    renderPanel();
+    expect(screen.getByRole('columnheader', { name: /vs 90d/ })).toBeInTheDocument();
+    expect(screen.getByText('+25%')).toHaveClass('text-warning');
+  });
+
   it('shows the product name as plain text: the row click is Start plan', () => {
     renderPanel();
     expect(screen.queryByRole('link', { name: 'Widget Beta' })).not.toBeInTheDocument();

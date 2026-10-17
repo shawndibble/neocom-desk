@@ -8,6 +8,8 @@
 import { DAY_MS } from '@/lib/age';
 import type { DeadlineSeverity } from '@/engine/severity';
 import { ORDER_PROBLEMS, type OrderProblem } from '@/engine/market/orderProblems';
+import { isPriceSpike } from '@/engine/market/priceVsMedian';
+import { formatVsMedianPct } from '@/features/market/format';
 import { notCheckedCount, type OpenOrderRow } from '@/features/market/openOrdersModel';
 import type { WalletJournalEntry } from '@/esi/endpoints';
 import { LAYER_IDS, type LayerId, type LayerValues } from '@/engine/netWorth/series';
@@ -641,6 +643,8 @@ interface WatchedPrice {
   /** The poller's last hub price; null when it has none for this target yet. */
   price: number | null;
   crossed: boolean;
+  /** The latest price vs its 90-day median at the hub, in percent; null or absent when unknown. */
+  vs90d?: number | null;
 }
 
 /** `+5%`, `-0.8%`, `0%`: a distance is read to a tenth of a percent below ten, whole above. */
@@ -659,6 +663,13 @@ function gapCell(alert: WatchedPrice, ratio: number): TableCell {
   const text = signedPercentOf(ratio);
   if (alert.crossed) return { text, tone: 'good' };
   return Math.abs(ratio) <= NEAR_TARGET ? { text, tone: 'caution' } : text;
+}
+
+/** "+35%" amber from the spike threshold, "−12%" plain, blank when too thin to say — as on Build Opportunities. */
+function vs90dCell(value: number | null | undefined): TableCell {
+  if (value === null || value === undefined) return '';
+  const text = formatVsMedianPct(value);
+  return isPriceSpike(value) ? { text, tone: 'caution' } : text;
 }
 
 /**
@@ -680,6 +691,7 @@ export function priceWatchTable(t: Translate, alerts: readonly WatchedPrice[]): 
       { key: 'gap', label: t(`${W}.priceWatch.col.gap`), align: 'end', priority: 1 },
       { key: 'now', label: t(`${W}.priceWatch.col.now`), align: 'end', priority: 2 },
       { key: 'target', label: t(`${W}.priceWatch.col.target`), align: 'end', priority: 3 },
+      { key: 'vs90d', label: t(`${W}.priceWatch.col.vs90d`), align: 'end', priority: 4 },
     ],
     rows: sorted.map((alert) => {
       const priced = alert.price !== null && alert.targetPrice > 0;
@@ -694,6 +706,7 @@ export function priceWatchTable(t: Translate, alerts: readonly WatchedPrice[]): 
           t(`${W}.priceWatch.target.${alert.direction}`, {
             isk: formatCompactNumber(alert.targetPrice),
           }),
+          vs90dCell(alert.vs90d),
         ],
         tone: alert.crossed ? 'warning' : 'clear',
       };

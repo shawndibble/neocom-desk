@@ -36,6 +36,7 @@ describe('opportunitiesCsvColumns', () => {
       'industry.runs',
       'industry.opportunitiesUnitMargin',
       'industry.csvMarginPct',
+      'industry.csvVs90dPct',
       'industry.opportunitiesStockCovers',
       'industry.opportunitiesStillToBuy',
       'industry.csvTimeSeconds',
@@ -52,6 +53,7 @@ describe('opportunitiesCsvColumns', () => {
       5,
       200,
       10,
+      null,
       50,
       50,
       7200,
@@ -66,7 +68,8 @@ describe('opportunitiesCsvColumns', () => {
     expect(values[3]).toBeNull();
     expect(values[4]).toBeNull();
     expect(values[5]).toBeNull();
-    expect(values[9]).toBeNull();
+    expect(values[6]).toBeNull();
+    expect(values[10]).toBeNull();
   });
 });
 
@@ -80,6 +83,7 @@ describe('marketWideOpportunitiesCsvColumns', () => {
     seconds: 3600,
     iskPerHour: null,
     iskPerDay: 48_000,
+    vs90d: 35.4,
     buildCost: 1_500_000,
     orderDepth: 'deep',
   } as unknown as MarketWideDayRow;
@@ -89,6 +93,7 @@ describe('marketWideOpportunitiesCsvColumns', () => {
       'industry.product',
       'industry.marketOpportunitiesBlueprintSource',
       'industry.csvMarginPct',
+      'industry.csvVs90dPct',
       'industry.csvTimeSeconds',
       'industry.iskPerHour',
       'industry.iskPerDay',
@@ -102,6 +107,7 @@ describe('marketWideOpportunitiesCsvColumns', () => {
       'Rifter',
       'industry.marketOpportunitiesBlueprintSources.market',
       62.5,
+      35,
       3600,
       null,
       48_000,

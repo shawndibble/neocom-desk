@@ -5,7 +5,8 @@
  * The board never prices anything itself. The poller already fetches these
  * prices on its own cadence and keeps the last reading, and a landing page
  * that re-priced every target on each visit would spend a market call to
- * repeat a number it already has.
+ * repeat a number it already has. The one read of its own is each item's
+ * market history for "vs 90d", cached until ESI's daily rollover.
  */
 import type { QuickbarItem } from '@/db';
 import { priceAlertCrossed, type PriceAlertSnapshot } from '@/engine/notificationDiffs';
@@ -18,6 +19,8 @@ export interface BoardPriceAlert {
   /** The poller's last hub price, or null when it has none for this exact target yet. */
   price: number | null;
   crossed: boolean;
+  /** The latest price vs its 90-day median at the Market hub, in percent; null when unknown. */
+  vs90d?: number | null;
 }
 
 export function buildPriceAlertRows(
