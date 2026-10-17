@@ -1,7 +1,8 @@
 /**
  * ISK per unit for the ores a Survey shows, from the Survey's price hub
- * (`useSurveyPriceHub`: Jita unless the pilot chose another on this device): the highest buy order of the ore's
- * Compressed form where it has one, as the Moon Mining Tax ledger prices ore
+ * (`useSurveyPriceHub`: Jita unless the pilot chose another on this device):
+ * the highest buy order of the ore's Compressed form where it has one, as the
+ * Moon Mining Tax ledger prices ore
  * (`features/miningTax/pricing.ts`). Works for a visitor with no session too:
  * the hub falls back to Jita and Fuzzwork needs no login.
  */
