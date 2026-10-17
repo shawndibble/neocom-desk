@@ -859,8 +859,8 @@ describe('OpenOrdersPanel', () => {
     const row = await screen.findByRole('row', { name: /Tritanium/ });
     await user.click(within(row).getByText(/Tritanium|Pyerite|Mexallon/));
 
-    expect(await screen.findByRole('dialog', { name: 'Alpha · Tritanium' })).toBeInTheDocument();
-    expect(screen.getByText('Quick answer')).toBeInTheDocument();
+    expect(await screen.findByRole('dialog', { name: 'Tritanium' })).toBeInTheDocument();
+    expect(screen.getByText('Put the price up')).toBeInTheDocument();
   });
 
   it('opens the detail modal when the item name is clicked, with the name not a link', async () => {
@@ -884,7 +884,7 @@ describe('OpenOrdersPanel', () => {
     expect(within(row).queryByRole('link', { name: 'Tritanium' })).not.toBeInTheDocument();
     await user.click(within(row).getByText('Tritanium'));
 
-    const dialog = await screen.findByRole('dialog', { name: 'Alpha · Tritanium' });
+    const dialog = await screen.findByRole('dialog', { name: 'Tritanium' });
     expect(within(dialog).getByRole('link', { name: 'View in Market' })).toBeInTheDocument();
   });
 
@@ -922,11 +922,16 @@ describe('OpenOrdersPanel', () => {
     const row = await screen.findByRole('row', { name: /Tritanium/ });
     await user.click(within(row).getByText(/Tritanium|Pyerite|Mexallon/));
 
-    const dialog = await screen.findByRole('dialog', { name: 'Alpha · Tritanium' });
+    const dialog = await screen.findByRole('dialog', { name: 'Tritanium' });
     expect(loaders.priceHistory).toHaveBeenCalledWith(REGION, 34);
     // 300 units / 30 days = 10/day; BELOW_FLOOR_ORDER's volumeRemain is 10 ->
     // 1 day, with no deep book fetched yet so myShare defaults to 1.
-    await waitFor(() => expect(within(dialog).getByText('1d')).toBeInTheDocument());
+    // The folded "The numbers" section's trailing read carries it.
+    await waitFor(() =>
+      expect(within(dialog).getByRole('button', { name: /The numbers/ })).toHaveTextContent(
+        'Sells out in 1 day'
+      )
+    );
   });
 
   it('shows an unchecked scope as unchecked rather than clean', async () => {
@@ -957,7 +962,7 @@ describe('OpenOrdersPanel', () => {
     const row = await screen.findByRole('row', { name: /Tritanium/ });
     await user.click(within(row).getByText(/Tritanium|Pyerite|Mexallon/));
 
-    const dialog = await screen.findByRole('dialog', { name: 'Alpha · Tritanium' });
+    const dialog = await screen.findByRole('dialog', { name: 'Tritanium' });
     await waitFor(() => expect(within(dialog).queryByText('Checking…')).not.toBeInTheDocument());
     // "Who is cheaper" starts folded (issue #1428).
     fireEvent.click(within(dialog).getByRole('button', { name: /Who is cheaper/ }));
@@ -1343,7 +1348,7 @@ describe('OpenOrdersPanel', () => {
       renderPanel();
       const row = await screen.findByRole('row', { name: /Tritanium/ });
       await user.click(within(row).getByText(/Tritanium|Pyerite|Mexallon/));
-      await screen.findByRole('dialog', { name: 'Alpha · Tritanium' });
+      await screen.findByRole('dialog', { name: 'Tritanium' });
       await user.click(screen.getByRole('button', { name: 'Close' }));
       expect(loaders.regionCompetition).toHaveBeenCalledTimes(1);
 
@@ -1424,7 +1429,7 @@ describe('OpenOrdersPanel — phone', () => {
     const row = await screen.findByRole('button', { name: /^Tritanium/ });
     await user.click(row);
 
-    expect(await screen.findByRole('dialog', { name: 'Alpha · Tritanium' })).toBeInTheDocument();
+    expect(await screen.findByRole('dialog', { name: 'Tritanium' })).toBeInTheDocument();
   });
 
   it('drops the floor line when no visible row carries one', async () => {

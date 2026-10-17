@@ -101,7 +101,7 @@ function renderModal({
   return { onClose, onCheckDeeper };
 }
 
-/** Opens every folded section (issue #1428) — "Who is cheaper", the cost-basis ledger and "Is there a better exit?" all start collapsed. */
+/** Opens every folded section — all four start collapsed (issue #4012). */
 function expandAll() {
   for (const button of screen.getAllByRole('button', { expanded: false })) {
     fireEvent.click(button);
@@ -109,7 +109,7 @@ function expandAll() {
 }
 
 describe('OrderDetailModal', () => {
-  it('names the dialog after the item and shows the quick answer for a below-floor row', () => {
+  it('names the dialog after the item and leads with the call for a below-floor row', () => {
     const row: OpenOrderRow = {
       ...BASE_ROW,
       problem: 'belowFloor',
@@ -126,25 +126,47 @@ describe('OrderDetailModal', () => {
     };
     renderModal({ row });
 
-    // The dialog is named for the character as well as the item — several
-    // characters can hold an order on the same thing.
-    expect(screen.getByRole('dialog', { name: 'Alpha · Tritanium' })).toBeInTheDocument();
-    expect(screen.getByText('Quick answer')).toBeInTheDocument();
-    // With a floor in hand the quick answer is the call itself, not the
-    // badge's generic explanation.
+    expect(screen.getByRole('dialog', { name: 'Tritanium' })).toBeInTheDocument();
+    // Whose order, where, which side and how much is left, under the title —
+    // several characters can hold an order on the same thing.
+    expect(screen.getByText(/^Alpha · Jita IV - Moon 4/)).toHaveTextContent(
+      'Alpha · Jita IV - Moon 4 · Sell · 10 of 10 left'
+    );
+    // With a floor in hand the verdict is the call itself, not the badge's
+    // generic explanation, and the price it calls for is one Copy away.
     expect(screen.getByText('Put the price up')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Copy 700.00' })).toBeInTheDocument();
     expect(
       screen.getByText(/Every unit sells for 200.00 ISK less than it cost you to make/)
     ).toBeInTheDocument();
     expect(screen.getByText('-28.6%')).toBeInTheDocument();
   });
 
-  it('shows my price, floor, remaining and expires as stat chips', () => {
+  it('shows your price, the cheapest here and what you keep a unit as three facts', () => {
+    const row: OpenOrderRow = {
+      ...BASE_ROW,
+      floor: { relist: 550, fill: 520 },
+      station: { bestPrice: 520, beatsMe: false, gapIsk: 0, gapPct: 0 },
+    };
+    renderModal({ row, stationChecked: true });
+
+    const fact = (label: string) => screen.getByText(label).nextElementSibling;
+    expect(fact('Your price')).toHaveTextContent('500.00');
+    // Nobody under you at this station: you are the cheapest here.
+    expect(fact('Cheapest here')).toHaveTextContent('You');
+    // Holding nets price - fill: 500 - 520.
+    expect(fact('You keep a unit')).toHaveTextContent('-20.00');
+    expect(fact('You keep a unit')).toHaveClass('text-danger');
+  });
+
+  it('keeps the floor, remaining and expiry one fold away', () => {
     const row: OpenOrderRow = { ...BASE_ROW, floor: { relist: 550, fill: 520 } };
     renderModal({ row });
 
-    expect(screen.getByText('Never sell below')).toBeInTheDocument();
-    expect(screen.getByText('550.00')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /What it cost you/ })).toHaveTextContent(
+      'Floor 550.00'
+    );
+    expandAll();
     expect(screen.getByText('10 / 10')).toBeInTheDocument();
     expect(screen.getByText('60d')).toBeInTheDocument();
   });
@@ -216,7 +238,7 @@ describe('OrderDetailModal', () => {
     renderModal({ stationChecked: true });
     expandAll();
     await user.click(screen.getByRole('button', { name: 'Refresh system & region prices' }));
-    expect(screen.getByRole('table', { name: 'Who is cheaper, and where' })).toHaveFocus();
+    expect(screen.getByRole('table', { name: 'Who is cheaper' })).toHaveFocus();
   });
 
   it('announces the checking text through a status region while the deep load runs', async () => {
@@ -236,7 +258,7 @@ describe('OrderDetailModal', () => {
     renderModal({ row, deep, stationChecked: true });
     expandAll();
 
-    const whoSection = screen.getByText('Who is cheaper, and where').closest('section')!;
+    const whoSection = screen.getByText('Who is cheaper').closest('section')!;
     const systemRow = within(whoSection).getByText('System').closest('div');
     const regionRow = within(whoSection).getByText('Region').closest('div');
     expect(systemRow).toHaveTextContent('Not checked yet');
@@ -248,8 +270,8 @@ describe('OrderDetailModal', () => {
     renderModal({ row: BASE_ROW, deep, stationChecked: true });
     expandAll();
 
-    const table = screen.getByRole('table', { name: 'Who is cheaper, and where' });
-    expect(within(table).getAllByRole('columnheader')).toHaveLength(5);
+    const table = screen.getByRole('table', { name: 'Who is cheaper' });
+    expect(within(table).getAllByRole('columnheader')).toHaveLength(3);
     expect(within(table).getByRole('columnheader', { name: 'How close' })).toBeInTheDocument();
     expect(within(table).getByRole('rowheader', { name: 'Region' })).toBeInTheDocument();
   });
@@ -307,7 +329,7 @@ describe('OrderDetailModal', () => {
     renderModal({ row, deep, stationChecked: true, regionJumps: { kind: 'known', jumps: 4 } });
     expandAll();
 
-    const whoSection = screen.getByText('Who is cheaper, and where').closest('section')!;
+    const whoSection = screen.getByText('Who is cheaper').closest('section')!;
     const regionRow = within(whoSection).getByText('Region').closest('div');
     // The "their price" / "I am over by" / "distance" columns of that row.
     expect(regionRow).toHaveTextContent('450.00');
@@ -325,7 +347,7 @@ describe('OrderDetailModal', () => {
     renderModal({ row, deep });
     expandAll();
 
-    const whoSection = screen.getByText('Who is cheaper, and where').closest('section')!;
+    const whoSection = screen.getByText('Who is cheaper').closest('section')!;
     const stationRow = within(whoSection).getByText('Station').closest('div');
     const systemRow = within(whoSection).getByText('System').closest('div');
     const regionRow = within(whoSection).getByText('Region').closest('div');
@@ -374,7 +396,7 @@ describe('OrderDetailModal', () => {
     });
     expandAll();
 
-    const whoSection = screen.getByText('Who is cheaper, and where').closest('section')!;
+    const whoSection = screen.getByText('Who is cheaper').closest('section')!;
     const stationRow = within(whoSection).getByText('Station').closest('div');
     // A real price, not the "unavailable" copy — that's the whole point of #538.
     expect(stationRow).toHaveTextContent('480.00');
@@ -390,7 +412,7 @@ describe('OrderDetailModal', () => {
     renderModal({ row, structureMarket: { competitors: [], truncated: false } });
     expandAll();
 
-    const whoSection = screen.getByText('Who is cheaper, and where').closest('section')!;
+    const whoSection = screen.getByText('Who is cheaper').closest('section')!;
     const stationRow = within(whoSection).getByText('Station').closest('div');
     const systemRow = within(whoSection).getByText('System').closest('div');
     expect(stationRow).toHaveTextContent('Nobody cheaper here');
@@ -406,15 +428,18 @@ describe('OrderDetailModal', () => {
     renderModal({ row, structureMarket: { competitors: [], truncated: true } });
     expandAll();
 
-    const whoSection = screen.getByText('Who is cheaper, and where').closest('section')!;
+    const whoSection = screen.getByText('Who is cheaper').closest('section')!;
     const stationRow = within(whoSection).getByText('Station').closest('div');
     expect(stationRow).toHaveTextContent('Not checked yet');
   });
 
-  it('keeps the cost-basis card visible with no cost basis, and never shows a zero floor', () => {
+  it('keeps the cost-basis section with no cost basis, and never shows a zero floor', () => {
     renderModal({ row: { ...BASE_ROW, costBasis: null, floor: null } });
 
-    expect(screen.getByText('Where that price comes from')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /What it cost you/ })).toHaveTextContent(
+      'No cost basis'
+    );
+    expandAll();
     expect(screen.getByText("We don't know what this cost you")).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Link a build' })).toBeInTheDocument();
     // The hint used to offer "or type in what it cost" — a route the app has
@@ -424,24 +449,11 @@ describe('OrderDetailModal', () => {
     // Linking a build is the only real route, and it needs a Build Plan that
     // a pure trader does not have — so the hint has to name that up front
     // rather than send them to a page that will not help.
-    const costSection = screen.getByText('Where that price comes from').closest('section')!;
+    const costSection = screen.getByText('What it cost you').closest('section')!;
     expect(within(costSection).getByText(/build plan on the Industry page/i)).toBeInTheDocument();
     expect(screen.queryByText(/^0(\.00)? ISK$/)).not.toBeInTheDocument();
-    // The headline floor stat chip reads the shared "unknown" dash, not zero.
-    expect(screen.getAllByText('—').length).toBeGreaterThan(0);
-  });
-
-  it('top-aligns the cost-basis and better-exit cards so a collapsed bar is not stretched into an empty box (#3111)', () => {
-    for (const costBasis of [null, BASE_ROW.costBasis]) {
-      renderModal({ row: { ...BASE_ROW, costBasis } });
-      const costSection = screen
-        .getByText(/Where that price comes from|^Floor working/)
-        .closest('section')!;
-      const exitsSection = screen.getByText('Is there a better exit?').closest('section')!;
-      expect(costSection.parentElement).toBe(exitsSection.parentElement);
-      expect(costSection.parentElement).toHaveClass('items-start');
-      cleanup();
-    }
+    // No "You keep a unit" fact without a floor to work it out from.
+    expect(screen.queryByText('You keep a unit')).not.toBeInTheDocument();
   });
 
   it('renders the full cost-basis ledger, with the fill floor only inside the tooltip explanation — never as a second visible number', () => {
@@ -502,7 +514,7 @@ describe('OrderDetailModal', () => {
     renderModal({ row, skills });
     expandAll();
 
-    const ledger = screen.getByText('Where that price comes from').closest('section')!;
+    const ledger = screen.getByText('What it cost you').closest('section')!;
     const rowValue = (label: string) => {
       const text = within(ledger).getByText(label).nextElementSibling?.textContent ?? '';
       return Number(text.replace(/[^0-9.-]/g, ''));
@@ -536,7 +548,7 @@ describe('OrderDetailModal', () => {
     renderModal({ stationsLoaded: false, deep: null });
     expandAll();
 
-    const whoSection = screen.getByText('Who is cheaper, and where').closest('section')!;
+    const whoSection = screen.getByText('Who is cheaper').closest('section')!;
     const stationRow = within(whoSection).getByText('Station').closest('div');
     const systemRow = within(whoSection).getByText('System').closest('div');
     expect(stationRow).toHaveTextContent('Not checked yet');
@@ -554,7 +566,7 @@ describe('OrderDetailModal', () => {
       renderModal({ row, deep, stationChecked: true });
       expandAll();
 
-      const whoSection = screen.getByText('Who is cheaper, and where').closest('section')!;
+      const whoSection = screen.getByText('Who is cheaper').closest('section')!;
       const regionRow = within(whoSection).getByText('Region').closest('div');
       expect(regionRow).toHaveTextContent('Not checked yet');
     });
@@ -606,7 +618,7 @@ describe('OrderDetailModal', () => {
       renderModal({ row, deep, stationChecked: true });
       expandAll();
 
-      const whoSection = screen.getByText('Who is cheaper, and where').closest('section')!;
+      const whoSection = screen.getByText('Who is cheaper').closest('section')!;
       const regionRow = within(whoSection).getByText('Region').closest('div');
       expect(regionRow).toHaveTextContent('450.00');
     });
@@ -620,7 +632,7 @@ describe('OrderDetailModal', () => {
       renderModal({ row, deep, stationChecked: true });
       expandAll();
 
-      const whoSection = screen.getByText('Who is cheaper, and where').closest('section')!;
+      const whoSection = screen.getByText('Who is cheaper').closest('section')!;
       expect(
         within(whoSection).getByText('Incomplete data — some pages could not be loaded')
       ).toBeInTheDocument();
@@ -651,6 +663,10 @@ describe('OrderDetailModal', () => {
       // fetched); volumeRemain is BASE_ROW's 10 -> ceil(10/10) = 1 day.
       renderModal({ history });
 
+      expect(screen.getByRole('button', { name: /The numbers/ })).toHaveTextContent(
+        'Sells out in 1 day'
+      );
+      expandAll();
       expect(screen.getByText('Sells out in')).toBeInTheDocument();
       expect(screen.getByText('1d')).toBeInTheDocument();
     });
@@ -661,6 +677,7 @@ describe('OrderDetailModal', () => {
         fetchedAt: Date.now(),
       };
       renderModal({ history });
+      expandAll();
 
       // Scoped to the "Sells out in" card itself — "60d" elsewhere on the
       // modal (BASE_ROW's own expiry card) is a different stat entirely.
@@ -684,6 +701,7 @@ describe('OrderDetailModal', () => {
       // = 334 days, far past BASE_ROW's 60-day expiry.
       const row: OpenOrderRow = { ...BASE_ROW, volumeRemain: 1000, volumeTotal: 1000 };
       renderModal({ row, history });
+      expandAll();
 
       expect(screen.getByText('334d')).toBeInTheDocument();
       expect(screen.getByText('Runs past the day this order expires')).toBeInTheDocument();
@@ -714,12 +732,13 @@ describe('OrderDetailModal', () => {
       };
       const row: OpenOrderRow = { ...BASE_ROW, price: 500, volumeRemain: 100, volumeTotal: 100 };
       renderModal({ row, history, deep });
+      expandAll();
 
       expect(screen.getByText('7d')).toBeInTheDocument();
     });
   });
 
-  describe('quick answer, exits and rank', () => {
+  describe('verdict, exits and rank', () => {
     const UNDERCUT_ROW: OpenOrderRow = {
       ...BASE_ROW,
       problem: 'undercutStation',
@@ -761,6 +780,7 @@ describe('OrderDetailModal', () => {
           walletGap: { kind: 'partial', coveredUnits: 12, pool: 30, truncated: false },
         },
       });
+      expandAll();
       expect(
         screen.getByText('Your wallet shows buys for 12 of these 30 units.')
       ).toBeInTheDocument();
@@ -773,8 +793,9 @@ describe('OrderDetailModal', () => {
       expect(screen.getByText('Lower price or wait out other sellers.')).toBeInTheDocument();
       expect(screen.queryByText('Do not chase this one')).not.toBeInTheDocument();
       // No floor to advise a match against, but the cheapest rival is still a
-      // fact worth stating (owner decision, issue #1428) — never advice to match it.
-      expect(screen.getByText('Cheapest seller: 450.00')).toBeInTheDocument();
+      // fact worth stating (owner decision, issue #1428) — never a price to copy.
+      expect(screen.getByText('Cheapest here').nextElementSibling).toHaveTextContent('450.00');
+      expect(screen.queryByRole('button', { name: /^Copy / })).not.toBeInTheDocument();
       // And the exits card says why it has nothing to offer.
       expect(
         screen.getByText(
@@ -806,11 +827,8 @@ describe('OrderDetailModal', () => {
       renderModal({ row, stationChecked: true });
 
       const user = userEvent.setup();
-      // The verdict's own suggested price: undercutPrice(450) = 449.90 —
-      // scoped to the quick-answer section, since the exits list below
-      // coincidentally suggests the very same price for its own undercut row.
-      const quickAnswer = screen.getByText('Quick answer').closest('section')!;
-      await user.click(within(quickAnswer).getByRole('button', { name: /449\.90/ }));
+      // The verdict's own suggested price: undercutPrice(450) = 449.90.
+      await user.click(screen.getByRole('button', { name: 'Copy 449.90' }));
       expect(written).toEqual(['449.90']);
       expect(screen.getAllByText('Copied to clipboard').length).toBeGreaterThan(0);
 
@@ -834,15 +852,15 @@ describe('OrderDetailModal', () => {
 
       // outbidPrice(520) = 520.10 — one legal tick over the rival bid.
       const user = userEvent.setup();
-      await user.click(screen.getByRole('button', { name: 'Outbid at 520.10' }));
+      await user.click(screen.getByRole('button', { name: 'Copy 520.10' }));
       expect(written).toEqual(['520.10']);
 
       configureClipboard(null);
     });
 
     it('offers no outbid suggestion for a sell order', () => {
-      renderModal({ row: UNDERCUT_ROW, stationChecked: true });
-      expect(screen.queryByText(/^Outbid at/)).not.toBeInTheDocument();
+      renderModal({ row: UNDERCUT_ROW, stationChecked: true, deep: null });
+      expect(screen.queryByRole('button', { name: /^Copy / })).not.toBeInTheDocument();
     });
 
     it('names reprocessing as not built rather than estimating it', () => {
@@ -949,7 +967,10 @@ describe('OrderDetailModal', () => {
         stationChecked: true,
         deep: { competitors, truncated: false, fetchedAt: Date.now() },
       });
-      expect(screen.getByText('Rank 3 of 3 at this station')).toBeInTheDocument();
+      expandAll();
+      expect(screen.getByText('Rank at this station').nextElementSibling).toHaveTextContent(
+        '3 of 3'
+      );
 
       cleanup();
       renderModal({
@@ -957,7 +978,8 @@ describe('OrderDetailModal', () => {
         stationChecked: true,
         deep: { competitors, truncated: true, fetchedAt: Date.now() },
       });
-      expect(screen.queryByText(/Rank \d+ of/)).not.toBeInTheDocument();
+      expandAll();
+      expect(screen.queryByText('Rank at this station')).not.toBeInTheDocument();
     });
   });
 
@@ -1068,39 +1090,45 @@ describe('OrderDetailModal', () => {
       },
     };
 
-    it('starts the other sections collapsed, each with its own one-line trailing read, and opens "Who is cheaper" on an undercut (#3137)', () => {
+    it('starts every section folded, each with its own one-line trailing read (#4012)', () => {
       renderModal({ row: RICH_ROW, stationChecked: true });
 
       // Collapsed: only the heading/trailing row shows, not the content.
       expect(screen.queryByText('Qty')).not.toBeInTheDocument();
       expect(screen.queryByText('Hold at')).not.toBeInTheDocument();
 
-      const [who] = screen.getAllByRole('button', { name: /Who is cheaper/ });
-      const cost = screen.getByRole('button', { name: /Where that price comes from/ });
-      const exits = screen.getByRole('button', { name: /Is there a better exit/ });
-      expect(who).toHaveAttribute('aria-expanded', 'true');
-      expect(cost).toHaveAttribute('aria-expanded', 'false');
-      expect(exits).toHaveAttribute('aria-expanded', 'false');
+      const who = screen.getByRole('button', { name: /Who is cheaper/ });
+      const numbers = screen.getByRole('button', { name: /The numbers/ });
+      const cost = screen.getByRole('button', { name: /What it cost you/ });
+      const exits = screen.getByRole('button', { name: /Other ways out/ });
+      for (const section of [who, numbers, cost, exits]) {
+        expect(section).toHaveAttribute('aria-expanded', 'false');
+      }
       // One-line trailing reads, visible without expanding.
       expect(who).toHaveTextContent('Station · 450.00');
-      expect(cost).toHaveTextContent('400.00 ISK/unit');
+      expect(numbers).toHaveTextContent("Can't tell yet");
+      expect(cost).toHaveTextContent('Floor 480.00');
       expect(exits).toHaveTextContent(/Hold ·/);
     });
 
-    it('keeps "Who is cheaper" collapsed when nothing is cheaper or unchecked, and a manual toggle sticks (#3137)', () => {
-      renderModal({ row: BASE_ROW, stationChecked: true, deep: null });
+    it('opens and closes a section on its toggle, and opens the one asked for on arrival', () => {
+      renderModal({ row: RICH_ROW, stationChecked: true });
+      const who = screen.getByRole('button', { name: /Who is cheaper/ });
+      fireEvent.click(who);
+      expect(who).toHaveAttribute('aria-expanded', 'true');
+      fireEvent.click(who);
+      expect(who).toHaveAttribute('aria-expanded', 'false');
+
+      cleanup();
+      renderModal({ row: RICH_ROW, stationChecked: true, initialSection: 'exits' });
+      expect(screen.getByRole('button', { name: /Other ways out/ })).toHaveAttribute(
+        'aria-expanded',
+        'true'
+      );
       expect(screen.getByRole('button', { name: /Who is cheaper/ })).toHaveAttribute(
         'aria-expanded',
         'false'
       );
-
-      cleanup();
-      renderModal({ row: RICH_ROW, stationChecked: true });
-      const [who] = screen.getAllByRole('button', { name: /Who is cheaper/ });
-      fireEvent.click(who);
-      expect(who).toHaveAttribute('aria-expanded', 'false');
-      fireEvent.click(who);
-      expect(who).toHaveAttribute('aria-expanded', 'true');
     });
 
     it('reads "Clear" once every scope is checked and clean, and "Not checked" while any scope still is not', () => {
@@ -1119,7 +1147,8 @@ describe('OrderDetailModal', () => {
       expect(screen.getByRole('button', { name: /Who is cheaper/ })).toHaveTextContent('Clear');
     });
 
-    it('carries the verdict price on the Next step line for raisePrice, matchThem, letGo and leaveItAlone', () => {
+    it('offers Copy with the exact price for raisePrice and matchThem, and none for letGo or leaveItAlone', () => {
+      const copyButton = () => screen.queryByRole('button', { name: /^Copy / });
       const belowFloor: OpenOrderRow = {
         ...BASE_ROW,
         problem: 'belowFloor',
@@ -1128,37 +1157,40 @@ describe('OrderDetailModal', () => {
         floor: { relist: 700, fill: 600 },
       };
       renderModal({ row: belowFloor });
-      expect(screen.getByText('Next step')).toBeInTheDocument();
-      expect(screen.getByText('Set your price to 700.00')).toBeInTheDocument();
+      expect(copyButton()).toHaveAccessibleName('Copy 700.00');
 
       cleanup();
       const matchThem: OpenOrderRow = { ...RICH_ROW, floor: { relist: 400, fill: 390 } };
       renderModal({ row: matchThem, stationChecked: true });
-      expect(screen.getByText('Set your price to 449.90')).toBeInTheDocument();
+      expect(screen.getByText('Undercut to 449.90')).toBeInTheDocument();
+      expect(copyButton()).toHaveAccessibleName('Copy 449.90');
 
       cleanup();
       renderModal({ row: RICH_ROW, stationChecked: true }); // letGo: undercutting to 449.90 loses money against a 480 floor
-      expect(screen.getByText('Keep it at 500.00')).toBeInTheDocument();
+      expect(screen.getByText('Do not chase this one')).toBeInTheDocument();
+      expect(copyButton()).not.toBeInTheDocument();
 
       cleanup();
       renderModal({ row: { ...BASE_ROW, floor: { relist: 400, fill: 390 } } }); // healthy -> leaveItAlone
-      expect(screen.getByText('Keep it at 500.00')).toBeInTheDocument();
+      expect(screen.getByText('Leave it alone')).toBeInTheDocument();
+      expect(copyButton()).not.toBeInTheDocument();
     });
 
-    it('shows no Next step line — only the badge advice — with nothing to base one on', () => {
+    it('shows only the badge advice and the row summary with nothing to base a call on', () => {
       const row: OpenOrderRow = {
         ...BASE_ROW,
         problem: 'expiringOrStale',
         problems: ['expiringOrStale'],
       };
       renderModal({ row });
-      expect(screen.queryByText('Next step')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /^Copy / })).not.toBeInTheDocument();
       expect(
         screen.getByText('Relist it, or move the stock somewhere it sells.')
       ).toBeInTheDocument();
+      expect(screen.getByText('60d left with 10 unsold')).toBeInTheDocument();
     });
 
-    it('folds "the numbers" behind a Disclosure on a phone, but leaves it open on desktop', () => {
+    it('pins Copy to the sheet foot on a phone, once, instead of the verdict block', () => {
       const original = window.matchMedia;
       // `useIsPhone` reads a max-width query; answering yes is how a phone looks under test.
       window.matchMedia = (media: string) =>
@@ -1174,15 +1206,16 @@ describe('OrderDetailModal', () => {
         }) as unknown as MediaQueryList;
 
       try {
-        renderModal();
-        // "Volume left" (10 / 10) lives only in the stat grid — folded away
-        // on a phone until the section is opened.
-        expect(screen.queryByText('10 / 10')).not.toBeInTheDocument();
-        const numbers = screen.getByRole('button', { name: /The numbers/ });
-        expect(numbers).toHaveAttribute('aria-expanded', 'false');
-
-        fireEvent.click(numbers);
-        expect(screen.getByText('10 / 10')).toBeInTheDocument();
+        renderModal({
+          row: { ...RICH_ROW, floor: { relist: 400, fill: 390 } },
+          stationChecked: true,
+        });
+        const [copy, ...others] = screen.getAllByRole('button', { name: /^Copy / });
+        expect(others).toHaveLength(0);
+        expect(copy).toHaveAccessibleName('Copy 449.90');
+        expect(copy.parentElement).toHaveClass('sticky', 'bottom-0');
+        // View in Market stays with the verdict.
+        expect(screen.getByRole('link', { name: 'View in Market' })).toBeInTheDocument();
       } finally {
         window.matchMedia = original;
       }
@@ -1195,10 +1228,14 @@ describe('OrderDetailModal — buy order copy (#1733)', () => {
 
   it('reads fills-in, fills-as-listed and who-bids-higher instead of the sell-side wording', () => {
     renderModal({ row: BUY_ROW });
+    expandAll();
 
     expect(screen.getByText('Fills in')).toBeInTheDocument();
     expect(screen.getByText('If it fills as listed')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Who bids higher, and where/ })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /Who bids higher/, expanded: true })
+    ).toBeInTheDocument();
+    expect(screen.getByText('Top bid here')).toBeInTheDocument();
     expect(screen.queryByText('Sells out in')).not.toBeInTheDocument();
     expect(screen.queryByText('If it sells as listed')).not.toBeInTheDocument();
     expect(screen.queryByText(/Who is cheaper/)).not.toBeInTheDocument();
@@ -1208,18 +1245,22 @@ describe('OrderDetailModal — buy order copy (#1733)', () => {
     renderModal({ row: BUY_ROW });
     expandAll();
 
-    expect(screen.queryByText("We don't know what this cost you")).not.toBeInTheDocument();
-    expect(screen.queryByText('Is there a better exit?')).not.toBeInTheDocument();
+    expect(screen.queryByText('What it cost you')).not.toBeInTheDocument();
+    expect(screen.queryByText('Other ways out')).not.toBeInTheDocument();
   });
 
   it('keeps the sell-side wording and sections for a sell order', () => {
     renderModal();
+    expandAll();
 
     expect(screen.getByText('Sells out in')).toBeInTheDocument();
     expect(screen.getByText('If it sells as listed')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Who is cheaper, and where/ })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /Who is cheaper/, expanded: true })
+    ).toBeInTheDocument();
+    expect(screen.getByText('Cheapest here')).toBeInTheDocument();
     expect(screen.getByText("We don't know what this cost you")).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Is there a better exit\?/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Other ways out/ })).toBeInTheDocument();
   });
 
   it.each([
@@ -1233,6 +1274,7 @@ describe('OrderDetailModal — buy order copy (#1733)', () => {
         fetchedAt: Date.now(),
       };
       renderModal({ row: { ...base, volumeRemain: 1000, volumeTotal: 1000 }, history });
+      expandAll();
 
       const card = screen.getByText(label).closest('div') as HTMLElement;
       expect(within(card).getByText('Runs past the day this order expires')).toBeInTheDocument();

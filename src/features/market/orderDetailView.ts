@@ -11,6 +11,7 @@ import type { ReprocessingType } from '@/sde/types';
 import type { OpenOrdersPageSnapshot } from './openOrdersPageSnapshot';
 import type { CharacterSkills, OpenOrderRow } from './openOrdersModel';
 import type { RegionCompetition, StructureCompetition } from './orderCompetition';
+import type { OrderAdvice } from './orderAdvice';
 import type { HubBuyPrice, ReprocessingInput } from './orderExits';
 import type { PriceHistoryResult } from './priceHistory';
 import { stationPriceKey } from './stationPriceKey';
@@ -146,6 +147,39 @@ export function relistFees(
   if (!skills || !row.floor || !row.costBasis) return null;
   const tax = salesTax(row.floor.relist, skills.accountingLevel);
   return { salesTax: tax, brokerFee: row.floor.relist - row.costBasis.unitCost - tax };
+}
+
+/** The verdict block's two figures: what its Copy button copies, and the "You keep a unit" fact. */
+export interface OrderDetailCall {
+  /**
+   * The exact price to type into the order, or null when the call asks for
+   * no new price. Only a price the call recommends: never the cheapest rival
+   * on its own (a fact, not advice — issue #1428), never your current price.
+   */
+  copyPrice: number | null;
+  /**
+   * ISK a unit, after fees, if you follow the call: the margin left after
+   * undercutting when the call is to match them, otherwise what holding at
+   * your price nets once it sells. Null without an Order Floor.
+   */
+  keepPerUnit: number | null;
+}
+
+export function orderDetailCall(row: OpenOrderRow, advice: OrderAdvice): OrderDetailCall {
+  const { next, summary, verdict } = advice;
+  const copyPrice =
+    next.kind === 'raisePrice' || next.kind === 'matchThem'
+      ? next.price
+      : row.isBuyOrder && summary?.kind === 'outbid'
+        ? summary.suggestedPrice
+        : null;
+  const keepPerUnit =
+    row.isBuyOrder || !row.floor
+      ? null
+      : verdict?.kind === 'matchThem' && verdict.amount !== null
+        ? verdict.amount
+        : row.price - row.floor.fill;
+  return { copyPrice, keepPerUnit };
 }
 
 /** Cache contents for one order → everything the Order Detail modal shows beyond the row. */

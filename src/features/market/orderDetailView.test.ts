@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   assembleOrderDetailView,
+  orderDetailCall,
   type OrderDetailCacheContents,
   type OrderDetailSnapshot,
 } from './orderDetailView';
@@ -9,6 +10,7 @@ import type { UndercutRival } from '@/engine/market/undercut';
 import type { CharacterSkills } from './openOrdersModel';
 import { characterModifiers, NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
 import { orderFloor } from '@/engine/market/orderFloor';
+import { adviseOrder } from './orderAdvice';
 
 const JITA_SYSTEM = 30000142;
 const AMARR_SYSTEM = 30002187;
@@ -349,5 +351,58 @@ describe('assembleOrderDetailView', () => {
       expect(view.stationNameFor(60003760)).toBe('Jita IV - Moon 4');
       expect(view.stationNameFor(1_000_000_000_001)).toBeNull();
     });
+  });
+});
+
+describe('orderDetailCall', () => {
+  const call = (row: ReturnType<typeof openOrderRow>) => orderDetailCall(row, adviseOrder(row));
+  const UNDERCUT = {
+    problem: 'undercutStation' as const,
+    problems: ['undercutStation' as const],
+    worstScope: 'station' as const,
+    station: { bestPrice: 450, beatsMe: true, gapIsk: 50, gapPct: 10 },
+  };
+
+  it('copies the undercut price and keeps the margin after undercutting when the call is to match them', () => {
+    // undercutPrice(450) = 449.90; 449.90 - 400 relist = 49.90 kept a unit.
+    const row = openOrderRow({ ...UNDERCUT, floor: { relist: 400, fill: 390 } });
+    const { copyPrice, keepPerUnit } = call(row);
+    expect(copyPrice).toBe(449.9);
+    expect(keepPerUnit).toBeCloseTo(49.9, 2);
+    // The same figure the verdict sentence states.
+    expect(keepPerUnit).toBeCloseTo(adviseOrder(row).verdict!.amount!, 6);
+  });
+
+  it('copies the rounded-up floor when the call is to put the price up, and keeps what holding nets', () => {
+    const row = openOrderRow({
+      problem: 'belowFloor',
+      problems: ['belowFloor'],
+      belowFloor: true,
+      floor: { relist: 700, fill: 600 },
+    });
+    expect(call(row)).toEqual({ copyPrice: 700, keepPerUnit: 500 - 600 });
+  });
+
+  it('copies nothing when the call is to hold: "let it go" and "leave it alone" keep your own price', () => {
+    // Undercutting to 449.90 against a 480 relist floor loses money: let it go.
+    const letGo = openOrderRow({ ...UNDERCUT, floor: { relist: 480, fill: 470 } });
+    expect(call(letGo)).toEqual({ copyPrice: null, keepPerUnit: 30 });
+    const healthy = openOrderRow({ floor: { relist: 400, fill: 390 } });
+    expect(call(healthy)).toEqual({ copyPrice: null, keepPerUnit: 110 });
+  });
+
+  it('never offers the cheapest rival as a price to type with no floor, and keeps nothing it cannot know', () => {
+    expect(call(openOrderRow(UNDERCUT))).toEqual({ copyPrice: null, keepPerUnit: null });
+  });
+
+  it('copies one tick over the rival bid for an outbid buy order', () => {
+    const row = openOrderRow({
+      isBuyOrder: true,
+      problem: 'outbid',
+      problems: ['outbid'],
+      worstScope: 'station',
+      station: { bestPrice: 520, beatsMe: true, gapIsk: 20, gapPct: 4 },
+    });
+    expect(call(row)).toEqual({ copyPrice: 520.1, keepPerUnit: null });
   });
 });
