@@ -5,9 +5,12 @@ import '@/i18n';
 import { textWidth } from '@/engine/survey/chatFont';
 import { MAX_ROW_PX } from '@/engine/survey/chatMessage';
 import { parseSurveyScan } from '@/engine/survey/parseScan';
+import { db } from '@/db';
+import { DEFAULT_SURVEY_CHAT_OPTIONS } from '@/engine/survey/chatMessage';
 import { configureClipboard } from '@/lib/clipboard';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { SurveyBoard } from './SurveyBoard';
+import { useSurveyChatOptions } from './surveyPref';
 
 // Recharts needs a real layout; the chart has its own concerns.
 vi.mock('@/lib/useIsPhone', () => ({ useIsPhone: vi.fn(() => false) }));
@@ -45,8 +48,10 @@ const SCANS = [
 ];
 const URL = 'https://neocomdesk.test/share/abc123XYZ';
 
-afterEach(() => {
+afterEach(async () => {
   cleanup();
+  await db.settings.clear();
+  useSurveyChatOptions.setState({ value: DEFAULT_SURVEY_CHAT_OPTIONS, hydrated: false });
   vi.mocked(useIsPhone).mockReturnValue(false);
   configureClipboard(null);
 });
@@ -107,6 +112,23 @@ describe('SurveyBoard', () => {
     expect(screen.getByText('Add another scan to see the chart')).toBeTruthy();
     expect(screen.queryByTestId('charts')).toBeNull();
     expect(screen.getByText('Done at').nextElementSibling?.textContent).toBe('–');
+  });
+
+  it('copies with the options saved in the browser, without the config dialog being opened', async () => {
+    await db.settings.put({
+      key: 'miningSurveyChatOptions',
+      value: { border: 'double', bar: false },
+    });
+    const written: string[] = [];
+    configureClipboard(async (text) => {
+      written.push(text);
+    });
+    render(<SurveyBoard scans={SCANS} url={URL} expiresAt={null} />);
+    await waitFor(() => expect(useSurveyChatOptions.getState().hydrated).toBe(true));
+    fireEvent.click(screen.getByRole('button', { name: 'Copy chat message' }));
+    await waitFor(() => expect(written).toHaveLength(1));
+    expect(written[0]).toContain('╔');
+    expect(written[0]).not.toContain('█');
   });
 
   it('copies a heading and a four-row box with the link on the bottom rail, each row within the width', async () => {

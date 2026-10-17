@@ -4,12 +4,12 @@
  * choices. The heading and the link row are fixed; everything between is the
  * pilot's call, kept in the browser (`useSurveyChatOptions`).
  */
+import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Checkbox, Modal, SegmentedControl } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import {
   DEFAULT_SURVEY_CHAT_OPTIONS,
-  SURVEY_CHAT_BORDERS,
   SURVEY_CHAT_ORES,
   surveyChatMessage,
   type SurveyChatOptions,
@@ -29,6 +29,8 @@ interface SurveyChatDialogProps {
 }
 
 type FlagKey = 'location' | 'pace' | 'iskLeft' | 'volumeLeft' | 'elapsed';
+/** The drawn borders; the checkbox beside them is `none`. */
+const LINE_STYLES = ['single', 'double'] as const;
 const FLAGS: readonly FlagKey[] = ['location', 'pace', 'iskLeft', 'volumeLeft', 'elapsed'];
 
 export function SurveyChatDialog({
@@ -43,6 +45,10 @@ export function SurveyChatDialog({
   const options = useSurveyChatOptions((state) => state.value);
   const setOptions = useSurveyChatOptions((state) => state.setValue);
   const change = (changes: Partial<SurveyChatOptions>) => setOptions({ ...options, ...changes });
+  // The style the checkbox brings back after it was unticked.
+  const [lineStyle, setLineStyle] = useState<(typeof LINE_STYLES)[number]>(
+    options.border === 'double' ? 'double' : 'single'
+  );
   const oneScan = summary.points.length <= 1;
   const unavailable = (key: FlagKey): boolean => key === 'location' && location === null;
 
@@ -60,29 +66,29 @@ export function SurveyChatDialog({
           <p className="text-xs text-text-dim">{t('survey.chatConfig.previewHint')}</p>
         </section>
 
-        <SegmentedControl
-          label={t('survey.chatConfig.border')}
-          value={options.border}
-          onChange={(border) => change({ border })}
-          options={SURVEY_CHAT_BORDERS.map((value) => ({
-            value,
-            label: t(`survey.chatConfig.borders.${value}`),
-          }))}
-          uppercase={false}
-        />
-        <SegmentedControl
-          label={t('survey.chatConfig.ores')}
-          value={options.ores}
-          onChange={(ores) => change({ ores })}
-          options={SURVEY_CHAT_ORES.map((value) => ({
-            value,
-            label: t(`survey.chatConfig.oreModes.${value}`),
-          }))}
-          uppercase={false}
-        />
-
         <fieldset className="flex flex-col gap-1">
           <legend className="mb-1 text-xs text-text-dim">{t('survey.chatConfig.rows')}</legend>
+          <Toggle
+            label={t('survey.chatConfig.border')}
+            checked={options.border !== 'none'}
+            onChange={(on) => change({ border: on ? lineStyle : 'none' })}
+            trailing={
+              <SegmentedControl
+                label={t('survey.chatConfig.borderStyle')}
+                value={options.border === 'none' ? lineStyle : options.border}
+                onChange={(style) => {
+                  setLineStyle(style);
+                  change({ border: style });
+                }}
+                options={LINE_STYLES.map((value) => ({
+                  value,
+                  label: t(`survey.chatConfig.borders.${value}`),
+                }))}
+                uppercase={false}
+                size="sm"
+              />
+            }
+          />
           <Toggle
             label={t('survey.chatConfig.eta')}
             checked={options.eta}
@@ -100,6 +106,19 @@ export function SurveyChatDialog({
             checked={options.rockCounts}
             disabled={options.ores === 'off'}
             onChange={(rockCounts) => change({ rockCounts })}
+            trailing={
+              <SegmentedControl
+                label={t('survey.chatConfig.ores')}
+                value={options.ores}
+                onChange={(ores) => change({ ores })}
+                options={SURVEY_CHAT_ORES.map((value) => ({
+                  value,
+                  label: t(`survey.chatConfig.oreModes.${value}`),
+                }))}
+                uppercase={false}
+                size="sm"
+              />
+            }
           />
           {FLAGS.map((key) => (
             <Toggle
@@ -130,12 +149,15 @@ export function SurveyChatDialog({
 function Toggle({
   label,
   hint,
+  trailing,
   checked,
   disabled,
   onChange,
 }: {
   label: string;
   hint?: string;
+  /** A compact control at the row's end; it must fit the row's height. */
+  trailing?: ReactNode;
   checked: boolean;
   disabled?: boolean;
   onChange: (checked: boolean) => void;
@@ -149,6 +171,7 @@ function Toggle({
       />
       <span>{label}</span>
       {hint !== undefined && <span className="ml-auto text-xs text-text-dim">{hint}</span>}
+      {trailing !== undefined && <span className="ml-auto">{trailing}</span>}
     </label>
   );
 }

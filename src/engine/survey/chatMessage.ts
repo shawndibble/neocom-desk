@@ -27,9 +27,9 @@ export interface SurveyMessageLabels {
   location: string;
   /** `{pace}` is m³ mined per second. */
   pace: string;
-  /** `{isk}` is the compact ISK value of what is left. */
+  /** `{isk}` is the compact ISK value of what is left; one of the facts on the "Left:" line. */
   value: string;
-  /** `{left}` and `{total}` are m³ left and m³ the scans have shown. */
+  /** `{left}` is the m³ left. */
   volume: string;
   /** `{duration}` is the mining time so far. */
   elapsed: string;
@@ -107,13 +107,15 @@ interface Frame {
   rail: string;
   /** What a row starts with, beside the rail. */
   side: string;
+  /** Whether the top and bottom rows are rails; without, they are the bare label with no brackets or taper. */
+  rails: boolean;
 }
 
 const FRAMES: Record<SurveyChatBorder, Frame> = {
-  single: { top: '┌', bottom: '└', rail: '─', side: '│ ' },
-  double: { top: '╔', bottom: '╚', rail: '═', side: '║ ' },
-  // No side to hang a corner on: bare rails over the rows.
-  none: { top: '', bottom: '', rail: '─', side: '' },
+  single: { top: '┌', bottom: '└', rail: '─', side: '│ ', rails: true },
+  double: { top: '╔', bottom: '╚', rail: '═', side: '║ ', rails: true },
+  // No border at all: the ETA and the link are plain rows.
+  none: { top: '', bottom: '', rail: '', side: '', rails: false },
 };
 const BLOCK_PX = textWidth('█');
 const SPACE_PX = textWidth(' ');
@@ -129,8 +131,8 @@ const unitsFor = (gap: number, unit: number, round: (n: number) => number): numb
 const bracketed = (label: string): string => (label === '' ? '' : `[ ${label} ]`);
 
 /** A rail's fixed parts in px: the corner, the label's brackets and spaces (none when bare), the taper. */
-const railChromePx = (corner: string, label: string): number =>
-  textWidth(corner + bracketed(label)) - textWidth(label) + textWidth(TAPER);
+const railChromePx = (frame: Frame, corner: string, label: string): number =>
+  frame.rails ? textWidth(corner + bracketed(label)) - textWidth(label) + textWidth(TAPER) : 0;
 
 /**
  * `┌───[ label ]───╌┄┈`, label centred, at least `width` px long and under a
@@ -139,7 +141,7 @@ const railChromePx = (corner: string, label: string): number =>
  */
 function rail(frame: Frame, corner: string, label: string, width: number): string {
   const fill = unitsFor(
-    width - railChromePx(corner, label) - textWidth(label),
+    width - railChromePx(frame, corner, label) - textWidth(label),
     textWidth(frame.rail),
     Math.ceil
   );
@@ -190,13 +192,13 @@ export function formatDuration(ms: number): string {
 const NAMED_ORES = { top2: 2, top3: 3 } as const;
 
 /**
- * "Left: 5 Scordite · 4 Kernite · 35 other": the dearest ores by unit price (the
- * order the page lists them in), each with its rock count, and the rocks of
- * every other ore grouped into one count. `ores` arrives dearest first, and
- * fewer are named if a longer line would wrap. `all` names every ore instead,
- * over as many rows as the width needs.
+ * The ore entries of the "Left:" line, e.g. `["5 Scordite", "4 Kernite", "35 other"]`:
+ * the dearest ores by unit price (the order the page lists them in), each with
+ * its rock count, and the rocks of every other ore grouped into one count.
+ * `ores` arrives dearest first, and fewer are named if a longer line would
+ * wrap. `all` names every ore instead.
  */
-function oreRows(
+function oreItems(
   ores: SurveyChatSummaryOres,
   labels: SurveyMessageLabels,
   options: SurveyChatOptions,
@@ -205,26 +207,9 @@ function oreRows(
   const rocksIn = (list: SurveyChatSummaryOres): number => list.reduce((n, o) => n + o.rocks, 0);
   const entryFor = (ore: SurveyChatSummaryOres[number]): string =>
     options.rockCounts ? `${ore.rocks} ${ore.ore}` : ore.ore;
+  if (options.ores === 'all') return ores.map(entryFor);
+
   const prefixPx = sidePx + textWidth(fill(labels.left, { ores: '' }));
-
-  if (options.ores === 'all') {
-    const rows: string[] = [];
-    let row: string[] = [];
-    for (const ore of ores) {
-      const next = [...row, entryFor(ore)].join(SEPARATOR);
-      if (
-        row.length > 0 &&
-        (rows.length === 0 ? prefixPx : sidePx) + textWidth(next) > MAX_ROW_PX
-      ) {
-        rows.push(row.join(SEPARATOR));
-        row = [];
-      }
-      row.push(entryFor(ore));
-    }
-    if (row.length > 0) rows.push(row.join(SEPARATOR));
-    return rows.map((r, i) => (i === 0 ? fill(labels.left, { ores: r }) : r));
-  }
-
   const limit = NAMED_ORES[options.ores as 'top2' | 'top3'];
   const listed: string[] = [];
   let named = 0;
@@ -239,7 +224,7 @@ function oreRows(
   }
   const other = rocksIn(ores.slice(named));
   if (other > 0) listed.push(fill(labels.more, { count: other }));
-  return [fill(labels.left, { ores: listed.join(SEPARATOR) })];
+  return listed;
 }
 
 type SurveyChatSummaryOres = SurveySummary['ores'];
@@ -259,17 +244,34 @@ interface BoxContent {
 function box(frame: Frame, { headline, bar, rows, url }: BoxContent): string[] {
   const side = textWidth(frame.side);
   const width = Math.max(
-    railChromePx(frame.top, headline) + textWidth(headline),
-    railChromePx(frame.top, url) + textWidth(url),
+    railChromePx(frame, frame.top, headline) + textWidth(headline),
+    railChromePx(frame, frame.top, url) + textWidth(url),
     bar === null ? 0 : side + SPACE_PX + textWidth(`${bar.percent}%`) + MIN_BAR_CELLS * BLOCK_PX,
     ...rows.map((r) => side + textWidth(r))
   );
+  const top = frame.rails ? rail(frame, frame.top, headline, width) : headline;
   return [
-    rail(frame, frame.top, headline, width),
+    ...(top === '' ? [] : [top]),
     ...(bar === null ? [] : [barRow(frame, bar.percent, bar.finished, width)]),
     ...rows.map((r) => frame.side + r),
-    rail(frame, frame.bottom, url, width),
+    frame.rails ? rail(frame, frame.bottom, url, width) : url,
   ];
+}
+
+/**
+ * Short facts side by side on as few rows as fit the chat width. The first row
+ * also holds `firstPrefixPx` of text this does not return.
+ */
+function packRows(items: readonly string[], sidePx: number, firstPrefixPx = 0): string[] {
+  const rows: string[] = [];
+  for (const item of items) {
+    const last = rows.length - 1;
+    const joined = last >= 0 ? `${rows[last]}${SEPARATOR}${item}` : item;
+    const prefix = last === 0 ? firstPrefixPx : 0;
+    if (last >= 0 && sidePx + prefix + textWidth(joined) <= MAX_ROW_PX) rows[last] = joined;
+    else rows.push(item);
+  }
+  return rows;
 }
 
 export function surveyChatMessage(
@@ -307,23 +309,22 @@ export function surveyChatMessage(
 
   // Dearest unit first, as the page lists them.
   const present = summary.ores.filter((o) => o.rocks > 0);
-  const oresRows =
-    options.ores === 'off' ? [] : oreRows(present, labels, options, textWidth(frame.side));
   const num = (n: number): string => Math.round(n).toLocaleString('en-US');
-  const extras = [
-    ...(options.pace && summary.pace !== null
-      ? [fill(labels.pace, { pace: num(summary.pace) })]
-      : []),
+  const sidePx = textWidth(frame.side);
+  // Everything that is "left" shares one line, each fact with its own unit; no facts, no "Left:".
+  const leftItems = [
+    ...(options.ores === 'off' ? [] : oreItems(present, labels, options, sidePx)),
     ...(options.iskLeft && summary.iskLeft !== null
       ? [fill(labels.value, { isk: formatCompactNumber(summary.iskLeft) })]
       : []),
-    ...(options.volumeLeft
-      ? [
-          fill(labels.volume, {
-            left: num(summary.leftVolume),
-            total: num(summary.startVolume),
-          }),
-        ]
+    ...(options.volumeLeft ? [fill(labels.volume, { left: num(summary.leftVolume) })] : []),
+  ];
+  const leftRows = packRows(leftItems, sidePx, textWidth(fill(labels.left, { ores: '' }))).map(
+    (row, i) => (i === 0 ? fill(labels.left, { ores: row }) : row)
+  );
+  const stats = [
+    ...(options.pace && summary.pace !== null
+      ? [fill(labels.pace, { pace: num(summary.pace) })]
       : []),
     ...(options.elapsed && summary.elapsedMs > 0
       ? [fill(labels.elapsed, { duration: formatDuration(summary.elapsedMs) })]
@@ -338,7 +339,8 @@ export function surveyChatMessage(
         options.bar && summary.points.length > 1
           ? { percent: summary.percent, finished: false }
           : null,
-      rows: [...placeRows, ...oresRows, ...extras],
+      // What is left comes straight under the bar, which is a share of it.
+      rows: [...leftRows, ...placeRows, ...packRows(stats, sidePx)],
       url,
     }).join('\n')
   );
