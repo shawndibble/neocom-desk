@@ -131,6 +131,15 @@ function NumberBody({ model, dimmed = false }: { model: NumberModel; dimmed?: bo
           {note}
         </p>
       ))}
+      {model.link && (
+        <Link
+          to={model.link.to}
+          className={entityLinkClassName('flex w-fit items-center gap-0.5 text-xs')}
+        >
+          {model.link.label}
+          <Icon.Descend size={Icon.ICON_SIZE.sm} aria-hidden="true" className="shrink-0" />
+        </Link>
+      )}
     </div>
   );
 }
@@ -150,7 +159,9 @@ function TableViewBody({
   return (
     <div>
       {/* The headline stays on screen in every view; its secondary line is the table's job here. */}
-      <NumberBody model={{ ...view.number, secondary: undefined, notes: undefined }} />
+      <NumberBody
+        model={{ ...view.number, secondary: undefined, notes: undefined, link: undefined }}
+      />
       <TableBody
         table={tableOf(view)}
         columnsFor={size}
@@ -184,7 +195,7 @@ function ChartBody({
   const beside = table !== null && table.rows.length > 0;
   return (
     <div>
-      <NumberBody model={{ ...view.number, notes: undefined }} />
+      <NumberBody model={{ ...view.number, notes: undefined, link: undefined }} />
       <div className={cx(beside && 'md:flex md:items-start')}>
         <Chart
           model={view.chart}
@@ -322,7 +333,7 @@ function WidgetFrame({
               ? t('overview.widgets.failed.lastGoodUndated')
               : t('overview.widgets.failed.nothing')}
         </span>
-        {showLastGood && <NumberBody model={view.number} dimmed />}
+        {showLastGood && <NumberBody model={{ ...view.number, link: undefined }} dimmed />}
         <span>
           <Button size="sm" onClick={refresh}>
             {t('overview.widgets.failed.retry')}
