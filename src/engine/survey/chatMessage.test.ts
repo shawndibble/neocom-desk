@@ -79,7 +79,7 @@ describe('surveyChatMessage', () => {
     expect(heading).toBe('Neocom Desk Report');
     expect(box).toHaveLength(4);
     expect(box[0]).toMatch(/^┌─*\[ ETA: 16:56 EVE \(~1m\) \]─*╌┄┈$/);
-    expect(box[1]).toMatch(/^│ █+░+ 93%$/);
+    expect(box[1]).toMatch(/^│ █+░+$/);
     expect(box[2]).toBe('│ Left: 2 Glistening Sylvite · 1 other');
     expect(box[3]).toMatch(/^└─*\[ https:\/\/neocomdesk\.test\/survey\/abc123XYZ \]─*╌┄┈$/);
   });
@@ -147,8 +147,9 @@ describe('surveyChatMessage', () => {
     const { box } = message([scan(0, ['A', 1000]), scan(5, ['A', 750])]);
     const filled = box[1].match(/█/g)?.length ?? 0;
     const empty = box[1].match(/░/g)?.length ?? 0;
-    expect(box[1]).toMatch(/ 25%$/);
     expect(filled / (filled + empty)).toBeCloseTo(0.25, 1);
+    // The bar is a visual aid only; the percent is the "Left:" line's to give.
+    expect(box[1]).not.toMatch(/[\d%]/);
   });
 
   it('keeps the full ore name, since Brimful Zeolites is not worth what Zeolites is', () => {
@@ -193,7 +194,7 @@ describe('surveyChatMessage', () => {
     expect(heading).toBe('Neocom Desk Report');
     expect(box).toHaveLength(3);
     expect(box[0]).toMatch(/^┌─*\[ Field cleared in 2h 56m \]─*╌┄┈$/);
-    expect(box[1]).toMatch(/^│ █+ 100%$/);
+    expect(box[1]).toMatch(/^│ █+$/);
     expect(box[1]).not.toContain('░');
     expect(box[2]).toContain(URL);
     expectRailsOverBar(box);
@@ -275,7 +276,7 @@ describe('chat message options', () => {
   it('draws a double border with ║ and ═', () => {
     const { box } = withOptions({ border: 'double' });
     expect(box[0]).toMatch(/^╔═*\[ ETA: .* \]═*╌┄┈$/);
-    expect(box[1]).toMatch(/^║ █+░+ \d+%$/);
+    expect(box[1]).toMatch(/^║ █+░+$/);
     expect(box[2]).toMatch(/^║ Left: /);
     expect(box[3]).toMatch(/^╚═*\[ https:.* \]═*╌┄┈$/);
   });
@@ -283,7 +284,7 @@ describe('chat message options', () => {
   it('with no border drops the rails, the taper and the brackets', () => {
     const { box } = withOptions({ border: 'none' });
     expect(box[0]).toMatch(/^ETA: .*\(~\d+m\)$/);
-    expect(box[1]).toMatch(/^█+░+ \d+%$/);
+    expect(box[1]).toMatch(/^█+░+$/);
     expect(box[2]).toMatch(/^Left: /);
     expect(box[3]).toBe(URL);
     expect(box.join('')).not.toMatch(/[─═┌└╔╚╌┄┈[\]]/);
@@ -362,7 +363,7 @@ describe('chat message options', () => {
 
   it('puts value and volume on the Left line, right under the bar, with just their units', () => {
     const { box } = withOptions({ ores: 'off', volumeLeft: true, iskLeft: false });
-    expect(box[1]).toMatch(/^│ █+░+ \d+%$/);
+    expect(box[1]).toMatch(/^│ █+░+$/);
     expect(box[2]).toBe('│ Left: 33,080 m³');
   });
 
