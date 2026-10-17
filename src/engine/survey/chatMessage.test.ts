@@ -6,7 +6,6 @@ import {
   parseSurveyChatOptions,
   type SurveyChatOptions,
   surveyChatMessage,
-  shortOreNames,
   type SurveyMessageLabels,
 } from './chatMessage';
 import { summarizeSurvey, type SurveyScan } from './series';
@@ -33,34 +32,6 @@ const labels: SurveyMessageLabels = {
 function scan(minutes: number, ...rocks: [string, number][]): SurveyScan {
   return { at: T0 + minutes * MIN, rocks: rocks.map(([ore, volume]) => ({ ore, volume })) };
 }
-
-describe('shortOreNames', () => {
-  it('drops the quality prefix when the base name is unique', () => {
-    expect(shortOreNames(['Glistening Sylvite', 'Glistening Bitumens'])).toEqual({
-      'Glistening Sylvite': 'Sylvite',
-      'Glistening Bitumens': 'Bitumens',
-    });
-  });
-
-  it('keeps full names when two variants share a base', () => {
-    const m = shortOreNames(['Dense Veldspar', 'Concentrated Veldspar', 'Scordite']);
-    expect(m['Dense Veldspar']).toBe('Dense Veldspar');
-    expect(m['Concentrated Veldspar']).toBe('Concentrated Veldspar');
-    expect(m.Scordite).toBe('Scordite');
-  });
-
-  it('leaves names alone when the first word is not a quality prefix', () => {
-    const names = ['Dark Ochre', 'Clear Icicle', 'Blue Ice', 'Glacial Mass'];
-    expect(shortOreNames(names)).toEqual(Object.fromEntries(names.map((n) => [n, n])));
-  });
-
-  it('shortens graded ore names to the ore and its grade numeral', () => {
-    expect(shortOreNames(['Pyroxeres', 'Pyroxeres II-Grade'])).toEqual({
-      Pyroxeres: 'Pyroxeres',
-      'Pyroxeres II-Grade': 'Pyroxeres II',
-    });
-  });
-});
 
 /** The message split into its heading and the rows of the box. */
 function parts(message: string): { heading: string; box: string[] } {
@@ -108,7 +79,7 @@ describe('surveyChatMessage', () => {
     expect(box).toHaveLength(4);
     expect(box[0]).toMatch(/^┌─*\[ ETA: 16:56 EVE \(~1m\) \]─*╌┄┈$/);
     expect(box[1]).toMatch(/^│ █+░+ 93%$/);
-    expect(box[2]).toBe('│ Left: 2 Sylvite · 1 Bitumens');
+    expect(box[2]).toBe('│ Left: 2 Glistening Sylvite · 1 other');
     expect(box[3]).toMatch(/^└─*\[ https:\/\/neocomdesk\.test\/survey\/abc123XYZ \]─*╌┄┈$/);
   });
 
@@ -177,6 +148,11 @@ describe('surveyChatMessage', () => {
     const empty = box[1].match(/░/g)?.length ?? 0;
     expect(box[1]).toMatch(/ 25%$/);
     expect(filled / (filled + empty)).toBeCloseTo(0.25, 1);
+  });
+
+  it('keeps the full ore name, since Brimful Zeolites is not worth what Zeolites is', () => {
+    const { box } = message([scan(0, ['Brimful Zeolites', 100], ['Zeolites', 50])]);
+    expect(box[1]).toBe('│ Left: 1 Brimful Zeolites · 1 Zeolites');
   });
 
   it('names the two biggest ores and counts the rocks of the rest as one group', () => {

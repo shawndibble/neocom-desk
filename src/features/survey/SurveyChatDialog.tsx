@@ -6,12 +6,13 @@
  */
 import { useTranslation } from 'react-i18next';
 import { Button, Checkbox, Modal, SegmentedControl } from '@/components/ui';
+import { tappableRowClassName } from '@/components/ui/controlStyles';
 import {
   DEFAULT_SURVEY_CHAT_OPTIONS,
+  SURVEY_CHAT_BORDERS,
+  SURVEY_CHAT_ORES,
   surveyChatMessage,
-  type SurveyChatBorder,
   type SurveyChatOptions,
-  type SurveyChatOres,
   type SurveyMessageLabels,
 } from '@/engine/survey/chatMessage';
 import type { SurveySummary } from '@/engine/survey/series';
@@ -29,8 +30,6 @@ interface SurveyChatDialogProps {
 
 type FlagKey = 'location' | 'pace' | 'iskLeft' | 'volumeLeft' | 'elapsed';
 const FLAGS: readonly FlagKey[] = ['location', 'pace', 'iskLeft', 'volumeLeft', 'elapsed'];
-const BORDERS: readonly SurveyChatBorder[] = ['single', 'double', 'none'];
-const ORES: readonly SurveyChatOres[] = ['off', 'top2', 'top3', 'all'];
 
 export function SurveyChatDialog({
   summary,
@@ -65,7 +64,7 @@ export function SurveyChatDialog({
           label={t('survey.chatConfig.border')}
           value={options.border}
           onChange={(border) => change({ border })}
-          options={BORDERS.map((value) => ({
+          options={SURVEY_CHAT_BORDERS.map((value) => ({
             value,
             label: t(`survey.chatConfig.borders.${value}`),
           }))}
@@ -75,7 +74,7 @@ export function SurveyChatDialog({
           label={t('survey.chatConfig.ores')}
           value={options.ores}
           onChange={(ores) => change({ ores })}
-          options={ORES.map((value) => ({
+          options={SURVEY_CHAT_ORES.map((value) => ({
             value,
             label: t(`survey.chatConfig.oreModes.${value}`),
           }))}
@@ -92,7 +91,7 @@ export function SurveyChatDialog({
           <Toggle
             label={t('survey.chatConfig.bar')}
             hint={oneScan ? t('survey.chatConfig.barOneScan') : undefined}
-            checked={options.bar}
+            checked={options.bar && !oneScan}
             disabled={oneScan}
             onChange={(bar) => change({ bar })}
           />
@@ -142,7 +141,7 @@ function Toggle({
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <label className="flex min-h-9 items-center gap-2 touch:min-h-11">
+    <label className={`flex items-center gap-2 ${tappableRowClassName}`}>
       <Checkbox
         checked={checked}
         disabled={disabled}

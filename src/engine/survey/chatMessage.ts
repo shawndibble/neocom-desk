@@ -68,8 +68,8 @@ export const DEFAULT_SURVEY_CHAT_OPTIONS: SurveyChatOptions = {
   elapsed: false,
 };
 
-const BORDERS: readonly SurveyChatBorder[] = ['single', 'double', 'none'];
-const ORES: readonly SurveyChatOres[] = ['off', 'top2', 'top3', 'all'];
+export const SURVEY_CHAT_BORDERS: readonly SurveyChatBorder[] = ['single', 'double', 'none'];
+export const SURVEY_CHAT_ORES: readonly SurveyChatOres[] = ['off', 'top2', 'top3', 'all'];
 
 /** A stored value read back: unknown or missing fields fall to the default, so an old save survives a new option. */
 export function parseSurveyChatOptions(raw: unknown): SurveyChatOptions | null {
@@ -79,10 +79,10 @@ export function parseSurveyChatOptions(raw: unknown): SurveyChatOptions | null {
   const flag = (key: keyof SurveyChatOptions): boolean =>
     typeof r[key] === 'boolean' ? (r[key] as boolean) : (d[key] as boolean);
   return {
-    border: BORDERS.includes(r.border as SurveyChatBorder)
+    border: SURVEY_CHAT_BORDERS.includes(r.border as SurveyChatBorder)
       ? (r.border as SurveyChatBorder)
       : d.border,
-    ores: ORES.includes(r.ores as SurveyChatOres) ? (r.ores as SurveyChatOres) : d.ores,
+    ores: SURVEY_CHAT_ORES.includes(r.ores as SurveyChatOres) ? (r.ores as SurveyChatOres) : d.ores,
     eta: flag('eta'),
     bar: flag('bar'),
     rockCounts: flag('rockCounts'),
@@ -95,20 +95,15 @@ export function parseSurveyChatOptions(raw: unknown): SurveyChatOptions | null {
 }
 
 /**
- * The frame: an open box. The ETA is set into the top rail and the link into the
- * bottom one, each centred; the bar and the ore line sit beside a `║` rail on the
- * left. Nothing closes the right side: chat draws a proportional font, so a right
- * edge never lined up. Each rail tapers off (`╌┄┈`) instead.
- *
- * A rail is never shorter than the content under it, and at most a character
- * longer: it is as long as the ore line, or as the link's rail when that is
- * longer, rounded up to a whole `─`. The bar rounds the other way, so it never
- * outruns the rails. Lengths are measured in pixels with the widths in
- * `chatFont.ts` (an `i` is 4px, an `m` 10px), not counted in characters.
+ * How a border draws the box. The box is open: nothing closes the right side,
+ * because chat draws a proportional font and a right edge never lined up. Each
+ * rail tapers off (`╌┄┈`) instead.
  */
 interface Frame {
+  /** The corner that opens the top rail, and the one that opens the bottom rail. */
   top: string;
   bottom: string;
+  /** The character a rail is filled with. */
   rail: string;
   /** What a row starts with, beside the rail. */
   side: string;
@@ -130,18 +125,26 @@ const MIN_BAR_CELLS = 10;
 const unitsFor = (gap: number, unit: number, round: (n: number) => number): number =>
   Math.max(0, round(gap / unit));
 
-/** A rail without its fill: the corner, the label's brackets with a space inside each (none when bare), the taper. */
-const railFramePx = (frame: Frame, label: string): number =>
-  textWidth(frame.top + (label === '' ? '' : '[  ]') + TAPER);
+/** The brackets a rail sets its label in, with a space inside each; a bare rail has none. */
+const bracketed = (label: string): string => (label === '' ? '' : `[ ${label} ]`);
 
-/** `┌───[ label ]───╌┄┈`, at least `width` px long and under a character more, label centred. A bare rail has no label. */
+/** A rail's fixed parts in px: the corner, the label's brackets and spaces (none when bare), the taper. */
+const railChromePx = (corner: string, label: string): number =>
+  textWidth(corner + bracketed(label)) - textWidth(label) + textWidth(TAPER);
+
+/**
+ * `┌───[ label ]───╌┄┈`, label centred, at least `width` px long and under a
+ * character more: the rail rounds up to a whole rail character, where the bar
+ * rounds down, so the bar never outruns the rails. A bare rail has no label.
+ */
 function rail(frame: Frame, corner: string, label: string, width: number): string {
-  const railPx = textWidth(frame.rail);
-  const framePx = textWidth(corner + (label === '' ? '' : '[  ]') + TAPER);
-  const fill = unitsFor(width - framePx - textWidth(label), railPx, Math.ceil);
+  const fill = unitsFor(
+    width - railChromePx(corner, label) - textWidth(label),
+    textWidth(frame.rail),
+    Math.ceil
+  );
   const before = Math.floor(fill / 2);
-  const shown = label === '' ? '' : `[ ${label} ]`;
-  return `${corner}${frame.rail.repeat(before)}${shown}${frame.rail.repeat(fill - before)}${TAPER}`;
+  return `${corner}${frame.rail.repeat(before)}${bracketed(label)}${frame.rail.repeat(fill - before)}${TAPER}`;
 }
 
 /**
@@ -167,84 +170,6 @@ function barRow(frame: Frame, percent: number, finished: boolean, width: number)
  */
 export const MAX_ROW_PX = 300;
 const SEPARATOR = ' · ';
-
-/**
- * Quality prefixes that can come off an ore name. A first word not listed
- * here is part of the name ("Dark Ochre", "Clear Icicle", "Glacial Mass"), so
- * an unknown prefix only costs width, never a wrong name.
- */
-const QUALITY_PREFIXES = new Set([
-  'Concentrated',
-  'Dense',
-  'Condensed',
-  'Massive',
-  'Solid',
-  'Viscous',
-  'Azure',
-  'Rich',
-  'Silvery',
-  'Golden',
-  'Luminous',
-  'Fiery',
-  'Pure',
-  'Pristine',
-  'Vivid',
-  'Radiant',
-  'Vitric',
-  'Glazed',
-  'Bright',
-  'Gleaming',
-  'Sharp',
-  'Crystalline',
-  'Onyx',
-  'Obsidian',
-  'Iridescent',
-  'Prismatic',
-  'Triclinic',
-  'Monoclinic',
-  'Crimson',
-  'Prime',
-  'Magma',
-  'Vitreous',
-  'Brimful',
-  'Glistening',
-  'Copious',
-  'Twinkling',
-  'Lavish',
-  'Shimmering',
-  'Bountiful',
-  'Shiny',
-  'Replete',
-  'Glowing',
-  'Sparkling',
-  'Brilliant',
-  'Enriched',
-  'Thick',
-  'Smooth',
-]);
-
-/** Newer ore names carry the grade last: "Scordite II-Grade". */
-const GRADED = /\s(?:I|II|III|IV|V)-Grade$/;
-
-/**
- * Short names for a set of ore names: the quality prefix goes ("Glistening
- * Sylvite" -> "Sylvite") unless that would make two ores read the same
- * ("Dense Veldspar" and "Concentrated Veldspar" keep their prefixes).
- */
-export function shortOreNames(names: readonly string[]): Record<string, string> {
-  const base = (name: string): string => {
-    // "Pyroxeres II-Grade": the grade is a suffix and part of what the ore is.
-    if (GRADED.test(name)) return name.replace(/-Grade$/, '');
-    const words = name.split(' ');
-    return words.length > 1 && QUALITY_PREFIXES.has(words[0]) ? words.slice(1).join(' ') : name;
-  };
-  const unique = [...new Set(names)];
-  const counts = new Map<string, number>();
-  for (const name of unique) counts.set(base(name), (counts.get(base(name)) ?? 0) + 1);
-  return Object.fromEntries(
-    unique.map((name) => [name, counts.get(base(name)) === 1 ? base(name) : name])
-  );
-}
 
 const fill = (template: string, values: Record<string, string | number>): string =>
   template.replace(/\{(\w+)\}/g, (_, key: string) => String(values[key] ?? `{${key}}`));
@@ -273,14 +198,13 @@ const NAMED_ORES = { top2: 2, top3: 3 } as const;
  */
 function oreRows(
   ores: SurveyChatSummaryOres,
-  short: Record<string, string>,
   labels: SurveyMessageLabels,
   options: SurveyChatOptions,
   sidePx: number
 ): string[] {
   const rocksIn = (list: SurveyChatSummaryOres): number => list.reduce((n, o) => n + o.rocks, 0);
   const entryFor = (ore: SurveyChatSummaryOres[number]): string =>
-    options.rockCounts ? `${ore.rocks} ${short[ore.ore]}` : short[ore.ore];
+    options.rockCounts ? `${ore.rocks} ${ore.ore}` : ore.ore;
   const prefixPx = sidePx + textWidth(fill(labels.left, { ores: '' }));
 
   if (options.ores === 'all') {
@@ -335,8 +259,8 @@ interface BoxContent {
 function box(frame: Frame, { headline, bar, rows, url }: BoxContent): string[] {
   const side = textWidth(frame.side);
   const width = Math.max(
-    railFramePx(frame, headline) + textWidth(headline),
-    railFramePx(frame, url) + textWidth(url),
+    railChromePx(frame.top, headline) + textWidth(headline),
+    railChromePx(frame.top, url) + textWidth(url),
     bar === null ? 0 : side + SPACE_PX + textWidth(`${bar.percent}%`) + MIN_BAR_CELLS * BLOCK_PX,
     ...rows.map((r) => side + textWidth(r))
   );
@@ -384,15 +308,7 @@ export function surveyChatMessage(
   // Dearest unit first, as the page lists them.
   const present = summary.ores.filter((o) => o.rocks > 0);
   const oresRows =
-    options.ores === 'off'
-      ? []
-      : oreRows(
-          present,
-          shortOreNames(present.map((o) => o.ore)),
-          labels,
-          options,
-          textWidth(frame.side)
-        );
+    options.ores === 'off' ? [] : oreRows(present, labels, options, textWidth(frame.side));
   const num = (n: number): string => Math.round(n).toLocaleString('en-US');
   const extras = [
     ...(options.pace && summary.pace !== null
