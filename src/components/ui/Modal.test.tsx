@@ -111,6 +111,33 @@ describe('Modal', () => {
     expect(trigger).toHaveFocus();
   });
 
+  it('renders the footer inside the dialog but outside its scrolling body, after it in focus order', async () => {
+    const user = userEvent.setup();
+    render(
+      <Modal
+        open
+        onClose={() => {}}
+        title="Filters"
+        placement="sheet"
+        footer={<button type="button">Apply</button>}
+      >
+        <button type="button">Inside</button>
+      </Modal>
+    );
+    const dialog = screen.getByRole('dialog', { name: 'Filters' });
+    const inside = screen.getByRole('button', { name: 'Inside' });
+    const apply = screen.getByRole('button', { name: 'Apply' });
+    // The body is the one scroller: it carries `tabIndex={-1}` for open-time focus.
+    const body = inside.closest('[tabindex="-1"]');
+    expect(body).not.toBeNull();
+    expect(body).not.toContainElement(apply);
+    expect(dialog).toContainElement(apply);
+
+    inside.focus();
+    await user.tab();
+    expect(apply).toHaveFocus();
+  });
+
   it('renders no content while closed', () => {
     render(<Harness />);
     expect(screen.queryByRole('button', { name: 'Inside' })).not.toBeInTheDocument();

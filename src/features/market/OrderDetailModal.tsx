@@ -646,7 +646,15 @@ export function OrderDetailContent({
   const offHub = isOffHubStation(row.stationName, row.locationId);
 
   return (
-    <Modal open onClose={onClose} title={row.typeName} placement={isPhone ? 'sheet' : 'center'}>
+    <Modal
+      open
+      onClose={onClose}
+      title={row.typeName}
+      placement={isPhone ? 'sheet' : 'center'}
+      footer={
+        isPhone && copyPrice !== null && <CopyPriceButton price={copyPrice} className="w-full" />
+      }
+    >
       <div className="space-y-4">
         <p className="text-sm text-text-dim">
           {row.characterName} · {row.stationName ?? t('market.unknownStructure')}
@@ -1204,13 +1212,6 @@ export function OrderDetailContent({
           )}
         </div>
       </div>
-      {isPhone && copyPrice !== null && (
-        // Pinned to the sheet's bottom edge while the body scrolls. `bottom`
-        // cancels the body's bottom padding, which sticky insets by.
-        <div className="sticky bottom-[calc(-0.75rem_-_env(safe-area-inset-bottom))] -mx-3 -mb-[calc(0.75rem_+_env(safe-area-inset-bottom))] mt-3 border-t border-line bg-panel px-3 pt-2 pb-[calc(0.5rem_+_env(safe-area-inset-bottom))]">
-          <CopyPriceButton price={copyPrice} className="w-full" />
-        </div>
-      )}
     </Modal>
   );
 }

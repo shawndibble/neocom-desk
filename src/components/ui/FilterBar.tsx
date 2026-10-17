@@ -521,6 +521,27 @@ function FilterSheet<T>({
         onClose={requestClose}
         title={title ?? t('filters.title')}
         placement="sheet"
+        footer={
+          // Hidden with the controls while the discard prompt asks: Apply
+          // beside "Discard changes?" would answer a question nobody asked.
+          !confirming && (
+            <div className="flex gap-2">
+              <Button className="flex-1" onClick={closeSheet}>
+                {t('filters.cancel')}
+              </Button>
+              <Button
+                variant="primary"
+                className="flex-1"
+                onClick={() => {
+                  onChange(draft);
+                  closeSheet();
+                }}
+              >
+                {t('filters.apply')}
+              </Button>
+            </div>
+          )
+        }
       >
         {confirming && (
           <div
@@ -554,26 +575,6 @@ function FilterSheet<T>({
           */}
             <div className="flex flex-col items-start gap-3">{children(draft, setDraft)}</div>
           </FilterSurfaceContext.Provider>
-          {/*
-          Sticky rather than a `Modal` footer prop: the sheet's body is the
-          scroller, and five filters on a phone push a static Apply below the
-          fold. The negative margins let the bar span the body's own padding.
-        */}
-          <div className="sticky bottom-0 -mx-3 -mb-[calc(0.75rem_+_env(safe-area-inset-bottom))] mt-3 flex gap-2 border-t border-line bg-panel px-3 pt-2 pb-[calc(0.5rem_+_env(safe-area-inset-bottom))]">
-            <Button className="flex-1" onClick={closeSheet}>
-              {t('filters.cancel')}
-            </Button>
-            <Button
-              variant="primary"
-              className="flex-1"
-              onClick={() => {
-                onChange(draft);
-                closeSheet();
-              }}
-            >
-              {t('filters.apply')}
-            </Button>
-          </div>
         </div>
       </Modal>
     </>

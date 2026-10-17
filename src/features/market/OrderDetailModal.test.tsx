@@ -1241,7 +1241,9 @@ describe('OrderDetailModal', () => {
         const [copy, ...others] = screen.getAllByRole('button', { name: /^Copy / });
         expect(others).toHaveLength(0);
         expect(copy).toHaveAccessibleName('Copy 449.90');
-        expect(copy.parentElement).toHaveClass('sticky');
+        // In the Modal footer: outside the scrolling body (the `tabIndex={-1}` scroller).
+        expect(copy.closest('[tabindex="-1"]')).toBeNull();
+        expect(screen.getByRole('dialog')).toContainElement(copy);
         // View in Market stays with the verdict.
         expect(screen.getByRole('link', { name: 'View in Market' })).toBeInTheDocument();
       } finally {

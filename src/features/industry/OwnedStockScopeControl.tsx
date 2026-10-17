@@ -172,6 +172,23 @@ export function OwnedStockScopeControl({
               onClose={closeSheet}
               title={t('industry.ownedStockScopeLabel')}
               placement="sheet"
+              footer={
+                <div className="flex gap-2">
+                  <Button className="flex-1" onClick={closeSheet}>
+                    {t('filters.cancel')}
+                  </Button>
+                  <Button
+                    variant="primary"
+                    className="flex-1"
+                    onClick={() => {
+                      onChange(draft);
+                      closeSheet();
+                    }}
+                  >
+                    {t('filters.apply')}
+                  </Button>
+                </div>
+              }
             >
               <OwnedStockScopeTree
                 stations={stations}
@@ -179,21 +196,6 @@ export function OwnedStockScopeControl({
                 onChange={setDraft}
                 labelFor={labelFor}
               />
-              <div className="sticky bottom-0 -mx-3 -mb-[calc(0.75rem_+_env(safe-area-inset-bottom))] mt-3 flex gap-2 border-t border-line bg-panel px-3 pt-2 pb-[calc(0.5rem_+_env(safe-area-inset-bottom))]">
-                <Button className="flex-1" onClick={closeSheet}>
-                  {t('filters.cancel')}
-                </Button>
-                <Button
-                  variant="primary"
-                  className="flex-1"
-                  onClick={() => {
-                    onChange(draft);
-                    closeSheet();
-                  }}
-                >
-                  {t('filters.apply')}
-                </Button>
-              </div>
             </Modal>
           </>
         ) : (

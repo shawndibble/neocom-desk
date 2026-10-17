@@ -188,6 +188,23 @@ describe('FilterBar', () => {
     );
   });
 
+  it('hides Apply and Cancel while the discard prompt asks', async () => {
+    useNarrowViewport();
+    const user = userEvent.setup();
+    render(<Harness />);
+    await user.click(screen.getByRole('button', { name: 'Filters' }));
+    await user.click(screen.getByRole('button', { name: 'Unread only' }));
+    await user.keyboard('{Escape}');
+    expect(
+      screen.getByRole('alertdialog', { name: 'Discard filter changes?' })
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Apply' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Keep editing' }));
+    expect(screen.getByRole('button', { name: 'Apply' })).toBeInTheDocument();
+  });
+
   it('names the trigger with the number of active filters', async () => {
     useNarrowViewport();
     const user = userEvent.setup();
