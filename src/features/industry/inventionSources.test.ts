@@ -115,7 +115,6 @@ function context(overrides: Partial<InventionPricingContext> = {}): InventionPri
 describe('inventionQuoteFor', () => {
   it('prices the attempt from datacores, the copy job and the invention fee', () => {
     const result = inventionQuoteFor(T2_BP, context())!;
-    expect(result.hasT1Original).toBe(true);
     expect(result.skills).toEqual({ science: [4, 4], encryption: 3 });
     // Copy: 2% × (100 × 10) = 20, × (5% + 0.25% + 4%) = 1.85.
     expect(result.quote.copyJobFee).toBeCloseTo(1.85, 6);
@@ -131,7 +130,6 @@ describe('inventionQuoteFor', () => {
       T2_BP,
       context({ ownedBlueprints: [{ type_id: T1_BP, runs: 5 }] })
     )!;
-    expect(result.hasT1Original).toBe(false);
     expect(result.quote.copyJobFee).toBeNull();
     expect(result.quote.attemptCost).toBeNull();
   });

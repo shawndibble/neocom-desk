@@ -79,10 +79,7 @@ export function loadPlanSnapshots(
         () => NO_BLUEPRINT_PURCHASE_OFFERS
       )
     );
-    inventionMarkets.set(
-      key,
-      loadInventionMarket(group.hub, [...group.ids]).catch(() => null)
-    );
+    inventionMarkets.set(key, loadInventionMarket(group.hub, [...group.ids]));
   }
   return indexes.map(({ primary, reaction, offerKey }) => ({
     snapshot: snapshots[primary]!,

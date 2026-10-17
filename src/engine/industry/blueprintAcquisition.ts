@@ -68,9 +68,9 @@ export interface SelectBlueprintTierInputs {
   /** The BPO's ordinary sell price at the node's hub; null if unpriced there. */
   bpoSellPrice: number | null;
   /**
-   * Every other way to buy this blueprint the app can see — contract
-   * originals, region market sell orders, LP Store redemptions — shaped as
-   * offers. They compete on total cost with the listings above; absent is
+   * Every other way to get this blueprint the app can see — contract
+   * originals, region market sell orders, LP Store redemptions, invention
+   * tiers at their expected cost — shaped as offers. They compete on total cost with the listings above; absent is
    * the same as none.
    */
   extraOffers?: readonly BpcOffer[];
@@ -101,7 +101,7 @@ interface Candidate {
   extend: Extend | null;
 }
 
-/** What buying more at one tier brings: its runs, its price, who shares it when it is a Community Offer, and whether it is invented. */
+/** What buying more at one tier brings, carried over from its `BpcOffer`. */
 interface Extend {
   capacityRuns: number;
   price: number;

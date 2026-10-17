@@ -181,10 +181,12 @@ describe('researchJobFee', () => {
     // EIV = 10 × 1,000 + 5 × 2,000 = 20,000; 2% = 400.
     // 400 × (5% index + 0.25% NPC tax + 4% SCC) = 37
     const fee = researchJobFee(
-      [
-        { typeID: 34, quantity: 10 },
-        { typeID: 35, quantity: 5 },
-      ],
+      {
+        materials: [
+          { typeID: 34, quantity: 10 },
+          { typeID: 35, quantity: 5 },
+        ],
+      },
       { 34: 1_000, 35: 2_000 },
       0.05,
       FACILITY_PRESETS.npcStation

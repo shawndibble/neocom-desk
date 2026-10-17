@@ -65,10 +65,9 @@ export interface MarketSnapshot {
   /** True only when ESI answered but has no index for the system — never for the offline null. */
   systemCostIndexMissing?: boolean;
   /**
-   * The same system's copying and invention indices (issue #3990), for an
-   * invented blueprint's copy and invention job fees. Read off the one cached
-   * ESI response, so they cost no extra request; null when it failed, 0 when
-   * the system has none. Absent on a snapshot built before this existed.
+   * Same system's copying/invention indices (issue #3990), for invented-copy
+   * fees; same cached ESI response. null = failed, 0 = none; absent for a
+   * reaction plan.
    */
   copyingCostIndex?: number | null;
   inventionCostIndex?: number | null;
@@ -259,18 +258,19 @@ export function loadMarketSnapshots(
       hubSellVolumes[typeId] = aggregate.sellVolume;
     }
 
+    const activity = request.activity ?? 'manufacturing';
     const systemId = request.costIndexSystemId ?? request.hub.systemId;
-    const indexIn = async (activity: CostIndexActivity) => {
-      const indices = await indicesFor(activity);
+    const indexIn = async (forActivity: CostIndexActivity) => {
+      const indices = await indicesFor(forActivity);
       return indices == null ? null : (indices.get(systemId) ?? 0);
     };
-    const indices = await indicesFor(request.activity ?? 'manufacturing');
+    const indices = await indicesFor(activity);
     const found = indices?.get(systemId);
     const systemCostIndexMissing = indices != null && found === undefined;
     const systemCostIndex = indices == null ? null : (found ?? 0);
     // Only a manufacturing plan builds a blueprint that can be invented.
     const [copyingCostIndex, inventionCostIndex] =
-      (request.activity ?? 'manufacturing') === 'manufacturing'
+      activity === 'manufacturing'
         ? await Promise.all([indexIn('copying'), indexIn('invention')])
         : [undefined, undefined];
 

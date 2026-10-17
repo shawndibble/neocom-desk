@@ -252,7 +252,7 @@ export function useBlueprintPurchaseOffers(
     let cancelled = false;
     void Promise.all([
       loadBlueprintPurchaseOffers(characterId, hub, ids).catch(() => NO_BLUEPRINT_PURCHASE_OFFERS),
-      loadInventionMarket(hub, ids).catch(() => null),
+      loadInventionMarket(hub, ids),
     ]).then(([lookup, inventionMarket]) => {
       if (!cancelled) setLoaded({ key, lookup, inventionMarket });
     });

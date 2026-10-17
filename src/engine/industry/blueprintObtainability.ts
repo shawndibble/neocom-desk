@@ -18,11 +18,7 @@ export interface BlueprintSourceSets {
   contract: ReadonlySet<number>;
   /** Offered by an LP store the account holds points with. */
   lpStore: ReadonlySet<number>;
-  /**
-   * Invented from a T1 original some Character on the account owns (issue
-   * #3990) — the copy job Blueprint Acquisition prices an invention attempt
-   * with needs that original.
-   */
+  /** Inventable from a T1 original some Character on the account owns (issue #3990); the copy job needs one. */
   invention: ReadonlySet<number>;
 }
 

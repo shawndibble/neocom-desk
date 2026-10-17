@@ -2,21 +2,20 @@
  * The Blueprint Acquisition modal (issues #839, #1240): opened from an icon on
  * any Blueprint Acquisition row (the top-level plan or any nested sub-build),
  * it lays every way to get this blueprint side by side — Owned tiers, public
- * Contracts (copies and originals), Market sell orders, LP Store offers and a
- * Manual entry — each row with a "Use this blueprint" button.
+ * Contracts (copies and originals), Market sell orders, LP Store offers,
+ * Invent (issue #3990) and a Manual entry — each row with a "Use this
+ * blueprint" button.
  *
  * Picking writes `MaterialSourcing.acquisitionTierOverride` (+ `overridePrice`
- * for anything but an owned tier), keyed by the blueprint's own typeID, via
+ * except for an owned or invent row), keyed by the blueprint's own typeID, via
  * the caller's `onSourcingChange` — `acquisitionForLookup` (`recipes.ts`)
  * then honors it at every node that resolves this blueprint. What each row
  * writes, and why a picked price is one purchase of that row, lives in
  * `blueprintAcquisitionSources.ts`'s `overridePatchFor`.
  *
- * For a blueprint invention makes (issue #3990), an Invent section lists
- * what one attempt costs and one row per decryptor choice. Its numbers come
- * from the caller (`inventionQuoteFor`), priced exactly as automatic
- * selection prices them — at the plan's own hub and build system, not this
- * modal's hub picker.
+ * Invent's numbers come from the caller (`inventionQuoteFor`), priced as
+ * automatic selection prices them — at the plan's own hub and build system,
+ * not this modal's hub picker.
  *
  * Contracts and Market read one Trade Hub's region — the Build Plan's own by
  * default; Market reads the whole region (not just the hub station), unless
@@ -60,6 +59,7 @@ import {
 import { HintText } from '@/components/ui/HintText';
 import * as Icon from '@/components/ui/icons';
 import type { MaterialSourcing } from '@/engine/industry/types';
+import { romanLevel } from '@/engine/projection';
 import { loadTypeName } from '@/features/character/typeNames';
 import { loadPublicBpcContracts } from '@/features/bpcContracts/syncedContracts';
 import { loadContractLocationInfo } from '@/features/bpcContracts/blueprintLocation';
@@ -117,7 +117,6 @@ type ContractScope = typeof HUB_REGION | typeof ALL_REGIONS;
 
 const HEADING_CLASS = 'text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
 const SECTION_CLASS = 'flex flex-col gap-2 border-t border-line pt-3';
-const ROMAN = ['0', 'I', 'II', 'III', 'IV', 'V'] as const;
 
 interface BlueprintAcquisitionModalProps {
   onClose: () => void;
@@ -547,7 +546,6 @@ export function BlueprintAcquisitionModal({
     );
   }
 
-  /** The Invent section: what one attempt costs, then one row per decryptor choice. */
   function renderInventSection({
     result,
     t1BlueprintName,
@@ -565,7 +563,7 @@ export function BlueprintAcquisitionModal({
       .map((skill) =>
         t('industry.bpAcqInventSkillLevel', {
           name: skill.name,
-          level: ROMAN[skill.level ?? 0] ?? skill.level,
+          level: romanLevel(skill.level ?? 0),
         })
       )
       .join(', ');

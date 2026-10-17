@@ -1,26 +1,20 @@
 /**
  * Invention as a Blueprint Acquisition source (issue #3990): what one
- * invention attempt costs, how likely it is to succeed, and the expected cost
- * of the Tech II copy it produces — once with no decryptor and once per
- * decryptor, each a tier of its own so `selectBlueprintTier`'s cheapest-tier
- * pick is the decryptor optimiser.
- *
- * Expected cost per copy = attempt cost ÷ success chance; per run, ÷ the
- * copy's runs. "Expected": a run of bad luck costs more, a good one less.
- *
- * Pure: the caller prices the datacores and decryptors and works out the
- * copy and invention job fees (`researchJobFee`).
+ * attempt costs, its success chance and the expected cost of the T2 copy —
+ * with no decryptor and per decryptor, each its own tier so
+ * `selectBlueprintTier`'s cheapest-tier pick is the decryptor optimiser.
+ * "Expected": luck moves the real cost either way.
  */
 import type { BpcOffer } from './blueprintAcquisition';
-import { jobFee } from './jobCost';
-import type { AdjustedPrices, FacilityPreset } from './types';
+import { estimatedItemValue, jobFee } from './jobCost';
+import type { AdjustedPrices, FacilityPreset, IndustryBlueprint } from './types';
 
 /** An invented copy's ME before a decryptor — always 2, whatever the T1 copy's research. */
 export const INVENTED_BASE_ME = 2;
 /** An invented copy's TE before a decryptor — always 4. */
 export const INVENTED_BASE_TE = 4;
 /** Copying and invention fees are charged on this share of the built item's EIV. */
-export const RESEARCH_JOB_EIV_SHARE = 0.02;
+const RESEARCH_JOB_EIV_SHARE = 0.02;
 
 /** The trained levels an invention job reads. */
 export interface InventionSkillLevels {
@@ -86,7 +80,6 @@ export interface InventionTier {
   /** `null` = no decryptor. */
   decryptor: { typeID: number; name: string; unitPrice: number | null } | null;
   chance: number;
-  /** The invented copy's ME, TE and runs. */
   me: number;
   te: number;
   runs: number;
@@ -195,15 +188,12 @@ export function inventionOffers(quote: InventionQuote): BpcOffer[] {
  * product for a 1-run copy, the T2 product for invention.
  */
 export function researchJobFee(
-  materialsPerRun: readonly { typeID: number; quantity: number }[],
+  builtBy: Pick<IndustryBlueprint, 'materials'>,
   adjustedPrices: AdjustedPrices,
   systemCostIndex: number,
   facility: FacilityPreset,
   facilityTaxPct?: number
 ): number {
-  const eiv = materialsPerRun.reduce(
-    (sum, { typeID, quantity }) => sum + quantity * (adjustedPrices[typeID] ?? 0),
-    0
-  );
+  const eiv = estimatedItemValue(builtBy, 1, adjustedPrices);
   return jobFee(eiv * RESEARCH_JOB_EIV_SHARE, systemCostIndex, facility, facilityTaxPct).total;
 }

@@ -17,7 +17,7 @@ import { SCC_SURCHARGE_PCT } from '@/engine/industry/types';
 
 /** Estimated item value for the whole job. Missing adjusted prices count as 0. */
 export function estimatedItemValue(
-  blueprint: IndustryBlueprint,
+  blueprint: Pick<IndustryBlueprint, 'materials'>,
   runs: number,
   adjustedPrices: AdjustedPrices
 ): number {

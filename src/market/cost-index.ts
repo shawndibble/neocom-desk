@@ -9,12 +9,7 @@ import { getIndustrySystemCostIndices } from '@/esi/endpoints';
 import type { SystemCostIndices } from '@/esi/endpoints';
 import type { IndustryActivity } from '@/engine/industry/types';
 
-/**
- * An ESI cost-index activity this app reads: a plan's own manufacturing or
- * reaction index, plus the copying and invention indices an invented
- * blueprint's fees are charged at (issue #3990). ESI also lists the
- * research activities; nothing here prices those.
- */
+/** A plan's manufacturing/reaction index, plus copying/invention for invented-copy fees (issue #3990). Research indices unused. */
 export type CostIndexActivity = IndustryActivity | 'copying' | 'invention';
 
 /**

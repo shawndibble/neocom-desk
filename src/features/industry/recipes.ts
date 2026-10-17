@@ -71,7 +71,7 @@ export interface BlueprintAcquisitionSources {
    * Hub concept this module stays decoupled from.
    */
   offersFor: (blueprintTypeID: number) => readonly BpcOffer[];
-  /** Every other way to buy it the app can see — region market, LP Store — as offers. Absent = none. */
+  /** Every other way to get it the app can see — region market, LP Store, invention — as offers. Absent = none. */
   extraOffersFor?: (blueprintTypeID: number) => readonly BpcOffer[];
   /** Offers priced from only when nothing else prices the blueprint (other regions' contracts). */
   lastResortOffersFor?: (blueprintTypeID: number) => readonly BpcOffer[];
@@ -305,7 +305,8 @@ export function acquisitionForLookup(
     // owned/shortfall cost like automatic selection would; when it matches
     // nothing the app can see (a private contract, in-person trade), report
     // the forced me/te with no line price — `overridePrice` on the same
-    // sourcing entry is what prices it, in `materialResolution.ts`.
+    // sourcing entry is what prices it, in `materialResolution.ts` (an
+    // invention pick has none: unpriced until its tier prices again).
     const override = acquisitionSources.sourcing?.[blueprintTypeID]?.acquisitionTierOverride;
     const resolveInputs = override ? inputsForOverride(tierInputs, override) : tierInputs;
     let resolved;

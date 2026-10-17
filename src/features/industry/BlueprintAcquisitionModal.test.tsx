@@ -595,7 +595,6 @@ describe('BlueprintAcquisitionModal — Invent (issue #3990)', () => {
     return {
       t1BlueprintName: 'Gyrostabilizer I Blueprint',
       result: {
-        hasT1Original: copyJobFee !== null,
         skills,
         recipe: {
           t1BlueprintTypeID: 1,

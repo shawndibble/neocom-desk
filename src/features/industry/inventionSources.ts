@@ -1,19 +1,8 @@
 /**
- * Invention as a Blueprint Acquisition source (issue #3990): joins the SDE's
- * invention recipes and decryptors (`invention.json`), the hub prices of the
- * datacores and decryptors, the Character's skills and the plan's copy and
- * invention job fees into `inventionQuote`'s inputs.
- *
- * Two halves, split by what they depend on:
- * - `loadInventionMarket` — recipes plus hub prices, per (Trade Hub,
- *   blueprints). Loaded alongside the region-market and LP Store offers.
- * - `inventionQuoteFor` / `inventionOffersLookup` — pure, per plan: its
- *   build system's copying and invention indices, its facility, owned T1
- *   originals and the Character's skills.
- *
- * The copy job needs a T1 original the Character (or, with Corp Assets on,
- * the corp) owns; without one the copy job is unavailable and nothing is
- * offered.
+ * Invention as a Blueprint Acquisition source (issue #3990):
+ * `loadInventionMarket` loads recipes and hub prices per (Trade Hub,
+ * blueprints); `inventionQuoteFor` / `inventionOffersLookup` price them per
+ * plan (cost indices, facility, owned T1 originals, skills).
  */
 import type { BpcOffer } from '@/engine/industry/blueprintAcquisition';
 import {
@@ -50,7 +39,7 @@ export interface InventionRecipeInfo {
   baseRuns: number;
   /** Datacores one attempt consumes. */
   datacores: readonly { typeID: number; quantity: number }[];
-  /** The science skills the chance reads (a recipe's production skills don't count). */
+  /** The science skills the chance reads. */
   scienceSkills: readonly InventionSkill[];
   encryptionSkill: InventionSkill | null;
 }
@@ -107,10 +96,17 @@ export function inventionRecipes(
 /**
  * Loads the recipes inventing any of `blueprintTypeIds` and prices their
  * datacores and every decryptor at `hub`. Null when none of them is invented
- * — no price request is made then. Best-effort: unreadable prices read as
- * none, which leaves the tiers unpriced rather than free.
+ * — no price request is made then. Never rejects: unreadable data reads as
+ * no market, unreadable prices as none (tiers unpriced, never free).
  */
-export async function loadInventionMarket(
+export function loadInventionMarket(
+  hub: TradeHub,
+  blueprintTypeIds: readonly number[]
+): Promise<InventionMarket | null> {
+  return loadMarket(hub, blueprintTypeIds).catch(() => null);
+}
+
+async function loadMarket(
   hub: TradeHub,
   blueprintTypeIds: readonly number[]
 ): Promise<InventionMarket | null> {
@@ -151,8 +147,6 @@ export interface InventionPricingContext {
 export interface InventionQuoteResult {
   recipe: InventionRecipeInfo;
   quote: InventionQuote;
-  /** False: the copy job is unavailable and every tier is unpriced. */
-  hasT1Original: boolean;
   skills: InventionSkillLevels;
 }
 
@@ -166,11 +160,11 @@ export function inventionQuoteFor(
   const t1 = ctx.catalog.byBlueprintTypeID.get(recipe.t1BlueprintTypeID);
   const t2 = ctx.catalog.byBlueprintTypeID.get(blueprintTypeID);
   if (!t1 || !t2) return null;
-  const hasT1Original = ctx.ownedBlueprints.some(
+  const ownsT1Original = ctx.ownedBlueprints.some(
     (b) => b.type_id === recipe.t1BlueprintTypeID && b.runs === -1
   );
-  const fee = (materials: typeof t1.blueprint.materials, index: number) =>
-    researchJobFee(materials, ctx.adjustedPrices, index, ctx.facility, ctx.facilityTaxPct);
+  const fee = (builtBy: typeof t1.blueprint, index: number) =>
+    researchJobFee(builtBy, ctx.adjustedPrices, index, ctx.facility, ctx.facilityTaxPct);
   const skills: InventionSkillLevels = {
     science: recipe.scienceSkills.map((s) => ctx.skills[s.typeID] ?? 0),
     encryption: recipe.encryptionSkill ? (ctx.skills[recipe.encryptionSkill.typeID] ?? 0) : 0,
@@ -183,14 +177,15 @@ export function inventionQuoteFor(
       ...d,
       unitPrice: ctx.market.unitPriceFor(d.typeID),
     })),
-    copyJobFee: hasT1Original ? fee(t1.blueprint.materials, ctx.copyingCostIndex) : null,
-    inventionJobFee: fee(t2.blueprint.materials, ctx.inventionCostIndex),
+    // No T1 original: the copy job can't run, so every tier stays unpriced.
+    copyJobFee: ownsT1Original ? fee(t1.blueprint, ctx.copyingCostIndex) : null,
+    inventionJobFee: fee(t2.blueprint, ctx.inventionCostIndex),
     decryptors: ctx.market.decryptors.map((d) => ({
       ...d,
       unitPrice: ctx.market.unitPriceFor(d.typeID),
     })),
   });
-  return { recipe, quote, hasT1Original, skills };
+  return { recipe, quote, skills };
 }
 
 /** Each blueprint's priced invention tiers as offers, memoised per blueprint. */

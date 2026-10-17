@@ -15,7 +15,7 @@ import {
   iskPerRun,
   type BpcContractRow,
 } from '@/engine/contracts/bpcSearch';
-import type { InventionQuote } from '@/engine/industry/invention';
+import type { InventionQuote, InventionTier } from '@/engine/industry/invention';
 import type { MaterialSourcing } from '@/engine/industry/types';
 import type { RegionOrder } from '@/esi/endpoints';
 import type { LpOfferMatch } from '@/features/market/appraisalLpAcquisition';
@@ -348,43 +348,22 @@ export function ownedTierRows(copies: readonly AcquisitionOwnedCopy[]): OwnedTie
 
 /**
  * One way to invent this blueprint (issue #3990): no decryptor, or one
- * decryptor. `price` is the expected cost of one successful copy — what a
- * pick writes, the same one-copy unit a contract copy's price is.
+ * decryptor. `price` is the expected cost per copy, 0 when unpriced.
  */
-export interface InventTierRow {
-  kind: 'invent';
-  /** `null` = no decryptor. */
-  decryptor: { typeID: number; name: string; unitPrice: number | null } | null;
-  chance: number;
-  me: number;
-  te: number;
-  runs: number;
-  /** Expected cost per copy; 0 when unpriced (then not pickable). */
-  price: number;
-  expectedCostPerRun: number | null;
-  /** False when any part of the attempt has no price (or the copy job can't run). */
-  pickable: boolean;
-}
+export type InventTierRow = InventionTier & { kind: 'invent'; price: number; pickable: boolean };
 
 /** Every invention tier as a row: no decryptor first, then decryptors by name. */
 export function inventTierRows(quote: InventionQuote): InventTierRow[] {
-  return quote.tiers
-    .map((tier): InventTierRow => ({
-      kind: 'invent',
-      decryptor: tier.decryptor,
-      chance: tier.chance,
-      me: tier.me,
-      te: tier.te,
-      runs: tier.runs,
-      price: tier.expectedCostPerCopy ?? 0,
-      expectedCostPerRun: tier.expectedCostPerRun,
-      pickable: tier.expectedCostPerCopy !== null,
-    }))
-    .sort(
-      (a, b) =>
-        Number(a.decryptor !== null) - Number(b.decryptor !== null) ||
-        (a.decryptor?.name ?? '').localeCompare(b.decryptor?.name ?? '')
-    );
+  const [none, ...decrypted] = quote.tiers.map((tier): InventTierRow => ({
+    ...tier,
+    kind: 'invent',
+    price: tier.expectedCostPerCopy ?? 0,
+    pickable: tier.expectedCostPerCopy !== null,
+  }));
+  return [
+    ...(none ? [none] : []),
+    ...decrypted.sort((a, b) => a.decryptor!.name.localeCompare(b.decryptor!.name)),
+  ];
 }
 
 /** The invent row with the lowest expected cost per run, or null when none is priced. */
@@ -408,8 +387,7 @@ export type AcquisitionSourceRow =
  * An owned tier sets no price: `acquisitionForLookup` (recipes.ts) finds that
  * tier among its own `tierOptions` and costs any shortfall itself.
  *
- * An invent row forces its tier, marked invented with its runs per copy,
- * and no price: the plan keeps pricing it live at its expected cost.
+ * An invent row sets no price — see `acquisitionTierOverride.invented`.
  *
  * Every other row forces its tier *and* its price. Automatic selection
  * weighs the same sources, but it prices each tier by whichever offer covers
