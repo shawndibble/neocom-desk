@@ -23,12 +23,12 @@ import { SystemLink } from '@/features/entities';
 import type { RegionOrder } from '@/esi/endpoints';
 import { formatAge } from '@/lib/age';
 import { writeToClipboard } from '@/lib/clipboard';
-import { formatMarketIsk, marketIskDecimals } from '@/lib/isk';
+import { formatMarketIsk } from '@/lib/isk';
 import { formatVolume } from './format';
 import type { MarketOrderColumnId } from './marketOrderColumns';
 import { priceClipboardText } from './priceClipboardText';
 import { SetDestinationButton } from './SetDestinationButton';
-import { signedIsk } from './signedIsk';
+import { signedMarketIsk } from './signedIsk';
 
 export interface OrderRowDetailProps {
   order: RegionOrder;
@@ -128,7 +128,7 @@ export function OrderRowDetail({
         <Fact label={t('market.orderDetail.versusBest')}>
           {versusBest === null || versusBest.delta === 0
             ? t('market.orderDetail.isBest')
-            : `${signedIsk(versusBest.delta, marketIskDecimals(versusBest.delta))} (${versusBest.ratio > 0 ? '+' : '−'}${Math.abs(
+            : `${signedMarketIsk(versusBest.delta)} (${versusBest.ratio > 0 ? '+' : '−'}${Math.abs(
                 versusBest.ratio * 100
               ).toFixed(2)}%)`}
         </Fact>

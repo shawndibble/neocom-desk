@@ -65,6 +65,9 @@ import {
 } from '@/engine/industry/characterModifiers';
 import { roundPriceUp } from '@/engine/market/priceTick';
 import { CopyablePrice, CopyPriceButton } from './CopyablePrice';
+import { marketIskTone, signedMarketIsk } from './signedIsk';
+import { OpenInEveButton } from '@/features/openInEve/OpenInEveButton';
+import { MarketOnly } from '@/features/abyssal/MarketOnly';
 import { MarketItemLink } from './MarketItemLink';
 import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
 import { StructureFeeLine } from './StructureFeeLine';
@@ -141,14 +144,9 @@ function tightestRivalScope(
     : 'clear';
 }
 
-/** An ISK figure that can go either way, with its own sign — `+30.00`, `-30.10`. */
-function signedIsk(amount: number): string {
-  return `${amount >= 0 ? '+' : ''}${formatMarketIsk(amount)}`;
-}
-
 /** Money, not status: the ISK delta tokens, with the sign (DESIGN.md §1). */
 function IskDelta({ amount }: { amount: number }) {
-  return <span className={amount >= 0 ? 'text-isk-pos' : 'text-isk-neg'}>{signedIsk(amount)}</span>;
+  return <span className={marketIskTone(amount)}>{signedMarketIsk(amount)}</span>;
 }
 
 /** Short label for an exit's kind in the "Other ways out" disclosure's trailing read — distinct from the exit's own full sentence, which states the price rather than the net. */
@@ -588,7 +586,7 @@ export function OrderDetailContent({
     ? exits.reduce((best, exit) => (exit.netPerUnit > best.netPerUnit ? exit : best))
     : null;
   const exitsTrailing = bestExit
-    ? `${t(`market.orders.${EXIT_SHORT_KEY[bestExit.kind]}`)} · ${signedIsk(bestExit.netPerUnit)}`
+    ? `${t(`market.orders.${EXIT_SHORT_KEY[bestExit.kind]}`)} · ${signedMarketIsk(bestExit.netPerUnit)}`
     : haulGaps.length
       ? `${haulGaps[0].systemName} · +${formatMarketIsk(haulGaps[0].overLocal)}`
       : t('market.orders.trailingNoExit');
@@ -740,6 +738,16 @@ export function OrderDetailContent({
             <MarketItemLink typeId={row.typeId} className={buttonClassName({ variant: 'ghost' })}>
               {t('orders.viewInMarket')}
             </MarketItemLink>
+            {/* Where the order is edited. An abyssal type has no market window. */}
+            <MarketOnly typeId={row.typeId}>
+              <OpenInEveButton
+                kind="marketDetails"
+                id={row.typeId}
+                name={row.typeName}
+                size="md"
+                inRow
+              />
+            </MarketOnly>
           </div>
         </div>
 
@@ -1086,13 +1094,10 @@ export function OrderDetailContent({
                             )}
                           </span>
                           <span
-                            className={cx(
-                              'shrink-0 tabular-nums',
-                              exit.netPerUnit >= 0 ? 'text-isk-pos' : 'text-isk-neg'
-                            )}
+                            className={cx('shrink-0 tabular-nums', marketIskTone(exit.netPerUnit))}
                           >
                             {t('market.orders.exitPerUnit', {
-                              amount: signedIsk(exit.netPerUnit),
+                              amount: signedMarketIsk(exit.netPerUnit),
                             })}
                           </span>
                         </p>

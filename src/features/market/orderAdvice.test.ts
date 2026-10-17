@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { adviseOrder } from './orderAdvice';
 import { orderBadgeFor } from './orderBadgeKind';
-import { orderNextAction } from './orderNextAction';
 import * as summaryModule from './orderRowSummary';
 import { orderRowSummary } from './orderRowSummary';
 import { orderVerdict } from './orderVerdict';
@@ -106,24 +105,12 @@ const ROWS: Record<string, OpenOrderRow> = {
 afterEach(() => vi.restoreAllMocks());
 
 describe('adviseOrder', () => {
-  it.each(Object.entries(ROWS))('equals the four separate calls: %s', (_name, row) => {
-    const verdict = orderVerdict(row);
+  it.each(Object.entries(ROWS))('equals the three separate calls: %s', (_name, row) => {
     expect(adviseOrder(row)).toEqual({
       badge: orderBadgeFor(row),
       summary: orderRowSummary(row),
-      verdict,
-      next: orderNextAction(row, verdict),
+      verdict: orderVerdict(row),
     });
-  });
-
-  it('keeps verdict price and next-step price on the same single source', () => {
-    const advice = adviseOrder(ROWS['undercut, profitable match']);
-    expect(advice.verdict).toMatchObject({ kind: 'matchThem', price: 449.9 });
-    expect(advice.next).toEqual({ kind: 'matchThem', price: 449.9 });
-  });
-
-  it('falls back to the cheapest rival with no verdict', () => {
-    expect(adviseOrder(UNDERCUT).next).toEqual({ kind: 'cheapestRival', price: 450 });
   });
 
   it('derives the summary once', () => {

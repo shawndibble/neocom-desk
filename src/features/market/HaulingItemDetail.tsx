@@ -13,7 +13,7 @@ import { Disclosure, TypeIcon } from '@/components/ui';
 import { buttonClassName } from '@/components/ui/buttonClassName';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
-import { formatMarketIsk, marketIskDecimals } from '@/lib/isk';
+import { formatMarketIsk } from '@/lib/isk';
 import { HAULING_THRESHOLDS, lotEconomics, type LadderLevel } from '@/engine/market/haulingMarket';
 import { maxBuyPrice, type TripLine } from '@/engine/market/haulingPlan';
 import { ItemInfoLink } from '@/features/entities';
@@ -22,7 +22,7 @@ import { formatSignedPct } from './format';
 import { HaulingFlagWord } from './HaulingFlagWord';
 import { ItemMoreActions } from './ItemContextMenu';
 import { MarketItemLink } from './MarketItemLink';
-import { signedIsk } from './signedIsk';
+import { signedMarketIsk } from './signedIsk';
 import type { InstantHaulingScanRow, ListHaulingScanRow } from './haulingData';
 import { formatDaysToSell, type HaulingViewRow } from './haulingView';
 
@@ -48,8 +48,6 @@ export interface HaulingItemDetailProps {
 export function HaulingItemActions({ row }: { row: HaulingViewRow }) {
   return <ItemMoreActions typeId={row.typeId} itemName={row.name} variant="ghost" size="sm" />;
 }
-
-const signed = (value: number) => signedIsk(value, marketIskDecimals(value));
 
 const plannedUnits = (line: TripLine | undefined) =>
   line && line.quantity > 0 ? line.quantity : undefined;
@@ -163,7 +161,7 @@ function PayAtMost({ row }: { row: HaulingViewRow }) {
           )}
         >
           <span className="whitespace-nowrap">
-            {t('market.hauling.itemDetail.profitEach', { isk: signed(row.profitPerUnit) })}
+            {t('market.hauling.itemDetail.profitEach', { isk: signedMarketIsk(row.profitPerUnit) })}
           </span>
           <span aria-hidden="true">·</span>
           <span className="whitespace-nowrap">
@@ -385,7 +383,7 @@ function TheMath({
                 strong
                 tone={row.profitPerUnit >= 0 ? 'success' : 'danger'}
                 label={t('market.hauling.itemDetail.profitEachLine')}
-                amount={signed(row.profitPerUnit)}
+                amount={signedMarketIsk(row.profitPerUnit)}
               />
             </div>
           </>
