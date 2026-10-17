@@ -665,7 +665,7 @@ function gapCell(alert: WatchedPrice, ratio: number): TableCell {
   return Math.abs(ratio) <= NEAR_TARGET ? { text, tone: 'caution' } : text;
 }
 
-/** "+35%" amber from the spike threshold, "−12%" plain, blank when too thin to say — as on Build Opportunities. */
+/** "+35%" amber from the spike threshold, "−12%" plain, blank when unknown. */
 function vs90dCell(value: number | null | undefined): TableCell {
   if (value === null || value === undefined) return '';
   const text = formatVsMedianPct(value);

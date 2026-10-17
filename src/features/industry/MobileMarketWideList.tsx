@@ -79,7 +79,7 @@ const FIGURE_ORDER: readonly FigureId[] = [
 ];
 
 interface Figure {
-  /** Null: nothing to say, so a secondary readout is left out. */
+  /** Null: blank — left out as a secondary readout, "Unknown" as the hero. */
   node: ReactNode | null;
   toneClassName?: string;
 }

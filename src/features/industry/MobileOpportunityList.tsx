@@ -79,7 +79,7 @@ type SortFieldId =
   'iskPerHour' | 'unitMargin' | 'margin' | 'vs90d' | 'stockCovers' | 'stillToBuy' | 'duration';
 
 interface HeroValue {
-  /** Null: nothing to say, so a secondary readout is left out. */
+  /** Null: blank — left out as a secondary readout, "Unknown" as the hero. */
   node: ReactNode | null;
   toneClassName?: string;
 }

@@ -8,7 +8,6 @@
  */
 import { medianOf, type MarketHistoryPoint } from './priceHistory';
 
-/** How many days back the median looks. */
 export const VS_MEDIAN_WINDOW_DAYS = 90;
 
 /**
