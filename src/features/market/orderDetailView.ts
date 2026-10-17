@@ -154,14 +154,12 @@ export interface VerdictFigures {
   /**
    * The exact price to type into the order, or null when the call asks for
    * no new price. Only a price the call recommends: never the cheapest rival
-   * on its own (a fact, not advice — issue #1428), never your current price.
+   * on its own (a fact, not advice), never your current price.
    */
   copyPrice: number | null;
   /**
-   * ISK a unit, after fees: the margin left after undercutting when the call
-   * is to match them; against the relist floor when the call is to put the
-   * price up (the loss the verdict sentence states); otherwise what holding
-   * at your price nets once it sells. Null without an Order Floor.
+   * ISK a unit after fees, the figure the verdict sentence states: margin after
+   * undercutting, loss against relist, else what holding nets. Null without a floor.
    */
   keepPerUnit: number | null;
 }

@@ -101,7 +101,7 @@ function renderModal({
   return { onClose, onCheckDeeper };
 }
 
-/** Opens every folded section — all four start collapsed (issue #4012). */
+/** Opens every folded section — all four start collapsed. */
 function expandAll() {
   for (const button of screen.getAllByRole('button', { expanded: false })) {
     fireEvent.click(button);

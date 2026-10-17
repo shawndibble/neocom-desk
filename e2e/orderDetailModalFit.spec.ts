@@ -1,11 +1,7 @@
 /**
- * Order detail modal at in-between widths (issue #2988): on a foldable's
- * unfolded inner screen (~900 CSS px) the old `wide` modal grew past the
- * viewport, pushing its close button off screen. Since #4012 it is a narrow
- * centred dialog there and a bottom sheet on a phone. Asserts invariants
- * only — the dialog fits the viewport, its close button is inside it and
- * works, and the body does not scroll sideways — never pixel values, since
- * CI's fonts differ.
+ * Order detail at in-between widths (a foldable's ~900px inner screen once
+ * pushed Close off screen) and on a phone (bottom sheet): it fits the viewport,
+ * Close is visible and works, no sideways scroll. Invariants only; CI fonts differ.
  */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';

@@ -116,7 +116,7 @@ type ScopeState =
   | { kind: 'clear' }
   | { kind: 'rival'; rival: UndercutRival };
 
-/** The four folding sections of the detail modal (issues #1428, #4012), all folded on arrival. */
+/** The modal's four folding sections, all folded on arrival. */
 export type OrderDetailSectionId = 'numbers' | 'whoCheaper' | 'costBasis' | 'exits';
 
 /** The tightest scope carrying a rival, for the "Who is cheaper" disclosure's trailing read — or `'clear'`/`'notChecked'` when none of the three do. */
@@ -142,6 +142,11 @@ function tightestRivalScope(
 /** An ISK figure that can go either way, with its own sign — `+30.00`, `-30.10`. */
 function signedIsk(amount: number): string {
   return `${amount >= 0 ? '+' : ''}${formatMarketIsk(amount)}`;
+}
+
+/** Money, not status: the ISK delta tokens, with the sign (DESIGN.md §1). */
+function IskDelta({ amount }: { amount: number }) {
+  return <span className={amount >= 0 ? 'text-isk-pos' : 'text-isk-neg'}>{signedIsk(amount)}</span>;
 }
 
 /** Short label for an exit's kind in the "Other ways out" disclosure's trailing read — distinct from the exit's own full sentence, which states the price rather than the net. */
@@ -482,13 +487,9 @@ export function OrderDetailContent({
   onClose,
 }: OrderDetailContentProps) {
   const { t } = useTranslation();
-  // A narrow dialog on a pointer, a bottom sheet on a phone, where the one
-  // action (Copy) pins to the sheet's bottom edge instead of the verdict.
   const isPhone = useIsPhone();
-  // Every section starts folded (issue #4012): the verdict, Copy and the
-  // three facts above them are the answer, and each fold's trailing read is
-  // its one-line summary. The modal remounts per row (`OpenOrdersPanel` keys
-  // it by `orderId`), so open sections never carry from one order to the next.
+  // All folded: verdict, Copy and the facts are the answer, each trailing read
+  // its summary. Remounts per orderId, so nothing carries between orders.
   const [openSections, setOpenSections] = useState<ReadonlySet<OrderDetailSectionId>>(
     () => new Set(initialSection ? [initialSection] : [])
   );
@@ -587,6 +588,7 @@ export function OrderDetailContent({
 
   // Buy orders fill rather than sell out, and are beaten by a higher bid
   // rather than a cheaper ask (#1733).
+  const sellsOutLabel = t(row.isBuyOrder ? 'market.orders.fillsIn' : 'market.orders.sellsOutIn');
   const whoLabel = t(row.isBuyOrder ? 'market.orders.whoBidsHigher' : 'market.orders.whoIsCheaper');
 
   // "Cheapest here" is the station tier: the price a buyer standing in this
@@ -641,8 +643,6 @@ export function OrderDetailContent({
   return (
     <Modal open onClose={onClose} title={row.typeName} placement={isPhone ? 'sheet' : 'center'}>
       <div className="space-y-4">
-        {/* Whose order, where, which side and how much is left: the order's
-            identity, quiet, above the call. */}
         <p className="text-sm text-text-dim">
           {row.characterName} · {row.stationName ?? t('market.unknownStructure')}
           {offHub && (
@@ -702,9 +702,7 @@ export function OrderDetailContent({
             </>
           )}
           <div className="mt-3 flex flex-wrap gap-2">
-            {/* The exact price to type, plain digits on the clipboard. Only a
-                price the call recommends (`verdictFigures`); on a phone it
-                is pinned to the sheet's foot instead. */}
+            {/* Only a price the call recommends (`verdictFigures`). */}
             {!isPhone && copyPrice !== null && <CopyPriceButton price={copyPrice} />}
             {/*
               The phone list's row is plain text, not `MarketItemLink` (a
@@ -734,12 +732,7 @@ export function OrderDetailContent({
           {keepPerUnit !== null && (
             <StatChip
               label={t('market.orders.detail.chipYouKeep')}
-              // Money, not status: the ISK delta tokens, with the sign (DESIGN.md §1).
-              value={
-                <span className={keepPerUnit >= 0 ? 'text-isk-pos' : 'text-isk-neg'}>
-                  {signedIsk(keepPerUnit)}
-                </span>
-              }
+              value={<IskDelta amount={keepPerUnit} />}
             />
           )}
         </StatChips>
@@ -761,16 +754,9 @@ export function OrderDetailContent({
                 <TableActionsMenu name={whoLabel} tableExport={scopeExport} />
               </div>
               {/*
-                ONE grid for the whole table: header, every scope row and the
-                player's own order all contribute cells to these tracks, so
-                the price column lines up down the table. Rows cannot own a
-                background or a border here, so the rule between rows and the
-                "my order" tint are painted per cell. Each row is a
-                `display: contents` box carrying `role="row"`, so the grid
-                still reads as a table with column headers to assistive tech.
-                Three columns at every width: the dialog is narrow everywhere
-                now, so the gap and distance ride under the seller as
-                labelled lines.
+                ONE grid so the price column lines up down the table. Rows are
+                `display: contents` + `role="row"` (still a table to assistive
+                tech), so the row rule and "my order" tint paint per cell.
               */}
               <div
                 ref={whoTableRef}
@@ -891,13 +877,9 @@ export function OrderDetailContent({
                   <Field
                     label={
                       <span className="inline-flex items-center gap-1">
-                        {t(row.isBuyOrder ? 'market.orders.fillsIn' : 'market.orders.sellsOutIn')}
+                        {sellsOutLabel}
                         <InfoTooltip
-                          label={t('common.aboutLabel', {
-                            label: t(
-                              row.isBuyOrder ? 'market.orders.fillsIn' : 'market.orders.sellsOutIn'
-                            ),
-                          })}
+                          label={t('common.aboutLabel', { label: sellsOutLabel })}
                           content={t(
                             row.isBuyOrder
                               ? 'market.orders.fillsInHelp'
@@ -971,9 +953,7 @@ export function OrderDetailContent({
                       t('common.unknown')
                     ) : (
                       <span className="tabular-nums">
-                        <span className={netIfSellsAsListed >= 0 ? 'text-isk-pos' : 'text-isk-neg'}>
-                          {signedIsk(netIfSellsAsListed)}
-                        </span>{' '}
+                        <IskDelta amount={netIfSellsAsListed} />{' '}
                         <span className="text-text-dim">
                           {t('market.orders.statPerUnitAfterFees')}
                         </span>
@@ -1193,8 +1173,8 @@ export function OrderDetailContent({
         </div>
       </div>
       {isPhone && copyPrice !== null && (
-        // Pinned to the sheet's bottom edge while the body scrolls: the one
-        // action stays under the thumb. Same footer as `FilterBar`'s sheet.
+        // Pinned to the sheet's bottom edge while the body scrolls. `bottom`
+        // cancels the body's bottom padding, which sticky insets by.
         <div className="sticky bottom-[calc(-0.75rem_-_env(safe-area-inset-bottom))] -mx-3 -mb-[calc(0.75rem_+_env(safe-area-inset-bottom))] mt-3 border-t border-line bg-panel px-3 pt-2 pb-[calc(0.5rem_+_env(safe-area-inset-bottom))]">
           <CopyPriceButton price={copyPrice} className="w-full" />
         </div>
@@ -1203,11 +1183,7 @@ export function OrderDetailContent({
   );
 }
 
-/**
- * "What it cost you" with a cost basis in hand: where the cost came from
- * (a linked build's run, or the wallet buys it was priced from), cost per
- * unit, the two fees, and the one floor shown as a figure.
- */
+/** "What it cost you" once a cost basis is known: build run or wallet buys, fees, floor. */
 function CostLedger({
   row,
   costBasis,
