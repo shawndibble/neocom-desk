@@ -298,7 +298,7 @@ Paste panel
 - Lines chip: count of paste lines (`countPasteLines`), differs from row count because repeats merge.
 - Price Percent number field (0-1000, default 100, `pricePercent.ts:19-27`), device-local setting `useMarketPricePercent`; field holds typed string, writes only when in range (`AppraisalPanel.tsx:268`). `?percent=` URL param overrides for one visit (`Market.tsx:304`), cleared when user types.
 - Appraise (primary, disabled when empty/loading), Clear (disabled when empty).
-- Unmatched box: names that resolved to no market type, listed with source line numbers (`market.appraisal.unmatchedLine`).
+- Unmatched box: names that resolved to no market type, listed with source line numbers (`market.appraisal.unmatchedLine`), plus lines whose stated quantity could not be read (`12.5`, `5 m3`) rather than pricing them as 1. Quantities grouped with `.`, space, no-break space or `'` (`124.500`) parse as whole numbers (`appraisalPaste.ts`).
 - Changing hub or percent after a result exists re-prices automatically (effect deps in `useAppraisal.ts`).
 
 Accepted paste shapes (`src/engine/market/appraisalPaste.ts`): inventory copy `Name<TAB>Qty[...]`, multibuy `Name Qty` / `Name xQty`, bare name (=1), EFT fit (header `[Ship, Fit]`; hull priced, charges priced separately, empty slots dropped; via `engine/import/eftFit`). Thousands separators stripped. Trailing digits only split off when no tab and digits-only token. Duplicate names merge. Name matching `appraisalMatch.ts`, catalogue `loadAppraisalCatalogue` (first type id wins on duplicate names, `appraisalData.ts`).

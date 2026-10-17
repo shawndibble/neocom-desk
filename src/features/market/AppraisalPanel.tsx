@@ -598,7 +598,7 @@ export function AppraisalPanel({
       sortValue: (row) => row.lpIskCost ?? undefined,
     },
     volume: appraisalVolumeColumn(t),
-    iskPerM3: { ...appraisalIskPerM3Column(t), phoneHidden: true },
+    iskPerM3: appraisalIskPerM3Column(t),
   };
   const availableColumns = APPRAISAL_COLUMN_IDS.filter(
     (id) => (id !== 'refineTotal' || hasRefine) && (id !== 'lpTotal' || hasLpOption)

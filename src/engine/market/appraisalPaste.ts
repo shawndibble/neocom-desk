@@ -59,11 +59,11 @@ const TRAILING_QUANTITY = /^(.*\S)\s+(\d[\d.,']*)$/;
 
 /**
  * Digits grouped in threes by one repeated mark: a dot, an apostrophe, a space,
- * a no-break space or a narrow no-break space — what a non-English client or
+ * a no-break space, a thin space or a narrow no-break space — what a non-English client or
  * OS writes where English writes a comma. Every group after the first must be
  * exactly three digits, so `124.500` is 124500 while `12.5` is not a grouping.
  */
-const GROUPED_QUANTITY = /^\d{1,3}([.' \u00a0\u202f])\d{3}(?:\1\d{3})*$/;
+const GROUPED_QUANTITY = /^\d{1,3}([.' \u00a0\u2009\u202f])\d{3}(?:\1\d{3})*$/;
 
 /**
  * `124,500` -> 124500, and so are `124.500`, `124 500` and `124'500`. Answers
@@ -280,7 +280,10 @@ export function parseAppraisalPasteDetailed(text: string): {
   };
 }
 
-/** Parse pasted item text. Never throws — an unreadable line becomes a name. */
+/**
+ * Parse pasted item text into entries. Never throws. A line whose quantity
+ * can't be read is left out here; `parseAppraisalPasteDetailed` says which.
+ */
 export function parseAppraisalPaste(text: string): AppraisalPasteEntry[] {
   return parseAppraisalPasteDetailed(text).entries;
 }

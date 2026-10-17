@@ -160,6 +160,9 @@ describe('parseAppraisalPaste', () => {
     expect(parseAppraisalPaste('Tritanium\t1\u00a0234\u00a0567')).toEqual([
       { name: 'Tritanium', quantity: 1234567, lines: [1] },
     ]);
+    expect(parseAppraisalPaste('Tritanium\t1\u2009234\u2009567')).toEqual([
+      { name: 'Tritanium', quantity: 1234567, lines: [1] },
+    ]);
     expect(parseAppraisalPaste("Tritanium\t1'234'567")).toEqual([
       { name: 'Tritanium', quantity: 1234567, lines: [1] },
     ]);

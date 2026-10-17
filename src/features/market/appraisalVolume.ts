@@ -28,8 +28,7 @@ export function appraisalVolumeColumn(t: TFunction): DataTableColumn<AppraisalRo
 /**
  * ISK per m³ of cargo, beside the volume column: which lines are worth the
  * space they take in a hold. A line with no sell orders or no known volume is a
- * dash, never 0. Callers set `phoneHidden`: the stacked phone card keeps its
- * pairs. `formatIskAuto` because a rate spans orders of magnitude and
+ * dash, never 0. `formatIskAuto` because a rate spans orders of magnitude and
  * whole-ISK rounding would show a cheap bulk line as 0.
  */
 export function appraisalIskPerM3Column(t: TFunction): DataTableColumn<AppraisalRow> {
