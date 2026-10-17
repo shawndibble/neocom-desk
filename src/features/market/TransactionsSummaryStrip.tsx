@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Tooltip } from '@/components/ui';
+import { HintText } from '@/components/ui/HintText';
 import { cx } from '@/lib/cx';
 import { formatDateOnly } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
@@ -102,13 +102,7 @@ function SummaryFigure({
   return (
     <div className={cx('flex flex-col gap-0.5', className)}>
       <dt className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-        {tooltip ? (
-          <Tooltip content={tooltip}>
-            <span>{label}</span>
-          </Tooltip>
-        ) : (
-          label
-        )}
+        {tooltip ? <HintText content={tooltip}>{label}</HintText> : label}
       </dt>
       <dd className="text-sm font-semibold">{value}</dd>
       {note && <dd className="text-[0.6875rem] font-normal text-text-dim">{note}</dd>}

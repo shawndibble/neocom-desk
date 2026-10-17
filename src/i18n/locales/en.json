@@ -5424,7 +5424,6 @@
     "day": "Day",
     "salesCount": "Sales",
     "character": "Character",
-    "characterFilterLabel": "Characters",
     "reauthTitle": "Log in again to see your wallet",
     "reauthHint": "Log in again to fetch this character's wallet balance.",
     "reauthAction": "Log in again with EVE Online",
