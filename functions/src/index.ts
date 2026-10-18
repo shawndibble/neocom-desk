@@ -3,6 +3,7 @@
 // the client sends only its short-lived access token, which is verified
 // against EVE's published JWKS before any Firebase credential is minted.
 
+import { setTimeout as sleep } from 'node:timers/promises';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { defineSecret } from 'firebase-functions/params';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
@@ -29,7 +30,7 @@ import {
 } from './alertGrant.js';
 import { parseAlertsKey } from './alertGrantCrypto.js';
 import { firestoreAlertGrantStore, firestorePollerStore } from './alertGrantStore.js';
-import { fetchNotifications as fetchEsiNotifications } from './esiNotifications.js';
+import { ESI_USER_AGENT, fetchNotifications as fetchEsiNotifications } from './esiNotifications.js';
 import { pollEveNotifications as pollEveNotificationsRun } from './pollEveNotifications.js';
 import { buildDeviceRegistration, parseRegisterDeviceInput } from './registerDevice.js';
 import { dispatchDueProjections, writeDeviceRegistration } from './projectionStore.js';
@@ -46,6 +47,27 @@ import {
   decideAccountAction,
   lastSyncedAtOf,
 } from './purgeStaleAccounts.js';
+import {
+  parseBookCall,
+  parseConfirmGroupingInput,
+  parseEditAction,
+  parseStopReminders,
+  parseSyncInput,
+  parseToken,
+  parseTurnOnInput,
+} from './corpTaxBook.js';
+import { esiIdentityReader } from './corpTaxBookEsi.js';
+import {
+  confirmGrouping,
+  editBook,
+  readStatementByToken,
+  reclaimBook,
+  setRemindersByToken,
+  syncBook,
+  turnOnBook,
+  verifyOfficer,
+  type BookDeps,
+} from './corpTaxBookStore.js';
 import {
   parseCommunityIdInput,
   parseCreateInput,
@@ -717,6 +739,70 @@ export const removeCommunityPledgeCallable = onCall<unknown>(
   }
 );
 
+// Corp Tax Book (issue #4061, ADR 0023). Every write to a corporation's book
+// goes through these callables (corpTaxBookStore.ts) and lands in its audit
+// log; the client only reads, under firestore.rules. The caller sends a
+// short-lived EVE access token for the role check; it is used for ESI reads
+// and dropped, never stored or logged.
+const corpTaxBookDeps = (): BookDeps => ({
+  db: getFirestore(),
+  now: Date.now,
+  verifyToken: (token) => verifyEveAccessToken(token, verifyOptions),
+  readIdentity: esiIdentityReader(),
+});
+
+const CORP_TAX_BOOK_OPTIONS = { maxInstances: 5 };
+
+export const verifyCorpOfficerCallable = onCall<unknown>(CORP_TAX_BOOK_OPTIONS, (request) =>
+  verifyOfficer(corpTaxBookDeps(), callerOf(request), parseBookCall(request.data))
+);
+
+export const turnOnCorpTaxBookCallable = onCall<unknown>(CORP_TAX_BOOK_OPTIONS, (request) =>
+  turnOnBook(corpTaxBookDeps(), callerOf(request), parseTurnOnInput(request.data))
+);
+
+export const reclaimCorpTaxBookCallable = onCall<unknown>(CORP_TAX_BOOK_OPTIONS, (request) =>
+  reclaimBook(corpTaxBookDeps(), callerOf(request), parseBookCall(request.data))
+);
+
+// A sync is many small transactions (up to 2000 observer rows), so give it room.
+export const syncCorpTaxBookCallable = onCall<unknown>(
+  { ...CORP_TAX_BOOK_OPTIONS, timeoutSeconds: 120 },
+  (request) =>
+    syncBook(corpTaxBookDeps(), callerOf(request), parseSyncInput(request.data, Date.now()))
+);
+
+export const editCorpTaxBookCallable = onCall<unknown>(CORP_TAX_BOOK_OPTIONS, (request) =>
+  editBook(
+    corpTaxBookDeps(),
+    callerOf(request),
+    parseBookCall(request.data),
+    parseEditAction(request.data)
+  )
+);
+
+export const confirmCorpTaxBookGroupingCallable = onCall<unknown>(
+  CORP_TAX_BOOK_OPTIONS,
+  (request) => {
+    const { corporationId, minerId } = parseConfirmGroupingInput(request.data);
+    return confirmGrouping(corpTaxBookDeps(), callerOf(request), corporationId, minerId);
+  }
+);
+
+// No session on purpose: the verify link is the credential (D27), so a miner
+// without an EVE login can read their Statement and stop reminders.
+export const readCorpTaxBookStatementCallable = onCall<unknown>(CORP_TAX_BOOK_OPTIONS, (request) =>
+  readStatementByToken(corpTaxBookDeps(), parseToken(request.data))
+);
+
+export const stopCorpTaxBookRemindersCallable = onCall<unknown>(
+  CORP_TAX_BOOK_OPTIONS,
+  (request) => {
+    const { token, stopped } = parseStopReminders(request.data);
+    return setRemindersByToken(corpTaxBookDeps(), token, stopped);
+  }
+);
+
 /**
  * sweepCommunityRequests (issue #3812, ADR 0021): deletes Requests expired a
  * week ago and Requests closed a week ago, with their Pledges. Bounded to 500
@@ -937,14 +1023,9 @@ async function writePublicCourierContractsSnapshot(
  * per billing account ADR 0013 budgeted against, now that the blueprint-only
  * sync it briefly ran beside is gone.
  */
-// Same contact string ESI calls send (src/esi/client.ts's USER_AGENT) —
-// functions/ has no `@/` alias to import it, and Adam4EVE's own docs ask for
-// a User-Agent naming this app rather than a personal contact.
-const MARKET_HISTORY_USER_AGENT = 'Neocom Desk (github.com/shawndibble/neocom-desk)';
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+// Adam4EVE's own docs ask for a User-Agent naming this app rather than a
+// personal contact; reuse the ESI one.
+const MARKET_HISTORY_USER_AGENT = ESI_USER_AGENT;
 
 async function fetchAdam4eveChunk(
   typeIds: readonly number[],
