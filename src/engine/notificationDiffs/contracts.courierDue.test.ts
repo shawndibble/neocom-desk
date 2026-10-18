@@ -3,9 +3,9 @@ import {
   diffCourierDeliveryDue,
   type ContractEntrySnapshot,
   type ContractNotificationFire,
-} from './notificationDiffs';
-import { occurrenceKey, occurrenceFiredAt } from './occurrenceKey';
-import { projectContracts, projectionWording, PROJECTION_HORIZON_MS } from './projection';
+} from './index';
+import { occurrenceKey, occurrenceFiredAt } from '../occurrenceKey';
+import { projectContracts, projectionWording, PROJECTION_HORIZON_MS } from '../projection';
 
 const HOUR = 3_600_000;
 const T0 = 1_800_000_000_000;
