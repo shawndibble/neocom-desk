@@ -83,9 +83,9 @@ export function useUrlParams<S extends UrlParamSchema>(
 
   const [pending, setPending] = useState<Record<string, unknown>>({});
 
-  // The timer below fires after later renders — possibly after a tab switch
-  // changed the path — so it must write against the location as it is *then*,
-  // not as it was when the keystroke scheduled it.
+  // The timer below fires after later renders, so it reads the location as it
+  // is *then*, not as it was when the keystroke scheduled it (`flush` drops it
+  // if the path has changed since).
   const latest = useRef({ location, navigate, history, urlValues, pending });
   useLayoutEffect(() => {
     latest.current = { location, navigate, history, urlValues, pending };
@@ -112,7 +112,8 @@ export function useUrlParams<S extends UrlParamSchema>(
       startTransition(() => {
         setPending({});
         const { location: shown, navigate: go, history: router } = latest.current;
-        writeParams(currentLocation(router, shown), go, codecs, values, options);
+        const at = currentLocation(router, shown);
+        if (at !== null) writeParams(at, go, codecs, values, options);
       });
     },
     [codecs]
@@ -160,10 +161,15 @@ export function useUrlParams<S extends UrlParamSchema>(
  * renders the location before it until it commits; a write built on that —
  * a second pick, a Corp Wallet division switch's filter reset, a write after
  * Back — dropped what the history already holds. The history object updates
- * synchronously on push, replace and pop. A different page in flight keeps
- * the rendered location: a write never lands on a page it was not made on.
+ * synchronously on push, replace and pop. `null` while a different page is
+ * in flight: the write is dropped, never replaced over that navigation
+ * (which undid it). A router whose navigator has no live location writes on
+ * the rendered one, as before.
  */
-function currentLocation(router: ContextType<typeof NavigationContext>, shown: Location): Location {
+function currentLocation(
+  router: ContextType<typeof NavigationContext>,
+  shown: Location
+): Location | null {
   // BrowserRouter's and MemoryRouter's navigator is the history itself.
   const live = (router.navigator as { location?: Location }).location;
   if (live === undefined) return shown;
@@ -172,7 +178,7 @@ function currentLocation(router: ContextType<typeof NavigationContext>, shown: L
   const pathname = live.pathname.startsWith(basename)
     ? live.pathname.slice(basename.length) || '/'
     : live.pathname;
-  return trim(pathname) === trim(shown.pathname) ? { ...live, pathname: shown.pathname } : shown;
+  return trim(pathname) === trim(shown.pathname) ? { ...live, pathname: shown.pathname } : null;
 }
 
 function writeParams(

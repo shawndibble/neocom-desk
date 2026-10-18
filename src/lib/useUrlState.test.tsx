@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { Suspense, useMemo, useState } from 'react';
+import { Suspense, useLayoutEffect, useMemo, useState } from 'react';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {
@@ -456,11 +456,18 @@ describe('useRememberedUrlParams', () => {
 
 const IDS = orderedIdListParam();
 /** Holds every navigation's transition open until `release` runs: a slow page's render. */
-const hold: { promise: Promise<void> | null; release: () => void } = {
+const hold: {
+  promise: Promise<void> | null;
+  release: () => void;
+  /** Hold every move off this entry; unset, hold any move to a non-empty search. */
+  fromKey?: string;
+  shownKey?: string;
+} = {
   promise: null,
   release: () => {},
 };
-function holdNavigations() {
+function holdNavigations({ offShown = false } = {}) {
+  hold.fromKey = offShown ? hold.shownKey : undefined;
   hold.promise = new Promise((resolve) => {
     hold.release = () => {
       hold.promise = null;
@@ -469,9 +476,13 @@ function holdNavigations() {
   });
 }
 function HoldNavigation() {
-  const { search } = useLocation();
+  const { search, key } = useLocation();
+  const held = hold.fromKey === undefined ? search !== '' : key !== hold.fromKey;
   // Thrown, not `use`d: under `use` the held transition never landed after release.
-  if (search !== '' && hold.promise) throw hold.promise;
+  useLayoutEffect(() => {
+    hold.shownKey = key;
+  });
+  if (held && hold.promise) throw hold.promise;
   return null;
 }
 function Appending() {
@@ -562,8 +573,7 @@ describe('useUrlParam writes from two hooks', () => {
     await waitFor(() => expect(probe()).toBe('/p?a=1&b=1|REPLACE'));
   });
 
-  it('builds on where Back went, even while the write Back undid is still committing', async () => {
-    holdNavigations();
+  it('builds on where Back went while Back is still committing, never on the entry it left', async () => {
     const user = userEvent.setup();
     renderAt(
       '/p',
@@ -576,7 +586,11 @@ describe('useUrlParam writes from two hooks', () => {
       </>
     );
     await user.click(screen.getByRole('button', { name: 'push a' }));
+    expect(probe()).toBe('/p?a=1|PUSH');
+    // Back's own navigation is the slow one: `?a=1` stays on screen.
+    holdNavigations({ offShown: true });
     await user.click(screen.getByRole('button', { name: 'back' }));
+    expect(probe()).toBe('/p?a=1|PUSH');
     await user.click(screen.getByRole('button', { name: 'b false' }));
 
     await act(async () => hold.release());
