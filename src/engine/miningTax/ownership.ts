@@ -38,17 +38,15 @@ export function linesOwnedBy(
 
 /**
  * The Assignment later ore on this entry is routed to: the sole one, or the
- * one flagged `collectsGrowth` when there are several (an unpaid flagged one
- * ahead of a paid one). May be paid, in which case `computeOwnership` leaves
- * that growth unassigned; a new Assignment made from it then takes over as
- * collector (`createAssignment`). `undefined` for an unflagged split.
+ * one flagged `collectsGrowth` when there are several. May be paid, in which
+ * case `computeOwnership` leaves that growth unassigned; a new Assignment
+ * made from it then takes the flag over (`createAssignment`). `undefined`
+ * for an unflagged split.
  */
 export function growthCollector<T extends CoveringAssignment>(
   covering: readonly T[]
 ): T | undefined {
-  if (covering.length === 1) return covering[0];
-  const flagged = covering.filter((c) => c.collectsGrowth === true);
-  return flagged.find((c) => c.status !== 'paid') ?? flagged[0];
+  return covering.length === 1 ? covering[0] : covering.find((c) => c.collectsGrowth === true);
 }
 
 /**
@@ -73,8 +71,7 @@ export function growthCollector<T extends CoveringAssignment>(
  * - A **paid** Assignment never grows (paid stays paid, ADR 0024): ore that
  *   would have grown into it stays an unassigned residual, so the Tax tab
  *   offers it as a new, separately assignable row for the same day and
- *   system. Among several flagged collectors (a paid day whose late ore was
- *   assigned as a new collector, see `growthCollector`), an unpaid one wins.
+ *   system.
  *
  * A snapshot is never shrunk: an entry reporting *less* than an Assignment
  * holds (ESI settling, or a pilot-corrected line) leaves that Assignment's

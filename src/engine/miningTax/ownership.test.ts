@@ -181,18 +181,6 @@ describe('computeOwnership — a paid Assignment never grows (paid stays paid, A
     expect(result.unassigned).toEqual([{ typeId: A, quantity: 20 }]);
   });
 
-  it('lets an unpaid flagged collector take the growth over a paid one that is still flagged', () => {
-    // The day was paid, its late ore assigned as a new entry that now collects.
-    const entry: OreLine[] = [{ typeId: A, quantity: 180 }];
-    const result = computeOwnership(entry, [
-      paid('paid', [{ typeId: A, quantity: 100 }], true),
-      covering('after', [{ typeId: A, quantity: 50 }], true),
-    ]);
-    expect(result.ownedLines.get('paid')).toEqual([{ typeId: A, quantity: 100 }]);
-    expect(result.ownedLines.get('after')).toEqual([{ typeId: A, quantity: 80 }]);
-    expect(result.unassigned).toEqual([]);
-  });
-
   it('still lets a dismissed sole Assignment collect, so its growth flags for review', () => {
     const entry: OreLine[] = [{ typeId: A, quantity: 150 }];
     const result = computeOwnership(entry, [

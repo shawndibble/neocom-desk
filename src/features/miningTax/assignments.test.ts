@@ -168,9 +168,10 @@ describe("assigning a paid day's late ore (paid stays paid, ADR 0024)", () => {
     expect(await db.miningTaxAssignments.get('paid')).toEqual(paid);
   });
 
-  it('takes over from a paid flagged collector of a split too', async () => {
+  it('takes the flag over from a paid flagged collector of a split, leaving one collector', async () => {
+    const paid = paidDay({ collectsGrowth: true, oreLines: [{ typeId: TYPE_A, quantity: 60 }] });
     await db.miningTaxAssignments.bulkPut([
-      paidDay({ collectsGrowth: true, oreLines: [{ typeId: TYPE_A, quantity: 60 }] }),
+      paid,
       paidDay({
         id: 'other',
         payeeId: 'payee-2',
@@ -180,12 +181,19 @@ describe("assigning a paid day's late ore (paid stays paid, ADR 0024)", () => {
       }),
     ]);
 
-    const created = await createAssignment({
-      ...lateOre,
-      entryOreLines: [{ typeId: TYPE_A, quantity: 150 }],
-    });
+    const created = await createAssignment(lateOre);
 
     expect(created.collectsGrowth).toBe(true);
+    // Only the flag moves; the paid record's status, ore and tax stay as paid.
+    const stored = await db.miningTaxAssignments.get('paid');
+    expect(stored?.collectsGrowth).toBeUndefined();
+    expect(stored).toMatchObject({
+      status: 'paid',
+      paidAt: paid.paidAt,
+      oreLines: paid.oreLines,
+      estimatedValue: paid.estimatedValue,
+      taxOwed: paid.taxOwed,
+    });
   });
 
   it("leaves the flag off when the day's collector is not paid", async () => {

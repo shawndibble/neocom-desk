@@ -28,11 +28,18 @@ review". Dismissed growth still flags; unpaid growth is still absorbed.
   own Unassigned row.
 - **The entry made from a paid day's late ore takes over collecting.**
   `createAssignment` and `joinAssignments` set `collectsGrowth` on a new
-  Assignment when the entry's current collector is paid, and
-  `growthCollector` prefers an unpaid flagged collector over a paid one. So a
-  pilot still mining after paying gets one unpaid row that absorbs the rest
-  of the day, as unpaid growth always has, rather than a fresh Unassigned row
-  on every refresh. The paid record is never rewritten to hand the flag over.
+  Assignment when the entry's current collector is paid, and move it off a
+  paid record that carried it. So a pilot still mining after paying gets one
+  unpaid row that absorbs the rest of the day, as unpaid growth always has,
+  rather than a fresh Unassigned row on every refresh. The flag moves rather
+  than being added twice because `SplitDialog` and coalescing assume one
+  collector per entry; only the paid record's `collectsGrowth` changes, never
+  its status, ore or tax.
+- **Out of scope: a legacy unflagged split.** When the paid side is only a
+  type's sole claimant (no collector flag, a split made before the flag
+  existed), nothing is handed over. Its late ore is assignable, but further
+  growth on that type has two claimants and stays Unassigned, as legacy
+  splits already do for shared types.
 - **Already-flipped records are left as they are.** A paid Assignment that an
   earlier version already flipped to `needs-review` keeps its review and its
   Accept new total action; nothing migrates it.
