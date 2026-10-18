@@ -1535,7 +1535,7 @@ export const syncMarketOpenPrices = onSchedule(
     if (!found.final) {
       // Thrown, not returned, so the run fails and is retried.
       throw new Error(
-        `Market open prices: no final snapshot listed for ${date} yet (last listed: ${found.snapshot?.fileTime ?? 'none'})`
+        `Market open prices: no final snapshot listed for ${date} (last listed: ${found.snapshot?.fileTime ?? 'none'}); retried, and after the last retry the day has no point`
       );
     }
     const { url: snapshotUrl, fileTime } = found.snapshot;

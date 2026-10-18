@@ -23,7 +23,7 @@
 // skips that prompt for unattended runs). --dry-run is the default and is also
 // accepted explicitly.
 //
-// Do not run it while syncMarketOpenPrices may be running (00:45 to ~02:15 UTC,
+// Do not run it while syncMarketOpenPrices may be running (00:45 to ~03:00 UTC,
 // its retries included):
 // both do a non-transactional read-modify-write of the same documents.
 //

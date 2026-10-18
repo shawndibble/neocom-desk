@@ -28,7 +28,7 @@ export function parseIsBuy(value: string | undefined): boolean {
   throw new Error(`market-order snapshot has an unexpected is_buy_order value: ${String(value)}`);
 }
 
-function csvRows() {
+function snapshotCsvParser() {
   return parse({ skip_empty_lines: true, relax_column_count: true });
 }
 
@@ -37,7 +37,7 @@ export function foldOrdersCsv(csv: Readable, fold: OpenPriceFold): Promise<numbe
   // pipeline, not pipe: an error in the source (a dropped download, a corrupt
   // bzip2 block) destroys the parser with that error, so the loop rejects
   // instead of hanging or ending as if the file were complete.
-  const rows = csvRows();
+  const rows = snapshotCsvParser();
   pipeline(csv, rows, () => {});
   return foldRows(rows, fold);
 }
@@ -50,13 +50,16 @@ export function foldOrdersCsv(csv: Readable, fold: OpenPriceFold): Promise<numbe
  * MaxListenersExceededWarning on every run); one pipeline puts 9.
  */
 export function foldBz2Snapshot(compressed: Readable, fold: OpenPriceFold): Promise<number> {
-  const rows = csvRows();
+  const rows = snapshotCsvParser();
   pipeline(compressed, unbzip2Stream(), rows, () => {});
   return foldRows(rows, fold);
 }
 
 /** `rows` sits at the end of a pipeline, so destroying it tears the whole pipeline down. */
-async function foldRows(rows: ReturnType<typeof csvRows>, fold: OpenPriceFold): Promise<number> {
+async function foldRows(
+  rows: ReturnType<typeof snapshotCsvParser>,
+  fold: OpenPriceFold
+): Promise<number> {
   let columns: Record<(typeof REQUIRED_COLUMNS)[number], number> | null = null;
   let count = 0;
   for await (const row of rows as AsyncIterable<string[]>) {
