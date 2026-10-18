@@ -80,14 +80,7 @@ import {
   StateWord,
 } from './corpTaxBookParts';
 import { caretColumn, dayColumns, paymentColumns } from './corpTaxBookColumns';
-import {
-  MINING_PARAMS,
-  MOONS_PARAMS,
-  PHONE_GLOBALS,
-  isk,
-  isk2,
-  queueCounts,
-} from './corpTaxBookFormat';
+import { MINING_PARAMS, MOONS_PARAMS, PHONE_GLOBALS, isk, queueCounts } from './corpTaxBookFormat';
 
 /**
  * Corp Tax Book, the merged option (#4056), built on option A after Shawn's
@@ -1026,69 +1019,45 @@ function StatementMailPreview() {
           <span className="text-text-dim">Subject:</span> {m.subject}
         </p>
         <p>
-          Prices: {BOOK.hub} buy, {BOOK.oreForm} ore, on the day mined. Rate 10% (Member default
-          since {BOOK.rateFrom}). New lines in Sep 2026:
+          Hi {m.to}, here is your {CORP.name} moon tax Statement for Sep 2026.
         </p>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[46rem] tabular-nums">
-            <thead>
-              <tr className="text-left text-text-dim">
-                <th className="pr-3 font-normal">Day</th>
-                <th className="pr-3 font-normal">Refinery</th>
-                <th className="pr-3 font-normal">Ore</th>
-                <th className="pr-3 text-right font-normal">Quantity</th>
-                <th className="pr-3 text-right font-normal">Unit price</th>
-                <th className="pr-3 font-normal">Price date · source</th>
-                <th className="pr-3 text-right font-normal">Rate</th>
-                <th className="text-right font-normal">Tax</th>
+        <table className="w-full tabular-nums">
+          <thead>
+            <tr className="text-left text-text-dim">
+              <th className="pr-3 font-normal">Date</th>
+              <th className="pr-3 font-normal">Refinery</th>
+              <th className="pr-3 text-right font-normal">Mined value</th>
+              <th className="text-right font-normal">Tax</th>
+            </tr>
+          </thead>
+          <tbody>
+            {m.lines.map((r) => (
+              <tr key={r.id}>
+                <td className="pr-3">{r.date}</td>
+                <td className="pr-3">{r.refinery}</td>
+                <td className="pr-3 text-right">{isk(r.value)}</td>
+                <td className="text-right">{isk(r.tax)}</td>
               </tr>
-            </thead>
-            <tbody>
-              {m.lines.map((r) => (
-                <tr key={r.id}>
-                  <td className="pr-3">{r.date}</td>
-                  <td className="pr-3">{r.refinery}</td>
-                  <td className="pr-3">{r.ore}</td>
-                  <td className="pr-3 text-right">{r.units.toLocaleString('en')}</td>
-                  <td className="pr-3 text-right">{isk2(r.unitPrice)}</td>
-                  <td className="pr-3">
-                    {r.priceDate} · {r.priceSource}
-                  </td>
-                  <td className="pr-3 text-right">{r.rate}%</td>
-                  <td className="text-right">{isk(r.tax)}</td>
-                </tr>
-              ))}
-              <tr className="border-t border-line">
-                <td colSpan={7} className="pt-1 text-text-dim">
-                  Sep 2026 lines
-                </td>
-                <td className="pt-1 text-right">{isk(m.newTotal)}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <p className="tabular-nums">
-          Aug 2026 Statement (issued 1 Sep): {isk(m.augBilled)}
-          <br />
-          Payments credited, oldest debt first:
-          {m.payments.map((p) => (
-            <span key={p.id} className="block pl-3">
-              {p.date.slice(0, p.date.indexOf(' ', 3))} · {isk(p.amount)} from {p.from}
-              {p.notTax ? `, of which ${isk(p.notTax)} marked not tax` : ''}
-              {p.writtenOff ? `, +${isk(p.writtenOff)} written off within tolerance` : ''}
-            </span>
-          ))}
-          Carried from Aug 2026: {isk(m.carried)} · Credit: {isk(m.credit)}
-          <br />
-          <strong>
-            Balance due {isk(m.balance)} ISK ({isk(m.carried)} + {isk(m.newTotal)}), by {m.due}.
-          </strong>
-        </p>
+            ))}
+            <tr className="border-t border-line">
+              <td colSpan={3} className="pt-1 text-text-dim">
+                Total
+              </td>
+              <td className="pt-1 text-right">{isk(m.newTotal)}</td>
+            </tr>
+          </tbody>
+        </table>
         <p>
+          <strong>
+            Amount due {isk(m.balance)} ISK, by {m.due} (this total plus {isk(m.carried)} still
+            owed).
+          </strong>
+          <br />
           Donate to {CORP.name}; any of your characters counts. Code {m.code} pins it to this
           Statement.
           <br />
-          Check every line: <span className="text-accent underline">{m.verify}</span>
+          The link has every line&apos;s pricing, terms and payments:{' '}
+          <span className="text-accent underline">{m.verify}</span>
         </p>
       </div>
     </NewComponent>
@@ -1319,7 +1288,7 @@ export const Statements = corp(() => <StatementsF step="check" />);
 /** @summary 10 · Statements, phone. */
 export const StatementsPhone = corp(() => <StatementsF step="check" />, true);
 
-/** @summary 11 · Preview mail: the Statement exactly as mailed, every line, in a dialog. New component: StatementMailPreview. */
+/** @summary 11 · Preview mail: the short Statement mail (date, refinery, mined value, tax, total, code, verify link), in a dialog. New component: StatementMailPreview. */
 export const PreviewMail = corp(() => <StatementsF step="check" preview />);
 /** @summary 11 · Preview mail, phone: a full-height sheet. */
 export const PreviewMailPhone = corp(() => <StatementsF step="check" preview />, true);

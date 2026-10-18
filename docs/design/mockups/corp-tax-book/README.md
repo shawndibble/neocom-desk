@@ -18,7 +18,7 @@ New components (dashed, labelled): ExtractionTimeline, NeedsYouQueue, StatementR
 | 8 · Reject declaration dialog (Needs you) | ![](f-08-reject-declaration-1440.png) | ![](f-08-reject-declaration-390.png) |
 | 9 · Assign a donation dialog (Needs you, Unmatched) | ![](f-09-assign-donation-1440.png) | ![](f-09-assign-donation-390.png) |
 | 10 · Statements: run at Check, periods and write-offs | ![](f-10-statements-1440.png) | ![](f-10-statements-390.png) |
-| 11 · Preview mail (dialog): every line, payments, credit, code, verify link | ![](f-11-preview-mail-1440.png) | ![](f-11-preview-mail-390.png) |
+| 11 · Preview mail (dialog): short table of lines, total, amount due, code, verify link | ![](f-11-preview-mail-1440.png) | ![](f-11-preview-mail-390.png) |
 | 12 · Send, mail-limit notice | ![](f-12-send-notice-1440.png) | ![](f-12-send-notice-390.png) |
 | 13 · Progress chip (phone: icon + % badge, warning badge for failures) | ![](f-13-progress-chip-1440.png) | ![](f-13-progress-chip-390.png) |
 | 14 · Queue popover / sheet | ![](f-14-queue-1440.png) | ![](f-14-queue-390.png) |
