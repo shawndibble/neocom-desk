@@ -44,6 +44,7 @@ import { useRequestBadgePoll } from '@/features/communities/requestBadge';
 import { useAlertBadge } from '@/features/notifications/useUnreadAlertCount';
 import { barTabs, NAV_LABEL_KEYS, useMobileTabs } from '@/lib/mobileTabs';
 import { CorpGrantPrompt } from '@/features/corp/CorpGrantPrompt';
+import { MailQueueMount } from '@/features/corpTaxBook/MailQueueMount';
 import { InstallPrompt } from './InstallPrompt';
 import { CommandPaletteHost } from '@/features/commandPalette/CommandPaletteHost';
 import { NAV_LOCK_PATHS } from './navDestinations';
@@ -404,6 +405,8 @@ export const Layout = memo(function Layout() {
           </aside>
 
           <main className="min-w-0 flex-1 px-2 py-4 pb-[max(calc(5rem_+_env(safe-area-inset-bottom)),var(--compare-drawer-space,0px))] md:px-4 md:pb-[max(1rem,var(--compare-drawer-space,0px))]">
+            {/* Corp Tax Book send queue (D16): only while mail is queued. */}
+            <MailQueueMount />
             <OfflineBanner />
             <AlertCharacterSwitch />
             <AuthFailureNotice />

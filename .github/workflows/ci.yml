@@ -110,6 +110,8 @@ jobs:
             ~/.npm/_npx
             ~/.cache/firebase
           key: firebase-tools-14.27.0-${{ runner.os }}
+      # The Corp Tax Book callable tests (functions/) run in the same emulator session.
+      - run: npm ci --prefix functions
       - run: npm run test:rules
 
   # The name the `main` ruleset requires. See the `e2e` job below for the full
