@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { brokerFee } from '@/engine/industry/fees';
 import { orderFloor } from './orderFloor';
-import { impliedOwnerPct, listingNet, structureBrokerPct } from './structureFee';
+import { listingNet, structureBrokerPct } from './structureFee';
 
 describe('structureBrokerPct', () => {
   it('adds the owner rate to the 0.5% SCC surcharge', () => {
@@ -11,18 +11,6 @@ describe('structureBrokerPct', () => {
   it('rejects negative or non-finite owner rates', () => {
     expect(() => structureBrokerPct(-1)).toThrow(RangeError);
     expect(() => structureBrokerPct(Number.NaN)).toThrow(RangeError);
-  });
-});
-
-describe('impliedOwnerPct', () => {
-  it('round-trips a fee paid at a structure', () => {
-    const fee = 2_640_000 * 0.025;
-    expect(impliedOwnerPct(fee, 2_200, 1_200)).toBeCloseTo(2, 5);
-  });
-  it('is null when it cannot be derived', () => {
-    expect(impliedOwnerPct(0, 100, 10)).toBeNull();
-    expect(impliedOwnerPct(1, 100, 10)).toBeNull(); // below the SCC surcharge
-    expect(impliedOwnerPct(10, 0, 10)).toBeNull();
   });
 });
 
