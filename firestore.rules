@@ -233,6 +233,14 @@ service cloud.firestore {
       allow read: if request.auth != null;
       allow write: if false;
     }
+    // Daily open (end-of-UTC-day) best buy and best sell per Trade Hub region
+    // and type, doc id `<regionId>_<typeId>` (decision 20261018-121126), for the
+    // price-history chart. Public market data, so readable by anyone; written
+    // only by syncMarketOpenPrices and the one-off backfill (admin privileges).
+    match /marketOpenPrices/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
     // Public contract search (issues #608, #906, ADR 0013): one of the two
     // top-level collections that aren't per-Character sync data — the other is
     // publicCourierContracts just below, fed by the same job. Written only
