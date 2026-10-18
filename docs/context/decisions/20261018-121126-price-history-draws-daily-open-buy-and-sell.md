@@ -39,4 +39,3 @@ _Recorded 2026-10-18._
   overlay it.
 - **Cost:** `syncMarketOpenPrices` is one more Cloud Scheduler job past the free
   three (eleven scheduled functions in the deployment).
-
