@@ -18,8 +18,7 @@ import {
   conditionalFetch,
   loadWithCache,
   loadWithCacheStatus,
-  GLOBAL_CACHE_CHARACTER_ID,
-  STALE_AFTER,
+  loadStaticEntity,
   type CachedResult,
   type StatusResult,
 } from '@/esi/cache';
@@ -147,9 +146,7 @@ function sleep(ms: number): Promise<void> {
  * never even fired: `loadUniverseTypeOnce` returned a truthy (if
  * wrong-shaped) result on the very first pass.
  */
-function universeTypeCacheKey(typeId: number): string {
-  return `universeType:${typeId}`;
-}
+const UNIVERSE_TYPE_PREFIX = 'universeType';
 
 /**
  * One cache-first, ETag-revalidated read of a type (no retry, no delay):
@@ -159,17 +156,9 @@ function universeTypeCacheKey(typeId: number): string {
  * attributes or volume use `typeDetail.ts` (baked first).
  */
 export function loadUniverseTypeOnce(typeId: number): Promise<CachedResult<UniverseType> | null> {
-  const { fetchLive, conditional } = conditionalFetch((options) =>
-    getUniverseType(typeId, options)
-  );
-  return loadWithCache(
-    GLOBAL_CACHE_CHARACTER_ID,
-    universeTypeCacheKey(typeId),
-    fetchLive,
-    // An item type's name, description and dogma attributes change only when
-    // CCP patches them — not on the app's 10-minute cadence.
-    { staleAfterMs: STALE_AFTER.static, conditional }
-  );
+  // An item type's name, description and dogma attributes change only when
+  // CCP patches them — not on the app's 10-minute cadence.
+  return loadStaticEntity(UNIVERSE_TYPE_PREFIX, typeId, getUniverseType);
 }
 
 /**

@@ -5,13 +5,13 @@
 // newer CCP build for days, so the run fails and files an issue.
 
 import { readFile } from 'node:fs/promises';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
+import { USER_AGENT } from './lib/constants.mjs';
+import { SCRIPTS_DIR } from './lib/paths.mjs';
 import { resolveLatestUrl } from './lib/ccpStaticData.mjs';
 import { ccpBuildFromZipUrl, fetchFuzzworkDump, sdeUpdateDecision } from './lib/sdeBuild.mjs';
 
-const USER_AGENT = 'Neocom Desk (github.com/shawndibble/neocom-desk)';
-const STAMP = join(dirname(fileURLToPath(import.meta.url)), 'sde-build.json');
+const STAMP = join(SCRIPTS_DIR, 'sde-build.json');
 
 const baked = await readFile(STAMP, 'utf8')
   .then((text) => JSON.parse(text).ccpBuild)

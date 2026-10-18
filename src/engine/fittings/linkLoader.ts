@@ -12,7 +12,7 @@
  * slot information at all, and a killmail's flag says which slot but not
  * whether the item is a module or the charge loaded in it.
  */
-import { MAX_SLOTS_PER_CATEGORY } from '@/engine/fitting/fittingShare';
+import { MAX_SLOTS_PER_CATEGORY } from '@/engine/fittings/fittingShare';
 import type { EftSlotLookup } from './eftLoader';
 import type { LoadParts, LoadWarning, LoadWarningKind } from './load';
 import {

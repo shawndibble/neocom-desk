@@ -1,5 +1,6 @@
 /** "Modules that differ": one row per module type not shared identically across every compared Fitting. */
 import { useTranslation } from 'react-i18next';
+import { typeNameOr } from '@/lib/typeNameOr';
 import { TypeIcon } from '@/components/ui';
 import {
   COMPARE_TABLE_CLASS,
@@ -46,7 +47,7 @@ export function FittingCompareModulesSummary({
               <span className="flex items-center gap-2">
                 <TypeIcon typeId={entry.typeId} size={32} className="h-4 w-4 shrink-0" />
                 <span className="min-w-0 flex-1 [overflow-wrap:anywhere] sm:truncate">
-                  {names.get(entry.typeId) ?? t('common.unknownType', { id: entry.typeId })}
+                  {typeNameOr(t, names.get(entry.typeId), entry.typeId)}
                 </span>
               </span>
             </td>

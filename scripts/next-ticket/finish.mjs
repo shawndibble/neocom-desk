@@ -10,7 +10,7 @@
 //   {"status":"merged","issueClosed":true}
 //   {"status":"merge-failed","message":"..."}
 
-import { run, gh, ghJson, tryRun, printResult } from './lib.mjs';
+import { run, gh, ghJson, tryRun, printResult, sleepSync } from './lib.mjs';
 
 const [, , prArg, issueArg, worktreePath] = process.argv;
 if (!prArg || !issueArg || !worktreePath) {
@@ -34,10 +34,6 @@ if (!merge.ok) {
   }
 }
 
-function sleep(ms) {
-  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
-}
-
 let issueClosed = false;
 for (let i = 0; i < 5; i++) {
   const state = ghJson(['issue', 'view', issueArg, '--json', 'state']).state;
@@ -45,7 +41,7 @@ for (let i = 0; i < 5; i++) {
     issueClosed = true;
     break;
   }
-  sleep(2000);
+  sleepSync(2000);
 }
 
 if (!issueClosed) {

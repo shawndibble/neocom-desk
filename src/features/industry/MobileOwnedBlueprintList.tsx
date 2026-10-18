@@ -14,6 +14,7 @@ import { IskAmount, TypeIcon, sortRows } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { BlueprintBadge } from '@/features/character/assetBrowserRows';
 import { iskToneClass } from '@/features/character/format';
+import { ME_MAX, TE_MAX } from '@/engine/industry/efficiency';
 import { cx } from '@/lib/cx';
 import { useUrlSort } from '@/lib/useUrlState';
 import type { BlueprintCatalogEntry } from './blueprintCatalog';
@@ -41,9 +42,7 @@ interface MobileOwnedBlueprintListProps {
 type SortFieldId = 'blueprint' | 'iskPerHour' | 'me' | 'te' | 'runs';
 const SORT_FIELD_ORDER: readonly SortFieldId[] = ['blueprint', 'iskPerHour', 'me', 'te', 'runs'];
 
-/** ME researches to 10, TE to 20 — each meter is ten segments of its own scale. */
-const ME_MAX = 10;
-const TE_MAX = 20;
+/** Each meter is ten segments of its own scale (ME to `ME_MAX`, TE to `TE_MAX`). */
 const METER_SEGMENTS = 10;
 
 const identicalRowKey = (row: OwnedBlueprintRow) =>

@@ -6,6 +6,7 @@ import {
   needsAttentionCount,
   notCheckedCount,
   openOrderProblemCounts,
+  ownOrderIdSet,
   type BuildRowsInput,
   type OpenOrderRow,
   type CharacterSkills,
@@ -876,5 +877,22 @@ describe('buildOpenOrderRows — player-structure broker fee (issue #2911)', () 
     const npc = firstRow(at());
     const zero = firstRow(at({ structureFees: { [STRUCTURE_ID]: 0 } }));
     expect(zero.floor!.relist).not.toBe(npc.floor!.relist);
+  });
+});
+
+describe('ownOrderIdSet', () => {
+  it('collects order ids across every character', () => {
+    const snapshot = {
+      entries: [
+        { characterId: 1, orders: [{ order_id: 10 }, { order_id: 11 }] },
+        { characterId: 2, orders: [{ order_id: 20 }] },
+      ],
+      skipped: [],
+    } as unknown as OpenOrdersSnapshot;
+    expect([...ownOrderIdSet(snapshot)].sort()).toEqual([10, 11, 20]);
+  });
+
+  it('is empty for an empty snapshot', () => {
+    expect(ownOrderIdSet({ entries: [], skipped: [] }).size).toBe(0);
   });
 });
