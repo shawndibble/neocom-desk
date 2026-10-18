@@ -82,6 +82,11 @@ async function securityLookupFor(
   return systems ? (systemId) => systems.get(systemId)?.security : undefined;
 }
 
+/** The jump graph and the security lookup one search under `rules` needs. */
+function loadSearchContext(rules: LocalRouteRules) {
+  return Promise.all([loadJumpGraph(), securityLookupFor(rules.preference ?? 'shortest')]);
+}
+
 /**
  * The stargate route between two solar systems under one preference.
  *
@@ -97,10 +102,7 @@ export async function findLocalRoute(
   rules: LocalRouteRules = {},
   extras: RouteGraphExtras = {}
 ): Promise<LocalRouteResult> {
-  const [graph, securityOf] = await Promise.all([
-    loadJumpGraph(),
-    securityLookupFor(rules.preference ?? 'shortest'),
-  ]);
+  const [graph, securityOf] = await loadSearchContext(rules);
   if (!graph) return { kind: 'unknown' };
   return findFlownRoute(
     graph,
@@ -146,10 +148,7 @@ export async function localJumpDistances(
   rules: LocalRouteRules = {},
   extras: RouteGraphExtras = {}
 ): Promise<LocalJumpDistances> {
-  const [graph, securityOf] = await Promise.all([
-    loadJumpGraph(),
-    securityLookupFor(rules.preference ?? 'shortest'),
-  ]);
+  const [graph, securityOf] = await loadSearchContext(rules);
   if (!graph) return { kind: 'unknown' };
   return {
     kind: 'known',
@@ -176,10 +175,7 @@ export async function localJumpCountsForRoutes(
   rules: LocalRouteRules = {},
   extras: RouteGraphExtras = {}
 ): Promise<LocalJumpCounts> {
-  const [graph, securityOf] = await Promise.all([
-    loadJumpGraph(),
-    securityLookupFor(rules.preference ?? 'shortest'),
-  ]);
+  const [graph, securityOf] = await loadSearchContext(rules);
   if (!graph) return { kind: 'unknown' };
   return {
     kind: 'known',
@@ -208,10 +204,7 @@ export async function planLocalTrip(
   tripOptions: TripOptions = {},
   extras: RouteGraphExtras = {}
 ): Promise<LocalTripResult> {
-  const [graph, securityOf] = await Promise.all([
-    loadJumpGraph(),
-    securityLookupFor(rules.preference ?? 'shortest'),
-  ]);
+  const [graph, securityOf] = await loadSearchContext(rules);
   if (!graph) return { kind: 'unknown' };
   const options = engineOptions(rules, securityOf, extras);
   return {

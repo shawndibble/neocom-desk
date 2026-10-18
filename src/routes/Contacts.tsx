@@ -42,7 +42,7 @@ import {
   contactsCharacterColumnsStore,
   type ContactsAcrossColumnId,
   type ContactsCharacterColumnId,
-} from './contactsColumns';
+} from '@/features/character/contactsColumns';
 import { GrantBanner } from '@/app/GrantNote';
 import { ReauthCachedNote } from '@/app/ReauthCachedNote';
 import { contactLabelNames, loadContactLabels, loadContacts } from '@/features/character/contacts';

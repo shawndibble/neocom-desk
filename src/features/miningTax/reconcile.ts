@@ -5,19 +5,25 @@
  * was assigned or last resolved. For a *sole* Assignment on an entry, "more
  * ore" includes a brand-new ore type that shows up mid-session — a
  * continuous mining session folds into the one existing Assignment instead
- * of spawning a second, separately-assignable row (`linesOwnedByAssignment`,
- * rowStatus.ts). A *split* entry (2+ Assignments) keeps the narrower
- * per-type check, since a brand-new type has no obvious owner among several
- * Payees. Never silently absorbed into `oreLines` either way (decision doc)
+ * of spawning a second, separately-assignable row (`computeOwnership`,
+ * engine/miningTax/ownership.ts). A *split* entry (2+ Assignments) keeps the
+ * narrower per-type check, since a brand-new type has no obvious owner among
+ * several Payees. Never silently absorbed into `oreLines` either way (decision doc)
  * — only `status`/`reviewDiff` move; `planNeedsReviewResolution` (assignments.ts) is
  * the one place `oreLines` itself re-snapshots.
+ *
+ * Paid stays paid (ADR 0024): a paid Assignment is never diffed against more
+ * than its own snapshot, because `computeOwnership` never grows one. Its
+ * growth is left unassigned instead, and the Tax tab shows it as a new,
+ * separately assignable row for the same day and system, so its status, ore
+ * and tax never move here. Combined members and split sides alike.
  *
  * Unpaid growth skips the flag: it is absorbed straight into the Assignment
  * (`planNeedsReviewResolution`), since an unsettled obligation has no paid history to
  * protect. That includes a member of a combined entry — a session that crossed
  * midnight UTC is usually combined while the second day is still growing
- * (scope decision 20261004, "combined entries absorb unpaid growth"). Paid and
- * dismissed growth still flags.
+ * (scope decision 20261004, "combined entries absorb unpaid growth"). Dismissed
+ * growth still flags.
  *
  * Run once per character after loading its fresh ledger (see
  * `snapshot.ts`), not on every render — `sameDiffs` skips the write (and the
