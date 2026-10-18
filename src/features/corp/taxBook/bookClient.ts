@@ -8,12 +8,22 @@
  * Firestore here is the `lite` build (no listeners), so callers refetch after
  * a change.
  */
-import { collection, doc, getDoc, getDocs } from 'firebase/firestore/lite';
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  limit as limitTo,
+  orderBy,
+  query,
+} from 'firebase/firestore/lite';
 import { httpsCallable } from 'firebase/functions';
 import { getValidAccessToken } from '@/auth/session';
 import type { Miner } from '@/engine/corpTaxBook/charges';
 import type { Dismissal } from '@/engine/corpTaxBook/dismissals';
-import type { Statement } from '@/engine/corpTaxBook/statements';
+import type { Declaration } from '@/engine/corpTaxBook/overdue';
+import type { TaxRate } from '@/engine/corpTaxBook/rates';
+import type { Adjustment, Statement, StatementCadence } from '@/engine/corpTaxBook/statements';
 import type {
   JournalDonation,
   LastSync,
@@ -169,4 +179,154 @@ export async function readBookState(
     extractions,
     paidStatementIds: new Set((paid.data()?.ids as string[] | undefined) ?? []),
   };
+}
+
+// --- The whole book, for /corp/moons (issue #4063) --------------------------
+
+/** Every setting the Settings dialog edits, as the book document stores it. */
+export interface BookSettings extends BookSummary {
+  hubId: string;
+  oreForm: 'compressed' | 'raw';
+  graceHours: number;
+  minimumStatement: number;
+  overdueDays: number;
+  cadence: StatementCadence;
+  chunkM3PerHour: number | null;
+  rates: TaxRate[];
+  /** Above this a dismissal needs a Director (D6); null when there is no limit. */
+  dismissApprovalAboveIsk: number | null;
+  ownerCharacterId: number | null;
+}
+
+/** The book's settings document, or null when the corporation has none. */
+export async function readBookSettings(
+  characterId: number,
+  corporationId: number
+): Promise<BookSettings | null> {
+  await ensureSignedIn(characterId);
+  const snap = await getDoc(doc(getSyncFirestore(), 'corpTaxBooks', String(corporationId)));
+  return snap.exists() ? settingsFrom(snap.data()) : null;
+}
+
+function settingsFrom(d: Record<string, unknown>): BookSettings {
+  const num = (v: unknown, fallback: number) => (typeof v === 'number' ? v : fallback);
+  return {
+    active: d.active === true,
+    startDate: String(d.startDate ?? ''),
+    divisions: Array.isArray(d.divisions) ? (d.divisions as number[]) : [1],
+    lastSync: (d.lastSync as LastSync | null | undefined) ?? null,
+    structureExpiryHours: (d.structureExpiryHours as Record<string, number> | undefined) ?? {},
+    hubId: typeof d.hubId === 'string' ? d.hubId : 'jita',
+    oreForm: d.oreForm === 'raw' ? 'raw' : 'compressed',
+    graceHours: num(d.graceHours, 6),
+    minimumStatement: num(d.minimumStatement, 5_000_000),
+    overdueDays: num(d.overdueDays, 14),
+    cadence: (d.cadence as StatementCadence | undefined) ?? { kind: 'monthly' },
+    chunkM3PerHour: typeof d.chunkM3PerHour === 'number' ? d.chunkM3PerHour : null,
+    rates: Array.isArray(d.rates) ? (d.rates as TaxRate[]) : [],
+    dismissApprovalAboveIsk:
+      typeof d.dismissApprovalAboveIsk === 'number' ? d.dismissApprovalAboveIsk : null,
+    ownerCharacterId: typeof d.ownerCharacterId === 'number' ? d.ownerCharacterId : null,
+  };
+}
+
+/** Everything `/corp/moons` renders from. Officer-only: verify first. */
+export interface BookData {
+  settings: BookSettings;
+  state: BookState;
+  observed: ObservedRow[];
+  declarations: Declaration[];
+  adjustments: Adjustment[];
+}
+
+export async function readBookData(
+  characterId: number,
+  corporationId: number
+): Promise<BookData | null> {
+  const settings = await readBookSettings(characterId, corporationId);
+  if (!settings) return null;
+  const root = (name: string) =>
+    collection(getSyncFirestore(), 'corpTaxBooks', String(corporationId), name);
+  const list = async <T>(name: string): Promise<T[]> =>
+    (await getDocs(root(name))).docs.map((d) => d.data() as T);
+  const [
+    miners,
+    statements,
+    payments,
+    dismissals,
+    extractions,
+    paid,
+    observed,
+    declarations,
+    adjustments,
+  ] = await Promise.all([
+    list<Miner>('miners'),
+    list<Statement>('statements'),
+    list<SettlePayment>('payments'),
+    list<Dismissal>('dismissals'),
+    list<SyncExtraction>('extractions'),
+    getDoc(doc(getSyncFirestore(), 'corpTaxBooks', String(corporationId), 'meta', 'paid')),
+    list<ObservedRow>('observed'),
+    list<Declaration>('declarations'),
+    list<Adjustment>('adjustments'),
+  ]);
+  return {
+    settings,
+    state: {
+      book: settings,
+      miners,
+      statements,
+      payments,
+      dismissals,
+      extractions,
+      paidStatementIds: new Set((paid.data()?.ids as string[] | undefined) ?? []),
+    },
+    observed,
+    declarations,
+    adjustments,
+  };
+}
+
+/** One audit-log entry (D7): who did what, when. */
+export interface AuditEntry {
+  id: string;
+  at: number;
+  by: number | null;
+  byName: string;
+  via?: string;
+  action: string;
+  detail: Record<string, unknown>;
+}
+
+/** The newest entries of the immutable audit log; its ids sort by time. */
+export async function readAudit(
+  characterId: number,
+  corporationId: number,
+  count = 100
+): Promise<AuditEntry[]> {
+  await ensureSignedIn(characterId);
+  const snap = await getDocs(
+    query(
+      collection(getSyncFirestore(), 'corpTaxBooks', String(corporationId), 'audit'),
+      orderBy('at', 'desc'),
+      limitTo(count)
+    )
+  );
+  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<AuditEntry, 'id'>) }));
+}
+
+/** Turns the book on (a Director's act, D10): the start date and the corp default rate. */
+export async function turnOnBook(
+  characterId: number,
+  corporationId: number,
+  startDate: string,
+  startRatePct: number
+): Promise<void> {
+  const accessToken = await getValidAccessToken(characterId);
+  await call(characterId, 'turnOnCorpTaxBookCallable', {
+    corporationId,
+    accessToken,
+    startDate,
+    startRatePct,
+  });
 }
