@@ -30,7 +30,16 @@ interface AppraisalHeaderStatsProps {
   netAtFullMarket?: boolean;
 }
 
-function Group({ title, children }: { title: string; children: ReactNode }) {
+function Group({
+  title,
+  children,
+  footer,
+}: {
+  title: string;
+  children: ReactNode;
+  /** Pinned to the foot of the box, however tall its grid row stretches it. */
+  footer?: ReactNode;
+}) {
   return (
     <section
       aria-label={title}
@@ -44,6 +53,7 @@ function Group({ title, children }: { title: string; children: ReactNode }) {
       <div className="flex min-w-0 flex-col [&>span]:w-full [&>span>span:last-child]:ml-auto">
         {children}
       </div>
+      {footer && <div className="mt-auto pt-1">{footer}</div>}
     </section>
   );
 }
@@ -77,7 +87,16 @@ export function AppraisalHeaderStats({
   return (
     <div className="grid w-full grid-cols-[repeat(auto-fit,minmax(min(100%,12rem),1fr))] gap-2">
       {net && (
-        <Group title={t('market.appraisal.groupYouGet')}>
+        <Group
+          title={t('market.appraisal.groupYouGet')}
+          footer={
+            netAtFullMarket && (
+              <p className="text-[0.6875rem] text-text-dim">
+                {t('market.appraisal.netAlwaysAt100Note')}
+              </p>
+            )
+          }
+        >
           <StatChip
             label={`${t('market.appraisal.instantNet')}${mark}`}
             emphasis
@@ -100,11 +119,6 @@ export function AppraisalHeaderStats({
               broker: net.brokerFeePct.toFixed(2),
             })}
           />
-          {netAtFullMarket && (
-            <p className="mt-auto pt-1 text-[0.6875rem] text-text-dim">
-              {t('market.appraisal.netAlwaysAt100Note')}
-            </p>
-          )}
         </Group>
       )}
       <Group title={t('market.appraisal.groupWorth')}>
