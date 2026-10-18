@@ -87,7 +87,12 @@ export function PermissionsPanel() {
   }
 
   function statusOf(group: ScopeGroup): RowStatus {
-    if (group === 'corp') return CORP_STATUS[corp.state];
+    if (group === 'corp') {
+      // `ready` can still lack an additive capability's scope (issue #4058,
+      // `corpScopes.ts`); this row is the durable way to grant it.
+      if (corp.state === 'ready' && corp.missingScopes.length > 0) return 'missing';
+      return CORP_STATUS[corp.state];
+    }
     if (granted === undefined) return 'checking';
     return isPermissionGranted(group, granted) ? 'granted' : 'missing';
   }

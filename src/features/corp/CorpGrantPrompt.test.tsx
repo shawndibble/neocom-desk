@@ -92,6 +92,30 @@ describe('CorpGrantPrompt — when it appears', () => {
     expect(prompt()).not.toBeInTheDocument();
   });
 
+  /**
+   * Issue #4058: an Accountant whose corp grant predates the mining scope is
+   * still `ready` (their wallet keeps working) but is offered the grant, so
+   * the mining ledger can open — and only once, like every other offer.
+   */
+  it('offers the grant to a ready Accountant missing only the mining-ledger scope', async () => {
+    mockedGrantedScopes.mockReturnValue([
+      ROLES_SCOPE,
+      'esi-wallet.read_corporation_wallets.v1',
+      'esi-corporations.read_divisions.v1',
+    ]);
+    mockedLoadRoles.mockResolvedValue(rolesResolvingTo(['Accountant']));
+    const { unmount } = render(<CorpGrantPrompt />);
+    await waitFor(() => expect(prompt()).toBeInTheDocument());
+
+    await userEvent.click(screen.getByRole('button', { name: /not now/i }));
+    await waitFor(() => expect(prompt()).not.toBeInTheDocument());
+    unmount();
+    useGrantPromptDismissals.setState({ value: NO_DISMISSALS, hydrated: false });
+    render(<CorpGrantPrompt />);
+    await waitFor(() => expect(useGrantPromptDismissals.getState().hydrated).toBe(true));
+    expect(prompt()).not.toBeInTheDocument();
+  });
+
   it('stays away once the grant is already in place', async () => {
     mockedGrantedScopes.mockReturnValue(ALL_CORP_SCOPES);
     render(<CorpGrantPrompt />);

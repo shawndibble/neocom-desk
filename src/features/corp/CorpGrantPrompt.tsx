@@ -16,6 +16,11 @@
  * grows later (round 41), the recorded offer no longer covers it and the
  * prompt is eligible again — the Settings Corporation Permission row is the durable path
  * back regardless.
+ *
+ * Also offered to a `ready` Character still short of an additive
+ * capability's scope (issue #4058, `corpScopes.ts`): an Accountant whose
+ * grant predates the mining scope keeps their corp wallet and is asked once
+ * for the rest, under the same offer record.
  */
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -61,11 +66,15 @@ export function CorpGrantPrompt() {
 
   // `unknown` renders as nothing, exactly as everywhere else corp state is
   // read: a banner that flickers in on a cold load is worse than one a beat
-  // late, and `none`/`ready` have nothing to offer.
+  // late, `none` has nothing to offer, and neither has `ready` unless an
+  // additive capability's scope is still missing.
+  const offerable =
+    access.state === 'roles-without-grant' ||
+    (access.state === 'ready' && access.missingScopes.length > 0);
   const eligible =
     hydrated &&
     activeCharacterId !== null &&
-    access.state === 'roles-without-grant' &&
+    offerable &&
     !isGrantPromptDismissed(dismissals, activeCharacterId, CORP_GROUP_SCOPES);
   // Eligibility above is unchanged; this only decides whether the shared
   // bottom slot is this banner's to use right now (issue #1124).
@@ -78,8 +87,8 @@ export function CorpGrantPrompt() {
   useStickyClearance(bannerRef, 'onboarding-banner', { enabled: shown });
   if (!shown) return null;
   // Restated rather than derived from `eligible`: a boolean carries none of
-  // the narrowing the render below needs from these two.
-  if (activeCharacterId === null || access.state !== 'roles-without-grant') return null;
+  // the narrowing the render below needs.
+  if (activeCharacterId === null) return null;
 
   const remember = () =>
     setDismissals(withGrantPromptDismissed(dismissals, activeCharacterId, CORP_GROUP_SCOPES));

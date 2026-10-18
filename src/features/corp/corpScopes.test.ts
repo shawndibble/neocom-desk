@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { CORP_CAPABILITIES, corpCapabilities } from '@/engine/corpRoles';
 import { SCOPES, scopesForGroup } from '@/esi/scopes';
-import { CORP_SCOPES_FOR_CAPABILITY, missingCorpScopes } from './corpScopes';
+import { CORP_SCOPES_FOR_CAPABILITY, corpGrantCoverage, missingCorpScopes } from './corpScopes';
 
 /** Nothing granted, so "missing" is the full required set — the shape most tests want. */
 const requiredFor = (roles: readonly string[]) => missingCorpScopes(corpCapabilities(roles), []);
@@ -96,7 +96,7 @@ describe('missingCorpScopes', () => {
    */
   it('still reports the divisions scope when only the wallet scope is granted', () => {
     expect(
-      missingCorpScopes(corpCapabilities(['Accountant']), [
+      missingCorpScopes(corpCapabilities(['Junior_Accountant']), [
         'esi-wallet.read_corporation_wallets.v1',
       ])
     ).toEqual(['esi-corporations.read_divisions.v1']);
@@ -156,5 +156,73 @@ describe('missingCorpScopes', () => {
     expect(
       requiredFor(['Director']).filter((scope) => scope === 'esi-corporations.read_divisions.v1')
     ).toHaveLength(1);
+  });
+});
+
+const MINING = 'esi-industry.read_corporation_mining.v1';
+const WALLET_SCOPES = [
+  'esi-wallet.read_corporation_wallets.v1',
+  'esi-corporations.read_divisions.v1',
+];
+
+describe('corpGrantCoverage', () => {
+  it('claims the corp mining scope for the mining ledger', () => {
+    expect(CORP_SCOPES_FOR_CAPABILITY.canReadMiningLedger).toEqual([MINING]);
+  });
+
+  /**
+   * The re-grant path issue #4058 settles. An Accountant who granted the corp
+   * group before #327 added the mining scope holds every scope the wallet
+   * needs and none the ledger does. Claiming the scope for the ledger must
+   * not take their wallet away: the grant is still asked for, but nothing
+   * already readable hides while it is.
+   */
+  it('asks for an additive capability’s scope without blocking the rest', () => {
+    const coverage = corpGrantCoverage(corpCapabilities(['Accountant']), WALLET_SCOPES);
+    expect(coverage.missingScopes).toEqual([MINING]);
+    expect(coverage.blocking).toBe(false);
+    expect(coverage.capabilities.canReadWallet).toBe(true);
+    // Unreadable until granted, so nothing reads the ledger into a 403.
+    expect(coverage.capabilities.canReadMiningLedger).toBe(false);
+  });
+
+  it('turns the additive capability on once its scope is granted', () => {
+    const coverage = corpGrantCoverage(corpCapabilities(['Accountant']), [
+      ...WALLET_SCOPES,
+      MINING,
+    ]);
+    expect(coverage).toEqual({
+      missingScopes: [],
+      blocking: false,
+      capabilities: corpCapabilities(['Accountant']),
+    });
+  });
+
+  it('still blocks when a non-additive capability lacks a scope', () => {
+    const coverage = corpGrantCoverage(corpCapabilities(['Accountant']), [MINING]);
+    expect(coverage.blocking).toBe(true);
+    expect(coverage.missingScopes).toEqual(WALLET_SCOPES);
+  });
+
+  /**
+   * The same scope also serves the extraction schedule, which is not
+   * additive: a Station_Manager missing it was already blocked before the
+   * ledger existed, and still is.
+   */
+  it('blocks when a shared scope is also needed by a non-additive capability', () => {
+    const coverage = corpGrantCoverage(corpCapabilities(['Director']), [
+      ...scopesForGroup('corp').filter((scope) => scope !== MINING),
+    ]);
+    expect(coverage.missingScopes).toEqual([MINING]);
+    expect(coverage.blocking).toBe(true);
+  });
+
+  it('reports the same missing set as missingCorpScopes', () => {
+    for (const roles of [['Director'], ['Accountant'], ['Station_Manager'], []]) {
+      const capabilities = corpCapabilities(roles);
+      expect(corpGrantCoverage(capabilities, []).missingScopes).toEqual(
+        missingCorpScopes(capabilities, [])
+      );
+    }
   });
 });
