@@ -26,6 +26,7 @@ const JITA_REGION_ID = 10000002;
 vi.mock('@/sde/loadMarketSde', () => ({
   loadAttributeDictionary: vi.fn(),
   loadGlobalMarkets: vi.fn(async () => []),
+  loadMarketRegions: vi.fn(async () => [{ id: 10000002, name: 'The Forge' }]),
 }));
 vi.mock('@/sde/loadSde', () => ({
   loadSkills: vi.fn(async () => []),
@@ -149,6 +150,40 @@ describe('ItemDetailModal', () => {
     expect(screen.getByText('Speed and Travel')).toBeInTheDocument();
     expect(screen.getByText('Maximum Velocity')).toBeInTheDocument();
     expect(screen.getByText('250 m/sec')).toBeInTheDocument();
+  });
+
+  it('opens a Market tab with the Price History for the item and a region picker', async () => {
+    let historyRegion: string | null = null;
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/types/${TYPE_ID}`, () =>
+        HttpResponse.json({
+          type_id: TYPE_ID,
+          name: 'Rifter',
+          description: 'A rugged little frigate.',
+          group_id: 25,
+          published: true,
+          volume: 27289,
+          dogma_attributes: [],
+        })
+      ),
+      http.get(`${ESI_BASE_URL}/markets/:regionId/history`, ({ params }) => {
+        historyRegion = String(params.regionId);
+        const day = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+        return HttpResponse.json([
+          { date: day, average: 10, highest: 11, lowest: 9, order_count: 5, volume: 100 },
+        ]);
+      })
+    );
+    mockedLoadDictionary.mockResolvedValue({});
+    mockedLoadSkills.mockResolvedValue([]);
+
+    render(<ItemDetailModal typeId={TYPE_ID} itemName="Rifter" onClose={() => {}} />);
+
+    await screen.findByText('A rugged little frigate.');
+    await userEvent.click(screen.getByRole('tab', { name: 'Market' }));
+    expect(await screen.findByRole('button', { name: /Compare regions/ })).toBeInTheDocument();
+    await waitFor(() => expect(historyRegion).toBe(String(JITA_REGION_ID)));
+    expect(screen.queryByText('A rugged little frigate.')).not.toBeInTheDocument();
   });
 
   it('shows a groupID attribute as the Group name, not "483 groupID"', async () => {
