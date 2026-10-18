@@ -246,7 +246,14 @@ function Root() {
   return <Navigate to={activeCharacterId === null ? '/characters' : '/overview'} replace />;
 }
 
-export function App() {
+const NO_CHARACTER_IDS: number[] = [];
+
+/**
+ * Boot wiring and the Dexie/store subscriptions that go with it. Its own
+ * component, rendering nothing, so a character change re-renders only this and
+ * not the `<BrowserRouter>` tree (and its route table) below.
+ */
+function AppEffects() {
   const hydrate = useActiveCharacter((state) => state.hydrate);
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   useEffect(() => {
@@ -320,7 +327,10 @@ export function App() {
   // The above covers the active Character at boot. This covers the rest of
   // them, and covers a tab that has been open long enough for another device
   // to have changed something — see backgroundSync.ts.
-  const characterIds = useLiveQuery(() => db.characters.toCollection().primaryKeys(), [], []);
+  // One query serves the three consumers and the shell hint below. No default:
+  // `undefined` is "not read yet", which must not clear the hint.
+  const readIds = useLiveQuery(() => db.characters.toCollection().primaryKeys());
+  const characterIds = readIds ?? NO_CHARACTER_IDS;
   useBackgroundSync(characterIds, activeCharacterId);
   // Keeps what Characters share with their Communities current (issue #3600).
   usePublishSharedLibraries(characterIds, activeCharacterId);
@@ -328,9 +338,8 @@ export function App() {
   useSyncRequestDeliveries(characterIds, activeCharacterId);
 
   // Keeps `bootShellPreload.ts`'s hint in step with Dexie, so the next cold
-  // load knows to fetch the signed-in shell early. No default on the query:
-  // `undefined` is "not read yet", which must not clear the hint.
-  const characterCount = useLiveQuery(() => db.characters.count());
+  // load knows to fetch the signed-in shell early.
+  const characterCount = readIds?.length;
   useEffect(() => {
     if (characterCount !== undefined) writeSignedInShellHint(characterCount > 0);
   }, [characterCount]);
@@ -346,8 +355,13 @@ export function App() {
     return scheduleBootPrefetch(activeCharacterId);
   }, [activeCharacterId]);
 
+  return null;
+}
+
+export function App() {
   return (
     <ErrorBoundary>
+      <AppEffects />
       <BrowserRouter basename={ROUTER_BASENAME}>
         <AuthFailureRedirect />
         <AnalyticsPageViewTracker />

@@ -50,7 +50,8 @@ import { NeedsLoginNotice } from '@/app/AuthFailureNotice';
 import { useAuthFailure } from '@/stores/authFailure';
 import { CustomizePermissionsDialog } from '@/features/permissions/CustomizePermissionsDialog';
 import { isSyncConfigured } from '@/app/syncStatus';
-import { usePublicInfo, type PublicInfoEntry } from '@/stores/publicInfo';
+import { useShallow } from 'zustand/react/shallow';
+import { usePublicInfo } from '@/stores/publicInfo';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useFontScale, FONT_SCALE_STEPS, type FontScale } from '@/lib/fontScale';
 import { useNow } from '@/lib/useNow';
@@ -245,7 +246,6 @@ const TABLE_SORT = optionalSortParam();
 
 interface CharacterCardProps {
   character: CharacterRecord;
-  info: PublicInfoEntry | undefined;
   stats: CharacterSortStats | undefined;
   queue: QueueInfo | undefined;
   /** Whether this Character's `characterNotTraining` alert is on — false only for its one opt-out (issue #1731). */
@@ -309,7 +309,6 @@ function AffiliationName({ name }: { name: string | null | undefined }) {
 
 function CharacterCard({
   character,
-  info,
   stats,
   queue,
   notTrainingAlertEnabled,
@@ -326,6 +325,7 @@ function CharacterCard({
   onRemove,
 }: CharacterCardProps) {
   const { t } = useTranslation();
+  const info = usePublicInfo((state) => state.byCharacterId[character.characterId]);
   // One badge for the whole card, not one per stat (that was the actual
   // complaint — three "Xm ago"s in a row): the oldest of whichever fields
   // this character has cached, so the card never overstates its freshness.
@@ -594,7 +594,7 @@ function GroupSectionHeader({
 /** One character's table row — everything a column might render, gathered once per character rather than re-derived per cell. */
 interface CharacterRow {
   character: CharacterRecord;
-  info: PublicInfoEntry | undefined;
+  corporationName: string | undefined;
   stats: CharacterSortStats | undefined;
   queue: QueueInfo | undefined;
   /** Whether this Character's `characterNotTraining` alert is on — false only for its one opt-out (issue #1731). */
@@ -696,8 +696,8 @@ function buildColumns(
       id: 'corp',
       header: t('characters.column.corp'),
       className: 'text-text-dim',
-      sortValue: (row) => row.info?.corporationName ?? '',
-      render: (row) => <AffiliationName name={row.info?.corporationName} />,
+      sortValue: (row) => row.corporationName ?? '',
+      render: (row) => <AffiliationName name={row.corporationName} />,
     },
     // Same Select the card view's group control renders (issue #2077) — a
     // visible, Tab-reachable move-to-group in table view, no context-menu
@@ -900,7 +900,17 @@ export function Characters() {
   const navigate = useNavigate();
   const location = useLocation();
   const characters = useLiveQuery(() => db.characters.orderBy('characterId').toArray());
-  const publicInfo = usePublicInfo((state) => state.byCharacterId);
+  // Corp names only: each card reads its own entry, so a fetch that changes
+  // no corp name does not re-render the page.
+  const corporationNameById = usePublicInfo(
+    useShallow((state) => {
+      const names: Record<number, string> = {};
+      for (const [id, entry] of Object.entries(state.byCharacterId)) {
+        if (entry.corporationName) names[Number(id)] = entry.corporationName;
+      }
+      return names;
+    })
+  );
   const loadPublicInfoMany = usePublicInfo((state) => state.loadMany);
   const setActiveCharacter = useActiveCharacter((state) => state.setActiveCharacter);
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
@@ -1033,7 +1043,7 @@ export function Characters() {
   const narrowing = query.length > 0 || activeRosterFilterCount(rosterFilter) > 0;
   /** Search and funnel filters as one test, so card view, table view and the "nothing matches" state can't disagree. */
   function matchesFilters(characterId: number): boolean {
-    const corpName = publicInfo[characterId]?.corporationName ?? '';
+    const corpName = corporationNameById[characterId] ?? '';
     if (query) {
       const character = charactersById.get(characterId);
       const hit =
@@ -1410,7 +1420,6 @@ export function Characters() {
             <CharacterCard
               key={characterId}
               character={character}
-              info={publicInfo[characterId]}
               stats={rosterCore.get(characterId)?.stats}
               queue={rosterCore.get(characterId)?.queue}
               notTrainingAlertEnabled={notTrainingAlertEnabledFor(characterId)}
@@ -1456,7 +1465,7 @@ export function Characters() {
       const core = rosterCore.get(character.characterId);
       return {
         character,
-        info: publicInfo[character.characterId],
+        corporationName: corporationNameById[character.characterId],
         stats: core?.stats,
         queue: core?.queue,
         notTrainingAlertEnabled: notTrainingAlertEnabledFor(character.characterId),
@@ -1560,10 +1569,9 @@ export function Characters() {
   // counts it, a filter the pilot can neither see nor clear.
   const corpOptions = [
     ...new Set(
-      [
-        ...allIds.map((id) => publicInfo[id]?.corporationName),
-        rosterFilter.corp ?? undefined,
-      ].filter((name): name is string => !!name)
+      [...allIds.map((id) => corporationNameById[id]), rosterFilter.corp ?? undefined].filter(
+        (name): name is string => !!name
+      )
     ),
   ].sort((a, b) => a.localeCompare(b));
   // Same "keep a stale selection visible so it can be cleared" reasoning as
