@@ -113,6 +113,14 @@ export const LIVE_CHECK_ACTIONS: ReadonlySet<string> = new Set([
   'markNotTax',
 ]);
 
+/** A close-account that forfeits credit writes value off, so it re-checks the role live too (#4184). */
+function needsLiveToken(action: { action: string } & Record<string, unknown>): boolean {
+  return (
+    LIVE_CHECK_ACTIONS.has(action.action) ||
+    (action.action === 'closeAccount' && (action.credit as { kind?: string })?.kind === 'forfeit')
+  );
+}
+
 /**
  * One edit action through `editCorpTaxBookCallable`, e.g.
  * `{ action: 'settleStatements', statementIds }`. Attaches the access token
@@ -126,7 +134,7 @@ export async function editBook<Out = Record<string, unknown>>(
 ): Promise<Out> {
   // `freshToken` is for a caller that may outlive the 10-minute role cache (the mail queue).
   const accessToken =
-    options.freshToken || LIVE_CHECK_ACTIONS.has(action.action)
+    options.freshToken || needsLiveToken(action)
       ? await getValidAccessToken(characterId)
       : undefined;
   return call(characterId, 'editCorpTaxBookCallable', {

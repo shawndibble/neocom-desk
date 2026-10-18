@@ -19,6 +19,7 @@ import {
   statementForLine,
   type RunLine,
 } from '@/engine/corpTaxBook/bookView';
+import { mailableAfterClose } from '@/engine/corpTaxBook/closeAccount';
 import { composeStatementMail } from '@/engine/corpTaxBook/statementMail';
 import type { Statement } from '@/engine/corpTaxBook/statements';
 import { cx } from '@/lib/cx';
@@ -105,7 +106,13 @@ export function StatementRun() {
         const settled = view.internals.byMiner
           .get(s.minerId)
           ?.allocation.byStatement.get(s.id)?.settled;
-        return !settled && mailsSent(s) === 0 && !queue.some((q) => q.statementId === s.id);
+        const miner = view.input.miners.find((m) => m.id === s.minerId);
+        return (
+          !settled &&
+          mailsSent(s) === 0 &&
+          mailableAfterClose(miner, s) &&
+          !queue.some((q) => q.statementId === s.id)
+        );
       }),
     [view, queue]
   );

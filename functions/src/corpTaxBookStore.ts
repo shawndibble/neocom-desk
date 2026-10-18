@@ -21,7 +21,6 @@ import {
   DECLARATIONS,
   DISMISSALS,
   EXTRACTIONS,
-  LIVE_CHECK_ACTIONS,
   META,
   MINERS,
   OBSERVED,
@@ -34,6 +33,7 @@ import {
   TOKENS_COLLECTION,
   WRITE_OFFS,
   decideRoles,
+  needsLiveCheck,
   defaultSettings,
   isCacheFresh,
   parseRecordKey,
@@ -46,16 +46,22 @@ import {
   type OfficerAccess,
   type OfficerRoles,
   type StoredRate,
+  type StoredStatement,
   type SyncInput,
   type TurnOnInput,
 } from './corpTaxBook.js';
 import {
   allocatePayments,
+  dismissalCredits,
+  forfeitAllowed,
   canOverrideRecordRate,
   canRebillFrom,
   isRetroactiveRate,
   mergeObservedRows,
   observedRowKey,
+  type DismissableLine,
+  type MirrorDismissal,
+  type MirrorExtraction,
   type ObservedRow,
 } from './corpTaxBookEngine.js';
 import { ROLES_SCOPE, type IdentityReader } from './corpTaxBookEsi.js';
@@ -582,6 +588,8 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
     case 'setMiner': {
       const miners = await tx.get(col(c, MINERS));
       const mine = miners.docs.find((d) => d.id === action.minerId)?.data();
+      if (mine?.closedAt != null)
+        fail('failed-precondition', "This Miner's account is closed", 'account-closed');
       const clash = miners.docs.find(
         (d) =>
           d.id !== action.minerId &&
@@ -748,32 +756,17 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
     }
     case 'issueStatement': {
       const statement = parseStatement(action.statement);
-      const ref = col(c, STATEMENTS).doc(statement.id);
-      if ((await tx.get(ref)).exists)
-        fail('already-exists', 'An issued Statement never changes', 'statement-exists');
-      const token = randomBytes(32).toString('base64url');
-      tx.create(ref, {
-        ...statement,
-        uids: statement.characterIds.map((x) => `char:${x}`),
-        remindersStopped: false,
-        manualRemindersSent: 0,
-        issuedBy: by,
-      });
-      // The link lives beside the Statement, readable by editors only (rules): the
-      // miner and view-only officers never see it.
-      tx.create(col(c, STATEMENT_LINKS).doc(statement.id), { verifyToken: token });
-      tx.create(c.deps.db.collection(TOKENS_COLLECTION).doc(token), {
-        corporationId: c.corporationId,
-        statementId: statement.id,
-        minerId: statement.minerId,
-        remindersStopped: false,
-        createdAt: now,
-      });
+      const miner = await tx.get(col(c, MINERS).doc(statement.minerId));
+      if (miner.exists && miner.get('closedAt') != null)
+        fail('failed-precondition', "This Miner's account is closed", 'account-closed');
+      const token = await issueStatementDoc(c, statement);
       return {
         detail: { statementId: statement.id, minerId: statement.minerId, amount: statement.amount },
         result: { statementId: statement.id, verifyToken: token },
       };
     }
+    case 'closeAccount':
+      return closeAccount(c, action);
     case 'settleStatements': {
       const paidRef = col(c, META).doc(PAID_DOC);
       const paid = new Set<string>(
@@ -853,9 +846,163 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
   }
 }
 
+/** Stores an issued Statement and its verify link; returns the link's token. Reads nothing: callers check first. */
+async function issueStatementDoc(c: EditCtx, statement: StoredStatement): Promise<string> {
+  const { tx, now } = c;
+  const ref = col(c, STATEMENTS).doc(statement.id);
+  if ((await tx.get(ref)).exists)
+    fail('already-exists', 'An issued Statement never changes', 'statement-exists');
+  const token = randomBytes(32).toString('base64url');
+  tx.create(ref, {
+    ...statement,
+    uids: statement.characterIds.map((x) => `char:${x}`),
+    remindersStopped: false,
+    manualRemindersSent: 0,
+    issuedBy: c.access.characterId,
+  });
+  // The link lives beside the Statement, readable by editors only (rules): the
+  // miner and view-only officers never see it.
+  tx.create(col(c, STATEMENT_LINKS).doc(statement.id), { verifyToken: token });
+  tx.create(c.deps.db.collection(TOKENS_COLLECTION).doc(token), {
+    corporationId: c.corporationId,
+    statementId: statement.id,
+    minerId: statement.minerId,
+    remindersStopped: false,
+    createdAt: now,
+  });
+  return token;
+}
+
+/**
+ * Guest close-account (epic #4055, #4184): a final Statement, then the Miner
+ * is closed so Statement mail stops. Credit is refunded unless the guest
+ * consented or 90 days passed without a reply; a forfeit re-checks the role
+ * live (`needsLiveCheck`). Members are not closed: a leaver's debt has its own
+ * write-off.
+ */
+async function closeAccount(
+  c: EditCtx,
+  action: Extract<EditAction, { action: 'closeAccount' }>
+): Promise<EditOutcome> {
+  const { tx, now } = c;
+  const iso = new Date(now).toISOString();
+  const minerRef = col(c, MINERS).doc(action.minerId);
+  const minerSnap = await tx.get(minerRef);
+  if (minerSnap.exists && minerSnap.get('closedAt') != null)
+    fail('failed-precondition', 'This account is already closed', 'already-closed');
+  const characterIds = minerCharacters(action.minerId, minerSnap.data());
+  if (characterIds.length === 0) fail('not-found', 'Miner not found', 'not-found');
+  if (action.credit.kind === 'forfeit' && !forfeitAllowed(action.credit.basis, utcDate(now))) {
+    fail(
+      'failed-precondition',
+      "Credit is forfeited only with the guest's consent or after 90 days with no reply",
+      'forfeit-not-allowed'
+    );
+  }
+
+  // A guest, by the ore's recorded corporation on each character's latest day.
+  for (const characterId of characterIds) {
+    const rows = await tx.get(
+      col(c, OBSERVED)
+        .where('characterId', '==', characterId)
+        .select('recordedCorporationId', 'date')
+    );
+    const latest = rows.docs
+      .map((d) => ({ date: d.get('date') as string, corp: d.get('recordedCorporationId') }))
+      .sort((a, b) => b.date.localeCompare(a.date))[0];
+    if (latest?.corp === c.corporationId)
+      fail('failed-precondition', "Only a guest's account can be closed", 'not-a-guest');
+  }
+
+  const statement = action.statement ? parseStatement(action.statement) : undefined;
+  if (statement && statement.minerId !== action.minerId)
+    fail('invalid-argument', "Statement is another Miner's", 'wrong-miner');
+
+  // The credit the guest is left with once the final Statement is counted.
+  const [statements, payments, dismissals, extractions] = await Promise.all([
+    tx.get(col(c, STATEMENTS).where('minerId', '==', action.minerId)),
+    tx.get(col(c, PAYMENTS).where('minerId', '==', action.minerId)),
+    tx.get(col(c, DISMISSALS)),
+    tx.get(col(c, EXTRACTIONS)),
+  ]);
+  const held = statements.docs.map((d) => d.data() as Data);
+  const allocation = allocatePayments({
+    statements: [...held, ...(statement ? [statement] : [])].map((x) => ({
+      id: x.id as string,
+      amount: x.amount as number,
+      issuedAt: x.issuedAt as string,
+    })),
+    payments: payments.docs.map((d) => paymentForAllocation(d.id, d.data())),
+    dismissalCredits: dismissalCredits({
+      minerId: action.minerId,
+      statements: [...held, ...(statement ? [statement] : [])].map((x) => ({
+        id: x.id as string,
+        lines: (x.lines as DismissableLine[]) ?? [],
+      })),
+      dismissals: dismissals.docs.map((d) => d.data() as MirrorDismissal),
+      extractions: extractions.docs.map((d) => d.data() as MirrorExtraction),
+      expiryHours: (c.book.structureExpiryHours as Record<string, number> | undefined) ?? {},
+    }),
+  });
+  const credit = Math.max(0, allocation.credit);
+  const owed = [...allocation.byStatement.values()]
+    .filter((s) => !s.settled)
+    .reduce((sum, s) => sum + s.remaining, 0);
+
+  let token: string | undefined;
+  if (statement) token = await issueStatementDoc(c, statement);
+  const closeFields = {
+    closedAt: iso,
+    closedBy: c.access.characterId,
+    closeReason: action.reason,
+    closeCredit: {
+      amount: credit,
+      disposition: action.credit.kind,
+      ...(action.credit.kind === 'forfeit' ? { basis: action.credit.basis } : {}),
+    },
+    ...(statement ? { finalStatementId: statement.id } : {}),
+  };
+  if (minerSnap.exists) {
+    tx.update(minerRef, closeFields);
+  } else {
+    // A solo guest has no Miner document until now; it keeps the guest's own-lines read (D26b).
+    tx.set(minerRef, {
+      id: action.minerId,
+      characterIds,
+      mainCharacterId: characterIds[0],
+      pendingConfirmation: [],
+      confirmedCharacterIds: [],
+      uids: characterIds.map((x) => `char:${x}`),
+      ...closeFields,
+    });
+  }
+  return {
+    detail: {
+      minerId: action.minerId,
+      reason: action.reason,
+      ...(statement ? { statementId: statement.id, amount: statement.amount } : {}),
+      credit,
+      disposition: action.credit.kind,
+      owed,
+      ...(action.credit.kind === 'forfeit' ? { basis: action.credit.basis } : {}),
+    },
+    result: { credit, owed, ...(token ? { statementId: statement!.id, verifyToken: token } : {}) },
+  };
+}
+
+function paymentForAllocation(id: string, p: Data) {
+  return {
+    id,
+    amount: p.amount as number,
+    at: p.at as string,
+    ...(typeof p.statementId === 'string' ? { statementId: p.statementId } : {}),
+    ...(typeof p.notTaxAmount === 'number' ? { notTaxAmount: p.notTaxAmount } : {}),
+  };
+}
+
 export async function editBook(deps: BookDeps, caller: Caller, call: BookCall, action: EditAction) {
   const access = await authorizeOfficer(deps, caller, call, 'edit', {
-    live: LIVE_CHECK_ACTIONS.has(action.action),
+    live: needsLiveCheck(action),
   });
   const ref = bookRef(deps.db, call.corporationId);
   return deps.db.runTransaction(async (tx) => {
@@ -965,15 +1112,17 @@ export async function readStatementByToken(deps: BookDeps, token: string) {
     statementId: string;
     minerId: string;
   };
-  const [book, statements, payments, dismissals, paid, declarations, miner] = await Promise.all([
-    bookRef(deps.db, corporationId).get(),
-    sub(deps.db, corporationId, STATEMENTS).where('minerId', '==', minerId).get(),
-    sub(deps.db, corporationId, PAYMENTS).where('minerId', '==', minerId).get(),
-    sub(deps.db, corporationId, DISMISSALS).get(),
-    sub(deps.db, corporationId, META).doc(PAID_DOC).get(),
-    sub(deps.db, corporationId, DECLARATIONS).where('statementId', '==', statementId).get(),
-    sub(deps.db, corporationId, MINERS).doc(minerId).get(),
-  ]);
+  const [book, statements, payments, dismissals, extractions, paid, declarations, miner] =
+    await Promise.all([
+      bookRef(deps.db, corporationId).get(),
+      sub(deps.db, corporationId, STATEMENTS).where('minerId', '==', minerId).get(),
+      sub(deps.db, corporationId, PAYMENTS).where('minerId', '==', minerId).get(),
+      sub(deps.db, corporationId, DISMISSALS).get(),
+      sub(deps.db, corporationId, EXTRACTIONS).get(),
+      sub(deps.db, corporationId, META).doc(PAID_DOC).get(),
+      sub(deps.db, corporationId, DECLARATIONS).where('statementId', '==', statementId).get(),
+      sub(deps.db, corporationId, MINERS).doc(minerId).get(),
+    ]);
   const thisStatement = statements.docs.find((d) => d.id === statementId);
   if (!thisStatement) fail('not-found', 'Verify link is not valid', 'invalid-token');
   const s = thisStatement.data() as Data;
@@ -1010,24 +1159,17 @@ export async function readStatementByToken(deps: BookDeps, token: string) {
       const x = d.data();
       return { id: d.id, amount: x.amount as number, issuedAt: x.issuedAt as string };
     }),
-    payments: payments.docs.map((d) => {
-      const p = d.data();
-      return {
-        id: d.id,
-        amount: p.amount as number,
-        at: p.at as string,
-        ...(typeof p.statementId === 'string' ? { statementId: p.statementId } : {}),
-        ...(typeof p.notTaxAmount === 'number' ? { notTaxAmount: p.notTaxAmount } : {}),
-      };
-    }),
-    dismissalCredits: dismissalCreditsFor(
+    payments: payments.docs.map((d) => paymentForAllocation(d.id, d.data())),
+    dismissalCredits: dismissalCredits({
       minerId,
-      statements.docs.map((d) => ({
+      statements: statements.docs.map((d) => ({
         id: d.id,
-        lines: (d.data().lines as StatementLineData[]) ?? [],
+        lines: (d.data().lines as DismissableLine[]) ?? [],
       })),
-      dismissals.docs.map((d) => d.data() as DismissalData)
-    ),
+      dismissals: dismissals.docs.map((d) => d.data() as MirrorDismissal),
+      extractions: extractions.docs.map((d) => d.data() as MirrorExtraction),
+      expiryHours: (b.structureExpiryHours as Record<string, number> | undefined) ?? {},
+    }),
   });
   const here = allocation.paymentCredits.filter((c) => c.statementId === statementId);
   const bySource = new Map(payments.docs.map((d) => [d.id, d.data()]));
@@ -1061,53 +1203,9 @@ export async function readStatementByToken(deps: BookDeps, token: string) {
     }),
     settled: ((paid.data()?.ids as string[] | undefined) ?? []).includes(statementId),
     remindersStopped: s.remindersStopped === true,
-    // A guest's closed account (D27/epic): set by the close-account flow, which
-    // does not exist yet; the page shows a note when it is.
+    // A guest's closed account (epic): set by the `closeAccount` edit (#4184).
     accountClosed: miner.exists && miner.get('closedAt') != null,
   };
-}
-
-interface StatementLineData {
-  chargeKey?: string;
-  date?: string;
-  tax?: number;
-}
-
-interface DismissalData {
-  scope?: string;
-  targetId?: string;
-  at?: string;
-  reversed?: unknown;
-}
-
-/**
- * The credit active dismissals give a Miner's billed days. Mirrors
- * `dismissalCredits` (src/engine/corpTaxBook/dismissals.ts) for the scopes that
- * need only the Statement line: one record, or the whole Miner up to the day it
- * was made. A moon or Extraction dismissal needs observed-row metadata the
- * verify read does not load, so it is not applied here.
- */
-function dismissalCreditsFor(
-  minerId: string,
-  statements: readonly { id: string; lines: readonly StatementLineData[] }[],
-  dismissals: readonly DismissalData[]
-) {
-  const active = dismissals.filter((d) => !d.reversed);
-  const credits: { statementId: string; amount: number }[] = [];
-  for (const st of statements) {
-    for (const line of st.lines) {
-      if (!line.chargeKey) continue;
-      const hit = active.find(
-        (d) =>
-          (d.scope === 'record' && d.targetId === line.chargeKey) ||
-          (d.scope === 'miner' &&
-            d.targetId === minerId &&
-            (line.date ?? '') <= (d.at ?? '').slice(0, 10))
-      );
-      if (hit) credits.push({ statementId: st.id, amount: line.tax ?? 0 });
-    }
-  }
-  return credits;
 }
 
 /** The one write the verify link allows: the miner's "Stop reminders" toggle, audited like every write. */

@@ -593,7 +593,9 @@ export function nextRunPeriod(view: BookView): StatementPeriod | undefined {
 export function planStatementRun(view: BookView, period: StatementPeriod): StatementRunPlan {
   const lines: RunLine[] = [];
   let belowMinimum = 0;
+  const closed = new Set(view.input.miners.filter((m) => m.closedAt).map((m) => m.id));
   for (const m of view.miners) {
+    if (closed.has(m.id)) continue; // a closed guest's Statement mail has stopped (#4184)
     const inner = view.internals.byMiner.get(m.id)!;
     const draft = draftStatement({
       minerId: m.id,

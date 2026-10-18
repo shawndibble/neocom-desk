@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import * as mirror from '../../../functions/src/corpTaxBookEngine';
-import { allocatePayments } from './allocation';
+import { allocatePayments, dismissalCredits } from './allocation';
+import { placeOfFactory } from './bookView';
+import { FORFEIT_NO_REPLY_DAYS, forfeitAllowed } from './closeAccount';
+import type { Dismissal } from './dismissals';
+import { extractionId, type SyncExtraction } from './sync';
 import { DEFAULT_GRACE_HOURS } from './billable';
 import { DEFAULT_OVERDUE_DAYS } from './overdue';
 import { mergeObservedRows, observedRowKey } from './observed';
@@ -118,6 +122,138 @@ describe('functions mirror of the Corp Tax Book engine', () => {
     expect([...theirs.byStatement]).toEqual([...ours.byStatement]);
     expect(theirs.credit).toBe(ours.credit);
     expect(theirs.balance).toBe(ours.balance);
+  });
+
+  describe('dismissals (#4184)', () => {
+    // Fractured 17 Oct 03:00, expires 19 Oct 03:00; a second moon ran later at the same refinery.
+    const extractions: SyncExtraction[] = [
+      {
+        structureId: 1000,
+        moonId: 7,
+        extractionStartTime: '2026-10-10T00:00:00Z',
+        chunkArrivalTime: '2026-10-17T00:00:00Z',
+        naturalDecayTime: '2026-10-17T03:00:00Z',
+      },
+      {
+        structureId: 1000,
+        moonId: 8,
+        extractionStartTime: '2026-10-19T00:00:00Z',
+        chunkArrivalTime: '2026-10-25T00:00:00Z',
+        naturalDecayTime: '2026-10-25T03:00:00Z',
+        laserFiredAt: '2026-10-25T01:00:00Z',
+      },
+      {
+        structureId: 2000,
+        moonId: 9,
+        extractionStartTime: '2026-10-01T00:00:00Z',
+        chunkArrivalTime: '2026-10-10T00:00:00Z',
+        naturalDecayTime: '2026-10-10T03:00:00Z',
+        cancelledAt: '2026-10-05T00:00:00Z',
+      },
+    ];
+    const days = [
+      '2026-10-16',
+      '2026-10-17',
+      '2026-10-19',
+      '2026-10-20',
+      '2026-10-25',
+      '2026-10-27',
+    ];
+
+    it('puts a refinery on the same moon and Extraction on a day', () => {
+      for (const expiry of [{}, { '1000': 96 }] as Record<string, number>[]) {
+        const theirs = (structureId: number, date: string) =>
+          mirror.moonOnDay(extractions, expiry, structureId, date);
+        const ours = placeOfFactory(extractions, expiry);
+        for (const structureId of [1000, 2000, 3000]) {
+          for (const date of days)
+            expect(theirs(structureId, date)).toEqual(ours(structureId, date));
+        }
+      }
+      expect(mirror.extractionIdOf(extractions[0])).toBe(extractionId(extractions[0]));
+    });
+
+    it('credits the same Statement lines for record, Miner, moon and Extraction dismissals', () => {
+      const dismissal = (
+        id: string,
+        scope: Dismissal['scope'],
+        targetId: string,
+        reversed = false
+      ): Dismissal => ({
+        id,
+        scope,
+        targetId,
+        by: 1,
+        at: '2026-10-21T10:00:00Z',
+        reason: 'r',
+        ...(reversed ? { reversed: { by: 1, at: '2026-10-22T00:00:00Z' } } : {}),
+      });
+      const statements = [
+        {
+          id: 's1',
+          lines: days.map((date, i) => ({
+            chargeKey: `50:1000:${date}`,
+            date,
+            tax: 100 * (i + 1),
+            structureId: 1000,
+          })),
+        },
+        {
+          id: 's2',
+          lines: [{ chargeKey: 'a:2000', date: '2026-10-17', tax: 7, structureId: 2000 }],
+        },
+      ];
+      const sets: Dismissal[][] = [
+        [],
+        [dismissal('d', 'moon', '7')],
+        [dismissal('d', 'moon', '8')],
+        [dismissal('d', 'extraction', extractionId(extractions[0]))],
+        [dismissal('d', 'extraction', extractionId(extractions[1]))],
+        [dismissal('d', 'record', '50:1000:2026-10-17')],
+        [dismissal('d', 'miner', 'solo:50')],
+        [dismissal('d', 'moon', '7', true)],
+        [dismissal('a', 'moon', '7'), dismissal('b', 'extraction', extractionId(extractions[0]))],
+      ];
+      const place = placeOfFactory(extractions, {});
+      for (const dismissals of sets) {
+        const charges = statements.flatMap((s) =>
+          s.lines.map((l) => ({
+            key: l.chargeKey,
+            minerId: 'solo:50',
+            date: l.date,
+            ...place(l.structureId, l.date),
+          }))
+        );
+        const ours = dismissalCredits(
+          statements.map(
+            (s) => ({ ...s, lines: s.lines.map((l) => ({ ...l, kind: 'mined' })) }) as never
+          ),
+          dismissals,
+          charges
+        ).map((c) => ({ statementId: c.statementId, amount: c.amount }));
+        const theirs = mirror.dismissalCredits({
+          minerId: 'solo:50',
+          statements,
+          dismissals,
+          extractions,
+          expiryHours: {},
+        });
+        expect(theirs).toEqual(ours);
+      }
+    });
+  });
+
+  it('agrees on when credit may be forfeited', () => {
+    expect(mirror.FORFEIT_NO_REPLY_DAYS).toBe(FORFEIT_NO_REPLY_DAYS);
+    const bases = [
+      { kind: 'consent' as const, note: 'agreed' },
+      { kind: 'consent' as const, note: '  ' },
+      { kind: 'no-reply' as const, askedAt: '2026-07-20' },
+      { kind: 'no-reply' as const, askedAt: '2026-07-21' },
+    ];
+    for (const basis of bases) {
+      expect(mirror.forfeitAllowed(basis, '2026-10-18')).toBe(forfeitAllowed(basis, '2026-10-18'));
+    }
   });
 
   it('keeps the book defaults equal to the engine constants', () => {
