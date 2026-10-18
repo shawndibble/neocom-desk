@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, useLocation } from 'react-router-dom';
+import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { db } from '@/db';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
@@ -28,6 +28,7 @@ import type { MarketTypeEntry, NpcStationEntry, SolarSystemEntry } from '@/sde/m
 import { clearNpcStationIndex } from '@/sde/npcStations';
 import { clearSolarSystemIndex } from '@/sde/solarSystems';
 import type { PublicCourierContractRow } from '@/engine/contracts/courierSearch';
+import { LocationProbe } from '@/test/LocationProbe';
 
 vi.mock('@/app/syncStatus', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/app/syncStatus')>();
@@ -1303,10 +1304,6 @@ describe('ContractSearchPanel — Courier mode', () => {
 
 describe('ContractSearchPanel — Build Plan from an item row', () => {
   /** Reads where the menu navigated to; `MemoryRouter` never touches `window.location`. */
-  function LocationProbe() {
-    const { pathname, search } = useLocation();
-    return <span data-testid="location">{`${pathname}${search}`}</span>;
-  }
 
   function renderWithProbe() {
     return render(

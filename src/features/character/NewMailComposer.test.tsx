@@ -9,7 +9,7 @@ import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { EsiOfflineError } from '@/esi/errors';
 import { NewMailComposer } from './NewMailComposer';
-import { PlainBodyEditor } from './MailBodyEditor';
+import { PlainBodyEditor } from './PlainBodyEditor.testHelper';
 
 const sendMail = vi.hoisted(() => vi.fn());
 const loadMailingLists = vi.hoisted(() => vi.fn());

@@ -131,6 +131,66 @@ function candidate(
   return { id, oreLines, payeeId: 'p1', taxPct: 5, status: 'paid', ...overrides };
 }
 
+describe('computeOwnership — a paid Assignment never grows (paid stays paid, ADR 0024)', () => {
+  const paid = (id: string, oreLines: OreLine[], collectsGrowth?: boolean): CoveringAssignment => ({
+    ...covering(id, oreLines, collectsGrowth),
+    status: 'paid',
+  });
+
+  it('leaves growth on a sole paid Assignment unassigned, its own type or a new one', () => {
+    const entry: OreLine[] = [
+      { typeId: A, quantity: 150 },
+      { typeId: B, quantity: 40 },
+    ];
+    const result = computeOwnership(entry, [paid('a', [{ typeId: A, quantity: 100 }])]);
+    expect(result.ownedLines.get('a')).toEqual([{ typeId: A, quantity: 100 }]);
+    expect(result.unassigned).toEqual([
+      { typeId: A, quantity: 50 },
+      { typeId: B, quantity: 40 },
+    ]);
+  });
+
+  it('leaves growth unassigned when the flagged collector of a split is paid, and the other side stays put', () => {
+    const entry: OreLine[] = [
+      { typeId: A, quantity: 130 },
+      { typeId: C, quantity: 5 },
+    ];
+    const result = computeOwnership(entry, [
+      paid('keep', [{ typeId: A, quantity: 60 }], true),
+      covering('moved', [{ typeId: A, quantity: 40 }]),
+    ]);
+    expect(result.ownedLines.get('keep')).toEqual([{ typeId: A, quantity: 60 }]);
+    expect(result.ownedLines.get('moved')).toEqual([{ typeId: A, quantity: 40 }]);
+    expect(result.unassigned).toEqual([
+      { typeId: A, quantity: 30 },
+      { typeId: C, quantity: 5 },
+    ]);
+  });
+
+  it('leaves growth unassigned on a type only a paid Assignment claims in an unflagged split', () => {
+    const entry: OreLine[] = [
+      { typeId: A, quantity: 120 },
+      { typeId: B, quantity: 30 },
+    ];
+    const result = computeOwnership(entry, [
+      paid('p', [{ typeId: A, quantity: 100 }]),
+      covering('o', [{ typeId: B, quantity: 20 }]),
+    ]);
+    expect(result.ownedLines.get('p')).toEqual([{ typeId: A, quantity: 100 }]);
+    expect(result.ownedLines.get('o')).toEqual([{ typeId: B, quantity: 30 }]);
+    expect(result.unassigned).toEqual([{ typeId: A, quantity: 20 }]);
+  });
+
+  it('still lets a dismissed sole Assignment collect, so its growth flags for review', () => {
+    const entry: OreLine[] = [{ typeId: A, quantity: 150 }];
+    const result = computeOwnership(entry, [
+      { ...covering('d', [{ typeId: A, quantity: 100 }]), status: 'dismissed' },
+    ]);
+    expect(result.ownedLines.get('d')).toEqual([{ typeId: A, quantity: 150 }]);
+    expect(result.unassigned).toEqual([]);
+  });
+});
+
 describe('findDuplicateAssignmentIds', () => {
   const entry: OreLine[] = [{ typeId: A, quantity: 100 }];
 

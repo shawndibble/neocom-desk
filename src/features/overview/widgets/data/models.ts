@@ -41,7 +41,7 @@ import {
   ordersSeverity,
   priceAlertsSeverity,
   spExtractionSeverity,
-} from '../../boardSeverity';
+} from '../../data/boardSeverity';
 import {
   comingUpSummary,
   contractsDeadlineNote,
@@ -52,8 +52,8 @@ import {
   priceAlertsSummary,
   spExtractionSummary,
   stockBoardSummary,
-} from '../../boardSummary';
-import type { MailBoardData, MiningTaxBoardData, PriceAlertsBoardData } from '../../boardData';
+} from '../../data/boardSummary';
+import type { MailBoardData, MiningTaxBoardData, PriceAlertsBoardData } from '../../data/boardData';
 import {
   blank,
   count,
