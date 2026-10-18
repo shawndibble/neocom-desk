@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, within, fireEvent, waitFor } from '@testing-library/react';
-import { MemoryRouter, useLocation } from 'react-router-dom';
+import { MemoryRouter } from 'react-router-dom';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import '@/i18n';
@@ -9,6 +9,7 @@ import { db } from '@/db';
 import { ContractDetailModal, type ContractDetailModalProps } from './ContractDetailModal';
 import { usePublicInfoModalStore } from '@/stores/publicInfoModal';
 import type { Contract } from '@/esi/endpoints';
+import { LocationProbe } from '@/test/LocationProbe';
 
 vi.mock('@/sde/loadSde', () => ({
   loadTypes: vi.fn(async () => ({
@@ -93,10 +94,6 @@ const COURIER: Contract = {
 };
 
 /** Reports where the router ended up, so a navigating menu action is assertable. */
-function LocationProbe() {
-  const location = useLocation();
-  return <div data-testid="location">{`${location.pathname}${location.search}`}</div>;
-}
 
 /** `MarketItemLink` needs a router context — wrap in a router. */
 function renderModal(props: ContractDetailModalProps) {

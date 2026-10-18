@@ -4,7 +4,7 @@
 
 User goal: "who do I have standing with, who is blocked/watched, and do my alts agree?"
 
-Code: `src/routes/Contacts.tsx`, `src/routes/contactsColumns.ts`, `src/features/character/{contacts,contactsFilter,contactsAcrossCharacters,contactStandings,contactAffiliation,contactsCsv,CharacterFilterControl,characterFilterUrlParam,StandingTag}.ts(x)`, `src/components/ui/{StandingIcon,standingTier}.ts(x)`, `src/app/pageTabs.ts:23` (`CONTACTS_TABS`: `character`, `across`, `standings`).
+Code: `src/routes/Contacts.tsx`, `src/features/character/contactsColumns.ts`, `src/features/character/{contacts,contactsFilter,contactsAcrossCharacters,contactStandings,contactAffiliation,contactsCsv,CharacterFilterControl,characterFilterUrlParam,StandingTag}.ts(x)`, `src/components/ui/{StandingIcon,standingTier}.ts(x)`, `src/app/pageTabs.ts:23` (`CONTACTS_TABS`: `character`, `across`, `standings`).
 
 ## Summary
 

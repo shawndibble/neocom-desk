@@ -9,9 +9,8 @@
 
 import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { ROOT } from './lib/paths.mjs';
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DIR = path.join(ROOT, 'docs/context/decisions');
 
 const argv = process.argv.slice(2);

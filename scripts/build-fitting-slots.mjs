@@ -17,11 +17,10 @@
 // Usage: node scripts/build-fitting-slots.mjs
 
 import { readFile, writeFile } from 'node:fs/promises';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
+import { ROOT } from './lib/paths.mjs';
 
 const BASE_URL = 'https://www.fuzzwork.co.uk/dump/latest/csv/';
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT_FILE = join(ROOT, 'public', 'data', 'fittingSlots.json');
 const TYPES_FILE = join(ROOT, 'public', 'data', 'types.json');
 

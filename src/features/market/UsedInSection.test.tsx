@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { useEffect } from 'react';
+import { act, render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useNavigate, type NavigateFunction } from 'react-router-dom';
 import '@/i18n';
 import type { BlueprintCatalog, BlueprintCatalogEntry } from '@/features/industry/blueprintCatalog';
 import type { BlueprintType } from '@/sde/types';
@@ -47,10 +48,25 @@ function catalogOf(entries: BlueprintCatalogEntry[]): BlueprintCatalog {
   };
 }
 
-function renderSection(catalog: BlueprintCatalog, typeId = TRITANIUM, onNavigate = vi.fn()) {
+const router: { navigate: NavigateFunction | null } = { navigate: null };
+function GrabNavigate() {
+  const navigate = useNavigate();
+  useEffect(() => {
+    router.navigate = navigate;
+  });
+  return null;
+}
+
+function renderSection(
+  catalog: BlueprintCatalog,
+  typeId = TRITANIUM,
+  onNavigate = vi.fn(),
+  path = '/'
+) {
   const actions = fakeItemActions({ blueprints: catalog });
   render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[path]}>
+      <GrabNavigate />
       <FakeItemActions actions={actions}>
         <UsedInSection typeId={typeId} onNavigate={onNavigate} />
       </FakeItemActions>
@@ -103,6 +119,25 @@ describe('UsedInSection', () => {
 
     fireEvent.contextMenu(screen.getByText('Rifter').closest('li')!);
     await user.click(screen.getByRole('menuitem', { name: 'View in Market' }));
+    expect(onNavigate).toHaveBeenCalledOnce();
+  });
+
+  it('stays open through a redirect (a replace), and closes on a later navigation away', async () => {
+    const onNavigate = vi.fn();
+    renderSection(
+      catalogOf([entry(638, 587, 'Rifter', 4500)]),
+      TRITANIUM,
+      onNavigate,
+      '/market?info=type-34'
+    );
+    // A cold link's tab landing: TabRoute replaces `/market` with the default tab.
+    await act(() => router.navigate!('/market/browser?info=type-34', { replace: true }));
+    expect(onNavigate).not.toHaveBeenCalled();
+    // A drill-down on the landed page is judged from there, not from `/market`.
+    await act(() => router.navigate!('/market/browser?info=type-35'));
+    expect(onNavigate).not.toHaveBeenCalled();
+
+    await act(() => router.navigate!('/industry/plans?info=type-34'));
     expect(onNavigate).toHaveBeenCalledOnce();
   });
 

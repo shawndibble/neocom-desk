@@ -40,23 +40,6 @@ export async function loadPlanetName(planetId: number): Promise<string | null> {
 }
 
 /**
- * A planet's name and its own typeID, which
- * `PiData.planetTypeByTypeId` turns into the same `PlanetType` string an
- * owned colony reports. The Advisor needs both for a planet in the system
- * that the character has *no* colony on, where `/characters/{id}/planets`
- * says nothing at all.
- *
- * Shares the cached row `loadPlanetName` already reads, so a planet whose
- * name is on screen costs no second request to type.
- */
-export async function loadPlanetInfo(
-  planetId: number
-): Promise<{ name: string; typeId: number } | null> {
-  const info = await loadPlanetInfoRow(planetId);
-  return info ? { name: info.name, typeId: info.type_id } : null;
-}
-
-/**
  * Planet names from Dexie only — never a fetch. `loadPlanetName` is one live
  * GET per planet on a cache miss; the cross-character timeline reads every
  * Character's colonies on page open, so resolving names through it would
