@@ -42,6 +42,7 @@ import {
 import {
   LAST_SYNCED_FIELD,
   STALE_ACCOUNT_BATCH_SIZE,
+  STALE_ACCOUNT_READ_PAGE_SIZE,
   STALE_ACCOUNT_MAX_PASSES,
   decideAccountAction,
   lastSyncedAtOf,
@@ -450,9 +451,20 @@ export const purgeStaleAccounts = onSchedule(
     let passes = 0;
     let purged = 0;
 
-    for (const ref of await db.collection('characters').listDocuments()) {
-      const snap = await ref.get();
-      const action = decideAccountAction(lastSyncedAtOf(snap.data()), now);
+    const refs = await db.collection('characters').listDocuments();
+    const snaps = new Map<string, FirebaseFirestore.DocumentSnapshot>();
+    // Heartbeat reads are batched and masked to the one field the decision
+    // needs; the rest of each parent doc is never loaded.
+    for (let i = 0; i < refs.length; i += STALE_ACCOUNT_READ_PAGE_SIZE) {
+      const page = refs.slice(i, i + STALE_ACCOUNT_READ_PAGE_SIZE);
+      for (const snap of await db.getAll(...page, { fieldMask: [LAST_SYNCED_FIELD] })) {
+        snaps.set(snap.ref.path, snap);
+      }
+    }
+
+    for (const ref of refs) {
+      const snap = snaps.get(ref.path);
+      const action = decideAccountAction(lastSyncedAtOf(snap?.data()), now);
       if (action === 'keep') continue;
       if (action === 'seed') {
         await ref.set({ [LAST_SYNCED_FIELD]: now }, { merge: true });
@@ -1036,6 +1048,9 @@ async function backfillFromAdam4eve(db: Firestore, missingDates: readonly string
   });
 }
 
+/** Fuzzwork chunk requests in flight at once, per hub. */
+const FUZZWORK_CONCURRENCY = 4;
+
 /**
  * Captures every hub's current live book and folds it into today's running
  * average (marketSnapshot.ts's `foldHubPriceCapture`). Runs every 6 hours;
@@ -1050,7 +1065,8 @@ async function captureLiveHubPrices(db: Firestore, today: string): Promise<void>
 
   for (const hub of SNAPSHOT_HUBS) {
     const captured = new Map<number, SidePrices>();
-    for (const typeIdChunk of chunk(PRICED_TYPE_IDS, FUZZWORK_TYPE_CHUNK_SIZE)) {
+    const typeIdChunks = chunk(PRICED_TYPE_IDS, FUZZWORK_TYPE_CHUNK_SIZE);
+    const fetchChunk = async (typeIdChunk: number[]): Promise<Map<number, SidePrices>> => {
       const url = buildFuzzworkUrl(hub.stationId, typeIdChunk);
       let response: Response;
       try {
@@ -1060,14 +1076,21 @@ async function captureLiveHubPrices(db: Firestore, today: string): Promise<void>
           hub: hub.id,
           error: err instanceof Error ? err.message : String(err),
         });
-        continue;
+        return new Map();
       }
       if (!response.ok) {
         logWarn('Fuzzwork aggregates request failed', { hub: hub.id, status: response.status });
-        continue;
+        return new Map();
       }
-      for (const [typeId, prices] of parseFuzzworkAggregates(await response.json(), typeIdChunk)) {
-        captured.set(typeId, prices);
+      return parseFuzzworkAggregates(await response.json(), typeIdChunk);
+    };
+    // A small concurrency cap keeps the burst polite to Fuzzwork.
+    for (let i = 0; i < typeIdChunks.length; i += FUZZWORK_CONCURRENCY) {
+      const results = await Promise.all(
+        typeIdChunks.slice(i, i + FUZZWORK_CONCURRENCY).map(fetchChunk)
+      );
+      for (const prices of results) {
+        for (const [typeId, p] of prices) captured.set(typeId, p);
       }
     }
 
@@ -1115,9 +1138,11 @@ export const captureMiningPriceSnapshot = onSchedule(
     const db = getFirestore();
     const today = utcDateString(new Date());
 
-    const snapshot = await db.collection(MARKET_HISTORY_COLLECTION).get();
-    const existingDates = new Set(snapshot.docs.map((doc) => doc.id));
-    const staleDocs = snapshot.docs.filter((doc) => isOutsideRetention(doc.id, today));
+    // Only the day ids matter here, so list refs instead of loading every
+    // day doc's hub/price payload.
+    const dayRefs = await db.collection(MARKET_HISTORY_COLLECTION).listDocuments();
+    const existingDates = new Set(dayRefs.map((ref) => ref.id));
+    const staleDocs = dayRefs.filter((ref) => isOutsideRetention(ref.id, today));
 
     try {
       await backfillFromAdam4eve(db, missingBackfillDates(existingDates, today));
@@ -1130,7 +1155,7 @@ export const captureMiningPriceSnapshot = onSchedule(
 
     if (staleDocs.length > 0) {
       const batch = db.batch();
-      for (const doc of staleDocs) batch.delete(doc.ref);
+      for (const ref of staleDocs) batch.delete(ref);
       await batch.commit();
       logInfo('market history prune', { deleted: staleDocs.length });
     }
