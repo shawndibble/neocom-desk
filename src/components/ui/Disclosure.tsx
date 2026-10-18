@@ -31,9 +31,16 @@ interface DisclosureProps {
  * their own frame to reuse the component but must still point the same way
  * with the same glyph.
  */
-export function Caret({ expanded }: { expanded: boolean }) {
+export function Caret({ expanded, opensUp = false }: { expanded: boolean; opensUp?: boolean }) {
   const Glyph = expanded ? Icon.Expanded : Icon.Descend;
-  return <Glyph size={Icon.ICON_SIZE.sm} aria-hidden="true" className="shrink-0 text-text-faint" />;
+  // `opensUp`: the content appears above its trigger, so open points up.
+  return (
+    <Glyph
+      size={Icon.ICON_SIZE.sm}
+      aria-hidden="true"
+      className={`shrink-0 text-text-faint ${expanded && opensUp ? 'rotate-180' : ''}`}
+    />
+  );
 }
 
 /**

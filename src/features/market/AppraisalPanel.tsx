@@ -1021,9 +1021,7 @@ export function AppraisalPanel({
                     >
                       {t('market.appraisal.compareHubsTitle')}
                       {/* The cards open above the table, so open points up. */}
-                      <span className={compareExpanded ? 'inline-flex rotate-180' : 'inline-flex'}>
-                        <Caret expanded={compareExpanded} />
-                      </span>
+                      <Caret expanded={compareExpanded} opensUp />
                     </button>
                   ))}
                 <ColumnPickerMenu
