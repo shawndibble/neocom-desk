@@ -174,4 +174,43 @@ describe('parsers', () => {
   it('keeps the Statement fields the book relies on', () => {
     expect(() => parseStatement({ id: 's' })).toThrow();
   });
+
+  describe('display names for the verify page', () => {
+    const raw = {
+      id: 's1',
+      minerId: 'solo:1',
+      code: 'MT1',
+      periodStart: '2026-08-01',
+      periodEnd: '2026-08-31',
+      coversFrom: '2026-08-01',
+      coversThrough: '2026-08-31',
+      issuedAt: '2026-09-01T00:00:00Z',
+      hubId: 'jita',
+      oreForm: 'compressed',
+      lines: [],
+      amount: 5,
+      characterIds: [1],
+    };
+
+    it('keeps the corporation, Miner and refinery names, typed and bounded', () => {
+      const parsed = parseStatement({
+        ...raw,
+        corporationName: 'Brass Meridian',
+        minerName: 'Varro',
+        refineryNames: { '77': 'Efa V - Moon 3' },
+      });
+      expect(parsed).toMatchObject({
+        corporationName: 'Brass Meridian',
+        minerName: 'Varro',
+        refineryNames: { '77': 'Efa V - Moon 3' },
+      });
+    });
+
+    it('refuses names that are not strings or too many refineries', () => {
+      expect(() => parseStatement({ ...raw, minerName: 5 })).toThrow();
+      expect(() => parseStatement({ ...raw, refineryNames: { x: 'bad id' } })).toThrow();
+      const many = Object.fromEntries(Array.from({ length: 51 }, (_, i) => [String(i + 1), 'r']));
+      expect(() => parseStatement({ ...raw, refineryNames: many })).toThrow();
+    });
+  });
 });
