@@ -18,11 +18,19 @@ import {
   Line,
   type TooltipContentProps,
 } from 'recharts';
-import { Fragment, useMemo } from 'react';
+import { Fragment, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DataTable, type DataTableColumn } from '@/components/ui';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
+import { ColumnPickerMenu } from '@/components/ui/ColumnPickerMenu';
+import {
+  DEFAULT_VISIBLE_PRICE_HISTORY_COLUMNS,
+  PRICE_HISTORY_COLUMN_IDS,
+  leanPriceHistoryColumns,
+  useVisiblePriceHistoryColumns,
+  type PriceHistoryColumnId,
+} from './priceHistoryColumns';
 import {
   COMPACT_COUNT_Y_AXIS_WIDTH,
   COMPACT_ISK_Y_AXIS_WIDTH,
@@ -475,77 +483,136 @@ export default function PriceHistoryChart({
   const priceDecimals =
     priceDomain[0] >= 10_000 ? 0 : priceTickDecimals(priceDomain[1] - priceDomain[0]);
 
-  const columns = useMemo<DataTableColumn<PriceHistoryTableRow>[]>(
-    () => [
-      {
-        id: 'date',
-        header: t('market.priceHistory.date'),
-        stickyStart: true,
-        render: (p) => p.date,
-        sortValue: (p) => p.date,
-      },
-      {
-        id: 'average',
-        header: t('market.priceHistory.average'),
-        // On a phone the open buy and sell stand in for it: four price
-        // columns do not fit 390px.
-        phoneHidden: openLines.length > 0,
-        render: (p) => formatMarketIsk(p.average),
-        sortValue: (p) => p.average,
-      },
-      // Both sides whatever the series select draws: the select shapes the
-      // chart, and the table and its export are the day list.
-      ...openLines.flatMap((line) =>
-        SIDES.map((side): DataTableColumn<PriceHistoryTableRow> => ({
-          id: `${side}-${line.regionId}`,
-          header: sideLabel(t, side, compared ? line.name : undefined),
-          phoneHidden: !line.primary,
-          render: (p) => {
-            const value = p[side]?.[line.regionId];
-            return value === undefined ? t('market.priceHistory.noOrders') : formatMarketIsk(value);
-          },
-          sortValue: (p) => p[side]?.[line.regionId],
-        }))
-      ),
-      {
-        id: 'range',
-        header: t('market.priceHistory.priceRange'),
-        phoneHidden: true,
-        render: (p) => formatPriceRange(p.lowest, p.highest),
-        // Sorted by the day's high — the low half of the band has no column
-        // of its own to sort by instead.
-        sortValue: (p) => p.highest,
-      },
-      {
-        id: 'volume',
-        header: t('market.priceHistory.volume'),
-        render: (p) => formatVolume(p.volume),
-        sortValue: (p) => p.volume,
-      },
-      {
-        id: 'orderCount',
-        header: t('market.priceHistory.orderCount'),
-        phoneHidden: true,
-        render: (p) => formatVolume(p.orderCount),
-        sortValue: (p) => p.orderCount,
-      },
-      // Shed on a phone like the range: the chart and tooltip carry each
-      // region's line there, and five price columns do not fit 390px.
-      ...drawnComparisons
-        .filter((c) => !openLines.some((l) => l.regionId === c.regionId))
-        .map((c): DataTableColumn<PriceHistoryTableRow> => ({
-          id: `region-${c.regionId}`,
-          header: averageLabel(t, c.name),
-          phoneHidden: true,
-          render: (p) => {
-            const value = p.comparison?.[c.regionId];
-            return value === undefined ? t('market.priceHistory.noTrades') : formatMarketIsk(value);
-          },
-          sortValue: (p) => p.comparison?.[c.regionId],
-        })),
-    ],
-    [t, drawnComparisons, openLines, compared]
+  const storedColumns = useVisiblePriceHistoryColumns((state) => state.value);
+  const hydrateColumns = useVisiblePriceHistoryColumns((state) => state.hydrate);
+  const setStoredColumns = useVisiblePriceHistoryColumns((state) => state.setValue);
+  useEffect(() => {
+    void hydrateColumns();
+  }, [hydrateColumns]);
+  // A phone with nothing stored starts lean; an explicit pick is read as saved.
+  const visibleColumns =
+    isPhone && storedColumns === DEFAULT_VISIBLE_PRICE_HISTORY_COLUMNS
+      ? leanPriceHistoryColumns(primaryOpen)
+      : storedColumns;
+
+  const dateColumn = useMemo<DataTableColumn<PriceHistoryTableRow>>(
+    () => ({
+      id: 'date',
+      header: t('market.priceHistory.date'),
+      stickyStart: true,
+      render: (p) => p.date,
+      sortValue: (p) => p.date,
+    }),
+    [t]
   );
+  // Each optional id's column(s). Both sides always: the series select shapes
+  // the chart, and the table and its export are the day list.
+  const columnsById = useMemo<
+    Record<PriceHistoryColumnId, DataTableColumn<PriceHistoryTableRow>[]>
+  >(() => {
+    const priceCell = (value: number | undefined) =>
+      value === undefined ? t('market.priceHistory.noOrders') : formatMarketIsk(value);
+    const sideColumns = (line: OpenLine) =>
+      SIDES.map((side): DataTableColumn<PriceHistoryTableRow> => ({
+        id: `${side}-${line.regionId}`,
+        header: sideLabel(t, side, compared ? line.name : undefined),
+        render: (p) => priceCell(p[side]?.[line.regionId]),
+        sortValue: (p) => p[side]?.[line.regionId],
+      }));
+    const primaryLine = openLines.find((l) => l.primary);
+    const bySide = (side: OpenPriceSide) =>
+      primaryLine ? sideColumns(primaryLine).filter((c) => c.id.startsWith(side)) : [];
+    return {
+      average: [
+        {
+          id: 'average',
+          header: t('market.priceHistory.average'),
+          render: (p) => formatMarketIsk(p.average),
+          sortValue: (p) => p.average,
+        },
+      ],
+      buy: bySide('buy'),
+      sell: bySide('sell'),
+      range: [
+        {
+          id: 'range',
+          header: t('market.priceHistory.priceRange'),
+          render: (p) => formatPriceRange(p.lowest, p.highest),
+          // Sorted by the day's high — the low half of the band has no column
+          // of its own to sort by instead.
+          sortValue: (p) => p.highest,
+        },
+      ],
+      volume: [
+        {
+          id: 'volume',
+          header: t('market.priceHistory.volume'),
+          render: (p) => formatVolume(p.volume),
+          sortValue: (p) => p.volume,
+        },
+      ],
+      orderCount: [
+        {
+          id: 'orderCount',
+          header: t('market.priceHistory.orderCount'),
+          render: (p) => formatVolume(p.orderCount),
+          sortValue: (p) => p.orderCount,
+        },
+      ],
+      compared: drawnComparisons.flatMap((c): DataTableColumn<PriceHistoryTableRow>[] => {
+        const line = openLines.find((l) => l.regionId === c.regionId);
+        if (line) return sideColumns(line);
+        return [
+          {
+            id: `region-${c.regionId}`,
+            header: averageLabel(t, c.name),
+            render: (p) => {
+              const value = p.comparison?.[c.regionId];
+              return value === undefined
+                ? t('market.priceHistory.noTrades')
+                : formatMarketIsk(value);
+            },
+            sortValue: (p) => p.comparison?.[c.regionId],
+          },
+        ];
+      }),
+    };
+  }, [t, drawnComparisons, openLines, compared]);
+  // What the picker offers: only ids with a column to show.
+  const availableColumns = useMemo(
+    () => PRICE_HISTORY_COLUMN_IDS.filter((id) => columnsById[id].length > 0),
+    [columnsById]
+  );
+  const columns = useMemo(
+    () => [
+      dateColumn,
+      ...availableColumns
+        .filter((id) => visibleColumns.includes(id))
+        .flatMap((id) => columnsById[id]),
+    ],
+    [dateColumn, availableColumns, visibleColumns, columnsById]
+  );
+  // The picker labels each id from one representative column's header.
+  const pickerColumns = useMemo(() => {
+    const entries = availableColumns.map((id) => {
+      const first = columnsById[id][0]!;
+      return [
+        id,
+        id === 'compared' ? { ...first, header: t('market.priceHistory.columnCompared') } : first,
+      ] as const;
+    });
+    return Object.fromEntries(entries) as Record<
+      PriceHistoryColumnId,
+      DataTableColumn<PriceHistoryTableRow>
+    >;
+  }, [availableColumns, columnsById, t]);
+  function toggleColumn(id: PriceHistoryColumnId) {
+    void setStoredColumns(
+      visibleColumns.includes(id)
+        ? visibleColumns.filter((existing) => existing !== id)
+        : [...visibleColumns, id]
+    );
+  }
 
   const csvColumns = useMemo(
     () =>
@@ -863,7 +930,18 @@ export default function PriceHistoryChart({
             );
           })}
         </ul>
-        <TableActionsMenu name={t('market.tabHistory')} tableExport={tableExport} />
+        <div className="flex items-center gap-1">
+          <ColumnPickerMenu
+            available={availableColumns}
+            visible={visibleColumns}
+            columnsById={pickerColumns}
+            onToggle={toggleColumn}
+            buttonLabel={t('market.priceHistory.columnsButton')}
+            menuTitle={t('market.priceHistory.columnsMenuTitle')}
+            size="sm"
+          />
+          <TableActionsMenu name={t('market.tabHistory')} tableExport={tableExport} />
+        </div>
       </div>
 
       {/*

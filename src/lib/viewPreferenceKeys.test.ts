@@ -29,6 +29,7 @@ const PINNED = [
   'loyaltyStorePriceBasis',
   'mailFolders',
   'marketLocationMode',
+  'marketPriceHistoryColumns',
   'marketPriceHistoryRange',
   'marketPriceHistorySeries',
   'marketWideSalesShare',

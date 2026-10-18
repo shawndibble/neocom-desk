@@ -1,7 +1,13 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import '@/i18n';
 import PriceHistoryChart from './PriceHistoryChart';
+import userEvent from '@testing-library/user-event';
+import { db } from '@/db';
+import {
+  useVisiblePriceHistoryColumns,
+  DEFAULT_VISIBLE_PRICE_HISTORY_COLUMNS,
+} from './priceHistoryColumns';
 import { historyPoint } from '@/engine/market/__fixtures__/priceHistory';
 
 /*
@@ -43,8 +49,14 @@ function withPhoneViewport(body: () => void): void {
   }
 }
 
-afterEach(() => {
+afterEach(async () => {
+  cleanup();
   document.body.innerHTML = '';
+  await db.settings.clear();
+  useVisiblePriceHistoryColumns.setState({
+    value: DEFAULT_VISIBLE_PRICE_HISTORY_COLUMNS,
+    hydrated: false,
+  });
 });
 
 const POINTS = [
@@ -111,14 +123,23 @@ describe('PriceHistoryChart', () => {
     expect(screen.getByRole('table')).not.toHaveClass('sr-only');
   });
 
-  it('stays a plain table on a phone, shedding the price range and order count', () => {
+  it('stays a plain table on a phone, starting lean without the price range and order count', () => {
+    withPhoneViewport(() => {
+      render(<PriceHistoryChart points={POINTS} itemName="Tritanium" />);
+      const table = screen.getByRole('table');
+      expect(table).not.toHaveClass('dt-stack');
+      const row = within(table).getAllByRole('row')[1];
+      expect(row.querySelector('td[data-label="Daily range"]')).toBeNull();
+      expect(row.querySelector('td[data-label="Orders"]')).toBeNull();
+      expect(row.querySelector('td[data-label="Average Price"]')).not.toBeNull();
+    });
+  });
+
+  it('shows every column on a desktop by default', () => {
     render(<PriceHistoryChart points={POINTS} itemName="Tritanium" />);
-    const table = screen.getByRole('table');
-    expect(table).not.toHaveClass('dt-stack');
-    const row = within(table).getAllByRole('row')[1];
-    expect(row.querySelector('td[data-label="Daily range"]')).toHaveClass('max-sm:hidden');
-    expect(row.querySelector('td[data-label="Orders"]')).toHaveClass('max-sm:hidden');
-    expect(row.querySelector('td[data-label="Average Price"]')).not.toHaveClass('max-sm:hidden');
+    const row = within(screen.getByRole('table')).getAllByRole('row')[1];
+    expect(row.querySelector('td[data-label="Daily range"]')).not.toBeNull();
+    expect(row.querySelector('td[data-label="Orders"]')).not.toBeNull();
   });
 
   it('still names every series in the legend on a phone, where an axis no longer does', () => {
@@ -311,6 +332,32 @@ describe('PriceHistoryChart', () => {
       expect(within(legend).getByText('Domain buy')).toBeInTheDocument();
       expect(within(legend).getByText('Domain sell')).toBeInTheDocument();
       expect(within(legend).queryByText('Domain average')).not.toBeInTheDocument();
+    });
+
+    it('hides and shows table columns through the Columns menu, leaving the export whole', async () => {
+      const user = userEvent.setup();
+      render(
+        <PriceHistoryChart
+          points={POINTS}
+          itemName="Tritanium"
+          primaryRegionId={10000002}
+          openPrices={[FORGE_OPEN]}
+        />
+      );
+      expect(
+        within(screen.getByRole('table')).getByRole('columnheader', { name: /Sell/ })
+      ).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'Columns' }));
+      await user.click(await screen.findByRole('menuitemcheckbox', { name: 'Sell' }));
+      // The open menu hides the page from the accessibility tree.
+      const after = screen.getByRole('table', { hidden: true });
+      expect(
+        within(after).queryByRole('columnheader', { name: /Sell/, hidden: true })
+      ).not.toBeInTheDocument();
+      expect(
+        within(after).getByRole('columnheader', { name: /Buy/, hidden: true })
+      ).toBeInTheDocument();
+      await user.keyboard('{Escape}');
     });
   });
 });

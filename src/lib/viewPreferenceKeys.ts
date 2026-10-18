@@ -48,6 +48,7 @@ export const VIEW_PREFERENCE_KEYS: readonly string[] = [
   'loyaltyStorePriceBasis',
   'mailFolders',
   'marketLocationMode',
+  'marketPriceHistoryColumns',
   'marketPriceHistoryRange',
   'marketPriceHistorySeries',
   'marketWideSalesShare',

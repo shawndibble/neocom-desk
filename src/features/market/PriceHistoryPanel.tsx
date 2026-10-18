@@ -432,7 +432,7 @@ function RangedHistory({
           select is the tallest thing in it, so `items-center` already leaves
           the figures clear of the tab bar; stacked, they are first in the
           column with nothing setting a height and sit flush against it. */}
-      <div className="flex flex-col gap-2 px-1 pt-2 pb-2 sm:flex-row sm:items-center sm:justify-between sm:pt-0">
+      <div className="flex flex-col gap-2 px-1 pt-2 pb-2">
         <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs sm:flex sm:flex-wrap sm:gap-x-4">
           {summary ? (
             <>
@@ -482,8 +482,10 @@ function RangedHistory({
             <span className="text-text-dim">{t('market.priceHistory.summaryNone')}</span>
           )}
         </div>
-        {/* Each control a full-width row of its own on a phone, side by side above `sm`. */}
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        {/* The summary is a row of its own, and every control shares the one
+            row under it: each a full-width row on a phone, side by side above
+            `sm`. */}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
           {compare && (
             <CompareRegionsPicker
               primaryRegionId={compare.picksPrimary ? 0 : primaryRegionId}
