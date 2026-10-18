@@ -1,5 +1,6 @@
 import type { CsvColumn } from '@/lib/csv';
 import { formatSeconds } from '@/lib/duration';
+import { typeNameOr } from '@/lib/typeNameOr';
 import type { CompareRow, ModuleDiffEntry } from '@/engine/fittings/fittingCompare';
 
 type Translate = (key: string, opts?: Record<string, unknown>) => string;
@@ -52,7 +53,7 @@ export function fittingCompareModulesCsvColumns(
   return [
     {
       header: t('fittings.compare.moduleColumn'),
-      value: (entry) => names.get(entry.typeId) ?? t('common.unknownType', { id: entry.typeId }),
+      value: (entry) => typeNameOr(t, names.get(entry.typeId), entry.typeId),
     },
     ...fittings.map(({ name, statsIndex }): CsvColumn<ModuleDiffEntry> => ({
       header: name,
