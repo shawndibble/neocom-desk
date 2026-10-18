@@ -56,6 +56,8 @@ export interface BookViewInput {
   paidStatementIds: ReadonlySet<string>;
   /** The day's prices at the book's hub and Ore Form, by raw type id. */
   pricesOn: (date: string) => Pick<DayPrices, 'prices' | 'sources'>;
+  /** Ore of chunks with no notification, estimated from a linked Moon Ore Survey (D13), by extraction id. */
+  surveyOreLines?: ReadonlyMap<string, readonly OreLine[]>;
   /** Current members, when the viewer can read the roster; else standing comes from the ledger. */
   memberIds?: ReadonlySet<number>;
 }
@@ -112,7 +114,7 @@ export interface ExtractionRow {
   fracturedAt?: string;
   fracturedBy?: 'laser' | 'auto';
   expiresAt?: string;
-  oreSource: 'notification' | 'unknown';
+  oreSource: 'notification' | 'survey' | 'unknown';
   oreLines: OreLine[];
   estimatedValue: number | null;
   /** Share of the estimate already mined, 0-100; null when the make-up is unknown or it has not fractured. */
@@ -430,8 +432,10 @@ function buildExtractionRows(input: BookViewInput, charges: readonly DayCharge[]
       const ex = toEngineExtraction(x);
       const expiryHours = input.structureExpiryHours[String(x.structureId)];
       const status = extractionStatus(ex, input.now, { expiryHours });
-      // The ExtractionStarted notification is the only source stored on the row (D13).
-      const oreLines = x.oreLines ?? [];
+      // Source order (D13): the ExtractionStarted notification, then a linked Survey.
+      const notified = x.oreLines ?? [];
+      const surveyed = notified.length === 0 ? (input.surveyOreLines?.get(ex.id) ?? []) : [];
+      const oreLines: OreLine[] = [...(notified.length > 0 ? notified : surveyed)];
       const estimatedValue = oreLines.length
         ? oreLines.reduce((sum, l) => sum + l.quantity * (todayPrices.get(l.typeId) ?? 0), 0)
         : null;
@@ -457,7 +461,8 @@ function buildExtractionRows(input: BookViewInput, charges: readonly DayCharge[]
         ...(status.fracturedAt ? { fracturedAt: status.fracturedAt } : {}),
         ...(status.fracturedBy ? { fracturedBy: status.fracturedBy } : {}),
         ...(status.expiresAt ? { expiresAt: status.expiresAt } : {}),
-        oreSource: oreLines.length ? 'notification' : 'unknown',
+        oreSource:
+          notified.length > 0 ? 'notification' : surveyed.length > 0 ? 'survey' : 'unknown',
         oreLines,
         estimatedValue,
         minedPct,

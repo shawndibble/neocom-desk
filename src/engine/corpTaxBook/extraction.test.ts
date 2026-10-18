@@ -7,6 +7,7 @@ import {
   extractionStatus,
   minedVsLeft,
   minedDuringExtraction,
+  surveyFractions,
   type Extraction,
 } from './extraction';
 import type { ObservedMiningEntry } from './types';
@@ -153,5 +154,41 @@ describe('minedVsLeft', () => {
       { typeId: ORE_A, estimated: 100, mined: 40, left: 60 },
       { typeId: ORE_B, estimated: 50, mined: 60, left: 0 },
     ]);
+  });
+});
+
+describe('surveyFractions (D13)', () => {
+  const typeIdOf = (name: string) => ({ Zeolites: ORE_A, Sylvite: ORE_B })[name];
+
+  it('reads the chunk’s composition off a Survey’s first scan, as shares of its volume', () => {
+    expect(
+      surveyFractions(
+        [
+          { ore: 'Zeolites', volume: 300 },
+          { ore: 'Sylvite', volume: 100 },
+          { ore: 'Zeolites', volume: 100 },
+        ],
+        typeIdOf
+      )
+    ).toEqual([
+      { typeId: ORE_A, fraction: 0.8 },
+      { typeId: ORE_B, fraction: 0.2 },
+    ]);
+  });
+
+  it('leaves out ores it cannot name and renormalises the rest', () => {
+    expect(
+      surveyFractions(
+        [
+          { ore: 'Zeolites', volume: 100 },
+          { ore: 'Mystery', volume: 100 },
+        ],
+        typeIdOf
+      )
+    ).toEqual([{ typeId: ORE_A, fraction: 1 }]);
+  });
+
+  it('is empty for an empty scan', () => {
+    expect(surveyFractions([], typeIdOf)).toEqual([]);
   });
 });

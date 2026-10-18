@@ -706,6 +706,13 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       tx.update(ref, { reversed: { by, at: iso, reason: action.reason } });
       return { detail: { dismissalId: action.dismissalId, reason: action.reason } };
     }
+    case 'linkSurvey': {
+      const ref = col(c, EXTRACTIONS).doc(action.extractionId);
+      await mustGet(c, ref, 'Extraction');
+      // The sync's merge-set never writes this field, so a later sync keeps the link.
+      tx.update(ref, { surveyId: action.surveyId ?? FieldValue.delete() });
+      return { detail: { extractionId: action.extractionId, surveyId: action.surveyId } };
+    }
     case 'setMiner': {
       const miners = await tx.get(col(c, MINERS));
       const out = await planMiner(c, miners.docs, action, new Set());

@@ -318,3 +318,23 @@ describe('regroupMiner', () => {
     ).toThrow();
   });
 });
+
+describe('linkSurvey', () => {
+  it('parses a link and an unlink, and refuses a path-escaping id', () => {
+    expect(
+      parseEditAction({ action: 'linkSurvey', extractionId: 'x_1', surveyId: 'abc123' })
+    ).toEqual({
+      action: 'linkSurvey',
+      extractionId: 'x_1',
+      surveyId: 'abc123',
+    });
+    expect(parseEditAction({ action: 'linkSurvey', extractionId: 'x_1', surveyId: null })).toEqual({
+      action: 'linkSurvey',
+      extractionId: 'x_1',
+      surveyId: null,
+    });
+    expect(() =>
+      parseEditAction({ action: 'linkSurvey', extractionId: 'x_1', surveyId: '../s' })
+    ).toThrow();
+  });
+});

@@ -13858,7 +13858,18 @@
         "oreFrom": "Ore from",
         "source": {
           "notification": "Extraction notification",
-          "unknown": "Not known yet"
+          "survey": "Linked Survey (estimate)",
+          "unknown": "Ore unknown"
+        },
+        "link": {
+          "open": "Link a survey…",
+          "change": "Change survey…",
+          "title": "Link a Survey to this chunk",
+          "intro": "No extraction notification gave this chunk's ore. A Moon Ore Survey scanned before the chunk was mined can stand in for it.",
+          "field": "Survey link or id",
+          "confirm": "Link survey",
+          "notFound": "That Survey could not be opened. Check the link, and that it has not expired.",
+          "effect": "The ore is estimated from the Survey's first scan and the chunk rate in Settings; it is an estimate, not what the structure holds."
         },
         "whoMined": "Who mined this chunk",
         "nobody": "Nobody has mined this chunk yet.",

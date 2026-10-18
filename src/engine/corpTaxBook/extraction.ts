@@ -78,6 +78,29 @@ export interface ChunkSources {
   chunkM3PerHour?: number;
 }
 
+/**
+ * A linked Moon Ore Survey's composition as shares of its volume: the rocks of
+ * its first scan summed per ore. An ore the type lookup cannot name is left
+ * out and the rest renormalised, so the shares always sum to 1.
+ */
+export function surveyFractions(
+  rocks: readonly { ore: string; volume: number }[],
+  typeIdOf: (ore: string) => number | undefined
+): { typeId: number; fraction: number }[] {
+  const byType = new Map<number, number>();
+  for (const rock of rocks) {
+    const typeId = typeIdOf(rock.ore);
+    if (typeId !== undefined && rock.volume > 0) {
+      byType.set(typeId, (byType.get(typeId) ?? 0) + rock.volume);
+    }
+  }
+  const total = [...byType.values()].reduce((a, b) => a + b, 0);
+  if (total === 0) return [];
+  return [...byType]
+    .map(([typeId, volume]) => ({ typeId, fraction: volume / total }))
+    .sort((a, b) => a.typeId - b.typeId);
+}
+
 export interface ChunkEstimate {
   source: 'notification' | 'survey' | 'unknown';
   oreLines: OreLine[];

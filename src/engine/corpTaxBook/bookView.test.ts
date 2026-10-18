@@ -203,4 +203,29 @@ describe('buildBookView', () => {
     expect(detail.miners).toEqual([{ minerId: 'solo:1', units: 600, value: 600_000, tax: 60_000 }]);
     expect(view.charges[0].extractionId).toBe(row.id);
   });
+
+  it('takes the ore of a chunk with no notification from its linked Survey (D13)', () => {
+    const x = {
+      structureId: 1001,
+      moonId: 7,
+      extractionStartTime: '2026-09-01T10:00:00Z',
+      chunkArrivalTime: '2026-09-15T10:00:00Z',
+      naturalDecayTime: '2026-09-15T13:00:00Z',
+    };
+    const base = {
+      now: '2026-09-16T14:00:00Z',
+      lastSyncedAt: '2026-09-16T12:00:00Z',
+      entries: [entry(1, '2026-09-16', 500)],
+      extractions: [x],
+    };
+    expect(buildBookView(input(base)).extractions[0]).toMatchObject({
+      oreSource: 'unknown',
+      oreLines: [],
+    });
+    const id = buildBookView(input(base)).extractions[0].id;
+    const row = buildBookView(
+      input({ ...base, surveyOreLines: new Map([[id, [{ typeId: ORE, quantity: 1000 }]]]) })
+    ).extractions[0];
+    expect(row).toMatchObject({ oreSource: 'survey', minedPct: 50, estimatedValue: 1_000_000 });
+  });
 });

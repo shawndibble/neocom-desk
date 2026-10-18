@@ -137,6 +137,25 @@ export function getUniverseStation(
   });
 }
 
+// --- GET /universe/moons/{moon_id} (public) ---
+
+/** A moon: its name ("Efa V - Moon 3") is what the Corp Tax Book prints for a drilled moon. */
+export interface UniverseMoon {
+  moon_id: number;
+  name: string;
+  system_id: number;
+}
+
+export function getUniverseMoon(
+  moonId: number,
+  options: EndpointOptions = {}
+): Promise<EsiResult<UniverseMoon>> {
+  return esiFetch<UniverseMoon>(`/universe/moons/${moonId}`, {
+    ...options,
+    endpointId: 'getUniverseMoon',
+  });
+}
+
 // --- GET /universe/stargates/{stargate_id} (public) ---
 
 /**
