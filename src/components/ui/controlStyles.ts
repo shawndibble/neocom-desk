@@ -168,6 +168,17 @@ export const inlineLinkClassName = cx(
 );
 
 /**
+ * A value shown as text in a readout that opens a popover to change it —
+ * Appraisal's hold line, where the ship name opens the ship picker. Accent text
+ * with a dashed underline (DESIGN.md §6c); the popover trigger takes it as its
+ * `className`.
+ */
+export const popoverValueClassName = cx(
+  'rounded-xs text-accent underline decoration-dashed underline-offset-2 hover:decoration-solid',
+  focusRingClassName
+);
+
+/**
  * A bordered toggle chip's on/off state, per DESIGN.md §4: `FilterChip`'s
  * accent tint when on, the input fill with dim text when off. `FilterChip`
  * takes it from here, and so does any hand-built toggle chip whose content

@@ -5,6 +5,7 @@
  */
 import { useTranslation } from 'react-i18next';
 import { ProgressBar } from '@/components/ui';
+import { popoverValueClassName } from '@/components/ui/controlStyles';
 import type { AppraisalTotals } from '@/engine/market/appraisal';
 import { formatCubicMetres } from '@/lib/volume';
 import { HaulingCargoPopover } from './HaulingCargoControl';
@@ -40,7 +41,7 @@ export function AppraisalHoldBar({
             onCargoChange={onCargoChange}
             align="start"
             triggerLabel={t('market.appraisal.holdChange', { ship: cargo.label })}
-            triggerClassName="rounded-xs text-accent underline decoration-dashed underline-offset-2 hover:decoration-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            triggerClassName={popoverValueClassName}
           >
             {cargo.label}
           </HaulingCargoPopover>
