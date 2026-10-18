@@ -20,7 +20,7 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { CharacterRecord } from '@/db';
-import type { PublicInfoEntry } from '@/stores/publicInfo';
+import { usePublicInfo } from '@/stores/publicInfo';
 import { isPiExpired, type AttentionEntry } from '@/features/character/rosterAttention';
 import type { QueueInfo } from '@/features/character/rosterView';
 import type { CharacterGroup, CharacterSortStats } from '@/features/character/groups';
@@ -34,7 +34,6 @@ import {
 
 interface CharacterCardProps {
   character: CharacterRecord;
-  info: PublicInfoEntry | undefined;
   stats: CharacterSortStats | undefined;
   queue: QueueInfo | undefined;
   /** Whether this Character's `characterNotTraining` alert is on — false only for its one opt-out (issue #1731). */
@@ -78,7 +77,6 @@ export function AffiliationName({ name }: { name: string | null | undefined }) {
 
 export function CharacterCard({
   character,
-  info,
   stats,
   queue,
   notTrainingAlertEnabled,
@@ -94,6 +92,8 @@ export function CharacterCard({
   onMoveToGroup,
   onRemove,
 }: CharacterCardProps) {
+  // Own entry, not the page's whole map: a fetch for another card leaves this one alone.
+  const info = usePublicInfo((state) => state.byCharacterId[character.characterId]);
   const { t } = useTranslation();
   // One badge for the whole card, not one per stat (that was the actual
   // complaint — three "Xm ago"s in a row): the oldest of whichever fields
