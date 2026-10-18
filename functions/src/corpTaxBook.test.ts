@@ -82,6 +82,18 @@ describe('parsers', () => {
     ).toThrow();
   });
 
+  it('parses the audit-only recordMail action and bounds it', () => {
+    expect(
+      parseEditAction({ action: 'recordMail', statementId: 's1', mailId: 77, kind: 'statement' })
+    ).toEqual({ action: 'recordMail', statementId: 's1', mailId: 77, kind: 'statement' });
+    expect(() =>
+      parseEditAction({ action: 'recordMail', statementId: 's1', mailId: 0, kind: 'statement' })
+    ).toThrow();
+    expect(() =>
+      parseEditAction({ action: 'recordMail', statementId: 's1', mailId: 5, kind: 'other' })
+    ).toThrow();
+  });
+
   it('wants a main inside the group', () => {
     expect(() =>
       parseEditAction({

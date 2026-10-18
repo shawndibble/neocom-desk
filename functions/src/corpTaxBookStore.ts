@@ -840,6 +840,15 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       tx.update(ref, { manualRemindersSent: FieldValue.increment(1) });
       return { detail: { statementId: action.statementId } };
     }
+    case 'recordMail': {
+      // The queue sent this mail (D16): log it on the Statement and in the audit trail.
+      const ref = col(c, STATEMENTS).doc(action.statementId);
+      await mustGet(c, ref, 'Statement');
+      tx.update(ref, { lastMailedAt: iso, mailsSent: FieldValue.increment(1) });
+      return {
+        detail: { statementId: action.statementId, mailId: action.mailId, kind: action.kind },
+      };
+    }
   }
 }
 

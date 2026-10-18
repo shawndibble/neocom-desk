@@ -698,6 +698,18 @@ suite('Corp Tax Book callables (emulator)', () => {
         'reminders-stopped'
       );
       const log = (await book().collection('audit').orderBy('at').get()).docs.map((d) => d.data());
+      await edit(ACCOUNTANT, {
+        action: 'recordMail',
+        statementId: 's1',
+        mailId: 99,
+        kind: 'statement',
+      });
+      const mailLog = (await book().collection('audit').orderBy('at').get()).docs
+        .map((d) => d.data())
+        .find((e) => e.action === 'recordMail');
+      expect(mailLog).toMatchObject({
+        detail: { statementId: 's1', mailId: 99, kind: 'statement' },
+      });
       const stop = log.find((e) => e.action === 'stopReminders');
       expect(stop).toMatchObject({
         by: null,
