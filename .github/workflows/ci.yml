@@ -159,7 +159,15 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - run: npm ci
+      # setup-node caches the npm download, not node_modules; restoring the
+      # tree skips the install. A miss falls back to `npm ci`.
+      - uses: actions/cache@v4
+        id: node-modules
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-node24-${{ hashFiles('package-lock.json') }}
+      - if: steps.node-modules.outputs.cache-hit != 'true'
+        run: npm ci
       - run: npm run test:run -- --shard=${{ matrix.shard }}/4
 
   # Firestore rules tests (rules-tests/): run against the Firestore emulator,
@@ -178,7 +186,24 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
-      - run: npm ci
+      # setup-node caches the npm download, not node_modules; restoring the
+      # tree skips the install. A miss falls back to `npm ci`.
+      - uses: actions/cache@v4
+        id: node-modules
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-node24-${{ hashFiles('package-lock.json') }}
+      - if: steps.node-modules.outputs.cache-hit != 'true'
+        run: npm ci
+      # firebase-tools (npx's download) and the Firestore emulator jar are
+      # fetched on every run otherwise. Key carries the version pinned in the
+      # `test:rules` script — bump both together.
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.npm/_npx
+            ~/.cache/firebase
+          key: firebase-tools-14.27.0-${{ runner.os }}
       # The Corp Tax Book callable tests (functions/) run in the same emulator session.
       - run: npm ci --prefix functions
       - run: npm run test:rules
@@ -311,7 +336,15 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - run: npm ci
+      # setup-node caches the npm download, not node_modules; restoring the
+      # tree skips the install. A miss falls back to `npm ci`.
+      - uses: actions/cache@v4
+        id: node-modules
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-node24-${{ hashFiles('package-lock.json') }}
+      - if: steps.node-modules.outputs.cache-hit != 'true'
+        run: npm ci
       # Chromium comes from Playwright's own CDN; the only thing `--with-deps`
       # needs apt for is Ubuntu's shared libraries. The runner image ships
       # Google's Chrome repo regardless, so `apt-get update` fetches an index
