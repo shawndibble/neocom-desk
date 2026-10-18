@@ -27,12 +27,10 @@ import { MarkerRow } from './entryList/MarkerRow';
 import { PrereqRow } from './entryList/PrereqRow';
 import { ACTION_SPACER, TIME_CELL } from './entryList/rowChrome';
 
-export type { BandInfo };
-
 /** Matches Layout.tsx's phone/desktop line (#114). */
 const DESKTOP_QUERY = '(min-width: 48rem)';
 
-/** i18n key for a priority's display label, e.g. 'high' -> 'plans.priorityHigh'. */
+/** True at or above the `md` breakpoint, where a row fits on one line (#114). */
 function useIsDesktop(): boolean {
   const [isDesktop, setIsDesktop] = useState(
     () => typeof window !== 'undefined' && window.matchMedia(DESKTOP_QUERY).matches

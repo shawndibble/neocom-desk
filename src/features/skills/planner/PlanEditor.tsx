@@ -82,7 +82,7 @@ import { writeToClipboard } from '@/lib/clipboard';
 import type { SkillCatalog } from '../skillMap';
 import { SkillPicker } from './SkillPicker';
 import { EntryList } from './EntryList';
-import type { BandInfo } from './EntryList';
+import type { BandInfo } from './entryList/BandHeader';
 import { useColumnVisibility } from './columnPreference';
 import { useGroupingMode, GROUPING_MODES, type GroupingMode } from './groupingMode';
 import { attributePairBandStarts } from './attributePairBands';
