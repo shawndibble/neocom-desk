@@ -16,7 +16,7 @@ const pi = JSON.parse(
 
 /**
  * The eight values ESI returns for `CharacterPlanet.planet_type` (declared as
- * `PlanetType` in src/esi/endpoints.ts, field verified against
+ * `PlanetType` in src/esi/endpoints/, field verified against
  * https://esi.evetech.net/meta/openapi.json). A P0's `planetTypes` entries are
  * drawn from this set so a character's colony matches the table directly, with
  * no translation layer.

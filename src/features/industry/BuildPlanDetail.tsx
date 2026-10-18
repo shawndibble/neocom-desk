@@ -117,6 +117,7 @@ import { formatDuration } from '@/lib/duration';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { writeToClipboard } from '@/lib/clipboard';
+import { clampPct } from '@/lib/clampPct';
 import { unmaskNumber } from '@/lib/numberMask';
 import { MaterialsTable, SourcingInput, type MaterialsTableHandle } from './MaterialsTable';
 import { BuildRecipeModal } from './BuildRecipeModal';
@@ -312,7 +313,7 @@ function parseOrKeep(current: number, raw: string, transform: (n: number) => num
 function parseTaxPct(current: number, raw: string): number {
   const trimmed = raw.trim();
   const normalized = /^\d*,\d{1,2}$/.test(trimmed) ? trimmed.replace(',', '.') : trimmed;
-  return parseOrKeep(current, normalized, (n) => Math.min(100, Math.max(0, n)));
+  return parseOrKeep(current, normalized, clampPct);
 }
 
 /** Build Plan inputs (runs, ME/TE, facility, rig, security, hub, tax) + materials/results. */

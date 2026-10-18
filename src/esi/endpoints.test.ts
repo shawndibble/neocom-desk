@@ -14,6 +14,8 @@ import {
   getCharacterBlueprints,
   getCharacterPublicInfo,
   getCorporationPublicInfo,
+  getCorporationMiningObservers,
+  getCorporationMiningObserver,
   getAlliancePublicInfo,
   getUniverseType,
   getDogmaDynamicItem,
@@ -652,6 +654,61 @@ describe('wallet journal + transactions', () => {
     expect(fromIds).toEqual([null, '20', '10']);
     // History ran out; the cap never bit.
     expect(transactions.truncated).toBe(false);
+  });
+});
+
+describe('corp mining observers', () => {
+  const CORPORATION_ID = 98000001;
+  const OBSERVER_ID = 1030000000001;
+
+  it('getCorporationMiningObservers lists every refinery observer, across pages', async () => {
+    const page1 = [
+      { observer_id: OBSERVER_ID, observer_type: 'structure', last_updated: '2026-10-17' },
+    ];
+    const page2 = [
+      { observer_id: OBSERVER_ID + 1, observer_type: 'structure', last_updated: '2026-10-16' },
+    ];
+    server.use(
+      http.get(`${ESI_BASE_URL}/corporation/${CORPORATION_ID}/mining/observers`, ({ request }) => {
+        const bad = rejectBadEsiHeaders(request);
+        if (bad) return bad;
+        const page = new URL(request.url).searchParams.get('page');
+        return HttpResponse.json(page === '2' ? page2 : page1, { headers: { 'X-Pages': '2' } });
+      })
+    );
+
+    const observers = await getCorporationMiningObservers(CHARACTER_ID, CORPORATION_ID);
+
+    expect(observers.items).toEqual([...page1, ...page2]);
+    expect(observers.truncated).toBe(false);
+  });
+
+  it("getCorporationMiningObserver reads one refinery's ledger, across pages", async () => {
+    const row = (character_id: number) => ({
+      character_id,
+      recorded_corporation_id: CORPORATION_ID,
+      type_id: 46300,
+      quantity: 12000,
+      last_updated: '2026-10-17',
+    });
+    server.use(
+      http.get(
+        `${ESI_BASE_URL}/corporation/${CORPORATION_ID}/mining/observers/${OBSERVER_ID}`,
+        ({ request }) => {
+          const bad = rejectBadEsiHeaders(request);
+          if (bad) return bad;
+          const page = new URL(request.url).searchParams.get('page');
+          return HttpResponse.json(page === '2' ? [row(2)] : [row(1)], {
+            headers: { 'X-Pages': '2' },
+          });
+        }
+      )
+    );
+
+    const ledger = await getCorporationMiningObserver(CHARACTER_ID, CORPORATION_ID, OBSERVER_ID);
+
+    expect(ledger.items).toEqual([row(1), row(2)]);
+    expect(ledger.truncated).toBe(false);
   });
 });
 

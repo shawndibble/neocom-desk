@@ -6,19 +6,8 @@ import {
   indexSystemPositions,
   jumpFatigue,
   jumpFuel,
-  jumpTargets,
   lightYearDistance,
-  type JumpSystem,
 } from './jumpDrive';
-
-const sys = (id: number, x: number, security = 0.1, regionId = 10000002): JumpSystem => ({
-  id,
-  x,
-  y: 0,
-  z: 0,
-  security,
-  regionId,
-});
 
 describe('indexSystemPositions', () => {
   it('reads the flat id,x,y,z array (light years) into a lookup', () => {
@@ -39,38 +28,6 @@ describe('lightYearDistance', () => {
     const jita = { x: -13.64, y: 6.42, z: 12.42 };
     const amarr = { x: -21.64, y: 4.25, z: -6.09 };
     expect(lightYearDistance(jita, amarr)).toBeCloseTo(20.28, 1);
-  });
-});
-
-describe('jumpTargets', () => {
-  const from = sys(1, 0);
-
-  it('includes a system exactly at range and excludes one just beyond', () => {
-    const targets = jumpTargets(from, 6, [from, sys(2, 6), sys(3, 6.01)]);
-    expect(targets.map((t) => t.id)).toEqual([2]);
-  });
-
-  it('never lists the origin and sorts nearest first', () => {
-    const targets = jumpTargets(from, 10, [from, sys(2, 5), sys(3, 2)]);
-    expect(targets).toEqual([
-      { id: 3, distanceLy: 2 },
-      { id: 2, distanceLy: 5 },
-    ]);
-  });
-
-  it('excludes high security, with 0.45 (shown as 0.5) the edge', () => {
-    const targets = jumpTargets(from, 10, [sys(2, 1, 0.45), sys(3, 1, 0.44), sys(4, 1, 0.9)]);
-    expect(targets.map((t) => t.id)).toEqual([3]);
-  });
-
-  it('excludes systems a drive cannot target: wormhole space, Pochven, Zarzakh', () => {
-    const targets = jumpTargets(from, 10, [
-      sys(31000005, 1, -0.99, 11000030), // Thera
-      sys(30001234, 1, -0.5, 10000070), // Pochven
-      sys(30100000, 1, -1, 10000002), // Zarzakh
-      sys(5, 1, -0.5),
-    ]);
-    expect(targets.map((t) => t.id)).toEqual([5]);
   });
 });
 

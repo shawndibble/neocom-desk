@@ -13,7 +13,7 @@ import type { BlueprintCatalog, BlueprintCatalogEntry } from './blueprintCatalog
 import type { BuildResult } from '@/engine/industry/types';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import type { CorpOwnedBlueprintsState } from './corpOwnedBlueprints';
-import { PRICING_INPUTS_FIXTURE as PRICING_INPUTS } from './pricingInputsFixtures';
+import { PRICING_INPUTS_FIXTURE as PRICING_INPUTS } from './pricingInputsFixtures.testutil';
 import { getOrderBook, type OrderBookResult } from '@/features/market/orderBook';
 
 vi.mock('./computeBuildPlan', () => ({ computeBuildPlan: vi.fn() }));

@@ -6,7 +6,7 @@ import { MemoryRouter } from 'react-router-dom';
 import type { ComponentProps } from 'react';
 import '@/i18n';
 import { db } from '@/db';
-import { encodeFittingShare } from '@/engine/fitting/fittingShare';
+import { encodeFittingShare } from '@/engine/fittings/fittingShare';
 import { fittingToShareInput } from '@/engine/fittings/shareMapper';
 import type { Fitting } from '@/engine/fittings/types';
 import type { CharacterFitting } from '@/esi/endpoints';

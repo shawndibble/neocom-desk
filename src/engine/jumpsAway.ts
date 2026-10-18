@@ -23,14 +23,3 @@ export type JumpsAwayReason = 'noLocation' | 'noRoute';
 
 export type JumpsAwayResult =
   { kind: 'known'; jumps: number } | { kind: 'unknown'; reason: JumpsAwayReason };
-
-/**
- * `route` is ESI's system-id waypoint list (including both ends); null means
- * it could not be resolved. An empty array is treated the same way — ESI's
- * `/route/` always includes at least the origin system, so `[]` is not a
- * real "0 jumps" answer, just another shape of "unresolved".
- */
-export function jumpsAwayFromRoute(route: readonly number[] | null): JumpsAwayResult {
-  if (route === null || route.length === 0) return { kind: 'unknown', reason: 'noRoute' };
-  return { kind: 'known', jumps: route.length - 1 };
-}
