@@ -59,7 +59,10 @@ export function mergeObservedRows(
  * character.
  */
 export function groupObservedEntries(rows: readonly ObservedRow[]): ObservedMiningEntry[] {
-  const byKey = new Map<string, { entry: ObservedMiningEntry; lines: Map<number, number> }>();
+  const byKey = new Map<
+    string,
+    { entry: ObservedMiningEntry; lines: Map<number, number>; cachedAt: string }
+  >();
   for (const row of rows) {
     const key = observedEntryKey(row);
     let group = byKey.get(key);
@@ -73,8 +76,14 @@ export function groupObservedEntries(rows: readonly ObservedRow[]): ObservedMini
           oreLines: [],
         },
         lines: new Map(),
+        cachedAt: row.cachedAt,
       };
       byKey.set(key, group);
+    }
+    // A character who changed corp mid-day is judged by the freshest read.
+    if (Date.parse(row.cachedAt) > Date.parse(group.cachedAt)) {
+      group.cachedAt = row.cachedAt;
+      group.entry.recordedCorporationId = row.recordedCorporationId;
     }
     group.lines.set(row.typeId, (group.lines.get(row.typeId) ?? 0) + row.quantity);
   }

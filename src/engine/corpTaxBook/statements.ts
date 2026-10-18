@@ -11,6 +11,7 @@ import { shiftDate } from '../miningTax/yieldRange';
 import { computeAssignmentValue } from '../miningTax/valuation';
 import { activeDismissalFor, type Dismissal } from './dismissals';
 import type { DayCharge } from './charges';
+import type { TaxPriceSource } from '../miningTax/priceBasis';
 import type { OreLine } from './types';
 
 export const DEFAULT_MINIMUM_STATEMENT = 5_000_000;
@@ -73,8 +74,13 @@ export interface StatementLine {
   structureId?: number;
   /** The quantities this line bills — for late ore, only the growth. */
   oreLines: OreLine[];
+  /** Per-unit price by raw type id, as first billed for the day. */
   unitPrices?: Record<number, number>;
+  /** Which price tier priced each type — printed on the mail. */
+  priceSources?: Record<number, TaxPriceSource>;
   taxPct?: number;
+  /** The rate's effective-from date (D28); absent for a per-record override. */
+  rateEffectiveFrom?: string;
   estimatedValue: number;
   tax: number;
   reason?: string;
@@ -92,6 +98,9 @@ export interface Statement {
   /** Last day this Statement took in: the period end, or the last Billable day if earlier. */
   coversThrough: string;
   issuedAt: string;
+  /** The book's trade hub and Ore Form when issued — printed on every Statement (D11). */
+  hubId: string;
+  oreForm: 'compressed' | 'raw';
   lines: StatementLine[];
   /** Σ line tax. */
   amount: number;
@@ -119,7 +128,11 @@ export interface StatementDraftInput {
   adjustments: readonly Adjustment[];
   /** This Miner's issued Statements. */
   issued: readonly Statement[];
-  /** Issued Statements that are settled (`allocatePayments`). */
+  /**
+   * Statements ever settled. The caller persists a Statement here once
+   * `allocatePayments` first settles it, so its days stay closed for good
+   * (D22) even if a later "not tax" mark reopens its debt.
+   */
   paidStatementIds: ReadonlySet<string>;
   dismissals: readonly Dismissal[];
   /** `lastBillableDate`; undefined when the book has no sync after the grace. */
@@ -132,6 +145,8 @@ export interface StatementDraftInput {
 interface DraftCommon {
   writtenOff: WrittenOffOre[];
   dismissed: { charge: DayCharge; dismissal: Dismissal }[];
+  /** Positive corrections dated on a paid Statement's day — never billed (D22). */
+  blockedCorrections: Adjustment[];
 }
 
 export type StatementDraft =
@@ -154,7 +169,7 @@ function dateRange(from: string, through: string): string[] {
 /** Every day a Statement took in: its covered range plus any earlier day one of its lines billed. */
 export function statementDays(statement: Statement): Set<string> {
   const days = new Set(dateRange(statement.coversFrom, statement.coversThrough));
-  for (const line of statement.lines) days.add(line.date);
+  for (const line of statement.lines) if (line.kind !== 'correction') days.add(line.date);
   return days;
 }
 
@@ -189,25 +204,30 @@ function growth(current: readonly OreLine[], billed: ReadonlyMap<number, number>
 }
 
 export function draftStatement(input: StatementDraftInput): StatementDraft {
-  const writtenOff: WrittenOffOre[] = [];
-  const dismissed: DraftCommon['dismissed'] = [];
-  if (input.billableThrough === undefined) return { kind: 'nothing', writtenOff, dismissed };
+  const common: DraftCommon = { writtenOff: [], dismissed: [], blockedCorrections: [] };
+  const { writtenOff, dismissed, blockedCorrections } = common;
+  if (input.billableThrough === undefined) return { kind: 'nothing', ...common };
+  const issued = input.issued.filter((s) => s.minerId === input.minerId);
 
   const coversThrough =
     input.billableThrough < input.period.end ? input.billableThrough : input.period.end;
-  const lastCovered = input.issued.reduce<string | undefined>(
+  const lastCovered = issued.reduce<string | undefined>(
     (max, s) => (max === undefined || s.coversThrough > max ? s.coversThrough : max),
     undefined
   );
   const coversFrom = lastCovered ? shiftDate(lastCovered, 1) : input.startDate;
 
   const billedQty = new Map<string, Map<number, number>>();
+  const billedPrices = new Map<string, Record<number, number>>();
   const billedAdjustments = new Set<string>();
   const paidDay = new Map<string, string>();
-  for (const s of input.issued) {
+  for (const s of issued) {
     for (const line of s.lines) {
       if (line.adjustmentId) billedAdjustments.add(line.adjustmentId);
       if (!line.chargeKey) continue;
+      if (line.unitPrices && !billedPrices.has(line.chargeKey)) {
+        billedPrices.set(line.chargeKey, line.unitPrices);
+      }
       const qty = billedQty.get(line.chargeKey) ?? new Map<number, number>();
       for (const ore of line.oreLines)
         qty.set(ore.typeId, (qty.get(ore.typeId) ?? 0) + ore.quantity);
@@ -224,9 +244,11 @@ export function draftStatement(input: StatementDraftInput): StatementDraft {
     const billed = billedQty.get(charge.key);
     const extra = billed ? growth(charge.oreLines, billed) : charge.oreLines;
     if (extra.length === 0) continue;
+    // Late ore keeps the unit prices its day was first billed at.
+    const unitPrices = { ...charge.unitPrices, ...billedPrices.get(charge.key) };
     const { estimatedValue, taxOwed } = computeAssignmentValue(
       extra,
-      priceMap(charge.unitPrices),
+      priceMap(unitPrices),
       charge.taxPct
     );
     const paidStatementId = paidDay.get(charge.date);
@@ -242,12 +264,10 @@ export function draftStatement(input: StatementDraftInput): StatementDraft {
       });
       continue;
     }
-    if (!billed) {
-      const dismissal = activeDismissalFor(charge, input.dismissals);
-      if (dismissal) {
-        dismissed.push({ charge, dismissal });
-        continue;
-      }
+    const dismissal = activeDismissalFor(charge, input.dismissals);
+    if (dismissal) {
+      dismissed.push({ charge, dismissal });
+      continue;
     }
     const late = billed !== undefined || (lastCovered !== undefined && charge.date <= lastCovered);
     lines.push({
@@ -257,14 +277,23 @@ export function draftStatement(input: StatementDraftInput): StatementDraft {
       characterId: charge.characterId,
       structureId: charge.structureId,
       oreLines: extra,
-      unitPrices: charge.unitPrices,
+      unitPrices,
+      priceSources: charge.priceSources,
       taxPct: charge.taxPct,
+      ...(charge.rateEffectiveFrom !== undefined
+        ? { rateEffectiveFrom: charge.rateEffectiveFrom }
+        : {}),
       estimatedValue,
       tax: taxOwed,
     });
   }
   for (const adj of input.adjustments) {
     if (adj.minerId !== input.minerId || billedAdjustments.has(adj.id)) continue;
+    if (adj.date > coversThrough) continue;
+    if (adj.amount > 0 && paidDay.has(adj.date)) {
+      blockedCorrections.push(adj);
+      continue;
+    }
     lines.push({
       kind: 'correction',
       date: adj.date,
@@ -281,18 +310,26 @@ export function draftStatement(input: StatementDraftInput): StatementDraft {
       (a.chargeKey ?? a.adjustmentId ?? '').localeCompare(b.chargeKey ?? b.adjustmentId ?? '')
   );
 
-  if (lines.length === 0) return { kind: 'nothing', writtenOff, dismissed };
+  if (lines.length === 0) return { kind: 'nothing', ...common };
   const amount = lines.reduce((sum, line) => sum + line.tax, 0);
   if (!input.final && amount < (input.minimumAmount ?? DEFAULT_MINIMUM_STATEMENT)) {
-    return { kind: 'rolled-over', lines, amount, writtenOff, dismissed };
+    return { kind: 'rolled-over', lines, amount, ...common };
   }
-  return { kind: 'statement', lines, amount, coversFrom, coversThrough, writtenOff, dismissed };
+  return { kind: 'statement', lines, amount, coversFrom, coversThrough, ...common };
 }
 
 /** Freezes a draft into an issued Statement. */
 export function issueStatement(
   draft: Extract<StatementDraft, { kind: 'statement' }>,
-  meta: { id: string; code: string; minerId: string; period: StatementPeriod; issuedAt: string }
+  meta: {
+    id: string;
+    code: string;
+    minerId: string;
+    period: StatementPeriod;
+    issuedAt: string;
+    hubId: string;
+    oreForm: 'compressed' | 'raw';
+  }
 ): Statement {
   return {
     id: meta.id,
@@ -303,6 +340,8 @@ export function issueStatement(
     coversFrom: draft.coversFrom,
     coversThrough: draft.coversThrough,
     issuedAt: meta.issuedAt,
+    hubId: meta.hubId,
+    oreForm: meta.oreForm,
     lines: draft.lines,
     amount: draft.amount,
   };

@@ -31,7 +31,10 @@ const book = {
   startDate: '2026-07-01',
   miners,
   rates,
-  pricesOn: () => new Map([[ORE, 30]]),
+  pricesOn: () => ({
+    prices: new Map([[ORE, 30]]),
+    sources: new Map([[ORE, 'saved' as const]]),
+  }),
   placeOf: (structureId: number) =>
     structureId === 2002 ? { moonId: 40000001, extractionId: 'x1' } : {},
 };
@@ -42,7 +45,7 @@ describe('minerIdFor', () => {
   });
 
   it('defaults to one Miner per character', () => {
-    expect(minerIdFor(90000009, miners)).toBe('char:90000009');
+    expect(minerIdFor(90000009, miners)).toBe('solo:90000009');
   });
 });
 
@@ -59,6 +62,7 @@ describe('buildDayCharges', () => {
         isGuest: false,
         oreLines: [{ typeId: ORE, quantity: 100 }],
         unitPrices: { [ORE]: 30 },
+        priceSources: { [ORE]: 'saved' },
         taxPct: 10,
         rateScope: 'corp',
         rateEffectiveFrom: '2026-01-01',

@@ -25,6 +25,7 @@ function charge(date: string, quantity: number, overrides: Partial<DayCharge> = 
     isGuest: false,
     oreLines: [{ typeId: ORE, quantity }],
     unitPrices: { [ORE]: 1000 },
+    priceSources: { [ORE]: 'saved' },
     taxPct: 10,
     rateScope: 'corp',
     rateEffectiveFrom: '2026-01-01',
@@ -65,6 +66,8 @@ function issue(
     minerId: draftInput.minerId,
     period: draftInput.period,
     issuedAt,
+    hubId: 'jita',
+    oreForm: 'compressed',
   });
 }
 
@@ -272,6 +275,8 @@ describe('draftStatement', () => {
     const issuedAugust = issueStatement(august, {
       id: 's2',
       code: 'NDT-s2',
+      hubId: 'jita',
+      oreForm: 'compressed',
       minerId: 'm1',
       period: AUGUST,
       issuedAt: '2026-09-02T12:00:00Z',
@@ -313,6 +318,135 @@ describe('draftStatement', () => {
       input({ charges: [charge('2026-07-10', 60_000, { minerId: 'm2' })] })
     );
     expect(draft.kind).toBe('nothing');
+  });
+});
+
+describe('draftStatement (review follow-ups)', () => {
+  const correction = (date: string, amount: number) => ({
+    id: `a-${date}`,
+    minerId: 'm1',
+    date,
+    amount,
+    reason: 'Officer fix',
+    by: 95000001,
+    at: '2026-08-03T00:00:00Z',
+  });
+
+  it('freezes what the mail prints: rate, its effective date, price sources, hub and Ore Form', () => {
+    const july = issue(input({ charges: [charge('2026-07-10', 60_000)] }), 's1');
+    expect(july).toMatchObject({ hubId: 'jita', oreForm: 'compressed' });
+    expect(july.lines[0]).toMatchObject({
+      taxPct: 10,
+      rateEffectiveFrom: '2026-01-01',
+      unitPrices: { [ORE]: 1000 },
+      priceSources: { [ORE]: 'saved' },
+    });
+  });
+
+  it('holds a correction dated after the last Billable day for a later Statement', () => {
+    const draft = draftStatement(
+      input({
+        billableThrough: '2026-07-29',
+        charges: [charge('2026-07-10', 60_000)],
+        adjustments: [correction('2026-07-30', 100_000)],
+      })
+    );
+    if (draft.kind !== 'statement') throw new Error(draft.kind);
+    expect(draft.lines.map((l) => l.kind)).toEqual(['mined']);
+  });
+
+  it('a correction line never adds its day to the days a Statement covered', () => {
+    const july = issue(input({ charges: [charge('2026-07-10', 60_000)] }), 's1');
+    const august = issue(
+      input({
+        period: AUGUST,
+        billableThrough: '2026-08-10',
+        issued: [july],
+        charges: [charge('2026-08-05', 60_000)],
+        adjustments: [correction('2026-07-10', -100_000)],
+      }),
+      's2'
+    );
+    expect(daysOnStatements([august]).has('2026-07-10')).toBe(false);
+  });
+
+  it('does not bill a positive correction on a paid Statement’s day, and says so', () => {
+    const july = issue(input({ charges: [charge('2026-07-10', 60_000)] }), 's1');
+    const draft = draftStatement(
+      input({
+        period: AUGUST,
+        billableThrough: '2026-09-02',
+        issued: [july],
+        paidStatementIds: new Set(['s1']),
+        charges: [charge('2026-08-05', 60_000)],
+        adjustments: [correction('2026-07-10', 100_000), correction('2026-07-11', -50_000)],
+      })
+    );
+    if (draft.kind !== 'statement') throw new Error(draft.kind);
+    expect(draft.lines.map((l) => [l.kind, l.tax])).toEqual([
+      ['correction', -50_000],
+      ['mined', 6_000_000],
+    ]);
+    expect(draft.blockedCorrections.map((a) => a.id)).toEqual(['a-2026-07-10']);
+  });
+
+  it('ignores another Miner’s issued Statements', () => {
+    const other = {
+      ...issue(input({ charges: [charge('2026-07-10', 60_000)] }), 'sX'),
+      minerId: 'm2',
+    };
+    const draft = draftStatement(
+      input({ issued: [other], charges: [charge('2026-07-10', 60_000)] })
+    );
+    if (draft.kind !== 'statement') throw new Error(draft.kind);
+    expect(draft.lines.map((l) => l.kind)).toEqual(['mined']);
+  });
+
+  it('leaves late ore off a billed day that was dismissed since', () => {
+    const july = issue(input({ charges: [charge('2026-07-10', 60_000)] }), 's1');
+    const draft = draftStatement(
+      input({
+        period: AUGUST,
+        billableThrough: '2026-09-02',
+        issued: [july],
+        charges: [charge('2026-07-10', 61_000), charge('2026-08-05', 60_000)],
+        dismissals: [
+          {
+            id: 'd1',
+            scope: 'record',
+            targetId: '90000001:1001:2026-07-10',
+            by: 95000001,
+            at: '2026-08-03T00:00:00Z',
+            reason: 'Fleet op',
+          },
+        ],
+      })
+    );
+    if (draft.kind !== 'statement') throw new Error(draft.kind);
+    expect(draft.lines.map((l) => l.date)).toEqual(['2026-08-05']);
+    expect(draft.dismissed.map((d) => d.charge.date)).toEqual(['2026-07-10']);
+  });
+
+  it('prices late ore at the unit prices its day was first billed at', () => {
+    const july = issue(input({ charges: [charge('2026-07-10', 60_000)] }), 's1');
+    const draft = draftStatement(
+      input({
+        period: AUGUST,
+        billableThrough: '2026-09-02',
+        issued: [july],
+        // Repriced since (live → saved): the bill keeps the first price.
+        charges: [
+          charge('2026-07-10', 61_000, { unitPrices: { [ORE]: 2000 } }),
+          charge('2026-08-05', 60_000),
+        ],
+      })
+    );
+    if (draft.kind !== 'statement') throw new Error(draft.kind);
+    expect(draft.lines[0]).toMatchObject({
+      kind: 'late-ore',
+      tax: 100_000,
+      unitPrices: { [ORE]: 1000 },
+    });
   });
 });
 

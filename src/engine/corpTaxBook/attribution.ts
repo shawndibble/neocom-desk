@@ -79,6 +79,8 @@ export interface BookShareInput {
 export interface BookShare {
   /** Covered by ore the member had not given to anyone. */
   fromFree: OreLine[];
+  /** The free ore this book did not take — pass it to the next book in the system. */
+  freeLeft: OreLine[];
   /** Ore the member gave another Payee that this book also observed. */
   conflict: OreLine[];
   /** The conflict has run its 14 days and now belongs to the corp. */
@@ -95,10 +97,17 @@ export function resolveBookShare(input: BookShareInput): BookShare {
     if (line.quantity > free)
       conflict.push({ typeId: line.typeId, quantity: line.quantity - free });
   }
-  if (conflict.length === 0) return { fromFree, conflict, conflictOwed: false };
+  const freeLeft = input.free
+    .map((line) => ({
+      typeId: line.typeId,
+      quantity: line.quantity - quantityOf(fromFree, line.typeId),
+    }))
+    .filter((line) => line.quantity > 0);
+  if (conflict.length === 0) return { fromFree, freeLeft, conflict, conflictOwed: false };
   const resolvesAt = Date.parse(input.conflictSince ?? input.now) + CONFLICT_RESOLVE_DAYS * DAY_MS;
   return {
     fromFree,
+    freeLeft,
     conflict,
     conflictOwed: Date.parse(input.now) >= resolvesAt,
     conflictResolvesAt: new Date(resolvesAt).toISOString(),

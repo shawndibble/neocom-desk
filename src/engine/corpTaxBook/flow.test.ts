@@ -46,7 +46,7 @@ describe('a month of the Corp Tax Book', () => {
       startDate: '2026-07-01',
       miners: [],
       rates: [{ scope: 'corp', pct: 10, effectiveFrom: '2026-07-01' }],
-      pricesOn: () => day.prices,
+      pricesOn: () => day,
       placeOf: () => ({}),
     });
     // 50,000 × 1,200 = 60M; 10% = 6M — the same as computeAssignmentValue in the personal tab.
@@ -74,20 +74,22 @@ describe('a month of the Corp Tax Book', () => {
       minerId: charges[0].minerId,
       period,
       issuedAt: '2026-08-02T00:00:00Z',
+      hubId: 'jita',
+      oreForm: 'compressed',
     });
 
     const match = matchDonation(
       { characterId: 90000001, reason: 'moon tax' },
       { miners: [], statements: [statement], knownCharacterIds: new Set([90000001]) }
     );
-    expect(match).toEqual({ kind: 'miner', minerId: 'char:90000001' });
+    expect(match).toEqual({ kind: 'miner', minerId: 'solo:90000001' });
 
     const allocation = allocatePayments({
       statements: [statement],
       payments: [
         {
           id: 'j1',
-          minerId: 'char:90000001',
+          minerId: 'solo:90000001',
           characterId: 90000001,
           amount: 5_980_000,
           at: '2026-08-05T00:00:00Z',

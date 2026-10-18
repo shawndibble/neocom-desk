@@ -103,41 +103,47 @@ export function allocatePayments(input: AllocationInput): Allocation {
   const ordered = [...input.statements].sort(
     (a, b) => a.issuedAt.localeCompare(b.issuedAt) || a.id.localeCompare(b.id)
   );
-  const state = new Map(ordered.map((s) => [s.id, { amount: s.amount, credited: 0 }]));
-  const isDone = (st: { amount: number; credited: number }): boolean => {
+  type Running = { amount: number; credited: number; paidIn: number };
+  const state = new Map<string, Running>(
+    ordered.map((s) => [s.id, { amount: s.amount, credited: 0, paidIn: 0 }])
+  );
+  // Only a payment settles within the tolerance; a dismissal must cover in full.
+  const isDone = (st: Running): boolean => {
     const remaining = st.amount - st.credited;
-    return remaining <= 0 || (st.credited > 0 && remaining <= settleTolerance(st.amount));
+    return remaining <= 0 || (st.paidIn > 0 && remaining <= settleTolerance(st.amount));
   };
-  const apply = (id: string, available: number): number => {
+  const apply = (id: string, available: number, isPayment: boolean): number => {
     const st = state.get(id);
     if (!st || isDone(st)) return available;
     const take = Math.min(available, st.amount - st.credited);
     st.credited += take;
+    if (isPayment) st.paidIn += take;
     return available - take;
   };
-  const applyOldestFirst = (available: number): number => {
+  const applyOldestFirst = (available: number, isPayment: boolean): number => {
     for (const s of ordered) {
       if (available <= 0) break;
-      available = apply(s.id, available);
+      available = apply(s.id, available, isPayment);
     }
     return available;
   };
 
-  let credit = 0;
+  // A Statement that came out negative (mostly credit corrections) is credit.
+  let credit = ordered.reduce((sum, s) => sum + Math.max(0, -s.amount), 0);
   let paid = 0;
   let dismissed = 0;
   for (const d of input.dismissalCredits) {
     dismissed += d.amount;
-    credit += apply(d.statementId, d.amount);
+    credit += applyOldestFirst(apply(d.statementId, d.amount, false), false);
   }
   const payments = [...input.payments].sort(
     (a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id)
   );
   for (const p of payments) {
-    let available = Math.max(0, p.amount - Math.min(p.notTaxAmount ?? 0, p.amount));
+    let available = p.amount - Math.min(p.notTaxAmount ?? 0, p.amount);
     paid += available;
-    if (p.statementId) available = apply(p.statementId, available);
-    credit += applyOldestFirst(available);
+    if (p.statementId) available = apply(p.statementId, available, true);
+    credit += applyOldestFirst(available, true);
   }
 
   const byStatement = new Map<string, StatementSettlement>();

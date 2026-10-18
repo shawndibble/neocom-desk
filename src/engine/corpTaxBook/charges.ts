@@ -7,6 +7,8 @@
 import { observedEntryKey } from './observed';
 import { resolveRate, type RateScope, type TaxRate } from './rates';
 import { valueObservedEntry } from './valuation';
+import type { TaxPriceSource } from '../miningTax/priceBasis';
+import type { DayPrices } from './valuation';
 import type { ObservedMiningEntry, OreLine } from './types';
 
 export interface Miner {
@@ -18,7 +20,7 @@ export interface Miner {
 
 /** The Miner a character is billed under: its grouping, or a Miner of its own. */
 export function minerIdFor(characterId: number, miners: readonly Miner[]): string {
-  return miners.find((m) => m.characterIds.includes(characterId))?.id ?? `char:${characterId}`;
+  return miners.find((m) => m.characterIds.includes(characterId))?.id ?? `solo:${characterId}`;
 }
 
 /** What one Observed Mining Entry owes, snapshotted with the inputs that priced it. */
@@ -34,7 +36,10 @@ export interface DayCharge {
   isGuest: boolean;
   oreLines: OreLine[];
   /** Per-unit price by raw type id on `date` at the book's hub and Ore Form. */
+  /** Records rather than Maps so a charge stores as plain data. */
   unitPrices: Record<number, number>;
+  /** Which price tier priced each raw type id. */
+  priceSources: Record<number, TaxPriceSource>;
   taxPct: number;
   rateScope: RateScope;
   rateEffectiveFrom?: string;
@@ -48,8 +53,8 @@ export interface ChargeBook {
   startDate: string;
   miners: readonly Miner[];
   rates: readonly TaxRate[];
-  /** Per-unit price by raw type id on a date (`priceObservedDay(...).prices`). */
-  pricesOn: (date: string) => ReadonlyMap<number, number>;
+  /** The day's prices at the book's hub and Ore Form (`priceObservedDay`). */
+  pricesOn: (date: string) => Pick<DayPrices, 'prices' | 'sources'>;
   /** The moon and Extraction a refinery was working on a date, when known. */
   placeOf: (structureId: number, date: string) => { moonId?: number; extractionId?: string };
 }
@@ -87,7 +92,7 @@ export function buildDayCharges(
       result.unrated.push(entry);
       continue;
     }
-    const prices = book.pricesOn(entry.date);
+    const { prices, sources } = book.pricesOn(entry.date);
     const { estimatedValue, taxOwed } = valueObservedEntry(entry, prices, rate.pct);
     result.charges.push({
       key,
@@ -101,6 +106,9 @@ export function buildDayCharges(
       oreLines: entry.oreLines,
       unitPrices: Object.fromEntries(
         entry.oreLines.map((line) => [line.typeId, prices.get(line.typeId) ?? 0])
+      ),
+      priceSources: Object.fromEntries(
+        entry.oreLines.map((line) => [line.typeId, sources.get(line.typeId) ?? 'none'])
       ),
       taxPct: rate.pct,
       rateScope: rate.scope,

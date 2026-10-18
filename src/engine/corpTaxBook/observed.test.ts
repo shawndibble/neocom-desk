@@ -81,6 +81,14 @@ describe('mergeObservedRows', () => {
 });
 
 describe('groupObservedEntries', () => {
+  it('takes the recorded corporation from the freshest row when a character changed corp mid-day', () => {
+    const [entry] = groupObservedEntries([
+      row({ typeId: ORE_A }),
+      row({ typeId: ORE_B, recordedCorporationId: 1, cachedAt: '2026-07-12T13:00:00Z' }),
+    ]);
+    expect(entry.recordedCorporationId).toBe(1);
+  });
+
   it('sums one character at one refinery on one day into an Observed Mining Entry, per ore type', () => {
     const entries = groupObservedEntries([
       row({ typeId: ORE_B, quantity: 50 }),

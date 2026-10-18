@@ -83,7 +83,12 @@ describe('resolveBookShare', () => {
         free: [{ typeId: ORE_A, quantity: 800 }],
         now: '2026-07-20T00:00:00Z',
       })
-    ).toEqual({ fromFree: [{ typeId: ORE_A, quantity: 500 }], conflict: [], conflictOwed: false });
+    ).toEqual({
+      fromFree: [{ typeId: ORE_A, quantity: 500 }],
+      freeLeft: [{ typeId: ORE_A, quantity: 300 }],
+      conflict: [],
+      conflictOwed: false,
+    });
   });
 
   it('what Unattributed cannot cover, because the member gave it to another Payee, is a visible conflict — not owed', () => {
@@ -96,10 +101,26 @@ describe('resolveBookShare', () => {
       })
     ).toEqual({
       fromFree: [{ typeId: ORE_A, quantity: 200 }],
+      freeLeft: [],
       conflict: [{ typeId: ORE_A, quantity: 300 }],
       conflictOwed: false,
       conflictResolvesAt: '2026-07-29T00:00:00.000Z',
     });
+  });
+
+  it('returns the free ore it left, so the next book in the system cannot claim it again', () => {
+    const first = resolveBookShare({
+      share: [{ typeId: ORE_A, quantity: 500 }],
+      free: [{ typeId: ORE_A, quantity: 800 }],
+      now: '2026-07-20T00:00:00Z',
+    });
+    expect(first.freeLeft).toEqual([{ typeId: ORE_A, quantity: 300 }]);
+    const second = resolveBookShare({
+      share: [{ typeId: ORE_A, quantity: 400 }],
+      free: first.freeLeft,
+      now: '2026-07-20T00:00:00Z',
+    });
+    expect(second.conflict).toEqual([{ typeId: ORE_A, quantity: 100 }]);
   });
 
   it('the conflict resolves to the corp 14 days after it was raised', () => {

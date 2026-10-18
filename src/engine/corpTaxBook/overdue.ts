@@ -8,7 +8,10 @@
  */
 
 export const DEFAULT_OVERDUE_DAYS = 14;
+/** The most a Statement's Overdue clock pauses for declarations, in total. */
 export const DECLARATION_PAUSE_DAYS = 14;
+/** A rejected declaration leaves at least this long before Overdue. */
+export const REJECTION_GRACE_DAYS = 14;
 
 const DAY_MS = 86_400_000;
 
@@ -46,8 +49,9 @@ export interface OverdueInput {
 export function overdueStatus(input: OverdueInput): OverdueStatus {
   const now = Date.parse(input.now);
   const cap = DECLARATION_PAUSE_DAYS * DAY_MS;
-  // Each declaration's pause window, merged so overlapping ones count once.
-  const windows = input.declarations
+  // Each declaration's pause window, merged so overlapping ones count once and
+  // capped at 14 days in total, so filing again cannot extend the pause.
+  const requested = input.declarations
     .map((d) => {
       const start = Date.parse(d.at);
       const capped = start + cap;
@@ -55,11 +59,16 @@ export function overdueStatus(input: OverdueInput): OverdueStatus {
       return { start, end, unanswered: !d.resolution };
     })
     .sort((a, b) => a.start - b.start);
+  const windows: typeof requested = [];
   let paused = 0;
   let cursor = -Infinity;
-  for (const w of windows) {
+  for (const w of requested) {
     const start = Math.max(w.start, cursor);
-    if (w.end > start) paused += w.end - start;
+    const end = Math.min(w.end, start + (cap - paused));
+    if (end > start) {
+      paused += end - start;
+      windows.push({ ...w, start, end });
+    }
     cursor = Math.max(cursor, w.end);
   }
 
@@ -67,7 +76,7 @@ export function overdueStatus(input: OverdueInput): OverdueStatus {
     Date.parse(input.issuedAt) + (input.overdueDays ?? DEFAULT_OVERDUE_DAYS) * DAY_MS + paused;
   for (const d of input.declarations) {
     if (d.resolution?.kind === 'rejected') {
-      overdueAt = Math.max(overdueAt, Date.parse(d.resolution.at) + cap);
+      overdueAt = Math.max(overdueAt, Date.parse(d.resolution.at) + REJECTION_GRACE_DAYS * DAY_MS);
     }
   }
 

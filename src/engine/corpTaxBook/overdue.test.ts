@@ -98,6 +98,19 @@ describe('overdueStatus', () => {
     ).toBe('overdue');
   });
 
+  it('caps the unanswered pause at 14 days per Statement — filing again does not extend it', () => {
+    const status = overdueStatus({
+      issuedAt: ISSUED,
+      settled: false,
+      now: '2026-09-01T00:00:00Z',
+      declarations: [
+        declaration('2026-08-10T00:00:00Z'),
+        declaration('2026-08-24T00:00:00Z', { id: 'dc2' }),
+      ],
+    });
+    expect(status).toMatchObject({ state: 'overdue', overdueAt: '2026-08-29T00:00:00.000Z' });
+  });
+
   it('a confirmed declaration ends the pause where it was confirmed', () => {
     const status = overdueStatus({
       issuedAt: ISSUED,

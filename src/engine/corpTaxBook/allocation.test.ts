@@ -19,6 +19,8 @@ function statement(id: string, amount: number, issuedAt: string, code = `NDT-${i
     coversFrom: issuedAt.slice(0, 7) + '-01',
     coversThrough: issuedAt.slice(0, 10),
     issuedAt,
+    hubId: 'jita',
+    oreForm: 'compressed',
     amount,
     lines: [
       {
@@ -172,6 +174,42 @@ describe('allocatePayments', () => {
   });
 });
 
+describe('allocatePayments (review follow-ups)', () => {
+  it('a dismissal credit beyond its Statement flows to the oldest other open Statement', () => {
+    const result = allocatePayments({
+      statements: [JUNE, JULY],
+      payments: [],
+      dismissalCredits: [
+        { statementId: 's2', dismissalId: 'd1', chargeKey: 'k', amount: 9_000_000 },
+      ],
+    });
+    expect(result.byStatement.get('s2')).toMatchObject({ credited: 8_000_000, settled: true });
+    expect(result.byStatement.get('s1')).toMatchObject({ credited: 1_000_000 });
+    expect(result.credit).toBe(0);
+  });
+
+  it('only a payment can settle within the tolerance — a dismissal alone does not', () => {
+    const result = allocatePayments({
+      statements: [JUNE],
+      payments: [],
+      dismissalCredits: [
+        { statementId: 's1', dismissalId: 'd1', chargeKey: 'k', amount: 9_950_000 },
+      ],
+    });
+    expect(result.byStatement.get('s1')).toMatchObject({ settled: false, remaining: 50_000 });
+  });
+
+  it('a Statement that came out negative becomes credit', () => {
+    const result = allocatePayments({
+      statements: [statement('s3', -300_000, '2026-06-30T00:00:00Z')],
+      payments: [],
+      dismissalCredits: [],
+    });
+    expect(result.credit).toBe(300_000);
+    expect(result.balance).toBe(-300_000);
+  });
+});
+
 describe('dismissalCredits', () => {
   it('credits the tax a Statement billed for a day dismissed after it was issued', () => {
     const charge = {
@@ -226,7 +264,7 @@ describe('matchDonation', () => {
         { characterId: 777, reason: undefined },
         { miners, statements: [], knownCharacterIds: new Set([777]) }
       )
-    ).toEqual({ kind: 'miner', minerId: 'char:777' });
+    ).toEqual({ kind: 'miner', minerId: 'solo:777' });
   });
 
   it('sends an unknown character with no code to Unmatched', () => {
