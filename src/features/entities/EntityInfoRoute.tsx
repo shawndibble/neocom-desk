@@ -17,9 +17,10 @@
  * already open (a drill-down from a character to its corporation) replaces
  * instead of pushing, so a single Close or Back always returns to the page.
  */
-import { useEffect, useRef } from 'react';
-import { useLocation, useNavigate, useNavigationType } from 'react-router-dom';
+import { useCallback, useEffect, useRef } from 'react';
+import { useLocation, useNavigate, type Location } from 'react-router-dom';
 import { entityInfoHref, parseEntityInfo, withoutEntityInfo } from '@/lib/entityInfo';
+import { usePageLeave } from '@/lib/usePageLeave';
 import { registerEntityInfoNavigator } from '@/stores/entityInfoNavigator';
 import { useItemInfoModalStore } from '@/stores/itemInfoModal';
 import { usePlaceInfoModalStore } from '@/stores/placeInfoModal';
@@ -30,7 +31,6 @@ import { ENTITY_INFO_PUSHED_STATE, wasPushedHere } from './entityInfoState';
 export function EntityInfoRoute() {
   const navigate = useNavigate();
   const location = useLocation();
-  const navigationType = useNavigationType();
   const locationRef = useRef(location);
   useEffect(() => {
     locationRef.current = location;
@@ -69,22 +69,20 @@ export function EntityInfoRoute() {
   );
 
   // A tab switch keeps the search, so `info` would outlive the page the modal
-  // was opened on (the modals close on a page change): strip it. A replace
-  // that moves the path is a redirect, not a switch (`TabRoute`'s landing on
-  // the default tab, a remembered tab, a legacy path): the same visit, so a
-  // cold `/market?info=type-34` keeps its modal through `/market/browser`.
-  // No app action replaces onto another page with the search kept, so a
-  // replace is only ever such a redirect.
-  const shownPathname = useRef(location.pathname);
-  useEffect(() => {
-    if (shownPathname.current === location.pathname) return;
-    shownPathname.current = location.pathname;
-    if (navigationType === 'REPLACE') return;
-    if (parseEntityInfo(location.search) === null) return;
-    navigate(`${location.pathname}${withoutEntityInfo(location.search)}${location.hash}`, {
-      replace: true,
-    });
-  }, [location.pathname, location.search, location.hash, navigationType, navigate]);
+  // was opened on (the modals close on a page change): strip it. A redirect
+  // is not a page change (`usePageLeave`), so a cold `/market?info=type-34`
+  // keeps its modal through the landing on `/market/browser`.
+  usePageLeave(
+    useCallback(
+      (left: Location) => {
+        if (parseEntityInfo(left.search) === null) return;
+        navigate(`${left.pathname}${withoutEntityInfo(left.search)}${left.hash}`, {
+          replace: true,
+        });
+      },
+      [navigate]
+    )
+  );
 
   const info = parseEntityInfo(location.search);
   const kind = info?.kind ?? null;

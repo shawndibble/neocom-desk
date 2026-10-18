@@ -28,12 +28,18 @@ test('a cold ?info= link to a bare tabbed path keeps its modal through the tab l
   await page.route(/https:\/\/esi\.evetech\.net\/markets\/\d+\/orders/, (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
   );
-  await signInAndGoto(page, './market?section=browser&info=type-34');
+  await signInAndGoto(page, './market?info=type-34');
 
   const modal = page.getByRole('dialog');
-  await expect(modal).toBeVisible();
-  // The Market Browser tab under the modal has rendered: the redirect committed.
-  await expect(page.getByRole('tab', { name: 'Market', selected: true })).toBeAttached();
+  await expect(modal).toBeVisible({ timeout: 15_000 });
+  // The page's own tab bar (not the modal's) shows Market: the redirect committed.
+  await expect(
+    page
+      .getByRole('tablist', { name: 'Market' })
+      .getByRole('tab', { name: 'Market', selected: true })
+  ).toBeAttached({
+    timeout: 15_000,
+  });
   await expect(page).toHaveURL(/\/market\/browser\?.*info=type-34/);
   await expect(modal).toBeVisible();
 

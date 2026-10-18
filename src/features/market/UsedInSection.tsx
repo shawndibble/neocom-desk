@@ -160,7 +160,7 @@ export function UsedInSection({
 
 /**
  * Calls `onNavigate` once the page or its params (other than `?info`) change
- * after mount. A replace is a redirect, not a navigation away (a cold
+ * after mount. A replace onto another path is a redirect, not a navigation away (a cold
  * `/market?info=…` landing on `/market/browser`, see `EntityInfoRoute`): it
  * becomes the new starting point instead.
  */
@@ -173,7 +173,7 @@ function CloseOnNavigate({ onNavigate }: { onNavigate: () => void }) {
     const start = mountedAt.current;
     if (key === start.key) return;
     if (pathname === start.pathname && withoutEntityInfo(search) === start.search) return;
-    if (navigationType === 'REPLACE') {
+    if (navigationType === 'REPLACE' && pathname !== start.pathname) {
       mountedAt.current = { key, pathname, search: withoutEntityInfo(search) };
       return;
     }

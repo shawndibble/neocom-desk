@@ -133,6 +133,9 @@ describe('UsedInSection', () => {
     // A cold link's tab landing: TabRoute replaces `/market` with the default tab.
     await act(() => router.navigate!('/market/browser?info=type-34', { replace: true }));
     expect(onNavigate).not.toHaveBeenCalled();
+    // A drill-down on the landed page is judged from there, not from `/market`.
+    await act(() => router.navigate!('/market/browser?info=type-35'));
+    expect(onNavigate).not.toHaveBeenCalled();
 
     await act(() => router.navigate!('/industry/plans?info=type-34'));
     expect(onNavigate).toHaveBeenCalledOnce();
