@@ -15,6 +15,7 @@ function start(): void {
       snapshot = new Map(rows.map((row) => [row.characterId, row.name]));
       for (const listener of listeners) listener();
     },
+    // Same as the per-widget `useLiveQuery` it replaces: a failed read leaves the readouts blank.
     error: () => {},
   });
 }
