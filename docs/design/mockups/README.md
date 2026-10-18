@@ -32,5 +32,6 @@ PNG exports of the chosen mockups for ready tickets. Delete a folder (and its ro
 | [blueprint-acquisition-invent](blueprint-acquisition-invent/README.md) | Issue #3990 | Invent section, one tier per decryptor |
 | [contracts-below-market](contracts-below-market/README.md) | Issue #3989 | Below market chip, one row per contract |
 | [overview-market-industry-widgets](overview-market-industry-widgets/README.md) | Issues #3985, #3989, #3991, #3994, #3995 | Overview widget changes and two new widgets |
+| [corp-tax-book](corp-tax-book/README.md) | Issue #4056 (UI: #4063, #4064, #4065, #4066) | Final: A's drill-down pages, C's timeline + Needs you + Statement run, B's mail preview (dialog) and guest page, queue chip with % badge on phone, personal tab = today's Tax tab + corp states |
 
 First draft mockup; sample data. The ticket's Agent Brief text wins over the picture where they differ.
