@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import * as mirror from '../../../functions/src/corpTaxBookEngine';
+import { allocatePayments } from './allocation';
 import { DEFAULT_GRACE_HOURS } from './billable';
 import { DEFAULT_OVERDUE_DAYS } from './overdue';
 import { mergeObservedRows, observedRowKey } from './observed';
@@ -88,6 +89,35 @@ describe('functions mirror of the Corp Tax Book engine', () => {
         canRebillFrom(day, statements, paid)
       );
     }
+  });
+
+  it('allocates payments to Statements identically, including per-payment credits', () => {
+    const statements = [
+      { id: 's2', amount: 8_000_000, issuedAt: '2026-07-31T00:00:00Z' },
+      { id: 's1', amount: 10_000_000, issuedAt: '2026-06-30T00:00:00Z' },
+    ];
+    const payments = [
+      { id: 'p1', amount: 12_000_000, at: '2026-08-01T00:00:00Z', notTaxAmount: 500_000 },
+      { id: 'p2', amount: 3_000_000, at: '2026-08-02T00:00:00Z', statementId: 's2' },
+      { id: 'p3', amount: 50_000_000, at: '2026-08-03T00:00:00Z' },
+    ];
+    const dismissalCredits = [{ statementId: 's1', amount: 1_000_000 }];
+    const shared = { statements, payments, dismissalCredits };
+    const theirs = mirror.allocatePayments(shared);
+    const ours = allocatePayments({
+      statements: statements.map((s) => ({ ...s, minerId: 'm', code: '', lines: [] }) as never),
+      payments: payments.map((p) => ({
+        ...p,
+        minerId: 'm',
+        characterId: 1,
+        source: 'donation' as const,
+      })),
+      dismissalCredits: dismissalCredits.map((d) => ({ ...d, dismissalId: 'd', chargeKey: 'k' })),
+    });
+    expect(theirs.paymentCredits).toEqual(ours.paymentCredits);
+    expect([...theirs.byStatement]).toEqual([...ours.byStatement]);
+    expect(theirs.credit).toBe(ours.credit);
+    expect(theirs.balance).toBe(ours.balance);
   });
 
   it('keeps the book defaults equal to the engine constants', () => {

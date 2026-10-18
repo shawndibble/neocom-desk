@@ -57,6 +57,7 @@ describe('isPublicRoute', () => {
     expect(isPublicRoute('/share/fitting?code=x')).toBe(true);
     expect(isPublicRoute('/share/abc')).toBe(true);
     expect(isPublicRoute('/communities/join/XYZ')).toBe(true);
+    expect(isPublicRoute('/corp-tax-book/verify/abc')).toBe(true);
   });
 
   it('is false for the app and for routes that merely share a prefix', () => {
@@ -64,6 +65,7 @@ describe('isPublicRoute', () => {
     expect(isPublicRoute('/survey')).toBe(false);
     expect(isPublicRoute('/sharing')).toBe(false);
     expect(isPublicRoute('/communities')).toBe(false);
+    expect(isPublicRoute('/corp-tax-book')).toBe(false);
     expect(isPublicRoute('/communities/join')).toBe(true);
   });
 });

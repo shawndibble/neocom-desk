@@ -29,6 +29,10 @@ describe('pagePathFor', () => {
     expect(pagePathFor('/industry/groups/g1')).toBe('/industry/groups/:groupId');
   });
 
+  it("never reports a verify link's token, the only secret keeping a Statement private", () => {
+    expect(pagePathFor('/corp-tax-book/verify/abcDEF123_-xyz')).toBe('/*');
+  });
+
   it('falls back to a catch-all for anything unmatched', () => {
     expect(pagePathFor('/this-route-does-not-exist')).toBe('/*');
   });
