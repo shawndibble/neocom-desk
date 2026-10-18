@@ -179,7 +179,7 @@ beforeAll(async () => {
   // warming jsdom and React) took ~5s here, and landed on whichever test ran
   // first, timing out its 5s `findBy*` (the gate test, about one run in
   // three). Done here under the hook's own budget.
-  await Promise.all([routeChunks.loadCorp(), routeChunks.loadCorpWallet()]);
+  await routeChunks.loadCorpWallet();
   await seedSession();
   const { unmount } = render(<App />);
   await screen.findByRole('group', { name: 'Wallet division' }, { timeout: 25_000 });
