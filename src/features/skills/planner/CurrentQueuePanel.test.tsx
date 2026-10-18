@@ -51,7 +51,7 @@ function result(entries: SkillQueueEntry[]): CachedResult<SkillQueueEntry[]> {
 
 function renderPanel(entries: SkillQueueEntry[]) {
   const res = result(entries);
-  const view = buildQueueView(classifySkillQueue(entries, NOW));
+  const view = buildQueueView(classifySkillQueue(entries, NOW), NOW);
   return render(
     <MemoryRouter>
       <CurrentQueuePanel result={res} view={view} catalog={catalog} nowMs={NOW} />
@@ -87,8 +87,8 @@ describe('CurrentQueuePanel', () => {
 
   it('groups what is queued behind it by period, with count and time', () => {
     renderPanel(QUEUE);
-    expect(screen.getByRole('heading', { name: 'Next 3 weeks' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Month 2' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'This month' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'November' })).toBeInTheDocument();
     expect(screen.getByText('1 skill · 7d 0h')).toBeInTheDocument();
     expect(screen.getByText('1 skill · 32d 0h')).toBeInTheDocument();
     expect(screen.getByText('Gunnery')).toBeInTheDocument();
@@ -114,7 +114,7 @@ describe('CurrentQueuePanel', () => {
   });
 
   it('shows a spinner while the first read is in flight', () => {
-    const view = buildQueueView([]);
+    const view = buildQueueView([], NOW);
     render(
       <MemoryRouter>
         <CurrentQueuePanel result={undefined} view={view} catalog={catalog} nowMs={NOW} />
