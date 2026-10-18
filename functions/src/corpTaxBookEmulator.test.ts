@@ -8,6 +8,7 @@ import { HttpsError } from 'firebase-functions/v2/https';
 import { parseBookCall, parseEditAction, parseSyncInput, parseTurnOnInput } from './corpTaxBook.js';
 import { ROLES_SCOPE, type CorpIdentity } from './corpTaxBookEsi.js';
 import {
+  claimPayment,
   confirmGrouping,
   editBook,
   readStatementByToken,
@@ -493,6 +494,71 @@ suite('Corp Tax Book callables (emulator)', () => {
           edit(ACCOUNTANT, { action: 'assignPayment', paymentId: 'j1_5', minerId: 'solo:78' })
         )
       ).toBe('already-assigned');
+    });
+
+    it('lets a player claim only their own Unmatched donation, audited', async () => {
+      await turnOn();
+      await syncBook(
+        deps(),
+        who(ACCOUNTANT),
+        parseSyncInput(
+          {
+            corporationId: CORP,
+            donations: [
+              { refId: 7, division: 1, characterId: 77, amount: 10, at: '2026-10-18T00:00:00Z' },
+            ],
+          },
+          now
+        )
+      );
+      // Someone else's donation looks exactly like a missing one.
+      expect(await reason(claimPayment(deps(), who(78), CORP, 'j1_7'))).toBe('not-found');
+      expect(await reason(claimPayment(deps(), who(77), CORP, 'j1_404'))).toBe('not-found');
+      const before = await auditCount();
+      expect(await claimPayment(deps(), who(77), CORP, 'j1_7')).toEqual({ minerId: 'solo:77' });
+      expect((await book().collection('payments').doc('j1_7').get()).data()).toMatchObject({
+        minerId: 'solo:77',
+        claimedBy: 77,
+      });
+      expect(await auditCount()).toBe(before + 1);
+      const entry = (await book().collection('audit').where('action', '==', 'claimPayment').get())
+        .docs[0];
+      expect(entry.data()).toMatchObject({
+        action: 'claimPayment',
+        by: 77,
+        via: 'player-claim',
+        detail: { paymentId: 'j1_7', minerId: 'solo:77' },
+      });
+      // Claimed once; an officer's assignment cannot be overridden by a second claim.
+      expect(await reason(claimPayment(deps(), who(77), CORP, 'j1_7'))).toBe('already-assigned');
+    });
+
+    it('credits a claim to the Miner the character is grouped into', async () => {
+      await turnOn();
+      await edit(ACCOUNTANT, {
+        action: 'setMiner',
+        minerId: 'm-a',
+        characterIds: [60, 77],
+        mainCharacterId: 60,
+      });
+      await syncBook(
+        deps(),
+        who(ACCOUNTANT),
+        parseSyncInput(
+          {
+            corporationId: CORP,
+            donations: [
+              { refId: 8, division: 1, characterId: 77, amount: 10, at: '2026-10-18T00:00:00Z' },
+            ],
+          },
+          now
+        )
+      );
+      expect(await claimPayment(deps(), who(77), CORP, 'j1_8')).toEqual({ minerId: 'm-a' });
+    });
+
+    it('refuses a claim when the corporation has no book', async () => {
+      expect(await reason(claimPayment(deps(), who(77), CORP, 'j1_7'))).toBe('no-book');
     });
 
     it('groups characters, holds a guest until they confirm, and unlinks', async () => {

@@ -49,6 +49,7 @@ import {
 } from './purgeStaleAccounts.js';
 import {
   parseBookCall,
+  parseClaimPaymentInput,
   parseConfirmGroupingInput,
   parseEditAction,
   parseStopReminders,
@@ -58,6 +59,7 @@ import {
 } from './corpTaxBook.js';
 import { esiIdentityReader } from './corpTaxBookEsi.js';
 import {
+  claimPayment,
   confirmGrouping,
   editBook,
   readStatementByToken,
@@ -779,6 +781,12 @@ export const editCorpTaxBookCallable = onCall<unknown>(CORP_TAX_BOOK_OPTIONS, (r
     parseEditAction(request.data)
   )
 );
+
+// A player claims their own Unmatched donation (D5): uid-authorised, no officer role.
+export const claimCorpTaxBookPaymentCallable = onCall<unknown>(CORP_TAX_BOOK_OPTIONS, (request) => {
+  const { corporationId, paymentId } = parseClaimPaymentInput(request.data);
+  return claimPayment(corpTaxBookDeps(), callerOf(request), corporationId, paymentId);
+});
 
 export const confirmCorpTaxBookGroupingCallable = onCall<unknown>(
   CORP_TAX_BOOK_OPTIONS,

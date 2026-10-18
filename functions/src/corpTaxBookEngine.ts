@@ -14,6 +14,9 @@ export interface ObservedRow {
   date: string;
   quantity: number;
   cachedAt: string;
+  /** Where the refinery is and which moon it drilled, when the syncing officer's client knew (#4065). */
+  solarSystemId?: number;
+  moonId?: number;
 }
 
 /** The upsert key: miner + ore + day + structure (engine `observedRowKey`). */
