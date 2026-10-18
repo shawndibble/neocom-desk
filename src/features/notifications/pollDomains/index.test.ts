@@ -1003,6 +1003,28 @@ describe('mailDomain.toSnapshot', () => {
  * is device-local state, only readable in `load`'s async context, so
  * `toSnapshot` stays a pure passthrough for this domain.
  */
+describe('walletDomain journal cause', () => {
+  it('carries the context ESI names, so a contract line can be linked to its contract', async () => {
+    vi.mocked(loadWalletJournalWithStatus).mockResolvedValue(
+      statusResult(
+        [
+          journalEntry({
+            id: 5,
+            amount: 250,
+            ref_type: 'contract_price',
+            context_id: 55,
+            context_id_type: 'contract_id',
+          }),
+        ],
+        false
+      )
+    );
+    expect(await walletDomain.load(1)).toMatchObject([
+      { refType: 'contract_price', contextId: 55, contextIdType: 'contract_id' },
+    ]);
+  });
+});
+
 describe('walletDomain threshold', () => {
   beforeEach(async () => {
     vi.mocked(loadWalletJournalWithStatus).mockReset();
@@ -1023,6 +1045,7 @@ describe('walletDomain threshold', () => {
         amount: 250,
         thresholdIsk: DEFAULT_WALLET_BALANCE_CHANGED_THRESHOLD_ISK,
         dateMs: Date.parse('2026-01-01T00:00:00Z'),
+        refType: 'bounty',
       },
     ]);
   });
@@ -1046,6 +1069,7 @@ describe('walletDomain threshold', () => {
         amount: 250,
         thresholdIsk: 10_500_000,
         dateMs: Date.parse('2026-01-01T00:00:00Z'),
+        refType: 'bounty',
       },
     ]);
   });

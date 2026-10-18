@@ -1641,6 +1641,32 @@ describe('diffWalletBalanceChanged', () => {
     expect(diffWalletBalanceChanged(7, prev, next)).toEqual([walletFire(6, 250)]);
   });
 
+  it('carries what ESI says caused the line, and nothing when it says nothing', () => {
+    const prev = walletSnapshot([walletEntry(5)], T0);
+    const next = walletSnapshot(
+      [
+        {
+          ...walletEntry(7, 250),
+          refType: 'contract_price',
+          contextId: 55,
+          contextIdType: 'contract_id',
+        },
+        walletEntry(6, 100),
+        walletEntry(5),
+      ],
+      T0 + 2000
+    );
+    expect(diffWalletBalanceChanged(7, prev, next)).toEqual([
+      walletFire(6, 100),
+      {
+        ...walletFire(7, 250),
+        refType: 'contract_price',
+        contextId: 55,
+        contextIdType: 'contract_id',
+      },
+    ]);
+  });
+
   it('does not fire for an id already seen', () => {
     const prev = walletSnapshot([walletEntry(5)], T0);
     const next = walletSnapshot([walletEntry(5)], T0 + 2000);

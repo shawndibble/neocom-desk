@@ -976,6 +976,13 @@ export interface ContractNotificationFire {
    * happened (`date_accepted` / `date_completed`), when it said.
    */
   occurredMs?: number;
+  /**
+   * `contractAccepted` / `contractCompleted` / `contractFailed` only: the net
+   * ISK the wallet moved for this contract, when the journal lines it caused
+   * were seen in the same poll (`engine/walletCause.ts`). Display only — not
+   * part of the Occurrence Key.
+   */
+  walletChangeIsk?: number;
 }
 
 /**
@@ -1306,6 +1313,15 @@ export interface WalletJournalEntrySnapshot {
    * finds with the moment it looked (`engine/occurrenceKey.occurrenceFiredAt`).
    */
   dateMs: number;
+  /**
+   * What ESI says moved the ISK (`ref_type`, `context_id`, `context_id_type`),
+   * so a line a contract caused can be folded into that contract's alert
+   * (`engine/walletCause.ts`). Optional so a baseline persisted before they
+   * existed still validates; only entries newer than the baseline ever fire.
+   */
+  refType?: string;
+  contextId?: number;
+  contextIdType?: string;
 }
 
 export interface WalletSnapshot {
@@ -1321,6 +1337,10 @@ export interface WalletNotificationFire {
   journalEntryId: number;
   /** When the ISK moved, epoch ms — the feed row's `firedAt`. */
   dateMs: number;
+  /** The journal line's cause, when ESI named one — see `WalletJournalEntrySnapshot`. */
+  refType?: string;
+  contextId?: number;
+  contextIdType?: string;
 }
 
 /**
@@ -1364,6 +1384,9 @@ export function diffWalletBalanceChanged(
       amount: entry.amount,
       journalEntryId: entry.id,
       dateMs: entry.dateMs,
+      ...(entry.refType !== undefined ? { refType: entry.refType } : {}),
+      ...(entry.contextId !== undefined ? { contextId: entry.contextId } : {}),
+      ...(entry.contextIdType !== undefined ? { contextIdType: entry.contextIdType } : {}),
     }));
 }
 

@@ -323,6 +323,9 @@ function baseDeps(overrides: Partial<PollDependencies> & DomainOverrides = {}): 
     permission: () => 'granted',
     notify: vi.fn(async () => {}),
     recordToFeed: vi.fn(async () => {}),
+    walletFoldEnabled: vi.fn(async () => true),
+    feedRowExists: vi.fn(async () => false),
+    reviseContractFeedRow: vi.fn(async () => {}),
     alreadyDelivered: vi.fn(async () => false),
     markDelivered: vi.fn(async () => {}),
     retractFromFeed: vi.fn(async () => {}),
@@ -1272,6 +1275,111 @@ describe('runForegroundPoll', () => {
       dateMs: 1_000_000,
     });
     expect(character).toEqual(CHAR);
+  });
+
+  describe('wallet change caused by a contract', () => {
+    const contractLine = (id: number, amount: number) =>
+      walletJournalEntry({
+        id,
+        amount,
+        refType: 'contract_price',
+        contextId: 1,
+        contextIdType: 'contract_id',
+      });
+    const walletBaseline: WalletPollerState = {
+      [CHAR.characterId]: {
+        entries: [{ id: 5, amount: 100, thresholdIsk: 0, dateMs: 1_000_000 }],
+        nowMs: 1000,
+      },
+    };
+    const contractBaseline: ContractPollerState = {
+      [CHAR.characterId]: {
+        entries: [{ contractId: 1, status: 'in_progress', issuerId: 1, acceptorId: 0 }],
+        nowMs: 1000,
+      },
+    };
+
+    it('writes one contract row carrying the ISK, and no wallet row, when both land in one poll', async () => {
+      const recordToFeed = vi.fn<PollDependencies['recordToFeed']>(async () => {});
+      const deps = baseDeps({
+        grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, CONTRACTS_SCOPE, WALLET_SCOPE]),
+        feedChannelEnabled: async () => true,
+        prevContractState: async () => contractBaseline,
+        prevWalletState: async () => walletBaseline,
+        loadContracts: async () => [contract({ contract_id: 1, status: 'finished' })],
+        loadWalletJournal: async () => [
+          contractLine(6, 476_740_542),
+          walletJournalEntry({ id: 5 }),
+        ],
+        recordToFeed,
+      });
+      await runForegroundPoll(deps);
+      expect(recordToFeed).toHaveBeenCalledTimes(1);
+      expect(recordToFeed.mock.calls[0][0]).toEqual({
+        eventId: 'contractCompleted',
+        characterId: CHAR.characterId,
+        contractId: 1,
+        walletChangeIsk: 476_740_542,
+      });
+    });
+
+    it('revises the earlier contract row instead of raising a wallet alert when the journal catches up', async () => {
+      const recordToFeed = vi.fn<PollDependencies['recordToFeed']>(async () => {});
+      const reviseContractFeedRow = vi.fn<PollDependencies['reviseContractFeedRow']>(
+        async () => {}
+      );
+      const deps = baseDeps({
+        grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, WALLET_SCOPE]),
+        feedChannelEnabled: async () => true,
+        prevWalletState: async () => walletBaseline,
+        loadWalletJournal: async () => [contractLine(6, 300), walletJournalEntry({ id: 5 })],
+        feedRowExists: async (key) => key === `${CHAR.characterId}:contractCompleted:1`,
+        recordToFeed,
+        reviseContractFeedRow,
+      });
+      await runForegroundPoll(deps);
+      expect(recordToFeed).not.toHaveBeenCalled();
+      expect(reviseContractFeedRow).toHaveBeenCalledTimes(1);
+      expect(reviseContractFeedRow.mock.calls[0][0]).toEqual({
+        eventId: 'contractCompleted',
+        characterId: CHAR.characterId,
+        contractId: 1,
+        walletChangeIsk: 300,
+      });
+    });
+
+    it('still raises the wallet alert when no contract alert exists to carry it', async () => {
+      const recordToFeed = vi.fn<PollDependencies['recordToFeed']>(async () => {});
+      const deps = baseDeps({
+        grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, WALLET_SCOPE]),
+        feedChannelEnabled: async () => true,
+        prevWalletState: async () => walletBaseline,
+        loadWalletJournal: async () => [contractLine(6, 300), walletJournalEntry({ id: 5 })],
+        recordToFeed,
+      });
+      await runForegroundPoll(deps);
+      expect(recordToFeed).toHaveBeenCalledTimes(1);
+      expect(recordToFeed.mock.calls[0][0]).toMatchObject({ eventId: 'walletBalanceChanged' });
+    });
+
+    it('keeps both alerts when the Character turned folding off', async () => {
+      const recordToFeed = vi.fn<PollDependencies['recordToFeed']>(async () => {});
+      const deps = baseDeps({
+        grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, CONTRACTS_SCOPE, WALLET_SCOPE]),
+        feedChannelEnabled: async () => true,
+        prevContractState: async () => contractBaseline,
+        prevWalletState: async () => walletBaseline,
+        loadContracts: async () => [contract({ contract_id: 1, status: 'finished' })],
+        loadWalletJournal: async () => [contractLine(6, 300), walletJournalEntry({ id: 5 })],
+        walletFoldEnabled: async () => false,
+        recordToFeed,
+      });
+      await runForegroundPoll(deps);
+      expect(recordToFeed.mock.calls.map(([fire]) => fire.eventId).sort()).toEqual([
+        'contractCompleted',
+        'walletBalanceChanged',
+      ]);
+    });
   });
 
   it('skips market orders for a character with no granted scope', async () => {

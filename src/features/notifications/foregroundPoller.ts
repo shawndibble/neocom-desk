@@ -13,8 +13,10 @@
  * drives all live in `pollDomains/`; this file names none of them (#273).
  */
 import { db } from '@/db';
+import { scheduleSync } from '@/sync';
 import { inBackgroundLane } from '@/esi/lane';
 import { occurrenceKey, occurrenceFiredAt } from '@/engine/occurrenceKey';
+import type { ContractNotificationFire } from '@/engine/notificationDiffs';
 import type { ProjectionRow } from '@/engine/projection';
 import { mapWithConcurrencyLimit, ESI_FANOUT_CONCURRENCY } from '@/lib/concurrency';
 import i18n from '@/i18n';
@@ -34,12 +36,14 @@ import {
   hydrateNotificationPreferences,
   characterEventPrefs,
   characterEveTypePrefs,
+  characterEventThresholds,
   isBrowserChannelEnabled,
   isFeedChannelEnabled,
 } from './preferences';
 import { feedSuppressesToast, markFeedNotifiedHere } from './feed';
 import { dismissFeedKeysAndSync, recordFeedEntryAndSync } from './feedSync';
 import { settleFillTimes } from './fillTimeSettle';
+import { foldWalletFires } from './walletFold';
 import {
   isEventEnabledFor,
   isEveTypeAllowed,
@@ -121,6 +125,18 @@ export interface PollDependencies {
    * exist purely because push wrote it.
    */
   alreadyDelivered: (occurrenceKey: string) => Promise<boolean>;
+  /**
+   * Whether the Character folds a wallet change a contract caused into that
+   * contract's alert (`walletFoldIntoContract`), read every poll.
+   */
+  walletFoldEnabled: (characterId: number) => Promise<boolean>;
+  /** Whether a Notification Feed row exists for this Occurrence Key — the proof a contract alert is there to carry a wallet line. */
+  feedRowExists: (occurrenceKey: string) => Promise<boolean>;
+  /**
+   * Rewrites an existing contract alert's feed row so its body includes the
+   * wallet change (`fire.walletChangeIsk`). A no-op when the row is gone.
+   */
+  reviseContractFeedRow: (fire: ContractNotificationFire, character: CharacterRef) => Promise<void>;
   /** Records that this device just notified for these Occurrence Keys — what `alreadyDelivered` reads back. */
   markDelivered: (occurrenceKeys: readonly string[]) => Promise<void>;
   /**
@@ -399,9 +415,30 @@ async function runForegroundPollOnce(deps: PollDependencies): Promise<void> {
     // closed list is dropped here, before either channel and before any
     // name-resolution work (renderNotification → the domain's `names`)
     // that recordToFeed/notify would otherwise trigger for it.
-    const allowedFires = update.fires.filter(
+    const allowed = update.fires.filter(
       (fire) => fire.eventId !== 'eveNotification' || isEveTypeAllowed(fire.type)
     );
+
+    // A wallet change a contract caused rides on that contract's alert instead
+    // of raising its own (`walletFold.ts`). Per channel, since a contract event
+    // can be on for one and off for the other.
+    let feedSourceFires: AnyNotificationFire[] = allowed;
+    let browserSourceFires: AnyNotificationFire[] = allowed;
+    if (await deps.walletFoldEnabled(update.characterId)) {
+      const folded = await foldWalletFires({
+        fires: allowed,
+        isEnabled: (channel, eventId) =>
+          (channel === 'feed' ? feedEnabled : browserEnabled) &&
+          isEventEnabledFor(update.eventPrefs, eventId, channel),
+        rowExists: deps.feedRowExists,
+        nowMs: deps.now(),
+      });
+      feedSourceFires = folded.feedFires;
+      browserSourceFires = folded.browserFires;
+      for (const revision of folded.revisions) {
+        await deps.reviseContractFeedRow(revision, character);
+      }
+    }
 
     // Browser: grouped, and checked against the feed *before* the feed loop
     // below writes anything (issue #360). Web Push, or another device/tab
@@ -415,7 +452,7 @@ async function runForegroundPollOnce(deps: PollDependencies): Promise<void> {
     // by comparing rendered copy — grouping (`groupIdenticalFires`) happens
     // after, on whatever survives.
     const browserFires: AnyNotificationFire[] = [];
-    for (const fire of allowedFires) {
+    for (const fire of browserSourceFires) {
       if (
         !browserEnabled ||
         !isEventEnabledFor(update.eventPrefs, fire.eventId, 'browser') ||
@@ -435,7 +472,7 @@ async function runForegroundPollOnce(deps: PollDependencies): Promise<void> {
     // browser channel below does, would permanently lose the other
     // occurrences from the feed's history — nothing re-fires an
     // already-high-water-marked diff to recover them.
-    for (const fire of allowedFires) {
+    for (const fire of feedSourceFires) {
       const eventId = fire.eventId;
       if (
         feedEnabled &&
@@ -558,6 +595,35 @@ async function recordFeedNotification(
   }
 }
 
+/**
+ * Rewrites a contract alert's existing feed row so its body carries the wallet
+ * change that arrived after it (the journal lags the contract list by up to an
+ * hour). Only the body moves: `firedAt`, `dismissedAt` and the row's key stay.
+ * The browser toast that already went out is not touched.
+ */
+async function reviseContractFeedRow(
+  fire: ContractNotificationFire,
+  character: CharacterRef
+): Promise<void> {
+  try {
+    const key = occurrenceKey(fire, Date.now());
+    const { body } = await renderNotification(fire, character.name);
+    const changed = await db.notificationFeed
+      .where('id')
+      .equals(key)
+      .modify((row) => {
+        if (row.body === body) return;
+        row.body = body;
+        // Same as `fillTimeSettle`: clearing this is what pushes the row again.
+        delete row.syncedAt;
+      });
+    if (changed > 0) scheduleSync(character.characterId);
+  } catch {
+    // The wallet fire is already dropped and the baseline advanced; a failed
+    // revision costs the amount on one row, not the poll.
+  }
+}
+
 /** Hydrates a `createLocalSetting` store (a no-op once already hydrated) and returns its current value. */
 async function hydratedValue<T>(store: LocalSettingStore<T>): Promise<T> {
   await store.getState().hydrate();
@@ -598,6 +664,11 @@ export function liveDependencies(): PollDependencies {
     permission: () => readNotificationPermission(),
     notify: sendBrowserNotification,
     recordToFeed: recordFeedNotification,
+    walletFoldEnabled: async (characterId) =>
+      characterEventThresholds(await currentNotificationPreferences(), characterId)
+        .walletFoldIntoContract !== 0,
+    feedRowExists: async (key) => (await db.notificationFeed.get(key)) !== undefined,
+    reviseContractFeedRow: reviseContractFeedRow,
     alreadyDelivered: (key) => feedSuppressesToast(key, Date.now()),
     markDelivered: (keys) => markFeedNotifiedHere(keys, Date.now()),
     retractFromFeed: dismissFeedKeysAndSync,
