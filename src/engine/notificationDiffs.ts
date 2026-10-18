@@ -2172,20 +2172,3 @@ export const SKILL_QUEUE_NOTIFICATION_DIFFS: Record<
   characterNotTraining: diffCharacterNotTraining,
   skillQueueEnding: diffSkillQueueEnding,
 };
-
-/** Runs every registered diff whose event is enabled, for one character's skill-queue poll. */
-export function runSkillQueueNotificationDiffs(
-  characterId: number,
-  prev: SkillQueueSnapshot | undefined,
-  next: SkillQueueSnapshot,
-  enabledEvents: ReadonlySet<SkillQueueNotificationEventId>
-): NotificationFire[] {
-  const fires: NotificationFire[] = [];
-  for (const eventId of Object.keys(
-    SKILL_QUEUE_NOTIFICATION_DIFFS
-  ) as SkillQueueNotificationEventId[]) {
-    if (!enabledEvents.has(eventId)) continue;
-    fires.push(...SKILL_QUEUE_NOTIFICATION_DIFFS[eventId](characterId, prev, next));
-  }
-  return fires;
-}

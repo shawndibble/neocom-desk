@@ -5,7 +5,6 @@ import {
   diffSkillQueueEnding,
   diffSpExtractionReady,
   type SpExtractionSnapshot,
-  runSkillQueueNotificationDiffs,
   SKILL_QUEUE_NOTIFICATION_DIFFS,
   diffIndustryJobComplete,
   diffPlanetaryExtractionDone,
@@ -496,57 +495,12 @@ describe('diffSpExtractionReady', () => {
   });
 });
 
-describe('SKILL_QUEUE_NOTIFICATION_DIFFS / runSkillQueueNotificationDiffs', () => {
-  const prev = snapshot([entry({ skillId: 1, queuePosition: 0, finishMs: T0 + 1000 })], T0);
-  const next = snapshot([], T0 + 2000);
-
+describe('SKILL_QUEUE_NOTIFICATION_DIFFS', () => {
   it('registers all three events by id', () => {
     expect(Object.keys(SKILL_QUEUE_NOTIFICATION_DIFFS).sort()).toEqual([
       'characterNotTraining',
       'skillLevelComplete',
       'skillQueueEnding',
-    ]);
-  });
-
-  it('only runs diffs for enabled events', () => {
-    expect(runSkillQueueNotificationDiffs(7, prev, next, new Set())).toEqual([]);
-    expect(
-      runSkillQueueNotificationDiffs(7, prev, next, new Set(['characterNotTraining']))
-    ).toEqual([
-      {
-        eventId: 'characterNotTraining',
-        characterId: 7,
-        skillId: null,
-        level: null,
-        finishMs: null,
-      },
-    ]);
-  });
-
-  it('fires only skillLevelComplete, not characterNotTraining, when a skill finishes with more behind it', () => {
-    const completionPrev = snapshot(
-      [
-        entry({ skillId: 1, queuePosition: 0, finishedLevel: 3, finishMs: T0 + 1000 }),
-        entry({ skillId: 2, queuePosition: 1, finishedLevel: 1, finishMs: T0 + 10_000 }),
-      ],
-      T0
-    );
-    const completionNext = snapshot(
-      [
-        entry({ skillId: 1, queuePosition: 0, finishedLevel: 3, finishMs: T0 + 1000 }),
-        entry({ skillId: 2, queuePosition: 1, finishedLevel: 1, finishMs: T0 + 10_000 }),
-      ],
-      T0 + 2000
-    );
-    expect(
-      runSkillQueueNotificationDiffs(
-        7,
-        completionPrev,
-        completionNext,
-        new Set(['skillLevelComplete', 'characterNotTraining'])
-      )
-    ).toEqual([
-      { eventId: 'skillLevelComplete', characterId: 7, skillId: 1, level: 3, finishMs: T0 + 1000 },
     ]);
   });
 });
