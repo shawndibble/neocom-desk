@@ -1348,6 +1348,29 @@ describe('runForegroundPoll', () => {
       });
     });
 
+    it('still counts the ISK on the contract row when Wallet Balance Changed is off and the line is small', async () => {
+      const recordToFeed = vi.fn<PollDependencies['recordToFeed']>(async () => {});
+      const reviseContractFeedRow = vi.fn<PollDependencies['reviseContractFeedRow']>(
+        async () => {}
+      );
+      const deps = baseDeps({
+        grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, WALLET_SCOPE, CONTRACTS_SCOPE]),
+        feedChannelEnabled: async () => true,
+        eventPrefsFor: async () => ({ walletBalanceChanged: false }),
+        prevWalletState: async () => walletBaseline,
+        loadWalletJournal: async () => [
+          { ...contractLine(6, 300), thresholdIsk: 1_000_000 },
+          walletJournalEntry({ id: 5 }),
+        ],
+        feedRowExists: async (key) => key === `${CHAR.characterId}:contractCompleted:1`,
+        recordToFeed,
+        reviseContractFeedRow,
+      });
+      await runForegroundPoll(deps);
+      expect(recordToFeed).not.toHaveBeenCalled();
+      expect(reviseContractFeedRow.mock.calls[0][0]).toMatchObject({ walletChangeIsk: 300 });
+    });
+
     it('still raises the wallet alert when no contract alert exists to carry it', async () => {
       const recordToFeed = vi.fn<PollDependencies['recordToFeed']>(async () => {});
       const deps = baseDeps({

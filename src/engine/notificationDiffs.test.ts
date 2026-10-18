@@ -1667,6 +1667,29 @@ describe('diffWalletBalanceChanged', () => {
     ]);
   });
 
+  it('keeps a contract-caused line under the minimum, flagged, and still drops other small lines', () => {
+    const prev = walletSnapshot([walletEntry(5)], T0);
+    const contractLine = {
+      ...walletEntry(7, 40, 1_000),
+      refType: 'contract_price',
+      contextId: 55,
+      contextIdType: 'contract_id',
+    };
+    const next = walletSnapshot(
+      [contractLine, walletEntry(6, 40, 1_000), walletEntry(5)],
+      T0 + 2000
+    );
+    expect(diffWalletBalanceChanged(7, prev, next)).toEqual([
+      {
+        ...walletFire(7, 40),
+        belowThreshold: true,
+        refType: 'contract_price',
+        contextId: 55,
+        contextIdType: 'contract_id',
+      },
+    ]);
+  });
+
   it('does not fire for an id already seen', () => {
     const prev = walletSnapshot([walletEntry(5)], T0);
     const next = walletSnapshot([walletEntry(5)], T0 + 2000);

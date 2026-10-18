@@ -30,6 +30,14 @@ export interface WalletFoldInput {
   /** Whether the contract alert's feed row for this Occurrence Key exists and is not dismissed. */
   rowExists: (key: string) => Promise<boolean>;
   nowMs: number;
+  /** The Character's choice to fold (`walletFoldIntoContract`). Off, wallet fires pass through. */
+  foldEnabled: boolean;
+  /**
+   * Whether a wallet line is an alert in its own right (event on, scope
+   * granted). When false the lines were fetched only for a contract alert to
+   * count, and any that nothing absorbs are dropped.
+   */
+  walletStandalone: boolean;
 }
 
 export interface WalletFoldResult {
@@ -48,8 +56,20 @@ function contractKey(
   return occurrenceKey({ eventId, characterId, contractId }, nowMs);
 }
 
+/** A leftover wallet fire nobody should hear about: under the minimum, or the wallet event is off. */
+function isUnheard(fire: AnyNotificationFire, walletStandalone: boolean): boolean {
+  return (
+    fire.eventId === 'walletBalanceChanged' &&
+    (!walletStandalone || (fire as WalletNotificationFire).belowThreshold === true)
+  );
+}
+
 export async function foldWalletFires(input: WalletFoldInput): Promise<WalletFoldResult> {
   const { fires, nowMs } = input;
+  if (!input.foldEnabled) {
+    const heard = fires.filter((fire) => !isUnheard(fire, input.walletStandalone));
+    return { feedFires: heard, browserFires: heard, revisions: [] };
+  }
   // Look each candidate row up once, up front: the fold itself is synchronous.
   const existing = new Set<string>();
   for (const fire of fires) {
@@ -74,8 +94,8 @@ export async function foldWalletFires(input: WalletFoldInput): Promise<WalletFol
     () => false
   );
   return {
-    feedFires: feed.fires,
-    browserFires: browser.fires,
+    feedFires: feed.fires.filter((fire) => !isUnheard(fire, input.walletStandalone)),
+    browserFires: browser.fires.filter((fire) => !isUnheard(fire, input.walletStandalone)),
     revisions: feed.revisions.map((r: WalletRevision): ContractNotificationFire => ({
       eventId: r.eventId,
       characterId: r.characterId,

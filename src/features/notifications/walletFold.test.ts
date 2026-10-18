@@ -27,6 +27,8 @@ describe('foldWalletFires', () => {
       isEnabled: () => true,
       rowExists: async () => false,
       nowMs: NOW,
+      foldEnabled: true,
+      walletStandalone: true,
     });
     const folded = [{ ...completed, walletChangeIsk: 100 }];
     expect(result.feedFires).toEqual(folded);
@@ -40,6 +42,8 @@ describe('foldWalletFires', () => {
       isEnabled: () => true,
       rowExists: async (key) => key === rowKey,
       nowMs: NOW,
+      foldEnabled: true,
+      walletStandalone: true,
     });
     expect(result.feedFires).toEqual([]);
     // A toast already shown cannot take the amount, so the browser keeps its own.
@@ -56,6 +60,8 @@ describe('foldWalletFires', () => {
       isEnabled: () => true,
       rowExists: async () => false,
       nowMs: NOW,
+      foldEnabled: true,
+      walletStandalone: true,
     });
     expect(result.feedFires).toEqual(fires);
     expect(result.browserFires).toEqual(fires);
@@ -68,8 +74,73 @@ describe('foldWalletFires', () => {
       isEnabled: (channel) => channel === 'feed',
       rowExists: async () => false,
       nowMs: NOW,
+      foldEnabled: true,
+      walletStandalone: true,
     });
     expect(result.feedFires).toEqual([{ ...completed, walletChangeIsk: 100 }]);
     expect(result.browserFires).toEqual(fires);
+  });
+  it('drops a below-minimum line that nothing absorbs, but counts it when a contract carries it', async () => {
+    const small = { ...wallet(1, 40), belowThreshold: true } as AnyNotificationFire;
+    const alone = await foldWalletFires({
+      fires: [small],
+      isEnabled: () => true,
+      rowExists: async () => false,
+      nowMs: NOW,
+      foldEnabled: true,
+      walletStandalone: true,
+    });
+    expect(alone.feedFires).toEqual([]);
+    expect(alone.browserFires).toEqual([]);
+
+    const carried = await foldWalletFires({
+      fires: [wallet(2, 100), small],
+      isEnabled: () => true,
+      rowExists: async (key) => key === rowKey,
+      nowMs: NOW,
+      foldEnabled: true,
+      walletStandalone: true,
+    });
+    expect(carried.revisions).toEqual([
+      { eventId: 'contractCompleted', characterId: 7, contractId: 55, walletChangeIsk: 140 },
+    ]);
+  });
+
+  it('counts the lines for a contract even when Wallet Balance Changed itself is off', async () => {
+    const lines = [wallet(1, 100), wallet(2, 5_000)];
+    const result = await foldWalletFires({
+      fires: lines,
+      isEnabled: () => true,
+      rowExists: async (key) => key === rowKey,
+      nowMs: NOW,
+      foldEnabled: true,
+      walletStandalone: false,
+    });
+    expect(result.feedFires).toEqual([]);
+    expect(result.revisions[0].walletChangeIsk).toBe(5_100);
+    const orphan = await foldWalletFires({
+      fires: [{ ...wallet(3, 7), refType: 'bounty_prizes' } as AnyNotificationFire],
+      isEnabled: () => true,
+      rowExists: async () => false,
+      nowMs: NOW,
+      foldEnabled: true,
+      walletStandalone: false,
+    });
+    expect(orphan.feedFires).toEqual([]);
+  });
+
+  it('with folding off passes standalone wallet fires through and drops the rest', async () => {
+    const small = { ...wallet(1, 40), belowThreshold: true } as AnyNotificationFire;
+    const big = wallet(2, 900);
+    const result = await foldWalletFires({
+      fires: [small, big],
+      isEnabled: () => true,
+      rowExists: async () => true,
+      nowMs: NOW,
+      foldEnabled: false,
+      walletStandalone: true,
+    });
+    expect(result.feedFires).toEqual([big]);
+    expect(result.revisions).toEqual([]);
   });
 });

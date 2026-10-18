@@ -15,6 +15,7 @@
  * than flooding the notification the first time an already-stalled or
  * already-finished queue is observed.
  */
+import { contractCauseOf } from './walletCause';
 import type { FillMatch } from './market/fillTime';
 import { colonyStatus } from './pi/colonyStatus';
 import { diffRoster } from './corp/members';
@@ -1341,6 +1342,12 @@ export interface WalletNotificationFire {
   refType?: string;
   contextId?: number;
   contextIdType?: string;
+  /**
+   * Set on a contract-caused line under the Character's minimum ISK change. It
+   * exists so a contract alert can still count it; on its own it is not worth
+   * an alert, so whoever finds it unabsorbed drops it.
+   */
+  belowThreshold?: true;
 }
 
 /**
@@ -1374,20 +1381,31 @@ export function diffWalletBalanceChanged(
 ): WalletNotificationFire[] {
   if (!prev) return [];
   const maxPrevId = prev.entries.reduce((max, entry) => Math.max(max, entry.id), 0);
-  return next.entries
-    .filter((entry) => entry.id > maxPrevId)
-    .filter((entry) => entry.amount !== null && Math.abs(entry.amount) >= entry.thresholdIsk)
-    .sort((a, b) => a.id - b.id)
-    .map((entry) => ({
-      eventId: 'walletBalanceChanged' as const,
-      characterId,
-      amount: entry.amount,
-      journalEntryId: entry.id,
-      dateMs: entry.dateMs,
-      ...(entry.refType !== undefined ? { refType: entry.refType } : {}),
-      ...(entry.contextId !== undefined ? { contextId: entry.contextId } : {}),
-      ...(entry.contextIdType !== undefined ? { contextIdType: entry.contextIdType } : {}),
-    }));
+  return (
+    next.entries
+      .filter((entry) => entry.id > maxPrevId)
+      .filter((entry) => entry.amount !== null)
+      // Under the minimum, a line is kept only when a contract caused it: that
+      // alert's total counts every line, and the caller drops what nothing took.
+      .filter(
+        (entry) =>
+          Math.abs(entry.amount ?? 0) >= entry.thresholdIsk || contractCauseOf(entry) !== null
+      )
+      .sort((a, b) => a.id - b.id)
+      .map((entry) => ({
+        eventId: 'walletBalanceChanged' as const,
+        characterId,
+        amount: entry.amount,
+        journalEntryId: entry.id,
+        dateMs: entry.dateMs,
+        ...(Math.abs(entry.amount ?? 0) < entry.thresholdIsk
+          ? { belowThreshold: true as const }
+          : {}),
+        ...(entry.refType !== undefined ? { refType: entry.refType } : {}),
+        ...(entry.contextId !== undefined ? { contextId: entry.contextId } : {}),
+        ...(entry.contextIdType !== undefined ? { contextIdType: entry.contextIdType } : {}),
+      }))
+  );
 }
 
 export interface MarketOrderEntrySnapshot {
