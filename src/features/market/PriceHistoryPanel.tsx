@@ -57,6 +57,12 @@ export interface PriceHistoryCompare {
   onChange: (next: number[]) => void;
   /** Every market region, for the picker and for naming each line. */
   regions: readonly MarketRegionEntry[];
+  /**
+   * The picker chooses every region, the primary one included: `regionIds`
+   * then holds the picks after the primary, and `onChange` receives the whole
+   * list with the primary first (the Item Detail's Market tab).
+   */
+  picksPrimary?: boolean;
 }
 
 interface PriceHistoryPanelProps {
@@ -390,8 +396,9 @@ function RangedHistory({
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           {compare && (
             <CompareRegionsPicker
-              primaryRegionId={primaryRegionId}
-              selected={compareIds}
+              primaryRegionId={compare.picksPrimary ? 0 : primaryRegionId}
+              selected={compare.picksPrimary ? [primaryRegionId, ...compareIds] : compareIds}
+              required={compare.picksPrimary}
               onChange={compare.onChange}
               regions={compare.regions}
               className="w-full sm:w-auto"

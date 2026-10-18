@@ -10390,6 +10390,9 @@
       "groupNoneSold_other": "{{count}} items · none sold at {{scope}}"
     },
     "itemDetail": {
+      "tabInfo": "Info",
+      "tabMarket": "Market",
+      "tabsLabel": "Item detail sections",
       "abyssal": {
         "mutatedFrom": "Mutated from",
         "mutaplasmids": "Mutaplasmids",

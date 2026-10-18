@@ -47,9 +47,13 @@ import {
   RowMenuExtrasContext,
   RowMoreActions,
   Spinner,
+  TabPanel,
+  Tabs,
   Tooltip,
   TypeIcon,
+  useTabsId,
 } from '@/components/ui';
+import { DEFAULT_TRADE_HUB } from '@/market/hubs';
 import {
   groupItemAttributes,
   type AttributeDictionary,
@@ -83,6 +87,7 @@ import {
   useSavedOrderBookLocation,
   type OrderBookLocation,
 } from './orderBookView';
+import { ItemMarketTab } from './ItemMarketTab';
 import { RequiredSkillsSection } from './RequiredSkillsSection';
 import { skillNameOrFallback } from './skillNameOrFallback';
 import { UsedInSection } from './UsedInSection';
@@ -165,6 +170,8 @@ export function ItemDetailModal({
    * the rest of the modal is unaffected.
    */
   const [pi, setPi] = useState<PiData | null>(null);
+  const [tab, setTab] = useState<'info' | 'market'>('info');
+  const tabsId = useTabsId();
   const [trainedSkills, setTrainedSkills] = useState<ReadonlyMap<number, TrainedSkill>>(new Map());
 
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
@@ -313,7 +320,7 @@ export function ItemDetailModal({
       // The URL-backed host already owns the history entry (`?info`).
       closeOnBack={onLeave === undefined}
       // An abyssal type's roll table has a column per mutaplasmid, up to eight.
-      placement={abyssal ? 'wide' : 'center'}
+      placement={abyssal || tab === 'market' ? 'wide' : 'center'}
       title={itemName}
       titleActions={
         // Two text buttons squeeze the name to a letter on a phone; there they share one ⋮.
@@ -359,121 +366,147 @@ export function ItemDetailModal({
         </div>
       ) : (
         <div className="space-y-4">
-          <div className="flex items-start gap-3">
-            <TypeIcon
-              typeId={typeId}
-              size={64}
-              width={64}
-              height={64}
-              className="shrink-0 rounded-xs border border-line"
+          {abyssal === false && (
+            <Tabs
+              tabsId={tabsId}
+              tabs={[
+                { id: 'info', label: t('market.itemDetail.tabInfo') },
+                { id: 'market', label: t('market.itemDetail.tabMarket') },
+              ]}
+              value={tab}
+              onChange={(id) => setTab(id as 'info' | 'market')}
+              label={t('market.itemDetail.tabsLabel')}
             />
-            <div className="space-y-1 text-xs">
-              <p className="text-text-dim">
-                {t('market.itemDetail.volume', { volume: formatVolume(data.type.volume ?? 0) })}
-              </p>
-              {abyssal === null
-                ? null
-                : abyssal
-                  ? itemId !== undefined &&
-                    activeCharacterId !== null && (
-                      <AbyssalEstimateLine
-                        typeId={typeId}
-                        itemId={itemId}
-                        characterId={activeCharacterId}
-                      />
-                    )
-                  : priceState.status !== 'error' && (
-                      <p className="flex gap-4 text-text-dim">
-                        <PriceFigure
-                          label={t('market.itemDetail.bestSell')}
-                          side="sell"
-                          typeId={typeId}
-                          price={
-                            priceState.status === 'loading'
-                              ? undefined
-                              : priceState.summary.bestSell
-                          }
-                          onNavigate={leave}
-                          replace={onLeave !== undefined}
-                        />
-                        <PriceFigure
-                          label={t('market.itemDetail.bestBuy')}
-                          side="buy"
-                          typeId={typeId}
-                          price={
-                            priceState.status === 'loading' ? undefined : priceState.summary.bestBuy
-                          }
-                          onNavigate={leave}
-                          replace={onLeave !== undefined}
-                        />
-                      </p>
-                    )}
-              {data.type.description && (
-                <EveMarkupText markup={data.type.description} className="text-text" />
-              )}
-            </div>
-          </div>
-
-          <AbyssalItemDetail typeId={typeId} dynamic={dynamic} />
-
-          <RequiredSkillsSection
-            requiredSkills={data.requiredSkills}
-            skillNames={data.skillNames}
-            trainedSkills={trainedSkills}
-            target={targetPlan}
-            hasCharacter={activeCharacterId !== null}
-            itemName={itemName}
-          />
-
-          <PlanetaryProduction pi={pi} typeId={typeId} />
-
-          <UsedInSection typeId={typeId} onNavigate={leave} />
-
-          {attributeGroups.length === 0 ? (
-            <p className="text-xs text-text-dim">{t('market.itemDetail.noAttributes')}</p>
+          )}
+          {tab === 'market' && abyssal === false ? (
+            <TabPanel tabsId={tabsId} tabId="market">
+              <ItemMarketTab
+                typeId={typeId}
+                itemName={itemName}
+                initialRegionId={priceLocation?.regionId ?? DEFAULT_TRADE_HUB.regionId}
+              />
+            </TabPanel>
           ) : (
-            attributeGroups.map((group) => (
-              <div key={group.category}>
-                <h3 className="border-b border-line pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                  {group.category}
-                </h3>
-                <dl className="mt-1 grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 text-xs">
-                  {group.attributes.map((attribute) => {
-                    const valueText =
-                      attribute.displayValue ??
-                      `${formatAttributeValue(attribute.value, attribute.unit)}${attribute.unit ? ` ${attribute.unit}` : ''}`;
-                    const modifiers = activeCharacterId
-                      ? findModifyingSkills(
-                          attribute.attributeId,
-                          requiredSkillTypeIds,
-                          data.skillAttributeModifiers
+            <>
+              <div className="flex items-start gap-3">
+                <TypeIcon
+                  typeId={typeId}
+                  size={64}
+                  width={64}
+                  height={64}
+                  className="shrink-0 rounded-xs border border-line"
+                />
+                <div className="space-y-1 text-xs">
+                  <p className="text-text-dim">
+                    {t('market.itemDetail.volume', { volume: formatVolume(data.type.volume ?? 0) })}
+                  </p>
+                  {abyssal === null
+                    ? null
+                    : abyssal
+                      ? itemId !== undefined &&
+                        activeCharacterId !== null && (
+                          <AbyssalEstimateLine
+                            typeId={typeId}
+                            itemId={itemId}
+                            characterId={activeCharacterId}
+                          />
                         )
-                      : [];
-                    return (
-                      <div key={attribute.attributeId} className="contents">
-                        <dt className="text-text-dim">{attribute.name}</dt>
-                        <dd className="text-right text-text">
-                          {modifiers.length > 0 ? (
-                            <AttributeModifierTrigger
-                              modifiers={modifiers}
-                              skillNames={data.allSkillNames}
-                              trainedSkills={trainedSkills}
-                              target={targetPlan}
-                              itemName={itemName}
-                              attributeName={attribute.name}
-                            >
-                              {valueText}
-                            </AttributeModifierTrigger>
-                          ) : (
-                            valueText
-                          )}
-                        </dd>
-                      </div>
-                    );
-                  })}
-                </dl>
+                      : priceState.status !== 'error' && (
+                          <p className="flex gap-4 text-text-dim">
+                            <PriceFigure
+                              label={t('market.itemDetail.bestSell')}
+                              side="sell"
+                              typeId={typeId}
+                              price={
+                                priceState.status === 'loading'
+                                  ? undefined
+                                  : priceState.summary.bestSell
+                              }
+                              onNavigate={leave}
+                              replace={onLeave !== undefined}
+                            />
+                            <PriceFigure
+                              label={t('market.itemDetail.bestBuy')}
+                              side="buy"
+                              typeId={typeId}
+                              price={
+                                priceState.status === 'loading'
+                                  ? undefined
+                                  : priceState.summary.bestBuy
+                              }
+                              onNavigate={leave}
+                              replace={onLeave !== undefined}
+                            />
+                          </p>
+                        )}
+                  {data.type.description && (
+                    <EveMarkupText markup={data.type.description} className="text-text" />
+                  )}
+                </div>
               </div>
-            ))
+
+              <AbyssalItemDetail typeId={typeId} dynamic={dynamic} />
+
+              <RequiredSkillsSection
+                requiredSkills={data.requiredSkills}
+                skillNames={data.skillNames}
+                trainedSkills={trainedSkills}
+                target={targetPlan}
+                hasCharacter={activeCharacterId !== null}
+                itemName={itemName}
+              />
+
+              <PlanetaryProduction pi={pi} typeId={typeId} />
+
+              <UsedInSection typeId={typeId} onNavigate={leave} />
+
+              {attributeGroups.length === 0 ? (
+                <p className="text-xs text-text-dim">{t('market.itemDetail.noAttributes')}</p>
+              ) : (
+                attributeGroups.map((group) => (
+                  <div key={group.category}>
+                    <h3 className="border-b border-line pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                      {group.category}
+                    </h3>
+                    <dl className="mt-1 grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 text-xs">
+                      {group.attributes.map((attribute) => {
+                        const valueText =
+                          attribute.displayValue ??
+                          `${formatAttributeValue(attribute.value, attribute.unit)}${attribute.unit ? ` ${attribute.unit}` : ''}`;
+                        const modifiers = activeCharacterId
+                          ? findModifyingSkills(
+                              attribute.attributeId,
+                              requiredSkillTypeIds,
+                              data.skillAttributeModifiers
+                            )
+                          : [];
+                        return (
+                          <div key={attribute.attributeId} className="contents">
+                            <dt className="text-text-dim">{attribute.name}</dt>
+                            <dd className="text-right text-text">
+                              {modifiers.length > 0 ? (
+                                <AttributeModifierTrigger
+                                  modifiers={modifiers}
+                                  skillNames={data.allSkillNames}
+                                  trainedSkills={trainedSkills}
+                                  target={targetPlan}
+                                  itemName={itemName}
+                                  attributeName={attribute.name}
+                                >
+                                  {valueText}
+                                </AttributeModifierTrigger>
+                              ) : (
+                                valueText
+                              )}
+                            </dd>
+                          </div>
+                        );
+                      })}
+                    </dl>
+                  </div>
+                ))
+              )}
+            </>
           )}
         </div>
       )}
