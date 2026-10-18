@@ -15,6 +15,9 @@ import { getKind, isAddable, type WidgetKindId, type WidgetSize, type WidgetView
 export type { WidgetKindId, WidgetSize, WidgetView };
 
 export type WidgetScope = 'header' | 'all';
+export type CalendarEventsChoice = 'committed' | 'all';
+export const CALENDAR_EVENTS_CHOICES: readonly CalendarEventsChoice[] = ['committed', 'all'];
+
 export type WidgetRange = 7 | 30 | 90;
 export const WIDGET_RANGES: readonly WidgetRange[] = [7, 30, 90];
 export const DEFAULT_RANGE: WidgetRange = 30;
@@ -40,6 +43,8 @@ export interface Widget {
   rowsPerPage?: RowsPerPage;
   /** The pilot's Omega plan: PLEX per 30 days. Absent means the default (500). Only a kind with a plan reads it. */
   plexPer30Days?: number;
+  /** Coming up only: which events it lists. Absent means accepted and tentative; stored only for 'all'. */
+  calendarEvents?: CalendarEventsChoice;
   showOnPhone: boolean;
 }
 
@@ -199,6 +204,25 @@ export function setPlexPer30Days(layout: OverviewLayout, id: string, plex: numbe
       return rest;
     }
     return { ...w, plexPer30Days: plex };
+  });
+}
+
+/** Stored only when it differs from the default, so a widget nobody touched stays as small as before. */
+export function setCalendarEvents(
+  layout: OverviewLayout,
+  id: string,
+  choice: CalendarEventsChoice
+): OverviewLayout {
+  return update(layout, id, (w) => {
+    if (!getKind(w.kind)?.hasCalendarEvents || choice === (w.calendarEvents ?? 'committed')) {
+      return null;
+    }
+    if (choice === 'committed') {
+      const { calendarEvents: _dropped, ...rest } = w;
+      void _dropped;
+      return rest;
+    }
+    return { ...w, calendarEvents: choice };
   });
 }
 

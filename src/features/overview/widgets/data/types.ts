@@ -25,7 +25,7 @@ import type {
 import type { IncursionsBoardData } from '../../incursionsBoard';
 import type { BoardDeadline } from '../nextDeadline';
 import type { WidgetStateInput } from '../state';
-import type { WidgetRange } from '../layout';
+import type { CalendarEventsChoice, WidgetRange } from '../layout';
 import type { ChartModel } from '../charts/types';
 import type { SkillsQueuePanelData, WalletPanelData } from './loaders';
 import type {
@@ -189,6 +189,8 @@ export interface KindView {
   to: string | null;
   /** Overrides the kind's own empty message, when the reason is not "nothing there". */
   emptyMessage?: string;
+  /** Overrides the generic line under the empty message, when the kind has something more useful to say. */
+  emptyHint?: string;
   /** Endpoints whose permission is missing while the rest of the widget reads fine: a Grant access is drawn under the body. */
   grantEndpoints?: readonly EsiEndpointId[];
   /** Text for a link from the empty state to `to`, for a kind whose page is where its data gets made. */
@@ -267,4 +269,6 @@ export interface BuildContext {
   range: WidgetRange;
   /** The widget's Omega plan (PLEX per 30 days), for kinds that read one. */
   plexPer30Days?: number;
+  /** Which calendar events a Coming up widget lists; left out, accepted and tentative. */
+  calendarEvents?: CalendarEventsChoice;
 }
