@@ -66,20 +66,14 @@ function QueueRow({ row, catalog, nowMs }: RowProps) {
   );
 }
 
-function periodLabel(t: TFunction, group: Group): string {
-  switch (group.id) {
-    case 'week':
-      return t('plans.periodWeek');
-    case 'weeks':
-      return t('plans.periodWeeks');
-    case 'month2':
-      return t('plans.periodMonth2');
-    default:
-      return t('plans.periodMonths', {
-        from: group.firstMonth,
-        to: (group.firstMonth ?? 0) + 1,
-      });
-  }
+function periodLabel(t: TFunction, group: Group, nowMs: number): string {
+  if (group.id === 'week') return t('plans.periodWeek');
+  if (group.id === 'month' || !group.monthStart) return t('plans.periodMonth');
+  const sameYear = group.monthStart.getFullYear() === new Date(nowMs).getFullYear();
+  return group.monthStart.toLocaleString('en-US', {
+    month: 'long',
+    ...(sameYear ? {} : { year: 'numeric' }),
+  });
 }
 
 interface QueuePeriodGroupProps {
@@ -95,7 +89,7 @@ export function QueuePeriodGroup({ group, catalog, nowMs }: QueuePeriodGroupProp
     <section>
       <div className="mb-1 flex items-baseline justify-between gap-3 px-1">
         <h3 className="text-xs font-semibold tracking-wide text-text-dim uppercase">
-          {periodLabel(t, group)}
+          {periodLabel(t, group, nowMs)}
         </h3>
         <span className="text-xs text-text-dim tabular-nums">
           {t('plans.periodSummary', {

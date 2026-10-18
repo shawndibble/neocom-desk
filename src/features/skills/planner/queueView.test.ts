@@ -17,7 +17,7 @@ function entry(position: number, endDays: number, startDays: number | null = nul
   } satisfies SkillQueueEntry;
 }
 
-const view = (entries: SkillQueueEntry[]) => buildQueueView(classifySkillQueue(entries, NOW));
+const view = (entries: SkillQueueEntry[]) => buildQueueView(classifySkillQueue(entries, NOW), NOW);
 
 describe('buildQueueView', () => {
   it('takes the first still-training row as the hero and leaves it out of the groups', () => {
@@ -26,31 +26,25 @@ describe('buildQueueView', () => {
     expect(v.groups.flatMap((g) => g.rows.map((r) => r.entry.queue_position))).toEqual([1]);
   });
 
-  it('buckets by finish date: week, next three weeks, month 2, then two-month windows', () => {
+  it('buckets by finish date: this week, this month, then one group per calendar month', () => {
+    // NOW is 2026-10-14: day 5 is in-week, 10 is later in October,
+    // 20 is Nov 3, 50 is Dec 3, 80 is Jan 2.
     const v = view([
       entry(0, 1),
       entry(1, 5),
-      entry(2, 20),
-      entry(3, 45),
-      entry(4, 80),
-      entry(5, 130),
-      entry(6, 190),
+      entry(2, 10),
+      entry(3, 20),
+      entry(4, 50),
+      entry(5, 80),
     ]);
-    expect(v.groups.map((g) => g.id)).toEqual([
-      'week',
-      'weeks',
-      'month2',
-      'months-3',
-      'months-5',
-      'months-7',
-    ]);
-    expect(v.groups.map((g) => g.rows.length)).toEqual([1, 1, 1, 1, 1, 1]);
+    expect(v.groups.map((g) => g.id)).toEqual(['week', 'month', '2026-11', '2026-12', '2027-01']);
+    expect(v.groups.map((g) => g.rows.length)).toEqual([1, 1, 1, 1, 1]);
   });
 
-  it('puts a level finishing exactly on a boundary in the earlier bucket', () => {
-    const v = view([entry(0, 1), entry(1, 7), entry(2, 28), entry(3, 60), entry(4, 120)]);
-    expect(v.groups.map((g) => g.id)).toEqual(['week', 'weeks', 'month2', 'months-3']);
-    expect(v.groups.map((g) => g.rows.length)).toEqual([1, 1, 1, 1]);
+  it('puts a level finishing exactly seven days out in this week', () => {
+    const v = view([entry(0, 1), entry(1, 7), entry(2, 8)]);
+    expect(v.groups.map((g) => g.id)).toEqual(['week', 'month']);
+    expect(v.groups.map((g) => g.rows.length)).toEqual([1, 1]);
   });
 
   it('is not inflated by finished rows listed ahead of the active ones', () => {
@@ -61,15 +55,15 @@ describe('buildQueueView', () => {
 
   it('skips empty buckets', () => {
     const v = view([entry(0, 1), entry(1, 100)]);
-    expect(v.groups.map((g) => g.id)).toEqual(['months-3']);
+    expect(v.groups.map((g) => g.id)).toEqual(['2027-01']);
   });
 
   it("totals a group as the time it adds to the queue, not the last row's finish", () => {
     const v = view([entry(0, 1), entry(1, 10), entry(2, 12), entry(3, 40)]);
-    const weeks = v.groups.find((g) => g.id === 'weeks');
-    const month2 = v.groups.find((g) => g.id === 'month2');
-    expect(weeks?.totalSeconds).toBeCloseTo(11 * 86_400, 0);
-    expect(month2?.totalSeconds).toBeCloseTo(28 * 86_400, 0);
+    const month = v.groups.find((g) => g.id === 'month');
+    const nov = v.groups.find((g) => g.id === '2026-11');
+    expect(month?.totalSeconds).toBeCloseTo(11 * 86_400, 0);
+    expect(nov?.totalSeconds).toBeCloseTo(28 * 86_400, 0);
   });
 
   it('reports the whole queue length and end', () => {
@@ -106,6 +100,18 @@ describe('heroProgress', () => {
   it("is the elapsed share of the level's own start..finish window", () => {
     const e = entry(0, 1, -1);
     expect(heroProgress(e, NOW)).toBeCloseTo(0.5, 2);
+  });
+
+  it("is the share of the whole level's SP when ESI gives the SP span", () => {
+    // Window is half elapsed, but the level began mid-way: 400k of 1M at the
+    // window start, 1M at the end -> 700k now, i.e. 70% of the level.
+    const e: SkillQueueEntry = {
+      ...entry(0, 1, -1),
+      level_start_sp: 0,
+      training_start_sp: 400_000,
+      level_end_sp: 1_000_000,
+    };
+    expect(heroProgress(e, NOW)).toBeCloseTo(0.7, 2);
   });
 
   it('clamps to 0..1', () => {

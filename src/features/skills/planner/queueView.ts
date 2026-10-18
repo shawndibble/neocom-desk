@@ -8,10 +8,10 @@ export interface QueueRowView extends ClassifiedQueueEntry {
 }
 
 export interface QueuePeriodGroup {
-  /** Stable key, also the i18n variant: `week`, `weeks`, `month2` or `months-<first month>`. */
+  /** Stable key: `week`, `month` (the rest of this calendar month) or `YYYY-MM`. */
   id: string;
-  /** First month of a `months-<n>` window (it spans two); undefined for the fixed buckets. */
-  firstMonth?: number;
+  /** Calendar month (local time) of a `YYYY-MM` group; undefined for week and month. */
+  monthStart?: Date;
   rows: QueueRowView[];
   /** Time the group adds to the queue: the sum of its rows' own durations. */
   totalSeconds: number;
@@ -33,18 +33,22 @@ export interface QueueView {
 }
 
 const DAY_SECONDS = 86_400;
-const MONTH_DAYS = 30;
+const WEEK_DAYS = 7;
 
-/** Which bucket a level finishing `days` from now belongs to. */
-function bucketOf(days: number): { id: string; firstMonth?: number } {
-  if (days <= 7) return { id: 'week' };
-  if (days <= 28) return { id: 'weeks' };
-  if (days <= 2 * MONTH_DAYS) return { id: 'month2' };
-  // Two-month windows from month 3, each closed on its late edge like the
-  // fixed buckets above: (60-120d], (120-180d], ...
-  const windowIndex = Math.ceil((days - 2 * MONTH_DAYS) / (2 * MONTH_DAYS)) - 1;
-  const firstMonth = 3 + 2 * windowIndex;
-  return { id: `months-${firstMonth}`, firstMonth };
+/**
+ * Which bucket a level finishing at `finishMs` belongs to: the next seven
+ * days, the rest of this calendar month, then one group per calendar month.
+ */
+function bucketOf(finishMs: number, nowMs: number): { id: string; monthStart?: Date } {
+  if (finishMs - nowMs <= WEEK_DAYS * DAY_SECONDS * 1000) return { id: 'week' };
+  const now = new Date(nowMs);
+  const finish = new Date(finishMs);
+  const monthStart = new Date(finish.getFullYear(), finish.getMonth(), 1);
+  if (monthStart.getFullYear() === now.getFullYear() && monthStart.getMonth() === now.getMonth()) {
+    return { id: 'month' };
+  }
+  const id = `${monthStart.getFullYear()}-${String(monthStart.getMonth() + 1).padStart(2, '0')}`;
+  return { id, monthStart };
 }
 
 /**
@@ -53,7 +57,7 @@ function bucketOf(days: number): { id: string; firstMonth?: number } {
  * Pure: every figure comes from the ESI dates already folded into
  * `secondsRemaining`, never recomputed from attributes (the page's own rule).
  */
-export function buildQueueView(rows: readonly ClassifiedQueueEntry[]): QueueView {
+export function buildQueueView(rows: readonly ClassifiedQueueEntry[], nowMs: number): QueueView {
   const finished = rows.filter((r) => r.status === 'completed');
   const undated = rows.filter((r) => r.status === 'paused');
   const active = rows.filter((r) => r.status === 'training' || r.status === 'pending');
@@ -69,7 +73,7 @@ export function buildQueueView(rows: readonly ClassifiedQueueEntry[]): QueueView
   const hero = dated[0]?.status === 'training' ? dated[0] : null;
   const groups: QueuePeriodGroup[] = [];
   for (const row of hero ? dated.slice(1) : dated) {
-    const bucket = bucketOf((row.secondsRemaining ?? 0) / DAY_SECONDS);
+    const bucket = bucketOf(nowMs + (row.secondsRemaining ?? 0) * 1000, nowMs);
     let group = groups.find((g) => g.id === bucket.id);
     if (!group) {
       group = { ...bucket, rows: [], totalSeconds: 0 };
@@ -96,11 +100,25 @@ function trainingWindow(entry: SkillQueueEntry): { start: number; end: number } 
   return Number.isFinite(start) && Number.isFinite(end) && end > start ? { start, end } : null;
 }
 
-/** Share (0..1) of the level's own training window already elapsed; null when paused. */
+/**
+ * Share (0..1) of the level's SP already trained; null when paused. Reads the
+ * SP span off ESI when it is there, so a level resumed part-way (or a high
+ * rank skill) isn't reported as just the elapsed share of its last window.
+ */
 export function heroProgress(entry: SkillQueueEntry, nowMs: number): number | null {
   const w = trainingWindow(entry);
   if (!w) return null;
-  return Math.min(1, Math.max(0, (nowMs - w.start) / (w.end - w.start)));
+  const elapsed = Math.min(1, Math.max(0, (nowMs - w.start) / (w.end - w.start)));
+  const {
+    level_start_sp: levelStart,
+    training_start_sp: windowStart,
+    level_end_sp: levelEnd,
+  } = entry;
+  if (levelStart === undefined || windowStart === undefined || levelEnd === undefined)
+    return elapsed;
+  if (levelEnd <= levelStart) return elapsed;
+  const nowSp = windowStart + elapsed * (levelEnd - windowStart);
+  return Math.min(1, Math.max(0, (nowSp - levelStart) / (levelEnd - levelStart)));
 }
 
 /**

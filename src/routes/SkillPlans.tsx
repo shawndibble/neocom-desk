@@ -74,7 +74,7 @@ export function SkillPlans() {
   // Shared with every other 30 s clock on screen; paused while the tab is hidden.
   const nowMs = useTicker(TICK_MS);
   const queueView = useMemo(
-    () => buildQueueView(classifySkillQueue(queueResult?.data ?? [], nowMs)),
+    () => buildQueueView(classifySkillQueue(queueResult?.data ?? [], nowMs), nowMs),
     [queueResult, nowMs]
   );
 
