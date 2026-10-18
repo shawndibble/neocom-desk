@@ -1,3 +1,4 @@
+import { characterGet, characterPages } from './characterRequest';
 import { uniqueTransactions } from '../uniqueTransactions';
 import { esiFetch, recordEsiActivity, outcomeForError, attachEndpointId } from '../client';
 import type { EsiResult } from '../client';
@@ -13,11 +14,7 @@ export function getCharacterWallet(
   characterId: number,
   options: EndpointOptions = {}
 ): Promise<EsiResult<number>> {
-  return esiFetch<number>(`/characters/${characterId}/wallet`, {
-    ...options,
-    characterId,
-    endpointId: 'getCharacterWallet',
-  });
+  return characterGet<number>('getCharacterWallet', characterId, options);
 }
 
 // --- GET /characters/{character_id}/wallet/journal (esi-wallet.read_character_wallet.v1) ---
@@ -46,11 +43,7 @@ export function getCharacterWalletJournal(
   characterId: number,
   options: EndpointOptions = {}
 ): Promise<PaginatedResult<WalletJournalEntry>> {
-  return fetchAllPagesStatus<WalletJournalEntry>(`/characters/${characterId}/wallet/journal`, {
-    ...options,
-    characterId,
-    endpointId: 'getCharacterWalletJournal',
-  });
+  return characterPages<WalletJournalEntry>('getCharacterWalletJournal', characterId, options);
 }
 
 // --- GET /characters/{character_id}/wallet/transactions (esi-wallet.read_character_wallet.v1) ---

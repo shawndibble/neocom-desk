@@ -1,3 +1,4 @@
+import { characterGet, characterPages } from './characterRequest';
 import { esiFetch } from '../client';
 import type { EsiResult } from '../client';
 import { fetchAllPagesStatus } from '../paginated';
@@ -137,11 +138,7 @@ export function getCharacterOrders(
   characterId: number,
   options: EndpointOptions = {}
 ): Promise<EsiResult<MarketOrder[]>> {
-  return esiFetch<MarketOrder[]>(`/characters/${characterId}/orders`, {
-    ...options,
-    characterId,
-    endpointId: 'getCharacterOrders',
-  });
+  return characterGet<MarketOrder[]>('getCharacterOrders', characterId, options);
 }
 
 // --- GET /characters/{character_id}/orders/history (esi-markets.read_character_orders.v1) ---
@@ -155,9 +152,5 @@ export function getCharacterOrderHistory(
   characterId: number,
   options: EndpointOptions = {}
 ): Promise<TruncatableResult<MarketOrderHistory>> {
-  return fetchAllPagesStatus<MarketOrderHistory>(`/characters/${characterId}/orders/history`, {
-    ...options,
-    characterId,
-    endpointId: 'getCharacterOrderHistory',
-  });
+  return characterPages<MarketOrderHistory>('getCharacterOrderHistory', characterId, options);
 }

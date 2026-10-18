@@ -1,6 +1,6 @@
+import { characterPages } from './characterRequest';
 import { esiFetch } from '../client';
 import type { EsiResult } from '../client';
-import { fetchAllPagesStatus } from '../paginated';
 import type { TruncatableResult } from '../paginated';
 import type { EndpointOptions } from './options';
 
@@ -46,11 +46,7 @@ export function getCharacterContracts(
   characterId: number,
   options: EndpointOptions = {}
 ): Promise<TruncatableResult<Contract>> {
-  return fetchAllPagesStatus<Contract>(`/characters/${characterId}/contracts`, {
-    ...options,
-    characterId,
-    endpointId: 'getCharacterContracts',
-  });
+  return characterPages<Contract>('getCharacterContracts', characterId, options);
 }
 
 // --- GET /characters/{character_id}/contracts/{contract_id}/items (esi-contracts.read_character_contracts.v1) ---
