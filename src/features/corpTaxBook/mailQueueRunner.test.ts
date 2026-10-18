@@ -127,6 +127,16 @@ describe('stepQueue', () => {
     expect(step.delayMs).toBeNull();
   });
 
+  it('fails, not re-sends, a mail whose request may have landed (timeout)', async () => {
+    const send = vi.fn<QueueDeps['send']>(async () => {
+      throw new Error('timeout');
+    });
+    const h = harness([item(1)], { send, isUnconfirmed: () => true });
+    await stepQueue(h.deps, () => true);
+    expect(h.rows.get('m1')).toMatchObject({ status: 'failed', failureReason: 'other' });
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
   it('reports which mail is in flight, then clears it', async () => {
     const sending = vi.fn();
     const h = harness([item(1)], { sending });

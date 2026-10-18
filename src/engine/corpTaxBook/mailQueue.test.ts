@@ -64,8 +64,16 @@ describe('nextStep', () => {
     expect(step).toEqual({ kind: 'send', item: expect.objectContaining({ id: 'm2' }) });
   });
 
-  it('waits out a held head instead of skipping to the next mail', () => {
-    const items = [item(1, { notBefore: 5000 }), item(2)];
+  it('lets another sender’s mail go while one sender is held', () => {
+    const items = [item(1, { notBefore: 5000 }), item(2, { senderCharacterId: 2 })];
+    expect(nextStep(items, 1000)).toEqual({
+      kind: 'send',
+      item: expect.objectContaining({ id: 'm2' }),
+    });
+  });
+
+  it('waits out a held queue until its hold ends', () => {
+    const items = [item(1, { notBefore: 5000 }), item(2, { notBefore: 5000 })];
     expect(nextStep(items, 1000)).toEqual({ kind: 'wait', until: 5000 });
     expect(nextStep(items, 5000).kind).toBe('send');
   });

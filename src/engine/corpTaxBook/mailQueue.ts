@@ -115,13 +115,16 @@ export function waitingItems(items: readonly MailQueueItem[]): MailQueueItem[] {
 export type NextStep =
   { kind: 'send'; item: MailQueueItem } | { kind: 'wait'; until: number } | { kind: 'idle' };
 
-/** The next mail due, or when to look again. Strictly in order: a held head holds the rest. */
+/**
+ * The next mail due, or when to look again. In order, but ESI's limit is per
+ * sender: a head held for one sender does not stop another sender's mail.
+ */
 export function nextStep(items: readonly MailQueueItem[], now: number): NextStep {
-  const head = waitingItems(items)[0];
-  if (!head) return { kind: 'idle' };
-  if (head.notBefore !== undefined && head.notBefore > now)
-    return { kind: 'wait', until: head.notBefore };
-  return { kind: 'send', item: head };
+  const waiting = waitingItems(items);
+  if (waiting.length === 0) return { kind: 'idle' };
+  const due = waiting.find((i) => i.notBefore === undefined || i.notBefore <= now);
+  if (due) return { kind: 'send', item: due };
+  return { kind: 'wait', until: Math.min(...waiting.map((i) => i.notBefore!)) };
 }
 
 export function markSent(item: MailQueueItem, mailId: number, at: number): MailQueueItem {

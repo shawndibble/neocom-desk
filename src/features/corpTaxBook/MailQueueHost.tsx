@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import type { MailQueueItem } from '@/engine/corpTaxBook/mailQueue';
-import { isOfflineFailure } from '@/esi/client';
+import { isOfflineFailure, isUnconfirmedWrite } from '@/esi/client';
 import { sendMail } from '@/features/character/mail';
 import { openNewMail } from '@/features/openInEve/sendOpenNewMail';
 import { MailQueueChip } from './MailQueueChip';
@@ -33,6 +33,7 @@ function liveDeps(sending: (id: string | undefined) => void): QueueDeps {
       });
     },
     sending,
+    isUnconfirmed: isUnconfirmedWrite,
   };
 }
 

@@ -30,6 +30,8 @@ export interface QueueDeps {
   log(item: MailQueueItem): Promise<void>;
   /** Tells the UI which mail is in flight. */
   sending?(id: string | undefined): void;
+  /** The request may have reached ESI before it failed (a timeout): never re-send it. */
+  isUnconfirmed?(error: unknown): boolean;
 }
 
 export interface Step {
@@ -89,6 +91,13 @@ export async function stepQueue(
     await logSent(deps, [sent]);
     return { delayMs: sendGapMs(deps.random()) };
   } catch (error) {
+    if (deps.isUnconfirmed?.(error)) {
+      // It may well have been delivered; a second copy would be worse than a Retry.
+      await deps.save([
+        markFailed(item, 'other', 'The connection timed out; check Sent mail in EVE'),
+      ]);
+      return { delayMs: sendGapMs(deps.random()) };
+    }
     const failure = classifyMailFailure(failureShape(error, isOffline(error)));
     if (failure.kind === 'failed') {
       await deps.save([markFailed(item, failure.reason, failure.detail)]);
