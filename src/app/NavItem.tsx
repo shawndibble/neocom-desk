@@ -46,6 +46,13 @@ function tileClass({ isActive }: { isActive: boolean }): string {
   return `${TILE} ${isActive ? TILE_ACTIVE : TILE_IDLE}`;
 }
 
+// The More sheet's headless group (Overview, Corporation): a short row, icon beside label, so a lone page is not one tile stranded in a four-column grid.
+const BAR = `relative flex min-h-11 min-w-0 items-center gap-2 rounded-xs border px-3 text-[0.6875rem] font-semibold tracking-wide uppercase ${interactiveClassName} ${focusRingInsetClassName}`;
+
+function barClass({ isActive }: { isActive: boolean }): string {
+  return `${BAR} ${isActive ? TILE_ACTIVE : TILE_IDLE}`;
+}
+
 export interface NavItemProps {
   to: AppRoutePath;
   label: string;
@@ -63,11 +70,11 @@ export interface NavItemProps {
   badgeLabelKey?: string;
   /**
    * `rail` (default) is the desktop rail's full-width row; `tab` the phone tab
-   * bar's equal share of the viewport; `tile` a More-sheet tile. One component
-   * for all three so the lock marker, the badge and the accessible name cannot
+   * bar's equal share of the viewport; `tile` a More-sheet tile; `bar` a More-sheet
+   * row for the headless group. One component for all four so the lock marker, the badge and the accessible name cannot
    * say different things in the places a destination appears.
    */
-  presentation?: 'rail' | 'tab' | 'tile';
+  presentation?: 'rail' | 'tab' | 'tile' | 'bar';
   className?: string;
   onClick?: () => void;
 }
@@ -119,7 +126,13 @@ export function NavItem({
   const tile = presentation === 'tile';
   const counted = badge !== undefined && badge > 0;
   const Glyph = NAV_ICON_BY_PATH[to];
-  const linkClass = tab ? mobileNavClass : tile ? tileClass : navClass;
+  const linkClass = tab
+    ? mobileNavClass
+    : tile
+      ? tileClass
+      : presentation === 'bar'
+        ? barClass
+        : navClass;
   // The lock marker rides on a `Tooltip` (and `data-locked`), and the count on
   // `aria-label`: a second string inside the link would rewrite its accessible
   // name from "Assets" to "Assets, needs a new login", which is not what the
@@ -140,7 +153,13 @@ export function NavItem({
         <Glyph
           aria-hidden="true"
           className="shrink-0"
-          size={tile ? Icon.ICON_SIZE.lg : Icon.ICON_SIZE.sm}
+          size={
+            tile
+              ? Icon.ICON_SIZE.lg
+              : presentation === 'bar'
+                ? Icon.ICON_SIZE.md
+                : Icon.ICON_SIZE.sm
+          }
         />
       )}
       <span className="min-w-0 truncate">{label}</span>

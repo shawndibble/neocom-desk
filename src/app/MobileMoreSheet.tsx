@@ -111,14 +111,14 @@ export function MobileMoreSheet({
 
   const navBadge = useNavBadges();
   // Corp is in `groups` only while visible (`inSheet`), and never locked.
-  const tile = (page: NavPage) => {
+  const tile = (page: NavPage, presentation: 'tile' | 'bar' = 'tile') => {
     const link = (
       <NavItem
         key={page.path}
         to={page.path}
         label={t(page.labelKey)}
         locked={page.gating === 'scope' && locked.has(page.path)}
-        presentation="tile"
+        presentation={presentation}
         onClick={onClose}
         {...navBadge(page.path)}
       />
@@ -205,7 +205,14 @@ export function MobileMoreSheet({
                 {t(group.labelKey)}
               </h3>
             )}
-            <div className={TILE_GRID}>{group.pages.map(tile)}</div>
+            {group.labelKey === null ? (
+              // The headless group: one or two short rows rather than tiles.
+              <div className={cx('grid gap-1.5', group.pages.length > 1 && 'grid-cols-2')}>
+                {group.pages.map((page) => tile(page, 'bar'))}
+              </div>
+            ) : (
+              <div className={TILE_GRID}>{group.pages.map((page) => tile(page))}</div>
+            )}
           </section>
         ))}
 
@@ -234,7 +241,7 @@ export function MobileMoreSheet({
               </span>
               <Caret expanded={showHidden} />
             </button>
-            {showHidden && <div className={TILE_GRID}>{hiddenPages.map(tile)}</div>}
+            {showHidden && <div className={TILE_GRID}>{hiddenPages.map((page) => tile(page))}</div>}
           </div>
         )}
 
