@@ -5,6 +5,7 @@ import {
   decideRoles,
   defaultSettings,
   isCacheFresh,
+  parseClaimPaymentInput,
   parseEditAction,
   parseSettingsPatch,
   parseStatement,
@@ -131,6 +132,38 @@ describe('parsers', () => {
     expect(
       parseSyncInput({ corporationId: 9, observed: [{ ...row, date: '2026-10-18' }] }, now).observed
     ).toHaveLength(1);
+  });
+
+  it('keeps the system and moon an officer client sends with an observer row', () => {
+    const now = Date.parse('2026-10-18T12:00:00Z');
+    const row = {
+      structureId: 1,
+      characterId: 2,
+      recordedCorporationId: 3,
+      typeId: 4,
+      date: '2026-10-17',
+      quantity: 1,
+      cachedAt: '2026-10-18T11:00:00Z',
+    };
+    const [kept] = parseSyncInput(
+      { corporationId: 9, observed: [{ ...row, solarSystemId: 30003838, moonId: 40000001 }] },
+      now
+    ).observed;
+    expect(kept).toMatchObject({ solarSystemId: 30003838, moonId: 40000001 });
+    const [bare] = parseSyncInput({ corporationId: 9, observed: [row] }, now).observed;
+    expect('solarSystemId' in bare).toBe(false);
+    expect(() =>
+      parseSyncInput({ corporationId: 9, observed: [{ ...row, solarSystemId: 5 }] }, now)
+    ).toThrow();
+  });
+
+  it('parses a claim and refuses a path-escaping payment id', () => {
+    expect(parseClaimPaymentInput({ corporationId: 9, paymentId: 'j1_5' })).toEqual({
+      corporationId: 9,
+      paymentId: 'j1_5',
+    });
+    expect(() => parseClaimPaymentInput({ corporationId: 9, paymentId: '../x' })).toThrow();
+    expect(() => parseClaimPaymentInput({ corporationId: 0, paymentId: 'a' })).toThrow();
   });
 
   it('accepts only a 43-character url-safe token', () => {

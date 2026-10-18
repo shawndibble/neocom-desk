@@ -555,6 +555,8 @@ export interface SyncInput extends BookCall {
     date: string;
     quantity: number;
     cachedAt: string;
+    solarSystemId?: number;
+    moonId?: number;
   }[];
   extractions: {
     structureId: number;
@@ -602,6 +604,10 @@ export function parseSyncInput(data: unknown, nowMs: number): SyncInput {
       date,
       quantity: int(row.quantity, 'quantity', 0, 1e12),
       cachedAt,
+      ...(row.solarSystemId === undefined
+        ? {}
+        : { solarSystemId: int(row.solarSystemId, 'solarSystemId', 30_000_000, 32_000_000) }),
+      ...(row.moonId === undefined ? {} : { moonId: int(row.moonId, 'moonId') }),
     };
   });
   const extractions = list(d.extractions ?? [], 'extractions', MAX_SYNC_EXTRACTIONS).map((r) => {
@@ -687,5 +693,16 @@ export function parseConfirmGroupingInput(data: unknown): {
   return {
     corporationId: parseBookCall(data).corporationId,
     minerId: docId(record(data).minerId, 'minerId'),
+  };
+}
+
+/** A player claims one of their own Unmatched donations (D5). */
+export function parseClaimPaymentInput(data: unknown): {
+  corporationId: number;
+  paymentId: string;
+} {
+  return {
+    corporationId: parseBookCall(data).corporationId,
+    paymentId: docId(record(data).paymentId, 'paymentId'),
   };
 }
