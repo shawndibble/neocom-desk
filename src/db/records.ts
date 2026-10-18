@@ -982,7 +982,7 @@ export interface OrderProblemSampleRecord {
   samples: OrderProblemSample[];
 }
 
-/** Local widening of `MailRecipient` (`esi/endpoints.ts`) — `src/db` carries no dependency on the esi layer, same rule `NotificationFeedRecord.eventId` follows for `src/features`. */
+/** Local widening of `MailRecipient` (`esi/endpoints`) — `src/db` carries no dependency on the esi layer, same rule `NotificationFeedRecord.eventId` follows for `src/features`. */
 export interface MailDraftRecipient {
   recipient_id: number;
   recipient_type: ComposeRecipientType;

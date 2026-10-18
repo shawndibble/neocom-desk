@@ -36,7 +36,7 @@ export interface EsiCharacterFitting {
 }
 
 /**
- * The shape `postCharacterFitting` (`src/esi/endpoints.ts`) sends — named
+ * The shape `postCharacterFitting` (`src/esi/endpoints/`) sends — named
  * locally so this module never imports the ESI layer (`src/engine` stays
  * fetch-free); structurally identical to that wrapper's `NewCharacterFitting`.
  */

@@ -248,7 +248,7 @@ const MANUFACTURING_ACTIVITY_ID = 1;
 const REACTION_ACTIVITY_ID = 11;
 
 // The eight values ESI reports for CharacterPlanet.planet_type (mirrors
-// `PlanetType` in src/esi/endpoints.ts). P0_PLANET_TYPES is checked against
+// `PlanetType` in src/esi/endpoints/). P0_PLANET_TYPES is checked against
 // this set so pi.json can never name a planet type a colony won't match.
 const ESI_PLANET_TYPES = [
   'barren',
