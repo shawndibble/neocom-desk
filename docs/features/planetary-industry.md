@@ -79,7 +79,7 @@ One compact row of 3 one-line `Option` buttons in a `Panel` (`aria-current` on t
 Opening question (`planQuestion.openingQuestion`): any goal in URL (or a `?type=` seed in flight) -> product; else colonies -> make-more; else find-best. A one-line note under the picker says why it opened there (`piPlan.picker.opened.*`). `#customs` forces product (the "Set the rate" links).
 Failure: `EsiDidntAnswer` notice (Retry button) in the colony slot; Plan then runs as for a pilot with no colonies. A refused read is left to the page banner.
 
-### 4.2 Make more from my planets (`MakeMorePlan.tsx`, `MakeMoreSections.tsx`, `planView.ts`)
+### 4.2 Make more from my planets (`MakeMorePlan.tsx`, `makeMore/` (one file per panel), `planView.ts`)
 
 Reads the one recommendation model `buildPlanAdvice` (`planAdviceModel.ts`, `engine/pi/planAdvice.ts`) via `usePlanAdvice`; the same object Map and Colonies read, so figures agree. A screen-reader live region (`role="status"`) announces the headline on recompute.
 

@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
-import { RebuildPanel } from './MakeMoreSections';
-import { buildPlanView } from './planView';
-import { colony, fixtureAdvice, fixturePi } from './planViewFixture';
+import { RebuildPanel } from './RebuildPanel';
+import { buildPlanView } from '../planView';
+import { colony, fixtureAdvice, fixturePi } from '../planViewFixture';
 
 const NO_TICKS = { has: () => false, toggle: () => {} };
 const NO_REVEAL = { anchor: null, navKey: 'default' };
