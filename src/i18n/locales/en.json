@@ -14104,6 +14104,62 @@
         "approvalHint": "Currently {{limit}}. Leave it empty for no limit.",
         "approvalDirector": "Only a Director sets the approval limit."
       },
+      "grouping": {
+        "title": "Characters",
+        "hint": "One payment covers them all; mail goes to the main.",
+        "group": "Group with…",
+        "main": "main",
+        "makeMain": "Make main",
+        "unlink": "Unlink",
+        "pending": "waiting for their confirmation",
+        "outsideCorp": "not in the corporation",
+        "dialogTitle": "Group characters with {{name}}",
+        "dialogIntro": "Pick the Miners whose characters should be billed together.",
+        "mailMain": "Mail goes to",
+        "confirm_one": "Group {{count}} Miner",
+        "confirm_other": "Group {{count}} Miners",
+        "effect": "Their days, Statements and payments are billed as one Miner from now on.",
+        "pendingEffect": "A character outside the corporation is not linked until that player confirms it."
+      },
+      "corrections": {
+        "title": "Corrections",
+        "hint": "Logged under your name; corrections go on the next Statement.",
+        "none": "No correction lines.",
+        "reason": "Reason (logged, shown on the line)",
+        "rate": {
+          "open": "Change a day's rate…",
+          "title": "Change one day's rate",
+          "intro": "Only for a day not yet on a Statement. The change is logged and the day is repriced at once.",
+          "day": "Day",
+          "pickDay": "Pick a day",
+          "pct": "Rate for that day (%)",
+          "confirm": "Set rate",
+          "effect": "{{from}} becomes {{to}}: about {{tax}} of tax."
+        },
+        "adjust": {
+          "open": "Add a correction line…",
+          "title": "Correct {{name}}'s bill",
+          "intro": "Added to the next Statement as its own labelled line.",
+          "kind": "Direction",
+          "credit": "Credit them",
+          "charge": "Charge them",
+          "amount": "Amount",
+          "date": "Day it corrects",
+          "label": "Label on the line",
+          "confirm": "Add {{amount}}",
+          "effect": "A line dated after the next Statement's last day waits for the one after."
+        },
+        "rebill": {
+          "open": "Rebill from date…",
+          "title": "Rebill {{name}}",
+          "intro": "Bills ore that came in late for days not yet paid, on the next Statement.",
+          "from": "From date",
+          "paid": "A paid Statement covers that day. A paid day is closed for good.",
+          "confirm": "Rebill",
+          "effect": "Never reaches a paid Statement.",
+          "director": "Rebilling a corporation member needs a Director."
+        }
+      },
       "dialogs": {
         "logged": "Logged under your name with the reason. Your role is checked again when you confirm.",
         "reasonShown": "Reason (shown to the Miner)",

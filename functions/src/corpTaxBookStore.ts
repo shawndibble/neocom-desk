@@ -34,6 +34,7 @@ import {
   WRITE_OFFS,
   decideRoles,
   needsLiveCheck,
+  dismissalNeedsDirector,
   defaultSettings,
   isCacheFresh,
   parseRecordKey,
@@ -536,12 +537,13 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       return { detail: { paymentId: action.paymentId, minerId: action.minerId } };
     }
     case 'dismiss': {
-      const limit = c.book.dismissApprovalAboveIsk;
       // An omitted amount cannot dodge the gate: with a limit set it counts as over it.
       if (
-        typeof limit === 'number' &&
-        (action.amountIsk ?? Infinity) > limit &&
-        !c.access.isDirector
+        dismissalNeedsDirector(
+          c.book.dismissApprovalAboveIsk as number | null | undefined,
+          [action.amountIsk],
+          c.access.isDirector
+        )
       ) {
         throw new HttpsError(
           'permission-denied',
@@ -576,6 +578,47 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
           reason: action.reason,
         },
         result: { dismissalId: id },
+      };
+    }
+    case 'dismissRecords': {
+      // The limit is on the total of the whole act, so splitting by day cannot dodge it (#4194).
+      if (
+        dismissalNeedsDirector(
+          c.book.dismissApprovalAboveIsk as number | null | undefined,
+          action.targets.map((t) => t.amountIsk),
+          c.access.isDirector
+        )
+      ) {
+        throw new HttpsError(
+          'permission-denied',
+          'A Director must approve this size of dismissal',
+          { reason: 'director-approval' }
+        );
+      }
+      const ids: string[] = [];
+      action.targets.forEach((target, i) => {
+        const id = `d${now}_${i}_${rand(4)}`;
+        const characterId = Number(target.targetId.split(':')[0]);
+        tx.create(col(c, DISMISSALS).doc(id), {
+          id,
+          scope: 'record',
+          targetId: target.targetId,
+          by,
+          at: iso,
+          reason: action.reason,
+          uids: Number.isSafeInteger(characterId) ? [`char:${characterId}`] : [],
+          amountIsk: target.amountIsk,
+        });
+        ids.push(id);
+      });
+      return {
+        detail: {
+          dismissalIds: ids,
+          days: action.targets.length,
+          totalIsk: action.targets.reduce((s, t) => s + t.amountIsk, 0),
+          reason: action.reason,
+        },
+        result: { dismissalIds: ids },
       };
     }
     case 'reverseDismissal': {

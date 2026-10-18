@@ -71,6 +71,9 @@ function deps(over: Partial<SyncDeps> = {}) {
       donationsAdded: u.donations?.length ?? 0,
     })),
     settleStatements: vi.fn(async () => ({})),
+    loadAccountCharacters: vi.fn(async () => []),
+    declinedGrouping: vi.fn(async () => new Set<number>()),
+    applyGrouping: vi.fn(async () => ({})),
     ...over,
   };
   return d;
@@ -271,5 +274,36 @@ describe('syncCorpTaxBook', () => {
     const out = await run(d);
     expect(d.settleStatements).toHaveBeenCalledWith(5, CORP, ['s1']);
     expect(out).toMatchObject({ settled: ['s1'] });
+  });
+
+  it('groups the account’s own Characters in the corporation (D26)', async () => {
+    const d = deps({
+      loadAccountCharacters: async () => [
+        { characterId: 5, corporationId: CORP },
+        { characterId: 6, corporationId: CORP },
+        { characterId: 9, corporationId: 1 },
+      ],
+    });
+    const out = await run(d);
+    expect(d.applyGrouping).toHaveBeenCalledWith(5, CORP, {
+      action: 'setMiner',
+      minerId: 'solo:5',
+      characterIds: [5, 6],
+      mainCharacterId: 5,
+    });
+    expect(out).toMatchObject({ kind: 'synced', autoGrouped: 2 });
+  });
+
+  it('does not fail a sync that already uploaded when grouping is refused', async () => {
+    const d = deps({
+      loadAccountCharacters: async () => [
+        { characterId: 5, corporationId: CORP },
+        { characterId: 6, corporationId: CORP },
+      ],
+      applyGrouping: async () => {
+        throw new Error('refused');
+      },
+    });
+    expect(await run(d)).toMatchObject({ kind: 'synced', autoGrouped: 0 });
   });
 });

@@ -19,9 +19,11 @@ import {
   type MoonNotification,
   type SyncExtraction,
 } from '@/engine/corpTaxBook/sync';
+import { planAutoGroups, type GroupingEdit } from '@/engine/corpTaxBook/grouping';
 import type { Statement } from '@/engine/corpTaxBook/statements';
 import type { ObservedRow } from '@/engine/corpTaxBook/types';
 import type { CorpCapabilities } from '@/engine/corpRoles';
+import { db } from '@/db';
 import type { CorporationMiningExtraction } from '@/esi/endpoints';
 import {
   editBook,
@@ -41,6 +43,7 @@ import {
   type FeedFailure,
   type ObserverFeed,
 } from './esiFeed';
+import { declinedCharacterIds } from './autoGroupDeclined';
 
 /** The server accepts at most this many observer rows in one sync call. */
 export const OBSERVED_PER_CALL = 2000;
@@ -74,6 +77,14 @@ export interface SyncDeps {
     corporationId: number,
     statementIds: string[]
   ) => Promise<unknown>;
+  /** The Characters on this app account with the corporation they were last seen in (D26). */
+  loadAccountCharacters: () => Promise<{ characterId: number; corporationId: number }[]>;
+  declinedGrouping: (corporationId: number) => Promise<ReadonlySet<number>>;
+  applyGrouping: (
+    characterId: number,
+    corporationId: number,
+    edit: GroupingEdit
+  ) => Promise<unknown>;
 }
 
 export const defaultSyncDeps: SyncDeps = {
@@ -87,6 +98,14 @@ export const defaultSyncDeps: SyncDeps = {
   uploadSync,
   settleStatements: (characterId, corporationId, statementIds) =>
     editBook(characterId, corporationId, { action: 'settleStatements', statementIds }),
+  loadAccountCharacters: async () =>
+    (await db.characters.toArray()).flatMap((c) =>
+      c.corporationId === undefined
+        ? []
+        : [{ characterId: c.characterId, corporationId: c.corporationId }]
+    ),
+  declinedGrouping: declinedCharacterIds,
+  applyGrouping: (characterId, corporationId, edit) => editBook(characterId, corporationId, edit),
 };
 
 /** What the Character may read from ESI; the rest of the sync does without a source it cannot reach. */
@@ -114,6 +133,8 @@ export type SyncOutcome =
       /** Sources this Character could not read this time (the rest still synced). */
       missing: MissingSource[];
       truncated: boolean;
+      /** Characters of this account put into one Miner this visit (D26). */
+      autoGrouped: number;
     };
 
 /** A source this Character could not read this time; the rest still synced. */
@@ -220,6 +241,9 @@ export async function syncCorpTaxBook(
     await deps.uploadSync(characterId, { corporationId, extractions: rest, gaps });
   }
 
+  // D26: this account's own Characters in the corporation share one Miner, so one payment covers them.
+  const autoGrouped = await autoGroup(deps, characterId, corporationId, before.miners);
+
   // The donations just stored may settle Statements; read the book back to allocate against all of it.
   const after = donationsAdded > 0 ? await deps.readBookState(characterId, corporationId) : before;
   const toSettle = after
@@ -245,5 +269,32 @@ export async function syncCorpTaxBook(
     gaps,
     missing,
     truncated: feed.truncated,
+    autoGrouped,
   };
+}
+
+/**
+ * Groups the app account's Characters that are in the corporation and not in a
+ * Miner yet. A failure here must not fail the sync that already uploaded, so
+ * it counts as zero grouped and the next visit tries again.
+ */
+async function autoGroup(
+  deps: SyncDeps,
+  characterId: number,
+  corporationId: number,
+  miners: BookState['miners']
+): Promise<number> {
+  try {
+    const edits = planAutoGroups({
+      corporationId,
+      accountCharacters: await deps.loadAccountCharacters(),
+      miners,
+      declined: await deps.declinedGrouping(corporationId),
+      preferredMain: characterId,
+    });
+    for (const edit of edits) await deps.applyGrouping(characterId, corporationId, edit);
+    return edits.reduce((n, e) => n + (e.action === 'setMiner' ? e.characterIds.length : 0), 0);
+  } catch {
+    return 0;
+  }
 }

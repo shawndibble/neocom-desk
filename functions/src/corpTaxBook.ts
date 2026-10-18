@@ -309,6 +309,12 @@ export type EditAction =
       reason: string;
       amountIsk?: number;
     }
+  | {
+      action: 'dismissRecords';
+      /** Several days at once; the approval limit is checked on their total (#4194). */
+      targets: { targetId: string; amountIsk: number }[];
+      reason: string;
+    }
   | { action: 'reverseDismissal'; dismissalId: string; reason: string }
   | { action: 'setMiner'; minerId: string; characterIds: number[]; mainCharacterId: number }
   | { action: 'unlink'; minerId: string; characterId: number }
@@ -351,6 +357,7 @@ export type CloseCredit = { kind: 'refund' } | { kind: 'forfeit'; basis: Forfeit
 /** Dismissals, write-offs, rebills and "not tax" re-check the role live (D7). */
 export const LIVE_CHECK_ACTIONS: ReadonlySet<EditAction['action']> = new Set([
   'dismiss',
+  'dismissRecords',
   'reverseDismissal',
   'writeOff',
   'rebill',
@@ -363,6 +370,21 @@ export function needsLiveCheck(action: EditAction): boolean {
     LIVE_CHECK_ACTIONS.has(action.action) ||
     (action.action === 'closeAccount' && action.credit.kind === 'forfeit')
   );
+}
+
+/**
+ * Whether a dismissal needs a Director (D6): the approval limit applies to the
+ * total dismissed in one act, so a multi-day dismissal cannot slip under it
+ * day by day. An omitted amount counts as over the limit.
+ */
+export function dismissalNeedsDirector(
+  limit: number | null | undefined,
+  amounts: readonly (number | undefined)[],
+  isDirector: boolean
+): boolean {
+  if (isDirector || typeof limit !== 'number') return false;
+  const total = amounts.reduce<number>((sum, a) => sum + (a ?? Infinity), 0);
+  return total > limit;
 }
 
 const reason = (v: unknown) => boundedString(v, 'reason', 500);
@@ -390,6 +412,7 @@ export function parseEditAction(data: unknown): EditAction {
     'markNotTax',
     'assignPayment',
     'dismiss',
+    'dismissRecords',
     'reverseDismissal',
     'setMiner',
     'unlink',
@@ -448,6 +471,17 @@ export function parseEditAction(data: unknown): EditAction {
         reason: reason(d.reason),
         amountIsk: d.amountIsk === undefined ? undefined : num(d.amountIsk, 'amountIsk', 0, 1e13),
       };
+    case 'dismissRecords': {
+      const targets = list(d.targets, 'targets', 200).map((x) => {
+        const t = record(x);
+        return {
+          targetId: boundedString(t.targetId, 'targetId', 128),
+          amountIsk: num(t.amountIsk, 'amountIsk', 0, 1e13),
+        };
+      });
+      if (targets.length === 0) throw new HttpsError('invalid-argument', 'no days given');
+      return { action, targets, reason: reason(d.reason) };
+    }
     case 'reverseDismissal':
       return { action, dismissalId: docId(d.dismissalId, 'dismissalId'), reason: reason(d.reason) };
     case 'setMiner': {
