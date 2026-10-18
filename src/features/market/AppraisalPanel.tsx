@@ -965,20 +965,7 @@ export function AppraisalPanel({
                 {t('market.appraisal.refineUnpriced', { count: totals.refineUnpricedRows })}
               </p>
             )}
-            {compare !== null && (
-              <div className="flex flex-col">
-                <button
-                  type="button"
-                  aria-expanded={compareExpanded}
-                  onClick={() => setCompareExpanded((open) => !open)}
-                  className={textActionClassName('gap-1 self-start normal-case')}
-                >
-                  {t('market.appraisal.compareHubsTitle')}
-                  <Caret expanded={compareExpanded} />
-                </button>
-                {compareExpanded && <HubCompareCards rows={compare} />}
-              </div>
-            )}
+            {compare !== null && compareExpanded && <HubCompareCards rows={compare} />}
           </div>
         )}
 
@@ -994,6 +981,17 @@ export function AppraisalPanel({
           actions={
             result === null || failed || rows.length === 0 ? undefined : (
               <>
+                {compare !== null && (
+                  <button
+                    type="button"
+                    aria-expanded={compareExpanded}
+                    onClick={() => setCompareExpanded((open) => !open)}
+                    className={textActionClassName('gap-1 normal-case')}
+                  >
+                    {t('market.appraisal.compareHubsTitle')}
+                    <Caret expanded={compareExpanded} />
+                  </button>
+                )}
                 <ColumnPickerMenu
                   available={availableColumns}
                   visible={visibleColumns}
