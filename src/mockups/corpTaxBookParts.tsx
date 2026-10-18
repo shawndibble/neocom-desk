@@ -24,6 +24,7 @@ import {
   tabScrollerClassName,
 } from '@/components/ui/tabStyles';
 import * as Icon from '@/components/ui/icons';
+import { AttentionStrip } from '@/features/miningTax/AttentionStrip';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { NewComponent } from './NewComponent';
@@ -79,6 +80,54 @@ function RefreshButton() {
   return <IconButton icon={<Icon.Refresh />} label="Sync now" />;
 }
 
+/** D7: the audit log, shown as an activity feed. Opens a side panel over the page. */
+function ActivityButton() {
+  return (
+    <Button size="sm" variant="ghost">
+      <Icon.Recent size={Icon.ICON_SIZE.sm} aria-hidden="true" />
+      Activity
+    </Button>
+  );
+}
+
+/**
+ * D9: how fresh the book is and what is missing from it. The strip stays
+ * collapsed (one line) until opened, like the personal tab's, but a gap is a
+ * warning so it leads and the page never reads as complete when it is not.
+ */
+export function BookHealthStrip() {
+  return (
+    <AttentionStrip
+      items={[
+        {
+          id: 'gap',
+          tone: 'warning',
+          title: 'Gap: 5 Sep, Efa - Brass Anvil — unrecoverable',
+          detail: (
+            <p>
+              No officer synced between 4 Sep 09:00 and 7 Sep 11:00, and ESI no longer returns 5 Sep
+              for this refinery. Whatever was mined that day is missing from the book and cannot be
+              billed.
+            </p>
+          ),
+        },
+        {
+          id: 'sync',
+          tone: 'info',
+          title: `Last synced ${BOOK.lastSynced} by ${BOOK.lastSyncedBy}`,
+          detail: (
+            <p>
+              Billable through {BOOK.billableThrough} (day end + 6h grace, then a sync). The book
+              warns here once nobody has synced for about 3 days.
+            </p>
+          ),
+          action: <Button size="sm">Sync now</Button>,
+        },
+      ]}
+    />
+  );
+}
+
 export type MoonsTab = 'extractions' | 'miners' | 'statements';
 
 export function MoonsTabs({ value }: { value: MoonsTab }) {
@@ -108,6 +157,7 @@ export function MoonsHeader({ lead }: { lead?: ReactNode }) {
       actions={
         <span className="flex items-center gap-1">
           {lead}
+          <ActivityButton />
           <RefreshButton />
           <BookSettingsButton />
         </span>
@@ -278,7 +328,7 @@ export function QueueSummary({ items }: { items: QueueItem[] }) {
       <p className="text-xs text-text-dim">
         {done
           ? 'Every mail is logged on its Miner. Retry the failure, or open it in EVE to send by hand.'
-          : 'Sending from Kestrel Vane, one mail every 12–15s. Closing the tab pauses the queue; it picks up where it left off when you come back.'}
+          : 'Sending from Kestrel Vane, one mail every 12–15s. The queue keeps going in the background, and if the tab closes it picks up where it left off.'}
       </p>
     </div>
   );
@@ -324,7 +374,7 @@ export function MailQueueChip({
             {done ? 'sent' : `${c.sent} of ${c.total}`}
           </span>
           {c.failed > 0 && (
-            <span className="inline-flex items-center gap-0.5 text-danger">
+            <span className="inline-flex items-center gap-0.5 text-warning">
               <Icon.Warn size={Icon.ICON_SIZE.sm} aria-hidden="true" />
               {c.failed}
             </span>
@@ -358,7 +408,8 @@ export function MailLimitNotice({ count }: { count: number }) {
         </p>
         <p className="text-text-dim">
           They go out in the background from Kestrel Vane. Keep using the app; a chip at the top of
-          every page shows progress. Closing the tab pauses the queue until you come back.
+          every page shows progress. If you close the tab the queue keeps going in the background
+          and picks up where it left off.
         </p>
       </div>
     </div>

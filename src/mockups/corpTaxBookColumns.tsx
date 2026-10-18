@@ -20,6 +20,7 @@ const DAY_STATUS_TONE: Record<DayLine['status'], string> = {
   'Not Billable yet': 'text-text-dim',
   Dismissed: 'text-text-dim line-through decoration-text-faint',
   Paid: 'text-success',
+  'Written off': 'text-text-dim line-through decoration-text-faint',
 };
 
 export const dayColumns: DataTableColumn<DayLine>[] = [
@@ -67,7 +68,10 @@ export const dayColumns: DataTableColumn<DayLine>[] = [
     align: 'right',
     className: 'tabular-nums',
     cardCorner: true,
-    cellClassName: (row) => (row.status === 'Dismissed' ? 'line-through text-text-dim' : ''),
+    cellClassName: (row) =>
+      row.status === 'Dismissed' || row.status === 'Written off'
+        ? 'line-through text-text-dim'
+        : '',
     render: (row) => isk(row.tax),
     sortValue: (row) => row.tax,
   },
@@ -115,6 +119,11 @@ export const paymentColumns: DataTableColumn<PaymentLine>[] = [
         {row.notTax ? (
           <span className="block text-xs text-warning">
             {isk(row.notTax)} marked not tax (buyback)
+          </span>
+        ) : null}
+        {row.writtenOff ? (
+          <span className="block text-xs text-text-dim">
+            Settled within tolerance — {isk(row.writtenOff)} written off (logged)
           </span>
         ) : null}
       </span>
