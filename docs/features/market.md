@@ -262,7 +262,7 @@ Summary table
 | Feature             | Where                                                                 | Notes                                                                                                                                                  |
 | ------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Appraisal tab       | `/market/appraisal`, `src/features/market/AppraisalPanel.tsx`         | Paste list, price at one Trade Hub, Price Percent, net-of-fees, refine, LP, share                                                                      |
-| Compare Hubs        | Appraisal, text link above the table, `HubCompareCards.tsx`           | Same pile at all 5 hubs, sell/buy totals, click copies                                                                                                 |
+| Compare Hubs        | Appraisal, text link in the table header, `HubCompareCards.tsx`       | Same pile at all 5 hubs, sell/buy totals, click copies                                                                                                 |
 | Share Link          | Appraisal header IconButton; `AppraisalShareScreen.tsx`               | Firestore snapshot, 7-day TTL, read-only view                                                                                                          |
 | Copy menu           | Appraisal header IconButton                                           | Copy sell list (`name<TAB>price`, one tick under hub, for Import Prices) and Copy multibuy (`name<TAB>qty`, net of owned when Minus owned is on)       |
 | Recent              | Appraisal paste card select; `appraisalRecent.ts`                     | Last 5 pastes by raw text, re-priced on load; local only; Clear recent                                                                                 |
@@ -288,7 +288,7 @@ Scopes: `/market` is `UNGATED` (`src/app/routeScopes.ts:57`). Appraisal, Hauling
 
 Route `/market/appraisal` (MARKET_TABS id `appraisal`, `src/app/pageTabs.ts`). State lives at route level in `useAppraisal` (`useAppraisal.ts`) so a paste survives a trip to the Browser tab; panel is `AppraisalPanel.tsx`.
 
-Layout: grid, paste Panel left (21rem on lg), right column: stat boxes, hold line and a Compare Hubs link on the page ground, then the table as the only Panel (`AppraisalPanel.tsx:463`).
+Layout: grid, paste Panel left (21rem on lg), right column: stat boxes, hold line and the Compare Hubs cards (when open) on the page ground, then the table as the only Panel (the hub cards are page-ground tiles), its header carrying the Compare Hubs link (`AppraisalPanel.tsx:463`).
 
 Page header (shared with Browser, `Market.tsx:140,763`): Trade Hub select (no Location Mode chips, no Region mode on Appraisal; reason: Fuzzwork aggregates are per station) and a Refresh IconButton. On Appraisal Refresh re-prices bypassing the Fuzzwork TTL (`invalidateHubPrices`, `appraisalData.ts:181,274`); disabled until a result exists or while loading (`Market.tsx:831`).
 
@@ -329,7 +329,7 @@ Share (`handleShare`, `AppraisalPanel.tsx:190`): snapshot of priced items (`buil
 
 Shared Appraisal view (`AppraisalShareScreen.tsx`, route `routes/SharedLink.tsx`): read-only, hosted in `ShareShell`; shows hub + percent chip, Sell total, Buy total, Generated and Expires chips, table (Quantity, Item, Buy each, Sell each, Buy total, Sell total, Volume), CSV menu, "Open Neocom Desk" button (carries pile into live tab). Rebuilt with `buildAppraisal` at stored prices (`appraisalShareData.ts`); no refine/LP/net (depend on sharer's character). Invalid/expired = EmptyState (`appraisalShare.invalid*`). Unknown hub id returns `{ok:false}`.
 
-Compare Hubs (`HubCompareCards.tsx`, data `compareHubs` in `appraisalData.ts`): foldable section (accent "Compare hubs" text link with a caret, above the table, collapsed by default unless entered from Quickbar). One flat row per hub in fixed `TRADE_HUBS` order (Jita, Amarr, Dodixie, Rens, Hek); system name is a `SystemLink`; Sell total and Buy total figures as compact ISK, tooltip exact, click copies exact ISK to clipboard, 2s "copied" tooltip + sr-only live region. Each row wraps on a phone. No sorting (fixed order). No refine/LP/net in compare. A side with nothing priced is a dash (`buildHubComparison`).
+Compare Hubs (`HubCompareCards.tsx`, data `compareHubs` in `appraisalData.ts`): foldable section (accent "Compare hubs" text link with a caret in the table header, its cards opening above the table, collapsed by default unless entered from Quickbar). One card per hub in fixed `TRADE_HUBS` order (Jita, Amarr, Dodixie, Rens, Hek; 1 column on a phone, 3 at sm, 5 at lg); system name is a `SystemLink`; Sell total and Buy total figures as compact ISK, tooltip exact, click copies exact ISK to clipboard, 2s "copied" tooltip + sr-only live region. No sorting (fixed order). No refine/LP/net in compare. A side with nothing priced is a dash (`buildHubComparison`).
 
 Data source: Fuzzwork station aggregates via `market/prices.ts getHubPrices` (15-min TTL, per-type null fallback; ADR 0002); packaged volume from SDE market types (`loadMarketTypesById`); reprocessing from SDE `loadReprocessing` (1.4 MB, active character only); skills from Dexie `loadCharacterModifiers`; LP from ESI `getCharacterLoyaltyPoints` + public `getLoyaltyStoreOffers` for corps the character holds LP with (`appraisalLpAcquisition.ts`).
 
@@ -348,7 +348,7 @@ Observed gaps
 - Shared view has no refine/LP/net and no Compare Hubs; Compare Hubs has no refine/LP either (by design comment, `appraisalShareData.ts`).
 - Share needs a Character, Firebase sync and a signed-in session; otherwise the button is disabled with no explanatory tooltip for the no-character/no-sync cases (tooltip only for too-large/saving/failed/copied, `AppraisalPanel.tsx:578`).
 - No Region mode on Appraisal (header chips hidden, comment `Market.tsx:134`).
-- Compare Hubs rows cannot be sorted or exported (comment `HubCompareCards.tsx` header).
+- Compare Hubs cards cannot be sorted or exported (comment `HubCompareCards.tsx` header).
 - Paste is held in memory only: lost on reload (no persistence in `useAppraisal`).
 - Duplicate-name catalogue entries silently resolve to first type id.
 
