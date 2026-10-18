@@ -123,24 +123,6 @@ export function industrySummary(
     : t('overview.board.industryIdle');
 }
 
-/**
- * Alerts: how many are unread, and across how many types.
- *
- * Two lookups joined, not one key with two counts — i18next inflects a single
- * `count` per lookup, so one key asked to plural both would render "1 unread ·
- * 1 types" the moment either figure is one.
- *
- * No unreadable state: the feed is this device's own Dexie table, so unlike
- * every other row here it cannot fail to load or lose a grant.
- */
-export function alertsSummary(t: Translate, unread: number, typeCount: number): string {
-  if (unread === 0) return t('overview.board.alertsEmpty');
-  return `${t('overview.board.alertsUnread', { count: unread })} · ${t(
-    'overview.board.alertTypes',
-    { count: typeCount }
-  )}`;
-}
-
 /** The soonest contract on a clock, named for the strip and the card's footer. Null when nothing qualifies. */
 export function contractsDeadlineNote(t: Translate, data: ContractsBoardData): string | null {
   const { soonest } = data.summary;

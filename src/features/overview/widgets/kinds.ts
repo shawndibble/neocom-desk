@@ -310,10 +310,6 @@ export function getKind(id: WidgetKindId): WidgetKindDef | undefined {
   return BY_ID.get(id);
 }
 
-export function isKnownKind(id: WidgetKindId): boolean {
-  return BY_ID.has(id);
-}
-
 /** A kind the pilot can put on the Overview: known and actually built. */
 export function isAddable(id: WidgetKindId): boolean {
   return BY_ID.get(id)?.availability === 'available';

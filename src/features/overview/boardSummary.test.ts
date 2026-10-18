@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  alertsSummary,
   comingUpSummary,
   industrySummary,
   mailSummary,
@@ -259,21 +258,6 @@ describe('industrySummary', () => {
 
   it('says the line is idle when there are no jobs', () => {
     expect(industrySummary(t, industryData(), NOW)).toBe('overview.board.industryIdle');
-  });
-});
-
-describe('alertsSummary', () => {
-  it('joins two counts as two lookups', () => {
-    // i18next inflects one `count` per lookup, so "70 unread · 9 types" is two
-    // keys joined — asking one key for both plurals produces "1 unread · 1
-    // types".
-    expect(alertsSummary(t, 70, 9)).toBe(
-      'overview.board.alertsUnread(count=70) · overview.board.alertTypes(count=9)'
-    );
-  });
-
-  it('says nothing is new rather than printing two zeroes', () => {
-    expect(alertsSummary(t, 0, 0)).toBe('overview.board.alertsEmpty');
   });
 });
 
