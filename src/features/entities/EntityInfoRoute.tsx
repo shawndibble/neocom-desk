@@ -17,9 +17,10 @@
  * already open (a drill-down from a character to its corporation) replaces
  * instead of pushing, so a single Close or Back always returns to the page.
  */
-import { useEffect, useRef } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useRef } from 'react';
+import { useLocation, useNavigate, type Location } from 'react-router-dom';
 import { entityInfoHref, parseEntityInfo, withoutEntityInfo } from '@/lib/entityInfo';
+import { usePageLeave } from '@/lib/usePageLeave';
 import { registerEntityInfoNavigator } from '@/stores/entityInfoNavigator';
 import { useItemInfoModalStore } from '@/stores/itemInfoModal';
 import { usePlaceInfoModalStore } from '@/stores/placeInfoModal';
@@ -68,16 +69,20 @@ export function EntityInfoRoute() {
   );
 
   // A tab switch keeps the search, so `info` would outlive the page the modal
-  // was opened on (the modals close on a page change): strip it.
-  const shownPathname = useRef(location.pathname);
-  useEffect(() => {
-    if (shownPathname.current === location.pathname) return;
-    shownPathname.current = location.pathname;
-    if (parseEntityInfo(location.search) === null) return;
-    navigate(`${location.pathname}${withoutEntityInfo(location.search)}${location.hash}`, {
-      replace: true,
-    });
-  }, [location.pathname, location.search, location.hash, navigate]);
+  // was opened on (the modals close on a page change): strip it. A redirect
+  // is not a page change (`usePageLeave`), so a cold `/market?info=type-34`
+  // keeps its modal through the landing on `/market/browser`.
+  usePageLeave(
+    useCallback(
+      (left: Location) => {
+        if (parseEntityInfo(left.search) === null) return;
+        navigate(`${left.pathname}${withoutEntityInfo(left.search)}${left.hash}`, {
+          replace: true,
+        });
+      },
+      [navigate]
+    )
+  );
 
   const info = parseEntityInfo(location.search);
   const kind = info?.kind ?? null;
