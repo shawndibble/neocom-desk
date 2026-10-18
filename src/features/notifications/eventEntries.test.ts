@@ -49,6 +49,7 @@ describe('NOTIFICATION_EVENT_ENTRIES', () => {
       contractExpiringLeadHours: ['contractExpiring'],
       ordersLapsingLeadHours: ['ordersLapsing'],
       walletBalanceChangedThresholdIsk: ['walletBalanceChanged'],
+      walletFoldIntoContract: ['walletBalanceChanged'],
       incursionNearbyJumps: ['incursionNearby'],
       structureFuelLowDays: ['structureFuelLow'],
       corpWalletBalanceFloorIsk: ['corpWalletThreshold'],

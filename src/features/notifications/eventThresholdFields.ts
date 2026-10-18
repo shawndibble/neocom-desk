@@ -32,6 +32,8 @@ export interface CharacterEventThresholds {
   corpWalletTransactionCeilingIsk?: number;
   /** Absolute ISK amount a single wallet journal entry must reach to fire `walletBalanceChanged`. */
   walletBalanceChangedThresholdIsk?: number;
+  /** 1 folds a wallet change a contract alert explains into that alert (`engine/walletCause.ts`); 0 keeps both. */
+  walletFoldIntoContract?: number;
   /** Jumps from the Current System within which an Incursion fires `incursionNearby` (issue #3542) — one of `INCURSION_NEARBY_JUMP_OPTIONS`. */
   incursionNearbyJumps?: number;
 }
@@ -63,6 +65,9 @@ export const ORDERS_LAPSING_LEAD_HOUR_OPTIONS: readonly number[] = [48, 24, 12, 
 /** How near an Incursion must be for `incursionNearby` (issue #3542): a short hop up to a long trip. */
 export const INCURSION_NEARBY_JUMP_OPTIONS: readonly number[] = [3, 5, 10, 15, 20];
 
+/** `walletFoldIntoContract`'s two choices: fold (1) or keep both alerts (0). */
+export const WALLET_FOLD_INTO_CONTRACT_OPTIONS: readonly number[] = [1, 0];
+
 /** A week's warning is the issue's own justification: "a director planning a fuel run wants a week's warning." */
 export const DEFAULT_STRUCTURE_FUEL_LOW_DAYS = 7;
 export const DEFAULT_EXTRACTOR_EXPIRING_LEAD_HOURS = 6;
@@ -72,6 +77,7 @@ export const DEFAULT_ORDERS_LAPSING_LEAD_HOURS = 24;
 export const DEFAULT_CORP_WALLET_BALANCE_FLOOR_ISK = 50_000_000;
 export const DEFAULT_CORP_WALLET_TRANSACTION_CEILING_ISK = 100_000_000;
 export const DEFAULT_WALLET_BALANCE_CHANGED_THRESHOLD_ISK = 1_000_000;
+export const DEFAULT_WALLET_FOLD_INTO_CONTRACT = 1;
 /** Close enough to fly to on a whim, without an alert for every Incursion in the region. */
 export const DEFAULT_INCURSION_NEARBY_JUMPS = 5;
 /**
@@ -208,6 +214,16 @@ export const THRESHOLD_FIELDS: { readonly [K in ThresholdKey]: ThresholdField<K>
       labelKey: 'settings.notifications.walletBalanceChangedThresholdLabel',
       inputIdPrefix: 'wallet-balance-changed-threshold',
       labelHidden: true,
+    },
+  },
+  walletFoldIntoContract: {
+    key: 'walletFoldIntoContract',
+    defaultValue: DEFAULT_WALLET_FOLD_INTO_CONTRACT,
+    control: {
+      kind: 'choice',
+      labelKey: 'settings.notifications.walletFoldIntoContractLabel',
+      options: WALLET_FOLD_INTO_CONTRACT_OPTIONS,
+      optionKey: 'settings.notifications.walletFoldIntoContractOption',
     },
   },
   incursionNearbyJumps: {

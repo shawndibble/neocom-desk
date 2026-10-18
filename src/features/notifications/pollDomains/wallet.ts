@@ -25,6 +25,9 @@ const isWalletJournalEntrySnapshot = shapeGuard<WalletJournalEntrySnapshot>({
   amount: is.nullable(is.number),
   thresholdIsk: is.number,
   dateMs: is.finite,
+  refType: is.optional(is.string),
+  contextId: is.optional(is.number),
+  contextIdType: is.optional(is.string),
 });
 
 /**
@@ -60,6 +63,10 @@ export const walletDomain = defineDomain<
         amount: entry.amount ?? null,
         thresholdIsk: thresholds.walletBalanceChangedThresholdIsk,
         dateMs: Number.isFinite(dateMs) ? dateMs : Date.now(),
+        // Absent stays absent (not `undefined` keys): the stored baseline round-trips as it was.
+        ...(entry.ref_type ? { refType: entry.ref_type } : {}),
+        ...(entry.context_id !== undefined ? { contextId: entry.context_id } : {}),
+        ...(entry.context_id_type ? { contextIdType: entry.context_id_type } : {}),
       };
     });
   },

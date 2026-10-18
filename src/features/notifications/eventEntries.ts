@@ -493,7 +493,10 @@ export const NOTIFICATION_EVENT_ENTRIES = {
     copy: walletCopy,
     projection: null,
     thresholds: {
-      fields: [THRESHOLD_FIELDS.walletBalanceChangedThresholdIsk],
+      fields: [
+        THRESHOLD_FIELDS.walletFoldIntoContract,
+        THRESHOLD_FIELDS.walletBalanceChangedThresholdIsk,
+      ],
       hintKey: 'settings.notifications.walletBalanceChangedThresholdHint',
       headingKey: 'settings.notifications.minimumIskChangeAlert',
     },

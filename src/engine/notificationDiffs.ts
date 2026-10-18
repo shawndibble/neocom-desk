@@ -15,6 +15,7 @@
  * than flooding the notification the first time an already-stalled or
  * already-finished queue is observed.
  */
+import { contractCauseOf } from './walletCause';
 import type { FillMatch } from './market/fillTime';
 import { colonyStatus } from './pi/colonyStatus';
 import { diffRoster } from './corp/members';
@@ -976,6 +977,13 @@ export interface ContractNotificationFire {
    * happened (`date_accepted` / `date_completed`), when it said.
    */
   occurredMs?: number;
+  /**
+   * `contractAccepted` / `contractCompleted` / `contractFailed` only: the net
+   * ISK the wallet moved for this contract, when the journal lines it caused
+   * were seen in the same poll (`engine/walletCause.ts`). Display only — not
+   * part of the Occurrence Key.
+   */
+  walletChangeIsk?: number;
 }
 
 /**
@@ -1306,6 +1314,15 @@ export interface WalletJournalEntrySnapshot {
    * finds with the moment it looked (`engine/occurrenceKey.occurrenceFiredAt`).
    */
   dateMs: number;
+  /**
+   * What ESI says moved the ISK (`ref_type`, `context_id`, `context_id_type`),
+   * so a line a contract caused can be folded into that contract's alert
+   * (`engine/walletCause.ts`). Optional so a baseline persisted before they
+   * existed still validates; only entries newer than the baseline ever fire.
+   */
+  refType?: string;
+  contextId?: number;
+  contextIdType?: string;
 }
 
 export interface WalletSnapshot {
@@ -1321,6 +1338,16 @@ export interface WalletNotificationFire {
   journalEntryId: number;
   /** When the ISK moved, epoch ms — the feed row's `firedAt`. */
   dateMs: number;
+  /** The journal line's cause, when ESI named one — see `WalletJournalEntrySnapshot`. */
+  refType?: string;
+  contextId?: number;
+  contextIdType?: string;
+  /**
+   * Set on a contract-caused line under the Character's minimum ISK change. It
+   * exists so a contract alert can still count it; on its own it is not worth
+   * an alert, so whoever finds it unabsorbed drops it.
+   */
+  belowThreshold?: true;
 }
 
 /**
@@ -1354,17 +1381,31 @@ export function diffWalletBalanceChanged(
 ): WalletNotificationFire[] {
   if (!prev) return [];
   const maxPrevId = prev.entries.reduce((max, entry) => Math.max(max, entry.id), 0);
-  return next.entries
-    .filter((entry) => entry.id > maxPrevId)
-    .filter((entry) => entry.amount !== null && Math.abs(entry.amount) >= entry.thresholdIsk)
-    .sort((a, b) => a.id - b.id)
-    .map((entry) => ({
-      eventId: 'walletBalanceChanged' as const,
-      characterId,
-      amount: entry.amount,
-      journalEntryId: entry.id,
-      dateMs: entry.dateMs,
-    }));
+  return (
+    next.entries
+      .filter((entry) => entry.id > maxPrevId)
+      .filter((entry) => entry.amount !== null)
+      // Under the minimum, a line is kept only when a contract caused it: that
+      // alert's total counts every line, and the caller drops what nothing took.
+      .filter(
+        (entry) =>
+          Math.abs(entry.amount ?? 0) >= entry.thresholdIsk || contractCauseOf(entry) !== null
+      )
+      .sort((a, b) => a.id - b.id)
+      .map((entry) => ({
+        eventId: 'walletBalanceChanged' as const,
+        characterId,
+        amount: entry.amount,
+        journalEntryId: entry.id,
+        dateMs: entry.dateMs,
+        ...(Math.abs(entry.amount ?? 0) < entry.thresholdIsk
+          ? { belowThreshold: true as const }
+          : {}),
+        ...(entry.refType !== undefined ? { refType: entry.refType } : {}),
+        ...(entry.contextId !== undefined ? { contextId: entry.contextId } : {}),
+        ...(entry.contextIdType !== undefined ? { contextIdType: entry.contextIdType } : {}),
+      }))
+  );
 }
 
 export interface MarketOrderEntrySnapshot {

@@ -21,6 +21,7 @@ describe('THRESHOLD_FIELDS', () => {
       'corpWalletBalanceFloorIsk',
       'corpWalletTransactionCeilingIsk',
       'walletBalanceChangedThresholdIsk',
+      'walletFoldIntoContract',
       'incursionNearbyJumps',
     ]);
   });
@@ -55,6 +56,7 @@ describe('defaultedThresholds', () => {
       corpWalletBalanceFloorIsk: 50_000_000,
       corpWalletTransactionCeilingIsk: 100_000_000,
       walletBalanceChangedThresholdIsk: 1_000_000,
+      walletFoldIntoContract: 1,
       incursionNearbyJumps: 5,
     });
   });

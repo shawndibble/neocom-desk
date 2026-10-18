@@ -519,6 +519,12 @@ export interface NotificationFeedRecord {
    */
   dismissedAt?: number;
   /**
+   * Contract rows only: the ISK of wallet lines folded into the body so far, so
+   * a later poll's lines add to it instead of replacing it. Local bookkeeping,
+   * not synced (the body carries the result to other devices).
+   */
+  walletChangeIsk?: number;
+  /**
    * `marketOrderFilled` rows only: how to find the order's sales in the
    * wallet (`engine/market/fillTime.FillMatch`, restated here because
    * `src/db` depends on nothing above it). Present means `firedAt` started as

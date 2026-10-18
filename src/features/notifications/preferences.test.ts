@@ -30,6 +30,7 @@ import {
   DEFAULT_CORP_WALLET_BALANCE_FLOOR_ISK,
   DEFAULT_CORP_WALLET_TRANSACTION_CEILING_ISK,
   DEFAULT_WALLET_BALANCE_CHANGED_THRESHOLD_ISK,
+  DEFAULT_WALLET_FOLD_INTO_CONTRACT,
   DEFAULT_INCURSION_NEARBY_JUMPS,
   updateNotificationPrefs,
   toggleEventChannelPref,
@@ -313,6 +314,7 @@ describe('characterEventThresholds / withCharacterEventThreshold', () => {
       corpWalletBalanceFloorIsk: DEFAULT_CORP_WALLET_BALANCE_FLOOR_ISK,
       corpWalletTransactionCeilingIsk: DEFAULT_CORP_WALLET_TRANSACTION_CEILING_ISK,
       walletBalanceChangedThresholdIsk: DEFAULT_WALLET_BALANCE_CHANGED_THRESHOLD_ISK,
+      walletFoldIntoContract: DEFAULT_WALLET_FOLD_INTO_CONTRACT,
       incursionNearbyJumps: DEFAULT_INCURSION_NEARBY_JUMPS,
     });
   });
@@ -334,6 +336,7 @@ describe('characterEventThresholds / withCharacterEventThreshold', () => {
       corpWalletBalanceFloorIsk: DEFAULT_CORP_WALLET_BALANCE_FLOOR_ISK,
       corpWalletTransactionCeilingIsk: DEFAULT_CORP_WALLET_TRANSACTION_CEILING_ISK,
       walletBalanceChangedThresholdIsk: DEFAULT_WALLET_BALANCE_CHANGED_THRESHOLD_ISK,
+      walletFoldIntoContract: DEFAULT_WALLET_FOLD_INTO_CONTRACT,
       incursionNearbyJumps: DEFAULT_INCURSION_NEARBY_JUMPS,
     });
   });
@@ -356,6 +359,7 @@ describe('characterEventThresholds / withCharacterEventThreshold', () => {
       corpWalletBalanceFloorIsk: 10_000_000,
       corpWalletTransactionCeilingIsk: DEFAULT_CORP_WALLET_TRANSACTION_CEILING_ISK,
       walletBalanceChangedThresholdIsk: DEFAULT_WALLET_BALANCE_CHANGED_THRESHOLD_ISK,
+      walletFoldIntoContract: DEFAULT_WALLET_FOLD_INTO_CONTRACT,
       incursionNearbyJumps: DEFAULT_INCURSION_NEARBY_JUMPS,
     });
   });
@@ -387,6 +391,7 @@ describe('characterEventThresholds / withCharacterEventThreshold', () => {
       corpWalletBalanceFloorIsk: DEFAULT_CORP_WALLET_BALANCE_FLOOR_ISK,
       corpWalletTransactionCeilingIsk: DEFAULT_CORP_WALLET_TRANSACTION_CEILING_ISK,
       walletBalanceChangedThresholdIsk: 10_500_000,
+      walletFoldIntoContract: DEFAULT_WALLET_FOLD_INTO_CONTRACT,
       incursionNearbyJumps: DEFAULT_INCURSION_NEARBY_JUMPS,
     });
   });

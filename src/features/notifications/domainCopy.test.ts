@@ -265,6 +265,24 @@ describe('poll copy', () => {
       expected: { title, body },
     })),
     {
+      name: 'contractCompleted with the wallet change folded in',
+      render: () =>
+        contractCopy.poll(
+          {
+            eventId: 'contractCompleted',
+            characterId: C,
+            contractId: 3,
+            walletChangeIsk: 476_740_542,
+          },
+          PILOT,
+          {}
+        ),
+      expected: {
+        title: 'Contract completed',
+        body: "Kestrel's contract was completed. Wallet balance changed by 476,740,542.00 ISK.",
+      },
+    },
+    {
       name: 'walletBalanceChanged, no amount',
       render: () =>
         walletCopy.poll(
