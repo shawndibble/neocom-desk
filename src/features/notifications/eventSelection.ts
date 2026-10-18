@@ -163,7 +163,8 @@ export type NotificationFamily = (typeof NOTIFICATION_FAMILIES)[number];
  * either delivery channel or any name-resolution work, rather than opted out
  * from a much larger catalog after the fact (round 34's model — the live ESI
  * catalog turned out to hold 254 types, not the ~100 that assumed). This is
- * tranches one and two: the 26 types that already have hand-written bodies in
+ * tranches one and two plus the moon drill's full cycle (issue #4058): the 29
+ * types that already have hand-written bodies in
  * `notifications.fired.eveNotification.types` (`src/i18n/locales/en.json`).
  *
  * A type's Family lives beside it here (issue #352, AC5), not in a separate
@@ -183,8 +184,11 @@ const EVE_ALLOWED_TYPE_ENTRIES: readonly { type: string; family: NotificationFam
   { type: 'StructuresJobsCancelled', family: 'structures' },
   { type: 'StructureLowReagentsAlert', family: 'structures' },
   { type: 'StructureNoReagentsAlert', family: 'structures' },
+  { type: 'MoonminingExtractionStarted', family: 'moonMining' },
   { type: 'MoonminingExtractionFinished', family: 'moonMining' },
+  { type: 'MoonminingLaserFired', family: 'moonMining' },
   { type: 'MoonminingAutomaticFracture', family: 'moonMining' },
+  { type: 'MoonminingExtractionCancelled', family: 'moonMining' },
   { type: 'CorpAllBillMsg', family: 'bills' },
   { type: 'BillOutOfMoneyMsg', family: 'bills' },
   { type: 'CorpOfficeExpirationMsg', family: 'bills' },

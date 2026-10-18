@@ -113,9 +113,9 @@ const TYPE_A = 'BillOutOfMoneyMsg';
 const TYPE_B = 'AllWarDeclaredMsg';
 
 describe('EVE_ALLOWED_TYPES / isEveTypeAllowed', () => {
-  it('holds exactly the 26 types with hand-written bodies', () => {
-    expect(EVE_ALLOWED_TYPES).toHaveLength(26);
-    expect(new Set(EVE_ALLOWED_TYPES).size).toBe(26);
+  it('holds exactly the 29 types with hand-written bodies', () => {
+    expect(EVE_ALLOWED_TYPES).toHaveLength(29);
+    expect(new Set(EVE_ALLOWED_TYPES).size).toBe(29);
   });
 
   it('allows every type on the list', () => {
@@ -219,6 +219,18 @@ describe('NOTIFICATION_FAMILIES / eveTypesByFamily', () => {
   it('assigns every allow-listed type to exactly one family', () => {
     const grouped = NOTIFICATION_FAMILIES.flatMap((family) => eveTypesByFamily(family));
     expect([...grouped].sort()).toEqual([...EVE_ALLOWED_TYPES].sort());
+  });
+
+  // Issue #4058: the whole drill cycle, so a corp moon Extraction
+  // timeline is exact (epic #4055, D14).
+  it('groups the moonMining family: the whole drill cycle', () => {
+    expect([...eveTypesByFamily('moonMining')].sort()).toEqual([
+      'MoonminingAutomaticFracture',
+      'MoonminingExtractionCancelled',
+      'MoonminingExtractionFinished',
+      'MoonminingExtractionStarted',
+      'MoonminingLaserFired',
+    ]);
   });
 
   it('groups the pi family (customs-office types only)', () => {

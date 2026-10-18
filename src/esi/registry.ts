@@ -709,6 +709,21 @@ export const ESI_REGISTRY = {
     scope: 'esi-industry.read_corporation_mining.v1',
     group: 'corp',
   },
+  /**
+   * The refinery mining ledger (issue #4058): the same scope as the
+   * extractions above, but `x-required-roles` is Accountant, not
+   * Station_Manager — `canReadMiningLedger` in `engine/corpRoles.ts`.
+   */
+  getCorporationMiningObservers: {
+    route: '/corporation/{corporation_id}/mining/observers',
+    scope: 'esi-industry.read_corporation_mining.v1',
+    group: 'corp',
+  },
+  getCorporationMiningObserver: {
+    route: '/corporation/{corporation_id}/mining/observers/{observer_id}',
+    scope: 'esi-industry.read_corporation_mining.v1',
+    group: 'corp',
+  },
   getCorporationIndustryJobs: {
     route: '/corporations/{corporation_id}/industry/jobs',
     scope: 'esi-industry.read_corporation_jobs.v1',

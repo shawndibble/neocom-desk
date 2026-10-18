@@ -11,7 +11,7 @@ import {
 import { cx } from '@/lib/cx';
 import { useUrlParam } from '@/lib/useUrlState';
 import { EsiDidntAnswer } from './EsiDidntAnswer';
-import { colonyCountUnknown } from './colonyStripModel';
+import { colonyCountUnknown } from './colonyFillModel';
 import { FindBestPlan } from './FindBestPlan';
 import { GoalPlannerPanel, type GoalPlannerPanelProps } from './GoalPlannerPanel';
 import { loadGoalPlannerSnapshot, type GoalPlannerSnapshot } from './goalPlannerSnapshot';
