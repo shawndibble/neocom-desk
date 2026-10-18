@@ -20,18 +20,7 @@ PNG exports of the chosen mockups for ready tickets. Delete a folder (and its ro
 
 | Folder | Issue | Chosen |
 |---|---|---|
-| [lp-store-search](lp-store-search/README.md) | Issue #2873 | option B, one box for item or corporation |
 | [wallet-balance-trend](wallet-balance-trend/README.md) | worked example | story `mockups-wallet--proposed`, today vs proposed |
-| [stock-targets](stock-targets/index.html) | Issue #3521 | revised: Market › Stock, one list per market (station picked), listed vs hangar; HTML, not PNGs |
-| [wallet-journal-all-characters](wallet-journal-all-characters/README.md) | Issues #3908, #3914, #3915 | revised: side panel that filters the Journal, hideable daily chart, phone day-grouped list |
-| [fitting-can-fly-by-character](fitting-can-fly-by-character/README.md) | Issue #3910 | revised: Your Characters section in the stats column, chips + search + closest-first table |
-| [open-orders-work-through](open-orders-work-through/README.md) | Issue #3991 | work-through controls inside the current row, summary line counter |
-| [market-history-trading-profit](market-history-trading-profit/README.md) | Issue #3995 | strip Margin + Broker fees, All characters filter |
-| [plan-slot-schedule](plan-slot-schedule/README.md) | Issue #3985 | slot line "Uses N slots · done by", Show plan expands in-line |
-| [plan-order-book-depth](plan-order-book-depth/README.md) | Issue #3993 | Price cell "best · avg for N", Calculation Breakdown levels |
-| [blueprint-acquisition-invent](blueprint-acquisition-invent/README.md) | Issue #3990 | Invent section, one tier per decryptor |
-| [contracts-below-market](contracts-below-market/README.md) | Issue #3989 | Below market chip, one row per contract |
-| [overview-market-industry-widgets](overview-market-industry-widgets/README.md) | Issues #3985, #3989, #3991, #3994, #3995 | Overview widget changes and two new widgets |
 | [corp-tax-book](corp-tax-book/README.md) | Issue #4056 (UI: #4063, #4064, #4065, #4066) | Final: A's drill-down pages, C's timeline + Needs you + Statement run, B's mail preview (dialog) and guest page, queue chip with % badge on phone, personal tab = today's Tax tab + corp states |
 
 First draft mockup; sample data. The ticket's Agent Brief text wins over the picture where they differ.
