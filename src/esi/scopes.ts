@@ -119,9 +119,6 @@ export function isPermissionGranted(group: ScopeGroup, granted: readonly string[
   return scopesForGroup(group).every((scope) => held.has(scope));
 }
 
-/** Space-joined form for the SSO authorize URL `scope` parameter. */
-export const SCOPES_STRING: string = SCOPES.join(' ');
-
 /**
  * Scopes in `previous` but not `next` — what the character revoked. Empty when
  * the grant is unchanged or *widened*: a wider grant is not a revocation and
