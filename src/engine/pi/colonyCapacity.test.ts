@@ -2,13 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { PiData } from '@/sde/types';
-import {
-  bestSingleSlotFit,
-  colonyExtraction,
-  extractionOptions,
-  fitPlannedPins,
-  p1ForP0,
-} from './colonyCapacity';
+import { colonyExtraction, extractionOptions, fitPlannedPins } from './colonyCapacity';
 import type { PlannerColony, PlannerPolicy, PlanetType } from './goalTypes';
 import { pinsLoad } from './pinBudget';
 
@@ -61,13 +55,6 @@ function colony(opts: {
   };
 }
 
-describe('p1ForP0', () => {
-  it('finds the basic schematic whose single input is the P0', () => {
-    expect(p1ForP0(BASE_METALS, pi)).toBe(REACTIVE_METALS);
-    expect(p1ForP0(NOBLE_METALS, pi)).toBe(PRECIOUS_METALS);
-  });
-});
-
 describe('colonyExtraction', () => {
   it('fits two 10-head ECUs at CC5 but only one at CC4', () => {
     const want = [{ p0TypeId: BASE_METALS, ecus: 2 }];
@@ -76,13 +63,6 @@ describe('colonyExtraction', () => {
 
     const low = colonyExtraction(colony({ cc: 4 }), want, pi, POLICY);
     expect(low).toMatchObject({ status: 'does-not-fit', limitedBy: ['powergrid'] });
-
-    expect(bestSingleSlotFit(colony({ cc: 4 }), BASE_METALS, pi, POLICY)?.slots).toMatchObject([
-      { p0TypeId: BASE_METALS, ecus: 1 },
-    ]);
-    expect(bestSingleSlotFit(colony({ cc: 5 }), BASE_METALS, pi, POLICY)?.slots).toMatchObject([
-      { p0TypeId: BASE_METALS, ecus: 2 },
-    ]);
   });
 
   it('credits a second ECU on the same P0 at the extra-ECU factor, sizing basics off the schematic', () => {

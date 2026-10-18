@@ -72,7 +72,12 @@ import { OpenOrdersList } from './OpenOrdersList';
 import { loadOpenOrdersSnapshot } from './openOrdersPageSnapshot';
 import { recordOrderProblemSamples, sampleableCharacterIds } from './orderProblemSamples';
 import { sampledProblem } from '@/engine/market/orderProblemHistory';
-import { buildOpenOrderRows, openOrderProblemCounts, type OpenOrderRow } from './openOrdersModel';
+import {
+  buildOpenOrderRows,
+  openOrderProblemCounts,
+  ownOrderIdSet,
+  type OpenOrderRow,
+} from './openOrdersModel';
 import {
   EMPTY_OPEN_ORDERS_FILTER,
   FILTERABLE_PROBLEMS,
@@ -490,7 +495,7 @@ export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
   );
   // Every Character's orders, before any narrowing: never undercut an alt.
   const ownOrderIds = useMemo(
-    () => new Set(data?.openOrders.entries.flatMap((e) => e.orders.map((o) => o.order_id)) ?? []),
+    () => (data ? ownOrderIdSet(data.openOrders) : new Set<number>()),
     [data]
   );
   const fetchedAtByCharacter = useMemo(

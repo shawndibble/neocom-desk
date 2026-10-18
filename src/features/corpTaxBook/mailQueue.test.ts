@@ -1,0 +1,158 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { db } from '@/db';
+import { enqueueReminder, enqueueStatements, retryMail, type StatementToMail } from './mailQueue';
+
+const readVerifyTokens = vi.fn();
+const editCorpTaxBook = vi.fn();
+vi.mock('./bookApi', () => ({
+  readVerifyTokens: (...a: unknown[]) => readVerifyTokens(...a),
+  editCorpTaxBook: (...a: unknown[]) => editCorpTaxBook(...a),
+  verifyUrl: (origin: string, token: string) => `${origin}/v/${token}`,
+}));
+
+function statement(n: number): StatementToMail {
+  return {
+    statementId: `s${n}`,
+    recipientId: 100 + n,
+    recipientName: `Miner ${n}`,
+    amountDue: 6_000_000,
+    periodLabel: 'Sep 2026',
+    code: `C${n}`,
+    carried: 0,
+    dueDate: '2026-10-15',
+    lines: [
+      {
+        kind: 'mined',
+        date: '2026-09-03',
+        structureId: 1,
+        estimatedValue: 60_000_000,
+        tax: 6_000_000,
+      },
+    ],
+  };
+}
+
+const base = {
+  corporationId: 98000001,
+  corporationName: 'Ore & Glory',
+  senderCharacterId: 7,
+  refineryName: () => 'Efa - Brass Anvil',
+  origin: 'https://app.test',
+};
+
+beforeEach(async () => {
+  await db.corpMailQueue.clear();
+  readVerifyTokens.mockReset();
+  editCorpTaxBook.mockReset().mockResolvedValue(undefined);
+});
+
+describe('enqueueStatements', () => {
+  it('queues one waiting mail per Statement, in order, with the verify link in the body', async () => {
+    readVerifyTokens.mockResolvedValue(
+      new Map([
+        ['s1', 'tok1'],
+        ['s2', 'tok2'],
+      ])
+    );
+    const result = await enqueueStatements({ ...base, statements: [statement(1), statement(2)] });
+    expect(result).toMatchObject({ queued: 2, skipped: 0, missingLink: [] });
+    expect(readVerifyTokens).toHaveBeenCalledWith(7, 98000001, ['s1', 's2']);
+    const rows = (await db.corpMailQueue.toArray()).sort((a, b) => a.order - b.order);
+    expect(rows.map((r) => [r.statementId, r.recipientId, r.status, r.kind])).toEqual([
+      ['s1', 101, 'waiting', 'statement'],
+      ['s2', 102, 'waiting', 'statement'],
+    ]);
+    expect(rows[0].body).toContain('https://app.test/v/tok1');
+    expect(rows[0].batchId).toBe(rows[1].batchId);
+  });
+
+  it('skips a Statement already queued and one with no verify link', async () => {
+    readVerifyTokens.mockResolvedValue(new Map([['s1', 'tok1']]));
+    await enqueueStatements({ ...base, statements: [statement(1)] });
+    readVerifyTokens.mockResolvedValue(new Map([['s1', 'tok1']]));
+    const again = await enqueueStatements({ ...base, statements: [statement(1), statement(2)] });
+    expect(again).toMatchObject({ queued: 0, skipped: 1, missingLink: ['s2'] });
+    expect(await db.corpMailQueue.count()).toBe(1);
+  });
+
+  it('continues numbering after what is already queued', async () => {
+    readVerifyTokens.mockResolvedValue(
+      new Map([
+        ['s1', 't'],
+        ['s2', 't'],
+      ])
+    );
+    await enqueueStatements({ ...base, statements: [statement(1)] });
+    await enqueueStatements({ ...base, statements: [statement(2)] });
+    const orders = (await db.corpMailQueue.toArray()).map((r) => r.order).sort();
+    expect(new Set(orders).size).toBe(2);
+  });
+});
+
+describe('enqueueReminder (D27)', () => {
+  const stopped = { remindersStopped: true, manualRemindersSent: 0 };
+
+  it('sends one reminder to an opted-out Miner, counted in the book first', async () => {
+    readVerifyTokens.mockResolvedValue(new Map([['s1', 'tok1']]));
+    const result = await enqueueReminder({ ...base, statement: statement(1), ...stopped });
+    expect(result).toMatchObject({ ok: true, queued: 1 });
+    expect(editCorpTaxBook).toHaveBeenCalledWith(7, 98000001, {
+      action: 'recordReminder',
+      statementId: 's1',
+    });
+    const [row] = await db.corpMailQueue.toArray();
+    expect(row.kind).toBe('reminder');
+    expect(row.subject.startsWith('Reminder: ')).toBe(true);
+  });
+
+  it('refuses the second one without touching the book', async () => {
+    const result = await enqueueReminder({
+      ...base,
+      statement: statement(1),
+      remindersStopped: true,
+      manualRemindersSent: 1,
+    });
+    expect(result).toEqual({ ok: false, reason: 'stopped' });
+    expect(editCorpTaxBook).not.toHaveBeenCalled();
+    expect(await db.corpMailQueue.count()).toBe(0);
+  });
+
+  it('does not double-queue a reminder still waiting', async () => {
+    readVerifyTokens.mockResolvedValue(new Map([['s1', 'tok1']]));
+    const opts = {
+      ...base,
+      statement: statement(1),
+      remindersStopped: false,
+      manualRemindersSent: 0,
+    };
+    await enqueueReminder(opts);
+    expect(await enqueueReminder(opts)).toEqual({ ok: false, reason: 'queued' });
+    expect(editCorpTaxBook).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not count a reminder it cannot queue', async () => {
+    readVerifyTokens.mockResolvedValue(new Map());
+    const result = await enqueueReminder({ ...base, statement: statement(1), ...stopped });
+    expect(result).toEqual({ ok: false, reason: 'missingLink' });
+    expect(editCorpTaxBook).not.toHaveBeenCalled();
+  });
+});
+
+describe('retryMail', () => {
+  it('puts a failed mail back at the end, waiting', async () => {
+    readVerifyTokens.mockResolvedValue(
+      new Map([
+        ['s1', 't'],
+        ['s2', 't'],
+      ])
+    );
+    await enqueueStatements({ ...base, statements: [statement(1), statement(2)] });
+    const [first] = (await db.corpMailQueue.toArray()).sort((a, b) => a.order - b.order);
+    await db.corpMailQueue.put({ ...first, status: 'failed', failureReason: 'cspa' });
+    await retryMail({ ...first, status: 'failed', failureReason: 'cspa' });
+    const after = await db.corpMailQueue.get(first.id);
+    expect(after).toMatchObject({ status: 'waiting' });
+    expect(after?.order).toBeGreaterThan(first.order + 1);
+    expect(after?.failureReason).toBeUndefined();
+  });
+});

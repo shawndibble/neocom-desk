@@ -67,8 +67,11 @@ import {
   LOYALTY_STORE_OFFERS_COLUMN_IDS,
   loyaltyStoreOffersColumnsStore,
   type LoyaltyStoreOffersColumnId,
-} from './loyaltyStoreColumns';
-import { loyaltyOfferCsvColumns, loyaltyOfferMaterialsCsvColumns } from './loyaltyStoreCsv';
+} from '@/features/loyalty/loyaltyStoreColumns';
+import {
+  loyaltyOfferCsvColumns,
+  loyaltyOfferMaterialsCsvColumns,
+} from '@/features/loyalty/loyaltyStoreCsv';
 import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
 import { boolParam, optionalIdParam, textParam } from '@/lib/urlState';
 import { formatIsk } from '@/lib/isk';
