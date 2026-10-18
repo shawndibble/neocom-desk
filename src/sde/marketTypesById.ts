@@ -14,28 +14,18 @@
  */
 import { loadMarketTypes } from './loadMarketSde';
 import type { MarketTypeEntry } from './marketTypes';
-
-let index: Promise<ReadonlyMap<number, MarketTypeEntry>> | null = null;
+import { memoizeAsync } from '@/lib/memoizeAsync';
 
 /** The whole market catalogue keyed by type id, built once per session. */
-export function loadMarketTypesById(): Promise<ReadonlyMap<number, MarketTypeEntry>> {
-  if (index) return index;
-  const pending = loadMarketTypes()
-    .then((entries): ReadonlyMap<number, MarketTypeEntry> => {
-      const map = new Map<number, MarketTypeEntry>();
-      for (const entry of entries) map.set(entry.typeId, entry);
-      return map;
-    })
-    .catch((error: unknown) => {
-      // Allow retry after failure — unless a clear already replaced this load.
-      if (index === pending) index = null;
-      throw error;
-    });
-  index = pending;
-  return pending;
-}
+export const loadMarketTypesById = memoizeAsync(
+  async (): Promise<ReadonlyMap<number, MarketTypeEntry>> => {
+    const map = new Map<number, MarketTypeEntry>();
+    for (const entry of await loadMarketTypes()) map.set(entry.typeId, entry);
+    return map;
+  }
+);
 
 /** Test-only: drops the memoized index so tests can swap the catalogue between cases. */
 export function clearMarketTypeIndex(): void {
-  index = null;
+  loadMarketTypesById.reset();
 }

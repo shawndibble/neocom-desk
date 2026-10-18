@@ -6,12 +6,11 @@
 // Usage: node scripts/bake-mutaplasmids.mjs <dynamicItemAttributes.jsonl> <dogmaAttributes.jsonl>
 
 import { readFile, writeFile } from 'node:fs/promises';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
+import { ROOT } from './lib/paths.mjs';
 import { parseJsonl } from './lib/certifiedPlans.mjs';
 import { bakeMutaplasmids, dogmaAttributeInfo } from './lib/mutaplasmids.mjs';
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT_FILE = join(ROOT, 'public', 'data', 'mutaplasmids.json');
 
 const [dynamicPath, dogmaPath] = process.argv.slice(2);
