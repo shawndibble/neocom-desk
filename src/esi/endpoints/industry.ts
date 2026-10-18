@@ -1,3 +1,4 @@
+import { characterPages } from './characterRequest';
 import { esiFetch } from '../client';
 import type { EsiResult } from '../client';
 import { fetchAllPagesStatus } from '../paginated';
@@ -25,11 +26,7 @@ export function getCharacterBlueprints(
   characterId: number,
   options: EndpointOptions = {}
 ): Promise<TruncatableResult<CharacterBlueprint>> {
-  return fetchAllPagesStatus<CharacterBlueprint>(`/characters/${characterId}/blueprints`, {
-    ...options,
-    characterId,
-    endpointId: 'getCharacterBlueprints',
-  });
+  return characterPages<CharacterBlueprint>('getCharacterBlueprints', characterId, options);
 }
 
 // --- GET /industry/systems (public) ---
@@ -114,11 +111,7 @@ export function getCharacterMining(
   characterId: number,
   options: EndpointOptions = {}
 ): Promise<PaginatedResult<MiningLedgerRow>> {
-  return fetchAllPagesStatus<MiningLedgerRow>(`/characters/${characterId}/mining/`, {
-    ...options,
-    characterId,
-    endpointId: 'getCharacterMining',
-  });
+  return characterPages<MiningLedgerRow>('getCharacterMining', characterId, options);
 }
 
 // --- GET /corporation/{corporation_id}/mining/extractions (esi-industry.read_corporation_mining.v1) ---

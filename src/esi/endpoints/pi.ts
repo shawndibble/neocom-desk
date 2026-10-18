@@ -1,3 +1,4 @@
+import { characterGet } from './characterRequest';
 import { esiFetch } from '../client';
 import type { EsiResult } from '../client';
 import type { EndpointOptions } from './options';
@@ -27,11 +28,7 @@ export function getCharacterPlanets(
   characterId: number,
   options: EndpointOptions = {}
 ): Promise<EsiResult<CharacterPlanet[]>> {
-  return esiFetch<CharacterPlanet[]>(`/characters/${characterId}/planets`, {
-    ...options,
-    characterId,
-    endpointId: 'getCharacterPlanets',
-  });
+  return characterGet<CharacterPlanet[]>('getCharacterPlanets', characterId, options);
 }
 
 // --- GET /characters/{character_id}/planets/{planet_id} (esi-planets.manage_planets.v1) ---
