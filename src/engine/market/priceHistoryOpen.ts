@@ -1,7 +1,7 @@
 /**
  * Daily open prices for the Price History chart: the highest buy order and the
  * lowest sell order standing at the end of each UTC day, as the
- * `marketOpenPrices` snapshot stores them (docs/context/decisions/
+ * `marketOpenPricesByType` snapshot stores them (docs/context/decisions/
  * 20261018-121126-price-history-draws-daily-open-buy-and-sell.md). ESI history
  * only records trades, so it cannot say this. Pure — the loader adapts the
  * stored document.
@@ -9,7 +9,7 @@
 import { filterPriceHistoryRange, medianOf, type PriceHistoryRange } from './priceHistory';
 import type { ComparedHistoryDay } from './priceHistoryCompare';
 
-/** The stored shape: parallel arrays, `null` where no order stood that day. */
+/** One region of a stored type document: parallel arrays, `null` where no order stood that day. */
 export interface OpenPriceSeries {
   dates: readonly string[];
   buy: readonly (number | null)[];
