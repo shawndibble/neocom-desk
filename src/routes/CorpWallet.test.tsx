@@ -17,6 +17,7 @@ import { scopesForGroup } from '@/esi/scopes';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
 import { App } from '@/app/App';
+import * as routeChunks from '@/app/routeChunks';
 import type { TypeMap } from '@/sde/types';
 
 vi.mock('@/app/loginFlow', () => ({ beginEveLogin: vi.fn().mockResolvedValue(undefined) }));
@@ -141,10 +142,7 @@ const server = setupServer(
   )
 );
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-afterAll(() => server.close());
-afterEach(() => server.resetHandlers());
-beforeEach(async () => {
+async function seedSession() {
   await db.characters.clear();
   await db.tokens.clear();
   await db.settings.clear();
@@ -172,7 +170,25 @@ beforeEach(async () => {
   });
   await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: CHAR_ID });
   window.history.pushState({}, '', '/corp/wallet');
-});
+}
+
+beforeAll(async () => {
+  server.listen({ onUnhandledRequest: 'error' });
+  // One throwaway render of the wallet page, so no test pays for the first
+  // one. A worker's first `App` render (compiling the lazy route chunks,
+  // warming jsdom and React) took ~5s here, and landed on whichever test ran
+  // first, timing out its 5s `findBy*` (the gate test, about one run in
+  // three). Done here under the hook's own budget.
+  await Promise.all([routeChunks.loadCorp(), routeChunks.loadCorpWallet()]);
+  await seedSession();
+  const { unmount } = render(<App />);
+  await screen.findByRole('group', { name: 'Wallet division' }, { timeout: 25_000 });
+  unmount();
+  server.resetHandlers();
+}, 30_000);
+afterAll(() => server.close());
+afterEach(() => server.resetHandlers());
+beforeEach(seedSession);
 
 /** The division strip, once the roles, scopes and balances have all resolved. */
 function findDivisions() {
