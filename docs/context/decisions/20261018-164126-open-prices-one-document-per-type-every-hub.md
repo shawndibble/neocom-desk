@@ -28,10 +28,13 @@ that decision stands._
   average line, as before.
 - **The old `marketOpenPrices` collection is dropped**, not migrated: it held
   only part of a backfill, which is re-run into the new collection. Its rule is
-  removed; nothing reads it. `marketOpenPricesMeta/lastRun` keeps its meaning
+  removed; nothing reads it. A stale PWA bundle still asking for the old path
+  gets permission-denied, which the loader already treats as "no series": the
+  chart shows its ESI average line until the app updates. `marketOpenPricesMeta/lastRun` keeps its meaning
   (priced types per region of the last published day), so the shrink guard
   needs no reset.
 - **The backfill writes each document once.** It folds every day first, keeping
   only two Float64Arrays (buy, sell) per day indexed by region/type pair
   (~16 bytes per pair per day, ~450 MB for 400 days), then runs one merge-write
-  pass. The merge keeps any day the daily job already stored.
+  pass. The merge keeps any stored day outside the backfilled range (the daily
+  job's), replacing a day inside it with the same snapshot's prices.

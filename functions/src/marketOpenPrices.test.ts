@@ -267,6 +267,21 @@ describe('mergeDays', () => {
       [FORGE]: { buy: [1, null, 9], sell: [2, 3, 9] },
     });
   });
+  it('drops a stored date where no region has a price', () => {
+    const merged = mergeDays(
+      base,
+      {
+        dates: ['2026-10-01', '2026-10-02'],
+        regions: { [FORGE]: { buy: [null, 1], sell: [null, 2] } },
+      },
+      []
+    );
+    expect(merged).toEqual({
+      typeId: 34,
+      dates: ['2026-10-02'],
+      regions: { [FORGE]: { buy: [1], sell: [2] } },
+    });
+  });
   it('keeps a document of 400 days x 5 regions well under 1 MB', () => {
     const regions = [10000002, 10000043, 10000032, 10000030, 10000042];
     const days = dateRange('2025-09-14', '2026-10-17').map((date) =>

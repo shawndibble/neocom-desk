@@ -20,7 +20,8 @@
 // Phase 2 then runs one writeOpenPrices pass over `marketOpenPricesByType`
 // (one document per type, every hub region in it: ~20k documents), so each is read and
 // merge-written exactly once, with progress lines as it goes. The merge keeps
-// days the daily function already stored and the 400-day cap. Nothing is
+// stored days outside --from..--to (the daily function's) and the 400-day cap;
+// a stored day inside the range is replaced with the same snapshot's prices. Nothing is
 // written until every day is folded, so a run stopped during phase 1 is
 // re-run from the same --from.
 //

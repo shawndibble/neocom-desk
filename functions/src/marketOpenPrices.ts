@@ -292,7 +292,7 @@ export function mergeDays(
         const sell = priceAt(series.sell, i);
         if (buy !== null || sell !== null) regions.set(regionId, { buy, sell });
       }
-      byDate.set(date, regions);
+      if (regions.size > 0) byDate.set(date, regions);
     });
   }
   for (const day of days) byDate.set(day.date, new Map(Object.entries(day.regions)));

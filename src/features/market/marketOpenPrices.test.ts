@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { getDocMock, listMock, syncConfigured } = vi.hoisted(() => ({
+const { getDocMock, listMock, syncConfigured, firestoreThrows } = vi.hoisted(() => ({
   getDocMock: vi.fn(),
   listMock: vi.fn(),
   syncConfigured: { value: true },
+  firestoreThrows: { value: false },
 }));
 vi.mock('firebase/firestore/lite', () => ({
   doc: (_db: unknown, collection: string, id: string) => ({ path: `${collection}/${id}` }),
@@ -11,7 +12,12 @@ vi.mock('firebase/firestore/lite', () => ({
   collection: listMock,
   getDocs: listMock,
 }));
-vi.mock('@/sync/firebaseApp', () => ({ getSyncFirestore: () => ({}) }));
+vi.mock('@/sync/firebaseApp', () => ({
+  getSyncFirestore: () => {
+    if (firestoreThrows.value) throw new Error('bad config');
+    return {};
+  },
+}));
 vi.mock('@/app/syncStatus', () => ({ isSyncConfigured: () => syncConfigured.value }));
 
 import {
@@ -39,6 +45,7 @@ beforeEach(() => {
   getDocMock.mockReset();
   listMock.mockReset();
   syncConfigured.value = true;
+  firestoreThrows.value = false;
   resetMarketOpenPricesCache();
 });
 
@@ -96,6 +103,11 @@ describe('loadMarketOpenPrices', () => {
     syncConfigured.value = false;
     expect(await loadMarketOpenPrices(1, 2)).toBeNull();
     expect(getDocMock).not.toHaveBeenCalled();
+  });
+
+  it('is null, never a rejection, when Firestore cannot even be set up', async () => {
+    firestoreThrows.value = true;
+    await expect(loadMarketOpenPrices(FORGE, 2)).resolves.toBeNull();
   });
 
   it('is null on a failed read (offline) and tries again next time', async () => {

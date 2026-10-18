@@ -1,7 +1,7 @@
 /**
  * Writes folded open prices to Firestore: reads each touched document once,
  * merges the new day(s) into it with `mergeDays`, and commits in batches of at
- * most 100: a type document at 400 days x 5 regions is ~40 KB, and a commit
+ * most 100: a type document at 400 days x 5 regions is ~37 KB, and a commit
  * must stay under Firestore's 10 MiB request limit. Shared by the daily function and the backfill script (type-only
  * relative imports, see marketOrdersArchive.ts).
  */
@@ -20,7 +20,7 @@ export interface MergeFn {
 }
 
 /**
- * Merges `items` into `marketOpenPrices` and returns how many documents were
+ * Merges `items` into `collection` and returns how many documents were
  * written. `items` is consumed lazily, one batch at a time, so a large
  * generator (the backfill's ~20k documents) is never materialized whole.
  * `onProgress`, when given, gets the running total after each committed batch.

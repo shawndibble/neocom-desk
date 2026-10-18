@@ -66,15 +66,21 @@ export function resetMarketOpenPricesCache(): void {
 function readType(typeId: number, now: number): Promise<RegionSeries | null | undefined> {
   let pending = inflight.get(typeId);
   if (!pending) {
-    pending = getDoc(doc(getSyncFirestore(), MARKET_OPEN_PRICES_COLLECTION, String(typeId)))
+    // Started inside the chain, so a Firestore that cannot be set up is a
+    // failed read too, never a rejection.
+    const read: Promise<RegionSeries | null | undefined> = Promise.resolve()
+      .then(() => getDoc(doc(getSyncFirestore(), MARKET_OPEN_PRICES_COLLECTION, String(typeId))))
       .then((snapshot) => {
         const regions = snapshot.exists() ? parseOpenPricesByType(snapshot.data()) : null;
         cache.set(typeId, { at: now, regions });
         return regions;
       })
       .catch(() => undefined)
-      .finally(() => inflight.delete(typeId));
-    inflight.set(typeId, pending);
+      .finally(() => {
+        if (inflight.get(typeId) === read) inflight.delete(typeId);
+      });
+    pending = read;
+    inflight.set(typeId, read);
   }
   return pending;
 }

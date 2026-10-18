@@ -50,7 +50,7 @@ describe('writeOpenPrices', () => {
     });
   });
 
-  it('commits in batches of at most 100, keeping a batch of ~45 KB documents under 10 MiB', async () => {
+  it('commits in batches of at most 100, keeping a batch of ~37 KB documents under 10 MiB', async () => {
     const { db, commits } = fakeDb({});
     const items = Array.from({ length: 201 }, (_, t) => ({
       typeId: t,

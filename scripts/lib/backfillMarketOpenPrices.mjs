@@ -11,6 +11,7 @@ import {
   dateRange,
   implausibleReason,
   isIsoDate,
+  pairKey,
 } from '../../functions/src/marketOpenPrices.ts';
 
 export const USAGE = `Usage: node scripts/backfill-market-open-prices.mjs --from YYYY-MM-DD --to YYYY-MM-DD [--project <id>] [--write [--yes]] [--dry-run]
@@ -90,7 +91,7 @@ export class OpenPriceTable {
   addDay(date, fold) {
     const indexes = [];
     for (const e of fold.entries()) {
-      const key = `${e.regionId}_${e.typeId}`;
+      const key = pairKey(e.regionId, e.typeId);
       let i = this.#pairIndex.get(key);
       if (i === undefined) {
         i = this.#regionIds.length;
@@ -237,7 +238,7 @@ export async function runBackfill(deps) {
     return { written, skipped };
   } catch (err) {
     log(
-      'write failed: the batches already committed are complete and the merge is idempotent, so re-run the same command'
+      'write failed: the batches already committed are complete and the merge is idempotent, so re-run the same command (it downloads every day again, ~35 s each)'
     );
     throw err;
   }
