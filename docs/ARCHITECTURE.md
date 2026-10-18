@@ -456,6 +456,45 @@ nightly when both sources move to a newer build and opens an auto-merging PR.
   panel's **Remove request…** and per-Pledger **Remove…**, each behind
   `ConfirmDialog`. Neither the sweep nor the callables are deployed by
   CI: `firebase deploy --only functions`.
+- **Corp-shared data: the Corp Tax Book** (issues #4061/#4055, ADR 0023) is
+  the fourth kind of Firebase data: a corporation's moon-mining tax record,
+  `corpTaxBooks/{corporationId}`, shared by every officer and gated by a
+  verified corp role instead of a uid or a Community. The root doc holds the
+  settings (start date, trade hub, Ore Form, dated rates, grace, minimum
+  Statement, divisions, last sync); beside it are `officers/{uid}` (access
+  records), `observed` (Observed Mining Entry rows), `extractions`,
+  `payments` (Tax Payments), `dismissals`, `declarations`, `adjustments`,
+  `writeOffs`, `rebills`, `statements` (create-only; a Statement never
+  changes), `miners` (groupings), `meta/paid` (`paidStatementIds`, only ever
+  grown: a paid Statement's days stay closed, D22) and `audit` (immutable log,
+  shown as the activity feed). `corpTaxBookTokens/{token}` maps a Statement's
+  verify link to its Statement; no client can read it. **Nothing is written by
+  a client**: every write is a callable in `functions/src/corpTaxBookStore.ts`
+  (pure parsing and role decisions in `corpTaxBook.ts`) that appends an audit
+  entry in the same transaction. `verifyCorpOfficerCallable` takes the caller's
+  short-lived EVE **access token** (never a refresh token), reads the
+  Character's corporation, roles and the CEO from ESI (with
+  `X-Compatibility-Date` and an `X-User-Agent`), writes an `officers/{uid}`
+  access record that expires after 24h, and keeps no token. Role checks are
+  trusted for 10 minutes; dismiss, reverse-dismissal, write-off, rebill and
+  "not tax" require a live check (the token again). Rules let an officer read
+  the whole book while that record is unexpired for their ownerHash, and let
+  any signed-in Character read **their own lines** (`uid`/`uids` equals the
+  verified `char:{id}` uid) in any corp's book, including after leaving it; the
+  settings doc is `get`-able by any signed-in Character (the terms are on every
+  mail). Callables: `verifyCorpOfficerCallable`, `turnOnCorpTaxBookCallable`
+  (Director), `reclaimCorpTaxBookCallable` (the CEO; revokes other officers'
+  access), `syncCorpTaxBookCallable` (monotonic observer upsert, Extractions,
+  donations; Accountant+), `editCorpTaxBookCallable` (rates, settings, payments,
+  dismissals, groupings, adjustments, write-offs, rebills, Statements,
+  declarations), `confirmCorpTaxBookGroupingCallable`, and the two no-login
+  verify-link callables `readCorpTaxBookStatementCallable` and
+  `stopCorpTaxBookRemindersCallable`. `functions/` cannot import `src/`, so the
+  slice of the pure engine the callables enforce is mirrored in
+  `functions/src/corpTaxBookEngine.ts`, pinned to `src/engine/corpTaxBook` by
+  `functionsMirror.test.ts`. Callable tests run against the emulator
+  (`functions/src/corpTaxBookEmulator.test.ts`, part of `npm run test:rules`).
+  Not deployed by CI: `firebase deploy --only functions,firestore:rules`.
 - Firestore rules tests live in `rules-tests/` (`@firebase/rules-unit-testing`,
   `vitest.rules.config.ts`) and run only via `npm run test:rules`, which starts
   the Firestore emulator (needs a JRE; CI's `rules` job installs Java 21). They
