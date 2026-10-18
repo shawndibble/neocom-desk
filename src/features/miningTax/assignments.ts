@@ -26,7 +26,7 @@ import {
 import { appendTombstones, tombstoneKey } from '@/sync/localBookkeeping';
 import { MINING_TAX_ASSIGNMENTS } from '@/sync/syncedCollections';
 import { computeAssignmentValue } from '@/engine/miningTax/valuation';
-import { linesOwnedBy } from '@/engine/miningTax/ownership';
+import { growthCollector, linesOwnedBy } from '@/engine/miningTax/ownership';
 import { planSplit } from '@/engine/miningTax/split';
 import type { MiningLedgerEntry } from '@/engine/miningTax/types';
 import { normalizePaymentInfo } from './paymentLinks';
@@ -80,6 +80,26 @@ async function assertUnclaimed(
     return held === undefined ? true : already + line.quantity > held;
   });
   if (clash) throw new AlreadyAssignedError();
+}
+
+/**
+ * Whether a new Assignment on this entry should collect its later ore: true
+ * when the entry's current collector is paid. A paid Assignment never grows
+ * (ADR 0024), so its late ore is left unassigned for the pilot to assign as
+ * a new entry; that new entry then takes over collecting, so a session still
+ * mining after payment folds into the one unpaid entry instead of spawning a
+ * fresh row on every ledger refresh. Meant to run inside the write's
+ * transaction, like `assertUnclaimed`.
+ */
+async function collectsAfterPaid(
+  characterId: number,
+  date: string,
+  solarSystemId: number
+): Promise<boolean> {
+  const covering = (
+    await db.miningTaxAssignments.where('characterId').equals(characterId).toArray()
+  ).filter((a) => a.date === date && a.solarSystemId === solarSystemId);
+  return growthCollector(covering)?.status === 'paid';
 }
 
 /** Normalizes each record's `payment` on the way out — see `normalizePaymentInfo`. */
@@ -147,6 +167,9 @@ export async function createAssignment(input: AssignInput): Promise<MiningTaxAss
       input.oreLines,
       input.entryOreLines
     );
+    if (await collectsAfterPaid(input.characterId, input.date, input.solarSystemId)) {
+      record.collectsGrowth = true;
+    }
     await db.miningTaxAssignments.put(record);
   });
   return record;
@@ -354,7 +377,7 @@ export async function joinAssignments(
   // Only the members this call would *create* are checked — an already-assigned
   // member is just re-tagged, and adds no claim. Same transaction as the write.
   await db.transaction('rw', db.miningTaxAssignments, async () => {
-    for (const m of members) {
+    for (const [i, m] of members.entries()) {
       if (m.assignment) continue;
       await assertUnclaimed(
         m.characterId,
@@ -363,6 +386,9 @@ export async function joinAssignments(
         m.oreLines ?? [],
         m.entryOreLines
       );
+      if (await collectsAfterPaid(m.characterId, m.date, m.solarSystemId)) {
+        records[i].collectsGrowth = true;
+      }
     }
     await db.miningTaxAssignments.bulkPut(records);
   });
