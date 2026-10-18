@@ -14,8 +14,8 @@
  * The Browser's own two-column grid holds two halves: the paste box, one
  * `Panel`, narrower on the left since it does not need the width the Market
  * Group tree does; and the result column, which stacks the primary result
- * `Panel` above an optional, foldable Compare Hubs section once something
- * has been appraised.
+ * `Panel` (its header carries the Compare Hubs toggle) beneath the summary
+ * and, when open, the Compare Hubs cards, once something has been appraised.
  */
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { useEffect, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react';
@@ -912,8 +912,8 @@ export function AppraisalPanel({
 
       <div className="flex flex-col gap-4">
         {summaryReady && result !== null && totals !== undefined && (
-          // No box: the totals, hold and hub comparison sit on the page ground and
-          // the table below is the only panel (DESIGN.md §6c, boxes in boxes).
+          // The summary groups, hold line and hub cards sit on the page ground; the
+          // table below is the only Panel (DESIGN.md §6c, boxes in boxes).
           <div className="flex flex-col gap-2">
             <div className="flex flex-wrap items-center gap-2">
               {minusOwned && (
@@ -973,9 +973,15 @@ export function AppraisalPanel({
           title={t('market.appraisal.resultTitle')}
           headingRef={resultHeadingRef}
           padded={result === null}
+          wrapMeta
           meta={
             result !== null ? (
-              <StatChip label={hubName} value={t('market.appraisal.atPercent', { pricePercent })} />
+              <span className="max-md:basis-full">
+                <StatChip
+                  label={hubName}
+                  value={t('market.appraisal.atPercent', { pricePercent })}
+                />
+              </span>
             ) : undefined
           }
           actions={

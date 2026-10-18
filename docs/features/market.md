@@ -288,7 +288,7 @@ Scopes: `/market` is `UNGATED` (`src/app/routeScopes.ts:57`). Appraisal, Hauling
 
 Route `/market/appraisal` (MARKET_TABS id `appraisal`, `src/app/pageTabs.ts`). State lives at route level in `useAppraisal` (`useAppraisal.ts`) so a paste survives a trip to the Browser tab; panel is `AppraisalPanel.tsx`.
 
-Layout: grid, paste Panel left (21rem on lg), right column: stat boxes, hold line and the Compare Hubs cards (when open) on the page ground, then the table as the only Panel, its header carrying the Compare Hubs link (`AppraisalPanel.tsx:463`).
+Layout: grid, paste Panel left (21rem on lg), right column: stat boxes, hold line and the Compare Hubs cards (when open) on the page ground, then the table as the only Panel (the hub cards are page-ground tiles), its header carrying the Compare Hubs link (`AppraisalPanel.tsx:463`).
 
 Page header (shared with Browser, `Market.tsx:140,763`): Trade Hub select (no Location Mode chips, no Region mode on Appraisal; reason: Fuzzwork aggregates are per station) and a Refresh IconButton. On Appraisal Refresh re-prices bypassing the Fuzzwork TTL (`invalidateHubPrices`, `appraisalData.ts:181,274`); disabled until a result exists or while loading (`Market.tsx:831`).
 

@@ -1,17 +1,11 @@
 /**
- * Compare Hubs as a card per Trade Hub rather than a row per Trade Hub.
+ * Compare Hubs as a card per Trade Hub. Five hubs is a fixed, tiny set that
+ * fits across the page, so the comparison is a glance across the row rather
+ * than a scan down a column.
  *
- * The table this replaced answered "what is the spread at each hub" only by
- * reading a number out of a column and holding it against the number two rows
- * down. Five hubs is a fixed, tiny set — it fits across the panel — so each
- * hub gets its own box and the comparison becomes a glance across the row
- * instead of a scan down a column.
- *
- * What that trades away is sorting: `DataTable` gave sortable buy/sell
- * columns and a card grid has no column to sort. `TRADE_HUBS`' own fixed
- * order (Jita, Amarr, Dodixie, Rens, Hek) is the order here, at every width,
- * so a hub is always in the same place on the grid — which is the thing a
- * sort would otherwise destroy.
+ * A card grid has no column to sort, so `TRADE_HUBS`' own fixed order (Jita,
+ * Amarr, Dodixie, Rens, Hek) is the order at every width: a hub is always in
+ * the same place on the grid.
  */
 import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
 import { useEffect, useRef, useState } from 'react';
