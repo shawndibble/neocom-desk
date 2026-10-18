@@ -7,6 +7,8 @@
  * Cues follow DESIGN.md §6c: the product name opens its PI detail; the rows
  * carry no controls of their own.
  */
+import { formatCount } from '@/lib/formatCount';
+import { formatList } from '@/lib/listFormat';
 import { useTranslation } from 'react-i18next';
 import { IskAmount, Panel, Spinner, StatChip, StatChips, TypeIcon } from '@/components/ui';
 import { piTier } from '@/engine/pi/chain';
@@ -16,7 +18,6 @@ import { PiProductLink } from './PiProductLink';
 import type { PlanAdvice } from './planAdviceModel';
 import type { AccountChange, AccountView } from './accountPlanModel';
 
-const listFormat = new Intl.ListFormat('en', { style: 'long', type: 'conjunction' });
 function PerDay({ value, plus = false }: { value: number; plus?: boolean }) {
   const { t } = useTranslation();
   return (
@@ -28,7 +29,7 @@ function PerDay({ value, plus = false }: { value: number; plus?: boolean }) {
   );
 }
 
-const m3 = (value: number) => Math.round(value).toLocaleString('en');
+const m3 = formatCount;
 
 function Row({
   group,
@@ -41,7 +42,7 @@ function Row({
 }) {
   const { t } = useTranslation();
   const { typeId } = group;
-  const planets = listFormat.format(group.planetIds.map(nameOf));
+  const planets = formatList(group.planetIds.map(nameOf));
   return (
     <li className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2">
       <TypeIcon typeId={typeId} size={32} width={24} height={24} />

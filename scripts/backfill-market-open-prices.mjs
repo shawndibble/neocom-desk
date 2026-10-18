@@ -23,7 +23,8 @@
 // skips that prompt for unattended runs). --dry-run is the default and is also
 // accepted explicitly.
 //
-// Do not run it while syncMarketOpenPrices is running (00:45 UTC +/- an hour):
+// Do not run it while syncMarketOpenPrices may be running (00:45 to ~03:00 UTC,
+// its retries included):
 // both do a non-transactional read-modify-write of the same documents.
 //
 // Dates are UTC days, inclusive; --to is normally the day before the daily
@@ -38,9 +39,8 @@ import { createRequire } from 'node:module';
 import { createInterface } from 'node:readline/promises';
 import {
   MARKET_OPEN_PRICES_COLLECTION,
-  dayIndexUrl,
+  findFinalSnapshot,
   mergeDays,
-  pickLastSnapshotUrl,
 } from '../functions/src/marketOpenPrices.ts';
 import { writeOpenPrices } from '../functions/src/marketOpenPricesStore.ts';
 import { fetchJson, foldSnapshotUrl } from '../functions/src/marketOrdersArchive.ts';
@@ -105,8 +105,12 @@ async function confirmWrite(documents) {
 
 const { lastWritten, skipped } = await runBackfill({
   ...args,
-  snapshotUrlFor: async (date) =>
-    pickLastSnapshotUrl(await fetchJson(dayIndexUrl(date), USER_AGENT), date),
+  // Only a day's final snapshot: a --to of today or yesterday, before EVE Ref
+  // lists 23:45, is skipped rather than stored with an earlier price.
+  snapshotUrlFor: async (date) => {
+    const found = await findFinalSnapshot(date, (url) => fetchJson(url, USER_AGENT));
+    return found.final ? found.snapshot.url : null;
+  },
   foldUrl: (url, fold) => foldSnapshotUrl(url, fold, USER_AGENT),
   writeGroups: async (groups) => {
     await confirmWrite(groups.length);
