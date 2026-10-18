@@ -84,29 +84,66 @@ export function dayIndexUrl(date: string): string {
   return `${EVEREF_ORDERS_BASE}/${date.slice(0, 4)}/${date}/index.json`;
 }
 
+export interface DaySnapshot {
+  url: string;
+  /** EVE Ref's `file_time`, e.g. `2026-10-17T23:45:06Z`. */
+  fileTime: string;
+}
+
 /**
  * The last snapshot of `date` from that day's `index.json`: the file with the
  * greatest `file_time` on that UTC day, or `null` when the listing has none
  * (a missing day, a malformed body). Only `.csv.bz2` market-order files count.
  */
-export function pickLastSnapshotUrl(listing: unknown, date: string): string | null {
+export function pickLastSnapshot(listing: unknown, date: string): DaySnapshot | null {
   if (typeof listing !== 'object' || listing === null) return null;
   const files = (listing as { files?: unknown }).files;
   if (!Array.isArray(files)) return null;
-  let bestTime = '';
-  let bestUrl: string | null = null;
+  let best: DaySnapshot | null = null;
   for (const file of files as unknown[]) {
     if (typeof file !== 'object' || file === null) continue;
     const { file_time: time, name, url } = file as Record<string, unknown>;
     if (typeof time !== 'string' || typeof url !== 'string') continue;
     if (typeof name !== 'string' || !name.endsWith('.csv.bz2')) continue;
     if (!time.startsWith(`${date}T`)) continue;
-    if (time > bestTime) {
-      bestTime = time;
-      bestUrl = url;
-    }
+    if (!best || time > best.fileTime) best = { url, fileTime: time };
   }
-  return bestUrl;
+  return best;
+}
+
+/**
+ * EVE Ref snapshots every half hour, at :15 and :45, and lists each about five
+ * minutes later. A snapshot from the day's last half hour (23:30 onward) is
+ * the 23:45 one: the day's final.
+ */
+export function isFinalSlot(fileTime: string, date: string): boolean {
+  return fileTime >= `${date}T23:30:00Z` && fileTime.startsWith(`${date}T`);
+}
+
+export type FinalSnapshotResult =
+  | { final: true; snapshot: DaySnapshot }
+  /** Nothing listed, or only an earlier snapshot while the 23:45 one may still be coming. */
+  | { final: false; snapshot: DaySnapshot | null };
+
+/**
+ * The day's final snapshot, or why it is not known yet. The last listed
+ * snapshot is final when it sits in the day's last slot, or when the next day
+ * already has a snapshot listed: EVE Ref has moved on, so a skipped 23:45 slot
+ * is never coming and the earlier one really is the day's last. Otherwise the
+ * 23:45 snapshot may simply not be listed yet, and reading the earlier one
+ * would store a price that is not the day's last. `fetchListing` returns the
+ * parsed `index.json`, or `null` when there is none.
+ */
+export async function findFinalSnapshot(
+  date: string,
+  fetchListing: (url: string) => Promise<unknown>
+): Promise<FinalSnapshotResult> {
+  const snapshot = pickLastSnapshot(await fetchListing(dayIndexUrl(date)), date);
+  if (!snapshot) return { final: false, snapshot: null };
+  if (isFinalSlot(snapshot.fileTime, date)) return { final: true, snapshot };
+  const next = addDays(date, 1);
+  const movedOn = pickLastSnapshot(await fetchListing(dayIndexUrl(next)), next) !== null;
+  return movedOn ? { final: true, snapshot } : { final: false, snapshot };
 }
 
 /**

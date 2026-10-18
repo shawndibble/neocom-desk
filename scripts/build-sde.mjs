@@ -9,8 +9,9 @@
 
 import { mkdir, readFile, rm, writeFile, stat } from 'node:fs/promises';
 import { isDeepStrictEqual } from 'node:util';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
+import { ESI_COMPATIBILITY_DATE, USER_AGENT as ESI_USER_AGENT } from './lib/constants.mjs';
+import { ROOT, SCRIPTS_DIR } from './lib/paths.mjs';
 import { flattenMarketWideTree, MARKET_WIDE_MAX_DEPTH } from './lib/flattenMarketWideTree.mjs';
 import { buildShipTree } from './lib/shipTree.mjs';
 import { npcCorpFactions, stationOwnerFields } from './lib/stationOwners.mjs';
@@ -32,8 +33,7 @@ import { bakeDecryptors, bakeInvention, GENERIC_DECRYPTOR_GROUP_ID } from './lib
 
 // The build this bake used, for the nightly refresh's "is there a newer one"
 // check (.github/workflows/sde-refresh.yml).
-const BUILD_STAMP_FILE = join(dirname(fileURLToPath(import.meta.url)), 'sde-build.json');
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+const BUILD_STAMP_FILE = join(SCRIPTS_DIR, 'sde-build.json');
 const OUT_DIR = join(ROOT, 'public', 'data');
 // Default cache lives inside the repo (gitignored), not the world-shared
 // /tmp: a shared tmpdir is writable by any local user/process, so a
@@ -97,8 +97,6 @@ const MARKET_OUT_DIR = join(OUT_DIR, 'market');
 
 // Mirrors src/esi/client.ts's headers — a build-time probe is still an ESI
 // client, and courtesy to CCP's API doesn't stop at the browser boundary.
-const ESI_COMPATIBILITY_DATE = '2026-08-01';
-const ESI_USER_AGENT = 'Neocom Desk (github.com/shawndibble/neocom-desk)';
 const ESI_BASE = 'https://esi.evetech.net';
 const PROBE_CACHE_FILE = join(CACHE_DIR, 'market-regions-probe.json');
 // Delve: canary region with no NPC station that still carries busy
