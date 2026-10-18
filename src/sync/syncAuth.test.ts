@@ -3,6 +3,7 @@ import { signInWithCustomToken, signOut } from 'firebase/auth';
 import { httpsCallable } from 'firebase/functions';
 import { getValidAccessToken } from '@/auth/session';
 import { ensureAnySession, ensureSignedIn, signOutOfSync, uidForCharacter } from './syncAuth';
+import { deferred } from '@/test/deferred';
 
 vi.mock('firebase/auth', () => ({
   signInWithCustomToken: vi.fn(),
@@ -84,15 +85,6 @@ describe('ensureSignedIn', () => {
     expect(signOut).toHaveBeenCalled();
   });
 });
-
-/** A promise plus its resolver, so a test can decide when a sign-in lands. */
-function deferred<T>() {
-  let resolve!: (value: T) => void;
-  const promise = new Promise<T>((r) => {
-    resolve = r;
-  });
-  return { promise, resolve };
-}
 
 /** Mint returns `token-<id>`; signing in with it becomes `char:<id>`. */
 function mintPerCharacter() {

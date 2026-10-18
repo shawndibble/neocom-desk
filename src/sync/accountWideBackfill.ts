@@ -59,6 +59,7 @@
  * made still wins, exactly as it would have without this backfill.
  */
 
+import type { EntityTable } from 'dexie';
 import { db } from '@/db';
 import type { PlanetRichnessRecord, StationPinRecord } from '@/db';
 import type { SyncRecord } from './merge';
@@ -102,46 +103,77 @@ interface AccountWideCollection<T extends SyncRecord> {
   inWriteTransaction<R>(run: () => Promise<R>): Promise<R>;
 }
 
-const stationPins: AccountWideCollection<StationPinRecord> = {
-  // Whole-table read, filtered in memory: `scope` is not a Dexie index, and
-  // adding one would mean a schema version bump for a table that holds a
-  // handful of rows per Character.
-  loadShared: async (exceptCharacterId) => {
-    const rows = await db.stationPins.toArray();
-    return rows.filter((row) => row.scope === 'account' && row.characterId !== exceptCharacterId);
-  },
-  sharedKey: (row) => String(row.locationId),
+type TombstoneCollection = Parameters<typeof tombstoneKey>[0];
+
+/**
+ * The parts of an `AccountWideCollection` that are the same for every
+ * collection: all read the same way off a Dexie table keyed by `id` with a
+ * `characterId` index, and recover a Character-independent key from the
+ * second segment of a `${characterId}:${key}` row id.
+ */
+function makeAccountWideCollection<
+  T extends SyncRecord & { id: string; characterId: number },
+>(opts: {
+  table: EntityTable<T, 'id'>;
+  /** Which collection's per-Character tombstones record a deletion. */
+  tombstones: TombstoneCollection;
+  sharedKey: (row: T) => string;
+  /** Narrows the whole-table read to account-wide rows; the other Characters' filter is applied on top. */
+  filter?: (row: T) => boolean;
+  cloneOnto: (row: T, characterId: number) => T;
+}): AccountWideCollection<T> {
+  const { table, tombstones, sharedKey, filter, cloneOnto } = opts;
+  return {
+    loadShared: async (exceptCharacterId) => {
+      const rows = await table.toArray();
+      return rows.filter(
+        (row) => (filter ? filter(row) : true) && row.characterId !== exceptCharacterId
+      );
+    },
+    sharedKey,
+    deletedAtByKey: async () => {
+      const characters = await db.characters.toCollection().primaryKeys();
+      const latest = new Map<string, number>();
+      const lists = await Promise.all(
+        characters.map((characterId) =>
+          readTombstones(tombstoneKey(tombstones, Number(characterId)))
+        )
+      );
+      for (const tombstone of lists.flat()) {
+        const key = tombstone.id.split(':')[1];
+        if (!key) continue;
+        const held = latest.get(key) ?? 0;
+        if (tombstone.deletedAt > held) latest.set(key, tombstone.deletedAt);
+      }
+      return latest;
+    },
+    cloneOnto,
+    bulkPut: (rows) => table.bulkPut(rows),
+    inWriteTransaction: (run) => db.transaction('rw', table, run),
+    existingIds: async (characterId) => {
+      const rows = await table.where('characterId').equals(characterId).toArray();
+      return new Set(rows.map((row) => row.id));
+    },
+  };
+}
+
+const stationPins = makeAccountWideCollection<StationPinRecord>({
+  table: db.stationPins,
+  tombstones: STATION_PINS,
+  // `scope` is not a Dexie index, and adding one would mean a schema version
+  // bump for a table that holds a handful of rows per Character — so the
+  // whole table is read and filtered in memory.
+  filter: (row) => row.scope === 'account',
   // Tombstones are per Character and keyed by that Character's own row id
   // (`${characterId}:${locationId}`), so the locationId is recovered from the
   // id's second segment to compare across Characters.
-  deletedAtByKey: async () => {
-    const characters = await db.characters.toCollection().primaryKeys();
-    const latest = new Map<string, number>();
-    const lists = await Promise.all(
-      characters.map((characterId) =>
-        readTombstones(tombstoneKey(STATION_PINS, Number(characterId)))
-      )
-    );
-    for (const tombstone of lists.flat()) {
-      const locationId = tombstone.id.split(':')[1];
-      if (!locationId) continue;
-      const held = latest.get(locationId) ?? 0;
-      if (tombstone.deletedAt > held) latest.set(locationId, tombstone.deletedAt);
-    }
-    return latest;
-  },
+  sharedKey: (row) => String(row.locationId),
   cloneOnto: (row, characterId) => ({
     ...row,
     id: `${characterId}:${row.locationId}`,
     characterId,
   }),
-  bulkPut: (rows) => db.stationPins.bulkPut(rows),
-  inWriteTransaction: (run) => db.transaction('rw', db.stationPins, run),
-  existingIds: async (characterId) => {
-    const rows = await db.stationPins.where('characterId').equals(characterId).toArray();
-    return new Set(rows.map((row) => row.id));
-  },
-};
+});
 
 /**
  * Every collection the fan-out writes account-wide.
@@ -162,28 +194,10 @@ const stationPins: AccountWideCollection<StationPinRecord> = {
  * so unlike `stationPins` there is no `scope` to filter on: every row is
  * shared by definition.
  */
-const planetRichness: AccountWideCollection<PlanetRichnessRecord> = {
-  loadShared: async (exceptCharacterId) => {
-    const rows = await db.planetRichness.toArray();
-    return rows.filter((row) => row.characterId !== exceptCharacterId);
-  },
+const planetRichness = makeAccountWideCollection<PlanetRichnessRecord>({
+  table: db.planetRichness,
+  tombstones: PLANET_RICHNESS,
   sharedKey: (row) => String(row.planetId),
-  deletedAtByKey: async () => {
-    const characters = await db.characters.toCollection().primaryKeys();
-    const latest = new Map<string, number>();
-    const lists = await Promise.all(
-      characters.map((characterId) =>
-        readTombstones(tombstoneKey(PLANET_RICHNESS, Number(characterId)))
-      )
-    );
-    for (const tombstone of lists.flat()) {
-      const planetId = tombstone.id.split(':')[1];
-      if (!planetId) continue;
-      const held = latest.get(planetId) ?? 0;
-      if (tombstone.deletedAt > held) latest.set(planetId, tombstone.deletedAt);
-    }
-    return latest;
-  },
   cloneOnto: (row, characterId) => ({
     ...row,
     id: `${characterId}:${row.planetId}`,
@@ -192,13 +206,7 @@ const planetRichness: AccountWideCollection<PlanetRichnessRecord> = {
     // reordering one would silently reorder the other.
     order: [...row.order],
   }),
-  bulkPut: (rows) => db.planetRichness.bulkPut(rows),
-  existingIds: async (characterId) => {
-    const rows = await db.planetRichness.where('characterId').equals(characterId).toArray();
-    return new Set(rows.map((row) => row.id));
-  },
-  inWriteTransaction: (run) => db.transaction('rw', db.planetRichness, run),
-};
+});
 
 /**
  * Exposed so `planSync.ts` can feed the same signal into `mergeRecords`'

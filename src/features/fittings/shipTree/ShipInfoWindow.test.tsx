@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import '@/i18n';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import { bpcSourcingHref } from '@/features/bpcContracts/bpcSourcingUrl';
@@ -16,6 +16,7 @@ import { INTERCEPTORS, MERLIN } from './__fixtures__/shipTreeFixture';
 import { clearShipTreeCatalogCache } from './shipTreeCatalogs';
 import { ShipTreeTab } from './ShipTreeTab';
 import { useShipInfoShowMissing, useShipTreeViewPreference } from './shipTreeViewPreference';
+import { LocationProbe } from '@/test/LocationProbe';
 
 vi.mock('@/engine/fitting/fittingShare', async (importOriginal) => {
   const real = await importOriginal<typeof import('@/engine/fitting/fittingShare')>();
@@ -129,11 +130,6 @@ vi.mock('@/features/industry/data', () => ({
     needsReauth: false,
   })),
 }));
-
-function LocationProbe() {
-  const location = useLocation();
-  return <output data-testid="location">{`${location.pathname}${location.search}`}</output>;
-}
 
 async function openShip(name: RegExp) {
   const user = userEvent.setup();

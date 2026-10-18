@@ -10,8 +10,23 @@
 import type { KillmailHashLookup } from '@/engine/fittings/load';
 import type { KillmailVictim } from '@/engine/fittings/linkLoader';
 import { fetchWithTimeout } from '@/lib/fetchWithTimeout';
+import { createTtlCache } from '@/lib/ttlCache';
 import type { KillRecord, KillSpace } from '@/engine/pilotList/killActivity';
 import type { RecentKill, RecentKillAttacker } from '@/engine/route/recentKills';
+
+/** `status` is null when no answer came (offline, a timeout) or the body was unreadable. */
+type ZkillJson = { ok: true; body: unknown } | { ok: false; status: number | null };
+
+/** One zKillboard GET, parsed. Never throws; no custom headers (scope decision `20260924-195833`). */
+async function zkillJson(url: string): Promise<ZkillJson> {
+  try {
+    const response = await fetchWithTimeout(url);
+    if (!response.ok) return { ok: false, status: response.status };
+    return { ok: true, body: await response.json() };
+  } catch {
+    return { ok: false, status: null };
+  }
+}
 
 /**
  * A zKillboard link carries only the killmail id, but ESI's killmail endpoint
@@ -21,16 +36,11 @@ import type { RecentKill, RecentKillAttacker } from '@/engine/route/recentKills'
  * status, an unreadable body), which says nothing about the kill.
  */
 export async function fetchKillmailHash(killmailId: number): Promise<KillmailHashLookup> {
-  try {
-    const response = await fetchWithTimeout(`https://zkillboard.com/api/killID/${killmailId}/`);
-    if (response.status === 404) return { status: 'not-found' };
-    if (!response.ok) return { status: 'unreachable' };
-    const body: unknown = await response.json();
-    const hash = Array.isArray(body) ? (body[0] as { zkb?: { hash?: unknown } })?.zkb?.hash : null;
-    return typeof hash === 'string' ? { status: 'ok', hash } : { status: 'not-found' };
-  } catch {
-    return { status: 'unreachable' };
-  }
+  const result = await zkillJson(`https://zkillboard.com/api/killID/${killmailId}/`);
+  if (!result.ok) return { status: result.status === 404 ? 'not-found' : 'unreachable' };
+  const { body } = result;
+  const hash = Array.isArray(body) ? (body[0] as { zkb?: { hash?: unknown } })?.zkb?.hash : null;
+  return typeof hash === 'string' ? { status: 'ok', hash } : { status: 'not-found' };
 }
 
 /** How many of a hull's most recent losses Popular fits reads. */
@@ -89,20 +99,19 @@ export function parseHullLosses(body: unknown, limit = HULL_LOSS_LIMIT): ZkillHu
   return losses.sort((a, b) => b.killmailId - a.killmailId).slice(0, limit);
 }
 
+/** Concurrent callers for one hull share one request; nothing is reused once it settles. */
+const hullLossesInflight = createTtlCache<ZkillHullLoss[]>({ ttlMs: 0, max: 50 });
+
 /**
  * A hull's most recent losses, for Popular fits. A browser fetch with no
  * custom headers, as `fetchKillmailHash` (scope decision `20260924-195833`).
  */
 export async function fetchHullLosses(shipTypeId: number): Promise<HullLossesResult> {
-  try {
-    const response = await fetchWithTimeout(
-      `https://zkillboard.com/api/losses/shipTypeID/${shipTypeId}/`
-    );
-    if (!response.ok) return { ok: false, losses: [] };
-    return { ok: true, losses: parseHullLosses(await response.json()) };
-  } catch {
-    return { ok: false, losses: [] };
-  }
+  const losses = await hullLossesInflight.get(String(shipTypeId), async () => {
+    const result = await zkillJson(`https://zkillboard.com/api/losses/shipTypeID/${shipTypeId}/`);
+    return result.ok ? parseHullLosses(result.body) : null;
+  });
+  return losses === null ? { ok: false, losses: [] } : { ok: true, losses };
 }
 
 /** How many of a pilot's most-used hulls Pilot Lookup lists. */
@@ -201,8 +210,17 @@ export function parsePilotStats(body: unknown): PilotStatsParse | null {
 
 type StatsEntity = 'characterID' | 'corporationID' | 'allianceID';
 
+/**
+ * Lists kept at once. Each holds up to 200 full killmail bodies, so a long Local
+ * list must not pin them all for the session: the oldest go first.
+ */
+const PILOT_LIST_CACHE_MAX = 120;
+
 /** Keyed `kind:id`: a pilot, a corporation and an alliance can never share an answer. */
-const pilotStatsCache = new Map<string, { at: number; value: PilotStatsParse }>();
+const pilotStatsCache = createTtlCache<PilotStatsParse>({
+  ttlMs: PILOT_STATS_CACHE_MS,
+  max: 500,
+});
 
 /** Test seam: forget every cached pilot and corporation. */
 export function resetPilotStatsCache(): void {
@@ -214,22 +232,15 @@ export function resetPilotStatsCache(): void {
  * so `parsePilotStats` reads either. A browser fetch with no custom headers,
  * as `fetchKillmailHash` (scope decision `20260924-195833`). The URL 302s to
  * `.../kills/`; both legs are CORS-open, so the fetch follows it. Answers are
- * reused for `PILOT_STATS_CACHE_MS`; a failure never is.
+ * reused for `PILOT_STATS_CACHE_MS`, and concurrent callers share one request;
+ * a failure never is reused.
  */
 async function fetchEntityStats(entity: StatsEntity, id: number): Promise<PilotStatsResult> {
-  const key = `${entity}:${id}`;
-  const cached = pilotStatsCache.get(key);
-  if (cached && Date.now() - cached.at < PILOT_STATS_CACHE_MS) return cached.value;
-  try {
-    const response = await fetchWithTimeout(`https://zkillboard.com/api/stats/${entity}/${id}/`);
-    if (!response.ok) return { kind: 'failed' };
-    const parsed = parsePilotStats(await response.json());
-    if (parsed === null) return { kind: 'failed' };
-    pilotStatsCache.set(key, { at: Date.now(), value: parsed });
-    return parsed;
-  } catch {
-    return { kind: 'failed' };
-  }
+  const parsed = await pilotStatsCache.get(`${entity}:${id}`, async () => {
+    const result = await zkillJson(`https://zkillboard.com/api/stats/${entity}/${id}/`);
+    return result.ok ? parsePilotStats(result.body) : null;
+  });
+  return parsed ?? { kind: 'failed' };
 }
 
 /** A pilot's zKillboard stats, for Pilot Lookup and the Show Info Character tab. */
@@ -324,13 +335,10 @@ export function parsePilotKillmails(body: unknown, side: PilotKillmail['side']):
 
 type PilotListPath = 'kills' | 'losses';
 
-const pilotListCache = new Map<string, { at: number; body: Promise<unknown[] | null> }>();
-
-/**
- * Lists kept at once. Each holds up to 200 full killmail bodies, so a long Local
- * list must not pin them all for the session: the oldest go first.
- */
-const PILOT_LIST_CACHE_MAX = 120;
+const pilotListCache = createTtlCache<unknown[]>({
+  ttlMs: PILOT_STATS_CACHE_MS,
+  max: PILOT_LIST_CACHE_MAX,
+});
 
 /** Test seam: forget every cached pilot's kills and losses. */
 export function resetPilotKillmailsCache(): void {
@@ -347,32 +355,12 @@ export function resetPilotKillmailsCache(): void {
  * that is not a list, is never kept: the next reader asks again.
  */
 function fetchPilotList(characterId: number, path: PilotListPath): Promise<unknown[] | null> {
-  const key = `${path}/${characterId}`;
-  const cached = pilotListCache.get(key);
-  if (cached && Date.now() - cached.at < PILOT_STATS_CACHE_MS) return cached.body;
-  const body: Promise<unknown[] | null> = fetchWithTimeout(
-    `https://zkillboard.com/api/${path}/characterID/${characterId}/`
-  )
-    .then(async (response) => {
-      if (!response.ok) return null;
-      const parsed: unknown = await response.json();
-      return Array.isArray(parsed) ? parsed : null;
-    })
-    .catch(() => null);
-  const entry = { at: Date.now(), body };
-  // Expired lists first, then the oldest, until there is room (a Map keeps insertion order).
-  for (const [oldKey, old] of pilotListCache) {
-    if (Date.now() - old.at >= PILOT_STATS_CACHE_MS) pilotListCache.delete(oldKey);
-  }
-  for (const oldKey of pilotListCache.keys()) {
-    if (pilotListCache.size < PILOT_LIST_CACHE_MAX) break;
-    pilotListCache.delete(oldKey);
-  }
-  pilotListCache.set(key, entry);
-  void body.then((list) => {
-    if (list === null && pilotListCache.get(key) === entry) pilotListCache.delete(key);
+  return pilotListCache.get(`${path}/${characterId}`, async () => {
+    const result = await zkillJson(
+      `https://zkillboard.com/api/${path}/characterID/${characterId}/`
+    );
+    return result.ok && Array.isArray(result.body) ? result.body : null;
   });
-  return body;
 }
 
 /** Drops one cached list, for a body that parsed as a list but could not be read. */
@@ -600,21 +588,22 @@ export function parseRegionKills(body: unknown): Map<number, RecentKill[]> {
   return bySystem;
 }
 
+/** Concurrent callers for one system share one request; nothing is reused once it settles. */
+const systemKillsInflight = createTtlCache<RecentKill[]>({ ttlMs: 0, max: 200 });
+
 /**
  * A solar system's player kills from the last hour, for Route Safety. A
  * browser fetch with no custom headers, as `fetchKillmailHash` (scope
  * decision `20260924-195833`).
  */
 export async function fetchSystemRecentKills(systemId: number): Promise<SystemRecentKillsResult> {
-  try {
-    const response = await fetchWithTimeout(
+  const kills = await systemKillsInflight.get(String(systemId), async () => {
+    const result = await zkillJson(
       `https://zkillboard.com/api/kills/systemID/${systemId}/pastSeconds/3600/`
     );
-    if (!response.ok) return { ok: false };
-    return { ok: true, kills: parseSystemKills(await response.json()) };
-  } catch {
-    return { ok: false };
-  }
+    return result.ok ? parseSystemKills(result.body) : null;
+  });
+  return kills === null ? { ok: false } : { ok: true, kills };
 }
 
 /** zKillboard's page size: a page with this many entries may have a next page. */
@@ -642,30 +631,26 @@ export async function fetchRegionRecentKills(
   const bySystem = new Map<number, RecentKill[]>();
   // New kills shift the pages while they are read, so one can show on two.
   const seen = new Set<number>();
-  try {
-    for (let pageNumber = 1; pageNumber <= REGION_MAX_PAGES; pageNumber += 1) {
-      const suffix = pageNumber === 1 ? '' : `page/${pageNumber}/`;
-      const response = await fetchWithTimeout(
-        `https://zkillboard.com/api/kills/regionID/${regionId}/pastSeconds/${pastSeconds}/${suffix}`
-      );
-      if (!response.ok) return { ok: false };
-      const body: unknown = await response.json();
-      // An error body is a failure, not an empty hour.
-      if (!Array.isArray(body)) return { ok: false };
-      for (const [systemId, kills] of parseRegionKills(body)) {
-        const fresh = kills.filter((kill) => !seen.has(kill.killmailId));
-        for (const kill of fresh) seen.add(kill.killmailId);
-        const known = bySystem.get(systemId);
-        if (known) known.push(...fresh);
-        else bySystem.set(systemId, fresh);
-      }
-      if (body.length < REGION_PAGE_SIZE) return { ok: true, bySystem };
+  for (let pageNumber = 1; pageNumber <= REGION_MAX_PAGES; pageNumber += 1) {
+    const suffix = pageNumber === 1 ? '' : `page/${pageNumber}/`;
+    const result = await zkillJson(
+      `https://zkillboard.com/api/kills/regionID/${regionId}/pastSeconds/${pastSeconds}/${suffix}`
+    );
+    if (!result.ok) return { ok: false };
+    const { body } = result;
+    // An error body is a failure, not an empty hour.
+    if (!Array.isArray(body)) return { ok: false };
+    for (const [systemId, kills] of parseRegionKills(body)) {
+      const fresh = kills.filter((kill) => !seen.has(kill.killmailId));
+      for (const kill of fresh) seen.add(kill.killmailId);
+      const known = bySystem.get(systemId);
+      if (known) known.push(...fresh);
+      else bySystem.set(systemId, fresh);
     }
-    // Still full at the page cap: a partial hour would read as quiet.
-    return { ok: false };
-  } catch {
-    return { ok: false };
+    if (body.length < REGION_PAGE_SIZE) return { ok: true, bySystem };
   }
+  // Still full at the page cap: a partial hour would read as quiet.
+  return { ok: false };
 }
 
 export function systemZkillUrl(systemId: number): string {

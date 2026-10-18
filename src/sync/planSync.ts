@@ -275,17 +275,26 @@ export async function setCharacterStationPin(
  * definition supersedes any Character-specific opt-in that predates it.
  */
 export async function setAccountStationPin(locationId: number): Promise<void> {
+  await fanOutAccountWide(db.stationPins, (characterId, updatedAt) => ({
+    id: stationPinId(characterId, locationId),
+    characterId,
+    locationId,
+    scope: 'account' as const,
+    updatedAt,
+  }));
+}
+
+/**
+ * Write one row per Character known on this device, then schedule a sync for
+ * each. The shared body of every account-wide setter.
+ */
+async function fanOutAccountWide<T>(
+  table: { bulkPut(rows: T[]): Promise<unknown> },
+  toRow: (characterId: number, updatedAt: number) => T
+): Promise<void> {
   const characters = await db.characters.toArray();
   const now = Date.now();
-  await db.stationPins.bulkPut(
-    characters.map((c) => ({
-      id: stationPinId(c.characterId, locationId),
-      characterId: c.characterId,
-      locationId,
-      scope: 'account' as const,
-      updatedAt: now,
-    }))
-  );
+  await table.bulkPut(characters.map((c) => toRow(c.characterId, now)));
   for (const c of characters) scheduleSync(c.characterId);
 }
 
@@ -323,18 +332,13 @@ function planetRichnessId(characterId: number, planetId: number): string {
  * for every Character — so this always writes every row.
  */
 export async function setPlanetRichness(planetId: number, order: number[]): Promise<void> {
-  const characters = await db.characters.toArray();
-  const now = Date.now();
-  await db.planetRichness.bulkPut(
-    characters.map((c) => ({
-      id: planetRichnessId(c.characterId, planetId),
-      characterId: c.characterId,
-      planetId,
-      order: [...order],
-      updatedAt: now,
-    }))
-  );
-  for (const c of characters) scheduleSync(c.characterId);
+  await fanOutAccountWide(db.planetRichness, (characterId, updatedAt) => ({
+    id: planetRichnessId(characterId, planetId),
+    characterId,
+    planetId,
+    order: [...order],
+    updatedAt,
+  }));
 }
 
 /**
