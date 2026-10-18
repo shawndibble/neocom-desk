@@ -53,11 +53,9 @@ function eventDefaultFor(eventId: NotificationEventId, channel: NotificationChan
 // ---------------------------------------------------------------------------
 // Shared per-channel toggle-map behavior
 //
-// `toggleEventChannel`/`toggleAllEventsOnChannel`/`selectionStateForEvents`
-// below and their `*EveType*` counterparts further down implement one shape
-// twice: "given a way to read whether a key is enabled on a channel, flip
-// one, flip a whole column, or summarize a column's checked state." The
-// three generics here are that shape's one implementation, each taking the
+// `toggleEventChannel` below and its `*EveType*` counterpart further down
+// implement one shape twice: "given a way to read whether a key is enabled on a channel, flip
+// one." The generic here is that shape's one implementation, taking the
 // caller's own `isEnabledFor` as its reader rather than a map directly — so
 // they never need to know `EventEnabledMap`'s legacy bare-boolean case
 // (`EventChannelState`) exists at all, and produce only object-shaped
@@ -83,42 +81,6 @@ function toggledFlags<K extends string, M>(
   return next;
 }
 
-/**
- * Column select-all's new flags, for `keys` only — the caller merges these
- * back into its own map, carrying every other key through unchanged
- * (including a legacy bare boolean elsewhere, on the event side). Cascades
- * over one channel only: checked or indeterminate both fill in to fully
- * enabled; only a fully-enabled column clears.
- */
-function allToggledFlags<K extends string, M>(
-  keys: readonly K[],
-  map: M,
-  channel: NotificationChannel,
-  isEnabledFor: (map: M, key: K, channel: NotificationChannel) => boolean
-): Record<K, ChannelFlags> {
-  const allEnabled = keys.length > 0 && keys.every((k) => isEnabledFor(map, k, channel));
-  const result = {} as Record<K, ChannelFlags>;
-  for (const key of keys) {
-    const flags: ChannelFlags = {};
-    for (const c of NOTIFICATION_CHANNELS) flags[c] = isEnabledFor(map, key, c);
-    flags[channel] = !allEnabled;
-    result[key] = flags;
-  }
-  return result;
-}
-
-function selectionStateFor<K extends string | number, M>(
-  keys: readonly K[],
-  map: M,
-  channel: NotificationChannel,
-  isEnabledFor: (map: M, key: K, channel: NotificationChannel) => boolean
-): SelectionState {
-  if (keys.length === 0) return 'unchecked';
-  const enabledCount = keys.filter((k) => isEnabledFor(map, k, channel)).length;
-  if (enabledCount === 0) return 'unchecked';
-  return enabledCount === keys.length ? 'checked' : 'indeterminate';
-}
-
 export function isEventEnabledFor(
   map: EventEnabledMap,
   eventId: NotificationEventId,
@@ -130,14 +92,6 @@ export function isEventEnabledFor(
   return state[channel] ?? eventDefaultFor(eventId, channel);
 }
 
-export function selectionStateForEvents(
-  eventIds: readonly NotificationEventId[],
-  map: EventEnabledMap,
-  channel: NotificationChannel
-): SelectionState {
-  return selectionStateFor(eventIds, map, channel, isEventEnabledFor);
-}
-
 /** Flips one event on one channel, preserving whatever the other channel said. */
 export function toggleEventChannel(
   map: EventEnabledMap,
@@ -145,55 +99,6 @@ export function toggleEventChannel(
   channel: NotificationChannel
 ): EventEnabledMap {
   return { ...map, [eventId]: toggledFlags(map, eventId, channel, isEventEnabledFor) };
-}
-
-export function toggleAllEventsOnChannel(
-  eventIds: readonly NotificationEventId[],
-  map: EventEnabledMap,
-  channel: NotificationChannel
-): EventEnabledMap {
-  return { ...map, ...allToggledFlags(eventIds, map, channel, isEventEnabledFor) };
-}
-
-/**
- * Cross-character select-all/mixed state for one event on one channel (issue
- * #738's event-first row): the same three-state read as
- * `selectionStateForEvents`, but the axis being summarized is Characters
- * instead of Events — one event, every known Character's own value for it.
- */
-export function selectionStateForEventAcrossCharacters(
-  characterIds: readonly number[],
-  eventId: NotificationEventId,
-  perCharacterMap: Readonly<Record<number, EventEnabledMap>>,
-  channel: NotificationChannel
-): SelectionState {
-  return selectionStateFor(characterIds, perCharacterMap, channel, (map, characterId, c) =>
-    isEventEnabledFor(map[characterId] ?? {}, eventId, c)
-  );
-}
-
-/**
- * Cross-character, cross-event select-all/mixed state for the row-level
- * own select-all header (issue #738) — checked only when every known
- * Character agrees every Event is on for this channel.
- */
-export function selectionStateForAllCharactersAllEvents(
-  characterIds: readonly number[],
-  eventIds: readonly NotificationEventId[],
-  perCharacterMap: Readonly<Record<number, EventEnabledMap>>,
-  channel: NotificationChannel
-): SelectionState {
-  if (characterIds.length === 0 || eventIds.length === 0) return 'unchecked';
-  const total = characterIds.length * eventIds.length;
-  let enabledCount = 0;
-  for (const characterId of characterIds) {
-    const map = perCharacterMap[characterId] ?? {};
-    for (const eventId of eventIds) {
-      if (isEventEnabledFor(map, eventId, channel)) enabledCount += 1;
-    }
-  }
-  if (enabledCount === 0) return 'unchecked';
-  return enabledCount === total ? 'checked' : 'indeterminate';
 }
 
 /** One event's channel flags with `channel` forced to `value`, the other channel carried through unchanged. */
@@ -211,10 +116,9 @@ function eventFlagsWithChannelSet(
 
 /**
  * Broadcast cascade for one event's channel across every known Character
- * (issue #738): same cascade rule as `allToggledFlags` (any state where at
+ * (issue #738): any state where at
  * least one Character disagrees, or all are off, turns every Character on;
- * only full agreement-on turns them all off), generalized over Characters
- * instead of Events. Returns one merged `EventEnabledMap` per Character,
+ * only full agreement-on turns them all off. Returns one merged `EventEnabledMap` per Character,
  * ready to spread into `perCharacter`.
  */
 export function broadcastEventChannelFlags(
@@ -234,39 +138,6 @@ export function broadcastEventChannelFlags(
       ...prefs,
       [eventId]: eventFlagsWithChannelSet(prefs, eventId, channel, nextEnabled),
     };
-  }
-  return result;
-}
-
-/**
- * Broadcast cascade for every event's channel across every known Character at
- * once (issue #738's master select-all): one global on/off decision — is
- * every (Character, Event) pair already on for this channel — applied
- * uniformly, the same "one aggregate decision, applied to every key" shape
- * `allToggledFlags` uses for a single Character's column.
- */
-export function broadcastAllEventsChannelFlags(
-  characterIds: readonly number[],
-  eventIds: readonly NotificationEventId[],
-  perCharacterMap: Readonly<Record<number, EventEnabledMap>>,
-  channel: NotificationChannel
-): Record<number, EventEnabledMap> {
-  const allEnabled =
-    characterIds.length > 0 &&
-    eventIds.length > 0 &&
-    characterIds.every((id) => {
-      const prefs = perCharacterMap[id] ?? {};
-      return eventIds.every((eventId) => isEventEnabledFor(prefs, eventId, channel));
-    });
-  const nextEnabled = !allEnabled;
-  const result: Record<number, EventEnabledMap> = {};
-  for (const characterId of characterIds) {
-    const prefs = perCharacterMap[characterId] ?? {};
-    const nextPrefs: EventEnabledMap = { ...prefs };
-    for (const eventId of eventIds) {
-      nextPrefs[eventId] = eventFlagsWithChannelSet(prefs, eventId, channel, nextEnabled);
-    }
-    result[characterId] = nextPrefs;
   }
   return result;
 }
@@ -421,51 +292,10 @@ export function toggleEveTypeChannel(
   return { ...map, [type]: toggledFlags(map, type, channel, isEveTypeEnabledFor) };
 }
 
-/** Family header select-all/none state (issue #352) — same shape as `selectionStateForEvents`. */
-export function selectionStateForEveTypes(
-  types: readonly string[],
-  map: EveTypeEnabledMap,
-  channel: NotificationChannel
-): SelectionState {
-  return selectionStateFor(types, map, channel, isEveTypeEnabledFor);
-}
-
-/**
- * Family header select-all/none toggle (issue #352) — same cascade semantics
- * as `toggleAllEventsOnChannel`: fills a partial column to fully enabled;
- * only a fully-enabled column clears. The other channel is carried through.
- */
-export function toggleAllEveTypesOnChannel(
-  types: readonly string[],
-  map: EveTypeEnabledMap,
-  channel: NotificationChannel
-): EveTypeEnabledMap {
-  return { ...map, ...allToggledFlags(types, map, channel, isEveTypeEnabledFor) };
-}
-
-/**
- * Cross-character select-all/mixed state for one EVE Notification type on one
- * channel — the eve-type counterpart of `selectionStateForEventAcrossCharacters`
- * (issue #738), for the EVE type rows underneath
- * `eveNotification` (issue #745). One type, every known Character's own value
- * for it.
- */
-export function selectionStateForEveTypeAcrossCharacters(
-  characterIds: readonly number[],
-  type: string,
-  perCharacterMap: Readonly<Record<number, EveTypeEnabledMap>>,
-  channel: NotificationChannel
-): SelectionState {
-  return selectionStateFor(characterIds, perCharacterMap, channel, (map, characterId, c) =>
-    isEveTypeEnabledFor(map[characterId] ?? {}, type, c)
-  );
-}
-
 /**
  * Cross-character, cross-type select-all/mixed state for a Family's own
  * family select-all header (issue #745) — the
- * eve-type counterpart of `selectionStateForAllCharactersAllEvents`, scoped
- * to whatever `types` the caller passes (a single Family's types here).
+ * scoped to whatever `types` the caller passes (a single Family's types here).
  */
 export function selectionStateForAllCharactersEveTypes(
   characterIds: readonly number[],
@@ -528,8 +358,7 @@ export function broadcastEveTypeChannelFlags(
 
 /**
  * Broadcast cascade for a whole set of EVE Notification types' channel across
- * every known Character at once (issue #745) — the eve-type counterpart of
- * `broadcastAllEventsChannelFlags`, used for a Family's own select-all in the
+ * every known Character at once (issue #745) — used for a Family's own select-all in the
  * the EVE family headers.
  */
 export function broadcastAllEveTypesChannelFlags(
