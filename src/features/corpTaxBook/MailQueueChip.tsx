@@ -4,6 +4,7 @@ import { Modal, ProgressBar } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover';
 import { summarize, type MailQueueItem } from '@/engine/corpTaxBook/mailQueue';
+import { focusRingClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { MailQueuePanel, type MailQueueActions } from './MailQueuePanel';
@@ -41,7 +42,10 @@ export function MailQueueChip(props: ChipProps) {
           aria-label={label}
           aria-haspopup="dialog"
           onClick={() => setSheetOpen(true)}
-          className="relative inline-flex size-11 items-center justify-center rounded-xs border border-line hover:bg-panel-2"
+          className={cx(
+            'relative inline-flex size-11 items-center justify-center rounded-xs border border-line hover:bg-panel-2',
+            focusRingClassName
+          )}
         >
           <Icon.MailSent size={Icon.ICON_SIZE.md} aria-hidden="true" />
           <span
@@ -83,7 +87,10 @@ export function MailQueueChip(props: ChipProps) {
         <button
           type="button"
           aria-label={label}
-          className="inline-flex h-8 items-center gap-2 rounded-xs border border-line px-2 text-xs whitespace-nowrap hover:bg-panel-2"
+          className={cx(
+            'inline-flex h-8 items-center gap-2 rounded-xs border border-line px-2 text-xs whitespace-nowrap hover:bg-panel-2',
+            focusRingClassName
+          )}
         >
           <Icon.MailSent size={Icon.ICON_SIZE.sm} aria-hidden="true" />
           <span className="tabular-nums">
