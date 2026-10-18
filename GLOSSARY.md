@@ -259,7 +259,9 @@ here — they go one per file in `docs/context/decisions/`.
 - **Corp Access**: The single resolved state for the active Character,
   composing Corp Capability with granted scopes: `unknown` (not resolved yet),
   `none` (no Corp Role), `roles-without-grant` (holds a role, corp scopes not
-  granted), `ready` (holds a role and its scopes).
+  granted), `ready` (holds a role and its scopes — or every scope but an
+  additive Corp Capability's, which then stays off without hiding the rest;
+  see `docs/context/decisions/20261018-141225-*`).
 - **Corp Capability**: What a Character can actually _see_ — wallet,
   structures, members, industry — derived from their Corp Roles. The unit
   every consumer branches on; none compares role strings itself.
@@ -391,8 +393,9 @@ here — they go one per file in `docs/context/decisions/`.
 - **Growth Collector**: On a Mining Ledger Entry covered by two or more
   Assignments (a quantity split), the one Assignment that receives any ore
   ESI reports for that day _after_ the split. A sole Assignment always
-  collects. Nothing on a split day is ever silently unassigned or doubly
-  claimed.
+  collects. Nothing on a split day is ever doubly claimed. A paid collector
+  takes nothing (paid stays paid, ADR 0024): that ore stays unassigned until
+  the pilot assigns it, and the new Assignment then takes over collecting.
 - **Global Market Region**: A region that exists only to hold one item's
   cluster-wide market. PLEX is the only one today: its orders live in a region
   of their own, yet each order still points at an ordinary station. So a global
@@ -619,7 +622,7 @@ here — they go one per file in `docs/context/decisions/`.
 - **Net Worth Snapshot**: One Character's wallet, asset value (at the chosen Trade Hub, PLEX excluded because the PLEX Vault is not in ESI), buy-order escrow and sell-order stock on one UTC day: numbers only, kept forever and synced as Editable Data. A day the app was not opened has no row and is never interpolated.
 - **Tab Leader**: The one open tab that runs a piece of origin-wide background work, such as the **Foreground Poller** or the background sync sweep, so several open tabs do it once, not once each. Always a visible tab: with every tab hidden nobody leads.
 - **Target Profile**: The signature radius, speed and (optionally) resist to each damage type of an imagined target that a **Fitting**'s applied damage is worked out against — built-in NPC classes or one the pilot defines. Changes applied DPS and its graphs, never raw DPS. A profile with no resists resists nothing. Distinct from a **Damage Profile**, which is about what shoots at the Fitting.
-- **Tax Payment**: ISK a miner sent the corporation, credited against what they owe in a **Corp Tax Book**, oldest debt first. Usually a donation into the corporation's wallet, found automatically; an officer can record one by hand, or dismiss one that turned out to be for something else. Distinct from a **Made Payment**, which is the pilot's own record of ISK sent.
+- **Tax Payment**: ISK a miner sent the corporation, credited against what they owe in a **Corp Tax Book**, oldest debt first. Usually a donation into the corporation's wallet, found automatically; an officer can record one by hand, or mark one "not tax" when it turned out to be for something else. Distinct from a **Made Payment**, which is the pilot's own record of ISK sent.
 - **Throughput** (planetary): A second budget, independent of the **Pin Budget**: whether the colony's links can carry the material flow and whether a buffer cycle fits in the Launchpad and Storage Facility. A layout can clear the Pin Budget and still stall.
 - **Triage Board**: The Overview as it was before the widget grid: a fixed board
   with one card per domain. Retired; the Overview is now an **Overview Layout**

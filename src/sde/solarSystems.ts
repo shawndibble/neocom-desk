@@ -12,8 +12,7 @@
  */
 import { loadSolarSystems } from './loadMarketSde';
 import type { SolarSystemEntry } from './marketTypes';
-
-let index: Promise<ReadonlyMap<number, SolarSystemEntry> | null> | null = null;
+import { memoizeAsync } from '@/lib/memoizeAsync';
 
 /**
  * The whole snapshot as a lookup, or `null` if it could not be read.
@@ -23,19 +22,14 @@ let index: Promise<ReadonlyMap<number, SolarSystemEntry> | null> | null = null;
  * awaiting each id would serialise the search. Prefer `lookupSolarSystem` for
  * one-off reads.
  */
-export function loadSolarSystemsById(): Promise<ReadonlyMap<number, SolarSystemEntry> | null> {
-  index ??= loadSolarSystems()
-    .then((entries): ReadonlyMap<number, SolarSystemEntry> => {
-      const map = new Map<number, SolarSystemEntry>();
-      for (const entry of entries) map.set(entry.id, entry);
-      return map;
-    })
-    .catch(() => {
-      index = null;
-      return null;
-    });
-  return index;
-}
+export const loadSolarSystemsById = memoizeAsync(
+  async (): Promise<ReadonlyMap<number, SolarSystemEntry>> => {
+    const map = new Map<number, SolarSystemEntry>();
+    for (const entry of await loadSolarSystems()) map.set(entry.id, entry);
+    return map;
+  },
+  { fallback: null }
+);
 
 /**
  * The snapshot's entry for one system id, or `null` if the snapshot loaded
@@ -85,6 +79,6 @@ export async function lookupSolarSystemByName(
 
 /** Test-only: drops the memoized index so tests can swap the snapshot between cases. */
 export function clearSolarSystemIndex(): void {
-  index = null;
+  loadSolarSystemsById.reset();
   nameIndex = null;
 }
