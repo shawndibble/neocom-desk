@@ -77,7 +77,7 @@ import { courierContractsCsvColumns } from './courierContractsCsv';
 import { endpointSystemName } from '@/features/contractSearch/courierEndpointNames';
 import { loadCharacterRegionId } from '@/features/contractSearch/characterRegion';
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
-import { formatIskAuto, formatIskCompact } from '@/lib/isk';
+import { formatIskAuto, formatIskCompact, parseNumeric } from '@/lib/isk';
 import { formatMagnitude } from '@/lib/magnitude';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
@@ -139,13 +139,6 @@ function offeredSpaceKinds(rows: readonly CourierRouteRow[]): SpaceKind[] {
  */
 function narrowsSpace(selected: readonly SpaceKind[], offered: readonly SpaceKind[]): boolean {
   return offered.some((kind) => !selected.includes(kind));
-}
-
-/** A blank or unparseable field is "no restriction", never `NaN` — which would silently exclude every row. */
-function parseNumeric(value: string): number | null {
-  if (value.trim() === '') return null;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
 }
 
 /**

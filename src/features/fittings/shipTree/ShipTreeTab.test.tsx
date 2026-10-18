@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import '@/i18n';
 import { hullCountsFor, layoutShipTree } from '@/engine/shipTree/layout';
 import { classNeedsOmega } from '@/engine/shipTree/rules';
@@ -22,6 +22,7 @@ import {
 import { clearShipTreeCatalogCache } from './shipTreeCatalogs';
 import { ShipTreeTab } from './ShipTreeTab';
 import { useShipTreeViewPreference } from './shipTreeViewPreference';
+import { LocationProbe } from '@/test/LocationProbe';
 
 vi.mock('@/sde/loadSde', async (importOriginal) => {
   const f = await import('./__fixtures__/shipTreeFixture');
@@ -65,11 +66,6 @@ vi.mock('@/features/skills/useTargetPlan', async (importOriginal) => ({
   ...(await importOriginal<object>()),
   useTargetPlan: () => target,
 }));
-
-function LocationProbe() {
-  const location = useLocation();
-  return <output data-testid="location">{`${location.pathname}${location.search}`}</output>;
-}
 
 function renderTab(path = '/ships/tree') {
   return render(

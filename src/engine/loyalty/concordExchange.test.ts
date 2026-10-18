@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { concordLpCost, concordRate, iskPerConcordLp } from './concordExchange';
+import { concordRate, iskPerConcordLp } from './concordExchange';
 
 describe('concordRate', () => {
   it('is 0.8 and verified for the Empire factions, Ammatar and Khanid', () => {
@@ -37,10 +37,6 @@ describe('concordRate', () => {
 });
 
 describe('concord conversion', () => {
-  it('costs target LP / rate in CONCORD LP', () => {
-    expect(concordLpCost(1000, 0.8)).toBe(1250);
-  });
-
   it('scales ISK per LP by the rate, keeping a missing value missing', () => {
     expect(iskPerConcordLp(1000, 0.8)).toBe(800);
     expect(iskPerConcordLp(null, 0.8)).toBeNull();

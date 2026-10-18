@@ -5,7 +5,6 @@ import {
   capHeadersForDisplay,
   mailKey,
   mergeOwnedMail,
-  skippedMailCharacters,
   sumUnreadByTab,
   totalSystemUnread,
   mailSearchMatches,
@@ -379,22 +378,6 @@ describe('unread across Characters', () => {
     expect(sums.get('inbox')).toBe(5);
     expect(sums.get('corp')).toBe(5);
     expect(sums.get('sent')).toBe(0);
-  });
-});
-
-describe('skippedMailCharacters', () => {
-  it('names Characters without the mail grant or without cached headers', () => {
-    expect(
-      skippedMailCharacters([
-        { name: 'A', granted: true, hasHeaders: true },
-        { name: 'B', granted: false, hasHeaders: false },
-        { name: 'C', granted: true, hasHeaders: false },
-      ])
-    ).toEqual(['B', 'C']);
-  });
-
-  it('is empty when every Character is covered', () => {
-    expect(skippedMailCharacters([{ name: 'A', granted: true, hasHeaders: true }])).toEqual([]);
   });
 });
 

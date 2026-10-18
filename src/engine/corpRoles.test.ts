@@ -21,12 +21,26 @@ describe('corpCapabilities', () => {
 
   // GET /corporations/{id}/wallets (+ journal, transactions) declares
   // x-required-roles ["Accountant", "Junior_Accountant"] — either one alone.
-  it('grants wallet access to an Accountant', () => {
-    expect(held(['Accountant'])).toEqual(['canReadWallet']);
+  it('grants wallet and mining-ledger access to an Accountant', () => {
+    expect(held(['Accountant'])).toEqual(['canReadWallet', 'canReadMiningLedger']);
   });
 
   it('grants wallet access to a Junior_Accountant', () => {
     expect(held(['Junior_Accountant'])).toEqual(['canReadWallet']);
+  });
+
+  /**
+   * GET /corporation/{id}/mining/observers (and /observers/{observer_id})
+   * declare x-required-roles ["Accountant"] — not Junior_Accountant, not
+   * Station_Manager, even though the extraction schedule beside it answers to
+   * Station_Manager. A Director holds it through the Director clause (and so
+   * does a CEO, whose ESI role list carries Director).
+   */
+  it('grants mining-ledger access to an Accountant or a Director only', () => {
+    expect(corpCapabilities(['Accountant']).canReadMiningLedger).toBe(true);
+    expect(corpCapabilities(['Director']).canReadMiningLedger).toBe(true);
+    expect(corpCapabilities(['Junior_Accountant']).canReadMiningLedger).toBe(false);
+    expect(corpCapabilities(['Station_Manager']).canReadMiningLedger).toBe(false);
   });
 
   /**
@@ -89,7 +103,11 @@ describe('corpCapabilities', () => {
   });
 
   it('unions the capabilities of several roles held at once', () => {
-    expect(held(['Accountant', 'Factory_Manager'])).toEqual(['canReadWallet', 'canReadIndustry']);
+    expect(held(['Accountant', 'Factory_Manager'])).toEqual([
+      'canReadWallet',
+      'canReadMiningLedger',
+      'canReadIndustry',
+    ]);
   });
 
   it('ignores roles no capability is modelled on, rather than throwing', () => {
