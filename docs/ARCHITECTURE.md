@@ -487,7 +487,8 @@ nightly when both sources move to a newer build and opens an auto-merging PR.
   access), `syncCorpTaxBookCallable` (monotonic observer upsert, Extractions,
   donations; Accountant+), `editCorpTaxBookCallable` (rates, settings, payments,
   dismissals, groupings, adjustments, write-offs, rebills, Statements,
-  declarations), `confirmCorpTaxBookGroupingCallable`, and the two no-login
+  declarations), `confirmCorpTaxBookGroupingCallable`, the player-facing
+  `claimCorpTaxBookPaymentCallable` (see below), and the two no-login
   verify-link callables `readCorpTaxBookStatementCallable` and
   `stopCorpTaxBookRemindersCallable`. `functions/` cannot import `src/`, so the
   slice of the pure engine the callables enforce is mirrored in
@@ -501,6 +502,38 @@ nightly when both sources move to a newer build and opens an auto-merging PR.
   pure half is `src/engine/corpTaxBook/sync.ts` (gaps, donation resolution,
   settlement plan). `useCorpTaxBook` exposes last-synced/stale/gaps and syncs
   on visit; `useMiningLedgerAccess` says when to ask for the mining scope.
+  **Claiming a donation** (issue #4065): `claimCorpTaxBookPaymentCallable` is
+  authorised by the caller's uid, not an officer record. It finds the payment,
+  answers "not found" for a missing one and for someone else's alike, refuses
+  one already assigned or marked not tax, and sets the payment's `minerId`
+  (the Miner the Character is grouped into, else `solo:{characterId}`) plus
+  `claimedBy` and `claimedAt`; the audit entry is `claimPayment`, attributed to
+  "Player claim". **The personal tab** (`src/features/miningTax/corpBook/`) is
+  the member's view of the same book: `useCorpBookView` does a `get` of
+  `corpTaxBooks/{corp}` for the Character's corp (and any corp remembered in
+  the `corpTaxBookCorps` setting, so a leaver keeps reading), reads only the
+  member's own lines through the `uid`/`uids` rules, and
+  `src/engine/corpTaxBook/personal.ts` (pure) overlays them on the Tax tab. No
+  book or any failed read leaves the tab untouched; a guest has no app login
+  and uses the verify page instead. **The verify page** is the public,
+  no-login route `/corp-tax-book/verify/:token`
+  (`src/features/corpTaxBook/VerifyPage.tsx`): it is in `PUBLIC_ROUTES`
+  (`src/app/routerPath.ts`), so it sits outside `RequireCharacter`, registers
+  no service worker and skips the update wait, and analytics and Sentry
+  record the route pattern, never the token. It calls
+  `readCorpTaxBookStatementCallable`, whose `readStatementByToken` resolves
+  `corpTaxBookTokens/{token}` and returns that Statement, its terms and **only
+  the payments credited to it** (`paymentCredits`, from the mirrored
+  `allocatePayments`, so a donation that paid two Statements shows its own part
+  on each) and never the Miner's other Statements. A token carries a
+  closed-account note when `miners/{id}.closedAt` is set.
+  **Local development** runs against the Firebase emulators instead of
+  production: `VITE_FIREBASE_EMULATORS=1` in `.env.local` (issue #4190)
+  points Auth (9099), Firestore (8080) and Functions (5001) at
+  `npm run emulators`, with project id `demo-neocom-desk`, and
+  `npm run emulators:seed` writes a sample book. It also requires
+  `import.meta.env.DEV`, so a production build never connects. Steps:
+  `docs/agents/testing-and-ci.md`.
   Not deployed by CI: `firebase deploy --only functions,firestore:rules`.
 - **Corp Tax Book send queue** (issue #4064, D16). Pure rules:
   `src/engine/corpTaxBook/mailQueue.ts` (pacing, 520 holds, summary, D27
@@ -513,7 +546,13 @@ nightly when both sources move to a newer build and opens an auto-merging PR.
   `recordReminder` through `editCorpTaxBookCallable`), and the UI
   (`MailQueueChip`, `MailQueuePanel`, `MailLimitNotice`,
   `StatementMailPreview`). `MailQueueMount` sits in `Layout` and loads the
-  chip and sender only while the queue has rows.
+  chip and sender only while the queue has rows. The queue is **local**, never
+  in Firebase: Dexie `corpMailQueue` (indexed on corporation, batch and sender)
+  is the only record of what is waiting, and the sender is whichever tab holds
+  the `neocom:mailQueue` Web Lock, one at a time, so two open tabs never send
+  twice. Only the audit of each mail (`recordMail` / `recordReminder`) goes to
+  the book. The queue sends only while an app tab is open: no server holds an
+  ESI token (ADR 0010).
 - Firestore rules tests live in `rules-tests/` (`@firebase/rules-unit-testing`,
   `vitest.rules.config.ts`) and run only via `npm run test:rules`, which starts
   the Firestore emulator (needs a JRE; CI's `rules` job installs Java 21). They

@@ -11,6 +11,8 @@ Terms per `GLOSSARY.md`: Corp Access, Corp Capability, Corp Role, Corp Board Ite
 | Wallet   | `/corp/wallet`                   | `src/routes/CorpWallet.tsx`  | `canReadWallet`                      | Division balances, journal, market transactions                                          |
 | Assets   | `/corp/assets`, `/corp/assets/*` | `src/routes/CorpAssets.tsx`  | `canReadAssets` (Director)           | Division-first drill-down asset browser                                                  |
 
+Moons (`/corp/moons`, the Corp Tax Book: Extractions, Miners, Statements, mail queue) is documented in `mining.md` ("Corp Tax Book"); its Corp sub-nav entry shows to Accountant, Director and CEO, gated on the role-based `canReadMiningLedger` so the page can ask for the missing scope (`20261018-172958`). The Moons Kind Card links there.
+
 Related elsewhere: Settings -> Corporation (dark threshold) and Settings -> Permissions Corporation row (`settings.md`); Notifications Corp event group (`settings.md`); one-time grant banner (`CorpGrantPrompt`, mounted `src/app/Layout.tsx:440`).
 
 ## Purpose and user goal
