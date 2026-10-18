@@ -42,7 +42,7 @@ export function TransactionsSummaryStrip({
           })}
         </p>
       )}
-      <dl className="grid grid-cols-3 gap-3 tabular-nums">
+      <dl className="flex flex-wrap gap-x-6 gap-y-2 tabular-nums">
         <SummaryFigure
           label={t('wallet.sold')}
           value={signedIsk(summary.sold, 0)}
@@ -56,25 +56,25 @@ export function TransactionsSummaryStrip({
         <SummaryFigure
           label={t('wallet.net')}
           value={signedIsk(summary.net, 0)}
-          className={cx('items-end', iskToneClass(summary.net))}
+          className={iskToneClass(summary.net)}
         />
-      </dl>
-      {trading && (
-        <dl className="grid grid-cols-3 gap-3 tabular-nums">
+        {trading && trading.matched > 0 && (
           <SummaryFigure
             label={t('wallet.tradingMargin')}
-            value={trading.matched > 0 ? signedIsk(trading.margin, 0) : '—'}
+            value={signedIsk(trading.margin, 0)}
             note={t('wallet.tradingMatched', { matched: trading.matched, count: trading.sales })}
-            className={trading.matched > 0 ? iskToneClass(trading.margin) : 'text-text-dim'}
+            className={iskToneClass(trading.margin)}
           />
+        )}
+        {trading && (
           <SummaryFigure
             label={t('wallet.brokerFees')}
             tooltip={t('wallet.brokerFeesTooltip')}
             value={signedIsk(-trading.brokerFees, 0)}
             className={trading.brokerFees > 0 ? 'text-isk-neg' : 'text-text'}
           />
-        </dl>
-      )}
+        )}
+      </dl>
       {trading?.archiveSince != null && (
         <p className="text-xs text-text-dim">
           {t('wallet.archiveSince', {
@@ -100,7 +100,7 @@ function SummaryFigure({
   className: string;
 }) {
   return (
-    <div className={cx('flex flex-col gap-0.5', className)}>
+    <div className={cx('flex flex-col gap-0.5 whitespace-nowrap', className)}>
       <dt className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
         {tooltip ? <HintText content={tooltip}>{label}</HintText> : label}
       </dt>

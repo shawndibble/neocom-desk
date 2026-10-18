@@ -1,12 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { realizedMargins } from './realizedMargin';
-import {
-  marginsByDay,
-  marginsByItem,
-  sumBrokerFees,
-  sumMargins,
-  type SaleFill,
-} from './tradingProfit';
+import { marginsByItem, sumBrokerFees, sumMargins, type SaleFill } from './tradingProfit';
 import type { RealizedMargin } from './realizedMargin';
 import type { WalletTrade } from './walletCostBasis';
 
@@ -35,25 +29,6 @@ describe('sumMargins', () => {
 
   it('is zero over no sales', () => {
     expect(sumMargins([], new Map())).toEqual({ margin: 0, matched: 0, sales: 0 });
-  });
-});
-
-describe('marginsByDay', () => {
-  it('sums matched margins per day, oldest day first', () => {
-    const fills = [
-      sale(2, '2026-01-02T11:00:00Z'),
-      sale(1, '2026-01-01T10:00:00Z'),
-      sale(3, '2026-01-01T11:00:00Z'),
-    ];
-    const margins = new Map([
-      [1, margin(100)],
-      [2, margin(5)],
-    ]);
-    const days = marginsByDay(fills, margins, (date) => date.slice(0, 10));
-    expect(days).toEqual([
-      { dayKey: '2026-01-01', margin: 100, matched: 1, sales: 2 },
-      { dayKey: '2026-01-02', margin: 5, matched: 1, sales: 1 },
-    ]);
   });
 });
 

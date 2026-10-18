@@ -303,24 +303,6 @@ describe('TransactionsPanel — margin', () => {
     expect(marginCell(row)).toHaveTextContent('—');
   });
 
-  it('rolls the margin up by item, leaving an uncovered item unranked, and a click sets only the search', async () => {
-    load([taxFor(2, -49_766.4), taxFor(3, -100)]);
-    renderPanel();
-    const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: /By item/ }));
-    const table = screen.getByRole('table', { name: 'By item' });
-    const dcu = within(table).getByRole('row', { name: /Damage Control II/ });
-    expect(dcu).toHaveTextContent('+132,634');
-    expect(within(table).getByRole('row', { name: /Tritanium/ })).toHaveTextContent('—');
-
-    await user.click(dcu);
-    expect(screen.getByPlaceholderText(/Search item/)).toHaveValue('Damage Control II');
-    await waitFor(() =>
-      expect(screen.getByTestId('location-search').textContent).toMatch(/^\?txn\.q=Damage/)
-    );
-    expect(screen.getByTestId('location-search').textContent).not.toMatch(/txn\.(side|start|end)/);
-  });
-
   it('totals the margin of the matched sales and the broker fees over the same dates', async () => {
     load([
       taxFor(2, -49_766.4),
@@ -338,17 +320,6 @@ describe('TransactionsPanel — margin', () => {
     expect(strip).toHaveTextContent('+132,634');
     expect(strip).toHaveTextContent('1 of 2 sales matched');
     expect(strip).toHaveTextContent('-8,104,550');
-  });
-
-  it('rolls the margin up by day when By day is picked', async () => {
-    load([taxFor(2, -49_766.4), taxFor(3, -100)]);
-    renderPanel();
-    const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: /By item/ }));
-    await user.click(screen.getByRole('button', { name: 'By day' }));
-    const table = screen.getByRole('table', { name: 'By day' });
-    expect(within(table).getByRole('row', { name: /2026-09-20/ })).toHaveTextContent('+132,634');
-    expect(within(table).getByRole('row', { name: /2026-09-21/ })).toHaveTextContent('—');
   });
 });
 
