@@ -10,8 +10,8 @@
  * Recomputed from the whole history each time, so marking "not tax" or
  * reversing a dismissal simply reflows the credit.
  */
-import { activeDismissalFor, type Dismissal } from './dismissals';
-import { minerIdFor, type DayCharge, type Miner } from './charges';
+import { activeDismissalFor, type DismissableCharge, type Dismissal } from './dismissals';
+import { minerIdFor, type Miner } from './charges';
 import type { Statement } from './statements';
 
 export const SETTLE_TOLERANCE_PCT = 0.5;
@@ -50,7 +50,7 @@ export interface DismissalCredit {
 export function dismissalCredits(
   statements: readonly Statement[],
   dismissals: readonly Dismissal[],
-  charges: readonly DayCharge[]
+  charges: readonly DismissableCharge[]
 ): DismissalCredit[] {
   const byKey = new Map(charges.map((c) => [c.key, c]));
   const credits: DismissalCredit[] = [];

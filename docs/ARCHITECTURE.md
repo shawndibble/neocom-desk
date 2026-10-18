@@ -494,6 +494,13 @@ nightly when both sources move to a newer build and opens an auto-merging PR.
   `functions/src/corpTaxBookEngine.ts`, pinned to `src/engine/corpTaxBook` by
   `functionsMirror.test.ts`. Callable tests run against the emulator
   (`functions/src/corpTaxBookEmulator.test.ts`, part of `npm run test:rules`).
+  The officer sync client is `src/features/corp/taxBook/` (issue #4062):
+  `syncCorpTaxBook` reads the observer ledger, Extractions, moon notifications
+  and journal donations, uploads them, then settles the Statements
+  `allocatePayments` reports paid (the server never detects settlement); its
+  pure half is `src/engine/corpTaxBook/sync.ts` (gaps, donation resolution,
+  settlement plan). `useCorpTaxBook` exposes last-synced/stale/gaps and syncs
+  on visit; `useMiningLedgerAccess` says when to ask for the mining scope.
   Not deployed by CI: `firebase deploy --only functions,firestore:rules`.
 - Firestore rules tests live in `rules-tests/` (`@firebase/rules-unit-testing`,
   `vitest.rules.config.ts`) and run only via `npm run test:rules`, which starts
