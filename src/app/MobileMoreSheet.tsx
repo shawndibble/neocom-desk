@@ -7,7 +7,6 @@ import { Caret } from '@/components/ui/Disclosure';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
-import { mobileSheetPaths, type MobileTabPath } from '@/lib/mobileTabs';
 import { useHiddenTabPaths } from './useHiddenTabPaths';
 import { useCorpNavVisible } from '@/features/corp/useCorpNavVisible';
 import { useCommandPalette } from '@/features/commandPalette/store';
@@ -30,7 +29,6 @@ interface MobileMoreSheetProps {
   open: boolean;
   onClose: () => void;
   locked: ReadonlySet<AppRoutePath>;
-  tabs: readonly MobileTabPath[];
   /**
    * The active Character's portrait link, which `Layout` owns, given the page
    * to return to once a Character is picked (#1764).
@@ -42,7 +40,9 @@ interface MobileMoreSheetProps {
  * The phone's More sheet (scope decision
  * `20261002-145653-rail-opens-the-current-page-icons-hiding-and`): a search
  * field that opens the command palette, a short Recent row, then every page
- * the bottom bar does not hold as icon tiles, grouped like the rail. Pages
+ * as icon tiles, grouped like the rail — including the four the bottom bar
+ * holds, because the sheet covers the bar and a pilot opening More expects the
+ * whole map (a page in the bar is not missing from here). Pages
  * only — a page's views are reached through its own tabs, Recent and search,
  * which keeps the sheet to about a dozen choices.
  *
@@ -58,7 +58,6 @@ export function MobileMoreSheet({
   open,
   onClose,
   locked,
-  tabs,
   renderCharacterLink,
 }: MobileMoreSheetProps) {
   const { t } = useTranslation();
@@ -89,9 +88,8 @@ export function MobileMoreSheet({
     [destinations]
   );
 
-  const sheetPaths = new Set<string>(mobileSheetPaths(tabs));
   const inSheet = (page: NavPage) =>
-    page.gating === 'corp' ? corpVisible : sheetPaths.has(page.path) && page.path !== '/characters';
+    page.gating === 'corp' ? corpVisible : page.path !== '/characters';
   const hiddenSet = new Set(hidden);
   const groups = SHEET_GROUPS.map((group) => ({
     ...group,

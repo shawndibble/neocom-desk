@@ -1003,7 +1003,7 @@ describe("Layout mobile tab bar follows the pilot's choice", () => {
     ).toEqual(['Overview', 'Wallet', 'Assets', 'Mail']);
   });
 
-  it('moves the links it replaced into the More sheet', async () => {
+  it('lists every page in the More sheet, the ones the bar holds included', async () => {
     mockIsSyncConfigured.mockReturnValue(false);
     useMobileTabs.setState({
       value: ['/mail', '/wallet', '/overview', '/assets'],
@@ -1016,13 +1016,9 @@ describe("Layout mobile tab bar follows the pilot's choice", () => {
     await user.click(within(mobileNav).getByRole('button', { name: 'More' }));
     const sheet = screen.getByRole('dialog', { name: 'More' });
 
-    // Everything the default bar held, bar Overview — which is still a tab.
-    for (const evicted of ['Skills', 'Industry', 'Market']) {
-      expect(within(sheet).getByRole('link', { name: evicted })).toBeInTheDocument();
-    }
-    // And nothing is in both places at once.
-    for (const chosen of ['Wallet', 'Assets', 'Mail']) {
-      expect(within(sheet).queryByRole('link', { name: chosen })).not.toBeInTheDocument();
+    // The sheet covers the bar, so it is the whole map: replaced and chosen alike.
+    for (const name of ['Skills', 'Industry', 'Market', 'Overview', 'Wallet', 'Assets', 'Mail']) {
+      expect(within(sheet).getByRole('link', { name })).toBeInTheDocument();
     }
   });
 

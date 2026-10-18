@@ -29,7 +29,6 @@ function Harness() {
         open={open}
         onClose={() => setOpen(false)}
         locked={NO_LOCKS}
-        tabs={[]}
         renderCharacterLink={() => null}
       />
     </BrowserRouter>
@@ -54,5 +53,16 @@ describe('MobileMoreSheet history', () => {
     await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/overview'));
     // Landed on the original entry, not a dead one the overlay left behind.
     expect(window.history.state).not.toHaveProperty('__neocomOverlay');
+  });
+
+  it('lists the pages the tab bar holds too, since the sheet covers the bar', async () => {
+    window.history.replaceState(null, '', '/overview');
+    const user = userEvent.setup();
+    render(<Harness />);
+
+    await user.click(screen.getByRole('button', { name: 'Open More' }));
+    for (const name of ['Overview', 'Skills', 'Industry', 'Market']) {
+      expect(screen.getByRole('link', { name })).toBeInTheDocument();
+    }
   });
 });
