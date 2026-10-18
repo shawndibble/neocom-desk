@@ -46,7 +46,8 @@ function tileClass({ isActive }: { isActive: boolean }): string {
   return `${TILE} ${isActive ? TILE_ACTIVE : TILE_IDLE}`;
 }
 
-// The More sheet's headless group (Overview, Corporation): a short row, icon beside label, so a lone page is not one tile stranded in a four-column grid.
+// The More sheet's headless group (Overview, Corporation): a short row, icon
+// beside label, so a lone page is not one tile stranded in a four-column grid.
 const BAR = `relative flex min-h-11 min-w-0 items-center gap-2 rounded-xs border px-3 text-[0.6875rem] font-semibold tracking-wide uppercase ${interactiveClassName} ${focusRingInsetClassName}`;
 
 function barClass({ isActive }: { isActive: boolean }): string {
@@ -124,15 +125,10 @@ export function NavItem({
   };
   const tab = presentation === 'tab';
   const tile = presentation === 'tile';
+  const bar = presentation === 'bar';
   const counted = badge !== undefined && badge > 0;
   const Glyph = NAV_ICON_BY_PATH[to];
-  const linkClass = tab
-    ? mobileNavClass
-    : tile
-      ? tileClass
-      : presentation === 'bar'
-        ? barClass
-        : navClass;
+  const linkClass = tab ? mobileNavClass : tile ? tileClass : bar ? barClass : navClass;
   // The lock marker rides on a `Tooltip` (and `data-locked`), and the count on
   // `aria-label`: a second string inside the link would rewrite its accessible
   // name from "Assets" to "Assets, needs a new login", which is not what the
@@ -153,13 +149,7 @@ export function NavItem({
         <Glyph
           aria-hidden="true"
           className="shrink-0"
-          size={
-            tile
-              ? Icon.ICON_SIZE.lg
-              : presentation === 'bar'
-                ? Icon.ICON_SIZE.md
-                : Icon.ICON_SIZE.sm
-          }
+          size={tile ? Icon.ICON_SIZE.lg : bar ? Icon.ICON_SIZE.md : Icon.ICON_SIZE.sm}
         />
       )}
       <span className="min-w-0 truncate">{label}</span>
