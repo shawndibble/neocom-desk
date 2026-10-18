@@ -6,6 +6,8 @@ export interface CoveringAssignment {
   oreLines: readonly OreLine[];
   /** Only meaningful when 2+ Assignments cover the entry; a sole Assignment always collects. */
   collectsGrowth?: boolean;
+  /** `'paid'` freezes the Assignment at its own snapshot: it never grows (ADR 0024). Any other status, or none, can. */
+  status?: string;
 }
 
 export interface Ownership {
@@ -35,6 +37,19 @@ export function linesOwnedBy(
 }
 
 /**
+ * The Assignment later ore on this entry is routed to: the sole one, or the
+ * one flagged `collectsGrowth` when there are several. May be paid, in which
+ * case `computeOwnership` leaves that growth unassigned; a new Assignment
+ * made from it then takes the flag over (`createAssignment`). `undefined`
+ * for an unflagged split.
+ */
+export function growthCollector<T extends CoveringAssignment>(
+  covering: readonly T[]
+): T | undefined {
+  return covering.length === 1 ? covering[0] : covering.find((c) => c.collectsGrowth === true);
+}
+
+/**
  * Who owns which units of one Mining Ledger Entry (issue #523, quantity
  * split). ESI aggregates a whole EVE/UTC day into one entry, so two
  * local-time sessions at two corps' moons in one system land in the same
@@ -53,6 +68,11 @@ export function linesOwnedBy(
  *   claimed by none, or by two or more, stays an unassigned residual until a
  *   collector is chosen.
  *
+ * - A **paid** Assignment never grows (paid stays paid, ADR 0024): ore that
+ *   would have grown into it stays an unassigned residual, so the Tax tab
+ *   offers it as a new, separately assignable row for the same day and
+ *   system.
+ *
  * A snapshot is never shrunk: an entry reporting *less* than an Assignment
  * holds (ESI settling, or a pilot-corrected line) leaves that Assignment's
  * own lines as they are.
@@ -66,8 +86,7 @@ export function computeOwnership(
     return { unassigned: sortedByType([...entryLines]), ownedLines };
   }
 
-  const collector =
-    covering.length === 1 ? covering[0] : covering.find((c) => c.collectsGrowth === true);
+  const collector = growthCollector(covering);
 
   // Each Assignment starts by owning exactly its own snapshot.
   const ownedByType = new Map<string, Map<number, number>>();
@@ -86,7 +105,7 @@ export function computeOwnership(
     if (residual <= 0) continue;
 
     const grower = collector ?? (claimants.length === 1 ? claimants[0] : undefined);
-    if (grower) {
+    if (grower && grower.status !== 'paid') {
       const mine = ownedByType.get(grower.id)!;
       mine.set(line.typeId, (mine.get(line.typeId) ?? 0) + residual);
     } else {

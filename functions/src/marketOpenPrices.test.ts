@@ -10,7 +10,9 @@ import {
   isIsoDate,
   mergeDays,
   openPriceDocId,
-  pickLastSnapshotUrl,
+  findFinalSnapshot,
+  isFinalSlot,
+  pickLastSnapshot,
   regionCounts,
   shrunkRegion,
   previousUtcDate,
@@ -46,14 +48,14 @@ describe('dates', () => {
   });
 });
 
-describe('pickLastSnapshotUrl', () => {
+describe('pickLastSnapshot', () => {
   const file = (time: string, name = `market-orders-${time}.v3.csv.bz2`) => ({
     file_time: time,
     name,
     url: `https://x/${name}`,
   });
 
-  it('picks the file with the latest file_time on that day', () => {
+  it('picks the file with the latest file_time on that day, with its time', () => {
     const listing = {
       files: [
         file('2026-10-17T23:45:06Z'),
@@ -61,20 +63,81 @@ describe('pickLastSnapshotUrl', () => {
         file('2026-10-17T12:15:05Z'),
       ],
     };
-    expect(pickLastSnapshotUrl(listing, '2026-10-17')).toBe(
-      'https://x/market-orders-2026-10-17T23:45:06Z.v3.csv.bz2'
-    );
+    expect(pickLastSnapshot(listing, '2026-10-17')).toEqual({
+      url: 'https://x/market-orders-2026-10-17T23:45:06Z.v3.csv.bz2',
+      fileTime: '2026-10-17T23:45:06Z',
+    });
   });
   it('ignores other days and non-bz2 files', () => {
     const listing = {
       files: [file('2026-10-18T00:15:05Z'), file('2026-10-17T23:45:06Z', 'readme.txt')],
     };
-    expect(pickLastSnapshotUrl(listing, '2026-10-17')).toBeNull();
+    expect(pickLastSnapshot(listing, '2026-10-17')).toBeNull();
   });
   it('is null for a malformed or empty listing', () => {
-    expect(pickLastSnapshotUrl(null, '2026-10-17')).toBeNull();
-    expect(pickLastSnapshotUrl({}, '2026-10-17')).toBeNull();
-    expect(pickLastSnapshotUrl({ files: [{ file_time: 1 }, 'x'] }, '2026-10-17')).toBeNull();
+    expect(pickLastSnapshot(null, '2026-10-17')).toBeNull();
+    expect(pickLastSnapshot({}, '2026-10-17')).toBeNull();
+    expect(pickLastSnapshot({ files: [{ file_time: 1 }, 'x'] }, '2026-10-17')).toBeNull();
+  });
+});
+
+describe('isFinalSlot', () => {
+  it("is true only for a snapshot taken in the day's last half hour", () => {
+    expect(isFinalSlot('2026-10-17T23:45:06Z', '2026-10-17')).toBe(true);
+    expect(isFinalSlot('2026-10-17T23:30:00Z', '2026-10-17')).toBe(true);
+    expect(isFinalSlot('2026-10-17T23:15:06Z', '2026-10-17')).toBe(false);
+    expect(isFinalSlot('2026-10-16T23:45:06Z', '2026-10-17')).toBe(false);
+  });
+});
+
+describe('findFinalSnapshot', () => {
+  const listingOf = (...times: string[]) => ({
+    files: times.map((t) => ({ file_time: t, name: `m-${t}.csv.bz2`, url: `https://x/${t}` })),
+  });
+  const fetcher = (byUrl: Record<string, unknown>) => {
+    const asked: string[] = [];
+    const fetchListing = async (url: string) => {
+      asked.push(url);
+      return byUrl[url] ?? null;
+    };
+    return { fetchListing, asked };
+  };
+  const day = '2026-10-17';
+
+  it('takes the 23:45 snapshot without reading the next day', async () => {
+    const { fetchListing, asked } = fetcher({
+      [dayIndexUrl(day)]: listingOf('2026-10-17T23:15:06Z', '2026-10-17T23:45:06Z'),
+    });
+    expect(await findFinalSnapshot(day, fetchListing)).toEqual({
+      final: true,
+      snapshot: { url: 'https://x/2026-10-17T23:45:06Z', fileTime: '2026-10-17T23:45:06Z' },
+    });
+    expect(asked).toEqual([dayIndexUrl(day)]);
+  });
+  it('is not final when the last listed snapshot is earlier and the next day has none yet', async () => {
+    const { fetchListing } = fetcher({
+      [dayIndexUrl(day)]: listingOf('2026-10-17T22:45:06Z', '2026-10-17T23:15:06Z'),
+    });
+    expect(await findFinalSnapshot(day, fetchListing)).toEqual({
+      final: false,
+      snapshot: { url: 'https://x/2026-10-17T23:15:06Z', fileTime: '2026-10-17T23:15:06Z' },
+    });
+  });
+  it('accepts an earlier snapshot once the next day is listed: the final slot was skipped', async () => {
+    const { fetchListing } = fetcher({
+      [dayIndexUrl(day)]: listingOf('2026-10-17T23:15:06Z'),
+      [dayIndexUrl('2026-10-18')]: listingOf('2026-10-18T00:15:05Z'),
+    });
+    expect(await findFinalSnapshot(day, fetchListing)).toEqual({
+      final: true,
+      snapshot: { url: 'https://x/2026-10-17T23:15:06Z', fileTime: '2026-10-17T23:15:06Z' },
+    });
+  });
+  it('is not final with no snapshot listed at all, even once the next day is', async () => {
+    const { fetchListing } = fetcher({
+      [dayIndexUrl('2026-10-18')]: listingOf('2026-10-18T00:15:05Z'),
+    });
+    expect(await findFinalSnapshot(day, fetchListing)).toEqual({ final: false, snapshot: null });
   });
 });
 

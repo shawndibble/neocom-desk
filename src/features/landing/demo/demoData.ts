@@ -20,7 +20,7 @@ import type { CalendarEventSummary, SkillQueueEntry, WalletJournalEntry } from '
 import type { CachedResult } from '@/esi/cache';
 import type { OrderProblem } from '@/engine/market/orderProblems';
 import { summarizeSurvey, type SurveyScan } from '@/engine/survey/series';
-import { ordersSeverity } from '@/features/overview/boardSeverity';
+import { ordersSeverity } from '@/features/overview/data/boardSeverity';
 import type { OpenOrderRow } from '@/features/market/openOrdersModel';
 import type { SkillCatalog } from '@/features/skills/skillMap';
 import { blank, statusOf } from '@/features/overview/widgets/data/builderKit';
