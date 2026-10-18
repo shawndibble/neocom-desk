@@ -472,7 +472,7 @@ Observed gaps: no visible hint of the shortcut outside Help shortcuts; a failed 
 
 ## 4b. Stock (`/market/stock`, Stock Lists)
 
-Issue #3521; scope decision `20261010-182330-stock-targets-v1-scope`; mockup `docs/design/mockups/stock-targets/`. A tab entry with `deep: true`: `/market/stock` lists the markets the pilot stocks (or opens the only one), `/market/stock/<list id>` opens one. Entry `features/stockTargets/StockTab.tsx`. Terms per `GLOSSARY.md`: **Stock List** (a "market" in the UI), **Stock Target**, **Shortfall**.
+Issue #3521; scope decision `20261010-182330-stock-targets-v1-scope`. A tab entry with `deep: true`: `/market/stock` lists the markets the pilot stocks (or opens the only one), `/market/stock/<list id>` opens one. Entry `features/stockTargets/StockTab.tsx`. Terms per `GLOSSARY.md`: **Stock List** (a "market" in the UI), **Stock Target**, **Shortfall**.
 
 | Piece                                      | Where                                                                                  | Notes                                                                                                                                                                                                             |
 | ------------------------------------------ | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
