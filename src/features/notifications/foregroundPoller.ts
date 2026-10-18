@@ -13,23 +13,11 @@
  * drives all live in `pollDomains/`; this file names none of them (#273).
  */
 import { db } from '@/db';
-import { scheduleSync } from '@/sync';
-import { inBackgroundLane } from '@/esi/lane';
-import { occurrenceKey, occurrenceFiredAt } from '@/engine/occurrenceKey';
 import type { ContractNotificationFire } from '@/engine/notificationDiffs';
 import type { ProjectionRow } from '@/engine/projection';
 import { mapWithConcurrencyLimit, ESI_FANOUT_CONCURRENCY } from '@/lib/concurrency';
-import i18n from '@/i18n';
 import type { LocalSettingStore } from '@/lib/useLocalSetting';
-import { hasEventScope, type NotificationEventId } from './events';
-import {
-  POLL_DOMAINS,
-  renderNotification,
-  notificationSubjectId,
-  type AnyNotificationFire,
-  type PollDomain,
-} from './pollDomains';
-import { groupIdenticalFires, type RenderedFire } from './groupFires';
+import { POLL_DOMAINS, type AnyNotificationFire, type PollDomain } from './pollDomains';
 import { withCharacterSnapshot, type PollerState } from './pollerState';
 import {
   useNotificationPreferences,
@@ -41,24 +29,27 @@ import {
   isFeedChannelEnabled,
 } from './preferences';
 import { feedSuppressesToast, markFeedNotifiedHere } from './feed';
-import { dismissFeedKeysAndSync, recordFeedEntryAndSync } from './feedSync';
+import { dismissFeedKeysAndSync } from './feedSync';
 import { settleFillTimes } from './fillTimeSettle';
-import { foldWalletFires } from './walletFold';
-import {
-  isEventEnabledFor,
-  isEveTypeAllowed,
-  isEveTypeEnabledFor,
-  type EventEnabledMap,
-  type EveTypeEnabledMap,
-  type NotificationChannel,
-} from './eventSelection';
+import type { EventEnabledMap, EveTypeEnabledMap } from './eventSelection';
 import { readNotificationPermission } from './permission';
-import { displayPageNotification, livePageDisplayEnv } from './display';
-import { notificationOptionsFor } from './notificationOptions';
 import { uploadProjectionRows } from './projectionUpload';
 import { rebuildProjection } from './projectionRebuild';
+import {
+  reviseContractFeedRow,
+  sendBrowserNotification,
+  recordFeedNotification,
+} from './fireDelivery';
+import {
+  pollCharacter,
+  type DomainRun,
+  type CharacterUpdate,
+  type LiveChannels,
+} from './foregroundPoller/pollCharacter';
+import { dispatchFires } from './foregroundPoller/dispatchFire';
 
 export type { AnyNotificationFire } from './pollDomains';
+export { reviseContractFeedRow };
 
 export const POLL_INTERVAL_MS = 5 * 60 * 1000;
 
@@ -180,93 +171,6 @@ export interface PollDependencies {
   ) => Promise<void>;
 }
 
-/** Which delivery channels are live for this poll, before per-event opinions. */
-interface LiveChannels {
-  browser: boolean;
-  feed: boolean;
-}
-
-/**
- * Whether this event would reach *somewhere* — a live channel that the event
- * is also switched on for. An event set to feed-only still has its data
- * fetched when the feed is on and browser notifications are off; one switched
- * off on both columns is not fetched at all.
- */
-function reachesAnyChannel(
-  eventPrefs: EventEnabledMap,
-  eventId: NotificationEventId,
-  channels: LiveChannels
-): boolean {
-  return (
-    (channels.browser && isEventEnabledFor(eventPrefs, eventId, 'browser')) ||
-    (channels.feed && isEventEnabledFor(eventPrefs, eventId, 'feed'))
-  );
-}
-
-/** The contract events whose alerts can carry a wallet line (`ContractCauseEventId`). */
-const CONTRACT_CAUSE_EVENTS = ['contractAccepted', 'contractCompleted', 'contractFailed'] as const;
-
-/**
- * Which of a set of candidate events this character is eligible for right
- * now: has the scope (or, for `priceAlertTriggered`, needs none at all — see
- * `NotificationEventDef.scope`), and reaches at least one live channel.
- */
-function enabledEventsFor(
-  eventIds: readonly NotificationEventId[],
-  scopes: ReadonlySet<string>,
-  eventPrefs: EventEnabledMap,
-  channels: LiveChannels
-): ReadonlySet<NotificationEventId> {
-  const enabled = new Set<NotificationEventId>();
-  for (const eventId of eventIds) {
-    if (hasEventScope(eventId, scopes) && reachesAnyChannel(eventPrefs, eventId, channels)) {
-      enabled.add(eventId);
-    }
-  }
-  return enabled;
-}
-
-/** One domain's state for the length of one poll: where to read/write it, and the value being built. */
-interface DomainRun {
-  domain: PollDomain;
-  state: DomainPollState;
-  /** Starts as the persisted baseline; every character's snapshot is merged in. */
-  next: PollerState<unknown>;
-}
-
-interface CharacterUpdate {
-  characterId: number;
-  /** Carried through so the delivery loop can honour each event's per-channel columns. */
-  eventPrefs: EventEnabledMap;
-  /** Carried through so the delivery loop can honour each eveNotification type's per-channel columns. */
-  eveTypePrefs: EveTypeEnabledMap;
-  /** The snapshot this poll built per domain — absent for a domain it skipped. */
-  snapshots: Map<DomainRun, unknown>;
-  fires: AnyNotificationFire[];
-  /** Occurrence Keys this poll disproved — see `PollDependencies.retractFromFeed`. */
-  retractedKeys: string[];
-  /** Whether a wallet line is an alert on its own for this Character this poll — see `WalletFoldInput`. */
-  walletStandalone: boolean;
-  walletFoldEnabled: boolean;
-}
-
-/**
- * A layer underneath `isEventEnabledFor` for `eveNotification` fires only
- * (issue #274): every other event's channel gate is the single check above,
- * but this one event covers the Notification Allow-List's types (issue
- * #350), each independently opt-out-able. Non-`eveNotification` fires pass
- * through unchanged. Only ever reached for allow-listed types — the poll
- * loop below drops everything else before this runs.
- */
-function eveTypeAllowsChannel(
-  fire: AnyNotificationFire,
-  eveTypePrefs: EveTypeEnabledMap,
-  channel: NotificationChannel
-): boolean {
-  if (fire.eventId !== 'eveNotification') return true;
-  return isEveTypeEnabledFor(eveTypePrefs, fire.type, channel);
-}
-
 /**
  * Guards against overlapping polls: `ForegroundNotificationPoller` can call
  * this from mount, its interval, and a visibility-change handler in close
@@ -322,95 +226,9 @@ async function runForegroundPollOnce(deps: PollDependencies): Promise<void> {
   );
 
   const updates: CharacterUpdate[] = [];
-
   await mapWithConcurrencyLimit(characters, ESI_FANOUT_CONCURRENCY, async (character) => {
-    const [scopes, eventPrefs, eveTypePrefs] = await Promise.all([
-      deps.grantedScopes(character.characterId),
-      deps.eventPrefsFor(character.characterId),
-      deps.eveTypePrefsFor(character.characterId),
-    ]);
-
-    const fires: AnyNotificationFire[] = [];
-    const retractedKeys: string[] = [];
-    const snapshots = new Map<DomainRun, unknown>();
-    const walletFoldEnabled = await deps.walletFoldEnabled(character.characterId);
-    let walletStandalone = false;
-
-    for (const run of runs) {
-      const enabledEvents = new Set(
-        enabledEventsFor(run.domain.eventIds, scopes, eventPrefs, channels)
-      );
-      if (enabledEvents.has('walletBalanceChanged')) walletStandalone = true;
-      // The journal is fetched anyway when a contract alert wants to count its
-      // lines, even with Wallet Balance Changed itself off: the fold drops
-      // whatever nothing absorbs.
-      else if (
-        walletFoldEnabled &&
-        run.domain.eventIds.includes('walletBalanceChanged') &&
-        hasEventScope('walletBalanceChanged', scopes) &&
-        CONTRACT_CAUSE_EVENTS.some(
-          (eventId) =>
-            hasEventScope(eventId, scopes) && reachesAnyChannel(eventPrefs, eventId, channels)
-        )
-      ) {
-        enabledEvents.add('walletBalanceChanged');
-      }
-      // Nothing this domain could fire is both in scope and switched on for a
-      // live channel: no fetch at all (AC5).
-      if (enabledEvents.size === 0) continue;
-      // Background at the ESI gate (issue #2271): a poll across every
-      // Character must not queue the page in view behind it. Wraps only the
-      // synchronous call — the lane cannot outlive an `await` (`esi/lane.ts`).
-      const rows = await inBackgroundLane(() => deps.loadDomain(run.domain, character.characterId));
-      // A failed — or deliberately skipped, as the truncation guards do —
-      // load persists no snapshot and fires nothing, leaving the previous
-      // baseline for the next complete poll.
-      if (rows === null) continue;
-      const previous = run.next[character.characterId];
-      // `previous` goes to `toSnapshot` as well as `diff` (issue #1423): a
-      // domain whose own snapshot needs to carry state forward across a poll
-      // that observed nothing new — `marketOrderUndercutDomain`'s `armed`
-      // latch surviving an `unknown` poll — reads the very same baseline the
-      // diff below compares against, never a second, possibly stale copy.
-      const next = run.domain.toSnapshot(rows, deps.now(), previous);
-      snapshots.set(run, next);
-      fires.push(...run.domain.diff(character.characterId, previous, next, enabledEvents));
-      // Unlike the diffs, not filtered per event: the row being retracted may
-      // have been written by Web Push or another device, for either of this
-      // domain's two events, so one enabled event's fetch retracts both.
-      //
-      // It still rides on the domain having been fetched at all (the
-      // `enabledEvents.size === 0` skip above, AC5), and that is the right
-      // bound rather than a gap: a character with both planetary events off
-      // on both channels has those rows hidden from the feed anyway
-      // (`feedSelection.isEntryVisible`), so there is nothing visible left to
-      // retract — and one with the scope revoked cannot prove anything about
-      // them either way.
-      if (run.domain.disproven) {
-        retractedKeys.push(
-          ...run.domain
-            .disproven(character.characterId, previous, next)
-            .map((fire) => occurrenceKey(fire, deps.now()))
-        );
-      }
-    }
-
-    // Fills an earlier poll could only date by when it noticed them; the feed
-    // rows this poll writes below get their turn on the next one.
-    await deps.settleFillTimes(character.characterId, scopes);
-
-    if (snapshots.size > 0) {
-      updates.push({
-        characterId: character.characterId,
-        eventPrefs,
-        eveTypePrefs,
-        snapshots,
-        fires,
-        retractedKeys,
-        walletStandalone,
-        walletFoldEnabled,
-      });
-    }
+    const update = await pollCharacter(deps, runs, channels, character);
+    if (update) updates.push(update);
   });
 
   if (updates.length === 0) return;
@@ -437,89 +255,7 @@ async function runForegroundPollOnce(deps: PollDependencies): Promise<void> {
   const charactersById = new Map(characters.map((c) => [c.characterId, c]));
   for (const update of updates) {
     const character = charactersById.get(update.characterId);
-    if (!character) continue;
-    // Notification Allow-List (GLOSSARY.md round 44): a type outside the
-    // closed list is dropped here, before either channel and before any
-    // name-resolution work (renderNotification → the domain's `names`)
-    // that recordToFeed/notify would otherwise trigger for it.
-    const allowed = update.fires.filter(
-      (fire) => fire.eventId !== 'eveNotification' || isEveTypeAllowed(fire.type)
-    );
-
-    // A wallet change a contract caused rides on that contract's alert instead
-    // of raising its own (`walletFold.ts`). Per channel, since a contract event
-    // can be on for one and off for the other.
-    const folded = await foldWalletFires({
-      foldEnabled: update.walletFoldEnabled,
-      walletStandalone: update.walletStandalone,
-      fires: allowed,
-      isEnabled: (channel, eventId) =>
-        (channel === 'feed' ? feedEnabled : browserEnabled) &&
-        isEventEnabledFor(update.eventPrefs, eventId, channel),
-      rowExists: deps.feedRowExists,
-      nowMs: deps.now(),
-    });
-    const feedSourceFires = folded.feedFires;
-    const browserSourceFires = folded.browserFires;
-    for (const revision of folded.revisions) {
-      await deps.reviseContractFeedRow(revision, character);
-    }
-
-    // Browser: grouped, and checked against the feed *before* the feed loop
-    // below writes anything (issue #360). Web Push, or another device/tab
-    // syncing the feed, may have already delivered this exact occurrence —
-    // `deps.alreadyDelivered` is what lets the poller suppress its own
-    // redundant bubble for it. This must run before this device's own feed
-    // loop: that loop's `recordToFeed` writes a row keyed by the very same
-    // Occurrence Key, and for the common case of an event with both channels
-    // enabled, checking after that write would make every occurrence appear
-    // "already delivered" by itself. Checked per fire, by Occurrence Key, not
-    // by comparing rendered copy — grouping (`groupIdenticalFires`) happens
-    // after, on whatever survives.
-    const browserFires: AnyNotificationFire[] = [];
-    for (const fire of browserSourceFires) {
-      if (
-        !browserEnabled ||
-        !isEventEnabledFor(update.eventPrefs, fire.eventId, 'browser') ||
-        !eveTypeAllowsChannel(fire, update.eveTypePrefs, 'browser')
-      ) {
-        continue;
-      }
-      if (await deps.alreadyDelivered(occurrenceKey(fire, deps.now()))) continue;
-      browserFires.push(fire);
-    }
-
-    // Feed: one row per actual occurrence, never grouped — each fire's own
-    // Occurrence Key (`@/engine/occurrenceKey`) is what lets the Scheduled
-    // Push backend, independently observing the same occurrence, agree with
-    // the Foreground Poller on the feed row it belongs to (GLOSSARY.md round
-    // 44/48). Collapsing several fires into one feed write, the way the
-    // browser channel below does, would permanently lose the other
-    // occurrences from the feed's history — nothing re-fires an
-    // already-high-water-marked diff to recover them.
-    for (const fire of feedSourceFires) {
-      const eventId = fire.eventId;
-      if (
-        feedEnabled &&
-        isEventEnabledFor(update.eventPrefs, eventId, 'feed') &&
-        eveTypeAllowsChannel(fire, update.eveTypePrefs, 'feed')
-      ) {
-        await deps.recordToFeed(fire, character);
-      }
-    }
-    const rendered: RenderedFire<AnyNotificationFire>[] = [];
-    for (const fire of browserFires) {
-      rendered.push({ fire, ...(await renderNotification(fire, character.name)) });
-    }
-    for (const group of groupIdenticalFires(rendered)) {
-      const title = group.count > 1 ? groupedTitle(group.title, group.count) : group.title;
-      await deps.notify(group.fire, character, { title, body: group.body });
-    }
-    // Every browser fire went out, grouped or not. Marked after the feed loop
-    // above wrote their rows, so there is a row to mark.
-    if (browserFires.length > 0) {
-      await deps.markDelivered(browserFires.map((fire) => occurrenceKey(fire, deps.now())));
-    }
+    if (character) await dispatchFires(deps, channels, character, update);
   }
 
   // A retraction cannot address a row this poll just wrote: a retracted key
@@ -540,125 +276,6 @@ async function runForegroundPollOnce(deps: PollDependencies): Promise<void> {
   // saved — including one this poll skipped or failed to load, whose last
   // good snapshot still stands (issue #1248).
   await rebuildProjection(deps, new Map(runs.map((run) => [run.domain, run.next])));
-}
-
-/** `"{{title}} x{{count}}"` — the suffix a grouped browser-toast title carries (`groupFires.ts`). */
-function groupedTitle(title: string, count: number): string {
-  return i18n.t('notifications.groupedTitle', { title, count });
-}
-
-/**
- * Delivery goes through `display.ts`, which prefers the Service Worker
- * registration's `showNotification` over `new Notification(...)` — the
- * constructor throws on Android Chrome and does not exist on iOS, so it is
- * the one path that reaches a phone at all. A failure on every path is
- * swallowed there: pollerState.ts is what prevents a re-fire, not this call
- * succeeding.
- *
- * `override` is the copy the delivery loop already rendered (and, for a
- * grouped burst, already count-adjusted) — `renderNotification` is only called
- * here as a fallback for a caller reaching this directly, outside that loop.
- */
-async function sendBrowserNotification(
-  fire: AnyNotificationFire,
-  character: CharacterRef,
-  override?: { title: string; body: string }
-): Promise<void> {
-  const { title, body } = override ?? (await renderNotification(fire, character.name));
-  await displayPageNotification(
-    livePageDisplayEnv(),
-    title,
-    notificationOptionsFor(
-      {
-        eventId: fire.eventId,
-        characterId: character.characterId,
-        subjectId: notificationSubjectId(fire),
-      },
-      body
-    )
-  );
-}
-
-/**
- * Files the same copy the browser notification carries into the Notification
- * Feed. Always renders its own copy from the raw `fire` — never grouped the
- * way `sendBrowserNotification`'s toast is (`runForegroundPollOnce`'s doc
- * comment on the feed-delivery loop): one row per actual occurrence, each
- * keyed by its own `occurrenceKey`, is what keeps the feed agreeing with the
- * Scheduled Push backend's independent view of the same occurrences.
- */
-async function recordFeedNotification(
-  fire: AnyNotificationFire,
-  character: CharacterRef
-): Promise<void> {
-  try {
-    const { title, body } = await renderNotification(fire, character.name);
-    const now = Date.now();
-    // Dated by the occurrence, not by this poll, wherever the fire knows when
-    // it happened (`occurrenceFiredAt`): a device opened after days away
-    // reports everything it missed in one poll, and stamping all of it `now`
-    // would pile days of history onto one minute at the top of the feed.
-    const firedAt = occurrenceFiredAt(fire, now);
-    await recordFeedEntryAndSync({
-      id: occurrenceKey(fire, now),
-      characterId: character.characterId,
-      eventId: fire.eventId,
-      eveType: fire.eventId === 'eveNotification' ? fire.type : undefined,
-      subjectId: notificationSubjectId(fire),
-      title,
-      body,
-      firedAt,
-      // Marks the row provisional until `fillTimeSettle` finds the sale.
-      ...(fire.eventId === 'marketOrderFilled' && fire.fillMatch !== undefined
-        ? { fillMatch: fire.fillMatch }
-        : {}),
-      ...('walletChangeIsk' in fire && fire.walletChangeIsk !== undefined
-        ? { walletChangeIsk: fire.walletChangeIsk }
-        : {}),
-    });
-  } catch {
-    // Same fire-and-forget contract as sendBrowserNotification: pollerState
-    // is already persisted, so a failed write must not abort the remaining
-    // fires of this poll.
-  }
-}
-
-/**
- * Rewrites a contract alert's existing feed row so its body carries the wallet
- * change that arrived after it (the journal lags the contract list by up to an
- * hour). Only the body moves: `firedAt`, `dismissedAt` and the row's key stay.
- * The browser toast that already went out is not touched.
- */
-export async function reviseContractFeedRow(
-  fire: ContractNotificationFire,
-  character: CharacterRef
-): Promise<void> {
-  try {
-    const key = occurrenceKey(fire, Date.now());
-    const changed = await db.transaction('rw', db.notificationFeed, async () => {
-      const row = await db.notificationFeed.get(key);
-      if (row === undefined || fire.walletChangeIsk === undefined) return 0;
-      // Lines land across polls, so this adds to what the row already carries.
-      const total = (row.walletChangeIsk ?? 0) + fire.walletChangeIsk;
-      const { body } = await renderNotification(
-        { ...fire, walletChangeIsk: total },
-        character.name
-      );
-      return db.notificationFeed
-        .where('id')
-        .equals(key)
-        .modify((r) => {
-          r.walletChangeIsk = total;
-          r.body = body;
-          // Same as `fillTimeSettle`: clearing this is what pushes the row again.
-          delete r.syncedAt;
-        });
-    });
-    if (changed > 0) scheduleSync(character.characterId);
-  } catch {
-    // The wallet fire is already dropped and the baseline advanced; a failed
-    // revision costs the amount on one row, not the poll.
-  }
 }
 
 /** Hydrates a `createLocalSetting` store (a no-op once already hydrated) and returns its current value. */
