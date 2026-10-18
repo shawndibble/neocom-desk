@@ -32,7 +32,7 @@ import {
   type BookSettings,
   type OfficerVerdict,
 } from '../taxBook/bookClient';
-import { useCorpTaxBook } from '../taxBook/useCorpTaxBook';
+import type { CorpTaxBookSync } from '../taxBook/useCorpTaxBook';
 
 export interface BookNames {
   character: (id: number) => string;
@@ -87,11 +87,10 @@ function utcNow() {
   return new Date().toISOString();
 }
 
-export function useCorpBook(): CorpBook {
+export function useCorpBook(sync: CorpTaxBookSync): CorpBook {
   const characterId = useActiveCharacter((s) => s.activeCharacterId);
   const corporationId = useActiveCorporationId();
   const access = useCorpAccess();
-  const sync = useCorpTaxBook();
   const [fetched, setFetched] = useState<Fetched>({ status: 'loading' });
   const [attempt, setAttempt] = useState(0);
   const [now, setNow] = useState(utcNow);
