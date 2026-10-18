@@ -25,7 +25,11 @@ import {
 } from '@/components/ui/tabStyles';
 import * as Icon from '@/components/ui/icons';
 import { AttentionStrip } from '@/features/miningTax/AttentionStrip';
-import { inlineLinkClassName } from '@/components/ui/controlStyles';
+import {
+  focusRingClassName,
+  inlineLinkClassName,
+  tappableRowClassName,
+} from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { NewComponent } from './NewComponent';
 import {
@@ -365,6 +369,7 @@ export function MailQueueChip({
           type="button"
           className={cx(
             'inline-flex h-8 items-center gap-2 rounded-xs px-2 text-xs whitespace-nowrap',
+            focusRingClassName,
             cue === 'link' ? 'hover:bg-panel-2' : 'border border-line hover:bg-panel-2'
           )}
         >
@@ -461,7 +466,12 @@ export function CorpBookDiff() {
 /** D27: the guest's opt-out. The monthly Statement still goes. */
 export function StopReminders({ checked }: { checked: boolean }) {
   return (
-    <label className="flex cursor-pointer items-start gap-3 rounded-xs border border-line p-3">
+    <label
+      className={cx(
+        'flex cursor-pointer items-start gap-3 rounded-xs border border-line p-3',
+        tappableRowClassName
+      )}
+    >
       <Checkbox checked={checked} onChange={() => {}} className="mt-0.5" />
       <span className="text-sm">
         Stop reminders

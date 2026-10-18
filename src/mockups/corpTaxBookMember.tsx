@@ -65,6 +65,7 @@ import {
 } from './corpTaxBookFixtures';
 import { CorpBookDiff, StopReminders, VerifyTopBar } from './corpTaxBookParts';
 import { isk, isk2 } from './corpTaxBookFormat';
+import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 
 const ME = SAMPLE_ACTIVE_CHARACTER.characterId;
 const ME_NAME = SAMPLE_ACTIVE_CHARACTER.name;
@@ -193,7 +194,9 @@ function usePersonalColumns(withSelect: boolean): DataTableColumn<PersonalRow>[]
             stackEdge: 'start',
             render: (row: PersonalRow) =>
               selectable(row) ? (
-                <Checkbox aria-label={`Select ${row.date}, ${row.system}`} onChange={() => {}} />
+                <label className={touchCheckboxLabelClassName}>
+                  <Checkbox aria-label={`Select ${row.date}, ${row.system}`} onChange={() => {}} />
+                </label>
               ) : null,
           } satisfies DataTableColumn<PersonalRow>,
         ]

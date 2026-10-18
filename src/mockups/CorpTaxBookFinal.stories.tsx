@@ -81,6 +81,7 @@ import {
 } from './corpTaxBookParts';
 import { caretColumn, dayColumns, paymentColumns } from './corpTaxBookColumns';
 import { MINING_PARAMS, MOONS_PARAMS, PHONE_GLOBALS, isk, queueCounts } from './corpTaxBookFormat';
+import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 
 /**
  * Corp Tax Book, the merged option (#4056), built on option A after Shawn's
@@ -496,11 +497,13 @@ function MinerDetailF({ dialog }: { dialog?: MinerDialog }) {
     className: 'w-8',
     render: (row) =>
       row.status === 'Not on a Statement yet' || row.status === 'Not Billable yet' ? (
-        <Checkbox
-          aria-label={`Select ${row.date} ${row.ore}`}
-          checked={dialog === 'dismiss' && VARRO_DISMISS_IDS.includes(row.id)}
-          onChange={() => {}}
-        />
+        <label className={touchCheckboxLabelClassName}>
+          <Checkbox
+            aria-label={`Select ${row.date} ${row.ore}`}
+            checked={dialog === 'dismiss' && VARRO_DISMISS_IDS.includes(row.id)}
+            onChange={() => {}}
+          />
+        </label>
       ) : null,
   };
   const paymentMenu: DataTableColumn<(typeof VARRO_PAYMENTS)[number]> = {
