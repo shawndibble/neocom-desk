@@ -23,7 +23,7 @@ import { useIsPhone } from '@/lib/useIsPhone';
 import { editErrorMessage, useBook } from './useBook';
 import { isk, newId } from './moonsFormat';
 
-function Label({ text, children }: { text: ReactNode; children: ReactNode }) {
+export function Label({ text, children }: { text: ReactNode; children: ReactNode }) {
   return (
     <label className="block space-y-1">
       <span className="text-xs text-text-dim">{text}</span>
@@ -43,7 +43,7 @@ interface ShellProps {
 }
 
 /** Modal + confirm button + busy state + the server's refusal. */
-function DialogShell({
+export function DialogShell({
   open,
   onClose,
   title,
@@ -98,7 +98,7 @@ function DialogShell({
   );
 }
 
-function Effect({ children }: { children: ReactNode }) {
+export function Effect({ children }: { children: ReactNode }) {
   return (
     <p className="rounded-xs border border-line bg-panel-2 p-2 text-xs tabular-nums">{children}</p>
   );

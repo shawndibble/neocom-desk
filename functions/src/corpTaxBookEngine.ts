@@ -213,3 +213,128 @@ export function allocatePayments(input: {
     balance: billed - paid - dismissed - writtenOffTotal,
   };
 }
+
+// --- Dismissal credits (issue #4184) -----------------------------------------
+// Mirror of src/engine/corpTaxBook/{dismissals,extraction,sync,allocation}.ts
+// for the verify read: which Statement lines an active record, Miner, moon or
+// Extraction dismissal waives. functionsMirror.test.ts keeps them in step.
+
+const HOUR_MS = 3_600_000;
+const DEFAULT_EXPIRY_HOURS = 48;
+const MAX_EXPIRY_HOURS = 96;
+
+/** A stored Extraction, as `syncBook` writes it. */
+export interface MirrorExtraction {
+  structureId: number;
+  moonId: number;
+  extractionStartTime: string;
+  chunkArrivalTime: string;
+  naturalDecayTime: string;
+  laserFiredAt?: string;
+  cancelledAt?: string;
+}
+
+/** Engine `extractionId`. */
+export function extractionIdOf(x: Pick<MirrorExtraction, 'structureId' | 'extractionStartTime'>) {
+  return `${x.structureId}_${Date.parse(x.extractionStartTime)}`;
+}
+
+/**
+ * Engine `moonOnDay`/`placeOfFactory`: the moon and Extraction a refinery was
+ * working on a date, from the day the chunk fractured to the day its belt
+ * expired. `expiryHours` is the book's per-structure override.
+ */
+export function moonOnDay(
+  extractions: readonly MirrorExtraction[],
+  expiryHours: Readonly<Record<string, number>>,
+  structureId: number | undefined,
+  date: string
+): { moonId?: number; extractionId?: string } {
+  const now = Date.parse(`${date}T23:59:59Z`);
+  for (const x of extractions) {
+    if (x.structureId !== structureId || x.cancelledAt) continue;
+    if (now < Date.parse(x.chunkArrivalTime)) continue;
+    const fracturedAt = Date.parse(x.laserFiredAt ?? x.naturalDecayTime);
+    if (now < fracturedAt) continue;
+    const hours = Math.min(
+      expiryHours[String(x.structureId)] ?? DEFAULT_EXPIRY_HOURS,
+      MAX_EXPIRY_HOURS
+    );
+    const expiresAt = fracturedAt + hours * HOUR_MS;
+    if (
+      date >= new Date(fracturedAt).toISOString().slice(0, 10) &&
+      date <= new Date(expiresAt).toISOString().slice(0, 10)
+    ) {
+      return { moonId: x.moonId, extractionId: extractionIdOf(x) };
+    }
+  }
+  return {};
+}
+
+export interface MirrorDismissal {
+  scope?: string;
+  targetId?: string;
+  at?: string;
+  reversed?: unknown;
+}
+
+export interface DismissableLine {
+  chargeKey?: string;
+  date?: string;
+  tax?: number;
+  structureId?: number;
+}
+
+/**
+ * Engine `dismissalCredits`: the credit active dismissals give a Miner's billed
+ * days. A Miner or moon dismissal waives what was mined up to the day it was
+ * made; a record or Extraction one is exact.
+ */
+export function dismissalCredits(input: {
+  minerId: string;
+  statements: readonly { id: string; lines: readonly DismissableLine[] }[];
+  dismissals: readonly MirrorDismissal[];
+  extractions: readonly MirrorExtraction[];
+  expiryHours: Readonly<Record<string, number>>;
+}): AllocDismissalCredit[] {
+  const active = input.dismissals.filter((d) => !d.reversed);
+  const credits: AllocDismissalCredit[] = [];
+  for (const st of input.statements) {
+    for (const line of st.lines) {
+      if (!line.chargeKey) continue;
+      const date = line.date ?? '';
+      const place = moonOnDay(input.extractions, input.expiryHours, line.structureId, date);
+      const hit = active.find((d) => {
+        const waivedUpTo = date <= (d.at ?? '').slice(0, 10);
+        switch (d.scope) {
+          case 'record':
+            return d.targetId === line.chargeKey;
+          case 'extraction':
+            return place.extractionId !== undefined && d.targetId === place.extractionId;
+          case 'miner':
+            return d.targetId === input.minerId && waivedUpTo;
+          case 'moon':
+            return place.moonId !== undefined && d.targetId === String(place.moonId) && waivedUpTo;
+          default:
+            return false;
+        }
+      });
+      if (hit) credits.push({ statementId: st.id, amount: line.tax ?? 0 });
+    }
+  }
+  return credits;
+}
+
+// --- Guest close-account (issue #4184) ---------------------------------------
+
+/** A guest's credit is forfeited without consent only after this many days with no reply. */
+export const FORFEIT_NO_REPLY_DAYS = 90;
+
+export type ForfeitBasis =
+  { kind: 'consent'; note: string } | { kind: 'no-reply'; askedAt: string };
+
+/** Engine `forfeitAllowed`: consent is recorded in words, or 90 days passed since the guest was asked. */
+export function forfeitAllowed(basis: ForfeitBasis, today: string): boolean {
+  if (basis.kind === 'consent') return basis.note.trim().length > 0;
+  return basis.askedAt <= shiftDate(today, -FORFEIT_NO_REPLY_DAYS);
+}

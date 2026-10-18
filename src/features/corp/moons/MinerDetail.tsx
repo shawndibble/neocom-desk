@@ -20,6 +20,7 @@ import { listQueue } from '@/features/corpTaxBook/mailQueueStore';
 import { AuditFeed } from './AuditFeed';
 import { useBookAudit } from './useBookAudit';
 import { useBook } from './useBook';
+import { CloseAccountDialog } from './CloseAccountDialog';
 import { MarkNotTaxDialog, ReasonDialog, RecordPaymentDialog } from './BookDialogs';
 import { isk, shortDate, shortDateTime } from './moonsFormat';
 import { Crumb, StandingWord } from './moonsParts';
@@ -55,6 +56,7 @@ export function MinerDetail({ id }: { id: string }) {
     | { kind: 'record' }
     | { kind: 'dismiss' }
     | { kind: 'dismissAll' }
+    | { kind: 'close' }
     | { kind: 'notTax'; payment: Payment }
     | { kind: 'reverse'; dismissalId: string }
     | null
@@ -89,6 +91,7 @@ export function MinerDetail({ id }: { id: string }) {
   const openStatement = detail.statements.find(
     (s) => !view.internals.byMiner.get(id)?.allocation.byStatement.get(s.id)?.settled
   );
+  const closedAt = view.input.miners.find((m) => m.id === id)?.closedAt;
   const toleranceTotal = detail.toleranceWriteOffs.reduce((s, w) => s + w.amount, 0);
   const lateTotal = detail.lateWriteOffs.reduce((s, w) => s + w.tax, 0);
   const selectedDays = detail.days.filter((d) => selected.has(d.key));
@@ -295,6 +298,11 @@ export function MinerDetail({ id }: { id: string }) {
               <Button size="sm" variant="ghost" onClick={() => setDialog({ kind: 'dismissAll' })}>
                 {t('corpTaxBook.moons.miner.dismissAll')}
               </Button>
+              {row.standing === 'guest' && !closedAt && (
+                <Button size="sm" variant="ghost" onClick={() => setDialog({ kind: 'close' })}>
+                  {t('corpTaxBook.moons.miner.closeAccount')}
+                </Button>
+              )}
             </span>
           ) : undefined
         }
@@ -302,6 +310,11 @@ export function MinerDetail({ id }: { id: string }) {
       {notice && (
         <p role="status" className="text-xs text-text-dim">
           {notice}
+        </p>
+      )}
+      {closedAt && (
+        <p role="status" className="text-xs text-text-dim">
+          {t('corpTaxBook.moons.miner.closedNote', { date: shortDate(closedAt.slice(0, 10)) })}
         </p>
       )}
       <StatChips>
@@ -493,6 +506,9 @@ export function MinerDetail({ id }: { id: string }) {
             });
           }}
         />
+      )}
+      {dialog?.kind === 'close' && (
+        <CloseAccountDialog open onClose={() => setDialog(null)} miner={row} minerName={name} />
       )}
       {dialog?.kind === 'notTax' && (
         <MarkNotTaxDialog

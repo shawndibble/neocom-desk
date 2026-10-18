@@ -841,8 +841,187 @@ suite('Corp Tax Book callables (emulator)', () => {
       expect((await readStatementByToken(deps(), String(verifyToken))).accountClosed).toBe(true);
     });
 
+    describe('moon and Extraction dismissals (#4184)', () => {
+      const started = '2026-10-10T00:00:00Z';
+      const extractionId = `1000_${Date.parse(started)}`;
+      // Fractured 17 Oct 03:00, expired 19 Oct 03:00: it covers 17-19 Oct.
+      const seedExtraction = () =>
+        book().collection('extractions').doc(extractionId).set({
+          id: extractionId,
+          structureId: 1000,
+          moonId: 7,
+          extractionStartTime: started,
+          chunkArrivalTime: '2026-10-17T00:00:00Z',
+          naturalDecayTime: '2026-10-17T03:00:00Z',
+        });
+      const billed = (id: string, date: string, structureId: number) =>
+        statement(id, {
+          amount: 4_000_000,
+          lines: [
+            {
+              kind: 'mined',
+              date,
+              characterId: 50,
+              chargeKey: `50:${structureId}:${date}`,
+              structureId,
+              oreLines: [],
+              estimatedValue: 1,
+              tax: 4_000_000,
+            },
+          ],
+        });
+      const settlementAfter = async (
+        dismissal: Record<string, unknown>,
+        line: [string, number]
+      ) => {
+        await turnOn();
+        await seedExtraction();
+        const { verifyToken } = await edit(ACCOUNTANT, {
+          action: 'issueStatement',
+          statement: billed('s1', ...line),
+        });
+        await edit(ACCOUNTANT, { action: 'dismiss', reason: 'waived', ...dismissal }, true);
+        return (await readStatementByToken(deps(), String(verifyToken))).settlement;
+      };
+
+      it('settles a Statement whose day a moon dismissal waived', async () => {
+        expect(
+          await settlementAfter({ scope: 'moon', targetId: '7' }, ['2026-10-18', 1000])
+        ).toMatchObject({ credited: 4_000_000, remaining: 0, settled: true });
+      });
+
+      it('settles a Statement whose day an Extraction dismissal waived', async () => {
+        expect(
+          await settlementAfter({ scope: 'extraction', targetId: extractionId }, [
+            '2026-10-18',
+            1000,
+          ])
+        ).toMatchObject({ credited: 4_000_000, remaining: 0, settled: true });
+      });
+
+      it('leaves a day outside the Extraction owed', async () => {
+        expect(
+          await settlementAfter({ scope: 'moon', targetId: '7' }, ['2026-10-20', 1000])
+        ).toMatchObject({ credited: 0, remaining: 4_000_000, settled: false });
+      });
+    });
+
     it('does not resolve a made-up token', async () => {
       expect(await reason(readStatementByToken(deps(), 'x'.repeat(43)))).toBe('invalid-token');
+    });
+  });
+  describe('closeAccount (#4184)', () => {
+    const close = (extra: Record<string, unknown> = {}, token = false) =>
+      edit(
+        ACCOUNTANT,
+        {
+          action: 'closeAccount',
+          minerId: 'solo:50',
+          reason: 'Guest left the area',
+          credit: { kind: 'refund' },
+          ...extra,
+        },
+        token
+      );
+    const miner = async () => (await book().collection('miners').doc('solo:50').get()).data();
+
+    it('issues the final Statement, closes the Miner and audits it', async () => {
+      await turnOn();
+      const out = await close({ statement: statement('final_solo:50') });
+      expect(out).toMatchObject({ statementId: 'final_solo:50', owed: 10_000_000, credit: 0 });
+      expect(await miner()).toMatchObject({
+        closedAt: new Date(T0).toISOString(),
+        closedBy: ACCOUNTANT,
+        finalStatementId: 'final_solo:50',
+        closeCredit: { amount: 0, disposition: 'refund' },
+        uids: ['char:50'],
+      });
+      const view = await readStatementByToken(deps(), String(out.verifyToken));
+      expect(view.accountClosed).toBe(true);
+      const log = (await book().collection('audit').get()).docs.map((d) => d.data());
+      expect(log.find((e) => e.action === 'closeAccount')).toMatchObject({
+        detail: { minerId: 'solo:50', statementId: 'final_solo:50', disposition: 'refund' },
+      });
+    });
+
+    it('records the credit left to refund by default', async () => {
+      await turnOn();
+      await edit(ACCOUNTANT, {
+        action: 'recordPayment',
+        paymentId: 'p1',
+        minerId: 'solo:50',
+        characterId: 50,
+        amount: 12_000_000,
+        at: '2026-10-30T00:00:00Z',
+      });
+      await close({ statement: statement('final_solo:50') });
+      expect(await miner()).toMatchObject({
+        closeCredit: { amount: 2_000_000, disposition: 'refund' },
+      });
+    });
+
+    it('stops there: no later Statement, no second close, no regrouping', async () => {
+      await turnOn();
+      await close({ statement: statement('final_solo:50') });
+      expect(
+        await reason(edit(ACCOUNTANT, { action: 'issueStatement', statement: statement('s2') }))
+      ).toBe('account-closed');
+      expect(await reason(close())).toBe('already-closed');
+      expect(
+        await reason(
+          edit(ACCOUNTANT, {
+            action: 'setMiner',
+            minerId: 'solo:50',
+            characterIds: [50],
+            mainCharacterId: 50,
+          })
+        )
+      ).toBe('account-closed');
+    });
+
+    it('closes with no final Statement when nothing is left to bill', async () => {
+      await turnOn();
+      await close();
+      expect(await miner()).not.toHaveProperty('finalStatementId');
+    });
+
+    it('refuses a member', async () => {
+      await turnOn();
+      await syncBook(
+        deps(),
+        who(ACCOUNTANT),
+        parseSyncInput({ corporationId: CORP, observed: [row(100, '2026-10-18T10:00:00Z')] }, now)
+      );
+      expect(await reason(close())).toBe('not-a-guest');
+    });
+
+    it('forfeits credit only with consent or after 90 days, and re-checks the role live', async () => {
+      await turnOn();
+      const forfeit = (basis: Record<string, unknown>) => ({ credit: { kind: 'forfeit', basis } });
+      const consent = forfeit({ kind: 'consent', note: 'Agreed in a corp mail on 15 Oct' });
+      expect(await reason(close(consent))).toBe('live-check-required');
+      expect(await reason(close(forfeit({ kind: 'no-reply', askedAt: '2026-08-01' }), true))).toBe(
+        'forfeit-not-allowed'
+      );
+      // 90 days before 18 Oct is 20 Jul.
+      await close(forfeit({ kind: 'no-reply', askedAt: '2026-07-20' }), true);
+      expect(await miner()).toMatchObject({
+        closeCredit: { disposition: 'forfeit', basis: { kind: 'no-reply', askedAt: '2026-07-20' } },
+      });
+    });
+
+    it('records a forfeit with consent', async () => {
+      await turnOn();
+      await close(
+        {
+          credit: {
+            kind: 'forfeit',
+            basis: { kind: 'consent', note: 'Agreed in a corp mail on 15 Oct' },
+          },
+        },
+        true
+      );
+      expect(await miner()).toMatchObject({ closeCredit: { disposition: 'forfeit' } });
     });
   });
 });

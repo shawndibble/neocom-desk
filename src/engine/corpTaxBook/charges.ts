@@ -16,6 +16,10 @@ export interface Miner {
   characterIds: number[];
   /** The character that gets the mail. */
   mainCharacterId: number;
+  /** An officer closed this guest's account (#4184): no Statement mail after the final one. */
+  closedAt?: string;
+  /** The final Statement the close issued, if anything was left to bill. */
+  finalStatementId?: string;
 }
 
 /** The Miner a character is billed under: its grouping, or a Miner of its own. */

@@ -19,7 +19,7 @@
 
 import { HttpsError } from 'firebase-functions/v2/https';
 import { boundedString, docId, record } from './communities.js';
-import { BOOK_DEFAULTS } from './corpTaxBookEngine.js';
+import { BOOK_DEFAULTS, type ForfeitBasis } from './corpTaxBookEngine.js';
 
 export const BOOKS_COLLECTION = 'corpTaxBooks';
 export const TOKENS_COLLECTION = 'corpTaxBookTokens';
@@ -315,6 +315,15 @@ export type EditAction =
   | { action: 'addAdjustment'; minerId: string; date: string; amount: number; reason: string }
   | { action: 'writeOff'; minerId: string; statementId?: string; amount: number; reason: string }
   | { action: 'rebill'; minerId: string; fromDate: string; reason: string }
+  | {
+      action: 'closeAccount';
+      minerId: string;
+      reason: string;
+      /** The final Statement, issued in the same write. Absent when nothing is left to bill. */
+      statement?: Record<string, unknown>;
+      /** Credit is refunded unless the guest consented or went 90 days without replying. */
+      credit: CloseCredit;
+    }
   | { action: 'issueStatement'; statement: Record<string, unknown> }
   | { action: 'settleStatements'; statementIds: string[] }
   | {
@@ -337,6 +346,8 @@ export type EditAction =
       kind: 'statement' | 'reminder';
     };
 
+export type CloseCredit = { kind: 'refund' } | { kind: 'forfeit'; basis: ForfeitBasis };
+
 /** Dismissals, write-offs, rebills and "not tax" re-check the role live (D7). */
 export const LIVE_CHECK_ACTIONS: ReadonlySet<EditAction['action']> = new Set([
   'dismiss',
@@ -346,10 +357,28 @@ export const LIVE_CHECK_ACTIONS: ReadonlySet<EditAction['action']> = new Set([
   'markNotTax',
 ]);
 
+/** A close that forfeits credit writes value off, so it re-checks the role live too (#4184). */
+export function needsLiveCheck(action: EditAction): boolean {
+  return (
+    LIVE_CHECK_ACTIONS.has(action.action) ||
+    (action.action === 'closeAccount' && action.credit.kind === 'forfeit')
+  );
+}
+
 const reason = (v: unknown) => boundedString(v, 'reason', 500);
 const optNote = (v: unknown) => (v === undefined ? undefined : boundedString(v, 'note', 500));
 const optId = (v: unknown, f: string) => (v === undefined ? undefined : docId(v, f));
 const money = (v: unknown, f: string) => num(v, f, 0.01, 1e13);
+
+function parseCloseCredit(raw: unknown): CloseCredit {
+  const c = record(raw);
+  if (oneOf(c.kind, 'credit.kind', ['refund', 'forfeit'] as const) === 'refund')
+    return { kind: 'refund' };
+  const b = record(c.basis);
+  return oneOf(b.kind, 'basis.kind', ['consent', 'no-reply'] as const) === 'consent'
+    ? { kind: 'forfeit', basis: { kind: 'consent', note: boundedString(b.note, 'note', 500) } }
+    : { kind: 'forfeit', basis: { kind: 'no-reply', askedAt: dateString(b.askedAt, 'askedAt') } };
+}
 
 export function parseEditAction(data: unknown): EditAction {
   const d = record(data);
@@ -367,6 +396,7 @@ export function parseEditAction(data: unknown): EditAction {
     'addAdjustment',
     'writeOff',
     'rebill',
+    'closeAccount',
     'issueStatement',
     'settleStatements',
     'declare',
@@ -465,6 +495,19 @@ export function parseEditAction(data: unknown): EditAction {
         throw new HttpsError('invalid-argument', 'statement is too large');
       }
       return { action, statement };
+    }
+    case 'closeAccount': {
+      const statement = d.statement === undefined ? undefined : record(d.statement);
+      if (statement && JSON.stringify(statement).length > MAX_STATEMENT_JSON) {
+        throw new HttpsError('invalid-argument', 'statement is too large');
+      }
+      return {
+        action,
+        minerId: docId(d.minerId, 'minerId'),
+        reason: reason(d.reason),
+        ...(statement ? { statement } : {}),
+        credit: parseCloseCredit(d.credit),
+      };
     }
     case 'settleStatements':
       return {

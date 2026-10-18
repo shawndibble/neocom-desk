@@ -6,6 +6,7 @@ import {
   defaultSettings,
   isCacheFresh,
   parseClaimPaymentInput,
+  needsLiveCheck,
   parseEditAction,
   parseSettingsPatch,
   parseStatement,
@@ -211,6 +212,40 @@ describe('parsers', () => {
       expect(() => parseStatement({ ...raw, refineryNames: { x: 'bad id' } })).toThrow();
       const many = Object.fromEntries(Array.from({ length: 51 }, (_, i) => [String(i + 1), 'r']));
       expect(() => parseStatement({ ...raw, refineryNames: many })).toThrow();
+    });
+  });
+
+  describe('closeAccount (#4184)', () => {
+    const close = (credit: unknown) => ({
+      action: 'closeAccount',
+      minerId: 'solo:50',
+      reason: 'Left the area',
+      credit,
+    });
+
+    it('refunds by default and needs no live role check', () => {
+      const action = parseEditAction(close({ kind: 'refund' }));
+      expect(action).toMatchObject({ action: 'closeAccount', credit: { kind: 'refund' } });
+      expect(needsLiveCheck(action)).toBe(false);
+    });
+
+    it('re-checks the role live when it forfeits', () => {
+      const consent = parseEditAction(
+        close({ kind: 'forfeit', basis: { kind: 'consent', note: 'agreed' } })
+      );
+      const silent = parseEditAction(
+        close({ kind: 'forfeit', basis: { kind: 'no-reply', askedAt: '2026-07-01' } })
+      );
+      expect(needsLiveCheck(consent)).toBe(true);
+      expect(needsLiveCheck(silent)).toBe(true);
+    });
+
+    it('refuses a forfeit with no stated basis', () => {
+      expect(() => parseEditAction(close({ kind: 'forfeit' }))).toThrow();
+      expect(() =>
+        parseEditAction(close({ kind: 'forfeit', basis: { kind: 'no-reply', askedAt: 'soon' } }))
+      ).toThrow();
+      expect(() => parseEditAction(close({ kind: 'keep' }))).toThrow();
     });
   });
 });
