@@ -58,6 +58,15 @@ export type UrlParamValues<S extends UrlParamSchema> = {
 
 type AnyCodec = UrlParamCodec<unknown>;
 
+/**
+ * The search the last write navigated to, while that navigation's transition
+ * is still open. Every hook renders the location *before* it, so a second
+ * hook writing in that gap — a Corp Wallet division switch resetting its
+ * filters — built on the old search and dropped the first write's key.
+ */
+let lastWrite: { fromKey: string; pathname: string; search: string } | null = null;
+let mountedHooks = 0;
+
 export function useUrlParams<S extends UrlParamSchema>(
   schema: S
 ): [UrlParamValues<S>, (patch: Partial<UrlParamValues<S>>, options?: UrlWriteOptions) => void] {
@@ -80,17 +89,23 @@ export function useUrlParams<S extends UrlParamSchema>(
   const latest = useRef({ location, navigate, urlValues, pending });
   useLayoutEffect(() => {
     latest.current = { location, navigate, urlValues, pending };
+    // A navigation landed (or Back went elsewhere): the URL is current again.
+    if (lastWrite !== null && lastWrite.fromKey !== location.key) lastWrite = null;
   });
 
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Leaving the page drops a pending write rather than landing it on
   // whichever page the reader went to.
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    mountedHooks += 1;
+    return () => {
       if (timer.current !== null) clearTimeout(timer.current);
-    },
-    []
-  );
+      // Every router's first entry has the key `default`: a write still in
+      // flight when the last hook goes must not seed the next router's base.
+      mountedHooks -= 1;
+      if (mountedHooks === 0) lastWrite = null;
+    };
+  }, []);
 
   const flush = useCallback(
     (values: Record<string, unknown>, options: UrlWriteOptions = {}) => {
@@ -99,6 +114,7 @@ export function useUrlParams<S extends UrlParamSchema>(
       // `startTransition`, so clearing `pending` urgently would commit a frame
       // with the old URL's values — the text box would flicker back, and a
       // write in that frame would start from the stale query string.
+      // (`setValues` has already shown `values` urgently.)
       startTransition(() => {
         setPending({});
         writeParams(latest.current.location, latest.current.navigate, codecs, values, options);
@@ -125,16 +141,15 @@ export function useUrlParams<S extends UrlParamSchema>(
       // Written straight through too, so a second call before the next render
       // sees this one's value as its "before".
       latest.current = { ...latest.current, pending: next };
+      // Shown now, debounced or not — never only once the navigation's
+      // transition commits: a slow page holds that open, and a second click
+      // in the gap built on the old value (three quick picks kept only the
+      // last). `flush` clears it in the same transition that lands the URL.
+      setPending(next);
       if (immediate || wait === 0) {
-        // Shown now, not when the navigation's transition commits: a slow
-        // page holds that open, and a second click in the gap built on the
-        // old value — three quick picks kept only the last. `flush` clears
-        // it in the same transition that lands the URL.
-        setPending(next);
         flush(next, options);
         return;
       }
-      setPending(next);
       timer.current = setTimeout(() => flush(latest.current.pending, options), wait);
     },
     [codecs, flush]
@@ -151,14 +166,25 @@ function writeParams(
   values: Record<string, unknown>,
   { push = false, clearHash = false }: UrlWriteOptions
 ): void {
-  const params = new URLSearchParams(location.search);
+  const base =
+    lastWrite !== null &&
+    lastWrite.fromKey === location.key &&
+    lastWrite.pathname === location.pathname
+      ? lastWrite.search
+      : location.search;
+  const params = new URLSearchParams(base);
   for (const [key, value] of Object.entries(values)) {
     const serialized = codecs[key].serialize(value);
     if (serialized === null) params.delete(key);
     else params.set(key, serialized);
   }
   const search = params.toString();
-  if (`?${search}` === location.search || (search === '' && location.search === '')) return;
+  if (`?${search}` === base || (search === '' && base === '')) return;
+  lastWrite = {
+    fromKey: location.key,
+    pathname: location.pathname,
+    search: search === '' ? '' : `?${search}`,
+  };
   navigate(
     {
       pathname: location.pathname,

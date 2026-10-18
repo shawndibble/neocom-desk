@@ -2,7 +2,14 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { Suspense, useMemo, useState } from 'react';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Route, Routes, useLocation, useNavigationType } from 'react-router-dom';
+import {
+  MemoryRouter,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+  useNavigationType,
+} from 'react-router-dom';
 import { boolParam, enumSetParam, orderedIdListParam, textParam } from './urlState';
 import {
   useRememberedUrlParams,
@@ -487,7 +494,7 @@ function Appending() {
 
 describe('useUrlParam immediate writes', () => {
   afterEach(() => {
-    hold.promise = null;
+    hold.release();
   });
 
   it('shows a write before its navigation commits, so the next pick builds on it', async () => {
@@ -502,5 +509,72 @@ describe('useUrlParam immediate writes', () => {
     await act(async () => hold.release());
     await waitFor(() => expect(probe()).toBe(`/p?ids=${encodeURIComponent('1,2')}|REPLACE`));
     expect(screen.getByTestId('ids').textContent).toBe('1,2');
+  });
+});
+
+const FLAG = boolParam();
+function FlagButton({ name }: { name: string }) {
+  const [on, setOn] = useUrlParam(name, FLAG);
+  return (
+    <button type="button" onClick={() => setOn(!on)}>
+      {name} {String(on)}
+    </button>
+  );
+}
+
+describe('useUrlParam writes from two hooks', () => {
+  afterEach(() => {
+    hold.release();
+  });
+
+  it("keeps the first hook's write when a second writes before it commits", async () => {
+    holdNavigations();
+    const user = userEvent.setup();
+    renderAt(
+      '/p',
+      <>
+        <FlagButton name="a" />
+        <FlagButton name="b" />
+        <Suspense>
+          <HoldNavigation />
+        </Suspense>
+      </>
+    );
+    await user.click(screen.getByRole('button', { name: 'a false' }));
+    await user.click(screen.getByRole('button', { name: 'b false' }));
+
+    await act(async () => hold.release());
+    await waitFor(() => expect(probe()).toBe('/p?a=1&b=1|REPLACE'));
+  });
+
+  it('builds on the committed URL again after Back, never on a write Back left', async () => {
+    function PushThenBack() {
+      const [a, setA] = useUrlParam('a', FLAG);
+      const navigate = useNavigate();
+      return (
+        <>
+          <button type="button" onClick={() => setA(!a, { push: true })}>
+            push a
+          </button>
+          <button type="button" onClick={() => void navigate(-1)}>
+            back
+          </button>
+        </>
+      );
+    }
+    const user = userEvent.setup();
+    renderAt(
+      '/p',
+      <>
+        <PushThenBack />
+        <FlagButton name="b" />
+      </>
+    );
+    await user.click(screen.getByRole('button', { name: 'push a' }));
+    expect(probe()).toBe('/p?a=1|PUSH');
+    await user.click(screen.getByRole('button', { name: 'back' }));
+    expect(probe()).toBe('/p|POP');
+    await user.click(screen.getByRole('button', { name: 'b false' }));
+    expect(probe()).toBe('/p?b=1|REPLACE');
   });
 });
