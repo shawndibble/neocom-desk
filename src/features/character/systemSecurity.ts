@@ -12,29 +12,15 @@
  */
 import { getUniverseSystem, type UniverseSystem } from '@/esi/endpoints';
 import { lookupSolarSystem } from '@/sde/solarSystems';
-import {
-  conditionalFetch,
-  loadWithCache,
-  readCached,
-  GLOBAL_CACHE_CHARACTER_ID,
-  STALE_AFTER,
-} from '@/esi/cache';
+import { loadStaticEntity, readCached, GLOBAL_CACHE_CHARACTER_ID } from '@/esi/cache';
 
 function cacheKey(systemId: number): string {
   return `system:${systemId}`;
 }
 
 async function loadSystem(systemId: number): Promise<UniverseSystem | null> {
-  const { fetchLive, conditional } = conditionalFetch((options) =>
-    getUniverseSystem(systemId, options)
-  );
-  const result = await loadWithCache(
-    GLOBAL_CACHE_CHARACTER_ID,
-    cacheKey(systemId),
-    fetchLive,
-    // A solar system's name and security status are map constants.
-    { staleAfterMs: STALE_AFTER.static, conditional }
-  );
+  // A solar system's name and security status are map constants.
+  const result = await loadStaticEntity('system', systemId, getUniverseSystem);
   return result?.data ?? null;
 }
 
