@@ -1,15 +1,10 @@
+/* eslint-disable react-hooks/preserve-manual-memoization, react-hooks/set-state-in-effect, react-hooks/purity --
+   The React Compiler is not enabled in this build. Assets() used to be skipped by these
+   rules while it called `useVirtualizer` directly (incompatible library); now that the
+   call lives in `useAssetRowVirtualizer`, they would flag pre-existing patterns. */
 import { FromWalletCrumb } from '@/features/netWorth/FromWalletCrumb';
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { measureElement, useVirtualizer } from '@tanstack/react-virtual';
 import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { industryTabHref } from '@/features/industry/industryTabs';
 import { useTranslation } from 'react-i18next';
@@ -43,7 +38,6 @@ import {
 import { usePageTab } from '@/lib/usePageTab';
 import { tabBarTabs, tabPath } from '@/lib/pageTabs';
 import type { MarketAppraiseState } from '@/lib/shortcuts';
-import { rootFontScale } from '@/lib/fontScale';
 import { ASSETS_TABS, MARKET_TABS } from '@/app/pageTabs';
 import * as Icon from '@/components/ui/icons';
 import type { EsiEndpointId } from '@/esi/registry';
@@ -91,7 +85,6 @@ import type { JumpsAwayResult } from '@/engine/jumpsAway';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { loadAssetCopyValues } from '@/features/character/assetCopyValues';
 import { useBlueprintTypeIds } from '@/features/character/useBlueprintTypeIds';
-import { assetBlueprintKind } from '@/engine/blueprintKind';
 import { loadCharacterBlueprints } from '@/features/industry/data';
 import { formatAge } from '@/lib/age';
 import { TableActionsMenu, TableExportProvider } from '@/components/ui/TableExport';
@@ -104,12 +97,8 @@ import {
   withoutAbyssalTypePrices,
   type AbyssalSummary,
 } from '@/engine/market/abyssalValuation';
-import {
-  useAbyssalAssetEstimates,
-  type AbyssalAssetEstimates,
-} from '@/features/abyssal/useAbyssalAssetEstimates';
+import { useAbyssalAssetEstimates } from '@/features/abyssal/useAbyssalAssetEstimates';
 import { AbyssalValueNote } from '@/features/abyssal/AbyssalValueNote';
-import { abyssalValueHint } from '@/features/abyssal/abyssalValueHint';
 import { formatIsk, parseIskAmount } from '@/lib/isk';
 import {
   assetStackValue,
@@ -122,44 +111,40 @@ import {
   type AssetTreeStation,
   type StationSortField,
 } from '@/engine/assetTree';
-import {
-  assetNodeSegment,
-  assetPathHref,
-  parseAssetPath,
-  resolveAssetPath,
-} from '@/engine/assetPath';
+import { assetNodeSegment, parseAssetPath, resolveAssetPath } from '@/engine/assetPath';
 import { useStationSort } from '@/features/character/stationSortPreference';
 import { useAssetSort, type AssetSortField } from '@/features/character/assetSortPreference';
 import {
   namesForSelection,
   quantityLinesForSelection,
   selectAll,
-  selectionStateForIds,
   toggleSelection,
 } from '@/features/character/assetSelection';
 import {
-  ContainerRow,
   ItemColumnLabels,
-  ItemRow,
   JumpsAwayText,
-  LocationRow,
-  SearchResultRow,
-  SectionHeading,
   SecurityValue,
 } from '@/features/character/assetBrowserRows';
 import { hasItemRows } from '@/features/character/assetBrowserFormat';
-import { OreItemMenu } from '@/features/assets/oreDecision/OreItemMenu';
+import { useAssetRowVirtualizer } from '@/features/assets/useAssetRowVirtualizer';
+import { BrowseRowView } from '@/features/assets/AssetBrowseRows';
+import {
+  AssetItemActionsContext,
+  assetHref,
+  baseRowHeight,
+  isUnresolvedParent,
+  type AssetItemActions,
+  type AssetMatch,
+  type BrowseRow,
+  type CharacterBadgeContext,
+} from '@/features/assets/assetBrowseModel';
 import { assetShipEditLocation } from '@/features/fittings/assetShipLocation';
 import { useOpenInFittings } from '@/features/fittings/useOpenInFittings';
 import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
-import { useItemActions } from '@/features/market/itemActions';
 import { usePageItemActions } from '@/features/market/usePageItemActions';
 import { addQuickbarItem } from '@/features/market/quickbar';
 import { writeToClipboard } from '@/lib/clipboard';
-import {
-  buildPlansByMaterialTypeID,
-  planTargetForItem,
-} from '@/features/industry/blueprintCatalog';
+import { buildPlansByMaterialTypeID } from '@/features/industry/blueprintCatalog';
 
 // Matches Market.tsx's/SkillPicker.tsx's own search debounce — the input stays
 // instantly responsive, only the potentially-thousands-of-assets recompute
@@ -180,15 +165,6 @@ const ASSETS_VIEW_PARAMS = {
   min: MIN_VALUE_PARAM,
   chars: characterFilterParam('current'),
 };
-
-/**
- * A drill-down href that keeps the page's whole query string: its filters
- * describe the same view one level deeper, and the component instance (and
- * its state) already survives drill-down.
- */
-function assetHref(stationId: number | null, segments: readonly string[], query: string): string {
-  return assetPathHref(stationId, segments) + query;
-}
 
 /** Stable identity, so the fallback doesn't invalidate the grouping memo every render. */
 const NO_NAMES: ReadonlyMap<number, string> = new Map();
@@ -257,11 +233,6 @@ function locationLabel(
   }
   // Exhaustiveness fallback: every current location_type is handled above.
   return t('assets.structureLabel', { id: locationId });
-}
-
-interface AssetMatch {
-  asset: CharacterAsset;
-  name: string;
 }
 
 /** Name-substring search over a flat asset list, shared by the CSV export path and the on-screen results path. */
@@ -594,108 +565,12 @@ function sortStations(
     );
 }
 
-/**
- * Cross-character search (issue #746, formerly #85's toggle): who owns which
- * row, relative to the active Character — the three pieces always travel
- * together, so they get one value instead of three.
- */
-interface CharacterBadgeContext {
-  activeCharacterId: number | null;
-  idByItemId: ReadonlyMap<number, number>;
-  nameById: ReadonlyMap<number, string>;
-}
-
-/** The owning Character's name, only when it isn't the active Character — null means "no badge". */
-function characterBadgeFor(itemId: number, ctx: CharacterBadgeContext): string | null {
-  const ownerId = ctx.idByItemId.get(itemId);
-  if (ownerId === undefined || ownerId === ctx.activeCharacterId) return null;
-  return ctx.nameById.get(ownerId) ?? null;
-}
-
-/**
- * Assets-only supporting data an item row needs but a prop-threaded context
- * cannot carry cheaply — pricing/volume and the "View in Industry as
- * material" wiring. Quickbar, blueprint lookup and Show info are the page's
- * shared Item Actions (`itemActions.ts`) now, read by `ItemContextMenu`
- * itself; this context stays for what's Assets-specific. Reaching these
- * through `useContext` rather than props matters beyond style: the React
- * Compiler's purity/refs checks can verify a value read via Context is
- * deferred to event time, but lose that guarantee for a closure passed
- * through ordinary props.
- */
-interface AssetItemActions {
-  priceByTypeId: ReadonlyMap<number, number>;
-  itemValueByItemId: ReadonlyMap<number, number>;
-  /** Abyssal modules' MutaMarket estimates; a row on screen asks for its own. */
-  abyssal: AbyssalAssetEstimates;
-  volumeByTypeId: ReadonlyMap<number, number>;
-  /** Material typeID -> the character's own Build Plan consuming it; null until the blueprint catalog has loaded. */
-  materialPlanMap: ReadonlyMap<number, BuildPlanRecord> | null;
-  onViewInIndustryAsMaterial: (typeId: number) => void;
-  /** Blueprint typeIDs for the BPO badge; null until loaded, or when nothing listed can be a blueprint. */
-  blueprintTypeIds: ReadonlySet<number> | null;
-}
-
-const AssetItemActionsContext = createContext<AssetItemActions | null>(null);
-
-function useAssetItemActions(): AssetItemActions {
-  const actions = useContext(AssetItemActionsContext);
-  if (!actions) throw new Error('Asset row rendered outside its actions provider');
-  return actions;
-}
-
-/**
- * One row of whatever list is currently on screen. Three list shapes share a
- * single virtualizer and a single row union rather than three parallel
- * implementations: the location list, one level of a location's contents, and
- * flat search results.
- */
-type BrowseRow =
-  | { kind: 'heading'; key: string; label: string; tone: 'default' | 'warning' }
-  | { kind: 'location'; key: string; station: AssetTreeStation }
-  | { kind: 'node'; key: string; node: AssetTreeNode }
-  | { kind: 'match'; key: string; match: AssetMatch };
-
-/** Estimated heights — the virtualizer windows on these, same fixed-estimate approach as the tree view it replaces. */
-function estimateRowHeight(row: BrowseRow): number {
-  return rootFontScale() * baseRowHeight(row);
-}
-
-function baseRowHeight(row: BrowseRow): number {
-  switch (row.kind) {
-    case 'heading':
-      return 33;
-    case 'location':
-    case 'match':
-      return 64;
-    case 'node':
-      return 48;
-  }
-}
-
 /** An asset group's `location_type` as the kind a Place resolves under. */
 function placeKindForStation(
   locationType: AssetTreeStation['locationType']
 ): 'station' | 'solar_system' | 'structure' | undefined {
   if (locationType === 'station' || locationType === 'solar_system') return locationType;
   return locationType === 'other' || locationType === 'item' ? 'structure' : undefined;
-}
-
-/**
- * An orphan group: `buildAssetTree` promotes an asset whose parent wasn't in
- * the fetched page to its own top-level group, which is why a bare "Container"
- * or a ship name can appear beside real stations. Most such parents really are
- * unresolvable (a cycle, or a page never fetched), but some are structure ids
- * ESI just never returns an asset row for (a personal-hangar division inside a
- * player-owned structure) — `loadAssetsSnapshot` best-effort resolves those via
- * the structures endpoint, and a hit there means this is a real, named
- * location after all, not an orphan.
- */
-function isUnresolvedParent(
-  station: AssetTreeStation,
-  locationNames: ReadonlyMap<number, string>
-): boolean {
-  return station.locationType === 'item' && !locationNames.has(station.locationId);
 }
 
 /** Character assets, browsed one level at a time. Read-only, cached for offline. */
@@ -1325,33 +1200,12 @@ export function Assets() {
   // results, whose rows are a different shape).
   const showItemColumns = !flatModeActive && pathStationId !== null && hasItemRows(rows);
 
-  const scrollParentRef = useRef<HTMLDivElement>(null);
-  // React Compiler isn't enabled in this build (no babel plugin configured);
-  // this is eslint-plugin-react-hooks flagging TanStack Virtual's returned
-  // functions as unsafe to memoize *if* the compiler is ever turned on.
-  // eslint-disable-next-line react-hooks/incompatible-library
-  const rowVirtualizer = useVirtualizer({
-    count: rows.length,
-    getScrollElement: () => scrollParentRef.current,
-    estimateSize: (index) => estimateRowHeight(rows[index]),
-    // Rows wrap onto two lines at phone widths, so the estimate is only a first
-    // guess — measure the real height or rows overlap. Zero (jsdom, a row not
-    // laid out yet) falls back to the estimate.
-    measureElement: (element, entry, instance) =>
-      measureElement(element, entry, instance) ||
-      instance.options.estimateSize(instance.indexFromElement(element)),
-    getItemKey: (index) => rows[index].key,
-    overscan: 10,
+  const { scrollParentRef, rowVirtualizer } = useAssetRowVirtualizer({
+    rows,
+    baseRowHeight,
+    // Every level change is a different list; keep the new one at the top.
+    resetKey: `${wildcard}|${flatModeActive}`,
   });
-
-  // Every level change is a different list; keep the new one at the top
-  // rather than inheriting the previous level's scroll offset. Plain
-  // `scrollTop` rather than `scrollTo()` — jsdom's test shim implements the
-  // former, not the latter, and there's no smooth-scroll case here worth the
-  // extra API surface.
-  useEffect(() => {
-    if (scrollParentRef.current) scrollParentRef.current.scrollTop = 0;
-  }, [wildcard, flatModeActive]);
 
   // Level-heading focus (issue #1485): a location/container/search-result
   // link, or Back, unmounts the control the pilot just activated — without
@@ -2149,204 +2003,5 @@ export function Assets() {
         </TabPanel>
       </div>
     </ItemActionsProvider>
-  );
-}
-
-interface BrowseRowViewProps {
-  row: BrowseRow;
-  t: Translate;
-  typeNames: ReadonlyMap<number, string>;
-  characterBadges: CharacterBadgeContext;
-  selectMode: boolean;
-  selectedIds: ReadonlySet<number>;
-  onToggleSelection: (ids: readonly number[]) => void;
-  stationLabelFor: (station: AssetTreeStation) => string;
-  nodeLabel: (node: AssetTreeNode) => string;
-  locationNames: ReadonlyMap<number, string>;
-  securityForStation: (locationId: number) => number | null | undefined;
-  jumpsAwayFor: (locationId: number) => JumpsAwayResult | undefined;
-  pinStateFor: (locationId: number) => PinState;
-  onTogglePin: (locationId: number) => void;
-  pathStationId: number | null;
-  pathSegments: readonly string[];
-  trailFor: (asset: CharacterAsset) => string[];
-  rootStationIdFor: (asset: CharacterAsset) => number | null;
-  /** The page's query string, carried onto every drill-down link. */
-  query: string;
-}
-
-/** Dispatches one virtualized row to the right presentation component. */
-function BrowseRowView(props: BrowseRowViewProps) {
-  const { row, t } = props;
-
-  if (row.kind === 'heading') {
-    return <SectionHeading tone={row.tone}>{row.label}</SectionHeading>;
-  }
-
-  if (row.kind === 'location') {
-    const { station } = row;
-    const orphan = isUnresolvedParent(station, props.locationNames);
-    return (
-      <LocationRow
-        href={assetHref(station.locationId, [], props.query)}
-        label={props.stationLabelFor(station)}
-        security={orphan ? undefined : props.securityForStation(station.locationId)}
-        jumpsAway={orphan ? undefined : props.jumpsAwayFor(station.locationId)}
-        itemCount={station.itemCount}
-        estimatedValue={station.estimatedValue}
-        pinState={props.pinStateFor(station.locationId)}
-        onTogglePin={() => props.onTogglePin(station.locationId)}
-        unresolvedParent={orphan}
-        selectMode={props.selectMode}
-        selectionState={selectionStateForIds(collectStationItemIds(station), props.selectedIds)}
-        onToggleSelection={() => props.onToggleSelection(collectStationItemIds(station))}
-        t={t}
-      />
-    );
-  }
-
-  if (row.kind === 'node') {
-    return <NodeRowView {...props} node={row.node} />;
-  }
-
-  return <SearchMatchRow {...props} match={row.match} />;
-}
-
-/**
- * An abyssal module's row asks for its MutaMarket estimate while it is on
- * screen, and names what its value is (or why it has none). Undefined for
- * any other stack.
- */
-function useAbyssalValueHint(
-  asset: Pick<CharacterAsset, 'item_id' | 'type_id'> | null,
-  abyssal: AbyssalAssetEstimates,
-  t: Translate
-): string | undefined {
-  const isAbyssal = asset !== null && (abyssal.isAbyssalType?.(asset.type_id) ?? false);
-  const itemId = asset?.item_id;
-  const typeId = asset?.type_id;
-  const { request } = abyssal;
-  useEffect(() => {
-    if (!isAbyssal || itemId === undefined || typeId === undefined) return undefined;
-    // Leaving the screen before its turn drops the ask.
-    return request({ itemId, typeId });
-  }, [isAbyssal, itemId, typeId, request]);
-  if (!isAbyssal || itemId === undefined) return undefined;
-  return abyssalValueHint(abyssal.estimates.get(itemId), t);
-}
-
-/** Split out so it can call `useAssetItemActions` — a heading/location row does not. */
-function SearchMatchRow({
-  match,
-  t,
-  characterBadges,
-  securityForStation,
-  trailFor,
-  rootStationIdFor,
-  query,
-}: BrowseRowViewProps & { match: AssetMatch }) {
-  const actions = useAssetItemActions();
-  const { asset, name } = match;
-  const valueHint = useAbyssalValueHint(asset, actions.abyssal, t);
-  const rootStationId = rootStationIdFor(asset);
-  return (
-    <SearchResultRow
-      name={name}
-      quantity={asset.quantity}
-      estimatedValue={assetStackValue(asset, actions.priceByTypeId, actions.itemValueByItemId)}
-      trail={trailFor(asset)}
-      security={rootStationId === null ? undefined : securityForStation(rootStationId)}
-      href={assetHref(rootStationId, [], query)}
-      characterBadge={characterBadgeFor(asset.item_id, characterBadges)}
-      blueprintKind={assetBlueprintKind(asset, actions.blueprintTypeIds)}
-      valueHint={valueHint}
-      t={t}
-    />
-  );
-}
-
-/** Split out so it can call `useAssetItemActions` — a leaf needs pricing/menu wiring a heading does not. */
-function NodeRowView({
-  node,
-  t,
-  selectMode,
-  selectedIds,
-  onToggleSelection,
-  nodeLabel,
-  characterBadges,
-  pathStationId,
-  pathSegments,
-  query,
-}: BrowseRowViewProps & { node: AssetTreeNode }) {
-  const actions = useAssetItemActions();
-  const pageActions = useItemActions();
-  const label = nodeLabel(node);
-  const badge = node.kind === 'bay' ? null : characterBadgeFor(node.asset.item_id, characterBadges);
-
-  const valueHint = useAbyssalValueHint(
-    node.kind === 'item' ? node.asset : null,
-    actions.abyssal,
-    t
-  );
-  if (node.kind !== 'item') {
-    return (
-      <ContainerRow
-        href={assetHref(pathStationId, [...pathSegments, assetNodeSegment(node)], query)}
-        label={label}
-        itemCount={node.itemCount}
-        estimatedValue={node.estimatedValue}
-        characterBadge={badge}
-        named={node.kind !== 'bay'}
-        selectMode={selectMode}
-        selectionState={selectionStateForIds(collectItemIds(node), selectedIds)}
-        onToggleSelection={() => onToggleSelection(collectItemIds(node))}
-        t={t}
-      />
-    );
-  }
-
-  const { asset } = node;
-  // A Mutated module's Show info opens on its own Rolls; any other stack's on its type.
-  const itemId = actions.abyssal.isAbyssalType?.(asset.type_id) ? asset.item_id : undefined;
-  const estimatedValue = assetStackValue(asset, actions.priceByTypeId, actions.itemValueByItemId);
-  const planTarget =
-    pageActions.blueprints === null
-      ? undefined
-      : planTargetForItem(pageActions.blueprints, asset.type_id);
-  const blueprintTypeID =
-    planTarget === undefined ? undefined : (planTarget?.blueprintTypeID ?? null);
-  const onViewInIndustryAsMaterial = actions.materialPlanMap?.has(asset.type_id)
-    ? () => actions.onViewInIndustryAsMaterial(asset.type_id)
-    : undefined;
-
-  return (
-    <ItemRow
-      name={label}
-      quantity={asset.quantity}
-      unitVolume={actions.volumeByTypeId.get(asset.type_id)}
-      estimatedValue={estimatedValue}
-      valueHint={valueHint}
-      characterBadge={badge}
-      blueprintKind={assetBlueprintKind(asset, actions.blueprintTypeIds)}
-      typeId={asset.type_id}
-      itemId={itemId}
-      selectMode={selectMode}
-      selectionState={selectedIds.has(asset.item_id) ? 'checked' : 'unchecked'}
-      onToggleSelection={() => onToggleSelection([asset.item_id])}
-      t={t}
-      wrap={(children) => (
-        <OreItemMenu
-          quantity={asset.quantity}
-          typeId={asset.type_id}
-          itemId={itemId}
-          itemName={label}
-          blueprintTypeID={blueprintTypeID}
-          planProductTypeID={planTarget?.productTypeID}
-          onViewInIndustryAsMaterial={onViewInIndustryAsMaterial}
-        >
-          {children}
-        </OreItemMenu>
-      )}
-    />
   );
 }
