@@ -218,8 +218,8 @@ describe('syncCorpTaxBook', () => {
     expect(calls).toHaveLength(2);
     expect(calls[0].observed).toHaveLength(OBSERVED_PER_CALL);
     expect(calls[1].observed).toHaveLength(5);
-    expect(calls[0].extractions).toBeUndefined();
-    expect(calls[1].extractions).toBeDefined();
+    expect(calls[0].extractions).toBeDefined();
+    expect(calls[1].extractions).toBeUndefined();
   });
 
   it('settles the Statements the new donation pays, and only those', async () => {

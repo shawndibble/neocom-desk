@@ -14,7 +14,7 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useActiveCorporationId } from '../owner';
 import { useCorpAccess } from '../useCorpAccess';
 import { readBookSummary, type BookSummary } from './bookClient';
-import { useMiningLedgerAccess } from './miningLedgerAccess';
+import { useMiningLedgerAccess, type MiningLedgerAccess } from './miningLedgerAccess';
 import {
   syncCorpTaxBook,
   type SyncCapabilities,
@@ -82,6 +82,8 @@ export interface CorpTaxBookSync {
   /** "Last synced 3d ago by X", stale after about 3 days, and the gaps on record. */
   status: SyncStatus;
   run: SyncRun;
+  /** `needs-scope` means the first ledger screen should offer the mining scope. */
+  ledger: MiningLedgerAccess & { request: () => Promise<void> };
   /** Syncs now. The page's own refresh action. */
   sync: () => Promise<void>;
 }
@@ -140,6 +142,7 @@ export function useCorpTaxBook(options: { autoSync?: boolean } = {}): CorpTaxBoo
     loading: key !== null && !loaded,
     status: syncStatus(loaded ? summary?.lastSync : null, now),
     run: run ?? { phase: 'idle' },
+    ledger,
     sync,
   };
 }

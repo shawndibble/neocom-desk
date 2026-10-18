@@ -45,6 +45,9 @@ import {
 export const OBSERVED_PER_CALL = 2000;
 /** And this many donations; the newest are sent first and the rest follow on the next visit. */
 export const DONATIONS_PER_CALL = 500;
+/** And this many extractions, and this many Statement ids to settle. */
+export const EXTRACTIONS_PER_CALL = 200;
+export const SETTLE_PER_CALL = 200;
 
 export interface SyncDeps {
   now: () => number;
@@ -108,9 +111,12 @@ export type SyncOutcome =
       /** The gaps now on record, earlier ones included. */
       gaps: ReturnType<typeof mergeGaps>;
       /** Sources this Character could not read this time (the rest still synced). */
-      missing: ('extractions' | 'donations' | 'moon-notifications')[];
+      missing: MissingSource[];
       truncated: boolean;
     };
+
+/** A source this Character could not read this time; the rest still synced. */
+export type MissingSource = 'extractions' | 'donations';
 
 const paymentId = (d: JournalDonation) => `j${d.division}_${d.refId}`;
 
@@ -135,7 +141,7 @@ export async function syncCorpTaxBook(
   const before = await deps.readBookState(characterId, corporationId);
   if (!before) return { kind: 'skipped', reason: 'no-book' };
 
-  const missing: ('extractions' | 'donations' | 'moon-notifications')[] = [];
+  const missing: MissingSource[] = [];
   const canExtract = capabilities.canReadMoonExtractions && verdict.isStationManager;
   const [feed, esiExtractions, notifications, donations] = await Promise.all([
     deps.loadObserverFeed(characterId, corporationId),
@@ -152,7 +158,6 @@ export async function syncCorpTaxBook(
   if (feed === 'unavailable') return { kind: 'skipped', reason: 'esi-unavailable' };
   if (canExtract && esiExtractions === null) missing.push('extractions');
   if (!capabilities.canReadWallet || donations === null) missing.push('donations');
-  if (canExtract && notifications.length === 0) missing.push('moon-notifications');
 
   const now = deps.now();
   const gaps = mergeGaps(
@@ -186,21 +191,28 @@ export async function syncCorpTaxBook(
     knownCharacterIds: known,
   });
 
-  // Observer rows past the per-call cap go first, in their own calls; the last
-  // call carries everything else and records the visit.
+  // The first call carries everything but the overflow of observer rows, so a
+  // later failure loses only ledger rows (each call also records the visit).
+  // The server caps extractions per call, so they split too.
   const batches = chunks(feed.rows as ObservedRow[], OBSERVED_PER_CALL);
-  const tail = batches.pop() ?? [];
-  for (const observed of batches) {
-    await deps.uploadSync(characterId, { corporationId, observed, gaps });
-  }
+  const extraCalls = chunks(extractions, EXTRACTIONS_PER_CALL);
+  const first = { observed: batches.shift() ?? [], extractions: extraCalls.shift() ?? [] };
+  // Verifying again right before writing renews the 10-minute role cache the
+  // upload relies on, which the slow ESI reads above may have outlived.
+  await deps.verifyOfficer(characterId, corporationId);
   const receipt = await deps.uploadSync(characterId, {
     corporationId,
-    observed: tail,
-    extractions,
+    ...first,
     donations: resolved,
     gaps,
   });
   const { donationsAdded } = receipt;
+  for (const observed of batches) {
+    await deps.uploadSync(characterId, { corporationId, observed, gaps });
+  }
+  for (const rest of extraCalls) {
+    await deps.uploadSync(characterId, { corporationId, extractions: rest, gaps });
+  }
 
   // The donations just stored may settle Statements; read the book back to allocate against all of it.
   const after = donationsAdded > 0 ? await deps.readBookState(characterId, corporationId) : before;
@@ -214,7 +226,9 @@ export async function syncCorpTaxBook(
         extractions: after.extractions,
       })
     : [];
-  if (toSettle.length > 0) await deps.settleStatements(characterId, corporationId, toSettle);
+  for (const ids of chunks(toSettle, SETTLE_PER_CALL)) {
+    await deps.settleStatements(characterId, corporationId, ids);
+  }
 
   return {
     kind: 'synced',
