@@ -129,7 +129,7 @@ export function HubCompareCards({ rows }: { rows: readonly HubComparisonRow[] })
       */}
       <ul
         aria-label={t('market.appraisal.compareHubsTitle')}
-        className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-3 lg:grid-cols-5"
+        className="grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5"
       >
         {rows.map((row) => (
           <li

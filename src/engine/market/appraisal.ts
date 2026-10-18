@@ -172,7 +172,7 @@ function scale(price: number | null, percent: number): number | null {
  * Does refining this row beat selling it as is?
  *
  * "Sell-as-is" is `buyTotal` in this engine's own vocabulary — what the list
- * fetches sold into buy orders right now (`market.appraisal.buyTotalHelp`) —
+ * fetches sold into buy orders right now —
  * so that is what the refine-then-sell comparison is judged against, the same
  * axis `orderExits.ts` prices its own refine exit on.
  *
@@ -344,8 +344,9 @@ export interface AppraisalUndercut {
  * The Appraisal's Undercut view: what to list each pasted item at so it
  * sits cheapest at the hub. Reads the unscaled `AppraisalItem`, never a
  * Price-Percent-scaled row — the price is a real order being beaten, not a
- * negotiated fraction of one — and is the same price `appraisalNet`'s
- * `listNet` is built on, so the column and the chip always agree.
+ * negotiated fraction of one. `appraisalNet`'s `listNet` undercuts the
+ * Price-Percent-scaled sell instead, so the column and the chip agree only at
+ * 100%.
  *
  * Null when nobody is selling (nothing to undercut) or the cheapest seller
  * already sits on the 0.01 ISK floor (no legal price below it).

@@ -106,7 +106,7 @@ for (const width of [1024, 1100, 1280, 1440]) {
     );
 
     expect(geometry.boxes.map((b) => b.name)).toEqual(
-      expect.arrayContaining(["It's worth", 'Cargo'])
+      expect.arrayContaining(['Buy', 'Split', 'Sell'])
     );
     for (const b of geometry.boxes) expect(b.overflowX).toBeLessThanOrEqual(1);
     for (const [i, a] of geometry.boxes.entries()) {
