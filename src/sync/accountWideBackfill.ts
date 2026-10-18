@@ -134,15 +134,16 @@ function makeAccountWideCollection<
     deletedAtByKey: async () => {
       const characters = await db.characters.toCollection().primaryKeys();
       const latest = new Map<string, number>();
-      for (const characterId of characters) {
-        for (const tombstone of await readTombstones(
-          tombstoneKey(tombstones, Number(characterId))
-        )) {
-          const key = tombstone.id.split(':')[1];
-          if (!key) continue;
-          const held = latest.get(key) ?? 0;
-          if (tombstone.deletedAt > held) latest.set(key, tombstone.deletedAt);
-        }
+      const lists = await Promise.all(
+        characters.map((characterId) =>
+          readTombstones(tombstoneKey(tombstones, Number(characterId)))
+        )
+      );
+      for (const tombstone of lists.flat()) {
+        const key = tombstone.id.split(':')[1];
+        if (!key) continue;
+        const held = latest.get(key) ?? 0;
+        if (tombstone.deletedAt > held) latest.set(key, tombstone.deletedAt);
       }
       return latest;
     },
