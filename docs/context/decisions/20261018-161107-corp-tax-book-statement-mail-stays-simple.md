@@ -1,0 +1,10 @@
+# Scope decisions — Corp Tax Book Statement mail stays simple (issue #4064)
+
+_Recorded 2026-10-18 · issue #4064._
+
+- **The Statement mail is short.** Per line it carries only the date, the location (refinery), the mined value and the tax amount; then the total at the bottom, the amount due and its due date, the pay code and the verify link. No unit price, quantity, price date or source, or rate columns, and no payments-credited section. Shawn's mockup-review comment on #4064 supersedes D16's "full breakdown" (and the older, fuller table the Preview mail story still draws). The verify link (D27, #4066) carries the detail: lines with pricing, terms with dates, payments credited.
+- **A mail past 10,000 characters is summarised.** First one line per day per refinery (summing a Miner's characters), then one line per refinery for the period. The total, amount due, code and link are never cut.
+- **The queue sends only while an app tab is open.** It is stored in Dexie and one tab at a time works through it under a Web Lock (`neocom:mailQueue`), at one mail every 12–15 s. Unlike the visibility-gated Tab Leader jobs it keeps going in a background tab, since an officer sends a batch and then goes back to the game. Close every tab and it waits; the next open tab resumes it where it stopped. Nothing runs on a server (no ESI token ever leaves Dexie, ADR 0010).
+- **A 520 MailStopSpamming pauses the queue, not the mail.** The mail stays waiting; the whole queue holds for `remainingTime` (ESI sends it in seconds) plus a second. A mail that fails any other way is marked Failed with a reason and a Retry; "Open in EVE" opens the in-game compose window instead.
+- **Reminders respect "Stop reminders" (D27).** An officer may send a reminder to a Miner who opted out only once per Statement: the reminder is reserved through `recordReminder` before it is queued, and the book refuses the second.
+- **Each mail is logged in the book's audit trail.** After a send, `recordMail` (a new audit-only edit action on `editCorpTaxBookCallable`) records the Statement and the mail id; a log call that fails is retried on the next tick and never re-sends the mail.

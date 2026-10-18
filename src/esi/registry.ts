@@ -7,7 +7,7 @@
  * `esi/endpointRoutes.ts` for the runtime route-template lookup — so none can
  * drift from the endpoints the app actually calls.
  *
- * Pure static data, importing nothing at runtime (`endpoints.ts` is referenced
+ * Pure static data, importing nothing at runtime (`endpoints/` is referenced
  * type-only), so `e2e/support` fixtures can import it without dragging in
  * Dexie or fetch. Must never grow auth state (docs/ARCHITECTURE.md §2) and
  * must never be imported by `src/engine` (CLAUDE.md).
@@ -205,7 +205,7 @@ export interface EsiEndpointSpec {
 }
 
 /**
- * Every exported wrapper in `endpoints.ts`, computed by the compiler rather
+ * Every exported wrapper in `endpoints/`, computed by the compiler rather
  * than hand-listed, so the `Record<EndpointName, ...>` below makes both a
  * missing entry and a stale one a build error.
  */
@@ -216,7 +216,7 @@ type EndpointName = {
 
 /**
  * Transcribed from the `// --- METHOD /route (scope) ---` markers in
- * `endpoints.ts`, verified against https://esi.evetech.net/meta/openapi.json;
+ * `endpoints/`, verified against https://esi.evetech.net/meta/openapi.json;
  * `registry.test.ts` re-parses those markers and asserts they still agree.
  * Covers every wrapper — nothing else calls ESI directly today.
  */
@@ -706,6 +706,21 @@ export const ESI_REGISTRY = {
    */
   getCorporationMiningExtractions: {
     route: '/corporation/{corporation_id}/mining/extractions',
+    scope: 'esi-industry.read_corporation_mining.v1',
+    group: 'corp',
+  },
+  /**
+   * The refinery mining ledger (issue #4058): the same scope as the
+   * extractions above, but `x-required-roles` is Accountant, not
+   * Station_Manager — `canReadMiningLedger` in `engine/corpRoles.ts`.
+   */
+  getCorporationMiningObservers: {
+    route: '/corporation/{corporation_id}/mining/observers',
+    scope: 'esi-industry.read_corporation_mining.v1',
+    group: 'corp',
+  },
+  getCorporationMiningObserver: {
+    route: '/corporation/{corporation_id}/mining/observers/{observer_id}',
     scope: 'esi-industry.read_corporation_mining.v1',
     group: 'corp',
   },

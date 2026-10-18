@@ -1,5 +1,5 @@
 import { tappableRowClassName } from '@/components/ui/controlStyles';
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Checkbox, EmptyState, SearchInput, Spinner } from '@/components/ui';
 import { fittingChoiceKey } from '@/engine/communities/sharedFittings';
@@ -7,7 +7,9 @@ import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { AddSharedItemsDialog } from './AddSharedItemsDialog';
 import { ConfirmDialog } from './ConfirmDialog';
 import { collectFittingsToShare } from './shareAllFittings';
+import { namedLike, needleOf, ROW_LIMIT } from './shareLists';
 import { loadFittingsAll, saveFittingsAll } from './shareSelection';
+import { useSerialShareState } from './useSerialShareState';
 import {
   loadMySharedFittingKeys,
   shareFitting,
@@ -17,19 +19,10 @@ import {
   type SharedFittingInput,
 } from './sharedFittings';
 
-/** A long list shows this many rows; the search narrows it. */
-const ROW_LIMIT = 100;
-
-const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name);
-
 /** The source and key a `fittingChoiceKey` was made from. */
 function keyOf(choiceKey: string): Pick<SharedFittingInput, 'source' | 'key'> {
   const source = choiceKey.startsWith('game-') ? 'game' : 'saved';
   return { source, key: choiceKey.slice(source.length + 1) };
-}
-
-function namedLike(inputs: readonly SharedFittingInput[], needle: string): SharedFittingInput[] {
-  return inputs.filter((input) => input.name.toLowerCase().includes(needle)).sort(byName);
 }
 
 interface Loaded {
@@ -56,23 +49,12 @@ export function ShareFittingsTab({
   communityId: string;
 }) {
   const { t } = useTranslation();
-  const [loaded, setLoaded] = useState<Loaded | null>(null);
-  const [loadFailed, setLoadFailed] = useState(false);
   const [query, setQuery] = useState('');
   const [confirmingOff, setConfirmingOff] = useState(false);
   const [adding, setAdding] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
   const search = useRef<HTMLInputElement>(null);
   const stopButtons = useRef(new Map<string, HTMLButtonElement>());
   const focusAfterCommit = useFocusAfterCommit();
-  const latest = useRef<Loaded | null>(null);
-  const queue = useRef<Promise<void>>(Promise.resolve());
-  const loads = useRef(0);
-
-  const apply = useCallback((next: Loaded | null) => {
-    latest.current = next;
-    setLoaded(next);
-  }, []);
 
   const fetchAll = useCallback(async (): Promise<Loaded> => {
     const [fittings, allExcluded, shared] = await Promise.all([
@@ -82,53 +64,13 @@ export function ShareFittingsTab({
     ]);
     return { fittings, allExcluded, shared };
   }, [characterId, communityId]);
-
-  // Only the newest load may write: one for another Community, or one a
-  // failed change asked for later, must not be overwritten by an older answer.
-  const settle = useCallback(
-    (mine: number, next: Loaded | null) => {
-      if (mine !== loads.current) return;
-      if (next) apply(next);
-      setLoadFailed(next === null);
-    },
-    [apply]
+  const { loaded, loadFailed, notice, setNotice, run } = useSerialShareState(
+    fetchAll,
+    'communities.fittings.failed'
   );
 
-  useEffect(() => {
-    const mine = ++loads.current;
-    fetchAll().then(
-      (next) => settle(mine, next),
-      () => settle(mine, null)
-    );
-  }, [fetchAll, settle]);
-
-  const reload = useCallback(async () => {
-    const mine = ++loads.current;
-    settle(mine, await fetchAll().catch(() => null));
-  }, [fetchAll, settle]);
-
-  /**
-   * Runs one change after the one before, each from the state the one before
-   * left. A failure reloads the truth from the Community and this device
-   * instead of guessing how to undo.
-   */
-  function run(change: (current: Loaded) => Promise<Loaded>): Promise<void> {
-    setNotice(null);
-    queue.current = queue.current.then(async () => {
-      const current = latest.current;
-      if (current === null) return;
-      try {
-        apply(await change(current));
-      } catch {
-        setNotice(t('communities.fittings.failed'));
-        await reload();
-      }
-    });
-    return queue.current;
-  }
-
   const fittings = useMemo(() => loaded?.fittings ?? [], [loaded]);
-  const needle = query.trim().toLowerCase();
+  const needle = needleOf(query);
   const unavailable = t('communities.fittings.unavailable');
   const sharedRows = useMemo(() => {
     if (!loaded) return [];

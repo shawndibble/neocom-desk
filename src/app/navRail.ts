@@ -46,15 +46,6 @@ function deepestOwner(pathname: string): OwnedPath | undefined {
   return best;
 }
 
-/**
- * The page whose section the rail opens for `pathname`. A sub-view belongs to
- * its page even where its path does not nest under it (`/clones` → Overview),
- * and a detail route belongs to the page above it.
- */
-export function currentPagePath(pathname: string): NavPagePath | null {
-  return deepestOwner(pathname)?.pagePath ?? null;
-}
-
 /** The page, tab or sub-view `pathname` shows — what the Recent row records. */
 export function viewPathFor(pathname: string): string | null {
   return deepestOwner(pathname)?.path ?? null;
@@ -146,15 +137,6 @@ function hiddenExcept(shown: ReadonlySet<string>): string[] {
 /** The hidden list of a pilot who has not chosen anything: every page outside the default set. */
 export function defaultHiddenNav(): string[] {
   return hiddenExcept(new Set(DEFAULT_SHOWN_NAV));
-}
-
-/** The starting hidden list for the activities a pilot picked: the default set plus their pages. */
-export function hiddenNavForActivities(activities: readonly string[]): string[] {
-  const shown = new Set(DEFAULT_SHOWN_NAV);
-  for (const activity of NAV_ACTIVITIES) {
-    if (activities.includes(activity.id)) for (const path of activity.paths) shown.add(path);
-  }
-  return hiddenExcept(shown);
 }
 
 /** How many recent views are kept: one more than are shown, so the current one can be skipped. */

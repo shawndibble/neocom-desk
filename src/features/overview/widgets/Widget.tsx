@@ -18,8 +18,7 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '@/db';
+import { useRosterNames } from './useRosterNames';
 import { CharacterScopeReadout } from '@/features/character/CharacterScopeReadout';
 import {
   Button,
@@ -218,18 +217,16 @@ function ChartBody({
 
 /** The fixed scope readout (DESIGN §6c): this widget reads every Character on the device. */
 function AllCharactersReadout({ compact }: { compact: boolean }) {
-  const total = useLiveQuery(() => db.characters.count(), []);
+  const total = useRosterNames()?.size;
   if (!total) return null;
   return <CharacterScopeReadout scope="all" total={total} compact={compact} />;
 }
 
 /** The same readout in its "Name only" form: All was asked for, but this kind reads one Character. */
 function HeaderCharacterReadout({ characterId }: { characterId: number }) {
-  const character = useLiveQuery(() => db.characters.get(characterId), [characterId]);
-  if (!character) return null;
-  return (
-    <CharacterScopeReadout scope="one" characterId={characterId} characterName={character.name} />
-  );
+  const name = useRosterNames()?.get(characterId);
+  if (name === undefined) return null;
+  return <CharacterScopeReadout scope="one" characterId={characterId} characterName={name} />;
 }
 
 function Skeleton() {

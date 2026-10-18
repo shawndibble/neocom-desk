@@ -129,6 +129,7 @@ export const loadCorp = named(() => import('@/routes/Corp'), 'Corp');
 export const loadCorpMembers = named(() => import('@/routes/CorpMembers'), 'CorpMembers');
 export const loadCorpAssets = named(() => import('@/routes/CorpAssets'), 'CorpAssets');
 export const loadCorpWallet = named(() => import('@/routes/CorpWallet'), 'CorpWallet');
+export const loadCorpMoons = named(() => import('@/routes/CorpMoons'), 'CorpMoons');
 export const loadMarket = named(() => import('@/routes/Market'), 'Market');
 export const loadWallet = named(() => import('@/routes/Wallet'), 'Wallet');
 export const loadMoonMiningTax = named(() => import('@/routes/MoonMiningTax'), 'MoonMiningTax');
@@ -155,6 +156,10 @@ export const loadStyleguide = named(() => import('@/routes/Styleguide'), 'Styleg
 export const loadFittingShared = named(() => import('@/routes/FittingShared'), 'FittingShared');
 export const loadCommunityJoin = named(() => import('@/routes/CommunityJoin'), 'CommunityJoin');
 export const loadSharedLink = named(() => import('@/routes/SharedLink'), 'SharedLink');
+export const loadCorpTaxBookVerify = named(
+  () => import('@/routes/CorpTaxBookVerify'),
+  'CorpTaxBookVerify'
+);
 export const loadErrorProbe = named(() => import('@/routes/ErrorProbe'), 'ErrorProbe');
 
 /**
@@ -195,6 +200,7 @@ const PRELOADERS: Record<AppRoutePath, () => Promise<RouteModule>> = {
   '/corp/members': loadCorpMembers,
   '/corp/wallet': loadCorpWallet,
   '/corp/assets': loadCorpAssets,
+  '/corp/moons': loadCorpMoons,
   '/corp/assets/*': loadCorpAssets,
   '/assets': loadAssets,
   '/mail': loadMail,
