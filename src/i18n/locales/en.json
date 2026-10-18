@@ -5272,6 +5272,7 @@
     }
   },
   "common": {
+    "unknownType": "Type #{{typeId}}",
     "needsConnection": "Needs a connection",
     "opensInNewTab": "(opens in a new tab)",
     "pricesUnavailableOffline": "Prices unavailable offline",
