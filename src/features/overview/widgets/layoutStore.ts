@@ -54,6 +54,7 @@ function parseWidget(raw: unknown): Widget | null {
     delete out.range;
   }
   if (!isRowsPerPage(raw.rowsPerPage)) delete out.rowsPerPage;
+  if (!def.hasCalendarEvents || raw.calendarEvents !== 'all') delete out.calendarEvents;
   if (!def.hasPlexPlan || !isPlexPlan(raw.plexPer30Days)) delete out.plexPer30Days;
   return out as unknown as Widget;
 }

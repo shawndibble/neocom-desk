@@ -4039,7 +4039,9 @@
       "comingUpNext": "{{title}} in {{when}}",
       "response": {
         "accepted": "Accepted",
-        "tentative": "Tentative"
+        "tentative": "Tentative",
+        "declined": "Declined",
+        "not_responded": "No response"
       },
       "spExtraction": "SP extraction",
       "spareSp": "Spare SP",
@@ -4806,6 +4808,8 @@
         "title": "Coming up",
         "description": "Calendar events you accepted or may attend",
         "empty": "No accepted or tentative events ahead.",
+        "emptyHint": "Click the 3 dots menu to change to view all events.",
+        "emptyAll": "No events ahead.",
         "more": "+{{count}} more in 24h",
         "col": {
           "event": "Event",
@@ -5176,6 +5180,11 @@
       "nameOnly": "This widget shows the header Character only.",
       "range": "Range",
       "rangeDays": "{{days}}d",
+      "events": "Events",
+      "eventsChoice": {
+        "committed": "Accepted and tentative",
+        "all": "All events"
+      },
       "rename": "Rename",
       "renameTitle": "Rename {{title}}",
       "renameLabel": "Name",

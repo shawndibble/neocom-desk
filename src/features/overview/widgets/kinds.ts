@@ -36,6 +36,8 @@ export interface WidgetKindDef {
   hasRange: boolean;
   /** Whether the kind reads the pilot's Omega plan (PLEX per 30 days), a per-widget setting. */
   hasPlexPlan: boolean;
+  /** Whether the kind lists calendar events and lets the pilot pick which (accepted and tentative, or all). */
+  hasCalendarEvents: boolean;
   /** ESI endpoints the kind needs, for the "needs permission" state. */
   endpoints: readonly EsiEndpointId[];
   emptyMessageKey: string;
@@ -53,6 +55,7 @@ interface Spec {
   size: WidgetSize;
   range?: true;
   plexPlan?: true;
+  calendarEvents?: true;
   soon?: true;
   endpoints: readonly EsiEndpointId[];
 }
@@ -266,6 +269,7 @@ const SPECS: Record<string, Spec> = {
     views: NT,
     view: 'table',
     size: 'M',
+    calendarEvents: true,
     endpoints: ['getCharacterCalendar'],
   },
   contracts: {
@@ -294,6 +298,7 @@ export const WIDGET_KINDS: readonly WidgetKindDef[] = Object.entries(SPECS).map(
   defaultView: s.view,
   hasRange: s.range === true,
   hasPlexPlan: s.plexPlan === true,
+  hasCalendarEvents: s.calendarEvents === true,
   endpoints: s.endpoints,
   emptyMessageKey: `overview.widgets.${id}.empty`,
   availability: s.soon ? 'comingSoon' : 'available',

@@ -346,6 +346,34 @@ describe('comingUp', () => {
     expect(view.number.secondary?.text).toBe('Fleet op');
     expect(view.deadlines[0].at).toBe(NOW + 2 * HOUR);
   });
+
+  it('lists unanswered events only when the widget asks for all events', () => {
+    const events = [
+      {
+        event_id: 1,
+        title: 'Mass op',
+        event_date: new Date(NOW + 2 * HOUR).toISOString(),
+        event_response: 'not_responded',
+        importance: 1,
+      },
+    ];
+    const feeds: Feeds = {
+      calendar: ok({ events, needsReauth: false, fetchedAt: new Date(NOW) }) as never,
+    };
+    expect(stateOf(buildView('comingUp', feeds, ctx()))).toBe('empty');
+    const all = buildView('comingUp', feeds, ctx({ calendarEvents: 'all' }));
+    expect(all.number.secondary?.text).toBe('Mass op');
+    expect(all.rows).toHaveLength(1);
+  });
+
+  it('points an empty accepted-and-tentative widget at the menu', () => {
+    const feeds: Feeds = {
+      calendar: ok({ events: [], needsReauth: false, fetchedAt: new Date(NOW) }),
+    };
+    expect(buildView('comingUp', feeds, ctx()).emptyHint).toBe(
+      'overview.widgets.comingUp.emptyHint'
+    );
+  });
 });
 
 describe('priceWatch', () => {

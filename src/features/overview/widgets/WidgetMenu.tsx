@@ -38,7 +38,9 @@ import {
   isPlexPlan,
   MAX_PLEX_PLAN,
   MAX_WIDGETS,
+  CALENDAR_EVENTS_CHOICES,
   WIDGET_RANGES,
+  type CalendarEventsChoice,
   type Widget,
   type WidgetRange,
   type WidgetScope,
@@ -244,6 +246,24 @@ export function WidgetMenu({ widget, inert = false }: { widget: Widget; inert?: 
                 {WIDGET_RANGES.map((days) => (
                   <DropdownMenuRadioItem key={days} value={String(days)}>
                     {t('overview.menu.rangeDays', { days })}
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+            </>
+          )}
+          {kind.hasCalendarEvents && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel>{t('overview.menu.events')}</DropdownMenuLabel>
+              <DropdownMenuRadioGroup
+                value={widget.calendarEvents ?? 'committed'}
+                onValueChange={(next) =>
+                  edit.setCalendarEvents(widget.id, next as CalendarEventsChoice)
+                }
+              >
+                {CALENDAR_EVENTS_CHOICES.map((choice) => (
+                  <DropdownMenuRadioItem key={choice} value={choice}>
+                    {t(`overview.menu.eventsChoice.${choice}`)}
                   </DropdownMenuRadioItem>
                 ))}
               </DropdownMenuRadioGroup>

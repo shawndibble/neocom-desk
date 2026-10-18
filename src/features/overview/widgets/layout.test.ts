@@ -16,6 +16,7 @@ import {
   resizeWidgetUndoable,
   restoreLayout,
   setRange,
+  setCalendarEvents,
   setPlexPer30Days,
   setRowsPerPage,
   newWidget,
@@ -211,6 +212,21 @@ describe('setPlexPer30Days', () => {
     expect(setPlexPer30Days(l, 'a', 1.5)).toBe(l);
     expect(setPlexPer30Days(l, 'a', 99999)).toBe(l);
     expect(setPlexPer30Days(l, 'b', 700)).toBe(l);
+  });
+});
+
+describe('setCalendarEvents', () => {
+  it('stores All events and drops the field when it goes back to the default', () => {
+    const l = layoutOf(w('a', 'comingUp'));
+    const all = setCalendarEvents(l, 'a', 'all');
+    expect(all.widgets[0].calendarEvents).toBe('all');
+    expect('calendarEvents' in setCalendarEvents(all, 'a', 'committed').widgets[0]).toBe(false);
+  });
+
+  it('changes nothing for the default or a kind with no event choice', () => {
+    const l = layoutOf(w('a', 'comingUp'), w('b', 'orders'));
+    expect(setCalendarEvents(l, 'a', 'committed')).toBe(l);
+    expect(setCalendarEvents(l, 'b', 'all')).toBe(l);
   });
 });
 

@@ -9,7 +9,7 @@ import type { DeadlineSeverity } from '@/engine/severity';
 import { extractableSp, extractorCount } from '@/engine/spExtraction';
 import type { SkillQueueEntry } from '@/esi/endpoints';
 import type { ContractTableRow } from '@/engine/contractsBoard';
-import type { CommittedCalendarEvent } from '@/engine/calendarDeadline';
+import type { UpcomingCalendarEvent } from '@/engine/calendarDeadline';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { DAY_MS } from '@/lib/age';
 import { formatCountdown } from '@/lib/duration';
@@ -162,7 +162,7 @@ export function spTable(t: Translate, input: SpTableInput): TableModel {
 
 export function comingUpTable(
   t: Translate,
-  events: readonly CommittedCalendarEvent[],
+  events: readonly UpcomingCalendarEvent[],
   now: number,
   toneOf: (atMs: number, now: number) => DeadlineSeverity
 ): TableModel {

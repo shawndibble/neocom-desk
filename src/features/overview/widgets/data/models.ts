@@ -11,7 +11,11 @@
  * ticks and a build never invents a new object per render of a source.
  */
 import { severityForRemaining, type DeadlineSeverity } from '@/engine/severity';
-import { soonestCalendarDeadline, upcomingCommittedEvents } from '@/engine/calendarDeadline';
+import {
+  soonestCalendarDeadline,
+  upcomingCommittedEvents,
+  upcomingEvents,
+} from '@/engine/calendarDeadline';
 import { extractableSp, extractorCount } from '@/engine/spExtraction';
 import {
   buildOpenOrderRows,
@@ -371,12 +375,15 @@ const sp: Builder = (feeds, { t }) => {
   };
 };
 
-const comingUp: Builder = (feeds, { t, now }) => {
+const comingUp: Builder = (feeds, { t, now, calendarEvents }) => {
   const feed = feeds.calendar;
   const data = feed?.data ?? null;
   const to = '/calendar';
   if (!data) return blank(to, statusOf(feed));
-  const upcoming = upcomingCommittedEvents(data.events, now);
+  const all = calendarEvents === 'all';
+  const upcoming = all
+    ? upcomingEvents(data.events, now)
+    : upcomingCommittedEvents(data.events, now);
   const next = upcoming[0];
   const soonest = soonestCalendarDeadline(data.events, now);
   const laterToday = upcoming.filter(
@@ -392,6 +399,8 @@ const comingUp: Builder = (feeds, { t, now }) => {
         hasStaleData: data.fetchedAt !== null,
       })
     ),
+    emptyMessage: all ? t('overview.widgets.comingUp.emptyAll') : undefined,
+    emptyHint: all ? undefined : t('overview.widgets.comingUp.emptyHint'),
     fetchedAt: data.fetchedAt,
     number: next
       ? {
@@ -400,7 +409,9 @@ const comingUp: Builder = (feeds, { t, now }) => {
           unit:
             laterToday > 0 ? t('overview.widgets.comingUp.more', { count: laterToday }) : undefined,
           secondary: { text: next.title },
-          tone: comingUpSeverity(data, now) ?? 'clear',
+          tone: all
+            ? comingUpEventSeverity(next.atMs, now)
+            : (comingUpSeverity(data, now) ?? 'clear'),
         }
       : NEUTRAL_NUMBER,
     rows: upcoming.map((event) => ({

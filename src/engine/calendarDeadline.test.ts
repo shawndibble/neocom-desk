@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { soonestCalendarDeadline, upcomingCommittedEvents } from './calendarDeadline';
+import {
+  soonestCalendarDeadline,
+  upcomingCommittedEvents,
+  upcomingEvents,
+} from './calendarDeadline';
 import type { CalendarEventSummary } from '@/esi/endpoints';
 
 const NOW = Date.parse('2026-01-01T00:00:00Z');
@@ -73,5 +77,24 @@ describe('upcomingCommittedEvents', () => {
 
   it('is empty when nothing is committed', () => {
     expect(upcomingCommittedEvents([event({ event_response: 'not_responded' })], NOW)).toEqual([]);
+  });
+});
+
+describe('upcomingEvents', () => {
+  it('lists every event still ahead whatever the response, soonest first', () => {
+    const events = [
+      event({ event_id: 1, event_date: new Date(NOW + 7_200_000).toISOString(), title: 'Late' }),
+      event({
+        event_id: 2,
+        event_date: new Date(NOW + 3_600_000).toISOString(),
+        event_response: 'not_responded',
+        title: 'Early',
+      }),
+      event({ event_id: 3, event_date: new Date(NOW - 60_000).toISOString() }),
+    ];
+    expect(upcomingEvents(events, NOW)).toEqual([
+      { eventId: 2, atMs: NOW + 3_600_000, title: 'Early', response: 'not_responded' },
+      { eventId: 1, atMs: NOW + 7_200_000, title: 'Late', response: 'accepted' },
+    ]);
   });
 });
