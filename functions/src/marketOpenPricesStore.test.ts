@@ -59,4 +59,19 @@ describe('writeOpenPrices', () => {
     expect(await writeOpenPrices(db, 'c', items, mergeDays)).toBe(1201);
     expect(commits.map((c) => c.length)).toEqual([500, 500, 201]);
   });
+  it('reads the items lazily, one batch at a time, and reports progress after each commit', async () => {
+    const { db, commits } = fakeDb({});
+    let pulled = 0;
+    function* items() {
+      for (let t = 0; t < 1001; t++) {
+        pulled++;
+        // Never more than one batch ahead of what has been committed.
+        expect(pulled - commits.length * 500).toBeLessThanOrEqual(500);
+        yield { regionId: 1, typeId: t, days: [{ date: '2026-10-17', buy: 1, sell: 1 }] };
+      }
+    }
+    const progress: number[] = [];
+    expect(await writeOpenPrices(db, 'c', items(), mergeDays, (n) => progress.push(n))).toBe(1001);
+    expect(progress).toEqual([500, 1000, 1001]);
+  });
 });

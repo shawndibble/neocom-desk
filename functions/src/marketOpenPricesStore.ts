@@ -18,17 +18,22 @@ export interface MergeFn {
   ): OpenPriceSeries;
 }
 
-/** Merges `items` into `marketOpenPrices` and returns how many documents were written. */
+/**
+ * Merges `items` into `marketOpenPrices` and returns how many documents were
+ * written. `items` is consumed lazily, one batch at a time, so a large
+ * generator (the backfill's ~69k documents) is never materialized whole.
+ * `onProgress`, when given, gets the running total after each committed batch.
+ */
 export async function writeOpenPrices(
   db: Firestore,
   collection: string,
   items: Iterable<KeyedDays>,
-  merge: MergeFn
+  merge: MergeFn,
+  onProgress?: (written: number) => void
 ): Promise<number> {
-  const all = [...items];
   let written = 0;
-  for (let start = 0; start < all.length; start += BATCH_SIZE) {
-    const slice = all.slice(start, start + BATCH_SIZE);
+  let slice: KeyedDays[] = [];
+  const commit = async () => {
     const refs = slice.map((i) => db.collection(collection).doc(`${i.regionId}_${i.typeId}`));
     const snaps: DocumentSnapshot[] = [];
     for (let r = 0; r < refs.length; r += READ_CHUNK) {
@@ -44,6 +49,13 @@ export async function writeOpenPrices(
     });
     await batch.commit();
     written += slice.length;
+    slice = [];
+    onProgress?.(written);
+  };
+  for (const item of items) {
+    slice.push(item);
+    if (slice.length === BATCH_SIZE) await commit();
   }
+  if (slice.length > 0) await commit();
   return written;
 }
