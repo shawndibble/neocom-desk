@@ -915,7 +915,7 @@ export function AppraisalPanel({
           // No box: the totals, hold and hub comparison sit on the page ground and
           // the table below is the only panel (DESIGN.md §6c, boxes in boxes).
           <div className="flex flex-col gap-2">
-            <div className="flex flex-wrap items-center gap-2 ">
+            <div className="flex flex-wrap items-center gap-2">
               {minusOwned && (
                 <span className="w-full text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                   {ownedPref.everywhere
@@ -945,31 +945,28 @@ export function AppraisalPanel({
             )}
 
             {net && pricePercent !== 100 && (
-              <p className="px-3 text-[0.6875rem] text-text-dim">
+              <p className="text-[0.6875rem] text-text-dim">
                 {t('market.appraisal.netAlwaysAt100Note')}
               </p>
             )}
 
             {net && (
-              <AssumesBaseStandingsNote
-                className="px-3"
-                hint={t('market.appraisal.assumesBaseStandingsHint')}
-              />
+              <AssumesBaseStandingsNote hint={t('market.appraisal.assumesBaseStandingsHint')} />
             )}
 
             {hasRefine && refinesOreOrIce && (
-              <div className="px-3 empty:hidden">
+              <div className="empty:hidden">
                 <ImplantsAssumedNote hint={t('market.appraisal.refineAssumesNoImplantsHint')} />
               </div>
             )}
 
             {!result.pricesUnreachable && totals.unpricedRows > 0 && (
-              <p className="px-3 text-[0.6875rem] text-warning">
+              <p className="text-[0.6875rem] text-warning">
                 {t('market.appraisal.unpriced', { count: totals.unpricedRows })}
               </p>
             )}
             {!result.pricesUnreachable && totals.refineUnpricedRows > 0 && (
-              <p className="px-3 text-[0.6875rem] text-warning">
+              <p className="text-[0.6875rem] text-warning">
                 {t('market.appraisal.refineUnpriced', { count: totals.refineUnpricedRows })}
               </p>
             )}

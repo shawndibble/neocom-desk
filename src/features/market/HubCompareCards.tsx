@@ -1,17 +1,15 @@
 /**
- * Compare Hubs as a card per Trade Hub rather than a row per Trade Hub.
+ * Compare Hubs as one flat row per Trade Hub: name, then Sell and Buy totals.
  *
- * The table this replaced answered "what is the spread at each hub" only by
- * reading a number out of a column and holding it against the number two rows
- * down. Five hubs is a fixed, tiny set — it fits across the panel — so each
- * hub gets its own box and the comparison becomes a glance across the row
- * instead of a scan down a column.
+ * Five hubs is a fixed, tiny set, so the comparison reads as a short list
+ * above the table rather than a grid of boxes (the table is the page's only
+ * box).
  *
  * What that trades away is sorting: `DataTable` gave sortable buy/sell
- * columns and a card grid has no column to sort. `TRADE_HUBS`' own fixed
+ * columns and a short list has no column to sort. `TRADE_HUBS`' own fixed
  * order (Jita, Amarr, Dodixie, Rens, Hek) is the order here, at every width,
- * so a hub is always in the same place on the grid — which is the thing a
- * sort would otherwise destroy.
+ * so a hub is always in the same place — which is the thing a sort would
+ * otherwise destroy.
  */
 import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
 import { useEffect, useRef, useState } from 'react';
@@ -70,9 +68,8 @@ function CopyableTotal({
 }
 
 /**
- * One labelled figure inside a card. Label above value, never beside it: the
- * narrowest track this grid produces is ~120px of content, where a
- * side-by-side label would leave the figure nowhere to sit.
+ * One labelled figure inside a hub's row: label beside value, wrapping to the
+ * next line on a narrow row rather than truncating the figure.
  */
 function HubFigure({
   label,
