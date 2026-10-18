@@ -225,8 +225,18 @@ const TYPE_RENDERERS: Readonly<Record<string, (ctx: RenderContext) => BodyChoice
       ? { key: 'body', vars: { structure } }
       : { key: 'bodyWithDays', vars: { structure, count: days } };
   },
+  MoonminingExtractionStarted: (ctx) => {
+    const structure = structureLabel(ctx);
+    if (structure === null) return null;
+    const ready = ctx.payload.readyTimeMs;
+    return ready === undefined
+      ? { key: 'body', vars: { structure } }
+      : { key: 'bodyWithReady', vars: { structure, ready: formatLocalDateTime(new Date(ready)) } };
+  },
   MoonminingExtractionFinished: structureOnly,
+  MoonminingLaserFired: structureOnly,
   MoonminingAutomaticFracture: structureOnly,
+  MoonminingExtractionCancelled: structureOnly,
   CorpAllBillMsg: ({ payload }) => {
     const amount = payload.amount === undefined ? undefined : formatIsk(payload.amount);
     const due =
