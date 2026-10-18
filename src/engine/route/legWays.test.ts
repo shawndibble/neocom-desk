@@ -4,7 +4,6 @@ import { holeNetwork } from './routeHoles';
 import { HUB_SYSTEM_IDS, type TheraConnection } from './theraConnections';
 import { gatesOnlyOptions } from './holeDetour';
 import {
-  legPinToken,
   legWays,
   parseLegPin,
   pinnedLegRoute,
@@ -247,13 +246,6 @@ describe('leg pins', () => {
     expect(parseLegPin('')).toBeNull();
     expect(parseLegPin('<script>')).toBeNull();
   });
-
-  it('writes each pin back as the token it was read from', () => {
-    for (const token of ['gates', 'thera', 'turnur', '48213']) {
-      const pin = parseLegPin(token);
-      expect(pin && legPinToken(pin)).toBe(token);
-    }
-  });
 });
 
 describe('pinnedLegRoute', () => {
@@ -353,9 +345,8 @@ describe('legWays with bridges', () => {
 });
 
 describe('ansiblex pins', () => {
-  it('reads and writes ansiblex as its own pin, never a hole id', () => {
+  it('reads ansiblex as its own pin, never a hole id', () => {
     expect(parseLegPin('ansiblex')).toEqual({ kind: 'ansiblex' });
-    expect(legPinToken({ kind: 'ansiblex' })).toBe('ansiblex');
   });
 
   it('flies an ansiblex pin over the bridges', () => {

@@ -3,7 +3,7 @@ import { Readable } from 'node:stream';
 import unbzip2Stream from 'unbzip2-stream';
 import { describe, expect, it } from 'vitest';
 import { OpenPriceFold } from './marketOpenPrices.js';
-import { foldOrdersCsv, parseIsBuy } from './marketOrdersArchive.js';
+import { foldBz2Snapshot, foldOrdersCsv, parseIsBuy } from './marketOrdersArchive.js';
 
 const HEADER =
   'duration,is_buy_order,issued,location_id,min_volume,order_id,price,range,system_id,type_id,volume_remain,volume_total,http_last_modified,station_id,region_id,constellation_id';
@@ -68,6 +68,35 @@ describe('foldOrdersCsv', () => {
     await expect(foldOrdersCsv(Readable.from([bad]), new OpenPriceFold())).rejects.toThrow(
       /is_buy_order/
     );
+  });
+});
+
+describe('foldBz2Snapshot', () => {
+  it('decompresses and folds a compressed snapshot stream', async () => {
+    const bz2 = execFileSync('bzip2', ['-c'], { input: CSV });
+    const fold = new OpenPriceFold();
+    expect(await foldBz2Snapshot(Readable.from([bz2]), fold)).toBe(5);
+    expect([...fold.entries()][0]).toMatchObject({ buy: 5.6, sell: 6.0 });
+  });
+
+  it('rejects when the download is corrupt or truncated', async () => {
+    const bz2 = execFileSync('bzip2', ['-c'], { input: CSV.repeat(200) });
+    const cut = bz2.subarray(0, Math.floor(bz2.length / 2));
+    await expect(foldBz2Snapshot(Readable.from([cut]), new OpenPriceFold())).rejects.toThrow();
+  });
+
+  it('keeps the decompressor under the default listener limit (no MaxListenersExceededWarning)', async () => {
+    const warnings: string[] = [];
+    const onWarning = (w: Error) => warnings.push(w.name);
+    process.on('warning', onWarning);
+    try {
+      const bz2 = execFileSync('bzip2', ['-c'], { input: CSV });
+      await foldBz2Snapshot(Readable.from([bz2]), new OpenPriceFold());
+      await new Promise((resolve) => setImmediate(resolve));
+    } finally {
+      process.off('warning', onWarning);
+    }
+    expect(warnings).not.toContain('MaxListenersExceededWarning');
   });
 });
 

@@ -84,6 +84,14 @@ describe('runBackfill', () => {
     expect(result.skipped).toEqual(['2026-10-01', '2026-10-02', '2026-10-03', '2026-10-04']);
     expect(d.writeGroups).not.toHaveBeenCalled();
   });
+  it('names the snapshot each day was read from, and why a day was skipped', async () => {
+    const d = deps({
+      snapshotUrlFor: async (date) => (date === '2026-10-02' ? null : `https://x/${date}`),
+    });
+    await runBackfill(d);
+    expect(d.log).toHaveBeenCalledWith(expect.stringContaining('from https://x/2026-10-01'));
+    expect(d.log).toHaveBeenCalledWith('2026-10-02: no final snapshot listed, skipped');
+  });
   it('stops at a failed write so lastWritten still names the resume point', async () => {
     let calls = 0;
     const d = deps({

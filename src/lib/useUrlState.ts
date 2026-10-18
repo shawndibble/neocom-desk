@@ -25,7 +25,9 @@
  */
 import {
   startTransition,
+  type ContextType,
   useCallback,
+  useContext,
   useDeferredValue,
   useEffect,
   useLayoutEffect,
@@ -33,7 +35,13 @@ import {
   useRef,
   useState,
 } from 'react';
-import { useLocation, useNavigate, type Location, type NavigateFunction } from 'react-router-dom';
+import {
+  UNSAFE_NavigationContext as NavigationContext,
+  useLocation,
+  useNavigate,
+  type Location,
+  type NavigateFunction,
+} from 'react-router-dom';
 import { resolveSort, sortParam, type UrlParamCodec, type UrlSort } from './urlState';
 
 /** Any codec, whatever its value type — `serialize`'s parameter is the only contravariant spot. */
@@ -63,6 +71,7 @@ export function useUrlParams<S extends UrlParamSchema>(
 ): [UrlParamValues<S>, (patch: Partial<UrlParamValues<S>>, options?: UrlWriteOptions) => void] {
   const location = useLocation();
   const navigate = useNavigate();
+  const history = useContext(NavigationContext);
   const codecs = schema as unknown as Record<string, AnyCodec>;
 
   const urlValues = useMemo(() => {
@@ -74,12 +83,12 @@ export function useUrlParams<S extends UrlParamSchema>(
 
   const [pending, setPending] = useState<Record<string, unknown>>({});
 
-  // The timer below fires after later renders — possibly after a tab switch
-  // changed the path — so it must write against the location as it is *then*,
-  // not as it was when the keystroke scheduled it.
-  const latest = useRef({ location, navigate, urlValues, pending });
+  // The timer below fires after later renders, so it reads the location as it
+  // is *then*, not as it was when the keystroke scheduled it (`flush` drops it
+  // if the path has changed since).
+  const latest = useRef({ location, navigate, history, urlValues, pending });
   useLayoutEffect(() => {
-    latest.current = { location, navigate, urlValues, pending };
+    latest.current = { location, navigate, history, urlValues, pending };
   });
 
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -99,9 +108,12 @@ export function useUrlParams<S extends UrlParamSchema>(
       // `startTransition`, so clearing `pending` urgently would commit a frame
       // with the old URL's values — the text box would flicker back, and a
       // write in that frame would start from the stale query string.
+      // (`setValues` has already shown `values` urgently.)
       startTransition(() => {
         setPending({});
-        writeParams(latest.current.location, latest.current.navigate, codecs, values, options);
+        const { location: shown, navigate: go, history: router } = latest.current;
+        const at = currentLocation(router, shown);
+        if (at !== null) writeParams(at, go, codecs, values, options);
       });
     },
     [codecs]
@@ -125,11 +137,15 @@ export function useUrlParams<S extends UrlParamSchema>(
       // Written straight through too, so a second call before the next render
       // sees this one's value as its "before".
       latest.current = { ...latest.current, pending: next };
+      // Shown now, debounced or not — never only once the navigation's
+      // transition commits: a slow page holds that open, and a second click
+      // in the gap built on the old value (three quick picks kept only the
+      // last). `flush` clears it in the same transition that lands the URL.
+      setPending(next);
       if (immediate || wait === 0) {
         flush(next, options);
         return;
       }
-      setPending(next);
       timer.current = setTimeout(() => flush(latest.current.pending, options), wait);
     },
     [codecs, flush]
@@ -137,6 +153,32 @@ export function useUrlParams<S extends UrlParamSchema>(
 
   const values = useMemo(() => ({ ...urlValues, ...pending }), [urlValues, pending]);
   return [values as UrlParamValues<S>, setValues];
+}
+
+/**
+ * Where the router's history is *now*, if that is still the page `shown`
+ * renders. The router applies a navigation in a transition, so every hook
+ * renders the location before it until it commits; a write built on that —
+ * a second pick, a Corp Wallet division switch's filter reset, a write after
+ * Back — dropped what the history already holds. The history object updates
+ * synchronously on push, replace and pop. `null` while a different page is
+ * in flight: the write is dropped, never replaced over that navigation
+ * (which undid it). A router whose navigator has no live location writes on
+ * the rendered one, as before.
+ */
+function currentLocation(
+  router: ContextType<typeof NavigationContext>,
+  shown: Location
+): Location | null {
+  // BrowserRouter's and MemoryRouter's navigator is the history itself.
+  const live = (router.navigator as { location?: Location }).location;
+  if (live === undefined) return shown;
+  const trim = (path: string) => path.replace(/\/+$/, '');
+  const basename = trim(router.basename);
+  const pathname = live.pathname.startsWith(basename)
+    ? live.pathname.slice(basename.length) || '/'
+    : live.pathname;
+  return trim(pathname) === trim(shown.pathname) ? { ...live, pathname: shown.pathname } : null;
 }
 
 function writeParams(

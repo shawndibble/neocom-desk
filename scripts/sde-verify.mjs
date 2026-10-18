@@ -6,14 +6,12 @@
 // scheduled workflow and always exits 0 so the workflow can act on it.
 
 import { readFile, writeFile } from 'node:fs/promises';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
+import { ESI_COMPATIBILITY_DATE, USER_AGENT } from './lib/constants.mjs';
+import { ROOT } from './lib/paths.mjs';
 import { compareType, driftIssueAction, renderDiff } from './lib/sdeVerify.mjs';
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const ESI = 'https://esi.evetech.net';
-const COMPATIBILITY_DATE = '2026-08-01';
-const USER_AGENT = 'Neocom Desk (github.com/shawndibble/neocom-desk)';
 const SKILL_SAMPLE = 12;
 const ORE_SAMPLE_IDS = [18, 19, 20, 21, 22];
 
@@ -24,7 +22,7 @@ async function esiGet(path) {
     const res = await fetch(ESI + path, {
       headers: {
         Accept: 'application/json',
-        'X-Compatibility-Date': COMPATIBILITY_DATE,
+        'X-Compatibility-Date': ESI_COMPATIBILITY_DATE,
         'X-User-Agent': USER_AGENT,
       },
     });
