@@ -5,7 +5,7 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import '@/i18n';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import { bpcSourcingHref } from '@/features/bpcContracts/bpcSourcingUrl';
-import { encodeFittingShare } from '@/engine/fitting/fittingShare';
+import { encodeFittingShare } from '@/engine/fittings/fittingShare';
 import { loadBlueprintCatalog, type BlueprintCatalog } from '@/features/industry/blueprintCatalog';
 import { industryTabHref } from '@/features/industry/industryTabs';
 import type { TargetPlan } from '@/features/skills/useTargetPlan';
@@ -17,8 +17,8 @@ import { clearShipTreeCatalogCache } from './shipTreeCatalogs';
 import { ShipTreeTab } from './ShipTreeTab';
 import { useShipInfoShowMissing, useShipTreeViewPreference } from './shipTreeViewPreference';
 
-vi.mock('@/engine/fitting/fittingShare', async (importOriginal) => {
-  const real = await importOriginal<typeof import('@/engine/fitting/fittingShare')>();
+vi.mock('@/engine/fittings/fittingShare', async (importOriginal) => {
+  const real = await importOriginal<typeof import('@/engine/fittings/fittingShare')>();
   return { ...real, encodeFittingShare: vi.fn(real.encodeFittingShare) };
 });
 const { usePopularFitsMock } = vi.hoisted(() => ({ usePopularFitsMock: vi.fn() }));

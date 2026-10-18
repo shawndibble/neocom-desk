@@ -19,7 +19,7 @@ import {
 } from '@/engine/communities/sharedFittings';
 import type { CommunitySummary } from '@/features/communities/communityStore';
 import { uidForCharacter } from '@/sync/uid';
-import { decodeFittingShare } from '@/engine/fitting/fittingShare';
+import { decodeFittingShare } from '@/engine/fittings/fittingShare';
 import type { MyFittingRow } from '@/engine/fittings/myFittings';
 import type { CachedResult } from '@/esi/cache';
 import type { CharacterFitting } from '@/esi/endpoints';
