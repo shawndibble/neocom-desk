@@ -105,13 +105,17 @@ export function diffSkillLevelComplete(
   if (!prev) return [];
   const ordered = orderedByQueuePosition(next.entries);
   const fires: NotificationFire[] = [];
+  // hasActiveBehind[i]: some entry after i is still active.
+  const hasActiveBehind = new Array<boolean>(ordered.length).fill(false);
+  for (let i = ordered.length - 2; i >= 0; i--) {
+    hasActiveBehind[i] = hasActiveBehind[i + 1] || isActive(ordered[i + 1], next.nowMs);
+  }
   for (let i = 0; i < ordered.length; i++) {
     const current = ordered[i];
     if (!isCompleted(current, next.nowMs)) continue;
     const alreadyCompletedLastPoll = current.finishMs !== null && current.finishMs <= prev.nowMs;
     if (alreadyCompletedLastPoll) continue;
-    const hasMoreBehind = ordered.slice(i + 1).some((entry) => isActive(entry, next.nowMs));
-    if (!hasMoreBehind) continue;
+    if (!hasActiveBehind[i]) continue;
     fires.push({
       eventId: 'skillLevelComplete',
       characterId,
