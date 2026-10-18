@@ -522,6 +522,21 @@ function FlagButton({ name }: { name: string }) {
   );
 }
 
+function PushThenBack() {
+  const [a, setA] = useUrlParam('a', FLAG);
+  const navigate = useNavigate();
+  return (
+    <>
+      <button type="button" onClick={() => setA(!a, { push: true })}>
+        push a
+      </button>
+      <button type="button" onClick={() => void navigate(-1)}>
+        back
+      </button>
+    </>
+  );
+}
+
 describe('useUrlParam writes from two hooks', () => {
   afterEach(() => {
     hold.release();
@@ -547,21 +562,28 @@ describe('useUrlParam writes from two hooks', () => {
     await waitFor(() => expect(probe()).toBe('/p?a=1&b=1|REPLACE'));
   });
 
+  it('builds on where Back went, even while the write Back undid is still committing', async () => {
+    holdNavigations();
+    const user = userEvent.setup();
+    renderAt(
+      '/p',
+      <>
+        <PushThenBack />
+        <FlagButton name="b" />
+        <Suspense>
+          <HoldNavigation />
+        </Suspense>
+      </>
+    );
+    await user.click(screen.getByRole('button', { name: 'push a' }));
+    await user.click(screen.getByRole('button', { name: 'back' }));
+    await user.click(screen.getByRole('button', { name: 'b false' }));
+
+    await act(async () => hold.release());
+    await waitFor(() => expect(probe()).toBe('/p?b=1|REPLACE'));
+  });
+
   it('builds on the committed URL again after Back, never on a write Back left', async () => {
-    function PushThenBack() {
-      const [a, setA] = useUrlParam('a', FLAG);
-      const navigate = useNavigate();
-      return (
-        <>
-          <button type="button" onClick={() => setA(!a, { push: true })}>
-            push a
-          </button>
-          <button type="button" onClick={() => void navigate(-1)}>
-            back
-          </button>
-        </>
-      );
-    }
     const user = userEvent.setup();
     renderAt(
       '/p',
