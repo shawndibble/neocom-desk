@@ -16,3 +16,28 @@ export const COMPARE_REGION_STROKES = [
 export function compareRegionStroke(slot: number): { color: string; dash: string } {
   return COMPARE_REGION_STROKES[slot % COMPARE_REGION_STROKES.length]!;
 }
+
+/** Line weights of a region's open-price lines: Sell is the heavier one. */
+const OPEN_SELL_WIDTH = 2.5;
+const OPEN_BUY_WIDTH = 1.25;
+
+/** The primary region's line: the accent, solid (its average line is solid too). */
+export const PRIMARY_REGION_STROKE = { color: 'var(--color-accent)', dash: undefined } as const;
+
+/**
+ * A region's open-price lines (Buy / Sell). Two cues, neither of them colour:
+ * the region is told by its dash pattern (the primary solid, each compared slot
+ * its own, as for its average line) and the side by weight (Sell heavy, Buy
+ * light). The region's colour is shared by both of its lines. `region` is the
+ * primary's stroke or `compareRegionStroke(slot)`.
+ */
+export function openPriceStroke(
+  region: { color: string; dash: string | undefined },
+  side: 'buy' | 'sell'
+): { color: string; dash: string | undefined; width: number } {
+  return {
+    color: region.color,
+    dash: region.dash,
+    width: side === 'sell' ? OPEN_SELL_WIDTH : OPEN_BUY_WIDTH,
+  };
+}

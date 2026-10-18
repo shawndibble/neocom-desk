@@ -6,7 +6,7 @@ import { MultiSelect, type MultiSelectGroup } from '@/components/ui/MultiSelect'
 import { TRADE_HUBS } from '@/market/hubs';
 import { MAX_COMPARE_REGIONS, toggleCompareRegion } from '@/engine/market/priceHistoryCompare';
 import type { MarketRegionEntry } from '@/sde/marketTypes';
-import { compareRegionStroke } from './compareRegionStrokes';
+import { compareRegionStroke, PRIMARY_REGION_STROKE } from './compareRegionStrokes';
 
 interface CompareRegionsPickerProps {
   /** The order book's region — already the main line, so not offered. */
@@ -42,10 +42,14 @@ export function CompareRegionsPicker({
   const groups = useMemo<MultiSelectGroup<number>[]>(() => {
     const swatch = (id: number) => {
       // With `required` the first pick is the primary region: the chart's main
-      // line, with no comparison stroke of its own.
-      const slot = selected.indexOf(id) - (required ? 1 : 0);
-      if (slot < 0) return undefined;
-      const stroke = compareRegionStroke(slot);
+      // colour (accent), with no comparison stroke of its own.
+      const index = selected.indexOf(id);
+      if (index < 0) return undefined;
+      const slot = index - (required ? 1 : 0);
+      // The region's colour and dash, which its line on the chart carries
+      // whether it draws an average or a Buy / Sell pair (those two differ by
+      // weight, shown in the chart legend).
+      const stroke = slot < 0 ? PRIMARY_REGION_STROKE : compareRegionStroke(slot);
       return (
         <svg width="14" height="8" aria-hidden="true" className="shrink-0">
           <line
