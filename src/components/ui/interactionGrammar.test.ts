@@ -177,7 +177,7 @@ describe('interaction grammar source guards (DESIGN.md §6c)', () => {
       'src/features/market/ItemDetailModal.tsx',
       'src/features/market/OpenOrdersList.tsx',
       'src/features/market/UsedInSection.tsx',
-      'src/features/skills/planner/EntryList.tsx',
+      'src/features/skills/planner/entryList/EntryRow.tsx',
     ];
     // Stale entries are harmless and left alone, so fix PRs never conflict on this list.
     const stripComments = (src: string) => src.replace(/\/\*[\s\S]*?\*\/|(^|[^:])\/\/.*$/gm, '$1');
@@ -190,8 +190,9 @@ describe('interaction grammar source guards (DESIGN.md §6c)', () => {
     // recipe, or via a same-file constant/function its className uses.
     // Exceptions, by file: styled by a stylesheet rule, not utilities.
     const exceptions = [
+      'src/features/skills/planner/entryList/cells.tsx', // PriorityPill: ring drawn on the child via group-focus-visible
+      'src/features/skills/planner/entryList/MarkerRow.tsx', // moved with EntryList's exception: same file-level carve-out
       'src/features/character/CharacterCard.tsx', // avatar: pointer-only (tabIndex -1, aria-hidden); the name button carries the ring
-      'src/features/skills/planner/EntryList.tsx', // PriorityPill: ring drawn on the child via group-focus-visible
       'src/features/fittings/shipTree/FactionGrid.tsx', // .isis-faction (shipTree.css :focus-visible)
       'src/features/fittings/shipTree/IsisTile.tsx', // .isis-tile (shipTree.css :focus-visible)
       'src/features/fittings/shipTree/ShipTreeMap.tsx', // .isis-emblem (shipTree.css :focus-visible)
