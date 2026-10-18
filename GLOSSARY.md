@@ -24,7 +24,7 @@ here — they go one per file in `docs/context/decisions/`.
   the event id otherwise). A danger type nobody has acknowledged also raises
   the **Danger banner**. Distinct from the browser notification the same
   fire may also raise: two delivery channels, one event.
-- **API-Derived Data**: Character data pulled from ESI (assets, mail, wallet, etc.). Cached locally per device for offline viewing. Never synced through the backend — except the blueprints and **Fitting**s a **Member** opts to share with a **Community** (ADR 0018).
+- **API-Derived Data**: Character data pulled from ESI (assets, mail, wallet, etc.). Cached locally per device for offline viewing. Never synced through the backend — except the blueprints and **Fitting**s a **Member** opts to share with a **Community** (ADR 0018), and a corporation's **Corp Tax Book** (ADR 0023).
 - **Appraisal**: A Market page tab that prices a pasted pile of items — loot,
   a haul, a shopping list, or a whole EFT ship fit — at a **Trade Hub**, on
   both sides of the book at once: what it fetches sold into buy orders, and
@@ -269,6 +269,7 @@ here — they go one per file in `docs/context/decisions/`.
   corporation endpoints, so a Character can grant a corp scope and still be
   refused. Director implicitly holds every other role in game, and ESI does
   **not** expand that.
+- **Corp Tax Book**: A corporation's shared record of moon mining tax: its rates, start date, trade hub and Ore Form, every **Observed Mining Entry**, **Extraction**, **Tax Payment**, dismissal and sent **Statement**, and who did each. Kept for the corporation, not for one officer, so every officer sees the same book; a miner sees only their own lines. Mining before its start date is kept as history and owes nothing. Distinct from the personal Moon Mining Tax ledger, which a pilot keeps for themselves against a **Payee**.
 - **Cost Index**: A solar system's current manufacturing activity level
   (read live from ESI). Higher activity in a system drives its Job Fee up;
   distinct from EIV, which prices the materials rather than the system.
@@ -346,6 +347,7 @@ here — they go one per file in `docs/context/decisions/`.
   — what its own factories make, less its **Local Draw**. This, never gross
   production, is what a **Colony Network** plan may spend. A product a colony
   wholly consumes is absent rather than zero.
+- **Extraction**: One moon drill cycle at a corporation's refinery, in its in-game sense: Extracting until the chunk arrives (Ready), Fractured when the laser is fired or the chunk breaks on its own, and Expired once the asteroid field is assumed gone. Carries the chunk's estimated ore and ISK when its make-up is known.
 - **Facility Preset**: Industry location model: NPC station or player structure type + rig level. Manufacturing structures and reaction structures (no NPC-station equivalent) each use their own **Industry Activity**'s rig bonuses and security multipliers; the two never mix on one facility. Drives ME/time/cost bonuses in a Build Plan.
 - **Fit Import**: Pasting EFT fit text into Industry to get a **Build Group**
   holding one **Build Plan** per buildable item in the fit. Quantities count
@@ -478,6 +480,7 @@ here — they go one per file in `docs/context/decisions/`.
 - **Folded Wallet Change**: A Wallet Balance Changed line that a contract caused (ESI names the contract on the journal line), shown inside that contract's Contract Accepted / Completed / Failed alert instead of as its own alert. A Character choice under Wallet Balance Changed, on by default. Only folded when the contract alert is there to carry it; the ISK often arrives after the contract alert (the journal lags the contract list by up to an hour), so the contract's Feed row is revised rather than a second alert raised.
 - **Notification Event**: One of a fixed catalog of character-state changes a user can be notified about — Skill Level Complete, Character Not Training, Industry Job Complete, New Mail, Planetary Extraction Done, Market Order Filled, New Calendar Event, Calendar Event Starting, Contract Accepted, Wallet Balance Changed. Each is independently toggleable per Character.
 - **Notification Family**: A presentation grouping over the **Notification Allow-List** — Structures, War, Corp Governance, Bills, Moon Mining, PI. How Settings arranges the list and nothing more: it carries no defaults and gates no delivery.
+- **Observed Mining Entry**: One row of a **Corp Tax Book**: everything one character mined at one of the corporation's refineries on one EVE/UTC date, summed per ore type, as the refinery itself recorded it. The corp-side counterpart of a **Mining Ledger Entry**, valued the same way, so both sides reach the same tax.
 - **Occurrence Key**: The deterministic identity of one notification occurrence, derived from the Character, the **Notification Event** and the natural id of the thing that happened. Devices and the backend observing the same occurrence all compute the same key, which is what makes de-duplication possible. Distinct from the Notification Feed's row id.
 - **Offline Services**: The `/corp` overview's strip for the board's one untimed kind: a structure service that is off. A standing fault with no instant, so it has no place in a **Kind Card**'s ordering or on the Deadline Strip.
 - **Optimize Modes**: Skill Plan optimizer actions in one "Optimize" dropdown: "optimize for me" (the default: reorder, then place remaps on the new order), "reorder only" (honours prerequisites and **Plan Priority**, keeps current remaps), "place remaps only" (keeps current order), and "use my remap markers" (best attribute spread per segment between **Remap Markers**). Every mode previews; nothing applies silently.
@@ -601,6 +604,7 @@ here — they go one per file in `docs/context/decisions/`.
 - **Stale-Serve**: Showing a cached row whose **Freshness Window** has lapsed while the replacement is fetched behind it, rather than spinning until it lands. Signalled for a **Published Snapshot**, where a long window encodes a publish cadence; silent for a game constant, whose long window asserts the value cannot change. One that fails to revalidate must say so on the next read.
 - **Standing (corp)**: The `/corp` overview's top panel: the figures a corp manager acts on (clocks due inside a day, Runway, 30-day net), beside the Deadline Strip. Degrades figure by figure on Corp Capability.
 - **Starred Character**: A Character the user has marked to float to the top of its group on the Characters page. Device-local, never synced. Called "starred", not "pinned", because **Pin** already means a planetary structure (and a **Station Pin**).
+- **Statement**: One miner's bill from a **Corp Tax Book** for one billing period: what they mined, where and when, its value, the tax due, and what they have paid. What gets mailed to the miner.
 - **Stock List**: A market the pilot stocks: the station or structure they sell at, and the **Stock Targets** it should have listed. Account-wide: it counts every Character's own sell orders there (listed) and their hangars at the same location (ready to list). Shared by link as a copy, never with the sender's counts. Called a "market" in the UI.
 - **Stock Target**: One item on a **Stock List** with the whole number of units to keep listed. Always written in full in prose, never a bare "target", so it cannot be read as a **Target Profile**. Its status is measured by what is listed: Out (none), Low (under half), OK, or Over.
 - **Shortfall**: How many units a **Stock Target** is short (target minus listed, never below zero). The part the hangar at the market covers is "ready to list"; the rest is "to buy or build".
@@ -615,6 +619,7 @@ here — they go one per file in `docs/context/decisions/`.
 - **Net Worth Snapshot**: One Character's wallet, asset value (at the chosen Trade Hub, PLEX excluded because the PLEX Vault is not in ESI), buy-order escrow and sell-order stock on one UTC day: numbers only, kept forever and synced as Editable Data. A day the app was not opened has no row and is never interpolated.
 - **Tab Leader**: The one open tab that runs a piece of origin-wide background work, such as the **Foreground Poller** or the background sync sweep, so several open tabs do it once, not once each. Always a visible tab: with every tab hidden nobody leads.
 - **Target Profile**: The signature radius, speed and (optionally) resist to each damage type of an imagined target that a **Fitting**'s applied damage is worked out against — built-in NPC classes or one the pilot defines. Changes applied DPS and its graphs, never raw DPS. A profile with no resists resists nothing. Distinct from a **Damage Profile**, which is about what shoots at the Fitting.
+- **Tax Payment**: ISK a miner sent the corporation, credited against what they owe in a **Corp Tax Book**, oldest debt first. Usually a donation into the corporation's wallet, found automatically; an officer can record one by hand, or dismiss one that turned out to be for something else. Distinct from a **Made Payment**, which is the pilot's own record of ISK sent.
 - **Throughput** (planetary): A second budget, independent of the **Pin Budget**: whether the colony's links can carry the material flow and whether a buffer cycle fits in the Launchpad and Storage Facility. A layout can clear the Pin Budget and still stall.
 - **Triage Board**: The Overview as it was before the widget grid: a fixed board
   with one card per domain. Retired; the Overview is now an **Overview Layout**
