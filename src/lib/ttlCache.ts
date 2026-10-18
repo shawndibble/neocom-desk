@@ -1,7 +1,7 @@
 /**
  * A keyed async cache: reuses an answer for `ttlMs`, shares one in-flight load
  * between concurrent callers, and holds at most `max` entries (expired first,
- * then oldest). A load that resolves `null` is a failure and is never kept.
+ * then oldest). A load that resolves `null` or throws is a failure and is never kept.
  * `ttlMs: 0` dedupes concurrent callers only; nothing is reused once settled.
  */
 export interface TtlCache<V> {
@@ -35,7 +35,13 @@ export function createTtlCache<V>(options: { ttlMs: number; max: number }): TtlC
         if (entries.size < max) break;
         entries.delete(oldKey);
       }
-      const entry: Entry<V> = { at: Date.now(), settled: false, value: load() };
+      const entry: Entry<V> = {
+        at: Date.now(),
+        settled: false,
+        value: Promise.resolve()
+          .then(load)
+          .catch(() => null),
+      };
       entries.set(key, entry);
       void entry.value.then((value) => {
         entry.settled = true;

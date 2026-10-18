@@ -219,7 +219,7 @@ const PILOT_LIST_CACHE_MAX = 120;
 /** Keyed `kind:id`: a pilot, a corporation and an alliance can never share an answer. */
 const pilotStatsCache = createTtlCache<PilotStatsParse>({
   ttlMs: PILOT_STATS_CACHE_MS,
-  max: PILOT_LIST_CACHE_MAX,
+  max: 500,
 });
 
 /** Test seam: forget every cached pilot and corporation. */

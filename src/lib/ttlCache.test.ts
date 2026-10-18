@@ -54,4 +54,11 @@ describe('createTtlCache', () => {
     await cache.get('a', load);
     expect(load).toHaveBeenCalledTimes(4);
   });
+
+  it('treats a throwing load as a failure and retries', async () => {
+    const cache = createTtlCache<number>({ ttlMs: 1000, max: 5 });
+    const load = vi.fn().mockRejectedValueOnce(new Error('boom')).mockResolvedValueOnce(3);
+    expect(await cache.get('k', load)).toBeNull();
+    expect(await cache.get('k', load)).toBe(3);
+  });
 });
