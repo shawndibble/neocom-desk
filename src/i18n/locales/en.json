@@ -13515,5 +13515,77 @@
       "groupTitle": "New Build Group",
       "groupConfirm": "Create group"
     }
+  },
+  "corpTaxBook": {
+    "mailQueue": {
+      "title": "Statement mail",
+      "minutes_one": "{{count}} minute",
+      "minutes_other": "{{count}} minutes",
+      "chip": {
+        "label": "Statements",
+        "progress": "{{sent}} of {{total}}",
+        "sent": "sent",
+        "aria": "Statement mail: {{percent}}% sent",
+        "ariaDone": "Statement mail: {{percent}}% sent, done",
+        "ariaFailed": "{{count}} failed"
+      },
+      "summary": {
+        "sending": "Sending {{current}} of {{total}}",
+        "done": "Done",
+        "sent": "{{count}} sent",
+        "paused": "{{count}} paused",
+        "waiting": "{{count}} waiting",
+        "failed": "{{count}} failed",
+        "left": "about {{time}} left",
+        "progressLabel": "Statements sent",
+        "runningNote": "One mail every 12–15 seconds, in the background. It keeps going while the app is open in any tab; if you close every tab it waits and picks up where it left off when you next open the app.",
+        "doneNote": "Every mail is logged on its Miner. Retry a failure, or open it in EVE to send it by hand."
+      },
+      "table": {
+        "label": "Send queue",
+        "to": "To",
+        "statement": "Statement",
+        "status": "Status",
+        "reminder": "Reminder"
+      },
+      "status": {
+        "sent": "Sent",
+        "sending": "Sending",
+        "paused": "Paused",
+        "waiting": "Waiting",
+        "failed": "Failed"
+      },
+      "hold": {
+        "rateLimit": "EVE asked us to wait {{seconds}}s (too many mails)",
+        "offline": "Waiting for a connection"
+      },
+      "failure": {
+        "cspa": "{{name}} charges to receive mail. Open it in EVE to send it by hand.",
+        "auth": "EVE refused the mail permission. Log in again, then retry.",
+        "other": "EVE refused: {{detail}}",
+        "otherNoDetail": "EVE refused the mail."
+      },
+      "actions": {
+        "retry": "Retry",
+        "retryLabel": "Retry mail to {{name}}",
+        "openInEve": "Open in EVE",
+        "openInEveLabel": "Open mail to {{name}} in EVE",
+        "clearDone": "Clear sent mail",
+        "close": "Close"
+      },
+      "notice": {
+        "line_one": "EVE lets a character send about 5 mails a minute, so this mail takes about {{minutes}}.",
+        "line_other": "EVE lets a character send about 5 mails a minute, so {{count}} mails take about {{minutes}}.",
+        "detail": "They go out in the background{{from}}. Keep using the app; a chip at the top of every page shows progress. If you close the tab the queue picks up where it left off when you next open the app.",
+        "from": " from {{name}}"
+      },
+      "preview": {
+        "title": "Preview mail",
+        "to": "To",
+        "subject": "Subject",
+        "summarised": "This mail is summarised to fit EVE’s 10,000-character limit; the verify link has every line."
+      },
+      "panelTitle": "Statement mail queue"
+    }
   }
 }

@@ -1,6 +1,7 @@
 import Dexie, { type EntityTable } from 'dexie';
 import { emitUpgradeBlocked } from './blockedSignal';
 import { esiCacheMetaMiddleware } from './esiCacheMeta';
+import type { MailQueueItem } from '@/engine/corpTaxBook/mailQueue';
 import type {
   AnsiblexGateRecord,
   ArchiveKind,
@@ -69,6 +70,7 @@ export const db = new Dexie('neocom') as Dexie & {
   hullFitCache: EntityTable<HullFitCacheRecord, 'key'>;
   ansiblexGates: EntityTable<AnsiblexGateRecord, 'id'>;
   dynamicItems: EntityTable<DynamicItemRecord, 'itemId'>;
+  corpMailQueue: EntityTable<MailQueueItem, 'id'>;
 };
 
 /**
@@ -657,4 +659,41 @@ db.version(25).stores({
   walletTransactionArchive: '[characterId+transaction_id], characterId, [characterId+date]',
   walletArchiveCoverage: '[characterId+kind], characterId',
   dynamicItems: 'itemId',
+});
+
+// Adds `corpMailQueue`, the Corp Tax Book send queue (issue #4064): one row per mail,
+// kept so the queue survives closing the tab.
+db.version(26).stores({
+  characters: 'characterId, corporationId',
+  tokens: 'characterId',
+  settings: 'key',
+  skillPlans: 'id, characterId',
+  esiCache: '[characterId+key]',
+  esiCacheMeta: '[characterId+key]',
+  buildPlans: 'id, characterId',
+  quickbars: 'id, characterId',
+  stationPins: 'id, characterId, locationId',
+  planetRichness: 'id, characterId, planetId',
+  notificationFeed: 'id, characterId, firedAt',
+  productionRuns: 'id, characterId, buildPlanId',
+  productionSaleLinks: 'id, characterId, runId',
+  productionOrderWatches: 'id, characterId, runId',
+  payees: 'id, characterId',
+  miningTaxAssignments: 'id, characterId, [characterId+date+solarSystemId]',
+  bpcSearchWatches: null,
+  orderProblemSamples: 'orderId, characterId',
+  mailDrafts: 'id, characterId',
+  miningLedgerHistory: 'characterId',
+  jitaPriceSnapshots: 'date',
+  fittings: 'id, characterId',
+  hullFitCache: 'key, savedAt',
+  ansiblexGates: 'id',
+  industryJobHistory: 'characterId',
+  netWorthSnapshots: 'id, characterId',
+  productionLosses: 'id, characterId, runId',
+  walletJournalArchive: '[characterId+id], characterId, [characterId+date]',
+  walletTransactionArchive: '[characterId+transaction_id], characterId, [characterId+date]',
+  walletArchiveCoverage: '[characterId+kind], characterId',
+  dynamicItems: 'itemId',
+  corpMailQueue: 'id, corporationId, batchId, senderCharacterId',
 });

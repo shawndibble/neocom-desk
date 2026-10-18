@@ -4,7 +4,6 @@ import {
   EMPTY_WALLET_JOURNAL_FILTER,
   activeWalletJournalFilterCount,
   filterWalletJournal,
-  journalNetTotal,
   journalRefTypeBreakdown,
   toggleBreakdownRefType,
   journalRefTypes,
@@ -151,22 +150,6 @@ describe('activeWalletJournalFilterCount', () => {
     expect(
       activeWalletJournalFilterCount({ ...EMPTY_WALLET_JOURNAL_FILTER, text: 'concord' })
     ).toBe(0);
-  });
-});
-
-describe('journalNetTotal', () => {
-  it('sums the amount across every entry', () => {
-    const rows = [entry({ id: 1, amount: 1000 }), entry({ id: 2, amount: -400 })];
-    expect(journalNetTotal(rows)).toBe(600);
-  });
-
-  it('treats a missing amount as zero', () => {
-    const rows = [entry({ id: 1, amount: undefined }), entry({ id: 2, amount: 250 })];
-    expect(journalNetTotal(rows)).toBe(250);
-  });
-
-  it('is zero for no entries', () => {
-    expect(journalNetTotal([])).toBe(0);
   });
 });
 

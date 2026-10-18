@@ -1,6 +1,6 @@
+import { characterGet, characterPages } from './characterRequest';
 import { esiFetch } from '../client';
 import type { EsiResult } from '../client';
-import { fetchAllPagesStatus } from '../paginated';
 import type { TruncatableResult } from '../paginated';
 import type { EndpointOptions } from './options';
 
@@ -20,11 +20,7 @@ export function getCharacterContacts(
   characterId: number,
   options: EndpointOptions = {}
 ): Promise<TruncatableResult<CharacterContact>> {
-  return fetchAllPagesStatus<CharacterContact>(`/characters/${characterId}/contacts`, {
-    ...options,
-    characterId,
-    endpointId: 'getCharacterContacts',
-  });
+  return characterPages<CharacterContact>('getCharacterContacts', characterId, options);
 }
 
 // --- GET /characters/{character_id}/contacts/labels (esi-characters.read_contacts.v1) ---
@@ -38,11 +34,7 @@ export function getCharacterContactLabels(
   characterId: number,
   options: EndpointOptions = {}
 ): Promise<EsiResult<CharacterContactLabel[]>> {
-  return esiFetch<CharacterContactLabel[]>(`/characters/${characterId}/contacts/labels`, {
-    ...options,
-    characterId,
-    endpointId: 'getCharacterContactLabels',
-  });
+  return characterGet<CharacterContactLabel[]>('getCharacterContactLabels', characterId, options);
 }
 
 // --- GET /characters/{character_id}/standings/ (esi-characters.read_standings.v1) ---
@@ -57,11 +49,7 @@ export function getCharacterStandings(
   characterId: number,
   options: EndpointOptions = {}
 ): Promise<EsiResult<CharacterStanding[]>> {
-  return esiFetch<CharacterStanding[]>(`/characters/${characterId}/standings/`, {
-    ...options,
-    characterId,
-    endpointId: 'getCharacterStandings',
-  });
+  return characterGet<CharacterStanding[]>('getCharacterStandings', characterId, options);
 }
 
 // --- GET /loyalty/stores/{corporation_id}/offers/ (public) ---

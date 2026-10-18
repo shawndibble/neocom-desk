@@ -1,3 +1,4 @@
+import { characterGet } from './characterRequest';
 import { esiFetch } from '../client';
 import type { EsiResult } from '../client';
 import type { EndpointOptions } from './options';
@@ -22,11 +23,7 @@ export function getCharacterSkills(
   characterId: number,
   options: EndpointOptions = {}
 ): Promise<EsiResult<CharacterSkills>> {
-  return esiFetch<CharacterSkills>(`/characters/${characterId}/skills`, {
-    ...options,
-    characterId,
-    endpointId: 'getCharacterSkills',
-  });
+  return characterGet<CharacterSkills>('getCharacterSkills', characterId, options);
 }
 
 // --- GET /characters/{character_id}/skillqueue (esi-skills.read_skillqueue.v1) ---
@@ -47,11 +44,7 @@ export function getCharacterSkillQueue(
   characterId: number,
   options: EndpointOptions = {}
 ): Promise<EsiResult<SkillQueueEntry[]>> {
-  return esiFetch<SkillQueueEntry[]>(`/characters/${characterId}/skillqueue`, {
-    ...options,
-    characterId,
-    endpointId: 'getCharacterSkillQueue',
-  });
+  return characterGet<SkillQueueEntry[]>('getCharacterSkillQueue', characterId, options);
 }
 
 // --- GET /characters/{character_id}/attributes (esi-skills.read_skills.v1) ---
@@ -72,11 +65,7 @@ export function getCharacterAttributes(
   characterId: number,
   options: EndpointOptions = {}
 ): Promise<EsiResult<CharacterAttributes>> {
-  return esiFetch<CharacterAttributes>(`/characters/${characterId}/attributes`, {
-    ...options,
-    characterId,
-    endpointId: 'getCharacterAttributes',
-  });
+  return characterGet<CharacterAttributes>('getCharacterAttributes', characterId, options);
 }
 
 // --- GET /characters/{character_id}/implants (esi-clones.read_implants.v1) ---
@@ -86,11 +75,7 @@ export function getCharacterImplants(
   characterId: number,
   options: EndpointOptions = {}
 ): Promise<EsiResult<number[]>> {
-  return esiFetch<number[]>(`/characters/${characterId}/implants`, {
-    ...options,
-    characterId,
-    endpointId: 'getCharacterImplants',
-  });
+  return characterGet<number[]>('getCharacterImplants', characterId, options);
 }
 
 // --- GET /characters/{character_id} (public) ---
@@ -143,11 +128,7 @@ export function getCharacterNotifications(
   characterId: number,
   options: EndpointOptions = {}
 ): Promise<EsiResult<CharacterNotification[]>> {
-  return esiFetch<CharacterNotification[]>(`/characters/${characterId}/notifications`, {
-    ...options,
-    characterId,
-    endpointId: 'getCharacterNotifications',
-  });
+  return characterGet<CharacterNotification[]>('getCharacterNotifications', characterId, options);
 }
 
 // --- GET /characters/{character_id}/search (esi-search.search_structures.v1) ---
@@ -201,11 +182,7 @@ export function getCharacterCalendar(
   characterId: number,
   options: EndpointOptions = {}
 ): Promise<EsiResult<CalendarEventSummary[]>> {
-  return esiFetch<CalendarEventSummary[]>(`/characters/${characterId}/calendar`, {
-    ...options,
-    characterId,
-    endpointId: 'getCharacterCalendar',
-  });
+  return characterGet<CalendarEventSummary[]>('getCharacterCalendar', characterId, options);
 }
 
 // --- GET /characters/{character_id}/calendar/{event_id} (esi-calendar.read_calendar_events.v1) ---
@@ -298,11 +275,7 @@ export function getCharacterRoles(
   characterId: number,
   options: EndpointOptions = {}
 ): Promise<EsiResult<CharacterCorporationRoles>> {
-  return esiFetch<CharacterCorporationRoles>(`/characters/${characterId}/roles`, {
-    ...options,
-    characterId,
-    endpointId: 'getCharacterRoles',
-  });
+  return characterGet<CharacterCorporationRoles>('getCharacterRoles', characterId, options);
 }
 
 // --- GET /characters/{character_id}/clones (esi-clones.read_clones.v1) ---
@@ -326,11 +299,7 @@ export function getCharacterClones(
   characterId: number,
   options: EndpointOptions = {}
 ): Promise<EsiResult<CharacterClones>> {
-  return esiFetch<CharacterClones>(`/characters/${characterId}/clones`, {
-    ...options,
-    characterId,
-    endpointId: 'getCharacterClones',
-  });
+  return characterGet<CharacterClones>('getCharacterClones', characterId, options);
 }
 
 // --- GET /characters/{character_id}/fatigue (esi-characters.read_fatigue.v1) ---
@@ -346,11 +315,7 @@ export function getCharacterFatigue(
   characterId: number,
   options: EndpointOptions = {}
 ): Promise<EsiResult<CharacterFatigue>> {
-  return esiFetch<CharacterFatigue>(`/characters/${characterId}/fatigue`, {
-    ...options,
-    characterId,
-    endpointId: 'getCharacterFatigue',
-  });
+  return characterGet<CharacterFatigue>('getCharacterFatigue', characterId, options);
 }
 
 // --- GET /characters/{character_id}/loyalty/points (esi-characters.read_loyalty.v1) ---
@@ -364,11 +329,7 @@ export function getCharacterLoyaltyPoints(
   characterId: number,
   options: EndpointOptions = {}
 ): Promise<EsiResult<CharacterLoyaltyPoints[]>> {
-  return esiFetch<CharacterLoyaltyPoints[]>(`/characters/${characterId}/loyalty/points`, {
-    ...options,
-    characterId,
-    endpointId: 'getCharacterLoyaltyPoints',
-  });
+  return characterGet<CharacterLoyaltyPoints[]>('getCharacterLoyaltyPoints', characterId, options);
 }
 
 // --- GET /characters/{character_id}/location (esi-location.read_location.v1) ---
@@ -383,11 +344,7 @@ export function getCharacterLocation(
   characterId: number,
   options: EndpointOptions = {}
 ): Promise<EsiResult<CharacterLocation>> {
-  return esiFetch<CharacterLocation>(`/characters/${characterId}/location`, {
-    ...options,
-    characterId,
-    endpointId: 'getCharacterLocation',
-  });
+  return characterGet<CharacterLocation>('getCharacterLocation', characterId, options);
 }
 
 // --- GET /characters/{character_id}/ship (esi-location.read_ship_type.v1) ---
@@ -402,9 +359,5 @@ export function getCharacterShip(
   characterId: number,
   options: EndpointOptions = {}
 ): Promise<EsiResult<CharacterShip>> {
-  return esiFetch<CharacterShip>(`/characters/${characterId}/ship`, {
-    ...options,
-    characterId,
-    endpointId: 'getCharacterShip',
-  });
+  return characterGet<CharacterShip>('getCharacterShip', characterId, options);
 }

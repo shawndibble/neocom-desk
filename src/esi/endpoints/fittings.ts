@@ -1,3 +1,4 @@
+import { characterGet } from './characterRequest';
 import type { KillmailVictim } from '@/engine/fittings/linkLoader';
 import { esiFetch } from '../client';
 import type { EsiResult } from '../client';
@@ -24,11 +25,7 @@ export function getCharacterFittings(
   characterId: number,
   options: EndpointOptions = {}
 ): Promise<EsiResult<CharacterFitting[]>> {
-  return esiFetch<CharacterFitting[]>(`/characters/${characterId}/fittings`, {
-    ...options,
-    characterId,
-    endpointId: 'getCharacterFittings',
-  });
+  return characterGet<CharacterFitting[]>('getCharacterFittings', characterId, options);
 }
 
 // --- POST /characters/{character_id}/fittings/ (esi-fittings.write_fittings.v1) ---

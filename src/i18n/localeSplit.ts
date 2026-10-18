@@ -62,6 +62,7 @@ export const LAZY_SECTIONS: readonly string[] = [
   'appraisalShare',
   'contractDetail',
   'loyalty',
+  'corpTaxBook',
 ];
 
 /**

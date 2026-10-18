@@ -12,11 +12,7 @@
  */
 import { getUniverseSystem, type UniverseSystem } from '@/esi/endpoints';
 import { lookupSolarSystem } from '@/sde/solarSystems';
-import { loadStaticEntity, readCached, GLOBAL_CACHE_CHARACTER_ID } from '@/esi/cache';
-
-function cacheKey(systemId: number): string {
-  return `system:${systemId}`;
-}
+import { loadStaticEntity } from '@/esi/cache';
 
 async function loadSystem(systemId: number): Promise<UniverseSystem | null> {
   // A solar system's name and security status are map constants.
@@ -37,18 +33,6 @@ export async function loadSystemSecurity(systemId: number): Promise<number | nul
   const local = await loadLocalSystem(systemId);
   if (local) return local.security;
   return (await loadSystem(systemId))?.security_status ?? null;
-}
-
-/**
- * A solar system's security status from cache only — never fetches.
- *
- * For a caller that must not spend ESI just because it noticed a system
- * (an alt's colony system, say): `null` here means "unknown", not "offline",
- * and the caller is expected to have a safe fallback for that.
- */
-export async function readCachedSystemSecurity(systemId: number): Promise<number | null> {
-  const cached = await readCached<UniverseSystem>(GLOBAL_CACHE_CHARACTER_ID, cacheKey(systemId));
-  return cached?.security_status ?? null;
 }
 
 /** A solar system's name, or null if unresolvable (offline + uncached). */

@@ -1,3 +1,4 @@
+import { characterGet } from './characterRequest';
 import { esiFetch } from '../client';
 import type { EsiResult } from '../client';
 import type { EndpointOptions } from './options';
@@ -83,11 +84,7 @@ export function getCharacterMailLabels(
   characterId: number,
   options: EndpointOptions = {}
 ): Promise<EsiResult<MailLabels>> {
-  return esiFetch<MailLabels>(`/characters/${characterId}/mail/labels`, {
-    ...options,
-    characterId,
-    endpointId: 'getCharacterMailLabels',
-  });
+  return characterGet<MailLabels>('getCharacterMailLabels', characterId, options);
 }
 
 // --- GET /characters/{character_id}/mail/lists (esi-mail.read_mail.v1) ---
@@ -102,11 +99,7 @@ export function getCharacterMailingLists(
   characterId: number,
   options: EndpointOptions = {}
 ): Promise<EsiResult<MailingList[]>> {
-  return esiFetch<MailingList[]>(`/characters/${characterId}/mail/lists`, {
-    ...options,
-    characterId,
-    endpointId: 'getCharacterMailingLists',
-  });
+  return characterGet<MailingList[]>('getCharacterMailingLists', characterId, options);
 }
 
 // --- PUT /characters/{character_id}/mail/{mail_id}/ (esi-mail.organize_mail.v1) ---
