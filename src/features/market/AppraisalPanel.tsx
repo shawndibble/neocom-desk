@@ -47,6 +47,7 @@ import * as Icon from '@/components/ui/icons';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { Caret } from '@/components/ui/Disclosure';
+import { textActionClassName } from '@/components/ui/textActionClassName';
 import { HintText } from '@/components/ui/HintText';
 import { ExternalLink } from '@/components/ui/ExternalLink';
 import { cx } from '@/lib/cx';
@@ -277,6 +278,7 @@ export function AppraisalPanel({
   const setOwnedPref = useAppraisalOwnedPref((state) => state.setValue);
   const cargo = useHaulingCargo((state) => state.value);
   const hydrateCargo = useHaulingCargo((state) => state.hydrate);
+  const setCargo = useHaulingCargo((state) => state.setValue);
   useEffect(() => {
     void hydrateRecent();
     void hydrateOwnedPref();
@@ -684,6 +686,13 @@ export function AppraisalPanel({
     </div>
   );
 
+  const summaryReady =
+    !(loading && result === null) &&
+    !failed &&
+    result !== null &&
+    totals !== undefined &&
+    rows.length > 0;
+
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-[16rem_minmax(0,1fr)] lg:items-start xl:grid-cols-[18rem_minmax(0,1fr)]">
       {pasteFolded ? (
@@ -902,6 +911,82 @@ export function AppraisalPanel({
       )}
 
       <div className="flex flex-col gap-4">
+        {summaryReady && result !== null && totals !== undefined && (
+          // No box: the totals, hold and hub comparison sit on the page ground and
+          // the table below is the only panel (DESIGN.md §6c, boxes in boxes).
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {minusOwned && (
+                <span className="w-full text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                  {ownedPref.everywhere
+                    ? t('market.appraisal.minusOwnedChipEverywhere')
+                    : t('market.appraisal.minusOwnedChip', { station: ownedStation.systemName })}
+                </span>
+              )}
+              <AppraisalHeaderStats
+                totals={totals}
+                net={net}
+                itemCount={rows.length}
+                showRefine={hasRefine}
+                showCheapest={hasLpOption}
+                implantBonusPct={implantBonusPct}
+                pricesUnavailable={result.pricesUnreachable}
+              />
+              {loading && <Spinner label={t('common.loading')} size="sm" />}
+            </div>
+
+            {cargo !== null && (
+              <AppraisalHoldBar
+                totals={totals}
+                cargo={cargo}
+                characterId={characterId}
+                onCargoChange={(next) => void setCargo(next)}
+              />
+            )}
+
+            {net && pricePercent !== 100 && (
+              <p className="text-[0.6875rem] text-text-dim">
+                {t('market.appraisal.netAlwaysAt100Note')}
+              </p>
+            )}
+
+            {net && (
+              <AssumesBaseStandingsNote hint={t('market.appraisal.assumesBaseStandingsHint')} />
+            )}
+
+            {hasRefine && refinesOreOrIce && (
+              <div className="empty:hidden">
+                <ImplantsAssumedNote hint={t('market.appraisal.refineAssumesNoImplantsHint')} />
+              </div>
+            )}
+
+            {!result.pricesUnreachable && totals.unpricedRows > 0 && (
+              <p className="text-[0.6875rem] text-warning">
+                {t('market.appraisal.unpriced', { count: totals.unpricedRows })}
+              </p>
+            )}
+            {!result.pricesUnreachable && totals.refineUnpricedRows > 0 && (
+              <p className="text-[0.6875rem] text-warning">
+                {t('market.appraisal.refineUnpriced', { count: totals.refineUnpricedRows })}
+              </p>
+            )}
+            {compare !== null && (
+              <div className="flex flex-col">
+                <button
+                  type="button"
+                  aria-expanded={compareExpanded}
+                  onClick={() => setCompareExpanded((open) => !open)}
+                  className={textActionClassName('gap-1 self-start normal-case')}
+                >
+                  {t('market.appraisal.compareHubsTitle')}
+                  <Caret expanded={compareExpanded} />
+                </button>
+                {compareExpanded && <HubCompareCards rows={compare} />}
+              </div>
+            )}
+          </div>
+        )}
+
         <Panel
           title={t('market.appraisal.resultTitle')}
           headingRef={resultHeadingRef}
@@ -1021,63 +1106,6 @@ export function AppraisalPanel({
                   </Button>
                 </div>
               )}
-              <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
-                {minusOwned && (
-                  <span className="w-full text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                    {ownedPref.everywhere
-                      ? t('market.appraisal.minusOwnedChipEverywhere')
-                      : t('market.appraisal.minusOwnedChip', { station: ownedStation.systemName })}
-                  </span>
-                )}
-                <AppraisalHeaderStats
-                  totals={totals}
-                  net={net}
-                  itemCount={rows.length}
-                  showRefine={hasRefine}
-                  showCheapest={hasLpOption}
-                  implantBonusPct={implantBonusPct}
-                  pricesUnavailable={result.pricesUnreachable}
-                />
-                {loading && <Spinner label={t('common.loading')} size="sm" />}
-              </div>
-
-              {cargo !== null && <AppraisalHoldBar totals={totals} cargo={cargo} />}
-
-              {net && pricePercent !== 100 && (
-                <p className="border-b border-line px-3 py-2 text-[0.6875rem] text-text-dim">
-                  {t('market.appraisal.netAlwaysAt100Note')}
-                </p>
-              )}
-
-              {net && (
-                <AssumesBaseStandingsNote
-                  className="border-b border-line px-3"
-                  hint={t('market.appraisal.assumesBaseStandingsHint')}
-                />
-              )}
-
-              {hasRefine && refinesOreOrIce && (
-                <div className="border-b border-line px-3 empty:hidden">
-                  <ImplantsAssumedNote hint={t('market.appraisal.refineAssumesNoImplantsHint')} />
-                </div>
-              )}
-
-              {!result.pricesUnreachable && totals.unpricedRows > 0 && (
-                <p className="border-b border-line px-3 py-2 text-[0.6875rem] text-warning">
-                  {t('market.appraisal.unpriced', { count: totals.unpricedRows })}
-                </p>
-              )}
-              {!result.pricesUnreachable && totals.refineUnpricedRows > 0 && (
-                <p className="border-b border-line px-3 py-2 text-[0.6875rem] text-warning">
-                  {t('market.appraisal.refineUnpriced', { count: totals.refineUnpricedRows })}
-                </p>
-              )}
-              {totals.cheapestBuyViaLp > 0 && (
-                <p className="border-b border-line px-3 py-2 text-[0.6875rem] text-text-dim">
-                  {t('market.appraisal.cheapestBuyViaLp', { count: totals.cheapestBuyViaLp })}
-                </p>
-              )}
-
               {/* A card a little narrower than the table's own minimum scrolls here instead of pushing past its column (#2949). */}
               <div className="min-w-0 overflow-x-auto">
                 <DataTable
@@ -1099,37 +1127,6 @@ export function AppraisalPanel({
             </>
           )}
         </Panel>
-
-        {compare !== null && (
-          // Deliberately not a panel: the hub cards are panel surfaces
-          // themselves, so framing them put a box around five boxes. The fold
-          // survives as a bare caret-plus-heading row on the page ground — the
-          // leading caret stays its own `IconButton` rather than swallowing the
-          // heading, so the toggle's accessible name is not an `aria-label`
-          // overriding visible text (WCAG 2.5.3).
-          <section aria-labelledby="market-appraisal-compare-hubs">
-            <div className="flex min-h-9 items-center gap-1">
-              <IconButton
-                size="sm"
-                icon={<Caret expanded={compareExpanded} />}
-                label={
-                  compareExpanded
-                    ? t('market.appraisal.compareHubsHide')
-                    : t('market.appraisal.compareHubsShow')
-                }
-                aria-expanded={compareExpanded}
-                onClick={() => setCompareExpanded((open) => !open)}
-              />
-              <h2
-                id="market-appraisal-compare-hubs"
-                className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
-              >
-                {t('market.appraisal.compareHubsTitle')}
-              </h2>
-            </div>
-            {compareExpanded && <HubCompareCards rows={compare} />}
-          </section>
-        )}
       </div>
     </div>
   );

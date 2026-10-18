@@ -7,7 +7,7 @@
  * The popover body mounts only when opened, so the catalogue and saved
  * Fittings it reads cost nothing to a visit that never picks a ship.
  */
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -55,43 +55,31 @@ function formatM3(m3: number): string {
   return `${Math.round(m3).toLocaleString()} m³`;
 }
 
-export function HaulingCargoControl({
+/**
+ * The picker popover around any trigger. The page-level button and the
+ * Appraisal hold line's ship name are two triggers for the one picker.
+ */
+export function HaulingCargoPopover({
   characterId,
   cargo,
   onCargoChange,
-}: HaulingCargoControlProps) {
-  const { t } = useTranslation();
+  triggerClassName,
+  triggerLabel,
+  align = 'end',
+  children,
+}: HaulingCargoControlProps & {
+  triggerClassName: string;
+  triggerLabel: string;
+  align?: 'start' | 'end';
+  children: ReactNode;
+}) {
   const [open, setOpen] = useState(false);
-
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger
-        // Gives way first when the summary bar is short of room (a phone, or a
-        // tablet with the rail open): in a bar under 30rem the m³ goes, since
-        // the bar's hold meter prints it beside the button, and past that the
-        // name truncates on one line rather than wrapping inside a
-        // fixed-height button.
-        className={buttonClassName({
-          variant: cargo === null ? 'primary' : 'ghost',
-          size: 'sm',
-          className: 'min-w-0',
-        })}
-        aria-label={t('market.hauling.cargo.label')}
-      >
-        <span className="truncate">
-          {cargo === null ? (
-            t('market.hauling.cargo.choose')
-          ) : (
-            <>
-              {cargo.label}
-              <span className="@max-[30rem]:hidden">
-                {t('market.hauling.cargo.chosenM3', { m3: formatM3(totalCargoM3(cargo)) })}
-              </span>
-            </>
-          )}
-        </span>
+      <PopoverTrigger className={triggerClassName} aria-label={triggerLabel}>
+        {children}
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-[min(24rem,calc(100vw-2rem))] p-3">
+      <PopoverContent align={align} className="w-[min(24rem,calc(100vw-2rem))] p-3">
         {open && (
           <CargoPickerBody
             characterId={characterId}
@@ -108,6 +96,45 @@ export function HaulingCargoControl({
         )}
       </PopoverContent>
     </Popover>
+  );
+}
+
+export function HaulingCargoControl({
+  characterId,
+  cargo,
+  onCargoChange,
+}: HaulingCargoControlProps) {
+  const { t } = useTranslation();
+  return (
+    <HaulingCargoPopover
+      characterId={characterId}
+      cargo={cargo}
+      onCargoChange={onCargoChange}
+      triggerLabel={t('market.hauling.cargo.label')}
+      // Gives way first when the summary bar is short of room (a phone, or a
+      // tablet with the rail open): in a bar under 30rem the m³ goes, since
+      // the bar's hold meter prints it beside the button, and past that the
+      // name truncates on one line rather than wrapping inside a
+      // fixed-height button.
+      triggerClassName={buttonClassName({
+        variant: cargo === null ? 'primary' : 'ghost',
+        size: 'sm',
+        className: 'min-w-0',
+      })}
+    >
+      <span className="truncate">
+        {cargo === null ? (
+          t('market.hauling.cargo.choose')
+        ) : (
+          <>
+            {cargo.label}
+            <span className="@max-[30rem]:hidden">
+              {t('market.hauling.cargo.chosenM3', { m3: formatM3(totalCargoM3(cargo)) })}
+            </span>
+          </>
+        )}
+      </span>
+    </HaulingCargoPopover>
   );
 }
 

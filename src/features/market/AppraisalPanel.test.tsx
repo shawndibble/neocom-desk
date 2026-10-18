@@ -476,8 +476,8 @@ describe('AppraisalPanel', () => {
     }));
 
     async function compareCards() {
-      const toggle = await screen.findByRole('button', { name: /hub comparison/i });
-      if (toggle.getAttribute('aria-label')?.startsWith('Show')) {
+      const toggle = await screen.findByRole('button', { name: 'Compare hubs' });
+      if (toggle.getAttribute('aria-expanded') === 'false') {
         await userEvent.click(toggle);
       }
       return screen.findByRole('list', { name: 'Compare hubs' });
@@ -1531,6 +1531,16 @@ describe('AppraisalPanel — shopping list (#2868)', () => {
     renderPanel({ controller: controller({ result: outcome() }) });
     expect(screen.getByTestId('hold-bar')).toHaveTextContent('1,255.5 of 1,000 m³');
     expect(screen.getByText('Does not fit in one trip.')).toBeInTheDocument();
+  });
+
+  it('opens the cargo picker from the ship name on the hold bar', async () => {
+    useHaulingCargo.setState({
+      value: { label: 'Charon', holds: [{ kind: 'general', capacityM3: 1_000 }] },
+      hydrated: true,
+    });
+    renderPanel({ controller: controller({ result: outcome() }) });
+    await userEvent.click(screen.getByRole('button', { name: /Charon: change ship/i }));
+    expect(await screen.findByText('Enter m³')).toBeInTheDocument();
   });
 });
 

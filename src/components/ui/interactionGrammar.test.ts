@@ -142,7 +142,7 @@ describe('interaction grammar source guards (DESIGN.md §6c)', () => {
     expect(offendersOf((src) => /target=["{'`]*_blank/.test(src))).toEqual([]);
   });
 
-  it('uses a dotted underline only in HintText, and a dashed one nowhere', () => {
+  it('uses a dotted underline only in HintText, and a dashed one only in the ui primitives', () => {
     expect(offendersOf((src) => /decoration-dotted|\bunderline-dotted/.test(src))).toEqual([]);
     expect(offendersOf((src) => /decoration-dashed|\bunderline-dashed/.test(src))).toEqual([]);
   });
