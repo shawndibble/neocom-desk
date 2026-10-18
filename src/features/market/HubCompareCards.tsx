@@ -86,11 +86,11 @@ function HubFigure({
   onCopied: () => void;
 }) {
   return (
-    <div>
+    <div className="flex items-baseline gap-1.5">
       <dt className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
         {label}
       </dt>
-      <dd className="text-base text-text tabular-nums">
+      <dd className="text-sm text-text tabular-nums">
         {value === null ? '—' : <CopyableTotal value={value} copied={copied} onCopied={onCopied} />}
       </dd>
     </div>
@@ -117,35 +117,23 @@ export function HubCompareCards({ rows }: { rows: readonly HubComparisonRow[] })
   return (
     <>
       {/*
-        The cards are the panel surfaces here — `bg-panel/85` on a hairline,
-        DESIGN.md §1's glass treatment — because there is no outer panel around
-        them any more. They sit straight on the page ground, like the result
-        `Panel` above them.
-
-        One column on a phone, three from `sm`, all five from `lg` — which is
-        also where the paste box becomes a 21rem sidebar, so the results track
-        narrows at the same breakpoint the card count grows. Five tracks in
-        that ~640px track is ~120px of content each: enough for a compact ISK
-        figure, and a label that wraps to two lines at the very bottom of the
-        range simply makes the row of cards taller rather than breaking.
-
-        `min-w-0` on the grid and every card: a grid item's default `min-width`
-        is its content's intrinsic width, so without it a long figure widens
-        its track instead of being contained.
+        Flat rows, not cards: the table below is the page's only box, so a hub
+        is a hairline-divided row (name, then sell and buy) on the page ground.
+        Rows wrap on a phone rather than breaking.
       */}
       <ul
         aria-label={t('market.appraisal.compareHubsTitle')}
-        className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-3 lg:grid-cols-5"
+        className="min-w-0 divide-y divide-line border-t border-line"
       >
         {rows.map((row) => (
           <li
             key={row.hub.id}
-            className="min-w-0 rounded-xs border border-line bg-panel/85 p-3 backdrop-blur-sm"
+            className="flex min-w-0 flex-wrap items-baseline gap-x-6 gap-y-0.5 px-3 py-1.5"
           >
-            <p className="truncate text-sm font-semibold">
+            <p className="w-24 shrink-0 truncate text-sm font-semibold">
               <SystemLink systemId={row.hub.systemId}>{row.hub.systemName}</SystemLink>
             </p>
-            <dl className="mt-2 flex flex-col gap-2">
+            <dl className="flex flex-wrap gap-x-6 gap-y-0.5">
               <HubFigure
                 label={t('market.appraisal.sellTotal')}
                 value={row.sell}
@@ -160,7 +148,7 @@ export function HubCompareCards({ rows }: { rows: readonly HubComparisonRow[] })
               />
             </dl>
             {row.unreachable && (
-              <p className="mt-2 text-[0.6875rem] text-text-dim">{pricesUnavailableLabel}</p>
+              <p className="text-[0.6875rem] text-text-dim">{pricesUnavailableLabel}</p>
             )}
           </li>
         ))}
