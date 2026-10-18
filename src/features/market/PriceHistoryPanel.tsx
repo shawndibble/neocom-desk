@@ -35,6 +35,7 @@ import {
   type RegionOpenSeries,
 } from '@/engine/market/priceHistoryOpen';
 import { loadMarketOpenPrices } from './marketOpenPrices';
+import { seriesChoiceLabel } from './priceHistoryLabels';
 import { usePriceHistoryRange } from './priceHistoryRangePref';
 import { usePriceHistorySeries } from './priceHistorySeriesPref';
 import { marketIskDecimals } from '@/lib/isk';
@@ -153,6 +154,9 @@ function useComparedHistories(typeId: number, regionIds: readonly number[]) {
  * the history is open). `loadMarketOpenPrices` never throws; a region without
  * a series maps to `null`, and one still being read is absent from the map.
  * The chart draws its average line for either until the series lands.
+ * A read that came back `null` is not retried for the life of the panel (and
+ * the loader holds a good answer for an hour, never a failure): a failed read
+ * simply leaves that region on its average line until the panel is reopened.
  */
 function useOpenSeries(typeId: number, regionIds: readonly number[]) {
   const [byKey, setByKey] = useState<ReadonlyMap<string, OpenPriceSeries | null>>(new Map());
@@ -511,9 +515,7 @@ function RangedHistory({
               <SelectContent>
                 {PRICE_SERIES_CHOICES.map((choice) => (
                   <SelectItem key={choice} value={choice}>
-                    {t(
-                      `market.priceHistory.series${choice === 'both' ? 'Both' : choice === 'buy' ? 'Buy' : 'Sell'}`
-                    )}
+                    {seriesChoiceLabel(t, choice)}
                   </SelectItem>
                 ))}
               </SelectContent>

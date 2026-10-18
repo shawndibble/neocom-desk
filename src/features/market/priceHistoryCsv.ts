@@ -1,8 +1,11 @@
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
 import type { MarketHistoryPoint } from '@/engine/market/priceHistory';
+import { openSideLabel } from './priceHistoryLabels';
 
 /** A day of the primary region's history, with each compared region's average that day keyed by region id. */
-export interface PriceHistoryTableRow extends MarketHistoryPoint {
+export interface PriceHistoryTableRow extends Partial<Omit<MarketHistoryPoint, 'date'>> {
+  /** A day with an open price but no ESI trade has a date and nothing else of ESI's. */
+  date: string;
   comparison?: Readonly<Record<number, number>>;
   /** Each region's open buy and sell that day, by region id (the primary region's included). */
   buy?: Readonly<Record<number, number>>;
@@ -39,17 +42,13 @@ export function priceHistoryCsvColumns(
   compared: readonly ComparedRegionLabel[] = [],
   openRegions: readonly OpenRegionLabel[] = []
 ): CsvColumn<PriceHistoryTableRow>[] {
-  const sideHeader = (side: 'Buy' | 'Sell', name?: string) =>
-    name
-      ? t(`market.priceHistory.region${side}`, { region: name })
-      : t(`market.priceHistory.open${side}`);
   return [
     { header: t('market.priceHistory.date'), value: (p) => `${p.date}T00:00:00Z` },
     { header: t('market.priceHistory.average'), value: (p) => p.average },
     // The open prices, then the day's trade facts: blank where no order stood.
     ...openRegions.flatMap(({ regionId, name }): CsvColumn<PriceHistoryTableRow>[] => [
-      { header: sideHeader('Buy', name), value: (p) => p.buy?.[regionId] },
-      { header: sideHeader('Sell', name), value: (p) => p.sell?.[regionId] },
+      { header: openSideLabel(t, 'buy', name), value: (p) => p.buy?.[regionId] },
+      { header: openSideLabel(t, 'sell', name), value: (p) => p.sell?.[regionId] },
     ]),
     { header: t('market.priceHistory.summaryLo'), value: (p) => p.lowest },
     { header: t('market.priceHistory.summaryHi'), value: (p) => p.highest },

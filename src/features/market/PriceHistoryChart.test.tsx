@@ -334,6 +334,27 @@ describe('PriceHistoryChart', () => {
       expect(within(legend).queryByText('Domain average')).not.toBeInTheDocument();
     });
 
+    it('tables a day that has an open price but no ESI trade, with dashes for the trade figures', () => {
+      render(
+        <PriceHistoryChart
+          points={POINTS}
+          itemName="Tritanium"
+          primaryRegionId={10000002}
+          openPrices={[
+            {
+              regionId: 10000002,
+              points: [{ date: '2026-07-30', buy: 7, sell: 8 }, ...FORGE_OPEN.points],
+            },
+          ]}
+        />
+      );
+      const rows = within(screen.getByRole('table')).getAllByRole('row');
+      // Header, the open-only day, and the two ESI days.
+      expect(rows).toHaveLength(4);
+      expect(within(rows[1]).getByText('2026-07-30')).toBeInTheDocument();
+      expect(within(rows[1]).getAllByText('—').length).toBeGreaterThan(0);
+    });
+
     it('hides and shows table columns through the Columns menu, leaving the export whole', async () => {
       const user = userEvent.setup();
       render(
