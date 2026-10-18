@@ -96,3 +96,11 @@ describe('runBackfill', () => {
     expect(d.log).toHaveBeenCalledWith(expect.stringContaining('resume with --from 2026-10-03'));
   });
 });
+
+describe('parseArgs --yes / --dry-run', () => {
+  it('reads --yes and lets --dry-run turn writing off', () => {
+    const base = ['--from', '2026-10-01', '--to', '2026-10-03'];
+    expect(parseArgs([...base, '--write', '--project', 'p', '--yes'])).toMatchObject({ yes: true });
+    expect(parseArgs([...base, '--write', '--project', 'p', '--dry-run']).write).toBe(false);
+  });
+});

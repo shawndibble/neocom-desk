@@ -11,6 +11,8 @@ import {
   mergeDays,
   openPriceDocId,
   pickLastSnapshotUrl,
+  regionCounts,
+  shrunkRegion,
   previousUtcDate,
 } from './marketOpenPrices.js';
 
@@ -198,5 +200,26 @@ describe('groupByDocument', () => {
       },
       { regionId: DOMAIN, typeId: 34, days: [{ date: '2026-10-02', buy: 3, sell: null }] },
     ]);
+  });
+});
+
+describe('shrunkRegion', () => {
+  const fold = new OpenPriceFold([FORGE, DOMAIN]);
+  for (let t = 0; t < 10; t++) fold.add(FORGE, t, true, 1);
+  for (let t = 0; t < 4; t++) fold.add(DOMAIN, t, true, 1);
+
+  it('has nothing to compare on a first run or a missing region', () => {
+    expect(shrunkRegion(fold, null)).toBeNull();
+    expect(shrunkRegion(fold, {})).toBeNull();
+  });
+  it('passes counts at or above half of the previous run', () => {
+    expect(shrunkRegion(fold, { [FORGE]: 20, [DOMAIN]: 8 })).toBeNull();
+  });
+  it('names a region that fell under half', () => {
+    expect(shrunkRegion(fold, { [FORGE]: 20, [DOMAIN]: 9 })).toContain(String(DOMAIN));
+    expect(shrunkRegion(fold, { [FORGE]: 21 })).toContain(String(FORGE));
+  });
+  it('regionCounts keys by region id', () => {
+    expect(regionCounts(fold)).toEqual({ [FORGE]: 10, [DOMAIN]: 4 });
   });
 });

@@ -23,7 +23,13 @@ export const MARKET_OPEN_PRICES_REGION_IDS: readonly number[] = [
   10000002, 10000043, 10000032, 10000030, 10000042,
 ];
 
-/** A day's snapshot below this many region/type pairs, overall or in any tracked region, is treated as a broken download. */
+/**
+ * A day's snapshot with fewer priced types than this in any tracked region is
+ * treated as a broken download. The smallest tracked regions (Domain, Sinq
+ * Laison, Heimatar, Metropolis) measured 11k to 17k priced types on a real day,
+ * so 2,000 cannot block a healthy region; it only catches a near-empty file.
+ * The comparison with the previous run (`shrunkRegion`) catches a half-sized one.
+ */
 export const MIN_PAIRS_PER_REGION = 2000;
 
 const EVEREF_ORDERS_BASE = 'https://data.everef.net/market-orders/history';
@@ -159,6 +165,35 @@ export function implausibleReason(fold: OpenPriceFold, minPerRegion = MIN_PAIRS_
   for (const [regionId, count] of fold.pairsByRegion()) {
     if (count < minPerRegion) {
       return `region ${regionId} has ${count} priced types, expected at least ${minPerRegion}`;
+    }
+  }
+  return null;
+}
+
+/** Doc `marketOpenPricesMeta/lastRun`: what the last published day looked like, for `shrunkRegion`. Admin-only (no rule matches it). */
+export const MARKET_OPEN_PRICES_META_PATH = 'marketOpenPricesMeta/lastRun';
+
+/** Priced-type count per region, as stored in the meta doc (string keys: Firestore field names). */
+export function regionCounts(fold: OpenPriceFold): Record<string, number> {
+  return Object.fromEntries([...fold.pairsByRegion()].map(([id, n]) => [String(id), n]));
+}
+
+/**
+ * The second 'publish nothing' guard: names a tracked region whose priced-type
+ * count fell under `minShare` of the previous published day's, or `null`. No
+ * previous counts (first run) means nothing to compare. A real, lasting drop
+ * must be accepted by deleting the meta doc.
+ */
+export function shrunkRegion(
+  fold: OpenPriceFold,
+  previous: Record<string, unknown> | null | undefined,
+  minShare = 0.5
+): string | null {
+  if (!previous) return null;
+  for (const [regionId, count] of fold.pairsByRegion()) {
+    const before = previous[String(regionId)];
+    if (typeof before === 'number' && before > 0 && count < before * minShare) {
+      return `region ${regionId} has ${count} priced types, under ${minShare * 100}% of the previous run's ${before}`;
     }
   }
   return null;

@@ -11,12 +11,20 @@ import {
 
 export const DEFAULT_CHUNK_DAYS = 30;
 
-export const USAGE = `Usage: node scripts/backfill-market-open-prices.mjs --from YYYY-MM-DD --to YYYY-MM-DD [--project <id>] [--chunk-days 30] [--write]
+export const USAGE = `Usage: node scripts/backfill-market-open-prices.mjs --from YYYY-MM-DD --to YYYY-MM-DD [--project <id>] [--chunk-days 30] [--write [--yes]] [--dry-run]
+--dry-run (the default) folds each day and writes nothing. --write asks you to type the project id before the first write; --yes skips that prompt.
 Dry run unless --write is given. --write also needs --project and GOOGLE_APPLICATION_CREDENTIALS.`;
 
 /** @param {string[]} argv */
 export function parseArgs(argv) {
-  const out = { from: '', to: '', project: '', chunkDays: DEFAULT_CHUNK_DAYS, write: false };
+  const out = {
+    from: '',
+    to: '',
+    project: '',
+    chunkDays: DEFAULT_CHUNK_DAYS,
+    write: false,
+    yes: false,
+  };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     const value = () => {
@@ -29,6 +37,7 @@ export function parseArgs(argv) {
     else if (arg === '--project') out.project = value();
     else if (arg === '--chunk-days') out.chunkDays = Number(value());
     else if (arg === '--write') out.write = true;
+    else if (arg === '--yes') out.yes = true;
     else if (arg === '--dry-run') out.write = false;
     else throw new Error(`unknown argument ${arg}`);
   }
