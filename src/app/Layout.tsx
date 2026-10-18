@@ -466,7 +466,6 @@ export const Layout = memo(function Layout() {
               open={moreOpen}
               onClose={() => setMoreOpen(false)}
               locked={locked}
-              tabs={tabs}
               renderCharacterLink={(originPath) => (
                 <CharacterFooterLink
                   activeCharacter={activeCharacter}

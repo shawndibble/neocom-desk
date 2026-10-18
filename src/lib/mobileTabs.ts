@@ -15,10 +15,8 @@
  *   desktop rail's order with gaps in it — one order to learn, not two — so
  *   `sortMobileTabs` re-sorts whatever the Settings chips hand over.
  *
- * The More sheet renders `mobileSheetPaths` — the complement — so a path is in
- * exactly one of the two places, by construction rather than by upkeep: two
- * hand-kept lists eventually leave a route in neither, which on a phone means
- * unreachable.
+ * The More sheet lists every page, bar pages included: it covers the bar, and
+ * one complete list cannot leave a route in neither place.
  */
 import { NAV_PAGES, navPageLabelKey } from '@/app/navDestinations';
 import { createLocalSetting } from './useLocalSetting';
@@ -83,11 +81,6 @@ export function sortMobileTabs(paths: readonly MobileTabPath[]): MobileTabPath[]
  */
 export function barTabs(tabs: readonly MobileTabPath[]): MobileTabPath[] {
   return parseMobileTabs([...tabs]) ?? [...DEFAULT_MOBILE_TABS];
-}
-
-/** The sheet's rows: everything the bar does not hold, in canonical order. */
-export function mobileSheetPaths(tabs: readonly MobileTabPath[]): MobileTabPath[] {
-  return MOBILE_TAB_CHOICES.filter((path) => !tabs.includes(path));
 }
 
 /**
