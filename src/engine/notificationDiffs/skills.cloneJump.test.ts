@@ -1,11 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import {
-  diffCloneJumpReady,
-  type CloneJumpEntrySnapshot,
-  type CloneJumpReadyFire,
-} from './notificationDiffs';
-import { occurrenceKey, occurrenceFiredAt } from './occurrenceKey';
-import { projectCloneJump, projectionWording, PROJECTION_HORIZON_MS } from './projection';
+import { diffCloneJumpReady, type CloneJumpEntrySnapshot, type CloneJumpReadyFire } from './index';
+import { occurrenceKey, occurrenceFiredAt } from '../occurrenceKey';
+import { projectCloneJump, projectionWording, PROJECTION_HORIZON_MS } from '../projection';
 
 const HOUR = 3_600_000;
 const T0 = 1_800_000_000_000;
