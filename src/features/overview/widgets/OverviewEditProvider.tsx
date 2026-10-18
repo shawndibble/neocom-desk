@@ -31,6 +31,7 @@ import {
   setRange,
   setRowsPerPage,
   setPlexPer30Days,
+  setCalendarEvents,
   setScope,
   setShowOnPhone,
   setView,
@@ -196,6 +197,7 @@ export function OverviewEditProvider({
       setRange: (id, range) => commit(setRange(layoutRef.current, id, range)),
       setRowsPerPage: (id, rows) => commit(setRowsPerPage(layoutRef.current, id, rows)),
       setPlexPer30Days: (id, plex) => commit(setPlexPer30Days(layoutRef.current, id, plex)),
+      setCalendarEvents: (id, choice) => commit(setCalendarEvents(layoutRef.current, id, choice)),
       rename: (id, title) => commit(renameWidget(layoutRef.current, id, title)),
       setShowOnPhone: (id, show) => commit(setShowOnPhone(layoutRef.current, id, show)),
     };

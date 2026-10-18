@@ -36,8 +36,31 @@ export function soonestCalendarDeadline(
   return soonest;
 }
 
-export interface CommittedCalendarEvent extends CalendarDeadlineItem {
+export interface UpcomingCalendarEvent extends CalendarDeadlineItem {
+  response: CalendarEventSummary['event_response'];
+}
+
+export interface CommittedCalendarEvent extends UpcomingCalendarEvent {
   response: 'accepted' | 'tentative';
+}
+
+/** Every event still ahead whatever the pilot answered, soonest first: the Coming up card's "All events" choice. */
+export function upcomingEvents(
+  events: readonly CalendarEventSummary[],
+  nowMs: number
+): UpcomingCalendarEvent[] {
+  const upcoming: UpcomingCalendarEvent[] = [];
+  for (const event of events) {
+    const atMs = parseInstant(event.event_date);
+    if (atMs === null || atMs <= nowMs) continue;
+    upcoming.push({
+      eventId: event.event_id,
+      atMs,
+      title: event.title,
+      response: event.event_response,
+    });
+  }
+  return upcoming.sort((a, b) => a.atMs - b.atMs);
 }
 
 /**

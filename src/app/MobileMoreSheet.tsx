@@ -111,19 +111,24 @@ export function MobileMoreSheet({
 
   const navBadge = useNavBadges();
   // Corp is in `groups` only while visible (`inSheet`), and never locked.
-  const tile = (page: NavPage) => {
+  const tile = (page: NavPage, presentation: 'tile' | 'bar' = 'tile') => {
+    const bar = presentation === 'bar';
+    // Edit mode overlays the hide toggle: a tile's corner, a bar's trailing
+    // edge, with the bar's padding making room so it never covers the label.
+    const editable = editing && canHide(page.path);
     const link = (
       <NavItem
         key={page.path}
         to={page.path}
         label={t(page.labelKey)}
         locked={page.gating === 'scope' && locked.has(page.path)}
-        presentation="tile"
+        presentation={presentation}
+        className={bar && editable ? 'pr-12' : undefined}
         onClick={onClose}
         {...navBadge(page.path)}
       />
     );
-    if (!editing || !canHide(page.path)) return link;
+    if (!editable) return link;
     const pageHidden = hiddenSet.has(page.path);
     return (
       <div key={page.path} className="relative">
@@ -132,14 +137,19 @@ export function MobileMoreSheet({
           <Icon.NavHidden
             aria-hidden="true"
             size={Icon.ICON_SIZE.sm}
-            className="pointer-events-none absolute top-1.5 left-1.5 text-text-dim"
+            className={cx(
+              'pointer-events-none absolute text-text-dim',
+              bar ? 'top-1/2 right-11 -translate-y-1/2' : 'top-1.5 left-1.5'
+            )}
           />
         )}
         <NavHideToggle
           path={page.path}
           label={t(page.labelKey)}
           hidden={pageHidden}
-          className="absolute bottom-0.5 left-0.5"
+          className={
+            bar ? 'absolute top-1/2 right-0.5 -translate-y-1/2' : 'absolute bottom-0.5 left-0.5'
+          }
         />
       </div>
     );
@@ -205,7 +215,14 @@ export function MobileMoreSheet({
                 {t(group.labelKey)}
               </h3>
             )}
-            <div className={TILE_GRID}>{group.pages.map(tile)}</div>
+            {group.labelKey === null ? (
+              // The headless group: one or two short rows rather than tiles.
+              <div className={cx('grid gap-1.5', group.pages.length > 1 && 'grid-cols-2')}>
+                {group.pages.map((page) => tile(page, 'bar'))}
+              </div>
+            ) : (
+              <div className={TILE_GRID}>{group.pages.map((page) => tile(page))}</div>
+            )}
           </section>
         ))}
 
@@ -234,7 +251,7 @@ export function MobileMoreSheet({
               </span>
               <Caret expanded={showHidden} />
             </button>
-            {showHidden && <div className={TILE_GRID}>{hiddenPages.map(tile)}</div>}
+            {showHidden && <div className={TILE_GRID}>{hiddenPages.map((page) => tile(page))}</div>}
           </div>
         )}
 

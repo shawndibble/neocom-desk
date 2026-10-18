@@ -10,7 +10,14 @@
  * which is what a widget rendered alone (a test, the Gallery's preview) wants.
  */
 import { createContext, useContext } from 'react';
-import type { OverviewLayout, WidgetRange, WidgetScope, WidgetSize, WidgetView } from './layout';
+import type {
+  CalendarEventsChoice,
+  OverviewLayout,
+  WidgetRange,
+  WidgetScope,
+  WidgetSize,
+  WidgetView,
+} from './layout';
 import type { RowsPerPage } from './tableSortPage';
 
 export interface OverviewEditActions {
@@ -32,6 +39,7 @@ export interface OverviewEditActions {
   setRange: (id: string, range: WidgetRange) => void;
   setRowsPerPage: (id: string, rows: RowsPerPage) => void;
   setPlexPer30Days: (id: string, plex: number) => void;
+  setCalendarEvents: (id: string, choice: CalendarEventsChoice) => void;
   rename: (id: string, title: string) => void;
   setShowOnPhone: (id: string, show: boolean) => void;
 }
@@ -71,6 +79,7 @@ export const OverviewEditContext = createContext<OverviewEdit>({
   setRange: none,
   setRowsPerPage: none,
   setPlexPer30Days: none,
+  setCalendarEvents: none,
   rename: none,
   setShowOnPhone: none,
 });
