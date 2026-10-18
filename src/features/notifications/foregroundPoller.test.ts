@@ -1371,6 +1371,37 @@ describe('runForegroundPoll', () => {
       expect(reviseContractFeedRow.mock.calls[0][0]).toMatchObject({ walletChangeIsk: 300 });
     });
 
+    it('does not fetch the journal for a contract alert when folding is off', async () => {
+      const loadWalletJournal = vi.fn(async () => [contractLine(6, 300)]);
+      const deps = baseDeps({
+        grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, WALLET_SCOPE, CONTRACTS_SCOPE]),
+        feedChannelEnabled: async () => true,
+        eventPrefsFor: async () => ({ walletBalanceChanged: false }),
+        walletFoldEnabled: async () => false,
+        loadWalletJournal,
+      });
+      await runForegroundPoll(deps);
+      expect(loadWalletJournal).not.toHaveBeenCalled();
+    });
+
+    it('drops a small contract line with no carrier, and keeps a wallet alert only above the minimum', async () => {
+      const recordToFeed = vi.fn<PollDependencies['recordToFeed']>(async () => {});
+      const deps = baseDeps({
+        grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, WALLET_SCOPE, CONTRACTS_SCOPE]),
+        feedChannelEnabled: async () => true,
+        prevWalletState: async () => walletBaseline,
+        loadWalletJournal: async () => [
+          { ...contractLine(7, 40), thresholdIsk: 1_000 },
+          contractLine(6, 5_000),
+          walletJournalEntry({ id: 5 }),
+        ],
+        recordToFeed,
+      });
+      await runForegroundPoll(deps);
+      expect(recordToFeed).toHaveBeenCalledTimes(1);
+      expect(recordToFeed.mock.calls[0][0]).toMatchObject({ journalEntryId: 6 });
+    });
+
     it('still raises the wallet alert when no contract alert exists to carry it', async () => {
       const recordToFeed = vi.fn<PollDependencies['recordToFeed']>(async () => {});
       const deps = baseDeps({

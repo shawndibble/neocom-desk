@@ -43,3 +43,5 @@ _Recorded 2026-10-17._
   own (event on, at or above the minimum).
 
 Review follow-ups: a later poll's lines are added to the amount the feed row already carries (kept on the row as local `walletChangeIsk`), a dismissed row no longer counts as carrying the alert, and browser toasts fold only within one poll — a toast already shown cannot be revised, so a line arriving later stays its own wallet toast.
+
+Fetching the journal for a contract alert also saves the wallet baseline when Wallet Balance Changed is off. Turning that event on later alerts only on lines newer than that baseline.

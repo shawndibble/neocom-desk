@@ -203,13 +203,14 @@ function reachesAnyChannel(
   );
 }
 
+/** The contract events whose alerts can carry a wallet line (`ContractCauseEventId`). */
+const CONTRACT_CAUSE_EVENTS = ['contractAccepted', 'contractCompleted', 'contractFailed'] as const;
+
 /**
  * Which of a set of candidate events this character is eligible for right
  * now: has the scope (or, for `priceAlertTriggered`, needs none at all — see
  * `NotificationEventDef.scope`), and reaches at least one live channel.
  */
-const CONTRACT_CAUSE_EVENTS = ['contractAccepted', 'contractCompleted', 'contractFailed'] as const;
-
 function enabledEventsFor(
   eventIds: readonly NotificationEventId[],
   scopes: ReadonlySet<string>,

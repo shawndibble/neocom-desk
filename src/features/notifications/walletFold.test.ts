@@ -143,4 +143,17 @@ describe('foldWalletFires', () => {
     expect(result.feedFires).toEqual([big]);
     expect(result.revisions).toEqual([]);
   });
+
+  it('with folding off and the wallet event off, nothing is heard', async () => {
+    const result = await foldWalletFires({
+      fires: [wallet(1, 900)],
+      isEnabled: () => true,
+      rowExists: async () => true,
+      nowMs: NOW,
+      foldEnabled: false,
+      walletStandalone: false,
+    });
+    expect(result.feedFires).toEqual([]);
+    expect(result.browserFires).toEqual([]);
+  });
 });
