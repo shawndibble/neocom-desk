@@ -42,7 +42,8 @@ describe('foldWalletFires', () => {
       nowMs: NOW,
     });
     expect(result.feedFires).toEqual([]);
-    expect(result.browserFires).toEqual([]);
+    // A toast already shown cannot take the amount, so the browser keeps its own.
+    expect(result.browserFires).toEqual([wallet(1, 100), wallet(2, -5)]);
     expect(result.revisions).toEqual([
       { eventId: 'contractCompleted', characterId: 7, contractId: 55, walletChangeIsk: 95 },
     ]);

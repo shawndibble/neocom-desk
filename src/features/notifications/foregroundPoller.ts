@@ -587,6 +587,9 @@ async function recordFeedNotification(
       ...(fire.eventId === 'marketOrderFilled' && fire.fillMatch !== undefined
         ? { fillMatch: fire.fillMatch }
         : {}),
+      ...('walletChangeIsk' in fire && fire.walletChangeIsk !== undefined
+        ? { walletChangeIsk: fire.walletChangeIsk }
+        : {}),
     });
   } catch {
     // Same fire-and-forget contract as sendBrowserNotification: pollerState
@@ -607,16 +610,25 @@ async function reviseContractFeedRow(
 ): Promise<void> {
   try {
     const key = occurrenceKey(fire, Date.now());
-    const { body } = await renderNotification(fire, character.name);
-    const changed = await db.notificationFeed
-      .where('id')
-      .equals(key)
-      .modify((row) => {
-        if (row.body === body) return;
-        row.body = body;
-        // Same as `fillTimeSettle`: clearing this is what pushes the row again.
-        delete row.syncedAt;
-      });
+    const changed = await db.transaction('rw', db.notificationFeed, async () => {
+      const row = await db.notificationFeed.get(key);
+      if (row === undefined || fire.walletChangeIsk === undefined) return 0;
+      // Lines land across polls, so this adds to what the row already carries.
+      const total = (row.walletChangeIsk ?? 0) + fire.walletChangeIsk;
+      const { body } = await renderNotification(
+        { ...fire, walletChangeIsk: total },
+        character.name
+      );
+      return db.notificationFeed
+        .where('id')
+        .equals(key)
+        .modify((r) => {
+          r.walletChangeIsk = total;
+          r.body = body;
+          // Same as `fillTimeSettle`: clearing this is what pushes the row again.
+          delete r.syncedAt;
+        });
+    });
     if (changed > 0) scheduleSync(character.characterId);
   } catch {
     // The wallet fire is already dropped and the baseline advanced; a failed
@@ -667,7 +679,10 @@ export function liveDependencies(): PollDependencies {
     walletFoldEnabled: async (characterId) =>
       characterEventThresholds(await currentNotificationPreferences(), characterId)
         .walletFoldIntoContract !== 0,
-    feedRowExists: async (key) => (await db.notificationFeed.get(key)) !== undefined,
+    feedRowExists: async (key) => {
+      const row = await db.notificationFeed.get(key);
+      return row !== undefined && row.dismissedAt === undefined;
+    },
     reviseContractFeedRow: reviseContractFeedRow,
     alreadyDelivered: (key) => feedSuppressesToast(key, Date.now()),
     markDelivered: (keys) => markFeedNotifiedHere(keys, Date.now()),

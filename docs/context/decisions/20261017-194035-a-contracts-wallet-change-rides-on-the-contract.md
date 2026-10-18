@@ -38,3 +38,5 @@ _Recorded 2026-10-17._
 - **The summed amount is the lines that cleared the minimum ISK change.** A
   small contract line (a fee under the threshold) fires no wallet alert and so
   is not in the sum.
+
+Review follow-ups: a later poll's lines are added to the amount the feed row already carries (kept on the row as local `walletChangeIsk`), a dismissed row no longer counts as carrying the alert, and browser toasts fold only within one poll — a toast already shown cannot be revised, so a line arriving later stays its own wallet toast.
