@@ -244,7 +244,7 @@ Paid stays paid when edited ("correcting isn't un-paying"). Frozen figures: late
 
 ## 5. Cross-feature
 
-- Overview page Mining card: unpaid tax severity `watch`, `warning` when the oldest unpaid entry is >= 30 days (`MINING_TAX_WARNING_DAYS`, `src/features/overview/boardSeverity.ts:60`, `20260925-164801`); needs re-auth => unreadable; unassigned > 0 with nothing owed = watch.
+- Overview page Mining card: unpaid tax severity `watch`, `warning` when the oldest unpaid entry is >= 30 days (`MINING_TAX_WARNING_DAYS`, `src/features/overview/data/boardSeverity.ts:60`, `20260925-164801`); needs re-auth => unreadable; unassigned > 0 with nothing owed = watch.
 - Calendar has a moon-chunk kind (`20260925-142253`); Wallet journal links tax payments back to the Tax row (#2818).
 - Settings > Mining tax hosts the same form as the Tax page settings modal.
 
