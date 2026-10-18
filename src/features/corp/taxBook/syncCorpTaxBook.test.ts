@@ -60,6 +60,7 @@ function deps(over: Partial<SyncDeps> = {}) {
       structureIds: [1001],
       oldestEsiDate: { 1001: '2026-07-19' },
       truncated: false,
+      systemIds: { 1001: 30000142 },
     })),
     loadEsiExtractions: vi.fn(async () => []),
     loadMoonNotifications: vi.fn(async () => []),
@@ -203,6 +204,14 @@ describe('syncCorpTaxBook', () => {
     expect(out).toMatchObject({ kind: 'synced', missing: ['donations'] });
   });
 
+  it('uploads each observed row with its refinery’s system', async () => {
+    const d = deps();
+    await run(d);
+    expect(vi.mocked(d.uploadSync).mock.calls[0][1].observed?.[0]).toMatchObject({
+      solarSystemId: 30000142,
+    });
+  });
+
   it('splits a big ledger across calls, leaving the visit’s record for the last', async () => {
     const rows = Array.from({ length: OBSERVED_PER_CALL + 5 }, (_, i) => row(1000 + i));
     const d = deps({
@@ -211,6 +220,7 @@ describe('syncCorpTaxBook', () => {
         structureIds: [1001],
         oldestEsiDate: {},
         truncated: false,
+        systemIds: {},
       }),
     });
     await run(d);

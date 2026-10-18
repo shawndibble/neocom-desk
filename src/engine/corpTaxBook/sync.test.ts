@@ -4,6 +4,7 @@ import {
   donationsFromJournal,
   mergeGaps,
   observedRowsFromLedger,
+  placeObservedRows,
   planSettlements,
   reconcileExtractions,
   resolveDonations,
@@ -12,9 +13,63 @@ import {
 } from './sync';
 import type { Statement } from './statements';
 import type { Dismissal } from './dismissals';
+import { resolveRate, type TaxRate } from './rates';
 
 const DAY = 86_400_000;
 const at = (iso: string) => Date.parse(iso);
+
+describe('placeObservedRows', () => {
+  const extraction: SyncExtraction = {
+    structureId: 1001,
+    moonId: 40,
+    extractionStartTime: '2026-07-01T12:00:00.000Z',
+    chunkArrivalTime: '2026-07-10T12:00:00.000Z',
+    naturalDecayTime: '2026-07-10T15:00:00.000Z',
+  };
+  const row = (structureId: number, date: string) => ({
+    structureId,
+    characterId: 7,
+    recordedCorporationId: 9,
+    typeId: 45490,
+    date,
+    quantity: 5,
+    cachedAt: '2026-07-12T10:00:00.000Z',
+  });
+
+  it('stamps the refinery’s system and the moon it was drilling that day', () => {
+    const [placed] = placeObservedRows([row(1001, '2026-07-10')], [extraction], { 1001: 30000142 });
+    expect(placed).toMatchObject({ solarSystemId: 30000142, moonId: 40 });
+  });
+
+  it('omits the moon on a day no Extraction covers, keeping the system', () => {
+    const [placed] = placeObservedRows([row(1001, '2026-07-05')], [extraction], { 1001: 30000142 });
+    expect(placed.solarSystemId).toBe(30000142);
+    expect(placed).not.toHaveProperty('moonId');
+  });
+
+  it('lets a per-moon rate resolve for a placed row, and not for an unplaced one', () => {
+    const rates: TaxRate[] = [
+      { scope: 'corp', pct: 10, effectiveFrom: '2026-01-01' },
+      { scope: 'moon', moonId: 40, pct: 5, effectiveFrom: '2026-01-01' },
+    ];
+    const ctxFor = (r: { date: string; moonId?: number }) => ({
+      date: r.date,
+      minerId: 'm1',
+      moonId: r.moonId,
+      recordKey: 'k',
+      isGuest: false,
+    });
+    const [placed] = placeObservedRows([row(1001, '2026-07-10')], [extraction], { 1001: 30000142 });
+    expect(resolveRate(rates, ctxFor(placed))).toMatchObject({ pct: 5, scope: 'moon' });
+    const [unplaced] = placeObservedRows([row(2002, '2026-07-10')], [extraction], {});
+    expect(resolveRate(rates, ctxFor(unplaced))).toMatchObject({ pct: 10, scope: 'corp' });
+  });
+
+  it('leaves a refinery with no known Extraction or system as it was, without crashing', () => {
+    const input = row(2002, '2026-07-10');
+    expect(placeObservedRows([input], [extraction], {})).toEqual([input]);
+  });
+});
 
 describe('observedRowsFromLedger', () => {
   it('stamps each ledger row with its refinery and the read time', () => {

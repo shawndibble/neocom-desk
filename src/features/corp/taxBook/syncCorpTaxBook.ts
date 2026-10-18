@@ -11,6 +11,7 @@
 import {
   detectGaps,
   mergeGaps,
+  placeObservedRows,
   planSettlements,
   reconcileExtractions,
   resolveDonations,
@@ -194,7 +195,12 @@ export async function syncCorpTaxBook(
   // The first call carries everything but the overflow of observer rows, so a
   // later failure loses only ledger rows (each call also records the visit).
   // The server caps extractions per call, so they split too.
-  const batches = chunks(feed.rows as ObservedRow[], OBSERVED_PER_CALL);
+  const placed = placeObservedRows(
+    feed.rows as ObservedRow[],
+    canExtract ? extractions : before.extractions,
+    feed.systemIds
+  );
+  const batches = chunks(placed, OBSERVED_PER_CALL);
   const extraCalls = chunks(extractions, EXTRACTIONS_PER_CALL);
   const first = { observed: batches.shift() ?? [], extractions: extraCalls.shift() ?? [] };
   // Verifying again right before writing renews the 10-minute role cache the
