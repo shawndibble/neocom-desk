@@ -261,6 +261,52 @@ export function toEngineExtraction(x: SyncExtraction): Extraction {
   };
 }
 
+/**
+ * The Extraction a refinery was working on a given day and its moon: from the
+ * day the chunk fractured to the day its belt expired. Empty when none covers it.
+ */
+export function moonOnDay(
+  extractions: readonly Extraction[],
+  structureId: number | undefined,
+  date: string
+): { moonId?: number; extractionId?: string } {
+  for (const ex of extractions) {
+    if (ex.structureId !== structureId) continue;
+    const status = extractionStatus(ex, `${date}T23:59:59Z`);
+    if (
+      status.fracturedAt &&
+      date >= status.fracturedAt.slice(0, 10) &&
+      date <= status.expiresAt!.slice(0, 10)
+    ) {
+      return { moonId: ex.moonId, extractionId: ex.id };
+    }
+  }
+  return {};
+}
+
+/**
+ * Observer rows with the refinery's solar system and that day's moon (#4181),
+ * so members, who cannot read Extractions, still line up by system and get
+ * per-moon rates. A refinery with no known system or Extraction keeps its row
+ * as it was: the fields are omitted, never guessed.
+ */
+export function placeObservedRows(
+  rows: readonly ObservedRow[],
+  extractions: readonly SyncExtraction[],
+  systemOfStructure: Readonly<Record<number, number | undefined>>
+): ObservedRow[] {
+  const engine = extractions.map(toEngineExtraction);
+  return rows.map((row) => {
+    const solarSystemId = row.solarSystemId ?? systemOfStructure[row.structureId];
+    const moonId = row.moonId ?? moonOnDay(engine, row.structureId, row.date).moonId;
+    return {
+      ...row,
+      ...(solarSystemId !== undefined ? { solarSystemId } : {}),
+      ...(moonId !== undefined ? { moonId } : {}),
+    };
+  });
+}
+
 export interface SettleInput {
   statements: readonly Statement[];
   payments: readonly SettlePayment[];
@@ -281,20 +327,8 @@ export interface SettleInput {
  */
 export function planSettlements(input: SettleInput): string[] {
   const extractions = (input.extractions ?? []).map(toEngineExtraction);
-  const placeOf = (structureId: number | undefined, date: string) => {
-    for (const ex of extractions) {
-      if (ex.structureId !== structureId) continue;
-      const status = extractionStatus(ex, `${date}T23:59:59Z`);
-      if (
-        status.fracturedAt &&
-        date >= status.fracturedAt.slice(0, 10) &&
-        date <= status.expiresAt!.slice(0, 10)
-      ) {
-        return { moonId: ex.moonId, extractionId: ex.id };
-      }
-    }
-    return {};
-  };
+  const placeOf = (structureId: number | undefined, date: string) =>
+    moonOnDay(extractions, structureId, date);
   const settled: string[] = [];
   const minerIds = [...new Set(input.statements.map((s) => s.minerId))];
   for (const minerId of minerIds) {

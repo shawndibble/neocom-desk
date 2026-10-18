@@ -19,6 +19,7 @@ import {
   type MoonNotification,
 } from '@/engine/corpTaxBook/sync';
 import type { ObservedRow } from '@/engine/corpTaxBook/types';
+import { loadStructureSystemId } from '@/features/character/structures';
 import { loadCharacterNotifications } from '@/features/character/notifications';
 import { loadCorporationMiningExtractions } from '../boardData';
 import { loadCorpPaginatedWithCacheStatus } from '../corpRead';
@@ -32,6 +33,8 @@ export interface ObserverFeed {
   oldestEsiDate: Record<number, string | undefined>;
   /** A page was missing, so the rows may not be the whole ledger. */
   truncated: boolean;
+  /** The solar system of each refinery whose structure this Character could resolve (#4181). */
+  systemIds: Record<number, number>;
 }
 
 /** Why a feed could not be read: sign in again, or ESI did not answer. */
@@ -59,6 +62,7 @@ export async function loadObserverFeed(
     structureIds: observers.map((o) => o.observer_id),
     oldestEsiDate: {},
     truncated: list.cached.truncated,
+    systemIds: {},
   };
   // One refinery at a time: each is its own paginated read in the corp-industry rate group.
   for (const observer of observers) {
@@ -80,6 +84,10 @@ export async function loadObserverFeed(
       ledger.cached.data,
       ledger.cached.fetchedAt.toISOString()
     );
+    const systemId = await loadStructureSystemId(characterId, observer.observer_id).catch(
+      () => null
+    );
+    if (systemId !== null) feed.systemIds[observer.observer_id] = systemId;
     feed.rows.push(...rows);
     feed.truncated ||= ledger.cached.truncated;
     feed.oldestEsiDate[observer.observer_id] = rows.map((r) => r.date).sort()[0];
