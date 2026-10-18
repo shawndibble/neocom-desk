@@ -189,11 +189,10 @@ import {
   MARKET_OPEN_PRICES_COLLECTION,
   MARKET_OPEN_PRICES_META_PATH,
   OpenPriceFold,
-  dayIndexUrl,
+  findFinalSnapshot,
   groupByDocument,
   implausibleReason,
   mergeDays,
-  pickLastSnapshotUrl,
   previousUtcDate,
   regionCounts,
   shrunkRegion,
@@ -1576,11 +1575,17 @@ export const syncLpStoreOffers = onSchedule(
  * the highest buy and lowest sell per tracked region and type and merges the
  * day into `marketOpenPrices/<regionId>_<typeId>` (~70,000 documents).
  *
- * Idempotent (re-running a day replaces its entry). A missing snapshot, a stream
- * that errors or ends truncated, a tracked region implausibly thin, or one
- * under half its size on the previous published day publishes nothing, the same stance as
- * `syncLpStoreOffers`: that day simply has no point, and the backfill script
- * can fill it later. 1GiB because the decompress-and-fold peaked at ~300MB RSS
+ * Idempotent (re-running a day replaces its entry). The day's 23:45 snapshot is
+ * normally listed by ~23:50, but a run that finds only an earlier one (EVE Ref
+ * lagging) or none must not store a price that is not the day's last, so it
+ * throws and Cloud Scheduler retries it (`retryCount`, 15 then 30 minutes
+ * apart); an earlier snapshot is accepted once the next day is listed, since
+ * then the 23:45 slot was skipped for good (`findFinalSnapshot`). A stream that
+ * errors or ends truncated also throws and retries. A tracked region
+ * implausibly thin, or one under half its size on the previous published day,
+ * publishes nothing, the same stance as `syncLpStoreOffers`: retrying the same
+ * file would not change it, that day simply has no point, and the backfill
+ * script can fill it later. 1GiB because the decompress-and-fold peaked at ~300MB RSS
  * in a local measurement and the contracts job has OOM'd before; 540s because
  * the same measurement took ~45s to download and fold, leaving room for the
  * ~140 read-merge-write batches.
@@ -1591,18 +1596,33 @@ export const syncLpStoreOffers = onSchedule(
 export const syncMarketOpenPrices = onSchedule(
   // A cron, unlike the other jobs' 'every N' strings, runs in the scheduler's
   // default zone; pinning Etc/UTC keeps it right after the 23:45 UTC snapshot.
-  { schedule: '45 0 * * *', timeZone: 'Etc/UTC', memory: '1GiB', timeoutSeconds: 540 },
+  {
+    schedule: '45 0 * * *',
+    timeZone: 'Etc/UTC',
+    memory: '1GiB',
+    timeoutSeconds: 540,
+    // A thrown run (the final snapshot not listed yet, a broken download) is
+    // retried at ~01:00, ~01:30 and ~02:00 UTC; `previousUtcDate` still names
+    // the same day on every retry.
+    retryCount: 3,
+    minBackoffSeconds: 900,
+    maxBackoffSeconds: 1800,
+  },
   async () => {
     const date = previousUtcDate(new Date());
-    const listing = await fetchEverefJson(dayIndexUrl(date), MARKET_HISTORY_USER_AGENT);
-    const snapshotUrl = pickLastSnapshotUrl(listing, date);
-    if (!snapshotUrl) {
-      logError('Market open prices sync skipped publishing: no snapshot listed', { date });
-      return;
+    const found = await findFinalSnapshot(date, (url) =>
+      fetchEverefJson(url, MARKET_HISTORY_USER_AGENT)
+    );
+    if (!found.final) {
+      // Thrown, not returned, so the run fails and is retried.
+      throw new Error(
+        `Market open prices: no final snapshot listed for ${date} (last listed: ${found.snapshot?.fileTime ?? 'none'}); retried, and after the last retry the day has no point`
+      );
     }
+    const { url: snapshotUrl, fileTime } = found.snapshot;
     const fold = new OpenPriceFold();
     const rows = await foldSnapshotUrl(snapshotUrl, fold, MARKET_HISTORY_USER_AGENT);
-    logInfo('Market open prices fold', { date, snapshotUrl, rows, pairs: fold.size });
+    logInfo('Market open prices fold', { date, fileTime, snapshotUrl, rows, pairs: fold.size });
     const reason = implausibleReason(fold);
     if (reason) {
       logError('Market open prices sync skipped publishing', { date, reason });
