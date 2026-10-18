@@ -30,6 +30,7 @@ const PINNED = [
   'mailFolders',
   'marketLocationMode',
   'marketPriceHistoryRange',
+  'marketPriceHistorySeries',
   'marketWideSalesShare',
   'piColoniesShowAlts',
   'piPlanControls',
