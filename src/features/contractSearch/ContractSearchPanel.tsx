@@ -717,15 +717,18 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
    * answer excludes" rule Courier's `narrowToOverRate` follows for its own
    * mid-load rows.
    */
+  // Deferred so a price/region edit keeps the inputs responsive while the
+  // ~370k-row filter reruns at low priority.
+  const deferredNonTypeFilter = useDeferredValue(nonTypeFilter);
   const nonTypeRows = useMemo(() => {
-    const engineFiltered = filterContractOffers(rows, nonTypeFilter);
+    const engineFiltered = filterContractOffers(rows, deferredNonTypeFilter);
     const allowed = jumpRangeFilter.allowed;
     if (allowed === null) return engineFiltered;
     return engineFiltered.filter((row) => {
       const location = offerLocations.get(row.locationId);
       return location === undefined || withinJumpRange(location.systemId, allowed);
     });
-  }, [rows, nonTypeFilter, offerLocations, jumpRangeFilter.allowed]);
+  }, [rows, deferredNonTypeFilter, offerLocations, jumpRangeFilter.allowed]);
   const statsByType = useMemo(() => {
     // Before the full rows land, the index's own per-type count and cheapest
     // stand in. They ignore the other filters, which only matters until the
@@ -762,7 +765,10 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
     const filtered = filterContractOffers(nonTypeRows, { typeIds });
     // Below market only reads which contracts pass; the offer table is not shown.
     if (belowMarket) return filtered;
-    return filtered.sort((a, b) => sortablePrice(a, plexPrice) - sortablePrice(b, plexPrice));
+    // Sort key computed once per row, not twice per comparison.
+    const keyed = filtered.map((row) => ({ row, key: sortablePrice(row, plexPrice) }));
+    keyed.sort((a, b) => a.key - b.key);
+    return keyed.map((entry) => entry.row);
   }, [nonTypeRows, typeIds, plexPrice, belowMarket]);
 
   const suggestions = useMemo<Suggestion[]>(() => {
