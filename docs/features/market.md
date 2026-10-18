@@ -268,7 +268,7 @@ Summary table
 | Recent              | Appraisal paste card select; `appraisalRecent.ts`                     | Last 5 pastes by raw text, re-priced on load; local only; Clear recent                                                                                 |
 | Minus owned         | Appraisal paste card checkbox + station select; `appraisalOwned.ts`   | Subtracts every Character's hangar stock at a Trade Hub station (default header hub); needs assets scope; Need/owned column, covered rows dim and sink |
 | Hold bar            | Appraisal result, `AppraisalHoldBar.tsx`                              | Packaged volume vs Hauling Cargo Space; only when one is set                                                                                           |
-| Header groups       | `AppraisalHeaderStats.tsx`                                            | You get / It's worth / Cargo, one emphasised figure each                                                                                               |
+| Header summary      | `AppraisalHeaderStats.tsx`                                            | Buy / Split / Sell, each with the figure it nets to (sell now after tax, spread, list after fees), then a line of volume, items, refine                |
 | Hauling tab         | `/market/hauling`, `HaulingPanel.tsx`                                 | Hub-to-hub price-gap scan, Trip Plan, Copy multibuy list                                                                                               |
 | Cargo space popover | Hauling trip rail, `HaulingCargoControl.tsx`                          | Ship / saved Fitting / custom m3 (the ISK budget is the Hauling filters' Max spend)                                                                    |
 | Compare drawer      | Market (all tabs when set non-empty), `CompareDrawer.tsx`             | Prices + Attributes views, resizable bottom drawer                                                                                                     |
@@ -313,13 +313,13 @@ Result panel
 - StatChips: Sell total (accent), Buy total, Instant net, List net, Spread, Refine total (only if any row has refine), Cheapest buy (only if any row has an LP option), Total volume (`AppraisalVolumeChip`), Items count. Sell/Buy use `FullIskTotal`; others `IskAmount` shorthand with exact on tap/hover.
 - Selling now and Listing are priced at the appraisal's Price %, like the totals beside them.
 - Notes above table (conditional): assumes-base-standings note; refine assumes no implants (ore/ice only); unpriced rows count (warning); refine-unpriced count; "cheapest buy via LP" count.
-- Table (`DataTable`, rowKey typeId, `stackColumns={2}`, `mobileSort`, `rowMoreActions`, `rowContextMenu` = `ItemContextMenu`):
+- Table (`DataTable`, rowKey typeId, `responsive="table"`, `rowMoreActions`, `rowContextMenu` = `ItemContextMenu`):
   - Always: Quantity, Item (MarketItemLink -> Browser).
   - Optional (picker): Buy each, Sell each, Buy total, Sell total, Refine total, LP total, Volume (m3, packaged). All sortable (`sortValue`); null sorts last.
   - Highlighting: Buy total bold green when refine does NOT beat sell-as-is; Refine total bold green when `refineBeatsSellAsIs`; `*` hint if refine partly unpriced; `!` hint when refine only wins because leftover units sell on top; LP total bold when `lpBeatsMarket`, `*` hint when LP unaffordable; LP cell carries `LpStoreLink` icon to `/market/lp-store/:corp`.
   - Each-price via `formatIskAuto`; totals via `IskAmount`; missing price is a dash, never 0.
 - States: loading spinner (first result only), `failed` (catalogue load) EmptyState, empty (no result), no-matches EmptyState; a re-price shows an inline small spinner in the chip row.
-- Mobile: paste panel stacks above result; table becomes 2-column stacked cards; sort via mobile sort control.
+- Mobile: paste panel folds above the result (its bar says hub and percent, so the Panel header omits them); the table stays a table with Item (count under the name), Buy total and Sell total, each header sorting; the Columns menu swaps others in. Compare Hubs is an icon toggle (pressed while open) and its cards go two across.
 
 CSV (`appraisalCsv.ts`, surface `market-appraisal`): Quantity, Item, Buy each, Sell each, Buy total, Sell total, Volume, ISK/m³ (CSV always includes it). Raw numbers at chosen percent; null exports empty. Refine and LP columns are not exported.
 

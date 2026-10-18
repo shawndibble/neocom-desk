@@ -369,8 +369,8 @@ describe('AppraisalPanel', () => {
 
     it('renders both net-of-fees chips once the active Character is resolved', () => {
       renderPanel({ controller: controller({ result: netOutcome() }) });
-      expect(screen.getByText(/^Selling now/)).toBeInTheDocument();
-      expect(screen.getByText(/^Listing/)).toBeInTheDocument();
+      expect(screen.getByText('Sell now, after tax')).toBeInTheDocument();
+      expect(screen.getByText('List it, after fees')).toBeInTheDocument();
     });
 
     it('excludes a row unpriced on the buy side from the instant net only', () => {
@@ -387,13 +387,13 @@ describe('AppraisalPanel', () => {
           result: netOutcome({ accountingLevel: null, brokerRelationsLevel: null }),
         }),
       });
-      expect(screen.queryByText('Selling now')).not.toBeInTheDocument();
-      expect(screen.queryByText('Listing')).not.toBeInTheDocument();
+      expect(screen.queryByText('Sell now, after tax')).not.toBeInTheDocument();
+      expect(screen.queryByText('List it, after fees')).not.toBeInTheDocument();
     });
 
     it('wraps whole chips in the totals strip rather than scrolling sideways', () => {
       renderPanel({ controller: controller({ result: netOutcome() }) });
-      const strip = screen.getByText(/^Selling now/).closest('.flex-wrap');
+      const strip = screen.getByText('Items').closest('.flex-wrap');
       expect(strip).not.toBeNull();
       expect(strip).not.toHaveClass('overflow-x-auto');
     });
@@ -453,11 +453,6 @@ describe('AppraisalPanel', () => {
   // The reflow itself is CSS behind a media query and is measured in
   // `e2e/marketAppraisalNarrow.spec.ts`; this only guards the opt-in from
   // being dropped, the same pairing `PriceHistoryChart.test.tsx` asserts.
-  it('pairs the figures two to a row in its stacked cards', () => {
-    renderPanel({ controller: controller({ result: outcome() }) });
-    expect(screen.getByRole('table', { name: 'Appraisal' })).toHaveClass('dt-stack-2col');
-  });
-
   describe('Compare hubs', () => {
     const COMPARE_ROWS: HubComparisonRow[] = TRADE_HUBS.map((hub, index) => ({
       hub,
@@ -1328,34 +1323,22 @@ describe('AppraisalPanel — shopping list (#2868)', () => {
     await db.settings.clear();
   });
 
-  it("groups the header figures under You get / It's worth / Cargo", () => {
+  it('shows Buy, Split and Sell, each with the figure it nets to, then the cargo facts', () => {
     renderPanel({
       controller: controller({
         result: outcome({ accountingLevel: 0, brokerRelationsLevel: 0 }),
       }),
     });
-    const youGet = screen.getByRole('region', { name: 'You get' });
-    expect(within(youGet).getByText(/^Selling now/)).toBeInTheDocument();
-    expect(within(youGet).getByText(/^Listing/)).toBeInTheDocument();
-    const worth = screen.getByRole('region', { name: "It's worth" });
-    for (const label of ['Sell total', 'Buy total', 'Spread']) {
-      expect(within(worth).getByText(label)).toBeInTheDocument();
-    }
-    const cargo = screen.getByRole('region', { name: 'Cargo' });
-    expect(within(cargo).getByText('Volume')).toBeInTheDocument();
-    expect(within(cargo).getByText('Items')).toBeInTheDocument();
-  });
-
-  it('emphasises exactly one figure in each header group', () => {
-    renderPanel({
-      controller: controller({
-        result: outcome({ accountingLevel: 0, brokerRelationsLevel: 0 }),
-      }),
-    });
-    for (const region of ['You get', "It's worth", 'Cargo']) {
-      expect(
-        screen.getByRole('region', { name: region }).querySelectorAll('.text-sm.font-semibold')
-      ).toHaveLength(1);
+    const buy = screen.getByRole('region', { name: 'Buy' });
+    expect(within(buy).getByText('Sell now, after tax')).toBeInTheDocument();
+    const split = screen.getByRole('region', { name: 'Split' });
+    expect(within(split).getByText('Spread')).toBeInTheDocument();
+    const sell = screen.getByRole('region', { name: 'Sell' });
+    expect(within(sell).getByText('List it, after fees')).toBeInTheDocument();
+    expect(screen.getByText('Volume')).toBeInTheDocument();
+    expect(screen.getByText('Items')).toBeInTheDocument();
+    for (const region of [buy, split, sell]) {
+      expect(region.querySelectorAll('.text-xl')).toHaveLength(1);
     }
   });
 

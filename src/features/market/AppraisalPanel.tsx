@@ -82,6 +82,7 @@ import { createShareLink, existingShareLink } from '@/features/share/shareStore'
 import { LpStoreLink } from '@/features/loyalty/LpStoreLink';
 import { writeToClipboard } from '@/lib/clipboard';
 import { formatIskAuto } from '@/lib/isk';
+import { useIsPhone } from '@/lib/useIsPhone';
 import { useMediaQuery } from '@/lib/useMediaQuery';
 import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import {
@@ -204,6 +205,8 @@ const COMPACT_RESULTS_QUERY = '(min-width: 64rem) and (max-width: 79.999rem)';
 const OWNED_EVERYWHERE = 'all' as const;
 
 const COMPACT_OFF_BY_DEFAULT: readonly AppraisalColumnId[] = ['buyEach', 'sellEach', 'volume'];
+/** A phone starts with Item, Buy and Sell; the Columns menu swaps others in. */
+const PHONE_ON_BY_DEFAULT: readonly AppraisalColumnId[] = ['buyTotal', 'sellTotal'];
 
 export function AppraisalPanel({
   controller,
@@ -300,10 +303,15 @@ export function AppraisalPanel({
   // the same thing) rather than pushing the row menu out of reach. Only a
   // default: ticking one shows it, and a stored selection is read as saved.
   const compactResults = useMediaQuery(COMPACT_RESULTS_QUERY);
+  const isPhone = useIsPhone();
   const visibleColumns =
-    compactResults && storedColumns === DEFAULT_VISIBLE_APPRAISAL_COLUMNS
-      ? DEFAULT_VISIBLE_APPRAISAL_COLUMNS.filter((id) => !COMPACT_OFF_BY_DEFAULT.includes(id))
-      : storedColumns;
+    storedColumns !== DEFAULT_VISIBLE_APPRAISAL_COLUMNS
+      ? storedColumns
+      : isPhone
+        ? DEFAULT_VISIBLE_APPRAISAL_COLUMNS.filter((id) => PHONE_ON_BY_DEFAULT.includes(id))
+        : compactResults
+          ? DEFAULT_VISIBLE_APPRAISAL_COLUMNS.filter((id) => !COMPACT_OFF_BY_DEFAULT.includes(id))
+          : storedColumns;
   const setVisibleColumns = useVisibleAppraisalColumns((state) => state.setValue);
   const hydrateVisibleColumns = useVisibleAppraisalColumns((state) => state.hydrate);
   useEffect(() => {
@@ -425,6 +433,8 @@ export function AppraisalPanel({
     {
       id: 'quantity',
       header: owned ? t('market.appraisal.columnNeed') : t('market.appraisal.columnQuantity'),
+      // On a phone the count sits under the item name instead (below).
+      phoneHidden: true,
       align: 'right',
       className: 'whitespace-nowrap tabular-nums',
       // A count, not ISK — an ISK formatter would run `clampIskZero` over it.
@@ -450,7 +460,14 @@ export function AppraisalPanel({
       // link drops `section`, which is exactly what `Market.tsx` reads as an
       // incoming item link and answers by switching tabs; the paste itself
       // survives the trip because `useAppraisal` lives at route level.
-      render: (row) => <MarketItemLink typeId={row.typeId}>{row.name}</MarketItemLink>,
+      render: (row) => (
+        <>
+          <MarketItemLink typeId={row.typeId}>{row.name}</MarketItemLink>
+          <span className="block text-[0.6875rem] text-text-dim tabular-nums sm:hidden">
+            {formatVolume(row.need ?? row.quantity)}
+          </span>
+        </>
+      ),
       sortValue: (row) => row.name,
     },
   ];
@@ -972,10 +989,10 @@ export function AppraisalPanel({
           title={t('market.appraisal.resultTitle')}
           headingRef={resultHeadingRef}
           padded={result === null}
-          wrapMeta
           meta={
             result !== null ? (
-              <span className="max-md:basis-full">
+              // The paste bar above already says hub and percent on a phone.
+              <span className="max-md:hidden">
                 <StatChip
                   label={hubName}
                   value={t('market.appraisal.atPercent', { pricePercent })}
@@ -986,17 +1003,29 @@ export function AppraisalPanel({
           actions={
             result === null || failed || rows.length === 0 ? undefined : (
               <>
-                {compare !== null && (
-                  <button
-                    type="button"
-                    aria-expanded={compareExpanded}
-                    onClick={() => setCompareExpanded((open) => !open)}
-                    className={textActionClassName('gap-1 normal-case')}
-                  >
-                    {t('market.appraisal.compareHubsTitle')}
-                    <Caret expanded={compareExpanded} />
-                  </button>
-                )}
+                {compare !== null &&
+                  (isPhone ? (
+                    <IconButton
+                      size="sm"
+                      icon={<Icon.Compare />}
+                      label={t('market.appraisal.compareHubsTitle')}
+                      pressed={compareExpanded}
+                      onClick={() => setCompareExpanded((open) => !open)}
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      aria-expanded={compareExpanded}
+                      onClick={() => setCompareExpanded((open) => !open)}
+                      className={textActionClassName('gap-1 normal-case')}
+                    >
+                      {t('market.appraisal.compareHubsTitle')}
+                      {/* The cards open above the table, so open points up. */}
+                      <span className={compareExpanded ? 'inline-flex rotate-180' : 'inline-flex'}>
+                        <Caret expanded={compareExpanded} />
+                      </span>
+                    </button>
+                  ))}
                 <ColumnPickerMenu
                   available={availableColumns}
                   visible={visibleColumns}
@@ -1115,11 +1144,8 @@ export function AppraisalPanel({
                   className="pb-1"
                   rowContextMenu={rowContextMenu}
                   rowMoreActions
-                  // Five or six short figures a card: one per line runs a priced
-                  // row to six, and hiding a column buys the same height at the
-                  // cost of a figure.
-                  stackColumns={2}
-                  mobileSort
+                  // A phone keeps the table: Item, Buy, Sell, each header sorts.
+                  responsive="table"
                 />
               </div>
             </>

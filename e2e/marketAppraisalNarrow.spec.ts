@@ -1,38 +1,10 @@
 /**
- * Appraisal result card's stacked layout at 390px (issue #1097): the result
- * table hung five short numeric columns off the item name — six once a row
- * carried reprocessing data and `refineTotal` joined them — at `DataTable`'s
- * default `stackColumns={1}`, so every priced line became a six-line card and
- * a fifteen-item haul a page of them. Fixed by passing `stackColumns={2}`,
- * the two-value-per-row mode `.dt-stack-2col` already ships for exactly this
- * shape (`src/styles/index.css`).
- *
- * The whole point is the reflow, and a reflow is layout: `.dt-stack-2col`'s
- * grid only exists inside a `@media (width < 40rem)` block in a real engine,
- * so jsdom can see the class token and nothing else — it cannot tell a
- * paired card from the six-line one that shipped. Hence Playwright, and hence
- * assertions on bounding boxes (which cells share a row, how wide each is)
- * rather than on the class name, the same reasoning
- * `industryRecordsNarrow.spec.ts` gives for its own stacked-card measurement.
- *
- * Both column counts are reachable here, so both are asserted end to end:
- * Veldspar has a `public/data/reprocessing.json` entry and Tritanium/Pyerite
- * do not, and the fixture pilot is an active Character — which is the whole
- * condition `appraisalData.ts` puts on computing `refine` at all. Since the
- * Volume column joined them (issue #2337), a paste of Veldspar renders seven
- * value columns (2+2+2+1, the odd trailing cell the ticket asks to see land
- * cleanly) and a paste of only minerals renders six (2+2+2, none left over).
- * The constants below keep their pre-#2337 names.
- *
- * The Fuzzwork aggregates route is overridden locally rather than in
- * `support/mockEsi.ts`: the shared `FUZZWORK_AGGREGATES` fixture omits
- * `orderCount`, and `market/fuzzwork.ts`'s `parseSide` reports a side with no
- * order count as *no price*, so against the shared mock every figure in this
- * table renders as an em dash. The grid tracks are `minmax(0, 1fr)` and so
- * would still pair up, but a test for "a full-width ISK figure fits in half a
- * card" that prices nothing is not testing much. `mockEsi.ts` names this
- * exact pattern ("a spec that needs real rows should override this route"),
- * and a later `page.route` wins over an earlier one — see `support/testBase.ts`.
+ * Appraisal result table at phone and desktop widths. A phone keeps a real
+ * table (Item, Buy total, Sell total; the Columns menu swaps others in) whose
+ * headers sort, instead of the stacked cards it used to collapse into. The
+ * Fuzzwork aggregates route is overridden locally because the shared fixture
+ * omits `orderCount`, which `market/fuzzwork.ts` reads as "no price" — a spec
+ * that needs real figures overrides it (see `support/testBase.ts`).
  */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
@@ -51,7 +23,6 @@ const PYERITE = 35;
 
 /** Quantities large enough that every total renders as a real multi-character ISK figure rather than a two-digit one that would fit anywhere. */
 const SIX_COLUMN_PASTE = `Veldspar\t1,248,000\nTritanium\t3,400,000`;
-const FIVE_COLUMN_PASTE = `Tritanium\t3,400,000\nPyerite\t1,750,000`;
 
 const PRICES: Record<number, { buy: number; sell: number }> = {
   [TRITANIUM]: { buy: 5.41, sell: 5.68 },
@@ -157,44 +128,6 @@ async function readRow(page: Page, typeId: number): Promise<RowGeometry> {
   }, typeId);
 }
 
-interface Box {
-  top: number;
-  left: number;
-  right: number;
-  bottom: number;
-  width: number;
-  height: number;
-}
-
-/**
- * The kebab's own box, pinned to the card's top-right corner (#1708): a
- * zero-width `.dt-actions` cell used to leave it clipped past the card's
- * right edge. Checked against the row's box rather than the viewport so a
- * regression that merely moved the clipping elsewhere (off the card, still
- * on the page) still fails here. No `toBeVisible` wait first, unlike
- * `readRow` above — every caller here runs this right after a `readRow` on
- * the same key, which already proved the row present.
- */
-async function readActionsButton(page: Page, typeId: number): Promise<{ row: Box; button: Box }> {
-  return page.evaluate((key) => {
-    const toBox = (rect: DOMRect): Box => ({
-      top: rect.top,
-      left: rect.left,
-      right: rect.right,
-      bottom: rect.bottom,
-      width: rect.width,
-      height: rect.height,
-    });
-    const table = document.querySelector('table[aria-label="Appraisal"]')!;
-    const row = table.querySelector(`tbody tr[data-row-key="${key}"]`) as HTMLElement;
-    const button = row.querySelector('td.dt-actions button') as HTMLElement;
-    return {
-      row: toBox(row.getBoundingClientRect()),
-      button: toBox(button.getBoundingClientRect()),
-    };
-  }, typeId);
-}
-
 /**
  * Cells clustered into the lines they actually render on, top-to-bottom then
  * left-to-right. A 1px tolerance rather than an exact match: grid stretches
@@ -221,92 +154,39 @@ test.describe('Market Appraisal — stacked result card', () => {
     await signInAndGoto(page);
   });
 
-  test('pairs its seven value columns two-per-row at 390px', async ({ page }) => {
+  test('keeps a real table at 390px: Item, Buy and Sell, sorted from their headers', async ({
+    page,
+  }) => {
     await page.setViewportSize(PHONE);
     await appraise(page, SIX_COLUMN_PASTE);
 
-    const { display, contentWidth, cells } = await readRow(page, VELDSPAR);
-    expect(display).toBe('grid');
-
-    // Seven values under a full-width title: 2+2+2+1. Asserted as the whole
-    // card at once — a per-pair check would pass just as happily on a card
-    // that had quietly dropped a column.
-    expect(labelLines(cells)).toEqual([
-      ['Item'],
-      ['Qty', 'Buy each'],
-      ['Sell each', 'Buy total'],
-      ['Sell total', 'Refine total'],
-      ['Volume (m³)'],
-    ]);
-
-    const [[item], ...valueLines] = lines(cells);
-    // The name still titles the card across both tracks (`grid-column: 1 / -1`).
-    expect(item.width).toBeCloseTo(contentWidth, 0);
-
-    for (const [first, second] of valueLines.slice(0, -1)) {
-      // Side by side, each roughly half the card: same width, same line, and
-      // the second starting past the end of the first (the 0.75rem gap).
-      expect(second.left).toBeGreaterThan(first.left + first.width);
-      expect(first.width).toBeCloseTo(second.width, 0);
-      expect(first.width).toBeLessThan(contentWidth * 0.55);
-      expect(first.width).toBeGreaterThan(contentWidth * 0.4);
-    }
-
-    const [firstOfPair] = valueLines[0];
-    const [trailing] = valueLines.at(-1)!;
-    // The dangling half-row #1097 asks about: it stays in the first track at
-    // a paired cell's width, rather than stretching across the card (which
-    // would print a label-above-value block at title width) or shifting into
-    // the second one.
-    expect(trailing.left).toBeCloseTo(firstOfPair.left, 0);
-    expect(trailing.width).toBeCloseTo(firstOfPair.width, 0);
-    expect(trailing.width).toBeLessThan(contentWidth * 0.55);
-    // The other half of "renders cleanly": its label sits above the value in
-    // flow, not pinned into the default card's 6.5rem gutter — which inside a
-    // ~160px cell would leave the figure nowhere to render.
-    expect(trailing.labelPosition).toBe('static');
-
-    // And the halved card still costs the page no sideways scroll, which is
-    // the risk a two-track grid runs on a 390px screen.
+    // A table, not stacked cards: the row stays a table row.
+    const { display, cells } = await readRow(page, VELDSPAR);
+    expect(display).toBe('table-row');
+    // The Qty cell is dropped below `sm`: the count sits under the name instead.
+    const shown = cells.filter((cell) => cell.width > 0).map((cell) => cell.label);
+    expect(shown).toEqual(['Item', 'Buy total', 'Sell total']);
     await expectNoPageOverflow(page);
 
-    // The kebab itself: a real 44px touch target, pinned inside the card's
-    // own right edge rather than clipped past it (#1708).
-    const { row, button } = await readActionsButton(page, VELDSPAR);
-    expect(button.width).toBeGreaterThanOrEqual(44);
-    expect(button.height).toBeGreaterThanOrEqual(44);
-    expect(button.left).toBeGreaterThanOrEqual(row.left);
-    expect(button.right).toBeLessThanOrEqual(row.right);
-    expect(button.top).toBeGreaterThanOrEqual(row.top);
-    expect(button.bottom).toBeLessThanOrEqual(row.bottom);
-  });
+    const rowKeys = () =>
+      page
+        .locator('table[aria-label="Appraisal"] tbody tr[data-row-key]')
+        .evaluateAll((rows) => rows.map((row) => row.getAttribute('data-row-key')));
+    // Paste order until a header is clicked.
+    expect(await rowKeys()).toEqual([String(VELDSPAR), String(TRITANIUM)]);
 
-  test('pairs its six value columns and keeps the last pair in step at 390px', async ({ page }) => {
-    await page.setViewportSize(PHONE);
-    await appraise(page, FIVE_COLUMN_PASTE);
-
-    const { contentWidth, cells } = await readRow(page, TRITANIUM);
-    // No row here has reprocessing data, so `AppraisalPanel` never adds the
-    // Refine column — six values, Volume closing the last pair.
-    expect(labelLines(cells)).toEqual([
-      ['Item'],
-      ['Qty', 'Buy each'],
-      ['Sell each', 'Buy total'],
-      ['Sell total', 'Volume (m³)'],
-    ]);
-
-    const valueLines = lines(cells).slice(1);
-    const [firstOfPair] = valueLines[0];
-    const [lastLineStart] = valueLines.at(-1)!;
-    // The last pair stays in step with the first: same track, same width,
-    // label in flow above the value.
-    expect(lastLineStart.left).toBeCloseTo(firstOfPair.left, 0);
-    expect(lastLineStart.width).toBeCloseTo(firstOfPair.width, 0);
-    expect(lastLineStart.width).toBeLessThan(contentWidth * 0.55);
-    expect(lastLineStart.labelPosition).toBe('static');
-
-    // Still no sideways scroll with the pinned kebab (#1708).
-    await expectNoPageOverflow(page);
+    const header = (name: RegExp) => page.getByRole('columnheader', { name }).getByRole('button');
+    // Sell total: Veldspar 26.8M against Tritanium 19.3M.
+    await header(/Sell total/).click();
+    await expect.poll(rowKeys).toEqual([String(TRITANIUM), String(VELDSPAR)]);
+    await header(/Sell total/).click();
+    await expect.poll(rowKeys).toEqual([String(VELDSPAR), String(TRITANIUM)]);
+    // Item sorts by name too.
+    await header(/Item/).click();
+    await expect.poll(rowKeys).toEqual([String(TRITANIUM), String(VELDSPAR)]);
+    // And so does Buy total.
+    await header(/Buy total/).click();
+    await expect.poll(rowKeys).toEqual([String(TRITANIUM), String(VELDSPAR)]);
   });
 
   test('still renders one real table row per item at 1280px', async ({ page }) => {
@@ -338,81 +218,29 @@ test.describe('Market Appraisal — stacked result card', () => {
     for (const cell of cells) expect(cell.width).toBeLessThan(contentWidth * 0.9);
   });
 
-  test('keeps the result header groups apart and inside the page at 1280px (#2949)', async ({
+  test('keeps the Buy, Split and Sell boxes in one row and inside the page at 1280px (#2949)', async ({
     page,
   }) => {
     await page.setViewportSize(DESKTOP);
     await appraise(page, SIX_COLUMN_PASTE);
 
-    const groups = await page
-      .locator(
-        'section[aria-label="You get"], section[aria-label="It\'s worth"], section[aria-label="Cargo"]'
-      )
+    const boxes = await page
+      .locator('section[aria-label="Buy"], section[aria-label="Split"], section[aria-label="Sell"]')
       .evaluateAll((sections) =>
         sections.map((section) => {
-          const rect = (el: Element) => {
-            const r = el.getBoundingClientRect();
-            return { left: r.left, right: r.right, top: r.top, bottom: r.bottom };
-          };
-          return {
-            box: rect(section),
-            chips: [...section.querySelectorAll('span.whitespace-nowrap')].map(rect),
-          };
+          const r = section.getBoundingClientRect();
+          return { left: r.left, right: r.right, top: r.top, bottom: r.bottom };
         })
       );
-    expect(groups.length).toBeGreaterThanOrEqual(2);
-
-    // Side by side, as in the mockup, not reflowed to 2+1.
-    for (const g of groups) expect(g.box.top).toBeCloseTo(groups[0].box.top, 0);
-
-    for (const [i, a] of groups.entries()) {
-      expect(a.chips.length).toBeGreaterThan(0);
-      // A chip is never wider than the group that holds it.
-      for (const chip of a.chips) {
-        expect(chip.right).toBeLessThanOrEqual(a.box.right + 1);
-        expect(chip.left).toBeGreaterThanOrEqual(a.box.left - 1);
-      }
-      // No two groups overlap.
-      for (const b of groups.slice(i + 1)) {
-        const apart =
-          a.box.right <= b.box.left + 1 ||
-          b.box.right <= a.box.left + 1 ||
-          a.box.bottom <= b.box.top + 1 ||
-          b.box.bottom <= a.box.top + 1;
-        expect(apart).toBe(true);
+    expect(boxes).toHaveLength(3);
+    // Side by side, not reflowed.
+    for (const b of boxes) expect(b.top).toBeCloseTo(boxes[0].top, 0);
+    for (const [i, a] of boxes.entries()) {
+      for (const b of boxes.slice(i + 1)) {
+        expect(a.right <= b.left + 1 || b.right <= a.left + 1).toBe(true);
       }
     }
     await expectNoPageOverflow(page);
-  });
-
-  test('offers a phone sort bar that reorders the stacked cards at 390px', async ({ page }) => {
-    await page.setViewportSize(PHONE);
-    await appraise(page, SIX_COLUMN_PASTE);
-
-    const rowKeys = () =>
-      page
-        .locator('table[aria-label="Appraisal"] tbody tr[data-row-key]')
-        .evaluateAll((rows) => rows.map((row) => row.getAttribute('data-row-key')));
-    // Paste order: no `defaultSort`, so the bar starts on its "no sort" label.
-    expect(await rowKeys()).toEqual([String(VELDSPAR), String(TRITANIUM)]);
-
-    const sortBy = page.getByLabel('Sort by', { exact: true });
-    await expect(sortBy).toBeAttached();
-    // Sell total: Veldspar 26.8M against Tritanium 19.3M.
-    await sortBy.selectOption({ label: 'Sell total ↑' });
-    await expect.poll(rowKeys).toEqual([String(TRITANIUM), String(VELDSPAR)]);
-    await sortBy.selectOption({ label: 'Sell total ↓' });
-    await expect.poll(rowKeys).toEqual([String(VELDSPAR), String(TRITANIUM)]);
-
-    // The paired-card layout is untouched by the bar.
-    const { cells } = await readRow(page, VELDSPAR);
-    expect(labelLines(cells)).toEqual([
-      ['Item'],
-      ['Qty', 'Buy each'],
-      ['Sell each', 'Buy total'],
-      ['Sell total', 'Refine total'],
-      ['Volume (m³)'],
-    ]);
   });
 
   test('folds the paste form so the first result group is on screen at 390px (#3135)', async ({
@@ -425,7 +253,7 @@ test.describe('Market Appraisal — stacked result card', () => {
     const summary = page.getByRole('button', { name: /Edit list/ });
     await expect(summary).toHaveAttribute('aria-expanded', 'false');
 
-    const group = page.locator('section[aria-label="You get"]');
+    const group = page.locator('section[aria-label="Buy"]');
     await expect(group).toBeVisible();
     const box = (await group.boundingBox())!;
     expect(box.y).toBeGreaterThanOrEqual(0);

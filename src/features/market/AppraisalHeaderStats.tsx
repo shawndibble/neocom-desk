@@ -1,11 +1,14 @@
 /**
- * The Appraisal result's header: eight-plus figures in three titled groups
- * (You get / It's worth / Cargo), one emphasised figure each. Nothing dropped.
+ * The Appraisal result's header: three plain numbers, Buy, Split and Sell,
+ * each with the figure it nets to beneath it (Buy → selling into the buy
+ * orders now, Sell → listing it yourself, Split → the spread), then one line of
+ * cargo facts. Nothing dropped.
  */
-import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
 import type { ReactNode } from 'react';
+import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
 import { useTranslation } from 'react-i18next';
-import { IskAmount, StatChip } from '@/components/ui';
+import { IskAmount, StatChip, StatChips } from '@/components/ui';
+import { HintText } from '@/components/ui/HintText';
 import type { AppraisalNetTotals, AppraisalTotals } from '@/engine/market/appraisal';
 import { iskToneClass } from '@/features/character/format';
 import { AppraisalVolumeChip } from './AppraisalVolumeChip';
@@ -25,20 +28,37 @@ interface AppraisalHeaderStatsProps {
   pricesUnavailable?: boolean;
 }
 
-function Group({ title, children }: { title: string; children: ReactNode }) {
+/** One of the three headline numbers: label, figure, what it is, and the figure it nets to. */
+function PriceCell({
+  title,
+  hint,
+  emphasis = false,
+  children,
+  below,
+}: {
+  title: string;
+  hint: string;
+  emphasis?: boolean;
+  children: ReactNode;
+  below?: ReactNode;
+}) {
   return (
     <section
       aria-label={title}
-      className="flex min-w-0 flex-col gap-0.5 rounded-xs border border-line bg-panel-2 px-2.5 py-1.5"
+      className="flex min-w-0 flex-col gap-0.5 rounded-xs border border-line bg-panel-2 px-2.5 py-2"
     >
       <h3 className="text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
         {title}
       </h3>
-      {/* One readout per line, label left and value right (the mockup's shape), so a
-          wide value has the column to itself and can't run into a neighbour group. */}
-      <div className="flex min-w-0 flex-col [&>span]:w-full [&>span>span:last-child]:ml-auto">
+      <span
+        className={`text-xl font-semibold tabular-nums ${emphasis ? 'text-accent' : 'text-text'}`}
+      >
         {children}
-      </div>
+      </span>
+      <span className="mb-1 text-[0.6875rem] text-text-dim">{hint}</span>
+      {below && (
+        <span className="mt-auto border-t border-line pt-1 text-xs text-text-dim">{below}</span>
+      )}
     </section>
   );
 }
@@ -54,92 +74,104 @@ export function AppraisalHeaderStats({
 }: AppraisalHeaderStatsProps) {
   const { t } = useTranslation();
   const pricesUnavailableLabel = usePricesUnavailableLabel();
+  const facts = (
+    <StatChips>
+      <AppraisalVolumeChip totals={totals} />
+      <StatChip label={t('market.appraisal.items')} value={itemCount} />
+      {!pricesUnavailable && showRefine && (
+        <StatChip
+          label={t('market.appraisal.refineTotal')}
+          value={<IskAmount value={totals.refine} decimals={0} />}
+          tooltip={
+            implantBonusPct > 0
+              ? `${t('market.appraisal.refineTotalHelp')} ${t('market.appraisal.refineImplantHint', { pct: implantBonusPct })}`
+              : t('market.appraisal.refineTotalHelp')
+          }
+        />
+      )}
+      {!pricesUnavailable && showCheapest && (
+        <StatChip
+          label={t('market.appraisal.cheapestBuy')}
+          value={<IskAmount value={totals.cheapestBuy} decimals={0} />}
+          tone="accent"
+          tooltip={t('market.appraisal.cheapestBuyHelp')}
+        />
+      )}
+    </StatChips>
+  );
   if (pricesUnavailable) {
     return (
-      <div className="grid w-full grid-cols-[repeat(auto-fit,minmax(min(100%,12rem),1fr))] gap-2">
-        <Group title={t('market.appraisal.groupWorth')}>
-          <p className="text-sm text-text-dim">{pricesUnavailableLabel}</p>
-        </Group>
-        <Group title={t('market.appraisal.groupCargo')}>
-          <AppraisalVolumeChip totals={totals} emphasis />
-          <StatChip label={t('market.appraisal.items')} value={itemCount} />
-        </Group>
+      <div className="flex flex-col gap-2">
+        <p className="text-sm text-text-dim">{pricesUnavailableLabel}</p>
+        {facts}
       </div>
     );
   }
   return (
-    <div className="grid w-full grid-cols-[repeat(auto-fit,minmax(min(100%,12rem),1fr))] gap-2">
-      {net && (
-        <Group title={t('market.appraisal.groupYouGet')}>
-          <StatChip
-            label={t('market.appraisal.instantNet')}
-            emphasis
-            value={
-              <span className={iskToneClass(net.instantNet)}>
-                <IskAmount value={net.instantNet} decimals={0} />
-              </span>
-            }
-            tooltip={t('market.appraisal.instantNetHelp', { tax: net.salesTaxPct.toFixed(2) })}
-          />
-          <StatChip
-            label={t('market.appraisal.listNet')}
-            value={
-              <span className={iskToneClass(net.listNet)}>
-                <IskAmount value={net.listNet} decimals={0} />
-              </span>
-            }
-            tooltip={t('market.appraisal.listNetHelp', {
-              tax: net.salesTaxPct.toFixed(2),
-              broker: net.brokerFeePct.toFixed(2),
-            })}
-          />
-        </Group>
-      )}
-      <Group title={t('market.appraisal.groupWorth')}>
-        <StatChip
-          label={t('market.appraisal.sellTotal')}
-          value={<FullIskTotal value={totals.sell} compact />}
-          tone="accent"
-          emphasis
-          tooltip={t('market.appraisal.sellTotalHelp')}
-        />
-        <StatChip
-          label={t('market.appraisal.buyTotal')}
-          value={<FullIskTotal value={totals.buy} compact />}
-          tooltip={t('market.appraisal.buyTotalHelp')}
-        />
-        <StatChip
-          label={t('market.appraisal.spread')}
-          value={
-            <span className={iskToneClass(totals.spread)}>
-              <IskAmount value={totals.spread} decimals={0} />
-            </span>
+    <div className="flex w-full flex-col gap-2">
+      <div className="grid grid-cols-3 gap-2">
+        <PriceCell
+          title={t('market.appraisal.summaryBuy')}
+          hint={t('market.appraisal.summaryBuyHint')}
+          below={
+            net && (
+              <>
+                <HintText
+                  content={t('market.appraisal.instantNetHelp', {
+                    tax: net.salesTaxPct.toFixed(2),
+                  })}
+                >
+                  {t('market.appraisal.summaryBuyNet')}
+                </HintText>{' '}
+                <b className={iskToneClass(net.instantNet)}>
+                  <IskAmount value={net.instantNet} decimals={0} />
+                </b>
+              </>
+            )
           }
-        />
-        {showCheapest && (
-          <StatChip
-            label={t('market.appraisal.cheapestBuy')}
-            value={<IskAmount value={totals.cheapestBuy} decimals={0} />}
-            tone="accent"
-            tooltip={t('market.appraisal.cheapestBuyHelp')}
-          />
-        )}
-      </Group>
-      <Group title={t('market.appraisal.groupCargo')}>
-        <AppraisalVolumeChip totals={totals} emphasis />
-        <StatChip label={t('market.appraisal.items')} value={itemCount} />
-        {showRefine && (
-          <StatChip
-            label={t('market.appraisal.refineTotal')}
-            value={<IskAmount value={totals.refine} decimals={0} />}
-            tooltip={
-              implantBonusPct > 0
-                ? `${t('market.appraisal.refineTotalHelp')} ${t('market.appraisal.refineImplantHint', { pct: implantBonusPct })}`
-                : t('market.appraisal.refineTotalHelp')
-            }
-          />
-        )}
-      </Group>
+        >
+          <FullIskTotal value={totals.buy} compact />
+        </PriceCell>
+        <PriceCell
+          title={t('market.appraisal.summarySplit')}
+          hint={t('market.appraisal.summarySplitHint')}
+          emphasis
+          below={
+            <>
+              {t('market.appraisal.spread')}{' '}
+              <b className={iskToneClass(totals.spread)}>
+                <IskAmount value={totals.spread} decimals={0} />
+              </b>
+            </>
+          }
+        >
+          <FullIskTotal value={(totals.buy + totals.sell) / 2} compact />
+        </PriceCell>
+        <PriceCell
+          title={t('market.appraisal.summarySell')}
+          hint={t('market.appraisal.summarySellHint')}
+          below={
+            net && (
+              <>
+                <HintText
+                  content={t('market.appraisal.listNetHelp', {
+                    tax: net.salesTaxPct.toFixed(2),
+                    broker: net.brokerFeePct.toFixed(2),
+                  })}
+                >
+                  {t('market.appraisal.summarySellNet')}
+                </HintText>{' '}
+                <b className={iskToneClass(net.listNet)}>
+                  <IskAmount value={net.listNet} decimals={0} />
+                </b>
+              </>
+            )
+          }
+        >
+          <FullIskTotal value={totals.sell} compact />
+        </PriceCell>
+      </div>
+      {facts}
     </div>
   );
 }
