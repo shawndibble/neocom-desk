@@ -369,8 +369,8 @@ describe('AppraisalPanel', () => {
 
     it('renders both net-of-fees chips once the active Character is resolved', () => {
       renderPanel({ controller: controller({ result: netOutcome() }) });
-      expect(screen.getByText('Selling now')).toBeInTheDocument();
-      expect(screen.getByText('Listing')).toBeInTheDocument();
+      expect(screen.getByText(/^Selling now/)).toBeInTheDocument();
+      expect(screen.getByText(/^Listing/)).toBeInTheDocument();
     });
 
     it('excludes a row unpriced on the buy side from the instant net only', () => {
@@ -392,17 +392,17 @@ describe('AppraisalPanel', () => {
 
     it('notes the net chips are always priced at 100% market when Price % differs (issue #1748)', () => {
       renderPanel({ controller: controller({ result: netOutcome() }) }); // default pricePercent: 90
-      expect(screen.getByText(/always priced at 100% market/i)).toBeInTheDocument();
+      expect(screen.getByText('* Prices are always at 100% market.')).toBeInTheDocument();
     });
 
     it('hides the 100%-market note once Price % is already 100 (issue #1748)', () => {
       renderPanel({ pricePercent: 100, controller: controller({ result: netOutcome() }) });
-      expect(screen.queryByText(/always priced at 100% market/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/always at 100% market/i)).not.toBeInTheDocument();
     });
 
     it('wraps whole chips in the totals strip rather than scrolling sideways', () => {
       renderPanel({ controller: controller({ result: netOutcome() }) });
-      const strip = screen.getByText('Selling now').closest('.flex-wrap');
+      const strip = screen.getByText(/^Selling now/).closest('.flex-wrap');
       expect(strip).not.toBeNull();
       expect(strip).not.toHaveClass('overflow-x-auto');
     });
@@ -1344,8 +1344,8 @@ describe('AppraisalPanel — shopping list (#2868)', () => {
       }),
     });
     const youGet = screen.getByRole('region', { name: 'You get' });
-    expect(within(youGet).getByText('Selling now')).toBeInTheDocument();
-    expect(within(youGet).getByText('Listing')).toBeInTheDocument();
+    expect(within(youGet).getByText(/^Selling now/)).toBeInTheDocument();
+    expect(within(youGet).getByText(/^Listing/)).toBeInTheDocument();
     const worth = screen.getByRole('region', { name: "It's worth" });
     for (const label of ['Sell total', 'Buy total', 'Spread']) {
       expect(within(worth).getByText(label)).toBeInTheDocument();

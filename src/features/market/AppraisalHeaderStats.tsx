@@ -23,6 +23,11 @@ interface AppraisalHeaderStatsProps {
    * placeholder instead of 0 ISK totals. Volume and item count need no price.
    */
   pricesUnavailable?: boolean;
+  /**
+   * Price % is not 100: mark the two net chips and say at the foot of You get
+   * that they are priced at 100% of market regardless.
+   */
+  netAtFullMarket?: boolean;
 }
 
 function Group({ title, children }: { title: string; children: ReactNode }) {
@@ -51,9 +56,11 @@ export function AppraisalHeaderStats({
   showCheapest,
   implantBonusPct,
   pricesUnavailable = false,
+  netAtFullMarket = false,
 }: AppraisalHeaderStatsProps) {
   const { t } = useTranslation();
   const pricesUnavailableLabel = usePricesUnavailableLabel();
+  const mark = netAtFullMarket ? '*' : '';
   if (pricesUnavailable) {
     return (
       <div className="grid w-full grid-cols-[repeat(auto-fit,minmax(min(100%,12rem),1fr))] gap-2">
@@ -72,7 +79,7 @@ export function AppraisalHeaderStats({
       {net && (
         <Group title={t('market.appraisal.groupYouGet')}>
           <StatChip
-            label={t('market.appraisal.instantNet')}
+            label={`${t('market.appraisal.instantNet')}${mark}`}
             emphasis
             value={
               <span className={iskToneClass(net.instantNet)}>
@@ -82,7 +89,7 @@ export function AppraisalHeaderStats({
             tooltip={t('market.appraisal.instantNetHelp', { tax: net.salesTaxPct.toFixed(2) })}
           />
           <StatChip
-            label={t('market.appraisal.listNet')}
+            label={`${t('market.appraisal.listNet')}${mark}`}
             value={
               <span className={iskToneClass(net.listNet)}>
                 <IskAmount value={net.listNet} decimals={0} />
@@ -93,6 +100,11 @@ export function AppraisalHeaderStats({
               broker: net.brokerFeePct.toFixed(2),
             })}
           />
+          {netAtFullMarket && (
+            <p className="mt-auto pt-1 text-[0.6875rem] text-text-dim">
+              {t('market.appraisal.netAlwaysAt100Note')}
+            </p>
+          )}
         </Group>
       )}
       <Group title={t('market.appraisal.groupWorth')}>
