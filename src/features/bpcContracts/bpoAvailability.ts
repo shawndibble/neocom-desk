@@ -112,24 +112,6 @@ export function cheaperBpo({ market, contract }: BpoSources): BpoOffer | null {
 }
 
 /**
- * The cheapest pickable original per type in `typeIds`, from contracts in
- * `contractRegionId` and market orders in each type's own book. A tie goes to
- * the contract: it may be researched, a market original never is. Types with
- * no BPO at all are left out.
- */
-export function cheapestBpoByType(
-  typeIds: Iterable<number>,
-  input: BpoAvailabilityInput
-): Map<number, BpoOffer> {
-  const result = new Map<number, BpoOffer>();
-  for (const [typeId, sources] of cheapestBpoSourcesByType(typeIds, input)) {
-    const best = cheaperBpo(sources);
-    if (best) result.set(typeId, best);
-  }
-  return result;
-}
-
-/**
  * The cheapest copy a BPO price can honestly be compared with: not a
  * multi-type bundle, not a zero-price barter. `null` when none qualifies.
  */
