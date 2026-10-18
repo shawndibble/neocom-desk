@@ -47,6 +47,27 @@ import {
   lastSyncedAtOf,
 } from './purgeStaleAccounts.js';
 import {
+  parseBookCall,
+  parseConfirmGroupingInput,
+  parseEditAction,
+  parseStopReminders,
+  parseSyncInput,
+  parseToken,
+  parseTurnOnInput,
+} from './corpTaxBook.js';
+import { esiIdentityReader } from './corpTaxBookEsi.js';
+import {
+  confirmGrouping,
+  editBook,
+  readStatementByToken,
+  reclaimBook,
+  setRemindersByToken,
+  syncBook,
+  turnOnBook,
+  verifyOfficer,
+  type BookDeps,
+} from './corpTaxBookStore.js';
+import {
   parseCommunityIdInput,
   parseCreateInput,
   parseJoinInput,
@@ -714,6 +735,70 @@ export const removeCommunityPledgeCallable = onCall<unknown>(
   async (request) => {
     const { communityId, requestId, pledgeUid } = parseRemovePledgeInput(request.data);
     await removePledge(getFirestore(), callerOf(request), communityId, requestId, pledgeUid);
+  }
+);
+
+// Corp Tax Book (issue #4061, ADR 0023). Every write to a corporation's book
+// goes through these callables (corpTaxBookStore.ts) and lands in its audit
+// log; the client only reads, under firestore.rules. The caller sends a
+// short-lived EVE access token for the role check; it is used for ESI reads
+// and dropped, never stored or logged.
+const corpTaxBookDeps = (): BookDeps => ({
+  db: getFirestore(),
+  now: Date.now,
+  verifyToken: (token) => verifyEveAccessToken(token, verifyOptions),
+  readIdentity: esiIdentityReader(),
+});
+
+const CORP_TAX_BOOK_OPTIONS = { maxInstances: 5 };
+
+export const verifyCorpOfficerCallable = onCall<unknown>(CORP_TAX_BOOK_OPTIONS, (request) =>
+  verifyOfficer(corpTaxBookDeps(), callerOf(request), parseBookCall(request.data))
+);
+
+export const turnOnCorpTaxBookCallable = onCall<unknown>(CORP_TAX_BOOK_OPTIONS, (request) =>
+  turnOnBook(corpTaxBookDeps(), callerOf(request), parseTurnOnInput(request.data))
+);
+
+export const reclaimCorpTaxBookCallable = onCall<unknown>(CORP_TAX_BOOK_OPTIONS, (request) =>
+  reclaimBook(corpTaxBookDeps(), callerOf(request), parseBookCall(request.data))
+);
+
+// A sync is many small transactions (up to 2000 observer rows), so give it room.
+export const syncCorpTaxBookCallable = onCall<unknown>(
+  { ...CORP_TAX_BOOK_OPTIONS, timeoutSeconds: 120 },
+  (request) =>
+    syncBook(corpTaxBookDeps(), callerOf(request), parseSyncInput(request.data, Date.now()))
+);
+
+export const editCorpTaxBookCallable = onCall<unknown>(CORP_TAX_BOOK_OPTIONS, (request) =>
+  editBook(
+    corpTaxBookDeps(),
+    callerOf(request),
+    parseBookCall(request.data),
+    parseEditAction(request.data)
+  )
+);
+
+export const confirmCorpTaxBookGroupingCallable = onCall<unknown>(
+  CORP_TAX_BOOK_OPTIONS,
+  (request) => {
+    const { corporationId, minerId } = parseConfirmGroupingInput(request.data);
+    return confirmGrouping(corpTaxBookDeps(), callerOf(request), corporationId, minerId);
+  }
+);
+
+// No session on purpose: the verify link is the credential (D27), so a miner
+// without an EVE login can read their Statement and stop reminders.
+export const readCorpTaxBookStatementCallable = onCall<unknown>(CORP_TAX_BOOK_OPTIONS, (request) =>
+  readStatementByToken(corpTaxBookDeps(), parseToken(request.data))
+);
+
+export const stopCorpTaxBookRemindersCallable = onCall<unknown>(
+  CORP_TAX_BOOK_OPTIONS,
+  (request) => {
+    const { token, stopped } = parseStopReminders(request.data);
+    return setRemindersByToken(corpTaxBookDeps(), token, stopped);
   }
 );
 
