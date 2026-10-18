@@ -375,9 +375,10 @@ describe('AppraisalPanel', () => {
 
     it('excludes a row unpriced on the buy side from the instant net only', () => {
       renderPanel({ controller: controller({ result: netOutcome() }) });
-      // Only row 1 has a buy price: 10,000 raw total, 7.5% sales tax
-      // (Accounting 0) — 10,000 - 750 = 9,250. Row 2 contributes nothing.
-      expect(screen.getByText('9,250 ISK', { selector: '.sr-only' })).toBeInTheDocument();
+      // Only row 1 has a buy price: 10,000 raw total, scaled by the default
+      // 90% Price % to 9,000, less 7.5% sales tax (Accounting 0) — 8,325.
+      // Row 2 contributes nothing.
+      expect(screen.getByText('8,325 ISK', { selector: '.sr-only' })).toBeInTheDocument();
     });
 
     it('never shows the net chips while the active Character’s skills are still loading', () => {
@@ -388,16 +389,6 @@ describe('AppraisalPanel', () => {
       });
       expect(screen.queryByText('Selling now')).not.toBeInTheDocument();
       expect(screen.queryByText('Listing')).not.toBeInTheDocument();
-    });
-
-    it('notes the net chips are always priced at 100% market when Price % differs (issue #1748)', () => {
-      renderPanel({ controller: controller({ result: netOutcome() }) }); // default pricePercent: 90
-      expect(screen.getByText('* Prices are always at 100% market.')).toBeInTheDocument();
-    });
-
-    it('hides the 100%-market note once Price % is already 100 (issue #1748)', () => {
-      renderPanel({ pricePercent: 100, controller: controller({ result: netOutcome() }) });
-      expect(screen.queryByText(/always at 100% market/i)).not.toBeInTheDocument();
     });
 
     it('wraps whole chips in the totals strip rather than scrolling sideways', () => {

@@ -157,11 +157,9 @@ export interface Appraisal {
   rows: AppraisalRow[];
   totals: AppraisalTotals;
   /**
-   * The same items, unscaled — `appraisalNet` reads these rather than
-   * `AppraisalRow`'s percent-scaled `buyEach`/`sellEach`, per the net-of-fees
-   * figures always being quoted at 100% of market
-   * (`20260924-010954-appraisal-shows-net-of-fees-totals-at-100.md`). Same
-   * order as `rows`, one per row.
+   * The same items, unscaled — `appraisalNet` scales these by Price Percent
+   * itself, and `appraisalUndercut` reads them as real orders. Same order as
+   * `rows`, one per row.
    */
   items: readonly AppraisalItem[];
 }
@@ -361,22 +359,24 @@ export function appraisalUndercut(
 }
 
 /**
- * Net-of-fees totals for the two ways to sell what was pasted, always at
- * 100% of market regardless of the appraisal's own Price Percent — reads
- * `AppraisalItem.buy`/`.sell` (unscaled) via `Appraisal.items`, never the
- * `AppraisalRow`'s own percent-scaled `buyEach`/`sellEach`. An item missing
+ * Net-of-fees totals for the two ways to sell what was pasted, at the
+ * appraisal's own Price Percent: the buy and sell prices are scaled by it
+ * before tax and fees, so the figures sit beside the gross totals they come
+ * from. Reads `AppraisalItem.buy`/`.sell` via `Appraisal.items`. An item missing
  * the relevant price is excluded from that side's net only, the same "an
  * unpriced side stays out of a total, never free" rule `buildAppraisal`
  * itself applies.
  */
 export function appraisalNet(
   items: readonly AppraisalItem[],
-  { accountingLevel, brokerRelationsLevel, standing }: AppraisalNetFees
+  { accountingLevel, brokerRelationsLevel, standing }: AppraisalNetFees,
+  pricePercent = 100
 ): AppraisalNetTotals {
   let instantNet = 0;
   let listNet = 0;
 
-  for (const item of items) {
+  for (const raw of items) {
+    const item = { ...raw, buy: scale(raw.buy, pricePercent), sell: scale(raw.sell, pricePercent) };
     if (item.buy !== null) {
       const buyTotal = item.buy * item.quantity;
       instantNet += buyTotal - salesTax(buyTotal, accountingLevel);

@@ -479,12 +479,12 @@ export function AppraisalPanel({
   // a base-rate (untrained) figure.
   const net = useMemo(() => {
     if (result === null || accountingLevel === null || brokerRelationsLevel === null) return null;
-    return appraisalNet(result.appraisal.items, {
-      accountingLevel,
-      brokerRelationsLevel,
-      standing,
-    });
-  }, [result, accountingLevel, brokerRelationsLevel, standing]);
+    return appraisalNet(
+      result.appraisal.items,
+      { accountingLevel, brokerRelationsLevel, standing },
+      pricePercent
+    );
+  }, [result, accountingLevel, brokerRelationsLevel, standing, pricePercent]);
   // Undefined per row when the type has no reprocessing data at all — the
   // column only earns its place on screen when at least one row has
   // something to show, which is also exactly when there is nothing to show
@@ -931,7 +931,6 @@ export function AppraisalPanel({
                 showCheapest={hasLpOption}
                 implantBonusPct={implantBonusPct}
                 pricesUnavailable={result.pricesUnreachable}
-                netAtFullMarket={pricePercent !== 100}
               />
               {loading && <Spinner label={t('common.loading')} size="sm" />}
             </div>
