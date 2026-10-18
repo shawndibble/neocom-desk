@@ -18,6 +18,7 @@ import { buildQueueView } from '@/features/skills/planner/queueView';
 import { useSkillQueue } from '@/features/skills/planner/useSkillQueue';
 import { classifySkillQueue } from '@/features/skills/queueStatus';
 import { usePlanEditorData } from '@/features/skills/planner/usePlanEditorData';
+import { useCalendarWeekStart } from '@/features/character/calendarWeekStart';
 import { useTicker } from '@/lib/ticker';
 
 /** Countdown recompute cadence; the display is minute-grained, so 30s is fresh enough. */
@@ -73,9 +74,14 @@ export function SkillPlans() {
   const queueResult = useSkillQueue(activeCharacterId ?? 0);
   // Shared with every other 30 s clock on screen; paused while the tab is hidden.
   const nowMs = useTicker(TICK_MS);
+  const weekStart = useCalendarWeekStart((state) => state.value);
+  const hydrateWeekStart = useCalendarWeekStart((state) => state.hydrate);
+  useEffect(() => {
+    void hydrateWeekStart();
+  }, [hydrateWeekStart]);
   const queueView = useMemo(
-    () => buildQueueView(classifySkillQueue(queueResult?.data ?? [], nowMs), nowMs),
-    [queueResult, nowMs]
+    () => buildQueueView(classifySkillQueue(queueResult?.data ?? [], nowMs), nowMs, weekStart),
+    [queueResult, nowMs, weekStart]
   );
 
   // The oldest of the sources that are actually the saved copy: a fresh queue

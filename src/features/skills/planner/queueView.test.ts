@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { SkillQueueEntry } from '@/esi/endpoints';
+import type { WeekStart } from '@/lib/calendarGrid';
 import { classifySkillQueue } from '../queueStatus';
 import { buildQueueView, heroProgress, heroSpPerHour } from './queueView';
 
@@ -17,7 +18,8 @@ function entry(position: number, endDays: number, startDays: number | null = nul
   } satisfies SkillQueueEntry;
 }
 
-const view = (entries: SkillQueueEntry[]) => buildQueueView(classifySkillQueue(entries, NOW), NOW);
+const view = (entries: SkillQueueEntry[], weekStart: WeekStart = 'monday') =>
+  buildQueueView(classifySkillQueue(entries, NOW), NOW, weekStart);
 
 describe('buildQueueView', () => {
   it('takes the first still-training row as the hero and leaves it out of the groups', () => {
@@ -27,11 +29,11 @@ describe('buildQueueView', () => {
   });
 
   it('buckets by finish date: this week, this month, then one group per calendar month', () => {
-    // NOW is 2026-10-14: day 5 is in-week, 10 is later in October,
+    // NOW is Wed 2026-10-14: day 3 is Sat the 17th (in-week), 10 is later in October,
     // 20 is Nov 3, 50 is Dec 3, 80 is Jan 2.
     const v = view([
       entry(0, 1),
-      entry(1, 5),
+      entry(1, 3),
       entry(2, 10),
       entry(3, 20),
       entry(4, 50),
@@ -41,10 +43,12 @@ describe('buildQueueView', () => {
     expect(v.groups.map((g) => g.rows.length)).toEqual([1, 1, 1, 1, 1]);
   });
 
-  it('puts a level finishing exactly seven days out in this week', () => {
-    const v = view([entry(0, 1), entry(1, 7), entry(2, 8)]);
-    expect(v.groups.map((g) => g.id)).toEqual(['week', 'month']);
-    expect(v.groups.map((g) => g.rows.length)).toEqual([1, 1]);
+  it("ends this week where the next one starts, per the pilot's week-start setting", () => {
+    // Sun the 18th: still this week when weeks start Monday, next week's
+    // first day (so rest of October) when they start Sunday.
+    const rows = [entry(0, 1), entry(1, 4)];
+    expect(view(rows, 'monday').groups.map((g) => g.id)).toEqual(['week']);
+    expect(view(rows, 'sunday').groups.map((g) => g.id)).toEqual(['month']);
   });
 
   it('is not inflated by finished rows listed ahead of the active ones', () => {

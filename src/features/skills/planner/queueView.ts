@@ -1,4 +1,5 @@
 import type { SkillQueueEntry } from '@/esi/endpoints';
+import { addWeeks, startOfWeek, type WeekStart } from '@/lib/calendarGrid';
 import type { ClassifiedQueueEntry } from '../queueStatus';
 
 /** A queue row plus how long it adds to the queue on its own. */
@@ -32,16 +33,18 @@ export interface QueueView {
   skillCount: number;
 }
 
-const DAY_SECONDS = 86_400;
-const WEEK_DAYS = 7;
-
 /**
- * Which bucket a level finishing at `finishMs` belongs to: the next seven
- * days, the rest of this calendar month, then one group per calendar month.
+ * Which bucket a level finishing at `finishMs` belongs to: the rest of this
+ * week (up to the next `weekStart`), the rest of this calendar month, then
+ * one group per calendar month.
  */
-function bucketOf(finishMs: number, nowMs: number): { id: string; monthStart?: Date } {
-  if (finishMs - nowMs <= WEEK_DAYS * DAY_SECONDS * 1000) return { id: 'week' };
+function bucketOf(
+  finishMs: number,
+  nowMs: number,
+  weekStart: WeekStart
+): { id: string; monthStart?: Date } {
   const now = new Date(nowMs);
+  if (finishMs < addWeeks(startOfWeek(now, weekStart), 1).getTime()) return { id: 'week' };
   const finish = new Date(finishMs);
   const monthStart = new Date(finish.getFullYear(), finish.getMonth(), 1);
   if (monthStart.getFullYear() === now.getFullYear() && monthStart.getMonth() === now.getMonth()) {
@@ -57,7 +60,11 @@ function bucketOf(finishMs: number, nowMs: number): { id: string; monthStart?: D
  * Pure: every figure comes from the ESI dates already folded into
  * `secondsRemaining`, never recomputed from attributes (the page's own rule).
  */
-export function buildQueueView(rows: readonly ClassifiedQueueEntry[], nowMs: number): QueueView {
+export function buildQueueView(
+  rows: readonly ClassifiedQueueEntry[],
+  nowMs: number,
+  weekStart: WeekStart
+): QueueView {
   const finished = rows.filter((r) => r.status === 'completed');
   const undated = rows.filter((r) => r.status === 'paused');
   const active = rows.filter((r) => r.status === 'training' || r.status === 'pending');
@@ -73,7 +80,7 @@ export function buildQueueView(rows: readonly ClassifiedQueueEntry[], nowMs: num
   const hero = dated[0]?.status === 'training' ? dated[0] : null;
   const groups: QueuePeriodGroup[] = [];
   for (const row of hero ? dated.slice(1) : dated) {
-    const bucket = bucketOf(nowMs + (row.secondsRemaining ?? 0) * 1000, nowMs);
+    const bucket = bucketOf(nowMs + (row.secondsRemaining ?? 0) * 1000, nowMs, weekStart);
     let group = groups.find((g) => g.id === bucket.id);
     if (!group) {
       group = { ...bucket, rows: [], totalSeconds: 0 };

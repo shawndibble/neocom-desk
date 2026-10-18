@@ -51,7 +51,7 @@ function result(entries: SkillQueueEntry[]): CachedResult<SkillQueueEntry[]> {
 
 function renderPanel(entries: SkillQueueEntry[]) {
   const res = result(entries);
-  const view = buildQueueView(classifySkillQueue(entries, NOW), NOW);
+  const view = buildQueueView(classifySkillQueue(entries, NOW), NOW, 'monday');
   return render(
     <MemoryRouter>
       <CurrentQueuePanel result={res} view={view} catalog={catalog} nowMs={NOW} />
@@ -114,7 +114,7 @@ describe('CurrentQueuePanel', () => {
   });
 
   it('shows a spinner while the first read is in flight', () => {
-    const view = buildQueueView([], NOW);
+    const view = buildQueueView([], NOW, 'monday');
     render(
       <MemoryRouter>
         <CurrentQueuePanel result={undefined} view={view} catalog={catalog} nowMs={NOW} />
