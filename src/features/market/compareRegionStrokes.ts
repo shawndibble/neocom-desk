@@ -16,3 +16,22 @@ export const COMPARE_REGION_STROKES = [
 export function compareRegionStroke(slot: number): { color: string; dash: string } {
   return COMPARE_REGION_STROKES[slot % COMPARE_REGION_STROKES.length]!;
 }
+
+/** Dash of a region's Buy line; its Sell line is solid. */
+export const OPEN_BUY_DASH = '5 3';
+
+/**
+ * A region's open-price lines (Buy / Sell). The region keeps one colour for
+ * both, so a reader finds a region by colour and a side by the line itself:
+ * Sell solid, Buy dashed. The region's own dash (`compareRegionStroke`) is
+ * spent on the average line of a region with no open series, so a mixed
+ * comparison still tells every line apart. `color` is the region's colour
+ * (`var(--color-accent)` for the primary, `compareRegionStroke(slot).color`
+ * for a compared one).
+ */
+export function openPriceStroke(
+  color: string,
+  side: 'buy' | 'sell'
+): { color: string; dash: string | undefined } {
+  return { color, dash: side === 'buy' ? OPEN_BUY_DASH : undefined };
+}

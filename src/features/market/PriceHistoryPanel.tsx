@@ -24,7 +24,19 @@ import {
   type PriceHistoryRange,
 } from '@/engine/market/priceHistory';
 import { normalizeCompareRegions } from '@/engine/market/priceHistoryCompare';
+import {
+  clipOpenPrices,
+  openPricePoints,
+  PRICE_SERIES_CHOICES,
+  seriesShows,
+  summarizeOpenPrices,
+  type OpenPriceSeries,
+  type PriceSeriesChoice,
+  type RegionOpenSeries,
+} from '@/engine/market/priceHistoryOpen';
+import { loadMarketOpenPrices } from './marketOpenPrices';
 import { usePriceHistoryRange } from './priceHistoryRangePref';
+import { usePriceHistorySeries } from './priceHistorySeriesPref';
 import { marketIskDecimals } from '@/lib/isk';
 import type { MarketRegionEntry } from '@/sde/marketTypes';
 import type { ComparedRegionSeries } from './PriceHistoryChart';
@@ -135,6 +147,36 @@ function useComparedHistories(typeId: number, regionIds: readonly number[]) {
   );
 }
 
+/**
+ * The daily open buy/sell series for the primary region and each compared one,
+ * one read per region and item, started when the panel mounts (so only while
+ * the history is open). `loadMarketOpenPrices` never throws; a region without
+ * a series maps to `null`, and one still being read is absent from the map.
+ * The chart draws its average line for either until the series lands.
+ */
+function useOpenSeries(typeId: number, regionIds: readonly number[]) {
+  const [byKey, setByKey] = useState<ReadonlyMap<string, OpenPriceSeries | null>>(new Map());
+  const requested = useRef(new Set<string>());
+  useEffect(() => {
+    for (const regionId of regionIds) {
+      const key = `${regionId}:${typeId}`;
+      if (requested.current.has(key)) continue;
+      requested.current.add(key);
+      void loadMarketOpenPrices(regionId, typeId).then((series) =>
+        setByKey((prev) => new Map(prev).set(key, series))
+      );
+    }
+  }, [typeId, regionIds]);
+  return useMemo(() => {
+    const result = new Map<number, OpenPriceSeries>();
+    for (const regionId of regionIds) {
+      const series = byKey.get(`${regionId}:${typeId}`);
+      if (series) result.set(regionId, series);
+    }
+    return result;
+  }, [byKey, regionIds, typeId]);
+}
+
 function ChartFallback({ label }: { label: string }) {
   return (
     <div className="flex justify-center py-8">
@@ -167,6 +209,8 @@ export function PriceHistoryPanel({
     typeId,
     points && points.length > 0 ? compareIds : NO_REGIONS
   );
+  const openRegionIds = useMemo(() => [regionId, ...compareIds], [regionId, compareIds]);
+  const openSeries = useOpenSeries(typeId, openRegionIds);
   // The window a trader reads in is a habit, not a property of the item, and
   // this panel remounts per item — so it comes from disk. Ungated on
   // `hydrated`, and hydrated above the early returns below so a loading or
@@ -254,6 +298,7 @@ export function PriceHistoryPanel({
         compare={compare}
         compareIds={compareIds}
         comparedHistories={comparedHistories}
+        openSeries={openSeries}
       />
     </>
   );
@@ -292,6 +337,8 @@ interface RangedHistoryProps {
   /** Normalized picks, parallel to `comparedHistories`. */
   compareIds: readonly number[];
   comparedHistories: readonly RegionHistoryState[];
+  /** Open buy/sell series by region id, for the regions that have one. */
+  openSeries: ReadonlyMap<number, OpenPriceSeries>;
 }
 
 /** Range control + hi/lo/median summary, both derived from the already-fetched points — neither needs the lazy chart loaded. */
@@ -305,8 +352,35 @@ function RangedHistory({
   compare,
   compareIds,
   comparedHistories,
+  openSeries,
 }: RangedHistoryProps) {
   const { t } = useTranslation();
+  const series = usePriceHistorySeries((state) => state.value);
+  const hydrateSeries = usePriceHistorySeries((state) => state.hydrate);
+  const setSeries = usePriceHistorySeries((state) => state.setValue);
+  useEffect(() => {
+    void hydrateSeries();
+  }, [hydrateSeries]);
+  // Cut to the range like the ESI days; a region with no open day left in it
+  // is left out, so it keeps its average line.
+  const openPrices = useMemo<RegionOpenSeries[]>(
+    () =>
+      [...openSeries.entries()]
+        .map(([regionId, stored]) => ({
+          regionId,
+          points: clipOpenPrices(openPricePoints(stored), range, now),
+        }))
+        .filter((o) => o.points.length > 0),
+    [openSeries, range, now]
+  );
+  const primaryOpen = useMemo(
+    () => openPrices.find((o) => o.regionId === primaryRegionId),
+    [openPrices, primaryRegionId]
+  );
+  const openSummary = useMemo(
+    () => (primaryOpen ? summarizeOpenPrices(primaryOpen.points) : null),
+    [primaryOpen]
+  );
   const regions = compare?.regions;
   // The summary strip stays the primary region's; compared regions only add
   // their average line, cut to the same range.
@@ -373,6 +447,22 @@ function RangedHistory({
               </Stat>
               {/* Units and orders, not ISK — plain figures, so no `IskAmount`
                   and nothing for its privacy blur to hide. */}
+              {typeof openSummary?.buyMedian === 'number' && seriesShows(series, 'buy') && (
+                <Stat label={t('market.priceHistory.summaryBuyMedian')}>
+                  <IskAmount
+                    value={openSummary.buyMedian}
+                    decimals={marketIskDecimals(openSummary.buyMedian)}
+                  />
+                </Stat>
+              )}
+              {typeof openSummary?.sellMedian === 'number' && seriesShows(series, 'sell') && (
+                <Stat label={t('market.priceHistory.summarySellMedian')}>
+                  <IskAmount
+                    value={openSummary.sellMedian}
+                    decimals={marketIskDecimals(openSummary.sellMedian)}
+                  />
+                </Stat>
+              )}
               <Stat label={t('market.priceHistory.summaryOrdersPerDay')}>
                 <span className="tabular-nums">{formatMeanCount(summary.meanOrderCount)}</span>
               </Stat>
@@ -403,6 +493,29 @@ function RangedHistory({
               regions={compare.regions}
               className="w-full sm:w-auto"
             />
+          )}
+          {openPrices.length > 0 && (
+            <Select
+              value={series}
+              onValueChange={(value) => void setSeries(value as PriceSeriesChoice)}
+            >
+              <SelectTrigger
+                size="md"
+                aria-label={t('market.priceHistory.series')}
+                className="w-full sm:w-32"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PRICE_SERIES_CHOICES.map((choice) => (
+                  <SelectItem key={choice} value={choice}>
+                    {t(
+                      `market.priceHistory.series${choice === 'both' ? 'Both' : choice === 'buy' ? 'Buy' : 'Sell'}`
+                    )}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           )}
           <Select
             value={range}
@@ -440,6 +553,9 @@ function RangedHistory({
           movingAverage={filteredMovingAverage}
           comparisons={comparisons}
           primaryRegionName={regions ? regionNameOf(regions, primaryRegionId) : undefined}
+          primaryRegionId={primaryRegionId}
+          openPrices={openPrices}
+          series={series}
         />
       </Suspense>
     </div>

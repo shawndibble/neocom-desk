@@ -42,21 +42,18 @@ export function CompareRegionsPicker({
   const groups = useMemo<MultiSelectGroup<number>[]>(() => {
     const swatch = (id: number) => {
       // With `required` the first pick is the primary region: the chart's main
-      // line, with no comparison stroke of its own.
-      const slot = selected.indexOf(id) - (required ? 1 : 0);
-      if (slot < 0) return undefined;
-      const stroke = compareRegionStroke(slot);
+      // colour (accent), with no comparison stroke of its own.
+      const index = selected.indexOf(id);
+      if (index < 0) return undefined;
+      const slot = index - (required ? 1 : 0);
+      const color = slot < 0 ? 'var(--color-accent)' : compareRegionStroke(slot).color;
+      // A block of the region's colour, not a line: a region draws a solid
+      // Sell and a dashed Buy line, or a dashed average where it has no open
+      // series, and the chart legend shows which. The colour is the one fact
+      // that holds for all of them.
       return (
-        <svg width="14" height="8" aria-hidden="true" className="shrink-0">
-          <line
-            x1="0"
-            y1="4"
-            x2="14"
-            y2="4"
-            stroke={stroke.color}
-            strokeWidth="2"
-            strokeDasharray={stroke.dash}
-          />
+        <svg width="10" height="10" aria-hidden="true" className="shrink-0">
+          <rect width="10" height="10" rx="2" fill={color} />
         </svg>
       );
     };

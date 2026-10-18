@@ -8,6 +8,7 @@ import {
   PRICE_SERIES_CHOICES,
 } from './priceHistoryOpen';
 import type { MarketHistoryPoint } from './priceHistory';
+import { joinRegionAverages } from './priceHistoryCompare';
 
 function day(date: string, average = 100): MarketHistoryPoint {
   return { date, average, highest: average + 5, lowest: average - 5, volume: 10, orderCount: 3 };
@@ -50,10 +51,9 @@ describe('clipOpenPrices', () => {
 
 describe('joinOpenPrices', () => {
   it('lays each region buy and sell on the days of ESI history, adding days only the open series has', () => {
-    const days = joinOpenPrices(
-      [day('2026-10-01'), day('2026-10-03')],
-      [{ regionId: 10, points: [{ date: '2026-10-02', buy: 7, sell: 9 }] }]
-    );
+    const days = joinOpenPrices(joinRegionAverages([day('2026-10-01'), day('2026-10-03')], []), [
+      { regionId: 10, points: [{ date: '2026-10-02', buy: 7, sell: 9 }] },
+    ]);
     expect(days.map((d) => d.date)).toEqual(['2026-10-01', '2026-10-02', '2026-10-03']);
     expect(days[0]!.primary?.average).toBe(100);
     expect(days[1]!.primary).toBeUndefined();
@@ -62,10 +62,9 @@ describe('joinOpenPrices', () => {
   });
 
   it('leaves a missing side out rather than writing a zero', () => {
-    const [d] = joinOpenPrices(
-      [day('2026-10-01')],
-      [{ regionId: 10, points: [{ date: '2026-10-01', buy: null, sell: 9 }] }]
-    );
+    const [d] = joinOpenPrices(joinRegionAverages([day('2026-10-01')], []), [
+      { regionId: 10, points: [{ date: '2026-10-01', buy: null, sell: 9 }] },
+    ]);
     expect(d!.buy).toEqual({});
     expect(d!.sell).toEqual({ 10: 9 });
   });

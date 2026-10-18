@@ -207,4 +207,110 @@ describe('PriceHistoryChart', () => {
       expect(screen.queryByText('The Forge average')).not.toBeInTheDocument();
     });
   });
+
+  describe('with open buy and sell series', () => {
+    const FORGE_OPEN = {
+      regionId: 10000002,
+      points: [
+        { date: '2026-08-01', buy: 9, sell: 12 },
+        { date: '2026-08-02', buy: 9.5, sell: null },
+      ],
+    };
+    const DOMAIN = {
+      regionId: 10000043,
+      name: 'Domain',
+      status: 'ready' as const,
+      points: [{ date: '2026-08-01', average: 11 }],
+    };
+
+    it('replaces the average with Buy and Sell in the legend, with no moving average', () => {
+      render(
+        <PriceHistoryChart
+          points={POINTS}
+          itemName="Tritanium"
+          primaryRegionId={10000002}
+          openPrices={[FORGE_OPEN]}
+          movingAverage={[{ date: '2026-08-02', average: 10 }]}
+        />
+      );
+      const legend = screen.getByRole('list');
+      expect(within(legend).getByText('Buy')).toBeInTheDocument();
+      expect(within(legend).getByText('Sell')).toBeInTheDocument();
+      expect(within(legend).queryByText('Average Price')).not.toBeInTheDocument();
+      expect(within(legend).queryByText('Moving average')).not.toBeInTheDocument();
+    });
+
+    it('lists only the side the series choice keeps', () => {
+      render(
+        <PriceHistoryChart
+          points={POINTS}
+          itemName="Tritanium"
+          primaryRegionId={10000002}
+          openPrices={[FORGE_OPEN]}
+          series="sell"
+        />
+      );
+      const legend = screen.getByRole('list');
+      expect(within(legend).getByText('Sell')).toBeInTheDocument();
+      expect(within(legend).queryByText('Buy')).not.toBeInTheDocument();
+    });
+
+    it('adds Buy and Sell columns, and keeps ESI figures, in the day table', () => {
+      render(
+        <PriceHistoryChart
+          points={POINTS}
+          itemName="Tritanium"
+          primaryRegionId={10000002}
+          openPrices={[FORGE_OPEN]}
+        />
+      );
+      const table = screen.getByRole('table');
+      expect(within(table).getByRole('columnheader', { name: /Buy/ })).toBeInTheDocument();
+      expect(within(table).getByRole('columnheader', { name: /Sell/ })).toBeInTheDocument();
+      expect(within(table).getByRole('columnheader', { name: /Volume/ })).toBeInTheDocument();
+      // 2026-08-02 had a buy order but no sell order.
+      expect(within(table).getByText('No orders')).toBeInTheDocument();
+    });
+
+    it('draws a region without a series as its average beside one with Buy and Sell', () => {
+      render(
+        <PriceHistoryChart
+          points={POINTS}
+          itemName="Tritanium"
+          primaryRegionName="The Forge"
+          primaryRegionId={10000002}
+          openPrices={[FORGE_OPEN]}
+          comparisons={[DOMAIN]}
+        />
+      );
+      const legend = screen.getByRole('list');
+      expect(within(legend).getByText('The Forge buy')).toBeInTheDocument();
+      expect(within(legend).getByText('The Forge sell')).toBeInTheDocument();
+      expect(within(legend).getByText('Domain average')).toBeInTheDocument();
+      const table = screen.getByRole('table');
+      expect(
+        within(table).getByRole('columnheader', { name: /Domain average/ })
+      ).toBeInTheDocument();
+    });
+
+    it('gives a compared region with a series its own Buy and Sell, not an average', () => {
+      render(
+        <PriceHistoryChart
+          points={POINTS}
+          itemName="Tritanium"
+          primaryRegionName="The Forge"
+          primaryRegionId={10000002}
+          openPrices={[
+            FORGE_OPEN,
+            { regionId: 10000043, points: [{ date: '2026-08-01', buy: 10, sell: 13 }] },
+          ]}
+          comparisons={[DOMAIN]}
+        />
+      );
+      const legend = screen.getByRole('list');
+      expect(within(legend).getByText('Domain buy')).toBeInTheDocument();
+      expect(within(legend).getByText('Domain sell')).toBeInTheDocument();
+      expect(within(legend).queryByText('Domain average')).not.toBeInTheDocument();
+    });
+  });
 });

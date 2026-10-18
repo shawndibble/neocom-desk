@@ -6,13 +6,8 @@
  * only records trades, so it cannot say this. Pure — the loader adapts the
  * stored document.
  */
-import {
-  filterPriceHistoryRange,
-  medianOf,
-  type MarketHistoryPoint,
-  type PriceHistoryRange,
-} from './priceHistory';
-import { joinRegionAverages } from './priceHistoryCompare';
+import { filterPriceHistoryRange, medianOf, type PriceHistoryRange } from './priceHistory';
+import type { ComparedHistoryDay } from './priceHistoryCompare';
 
 /** The stored shape: parallel arrays, `null` where no order stood that day. */
 export interface OpenPriceSeries {
@@ -69,10 +64,7 @@ export interface RegionOpenSeries {
   points: readonly OpenPricePoint[];
 }
 
-export interface OpenJoinedDay {
-  date: string;
-  /** Undefined on a day only an open series has. */
-  primary: MarketHistoryPoint | undefined;
+export interface OpenJoinedDay extends ComparedHistoryDay {
   /** Each region's highest buy order that day, by region id; absent where none stood. */
   buy: Readonly<Record<number, number>>;
   /** Each region's lowest sell order that day, by region id. */
@@ -80,30 +72,32 @@ export interface OpenJoinedDay {
 }
 
 /**
- * ESI's days plus each region's open buy and sell, over the union of their
- * dates, ascending. The open series is recorded for days ESI saw no trade, and
- * the line should still pass through them.
+ * The joined ESI days (`joinRegionAverages`) plus each region's open buy and
+ * sell, over the union of their dates, ascending. The open series is recorded
+ * for days ESI saw no trade, and the line should still pass through them.
  */
 export function joinOpenPrices(
-  history: readonly MarketHistoryPoint[],
+  days: readonly ComparedHistoryDay[],
   open: readonly RegionOpenSeries[]
 ): OpenJoinedDay[] {
-  const base = joinRegionAverages(history, []);
-  const byDate = new Map<string, OpenJoinedDay>(
-    base.map(({ date, primary }) => [date, { date, primary, buy: {}, sell: {} }])
-  );
+  const byDate = new Map<
+    string,
+    { day: ComparedHistoryDay; buy: Record<number, number>; sell: Record<number, number> }
+  >(days.map((day) => [day.date, { day, buy: {}, sell: {} }]));
   for (const series of open) {
     for (const p of series.points) {
-      let day = byDate.get(p.date);
-      if (!day) {
-        day = { date: p.date, primary: undefined, buy: {}, sell: {} };
-        byDate.set(p.date, day);
+      let entry = byDate.get(p.date);
+      if (!entry) {
+        entry = { day: { date: p.date, primary: undefined, averages: {} }, buy: {}, sell: {} };
+        byDate.set(p.date, entry);
       }
-      if (p.buy !== null) (day.buy as Record<number, number>)[series.regionId] = p.buy;
-      if (p.sell !== null) (day.sell as Record<number, number>)[series.regionId] = p.sell;
+      if (p.buy !== null) entry.buy[series.regionId] = p.buy;
+      if (p.sell !== null) entry.sell[series.regionId] = p.sell;
     }
   }
-  return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
+  return [...byDate.values()]
+    .map(({ day, buy, sell }) => ({ ...day, buy, sell }))
+    .sort((a, b) => a.date.localeCompare(b.date));
 }
 
 export interface OpenPriceSummary {

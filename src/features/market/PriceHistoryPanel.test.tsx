@@ -5,6 +5,8 @@ import '@/i18n';
 import { db } from '@/db';
 import { PriceHistoryPanel } from './PriceHistoryPanel';
 import { loadPriceHistory } from './priceHistory';
+import { loadMarketOpenPrices } from './marketOpenPrices';
+import { usePriceHistorySeries, DEFAULT_PRICE_HISTORY_SERIES } from './priceHistorySeriesPref';
 import {
   usePriceHistoryRange,
   DEFAULT_PRICE_HISTORY_RANGE,
@@ -20,6 +22,10 @@ vi.mock('./priceHistory', () => ({
   loadPriceHistory: vi.fn(),
 }));
 
+vi.mock('./marketOpenPrices', () => ({
+  loadMarketOpenPrices: vi.fn(async () => null),
+}));
+
 vi.mock('./PriceHistoryChart', () => ({
   default: ({
     points,
@@ -27,7 +33,11 @@ vi.mock('./PriceHistoryChart', () => ({
     movingAverage,
     comparisons,
     primaryRegionName,
+    openPrices,
+    series,
   }: {
+    openPrices?: { regionId: number; points: unknown[] }[];
+    series?: string;
     points: unknown[];
     itemName: string;
     movingAverage?: unknown[];
@@ -37,12 +47,14 @@ vi.mock('./PriceHistoryChart', () => ({
     <div data-testid="chart">
       {itemName}: {points.length} points, {movingAverage?.length ?? 0} ma points
       {primaryRegionName ? ` primary=${primaryRegionName}` : ''}
+      {(openPrices ?? []).map((o) => ` {open ${o.regionId}:${o.points.length}:${series}}`).join('')}
       {(comparisons ?? []).map((c) => ` [${c.name}:${c.status}:${c.points.length}]`).join('')}
     </div>
   ),
 }));
 
 const mockedLoad = vi.mocked(loadPriceHistory);
+const mockedOpen = vi.mocked(loadMarketOpenPrices);
 
 afterEach(() => {
   vi.clearAllMocks();
@@ -53,6 +65,8 @@ beforeEach(async () => {
   // Module-scope store: without a reset, the range one test picks is the
   // window the next one opens on.
   usePriceHistoryRange.setState({ value: DEFAULT_PRICE_HISTORY_RANGE, hydrated: false });
+  usePriceHistorySeries.setState({ value: DEFAULT_PRICE_HISTORY_SERIES, hydrated: false });
+  mockedOpen.mockResolvedValue(null);
 });
 
 describe('PriceHistoryPanel', () => {
@@ -438,6 +452,54 @@ describe('PriceHistoryPanel', () => {
       );
       await waitFor(() => expect(screen.getByTestId('chart')).toBeInTheDocument());
       expect(screen.queryByRole('button', { name: /Compare regions/ })).not.toBeInTheDocument();
+    });
+  });
+
+  describe('open buy and sell prices', () => {
+    const OPEN = {
+      dates: ['2026-08-01', '2026-08-02'],
+      buy: [9, 10],
+      sell: [12, 13],
+    };
+
+    function renderPanel() {
+      mockedLoad.mockResolvedValue({
+        points: [historyPoint({ date: '2026-08-01' })],
+        fetchedAt: 1,
+      });
+      return render(
+        <PriceHistoryPanel regionId={10000002} typeId={34} itemName="Tritanium" now={FIXED_NOW} />
+      );
+    }
+
+    it('hides the series select, and hands the chart no open series, when there is none', async () => {
+      renderPanel();
+      expect(await screen.findByTestId('chart')).not.toHaveTextContent('open');
+      expect(screen.queryByRole('combobox', { name: 'Lines' })).not.toBeInTheDocument();
+      expect(mockedOpen).toHaveBeenCalledWith(10000002, 34);
+    });
+
+    it('reads the series once and hands the chart the days inside the range', async () => {
+      mockedOpen.mockResolvedValue(OPEN);
+      renderPanel();
+      await waitFor(() =>
+        expect(screen.getByTestId('chart')).toHaveTextContent('{open 10000002:2:both}')
+      );
+      expect(screen.getByRole('combobox', { name: 'Lines' })).toHaveTextContent('Buy / Sell');
+      expect(mockedOpen).toHaveBeenCalledTimes(1);
+    });
+
+    it('remembers the chosen side across panels', async () => {
+      mockedOpen.mockResolvedValue(OPEN);
+      const user = userEvent.setup();
+      const first = renderPanel();
+      await user.click(await screen.findByRole('combobox', { name: 'Lines' }));
+      await user.click(await screen.findByRole('option', { name: 'Sell' }));
+      expect(screen.getByTestId('chart')).toHaveTextContent(':sell}');
+      first.unmount();
+      usePriceHistorySeries.setState({ hydrated: false });
+      renderPanel();
+      await waitFor(() => expect(screen.getByTestId('chart')).toHaveTextContent(':sell}'));
     });
   });
 });
