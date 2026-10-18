@@ -15,7 +15,7 @@
     "check:case": "node scripts/check-case-collisions.mjs",
     "test": "vitest",
     "test:run": "vitest run",
-    "test:rules": "npx --yes firebase-tools@14.27.0 emulators:exec --only firestore --project demo-neocom-rules \"vitest run --config vitest.rules.config.ts\"",
+    "test:rules": "npx --yes firebase-tools@14.27.0 emulators:exec --only firestore --project demo-neocom-rules \"vitest run --config vitest.rules.config.ts && npm run test:emulator --prefix functions\"",
     "test:e2e": "playwright test",
     "sde:build": "node scripts/build-sde.mjs",
     "sde:verify": "node scripts/sde-verify.mjs",

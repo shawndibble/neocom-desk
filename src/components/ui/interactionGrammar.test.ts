@@ -190,6 +190,7 @@ describe('interaction grammar source guards (DESIGN.md §6c)', () => {
     // recipe, or via a same-file constant/function its className uses.
     // Exceptions, by file: styled by a stylesheet rule, not utilities.
     const exceptions = [
+      'src/features/character/CharacterCard.tsx', // avatar: pointer-only (tabIndex -1, aria-hidden); the name button carries the ring
       'src/features/skills/planner/EntryList.tsx', // PriorityPill: ring drawn on the child via group-focus-visible
       'src/features/fittings/shipTree/FactionGrid.tsx', // .isis-faction (shipTree.css :focus-visible)
       'src/features/fittings/shipTree/IsisTile.tsx', // .isis-tile (shipTree.css :focus-visible)

@@ -1,14 +1,15 @@
+/**
+ * Memoizes an async loader for the session. A failed load is never memoized,
+ * so a later call can retry. By default it rejects; pass `fallback` to resolve
+ * that value instead. `reset()` drops the memo (tests swap data between
+ * cases); a failure from a load `reset()` already replaced leaves the newer
+ * memo alone.
+ */
 export interface MemoizedAsync<T> {
   (): Promise<T>;
-  /** Drops the memo. Test-only in practice: lets a test swap the source between cases. */
   reset(): void;
 }
 
-/**
- * Memoizes an async loader for the session. A failure is never memoized, so a
- * later call that can reach the source still gets it. By default the failure
- * rejects; with `{ fallback }` it resolves to that value instead.
- */
 export function memoizeAsync<T>(loader: () => Promise<T>): MemoizedAsync<T>;
 export function memoizeAsync<T, F>(
   loader: () => Promise<T>,
@@ -22,7 +23,6 @@ export function memoizeAsync<T, F>(
   const get = (): Promise<T | F> => {
     if (memo) return memo;
     const pending: Promise<T | F> = loader().catch((error: unknown) => {
-      // Allow retry after failure — unless a reset already replaced this load.
       if (memo === pending) memo = null;
       if (options) return options.fallback;
       throw error;
@@ -30,8 +30,9 @@ export function memoizeAsync<T, F>(
     memo = pending;
     return pending;
   };
-  get.reset = () => {
-    memo = null;
-  };
-  return get;
+  return Object.assign(get, {
+    reset: () => {
+      memo = null;
+    },
+  });
 }

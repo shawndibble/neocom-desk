@@ -4,16 +4,9 @@ import { setupServer } from 'msw/node';
 import { ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
 import { resolveCategories, resolveNames } from './names';
+import { deferred } from '@/test/deferred';
 
 const server = setupServer();
-
-function deferred() {
-  let resolve!: () => void;
-  const promise = new Promise<void>((r) => {
-    resolve = r;
-  });
-  return { promise, resolve };
-}
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 beforeEach(async () => {

@@ -5272,6 +5272,7 @@
     }
   },
   "common": {
+    "unknownType": "Type #{{typeId}}",
     "needsConnection": "Needs a connection",
     "opensInNewTab": "(opens in a new tab)",
     "pricesUnavailableOffline": "Prices unavailable offline",
@@ -5926,7 +5927,7 @@
       "paid": "Paid",
       "dismissed": "Dismissed"
     },
-    "needsReviewHint": "This entry grew after you settled it. Open the row to review the new total.",
+    "needsReviewHint": "More ore showed up for this entry. Open the row to review the new total.",
     "selectRow": "Select {{date}}, {{system}}",
     "selectionCount": "{{count}} selected",
     "selectAllAction": "Select all",
@@ -9466,8 +9467,11 @@
       "StructuresJobsCancelled": "Industry Jobs Cancelled",
       "StructureLowReagentsAlert": "Structure Low on Reagents",
       "StructureNoReagentsAlert": "Structure Out of Reagents",
+      "MoonminingExtractionStarted": "Moon Extraction Started",
       "MoonminingExtractionFinished": "Moon Extraction Ready",
+      "MoonminingLaserFired": "Moon Drill Fired",
       "MoonminingAutomaticFracture": "Moon Chunk Fractured",
+      "MoonminingExtractionCancelled": "Moon Extraction Cancelled",
       "CorpAllBillMsg": "Corporation Bill Issued",
       "BillOutOfMoneyMsg": "Bill Could Not Be Paid",
       "CorpOfficeExpirationMsg": "Corporation Office Expiring",
@@ -9649,6 +9653,19 @@
             "body": "{{character}}: assets at {{structure}} are at risk — the structure is close to being abandoned.",
             "bodyWithDays_one": "{{character}}: assets at {{structure}} are at risk — the structure is abandoned in {{count}} day.",
             "bodyWithDays_other": "{{character}}: assets at {{structure}} are at risk — the structure is abandoned in {{count}} days."
+          },
+          "MoonminingExtractionStarted": {
+            "title": "Moon extraction started",
+            "body": "{{character}}: a moon extraction started at {{structure}}.",
+            "bodyWithReady": "{{character}}: a moon extraction started at {{structure}}; the chunk arrives {{ready}}."
+          },
+          "MoonminingLaserFired": {
+            "title": "Moon drill fired",
+            "body": "{{character}}: the moon drill at {{structure}} was fired and the chunk fractured."
+          },
+          "MoonminingExtractionCancelled": {
+            "title": "Moon extraction cancelled",
+            "body": "{{character}}: the moon extraction at {{structure}} was cancelled."
           },
           "MoonminingExtractionFinished": {
             "title": "Moon extraction ready",
@@ -13497,6 +13514,78 @@
       "needsCharacter": "Pick a character first: Build Groups belong to one.",
       "groupTitle": "New Build Group",
       "groupConfirm": "Create group"
+    }
+  },
+  "corpTaxBook": {
+    "mailQueue": {
+      "title": "Statement mail",
+      "minutes_one": "{{count}} minute",
+      "minutes_other": "{{count}} minutes",
+      "chip": {
+        "label": "Statements",
+        "progress": "{{sent}} of {{total}}",
+        "sent": "sent",
+        "aria": "Statement mail: {{percent}}% sent",
+        "ariaDone": "Statement mail: {{percent}}% sent, done",
+        "ariaFailed": "{{count}} failed"
+      },
+      "summary": {
+        "sending": "Sending {{current}} of {{total}}",
+        "done": "Done",
+        "sent": "{{count}} sent",
+        "paused": "{{count}} paused",
+        "waiting": "{{count}} waiting",
+        "failed": "{{count}} failed",
+        "left": "about {{time}} left",
+        "progressLabel": "Statements sent",
+        "runningNote": "One mail every 12–15 seconds, in the background. It keeps going while the app is open in any tab; if you close every tab it waits and picks up where it left off when you next open the app.",
+        "doneNote": "Every mail is logged on its Miner. Retry a failure, or open it in EVE to send it by hand."
+      },
+      "table": {
+        "label": "Send queue",
+        "to": "To",
+        "statement": "Statement",
+        "status": "Status",
+        "reminder": "Reminder"
+      },
+      "status": {
+        "sent": "Sent",
+        "sending": "Sending",
+        "paused": "Paused",
+        "waiting": "Waiting",
+        "failed": "Failed"
+      },
+      "hold": {
+        "rateLimit": "EVE asked us to wait {{seconds}}s (too many mails)",
+        "offline": "Waiting for a connection"
+      },
+      "failure": {
+        "cspa": "{{name}} charges to receive mail. Open it in EVE to send it by hand.",
+        "auth": "EVE refused the mail permission. Log in again, then retry.",
+        "other": "EVE refused: {{detail}}",
+        "otherNoDetail": "EVE refused the mail."
+      },
+      "actions": {
+        "retry": "Retry",
+        "retryLabel": "Retry mail to {{name}}",
+        "openInEve": "Open in EVE",
+        "openInEveLabel": "Open mail to {{name}} in EVE",
+        "clearDone": "Clear sent mail",
+        "close": "Close"
+      },
+      "notice": {
+        "line_one": "EVE lets a character send about 5 mails a minute, so this mail takes about {{minutes}}.",
+        "line_other": "EVE lets a character send about 5 mails a minute, so {{count}} mails take about {{minutes}}.",
+        "detail": "They go out in the background{{from}}. Keep using the app; a chip at the top of every page shows progress. If you close the tab the queue picks up where it left off when you next open the app.",
+        "from": " from {{name}}"
+      },
+      "preview": {
+        "title": "Preview mail",
+        "to": "To",
+        "subject": "Subject",
+        "summarised": "This mail is summarised to fit EVE’s 10,000-character limit; the verify link has every line."
+      },
+      "panelTitle": "Statement mail queue"
     }
   }
 }
