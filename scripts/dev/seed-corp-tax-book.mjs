@@ -37,7 +37,7 @@ const { values: args } = parseArgs({
   },
 });
 
-function id(name) {
+function requireId(name) {
   const n = Number(args[name]);
   if (!Number.isSafeInteger(n) || n <= 0) {
     console.error(
@@ -48,13 +48,17 @@ function id(name) {
   }
   return n;
 }
-const CORP = id('corp');
-const OFFICER = id('officer');
-const MEMBER = id('member');
-const GUEST = args.guest === undefined ? null : id('guest');
+const CORP = requireId('corp');
+const OFFICER = requireId('officer');
+const MEMBER = requireId('member');
+const GUEST = args.guest === undefined ? null : requireId('guest');
 const CORP_NAME = args['corp-name'];
 
 const host = process.env.FIRESTORE_EMULATOR_HOST ?? '127.0.0.1:8080';
+if (!/^(127\.0\.0\.1|localhost|\[::1\]):\d+$/.test(host)) {
+  console.error(`Refusing to seed ${host}: FIRESTORE_EMULATOR_HOST must be a local emulator.`);
+  process.exit(1);
+}
 process.env.FIRESTORE_EMULATOR_HOST = host;
 initializeApp({ projectId: args.project });
 const db = getFirestore();
@@ -281,7 +285,7 @@ put(sub('declarations').doc('x-dev-1'), {
 });
 
 // --- Extractions: Extracting, Ready, Fractured, Expired ----------------------
-function extraction(index, structure, startedAgoH, arrivesInH, decaysInH, laserAgoH) {
+function extraction(structure, startedAgoH, arrivesInH, decaysInH, laserAgoH) {
   const start = NOW - startedAgoH * HOUR;
   const startIso = iso(start);
   const fields = {
@@ -294,12 +298,11 @@ function extraction(index, structure, startedAgoH, arrivesInH, decaysInH, laserA
   };
   if (laserAgoH !== undefined) fields.laserFiredAt = iso(NOW - laserAgoH * HOUR);
   put(sub('extractions').doc(fields.id), fields);
-  return index;
 }
-extraction(1, REFINERIES[0], 24, 72, 120); // Extracting: chunk lands in 3 days
-extraction(2, REFINERIES[1], 120, -2, 46); // Ready: arrived, not yet fractured
-extraction(3, REFINERIES[0], 200, -80, -30, 30); // Fractured: laser 30h ago, expires after 48h
-extraction(4, REFINERIES[1], 400, -300, -250); // Expired: fractured 250h ago
+extraction(REFINERIES[0], 24, 72, 120); // Extracting: chunk lands in 3 days
+extraction(REFINERIES[1], 120, -2, 46); // Ready: arrived, not yet fractured
+extraction(REFINERIES[0], 200, -80, -30, 30); // Fractured: laser 30h ago, expires after 48h
+extraction(REFINERIES[1], 400, -300, -250); // Expired: fractured 250h ago
 
 // --- Audit trail (what turnOn and issueStatement append) ---------------------
 function audit(at, action, detail) {

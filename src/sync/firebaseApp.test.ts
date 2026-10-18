@@ -18,7 +18,10 @@ vi.mock('firebase/functions', () => ({
   getFunctions: vi.fn(() => ({ kind: 'functions' })),
   connectFunctionsEmulator: (...args: unknown[]) => connectFunctionsEmulator(...args),
 }));
-vi.mock('./firebaseCore', () => ({ getFirebaseApp: vi.fn(() => ({ name: 'app' })) }));
+vi.mock('./firebaseCore', async (importActual) => ({
+  ...(await importActual<typeof import('./firebaseCore')>()),
+  getFirebaseApp: vi.fn(() => ({ name: 'app' })),
+}));
 
 async function load() {
   vi.resetModules();

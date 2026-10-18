@@ -71,7 +71,9 @@ touches a real Firebase project: the project id is `demo-neocom-desk`.
    shell that runs the emulators and the seed.
 2. **Flag.** Add `VITE_FIREBASE_EMULATORS=1` to `.env.local` and restart
    `npm run dev`. `src/sync/firebaseApp.ts` then connects Auth (9099), Firestore
-   lite (8080) and Functions (5001), the ports in `firebase.json`. It is off by
+   lite (8080) and Functions (5001), the ports in `firebase.json`, and uses the
+   project id `demo-neocom-desk` instead of `VITE_FIREBASE_PROJECT_ID` (data and
+   function URLs are namespaced by it). It is off by
    default and also requires `import.meta.env.DEV`, so a production build never
    connects to an emulator (`src/sync/firebaseApp.test.ts` pins both).
 3. **Emulators.** `npm run emulators` builds `functions/` and starts
@@ -90,7 +92,7 @@ touches a real Firebase project: the project id is `demo-neocom-desk`.
    record carries `--owner-hash`; the Firestore rules compare it to the signed-in
    token's `ownerHash` claim. The seeded value is a placeholder, and opening
    `/corp/moons` as a real officer of that corporation rewrites the record with
-   your real hash through `verifyCorpOfficerCallable`. Otherwise pass your own
+   your real hash through `verifyCorpOfficerCallable`. The live role check reads real ESI, so use your real corporation id for `--corp` when you want that route. Otherwise pass your own
    (the `ownerHash` claim of your signed-in ID token). The member and guest
    Characters see their own lines on the personal tab; the verify page needs no
    sign-in.

@@ -21,7 +21,7 @@
 import { connectAuthEmulator, getAuth, type Auth } from 'firebase/auth';
 import { connectFirestoreEmulator, getFirestore, type Firestore } from 'firebase/firestore/lite';
 import { connectFunctionsEmulator, getFunctions, type Functions } from 'firebase/functions';
-import { getFirebaseApp } from './firebaseCore';
+import { emulatorsOn, getFirebaseApp } from './firebaseCore';
 
 export { getFirebaseApp };
 
@@ -30,8 +30,6 @@ export { getFirebaseApp };
 // is compile-time false in a production build, so the branch and the emulator
 // hosts below are dead code there. Each connector may be called only once per
 // instance (Firebase throws on a second call after first use), hence the guards.
-const emulatorsOn = (): boolean =>
-  import.meta.env.DEV && import.meta.env.VITE_FIREBASE_EMULATORS === '1';
 const EMULATOR_HOST = '127.0.0.1';
 let authConnected = false;
 let firestoreConnected = false;
