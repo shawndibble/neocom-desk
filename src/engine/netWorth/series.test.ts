@@ -7,7 +7,6 @@ import {
   layerValues,
   listedLayers,
   netWorthOf,
-  partitionByCoverage,
   toggleHidden,
   totalsFor,
 } from './series';
@@ -119,15 +118,6 @@ describe('buildCharacterSeries', () => {
     });
     expect(s.firstSnapshotDay).toBeNull();
     expect(s.points[0]!.kind).toBe('wallet-only');
-  });
-});
-
-describe('partitionByCoverage', () => {
-  it('leaves Characters missing a permission out', () => {
-    expect(partitionByCoverage([1, 2, 3], new Set([1, 3]))).toEqual({
-      included: [1, 3],
-      missing: [2],
-    });
   });
 });
 
