@@ -2,6 +2,8 @@
 
 _Recorded 2026-10-18 · issue #4055._
 
+D-numbers are the decision numbers in epic #4055.
+
 - **One mail per debtor with the full breakdown (D16):** day, refinery, ore,
   quantity, unit price, price date and source, rate, tax, payments, credit,
   code and verify link. A breakdown past ESI's 10,000-character body is
@@ -19,4 +21,4 @@ _Recorded 2026-10-18 · issue #4055._
   (owed, overdue first; drill into a miner's days, payments, dismissals and
   mail) and Statements (periods, sending, the queue). Settings open from the
   page header. The moon Kind Cards on `/corp` link here.
-- **No UI is built before Shawn picks one of three mockup options** (#4056).
+- **No UI is built before one of three mockup options is chosen** (#4056).

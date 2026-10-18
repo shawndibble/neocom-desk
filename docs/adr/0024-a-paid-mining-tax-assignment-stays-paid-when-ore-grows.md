@@ -17,9 +17,8 @@ settled day reopen.
 The **Corp Tax Book** (ADR 0023, epic #4055) makes this worse. Its rule is
 forward-only: an issued **Statement** never changes, and late ore on a paid
 Statement's days is written off, never billed. If the personal tab reopens a
-paid day the corp has closed, a member and their corp disagree about whether
-anything is owed, which the epic's "never 'you still owe more'" rule exists
-to prevent.
+paid day the corp has closed, a corp member and their corp disagree about whether
+anything is owed, which the book's forward-only rule exists to prevent.
 
 ## Decision
 
@@ -41,5 +40,6 @@ behaviour; this decision is about paid Assignments only.
   it separately. Against a Corp Tax Book, that row follows the book's rule:
   if the book closed the day, it is "Recorded after payment — written off".
 - `reconcile.ts` changes (#4060) and its "paid growth flags" tests invert.
-  The decision-doc rule "never silently absorbed into `oreLines`" still holds:
+  The rule "never silently absorbed into `oreLines`"
+  (`20260905-180422-moon-mining-tax-v1-implementation-choices.md`) still holds:
   nothing is absorbed, the growth is split off.

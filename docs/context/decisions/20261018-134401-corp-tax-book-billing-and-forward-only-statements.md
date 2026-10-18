@@ -1,12 +1,14 @@
-# Scope decisions — Corp Tax Book billing, and never "you still owe more" (issue #4055)
+# Scope decisions — Corp Tax Book billing and forward-only Statements (issue #4055)
 
 _Recorded 2026-10-18 · issue #4055._
 
-- **Everyone in the observer ledger is billed (D2):** members, alts and
-  guests. The book shows each one's current corp, members by default with a
-  non-member filter. Billing works with no app use on the miner's side: mail
+D-numbers are the decision numbers in epic #4055.
+
+- **Everyone in the observer ledger is billed (D2):** corp members, alts and
+  guests. The book shows each one's current corp, corp members by default with a
+  filter for the rest. Billing works with no app use on the miner's side: mail
   plus donation.
-- **Valuation is the personal tab's engine (D11)**, so a member and their corp
+- **Valuation is the personal tab's engine (D11)**, so a corp member and their corp
   reach the same tax. The book has its own trade hub (Jita by default) and Ore
   Form (Compressed by default), both printed on every Statement. No refined
   value.
@@ -18,7 +20,7 @@ _Recorded 2026-10-18 · issue #4055._
   (D4).** The Statement is monthly by default, configurable, and is what gets
   mailed.
 - **Chunk ore and ISK (D13)** come from the ExtractionStarted notification,
-  else a linked Moon Ore Survey, else "Ore unknown — link a survey". After
+  else a linked **Survey**, else "Ore unknown — link a survey". After
   fracture, mined vs left. Chunk volume per hour is configurable because
   sources disagree (#4070).
 - **Lifecycle (D14):** Extracting → Ready → Fractured (laser fired, or
@@ -35,9 +37,13 @@ _Recorded 2026-10-18 · issue #4055._
 - **A paid Statement's days are closed for good (D22).** Late ore on them is
   logged as "Recorded after payment — written off" and never billed; officers
   see a count. "Rebill from date" can never reach a paid Statement, and for
-  members it needs Director approval.
+  corp members it needs Director approval.
 - **Day closing.** A UTC day becomes Billable only once day end + grace (6h by
-  default) has passed and an officer has synced after that.
+  default, adjustable) has passed and an officer has synced after that.
 - **Tolerance.** Payments within max(0.5%, 100k ISK) of a Statement settle
   it; the remainder is written off automatically and logged.
-- **Paid stays paid in the personal tab, for everyone (D23).** ADR 0024.
+- **Paid stays paid in the personal tab, for everyone (D23).** ADR 0024. This
+  reverses "paid and dismissed growth still flags" for paid entries
+  (`20261004-135551-mining-tax-redesign-owed-first-combined-entries-edit.md`,
+  `20260905-180422-moon-mining-tax-v1-implementation-choices.md`); dismissed
+  growth still flags.
