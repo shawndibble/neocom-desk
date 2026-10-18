@@ -37,3 +37,5 @@ _Recorded 2026-10-18._
 - **Item Detail's Market tab has no hub picker.** Compare regions picks the
   regions outright: the first pick is the main line and the summary, the rest
   overlay it.
+- **Cost:** `syncMarketOpenPrices` is one more Cloud Scheduler job past the free
+  three (eleven scheduled functions in the deployment).
