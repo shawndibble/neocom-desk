@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { useMemo, useState } from 'react';
+import { Suspense, useMemo, useState } from 'react';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation, useNavigationType } from 'react-router-dom';
-import { boolParam, enumSetParam, textParam } from './urlState';
+import { boolParam, enumSetParam, orderedIdListParam, textParam } from './urlState';
 import {
   useRememberedUrlParams,
   useUrlFilter,
@@ -444,5 +444,63 @@ describe('useRememberedUrlParams', () => {
     expect(screen.getByLabelText('max')).toHaveValue('50');
     expect(screen.getByTestId('linked')).toHaveTextContent('false');
     expect(onRemember).not.toHaveBeenCalled();
+  });
+});
+
+const IDS = orderedIdListParam();
+/** Holds every navigation's transition open until `release` runs: a slow page's render. */
+const hold: { promise: Promise<void> | null; release: () => void } = {
+  promise: null,
+  release: () => {},
+};
+function holdNavigations() {
+  hold.promise = new Promise((resolve) => {
+    hold.release = () => {
+      hold.promise = null;
+      resolve();
+    };
+  });
+}
+function HoldNavigation() {
+  const { search } = useLocation();
+  // Thrown, not `use`d: under `use` the held transition never landed after release.
+  if (search !== '' && hold.promise) throw hold.promise;
+  return null;
+}
+function Appending() {
+  const [ids, setIds] = useUrlParam('ids', IDS);
+  return (
+    <div>
+      <button type="button" onClick={() => setIds([...ids, 1])}>
+        add 1
+      </button>
+      <button type="button" onClick={() => setIds([...ids, 2])}>
+        add 2
+      </button>
+      <span data-testid="ids">{ids.join(',')}</span>
+      <Suspense>
+        <HoldNavigation />
+      </Suspense>
+    </div>
+  );
+}
+
+describe('useUrlParam immediate writes', () => {
+  afterEach(() => {
+    hold.promise = null;
+  });
+
+  it('shows a write before its navigation commits, so the next pick builds on it', async () => {
+    holdNavigations();
+    const user = userEvent.setup();
+    renderAt('/p', <Appending />);
+    await user.click(screen.getByRole('button', { name: 'add 1' }));
+    expect(screen.getByTestId('ids').textContent).toBe('1');
+    await user.click(screen.getByRole('button', { name: 'add 2' }));
+    expect(screen.getByTestId('ids').textContent).toBe('1,2');
+
+    await act(async () => hold.release());
+    await waitFor(() => expect(probe()).toBe(`/p?ids=${encodeURIComponent('1,2')}|REPLACE`));
+    expect(screen.getByTestId('ids').textContent).toBe('1,2');
   });
 });

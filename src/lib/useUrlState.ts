@@ -126,6 +126,11 @@ export function useUrlParams<S extends UrlParamSchema>(
       // sees this one's value as its "before".
       latest.current = { ...latest.current, pending: next };
       if (immediate || wait === 0) {
+        // Shown now, not when the navigation's transition commits: a slow
+        // page holds that open, and a second click in the gap built on the
+        // old value — three quick picks kept only the last. `flush` clears
+        // it in the same transition that lands the URL.
+        setPending(next);
         flush(next, options);
         return;
       }
