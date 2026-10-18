@@ -23,7 +23,9 @@ _Recorded 2026-10-18._
   region outside it still draws on the chart from ESI history alone. The
   backfill script is deleted once it has run (it lives under `scripts/` with a
   header saying so).
-- **Layout: one document per region and type.** Collection `marketOpenPrices`,
+- **Layout: one document per region and type.** _Superseded by
+  `20261018-164126-open-prices-one-document-per-type-every-hub.md`: one
+  document per type in `marketOpenPricesByType`, every hub region in it._ Collection `marketOpenPrices`,
   document id `<regionId>_<typeId>`, fields `regionId`, `typeId`, `dates`
   (ascending `YYYY-MM-DD`), `buy` and `sell` (parallel arrays of price or
   `null`), capped at 400 days. Firestore forbids arrays of arrays, hence the

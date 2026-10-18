@@ -192,6 +192,7 @@ describe('interaction grammar source guards (DESIGN.md §6c)', () => {
     const exceptions = [
       'src/features/skills/planner/entryList/cells.tsx', // PriorityPill: ring drawn on the child via group-focus-visible
       'src/features/skills/planner/entryList/MarkerRow.tsx', // moved with EntryList's exception: same file-level carve-out
+      'src/features/character/CharacterCard.tsx', // avatar: pointer-only (tabIndex -1, aria-hidden); the name button carries the ring
       'src/features/fittings/shipTree/FactionGrid.tsx', // .isis-faction (shipTree.css :focus-visible)
       'src/features/fittings/shipTree/IsisTile.tsx', // .isis-tile (shipTree.css :focus-visible)
       'src/features/fittings/shipTree/ShipTreeMap.tsx', // .isis-emblem (shipTree.css :focus-visible)
