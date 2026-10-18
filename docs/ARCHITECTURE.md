@@ -37,9 +37,9 @@ no app server. Two kinds of data:
   (`features/fittings/workbenchFits.ts` reads it).
 
 - A daily job (`syncMarketOpenPrices`) folds EVE Ref's last market-order
-  snapshot of the previous UTC day into `marketOpenPrices/<regionId>_<typeId>`:
-  per Trade Hub region and type, the day's highest buy and lowest sell, up to
-  400 days, public read (`functions/src/marketOpenPrices.ts` holds the logic,
+  snapshot of the previous UTC day into `marketOpenPricesByType/<typeId>`:
+  per type, every Trade Hub region's highest buy and lowest sell for the day, up
+  to 400 days, public read (`functions/src/marketOpenPrices.ts` holds the logic,
   `marketOrdersArchive.ts` the streaming fetch). The deployment now has eleven
   scheduled functions, i.e. eleven Cloud Scheduler jobs.
 

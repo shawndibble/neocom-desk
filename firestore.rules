@@ -233,11 +233,13 @@ service cloud.firestore {
       allow read: if request.auth != null;
       allow write: if false;
     }
-    // Daily open (end-of-UTC-day) best buy and best sell per Trade Hub region
-    // and type, doc id `<regionId>_<typeId>` (decision 20261018-121126), for the
-    // price-history chart. Public market data, so readable by anyone; written
-    // only by syncMarketOpenPrices and the one-off backfill (admin privileges).
-    match /marketOpenPrices/{docId} {
+    // Daily open (end-of-UTC-day) best buy and best sell per type, every Trade
+    // Hub region in one doc, doc id `<typeId>` (decisions 20261018-121126 and
+    // 20261018-164126), for the price-history chart. Public market data, so
+    // readable by anyone; written only by syncMarketOpenPrices and the one-off
+    // backfill (admin privileges). marketOpenPricesMeta matches no rule, so it
+    // stays admin-only.
+    match /marketOpenPricesByType/{typeId} {
       allow read: if true;
       allow write: if false;
     }
