@@ -4,9 +4,9 @@ import { enqueueReminder, enqueueStatements, retryMail, type StatementToMail } f
 
 const readVerifyTokens = vi.fn();
 const editCorpTaxBook = vi.fn();
-vi.mock('./bookApi', () => ({
+vi.mock('@/features/corp/taxBook/bookClient', () => ({
   readVerifyTokens: (...a: unknown[]) => readVerifyTokens(...a),
-  editCorpTaxBook: (...a: unknown[]) => editCorpTaxBook(...a),
+  editBook: (...a: unknown[]) => editCorpTaxBook(...a),
   verifyUrl: (origin: string, token: string) => `${origin}/v/${token}`,
 }));
 
@@ -96,10 +96,15 @@ describe('enqueueReminder (D27)', () => {
     readVerifyTokens.mockResolvedValue(new Map([['s1', 'tok1']]));
     const result = await enqueueReminder({ ...base, statement: statement(1), ...stopped });
     expect(result).toMatchObject({ ok: true, queued: 1 });
-    expect(editCorpTaxBook).toHaveBeenCalledWith(7, 98000001, {
-      action: 'recordReminder',
-      statementId: 's1',
-    });
+    expect(editCorpTaxBook).toHaveBeenCalledWith(
+      7,
+      98000001,
+      {
+        action: 'recordReminder',
+        statementId: 's1',
+      },
+      { freshToken: true }
+    );
     const [row] = await db.corpMailQueue.toArray();
     expect(row.kind).toBe('reminder');
     expect(row.subject.startsWith('Reminder: ')).toBe(true);

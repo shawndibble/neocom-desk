@@ -24,13 +24,18 @@ function liveDeps(sending: (id: string | undefined) => void): QueueDeps {
         item.body
       ),
     log: async (item) => {
-      const { editCorpTaxBook } = await import('./bookApi');
-      await editCorpTaxBook(item.senderCharacterId, item.corporationId, {
-        action: 'recordMail',
-        statementId: item.statementId,
-        mailId: item.mailId!,
-        kind: item.kind,
-      });
+      const { editBook } = await import('@/features/corp/taxBook/bookClient');
+      await editBook(
+        item.senderCharacterId,
+        item.corporationId,
+        {
+          action: 'recordMail',
+          statementId: item.statementId,
+          mailId: item.mailId!,
+          kind: item.kind,
+        },
+        { freshToken: true }
+      );
     },
     sending,
     isUnconfirmed: isUnconfirmedWrite,

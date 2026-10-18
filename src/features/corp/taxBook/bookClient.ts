@@ -121,11 +121,14 @@ export const LIVE_CHECK_ACTIONS: ReadonlySet<string> = new Set([
 export async function editBook<Out = Record<string, unknown>>(
   characterId: number,
   corporationId: number,
-  action: { action: string } & Record<string, unknown>
+  action: { action: string } & Record<string, unknown>,
+  options: { freshToken?: boolean } = {}
 ): Promise<Out> {
-  const accessToken = LIVE_CHECK_ACTIONS.has(action.action)
-    ? await getValidAccessToken(characterId)
-    : undefined;
+  // `freshToken` is for a caller that may outlive the 10-minute role cache (the mail queue).
+  const accessToken =
+    options.freshToken || LIVE_CHECK_ACTIONS.has(action.action)
+      ? await getValidAccessToken(characterId)
+      : undefined;
   return call(characterId, 'editCorpTaxBookCallable', {
     ...action,
     corporationId,
@@ -329,4 +332,30 @@ export async function turnOnBook(
     startDate,
     startRatePct,
   });
+}
+
+/** The verify token for each Statement id; one with no link doc is left out. Editors only (rules). */
+export async function readVerifyTokens(
+  characterId: number,
+  corporationId: number,
+  statementIds: readonly string[]
+): Promise<Map<string, string>> {
+  await ensureSignedIn(characterId);
+  const db = getSyncFirestore();
+  const tokens = new Map<string, string>();
+  await Promise.all(
+    statementIds.map(async (id) => {
+      const snap = await getDoc(
+        doc(db, 'corpTaxBooks', String(corporationId), 'statementLinks', id)
+      );
+      const token = snap.get('verifyToken');
+      if (typeof token === 'string' && token !== '') tokens.set(id, token);
+    })
+  );
+  return tokens;
+}
+
+/** Where a Statement's verify link points. The page itself is #4066. */
+export function verifyUrl(origin: string, token: string): string {
+  return `${origin}/corp-tax-book/verify/${token}`;
 }

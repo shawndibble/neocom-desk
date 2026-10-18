@@ -51,7 +51,7 @@ async function buildItems(
   kind: MailKind,
   batchId: string
 ): Promise<{ items: MailQueueItem[]; missingLink: string[] }> {
-  const { readVerifyTokens, verifyUrl } = await import('./bookApi');
+  const { readVerifyTokens, verifyUrl } = await import('@/features/corp/taxBook/bookClient');
   const tokens = await readVerifyTokens(
     input.senderCharacterId,
     input.corporationId,
@@ -131,11 +131,16 @@ export async function enqueueReminder(
   );
   if (items.length === 0) return { ok: false, reason: 'missingLink' };
   // Counted in the book first: the server is the one that enforces D27.
-  const { editCorpTaxBook } = await import('./bookApi');
-  await editCorpTaxBook(input.senderCharacterId, input.corporationId, {
-    action: 'recordReminder',
-    statementId: input.statement.statementId,
-  });
+  const { editBook } = await import('@/features/corp/taxBook/bookClient');
+  await editBook(
+    input.senderCharacterId,
+    input.corporationId,
+    {
+      action: 'recordReminder',
+      statementId: input.statement.statementId,
+    },
+    { freshToken: true }
+  );
   const { added, skipped } = await addToQueue(items);
   return { ok: true, batchId, queued: added.length, skipped: skipped.length, missingLink };
 }
