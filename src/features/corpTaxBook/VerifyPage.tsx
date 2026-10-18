@@ -22,14 +22,16 @@ import {
   type VerifyRow,
 } from '@/engine/corpTaxBook/verifyView';
 import { getCorporationPublicInfo } from '@/esi/endpoints/corp';
+import { DEFAULT_OVERDUE_DAYS } from '@/engine/corpTaxBook/overdue';
 import { callableErrorCode } from '@/features/communities/callableError';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 
-const isk = (value: number, decimals = 0) => `${formatIsk(value, decimals)} ISK`;
 import { TRADE_HUBS } from '@/market/hubs';
 import { readVerifyStatement, setVerifyRemindersStopped } from './verifyApi';
+
+const isk = (value: number, decimals = 0) => `${formatIsk(value, decimals)} ISK`;
 
 type LoadState =
   | { status: 'loading' }
@@ -182,7 +184,8 @@ function VerifyStatement({ token, payload }: { token: string; payload: VerifyPay
       : (statement.refineryNames?.[String(id)] ?? t('corpTaxBook.verify.refinery', { id }));
 
   const hub = TRADE_HUBS.find((h) => h.id === statement.hubId)?.systemName ?? statement.hubId;
-  const due = dueDate(statement.issuedAt, terms.overdueDays ?? 14);
+  const overdueDays = terms.overdueDays ?? DEFAULT_OVERDUE_DAYS;
+  const due = dueDate(statement.issuedAt, overdueDays);
   const credited = payload.payments.reduce((sum, p) => sum + p.amount, 0);
   const remaining = settlement?.remaining ?? Math.max(0, statement.amount - credited);
   const rates = ratesUsed(rows);
@@ -232,13 +235,12 @@ function VerifyStatement({ token, payload }: { token: string; payload: VerifyPay
             {r.ores.map((o) => (
               <span key={o.typeId} className="block">
                 {o.unitPrice === undefined ? '—' : isk(o.unitPrice, 2)}
+                <span className="block text-xs text-text-dim">
+                  {shortDate(r.date, locale)}
+                  {o.source && ` · ${t(`miningTax.detail.breakdown.source.${o.source}`)}`}
+                </span>
               </span>
             ))}
-            <span className="block text-xs text-text-dim">
-              {shortDate(r.date, locale)}
-              {r.ores[0]?.source &&
-                ` · ${t(`miningTax.detail.breakdown.source.${r.ores[0].source}`)}`}
-            </span>
           </span>
         ),
     },
@@ -339,6 +341,12 @@ function VerifyStatement({ token, payload }: { token: string; payload: VerifyPay
               billed: isk(statement.amount),
               paid: isk(credited),
             })}
+            {settlement && settlement.credited - credited > 0 && (
+              <>
+                {' '}
+                {t('corpTaxBook.verify.dismissed', { amount: isk(settlement.credited - credited) })}
+              </>
+            )}
             {settlement && settlement.writtenOff > 0 && (
               <> {t('corpTaxBook.verify.writtenOff', { amount: isk(settlement.writtenOff) })}</>
             )}
@@ -396,7 +404,7 @@ function VerifyStatement({ token, payload }: { token: string; payload: VerifyPay
             <Term label={t('corpTaxBook.verify.term.due')}>
               {t('corpTaxBook.verify.dueValue', {
                 date: shortDate(due, locale),
-                days: terms.overdueDays ?? 14,
+                days: overdueDays,
               })}
             </Term>
             {terms.minimumStatement !== undefined && (

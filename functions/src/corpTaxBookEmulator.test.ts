@@ -681,6 +681,10 @@ suite('Corp Tax Book callables (emulator)', () => {
       const view = await readStatementByToken(deps(), String(verifyToken));
       expect(view.statement).toMatchObject({ id: 's1', amount: 10_000_000 });
       expect(view.statement).not.toHaveProperty('verifyToken');
+      for (const key of ['characterIds', 'minerId', 'issuedBy', 'uids', 'manualRemindersSent']) {
+        expect(view.statement).not.toHaveProperty(key);
+      }
+      expect(JSON.stringify(view.statement.lines)).not.toContain('characterId');
       expect((await book().collection('statements').doc('s1').get()).data()).not.toHaveProperty(
         'verifyToken'
       );

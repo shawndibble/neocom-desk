@@ -923,9 +923,30 @@ export async function readStatementByToken(deps: BookDeps, token: string) {
   const thisStatement = statements.docs.find((d) => d.id === statementId);
   if (!thisStatement) fail('not-found', 'Verify link is not valid', 'invalid-token');
   const s = thisStatement.data() as Data;
-  const { verifyToken: _omit, uids: _uids, ...shown } = s;
-  void _omit;
-  void _uids;
+  // A whitelist: the guest sees no character ids, officer ids or other bookkeeping.
+  const shown: Data = {};
+  for (const key of [
+    'id',
+    'code',
+    'periodStart',
+    'periodEnd',
+    'coversFrom',
+    'coversThrough',
+    'issuedAt',
+    'hubId',
+    'oreForm',
+    'amount',
+    'corporationName',
+    'minerName',
+    'refineryNames',
+  ]) {
+    if (s[key] !== undefined) shown[key] = s[key];
+  }
+  shown.lines = ((s.lines as Data[] | undefined) ?? []).map((line) => {
+    const { characterId: _c, ...rest } = line;
+    void _c;
+    return rest;
+  });
   const b = book.data() ?? {};
 
   // The payments credited to THIS Statement: the Miner's whole allocation, then
