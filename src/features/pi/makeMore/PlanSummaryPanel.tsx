@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { formatCount } from '@/lib/formatCount';
 import { useTranslation } from 'react-i18next';
 import { InfoTooltip, IskAmount, Panel, SegmentedControl } from '@/components/ui';
 import type { RebuildPreference } from '@/engine/pi/planAdvice';
@@ -151,7 +152,7 @@ export function PlanSummaryPanel({
               stats.m3PerWeek === null
                 ? '—'
                 : t('piPlan.make.m3PerWeek', {
-                    value: Math.round(stats.m3PerWeek).toLocaleString('en'),
+                    value: formatCount(stats.m3PerWeek),
                   })
             }
           />

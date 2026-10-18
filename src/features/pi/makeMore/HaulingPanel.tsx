@@ -1,4 +1,5 @@
 import { useId, useState } from 'react';
+import { formatCount } from '@/lib/formatCount';
 import { useTranslation } from 'react-i18next';
 import { Button, Panel, StatChip, StatChips } from '@/components/ui';
 import { HAUL_SHIPS } from '@/engine/pi/planHaul';
@@ -16,9 +17,7 @@ export function HaulingPanel({ hauling, hubName }: { hauling: HaulView; hubName:
   const lowsec = route.kind === 'route' ? (route.lowsec ?? 0) : 0;
   const nullsec = route.kind === 'route' ? (route.nullsec ?? 0) : 0;
   const m3 = (value: number | null) =>
-    value === null
-      ? '—'
-      : t('piPlan.make.m3PerTrip', { value: Math.round(value).toLocaleString('en') });
+    value === null ? '—' : t('piPlan.make.m3PerTrip', { value: formatCount(value) });
   const fitKey =
     fit.kind === 'unknown'
       ? 'piPlan.make.fitUnknown'
