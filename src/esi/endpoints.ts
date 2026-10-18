@@ -2380,6 +2380,74 @@ export function getCorporationMiningExtractions(
   );
 }
 
+// --- GET /corporation/{corporation_id}/mining/observers (esi-industry.read_corporation_mining.v1) ---
+
+/**
+ * One refinery that keeps a mining ledger. Only Athanors and Tataras do;
+ * a Metenox has no ledger and never appears here (epic #4055).
+ */
+export interface CorporationMiningObserver {
+  observer_id: number;
+  /** `structure` is the only value ESI documents. */
+  observer_type: string;
+  /** A date (`YYYY-MM-DD`), not a timestamp: the day the ledger last changed. */
+  last_updated: string;
+}
+
+/**
+ * Accountant-gated (`canReadMiningLedger`), cached 3600s, paginated
+ * (X-Pages). Singular `/corporation/`, like the extractions route.
+ */
+export function getCorporationMiningObservers(
+  characterId: number,
+  corporationId: number,
+  options: EndpointOptions = {}
+): Promise<PaginatedResult<CorporationMiningObserver>> {
+  return fetchAllPagesStatus<CorporationMiningObserver>(
+    `/corporation/${corporationId}/mining/observers`,
+    {
+      ...options,
+      characterId,
+      endpointId: 'getCorporationMiningObservers',
+    }
+  );
+}
+
+// --- GET /corporation/{corporation_id}/mining/observers/{observer_id} (esi-industry.read_corporation_mining.v1) ---
+
+/**
+ * One row of a refinery's mining ledger: everything one character mined of
+ * one ore type there on one day. The row's `quantity` keeps growing through the day it describes,
+ * so a consumer upserts on (character, type, day) rather than appending.
+ */
+export interface CorporationMiningObserverEntry {
+  character_id: number;
+  /** The miner's corporation when the ore was recorded: what separates members from guests. */
+  recorded_corporation_id: number;
+  type_id: number;
+  /** Units, not m³. */
+  quantity: number;
+  /** A date (`YYYY-MM-DD`): the EVE/UTC day this row sums. */
+  last_updated: string;
+}
+
+/** Accountant-gated (`canReadMiningLedger`), cached 3600s, paginated (X-Pages). */
+export function getCorporationMiningObserver(
+  characterId: number,
+  corporationId: number,
+  observerId: number,
+  options: EndpointOptions = {}
+): Promise<PaginatedResult<CorporationMiningObserverEntry>> {
+  return fetchAllPagesStatus<CorporationMiningObserverEntry>(
+    `/corporation/${corporationId}/mining/observers/${observerId}`,
+    {
+      ...options,
+      characterId,
+      endpointId: 'getCorporationMiningObserver',
+    }
+  );
+}
+
 // --- GET /corporations/{corporation_id}/industry/jobs (esi-industry.read_corporation_jobs.v1) ---
 
 /**
