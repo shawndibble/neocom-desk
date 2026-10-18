@@ -117,15 +117,16 @@ const stationPins: AccountWideCollection<StationPinRecord> = {
   deletedAtByKey: async () => {
     const characters = await db.characters.toCollection().primaryKeys();
     const latest = new Map<string, number>();
-    for (const characterId of characters) {
-      for (const tombstone of await readTombstones(
-        tombstoneKey(STATION_PINS, Number(characterId))
-      )) {
-        const locationId = tombstone.id.split(':')[1];
-        if (!locationId) continue;
-        const held = latest.get(locationId) ?? 0;
-        if (tombstone.deletedAt > held) latest.set(locationId, tombstone.deletedAt);
-      }
+    const lists = await Promise.all(
+      characters.map((characterId) =>
+        readTombstones(tombstoneKey(STATION_PINS, Number(characterId)))
+      )
+    );
+    for (const tombstone of lists.flat()) {
+      const locationId = tombstone.id.split(':')[1];
+      if (!locationId) continue;
+      const held = latest.get(locationId) ?? 0;
+      if (tombstone.deletedAt > held) latest.set(locationId, tombstone.deletedAt);
     }
     return latest;
   },
@@ -170,15 +171,16 @@ const planetRichness: AccountWideCollection<PlanetRichnessRecord> = {
   deletedAtByKey: async () => {
     const characters = await db.characters.toCollection().primaryKeys();
     const latest = new Map<string, number>();
-    for (const characterId of characters) {
-      for (const tombstone of await readTombstones(
-        tombstoneKey(PLANET_RICHNESS, Number(characterId))
-      )) {
-        const planetId = tombstone.id.split(':')[1];
-        if (!planetId) continue;
-        const held = latest.get(planetId) ?? 0;
-        if (tombstone.deletedAt > held) latest.set(planetId, tombstone.deletedAt);
-      }
+    const lists = await Promise.all(
+      characters.map((characterId) =>
+        readTombstones(tombstoneKey(PLANET_RICHNESS, Number(characterId)))
+      )
+    );
+    for (const tombstone of lists.flat()) {
+      const planetId = tombstone.id.split(':')[1];
+      if (!planetId) continue;
+      const held = latest.get(planetId) ?? 0;
+      if (tombstone.deletedAt > held) latest.set(planetId, tombstone.deletedAt);
     }
     return latest;
   },

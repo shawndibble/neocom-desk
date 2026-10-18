@@ -13,6 +13,7 @@ import { uniqueTransactions } from './uniqueTransactions';
 import type { KillmailVictim } from '@/engine/fittings/linkLoader';
 import type { SystemJumpsEntry, SystemKillsEntry } from '@/engine/route/routeSafety';
 import type { IncursionEntry } from '@/engine/incursions/incursionRows';
+import { mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { esiFetch, recordEsiActivity, outcomeForError, attachEndpointId } from './client';
 import type { EsiResult } from './client';
 import { fetchAllPagesStatus } from './paginated';
@@ -1115,18 +1116,12 @@ export async function postUniverseNames(
   ids: number[],
   options: { signal?: AbortSignal } = {}
 ): Promise<UniverseName[]> {
-  if (ids.length === 0) return [];
-  const out: UniverseName[] = [];
-  for (const batch of chunk(ids, AFFILIATION_BATCH_LIMIT)) {
-    const result = await esiFetch<UniverseName[]>('/universe/names', {
-      method: 'POST',
-      body: batch,
-      signal: options.signal,
-      endpointId: 'postUniverseNames',
-    });
-    out.push(...(result.data ?? []));
-  }
-  return out;
+  return postChunked<number, UniverseName>(
+    '/universe/names',
+    'postUniverseNames',
+    ids,
+    options.signal
+  );
 }
 
 // --- POST /characters/affiliation (public) ---
@@ -1147,6 +1142,33 @@ function chunk<T>(items: T[], size: number): T[][] {
   return out;
 }
 
+/** Batches in flight at once: ESI bills errors against a shared budget, so stay small. */
+const POST_CHUNK_CONCURRENCY = 2;
+
+/**
+ * POSTs `ids` to a bulk-lookup endpoint in `AFFILIATION_BATCH_LIMIT`-sized
+ * batches, a couple at a time, and returns the results in batch order.
+ */
+async function postChunked<TIn, TOut>(
+  path: string,
+  endpointId: EsiEndpointId,
+  ids: TIn[],
+  signal: AbortSignal | undefined
+): Promise<TOut[]> {
+  const batches = chunk(ids, AFFILIATION_BATCH_LIMIT);
+  const results: TOut[][] = batches.map(() => []);
+  await mapWithConcurrencyLimit(batches, POST_CHUNK_CONCURRENCY, async (batch) => {
+    const result = await esiFetch<TOut[]>(path, {
+      method: 'POST',
+      body: batch,
+      signal,
+      endpointId,
+    });
+    results[batches.indexOf(batch)] = result.data ?? [];
+  });
+  return results.flat();
+}
+
 /**
  * Bulk corp/alliance lookup for many characters in one round trip (up to 1000
  * per request; more are chunked into sequential requests) — replaces N
@@ -1157,18 +1179,12 @@ export async function postCharactersAffiliation(
   characterIds: number[],
   options: { signal?: AbortSignal } = {}
 ): Promise<CharacterAffiliation[]> {
-  if (characterIds.length === 0) return [];
-  const out: CharacterAffiliation[] = [];
-  for (const batch of chunk(characterIds, AFFILIATION_BATCH_LIMIT)) {
-    const result = await esiFetch<CharacterAffiliation[]>('/characters/affiliation', {
-      method: 'POST',
-      body: batch,
-      signal: options.signal,
-      endpointId: 'postCharactersAffiliation',
-    });
-    out.push(...(result.data ?? []));
-  }
-  return out;
+  return postChunked<number, CharacterAffiliation>(
+    '/characters/affiliation',
+    'postCharactersAffiliation',
+    characterIds,
+    options.signal
+  );
 }
 
 // --- GET /characters/{character_id}/search (esi-search.search_structures.v1) ---

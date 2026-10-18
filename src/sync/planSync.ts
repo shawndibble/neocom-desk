@@ -43,7 +43,6 @@ import { purgeCharacterCacheOrSuppress } from '@/esi/cachePurge';
 import {
   FEED_SYNC_WINDOW_MS,
   mergeFeedRecord,
-  readFeed,
   rowsWithinSyncWindow,
   trimFeed,
 } from '@/features/notifications/feed';
@@ -120,6 +119,15 @@ export const HEARTBEAT_INTERVAL_MS = 24 * 3_600_000;
 
 function isSyncedSettingKey(key: string): boolean {
   return key.startsWith(SYNCED_PREFIX) && !key.startsWith(INTERNAL_PREFIX);
+}
+
+/** Firestore writes in flight at once: a first sync can queue thousands of rows. */
+const PUSH_CONCURRENCY = 20;
+
+async function runBounded(writes: (() => Promise<unknown>)[]): Promise<void> {
+  await mapWithConcurrencyLimit(writes, PUSH_CONCURRENCY, async (write) => {
+    await write();
+  });
 }
 
 async function writeTombstones(key: string, tombstones: LocalTombstone[]): Promise<void> {
@@ -599,28 +607,43 @@ async function handleOwnerHashChange(character: CharacterRecord): Promise<void> 
   const key = ownerHashKey(character.characterId);
   const stored = await db.settings.get(key);
   if (stored !== undefined && stored.value !== character.ownerHash) {
-    // Every editable collection, whatever its removal rule: this is the
-    // previous owner's data, not a Character the pilot chose to drop.
-    for (const collection of EDITABLE_COLLECTIONS) {
-      await db.table(collection.table).where('characterId').equals(character.characterId).delete();
-    }
-    for (const collection of EDITABLE_COLLECTIONS) {
-      await writeTombstones(tombstoneKey(collection, character.characterId), []);
-    }
-    // The new owner's docs can carry an `updatedAt` below the previous owner's
-    // high-water mark, so a surviving cursor would hide them entirely.
-    await clearPullCursors(character.characterId);
-    // Feed rows themselves survive a transfer (they are this device's archive
-    // of what it saw, and carry no tombstones), but the new owner's remote
-    // collection has never held any of them — so the claim `syncedAt` makes
-    // is now false for every one of them, and leaving it set would keep them
-    // off the new uid forever.
-    await db.notificationFeed
-      .where('characterId')
-      .equals(character.characterId)
-      .modify((row) => {
-        delete row.syncedAt;
-      });
+    // One transaction: a crash mid-wipe must not leave rows gone but their
+    // tombstones or pull cursors still the previous owner's. Dexie work only —
+    // nothing here awaits Firestore or the network.
+    const tables = [
+      ...EDITABLE_COLLECTIONS.map((collection) => db.table(collection.table)),
+      db.settings,
+      db.notificationFeed,
+    ];
+    await db.transaction('rw', tables, async () => {
+      // Every editable collection, whatever its removal rule: this is the
+      // previous owner's data, not a Character the pilot chose to drop.
+      await Promise.all(
+        EDITABLE_COLLECTIONS.map((collection) =>
+          db.table(collection.table).where('characterId').equals(character.characterId).delete()
+        )
+      );
+      await db.settings.bulkPut(
+        EDITABLE_COLLECTIONS.map((collection) => ({
+          key: tombstoneKey(collection, character.characterId),
+          value: [],
+        }))
+      );
+      // The new owner's docs can carry an `updatedAt` below the previous
+      // owner's high-water mark, so a surviving cursor would hide them entirely.
+      await clearPullCursors(character.characterId);
+      // Feed rows themselves survive a transfer (they are this device's archive
+      // of what it saw, and carry no tombstones), but the new owner's remote
+      // collection has never held any of them — so the claim `syncedAt` makes
+      // is now false for every one of them, and leaving it set would keep them
+      // off the new uid forever.
+      await db.notificationFeed
+        .where('characterId')
+        .equals(character.characterId)
+        .modify((row) => {
+          delete row.syncedAt;
+        });
+    });
     // Cached wallet/mail/assets belong to the previous owner just as much as
     // the plans do. `auth/session` purges on the same signal at login; this
     // covers a transfer noticed between logins. Degrades rather than throws
@@ -818,18 +841,21 @@ async function syncEditableCollection(spec: EditableCollection, ctx: SyncContext
     pull.since
   );
 
-  await Promise.all([
-    ...plan.pushUpserts.map((p) => setDoc(doc(col, p.id), spec.toRemoteDoc(p, ctx.ownerHash))),
-    ...plan.pushTombstones.map((t) =>
-      setDoc(doc(col, t.id), {
-        id: t.id,
-        characterId: ctx.characterId,
-        updatedAt: t.deletedAt,
-        ownerHash: ctx.ownerHash,
-        deleted: true,
-      })
+  await runBounded([
+    ...plan.pushUpserts.map(
+      (p) => () => setDoc(doc(col, p.id), spec.toRemoteDoc(p, ctx.ownerHash))
     ),
-    ...plan.purgeRemote.map((id) => deleteDoc(doc(col, id))),
+    ...plan.pushTombstones.map(
+      (t) => () =>
+        setDoc(doc(col, t.id), {
+          id: t.id,
+          characterId: ctx.characterId,
+          updatedAt: t.deletedAt,
+          ownerHash: ctx.ownerHash,
+          deleted: true,
+        })
+    ),
+    ...plan.purgeRemote.map((id) => () => deleteDoc(doc(col, id))),
   ]);
 
   if (plan.pullUpserts.length > 0) {
@@ -1070,7 +1096,11 @@ async function syncFeed(ctx: SyncContext): Promise<void> {
   const remote = pull.remote;
   // Feed rows for every Character share one local table (the Alerts page
   // shows them together); only this Character's own rows sync to its uid.
-  const local = (await readFeed()).filter((row) => row.characterId === ctx.characterId);
+  const local = await db.notificationFeed
+    .where('characterId')
+    .equals(ctx.characterId)
+    .reverse()
+    .sortBy('firedAt');
   const pushEligible = new Set(rowsWithinSyncWindow(local, ctx.now).map((row) => row.id));
 
   const plan = mergeFeed<NotificationFeedRecord, RemoteNotificationFeedDoc>(
@@ -1090,9 +1120,11 @@ async function syncFeed(ctx: SyncContext): Promise<void> {
     return remoteRow === undefined ? row : toLocalFeedRecord(remoteRow, writeNow, row);
   });
   const pushed = [...plan.pushCreate, ...plan.pushDismiss, ...redated];
-  await Promise.all([
-    ...pushed.map((row) => setDoc(doc(col, row.id), toRemoteFeedDoc(row, ctx.ownerHash, writeNow))),
-    ...plan.purgeRemote.map((id) => deleteDoc(doc(col, id))),
+  await runBounded([
+    ...pushed.map(
+      (row) => () => setDoc(doc(col, row.id), toRemoteFeedDoc(row, ctx.ownerHash, writeNow))
+    ),
+    ...plan.purgeRemote.map((id) => () => deleteDoc(doc(col, id))),
   ]);
 
   const localById = new Map(local.map((row) => [row.id, row]));
