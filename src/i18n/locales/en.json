@@ -13517,6 +13517,70 @@
     }
   },
   "corpTaxBook": {
+    "verify": {
+      "title": "Your Statement",
+      "readOnly": "Read-only · no login needed",
+      "goneTitle": "This link is not valid",
+      "goneHint": "Check that you copied the whole link from the mail. If it still fails, ask the corporation's officers for a fresh Statement.",
+      "failedTitle": "Couldn't load this Statement",
+      "failedHint": "Check your connection and try again.",
+      "theCorp": "the corporation",
+      "refinery": "Refinery {{id}}",
+      "eyebrow": "{{corp}} · Statement {{period}} · issued {{issued}}",
+      "closed": "This account is closed. {{corp}} sent a final Statement and will not mail you again.",
+      "mined": "What you mined",
+      "minedMeta": "{{hub}} buy, {{form}} ore, priced on the day mined",
+      "oreForm": {
+        "compressed": "Compressed",
+        "raw": "raw"
+      },
+      "linesLabel": "Statement lines",
+      "col": {
+        "day": "Day",
+        "ore": "Ore",
+        "price": "Unit price",
+        "rate": "Rate",
+        "tax": "Tax"
+      },
+      "correction": "Correction",
+      "lateOre": "Late ore",
+      "billed": "Billed",
+      "paymentsTitle": "Payments credited",
+      "noPayments": "No payments have been credited to this Statement yet.",
+      "source": {
+        "donation": "Donation to the corporation",
+        "manual": "Recorded by an officer"
+      },
+      "balanceDue": "Balance due",
+      "balanceSum": "Billed {{billed}} − paid {{paid}}.",
+      "writtenOff": "{{amount}} short of the Statement was written off.",
+      "howToPay": "Donate ISK to {{corp}}; any of your characters counts.",
+      "payCodeLead": "Put the code",
+      "payCodeTail": "in the reason to pin a donation to this Statement.",
+      "settled": "This Statement is settled.",
+      "declaration": "You told {{corp}} on {{date}} that you paid another way.",
+      "declarationPending": "An officer will confirm it.",
+      "termsTitle": "Terms",
+      "term": {
+        "rate": "Rate",
+        "price": "Price",
+        "due": "Due",
+        "minimum": "Minimum Statement",
+        "paying": "Paying"
+      },
+      "rateFrom": "{{pct}}%, effective {{date}}",
+      "rateNoDate": "{{pct}}%",
+      "rateOverride": "Some days carry an officer's logged rate correction.",
+      "priceBasis": "{{hub}} buy, {{form}} ore, on the day mined",
+      "dueValue": "{{date}} ({{days}} days after issue)",
+      "minimumValue": "{{amount}}; smaller balances roll into the next Statement",
+      "payingValue": "Donate to {{corp}}; any of your characters counts",
+      "stop": {
+        "label": "Stop reminders",
+        "hint": "Your monthly Statement still comes. Officers can send you at most one reminder per Statement.",
+        "failed": "Couldn't save that. Try again."
+      }
+    },
     "mailQueue": {
       "title": "Statement mail",
       "minutes_one": "{{count}} minute",

@@ -689,6 +689,8 @@ suite('Corp Tax Book callables (emulator)', () => {
       );
       expect(view.terms).toMatchObject({ hubId: 'jita', oreForm: 'compressed' });
       expect(view.payments.map((p) => p.id)).toEqual(['m1']);
+      expect(view.settlement).toMatchObject({ amount: 10_000_000, credited: 3 });
+      expect(view.accountClosed).toBe(false);
       expect(view.remindersStopped).toBe(false);
 
       await setRemindersByToken(deps(), String(verifyToken), true);
@@ -717,6 +719,55 @@ suite('Corp Tax Book callables (emulator)', () => {
         detail: { statementId: 's1', stopped: true },
       });
       expect(JSON.stringify(log)).not.toContain(String(verifyToken));
+    });
+
+    it('shows only the payments credited to this Statement, oldest first across Statements', async () => {
+      await turnOn();
+      await edit(ACCOUNTANT, {
+        action: 'issueStatement',
+        statement: statement('s1', { issuedAt: '2026-10-01T00:00:00.000Z', amount: 10_000_000 }),
+      });
+      const second = await edit(ACCOUNTANT, {
+        action: 'issueStatement',
+        statement: statement('s2', {
+          issuedAt: '2026-11-01T00:00:00.000Z',
+          amount: 8_000_000,
+          code: 'DEF456',
+        }),
+      });
+      // 12M: all of s1 (10M) and 2M of s2. A later 1M goes to s2 as well.
+      await edit(ACCOUNTANT, {
+        action: 'recordPayment',
+        paymentId: 'big',
+        minerId: 'solo:50',
+        characterId: 50,
+        amount: 12_000_000,
+        at: '2026-11-02T00:00:00Z',
+      });
+      await edit(ACCOUNTANT, {
+        action: 'recordPayment',
+        paymentId: 'small',
+        minerId: 'solo:50',
+        characterId: 50,
+        amount: 1_000_000,
+        at: '2026-11-03T00:00:00Z',
+      });
+      const view = await readStatementByToken(deps(), String(second.verifyToken));
+      expect(view.payments.map((p) => [p.id, p.amount])).toEqual([
+        ['big', 2_000_000],
+        ['small', 1_000_000],
+      ]);
+      expect(view.settlement).toMatchObject({ credited: 3_000_000, remaining: 5_000_000 });
+    });
+
+    it('flags a Miner whose account is closed', async () => {
+      await turnOn();
+      const { verifyToken } = await edit(ACCOUNTANT, {
+        action: 'issueStatement',
+        statement: statement('s1'),
+      });
+      await book().collection('miners').doc('solo:50').set({ closedAt: '2026-11-05T00:00:00Z' });
+      expect((await readStatementByToken(deps(), String(verifyToken))).accountClosed).toBe(true);
     });
 
     it('does not resolve a made-up token', async () => {

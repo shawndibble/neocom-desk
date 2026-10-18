@@ -210,6 +210,29 @@ describe('allocatePayments (review follow-ups)', () => {
   });
 });
 
+describe('allocatePayments paymentCredits', () => {
+  it('splits one donation across the Statements it paid, oldest first', () => {
+    const a = allocatePayments({
+      statements: [JUNE, JULY],
+      payments: [payment('p1', 12_000_000, '2026-08-01T00:00:00Z')],
+      dismissalCredits: [],
+    });
+    expect(a.paymentCredits).toEqual([
+      { paymentId: 'p1', statementId: 's1', amount: 10_000_000 },
+      { paymentId: 'p1', statementId: 's2', amount: 2_000_000 },
+    ]);
+  });
+
+  it('leaves a payment out of a Statement it did not touch, and counts only the tax part', () => {
+    const a = allocatePayments({
+      statements: [JUNE, JULY],
+      payments: [payment('p1', 6_000_000, '2026-08-01T00:00:00Z', { notTaxAmount: 1_000_000 })],
+      dismissalCredits: [],
+    });
+    expect(a.paymentCredits).toEqual([{ paymentId: 'p1', statementId: 's1', amount: 5_000_000 }]);
+  });
+});
+
 describe('dismissalCredits', () => {
   it('credits the tax a Statement billed for a day dismissed after it was issued', () => {
     const charge = {

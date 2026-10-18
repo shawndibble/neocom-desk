@@ -81,10 +81,19 @@ export interface StatementSettlement {
   settled: boolean;
 }
 
+/** The part of one Tax Payment that was credited to one Statement. */
+export interface PaymentCredit {
+  paymentId: string;
+  statementId: string;
+  amount: number;
+}
+
 export interface Allocation {
   byStatement: Map<string, StatementSettlement>;
   /** Tolerance write-offs, to log. */
   writeOffs: { statementId: string; amount: number }[];
+  /** Which Statement each Tax Payment's money went to, one entry per payment and Statement. */
+  paymentCredits: PaymentCredit[];
   /** Payment nothing absorbed — printed on the next Statement. */
   credit: number;
   /** Statements − payments − dismissals − write-offs; negative is credit. */
@@ -139,11 +148,18 @@ export function allocatePayments(input: AllocationInput): Allocation {
   const payments = [...input.payments].sort(
     (a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id)
   );
+  const paymentCredits: PaymentCredit[] = [];
   for (const p of payments) {
-    let available = p.amount - Math.min(p.notTaxAmount ?? 0, p.amount);
+    const net = p.amount - Math.min(p.notTaxAmount ?? 0, p.amount);
+    let available = net;
     paid += available;
+    const before = new Map([...state].map(([id, st]) => [id, st.credited]));
     if (p.statementId) available = apply(p.statementId, available, true);
     credit += applyOldestFirst(available, true);
+    for (const [id, st] of state) {
+      const amount = st.credited - (before.get(id) ?? 0);
+      if (amount > 0) paymentCredits.push({ paymentId: p.id, statementId: id, amount });
+    }
   }
 
   const byStatement = new Map<string, StatementSettlement>();
@@ -169,6 +185,7 @@ export function allocatePayments(input: AllocationInput): Allocation {
   return {
     byStatement,
     writeOffs,
+    paymentCredits,
     credit,
     balance: billed - paid - dismissed - writtenOffTotal,
   };

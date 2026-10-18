@@ -1,0 +1,476 @@
+import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import {
+  Button,
+  Checkbox,
+  DataTable,
+  EmptyState,
+  Panel,
+  Spinner,
+  StatChip,
+  StatChips,
+  type DataTableColumn,
+} from '@/components/ui';
+import { tappableRowClassName } from '@/components/ui/controlStyles';
+import * as Icon from '@/components/ui/icons';
+import {
+  dueDate,
+  hasRecordOverride,
+  ratesUsed,
+  verifyRows,
+  type VerifyPayload,
+  type VerifyRow,
+} from '@/engine/corpTaxBook/verifyView';
+import { getCorporationPublicInfo } from '@/esi/endpoints/corp';
+import { callableErrorCode } from '@/features/communities/callableError';
+import { loadTypeNames } from '@/features/character/typeNames';
+import { cx } from '@/lib/cx';
+import { formatIsk } from '@/lib/isk';
+
+const isk = (value: number, decimals = 0) => `${formatIsk(value, decimals)} ISK`;
+import { TRADE_HUBS } from '@/market/hubs';
+import { readVerifyStatement, setVerifyRemindersStopped } from './verifyApi';
+
+type LoadState =
+  | { status: 'loading' }
+  | { status: 'ok'; payload: VerifyPayload }
+  | { status: 'gone' }
+  | { status: 'failed' };
+
+/** An EVE/UTC date or instant as "15 Sep 2026". */
+function shortDate(value: string, locale?: string): string {
+  const date = new Date(value.length === 10 ? `${value}T00:00:00Z` : value);
+  return date.toLocaleDateString(locale, {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+}
+
+function periodLabel(start: string, locale?: string): string {
+  return new Date(`${start}T00:00:00Z`).toLocaleDateString(locale, {
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+}
+
+/**
+ * The guest verify page (issue #4066, D27, mockup step 19 option B): a
+ * Statement's lines with their pricing, its terms with dates and the payments
+ * credited, read with the link's token alone, no login and no Character. The
+ * mail is minimal on purpose; this is where a miner checks every line.
+ * Desktop: lines and payments left, Balance due / Terms / Stop reminders right.
+ * Phone: Balance due, Terms, What you mined, Payments credited, Stop reminders.
+ */
+export function VerifyPage({ token }: { token: string }) {
+  const { t } = useTranslation();
+  const [state, setState] = useState<LoadState>({ status: 'loading' });
+  const [attempt, setAttempt] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    readVerifyStatement(token).then(
+      (payload) => {
+        if (!cancelled) setState({ status: 'ok', payload });
+      },
+      (err: unknown) => {
+        if (cancelled) return;
+        const code = callableErrorCode(err);
+        setState({
+          status: code === 'not-found' || code === 'invalid-argument' ? 'gone' : 'failed',
+        });
+      }
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [token, attempt]);
+
+  return (
+    <div className="min-h-screen bg-bg text-text">
+      <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
+        <span className="text-sm font-semibold">{t('share.brand')}</span>
+        <span className="inline-flex items-center gap-1 text-xs text-text-dim">
+          <Icon.ReadOnly size={Icon.ICON_SIZE.sm} aria-hidden="true" />
+          {t('corpTaxBook.verify.readOnly')}
+        </span>
+      </div>
+      <main className="mx-auto max-w-6xl space-y-4 px-4 py-6">
+        {state.status === 'loading' && (
+          <div className="flex justify-center py-10">
+            <Spinner label={t('common.loading')} />
+          </div>
+        )}
+        {state.status === 'gone' && (
+          <>
+            <h1 className="sr-only">{t('corpTaxBook.verify.title')}</h1>
+            <EmptyState
+              title={t('corpTaxBook.verify.goneTitle')}
+              hint={t('corpTaxBook.verify.goneHint')}
+            />
+          </>
+        )}
+        {state.status === 'failed' && (
+          <>
+            <h1 className="sr-only">{t('corpTaxBook.verify.title')}</h1>
+            <EmptyState
+              title={t('corpTaxBook.verify.failedTitle')}
+              hint={t('corpTaxBook.verify.failedHint')}
+              action={
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setState({ status: 'loading' });
+                    setAttempt((n) => n + 1);
+                  }}
+                >
+                  {t('common.retry')}
+                </Button>
+              }
+            />
+          </>
+        )}
+        {state.status === 'ok' && <VerifyStatement token={token} payload={state.payload} />}
+      </main>
+    </div>
+  );
+}
+
+function VerifyStatement({ token, payload }: { token: string; payload: VerifyPayload }) {
+  const { t, i18n } = useTranslation();
+  const locale = i18n.language;
+  const { statement, terms, settlement } = payload;
+  const rows = useMemo(() => verifyRows(statement.lines), [statement.lines]);
+
+  const [corpName, setCorpName] = useState<string | undefined>(statement.corporationName);
+  useEffect(() => {
+    if (statement.corporationName) return;
+    let cancelled = false;
+    getCorporationPublicInfo(payload.corporationId).then(
+      (result) => {
+        if (!cancelled) setCorpName(result.data?.name);
+      },
+      () => undefined
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [payload.corporationId, statement.corporationName]);
+  const corp = corpName ?? t('corpTaxBook.verify.theCorp');
+
+  const [oreNames, setOreNames] = useState<ReadonlyMap<number, string>>(new Map());
+  useEffect(() => {
+    const ids = rows.flatMap((r) => r.ores.map((o) => o.typeId));
+    if (ids.length === 0) return;
+    let cancelled = false;
+    loadTypeNames(ids).then(
+      (names) => {
+        if (!cancelled) setOreNames(names);
+      },
+      () => undefined
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [rows]);
+
+  const refinery = (id: number | undefined) =>
+    id === undefined
+      ? undefined
+      : (statement.refineryNames?.[String(id)] ?? t('corpTaxBook.verify.refinery', { id }));
+
+  const hub = TRADE_HUBS.find((h) => h.id === statement.hubId)?.systemName ?? statement.hubId;
+  const due = dueDate(statement.issuedAt, terms.overdueDays ?? 14);
+  const credited = payload.payments.reduce((sum, p) => sum + p.amount, 0);
+  const remaining = settlement?.remaining ?? Math.max(0, statement.amount - credited);
+  const rates = ratesUsed(rows);
+
+  const columns: DataTableColumn<VerifyRow>[] = [
+    {
+      id: 'date',
+      header: t('corpTaxBook.verify.col.day'),
+      render: (r) => shortDate(r.date, locale),
+    },
+    {
+      id: 'ore',
+      header: t('corpTaxBook.verify.col.ore'),
+      primary: true,
+      render: (r) =>
+        r.ores.length === 0 ? (
+          <span>
+            {r.kind === 'correction'
+              ? t('corpTaxBook.verify.correction')
+              : t('corpTaxBook.verify.lateOre')}
+            {r.reason && <span className="block text-xs text-text-dim">{r.reason}</span>}
+          </span>
+        ) : (
+          <span>
+            {r.ores.map((o) => (
+              <span key={o.typeId} className="block">
+                {oreNames.get(o.typeId) ?? `#${o.typeId}`} × {o.quantity.toLocaleString(locale)}
+              </span>
+            ))}
+            <span className="block text-xs text-text-dim">
+              {refinery(r.structureId)}
+              {r.kind === 'late-ore' && ` · ${t('corpTaxBook.verify.lateOre')}`}
+            </span>
+          </span>
+        ),
+    },
+    {
+      id: 'price',
+      header: t('corpTaxBook.verify.col.price'),
+      align: 'right',
+      className: 'tabular-nums',
+      render: (r) =>
+        r.ores.length === 0 ? (
+          '—'
+        ) : (
+          <span>
+            {r.ores.map((o) => (
+              <span key={o.typeId} className="block">
+                {o.unitPrice === undefined ? '—' : isk(o.unitPrice, 2)}
+              </span>
+            ))}
+            <span className="block text-xs text-text-dim">
+              {shortDate(r.date, locale)}
+              {r.ores[0]?.source &&
+                ` · ${t(`miningTax.detail.breakdown.source.${r.ores[0].source}`)}`}
+            </span>
+          </span>
+        ),
+    },
+    {
+      id: 'rate',
+      header: t('corpTaxBook.verify.col.rate'),
+      align: 'right',
+      className: 'tabular-nums',
+      render: (r) => (r.taxPct === undefined ? '—' : `${r.taxPct}%`),
+    },
+    {
+      id: 'tax',
+      header: t('corpTaxBook.verify.col.tax'),
+      align: 'right',
+      className: 'tabular-nums',
+      cardCorner: true,
+      render: (r) => isk(r.tax),
+    },
+  ];
+
+  const lastDeclaration = payload.declarations.at(-1);
+
+  return (
+    <>
+      <header>
+        <p className="text-xs tracking-widest text-text-dim uppercase">
+          {t('corpTaxBook.verify.eyebrow', {
+            corp,
+            period: periodLabel(statement.periodStart, locale),
+            issued: shortDate(statement.issuedAt, locale),
+          })}
+        </p>
+        <h1 className="text-xl font-semibold">
+          {statement.minerName ?? t('corpTaxBook.verify.title')}
+        </h1>
+      </header>
+      {payload.accountClosed && (
+        <p className="rounded-xs border border-line p-3 text-sm" role="status">
+          {t('corpTaxBook.verify.closed', { corp })}
+        </p>
+      )}
+      <div className="flex flex-col gap-4 md:grid md:grid-cols-[minmax(0,1fr)_22rem] md:items-start">
+        <div className="order-3 min-w-0 space-y-4 md:order-none md:col-start-1 md:row-span-3 md:row-start-1">
+          <Panel
+            title={t('corpTaxBook.verify.mined')}
+            meta={
+              <span className="text-xs text-text-dim">
+                {t('corpTaxBook.verify.minedMeta', {
+                  hub,
+                  form: t(`corpTaxBook.verify.oreForm.${statement.oreForm}`),
+                })}
+              </span>
+            }
+            padded={false}
+          >
+            <DataTable
+              label={t('corpTaxBook.verify.linesLabel')}
+              columns={columns}
+              rows={rows}
+              rowKey={(r) => r.key}
+              density="compact"
+              stackLayout="dense"
+            />
+            <p className="border-t border-line px-3 py-2 text-right text-sm tabular-nums">
+              {t('corpTaxBook.verify.billed')}{' '}
+              <span className="font-semibold">{isk(statement.amount)}</span>
+            </p>
+          </Panel>
+          <Panel title={t('corpTaxBook.verify.paymentsTitle')}>
+            {payload.payments.length === 0 ? (
+              <p className="text-sm text-text-dim">{t('corpTaxBook.verify.noPayments')}</p>
+            ) : (
+              payload.payments.map((p) => (
+                <p key={p.id} className="flex justify-between gap-3 text-sm tabular-nums">
+                  <span>
+                    {shortDate(p.at, locale)}
+                    <span className="block text-xs text-text-dim">
+                      {t(`corpTaxBook.verify.source.${p.source}`)}
+                    </span>
+                  </span>
+                  <span className="text-isk-pos">+{isk(p.amount)}</span>
+                </p>
+              ))
+            )}
+          </Panel>
+        </div>
+        <Panel className="order-1 md:order-none md:col-start-2 md:row-start-1">
+          <StatChips>
+            <StatChip
+              label={t('corpTaxBook.verify.balanceDue')}
+              value={isk(remaining)}
+              tone={remaining > 0 ? 'danger' : 'success'}
+              emphasis
+            />
+          </StatChips>
+          <p className="mt-2 text-sm tabular-nums">
+            {t('corpTaxBook.verify.balanceSum', {
+              billed: isk(statement.amount),
+              paid: isk(credited),
+            })}
+            {settlement && settlement.writtenOff > 0 && (
+              <> {t('corpTaxBook.verify.writtenOff', { amount: isk(settlement.writtenOff) })}</>
+            )}
+          </p>
+          {remaining > 0 && (
+            <p className="mt-2 text-sm">
+              {t('corpTaxBook.verify.howToPay', { corp })} {t('corpTaxBook.verify.payCodeLead')}{' '}
+              <span className="font-mono">{statement.code}</span>{' '}
+              {t('corpTaxBook.verify.payCodeTail')}
+            </p>
+          )}
+          {payload.settled && remaining === 0 && (
+            <p className="mt-2 text-sm text-text-dim">{t('corpTaxBook.verify.settled')}</p>
+          )}
+          {lastDeclaration && (
+            <p className="mt-2 text-xs text-text-dim">
+              {t('corpTaxBook.verify.declaration', {
+                corp,
+                date: shortDate(lastDeclaration.at, locale),
+              })}{' '}
+              {lastDeclaration.resolution ?? t('corpTaxBook.verify.declarationPending')}
+            </p>
+          )}
+        </Panel>
+        <Panel
+          title={t('corpTaxBook.verify.termsTitle')}
+          className="order-2 md:order-none md:col-start-2 md:row-start-2"
+        >
+          <dl className="space-y-2 text-sm">
+            <Term label={t('corpTaxBook.verify.term.rate')}>
+              {rates.length === 0
+                ? '—'
+                : rates.map((r) => (
+                    <span key={`${r.pct}${r.effectiveFrom}`} className="block">
+                      {r.effectiveFrom
+                        ? t('corpTaxBook.verify.rateFrom', {
+                            pct: r.pct,
+                            date: shortDate(r.effectiveFrom, locale),
+                          })
+                        : t('corpTaxBook.verify.rateNoDate', { pct: r.pct })}
+                    </span>
+                  ))}
+              {hasRecordOverride(rows) && (
+                <span className="block text-xs text-text-dim">
+                  {t('corpTaxBook.verify.rateOverride')}
+                </span>
+              )}
+            </Term>
+            <Term label={t('corpTaxBook.verify.term.price')}>
+              {t('corpTaxBook.verify.priceBasis', {
+                hub,
+                form: t(`corpTaxBook.verify.oreForm.${statement.oreForm}`),
+              })}
+            </Term>
+            <Term label={t('corpTaxBook.verify.term.due')}>
+              {t('corpTaxBook.verify.dueValue', {
+                date: shortDate(due, locale),
+                days: terms.overdueDays ?? 14,
+              })}
+            </Term>
+            {terms.minimumStatement !== undefined && (
+              <Term label={t('corpTaxBook.verify.term.minimum')}>
+                {t('corpTaxBook.verify.minimumValue', {
+                  amount: isk(terms.minimumStatement),
+                })}
+              </Term>
+            )}
+            <Term label={t('corpTaxBook.verify.term.paying')}>
+              {t('corpTaxBook.verify.payingValue', { corp })}
+            </Term>
+          </dl>
+        </Panel>
+        <div className="order-4 md:order-none md:col-start-2 md:row-start-3">
+          <StopReminders token={token} initial={payload.remindersStopped} />
+        </div>
+      </div>
+    </>
+  );
+}
+
+function Term({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <dt className="text-xs text-text-dim">{label}</dt>
+      <dd>{children}</dd>
+    </div>
+  );
+}
+
+/** The one thing a miner can change here: the monthly Statement still comes either way. */
+function StopReminders({ token, initial }: { token: string; initial: boolean }) {
+  const { t } = useTranslation();
+  const [stopped, setStopped] = useState(initial);
+  const [saving, setSaving] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  async function toggle(next: boolean) {
+    setSaving(true);
+    setFailed(false);
+    try {
+      setStopped(await setVerifyRemindersStopped(token, next));
+    } catch {
+      setFailed(true);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="space-y-1">
+      <label
+        className={cx(
+          'flex cursor-pointer items-start gap-3 rounded-xs border border-line p-3',
+          tappableRowClassName
+        )}
+      >
+        <Checkbox
+          checked={stopped}
+          disabled={saving}
+          onChange={(e) => void toggle(e.target.checked)}
+          className="mt-0.5"
+        />
+        <span className="text-sm">
+          {t('corpTaxBook.verify.stop.label')}
+          <span className="block text-xs text-text-dim">{t('corpTaxBook.verify.stop.hint')}</span>
+        </span>
+      </label>
+      {failed && (
+        <p role="alert" className="text-xs text-danger">
+          {t('corpTaxBook.verify.stop.failed')}
+        </p>
+      )}
+    </div>
+  );
+}
