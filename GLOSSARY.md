@@ -259,7 +259,9 @@ here — they go one per file in `docs/context/decisions/`.
 - **Corp Access**: The single resolved state for the active Character,
   composing Corp Capability with granted scopes: `unknown` (not resolved yet),
   `none` (no Corp Role), `roles-without-grant` (holds a role, corp scopes not
-  granted), `ready` (holds a role and its scopes).
+  granted), `ready` (holds a role and its scopes — or every scope but an
+  additive Corp Capability's, which then stays off without hiding the rest;
+  see `docs/context/decisions/20261018-141225-*`).
 - **Corp Capability**: What a Character can actually _see_ — wallet,
   structures, members, industry — derived from their Corp Roles. The unit
   every consumer branches on; none compares role strings itself.
@@ -391,8 +393,9 @@ here — they go one per file in `docs/context/decisions/`.
 - **Growth Collector**: On a Mining Ledger Entry covered by two or more
   Assignments (a quantity split), the one Assignment that receives any ore
   ESI reports for that day _after_ the split. A sole Assignment always
-  collects. Nothing on a split day is ever silently unassigned or doubly
-  claimed.
+  collects. Nothing on a split day is ever doubly claimed. A paid collector
+  takes nothing (paid stays paid, ADR 0024): that ore stays unassigned until
+  the pilot assigns it, and the new Assignment then takes over collecting.
 - **Global Market Region**: A region that exists only to hold one item's
   cluster-wide market. PLEX is the only one today: its orders live in a region
   of their own, yet each order still points at an ordinary station. So a global

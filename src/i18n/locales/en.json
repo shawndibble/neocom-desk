@@ -5926,7 +5926,7 @@
       "paid": "Paid",
       "dismissed": "Dismissed"
     },
-    "needsReviewHint": "This entry grew after you settled it. Open the row to review the new total.",
+    "needsReviewHint": "More ore showed up for this entry. Open the row to review the new total.",
     "selectRow": "Select {{date}}, {{system}}",
     "selectionCount": "{{count}} selected",
     "selectAllAction": "Select all",
@@ -9466,8 +9466,11 @@
       "StructuresJobsCancelled": "Industry Jobs Cancelled",
       "StructureLowReagentsAlert": "Structure Low on Reagents",
       "StructureNoReagentsAlert": "Structure Out of Reagents",
+      "MoonminingExtractionStarted": "Moon Extraction Started",
       "MoonminingExtractionFinished": "Moon Extraction Ready",
+      "MoonminingLaserFired": "Moon Drill Fired",
       "MoonminingAutomaticFracture": "Moon Chunk Fractured",
+      "MoonminingExtractionCancelled": "Moon Extraction Cancelled",
       "CorpAllBillMsg": "Corporation Bill Issued",
       "BillOutOfMoneyMsg": "Bill Could Not Be Paid",
       "CorpOfficeExpirationMsg": "Corporation Office Expiring",
@@ -9649,6 +9652,19 @@
             "body": "{{character}}: assets at {{structure}} are at risk — the structure is close to being abandoned.",
             "bodyWithDays_one": "{{character}}: assets at {{structure}} are at risk — the structure is abandoned in {{count}} day.",
             "bodyWithDays_other": "{{character}}: assets at {{structure}} are at risk — the structure is abandoned in {{count}} days."
+          },
+          "MoonminingExtractionStarted": {
+            "title": "Moon extraction started",
+            "body": "{{character}}: a moon extraction started at {{structure}}.",
+            "bodyWithReady": "{{character}}: a moon extraction started at {{structure}}; the chunk arrives {{ready}}."
+          },
+          "MoonminingLaserFired": {
+            "title": "Moon drill fired",
+            "body": "{{character}}: the moon drill at {{structure}} was fired and the chunk fractured."
+          },
+          "MoonminingExtractionCancelled": {
+            "title": "Moon extraction cancelled",
+            "body": "{{character}}: the moon extraction at {{structure}} was cancelled."
           },
           "MoonminingExtractionFinished": {
             "title": "Moon extraction ready",
