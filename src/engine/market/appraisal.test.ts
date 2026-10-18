@@ -606,6 +606,19 @@ describe('appraisalNet (issue #1426)', () => {
     expect(salesTaxPct).toBeCloseTo(3.375, 6);
     expect(brokerFeePct).toBeCloseTo(3, 6);
   });
+
+  it('applies Price Percent to both sides before tax and fees', () => {
+    const priced = item({ quantity: 100, sell: 1_000, buy: 800 });
+    const fees = { accountingLevel: 0, brokerRelationsLevel: 0, standing: ZERO_STANDINGS };
+    const half = appraisalNet([priced], fees, 50);
+    const scaled = appraisalNet([{ ...priced, sell: 500, buy: 400 }], fees);
+    expect(half.instantNet).toBeCloseTo(scaled.instantNet, 6);
+    expect(half.listNet).toBeCloseTo(scaled.listNet, 6);
+    expect(appraisalNet([priced], fees).instantNet).toBeCloseTo(
+      appraisalNet([priced], fees, 100).instantNet,
+      6
+    );
+  });
 });
 
 describe('appraisalUndercut', () => {
@@ -639,19 +652,6 @@ describe('appraisalUndercut', () => {
 
   it('never flags a row nobody is buying', () => {
     expect(appraisalUndercut(item({ buy: null }))?.atOrBelowBuy).toBe(false);
-  });
-
-  it('applies Price Percent to both sides before tax and fees', () => {
-    const priced = item({ quantity: 100, sell: 1_000, buy: 800 });
-    const fees = { accountingLevel: 0, brokerRelationsLevel: 0, standing: ZERO_STANDINGS };
-    const half = appraisalNet([priced], fees, 50);
-    const scaled = appraisalNet([{ ...priced, sell: 500, buy: 400 }], fees);
-    expect(half.instantNet).toBeCloseTo(scaled.instantNet, 6);
-    expect(half.listNet).toBeCloseTo(scaled.listNet, 6);
-    expect(appraisalNet([priced], fees).instantNet).toBeCloseTo(
-      appraisalNet([priced], fees, 100).instantNet,
-      6
-    );
   });
 });
 

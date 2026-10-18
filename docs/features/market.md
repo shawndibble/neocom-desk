@@ -310,8 +310,7 @@ Result panel
 
 - Header meta chip: hub name + "at N%".
 - Actions: ColumnPickerMenu (optional columns, ISK/m³ off by default, device-local `appraisalVisibleColumns`), Share, Copy sell list, TableActionsMenu (CSV).
-- StatChips: Sell total (accent), Buy total, Instant net, List net, Spread, Refine total (only if any row has refine), Cheapest buy (only if any row has an LP option), Total volume (`AppraisalVolumeChip`), Items count. Sell/Buy use `FullIskTotal`; others `IskAmount` shorthand with exact on tap/hover.
-- Selling now and Listing are priced at the appraisal's Price %, like the totals beside them.
+- Summary: three cells, Buy (`totals.buy`), Split (midpoint, accent) and Sell (`totals.sell`), via `FullIskTotal`. Each carries the figure it nets to under a rule: Buy → "Sell now, after tax" (`net.instantNet`), Split → Spread, Sell → "List it, after fees" (`net.listNet`; both tooltips give the tax and broker rates). The net figures are priced at the appraisal's Price %, like the totals. Under the cells, one chip line: Total volume (`AppraisalVolumeChip`), Items, Refine total (only if any row has refine), Cheapest buy (only if any row has an LP option).
 - Notes above table (conditional): assumes-base-standings note; refine assumes no implants (ore/ice only); unpriced rows count (warning); refine-unpriced count; "cheapest buy via LP" count.
 - Table (`DataTable`, rowKey typeId, `responsive="table"`, `rowMoreActions`, `rowContextMenu` = `ItemContextMenu`):
   - Always: Quantity, Item (MarketItemLink -> Browser).

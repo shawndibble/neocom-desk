@@ -57,7 +57,7 @@ function PriceCell({
       </span>
       <span className="mb-1 text-[0.6875rem] text-text-dim">{hint}</span>
       {below && (
-        <span className="mt-auto border-t border-line pt-1 text-xs text-text-dim">{below}</span>
+        <div className="mt-auto border-t border-line pt-1 text-xs text-text-dim">{below}</div>
       )}
     </section>
   );
