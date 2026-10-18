@@ -42,12 +42,12 @@ interface MobileMoreSheetProps {
  * field that opens the command palette, a short Recent row, then every page
  * as icon tiles, grouped like the rail — including the four the bottom bar
  * holds, because the sheet covers the bar and a pilot opening More expects the
- * whole map (a page in the bar is not missing from here). Pages
+ * whole map (`20261018-013019`). Pages
  * only — a page's views are reached through its own tabs, Recent and search,
  * which keeps the sheet to about a dozen choices.
  *
  * Pages the pilot hid fold into one row that opens in place, so the sheet
- * still reaches every page (`20260913-095527`'s “never in neither”). Corp
+ * still reaches every page (“never in neither”). Corp
  * shows only while the Character has corp access; Settings, Help and the
  * Character link have permanent rows at the foot.
  *
