@@ -215,7 +215,11 @@ initializeApp();
 
 // Built at cold start so a missing EVE_CLIENT_ID fails deployment/startup
 // loudly instead of silently accepting any EVE app's tokens per request.
-const verifyOptions = verifyOptionsFromEnv();
+// The Firebase emulator's discovery pass loads this module without the env
+// files (the running functions get them), so only there a missing id is allowed.
+const verifyOptions = verifyOptionsFromEnv({
+  allowMissingClientId: process.env.FUNCTIONS_EMULATOR === 'true',
+});
 
 export const mintFirebaseToken = onCall<{ accessToken?: unknown }>(
   // Hobby-scale abuse cap; also bounds the JWKS fetch fan-out.
