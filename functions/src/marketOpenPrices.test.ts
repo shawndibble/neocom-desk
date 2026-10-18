@@ -9,7 +9,9 @@ import {
   implausibleReason,
   isIsoDate,
   mergeDays,
+  MARKET_OPEN_PRICES_COLLECTION,
   openPriceDocId,
+  pairKey,
   findFinalSnapshot,
   isFinalSlot,
   pickLastSnapshot,
@@ -156,9 +158,7 @@ describe('OpenPriceFold', () => {
     const fold = new OpenPriceFold();
     fold.add(FORGE, 35, true, 2);
     fold.add(DOMAIN, 35, false, 3);
-    const byKey = new Map(
-      [...fold.entries()].map((e) => [openPriceDocId(e.regionId, e.typeId), e])
-    );
+    const byKey = new Map([...fold.entries()].map((e) => [pairKey(e.regionId, e.typeId), e]));
     expect(byKey.get(`${FORGE}_35`)).toMatchObject({ buy: 2, sell: null });
     expect(byKey.get(`${DOMAIN}_35`)).toMatchObject({ buy: null, sell: 3 });
   });
@@ -182,70 +182,122 @@ describe('OpenPriceFold', () => {
   });
 });
 
-describe('mergeDays', () => {
-  const base = { regionId: FORGE, typeId: 34 };
+describe('openPriceDocId', () => {
+  it('is one document per type in the by-type collection', () => {
+    expect(MARKET_OPEN_PRICES_COLLECTION).toBe('marketOpenPricesByType');
+    expect(openPriceDocId(34)).toBe('34');
+  });
+});
 
-  it('starts a series from nothing', () => {
-    expect(mergeDays(base, null, [{ date: '2026-10-17', buy: 5, sell: 6 }])).toEqual({
-      ...base,
+describe('mergeDays', () => {
+  const base = { typeId: 34 };
+  const day = (
+    date: string,
+    regions: Record<string, { buy: number | null; sell: number | null }>
+  ) => ({
+    date,
+    regions,
+  });
+
+  it('starts a document from nothing: shared dates, per-region parallel arrays', () => {
+    expect(
+      mergeDays(base, null, [
+        day('2026-10-17', { [FORGE]: { buy: 5, sell: 6 }, [DOMAIN]: { buy: null, sell: 9 } }),
+      ])
+    ).toEqual({
+      typeId: 34,
       dates: ['2026-10-17'],
-      buy: [5],
-      sell: [6],
+      regions: { [FORGE]: { buy: [5], sell: [6] }, [DOMAIN]: { buy: [null], sell: [9] } },
     });
   });
-  it('appends in order and does not invent days for gaps', () => {
-    const first = mergeDays(base, null, [{ date: '2026-10-10', buy: 1, sell: 2 }]);
-    const next = mergeDays(base, first, [{ date: '2026-10-17', buy: null, sell: 4 }]);
+  it('a region with no orders on a day reads null there, and no day is invented for a gap', () => {
+    const first = mergeDays(base, null, [day('2026-10-10', { [FORGE]: { buy: 1, sell: 2 } })]);
+    const next = mergeDays(base, first, [day('2026-10-17', { [DOMAIN]: { buy: 3, sell: 4 } })]);
     expect(next.dates).toEqual(['2026-10-10', '2026-10-17']);
-    expect(next.buy).toEqual([1, null]);
-    expect(next.sell).toEqual([2, 4]);
+    expect(next.regions).toEqual({
+      [FORGE]: { buy: [1, null], sell: [2, null] },
+      [DOMAIN]: { buy: [null, 3], sell: [null, 4] },
+    });
   });
-  it('is idempotent: re-running a day replaces that entry', () => {
-    const once = mergeDays(base, null, [{ date: '2026-10-17', buy: 5, sell: 6 }]);
-    const again = mergeDays(base, once, [{ date: '2026-10-17', buy: 7, sell: 8 }]);
-    expect(again.dates).toEqual(['2026-10-17']);
-    expect([again.buy, again.sell]).toEqual([[7], [8]]);
-    expect(mergeDays(base, again, [{ date: '2026-10-17', buy: 7, sell: 8 }])).toEqual(again);
+  it('is idempotent: re-running a day replaces that whole day', () => {
+    const once = mergeDays(base, null, [
+      day('2026-10-17', { [FORGE]: { buy: 5, sell: 6 }, [DOMAIN]: { buy: 1, sell: 1 } }),
+    ]);
+    const again = mergeDays(base, once, [day('2026-10-17', { [FORGE]: { buy: 7, sell: 8 } })]);
+    expect(again).toEqual({
+      typeId: 34,
+      dates: ['2026-10-17'],
+      regions: { [FORGE]: { buy: [7], sell: [8] } },
+    });
+    expect(mergeDays(base, again, [day('2026-10-17', { [FORGE]: { buy: 7, sell: 8 } })])).toEqual(
+      again
+    );
   });
-  it('slots an older day in order (backfill after the daily job)', () => {
-    const live = mergeDays(base, null, [{ date: '2026-10-17', buy: 5, sell: 6 }]);
+  it('slots older days in order (backfill after the daily job), keeping the stored ones', () => {
+    const live = mergeDays(base, null, [day('2026-10-17', { [FORGE]: { buy: 5, sell: 6 } })]);
     const back = mergeDays(base, live, [
-      { date: '2026-10-16', buy: 3, sell: 4 },
-      { date: '2026-10-15', buy: 1, sell: 2 },
+      day('2026-10-15', { [FORGE]: { buy: 1, sell: 2 } }),
+      day('2026-10-16', { [FORGE]: { buy: 3, sell: 4 } }),
     ]);
     expect(back.dates).toEqual(['2026-10-15', '2026-10-16', '2026-10-17']);
-    expect(back.buy).toEqual([1, 3, 5]);
+    expect(back.regions[FORGE].buy).toEqual([1, 3, 5]);
   });
-  it('caps at the newest 400 days', () => {
-    const days = dateRange('2025-01-01', '2026-12-31').map((date, i) => ({
-      date,
-      buy: i,
-      sell: i,
-    }));
+  it('caps at the newest 400 days and drops a region left with no price', () => {
+    const days = dateRange('2025-01-01', '2026-12-31').map((date, i) =>
+      day(date, i === 0 ? { [DOMAIN]: { buy: 1, sell: 1 } } : { [FORGE]: { buy: i, sell: i } })
+    );
     const merged = mergeDays(base, null, days);
     expect(merged.dates).toHaveLength(MARKET_OPEN_PRICES_MAX_DAYS);
     expect(merged.dates.at(-1)).toBe('2026-12-31');
-    expect(merged.buy.at(-1)).toBe(days.length - 1);
-    expect(merged.dates).toEqual([...merged.dates].sort());
+    expect(merged.regions[FORGE].buy.at(-1)).toBe(days.length - 1);
+    expect(merged.regions[FORGE].buy).toHaveLength(MARKET_OPEN_PRICES_MAX_DAYS);
+    expect(Object.keys(merged.regions)).toEqual([String(FORGE)]);
   });
-  it('trusts a ragged stored series only up to its shortest array', () => {
+  it('reads a ragged or malformed stored region as null where it falls short', () => {
     const merged = mergeDays(
       base,
-      { dates: ['2026-10-01', '2026-10-02'], buy: [1], sell: [2, 3] },
-      [{ date: '2026-10-03', buy: 9, sell: 9 }]
+      {
+        dates: ['2026-10-01', '2026-10-02'],
+        regions: { [FORGE]: { buy: [1], sell: [2, 3] }, junk: 'x' } as never,
+      },
+      [day('2026-10-03', { [FORGE]: { buy: 9, sell: 9 } })]
     );
-    expect(merged.dates).toEqual(['2026-10-01', '2026-10-03']);
-    expect(merged.buy).toEqual([1, 9]);
+    expect(merged.dates).toEqual(['2026-10-01', '2026-10-02', '2026-10-03']);
+    expect(merged.regions).toEqual({
+      [FORGE]: { buy: [1, null, 9], sell: [2, 3, 9] },
+    });
+  });
+  it('keeps a document of 400 days x 5 regions well under 1 MB', () => {
+    const regions = [10000002, 10000043, 10000032, 10000030, 10000042];
+    const days = dateRange('2025-09-14', '2026-10-17').map((date) =>
+      day(date, Object.fromEntries(regions.map((r) => [r, { buy: 1234567.89, sell: 1234567.99 }])))
+    );
+    const merged = mergeDays(base, null, days);
+    // Firestore's documented storage sizes: string = UTF-8 length + 1,
+    // number = 8, null = 1, map = sum of (key length + 1 + value), + 32 per doc.
+    const sizeOf = (v: unknown): number =>
+      v === null
+        ? 1
+        : typeof v === 'string'
+          ? v.length + 1
+          : typeof v === 'number'
+            ? 8
+            : Array.isArray(v)
+              ? v.reduce((n: number, x) => n + sizeOf(x), 0)
+              : Object.entries(v as object).reduce((n, [k, x]) => n + k.length + 1 + sizeOf(x), 0);
+    const size = sizeOf(merged) + 32;
+    expect(size).toBeLessThan(50_000);
   });
 });
 
 describe('groupByDocument', () => {
-  it("collects each document's days ascending", () => {
+  it("collects each type's days ascending, every region of a day together", () => {
     const a = new OpenPriceFold();
     a.add(FORGE, 34, true, 1);
     const b = new OpenPriceFold();
     b.add(FORGE, 34, false, 2);
     b.add(DOMAIN, 34, true, 3);
+    b.add(DOMAIN, 35, true, 4);
     const groups = groupByDocument(
       new Map([
         ['2026-10-02', b],
@@ -254,14 +306,16 @@ describe('groupByDocument', () => {
     );
     expect(groups).toEqual([
       {
-        regionId: FORGE,
         typeId: 34,
         days: [
-          { date: '2026-10-01', buy: 1, sell: null },
-          { date: '2026-10-02', buy: null, sell: 2 },
+          { date: '2026-10-01', regions: { [FORGE]: { buy: 1, sell: null } } },
+          {
+            date: '2026-10-02',
+            regions: { [FORGE]: { buy: null, sell: 2 }, [DOMAIN]: { buy: 3, sell: null } },
+          },
         ],
       },
-      { regionId: DOMAIN, typeId: 34, days: [{ date: '2026-10-02', buy: 3, sell: null }] },
+      { typeId: 35, days: [{ date: '2026-10-02', regions: { [DOMAIN]: { buy: 4, sell: null } } }] },
     ]);
   });
 });

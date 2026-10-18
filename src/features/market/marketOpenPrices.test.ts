@@ -16,16 +16,19 @@ vi.mock('@/app/syncStatus', () => ({ isSyncConfigured: () => syncConfigured.valu
 
 import {
   loadMarketOpenPrices,
-  parseOpenPriceSeries,
+  parseOpenPricesByType,
   resetMarketOpenPricesCache,
 } from './marketOpenPrices';
 
+const FORGE = 10000002;
+const DOMAIN = 10000043;
 const DOC = {
-  regionId: 10000002,
   typeId: 34,
   dates: ['2026-10-01', '2026-10-02'],
-  buy: [5, null],
-  sell: [6, 7],
+  regions: {
+    [FORGE]: { buy: [5, null], sell: [6, 7] },
+    [DOMAIN]: { buy: [1, 2], sell: [3, 4] },
+  },
 };
 
 function serve(data: unknown) {
@@ -39,29 +42,38 @@ beforeEach(() => {
   resetMarketOpenPricesCache();
 });
 
-describe('parseOpenPriceSeries', () => {
-  it('reads the parallel arrays', () => {
-    expect(parseOpenPriceSeries(DOC)).toEqual({
-      dates: DOC.dates,
-      buy: DOC.buy,
-      sell: DOC.sell,
-    });
+describe('parseOpenPricesByType', () => {
+  it('reads each region as a series over the shared dates', () => {
+    const parsed = parseOpenPricesByType(DOC);
+    expect(parsed?.get(FORGE)).toEqual({ dates: DOC.dates, buy: [5, null], sell: [6, 7] });
+    expect(parsed?.get(DOMAIN)?.buy).toEqual([1, 2]);
   });
 
-  it('rejects anything not shaped like a series', () => {
-    expect(parseOpenPriceSeries(undefined)).toBeNull();
-    expect(parseOpenPriceSeries({ dates: [], buy: [], sell: [] })).toBeNull();
-    expect(parseOpenPriceSeries({ dates: ['2026-10-01'], buy: ['x'], sell: [1] })).toBeNull();
+  it('skips a malformed region and rejects anything not shaped like a type document', () => {
+    expect(
+      parseOpenPricesByType({ ...DOC, regions: { ...DOC.regions, 1: { buy: ['x'], sell: [] } } })
+        ?.size
+    ).toBe(2);
+    expect(parseOpenPricesByType(undefined)).toBeNull();
+    expect(parseOpenPricesByType({ dates: [], regions: {} })).toBeNull();
+    expect(parseOpenPricesByType({ dates: ['2026-10-01'] })).toBeNull();
   });
 });
 
 describe('loadMarketOpenPrices', () => {
-  it('reads one document by region_type id, never listing', async () => {
+  it('reads one document per type, never listing, and serves every region from it', async () => {
     serve(DOC);
-    const series = await loadMarketOpenPrices(10000002, 34);
-    expect(series?.dates).toEqual(DOC.dates);
+    const [forge, domain, other] = await Promise.all([
+      loadMarketOpenPrices(FORGE, 34),
+      loadMarketOpenPrices(DOMAIN, 34),
+      loadMarketOpenPrices(10000001, 34),
+    ]);
+    expect(forge?.sell).toEqual([6, 7]);
+    expect(domain?.buy).toEqual([1, 2]);
+    // A compared non-hub region simply has no open series.
+    expect(other).toBeNull();
     expect(getDocMock.mock.calls.map(([ref]) => (ref as { path: string }).path)).toEqual([
-      'marketOpenPrices/10000002_34',
+      'marketOpenPricesByType/34',
     ]);
     expect(listMock).not.toHaveBeenCalled();
   });
@@ -69,14 +81,14 @@ describe('loadMarketOpenPrices', () => {
   it('holds the answer, a missing document included, so a reopen reads nothing', async () => {
     serve(undefined);
     expect(await loadMarketOpenPrices(1, 2, 1000)).toBeNull();
-    expect(await loadMarketOpenPrices(1, 2, 2000)).toBeNull();
+    expect(await loadMarketOpenPrices(3, 2, 2000)).toBeNull();
     expect(getDocMock).toHaveBeenCalledTimes(1);
   });
 
   it('reads again once the hold lapses', async () => {
     serve(DOC);
-    await loadMarketOpenPrices(1, 2, 0);
-    await loadMarketOpenPrices(1, 2, 2 * 60 * 60_000);
+    await loadMarketOpenPrices(FORGE, 2, 0);
+    await loadMarketOpenPrices(FORGE, 2, 2 * 60 * 60_000);
     expect(getDocMock).toHaveBeenCalledTimes(2);
   });
 
@@ -88,8 +100,8 @@ describe('loadMarketOpenPrices', () => {
 
   it('is null on a failed read (offline) and tries again next time', async () => {
     getDocMock.mockRejectedValueOnce(new Error('offline'));
-    expect(await loadMarketOpenPrices(1, 2)).toBeNull();
+    expect(await loadMarketOpenPrices(FORGE, 2)).toBeNull();
     serve(DOC);
-    expect((await loadMarketOpenPrices(1, 2))?.buy).toEqual(DOC.buy);
+    expect((await loadMarketOpenPrices(FORGE, 2))?.buy).toEqual([5, null]);
   });
 });

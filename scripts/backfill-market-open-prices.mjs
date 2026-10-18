@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-// ONE-OFF: seeds `marketOpenPrices` with past days from EVE Ref's market-order
+// ONE-OFF: seeds `marketOpenPricesByType` with past days from EVE Ref's market-order
 // snapshot history. DELETE THIS SCRIPT (and scripts/lib/backfillMarketOpenPrices.*)
 // once the backfill has run; the daily `syncMarketOpenPrices` function carries
-// it on from there. Decision: docs/context/decisions/20261018-121126-*.md.
+// it on from there. Decisions: docs/context/decisions/20261018-121126-*.md and 20261018-164126-*.md.
 //
 // Run by the maintainer, with their own service-account credentials. It never
 // runs in CI or from an agent. From the repo root, after `npm ci` in both the
@@ -17,7 +17,8 @@
 //
 // Phase 1 folds every day and keeps only a compact table in memory (two
 // Float64Arrays per day, indexed by region/type pair: ~450 MB for 400 days).
-// Phase 2 then runs one writeOpenPrices pass, so each document is read and
+// Phase 2 then runs one writeOpenPrices pass over `marketOpenPricesByType`
+// (one document per type, every hub region in it: ~20k documents), so each is read and
 // merge-written exactly once, with progress lines as it goes. The merge keeps
 // days the daily function already stored and the 400-day cap. Nothing is
 // written until every day is folded, so a run stopped during phase 1 is
@@ -40,7 +41,7 @@
 //
 // Dates are UTC days, inclusive; --to is normally the day before the daily
 // function's first run. The merge is idempotent (a stored day is replaced,
-// never duplicated) and every batch of 500 commits atomically, so an
+// never duplicated) and every batch of 100 commits atomically, so an
 // interrupted write is simply run again. Each day downloads ~20MB and takes
 // ~45s. Runs on Node 24 directly on the TypeScript sources in functions/src.
 import { readFileSync } from 'node:fs';
@@ -61,7 +62,7 @@ import {
 } from './lib/backfillMarketOpenPrices.mjs';
 
 const USER_AGENT = 'Neocom Desk (github.com/shawndibble/neocom-desk) backfill';
-const PROGRESS_EVERY = 2000;
+const PROGRESS_EVERY = 1000;
 
 let args;
 try {

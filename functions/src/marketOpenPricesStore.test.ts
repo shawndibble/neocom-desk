@@ -21,57 +21,57 @@ function fakeDb(stored: Record<string, unknown>) {
 }
 
 describe('writeOpenPrices', () => {
-  it('merges into existing documents and creates new ones', async () => {
+  it('merges into existing type documents and creates new ones', async () => {
     const { db, commits } = fakeDb({
-      '1_34': { regionId: 1, typeId: 34, dates: ['2026-10-16'], buy: [1], sell: [2] },
+      '34': { typeId: 34, dates: ['2026-10-16'], regions: { 1: { buy: [1], sell: [2] } } },
     });
     const n = await writeOpenPrices(
       db,
-      'marketOpenPrices',
+      'marketOpenPricesByType',
       [
-        { regionId: 1, typeId: 34, days: [{ date: '2026-10-17', buy: 3, sell: 4 }] },
-        { regionId: 1, typeId: 35, days: [{ date: '2026-10-17', buy: null, sell: 5 }] },
+        { typeId: 34, days: [{ date: '2026-10-17', regions: { 1: { buy: 3, sell: 4 } } }] },
+        { typeId: 35, days: [{ date: '2026-10-17', regions: { 1: { buy: null, sell: 5 } } }] },
       ],
       mergeDays
     );
     expect(n).toBe(2);
     expect(commits).toHaveLength(1);
     expect(commits[0][0]).toEqual({
-      id: '1_34',
+      id: '34',
       data: {
-        regionId: 1,
         typeId: 34,
         dates: ['2026-10-16', '2026-10-17'],
-        buy: [1, 3],
-        sell: [2, 4],
+        regions: { 1: { buy: [1, 3], sell: [2, 4] } },
       },
     });
-    expect(commits[0][1].data).toMatchObject({ dates: ['2026-10-17'], buy: [null], sell: [5] });
+    expect(commits[0][1].data).toMatchObject({
+      dates: ['2026-10-17'],
+      regions: { 1: { buy: [null], sell: [5] } },
+    });
   });
 
-  it('commits in batches of at most 500', async () => {
+  it('commits in batches of at most 100, keeping a batch of ~45 KB documents under 10 MiB', async () => {
     const { db, commits } = fakeDb({});
-    const items = Array.from({ length: 1201 }, (_, t) => ({
-      regionId: 1,
+    const items = Array.from({ length: 201 }, (_, t) => ({
       typeId: t,
-      days: [{ date: '2026-10-17', buy: 1, sell: 1 }],
+      days: [{ date: '2026-10-17', regions: { 1: { buy: 1, sell: 1 } } }],
     }));
-    expect(await writeOpenPrices(db, 'c', items, mergeDays)).toBe(1201);
-    expect(commits.map((c) => c.length)).toEqual([500, 500, 201]);
+    expect(await writeOpenPrices(db, 'c', items, mergeDays)).toBe(201);
+    expect(commits.map((c) => c.length)).toEqual([100, 100, 1]);
   });
   it('reads the items lazily, one batch at a time, and reports progress after each commit', async () => {
     const { db, commits } = fakeDb({});
     let pulled = 0;
     function* items() {
-      for (let t = 0; t < 1001; t++) {
+      for (let t = 0; t < 201; t++) {
         pulled++;
         // Never more than one batch ahead of what has been committed.
-        expect(pulled - commits.length * 500).toBeLessThanOrEqual(500);
-        yield { regionId: 1, typeId: t, days: [{ date: '2026-10-17', buy: 1, sell: 1 }] };
+        expect(pulled - commits.length * 100).toBeLessThanOrEqual(100);
+        yield { typeId: t, days: [{ date: '2026-10-17', regions: { 1: { buy: 1, sell: 1 } } }] };
       }
     }
     const progress: number[] = [];
-    expect(await writeOpenPrices(db, 'c', items(), mergeDays, (n) => progress.push(n))).toBe(1001);
-    expect(progress).toEqual([500, 1000, 1001]);
+    expect(await writeOpenPrices(db, 'c', items(), mergeDays, (n) => progress.push(n))).toBe(201);
+    expect(progress).toEqual([100, 200, 201]);
   });
 });

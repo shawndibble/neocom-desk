@@ -78,21 +78,40 @@ describe('OpenPriceTable', () => {
     const table = new OpenPriceTable();
     table.addDay('2026-10-01', a);
     table.addDay('2026-10-02', b);
-    expect(table.size).toBe(2);
+    expect(table.size).toBe(2); // types 34 and 35
     expect(table.dates).toEqual(['2026-10-01', '2026-10-02']);
-    // Two Float64Arrays (buy, sell) per day, sized to the pairs known that day.
+    // Two Float64Arrays (buy, sell) per day, sized to the region/type pairs known that day.
     expect(table.bytes).toBe((1 + 2) * 2 * 8);
     expect([...table.documents()]).toEqual([
       {
-        regionId: 10000002,
         typeId: 34,
         days: [
-          { date: '2026-10-01', buy: 1, sell: 2 },
-          { date: '2026-10-02', buy: null, sell: 3 },
+          { date: '2026-10-01', regions: { 10000002: { buy: 1, sell: 2 } } },
+          { date: '2026-10-02', regions: { 10000002: { buy: null, sell: 3 } } },
         ],
       },
-      { regionId: 10000043, typeId: 35, days: [{ date: '2026-10-02', buy: 4, sell: null }] },
+      {
+        typeId: 35,
+        days: [{ date: '2026-10-02', regions: { 10000043: { buy: 4, sell: null } } }],
+      },
     ]);
+  });
+  it('gathers every region of a type into its one document', () => {
+    const a = new OpenPriceFold();
+    a.add(10000002, 34, true, 1);
+    a.add(10000043, 35, true, 2);
+    const b = new OpenPriceFold();
+    b.add(10000043, 34, false, 3);
+    const table = new OpenPriceTable();
+    table.addDay('2026-10-01', a);
+    table.addDay('2026-10-02', b);
+    expect([...table.documents()][0]).toEqual({
+      typeId: 34,
+      days: [
+        { date: '2026-10-01', regions: { 10000002: { buy: 1, sell: null } } },
+        { date: '2026-10-02', regions: { 10000043: { buy: null, sell: 3 } } },
+      ],
+    });
   });
   it('a pair a later day drops gets no entry for that day', () => {
     const a = new OpenPriceFold();
@@ -100,7 +119,9 @@ describe('OpenPriceTable', () => {
     const table = new OpenPriceTable();
     table.addDay('2026-10-01', a);
     table.addDay('2026-10-02', new OpenPriceFold());
-    expect([...table.documents()][0].days).toEqual([{ date: '2026-10-01', buy: 1, sell: null }]);
+    expect([...table.documents()][0].days).toEqual([
+      { date: '2026-10-01', regions: { 10000002: { buy: 1, sell: null } } },
+    ]);
   });
 });
 
@@ -152,8 +173,8 @@ describe('runBackfill', () => {
     const result = await runBackfill(d);
     expect(d.writeDocuments).toHaveBeenCalledTimes(1);
     const [docs, total] = d.writeDocuments.mock.calls[0];
-    expect(total).toBe(10000);
-    expect(result).toEqual({ written: 10000, skipped: [] });
+    expect(total).toBe(2000); // 2,000 types, each holding 5 regions
+    expect(result).toEqual({ written: 2000, skipped: [] });
     const first = docs[Symbol.iterator]().next().value;
     expect(first.days.map((x) => x.date)).toEqual(['2026-10-01', '2026-10-02', '2026-10-03']);
   });
@@ -161,7 +182,7 @@ describe('runBackfill', () => {
     const d = deps({ write: false });
     expect((await runBackfill(d)).written).toBe(0);
     expect(d.writeDocuments).not.toHaveBeenCalled();
-    expect(d.log).toHaveBeenCalledWith(expect.stringMatching(/dry run: would write 10000 doc/));
+    expect(d.log).toHaveBeenCalledWith(expect.stringMatching(/dry run: would write 2000 doc/));
   });
   it('says a stopped download resumes by re-running from --from, since nothing is written yet', async () => {
     const d = deps({

@@ -73,11 +73,14 @@ export function checkCredentials({ credentialProject, project, yes }) {
  * order". The fold only lists a pair with at least one side priced, so both
  * NaN means the day did not list it. 16 bytes per pair per day: 400 days x
  * ~70k pairs is ~450 MB, where the folds' Maps of objects would be several GB.
+ * Documents are one per type (`marketOpenPricesByType`), so `documents()`
+ * gathers each type's pairs, one per region, into one document.
  */
 export class OpenPriceTable {
   #pairIndex = new Map();
   #regionIds = [];
-  #typeIds = [];
+  /** typeId -> its pairs' indexes, in first-seen order: one document each. */
+  #pairsByType = new Map();
   #buys = [];
   #sells = [];
   /** Ascending as added. */
@@ -93,7 +96,12 @@ export class OpenPriceTable {
         i = this.#regionIds.length;
         this.#pairIndex.set(key, i);
         this.#regionIds.push(e.regionId);
-        this.#typeIds.push(e.typeId);
+        let pairs = this.#pairsByType.get(e.typeId);
+        if (!pairs) {
+          pairs = [];
+          this.#pairsByType.set(e.typeId, pairs);
+        }
+        pairs.push(i);
       }
       indexes.push(i);
     }
@@ -110,9 +118,9 @@ export class OpenPriceTable {
     this.#sells.push(sell);
   }
 
-  /** Documents (region/type pairs) seen so far. */
+  /** Documents (types) seen so far. */
   get size() {
-    return this.#regionIds.length;
+    return this.#pairsByType.size;
   }
 
   /** Bytes held in the price columns. */
@@ -120,24 +128,28 @@ export class OpenPriceTable {
     return this.#buys.reduce((n, a) => n + a.byteLength * 2, 0);
   }
 
-  /** One `KeyedDays` per document, days ascending, built lazily. */
+  /** One `TypeDays` per type document, every region of a day together, days ascending. Built lazily. */
   *documents() {
     const buys = this.#buys;
     const sells = this.#sells;
-    for (let p = 0; p < this.#regionIds.length; p++) {
+    for (const [typeId, pairs] of this.#pairsByType) {
       const days = [];
       for (let d = 0; d < this.dates.length; d++) {
-        if (p >= buys[d].length) continue;
-        const b = buys[d][p];
-        const s = sells[d][p];
-        if (Number.isNaN(b) && Number.isNaN(s)) continue;
-        days.push({
-          date: this.dates[d],
-          buy: Number.isNaN(b) ? null : b,
-          sell: Number.isNaN(s) ? null : s,
-        });
+        let regions = null;
+        for (const p of pairs) {
+          if (p >= buys[d].length) continue;
+          const b = buys[d][p];
+          const s = sells[d][p];
+          if (Number.isNaN(b) && Number.isNaN(s)) continue;
+          regions ??= {};
+          regions[String(this.#regionIds[p])] = {
+            buy: Number.isNaN(b) ? null : b,
+            sell: Number.isNaN(s) ? null : s,
+          };
+        }
+        if (regions) days.push({ date: this.dates[d], regions });
       }
-      yield { regionId: this.#regionIds[p], typeId: this.#typeIds[p], days };
+      yield { typeId, days };
     }
   }
 }
@@ -189,7 +201,7 @@ export async function foldDays({ from, to, table, snapshotUrlFor, foldUrl, log }
  *   from: string, to: string, write: boolean,
  *   snapshotUrlFor: (date: string) => Promise<string | null>,
  *   foldUrl: (url: string, fold: OpenPriceFold) => Promise<number>,
- *   writeDocuments: (docs: Iterable<import('../../functions/src/marketOpenPrices.ts').KeyedDays>, total: number) => Promise<number>,
+ *   writeDocuments: (docs: Iterable<import('../../functions/src/marketOpenPrices.ts').TypeDays>, total: number) => Promise<number>,
  *   log: (line: string) => void,
  * }} deps
  */
