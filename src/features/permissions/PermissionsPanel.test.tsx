@@ -295,24 +295,6 @@ describe('PermissionsPanel — the Corporation row', () => {
     );
     expect(within(row('Corporation')).queryByRole('button')).not.toBeInTheDocument();
   });
-
-  /**
-   * Issue #4058: a ready Accountant whose grant predates the mining scope
-   * keeps the corp wallet, and this row is the durable way to the mining
-   * ledger once the one-time prompt is gone.
-   */
-  it('ready but short of the mining-ledger scope: offers Grant', async () => {
-    mockedGrantedScopes.mockReturnValue([
-      ROLES_SCOPE,
-      'esi-wallet.read_corporation_wallets.v1',
-      'esi-corporations.read_divisions.v1',
-    ]);
-    mockedLoadRoles.mockResolvedValue(rolesResolvingTo(['Accountant']));
-    renderPanel();
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Grant Corporation' })).toBeInTheDocument()
-    );
-  });
 });
 
 describe('PermissionsPanel — no active Character', () => {

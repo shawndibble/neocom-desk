@@ -364,7 +364,7 @@ describe('parseEveNotificationPayload — real payload samples', () => {
 
 /**
  * The three moon-drill types issue #4058 allow-lists, plus the ore volumes the
- * Corp Tax Book's Extraction estimate reads (epic #4055, D13). Their shape is
+ * moon chunk estimate reads (epic #4055, D13). Their shape is
  * taken from public samples (aa-moonmining's fixtures), not from CCP, and is
  * unverified against live data — so every field is optional and the ore
  * block is read defensively: one bad line costs that line, never the rest.
@@ -454,6 +454,12 @@ describe('parseEveNotificationPayload — moon drill', () => {
       { typeId: 45490, volumeM3: 1.5 },
       { typeId: 46677, volumeM3: 2 },
     ]);
+  });
+
+  it('reads an ore block carrying a YAML anchor', () => {
+    expect(
+      parseEveNotificationPayload('oreVolumeByType: &id001\n  45490: 1.5\n').oreVolumes
+    ).toEqual([{ typeId: 45490, volumeM3: 1.5 }]);
   });
 
   it('reads CRLF ore lines', () => {

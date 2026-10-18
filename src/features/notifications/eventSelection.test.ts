@@ -328,7 +328,7 @@ describe('NOTIFICATION_FAMILIES / eveTypesByFamily', () => {
     expect([...grouped].sort()).toEqual([...EVE_ALLOWED_TYPES].sort());
   });
 
-  // Issue #4058: the whole drill cycle, so the Corp Tax Book's Extraction
+  // Issue #4058: the whole drill cycle, so a corp moon Extraction
   // timeline is exact (epic #4055, D14).
   it('groups the moonMining family: the whole drill cycle', () => {
     expect([...eveTypesByFamily('moonMining')].sort()).toEqual([

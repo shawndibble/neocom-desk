@@ -92,18 +92,19 @@ export const CORP_SCOPES_FOR_CAPABILITY: Readonly<Record<CorpCapability, readonl
 
 /**
  * Capabilities added after Characters already reached `ready` without them.
- * Missing one of their scopes asks for the grant (the corp grant prompt, the
- * Settings Corporation Permission row) but never hides corp surfaces the
- * Character could already read: the capability itself just stays off until
- * the scope arrives.
+ * Missing one of their scopes never hides corp surfaces the Character could
+ * already read: the capability itself just stays off until the scope arrives,
+ * and `missingScopes` still names it so a surface that needs it can ask.
  *
  * Why not simply require the scope, as #327 did: an Accountant who granted
  * the corp group before #327 holds every wallet scope and not the mining one,
  * so a plain requirement would drop them from `ready` to
  * `roles-without-grant` and hide their corp wallet until they re-granted —
  * breaking a working surface to offer a new one. Additive, they keep the
- * wallet and are offered the grant once (the prompt's offer record is keyed
- * on the group's scope set, which they have not seen in full).
+ * wallet. Asking them for the scope is left to the first surface that reads
+ * the ledger (#4062/#4063): an offer made before anything uses it would spend
+ * the corp grant prompt's once-only ask on nothing (decision
+ * `20261018-141225-additive-corp-capabilities-do-not-hide-corp-ui`).
  */
 const ADDITIVE_CORP_CAPABILITIES: ReadonlySet<CorpCapability> = new Set(['canReadMiningLedger']);
 
@@ -162,11 +163,12 @@ export function corpGrantCoverage(
   for (const capability of CORP_CAPABILITIES) {
     if (!capabilities[capability]) continue;
     const complete = CORP_SCOPES_FOR_CAPABILITY[capability].every((scope) => held.has(scope));
-    if (!complete && !ADDITIVE_CORP_CAPABILITIES.has(capability)) blocking = true;
+    const additive = ADDITIVE_CORP_CAPABILITIES.has(capability);
+    if (!complete && !additive) blocking = true;
     // A non-additive capability keeps the roles' answer even when incomplete,
     // as `useCorpAccess` always reported it: that gap blocks, and a blocked
     // grant hides every corp surface regardless.
-    covered[capability] = complete || !ADDITIVE_CORP_CAPABILITIES.has(capability);
+    covered[capability] = complete || !additive;
   }
   return {
     missingScopes: missingCorpScopes(capabilities, granted),

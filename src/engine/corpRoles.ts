@@ -36,8 +36,8 @@ export interface CorpCapabilities {
   canReadMoonExtractions: boolean;
   /**
    * GET /corporation/{id}/mining/observers and /observers/{observer_id} —
-   * who mined how much of what at the corporation's refineries, each row an
-   * **Observed Mining Entry** in the making (issue #4058, epic #4055).
+   * who mined how much of what at the corporation's refineries, by
+   * character, ore type and day (issue #4058, epic #4055).
    *
    * Not folded into `canReadMoonExtractions` although both read through the
    * same scope: the extraction schedule answers to Station_Manager, the

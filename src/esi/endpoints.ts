@@ -2417,8 +2417,7 @@ export function getCorporationMiningObservers(
 
 /**
  * One row of a refinery's mining ledger: everything one character mined of
- * one ore type there on one day — the raw material of an **Observed Mining
- * Entry**. The row's `quantity` keeps growing through the day it describes,
+ * one ore type there on one day. The row's `quantity` keeps growing through the day it describes,
  * so a consumer upserts on (character, type, day) rather than appending.
  */
 export interface CorporationMiningObserverEntry {

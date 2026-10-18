@@ -105,7 +105,7 @@ export interface EveNotificationPayload {
   /**
    * `oreVolumeByType` — the chunk's ore, in m³ per ore type, on
    * MoonminingExtractionStarted and the drill types after it. The exact ore
-   * the Corp Tax Book's Extraction estimate prefers (epic #4055, D13).
+   * a moon chunk estimate prefers over a survey (epic #4055, D13).
    * Unverified against live data, so read line by line: a malformed line is
    * dropped, the rest kept, and a block with no usable line is absent.
    */
@@ -225,7 +225,8 @@ function oreVolumes(text: string): MoonOreVolume[] | undefined {
     if (header === null || header[0].trim().toLowerCase() !== ORE_BLOCK_KEY) continue;
     // A leading space means this is someone else's nested key, not the block.
     if (/^\s/.test(lines[i])) continue;
-    const inline = header[1].trim();
+    // `&id001` — an anchor on the block itself, as CCP writes on structure ids.
+    const inline = header[1].trim().replace(/^&\S+\s*/, '');
     if (inline.startsWith('{') && inline.endsWith('}')) {
       for (const entry of inline.slice(1, -1).split(',')) add(splitPair(entry));
       continue;
