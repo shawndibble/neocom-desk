@@ -74,6 +74,14 @@ describe('SurveyInfoEditor', () => {
     expect(screen.getByRole('button', { name: 'Set waypoint to Efa' })).toBeTruthy();
   });
 
+  it('tells the page once a store lands, so it can re-read the survey', async () => {
+    const onStored = vi.fn();
+    render(<SurveyInfoEditor characterId={7} survey={SURVEY} moon={false} onStored={onStored} />);
+    fireEvent.click(screen.getByText('pick'));
+    await waitFor(() => expect(onStored).toHaveBeenCalledTimes(1));
+    expect(setSurveyInfo).toHaveBeenCalledTimes(1);
+  });
+
   it('stores the notes on blur only, keeping the location, and not again when nothing changed', async () => {
     render(
       <SurveyInfoEditor
