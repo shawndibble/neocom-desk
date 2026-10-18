@@ -931,6 +931,7 @@ export function AppraisalPanel({
                 showCheapest={hasLpOption}
                 implantBonusPct={implantBonusPct}
                 pricesUnavailable={result.pricesUnreachable}
+                netAtFullMarket={pricePercent !== 100}
               />
               {loading && <Spinner label={t('common.loading')} size="sm" />}
             </div>
@@ -942,12 +943,6 @@ export function AppraisalPanel({
                 characterId={characterId}
                 onCargoChange={(next) => void setCargo(next)}
               />
-            )}
-
-            {net && pricePercent !== 100 && (
-              <p className="text-[0.6875rem] text-text-dim">
-                {t('market.appraisal.netAlwaysAt100Note')}
-              </p>
             )}
 
             {net && (
