@@ -6,7 +6,7 @@ import { MultiSelect, type MultiSelectGroup } from '@/components/ui/MultiSelect'
 import { TRADE_HUBS } from '@/market/hubs';
 import { MAX_COMPARE_REGIONS, toggleCompareRegion } from '@/engine/market/priceHistoryCompare';
 import type { MarketRegionEntry } from '@/sde/marketTypes';
-import { compareRegionStroke } from './compareRegionStrokes';
+import { compareRegionStroke, PRIMARY_REGION_STROKE } from './compareRegionStrokes';
 
 interface CompareRegionsPickerProps {
   /** The order book's region — already the main line, so not offered. */
@@ -16,6 +16,12 @@ interface CompareRegionsPickerProps {
   onChange: (next: number[]) => void;
   regions: readonly MarketRegionEntry[];
   className?: string;
+  /**
+   * The picker chooses the regions outright, the primary one included (the
+   * Item Detail's Market tab, which has no Browser scope to supply one):
+   * nothing is left out of the list, and the last pick cannot be cleared.
+   */
+  required?: boolean;
 }
 
 /**
@@ -30,13 +36,20 @@ export function CompareRegionsPicker({
   onChange,
   regions,
   className,
+  required = false,
 }: CompareRegionsPickerProps) {
   const { t } = useTranslation();
   const groups = useMemo<MultiSelectGroup<number>[]>(() => {
     const swatch = (id: number) => {
-      const slot = selected.indexOf(id);
-      if (slot === -1) return undefined;
-      const stroke = compareRegionStroke(slot);
+      // With `required` the first pick is the primary region: the chart's main
+      // colour (accent), with no comparison stroke of its own.
+      const index = selected.indexOf(id);
+      if (index < 0) return undefined;
+      const slot = index - (required ? 1 : 0);
+      // The region's colour and dash, which its line on the chart carries
+      // whether it draws an average or a Buy / Sell pair (those two differ by
+      // weight, shown in the chart legend).
+      const stroke = slot < 0 ? PRIMARY_REGION_STROKE : compareRegionStroke(slot);
       return (
         <svg width="14" height="8" aria-hidden="true" className="shrink-0">
           <line
@@ -67,7 +80,7 @@ export function CompareRegionsPicker({
       { label: t('market.priceHistory.compareHubsGroup'), options: hubs },
       { label: t('market.priceHistory.compareAllGroup'), options: others },
     ];
-  }, [t, regions, primaryRegionId, selected]);
+  }, [t, regions, primaryRegionId, selected, required]);
   const selectedSet = useMemo(() => new Set(selected), [selected]);
 
   return (
@@ -91,13 +104,17 @@ export function CompareRegionsPicker({
       }
       groups={groups}
       selected={selectedSet}
-      onToggle={(id) => onChange(toggleCompareRegion(selected, id))}
+      onToggle={(id) => {
+        const next = toggleCompareRegion(selected, id);
+        if (required && next.length === 0) return;
+        onChange(next);
+      }}
       searchPlaceholder={t('common.searchRegions')}
       noResultsLabel={t('common.noRegionMatches')}
       extraContent={(close) => (
         <div className="flex items-center justify-between gap-2 border-b border-line p-1 pl-2 text-xs text-text-dim">
           <span>{t('market.priceHistory.compareLimit', { max: MAX_COMPARE_REGIONS })}</span>
-          {selected.length > 0 && (
+          {selected.length > 0 && !required && (
             <Button
               variant="ghost"
               size="sm"

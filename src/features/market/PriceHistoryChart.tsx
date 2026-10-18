@@ -18,11 +18,19 @@ import {
   Line,
   type TooltipContentProps,
 } from 'recharts';
-import { useMemo } from 'react';
+import { Fragment, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DataTable, type DataTableColumn } from '@/components/ui';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
+import { ColumnPickerMenu } from '@/components/ui/ColumnPickerMenu';
+import {
+  DEFAULT_VISIBLE_PRICE_HISTORY_COLUMNS,
+  PRICE_HISTORY_COLUMN_IDS,
+  leanPriceHistoryColumns,
+  useVisiblePriceHistoryColumns,
+  type PriceHistoryColumnId,
+} from './priceHistoryColumns';
 import {
   COMPACT_COUNT_Y_AXIS_WIDTH,
   COMPACT_ISK_Y_AXIS_WIDTH,
@@ -33,10 +41,22 @@ import { formatCompactNumber } from '@/lib/compactNumber';
 import { formatIsk, formatIskCompact, formatMarketIsk } from '@/lib/isk';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { formatPriceRange, formatVolume } from './format';
-import { compareRegionStroke } from './compareRegionStrokes';
+import {
+  compareRegionStroke,
+  openPriceStroke,
+  PRIMARY_REGION_STROKE,
+} from './compareRegionStrokes';
+import { openSideLabel } from './priceHistoryLabels';
 import { priceHistoryCsvColumns, type PriceHistoryTableRow } from './priceHistoryCsv';
 import type { MarketHistoryPoint, MovingAveragePoint } from '@/engine/market/priceHistory';
 import { joinRegionAverages } from '@/engine/market/priceHistoryCompare';
+import {
+  joinOpenPrices,
+  seriesShows,
+  type OpenPriceSide,
+  type PriceSeriesChoice,
+  type RegionOpenSeries,
+} from '@/engine/market/priceHistoryOpen';
 
 /** One compared region's average line, as the panel has it so far. */
 export interface ComparedRegionSeries {
@@ -57,9 +77,35 @@ interface PriceHistoryChartProps {
   comparisons?: readonly ComparedRegionSeries[];
   /** Names the primary average once other regions' averages sit beside it. */
   primaryRegionName?: string;
+  /** The primary region, so its open series can be found among `openPrices`. */
+  primaryRegionId?: number;
+  /**
+   * Daily open buy and sell per region (the primary's and the compared ones'),
+   * already cut to the selected range. A region listed here with days draws a
+   * Buy and a Sell line in place of its average line; one absent keeps the
+   * average.
+   */
+  openPrices?: readonly RegionOpenSeries[];
+  /** Which open lines are drawn. */
+  series?: PriceSeriesChoice;
 }
 
 const NO_COMPARISONS: readonly ComparedRegionSeries[] = [];
+const NO_OPEN: readonly RegionOpenSeries[] = [];
+
+/** One region drawing Buy / Sell lines instead of an average. */
+interface OpenLine {
+  regionId: number;
+  name: string | undefined;
+  /** The region's own stroke (colour and dash); the side adds the weight. */
+  region: { color: string; dash: string | undefined };
+  primary: boolean;
+}
+
+const SIDES: readonly OpenPriceSide[] = ['buy', 'sell'];
+
+/** A table cell for a figure ESI has no day for (an open price on a day nothing traded). */
+const DASH = '—';
 
 /**
  * Links the two charts' tooltips and cursors, so hovering either strip
@@ -128,6 +174,9 @@ interface ChartRow extends Partial<Omit<MarketHistoryPoint, 'date'>> {
   movingAverage: number | undefined;
   /** Each compared region's average that day, by region id. */
   comparison: Readonly<Record<number, number>>;
+  /** Each region's open buy and sell that day, by region id. */
+  buy: Readonly<Record<number, number>>;
+  sell: Readonly<Record<number, number>>;
 }
 
 /** "Domain average" once regions are compared; plain "Average Price" otherwise. */
@@ -152,24 +201,43 @@ function HistoryTooltip({
   label,
   comparisons,
   primaryRegionName,
+  openLines,
+  series,
 }: TooltipContentProps & {
   comparisons: readonly ComparedRegionSeries[];
   primaryRegionName: string | undefined;
+  openLines: readonly OpenLine[];
+  series: PriceSeriesChoice;
 }): React.ReactElement | null {
   const { t } = useTranslation();
   if (!active || !payload || payload.length === 0) return null;
   const point = payload[0]?.payload as ChartRow | undefined;
   if (!point) return null;
   const drawn = comparisons.filter((c) => c.status === 'ready');
+  const primaryOpen = openLines.find((l) => l.primary);
+  const named = drawn.length > 0;
+  const sideRows = (line: OpenLine) =>
+    SIDES.filter((side) => seriesShows(series, side)).map((side) => {
+      const value = point[side][line.regionId];
+      return (
+        <p key={`${line.regionId}-${side}`}>
+          {openSideLabel(t, side, named ? line.name : undefined)}:{' '}
+          {value === undefined ? t('market.priceHistory.noOrders') : formatMarketIsk(value)}
+        </p>
+      );
+    });
   return (
     <ChartTooltipShell>
       <p className="font-semibold text-text">{label}</p>
+      {primaryOpen && sideRows(primaryOpen)}
       {point.average !== undefined && (
         <>
-          <p>
-            {averageLabel(t, drawn.length > 0 ? primaryRegionName : undefined)}:{' '}
-            {formatMarketIsk(point.average)}
-          </p>
+          {!primaryOpen && (
+            <p>
+              {averageLabel(t, named ? primaryRegionName : undefined)}:{' '}
+              {formatMarketIsk(point.average)}
+            </p>
+          )}
           <p>
             {t('market.priceHistory.priceRange')}:{' '}
             {formatPriceRange(point.lowest ?? 0, point.highest ?? 0)}
@@ -183,6 +251,8 @@ function HistoryTooltip({
         </>
       )}
       {drawn.map((c) => {
+        const open = openLines.find((l) => l.regionId === c.regionId);
+        if (open) return <Fragment key={c.regionId}>{sideRows(open)}</Fragment>;
         const value = point.comparison[c.regionId];
         return (
           <p key={c.regionId}>
@@ -203,9 +273,11 @@ interface LegendItemProps {
   opacity?: number;
   /** The rule's own dash pattern, for a compared region's line; `dashed` alone means the moving average's `4 3`. */
   dash?: string;
+  /** Rule weight; the open Buy / Sell lines differ by it. */
+  width?: number;
 }
 
-function LegendItem({ label, shape, color, opacity = 1, dash }: LegendItemProps) {
+function LegendItem({ label, shape, color, opacity = 1, dash, width = 2 }: LegendItemProps) {
   return (
     <span className="flex items-center gap-1.5">
       <svg width="14" height="8" aria-hidden="true" className="shrink-0">
@@ -231,13 +303,41 @@ function LegendItem({ label, shape, color, opacity = 1, dash }: LegendItemProps)
             x2="14"
             y2="4"
             stroke={color}
-            strokeWidth="2"
+            strokeWidth={width}
             strokeDasharray={dash ?? (shape === 'dashed' ? '4 3' : undefined)}
           />
         )}
       </svg>
       {label}
     </span>
+  );
+}
+
+/** A region's Buy and Sell legend entries, each in the stroke it is drawn in. */
+function OpenLegend({
+  line,
+  series,
+  region,
+}: {
+  line: OpenLine;
+  series: PriceSeriesChoice;
+  region: string | undefined;
+}) {
+  const { t } = useTranslation();
+  return (
+    <>
+      {SIDES.filter((side) => seriesShows(series, side)).map((side) => (
+        <li key={side}>
+          <LegendItem
+            label={openSideLabel(t, side, region)}
+            shape="line"
+            color={openPriceStroke(line.region, side).color}
+            dash={openPriceStroke(line.region, side).dash}
+            width={openPriceStroke(line.region, side).width}
+          />
+        </li>
+      ))}
+    </>
   );
 }
 
@@ -259,6 +359,9 @@ export default function PriceHistoryChart({
   movingAverage = [],
   comparisons = NO_COMPARISONS,
   primaryRegionName,
+  primaryRegionId,
+  openPrices = NO_OPEN,
+  series = 'both',
 }: PriceHistoryChartProps) {
   const { t } = useTranslation();
   // Below `sm` the two grouped-integer gutters the desktop chart reserves
@@ -277,29 +380,66 @@ export default function PriceHistoryChart({
     () => comparisons.filter((c) => c.status === 'ready'),
     [comparisons]
   );
-  const joined = useMemo(
-    () => joinRegionAverages(points, drawnComparisons),
-    [points, drawnComparisons]
-  );
+  // Every region drawing Buy / Sell lines: the primary one first, then the
+  // compared ones in pick order (slot fixes the colour). A region with no
+  // open days in range is absent and keeps its average line.
+  const openLines = useMemo<OpenLine[]>(() => {
+    const withDays = new Set(openPrices.filter((o) => o.points.length > 0).map((o) => o.regionId));
+    const lines: OpenLine[] = [];
+    if (primaryRegionId !== undefined && withDays.has(primaryRegionId)) {
+      lines.push({
+        regionId: primaryRegionId,
+        name: primaryRegionName,
+        region: PRIMARY_REGION_STROKE,
+        primary: true,
+      });
+    }
+    comparisons.forEach((c, slot) => {
+      if (c.status === 'ready' && withDays.has(c.regionId)) {
+        lines.push({
+          regionId: c.regionId,
+          name: c.name,
+          region: compareRegionStroke(slot),
+          primary: false,
+        });
+      }
+    });
+    return lines;
+  }, [openPrices, primaryRegionId, primaryRegionName, comparisons]);
+  const primaryOpen = openLines.some((l) => l.primary);
+  const compared = drawnComparisons.length > 0;
+  const joined = useMemo(() => {
+    const ids = new Set(openLines.map((l) => l.regionId));
+    return joinOpenPrices(
+      joinRegionAverages(points, drawnComparisons),
+      openPrices.filter((o) => ids.has(o.regionId))
+    );
+  }, [points, drawnComparisons, openPrices, openLines]);
 
   const chartData = useMemo<ChartRow[]>(() => {
     const maByDate = new Map(movingAverage.map((p) => [p.date, p.average]));
-    return joined.map(({ date, primary, averages }) => ({
+    return joined.map(({ date, primary, averages, buy, sell }) => ({
       ...primary,
       date,
       dateLabel: formatTick(date),
       range: primary ? [primary.lowest, primary.highest] : undefined,
       movingAverage: maByDate.get(date),
       comparison: averages,
+      buy,
+      sell,
     }));
   }, [joined, movingAverage]);
 
-  // The day table and its export stay the primary region's days, each
+  // The day table and its export are the primary region's days, each
   // carrying the compared regions' averages for that day as extra columns.
   const tableRows = useMemo<PriceHistoryTableRow[]>(
     () =>
-      joined.flatMap(({ primary, averages }) =>
-        primary ? [{ ...primary, comparison: averages }] : []
+      joined.flatMap(({ date, primary, averages, buy, sell }) =>
+        // ESI's days, plus any day an open price was recorded for: the tooltip
+        // names those, so the table must too.
+        primary || Object.keys(buy).length > 0 || Object.keys(sell).length > 0
+          ? [{ ...primary, date, comparison: averages, buy, sell }]
+          : []
       ),
     [joined]
   );
@@ -317,9 +457,18 @@ export default function PriceHistoryChart({
       if (p.lowest !== undefined) lo = Math.min(lo, p.lowest);
       if (p.highest !== undefined) hi = Math.max(hi, p.highest);
       // A compared region's line must fit too, or it clips at the strip's edge.
-      for (const value of Object.values(p.comparison)) {
+      for (const [id, value] of Object.entries(p.comparison)) {
+        // A region drawing Buy / Sell lines draws no average to fit.
+        if (openLines.some((l) => l.regionId === Number(id))) continue;
         lo = Math.min(lo, value);
         hi = Math.max(hi, value);
+      }
+      for (const side of SIDES) {
+        if (!seriesShows(series, side)) continue;
+        for (const value of Object.values(p[side])) {
+          lo = Math.min(lo, value);
+          hi = Math.max(hi, value);
+        }
       }
     }
     if (!Number.isFinite(lo) || !Number.isFinite(hi)) return [0, 1];
@@ -328,82 +477,165 @@ export default function PriceHistoryChart({
       return [lo - pad, hi + pad];
     }
     return [lo, hi];
-  }, [chartData]);
+  }, [chartData, series, openLines]);
 
   // Whole ISK once the axis starts at 10,000, the Market page's no-cents line.
   const priceDecimals =
     priceDomain[0] >= 10_000 ? 0 : priceTickDecimals(priceDomain[1] - priceDomain[0]);
 
-  const columns = useMemo<DataTableColumn<PriceHistoryTableRow>[]>(
-    () => [
-      {
-        id: 'date',
-        header: t('market.priceHistory.date'),
-        stickyStart: true,
-        render: (p) => p.date,
-        sortValue: (p) => p.date,
-      },
-      {
-        id: 'average',
-        header: t('market.priceHistory.average'),
-        render: (p) => formatMarketIsk(p.average),
-        sortValue: (p) => p.average,
-      },
-      {
-        id: 'range',
-        header: t('market.priceHistory.priceRange'),
-        phoneHidden: true,
-        render: (p) => formatPriceRange(p.lowest, p.highest),
-        // Sorted by the day's high — the low half of the band has no column
-        // of its own to sort by instead.
-        sortValue: (p) => p.highest,
-      },
-      {
-        id: 'volume',
-        header: t('market.priceHistory.volume'),
-        render: (p) => formatVolume(p.volume),
-        sortValue: (p) => p.volume,
-      },
-      {
-        id: 'orderCount',
-        header: t('market.priceHistory.orderCount'),
-        phoneHidden: true,
-        render: (p) => formatVolume(p.orderCount),
-        sortValue: (p) => p.orderCount,
-      },
-      // Shed on a phone like the range: the chart and tooltip carry each
-      // region's line there, and five price columns do not fit 390px.
-      ...drawnComparisons.map((c): DataTableColumn<PriceHistoryTableRow> => ({
-        id: `region-${c.regionId}`,
-        header: averageLabel(t, c.name),
-        phoneHidden: true,
-        render: (p) => {
-          const value = p.comparison?.[c.regionId];
-          return value === undefined ? t('market.priceHistory.noTrades') : formatMarketIsk(value);
-        },
-        sortValue: (p) => p.comparison?.[c.regionId],
-      })),
-    ],
-    [t, drawnComparisons]
+  const storedColumns = useVisiblePriceHistoryColumns((state) => state.value);
+  const hydrateColumns = useVisiblePriceHistoryColumns((state) => state.hydrate);
+  const setStoredColumns = useVisiblePriceHistoryColumns((state) => state.setValue);
+  useEffect(() => {
+    void hydrateColumns();
+  }, [hydrateColumns]);
+  // A phone with nothing stored starts lean; an explicit pick is read as saved.
+  const visibleColumns =
+    isPhone && storedColumns === DEFAULT_VISIBLE_PRICE_HISTORY_COLUMNS
+      ? leanPriceHistoryColumns(primaryOpen)
+      : storedColumns;
+
+  const dateColumn = useMemo<DataTableColumn<PriceHistoryTableRow>>(
+    () => ({
+      id: 'date',
+      header: t('market.priceHistory.date'),
+      stickyStart: true,
+      render: (p) => <span className="whitespace-nowrap">{p.date}</span>,
+      sortValue: (p) => p.date,
+    }),
+    [t]
   );
+  // Each optional id's column(s). Both sides always: the series select shapes
+  // the chart, and the table and its export are the day list.
+  const columnsById = useMemo<
+    Record<PriceHistoryColumnId, DataTableColumn<PriceHistoryTableRow>[]>
+  >(() => {
+    const priceCell = (value: number | undefined) =>
+      value === undefined ? t('market.priceHistory.noOrders') : formatMarketIsk(value);
+    const sideColumn = (
+      line: OpenLine,
+      side: OpenPriceSide
+    ): DataTableColumn<PriceHistoryTableRow> => ({
+      id: `${side}-${line.regionId}`,
+      header: openSideLabel(t, side, compared ? line.name : undefined),
+      render: (p) => priceCell(p[side]?.[line.regionId]),
+      sortValue: (p) => p[side]?.[line.regionId],
+    });
+    const primaryLine = openLines.find((l) => l.primary);
+    return {
+      average: [
+        {
+          id: 'average',
+          header: t('market.priceHistory.average'),
+          render: (p) => (p.average === undefined ? DASH : formatMarketIsk(p.average)),
+          sortValue: (p) => p.average,
+        },
+      ],
+      buy: primaryLine ? [sideColumn(primaryLine, 'buy')] : [],
+      sell: primaryLine ? [sideColumn(primaryLine, 'sell')] : [],
+      range: [
+        {
+          id: 'range',
+          header: t('market.priceHistory.priceRange'),
+          render: (p) =>
+            p.lowest === undefined || p.highest === undefined
+              ? DASH
+              : formatPriceRange(p.lowest, p.highest),
+          // Sorted by the day's high — the low half of the band has no column
+          // of its own to sort by instead.
+          sortValue: (p) => p.highest,
+        },
+      ],
+      volume: [
+        {
+          id: 'volume',
+          header: t('market.priceHistory.volume'),
+          render: (p) => (p.volume === undefined ? DASH : formatVolume(p.volume)),
+          sortValue: (p) => p.volume,
+        },
+      ],
+      orderCount: [
+        {
+          id: 'orderCount',
+          header: t('market.priceHistory.orderCount'),
+          render: (p) => (p.orderCount === undefined ? DASH : formatVolume(p.orderCount)),
+          sortValue: (p) => p.orderCount,
+        },
+      ],
+      compared: drawnComparisons.flatMap((c): DataTableColumn<PriceHistoryTableRow>[] => {
+        const line = openLines.find((l) => l.regionId === c.regionId);
+        if (line) return SIDES.map((side) => sideColumn(line, side));
+        return [
+          {
+            id: `region-${c.regionId}`,
+            header: averageLabel(t, c.name),
+            render: (p) => {
+              const value = p.comparison?.[c.regionId];
+              return value === undefined
+                ? t('market.priceHistory.noTrades')
+                : formatMarketIsk(value);
+            },
+            sortValue: (p) => p.comparison?.[c.regionId],
+          },
+        ];
+      }),
+    };
+  }, [t, drawnComparisons, openLines, compared]);
+  // What the picker offers: only ids with a column to show.
+  const availableColumns = useMemo(
+    () => PRICE_HISTORY_COLUMN_IDS.filter((id) => columnsById[id].length > 0),
+    [columnsById]
+  );
+  const columns = useMemo(
+    () => [
+      dateColumn,
+      ...availableColumns
+        .filter((id) => visibleColumns.includes(id))
+        .flatMap((id) => columnsById[id]),
+    ],
+    [dateColumn, availableColumns, visibleColumns, columnsById]
+  );
+  // The picker labels each id from one representative column's header.
+  const pickerColumns = useMemo(() => {
+    const entries = availableColumns.map((id) => {
+      const first = columnsById[id][0]!;
+      return [
+        id,
+        id === 'compared' ? { ...first, header: t('market.priceHistory.columnCompared') } : first,
+      ] as const;
+    });
+    return Object.fromEntries(entries) as Record<
+      PriceHistoryColumnId,
+      DataTableColumn<PriceHistoryTableRow>
+    >;
+  }, [availableColumns, columnsById, t]);
+  function toggleColumn(id: PriceHistoryColumnId) {
+    void setStoredColumns(
+      visibleColumns.includes(id)
+        ? visibleColumns.filter((existing) => existing !== id)
+        : [...visibleColumns, id]
+    );
+  }
 
   const csvColumns = useMemo(
     () =>
       priceHistoryCsvColumns(
         t,
-        drawnComparisons.map(({ regionId, name }) => ({ regionId, name }))
+        drawnComparisons.map(({ regionId, name }) => ({
+          regionId,
+          name,
+          open: openLines.some((l) => l.regionId === regionId),
+        })),
+        openLines.map((l) => ({ regionId: l.regionId, name: compared ? l.name : undefined }))
       ),
-    [t, drawnComparisons]
+    [t, drawnComparisons, openLines, compared]
   );
   const tableExport = useTableExport<PriceHistoryTableRow>({
     surface: 'market-price-history',
     rows: tableRows,
     columns: csvColumns,
   });
-  const primaryAverageLabel = averageLabel(
-    t,
-    drawnComparisons.length > 0 ? primaryRegionName : undefined
-  );
+  const primaryAverageLabel = averageLabel(t, compared ? primaryRegionName : undefined);
 
   // `role="img"` collapses everything inside it into one opaque image for
   // assistive tech, so the sr-only table below must be a *sibling*, not a
@@ -461,6 +693,8 @@ export default function PriceHistoryChart({
                     {...props}
                     comparisons={comparisons}
                     primaryRegionName={primaryRegionName}
+                    openLines={openLines}
+                    series={series}
                   />
                 )}
               />
@@ -478,17 +712,40 @@ export default function PriceHistoryChart({
                 connectNulls
                 name={t('market.priceHistory.priceRange')}
               />
-              <Line
-                isAnimationActive={false}
-                type={CURVE_TYPE}
-                dataKey="average"
-                stroke="var(--color-accent)"
-                strokeWidth={2}
-                dot={false}
-                connectNulls
-                name={primaryAverageLabel}
-              />
-              {movingAverage.length > 0 && (
+              {!primaryOpen && (
+                <Line
+                  isAnimationActive={false}
+                  type={CURVE_TYPE}
+                  dataKey="average"
+                  stroke={PRIMARY_REGION_STROKE.color}
+                  strokeWidth={2}
+                  dot={false}
+                  connectNulls
+                  name={primaryAverageLabel}
+                />
+              )}
+              {/* A region with an open series draws the day's highest buy and
+                  lowest sell order instead of an average: one colour and dash
+                  per region, Sell heavy and Buy light. No `connectNulls`: a
+                  day with a buy but no sell breaks the sell line. */}
+              {openLines.flatMap((line) =>
+                SIDES.filter((side) => seriesShows(series, side)).map((side) => (
+                  <Line
+                    key={`${line.regionId}-${side}`}
+                    isAnimationActive={false}
+                    type={CURVE_TYPE}
+                    dataKey={(row: ChartRow) => row[side][line.regionId]}
+                    stroke={openPriceStroke(line.region, side).color}
+                    strokeWidth={openPriceStroke(line.region, side).width}
+                    strokeDasharray={openPriceStroke(line.region, side).dash}
+                    dot={false}
+                    name={openSideLabel(t, side, compared ? line.name : undefined)}
+                  />
+                ))
+              )}
+              {/* A moving average of the average has no place beside buy and
+                  sell lines. */}
+              {movingAverage.length > 0 && !primaryOpen && (
                 <Line
                   isAnimationActive={false}
                   type={CURVE_TYPE}
@@ -507,7 +764,7 @@ export default function PriceHistoryChart({
                   order: the slot fixes the colour and dash, so a region keeps
                   its line when another is added or removed after it. */}
               {comparisons.map((c, slot) =>
-                c.status === 'ready' ? (
+                c.status === 'ready' && !openLines.some((l) => l.regionId === c.regionId) ? (
                   <Line
                     key={c.regionId}
                     isAnimationActive={false}
@@ -619,10 +876,22 @@ export default function PriceHistoryChart({
               opacity={BAND_FILL_OPACITY}
             />
           </li>
-          <li>
-            <LegendItem label={primaryAverageLabel} shape="line" color="var(--color-accent)" />
-          </li>
-          {movingAverage.length > 0 && (
+          {primaryOpen ? (
+            <OpenLegend
+              line={openLines.find((l) => l.primary)!}
+              series={series}
+              region={compared ? primaryRegionName : undefined}
+            />
+          ) : (
+            <li>
+              <LegendItem
+                label={primaryAverageLabel}
+                shape="line"
+                color={PRIMARY_REGION_STROKE.color}
+              />
+            </li>
+          )}
+          {movingAverage.length > 0 && !primaryOpen && (
             <li>
               <LegendItem
                 label={t('market.priceHistory.movingAverage')}
@@ -650,6 +919,9 @@ export default function PriceHistoryChart({
               that silently never appears reads as a bug. */}
           {comparisons.map((c, slot) => {
             const stroke = compareRegionStroke(slot);
+            const open = openLines.find((l) => l.regionId === c.regionId);
+            if (open)
+              return <OpenLegend key={c.regionId} line={open} series={series} region={c.name} />;
             const label =
               c.status === 'loading'
                 ? t('market.priceHistory.compareLoading', { region: c.name })
@@ -665,7 +937,18 @@ export default function PriceHistoryChart({
             );
           })}
         </ul>
-        <TableActionsMenu name={t('market.tabHistory')} tableExport={tableExport} />
+        <div className="flex items-center gap-1">
+          <ColumnPickerMenu
+            available={availableColumns}
+            visible={visibleColumns}
+            columnsById={pickerColumns}
+            onToggle={toggleColumn}
+            buttonLabel={t('market.priceHistory.columnsButton')}
+            menuTitle={t('market.priceHistory.columnsMenuTitle')}
+            size="sm"
+          />
+          <TableActionsMenu name={t('market.tabHistory')} tableExport={tableExport} />
+        </div>
       </div>
 
       {/*

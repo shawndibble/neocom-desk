@@ -51,4 +51,47 @@ describe('priceHistoryCsvColumns', () => {
     const csv = toCsv([{ ...POINT, comparison: { 10000043: 4.9 } }], columns);
     expect(csv.split('\r\n')[1].split(',').slice(6)).toEqual(['4.9', '']);
   });
+
+  it("puts Buy and Sell after the average for each region with an open series, and drops that region's average column", () => {
+    const tr = (k: string, o?: Record<string, unknown>) => (o ? `${k}:${String(o.region)}` : k);
+    const columns = priceHistoryCsvColumns(
+      tr,
+      [{ regionId: 10000043, name: 'Domain', open: true }],
+      [
+        { regionId: 10000002, name: 'The Forge' },
+        { regionId: 10000043, name: 'Domain' },
+      ]
+    );
+    expect(columns.map((c) => c.header)).toEqual([
+      'market.priceHistory.date',
+      'market.priceHistory.average',
+      'market.priceHistory.regionBuy:The Forge',
+      'market.priceHistory.regionSell:The Forge',
+      'market.priceHistory.regionBuy:Domain',
+      'market.priceHistory.regionSell:Domain',
+      'market.priceHistory.summaryLo',
+      'market.priceHistory.summaryHi',
+      'market.priceHistory.volume',
+      'market.priceHistory.orderCount',
+    ]);
+    const row = {
+      ...POINT,
+      buy: { 10000002: 4.4, 10000043: 4.3 },
+      sell: { 10000002: 5.2 },
+    };
+    expect(toCsv([row], columns).split('\r\n')[1].split(',').slice(2, 6)).toEqual([
+      '4.4',
+      '5.2',
+      '4.3',
+      '',
+    ]);
+  });
+
+  it('names the sides plainly when only one region is shown', () => {
+    const columns = priceHistoryCsvColumns(t, [], [{ regionId: 10000002 }]);
+    expect(columns.slice(2, 4).map((c) => c.header)).toEqual([
+      'market.priceHistory.openBuy',
+      'market.priceHistory.openSell',
+    ]);
+  });
 });

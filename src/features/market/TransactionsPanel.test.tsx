@@ -303,6 +303,14 @@ describe('TransactionsPanel — margin', () => {
     expect(marginCell(row)).toHaveTextContent('—');
   });
 
+  it('leaves Margin out of the totals when no sale has one', async () => {
+    load(null);
+    renderPanel();
+    const strip = await screen.findByRole('region', { name: /Totals/ });
+    expect(within(strip).getByText('Net')).toBeInTheDocument();
+    expect(within(strip).queryByText('Margin')).not.toBeInTheDocument();
+  });
+
   it('totals the margin of the matched sales and the broker fees over the same dates', async () => {
     load([
       taxFor(2, -49_766.4),

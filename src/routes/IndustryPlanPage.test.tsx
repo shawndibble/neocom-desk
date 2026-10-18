@@ -26,6 +26,17 @@ import type { BlueprintMap, TypeMap } from '@/sde/types';
 
 // The "vs 90d" figures read market history; nothing here is about them.
 vi.mock('@/features/market/priceVsMedian', () => ({ loadPriceVsMedian: async () => null }));
+/**
+ * The boot cache warm-up starts on a 2 s timer under jsdom, so one test's
+ * run outlives it and lands in the next: a /skillqueue read it planned under
+ * `resetSession`'s scoped token hit the scopeless test's counter. The plan
+ * page reads nothing it warms.
+ */
+vi.mock('@/app/bootPrefetch', () => ({
+  scheduleBootPrefetch: () => () => {},
+  scheduleCachePrune: () => () => {},
+  scheduleLazySdeWarm: () => () => {},
+}));
 vi.mock('virtual:pwa-register/react', () => ({
   useRegisterSW: () => ({
     needRefresh: [false, vi.fn()],

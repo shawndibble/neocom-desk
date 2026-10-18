@@ -163,6 +163,21 @@ import {
   type PublicContractOfferRow,
   type PublicCourierContractRow,
 } from './publicContracts.js';
+import {
+  MARKET_OPEN_PRICES_COLLECTION,
+  MARKET_OPEN_PRICES_META_PATH,
+  OpenPriceFold,
+  dayIndexUrl,
+  groupByDocument,
+  implausibleReason,
+  mergeDays,
+  pickLastSnapshotUrl,
+  previousUtcDate,
+  regionCounts,
+  shrunkRegion,
+} from './marketOpenPrices.js';
+import { writeOpenPrices } from './marketOpenPricesStore.js';
+import { fetchJson as fetchEverefJson, foldSnapshotUrl } from './marketOrdersArchive.js';
 import { runWorkbenchSync } from './workbenchFits.js';
 import { firestoreWorkbenchFitsStore } from './workbenchFitsStore.js';
 import {
@@ -1470,6 +1485,67 @@ export const syncLpStoreOffers = onSchedule(
       return;
     }
     await writeChunkedSnapshot(getFirestore(), LP_STORE_OFFERS_SNAPSHOT, rows);
+  }
+);
+
+/**
+ * syncMarketOpenPrices: the price-history chart's Buy and Sell lines (decision
+ * 20261018-121126). Once a day, shortly after the previous UTC day's last
+ * EVE Ref market-order snapshot (23:45) is published, folds that snapshot into
+ * the highest buy and lowest sell per tracked region and type and merges the
+ * day into `marketOpenPrices/<regionId>_<typeId>` (~70,000 documents).
+ *
+ * Idempotent (re-running a day replaces its entry). A missing snapshot, a stream
+ * that errors or ends truncated, a tracked region implausibly thin, or one
+ * under half its size on the previous published day publishes nothing, the same stance as
+ * `syncLpStoreOffers`: that day simply has no point, and the backfill script
+ * can fill it later. 1GiB because the decompress-and-fold peaked at ~300MB RSS
+ * in a local measurement and the contracts job has OOM'd before; 540s because
+ * the same measurement took ~45s to download and fold, leaving room for the
+ * ~140 read-merge-write batches.
+ *
+ * Another Cloud Scheduler job past the free three; the deployment now has eleven
+ * scheduled functions.
+ */
+export const syncMarketOpenPrices = onSchedule(
+  // A cron, unlike the other jobs' 'every N' strings, runs in the scheduler's
+  // default zone; pinning Etc/UTC keeps it right after the 23:45 UTC snapshot.
+  { schedule: '45 0 * * *', timeZone: 'Etc/UTC', memory: '1GiB', timeoutSeconds: 540 },
+  async () => {
+    const date = previousUtcDate(new Date());
+    const listing = await fetchEverefJson(dayIndexUrl(date), MARKET_HISTORY_USER_AGENT);
+    const snapshotUrl = pickLastSnapshotUrl(listing, date);
+    if (!snapshotUrl) {
+      logError('Market open prices sync skipped publishing: no snapshot listed', { date });
+      return;
+    }
+    const fold = new OpenPriceFold();
+    const rows = await foldSnapshotUrl(snapshotUrl, fold, MARKET_HISTORY_USER_AGENT);
+    logInfo('Market open prices fold', { date, snapshotUrl, rows, pairs: fold.size });
+    const reason = implausibleReason(fold);
+    if (reason) {
+      logError('Market open prices sync skipped publishing', { date, reason });
+      return;
+    }
+    const db = getFirestore();
+    const meta = db.doc(MARKET_OPEN_PRICES_META_PATH);
+    const shrunk = shrunkRegion(fold, (await meta.get()).data()?.regions);
+    if (shrunk) {
+      logError('Market open prices sync skipped publishing: snapshot shrank', {
+        date,
+        reason: shrunk,
+        hint: `if the drop is real, delete ${MARKET_OPEN_PRICES_META_PATH}`,
+      });
+      return;
+    }
+    const written = await writeOpenPrices(
+      db,
+      MARKET_OPEN_PRICES_COLLECTION,
+      groupByDocument(new Map([[date, fold]])),
+      mergeDays
+    );
+    await meta.set({ date, regions: regionCounts(fold) });
+    logInfo('Market open prices sync', { date, written });
   }
 );
 
