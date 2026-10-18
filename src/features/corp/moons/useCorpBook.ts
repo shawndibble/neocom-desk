@@ -130,7 +130,8 @@ export function useCorpBook(sync: CorpTaxBookSync): CorpBook {
         for (const x of data.state.extractions)
           for (const l of x.oreLines ?? []) typeIds.add(l.typeId);
         const dates = new Set<string>(data.observed.map((r) => r.date));
-        dates.add(utcNow().slice(0, 10));
+        const loadedOn = utcNow().slice(0, 10);
+        dates.add(loadedOn);
         const prices = await loadDatedUnitPricesByHub(
           characterId,
           [...typeIds],
@@ -143,7 +144,11 @@ export function useCorpBook(sync: CorpTaxBookSync): CorpBook {
           status: 'loaded',
           verdict,
           data,
-          pricesOn: (date) => priceDay(prices, data.settings.hubId, date),
+          // A page left open past midnight asks for a day it never priced: use the last loaded one.
+          pricesOn: (date) => {
+            const day = priceDay(prices, data.settings.hubId, date);
+            return day.prices.size > 0 ? day : priceDay(prices, data.settings.hubId, loadedOn);
+          },
         });
       } catch (error) {
         if (cancelled) return;

@@ -225,6 +225,22 @@ Loading spinner; load error EmptyState; offline note; per-Character re-auth with
 
 Table order: Character (only if shown), Date (range for combined), System, Payee (null when unassigned), Estimated Value, Tax Owed (null when no Assignment, not 0), Status. No ore, no payment data. Cell helpers are shared with the table so export equals screen.
 
+### Corp Tax Book in the Tax tab (#4065, D12, D24, D28, D30)
+
+Only when a tracked Character's corp has an active Corp Tax Book (a `get` of `corpTaxBooks/{corp}`; a corp the Character left stays readable, remembered in the `corpTaxBookCorps` setting). No book, or any failed read: the tab is exactly as above. `useCorpBookView` reads the member's own lines (`uid`/`uids` rules) as each Character in turn, prices them at the book's hub and Ore Form with the tab's own loaders, and `overlayCorpBooks` (`src/engine/corpTaxBook/personal.ts`, pure) decides each day:
+
+- **Pending corp record**: the day is not Billable (day end + grace, then an officer sync) or has no rate. A relabel of the unassigned row; the member's own allocation applies and nothing is owed to the corp.
+- **Billed**: Billable. The book decides quantity, price and rate for exactly what it observed; an issued Statement's lines are that decision, frozen. The row is owed to the virtual "<Corp> (Corp Tax Book)" Payee (display-only, never in Dexie, never offered to Assign) and takes its ore from the member's unassigned ore.
+- **Sent, waiting for the corp**: a `player_donation` in the member's wallet journal to the corp that the book does not hold yet (matched by sender, amount and time) covers the oldest Billed days.
+- **Paid**: the Statement's settlement (`allocatePayments`); a part payment lands on the oldest days.
+- **Conflict**: ore the member gave another Payee that the book also observed. Visible, not owed; resolves to the corp 14 days after the day closed.
+- **Unattributed**: free ore no book claims on a closed day; owed to no one. Several books in one system on one day split the entry by observed quantity.
+- **Dismissed by corp**: shown with the officer's reason; owes nothing.
+
+Row detail adds the locked terms, the rate and its effective date, and "Disputed: you 10%, book 15%" with "Compare with the book…" (a modal, D28). Under the balance card, `CorpBookSyncNote` prints "Safe to pay — 12 Jul is closed (Corp synced 2h ago)" or "Safe to pay once Corp syncs (last synced 2d ago)". "Settle up" for the corp Payee is `CorpPayDialog` (what to send and where; the corp's book credits the donation itself). A donation the book could not match shows in the attention strip with **Claim**, which calls `claimCorpTaxBookPaymentCallable` (uid-authorised, audited as `claimPayment`, credits the Miner the Character is grouped into).
+
+The book's observed rows may carry optional `solarSystemId` and `moonId`, set by the syncing officer's client: the personal ledger knows only the system, so without it a row is lined up by character and day (several systems that day: the one sharing most ore) and per-moon rates cannot be resolved by a member.
+
 ## Reconciling with the corp's numbers
 
 An assigned row's detail has a "How this was priced" card (per-ore unit price, price tier, hub, ore form, tax %) with **Copy as text** to paste to the landlord (#2832); unit prices are re-read for the mined date, the total is the frozen bill. App reads only the Character's own ledger; corp observer data (moon id, timestamps) needs the Accountant role, which a renter lacks. No corp-figure import and no moon-level view exist. Likely causes of a mismatch and the fix for each:

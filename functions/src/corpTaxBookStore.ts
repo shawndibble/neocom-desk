@@ -50,6 +50,7 @@ import {
   type TurnOnInput,
 } from './corpTaxBook.js';
 import {
+  allocatePayments,
   canOverrideRecordRate,
   canRebillFrom,
   isRetroactiveRate,
@@ -900,6 +901,60 @@ export async function confirmGrouping(
   });
 }
 
+/**
+ * A player privately claims an Unmatched donation of their own (D5): the
+ * callable has no officer role, only the caller's uid, which must be the
+ * donor's. The ISK then credits the Miner the caller's character belongs to
+ * (its confirmed grouping, or a Miner of its own), oldest Statement first.
+ * Audited like every write; the audit entry names the donor character and
+ * that the player did it, never anything else.
+ */
+export async function claimPayment(
+  deps: BookDeps,
+  caller: Caller,
+  corporationId: number,
+  paymentId: string
+) {
+  const characterId = characterIdForUid(caller.uid);
+  if (characterId === undefined)
+    fail('unauthenticated', 'Sign in with a Character first', 'not-signed-in');
+  const paymentRef = sub(deps.db, corporationId, PAYMENTS).doc(paymentId);
+  return deps.db.runTransaction(async (tx) => {
+    const book = await tx.get(bookRef(deps.db, corporationId));
+    if (!book.exists || book.get('active') !== true)
+      fail('not-found', 'This corporation has no Corp Tax Book', 'no-book');
+    const snap = await tx.get(paymentRef);
+    const payment = snap.data();
+    // The same answer for a missing payment and someone else's: nothing leaks about other donors.
+    if (!payment || payment.uid !== caller.uid) fail('not-found', 'Payment not found', 'not-found');
+    if (payment.minerId !== undefined)
+      fail('failed-precondition', 'Already assigned', 'already-assigned');
+    if (((payment.notTaxAmount as number | undefined) ?? 0) >= (payment.amount as number))
+      fail('failed-precondition', 'An officer marked this as not tax', 'not-tax');
+    const grouped = await tx.get(
+      sub(deps.db, corporationId, MINERS).where('characterIds', 'array-contains', characterId)
+    );
+    // A guest's character stays unlinked until they confirm (D26b): only a Miner that lists
+    // this character in its readable `uids` counts.
+    const miner = grouped.docs.find((d) => (d.get('uids') as string[]).includes(caller.uid));
+    const minerId = miner ? miner.id : `solo:${characterId}`;
+    tx.update(paymentRef, {
+      minerId,
+      claimedBy: characterId,
+      claimedAt: new Date(deps.now()).toISOString(),
+    });
+    appendAudit(
+      tx,
+      deps,
+      corporationId,
+      { characterId, name: 'Player claim', via: 'player-claim' },
+      'claimPayment',
+      { paymentId, minerId }
+    );
+    return { minerId };
+  });
+}
+
 // --- Verify link -----------------------------------------------------------
 
 export async function readStatementByToken(deps: BookDeps, token: string) {
@@ -910,43 +965,149 @@ export async function readStatementByToken(deps: BookDeps, token: string) {
     statementId: string;
     minerId: string;
   };
-  const [book, statement, payments, paid, declarations] = await Promise.all([
+  const [book, statements, payments, dismissals, paid, declarations, miner] = await Promise.all([
     bookRef(deps.db, corporationId).get(),
-    sub(deps.db, corporationId, STATEMENTS).doc(statementId).get(),
+    sub(deps.db, corporationId, STATEMENTS).where('minerId', '==', minerId).get(),
     sub(deps.db, corporationId, PAYMENTS).where('minerId', '==', minerId).get(),
+    sub(deps.db, corporationId, DISMISSALS).get(),
     sub(deps.db, corporationId, META).doc(PAID_DOC).get(),
     sub(deps.db, corporationId, DECLARATIONS).where('statementId', '==', statementId).get(),
+    sub(deps.db, corporationId, MINERS).doc(minerId).get(),
   ]);
-  const s = statement.data() as Data;
-  const { verifyToken: _omit, uids: _uids, ...shown } = s;
-  void _omit;
-  void _uids;
+  const thisStatement = statements.docs.find((d) => d.id === statementId);
+  if (!thisStatement) fail('not-found', 'Verify link is not valid', 'invalid-token');
+  const s = thisStatement.data() as Data;
+  // A whitelist: the guest sees no character ids, officer ids or other bookkeeping.
+  const shown: Data = {};
+  for (const key of [
+    'id',
+    'code',
+    'periodStart',
+    'periodEnd',
+    'coversFrom',
+    'coversThrough',
+    'issuedAt',
+    'hubId',
+    'oreForm',
+    'amount',
+    'corporationName',
+    'minerName',
+    'refineryNames',
+  ]) {
+    if (s[key] !== undefined) shown[key] = s[key];
+  }
+  shown.lines = ((s.lines as Data[] | undefined) ?? []).map((line) => {
+    const { characterId: _c, ...rest } = line;
+    void _c;
+    return rest;
+  });
   const b = book.data() ?? {};
+
+  // The payments credited to THIS Statement: the Miner's whole allocation, then
+  // the part of each payment that landed here (the miner's other Statements stay private).
+  const allocation = allocatePayments({
+    statements: statements.docs.map((d) => {
+      const x = d.data();
+      return { id: d.id, amount: x.amount as number, issuedAt: x.issuedAt as string };
+    }),
+    payments: payments.docs.map((d) => {
+      const p = d.data();
+      return {
+        id: d.id,
+        amount: p.amount as number,
+        at: p.at as string,
+        ...(typeof p.statementId === 'string' ? { statementId: p.statementId } : {}),
+        ...(typeof p.notTaxAmount === 'number' ? { notTaxAmount: p.notTaxAmount } : {}),
+      };
+    }),
+    dismissalCredits: dismissalCreditsFor(
+      minerId,
+      statements.docs.map((d) => ({
+        id: d.id,
+        lines: (d.data().lines as StatementLineData[]) ?? [],
+      })),
+      dismissals.docs.map((d) => d.data() as DismissalData)
+    ),
+  });
+  const here = allocation.paymentCredits.filter((c) => c.statementId === statementId);
+  const bySource = new Map(payments.docs.map((d) => [d.id, d.data()]));
+  const settlement = allocation.byStatement.get(statementId);
   return {
     statement: shown,
+    corporationId,
     terms: {
       hubId: s.hubId,
       oreForm: s.oreForm,
       startDate: b.startDate,
       overdueDays: b.overdueDays,
+      minimumStatement: b.minimumStatement,
+      divisions: b.divisions,
     },
-    payments: payments.docs.map((d) => {
-      const p = d.data();
-      return {
-        id: d.id,
-        amount: p.amount,
-        notTaxAmount: p.notTaxAmount ?? 0,
-        at: p.at,
-        statementId: p.statementId ?? null,
-      };
-    }),
+    payments: here
+      .map((c) => {
+        const p = bySource.get(c.paymentId) ?? {};
+        return {
+          id: c.paymentId,
+          amount: c.amount,
+          at: p.at as string,
+          source: p.source === 'manual' ? 'manual' : 'donation',
+        };
+      })
+      .sort((x, y) => x.at.localeCompare(y.at) || x.id.localeCompare(y.id)),
+    settlement: settlement ?? null,
     declarations: declarations.docs.map((d) => {
       const x = d.data();
       return { kind: x.kind, at: x.at, resolution: x.resolution ?? null };
     }),
     settled: ((paid.data()?.ids as string[] | undefined) ?? []).includes(statementId),
     remindersStopped: s.remindersStopped === true,
+    // A guest's closed account (D27/epic): set by the close-account flow, which
+    // does not exist yet; the page shows a note when it is.
+    accountClosed: miner.exists && miner.get('closedAt') != null,
   };
+}
+
+interface StatementLineData {
+  chargeKey?: string;
+  date?: string;
+  tax?: number;
+}
+
+interface DismissalData {
+  scope?: string;
+  targetId?: string;
+  at?: string;
+  reversed?: unknown;
+}
+
+/**
+ * The credit active dismissals give a Miner's billed days. Mirrors
+ * `dismissalCredits` (src/engine/corpTaxBook/dismissals.ts) for the scopes that
+ * need only the Statement line: one record, or the whole Miner up to the day it
+ * was made. A moon or Extraction dismissal needs observed-row metadata the
+ * verify read does not load, so it is not applied here.
+ */
+function dismissalCreditsFor(
+  minerId: string,
+  statements: readonly { id: string; lines: readonly StatementLineData[] }[],
+  dismissals: readonly DismissalData[]
+) {
+  const active = dismissals.filter((d) => !d.reversed);
+  const credits: { statementId: string; amount: number }[] = [];
+  for (const st of statements) {
+    for (const line of st.lines) {
+      if (!line.chargeKey) continue;
+      const hit = active.find(
+        (d) =>
+          (d.scope === 'record' && d.targetId === line.chargeKey) ||
+          (d.scope === 'miner' &&
+            d.targetId === minerId &&
+            (line.date ?? '') <= (d.at ?? '').slice(0, 10))
+      );
+      if (hit) credits.push({ statementId: st.id, amount: line.tax ?? 0 });
+    }
+  }
+  return credits;
 }
 
 /** The one write the verify link allows: the miner's "Stop reminders" toggle, audited like every write. */

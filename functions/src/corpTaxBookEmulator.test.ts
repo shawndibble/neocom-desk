@@ -8,6 +8,7 @@ import { HttpsError } from 'firebase-functions/v2/https';
 import { parseBookCall, parseEditAction, parseSyncInput, parseTurnOnInput } from './corpTaxBook.js';
 import { ROLES_SCOPE, type CorpIdentity } from './corpTaxBookEsi.js';
 import {
+  claimPayment,
   confirmGrouping,
   editBook,
   readStatementByToken,
@@ -495,6 +496,72 @@ suite('Corp Tax Book callables (emulator)', () => {
       ).toBe('already-assigned');
     });
 
+    it('lets a player claim only their own Unmatched donation, audited', async () => {
+      await turnOn();
+      await syncBook(
+        deps(),
+        who(ACCOUNTANT),
+        parseSyncInput(
+          {
+            corporationId: CORP,
+            donations: [
+              { refId: 7, division: 1, characterId: 77, amount: 10, at: '2026-10-18T00:00:00Z' },
+            ],
+          },
+          now
+        )
+      );
+      // Someone else's donation looks exactly like a missing one.
+      expect(await reason(claimPayment(deps(), who(78), CORP, 'j1_7'))).toBe('not-found');
+      expect(await reason(claimPayment(deps(), who(77), CORP, 'j1_404'))).toBe('not-found');
+      const before = await auditCount();
+      expect(await claimPayment(deps(), who(77), CORP, 'j1_7')).toEqual({ minerId: 'solo:77' });
+      expect((await book().collection('payments').doc('j1_7').get()).data()).toMatchObject({
+        minerId: 'solo:77',
+        claimedBy: 77,
+      });
+      expect(await auditCount()).toBe(before + 1);
+      const entry = (await book().collection('audit').where('action', '==', 'claimPayment').get())
+        .docs[0];
+      expect(entry.data()).toMatchObject({
+        action: 'claimPayment',
+        by: 77,
+        via: 'player-claim',
+        detail: { paymentId: 'j1_7', minerId: 'solo:77' },
+      });
+      expect(entry.data()).toMatchObject({ byName: 'Player claim' });
+      // Claimed once; an officer's assignment cannot be overridden by a second claim.
+      expect(await reason(claimPayment(deps(), who(77), CORP, 'j1_7'))).toBe('already-assigned');
+    });
+
+    it('credits a claim to the Miner the character is grouped into', async () => {
+      await turnOn();
+      await edit(ACCOUNTANT, {
+        action: 'setMiner',
+        minerId: 'm-a',
+        characterIds: [60, 77],
+        mainCharacterId: 60,
+      });
+      await syncBook(
+        deps(),
+        who(ACCOUNTANT),
+        parseSyncInput(
+          {
+            corporationId: CORP,
+            donations: [
+              { refId: 8, division: 1, characterId: 77, amount: 10, at: '2026-10-18T00:00:00Z' },
+            ],
+          },
+          now
+        )
+      );
+      expect(await claimPayment(deps(), who(77), CORP, 'j1_8')).toEqual({ minerId: 'm-a' });
+    });
+
+    it('refuses a claim when the corporation has no book', async () => {
+      expect(await reason(claimPayment(deps(), who(77), CORP, 'j1_7'))).toBe('no-book');
+    });
+
     it('groups characters, holds a guest until they confirm, and unlinks', async () => {
       await turnOn();
       await syncBook(
@@ -681,6 +748,10 @@ suite('Corp Tax Book callables (emulator)', () => {
       const view = await readStatementByToken(deps(), String(verifyToken));
       expect(view.statement).toMatchObject({ id: 's1', amount: 10_000_000 });
       expect(view.statement).not.toHaveProperty('verifyToken');
+      for (const key of ['characterIds', 'minerId', 'issuedBy', 'uids', 'manualRemindersSent']) {
+        expect(view.statement).not.toHaveProperty(key);
+      }
+      expect(JSON.stringify(view.statement.lines)).not.toContain('characterId');
       expect((await book().collection('statements').doc('s1').get()).data()).not.toHaveProperty(
         'verifyToken'
       );
@@ -689,6 +760,8 @@ suite('Corp Tax Book callables (emulator)', () => {
       );
       expect(view.terms).toMatchObject({ hubId: 'jita', oreForm: 'compressed' });
       expect(view.payments.map((p) => p.id)).toEqual(['m1']);
+      expect(view.settlement).toMatchObject({ amount: 10_000_000, credited: 3 });
+      expect(view.accountClosed).toBe(false);
       expect(view.remindersStopped).toBe(false);
 
       await setRemindersByToken(deps(), String(verifyToken), true);
@@ -717,6 +790,55 @@ suite('Corp Tax Book callables (emulator)', () => {
         detail: { statementId: 's1', stopped: true },
       });
       expect(JSON.stringify(log)).not.toContain(String(verifyToken));
+    });
+
+    it('shows only the payments credited to this Statement, oldest first across Statements', async () => {
+      await turnOn();
+      await edit(ACCOUNTANT, {
+        action: 'issueStatement',
+        statement: statement('s1', { issuedAt: '2026-10-01T00:00:00.000Z', amount: 10_000_000 }),
+      });
+      const second = await edit(ACCOUNTANT, {
+        action: 'issueStatement',
+        statement: statement('s2', {
+          issuedAt: '2026-11-01T00:00:00.000Z',
+          amount: 8_000_000,
+          code: 'DEF456',
+        }),
+      });
+      // 12M: all of s1 (10M) and 2M of s2. A later 1M goes to s2 as well.
+      await edit(ACCOUNTANT, {
+        action: 'recordPayment',
+        paymentId: 'big',
+        minerId: 'solo:50',
+        characterId: 50,
+        amount: 12_000_000,
+        at: '2026-11-02T00:00:00Z',
+      });
+      await edit(ACCOUNTANT, {
+        action: 'recordPayment',
+        paymentId: 'small',
+        minerId: 'solo:50',
+        characterId: 50,
+        amount: 1_000_000,
+        at: '2026-11-03T00:00:00Z',
+      });
+      const view = await readStatementByToken(deps(), String(second.verifyToken));
+      expect(view.payments.map((p) => [p.id, p.amount])).toEqual([
+        ['big', 2_000_000],
+        ['small', 1_000_000],
+      ]);
+      expect(view.settlement).toMatchObject({ credited: 3_000_000, remaining: 5_000_000 });
+    });
+
+    it('flags a Miner whose account is closed', async () => {
+      await turnOn();
+      const { verifyToken } = await edit(ACCOUNTANT, {
+        action: 'issueStatement',
+        statement: statement('s1'),
+      });
+      await book().collection('miners').doc('solo:50').set({ closedAt: '2026-11-05T00:00:00Z' });
+      expect((await readStatementByToken(deps(), String(verifyToken))).accountClosed).toBe(true);
     });
 
     it('does not resolve a made-up token', async () => {

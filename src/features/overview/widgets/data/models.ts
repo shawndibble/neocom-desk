@@ -29,7 +29,7 @@ import { formatCompactNumber } from '@/lib/compactNumber';
 import { formatCountdown, formatDuration } from '@/lib/duration';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
 import { DAY_MS } from '@/lib/age';
-import { sortQueueEntries, selectActiveEntryFromSorted } from '@/routes/overviewQueue';
+import { sortQueueEntries, selectActiveEntryFromSorted } from '@/features/overview/overviewQueue';
 import { dailyWalletFromJournal } from '@/engine/netWorth/series';
 import { getKind } from '../kinds';
 import {

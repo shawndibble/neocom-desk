@@ -517,6 +517,35 @@ export interface StoredStatement {
   characterIds: number[];
 }
 
+/**
+ * The names the guest verify page prints (#4066): a guest cannot look up a
+ * structure's name, so the officer's client stores them on the Statement.
+ * Bounded and typed here rather than stored as given.
+ */
+function displayNames(raw: Record<string, unknown>) {
+  const out: {
+    corporationName?: string;
+    minerName?: string;
+    refineryNames?: Record<string, string>;
+  } = {};
+  if (raw.corporationName !== undefined)
+    out.corporationName = boundedString(raw.corporationName, 'corporationName', 100);
+  if (raw.minerName !== undefined) out.minerName = boundedString(raw.minerName, 'minerName', 100);
+  if (raw.refineryNames !== undefined) {
+    const entries = Object.entries(record(raw.refineryNames));
+    if (entries.length > 50) throw new HttpsError('invalid-argument', 'too many refineries');
+    out.refineryNames = {};
+    for (const [id, name] of entries) {
+      out.refineryNames[String(int(Number(id), 'refinery id'))] = boundedString(
+        name,
+        'refinery name',
+        200
+      );
+    }
+  }
+  return out;
+}
+
 export function parseStatement(raw: Record<string, unknown>): StoredStatement {
   const lines = list(raw.lines, 'statement.lines', 5000).map((l) => {
     const line = record(l);
@@ -543,6 +572,7 @@ export function parseStatement(raw: Record<string, unknown>): StoredStatement {
     characterIds: list(raw.characterIds, 'statement.characterIds', 50).map((x) =>
       int(x, 'characterId')
     ),
+    ...displayNames(raw),
   } as StoredStatement;
 }
 
@@ -555,6 +585,8 @@ export interface SyncInput extends BookCall {
     date: string;
     quantity: number;
     cachedAt: string;
+    solarSystemId?: number;
+    moonId?: number;
   }[];
   extractions: {
     structureId: number;
@@ -602,6 +634,10 @@ export function parseSyncInput(data: unknown, nowMs: number): SyncInput {
       date,
       quantity: int(row.quantity, 'quantity', 0, 1e12),
       cachedAt,
+      ...(row.solarSystemId === undefined
+        ? {}
+        : { solarSystemId: int(row.solarSystemId, 'solarSystemId', 30_000_000, 32_000_000) }),
+      ...(row.moonId === undefined ? {} : { moonId: int(row.moonId, 'moonId') }),
     };
   });
   const extractions = list(d.extractions ?? [], 'extractions', MAX_SYNC_EXTRACTIONS).map((r) => {
@@ -687,5 +723,16 @@ export function parseConfirmGroupingInput(data: unknown): {
   return {
     corporationId: parseBookCall(data).corporationId,
     minerId: docId(record(data).minerId, 'minerId'),
+  };
+}
+
+/** A player claims one of their own Unmatched donations (D5). */
+export function parseClaimPaymentInput(data: unknown): {
+  corporationId: number;
+  paymentId: string;
+} {
+  return {
+    corporationId: parseBookCall(data).corporationId,
+    paymentId: docId(record(data).paymentId, 'paymentId'),
   };
 }

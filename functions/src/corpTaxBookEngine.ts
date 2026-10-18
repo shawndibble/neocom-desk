@@ -14,6 +14,9 @@ export interface ObservedRow {
   date: string;
   quantity: number;
   cachedAt: string;
+  /** Where the refinery is and which moon it drilled, when the syncing officer's client knew (#4065). */
+  solarSystemId?: number;
+  moonId?: number;
 }
 
 /** The upsert key: miner + ore + day + structure (engine `observedRowKey`). */
@@ -98,3 +101,115 @@ export const BOOK_DEFAULTS = {
   divisions: [1],
   cadence: { kind: 'monthly' },
 } as const;
+
+// --- Payment allocation (issue #4066) ---------------------------------------
+// Mirror of src/engine/corpTaxBook/allocation.ts `allocatePayments`, so the
+// verify link can show which payments were credited to one Statement.
+// functionsMirror.test.ts keeps the two in step.
+
+export interface AllocStatement {
+  id: string;
+  amount: number;
+  issuedAt: string;
+}
+
+export interface AllocPayment {
+  id: string;
+  amount: number;
+  at: string;
+  statementId?: string;
+  notTaxAmount?: number;
+}
+
+export interface AllocDismissalCredit {
+  statementId: string;
+  amount: number;
+}
+
+export function settleTolerance(amount: number): number {
+  return Math.max((amount * 0.5) / 100, 100_000);
+}
+
+export function allocatePayments(input: {
+  statements: readonly AllocStatement[];
+  payments: readonly AllocPayment[];
+  dismissalCredits: readonly AllocDismissalCredit[];
+}) {
+  const ordered = [...input.statements].sort(
+    (a, b) => a.issuedAt.localeCompare(b.issuedAt) || a.id.localeCompare(b.id)
+  );
+  type Running = { amount: number; credited: number; paidIn: number };
+  const state = new Map<string, Running>(
+    ordered.map((s) => [s.id, { amount: s.amount, credited: 0, paidIn: 0 }])
+  );
+  const isDone = (st: Running): boolean => {
+    const remaining = st.amount - st.credited;
+    return remaining <= 0 || (st.paidIn > 0 && remaining <= settleTolerance(st.amount));
+  };
+  const apply = (id: string, available: number, isPayment: boolean): number => {
+    const st = state.get(id);
+    if (!st || isDone(st)) return available;
+    const take = Math.min(available, st.amount - st.credited);
+    st.credited += take;
+    if (isPayment) st.paidIn += take;
+    return available - take;
+  };
+  const applyOldestFirst = (available: number, isPayment: boolean): number => {
+    for (const s of ordered) {
+      if (available <= 0) break;
+      available = apply(s.id, available, isPayment);
+    }
+    return available;
+  };
+
+  let credit = ordered.reduce((sum, s) => sum + Math.max(0, -s.amount), 0);
+  let paid = 0;
+  let dismissed = 0;
+  for (const d of input.dismissalCredits) {
+    dismissed += d.amount;
+    credit += applyOldestFirst(apply(d.statementId, d.amount, false), false);
+  }
+  const payments = [...input.payments].sort(
+    (a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id)
+  );
+  const paymentCredits: { paymentId: string; statementId: string; amount: number }[] = [];
+  for (const p of payments) {
+    let available = p.amount - Math.min(p.notTaxAmount ?? 0, p.amount);
+    paid += available;
+    const before = new Map([...state].map(([id, st]) => [id, st.credited]));
+    if (p.statementId) available = apply(p.statementId, available, true);
+    credit += applyOldestFirst(available, true);
+    for (const [id, st] of state) {
+      const amount = st.credited - (before.get(id) ?? 0);
+      if (amount > 0) paymentCredits.push({ paymentId: p.id, statementId: id, amount });
+    }
+  }
+
+  const byStatement = new Map<
+    string,
+    { amount: number; credited: number; writtenOff: number; remaining: number; settled: boolean }
+  >();
+  let billed = 0;
+  let writtenOffTotal = 0;
+  for (const s of ordered) {
+    const st = state.get(s.id)!;
+    billed += st.amount;
+    const settled = isDone(st);
+    const shortfall = Math.max(0, st.amount - st.credited);
+    const writtenOff = settled ? shortfall : 0;
+    writtenOffTotal += writtenOff;
+    byStatement.set(s.id, {
+      amount: st.amount,
+      credited: st.credited,
+      writtenOff,
+      remaining: shortfall - writtenOff,
+      settled,
+    });
+  }
+  return {
+    byStatement,
+    paymentCredits,
+    credit,
+    balance: billed - paid - dismissed - writtenOffTotal,
+  };
+}

@@ -2,15 +2,16 @@
  * Daily open prices (docs/context/decisions/20261018-121126-price-history-draws-daily-open-buy-and-sell.md):
  * for each tracked region and type, the highest buy order and the lowest sell
  * order standing at the end of a UTC day, read from EVE Ref's twice-hourly
- * market-order snapshots and stored one document per region and type in
- * `marketOpenPrices`.
+ * market-order snapshots and stored one document per type, holding every
+ * tracked region, in `marketOpenPricesByType` (layout: decision
+ * 20261018-164126-open-prices-one-document-per-type-every-hub).
  *
  * Pure and dependency-free (no Firestore, fetch or relative imports) so the
  * daily function and the one-off backfill script share exactly this code and
  * it runs under plain Node type stripping too.
  */
 
-export const MARKET_OPEN_PRICES_COLLECTION = 'marketOpenPrices';
+export const MARKET_OPEN_PRICES_COLLECTION = 'marketOpenPricesByType';
 /** Days kept per document; the oldest entries drop first. */
 export const MARKET_OPEN_PRICES_MAX_DAYS = 400;
 
@@ -39,18 +40,27 @@ export interface OpenPrice {
   sell: number | null;
 }
 
-export interface OpenPriceSeries {
-  regionId: number;
-  typeId: number;
-  /** Ascending, unique `YYYY-MM-DD`. */
-  dates: string[];
-  /** Parallel to `dates`. */
+/** One region's prices in a type document, parallel to its `dates`; `null` where that side had no order that day. */
+export interface RegionOpenPrices {
   buy: Array<number | null>;
-  /** Parallel to `dates`. */
   sell: Array<number | null>;
 }
 
-export function openPriceDocId(regionId: number, typeId: number): string {
+/** Document `marketOpenPricesByType/<typeId>`. */
+export interface TypeOpenPrices {
+  typeId: number;
+  /** Ascending, unique `YYYY-MM-DD`, shared by every region. */
+  dates: string[];
+  /** Keyed by region id; a region with no price in any kept day is absent. */
+  regions: Record<string, RegionOpenPrices>;
+}
+
+export function openPriceDocId(typeId: number): string {
+  return String(typeId);
+}
+
+/** The fold's key for one region and type. */
+export function pairKey(regionId: number, typeId: number): string {
   return `${regionId}_${typeId}`;
 }
 
@@ -162,7 +172,7 @@ export class OpenPriceFold {
   add(regionId: number, typeId: number, isBuy: boolean, price: number): void {
     if (!this.tracked.has(regionId)) return;
     if (!Number.isInteger(typeId) || !Number.isFinite(price) || price <= 0) return;
-    const key = openPriceDocId(regionId, typeId);
+    const key = pairKey(regionId, typeId);
     let entry = this.prices.get(key);
     if (!entry) {
       entry = { regionId, typeId, buy: null, sell: null };
@@ -236,64 +246,87 @@ export function shrunkRegion(
   return null;
 }
 
-export interface DayPrice extends OpenPrice {
+/** One day of one type: the regions that had a price, the others omitted. */
+export interface TypeDay {
   date: string;
-}
-
-/**
- * Merges `days` into a series (or starts one). Idempotent: a date already
- * present is replaced in place, so re-running a day never duplicates it.
- * Dates stay ascending and unique, and only the newest
- * `MARKET_OPEN_PRICES_MAX_DAYS` are kept. Days nobody supplied get no entry
- * (no invented nulls); a `null` only means that side had no orders that day.
- */
-export function mergeDays(
-  base: { regionId: number; typeId: number },
-  existing: Pick<OpenPriceSeries, 'dates' | 'buy' | 'sell'> | null,
-  days: readonly DayPrice[],
-  maxDays = MARKET_OPEN_PRICES_MAX_DAYS
-): OpenPriceSeries {
-  const byDate = new Map<string, OpenPrice>();
-  if (existing) {
-    // Parallel arrays that disagree in length are trusted only up to the shortest.
-    const n = Math.min(existing.dates.length, existing.buy.length, existing.sell.length);
-    for (let i = 0; i < n; i++) {
-      byDate.set(existing.dates[i], {
-        buy: existing.buy[i] ?? null,
-        sell: existing.sell[i] ?? null,
-      });
-    }
-  }
-  for (const day of days) byDate.set(day.date, { buy: day.buy, sell: day.sell });
-  const dates = [...byDate.keys()].sort().slice(-maxDays);
-  return {
-    regionId: base.regionId,
-    typeId: base.typeId,
-    dates,
-    buy: dates.map((d) => byDate.get(d)!.buy),
-    sell: dates.map((d) => byDate.get(d)!.sell),
-  };
+  regions: Record<string, OpenPrice>;
 }
 
 /** One document's worth of new days, ready for `mergeDays`. */
-export interface KeyedDays {
-  regionId: number;
+export interface TypeDays {
   typeId: number;
-  days: DayPrice[];
+  days: TypeDay[];
 }
 
-/** Regroups per-day folds by document, days ascending. Folds may be passed in any order. */
-export function groupByDocument(folds: ReadonlyMap<string, OpenPriceFold>): KeyedDays[] {
-  const groups = new Map<string, KeyedDays>();
-  for (const date of [...folds.keys()].sort()) {
-    for (const e of folds.get(date)!.entries()) {
-      const key = openPriceDocId(e.regionId, e.typeId);
-      let group = groups.get(key);
-      if (!group) {
-        group = { regionId: e.regionId, typeId: e.typeId, days: [] };
-        groups.set(key, group);
+function priceAt(values: unknown, i: number): number | null {
+  if (!Array.isArray(values)) return null;
+  const v: unknown = values[i];
+  return typeof v === 'number' && Number.isFinite(v) ? v : null;
+}
+
+/**
+ * Merges `days` into a type document (or starts one). Idempotent: a date
+ * already present is replaced whole, every region with it, so re-running a
+ * day never duplicates it. Dates stay ascending and unique, and only the
+ * newest `MARKET_OPEN_PRICES_MAX_DAYS` are kept. Days nobody supplied get no
+ * entry (no invented gaps); a `null` means that region had no order on that
+ * side that day. A stored region array that falls short reads as null, and a
+ * region left with no price at all is dropped.
+ */
+export function mergeDays(
+  base: { typeId: number },
+  existing: Pick<TypeOpenPrices, 'dates' | 'regions'> | null,
+  days: readonly TypeDay[],
+  maxDays = MARKET_OPEN_PRICES_MAX_DAYS
+): TypeOpenPrices {
+  const byDate = new Map<string, Map<string, OpenPrice>>();
+  if (existing && Array.isArray(existing.dates)) {
+    const stored =
+      typeof existing.regions === 'object' && existing.regions !== null ? existing.regions : {};
+    existing.dates.forEach((date, i) => {
+      if (typeof date !== 'string') return;
+      const regions = new Map<string, OpenPrice>();
+      for (const [regionId, series] of Object.entries(stored)) {
+        if (typeof series !== 'object' || series === null) continue;
+        const buy = priceAt(series.buy, i);
+        const sell = priceAt(series.sell, i);
+        if (buy !== null || sell !== null) regions.set(regionId, { buy, sell });
       }
-      group.days.push({ date, buy: e.buy, sell: e.sell });
+      if (regions.size > 0) byDate.set(date, regions);
+    });
+  }
+  for (const day of days) byDate.set(day.date, new Map(Object.entries(day.regions)));
+  const dates = [...byDate.keys()].sort().slice(-maxDays);
+  const regionIds = new Set<string>();
+  for (const date of dates) for (const id of byDate.get(date)!.keys()) regionIds.add(id);
+  const regions: Record<string, RegionOpenPrices> = {};
+  for (const id of [...regionIds].sort()) {
+    regions[id] = {
+      buy: dates.map((d) => byDate.get(d)!.get(id)?.buy ?? null),
+      sell: dates.map((d) => byDate.get(d)!.get(id)?.sell ?? null),
+    };
+  }
+  return { typeId: base.typeId, dates, regions };
+}
+
+/** Regroups per-day folds by type document, days ascending. Folds may be passed in any order. */
+export function groupByDocument(folds: ReadonlyMap<string, OpenPriceFold>): TypeDays[] {
+  const groups = new Map<number, TypeDays>();
+  for (const date of [...folds.keys()].sort()) {
+    const today = new Map<number, TypeDay>();
+    for (const e of folds.get(date)!.entries()) {
+      let day = today.get(e.typeId);
+      if (!day) {
+        day = { date, regions: {} };
+        today.set(e.typeId, day);
+        let group = groups.get(e.typeId);
+        if (!group) {
+          group = { typeId: e.typeId, days: [] };
+          groups.set(e.typeId, group);
+        }
+        group.days.push(day);
+      }
+      day.regions[String(e.regionId)] = { buy: e.buy, sell: e.sell };
     }
   }
   return [...groups.values()];

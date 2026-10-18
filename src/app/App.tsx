@@ -104,6 +104,7 @@ const Help = lazy(routeChunks.loadHelp);
 const Styleguide = lazy(routeChunks.loadStyleguide);
 const FittingShared = lazy(routeChunks.loadFittingShared);
 const SharedLink = lazy(routeChunks.loadSharedLink);
+const CorpTaxBookVerify = lazy(routeChunks.loadCorpTaxBookVerify);
 const ErrorProbe = lazy(routeChunks.loadErrorProbe);
 
 /**
@@ -404,6 +405,8 @@ export function App() {
             {/* The invite link: a signed-out visitor sees what it is for before logging in. */}
             <Route path="/communities/join/:code" element={<CommunityJoin />} />
             <Route path="/share/:shareId" element={<SharedLink />} />
+            {/* A Statement's verify link (#4066): read-only, no login, the token is the credential. */}
+            <Route path="/corp-tax-book/verify/:token" element={<CorpTaxBookVerify />} />
             {/* Undisclosed Sentry probe — see routes/ErrorProbe.tsx. */}
             <Route path="/error" element={<ErrorProbe />} />
             <Route path="*" element={<NotFound />} />

@@ -26,6 +26,14 @@ export interface ObservedRow {
   quantity: number;
   /** When the ESI response that carried this row was generated (its cache time). */
   cachedAt: string;
+  /**
+   * The system the refinery is in, when the syncing officer's client knew it.
+   * A member's personal ledger knows only the system, so this is what lets
+   * the personal tab line a book row up with its Mining Ledger Entry (#4065).
+   */
+  solarSystemId?: number;
+  /** The moon the refinery was drilling that day, when known — for per-moon rates. */
+  moonId?: number;
 }
 
 /**
@@ -37,6 +45,8 @@ export interface ObservedMiningEntry {
   recordedCorporationId: number;
   structureId: number;
   date: string;
+  solarSystemId?: number;
+  moonId?: number;
   /** Raw ore types, sorted by typeId ascending. */
   oreLines: OreLine[];
 }

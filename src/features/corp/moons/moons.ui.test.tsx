@@ -134,6 +134,11 @@ describe('StatementRun', () => {
     await waitFor(() => expect(enqueueStatements).toHaveBeenCalledTimes(1));
     const issued = editBook.mock.calls.map((c) => (c[2] as { action: string }).action);
     expect(issued).toEqual(['issueStatement', 'issueStatement']);
+    const stored = editBook.mock.calls[0][2] as {
+      statement: { minerName: string; refineryNames: Record<string, string> };
+    };
+    expect(stored.statement.minerName).toMatch(/^Pilot \d$/);
+    expect(stored.statement.refineryNames).toEqual({ '1001': 'Efa - Brass Anvil' });
     const [{ statements, corporationId, senderCharacterId }] = enqueueStatements.mock.calls[0];
     expect(corporationId).toBe(CORP);
     expect(senderCharacterId).toBe(7);

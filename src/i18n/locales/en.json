@@ -5920,6 +5920,84 @@
     "payeesSelected_one": "{{count}} payee",
     "payeesSelected_other": "{{count}} payees",
     "payeeOptionWithCharacter": "{{payee}} ({{character}})",
+    "corpBook": {
+      "payeeName": "{{corp}} (Corp Tax Book)",
+      "state": {
+        "pending": "Pending corp record",
+        "billed": "Billed",
+        "sentWaiting": "Sent, waiting for the corp",
+        "sentWaitingShort": "Sent, waiting",
+        "conflict": "Conflict",
+        "unattributed": "Unattributed",
+        "dismissed": "Dismissed by corp"
+      },
+      "hint": {
+        "pending": "{{corp}} has not closed this day in its book yet. Until it does, your own allocation applies and nothing is owed to the corp.",
+        "billed": "{{corp}}'s Corp Tax Book decides this day.",
+        "sentWaiting": "You sent this to {{corp}}. It shows as paid once the corp's book credits it.",
+        "conflict": "You gave this ore to another Payee, and {{corp}}'s book also recorded it. It is not owed; it resolves to {{corp}} on {{date}} unless you sort it out first.",
+        "unattributed": "No Corp Tax Book claims this ore, so nobody is owed for it.",
+        "dismissed": "{{corp}} dismissed this day: {{reason}}",
+        "paid": "Credited by {{corp}}'s book."
+      },
+      "sync": {
+        "safe": "Safe to pay — {{date}} is closed ({{corp}} synced {{ago}}).",
+        "safeOnce": "Safe to pay once {{corp}} syncs (last synced {{ago}}).",
+        "neverSynced": "Safe to pay once {{corp}} syncs (never synced).",
+        "openDay": "{{date}}: safe to pay once it is closed, after {{time}} UTC on {{closeDate}} and {{corp}}'s next sync.",
+        "inFlight": "{{amount}} ISK sent, waiting for {{corp}} to credit it.",
+        "credit": "{{amount}} ISK credit with {{corp}} goes on your next Statement.",
+        "left": "You left {{corp}}. Its book still shows your lines and what you owe."
+      },
+      "diff": {
+        "open": "Compare with the book…",
+        "title": "{{date}} · you and the book",
+        "you": "You",
+        "book": "Book",
+        "differs": "differs",
+        "quantity": "Quantity ({{ore}})",
+        "priceBasis": "Price basis",
+        "basis": "{{hub}} buy, {{form}}",
+        "rate": "Rate",
+        "tax": "Tax",
+        "explain": "Book rate {{pct}}% is the {{scope}}, effective {{from}}. Once {{date}} is Billable, the book's quantity, price and rate decide what you owe {{corp}}. Raise a difference with an officer."
+      },
+      "disputed": {
+        "rate": "Disputed: you {{you}}%, book {{book}}%",
+        "quantity": "Disputed: you {{you}}, book {{book}}",
+        "both": "Disputed: quantity and rate differ"
+      },
+      "rateScope": {
+        "corp": "corp rate",
+        "guest": "guest rate",
+        "miner": "per-Miner rate",
+        "moon": "per-moon rate",
+        "record": "correction for this day"
+      },
+      "detail": {
+        "bookAndYou": "{{book}} (book) · {{you}} (you)",
+        "priced": "{{hub}} buy · {{form}} ore · {{pct}}% {{scope}} from {{from}}",
+        "onStatement": "It is on {{corp}}'s Statement, which never changes.",
+        "decides": "The book decides this day: it is Billable ({{corp}} synced {{ago}}, after its grace period) and goes on {{corp}}'s next Statement.",
+        "terms": "Terms are locked to the book: {{hub}} buy, {{form}} ore, {{pct}}% {{scope}} from {{from}}.",
+        "disputeHint": "Your own record differs from the book."
+      },
+      "pay": {
+        "title": "Pay {{corp}}",
+        "amount": "Send",
+        "copy": "Copy",
+        "copied": "Copied.",
+        "how": "Send it as a donation from your wallet to {{corp}}, into division {{division}}. The corp's book finds it in its own wallet journal and credits it; nothing is recorded here.",
+        "code": "{{period}} Statement: put this code in the donation's reason to pin it to that Statement.",
+        "noCode": "No code is needed: the donation credits you, oldest day first."
+      },
+      "claim": {
+        "title": "A donation to {{corp}} is not matched to you",
+        "detail": "{{amount}} ISK sent on {{date}} from {{character}}. Claim it to credit it to you; only you and {{corp}}'s officers can see it.",
+        "action": "Claim",
+        "failed": "The claim did not go through. Try again."
+      }
+    },
     "status": {
       "unassigned": "Unassigned",
       "needsReview": "Needs Review",
@@ -13524,6 +13602,71 @@
     }
   },
   "corpTaxBook": {
+    "verify": {
+      "title": "Your Statement",
+      "readOnly": "Read-only · no login needed",
+      "goneTitle": "This link is not valid",
+      "goneHint": "Check that you copied the whole link from the mail. If it still fails, ask the corporation's officers for a fresh Statement.",
+      "failedTitle": "Couldn't load this Statement",
+      "failedHint": "Check your connection and try again.",
+      "theCorp": "the corporation",
+      "refinery": "Refinery {{id}}",
+      "eyebrow": "{{corp}} · Statement {{period}} · issued {{issued}}",
+      "closed": "This account is closed. {{corp}} sent a final Statement and will not mail you again.",
+      "mined": "What you mined",
+      "minedMeta": "{{hub}} buy, {{form}} ore, priced on the day mined",
+      "oreForm": {
+        "compressed": "Compressed",
+        "raw": "raw"
+      },
+      "linesLabel": "Statement lines",
+      "col": {
+        "day": "Day",
+        "ore": "Ore",
+        "price": "Unit price",
+        "rate": "Rate",
+        "tax": "Tax"
+      },
+      "correction": "Correction",
+      "lateOre": "Late ore",
+      "billed": "Billed",
+      "paymentsTitle": "Payments credited",
+      "noPayments": "No payments have been credited to this Statement yet.",
+      "source": {
+        "donation": "Donation to the corporation",
+        "manual": "Recorded by an officer"
+      },
+      "balanceDue": "Balance due",
+      "balanceSum": "Billed {{billed}} − paid {{paid}}.",
+      "dismissed": "{{amount}} was waived by an officer.",
+      "writtenOff": "{{amount}} short of the Statement was written off.",
+      "howToPay": "Donate ISK to {{corp}}; any of your characters counts.",
+      "payCodeLead": "Put the code",
+      "payCodeTail": "in the reason to pin a donation to this Statement.",
+      "settled": "This Statement is settled.",
+      "declaration": "You told {{corp}} on {{date}} that you paid another way.",
+      "declarationPending": "An officer will confirm it.",
+      "termsTitle": "Terms",
+      "term": {
+        "rate": "Rate",
+        "price": "Price",
+        "due": "Due",
+        "minimum": "Minimum Statement",
+        "paying": "Paying"
+      },
+      "rateFrom": "{{pct}}%, effective {{date}}",
+      "rateNoDate": "{{pct}}%",
+      "rateOverride": "Some days carry an officer's logged rate correction.",
+      "priceBasis": "{{hub}} buy, {{form}} ore, on the day mined",
+      "dueValue": "{{date}} ({{days}} days after issue)",
+      "minimumValue": "{{amount}}; smaller balances roll into the next Statement",
+      "payingValue": "Donate to {{corp}}; any of your characters counts",
+      "stop": {
+        "label": "Stop reminders",
+        "hint": "Your monthly Statement still comes. Officers can send you at most one reminder per Statement.",
+        "failed": "Couldn't save that. Try again."
+      }
+    },
     "mailQueue": {
       "title": "Statement mail",
       "minutes_one": "{{count}} minute",

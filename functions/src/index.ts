@@ -49,6 +49,7 @@ import {
 } from './purgeStaleAccounts.js';
 import {
   parseBookCall,
+  parseClaimPaymentInput,
   parseConfirmGroupingInput,
   parseEditAction,
   parseStopReminders,
@@ -58,6 +59,7 @@ import {
 } from './corpTaxBook.js';
 import { esiIdentityReader } from './corpTaxBookEsi.js';
 import {
+  claimPayment,
   confirmGrouping,
   editBook,
   readStatementByToken,
@@ -779,6 +781,12 @@ export const editCorpTaxBookCallable = onCall<unknown>(CORP_TAX_BOOK_OPTIONS, (r
     parseEditAction(request.data)
   )
 );
+
+// A player claims their own Unmatched donation (D5): uid-authorised, no officer role.
+export const claimCorpTaxBookPaymentCallable = onCall<unknown>(CORP_TAX_BOOK_OPTIONS, (request) => {
+  const { corporationId, paymentId } = parseClaimPaymentInput(request.data);
+  return claimPayment(corpTaxBookDeps(), callerOf(request), corporationId, paymentId);
+});
 
 export const confirmCorpTaxBookGroupingCallable = onCall<unknown>(
   CORP_TAX_BOOK_OPTIONS,
@@ -1573,7 +1581,8 @@ export const syncLpStoreOffers = onSchedule(
  * 20261018-121126). Once a day, shortly after the previous UTC day's last
  * EVE Ref market-order snapshot (23:45) is published, folds that snapshot into
  * the highest buy and lowest sell per tracked region and type and merges the
- * day into `marketOpenPrices/<regionId>_<typeId>` (~70,000 documents).
+ * day into `marketOpenPricesByType/<typeId>`, every tracked region in one
+ * document (~20,000 documents; layout decision 20261018-164126).
  *
  * Idempotent (re-running a day replaces its entry). The day's 23:45 snapshot is
  * normally listed by ~23:50, but a run that finds only an earlier one (EVE Ref
@@ -1588,7 +1597,7 @@ export const syncLpStoreOffers = onSchedule(
  * script can fill it later. 1GiB because the decompress-and-fold peaked at ~300MB RSS
  * in a local measurement and the contracts job has OOM'd before; 540s because
  * the same measurement took ~45s to download and fold, leaving room for the
- * ~140 read-merge-write batches.
+ * ~200 read-merge-write batches of 100 (~37 KB) documents.
  *
  * Another Cloud Scheduler job past the free three; the deployment now has eleven
  * scheduled functions.

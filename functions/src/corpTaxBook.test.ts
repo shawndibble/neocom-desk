@@ -5,6 +5,7 @@ import {
   decideRoles,
   defaultSettings,
   isCacheFresh,
+  parseClaimPaymentInput,
   parseEditAction,
   parseSettingsPatch,
   parseStatement,
@@ -133,6 +134,38 @@ describe('parsers', () => {
     ).toHaveLength(1);
   });
 
+  it('keeps the system and moon an officer client sends with an observer row', () => {
+    const now = Date.parse('2026-10-18T12:00:00Z');
+    const row = {
+      structureId: 1,
+      characterId: 2,
+      recordedCorporationId: 3,
+      typeId: 4,
+      date: '2026-10-17',
+      quantity: 1,
+      cachedAt: '2026-10-18T11:00:00Z',
+    };
+    const [kept] = parseSyncInput(
+      { corporationId: 9, observed: [{ ...row, solarSystemId: 30003838, moonId: 40000001 }] },
+      now
+    ).observed;
+    expect(kept).toMatchObject({ solarSystemId: 30003838, moonId: 40000001 });
+    const [bare] = parseSyncInput({ corporationId: 9, observed: [row] }, now).observed;
+    expect('solarSystemId' in bare).toBe(false);
+    expect(() =>
+      parseSyncInput({ corporationId: 9, observed: [{ ...row, solarSystemId: 5 }] }, now)
+    ).toThrow();
+  });
+
+  it('parses a claim and refuses a path-escaping payment id', () => {
+    expect(parseClaimPaymentInput({ corporationId: 9, paymentId: 'j1_5' })).toEqual({
+      corporationId: 9,
+      paymentId: 'j1_5',
+    });
+    expect(() => parseClaimPaymentInput({ corporationId: 9, paymentId: '../x' })).toThrow();
+    expect(() => parseClaimPaymentInput({ corporationId: 0, paymentId: 'a' })).toThrow();
+  });
+
   it('accepts only a 43-character url-safe token', () => {
     expect(parseToken({ token: 'a'.repeat(43) })).toHaveLength(43);
     expect(() => parseToken({ token: 'short' })).toThrow();
@@ -140,5 +173,44 @@ describe('parsers', () => {
 
   it('keeps the Statement fields the book relies on', () => {
     expect(() => parseStatement({ id: 's' })).toThrow();
+  });
+
+  describe('display names for the verify page', () => {
+    const raw = {
+      id: 's1',
+      minerId: 'solo:1',
+      code: 'MT1',
+      periodStart: '2026-08-01',
+      periodEnd: '2026-08-31',
+      coversFrom: '2026-08-01',
+      coversThrough: '2026-08-31',
+      issuedAt: '2026-09-01T00:00:00Z',
+      hubId: 'jita',
+      oreForm: 'compressed',
+      lines: [],
+      amount: 5,
+      characterIds: [1],
+    };
+
+    it('keeps the corporation, Miner and refinery names, typed and bounded', () => {
+      const parsed = parseStatement({
+        ...raw,
+        corporationName: 'Brass Meridian',
+        minerName: 'Varro',
+        refineryNames: { '77': 'Efa V - Moon 3' },
+      });
+      expect(parsed).toMatchObject({
+        corporationName: 'Brass Meridian',
+        minerName: 'Varro',
+        refineryNames: { '77': 'Efa V - Moon 3' },
+      });
+    });
+
+    it('refuses names that are not strings or too many refineries', () => {
+      expect(() => parseStatement({ ...raw, minerName: 5 })).toThrow();
+      expect(() => parseStatement({ ...raw, refineryNames: { x: 'bad id' } })).toThrow();
+      const many = Object.fromEntries(Array.from({ length: 51 }, (_, i) => [String(i + 1), 'r']));
+      expect(() => parseStatement({ ...raw, refineryNames: many })).toThrow();
+    });
   });
 });

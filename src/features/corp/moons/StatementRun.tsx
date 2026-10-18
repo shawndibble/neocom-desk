@@ -144,7 +144,21 @@ export function StatementRun() {
       const targets = [];
       for (const line of plan?.lines ?? []) {
         const statement = statementForLine(view, plan!, line);
-        await editBook(characterId, corporationId, { action: 'issueStatement', statement });
+        // A guest cannot look names up, so the verify page reads them off the Statement.
+        const refineryNames = Object.fromEntries(
+          [...new Set(statement.lines.flatMap((l) => (l.structureId ? [l.structureId] : [])))].map(
+            (id) => [String(id), names.refinery(id)]
+          )
+        );
+        await editBook(characterId, corporationId, {
+          action: 'issueStatement',
+          statement: {
+            ...statement,
+            corporationName,
+            minerName: names.character(minerRow(line.minerId).mainCharacterId),
+            refineryNames,
+          },
+        });
         targets.push(
           mailTarget(ctx, statement, minerRow(line.minerId), {
             amountDue: line.balanceDue,
