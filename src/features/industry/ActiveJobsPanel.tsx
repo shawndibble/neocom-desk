@@ -880,7 +880,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
         id: 'progress',
         header: t('industry.jobsColProgress'),
         // Sorts on the raw fraction, not the rounded percent the cell prints.
-        sortValue: (job) => jobProgress(job, toneNow),
+        sortValue: (job) => jobProgress(job, Date.now()),
         // A thin line of its own under the meta line, % at its right end.
         stackEdge: 'below',
         render: (job) => (
@@ -939,17 +939,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
           ) : null,
       },
     ],
-    [
-      t,
-      toneNow,
-      soon,
-      done,
-      jobTone,
-      nameForBlueprint,
-      showCharacterColumn,
-      canLog,
-      handleLogProduction,
-    ]
+    [t, soon, done, jobTone, nameForBlueprint, showCharacterColumn, canLog, handleLogProduction]
   );
   const planIdSet = useMemo(() => new Set(planIds ?? []), [planIds]);
   const showHistoryCharacterColumn = new Set(historyRows.map((job) => job.characterId)).size > 1;
