@@ -155,6 +155,10 @@ export const loadStyleguide = named(() => import('@/routes/Styleguide'), 'Styleg
 export const loadFittingShared = named(() => import('@/routes/FittingShared'), 'FittingShared');
 export const loadCommunityJoin = named(() => import('@/routes/CommunityJoin'), 'CommunityJoin');
 export const loadSharedLink = named(() => import('@/routes/SharedLink'), 'SharedLink');
+export const loadCorpTaxBookVerify = named(
+  () => import('@/routes/CorpTaxBookVerify'),
+  'CorpTaxBookVerify'
+);
 export const loadErrorProbe = named(() => import('@/routes/ErrorProbe'), 'ErrorProbe');
 
 /**
