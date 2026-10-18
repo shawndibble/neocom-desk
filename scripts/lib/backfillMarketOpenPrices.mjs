@@ -53,7 +53,8 @@ export function parseArgs(argv) {
 /**
  * Folds each day in order and, every `chunkDays` days, merges the chunk into
  * Firestore in one pass (one read and one write per document per chunk, not
- * per day). A day with no snapshot, or an implausible one, is skipped and
+ * per day). A day with no final snapshot (`findFinalSnapshot`), or an
+ * implausible one, is skipped and
  * reported, never written. Returns the last date whose chunk is fully written
  * (null on a dry run or if nothing was written) so a failed run resumes at the
  * day after it.
@@ -94,7 +95,7 @@ export async function runBackfill(deps) {
     const url = await snapshotUrlFor(date);
     if (!url) {
       skipped.push(date);
-      log(`${date}: no snapshot listed, skipped`);
+      log(`${date}: no final snapshot listed, skipped`);
     } else {
       const fold = new OpenPriceFold();
       const rows = await foldUrl(url, fold);
@@ -104,7 +105,7 @@ export async function runBackfill(deps) {
         log(`${date}: ${reason}, skipped`);
       } else {
         chunk.set(date, fold);
-        log(`${date}: ${rows} orders, ${fold.size} priced region/type pairs`);
+        log(`${date}: ${rows} orders, ${fold.size} priced region/type pairs, from ${url}`);
       }
     }
     if ((i + 1) % chunkDays === 0 || i === dates.length - 1) await flush(date);

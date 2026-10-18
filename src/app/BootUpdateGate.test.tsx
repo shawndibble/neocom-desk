@@ -6,6 +6,7 @@ import '@/i18n';
 import { BootUpdateGate } from './BootUpdateGate';
 import { resetBootUpdateForTest } from './bootUpdateOnce';
 import type { BootUpdateOutcome } from './bootUpdate';
+import { deferred } from '@/test/deferred';
 
 const { runBootUpdate, bootUpdateMayHold } = vi.hoisted(() => ({
   runBootUpdate: vi.fn(),
@@ -17,12 +18,6 @@ vi.mock('./bootStallReport', () => ({
   reportBootStallOnce: vi.fn(),
   reportBootStallResolved: vi.fn(),
 }));
-
-function deferred() {
-  let resolve!: (v: BootUpdateOutcome) => void;
-  const promise = new Promise<BootUpdateOutcome>((r) => (resolve = r));
-  return { promise, resolve };
-}
 
 function renderGate(strict = false) {
   const tree = (
@@ -42,7 +37,7 @@ beforeEach(() => {
 
 describe('BootUpdateGate', () => {
   it('shows the boot screen while pending, then the children', async () => {
-    const d = deferred();
+    const d = deferred<BootUpdateOutcome>();
     runBootUpdate.mockReturnValue(d.promise);
     renderGate();
     expect(screen.getByText('Neocom Desk')).toBeInTheDocument();

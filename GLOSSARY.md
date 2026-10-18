@@ -259,7 +259,9 @@ here — they go one per file in `docs/context/decisions/`.
 - **Corp Access**: The single resolved state for the active Character,
   composing Corp Capability with granted scopes: `unknown` (not resolved yet),
   `none` (no Corp Role), `roles-without-grant` (holds a role, corp scopes not
-  granted), `ready` (holds a role and its scopes).
+  granted), `ready` (holds a role and its scopes — or every scope but an
+  additive Corp Capability's, which then stays off without hiding the rest;
+  see `docs/context/decisions/20261018-141225-*`).
 - **Corp Capability**: What a Character can actually _see_ — wallet,
   structures, members, industry — derived from their Corp Roles. The unit
   every consumer branches on; none compares role strings itself.
@@ -391,8 +393,9 @@ here — they go one per file in `docs/context/decisions/`.
 - **Growth Collector**: On a Mining Ledger Entry covered by two or more
   Assignments (a quantity split), the one Assignment that receives any ore
   ESI reports for that day _after_ the split. A sole Assignment always
-  collects. Nothing on a split day is ever silently unassigned or doubly
-  claimed.
+  collects. Nothing on a split day is ever doubly claimed. A paid collector
+  takes nothing (paid stays paid, ADR 0024): that ore stays unassigned until
+  the pilot assigns it, and the new Assignment then takes over collecting.
 - **Global Market Region**: A region that exists only to hold one item's
   cluster-wide market. PLEX is the only one today: its orders live in a region
   of their own, yet each order still points at an ordinary station. So a global
@@ -483,6 +486,7 @@ here — they go one per file in `docs/context/decisions/`.
 - **Observed Mining Entry**: One row of a **Corp Tax Book**: everything one character mined at one of the corporation's refineries on one EVE/UTC date, summed per ore type, as the refinery itself recorded it. The corp-side counterpart of a **Mining Ledger Entry**, valued the same way, so both sides reach the same tax.
 - **Occurrence Key**: The deterministic identity of one notification occurrence, derived from the Character, the **Notification Event** and the natural id of the thing that happened. Devices and the backend observing the same occurrence all compute the same key, which is what makes de-duplication possible. Distinct from the Notification Feed's row id.
 - **Offline Services**: The `/corp` overview's strip for the board's one untimed kind: a structure service that is off. A standing fault with no instant, so it has no place in a **Kind Card**'s ordering or on the Deadline Strip.
+- **Open Price**: The highest buy order and the lowest sell order standing in a Region at the end of one UTC day, read from that day's final EVE Ref market-order snapshot (normally 23:45) and stored per Region and item in `marketOpenPrices`. Drawn on **Price History** as the Buy and Sell lines, for the five Trade Hub Regions only. Distinct from ESI's daily average price, which is what was actually paid across the day, and from the live **Order Book**, which is what is standing right now.
 - **Optimize Modes**: Skill Plan optimizer actions in one "Optimize" dropdown: "optimize for me" (the default: reorder, then place remaps on the new order), "reorder only" (honours prerequisites and **Plan Priority**, keeps current remaps), "place remaps only" (keeps current order), and "use my remap markers" (best attribute spread per segment between **Remap Markers**). Every mode previews; nothing applies silently.
 - **Order Count**: How many orders ticked for an item in a Region on one day. A read on how many parties were trading, not on how much moved; **Traded Volume** answers that.
 - **Order Book**: The live buy and sell orders for one item in one Region, read from ESI. Rows, not a summary: each is one order with its price, quantity, location, range and expiry. Distinct from a **Price Aggregate**'s single best bid/ask.
@@ -511,7 +515,7 @@ here — they go one per file in `docs/context/decisions/`.
 - **EVE Workbench fit**: A fit a pilot published on EVE Workbench, listed for its hull in the Popular fits panel's EVE Workbench tab with its name, price and date created, linked to its page there. **Load**s from its EFT. Comes from our own synced copy of Workbench's public list.
 - **Out-of-date fit**: An **EVE Workbench fit** that no longer works in today's game: it names a hull or item the game data doesn't have, or has more modules in a rack than the hull now has slots. CPU, powergrid and calibration never make a fit out of date. Never listed.
 - **Seen on zKillboard**: A sighting badge on an **EVE Workbench fit** whose fitted modules exactly match one of its hull's **Popular fit**s. Shows how many of the hull's recent losses flew that group and when it was last seen. A fit that matches nothing shows nothing, never a warning.
-- **Price History**: The Market Browser item tab charting one item's daily history in a Region: **Daily Range**, average price and its moving average, **Traded Volume** and **Order Count**. Up to four other Regions can be compared by average line. Every figure comes from ESI's daily rows, none from the live **Order Book**.
+- **Price History**: The Market Browser item tab charting one item's daily history in a Region: **Daily Range**, average price and its moving average, **Traded Volume** and **Order Count**. Up to four other Regions can be compared by average line. Every figure comes from ESI's daily rows except the Buy and Sell lines, which are **Open Prices**; none comes from the live **Order Book**.
 - **Price Aggregate**: One best-bid/best-ask summary per station (Fuzzwork). Still the source for Build Plan pricing; no longer what the Market Browser shows.
 - **Priority (Skill Plan)**: High/Normal/Low urgency a user assigns to a Skill Plan entry. A prerequisite's _effective_ priority is never less urgent than the most urgent entry that depends on it.
 - **Permission**: The user-facing name for a **Scope Group**: one checkbox under "Customize permissions", labelled with the pages it unlocks. A declined Permission empties only the pages that need it. Never used for the **Core Grant**, which is not a choice.
@@ -619,7 +623,7 @@ here — they go one per file in `docs/context/decisions/`.
 - **Net Worth Snapshot**: One Character's wallet, asset value (at the chosen Trade Hub, PLEX excluded because the PLEX Vault is not in ESI), buy-order escrow and sell-order stock on one UTC day: numbers only, kept forever and synced as Editable Data. A day the app was not opened has no row and is never interpolated.
 - **Tab Leader**: The one open tab that runs a piece of origin-wide background work, such as the **Foreground Poller** or the background sync sweep, so several open tabs do it once, not once each. Always a visible tab: with every tab hidden nobody leads.
 - **Target Profile**: The signature radius, speed and (optionally) resist to each damage type of an imagined target that a **Fitting**'s applied damage is worked out against — built-in NPC classes or one the pilot defines. Changes applied DPS and its graphs, never raw DPS. A profile with no resists resists nothing. Distinct from a **Damage Profile**, which is about what shoots at the Fitting.
-- **Tax Payment**: ISK a miner sent the corporation, credited against what they owe in a **Corp Tax Book**, oldest debt first. Usually a donation into the corporation's wallet, found automatically; an officer can record one by hand, or dismiss one that turned out to be for something else. Distinct from a **Made Payment**, which is the pilot's own record of ISK sent.
+- **Tax Payment**: ISK a miner sent the corporation, credited against what they owe in a **Corp Tax Book**, oldest debt first. Usually a donation into the corporation's wallet, found automatically; an officer can record one by hand, or mark one "not tax" when it turned out to be for something else. Distinct from a **Made Payment**, which is the pilot's own record of ISK sent.
 - **Throughput** (planetary): A second budget, independent of the **Pin Budget**: whether the colony's links can carry the material flow and whether a buffer cycle fits in the Launchpad and Storage Facility. A layout can clear the Pin Budget and still stall.
 - **Triage Board**: The Overview as it was before the widget grid: a fixed board
   with one card per domain. Retired; the Overview is now an **Overview Layout**
