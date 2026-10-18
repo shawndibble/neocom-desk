@@ -3,6 +3,7 @@
 // the client sends only its short-lived access token, which is verified
 // against EVE's published JWKS before any Firebase credential is minted.
 
+import { setTimeout as sleep } from 'node:timers/promises';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { defineSecret } from 'firebase-functions/params';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
@@ -29,7 +30,7 @@ import {
 } from './alertGrant.js';
 import { parseAlertsKey } from './alertGrantCrypto.js';
 import { firestoreAlertGrantStore, firestorePollerStore } from './alertGrantStore.js';
-import { fetchNotifications as fetchEsiNotifications } from './esiNotifications.js';
+import { ESI_USER_AGENT, fetchNotifications as fetchEsiNotifications } from './esiNotifications.js';
 import { pollEveNotifications as pollEveNotificationsRun } from './pollEveNotifications.js';
 import { buildDeviceRegistration, parseRegisterDeviceInput } from './registerDevice.js';
 import { dispatchDueProjections, writeDeviceRegistration } from './projectionStore.js';
@@ -937,14 +938,9 @@ async function writePublicCourierContractsSnapshot(
  * per billing account ADR 0013 budgeted against, now that the blueprint-only
  * sync it briefly ran beside is gone.
  */
-// Same contact string ESI calls send (src/esi/client.ts's USER_AGENT) —
-// functions/ has no `@/` alias to import it, and Adam4EVE's own docs ask for
-// a User-Agent naming this app rather than a personal contact.
-const MARKET_HISTORY_USER_AGENT = 'Neocom Desk (github.com/shawndibble/neocom-desk)';
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+// Adam4EVE's own docs ask for a User-Agent naming this app rather than a
+// personal contact; reuse the ESI one.
+const MARKET_HISTORY_USER_AGENT = ESI_USER_AGENT;
 
 async function fetchAdam4eveChunk(
   typeIds: readonly number[],
