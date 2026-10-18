@@ -19,7 +19,6 @@ import * as Icon from '@/components/ui/icons';
 import { GrantBanner } from '@/app/GrantNote';
 import { loadWalletJournal, loadWalletTransactionsWithStatus } from '@/features/character/wallet';
 import { TransactionsSummaryStrip } from './TransactionsSummaryStrip';
-import { TransactionsItemRollup } from './TransactionsItemRollup';
 import { TransactionsFilterBar } from '@/features/corp/CorpTransactionsPanel';
 import {
   EMPTY_TRANSACTION_FILTER_PARAMS,
@@ -394,16 +393,7 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
     <div className="space-y-4">
       {headerChrome}
       {hasRows && filteredTransactions.length > 0 && (
-        <div className="space-y-2">
-          <TransactionsSummaryStrip transactions={filteredTransactions} trading={trading} />
-          <TransactionsItemRollup
-            transactions={filteredTransactions}
-            margins={margins}
-            nameFor={nameFor}
-            truncated={transactionsTruncated}
-            onSelectItem={(name) => setFilter({ ...filter, text: name })}
-          />
-        </div>
+        <TransactionsSummaryStrip transactions={filteredTransactions} trading={trading} />
       )}
       <Panel padded={false}>
         {!allScope && transactionsNeedsReauth ? (

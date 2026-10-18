@@ -44,29 +44,6 @@ export function sumMargins(
   return total;
 }
 
-export interface DayMargin extends MarginTotal {
-  dayKey: string;
-}
-
-/** Margin per day, oldest first. `dayKeyOf` must return sortable keys (`YYYY-MM-DD`). */
-export function marginsByDay(
-  fills: readonly SaleFill[],
-  margins: ReadonlyMap<number, RealizedMargin>,
-  dayKeyOf: (date: string) => string
-): DayMargin[] {
-  const byDay = new Map<string, SaleFill[]>();
-  for (const fill of fills) {
-    if (fill.isBuy) continue;
-    const key = dayKeyOf(fill.date);
-    const list = byDay.get(key);
-    if (list) list.push(fill);
-    else byDay.set(key, [fill]);
-  }
-  return [...byDay.entries()]
-    .map(([dayKey, list]) => ({ dayKey, ...sumMargins(list, margins) }))
-    .sort((a, b) => a.dayKey.localeCompare(b.dayKey));
-}
-
 export interface ItemMargin extends MarginTotal {
   typeId: number;
 }
