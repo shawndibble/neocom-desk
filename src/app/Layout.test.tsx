@@ -1047,7 +1047,7 @@ describe("Layout mobile tab bar follows the pilot's choice", () => {
 
     const mobileNav = screen.getByRole('navigation', { name: 'Mobile navigation' });
     // Promoting a gated route into the bar used to hide its marker entirely:
-    // the bar did not draw one, and the sheet no longer lists what the bar holds.
+    // the bar did not draw one, and the sheet's bar-page tiles were dropped.
     await waitFor(() =>
       expect(within(mobileNav).getByRole('link', { name: 'Assets' })).toHaveAttribute(
         'data-locked',
