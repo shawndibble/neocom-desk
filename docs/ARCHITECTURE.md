@@ -495,6 +495,18 @@ nightly when both sources move to a newer build and opens an auto-merging PR.
   `functionsMirror.test.ts`. Callable tests run against the emulator
   (`functions/src/corpTaxBookEmulator.test.ts`, part of `npm run test:rules`).
   Not deployed by CI: `firebase deploy --only functions,firestore:rules`.
+- **Corp Tax Book send queue** (issue #4064, D16). Pure rules:
+  `src/engine/corpTaxBook/mailQueue.ts` (pacing, 520 holds, summary, D27
+  reminder rule) and `statementMail.ts` (the short Statement mail). Client:
+  `src/features/corpTaxBook/`: `mailQueue.ts` (`enqueueStatements`,
+  `enqueueReminder`, `retryMail`, the API the Statements tab calls),
+  `mailQueueStore.ts` (Dexie `corpMailQueue`, one row per mail),
+  `mailQueueRunner.ts` (`stepQueue` / `runMailQueue` under the
+  `neocom:mailQueue` Web Lock), `bookApi.ts` (verify tokens, `recordMail` /
+  `recordReminder` through `editCorpTaxBookCallable`), and the UI
+  (`MailQueueChip`, `MailQueuePanel`, `MailLimitNotice`,
+  `StatementMailPreview`). `MailQueueMount` sits in `Layout` and loads the
+  chip and sender only while the queue has rows.
 - Firestore rules tests live in `rules-tests/` (`@firebase/rules-unit-testing`,
   `vitest.rules.config.ts`) and run only via `npm run test:rules`, which starts
   the Firestore emulator (needs a JRE; CI's `rules` job installs Java 21). They

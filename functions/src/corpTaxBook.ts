@@ -329,7 +329,13 @@ export type EditAction =
       resolution: 'confirmed' | 'rejected';
       reason?: string;
     }
-  | { action: 'recordReminder'; statementId: string };
+  | { action: 'recordReminder'; statementId: string }
+  | {
+      action: 'recordMail';
+      statementId: string;
+      mailId: number;
+      kind: 'statement' | 'reminder';
+    };
 
 /** Dismissals, write-offs, rebills and "not tax" re-check the role live (D7). */
 export const LIVE_CHECK_ACTIONS: ReadonlySet<EditAction['action']> = new Set([
@@ -366,6 +372,7 @@ export function parseEditAction(data: unknown): EditAction {
     'declare',
     'resolveDeclaration',
     'recordReminder',
+    'recordMail',
   ] as const);
   switch (action) {
     case 'addRate':
@@ -482,6 +489,13 @@ export function parseEditAction(data: unknown): EditAction {
     }
     case 'recordReminder':
       return { action, statementId: docId(d.statementId, 'statementId') };
+    case 'recordMail':
+      return {
+        action,
+        statementId: docId(d.statementId, 'statementId'),
+        mailId: int(d.mailId, 'mailId', 1, Number.MAX_SAFE_INTEGER),
+        kind: oneOf(d.kind, 'kind', ['statement', 'reminder'] as const),
+      };
   }
 }
 
