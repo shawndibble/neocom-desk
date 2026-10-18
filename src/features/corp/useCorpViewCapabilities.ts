@@ -11,12 +11,13 @@ import { useCorpAccess } from './useCorpAccess';
  * only place that can ask. Every other entry is `useCorpAccess().capabilities`.
  */
 export function useCorpViewCapabilities(): CorpCapabilities {
-  const access = useCorpAccess();
+  const { state, roles, capabilities } = useCorpAccess();
+  // Keyed on the parts, not the access object, so the result is stable across renders.
   return useMemo(() => {
-    const ledger = miningLedgerAccess(access).state;
+    const ledger = miningLedgerAccess({ state, roles, capabilities }).state;
     return {
-      ...access.capabilities,
+      ...capabilities,
       canReadMiningLedger: ledger === 'ready' || ledger === 'needs-scope',
     };
-  }, [access]);
+  }, [state, roles, capabilities]);
 }

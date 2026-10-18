@@ -13996,7 +13996,7 @@
           "missing-mining-scope": "The mining scope is not granted, so nothing was synced.",
           "no-book": "This corporation has no Corp Tax Book to sync.",
           "not-an-editor": "Only an Accountant or Director can sync the book.",
-          "needs-reauth": "Sign in again to sync the book.",
+          "needs-reauth": "Log in again to sync the book.",
           "esi-unavailable": "EVE's servers did not answer, so nothing was synced."
         }
       },

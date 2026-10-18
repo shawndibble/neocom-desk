@@ -14,6 +14,8 @@ import {
   TextInput,
 } from '@/components/ui';
 import type { TaxRate } from '@/engine/corpTaxBook/rates';
+import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
+import { cx } from '@/lib/cx';
 import { TRADE_HUBS } from '@/market/hubs';
 import { editErrorMessage, useBook } from './useBook';
 import { isk } from './moonsFormat';
@@ -390,7 +392,7 @@ export function BookSettingsDialog({ open, onClose }: { open: boolean; onClose: 
             </legend>
             <div className="flex flex-wrap gap-3">
               {DIVISIONS.map((d) => (
-                <label key={d} className="flex items-center gap-1.5">
+                <label key={d} className={cx(touchCheckboxLabelClassName, 'gap-1.5')}>
                   <Checkbox
                     checked={divisions.includes(d)}
                     onChange={() =>

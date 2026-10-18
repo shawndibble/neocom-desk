@@ -89,7 +89,7 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
             subNav={<CorpSubNav flush />}
             actions={
               <span className="flex items-center gap-1">
-                <Button size="sm" variant="ghost" onClick={() => setActivityOpen(true)}>
+                <Button variant="ghost" onClick={() => setActivityOpen(true)}>
                   <Icon.Recent size={Icon.ICON_SIZE.sm} aria-hidden="true" />
                   {t('corpTaxBook.moons.activity.button')}
                 </Button>
