@@ -3,6 +3,7 @@
 // the client sends only its short-lived access token, which is verified
 // against EVE's published JWKS before any Firebase credential is minted.
 
+import { setTimeout as sleep } from 'node:timers/promises';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { defineSecret } from 'firebase-functions/params';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
@@ -29,7 +30,7 @@ import {
 } from './alertGrant.js';
 import { parseAlertsKey } from './alertGrantCrypto.js';
 import { firestoreAlertGrantStore, firestorePollerStore } from './alertGrantStore.js';
-import { fetchNotifications as fetchEsiNotifications } from './esiNotifications.js';
+import { ESI_USER_AGENT, fetchNotifications as fetchEsiNotifications } from './esiNotifications.js';
 import { pollEveNotifications as pollEveNotificationsRun } from './pollEveNotifications.js';
 import { buildDeviceRegistration, parseRegisterDeviceInput } from './registerDevice.js';
 import { dispatchDueProjections, writeDeviceRegistration } from './projectionStore.js';
@@ -46,6 +47,29 @@ import {
   decideAccountAction,
   lastSyncedAtOf,
 } from './purgeStaleAccounts.js';
+import {
+  parseBookCall,
+  parseClaimPaymentInput,
+  parseConfirmGroupingInput,
+  parseEditAction,
+  parseStopReminders,
+  parseSyncInput,
+  parseToken,
+  parseTurnOnInput,
+} from './corpTaxBook.js';
+import { esiIdentityReader } from './corpTaxBookEsi.js';
+import {
+  claimPayment,
+  confirmGrouping,
+  editBook,
+  readStatementByToken,
+  reclaimBook,
+  setRemindersByToken,
+  syncBook,
+  turnOnBook,
+  verifyOfficer,
+  type BookDeps,
+} from './corpTaxBookStore.js';
 import {
   parseCommunityIdInput,
   parseCreateInput,
@@ -167,11 +191,10 @@ import {
   MARKET_OPEN_PRICES_COLLECTION,
   MARKET_OPEN_PRICES_META_PATH,
   OpenPriceFold,
-  dayIndexUrl,
+  findFinalSnapshot,
   groupByDocument,
   implausibleReason,
   mergeDays,
-  pickLastSnapshotUrl,
   previousUtcDate,
   regionCounts,
   shrunkRegion,
@@ -717,6 +740,76 @@ export const removeCommunityPledgeCallable = onCall<unknown>(
   }
 );
 
+// Corp Tax Book (issue #4061, ADR 0023). Every write to a corporation's book
+// goes through these callables (corpTaxBookStore.ts) and lands in its audit
+// log; the client only reads, under firestore.rules. The caller sends a
+// short-lived EVE access token for the role check; it is used for ESI reads
+// and dropped, never stored or logged.
+const corpTaxBookDeps = (): BookDeps => ({
+  db: getFirestore(),
+  now: Date.now,
+  verifyToken: (token) => verifyEveAccessToken(token, verifyOptions),
+  readIdentity: esiIdentityReader(),
+});
+
+const CORP_TAX_BOOK_OPTIONS = { maxInstances: 5 };
+
+export const verifyCorpOfficerCallable = onCall<unknown>(CORP_TAX_BOOK_OPTIONS, (request) =>
+  verifyOfficer(corpTaxBookDeps(), callerOf(request), parseBookCall(request.data))
+);
+
+export const turnOnCorpTaxBookCallable = onCall<unknown>(CORP_TAX_BOOK_OPTIONS, (request) =>
+  turnOnBook(corpTaxBookDeps(), callerOf(request), parseTurnOnInput(request.data))
+);
+
+export const reclaimCorpTaxBookCallable = onCall<unknown>(CORP_TAX_BOOK_OPTIONS, (request) =>
+  reclaimBook(corpTaxBookDeps(), callerOf(request), parseBookCall(request.data))
+);
+
+// A sync is many small transactions (up to 2000 observer rows), so give it room.
+export const syncCorpTaxBookCallable = onCall<unknown>(
+  { ...CORP_TAX_BOOK_OPTIONS, timeoutSeconds: 120 },
+  (request) =>
+    syncBook(corpTaxBookDeps(), callerOf(request), parseSyncInput(request.data, Date.now()))
+);
+
+export const editCorpTaxBookCallable = onCall<unknown>(CORP_TAX_BOOK_OPTIONS, (request) =>
+  editBook(
+    corpTaxBookDeps(),
+    callerOf(request),
+    parseBookCall(request.data),
+    parseEditAction(request.data)
+  )
+);
+
+// A player claims their own Unmatched donation (D5): uid-authorised, no officer role.
+export const claimCorpTaxBookPaymentCallable = onCall<unknown>(CORP_TAX_BOOK_OPTIONS, (request) => {
+  const { corporationId, paymentId } = parseClaimPaymentInput(request.data);
+  return claimPayment(corpTaxBookDeps(), callerOf(request), corporationId, paymentId);
+});
+
+export const confirmCorpTaxBookGroupingCallable = onCall<unknown>(
+  CORP_TAX_BOOK_OPTIONS,
+  (request) => {
+    const { corporationId, minerId } = parseConfirmGroupingInput(request.data);
+    return confirmGrouping(corpTaxBookDeps(), callerOf(request), corporationId, minerId);
+  }
+);
+
+// No session on purpose: the verify link is the credential (D27), so a miner
+// without an EVE login can read their Statement and stop reminders.
+export const readCorpTaxBookStatementCallable = onCall<unknown>(CORP_TAX_BOOK_OPTIONS, (request) =>
+  readStatementByToken(corpTaxBookDeps(), parseToken(request.data))
+);
+
+export const stopCorpTaxBookRemindersCallable = onCall<unknown>(
+  CORP_TAX_BOOK_OPTIONS,
+  (request) => {
+    const { token, stopped } = parseStopReminders(request.data);
+    return setRemindersByToken(corpTaxBookDeps(), token, stopped);
+  }
+);
+
 /**
  * sweepCommunityRequests (issue #3812, ADR 0021): deletes Requests expired a
  * week ago and Requests closed a week ago, with their Pledges. Bounded to 500
@@ -937,14 +1030,9 @@ async function writePublicCourierContractsSnapshot(
  * per billing account ADR 0013 budgeted against, now that the blueprint-only
  * sync it briefly ran beside is gone.
  */
-// Same contact string ESI calls send (src/esi/client.ts's USER_AGENT) —
-// functions/ has no `@/` alias to import it, and Adam4EVE's own docs ask for
-// a User-Agent naming this app rather than a personal contact.
-const MARKET_HISTORY_USER_AGENT = 'Neocom Desk (github.com/shawndibble/neocom-desk)';
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+// Adam4EVE's own docs ask for a User-Agent naming this app rather than a
+// personal contact; reuse the ESI one.
+const MARKET_HISTORY_USER_AGENT = ESI_USER_AGENT;
 
 async function fetchAdam4eveChunk(
   typeIds: readonly number[],
@@ -1493,16 +1581,23 @@ export const syncLpStoreOffers = onSchedule(
  * 20261018-121126). Once a day, shortly after the previous UTC day's last
  * EVE Ref market-order snapshot (23:45) is published, folds that snapshot into
  * the highest buy and lowest sell per tracked region and type and merges the
- * day into `marketOpenPrices/<regionId>_<typeId>` (~70,000 documents).
+ * day into `marketOpenPricesByType/<typeId>`, every tracked region in one
+ * document (~20,000 documents; layout decision 20261018-164126).
  *
- * Idempotent (re-running a day replaces its entry). A missing snapshot, a stream
- * that errors or ends truncated, a tracked region implausibly thin, or one
- * under half its size on the previous published day publishes nothing, the same stance as
- * `syncLpStoreOffers`: that day simply has no point, and the backfill script
- * can fill it later. 1GiB because the decompress-and-fold peaked at ~300MB RSS
+ * Idempotent (re-running a day replaces its entry). The day's 23:45 snapshot is
+ * normally listed by ~23:50, but a run that finds only an earlier one (EVE Ref
+ * lagging) or none must not store a price that is not the day's last, so it
+ * throws and Cloud Scheduler retries it (`retryCount`, 15 then 30 minutes
+ * apart); an earlier snapshot is accepted once the next day is listed, since
+ * then the 23:45 slot was skipped for good (`findFinalSnapshot`). A stream that
+ * errors or ends truncated also throws and retries. A tracked region
+ * implausibly thin, or one under half its size on the previous published day,
+ * publishes nothing, the same stance as `syncLpStoreOffers`: retrying the same
+ * file would not change it, that day simply has no point, and the backfill
+ * script can fill it later. 1GiB because the decompress-and-fold peaked at ~300MB RSS
  * in a local measurement and the contracts job has OOM'd before; 540s because
  * the same measurement took ~45s to download and fold, leaving room for the
- * ~140 read-merge-write batches.
+ * ~200 read-merge-write batches of 100 (~37 KB) documents.
  *
  * Another Cloud Scheduler job past the free three; the deployment now has eleven
  * scheduled functions.
@@ -1510,18 +1605,33 @@ export const syncLpStoreOffers = onSchedule(
 export const syncMarketOpenPrices = onSchedule(
   // A cron, unlike the other jobs' 'every N' strings, runs in the scheduler's
   // default zone; pinning Etc/UTC keeps it right after the 23:45 UTC snapshot.
-  { schedule: '45 0 * * *', timeZone: 'Etc/UTC', memory: '1GiB', timeoutSeconds: 540 },
+  {
+    schedule: '45 0 * * *',
+    timeZone: 'Etc/UTC',
+    memory: '1GiB',
+    timeoutSeconds: 540,
+    // A thrown run (the final snapshot not listed yet, a broken download) is
+    // retried at ~01:00, ~01:30 and ~02:00 UTC; `previousUtcDate` still names
+    // the same day on every retry.
+    retryCount: 3,
+    minBackoffSeconds: 900,
+    maxBackoffSeconds: 1800,
+  },
   async () => {
     const date = previousUtcDate(new Date());
-    const listing = await fetchEverefJson(dayIndexUrl(date), MARKET_HISTORY_USER_AGENT);
-    const snapshotUrl = pickLastSnapshotUrl(listing, date);
-    if (!snapshotUrl) {
-      logError('Market open prices sync skipped publishing: no snapshot listed', { date });
-      return;
+    const found = await findFinalSnapshot(date, (url) =>
+      fetchEverefJson(url, MARKET_HISTORY_USER_AGENT)
+    );
+    if (!found.final) {
+      // Thrown, not returned, so the run fails and is retried.
+      throw new Error(
+        `Market open prices: no final snapshot listed for ${date} (last listed: ${found.snapshot?.fileTime ?? 'none'}); retried, and after the last retry the day has no point`
+      );
     }
+    const { url: snapshotUrl, fileTime } = found.snapshot;
     const fold = new OpenPriceFold();
     const rows = await foldSnapshotUrl(snapshotUrl, fold, MARKET_HISTORY_USER_AGENT);
-    logInfo('Market open prices fold', { date, snapshotUrl, rows, pairs: fold.size });
+    logInfo('Market open prices fold', { date, fileTime, snapshotUrl, rows, pairs: fold.size });
     const reason = implausibleReason(fold);
     if (reason) {
       logError('Market open prices sync skipped publishing', { date, reason });

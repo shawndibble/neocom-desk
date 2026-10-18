@@ -4,7 +4,6 @@ import { classifyLoadInput, loadDnaFitting } from './linkLoader';
 import { loadEftFitting, type EftSlotLookup } from './eftLoader';
 import {
   fittingItemCounts,
-  fittingToChatLink,
   fittingToDna,
   fittingToEft,
   fittingToEveXml,
@@ -139,7 +138,7 @@ describe('DNA and chat link', () => {
   });
 
   it('round-trips through classify and the DNA loader', () => {
-    const input = classifyLoadInput(fittingToChatLink(FITTING));
+    const input = classifyLoadInput(`<url=fitting:${DNA}>Brawler</url>`);
     expect(input.kind).toBe('dna');
     if (input.kind !== 'dna') return;
     const loaded = loadDnaFitting(input.dna, SLOTS);
@@ -157,16 +156,6 @@ describe('DNA and chat link', () => {
       { typeId: 5, quantity: 2 },
       { typeId: 7, quantity: 100 },
     ]);
-  });
-
-  it('keeps a name from closing the link markup early', () => {
-    expect(fittingToChatLink({ ...FITTING, name: 'a</url>b' })).toBe(
-      `<url=fitting:${DNA}>a /url b</url>`
-    );
-  });
-
-  it('wraps the DNA in the game link markup under the fitting name', () => {
-    expect(fittingToChatLink(FITTING)).toBe(`<url=fitting:${DNA}>Brawler</url>`);
   });
 });
 

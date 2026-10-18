@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
+import { typeNameOr } from '@/lib/typeNameOr';
 import { db, type FittingRecord } from '@/db';
 import { useEndpointsGranted } from '@/app/useGrantedScopes';
 import { isSyncConfigured } from '@/app/syncStatus';
@@ -58,8 +59,7 @@ function useHullNames(records: readonly FittingRecord[] | undefined): Map<string
         next.set(
           record.id,
           decoded.ok
-            ? (types[String(decoded.value.hullTypeId)]?.name ??
-                t('common.unknownType', { id: decoded.value.hullTypeId }))
+            ? typeNameOr(t, types[String(decoded.value.hullTypeId)]?.name, decoded.value.hullTypeId)
             : null
         );
       }
@@ -128,8 +128,7 @@ export function useInGameFittings(characterId: number | null) {
         if (!names.has(fitting.ship_type_id)) {
           names.set(
             fitting.ship_type_id,
-            types[String(fitting.ship_type_id)]?.name ??
-              t('common.unknownType', { id: fitting.ship_type_id })
+            typeNameOr(t, types[String(fitting.ship_type_id)]?.name, fitting.ship_type_id)
           );
         }
       }

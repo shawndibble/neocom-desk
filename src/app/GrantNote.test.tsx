@@ -7,6 +7,7 @@ import { ESI_REGISTRY, type EsiEndpointId } from '@/esi/registry';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { beginEveLogin } from './loginFlow';
 import { GrantBanner, GrantNote } from './GrantNote';
+import { seedGrant } from '@/test/seed';
 
 vi.mock('./loginFlow', () => ({ beginEveLogin: vi.fn().mockResolvedValue(undefined) }));
 
@@ -15,16 +16,6 @@ const ALT_ID = 8;
 const ENDPOINTS: readonly EsiEndpointId[] = ['getCharacterStandings'];
 const SCOPE = ESI_REGISTRY.getCharacterStandings.scope;
 const COPY = { title: 'Assumes base standings', hint: 'Fees at 0.', actionLabel: 'Grant it' };
-
-async function seedGrant(characterId: number, scopes: readonly string[]): Promise<void> {
-  await db.tokens.put({
-    characterId,
-    accessToken: 'access',
-    refreshToken: 'refresh',
-    expiresAt: Date.now() + 60_000,
-    scopes: [...scopes],
-  });
-}
 
 /** Lets a live query that would show the note settle before asserting it didn't. */
 const settle = () => new Promise((resolve) => setTimeout(resolve, 30));
