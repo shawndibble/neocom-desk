@@ -333,6 +333,7 @@ export function SurveyTab({ tabBar, tabsId }: SurveyTabProps) {
                     characterId={characterId}
                     oreNames={summary.oreNames}
                     owned={owned}
+                    onStored={() => void refresh()}
                     tax={state.status === 'ready' ? state.tax : null}
                     info={state.status === 'ready' ? state.info : null}
                     survey={
@@ -404,6 +405,7 @@ function SurveyInfoLine({
   tax,
   info,
   survey,
+  onStored,
 }: {
   characterId: number;
   oreNames: string[];
@@ -411,11 +413,18 @@ function SurveyInfoLine({
   tax: SurveyTaxShare | null;
   info: SurveyInfoShare | null;
   survey?: InfoSurvey;
+  onStored: () => void;
 }) {
   const moon = useHasMoonOre(oreNames);
   if (owned) {
     return (
-      <SurveyInfoEditor key={survey?.id} characterId={characterId} survey={survey} moon={moon} />
+      <SurveyInfoEditor
+        key={survey?.id}
+        characterId={characterId}
+        survey={survey}
+        moon={moon}
+        onStored={onStored}
+      />
     );
   }
   return <SurveyInfoReadout info={info} tax={moon ? tax : null} />;

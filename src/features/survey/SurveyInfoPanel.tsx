@@ -51,11 +51,14 @@ export function SurveyInfoEditor({
   characterId,
   survey,
   moon,
+  onStored,
 }: {
   characterId: number;
   survey?: InfoSurvey;
   /** The scans show a moon ore, so the moon tax row applies. */
   moon: boolean;
+  /** A store landed: the page re-reads the survey so what it passes on (the chat message's location) is current. */
+  onStored?: () => void;
 }) {
   const { t } = useTranslation();
   const [location, setLocation] = useState<Location | null>(survey?.info?.location ?? null);
@@ -86,10 +89,12 @@ export function SurveyInfoEditor({
       expiresAt: survey.expiresAt,
       location: nextLocation,
       notes: trimmed,
-    }).catch(() => {
-      // Best effort, like the moon tax: allow the next blur or pick to try again.
-      if (sent.current === key) sent.current = before;
-    });
+    })
+      .then(onStored)
+      .catch(() => {
+        // Best effort, like the moon tax: allow the next blur or pick to try again.
+        if (sent.current === key) sent.current = before;
+      });
   }
 
   const taxPct = parseTaxPct(tax.pct);
