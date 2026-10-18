@@ -31,7 +31,7 @@ import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { useRetryFocus } from '@/lib/useRetryFocus';
 import { guarded } from '@/app/routeChunks';
 import { useTranslation } from 'react-i18next';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigationType } from 'react-router-dom';
 import {
   Button,
   CharacterAvatar,
@@ -83,6 +83,7 @@ export function PublicInfoModal() {
   const close = usePublicInfoModalStore((state) => state.close);
   const clear = usePublicInfoModalStore((state) => state.clear);
   const { pathname } = useLocation();
+  const navigationType = useNavigationType();
   const shownPathname = useRef(pathname);
 
   const [activeTab, setActiveTab] = useState<PublicInfoKind | 'employment'>('character');
@@ -115,11 +116,14 @@ export function PublicInfoModal() {
 
   // Runs after render, so a caller must not navigate and open in one handler — the
   // open would be closed straight away. None does: every opener stays on its page.
+  // A replace that moves the path is a redirect (a tab landing), not a page
+  // change: `EntityInfoRoute` keeps `info` through it, so the modal stays.
   useEffect(() => {
     if (shownPathname.current === pathname) return;
     shownPathname.current = pathname;
+    if (navigationType === 'REPLACE') return;
     clear();
-  }, [pathname, clear]);
+  }, [pathname, navigationType, clear]);
 
   /** The request whose tab was last chosen, so a retry re-runs the lookups without jumping tabs. */
   const tabChosenFor = useRef<typeof request>(null);

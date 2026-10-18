@@ -12,7 +12,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigationType } from 'react-router-dom';
 import { Button, RowMoreActions, SearchInput, TypeIcon } from '@/components/ui';
 import {
   loadBlueprintCatalog,
@@ -158,16 +158,26 @@ export function UsedInSection({
   );
 }
 
-/** Calls `onNavigate` once the page or its params (other than `?info`) change after mount. */
+/**
+ * Calls `onNavigate` once the page or its params (other than `?info`) change
+ * after mount. A replace is a redirect, not a navigation away (a cold
+ * `/market?info=…` landing on `/market/browser`, see `EntityInfoRoute`): it
+ * becomes the new starting point instead.
+ */
 function CloseOnNavigate({ onNavigate }: { onNavigate: () => void }) {
   const { key, pathname, search } = useLocation();
+  const navigationType = useNavigationType();
   const mountedAt = useRef({ key, pathname, search: withoutEntityInfo(search) });
   useEffect(() => {
     // A drill-down only moves `?info` (the same page, another item): not a navigation away.
     const start = mountedAt.current;
     if (key === start.key) return;
     if (pathname === start.pathname && withoutEntityInfo(search) === start.search) return;
+    if (navigationType === 'REPLACE') {
+      mountedAt.current = { key, pathname, search: withoutEntityInfo(search) };
+      return;
+    }
     onNavigate();
-  }, [key, pathname, search, onNavigate]);
+  }, [key, pathname, search, navigationType, onNavigate]);
   return null;
 }
