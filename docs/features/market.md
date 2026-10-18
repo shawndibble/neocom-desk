@@ -311,7 +311,7 @@ Result panel
 - Header meta chip: hub name + "at N%".
 - Actions: ColumnPickerMenu (optional columns, ISK/m³ off by default, device-local `appraisalVisibleColumns`), Share, Copy sell list, TableActionsMenu (CSV).
 - StatChips: Sell total (accent), Buy total, Instant net, List net, Spread, Refine total (only if any row has refine), Cheapest buy (only if any row has an LP option), Total volume (`AppraisalVolumeChip`), Items count. Sell/Buy use `FullIskTotal`; others `IskAmount` shorthand with exact on tap/hover.
-- You get box (conditional): when percent != 100, Selling now and Listing carry a `*` and the box ends with "* Prices are always at 100% market."
+- Selling now and Listing are priced at the appraisal's Price %, like the totals beside them.
 - Notes above table (conditional): assumes-base-standings note; refine assumes no implants (ore/ice only); unpriced rows count (warning); refine-unpriced count; "cheapest buy via LP" count.
 - Table (`DataTable`, rowKey typeId, `stackColumns={2}`, `mobileSort`, `rowMoreActions`, `rowContextMenu` = `ItemContextMenu`):
   - Always: Quantity, Item (MarketItemLink -> Browser).

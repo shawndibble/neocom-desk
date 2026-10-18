@@ -47,7 +47,7 @@ describe('buildAppraisal', () => {
     expect(rows[0].sellTotal).toBe(1_536_000);
   });
 
-  it('returns the un-scaled items alongside the percent-scaled rows, for net-of-fees math that must ignore Price Percent', () => {
+  it('returns the un-scaled items alongside the percent-scaled rows', () => {
     const { rows, items } = buildAppraisal([damageControl], 50);
     expect(rows[0].buyEach).toBe(249_250);
     expect(rows[0].sellEach).toBe(256_000);
@@ -641,16 +641,17 @@ describe('appraisalUndercut', () => {
     expect(appraisalUndercut(item({ buy: null }))?.atOrBelowBuy).toBe(false);
   });
 
-  it('ignores Price Percent — it reads the unscaled item, so the column agrees with List Net', () => {
-    const priced = item({ quantity: 100, sell: 1_000, buy: null });
-    const undercut = appraisalUndercut(priced);
-    const { listNet } = appraisalNet([priced], {
-      accountingLevel: 0,
-      brokerRelationsLevel: 0,
-      standing: ZERO_STANDINGS,
-    });
-    const listValue = (undercut?.price ?? 0) * priced.quantity;
-    expect(listNet).toBeCloseTo(listValue - listValue * 0.075 - listValue * 0.03, 4);
+  it('applies Price Percent to both sides before tax and fees', () => {
+    const priced = item({ quantity: 100, sell: 1_000, buy: 800 });
+    const fees = { accountingLevel: 0, brokerRelationsLevel: 0, standing: ZERO_STANDINGS };
+    const half = appraisalNet([priced], fees, 50);
+    const scaled = appraisalNet([{ ...priced, sell: 500, buy: 400 }], fees);
+    expect(half.instantNet).toBeCloseTo(scaled.instantNet, 6);
+    expect(half.listNet).toBeCloseTo(scaled.listNet, 6);
+    expect(appraisalNet([priced], fees).instantNet).toBeCloseTo(
+      appraisalNet([priced], fees, 100).instantNet,
+      6
+    );
   });
 });
 
