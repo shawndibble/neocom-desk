@@ -4,6 +4,7 @@ import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 import { useIsPhone } from '@/lib/useIsPhone';
 import type { BookRowView } from '@/engine/corpTaxBook/personal';
+import { typeLabel } from './typeLabel';
 import { hubForPayee } from '../pricing';
 
 interface Props {
@@ -82,7 +83,7 @@ export function CorpBookDiffModal({ open, onClose, view, systemName, typeNames }
                 <tr key={line.typeId}>
                   <td className="py-1.5">
                     {t('miningTax.corpBook.diff.quantity', {
-                      ore: typeNames.get(line.typeId) ?? `#${line.typeId}`,
+                      ore: typeLabel(typeNames, line.typeId),
                     })}
                   </td>
                   <td className={cell(false)}>{you === undefined ? '—' : you.toLocaleString()}</td>

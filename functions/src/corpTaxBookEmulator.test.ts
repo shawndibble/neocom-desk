@@ -529,6 +529,7 @@ suite('Corp Tax Book callables (emulator)', () => {
         via: 'player-claim',
         detail: { paymentId: 'j1_7', minerId: 'solo:77' },
       });
+      expect(entry.data()).toMatchObject({ byName: 'Player claim' });
       // Claimed once; an officer's assignment cannot be overridden by a second claim.
       expect(await reason(claimPayment(deps(), who(77), CORP, 'j1_7'))).toBe('already-assigned');
     });

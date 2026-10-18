@@ -919,6 +919,8 @@ export async function claimPayment(
     if (!payment || payment.uid !== caller.uid) fail('not-found', 'Payment not found', 'not-found');
     if (payment.minerId !== undefined)
       fail('failed-precondition', 'Already assigned', 'already-assigned');
+    if (((payment.notTaxAmount as number | undefined) ?? 0) >= (payment.amount as number))
+      fail('failed-precondition', 'An officer marked this as not tax', 'not-tax');
     const grouped = await tx.get(
       sub(deps.db, corporationId, MINERS).where('characterIds', 'array-contains', characterId)
     );
@@ -935,7 +937,7 @@ export async function claimPayment(
       tx,
       deps,
       corporationId,
-      { characterId, name: '', via: 'player-claim' },
+      { characterId, name: 'Player claim', via: 'player-claim' },
       'claimPayment',
       { paymentId, minerId }
     );

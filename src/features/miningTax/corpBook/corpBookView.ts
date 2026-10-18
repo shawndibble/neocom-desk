@@ -75,6 +75,7 @@ export function buildCorpBookView(
     return {
       corporationId: book.corporationId,
       corpName: nameOf(book.corporationId),
+      characterIds: book.characterIds,
       startDate: book.startDate,
       graceHours: book.graceHours,
       ...(book.lastSyncedAt !== undefined ? { lastSyncedAt: book.lastSyncedAt } : {}),

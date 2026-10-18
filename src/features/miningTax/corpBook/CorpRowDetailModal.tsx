@@ -9,6 +9,7 @@ import { formatIsk } from '@/lib/isk';
 import { useTicker } from '@/lib/ticker';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { OreIcon, OreLink } from '../OreIcon';
+import { typeLabel } from './typeLabel';
 import { hubForPayee } from '../pricing';
 import type { DisplayRow } from '../groupRows';
 import { CorpBookDiffModal } from './CorpBookDiffModal';
@@ -126,9 +127,7 @@ export function CorpRowDetailModal({
                   >
                     <OreIcon typeId={line.typeId} size={32} className="h-4 w-4 shrink-0" />
                     <span className="min-w-0 flex-1 truncate">
-                      <OreLink typeId={line.typeId}>
-                        {typeNames.get(line.typeId) ?? `#${line.typeId}`}
-                      </OreLink>
+                      <OreLink typeId={line.typeId}>{typeLabel(typeNames, line.typeId)}</OreLink>
                     </span>
                     <span className="text-text-dim tabular-nums">
                       {you !== undefined && you !== line.quantity
@@ -161,9 +160,7 @@ export function CorpRowDetailModal({
               {view.oreLines.map((line) => (
                 <li key={line.typeId} className="flex flex-wrap items-baseline gap-x-2 py-1">
                   <span className="min-w-0 flex-1 truncate">
-                    <OreLink typeId={line.typeId}>
-                      {typeNames.get(line.typeId) ?? `#${line.typeId}`}
-                    </OreLink>
+                    <OreLink typeId={line.typeId}>{typeLabel(typeNames, line.typeId)}</OreLink>
                   </span>
                   <span className="text-text-dim tabular-nums">
                     {line.quantity.toLocaleString()} ×{' '}

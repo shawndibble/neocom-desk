@@ -187,6 +187,33 @@ describe('overlayCorpBooks', () => {
     expect(out.labels.get(`${ME}:2026-10-13:${SYSTEM}`)).toMatchObject({ state: 'unattributed' });
   });
 
+  it('says Unattributed only of the Characters the book is read for', () => {
+    const open = overlay(
+      [entry({ date: '2026-10-13' })],
+      [book({ observed: [], characterIds: [42] })]
+    );
+    expect(open.labels.size).toBe(0);
+  });
+
+  it('does not call a share of a split entry a dispute', () => {
+    const other = book({
+      corporationId: 98000002,
+      corpName: 'Ashfall Prospecting',
+      observed: [
+        {
+          characterId: ME,
+          recordedCorporationId: CORP,
+          structureId: 2000,
+          date: '2026-10-17',
+          solarSystemId: SYSTEM,
+          oreLines: [{ typeId: ZEO, quantity: 20_000 }],
+        },
+      ],
+    });
+    const out = overlay([entry()], [book(), other]);
+    expect(out.rows.every((r) => r.dispute === undefined)).toBe(true);
+  });
+
   it('keeps what the member gave another Payee a visible conflict, not owed, for 14 days', () => {
     const assigned = entry({
       freeOreLines: [],

@@ -56,6 +56,8 @@ export interface PersonalEntry {
 export interface PersonalBook {
   corporationId: number;
   corpName: string;
+  /** The tracked Characters this book is read for; Unattributed is only said of their ore. */
+  characterIds?: number[];
   startDate: string;
   graceHours?: number;
   /** The book's last sync by any officer; absent when never synced. */
@@ -410,7 +412,8 @@ export function overlayCorpBooks(input: {
     p: Prepared,
     charge: PreparedCharge,
     lines: readonly OreLine[],
-    conflict: { lines: OreLine[]; resolvesAt: string } | undefined
+    conflict: { lines: OreLine[]; resolvesAt: string } | undefined,
+    soleBook = true
   ) => {
     const { book } = p;
     const value = dayValue(charge);
@@ -433,7 +436,8 @@ export function overlayCorpBooks(input: {
       hubId: book.hubId,
       oreForm: book.oreForm,
     };
-    const dispute = disputeOf(charge.entry, lines, value.taxPct);
+    // With several books the member's entry is split among them: one book's share is not a dispute.
+    const dispute = soleBook ? disputeOf(charge.entry, lines, value.taxPct) : undefined;
     if (conflict) {
       const worth = computeAssignmentValue(
         conflict.lines,
@@ -528,7 +532,8 @@ export function overlayCorpBooks(input: {
           charge.oreLines,
           contested && take.length > 0
             ? { lines: take, resolvesAt: contested.resolvesAt }
-            : undefined
+            : undefined,
+          claiming.length === 1
         );
       }
     }
@@ -601,6 +606,7 @@ export function overlayCorpBooks(input: {
     }
     const closed = prepared.find(
       (p) =>
+        (p.book.characterIds === undefined || p.book.characterIds.includes(entry.characterId)) &&
         entry.date >= p.book.startDate &&
         isDayBillable(entry.date, {
           now,
