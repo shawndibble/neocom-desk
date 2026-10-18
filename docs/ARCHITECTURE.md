@@ -35,6 +35,12 @@ no app server. Two kinds of data:
   Workbench's API can't filter by hull; it is the one collection readable with
   no Firebase session at all, since the fitter works logged out
   (`features/fittings/workbenchFits.ts` reads it).
+  A daily job (`syncMarketOpenPrices`) folds EVE Ref's last market-order
+  snapshot of the previous UTC day into `marketOpenPrices/<regionId>_<typeId>`:
+  per Trade Hub region and type, the day's highest buy and lowest sell, up to
+  400 days, public read (`functions/src/marketOpenPrices.ts` holds the logic,
+  `marketOrdersArchive.ts` the streaming fetch). The deployment now has ten
+  scheduled functions, i.e. ten Cloud Scheduler jobs.
 
 Auth is browser-only OAuth2 PKCE against `login.eveonline.com`; refresh
 tokens never leave the device. Market prices come from Fuzzwork aggregates,
