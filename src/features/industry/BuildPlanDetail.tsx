@@ -794,13 +794,27 @@ export function BuildPlanDetail({
     [depth, resolveWith, plan, topOfBook]
   );
   // Break Even's trials walk the books for their own run count, as the page would at that count.
+  // Lowest-sell passes by trial run count: only `runs` varies across trials of
+  // this plan, so repeated trials (and the page's own run count) reuse one pass.
+  const lowestSellCache = useRef<{
+    topOfBook: ResolvedBuildPlan;
+    byRuns: Map<number, ResolvedBuildPlan>;
+  } | null>(null);
   const resolveAt = useCallback(
     (candidate: BuildPlanRecord) => {
-      const lowestSell = resolveWith(candidate);
+      if (lowestSellCache.current?.topOfBook !== topOfBook) {
+        lowestSellCache.current = { topOfBook, byRuns: new Map([[plan.runs, topOfBook]]) };
+      }
+      const { byRuns } = lowestSellCache.current;
+      let lowestSell = byRuns.get(candidate.runs);
+      if (!lowestSell) {
+        lowestSell = resolveWith(candidate);
+        byRuns.set(candidate.runs, lowestSell);
+      }
       const trialDepth = walkDepth(depthNeedsOf(candidate, lowestSell));
       return trialDepth.size > 0 ? resolveWith(candidate, depthPriceMap(trialDepth)) : lowestSell;
     },
-    [resolveWith, walkDepth, depthNeedsOf]
+    [resolveWith, walkDepth, depthNeedsOf, plan, topOfBook]
   );
   const { result, error, makeOrBuyContext, resolvedMe, resolvedTe, materialPrices, bpcCoverage } =
     resolved;
