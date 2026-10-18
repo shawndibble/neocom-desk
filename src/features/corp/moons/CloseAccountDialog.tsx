@@ -156,7 +156,7 @@ export function CloseAccountDialog({
               )}
               {!forfeitOk && (
                 <p role="status" className="text-xs text-warning">
-                  {t('corpTaxBook.moons.dialogs.close.notYet')}
+                  {t('corpTaxBook.moons.dialogs.close.notYet', { days: FORFEIT_NO_REPLY_DAYS })}
                 </p>
               )}
             </>

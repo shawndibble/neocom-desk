@@ -28,11 +28,6 @@ export function forfeitAllowed(basis: ForfeitBasis, today: string): boolean {
   return basis.askedAt <= shiftDate(today, -FORFEIT_NO_REPLY_DAYS);
 }
 
-/** Miners whose account an officer closed. */
-export function closedMinerIds(miners: readonly Miner[]): Set<string> {
-  return new Set(miners.filter((m) => m.closedAt !== undefined).map((m) => m.id));
-}
-
 /**
  * Statement mail stops after the final Statement (epic): the final one and any
  * issued before the close still go out; nothing issued later does.

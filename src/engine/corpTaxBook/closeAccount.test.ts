@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { buildBookView, planStatementRun, type BookViewInput } from './bookView';
 import {
   FORFEIT_NO_REPLY_DAYS,
-  closedMinerIds,
   forfeitAllowed,
   mailableAfterClose,
   planCloseAccount,
@@ -115,12 +114,6 @@ describe('a closed Miner', () => {
     expect(planStatementRun(view, { start: '2026-08-01', end: '2026-08-31' }).lines).toHaveLength(
       0
     );
-  });
-
-  it('lists the closed Miners', () => {
-    expect([
-      ...closedMinerIds([closed, { id: 'solo:51', characterIds: [51], mainCharacterId: 51 }]),
-    ]).toEqual(['solo:50']);
   });
 
   it('mails the final Statement and earlier ones, nothing issued after', () => {

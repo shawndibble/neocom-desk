@@ -14130,7 +14130,7 @@
           "noReply": "No reply for {{days}} days",
           "consentNote": "Where and when the guest agreed",
           "askedAt": "When you asked where to refund it (at least {{days}} days ago)",
-          "notYet": "Credit can be forfeited only with the guest's recorded consent, or once the refund offer has gone unanswered for 90 days.",
+          "notYet": "Credit can be forfeited only with the guest's recorded consent, or once the refund offer has gone unanswered for {{days}} days.",
           "reason": "Reason (kept in the activity log)",
           "sendHint": "The final Statement is mailed from the Statements tab."
         },
