@@ -175,6 +175,13 @@ suite('Corp Tax Book callables (emulator)', () => {
       expect(await reason(verifyOfficer(deps(), who(5), parseBookCall(withToken(5))))).toBe(
         'not-an-officer'
       );
+      // A failed renewal revokes the access the old check granted.
+      now = T0 + 11 * 60_000;
+      identities.set(JUNIOR, as([]));
+      expect(
+        await reason(verifyOfficer(deps(), who(JUNIOR), parseBookCall(withToken(JUNIOR))))
+      ).toBe('not-an-officer');
+      expect((await book().collection('officers').doc(`char:${JUNIOR}`).get()).exists).toBe(false);
     });
 
     it('rejects a token for another Character', async () => {
@@ -419,7 +426,21 @@ suite('Corp Tax Book callables (emulator)', () => {
 
     it('asks a Director above the dismissal approval limit', async () => {
       await turnOn();
+      expect(
+        await reason(
+          edit(ACCOUNTANT, { action: 'updateSettings', patch: { dismissApprovalAboveIsk: null } })
+        )
+      ).toBe('director-approval');
       await edit(DIRECTOR, { action: 'updateSettings', patch: { dismissApprovalAboveIsk: 1000 } });
+      expect(
+        await reason(
+          edit(
+            ACCOUNTANT,
+            { action: 'dismiss', scope: 'miner', targetId: 'solo:50', reason: 'x' },
+            true
+          )
+        )
+      ).toBe('director-approval');
       const big = {
         action: 'dismiss',
         scope: 'miner',
@@ -496,6 +517,7 @@ suite('Corp Tax Book callables (emulator)', () => {
         mainCharacterId: 60,
       });
       expect(out.pendingConfirmation).toEqual([61]);
+      expect((await book().collection('miners').doc('m-a').get()).get('uids')).toEqual(['char:60']);
       expect(
         await reason(
           edit(ACCOUNTANT, {
@@ -507,6 +529,10 @@ suite('Corp Tax Book callables (emulator)', () => {
         )
       ).toBe('already-grouped');
       await confirmGrouping(deps(), who(61), CORP, 'm-a');
+      expect((await book().collection('miners').doc('m-a').get()).get('uids').sort()).toEqual([
+        'char:60',
+        'char:61',
+      ]);
       expect((await book().collection('miners').doc('m-a').get()).data()).toMatchObject({
         pendingConfirmation: [],
         confirmedCharacterIds: [61],
@@ -655,6 +681,12 @@ suite('Corp Tax Book callables (emulator)', () => {
       const view = await readStatementByToken(deps(), String(verifyToken));
       expect(view.statement).toMatchObject({ id: 's1', amount: 10_000_000 });
       expect(view.statement).not.toHaveProperty('verifyToken');
+      expect((await book().collection('statements').doc('s1').get()).data()).not.toHaveProperty(
+        'verifyToken'
+      );
+      expect((await book().collection('statementLinks').doc('s1').get()).get('verifyToken')).toBe(
+        verifyToken
+      );
       expect(view.terms).toMatchObject({ hubId: 'jita', oreForm: 'compressed' });
       expect(view.payments.map((p) => p.id)).toEqual(['m1']);
       expect(view.remindersStopped).toBe(false);

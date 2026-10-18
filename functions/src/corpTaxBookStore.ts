@@ -30,6 +30,7 @@ import {
   PAYMENTS,
   REBILLS,
   STATEMENTS,
+  STATEMENT_LINKS,
   TOKENS_COLLECTION,
   WRITE_OFFS,
   decideRoles,
@@ -150,11 +151,15 @@ export async function authorizeOfficer(
       }
       const identity = await deps.readIdentity(characterId, call.accessToken);
       if (identity.corporationId !== call.corporationId) {
+        if (held) await officerRef.delete();
         fail('permission-denied', 'Not a member of this corporation', 'wrong-corp');
       }
       const roles = decideRoles(identity.roles, identity.ceoId === characterId);
-      if (!roles.canView)
+      if (!roles.canView) {
+        // A failed renewal revokes the read access the old check granted.
+        if (held) await officerRef.delete();
         fail('permission-denied', 'No officer role in this corporation', 'not-an-officer');
+      }
       access = {
         ...roles,
         characterId,
@@ -455,6 +460,11 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       return { detail: { recordKey: action.recordKey, pct: action.pct, reason: action.reason } };
     }
     case 'updateSettings': {
+      if (action.patch.dismissApprovalAboveIsk !== undefined && !c.access.isDirector) {
+        throw new HttpsError('permission-denied', 'Only a Director sets the approval limit', {
+          reason: 'director-approval',
+        });
+      }
       const { structureExpiryHours, dismissApprovalAboveIsk, ...rest } = action.patch;
       const update: Data = { ...rest };
       if (structureExpiryHours) {
@@ -520,7 +530,12 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
     }
     case 'dismiss': {
       const limit = c.book.dismissApprovalAboveIsk;
-      if (typeof limit === 'number' && (action.amountIsk ?? 0) > limit && !c.access.isDirector) {
+      // An omitted amount cannot dodge the gate: with a limit set it counts as over it.
+      if (
+        typeof limit === 'number' &&
+        (action.amountIsk ?? Infinity) > limit &&
+        !c.access.isDirector
+      ) {
         throw new HttpsError(
           'permission-denied',
           'A Director must approve this size of dismissal',
@@ -592,7 +607,8 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         mainCharacterId: action.mainCharacterId,
         pendingConfirmation: pending,
         confirmedCharacterIds: [...confirmed].filter((x) => action.characterIds.includes(x)),
-        uids: action.characterIds.map((x) => `char:${x}`),
+        // A guest's character stays out of the readable grouping until it confirms (D26b).
+        uids: action.characterIds.filter((x) => !pending.includes(x)).map((x) => `char:${x}`),
       });
       return {
         detail: { minerId: action.minerId, characterIds: action.characterIds, pending },
@@ -738,11 +754,13 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       tx.create(ref, {
         ...statement,
         uids: statement.characterIds.map((x) => `char:${x}`),
-        verifyToken: token,
         remindersStopped: false,
         manualRemindersSent: 0,
         issuedBy: by,
       });
+      // The link lives beside the Statement, readable by editors only (rules): the
+      // miner and view-only officers never see it.
+      tx.create(col(c, STATEMENT_LINKS).doc(statement.id), { verifyToken: token });
       tx.create(c.deps.db.collection(TOKENS_COLLECTION).doc(token), {
         corporationId: c.corporationId,
         statementId: statement.id,
@@ -867,6 +885,7 @@ export async function confirmGrouping(
     tx.update(ref, {
       pendingConfirmation: (miner.pendingConfirmation as number[]).filter((x) => x !== characterId),
       confirmedCharacterIds: FieldValue.arrayUnion(characterId),
+      uids: FieldValue.arrayUnion(caller.uid),
     });
     appendAudit(tx, deps, corporationId, { characterId, name: '' }, 'confirmGrouping', { minerId });
   });

@@ -33,6 +33,8 @@ export const ADJUSTMENTS = 'adjustments';
 export const WRITE_OFFS = 'writeOffs';
 export const REBILLS = 'rebills';
 export const STATEMENTS = 'statements';
+/** `statementLinks/{statementId}`: the verify token, readable by editors only. */
+export const STATEMENT_LINKS = 'statementLinks';
 export const MINERS = 'miners';
 export const META = 'meta';
 export const PAID_DOC = 'paid';

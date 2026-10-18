@@ -62,6 +62,11 @@ beforeEach(async () => {
       uids: ['char:2', 'char:9'],
       verifyToken: 't',
     });
+    await setDoc(doc(db, `${CORP}/statementLinks/s1`), { verifyToken: 't' });
+    await setDoc(
+      doc(db, `${CORP}/officers/char:6`),
+      officer({ characterId: 6, ownerHash: 'h6', canEdit: false })
+    );
     await setDoc(doc(db, `${CORP}/dismissals/d1`), { uids: ['char:2'], reason: 'x' });
     await setDoc(doc(db, `${CORP}/miners/m1`), { uids: ['char:2'], characterIds: [2] });
     await setDoc(doc(db, `${CORP}/audit/e1`), { action: 'sync' });
@@ -119,6 +124,18 @@ describe('corpTaxBooks rules', () => {
       getDocs(query(collection(db, `${CORP}/observed`), where('uid', '==', 'char:3')))
     );
     for (const path of OFFICER_ONLY) await assertFails(getDoc(doc(db, `${CORP}/${path}`)));
+  });
+
+  it('shows the verify link to editors only', async () => {
+    await assertSucceeds(
+      getDoc(doc(characterAuth(env, 1, 'h1').firestore(), `${CORP}/statementLinks/s1`))
+    );
+    await assertFails(
+      getDoc(doc(characterAuth(env, 6, 'h6').firestore(), `${CORP}/statementLinks/s1`))
+    );
+    await assertFails(
+      getDoc(doc(characterAuth(env, 2, 'h2').firestore(), `${CORP}/statementLinks/s1`))
+    );
   });
 
   it('keeps own-line reads after leaving the corp (no officer record needed)', async () => {

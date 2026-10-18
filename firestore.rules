@@ -529,6 +529,12 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      // The verify link for the mail: editors only, never the miner or a view-only officer.
+      match /statementLinks/{statementId} {
+        allow get, list: if isOfficer() && get(officerPath()).data.canEdit == true;
+        allow write: if false;
+      }
+
       match /statements/{statementId} {
         allow get, list: if isOfficer() || isOnOwnLine();
         allow write: if false;
