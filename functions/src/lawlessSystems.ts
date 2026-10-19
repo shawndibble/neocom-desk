@@ -41,3 +41,32 @@ export function parseLawlessSystemIds(body: unknown): number[] {
   }
   return [...ids].sort((a, b) => a - b);
 }
+
+/**
+ * How often an unchanged list is rewritten anyway (issue #4272). The app hides
+ * the list once `updatedAt` is 60 minutes old (`LAWLESS_STALE_AFTER_MS` in
+ * `src/engine/route/lawless.ts`), so `updatedAt` means "last confirmed", not
+ * "last changed": half that limit leaves a couple of failed runs of margin
+ * before a still-current list would age out.
+ */
+export const LAWLESS_HEARTBEAT_MS = 30 * 60 * 1000;
+
+/** Whether a stored `systemIds` value holds exactly `next`'s ids, in any order. */
+export function sameLawlessSystemIds(stored: unknown, next: readonly number[]): boolean {
+  if (!Array.isArray(stored) || stored.length !== next.length) return false;
+  if (!stored.every((id): id is number => typeof id === 'number')) return false;
+  const a = [...stored].sort((x, y) => x - y);
+  const b = [...next].sort((x, y) => x - y);
+  return a.every((id, i) => id === b[i]);
+}
+
+/**
+ * Whether `syncLawlessSystems` must write `systemConditions/lawless`: the list
+ * changed, nothing usable is stored, or the heartbeat is due. Otherwise the run
+ * skips the write — most runs, since the insurgency list rarely moves.
+ */
+export function lawlessWriteNeeded(stored: unknown, next: readonly number[], now: number): boolean {
+  if (!isRecord(stored) || typeof stored.updatedAt !== 'number') return true;
+  if (now - stored.updatedAt >= LAWLESS_HEARTBEAT_MS) return true;
+  return !sameLawlessSystemIds(stored.systemIds, next);
+}
