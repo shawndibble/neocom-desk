@@ -7,11 +7,9 @@ import {
   DataAgeBadge,
   CachedEmptyState,
   EmptyState,
-  FilterChip,
   IconButton,
   PageHeader,
   Panel,
-  SearchInput,
   Spinner,
   Toast,
   CachedNotice,
@@ -21,8 +19,7 @@ import { GrantBanner, GrantNote } from '@/app/GrantNote';
 import { ReauthCachedNote } from '@/app/ReauthCachedNote';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useOnline } from '@/stores/network';
-import { useRetryFocus } from '@/lib/useRetryFocus';
-import { loadMailBody, markMailReadOnEsi } from '@/features/character/mail';
+import { markMailReadOnEsi } from '@/features/character/mail';
 import { useMailScopeSwitch } from '@/features/character/useMailScopeSwitch';
 import {
   loadAllMailSnapshot,
@@ -36,14 +33,15 @@ import type { CharacterFilterValue } from '@/features/character/characterFilterV
 import { CharacterAvatar } from '@/components/ui/CharacterAvatar';
 import { NewMailComposer, type NewMailCloseReason } from '@/features/character/NewMailComposer';
 import { MailListPane } from '@/features/character/MailListPane';
+import { MailFilterBar } from '@/features/character/MailFilterBar';
 import { MailReaderBody } from '@/features/character/MailReaderBody';
 import { useMailPaging } from '@/features/character/useMailPaging';
+import { useMailSelection } from '@/features/character/useMailSelection';
+import { useMailBody } from '@/features/character/useMailBody';
+import { useMailRows } from '@/features/character/useMailRows';
 import { TAB_LABEL_KEY, type MailRow } from '@/features/character/mailDisplay';
-import type { CachedResult } from '@/esi/cache';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { useIsDesktop } from '@/lib/useIsDesktop';
-import { useFocusHeading } from '@/lib/useFocusHeading';
-import { stripEveMarkup } from '@/features/skills/typeDisplay';
 import { useMailFolders } from '@/features/character/mailFolderPref';
 import { useDebouncedValue } from '@/lib/useDebouncedValue';
 import { useUrlParams } from '@/lib/useUrlState';
@@ -52,19 +50,8 @@ import { useTimeZone } from '@/lib/timeFormat';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useCalendarWeekStart } from '@/features/character/calendarWeekStart';
 import { useNow } from '@/lib/useNow';
-import { groupMailByAge } from '@/engine/mail/mailAge';
-import {
-  capHeadersForDisplay,
-  mailKey,
-  mailSearchMatches,
-  mergeOwnedMail,
-  resolveMailTab,
-  sumUnreadByTab,
-  MAIL_FOLDERS,
-  type ComposeKind,
-  type MailTab,
-} from '@/engine/mail/mail';
-import type { MailBody, MailHeader } from '@/esi/endpoints';
+import { sumUnreadByTab, MAIL_FOLDERS, type MailTab } from '@/engine/mail/mail';
+import type { MailHeader } from '@/esi/endpoints';
 
 const SEARCH_PARAM = textParam();
 const HIDE_READ_PARAM = boolParam();
@@ -105,17 +92,6 @@ function MailView({ scope, scopeControl }: MailViewProps) {
     );
   }
 
-  // The open mail, as owner + `mail_id`: the id alone repeats across mailboxes.
-  const [selected, setSelected] = useState<{
-    ownerId: number;
-    mailId: number;
-    key: string;
-  } | null>(null);
-  const selectedKey = selected?.key ?? null;
-  // Which compose box is open, if any (mail-reply-and-forward decision) —
-  // reset below whenever the selected mail changes, so switching mails never
-  // leaves a stale Reply/Forward box open against the wrong header.
-  const [composeKind, setComposeKind] = useState<ComposeKind | null>(null);
   // New Mail compose (full-pane on a phone, inline in the reading pane on a
   // wide screen) and the one-line notice it leaves behind.
   const [newMailOpen, setNewMailOpen] = useState(false);
@@ -132,79 +108,20 @@ function MailView({ scope, scopeControl }: MailViewProps) {
       composeButtonRef.current?.focus();
     }
   }, [newMailOpen]);
-  function selectMail(target: { ownerId: number; mailId: number } | null) {
-    setSelected(target && { ...target, key: mailKey(target.ownerId, target.mailId) });
-    setComposeKind(null);
-  }
-
-  // Focus management below the `lg:` breakpoint (issue #1485), where opening
-  // a mail hides the list Panel and Back hides the reader Panel again — both
-  // CSS `hidden`, not an unmount, so nothing here needs a mount effect, only
-  // a place to land focus once the swap has happened.
   const isDesktop = useIsDesktop();
-  const searchInputRef = useRef<HTMLInputElement>(null);
-  // The exact row button last clicked to open a mail — a DOM node, not a
-  // mail id + `querySelector`, so a row the "Hide read" filter has since
-  // removed from the list is simply not `.isConnected` rather than matching
-  // some other row that happens to share an id after a re-render.
-  const openedRowRef = useRef<HTMLButtonElement | null>(null);
-  // Reader heading focus: fires once `body` has actually resolved for the
-  // newly selected mail, not the instant `selectedKey` changes — focusing a
-  // still-loading pane would land on a spinner, not the subject the pilot
-  // asked to read. `null` on desktop (both panes stay on screen; the clicked
-  // row already keeps its own focus there) and while nothing is selected.
-  const readerHeadingRef = useRef<HTMLElement>(null);
-  function selectMailFromRow(target: { ownerId: number; mailId: number }, row: HTMLButtonElement) {
-    openedRowRef.current = row;
-    selectMail(target);
-  }
-  // Back-to-list focus restore: only when the pilot actually pressed Back
-  // (captured below), never for an unrelated `selectedKey` reset — e.g.
-  // switching characters, which also lands on `selectedKey === null`.
-  const backToListRef = useRef(false);
-  function handleBackToList() {
-    backToListRef.current = true;
-    selectMail(null);
-  }
-  useEffect(() => {
-    if (selectedKey !== null) return;
-    // Cleared unconditionally the moment `selectedKey` goes null, before the
-    // `isDesktop` check below — otherwise a resize straight after the Back
-    // click (landing between the click and this effect's commit) could skip
-    // the reset entirely, leaving a stale flag that a later, unrelated
-    // `selectedKey` reset (a character switch) would misread as "Back was
-    // pressed" and wrongly steal focus for.
-    const wasBackPressed = backToListRef.current;
-    backToListRef.current = false;
-    if (!wasBackPressed || isDesktop) return;
-    const row = openedRowRef.current;
-    if (row && row.isConnected) row.focus();
-    else searchInputRef.current?.focus();
-  }, [selectedKey, isDesktop]);
-
-  // Reply/Forward focus restore (issue #1485): both buttons unmount the
-  // instant `composeKind` is set (replaced by the compose box in the same
-  // spot), so Cancel/Send — which unmount the compose box in turn — have
-  // nothing to hand focus back to unless it's remembered up front. Records
-  // which button opened it and which mail it opened it for; a mail switch
-  // clears `composeKind` too (see `selectMail`), and that must NOT steal
-  // focus back to a Reply/Forward button on a mail the pilot has since left.
-  const replyButtonRef = useRef<HTMLButtonElement>(null);
-  const forwardButtonRef = useRef<HTMLButtonElement>(null);
-  const composeOpenedFromRef = useRef<{ kind: ComposeKind; key: string } | null>(null);
-  function openCompose(kind: ComposeKind, key: string) {
-    composeOpenedFromRef.current = { kind, key };
-    setComposeKind(kind);
-  }
-  useEffect(() => {
-    if (composeKind !== null) return;
-    const opened = composeOpenedFromRef.current;
-    if (opened === null) return;
-    composeOpenedFromRef.current = null;
-    if (selectedKey !== opened.key) return;
-    const button = opened.kind === 'reply' ? replyButtonRef.current : forwardButtonRef.current;
-    button?.focus();
-  }, [composeKind, selectedKey]);
+  const {
+    selected,
+    selectedKey,
+    composeKind,
+    setComposeKind,
+    selectMail,
+    selectMailFromRow,
+    handleBackToList,
+    openCompose,
+    searchInputRef,
+    replyButtonRef,
+    forwardButtonRef,
+  } = useMailSelection(isDesktop);
   // Local "mark read" state, applied instantly on selection so the dim never
   // waits on the network — independent of `markMailReadOnEsi`'s own write
   // below. Set on selection, not toggled — no manual mark-unread control.
@@ -223,12 +140,6 @@ function MailView({ scope, scopeControl }: MailViewProps) {
   // instantly responsive, only the filter over potentially hundreds of
   // headers below waits out the debounce.
   const [debouncedSearch, setDebouncedSearch] = useDebouncedValue(search);
-  const [bodySnapshot, setBodySnapshot] = useState<{
-    key: string;
-    result: CachedResult<MailBody> | null;
-  } | null>(null);
-  /** Bumped by "Try again" on a body that could not be read, to refetch it. */
-  const [bodyAttempt, setBodyAttempt] = useState(0);
   const online = useOnline();
 
   // The pilot's Local/EVE-time preference, the same way Contracts,
@@ -269,71 +180,19 @@ function MailView({ scope, scopeControl }: MailViewProps) {
     return map;
   }, [data]);
 
-  const rows = useMemo<MailRow[]>(
-    () =>
-      mergeOwnedMail(
-        owners.map((o) => ({
-          characterId: o.characterId,
-          characterName: o.name,
-          headers: loadedHeaders?.get(o.characterId) ?? o.headersResult?.data ?? [],
-        }))
-      ).map(({ ownerId, ownerName, header }) => ({
-        key: mailKey(ownerId, header.mail_id),
-        ownerId,
-        ownerName,
-        header,
-        tab: resolveMailTab(header.labels, ownerById.get(ownerId)?.labelTabById ?? new Map()),
-      })),
-    [owners, ownerById, loadedHeaders]
-  );
-
-  // Folder, then search, then Hide read, kept per stage for `listState` below.
-  const folderRows = useMemo(
-    () => rows.filter((row) => folders.includes(row.tab)),
-    [rows, folders]
-  );
-  const searchRows = useMemo(
-    () =>
-      folderRows.filter((row) => {
-        const senderName = row.header.from === undefined ? undefined : names.get(row.header.from);
-        return mailSearchMatches(row.header, senderName, debouncedSearch);
-      }),
-    [folderRows, names, debouncedSearch]
-  );
-  const visibleRows = useMemo(
-    () =>
-      hideRead
-        ? searchRows.filter((row) => !(row.header.is_read || locallyReadKeys.has(row.key)))
-        : searchRows,
-    [searchRows, hideRead, locallyReadKeys]
-  );
-
-  // Rendered-list cap (issue #416): applied after every filter, so it caps
-  // what's actually mapped into DOM rows rather than the underlying fetch
-  // list — "load more"'s own pagination cursor is untouched by this.
-  const { headers: cappedRows, truncated: headersTruncated } = useMemo(
-    () => capHeadersForDisplay(visibleRows),
-    [visibleRows]
-  );
-
-  // Grouped after the cap, so a header only ever covers rows actually
-  // rendered, and "load more" just regroups the longer list: a bucket that
-  // gains rows keeps its one header instead of repeating at the page seam.
-  const rowSections = useMemo(
-    () =>
-      groupMailByAge(cappedRows, (row) => row.header.timestamp, new Date(now), timeZone, weekStart),
-    [cappedRows, now, timeZone, weekStart]
-  );
-
-  // Each empty state is named by the first stage that emptied the list, so
-  // its one action always brings rows back: an empty folder has none to offer.
-  const listState = (() => {
-    if (visibleRows.length > 0) return 'rows';
-    if (folders.length === 0) return 'no-folders';
-    if (folderRows.length === 0) return 'empty-folder';
-    if (searchRows.length === 0) return 'no-search-matches';
-    return 'all-read-hidden';
-  })();
+  const { rows, cappedRows, headersTruncated, rowSections, listState } = useMailRows({
+    owners,
+    ownerById,
+    loadedHeaders,
+    names,
+    folders,
+    debouncedSearch,
+    hideRead,
+    locallyReadKeys,
+    now,
+    timeZone,
+    weekStart,
+  });
 
   const selectedRow = rows.find((row) => row.key === selectedKey) ?? null;
   const selectedHeader = selectedRow?.header ?? null;
@@ -372,35 +231,10 @@ function MailView({ scope, scopeControl }: MailViewProps) {
     void refetchOwnerHeaders(ownerId);
   }
 
-  useEffect(() => {
-    if (selected === null) return;
-    let cancelled = false;
-    void loadMailBody(selected.ownerId, selected.mailId).then((result) => {
-      if (!cancelled) setBodySnapshot({ key: selected.key, result });
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [selected, bodyAttempt]);
-
-  const body = bodySnapshot?.key === selectedKey ? bodySnapshot.result : undefined;
-  const [bodyRetryRef, , holdBodyFocus] = useRetryFocus<HTMLDivElement>(
-    body === undefined ? 'busy' : body === null ? 'failed' : 'ok',
-    selectedKey
-  );
-  // Stripped once, shared by the reading pane's own paragraph and the
-  // compose box's auto-quote — both must quote exactly what the pilot reads.
-  const bodyText = body?.data.body ? stripEveMarkup(body.data.body) : '';
-
-  // `enabled: !isDesktop` — narrow-only; see `useFocusHeading`'s own doc
-  // comment for why that's a separate param rather than folded into the key.
-  // Off while composing too: Reply/Forward render from the header alone, so a
-  // pilot can open one before the body loads — the compose box then mounts
-  // with the body, and its own focus must not lose to this heading's.
-  useFocusHeading(
-    readerHeadingRef,
-    body === undefined ? null : selectedKey,
-    !isDesktop && composeKind === null
+  const { body, bodyText, bodyRetryRef, readerHeadingRef, retry } = useMailBody(
+    selected,
+    isDesktop,
+    composeKind
   );
 
   if (!hydrated) {
@@ -539,62 +373,16 @@ function MailView({ scope, scopeControl }: MailViewProps) {
           {offline && <CachedNotice fetchedAt={fetchedAt} />}
 
           {(isDesktop || selectedKey === null) && (
-            // A toggle-button group, not a tablist: `aria-selected` on a tab
-            // promises exactly one visible panel, which stops being true the
-            // moment two folders can be on at once. `aria-pressed` on a real
-            // button inside a `role="group"` is the APG toggle idiom, and the
-            // shape Contacts and Open Orders already ship. Losing the tab
-            // bar's arrow-key roving focus is correct rather than a
-            // regression — each chip is its own tab stop now.
-            <div
-              role="group"
-              aria-label={t('mail.foldersLabel')}
-              className="flex flex-wrap items-center gap-2"
-            >
-              {MAIL_FOLDERS.map((folder) => {
-                // Each System Label's own `unread_count`, never summed across
-                // the selected folders: round 18 recorded that these come from
-                // ESI as-is, and `total_unread_count` is not their sum once
-                // Custom Labels exist, so a client-side total would disagree
-                // with the number the game itself shows. The All view sums
-                // the same per-label figure across Characters (issue #2867).
-                const unread = unreadByTab.get(folder) ?? 0;
-                return (
-                  <FilterChip
-                    key={folder}
-                    size="md"
-                    label={t(TAB_LABEL_KEY[folder])}
-                    // Zero is shown, not dimmed away as Open Orders dims a
-                    // zero-match chip: there, zero means "nothing to do"; here
-                    // a folder with no unread mail is exactly where you go to
-                    // re-read something, and Sent reports zero unread forever.
-                    count={unread > 0 ? unread : undefined}
-                    countLabel={unread > 0 ? t('mail.unreadCount', { count: unread }) : undefined}
-                    selected={folders.includes(folder)}
-                    onToggle={() => toggleFolder(folder)}
-                  />
-                );
-              })}
-            </div>
-          )}
-
-          {(isDesktop || selectedKey === null) && (
-            <div className="flex flex-wrap items-center gap-2">
-              <SearchInput
-                ref={searchInputRef}
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder={t('mail.searchPlaceholder')}
-                aria-label={t('mail.searchLabel')}
-                className="min-w-0 flex-1"
-              />
-              <FilterChip
-                label={t('mail.hideRead')}
-                selected={hideRead}
-                onToggle={() => setHideRead(!hideRead)}
-                size="md"
-              />
-            </div>
+            <MailFilterBar
+              folders={folders}
+              unreadByTab={unreadByTab}
+              onToggleFolder={toggleFolder}
+              search={search}
+              onSearchChange={setSearch}
+              hideRead={hideRead}
+              onToggleHideRead={() => setHideRead(!hideRead)}
+              searchInputRef={searchInputRef}
+            />
           )}
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-[22rem_minmax(0,1fr)] lg:items-start xl:grid-cols-[24rem_minmax(0,1fr)]">
@@ -701,12 +489,7 @@ function MailView({ scope, scopeControl }: MailViewProps) {
                 online={online}
                 readerHeadingRef={readerHeadingRef}
                 onCompose={openNewMail}
-                onRetry={() => {
-                  // The retry button unmounts while the body loads: the wrapper holds focus meanwhile.
-                  holdBodyFocus();
-                  setBodySnapshot(null);
-                  setBodyAttempt((n) => n + 1);
-                }}
+                onRetry={retry}
                 selectedRow={selectedRow}
                 selectedOwner={selectedOwner}
                 selectedSender={selectedSender}
