@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -156,6 +157,24 @@ describe('FleetBoard', () => {
 
     await user.click(bar);
     expect(screen.queryByText('Distance from you, by role (km)')).toBeNull();
+  });
+});
+
+describe('group sub-labels', () => {
+  it('has a string for every group id the roles pin', async () => {
+    const { default: en } = await import('@/i18n/locales/en.json');
+    const labels = en.travel.pilot.dscan.group as Record<string, string>;
+    const source = readFileSync('src/engine/pilotList/dscanRoles.ts', 'utf8');
+    const pinned = [
+      ...source.matchAll(/\b(?!NOT_A_FLEET)\w+_GROUPS\b[^=]*=\s*new Set\(\[([\d,\s]+)\]\)/g),
+    ].flatMap((m) =>
+      m[1]
+        .split(',')
+        .map((id) => id.trim())
+        .filter(Boolean)
+    );
+    expect(pinned.length).toBeGreaterThan(20);
+    expect(pinned.filter((id) => labels[id] === undefined)).toEqual([]);
   });
 });
 
