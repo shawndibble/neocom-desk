@@ -9,6 +9,7 @@ import { popularFitLoad } from '@/engine/fittings/popularFits';
 import { formatAge } from '@/lib/age';
 import { cx } from '@/lib/cx';
 import { useNow } from '@/lib/useNow';
+import { zkillFailureKey } from '@/lib/zkillFailureKey';
 import { typeName } from '@/sde/loadSde';
 import { usePopularFits } from './popularFits';
 import { RackIconStrip } from './RackIconStrip';
@@ -107,7 +108,7 @@ function ZkillboardFits({
         <Spinner size="sm" delayMs={200} label={t('fittings.popular.loading')} />
       ) : !result.ok ? (
         <p role="status" className="text-xs text-warning">
-          {t('fittings.popular.failed')}
+          {t(zkillFailureKey(result.reason, 'fittings.popular.failed'))}
         </p>
       ) : result.fits.length === 0 ? (
         <p className="text-xs text-text-dim">{t('fittings.popular.empty')}</p>

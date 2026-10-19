@@ -1,25 +1,15 @@
-import { useMemo } from 'react';
-import type { CharacterBlueprint } from '@/esi/endpoints';
-import type { BpcContractRow, BpcSearchRow } from '@/engine/contracts/bpcSearch';
+import { useDeferredValue, useMemo } from 'react';
 import type { SpaceKind } from '@/engine/space';
-import type { ContractLocationInfo } from '@/features/bpcContracts/blueprintLocation';
-import {
-  prepareBpcOffers,
-  rankBpcOffers,
-  type BpcPrepareInput,
-  type BpcQuery,
-  type BpcSourceData,
+import type {
+  BpcPrepareInput,
+  BpcQuery,
+  BpcSourceData,
 } from '@/features/bpcContracts/searchBpcOffers';
+import { useBpcOfferSearch } from '@/features/bpcContracts/useBpcOfferSearch';
 import { sourceToggleKey, sourceToggleSet, type SourceToggle } from './bpcSourcingUrl';
 import type { UiFilter } from './BpcFilterBar';
 
 interface BpcRowsInput {
-  rows: readonly BpcContractRow[];
-  originals: readonly BpcContractRow[];
-  contractLocations: ReadonlyMap<number, ContractLocationInfo>;
-  blueprintNames: ReadonlyMap<number, string>;
-  ownedBlueprints: CharacterBlueprint[];
-  communityRows: readonly BpcSearchRow[];
   uiFilter: UiFilter;
   selectedTypeId: number | null;
   sources: ReadonlySet<SourceToggle>;
@@ -28,14 +18,8 @@ interface BpcRowsInput {
   sourceData: BpcSourceData;
 }
 
-/** Stage 1 (prepare: source/space/jump/filter narrowing) then stage 2 (rank), each memoized on its own inputs. */
+/** Stage 1 (prepare: source/space/jump/filter narrowing) then stage 2 (rank), run by `useBpcOfferSearch`. */
 export function useBpcRows({
-  rows,
-  originals,
-  contractLocations,
-  blueprintNames,
-  ownedBlueprints,
-  communityRows,
   uiFilter,
   selectedTypeId,
   sources,
@@ -76,36 +60,17 @@ export function useBpcRows({
   // keystroke's `sourcing.q` write doesn't rerun stage 1.
   const sourcesKey = sourceToggleKey(sources);
   const stableSources = useMemo(() => sourceToggleSet(sourcesKey), [sourcesKey]);
-  const prepared = useMemo(
-    () =>
-      prepareBpcOffers(
-        {
-          contractRows: rows,
-          originals,
-          contractLocations,
-          blueprintNames,
-          ownedBlueprints,
-          communityRows: communityRows,
-        },
-        {
-          filter: stableFilter,
-          sources: stableSources,
-          spaceKinds: activeSpaceKinds,
-          allowedSystems: allowedSystems,
-        }
-      ),
-    [
-      rows,
-      originals,
-      contractLocations,
-      blueprintNames,
-      ownedBlueprints,
-      communityRows,
-      stableFilter,
-      stableSources,
-      activeSpaceKinds,
+  // Deferred so a filter edit doesn't block input while the full snapshot reruns.
+  const deferredStableFilter = useDeferredValue(stableFilter);
+  const deferredQuery = useDeferredValue(query);
+  const prepareInput = useMemo<BpcPrepareInput>(
+    () => ({
+      filter: deferredStableFilter,
+      sources: stableSources,
+      spaceKinds: activeSpaceKinds,
       allowedSystems,
-    ]
+    }),
+    [deferredStableFilter, stableSources, activeSpaceKinds, allowedSystems]
   );
-  return useMemo(() => rankBpcOffers(prepared, sourceData, query), [prepared, sourceData, query]);
+  return useBpcOfferSearch(sourceData, prepareInput, deferredQuery);
 }

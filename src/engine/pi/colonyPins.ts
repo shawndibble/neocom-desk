@@ -15,6 +15,7 @@ import { colonyStatus } from '@/engine/pi/colonyStatus';
 import { pinsLoad } from '@/engine/pi/pinBudget';
 import { linksLoad, newLinkLoad, type LinkGeometry } from '@/engine/pi/linkCost';
 import type { PlanetLink } from '@/esi/endpoints';
+import { parseInstant } from '../esiInstant';
 
 export type PinRole = 'extractor' | 'factory' | 'other';
 
@@ -43,8 +44,7 @@ export function factorySchematicId(pin: PlanetPin): number | undefined {
  */
 export function extractorExpiryMs(pin: PlanetPin): number | null {
   if (!pin.extractor_details || !pin.expiry_time) return null;
-  const ms = Date.parse(pin.expiry_time);
-  return Number.isNaN(ms) ? null : ms;
+  return parseInstant(pin.expiry_time);
 }
 
 /**
@@ -54,8 +54,7 @@ export function extractorExpiryMs(pin: PlanetPin): number | null {
  */
 export function extractorInstallMs(pin: PlanetPin): number | null {
   if (!pin.install_time) return null;
-  const ms = Date.parse(pin.install_time);
-  return Number.isNaN(ms) ? null : ms;
+  return parseInstant(pin.install_time);
 }
 
 /**

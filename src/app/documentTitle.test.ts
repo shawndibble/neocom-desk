@@ -69,7 +69,6 @@ describe('documentTitleFor', () => {
   const REDIRECT_ONLY = new Set<string>([
     '/skills',
     '/bpc-contracts',
-    '/skills/ships',
     '/wallet/loyalty',
     '/wallet/loyalty/:corporationId',
     '/pilot-lookup',

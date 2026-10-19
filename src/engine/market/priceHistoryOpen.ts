@@ -1,7 +1,7 @@
 /**
  * Daily open prices for the Price History chart: the highest buy order and the
  * lowest sell order standing at the end of each UTC day, as the
- * `marketOpenPrices` snapshot stores them (docs/context/decisions/
+ * R2 `open-prices/<typeId>.json` objects store them (docs/context/decisions/
  * 20261018-121126-price-history-draws-daily-open-buy-and-sell.md). ESI history
  * only records trades, so it cannot say this. Pure — the loader adapts the
  * stored document.
@@ -9,7 +9,7 @@
 import { filterPriceHistoryRange, medianOf, type PriceHistoryRange } from './priceHistory';
 import type { ComparedHistoryDay } from './priceHistoryCompare';
 
-/** The stored shape: parallel arrays, `null` where no order stood that day. */
+/** One region of a stored type document: parallel arrays, `null` where no order stood that day. */
 export interface OpenPriceSeries {
   dates: readonly string[];
   buy: readonly (number | null)[];
@@ -22,14 +22,23 @@ export interface OpenPricePoint {
   sell: number | null;
 }
 
-/** Which open-price lines the chart draws. */
-export type PriceSeriesChoice = 'both' | 'buy' | 'sell';
+/**
+ * Which lines the chart draws: open buy and/or sell where a region has them,
+ * or `average` — every region's ESI average, so a trade hub and a region
+ * without open prices compare on the same footing.
+ */
+export type PriceSeriesChoice = 'both' | 'buy' | 'sell' | 'average';
 
-export const PRICE_SERIES_CHOICES: readonly PriceSeriesChoice[] = ['both', 'buy', 'sell'];
+export const PRICE_SERIES_CHOICES: readonly PriceSeriesChoice[] = [
+  'both',
+  'buy',
+  'sell',
+  'average',
+];
 
 export type OpenPriceSide = 'buy' | 'sell';
 
-/** Whether `side`'s line is drawn under `choice`. */
+/** Whether `side`'s line is drawn under `choice`; never under `average`. */
 export function seriesShows(choice: PriceSeriesChoice, side: OpenPriceSide): boolean {
   return choice === 'both' || choice === side;
 }

@@ -154,7 +154,6 @@ export function BpcSourcingPanel({
     marketRegionId,
     market,
     activeSpaceKinds,
-    communityOffers,
     sourceData,
   } = useBpcSourcingData();
 
@@ -184,21 +183,22 @@ export function BpcSourcingPanel({
     return () => onHeaderChange?.(null);
   }, [onHeaderChange, lastSyncedAt, loading, refreshAll]);
 
-  const { suggestions, filteredRows, bpoSourcesByType, bpoByType, displayRows, summary } =
-    useBpcRows({
-      rows,
-      originals,
-      contractLocations,
-      blueprintNames,
-      ownedBlueprints,
-      communityRows: communityOffers.rows,
-      uiFilter,
-      selectedTypeId,
-      sources,
-      activeSpaceKinds,
-      allowedSystems: jumpFilter.allowed,
-      sourceData,
-    });
+  const {
+    suggestions,
+    filteredRows,
+    bpoSourcesByType,
+    bpoByType,
+    displayRows,
+    summary,
+    awaiting: awaitingOffers,
+  } = useBpcRows({
+    uiFilter,
+    selectedTypeId,
+    sources,
+    activeSpaceKinds,
+    allowedSystems: jumpFilter.allowed,
+    sourceData,
+  });
 
   const selectedName =
     selectedTypeId === null ? null : (blueprintNames.get(selectedTypeId) ?? `#${selectedTypeId}`);
@@ -913,6 +913,10 @@ export function BpcSourcingPanel({
 
             {sources.size === 0 ? (
               <EmptyState title={t('bpcContracts.noSourceSelected')} className="py-8" />
+            ) : awaitingOffers ? (
+              <div className="flex justify-center py-16">
+                <Spinner label={t('common.loading')} />
+              </div>
             ) : displayRows.length === 0 ? (
               <EmptyState
                 title={t('bpcContracts.noFilterMatches')}

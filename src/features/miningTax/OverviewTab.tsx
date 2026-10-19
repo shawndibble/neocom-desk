@@ -91,9 +91,12 @@ import { yieldOverviewCsvColumns } from './yieldCsv';
 import { sumVolume, volumeDisplayMode } from './volume';
 import { VolumeDisplay } from './volumeDisplay';
 import { UnpricedIsk } from './UnpricedIsk';
+import { systemLabel } from './names';
 import type { DailyRatePoint, TypeComparisonPoint } from './MiningYieldCharts';
 
 const LazyMiningYieldCharts = lazy(() => guarded(() => import('./MiningYieldCharts')));
+
+const EMPTY_NAMES: ReadonlyMap<number, string> = new Map();
 
 const OVERVIEW_CHARACTER_FILTER_PARAM = characterFilterParam('all');
 const OVERVIEW_DEFAULT_SORT = { columnId: 'date', direction: 'desc' as const };
@@ -387,7 +390,7 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
   );
 
   function systemName(row: MiningYieldRow): string {
-    return data?.systemNames.get(row.entry.solarSystemId) ?? `#${row.entry.solarSystemId}`;
+    return systemLabel(data?.systemNames ?? EMPTY_NAMES, row.entry.solarSystemId);
   }
 
   const columnsById: Record<OverviewColumnId, DataTableColumn<MiningYieldRow>> = {

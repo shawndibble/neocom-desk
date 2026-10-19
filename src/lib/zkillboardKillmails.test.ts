@@ -117,7 +117,7 @@ describe('fetchPilotKillmails', () => {
 
   it('fails when either list fails, and does not cache the failure', async () => {
     respond({ 'https://zkillboard.com/api/kills/characterID/42/': [] });
-    expect(await fetchPilotKillmails(42)).toEqual({ ok: false });
+    expect(await fetchPilotKillmails(42)).toEqual({ ok: false, reason: 'http' });
     respond({
       'https://zkillboard.com/api/kills/characterID/42/': [],
       'https://zkillboard.com/api/losses/characterID/42/': [],
@@ -198,9 +198,9 @@ describe('fetchPilotKillmailHistory', () => {
 
   it('fails when a list fails, and when entries carry no time to count by', async () => {
     respond({ [KILLS]: [] });
-    expect(await fetchPilotKillmailHistory(42)).toEqual({ ok: false });
+    expect(await fetchPilotKillmailHistory(42)).toEqual({ ok: false, reason: 'http' });
     resetPilotKillmailsCache();
     respond({ [KILLS]: [{ killmail_id: 7, zkb: { hash: 'bb' } }], [LOSSES]: [] });
-    expect(await fetchPilotKillmailHistory(42)).toEqual({ ok: false });
+    expect(await fetchPilotKillmailHistory(42)).toEqual({ ok: false, reason: 'parse' });
   });
 });

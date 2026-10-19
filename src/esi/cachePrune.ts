@@ -97,6 +97,7 @@ export const PRUNE_RULES: readonly PruneRule[] = [
     'public-alliance-corporations',
     'public-employment',
     'station',
+    'moon',
     'universeType',
     'type-volume',
     'corp-name',

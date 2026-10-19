@@ -152,7 +152,8 @@ function useComparedHistories(typeId: number, regionIds: readonly number[]) {
  * The daily open buy/sell series for the primary region and each compared one,
  * one read per region and item, started when the panel mounts (so only while
  * the history is open). `loadMarketOpenPrices` never throws; a region without
- * a series maps to `null`, and one still being read is absent from the map.
+ * a series maps to `null` (and is listed in `missing`), and one still being
+ * read is in neither.
  * The chart draws its average line for either until the series lands.
  * A read that came back `null` is not retried for the life of the panel (and
  * the loader holds a good answer for an hour, never a failure): a failed read
@@ -172,12 +173,16 @@ function useOpenSeries(typeId: number, regionIds: readonly number[]) {
     }
   }, [typeId, regionIds]);
   return useMemo(() => {
-    const result = new Map<number, OpenPriceSeries>();
+    const series = new Map<number, OpenPriceSeries>();
+    const missing = new Set<number>();
     for (const regionId of regionIds) {
-      const series = byKey.get(`${regionId}:${typeId}`);
-      if (series) result.set(regionId, series);
+      const key = `${regionId}:${typeId}`;
+      if (!byKey.has(key)) continue;
+      const stored = byKey.get(key);
+      if (stored) series.set(regionId, stored);
+      else missing.add(regionId);
     }
-    return result;
+    return { series, missing };
   }, [byKey, regionIds, typeId]);
 }
 
@@ -214,7 +219,7 @@ export function PriceHistoryPanel({
     points && points.length > 0 ? compareIds : NO_REGIONS
   );
   const openRegionIds = useMemo(() => [regionId, ...compareIds], [regionId, compareIds]);
-  const openSeries = useOpenSeries(typeId, openRegionIds);
+  const { series: openSeries, missing: openMissing } = useOpenSeries(typeId, openRegionIds);
   // The window a trader reads in is a habit, not a property of the item, and
   // this panel remounts per item — so it comes from disk. Ungated on
   // `hydrated`, and hydrated above the early returns below so a loading or
@@ -303,6 +308,7 @@ export function PriceHistoryPanel({
         compareIds={compareIds}
         comparedHistories={comparedHistories}
         openSeries={openSeries}
+        openMissing={openMissing}
       />
     </>
   );
@@ -343,6 +349,8 @@ interface RangedHistoryProps {
   comparedHistories: readonly RegionHistoryState[];
   /** Open buy/sell series by region id, for the regions that have one. */
   openSeries: ReadonlyMap<number, OpenPriceSeries>;
+  /** Regions whose open read came back with no series at all. */
+  openMissing: ReadonlySet<number>;
 }
 
 /** Range control + hi/lo/median summary, both derived from the already-fetched points — neither needs the lazy chart loaded. */
@@ -357,6 +365,7 @@ function RangedHistory({
   compareIds,
   comparedHistories,
   openSeries,
+  openMissing,
 }: RangedHistoryProps) {
   const { t } = useTranslation();
   const series = usePriceHistorySeries((state) => state.value);
@@ -500,27 +509,28 @@ function RangedHistory({
               className="w-full sm:w-auto"
             />
           )}
-          {openPrices.length > 0 && (
-            <Select
-              value={series}
-              onValueChange={(value) => void setSeries(value as PriceSeriesChoice)}
+          {/* Always offered, open prices or not: outside the trade hubs the
+              legend says why Buy / Sell draws an average, and Average puts
+              every region on the same line for a fair comparison. */}
+          <Select
+            value={series}
+            onValueChange={(value) => void setSeries(value as PriceSeriesChoice)}
+          >
+            <SelectTrigger
+              size="md"
+              aria-label={t('market.priceHistory.series')}
+              className="w-full sm:w-32"
             >
-              <SelectTrigger
-                size="md"
-                aria-label={t('market.priceHistory.series')}
-                className="w-full sm:w-32"
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {PRICE_SERIES_CHOICES.map((choice) => (
-                  <SelectItem key={choice} value={choice}>
-                    {seriesChoiceLabel(t, choice)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {PRICE_SERIES_CHOICES.map((choice) => (
+                <SelectItem key={choice} value={choice}>
+                  {seriesChoiceLabel(t, choice)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Select
             value={range}
             onValueChange={(value) => onRangeChange(value as PriceHistoryRange)}
@@ -560,6 +570,7 @@ function RangedHistory({
           primaryRegionId={primaryRegionId}
           openPrices={openPrices}
           series={series}
+          openMissing={openMissing}
         />
       </Suspense>
     </div>
