@@ -31,3 +31,18 @@ export function applyImplantBasis(
       : {}),
   };
 }
+
+/**
+ * The set a planner starts from: on "My clone" with no set of the Fitting's
+ * own, the clone's implants (saving the first change puts the page on the
+ * Fitting's set); otherwise none — the Fitting's own set is the start.
+ */
+export function cloneSeedSet(
+  basis: ImplantBasis,
+  implantSet: FittingImplantSet | undefined,
+  cloneImplants: readonly number[] | undefined
+): FittingImplantSet | undefined {
+  return basis === 'clone' && implantSet === undefined && cloneImplants && cloneImplants.length > 0
+    ? { implants: [...cloneImplants], boosters: [] }
+    : undefined;
+}

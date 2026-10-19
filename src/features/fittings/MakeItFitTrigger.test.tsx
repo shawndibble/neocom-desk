@@ -6,18 +6,18 @@ import { MakeItFitContext } from './makeItFitContext';
 
 describe('MakeItFitTrigger', () => {
   it('renders nothing outside the editor', () => {
-    render(<MakeItFitTrigger />);
+    render(<MakeItFitTrigger resource="cpu" />);
     expect(screen.queryByRole('button')).toBeNull();
   });
 
-  it('opens the dialog from the editor', () => {
+  it('names the budget it fixes and opens the dialog for it', () => {
     const open = vi.fn();
     render(
       <MakeItFitContext.Provider value={open}>
-        <MakeItFitTrigger />
+        <MakeItFitTrigger resource="powergrid" />
       </MakeItFitContext.Provider>
     );
-    fireEvent.click(screen.getByRole('button', { name: /make it fit/i }));
-    expect(open).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole('button', { name: 'Fix powergrid' }));
+    expect(open).toHaveBeenCalledWith('powergrid');
   });
 });

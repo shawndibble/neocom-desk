@@ -49,7 +49,7 @@ import {
   swapModuleType,
 } from '@/engine/fittings/fittingEdit';
 import { FittingAddPanel } from '@/features/fittings/FittingAddPanel';
-import { MakeItFitContext } from '@/features/fittings/makeItFitContext';
+import { MakeItFitContext, type FitResource } from '@/features/fittings/makeItFitContext';
 import { MakeItFitDialog } from '@/features/fittings/MakeItFitDialog';
 import { CargoQuantityDialog } from '@/features/fittings/CargoQuantityDialog';
 import { FittingItemActionsProvider } from '@/features/fittings/fittingItemActions';
@@ -159,11 +159,12 @@ function FittingsPage() {
   // What the last add did, read out by the sr-only status (the browser stays open beside the Ring).
   const [added, setAdded] = useState({ message: '', n: 0 });
   const setAddedMessage = (message: string) => setAdded((a) => ({ message, n: a.n + 1 }));
-  const [makeItFitOpen, setMakeItFitOpen] = useState(false);
-  // What the last applied Make it fit swap changed, for its confirmation toast.
-  const [swapped, setSwapped] = useState<string | null>(null);
-  useTimedToast(swapped, () => setSwapped(null));
-  const openMakeItFit = useCallback(() => setMakeItFitOpen(true), []);
+  // Which budget's "Fix" link opened Make it fit; null while it is closed.
+  const [makeItFitFor, setMakeItFitFor] = useState<FitResource | null>(null);
+  // What the last applied Make it fit option changed, for its confirmation toast.
+  const [fitApplied, setFitApplied] = useState<string | null>(null);
+  useTimedToast(fitApplied, () => setFitApplied(null));
+  const openMakeItFit = useCallback((resource: FitResource) => setMakeItFitFor(resource), []);
   const storedView = useFittingViewPreference((state) => state.value);
   const viewHydrated = useHydratedStore(useFittingViewPreference);
   const setView = useFittingViewPreference((state) => state.setValue);
@@ -593,78 +594,83 @@ function FittingsPage() {
   const showMissingSkills = gaps !== null && gaps.missing.length > 0 && activeCharacterId !== null;
   const showSkillsUnknown = gaps?.unknown === true && activeCharacterId !== null;
 
+  // Under Make it fit's provider too: the Fitting section's figures carry their "Fix" links.
   const statsSections = (
-    <FittingStatsSections
-      stats={stats}
-      statsProgress={workspace.statsProgress}
-      statsError={workspace.statsError}
-      statsErrorReason={workspace.statsErrorReason}
-      skillsKnown={workspace.skillsKnown}
-      onRetry={workspace.retry}
-      price={workspace.price}
-      typeName={(typeId) => catalogueTypeName(catalogue, typeId)}
-      damageProfiles={workspace.damageProfiles}
-      targetProfiles={targetProfiles}
-      overlay={overlay}
-      showDrones={dronesShown}
-      fitting={fitting}
-      moduleResults={moduleResults}
-      whatToTrain={
-        <FittingWhatToTrainPanel
-          evaluator={workspace.skillGains}
-          characterId={activeCharacterId}
-          fittingName={fitting.name}
-          catalogue={catalogue}
-        />
-      }
-      yourCharacters={yourCharacters.length > 1 ? yourCharacters : undefined}
-      implants={
-        <>
-          <ImplantSetControl
-            basis={workspace.implantBasis}
-            canUseCloneBasis={workspace.canUseCloneBasis}
-            implantSet={fitting.implantSet}
-            onImplantSetChange={workspace.setImplantSet}
-            fitting={fitting}
-            profile={workspace.profile}
+    <MakeItFitContext.Provider value={openMakeItFit}>
+      <FittingStatsSections
+        stats={stats}
+        statsProgress={workspace.statsProgress}
+        statsError={workspace.statsError}
+        statsErrorReason={workspace.statsErrorReason}
+        skillsKnown={workspace.skillsKnown}
+        onRetry={workspace.retry}
+        price={workspace.price}
+        typeName={(typeId) => catalogueTypeName(catalogue, typeId)}
+        damageProfiles={workspace.damageProfiles}
+        targetProfiles={targetProfiles}
+        overlay={overlay}
+        showDrones={dronesShown}
+        fitting={fitting}
+        moduleResults={moduleResults}
+        whatToTrain={
+          <FittingWhatToTrainPanel
+            evaluator={workspace.skillGains}
+            characterId={activeCharacterId}
+            fittingName={fitting.name}
+            catalogue={catalogue}
           />
-          {workspace.implantBasis === 'clone' && workspace.canUseCloneBasis && (
-            // Across both columns of the stats column's controls grid.
-            <div className="col-span-2">
-              <ImplantsAssumedNote hint={t('fittings.implants.assumesNoImplantsHint')} />
-            </div>
-          )}
-        </>
-      }
-      abyssal={{
-        hullGroupId: catalogue?.types[String(fitting.shipTypeId)]?.groupID,
-        compare: workspace.compareWeather,
-      }}
-      statsWeatherTypeId={workspace.statsWeatherTypeId}
-      tacticalMode={hasModes ? <TacticalModePicker fitting={fitting} onChange={edit} /> : undefined}
-      pilot={
-        activeCharacterId === null
-          ? undefined
-          : {
-              characterName: characterName ?? null,
-              missingSkills: gaps?.missing.length,
-              skillsUnknown: gaps?.unknown === true,
-              notes:
-                showMissingSkills || showSkillsUnknown ? (
-                  <>
-                    {showMissingSkills && (
-                      <MissingSkillsChip
-                        entries={gaps.missing}
-                        characterId={activeCharacterId}
-                        fittingName={fitting.name}
-                      />
-                    )}
-                    {showSkillsUnknown && <SkillsUnknownNote />}
-                  </>
-                ) : undefined,
-            }
-      }
-    />
+        }
+        yourCharacters={yourCharacters.length > 1 ? yourCharacters : undefined}
+        implants={
+          <>
+            <ImplantSetControl
+              basis={workspace.implantBasis}
+              canUseCloneBasis={workspace.canUseCloneBasis}
+              implantSet={fitting.implantSet}
+              onImplantSetChange={workspace.setImplantSet}
+              fitting={fitting}
+              profile={workspace.profile}
+            />
+            {workspace.implantBasis === 'clone' && workspace.canUseCloneBasis && (
+              // Across both columns of the stats column's controls grid.
+              <div className="col-span-2">
+                <ImplantsAssumedNote hint={t('fittings.implants.assumesNoImplantsHint')} />
+              </div>
+            )}
+          </>
+        }
+        abyssal={{
+          hullGroupId: catalogue?.types[String(fitting.shipTypeId)]?.groupID,
+          compare: workspace.compareWeather,
+        }}
+        statsWeatherTypeId={workspace.statsWeatherTypeId}
+        tacticalMode={
+          hasModes ? <TacticalModePicker fitting={fitting} onChange={edit} /> : undefined
+        }
+        pilot={
+          activeCharacterId === null
+            ? undefined
+            : {
+                characterName: characterName ?? null,
+                missingSkills: gaps?.missing.length,
+                skillsUnknown: gaps?.unknown === true,
+                notes:
+                  showMissingSkills || showSkillsUnknown ? (
+                    <>
+                      {showMissingSkills && (
+                        <MissingSkillsChip
+                          entries={gaps.missing}
+                          characterId={activeCharacterId}
+                          fittingName={fitting.name}
+                        />
+                      )}
+                      {showSkillsUnknown && <SkillsUnknownNote />}
+                    </>
+                  ) : undefined,
+              }
+        }
+      />
+    </MakeItFitContext.Provider>
   );
 
   // Under the name: the hull, unless the Fitting is simply named after it,
@@ -870,9 +876,27 @@ function FittingsPage() {
             ))}
 
           <MakeItFitDialog
-            open={makeItFitOpen}
-            onClose={() => setMakeItFitOpen(false)}
+            open={makeItFitFor !== null}
+            resource={makeItFitFor}
+            onClose={() => setMakeItFitFor(null)}
             variants={workspace.variants}
+            skillGains={workspace.skillGains}
+            characterId={activeCharacterId}
+            fittingName={fitting.name}
+            implants={
+              workspace.profile
+                ? {
+                    fitting,
+                    profile: workspace.profile,
+                    basis: workspace.implantBasis,
+                    onChange: workspace.setImplantSet,
+                  }
+                : null
+            }
+            onImplantsApplied={(names) => {
+              setMakeItFitFor(null);
+              setFitApplied(t('fittings.makeItFit.implantsApplied', { names }));
+            }}
             catalogue={catalogue}
             placement={isPhone ? 'sheet' : 'center'}
             onOpenList={
@@ -880,7 +904,7 @@ function FittingsPage() {
                 ? undefined
                 : () => {
                     void setView('list');
-                    setMakeItFitOpen(false);
+                    setMakeItFitFor(null);
                   }
             }
             onApply={(option) => {
@@ -890,23 +914,23 @@ function FittingsPage() {
                   f
                 )
               );
-              setMakeItFitOpen(false);
-              setSwapped(
-                option.swaps
-                  .map((swap) =>
-                    t('fittings.makeItFit.swap', {
-                      from: catalogueTypeName(catalogue, swap.fromTypeId),
-                      to: catalogueTypeName(catalogue, swap.toTypeId),
-                    })
-                  )
-                  .join('; ')
+              setMakeItFitFor(null);
+              setFitApplied(
+                t('fittings.makeItFit.applied', {
+                  swap: option.swaps
+                    .map((swap) =>
+                      t('fittings.makeItFit.swap', {
+                        from: catalogueTypeName(catalogue, swap.fromTypeId),
+                        to: catalogueTypeName(catalogue, swap.toTypeId),
+                      })
+                    )
+                    .join('; '),
+                })
               );
             }}
           />
           {/* No Undo here: the editor has no in-app undo, only the browser's Back (one swap is one history entry). */}
-          {swapped !== null && (
-            <Toast message={t('fittings.makeItFit.applied', { swap: swapped })} />
-          )}
+          {fitApplied !== null && <Toast message={fitApplied} />}
           <Modal
             open={saveAsNewOpen}
             onClose={() => setSaveAsNewOpen(false)}
