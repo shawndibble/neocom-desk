@@ -1,3 +1,4 @@
+import { romanLevel } from '@/engine/projection';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Caret, FilterChip, LiveStatus, SearchInput } from '@/components/ui';
@@ -32,7 +33,6 @@ function isVerticallyInViewport(el: Element): boolean {
 /** How long the visible confirmation stays up before fading back to sr-only. */
 const ANNOUNCEMENT_VISIBLE_MS = 5000;
 
-const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
 const MAX_RESULTS = 20;
 interface SkillPickerProps {
   skills: readonly SkillType[];
@@ -264,8 +264,8 @@ export function SkillPicker({
               {selected === skill.typeID && (
                 <div className="space-y-2 px-2 pb-2">
                   <div className="flex flex-wrap gap-1">
-                    {ROMAN.map((roman, i) => {
-                      const level = i + 1;
+                    {[1, 2, 3, 4, 5].map((level) => {
+                      const roman = romanLevel(level);
                       const trainedLevel = trainedSkills.get(skill.typeID)?.level ?? 0;
                       // The highest of this skill's rows, not the first one:
                       // a plan holds one entry per level, so `find` reports

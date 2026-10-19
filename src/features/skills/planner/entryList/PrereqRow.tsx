@@ -1,3 +1,4 @@
+import { romanLevel } from '@/engine/projection';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import * as Icon from '@/components/ui/icons';
@@ -10,7 +11,7 @@ import type { MergedRow } from '../queueRows';
 import { formatLevelLabel } from '../rowAnnouncer';
 import { AttributePairBadge, MetaValue, TimeCell } from './cells';
 import { AlphaCapMark, BoosterMark } from './marks';
-import { GRIP_BUTTON, ICON_BUTTON, NAME_CELL, ROMAN, useRowSortable } from './rowChrome';
+import { GRIP_BUTTON, ICON_BUTTON, NAME_CELL, useRowSortable } from './rowChrome';
 
 interface PrereqRowProps {
   row: Extract<MergedRow, { kind: 'prereq' }>;
@@ -87,7 +88,7 @@ export const PrereqRow = memo(function PrereqRow({
         {name}
       </SkillLink>{' '}
       <span className="shrink-0">
-        <span>{ROMAN[row.step.level - 1]}</span>
+        <span>{romanLevel(row.step.level)}</span>
         <span className="ml-2 text-[0.625rem] uppercase">{t('plans.prereq')}</span>
         {boosted && <BoosterMark />}
         {alphaCapped && <AlphaCapMark />}
