@@ -40,11 +40,10 @@ no app server. Two kinds of data:
   (`{ typeId, dates, stations: { <stationId>: { buy, sell } } }`; objects from
   before #4279 may still carry region-wide `regions` until the backfill re-run), up
   to 400 days, public static file with no Firebase involved (`functions/src/marketOpenPrices.ts` holds the logic,
-  `marketOrdersArchive.ts` the streaming fetch). The mining types' share of the
-  same station fold is merged into
-  `mining-prices/<hubId>/<YYYY-MM>.json` (`functions/src/miningHubPrices.ts`),
-  which the mining pricing reads (`features/market/hubSnapshot.ts`); it replaced
-  the retired `captureMiningPriceSnapshot` job and its Firestore `marketHistory`.
+  `marketOrdersArchive.ts` the streaming fetch). The mining pricing reads the
+  same objects, one per type it prices (`features/market/hubSnapshot.ts`); they
+  replaced the retired `captureMiningPriceSnapshot` job, its Firestore
+  `marketHistory` and the `mining-prices/` month objects.
   The deployment now has ten scheduled functions, i.e. ten Cloud Scheduler jobs.
 
 Auth is browser-only OAuth2 PKCE against `login.eveonline.com`; refresh

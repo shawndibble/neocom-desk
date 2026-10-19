@@ -1,7 +1,7 @@
 /**
  * Trade-hub price lookups for the Moon Mining Tax ledger (issue #523), via
  * Fuzzwork for today's live book (ADR 0002), the server's daily hub-station
- * mining prices in R2 (`hubSnapshot.ts`) for a saved or historical day, and the app's per-browser Dexie
+ * Open Prices in R2 (`hubSnapshot.ts`) for a saved or historical day, and the app's per-browser Dexie
  * snapshot as a further Jita-only fallback (`priceBasis.ts`'s
  * `resolveTaxUnitPrice` — issue #1279 follow-up, "Mining Tax: price at the
  * entry's mined date, not today's live price").
@@ -110,7 +110,7 @@ async function resolvePricesForHubAcrossDates(
   const end = sortedDates[sortedDates.length - 1];
 
   const [{ saved: serverSaved, historical }, live, dexieSaved] = await Promise.all([
-    loadHubSnapshotRange(start, end, hub),
+    loadHubSnapshotRange(start, end, pricingTypeIds, hub),
     getHubPricesWithStatus(hub, pricingTypeIds),
     // Dexie only ever holds Jita — no equivalent for the other 4 hubs.
     hub.id === DEFAULT_TRADE_HUB.id
