@@ -56,6 +56,7 @@ import { loadSkills } from '@/sde/loadSde';
 import { useDogmaEngine } from './fittingContext';
 import { computeStatsOffThread, skillSourcesOffThread } from './evaluationService';
 import { useRetryOnReconnect } from '@/lib/useRetryOnReconnect';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 
 /**
@@ -399,7 +400,6 @@ export function useFittingEvaluation({
   const engine = useDogmaEngine();
   // A failure while offline mends itself when the connection returns.
   useRetryOnReconnect(statsError, retry);
-  const [price, setPrice] = useState<Appraisal | null>(null);
 
   // A different hull (or none) is a different Fitting: drop the old numbers at
   // once rather than show them under the new one's header — a swap from one
@@ -411,7 +411,6 @@ export function useFittingEvaluation({
     // eslint-disable-next-line react-hooks/set-state-in-effect -- reset for a new hull, not a render-time derivation
     setStats(null);
     setStatsProgress(null);
-    setPrice(null);
   }, [hullTypeId]);
 
   useEffect(() => {
@@ -447,18 +446,14 @@ export function useFittingEvaluation({
 
   // The clone's implants are already bought: priced like the multibuy list, without them.
   const cloneImplants = profile?.implantTypeIds;
-  useEffect(() => {
-    let cancelled = false;
-    if (fitting === null || !hubHydrated) return;
-    void (async () => {
-      const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
-      const result = await loadFittingPrice(fitting, hub, cloneImplants);
-      if (!cancelled) setPrice(result);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [fitting, hubId, hubHydrated, cloneImplants]);
+  // Keyed by hull: a different hull drops the old price, an edit refreshes behind it.
+  const loadPrice = useCallback(async () => {
+    const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
+    return loadFittingPrice(fitting!, hub, cloneImplants);
+  }, [fitting, hubId, cloneImplants]);
+  const price: Appraisal | null =
+    useKeyedLoad(fitting === null ? null : String(fitting.shipTypeId), loadPrice, !hubHydrated)
+      .data ?? null;
 
   // One baseline for Variations and "What to train" alike.
   const evaluators = useMemo(() => {
