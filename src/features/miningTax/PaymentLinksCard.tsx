@@ -1,3 +1,5 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { cx } from '@/lib/cx';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
@@ -63,7 +65,7 @@ export function PaymentLinksCard({
   return (
     <div className="space-y-1 rounded-xs border border-line bg-panel-2 p-2">
       <div className="flex items-center justify-between gap-2">
-        <p className="min-w-0 truncate text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+        <p className={cx(eyebrowClassName, 'min-w-0 truncate')}>
           {t('miningTax.paymentCardTitle')}
         </p>
         {onLinkTransaction && (

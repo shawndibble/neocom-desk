@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
@@ -30,7 +31,7 @@ import { eveClock, hoursLabel, schematicOutputTypeId } from './coloniesFormat';
 import { quickWinLine } from './coloniesText';
 import { Sentence } from '../sentence';
 
-const MICRO = 'text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
+const MICRO = eyebrowClassName;
 const DAY_MS = 86_400_000;
 
 /** Units a day a reinstall would recover right now, from `engine/pi/extraction`'s own curve. */

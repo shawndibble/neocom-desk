@@ -1,3 +1,4 @@
+import { useCharacters } from '@/features/character/useCharacters';
 /**
  * Set waypoints in game (issue #2479): the button at the right end of Route
  * Safety's facts line, which sends the trip's Stops to a Character's EVE
@@ -13,7 +14,6 @@
  */
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useLiveQuery } from 'dexie-react-hooks';
 import { GrantMissingLink } from '@/app/GrantMissingLink';
 import { GrantBanner } from '@/app/GrantNote';
 import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
@@ -26,7 +26,6 @@ import {
   SelectValue,
   Tooltip,
 } from '@/components/ui';
-import { db } from '@/db';
 import { permissionsForEndpoints, type EsiEndpointId } from '@/esi/registry';
 import { waypointSequence } from '@/engine/route/waypoints';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -50,7 +49,7 @@ export function SetWaypoints({
   children: ReactNode;
 }) {
   const { t } = useTranslation();
-  const characters = useLiveQuery(() => db.characters.toArray(), [], []);
+  const characters = useCharacters();
   const activeId = useActiveCharacter((s) => (s.hydrated ? s.activeCharacterId : null));
   const [chosenId, setChosenId] = useState<number | null>(null);
   const characterId =

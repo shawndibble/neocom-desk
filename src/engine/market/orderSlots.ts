@@ -23,14 +23,7 @@ export const ORDER_SLOT_SKILLS: readonly { typeID: number; perLevel: number }[] 
   { typeID: 18580, perLevel: 32 }, // Tycoon
 ];
 
-/** The four skill IDs alone, in the same order — for callers that only need identity. */
-export const ORDER_SLOT_SKILL_TYPE_IDS: readonly number[] = ORDER_SLOT_SKILLS.map((s) => s.typeID);
-
 const MAX_SKILL_LEVEL = 5;
-
-/** All four at V: 5 + 20 + 40 + 80 + 160. */
-export const MAX_ORDER_SLOTS =
-  BASE_ORDER_SLOTS + ORDER_SLOT_SKILLS.reduce((sum, s) => sum + s.perLevel * MAX_SKILL_LEVEL, 0);
 
 /**
  * The character's open-order ceiling. A skill absent from `trained` counts as

@@ -65,12 +65,12 @@ describe('loadPopularFits', () => {
 
     resetPopularFitsCache();
     getKillmailMock.mockRejectedValue(new Error('502'));
-    expect(await loadPopularFits(626, 0)).toEqual({ ok: false });
+    expect(await loadPopularFits(626, 0)).toEqual({ ok: false, reason: 'http' });
   });
 
   it('reports a zKillboard failure, and does not cache it', async () => {
-    fetchHullLossesMock.mockResolvedValue({ ok: false, losses: [] });
-    expect(await loadPopularFits(626, 0)).toEqual({ ok: false });
+    fetchHullLossesMock.mockResolvedValue({ ok: false, losses: [], reason: 'rate-limited' });
+    expect(await loadPopularFits(626, 0)).toEqual({ ok: false, reason: 'rate-limited' });
     fetchHullLossesMock.mockResolvedValue({ ok: true, losses: [] });
     expect(await loadPopularFits(626, 1)).toEqual({ ok: true, fits: [] });
   });

@@ -1,3 +1,4 @@
+import { idSetKey } from '@/lib/idSetKey';
 /**
  * The Goal Planner's URL state: `?goals=typeId:perDay,...` and the colonies
  * the pilot switched off (`?off=planetId,...`).
@@ -74,7 +75,6 @@ export function idListParam(): UrlParamCodec<number[]> {
       }
       return [...ids].sort((a, b) => a - b);
     },
-    serialize: (ids) =>
-      ids.length === 0 ? null : [...new Set(ids)].sort((a, b) => a - b).join(','),
+    serialize: (ids) => (ids.length === 0 ? null : idSetKey(ids)),
   };
 }

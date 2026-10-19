@@ -42,7 +42,6 @@ import { useDamageProfiles, type DamageProfiles } from './damageProfiles';
 import {
   computeFittingStats,
   explainModule,
-  fittingSkillSources,
   type DogmaAssetProgress,
   type DogmaEngine,
   type StatsOptions,
@@ -55,7 +54,9 @@ import { raisedSkillLevels } from '@/engine/fittings/moduleUpgrades';
 import type { PlanEntry } from '@/engine/types';
 import { loadSkills } from '@/sde/loadSde';
 import { useDogmaEngine } from './fittingContext';
+import { computeStatsOffThread, skillSourcesOffThread } from './evaluationService';
 import { onReconnect } from '@/stores/network';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 /**
  * Changes to the open Fitting (Variations' swap candidates), worked out
@@ -70,8 +71,15 @@ export interface VariantEvaluator {
   profile: PilotProfile;
   /** The ready engine, for the candidates' synchronous fit checks. */
   engine: DogmaEngine;
-  /** A variant's stats beside the open Fitting's own, both without overheat. */
-  compare: (variant: Fitting) => Promise<{ before: FittingStats; after: FittingStats }>;
+  /**
+   * A variant's stats beside the open Fitting's own, both without overheat.
+   * Worked out off the main thread; `signal` drops the variant's own
+   * calculation if the caller moves on.
+   */
+  compare: (
+    variant: Fitting,
+    signal?: AbortSignal
+  ) => Promise<{ before: FittingStats; after: FittingStats }>;
 }
 
 /**
@@ -86,10 +94,14 @@ export interface SkillGainEvaluator {
   engine: DogmaEngine;
   /** Every skill that modifies anything on the Fitting, found with every skill at V. */
   skillSources: () => Promise<number[]>;
-  /** The Fitting's stats with `skillTypeId` at `level`, beside its own, both without overheat. */
+  /**
+   * The Fitting's stats with `skillTypeId` at `level`, beside its own, both
+   * without overheat. `signal` drops the calculation if the caller moves on.
+   */
   compare: (
     skillTypeId: number,
-    level: number
+    level: number,
+    signal?: AbortSignal
   ) => Promise<{ before: FittingStats; after: FittingStats }>;
   /** The open Fitting — what a module upgrade swaps modules on. */
   fitting: Fitting;
@@ -194,13 +206,38 @@ function statsUnder(
   );
 }
 
+/**
+ * `statsUnder` off the main thread (`evaluationService`): for every
+ * evaluation that comes in numbers — a Variations sibling, a skill level, a
+ * Compare row — rather than the open Fitting's own stats, which the page
+ * works out itself so it can report the engine's download progress.
+ */
+function offThreadStatsUnder(
+  fitting: Fitting,
+  basis: EvaluationBasis,
+  extra: { overheated?: boolean; signal?: AbortSignal } = {}
+): Promise<FittingStats> {
+  return underBasis(basis, (pilot, options) =>
+    computeStatsOffThread(
+      fitting,
+      pilot,
+      basis.damageProfile,
+      {
+        ...(extra.overheated === undefined ? {} : { overheated: extra.overheated }),
+        ...options,
+      },
+      extra.signal
+    )
+  );
+}
+
 /** `fitting`'s own stats without overheat, worked out once on first ask and shared by every compare. */
 function sharedBaseline(fitting: Fitting, basis: EvaluationBasis): () => Promise<FittingStats> {
   // Dropped on failure so a transient error doesn't wedge every later compare.
   let baseline: Promise<FittingStats> | null = null;
   return () => {
     if (baseline === null) {
-      const pending = statsUnder(fitting, basis, { overheated: false });
+      const pending = offThreadStatsUnder(fitting, basis, { overheated: false });
       baseline = pending;
       pending.catch(() => {
         if (baseline === pending) baseline = null;
@@ -220,10 +257,10 @@ function variantEvaluator(
     fitting,
     profile: basis.pilot,
     engine,
-    async compare(variant) {
+    async compare(variant, signal) {
       const [before, after] = await Promise.all([
         baseline(),
-        statsUnder(variant, basis, { overheated: false }),
+        offThreadStatsUnder(variant, basis, { overheated: false, ...(signal ? { signal } : {}) }),
       ]);
       return { before, after };
     },
@@ -247,7 +284,7 @@ function skillGainEvaluator(
         ...basis.pilot,
         skillLevels: allVSkillLevels(all.map((skill) => skill.typeID)),
       };
-      return fittingSkillSources(
+      return skillSourcesOffThread(
         fitting,
         pilot,
         basis.damageProfile,
@@ -264,7 +301,7 @@ function skillGainEvaluator(
       );
       const [before, after] = await Promise.all([
         baseline(),
-        statsUnder(
+        offThreadStatsUnder(
           variant,
           { ...basis, conditions: { ...basis.conditions, skills } },
           { overheated: false }
@@ -272,7 +309,7 @@ function skillGainEvaluator(
       ]);
       return { before, after };
     },
-    async compare(skillTypeId, level) {
+    async compare(skillTypeId, level, signal) {
       const skills = withSkillLevel(
         basis.conditions.skills ?? NO_SKILL_OVERRIDES,
         skillTypeId,
@@ -280,10 +317,10 @@ function skillGainEvaluator(
       );
       const [before, after] = await Promise.all([
         baseline(),
-        statsUnder(
+        offThreadStatsUnder(
           fitting,
           { ...basis, conditions: { ...basis.conditions, skills } },
-          { overheated: false }
+          { overheated: false, ...(signal ? { signal } : {}) }
         ),
       ]);
       return { before, after };
@@ -304,7 +341,7 @@ export function evaluateFitting(
   conditions: StatsConditions
 ): Promise<FittingStats> {
   const pilot = applyImplantBasis(profile, fitting.implantSet, defaultImplantBasis(fitting));
-  return statsUnder(fitting, {
+  return offThreadStatsUnder(fitting, {
     pilot,
     conditions,
     ...(damageProfile === undefined ? {} : { damageProfile }),
@@ -325,7 +362,7 @@ export function evaluateImplantSet(
   set: FittingImplantSet
 ): Promise<FittingStats> {
   const pilot = applyImplantBasis(profile, set, 'fitting');
-  return statsUnder(
+  return offThreadStatsUnder(
     fitting,
     { pilot, conditions, ...(damageProfile === undefined ? {} : { damageProfile }) },
     { overheated: false }
@@ -406,11 +443,7 @@ export function useFittingEvaluation({
 
   // Priced at the pilot's Trade Hub (Settings, or the Price section's select).
   const hubId = useMarketHub((state) => state.value);
-  const hubHydrated = useMarketHub((state) => state.hydrated);
-  const hydrateHub = useMarketHub((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateHub();
-  }, [hydrateHub]);
+  const hubHydrated = useHydratedStore(useMarketHub);
 
   // The clone's implants are already bought: priced like the multibuy list, without them.
   const cloneImplants = profile?.implantTypeIds;
@@ -443,7 +476,7 @@ export function useFittingEvaluation({
     if (fitting === null || pilot === null || damageProfile === null) return null;
     return async (weatherTypeId: number) => {
       const under = (weather: number | null) =>
-        statsUnder(
+        offThreadStatsUnder(
           fitting,
           { pilot, damageProfile, conditions: { ...conditions, weatherTypeId: weather } },
           { overheated: false }

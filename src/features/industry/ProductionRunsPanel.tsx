@@ -1,6 +1,6 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type ProductionRunRecord } from '@/db';
 import { removeProductionOrderWatch, removeProductionSaleLink, scheduleSync } from '@/sync';
 import {
@@ -36,6 +36,7 @@ import { SaleLinkingModals } from './SaleLinkingControls';
 import { RunLossModals } from './RunLossModals';
 import { useRunLoss } from './useRunLoss';
 import { useSaleLinking } from './useSaleLinking';
+import { useProductionLedger } from './useProductionLedger';
 import { formatIsk } from '@/lib/isk';
 import { unmaskNumber } from '@/lib/numberMask';
 import { useTimeZone } from '@/lib/timeFormat';
@@ -125,32 +126,19 @@ export function ProductionRunsPanel({
   const requestedOpen = logRequest > dismissedLogRequest && productTypeID !== null;
   const loggingModalOpen = loggingOpen || requestedOpen;
 
-  const runs =
-    useLiveQuery(
-      () => db.productionRuns.where('buildPlanId').equals(buildPlanId).toArray(),
-      [buildPlanId]
-    ) ?? [];
-  const saleLinks =
-    useLiveQuery(
-      () => db.productionSaleLinks.where('characterId').equals(characterId).toArray(),
-      [characterId]
-    ) ?? [];
-  const orderWatches =
-    useLiveQuery(
-      () => db.productionOrderWatches.where('characterId').equals(characterId).toArray(),
-      [characterId]
-    ) ?? [];
-  const losses =
-    useLiveQuery(
-      () => db.productionLosses.where('characterId').equals(characterId).toArray(),
-      [characterId]
-    ) ?? [];
+  const { runs, saleLinks, orderWatches, losses } = useProductionLedger(characterId, {
+    byPlanId: buildPlanId,
+  });
 
   const sale = useSaleLinking(characterId, saleLinks, orderWatches);
   const runLoss = useRunLoss(characterId, losses);
 
-  const rows: ProductionRunSummary[] = runs.map((run) =>
-    summarizeProductionRun(run, saleLinks, orderWatches, skills, standing, losses)
+  const rows: ProductionRunSummary[] = useMemo(
+    () =>
+      runs.map((run) =>
+        summarizeProductionRun(run, saleLinks, orderWatches, skills, standing, losses)
+      ),
+    [runs, saleLinks, orderWatches, skills, standing, losses]
   );
 
   const editingRow = editingRunId ? rows.find((r) => r.run.id === editingRunId) : undefined;
@@ -333,9 +321,7 @@ export function ProductionRunsPanel({
             />
             {(editingRow.saleLinks.length > 0 || editingRow.orderWatches.length > 0) && (
               <div className="space-y-1 border-t border-line pt-3">
-                <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                  {t('industry.linkedSales')}
-                </p>
+                <p className={eyebrowClassName}>{t('industry.linkedSales')}</p>
                 <ul className="space-y-1">
                   {editingRow.saleLinks.map((link) => (
                     <li

@@ -106,25 +106,42 @@ function priceForMaxFilter(row: PublicContractOfferRow, plexPrice: number | null
   return plexPrice == null ? null : isk + row.requestedPlex * plexPrice;
 }
 
+/** One row against the filter; `filterContractOffers` and the worker's query share it. */
+export function offerPassesFilter(
+  row: PublicContractOfferRow,
+  filter: ContractOfferFilter
+): boolean {
+  if (filter.typeIds && !filter.typeIds.has(row.typeId)) return false;
+  if (filter.regionId != null && row.regionId !== filter.regionId) return false;
+  if (filter.minQuantity != null && row.quantity < filter.minQuantity) return false;
+  if (filter.saleKind != null && (row.isAuction ? 'auction' : 'exchange') !== filter.saleKind) {
+    return false;
+  }
+  if (filter.hideAuctions && row.isAuction) return false;
+  if (filter.hidePlexRequests && row.requestedPlex) return false;
+  if (filter.maxPrice != null) {
+    const price = priceForMaxFilter(row, filter.plexPrice ?? null);
+    if (price != null && price > filter.maxPrice) return false;
+  }
+  return true;
+}
+
 export function filterContractOffers(
   rows: readonly PublicContractOfferRow[],
   filter: ContractOfferFilter
 ): PublicContractOfferRow[] {
-  return rows.filter((row) => {
-    if (filter.typeIds && !filter.typeIds.has(row.typeId)) return false;
-    if (filter.regionId != null && row.regionId !== filter.regionId) return false;
-    if (filter.minQuantity != null && row.quantity < filter.minQuantity) return false;
-    if (filter.saleKind != null && (row.isAuction ? 'auction' : 'exchange') !== filter.saleKind) {
-      return false;
-    }
-    if (filter.hideAuctions && row.isAuction) return false;
-    if (filter.hidePlexRequests && row.requestedPlex) return false;
-    if (filter.maxPrice != null) {
-      const price = priceForMaxFilter(row, filter.plexPrice ?? null);
-      if (price != null && price > filter.maxPrice) return false;
-    }
-    return true;
-  });
+  return rows.filter((row) => offerPassesFilter(row, filter));
+}
+
+/**
+ * `offerAskingPrice`, except an unpriced (barter) row sorts last rather than
+ * at its literal 0 (issue #1080) — for the fixed, ascending "cheapest first"
+ * default view, a plain `.sort()` this `Infinity` sentinel is safe for.
+ * `DataTable`'s own reversible column sort must not use this: `Infinity`
+ * would sort *first* the moment a pilot flips the Price header to descending.
+ */
+export function sortableOfferPrice(row: PublicContractOfferRow, plexPrice: number | null): number {
+  return isUnpricedOffer(row, plexPrice) ? Infinity : offerAskingPrice(row, plexPrice);
 }
 
 export interface ContractTypeOption {
@@ -180,20 +197,27 @@ export function contractOfferStats(
   plexPrice: number | null = null
 ): Map<number, ContractOfferStats> {
   const stats = new Map<number, ContractOfferStats>();
-  for (const row of rows) {
-    const unpriced = isUnpricedOffer(row, plexPrice);
-    const price = offerAskingPrice(row, plexPrice);
-    const existing = stats.get(row.typeId);
-    if (!existing) {
-      stats.set(row.typeId, { offerCount: 1, cheapest: unpriced ? null : price });
-      continue;
-    }
-    existing.offerCount += 1;
-    if (!unpriced && (existing.cheapest === null || price < existing.cheapest)) {
-      existing.cheapest = price;
-    }
-  }
+  for (const row of rows) addToOfferStats(stats, row, plexPrice);
   return stats;
+}
+
+/** Folds one row into a per-type tally — the single step `contractOfferStats` and the worker's query share. */
+export function addToOfferStats(
+  stats: Map<number, ContractOfferStats>,
+  row: PublicContractOfferRow,
+  plexPrice: number | null
+): void {
+  const unpriced = isUnpricedOffer(row, plexPrice);
+  const price = offerAskingPrice(row, plexPrice);
+  const existing = stats.get(row.typeId);
+  if (!existing) {
+    stats.set(row.typeId, { offerCount: 1, cheapest: unpriced ? null : price });
+    return;
+  }
+  existing.offerCount += 1;
+  if (!unpriced && (existing.cheapest === null || price < existing.cheapest)) {
+    existing.cheapest = price;
+  }
 }
 
 /** The headline numbers once the search narrows to a single item type. */

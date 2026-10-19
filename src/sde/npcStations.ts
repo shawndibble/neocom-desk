@@ -28,8 +28,7 @@
  */
 import { loadNpcStations } from './loadMarketSde';
 import type { NpcStationEntry } from './marketTypes';
-
-let index: Promise<ReadonlyMap<number, NpcStationEntry> | null> | null = null;
+import { memoizeAsync } from '@/lib/memoizeAsync';
 
 /**
  * The snapshot keyed by station id, or `null` when it could not be read.
@@ -40,19 +39,14 @@ let index: Promise<ReadonlyMap<number, NpcStationEntry> | null> | null = null;
  * index would invite callers to do their own membership arithmetic on it —
  * which is precisely the three-valued decision this module exists to own.
  */
-function loadNpcStationsById(): Promise<ReadonlyMap<number, NpcStationEntry> | null> {
-  index ??= loadNpcStations()
-    .then((entries): ReadonlyMap<number, NpcStationEntry> => {
-      const map = new Map<number, NpcStationEntry>();
-      for (const entry of entries) map.set(entry.id, entry);
-      return map;
-    })
-    .catch(() => {
-      index = null;
-      return null;
-    });
-  return index;
-}
+const loadNpcStationsById = memoizeAsync(
+  async (): Promise<ReadonlyMap<number, NpcStationEntry>> => {
+    const map = new Map<number, NpcStationEntry>();
+    for (const entry of await loadNpcStations()) map.set(entry.id, entry);
+    return map;
+  },
+  { fallback: null }
+);
 
 /**
  * What the snapshot says about one location id:
@@ -77,5 +71,5 @@ export async function lookupNpcStation(
  * change inside a session.
  */
 export function clearNpcStationIndex(): void {
-  index = null;
+  loadNpcStationsById.reset();
 }

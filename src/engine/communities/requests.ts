@@ -13,10 +13,8 @@ import { DAY_MS } from '@/lib/age';
 
 /** Mirrors `functions/src/communityRequests.ts`, which enforces them. */
 export const MAX_LINES_PER_REQUEST = 50;
-export const MAX_OPEN_REQUESTS_PER_MEMBER = 10;
 export const MAX_LOCATION_LENGTH = 100;
 export const MAX_TERMS_LENGTH = 140;
-export const REQUEST_LIFETIME_DAYS = 30;
 /** Far above any real stack; the rules enforce the same cap on a Pledge. */
 export const MAX_PLEDGE_QUANTITY = 1_000_000_000_000;
 /** A Pledge with nothing delivered this long after it was last written greys out. */

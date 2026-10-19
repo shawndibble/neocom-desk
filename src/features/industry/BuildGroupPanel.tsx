@@ -1,3 +1,4 @@
+import { useCopyFeedback } from '@/lib/useCopyFeedback';
 /**
  * A **Build Group** opened as one thing: every member's materials merged and
  * its costs summed (issue #626, "Group Rollup" in GLOSSARY.md).
@@ -13,7 +14,7 @@
  * outlive their plans by design, so "what did this fit actually cost" is a
  * question this view cannot answer and must not appear to.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { DepthPrice } from '@/engine/industry/depthPrice';
 import { DepthPriceLine } from './DepthPriceLine';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
@@ -49,7 +50,7 @@ import { writeToClipboard } from '@/lib/clipboard';
 import { cx } from '@/lib/cx';
 import { formatDuration } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
-import { unmaskNumber } from '@/lib/numberMask';
+import { unmaskCount } from '@/lib/numberMask';
 import { getTradeHub } from '@/market/hubs';
 import type { PiData } from '@/sde/types';
 import { nameForType, volumeForType, type BlueprintCatalog } from './blueprintCatalog';
@@ -72,7 +73,7 @@ import {
 import { useOwnedStockBulk } from './useOwnedStockBulk';
 import { PlanScheduleLine } from './PlanScheduleLine';
 import { planJobNodes, usePlanSchedule } from './planJobSlots';
-import { hasShoppingList, shoppingListText } from './shoppingList';
+import { hasShoppingList, shoppingListText } from '@/engine/industry/shoppingList';
 import { useComparedBuildResults } from './useComparedBuildResults';
 import { useDetectedOwnedStock } from './useDetectedOwnedStock';
 import { RetargetGroupDialog, type RetargetTarget } from './RetargetGroupDialog';
@@ -83,12 +84,6 @@ import { useTableExport } from '@/components/ui/useTableExport';
 /** A merged materials row still open to buying, plus the buy-list's own
  * netted remainder — see the `buyRows`/`craftedTypeIds` split below. */
 type BuyMaterialRow = MaterialCostLine & { buyToShow: number };
-
-/** Whole-unit input parsing shared by every owned-quantity cell in this panel. */
-function parseOwnedCount(raw: string): number | undefined {
-  const value = unmaskNumber(raw);
-  return value === undefined ? undefined : Math.floor(value);
-}
 
 /** The whole-group copy control's key in `copyState`; no hub can collide with it. */
 const GROUP_COPY = 'group';
@@ -155,7 +150,10 @@ export function BuildGroupPanel({
   // Which list the outcome belongs to, not a bare flag: a mixed-hub group
   // shows one copy control per hub, and a shared flag would report Amarr as
   // copied the moment Jita was. `GROUP_COPY` is the whole-group control's key.
-  const [copyState, setCopyState] = useState<{ key: string; status: CopyStatus } | null>(null);
+  const { copied: copyState, flash: flashCopy } = useCopyFeedback<{
+    key: string;
+    status: CopyStatus;
+  }>(2000);
   const [retargeting, setRetargeting] = useState(false);
   const [applyingAutoBuild, setApplyingAutoBuild] = useState(false);
   // computeGroupResult: true — the group total needs each member's tree
@@ -459,7 +457,7 @@ export function BuildGroupPanel({
                 inputMode="numeric"
                 widthClassName="w-20"
                 placeholder="0"
-                parse={parseOwnedCount}
+                parse={unmaskCount}
                 onCommit={(quantity) => setOwnedQuantity(material.typeID, quantity)}
               />
               {offer !== null && (
@@ -518,16 +516,6 @@ export function BuildGroupPanel({
     columns: buyMaterialsCsv,
   });
 
-  // The copy outcome is a flash, not a state the panel keeps. Cleared by an
-  // effect rather than a `setTimeout` in the handler, so unmounting mid-flash
-  // — or copying another hub before it fades — cancels the pending timer
-  // instead of setting state on a gone component.
-  useEffect(() => {
-    if (copyState === null) return;
-    const timer = setTimeout(() => setCopyState(null), 2000);
-    return () => clearTimeout(timer);
-  }, [copyState]);
-
   const loading = rows.some((row) => row.loading);
   const failed = rows.filter((row) => row.error !== null);
 
@@ -554,9 +542,9 @@ export function BuildGroupPanel({
   async function handleCopy(key: string, materials: readonly MaterialCostLine[]) {
     try {
       await writeToClipboard(shoppingListText(materials, (id) => nameForType(catalog, id)));
-      setCopyState({ key, status: 'copied' });
+      flashCopy({ key, status: 'copied' });
     } catch {
-      setCopyState({ key, status: 'failed' });
+      flashCopy({ key, status: 'failed' });
     }
   }
 

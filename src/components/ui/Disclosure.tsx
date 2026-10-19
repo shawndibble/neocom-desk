@@ -1,3 +1,4 @@
+import { eyebrowClassName } from './eyebrowClassName';
 import type { ReactNode } from 'react';
 import { cx } from '@/lib/cx';
 import {
@@ -58,7 +59,7 @@ export function Disclosure({
   className = '',
 }: DisclosureProps) {
   const labelContent = (
-    <span className="flex min-w-0 items-center gap-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+    <span className={cx(eyebrowClassName, 'flex min-w-0 items-center gap-1.5')}>
       <Caret expanded={expanded} />
       {label}
     </span>

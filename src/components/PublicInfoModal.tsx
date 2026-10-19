@@ -23,15 +23,17 @@
  *
  * A link inside the modal that changes page (Open in Fittings) closes it.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { cx } from '@/lib/cx';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { OpenInEveButton } from '@/features/openInEve/OpenInEveButton';
 import { tabDomId } from '@/components/ui/tabPanel';
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { useRetryFocus } from '@/lib/useRetryFocus';
+import { usePageLeave } from '@/lib/usePageLeave';
 import { guarded } from '@/app/routeChunks';
 import { useTranslation } from 'react-i18next';
-import { useLocation } from 'react-router-dom';
 import {
   Button,
   CharacterAvatar,
@@ -82,8 +84,6 @@ export function PublicInfoModal() {
   const request = usePublicInfoModalStore((state) => state.request);
   const close = usePublicInfoModalStore((state) => state.close);
   const clear = usePublicInfoModalStore((state) => state.clear);
-  const { pathname } = useLocation();
-  const shownPathname = useRef(pathname);
 
   const [activeTab, setActiveTab] = useState<PublicInfoKind | 'employment'>('character');
   const focusAfterCommit = useFocusAfterCommit();
@@ -115,11 +115,9 @@ export function PublicInfoModal() {
 
   // Runs after render, so a caller must not navigate and open in one handler — the
   // open would be closed straight away. None does: every opener stays on its page.
-  useEffect(() => {
-    if (shownPathname.current === pathname) return;
-    shownPathname.current = pathname;
-    clear();
-  }, [pathname, clear]);
+  // A redirect is not a page change (`usePageLeave`): `EntityInfoRoute` keeps
+  // `info` through it, so the modal stays.
+  usePageLeave(clear);
 
   /** The request whose tab was last chosen, so a retry re-runs the lookups without jumping tabs. */
   const tabChosenFor = useRef<typeof request>(null);
@@ -446,9 +444,7 @@ function NpcCharacterCard({
     <div className="flex flex-wrap items-start gap-4 text-sm">
       <CharacterAvatar characterId={profile.characterId} size="lg" alt={profile.name} />
       <div className="min-w-0 flex-1 space-y-3">
-        <span className="block text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-          {t('publicInfo.npcAgent')}
-        </span>
+        <span className={cx(eyebrowClassName, 'block')}>{t('publicInfo.npcAgent')}</span>
         <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
           <dt className="text-text-dim">{t('publicInfo.corporation')}</dt>
           <dd>

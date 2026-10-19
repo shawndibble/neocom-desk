@@ -21,7 +21,7 @@
  * Opportunities wait on it too (#2054), just by not mounting until it clears
  * rather than by reading `isPricingReady` themselves — see their own callers.
  */
-import { useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import { loadBpcOfferRows } from '@/features/bpcContracts/bpcOfferRows';
 import { isSyncConfigured } from '@/app/syncStatus';
 import {
@@ -41,6 +41,7 @@ import { useWarmLoad } from '@/lib/useWarmLoad';
 import { useAssumedMe } from './assumedMe';
 import { useCorpOwnedBlueprints, type CorpOwnedBlueprintsState } from './corpOwnedBlueprints';
 import type { BuildPlanSources, CorpBlueprintSource } from './resolveBuildPlan';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 export interface BuildPlanPricingInputs {
   /** The settings below have hydrated. Until then they read their defaults. */
@@ -113,17 +114,15 @@ export function offersForRegion(
  * rows right now — Group Auto Build at click time — reads them here rather
  * than off possibly still-empty hook state.
  */
-export async function loadBpcContractRows(
-  characterId: number
-): Promise<readonly BpcContractRow[] | null> {
+export async function loadBpcContractRows(): Promise<readonly BpcContractRow[] | null> {
   // Originals ride beside the copies (`runs: -1`), so automatic selection
   // can price a blueprint only ever listed as an original.
-  return loadBpcOfferRows(characterId);
+  return loadBpcOfferRows();
 }
 
 /** A missing snapshot rejects, which `useWarmLoad` reads as "keep what is showing". */
-async function loadBpcContractRowsOrKeep(characterId: number): Promise<readonly BpcContractRow[]> {
-  const rows = await loadBpcContractRows(characterId);
+async function loadBpcContractRowsOrKeep(): Promise<readonly BpcContractRow[]> {
+  const rows = await loadBpcContractRows();
   if (!rows) throw new Error('no BPC contract snapshot');
   return rows;
 }
@@ -135,11 +134,7 @@ function useBpcContractRows(characterId: number | null): readonly BpcContractRow
 /** Hydrates and reads every Build Plan pricing input for one Character. */
 export function useBuildPlanPricingInputs(characterId: number | null): BuildPlanPricingInputs {
   const assumedMe = useAssumedMe((state) => state.value);
-  const assumedMeHydrated = useAssumedMe((state) => state.hydrated);
-  const hydrateAssumedMe = useAssumedMe((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateAssumedMe();
-  }, [hydrateAssumedMe]);
+  const assumedMeHydrated = useHydratedStore(useAssumedMe);
 
   const corpBlueprints = useCorpOwnedBlueprints();
   const standings = useTradeHubStandings(characterId);

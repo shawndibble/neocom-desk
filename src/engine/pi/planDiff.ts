@@ -63,7 +63,9 @@ export function planDiff(plan: GoalPlan, colonies: readonly PlannerColony[]): Co
       }
 
       const to = sortedUnique(assignment.slots.map((s) => s.p0TypeId));
-      const kept = from.filter((id) => to.includes(id));
+      const toSet = new Set(to);
+      const fromSet = new Set(from);
+      const kept = from.filter((id) => toSet.has(id));
       if (kept.length === from.length && from.length === to.length) {
         return { verb: 'keep', planetId, p0TypeIds: to };
       }
@@ -72,7 +74,7 @@ export function planDiff(plan: GoalPlan, colonies: readonly PlannerColony[]): Co
           verb: 'add-extractor',
           planetId,
           keep: from,
-          add: to.filter((id) => !from.includes(id)),
+          add: to.filter((id) => !fromSet.has(id)),
         };
       }
       return { verb: 'retarget', planetId, from, to };

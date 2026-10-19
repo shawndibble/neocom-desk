@@ -13,8 +13,9 @@ vi.mock('./planetSlots', () => ({ loadInterplanetaryConsolidation: vi.fn(async (
 vi.mock('./planAdviceModel', () => ({ hubBooks: vi.fn(() => ({})) }));
 const BASIS = vi.hoisted(() => ({ rules: {}, network: {}, key: 'k', hydrated: true }));
 vi.mock('@/features/route/jumpBasis', () => ({ useJumpBasis: () => BASIS }));
-vi.mock('@/features/route/routeExposure', () => ({
-  routeExposure: vi.fn(async () => ({ kind: 'unknown' })),
+let routesRead: () => Promise<{ kind: 'unknown' }> = async () => ({ kind: 'unknown' });
+vi.mock('@/features/route/localRoute', () => ({
+  localRoutesFromOrigin: () => routesRead(),
 }));
 
 const { usePiAdviceInputs } = await import('./usePiAdviceInputs');
@@ -39,6 +40,21 @@ describe('usePiAdviceInputs', () => {
     const { result } = renderHook(() => usePiAdviceInputs(snapshot, 7, 'isk'));
     expect(result.current.status).toBe('loading');
     await waitFor(() => expect(result.current.status).toBe('ready'));
+  });
+
+  it('holds loading until the routes settle, so the advice model runs once', async () => {
+    pricesRead = async () => prices(false);
+    let release: () => void = () => {};
+    routesRead = () =>
+      new Promise((resolve) => {
+        release = () => resolve({ kind: 'unknown' });
+      });
+    const { result } = renderHook(() => usePiAdviceInputs(snapshot, 7, 'isk'));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(result.current.status).toBe('loading');
+    release();
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    routesRead = async () => ({ kind: 'unknown' });
   });
 
   it('reports prices-failed when the loader resolves {failed:true}', async () => {

@@ -1,3 +1,4 @@
+import { idSetKey } from '@/lib/idSetKey';
 /**
  * The name lookups the Contract Search boards read, each resolved *behind* its
  * table rather than in front of it (issue #963).
@@ -191,7 +192,7 @@ export function useRegionNames(regionIds: readonly number[]): {
   // Sorted and joined so the effect keys on which regions, not on the order
   // two independently-loaded corpora happened to contribute them in — and so a
   // re-read that yields the same regions does not re-run the lookup at all.
-  const key = useMemo(() => [...regionIds].sort((a, b) => a - b).join(','), [regionIds]);
+  const key = useMemo(() => idSetKey(regionIds), [regionIds]);
   const ids = useMemo(() => (key === '' ? [] : key.split(',').map(Number)), [key]);
   return useResolved(ids, resolveRegionNames, EMPTY_NAMES);
 }

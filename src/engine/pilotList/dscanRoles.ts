@@ -71,15 +71,6 @@ const STRUCTURE_GROUPS = new Set([1025]);
 /** Capsule, Shuttle: ships, but no part of a fleet. */
 const NOT_A_FLEET_GROUPS = new Set([29, 31]);
 
-/** Every group id pinned to a role above — each needs a sub-label string. */
-export const PINNED_GROUP_IDS: readonly number[] = [
-  ...CAPITAL_GROUPS,
-  ...INDUSTRIAL_GROUPS,
-  ...TRANSPORT_GROUPS,
-  ...SUPPORT_GROUPS,
-  ...STRUCTURE_GROUPS,
-];
-
 const ORDER: readonly DscanRole[] = [
   'capitals',
   'industrial',

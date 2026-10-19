@@ -12,6 +12,7 @@
  * edit — a tag is one id in one list — so this is not `PayeeManagerDialog`'s
  * create/edit/delete manager, just the missing inverse of two actions.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { IconButton, Modal, Spinner } from '@/components/ui';
@@ -138,9 +139,7 @@ export function TypeOverridesDialog({ open, onClose, onChanged }: TypeOverridesD
         ) : (
           LIST_IDS.filter((list) => rows[list].length > 0).map((list) => (
             <div key={list} className="space-y-1">
-              <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                {t(LISTS[list].headingKey)}
-              </p>
+              <p className={eyebrowClassName}>{t(LISTS[list].headingKey)}</p>
               <ul className="divide-y divide-line">
                 {rows[list].map((row) => (
                   <li key={row.typeId} className="flex items-center gap-2 py-1.5">

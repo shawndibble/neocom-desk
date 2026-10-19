@@ -1,3 +1,4 @@
+import { NO_NAMES } from '@/lib/emptyCollections';
 import { useMemo } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -39,7 +40,6 @@ interface Snapshot {
 }
 
 /** Stable identity, so the fallback doesn't invalidate the column memo every render. */
-const NO_NAMES: ReadonlyMap<number, string> = new Map();
 
 async function loadEmploymentHistorySnapshot(
   characterId: number,

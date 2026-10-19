@@ -1,11 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { TrainedSkill } from '@/engine/types';
-import {
-  BASE_ORDER_SLOTS,
-  MAX_ORDER_SLOTS,
-  ORDER_SLOT_SKILL_TYPE_IDS,
-  maxMarketOrders,
-} from './orderSlots';
+import { BASE_ORDER_SLOTS, ORDER_SLOT_SKILLS, maxMarketOrders } from './orderSlots';
 
 function trained(levels: Record<number, number>): Map<number, TrainedSkill> {
   return new Map(
@@ -13,7 +8,7 @@ function trained(levels: Record<number, number>): Map<number, TrainedSkill> {
   );
 }
 
-const [TRADE, RETAIL, WHOLESALE, TYCOON] = ORDER_SLOT_SKILL_TYPE_IDS;
+const [TRADE, RETAIL, WHOLESALE, TYCOON] = ORDER_SLOT_SKILLS.map((s) => s.typeID);
 
 describe('maxMarketOrders', () => {
   it('gives the untrained base with no trade skills at all', () => {
@@ -40,8 +35,7 @@ describe('maxMarketOrders', () => {
 
   it('caps at 305 with all four skills at V', () => {
     const all = trained({ [TRADE]: 5, [RETAIL]: 5, [WHOLESALE]: 5, [TYCOON]: 5 });
-    expect(maxMarketOrders(all)).toBe(MAX_ORDER_SLOTS);
-    expect(MAX_ORDER_SLOTS).toBe(305);
+    expect(maxMarketOrders(all)).toBe(305);
   });
 
   it('ignores skills that are not trade skills', () => {

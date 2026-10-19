@@ -1,3 +1,4 @@
+import { usePrefersReducedMotion } from '@/lib/useMediaQuery';
 import { useRef, type PointerEvent as ReactPointerEvent, type RefObject } from 'react';
 
 /** Distance past which a release dismisses, in px. */
@@ -10,11 +11,8 @@ const DRAG_SLOP = 4;
 /** A release this long after the last move ignores velocity. */
 const VELOCITY_WINDOW_MS = 100;
 
-const REDUCED_MOTION = '(prefers-reduced-motion: reduce)';
-
-function applyOffset(el: HTMLElement | null, px: number, animate: boolean) {
+function applyOffset(el: HTMLElement | null, px: number, animate: boolean, reduced: boolean) {
   if (!el) return;
-  const reduced = window.matchMedia(REDUCED_MOTION).matches;
   el.style.transition = animate && !reduced ? 'transform 200ms ease-out' : 'none';
   el.style.transform = px === 0 ? '' : `translateY(${px}px)`;
 }
@@ -39,7 +37,9 @@ export function useSheetSwipe(
     pointerId: number;
   } | null>(null);
 
-  const setOffset = (px: number, animate: boolean) => applyOffset(target.current, px, animate);
+  const reduced = usePrefersReducedMotion();
+  const setOffset = (px: number, animate: boolean) =>
+    applyOffset(target.current, px, animate, reduced);
 
   if (!enabled) return {};
 

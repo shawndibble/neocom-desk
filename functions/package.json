@@ -10,7 +10,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:emulator": "vitest run --no-file-parallelism src/corpTaxBookEmulator.test.ts src/corpSyncGrantEmulator.test.ts"
   },
   "dependencies": {
     "aws4fetch": "^1.0.20",

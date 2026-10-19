@@ -19,6 +19,7 @@ import { loadTypeNames } from '@/features/character/typeNames';
 import { ratioMeterColor } from '@/engine/pilotList/meterColor';
 import { cx } from '@/lib/cx';
 import { useRetryFocus } from '@/lib/useRetryFocus';
+import { zkillFailureKey } from '@/lib/zkillFailureKey';
 import type { PilotStats, PilotStatsResult, PilotTopShip } from '@/lib/zkillboard';
 import { killerRatio, type StatTileItem } from './zkillFigures';
 
@@ -94,7 +95,7 @@ export function ZkillStatsStatus({
     return (
       <EmptyState
         title={t('travel.pilot.statsFailedTitle')}
-        hint={t('travel.pilot.statsFailedHint')}
+        hint={t(zkillFailureKey(stats.reason, 'travel.pilot.statsFailedHint'))}
         action={
           onRetry && (
             <Button size="sm" onClick={onRetry}>

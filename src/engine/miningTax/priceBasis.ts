@@ -3,9 +3,12 @@
  *
  * ESI's market history only has a daily *average* — a mix of buy- and
  * sell-side trades, neither the price a pilot gets selling into buy orders nor
- * the sell-order price — and no row at all for today. So the app saves its own
- * daily Jita buy/sell snapshot each time the Overview loads, and prices each
- * type on each day from the best source it has, in this order:
+ * the sell-order price — and no row at all for today. So each day is priced
+ * from a station buy/sell price instead where one exists — the server's daily
+ * end-of-day hub-station prices (`hubSnapshot.ts`, folded by
+ * `syncMarketOpenPrices`; decision 20261018-233051) and, for Jita, the snapshot
+ * this browser saves each time the Overview loads — from the best source it
+ * has, in this order:
  *
  *   saved snapshot for that day → Adam4EVE's historical buy/sell split →
  *   ESI daily average → today's live price (the last only for today and
@@ -17,10 +20,13 @@
  * blended ESI average, but region-wide rather than station-level (Adam4EVE's
  * `market_price_history` has no station filter) — weaker than `saved`
  * (station-exact) and `live` (station-exact, just the wrong day), stronger
- * than `average` (not even the right side of the book). It only ever covers a
- * day the server's own hub-price job (`functions/src/marketSnapshot.ts`)
- * hadn't captured live yet — a one-time backfill that runs itself out of work
- * once that job has covered the retention window.
+ * than `average` (not even the right side of the book). It only covers Jita
+ * days from before the retired `captureMiningPriceSnapshot` job captured live,
+ * a one-time backfill since copied into the R2 hub prices; no new day gets it.
+ *
+ * `saved` is the day's end-of-day best price (the last EVE Ref order snapshot
+ * of the UTC day) since decision 20261018-233051; days before that were the
+ * old job's average of up to four Fuzzwork captures through the day.
  */
 import { shiftDate } from './yieldRange';
 import { LEDGER_HISTORY_DAYS } from './ledgerHistory';

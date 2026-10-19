@@ -7,6 +7,7 @@ import type { PiData, PiFactoryKind, PiRawResource, PiSchematic } from '@/sde/ty
 import { piTier } from '../chain';
 import type { Goal } from '../goalTypes';
 import { singleFactoryRate } from '../pinBudget';
+import { rawById } from '../rawIndex';
 
 export const HOURS_PER_DAY = 24;
 export const HOURS_PER_WEEK = 168;
@@ -29,7 +30,7 @@ export function schematicOf(typeId: number, pi: PiData): PiSchematic {
 }
 
 export function rawOf(typeId: number, pi: PiData): PiRawResource {
-  return pi.raw.find((r) => r.typeID === typeId) ?? sdeMiss('P0 resource', typeId);
+  return rawById(pi).get(typeId) ?? sdeMiss('P0 resource', typeId);
 }
 
 export function factoriesFor(typeId: number, unitsPerHour: number, pi: PiData): number | null {

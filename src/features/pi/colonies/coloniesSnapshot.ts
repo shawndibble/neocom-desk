@@ -22,8 +22,6 @@ import type { PiData } from '@/sde/types';
  * header (data age, refresh) and the tab read the same snapshot.
  */
 
-export const NO_NAMES: ReadonlyMap<number, string> = new Map();
-
 /** `cached` wins on a shared id — it's always the fresher read (see call sites); `overlay` only fills what it left unresolved. */
 export function mergeNames(
   overlay: ReadonlyMap<number, string>,

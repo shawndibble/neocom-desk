@@ -112,7 +112,7 @@ export function IndustryGroupPage() {
     // `pricingInputs.bpcRows`, which may not have landed yet; no offers (not
     // synced / fetch failed) degrades to owned, forced and BPO tiers,
     // exactly as on the plan page.
-    const bpcRows = (await loadBpcContractRows(activeCharacterId)) ?? [];
+    const bpcRows = (await loadBpcContractRows()) ?? [];
     const picks = await applyGroupAutoBuild(
       plans,
       catalog,

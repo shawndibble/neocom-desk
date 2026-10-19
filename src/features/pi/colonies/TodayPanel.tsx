@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { Link } from 'react-router-dom';
 import { Trans, useTranslation } from 'react-i18next';
 import {
@@ -35,7 +36,7 @@ export function StatusWord({ status }: { status: CheckStatus }) {
   );
 }
 
-const MICRO = 'text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
+const MICRO = eyebrowClassName;
 
 interface TodayPanelProps {
   rows: readonly ColonyCheckRow[];

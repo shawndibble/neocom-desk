@@ -24,7 +24,7 @@ const RANGE_DAYS: Record<MiningYieldRange, number> = {
 export const shiftDate = shiftUtcDate;
 
 /** Today's EVE/UTC calendar date. */
-export function eveToday(now: Date = new Date()): string {
+export function eveToday(now: Date): string {
   return utcDay(now.getTime());
 }
 
