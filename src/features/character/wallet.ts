@@ -102,15 +102,6 @@ export function oldestCachedBalanceAt(
   return times.length > 0 ? Math.min(...times) : null;
 }
 
-/** Sum of every entry that actually has a usable balance — a needsReauth or never-fetched entry is simply absent from the total, not counted as zero. */
-export function totalWalletBalance(entries: readonly CharacterWalletBalance[]): number {
-  return entries.reduce(
-    (sum, entry) =>
-      entry.needsReauth || entry.balanceResult === null ? sum : sum + entry.balanceResult.data,
-    0
-  );
-}
-
 /** Journal. `truncated` on the result means pages were missing. */
 export async function loadWalletJournal(
   characterId: number

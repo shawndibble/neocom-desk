@@ -127,6 +127,132 @@ describe('createAssignment', () => {
   });
 });
 
+describe("assigning a paid day's late ore (paid stays paid, ADR 0024)", () => {
+  const paidDay = (
+    overrides: Partial<MiningTaxAssignmentRecord> = {}
+  ): MiningTaxAssignmentRecord => ({
+    id: 'paid',
+    characterId: CHAR_A,
+    date: '2026-09-04',
+    solarSystemId: 1,
+    payeeId: 'payee-1',
+    oreLines: [{ typeId: TYPE_A, quantity: 100 }],
+    taxPct: 10,
+    estimatedValue: 1000,
+    taxOwed: 100,
+    status: 'paid',
+    paidAt: 5,
+    updatedAt: 1,
+    ...overrides,
+  });
+  const lateOre = {
+    characterId: CHAR_A,
+    date: '2026-09-04',
+    solarSystemId: 1,
+    payeeId: 'payee-1',
+    oreLines: [{ typeId: TYPE_A, quantity: 50 }],
+    entryOreLines: [{ typeId: TYPE_A, quantity: 150 }],
+    taxPct: 10,
+    estimatedValue: 500,
+    taxOwed: 50,
+    markPaid: false,
+  };
+
+  it("makes the new entry the collector, so the day's later ore folds into it rather than the paid one", async () => {
+    const paid = paidDay();
+    await db.miningTaxAssignments.put(paid);
+
+    const created = await createAssignment(lateOre);
+
+    expect(created.collectsGrowth).toBe(true);
+    expect(await db.miningTaxAssignments.get('paid')).toEqual(paid);
+  });
+
+  it('takes the flag over from a paid flagged collector of a split, leaving one collector', async () => {
+    const paid = paidDay({ collectsGrowth: true, oreLines: [{ typeId: TYPE_A, quantity: 60 }] });
+    await db.miningTaxAssignments.bulkPut([
+      paid,
+      paidDay({
+        id: 'other',
+        payeeId: 'payee-2',
+        status: 'outstanding',
+        paidAt: undefined,
+        oreLines: [{ typeId: TYPE_A, quantity: 40 }],
+      }),
+    ]);
+
+    const created = await createAssignment(lateOre);
+
+    expect(created.collectsGrowth).toBe(true);
+    // Only the flag moves; the paid record's status, ore and tax stay as paid.
+    const stored = await db.miningTaxAssignments.get('paid');
+    expect(stored?.collectsGrowth).toBeUndefined();
+    expect(stored).toMatchObject({
+      status: 'paid',
+      paidAt: paid.paidAt,
+      oreLines: paid.oreLines,
+      estimatedValue: paid.estimatedValue,
+      taxOwed: paid.taxOwed,
+    });
+  });
+
+  it("leaves the flag off when the day's collector is not paid", async () => {
+    await db.miningTaxAssignments.put(
+      paidDay({ status: 'outstanding', paidAt: undefined, collectsGrowth: true })
+    );
+    await db.miningTaxAssignments.put(
+      paidDay({
+        id: 'other',
+        status: 'outstanding',
+        paidAt: undefined,
+        oreLines: [{ typeId: TYPE_B, quantity: 10 }],
+      })
+    );
+
+    const created = await createAssignment({
+      ...lateOre,
+      entryOreLines: [
+        { typeId: TYPE_A, quantity: 150 },
+        { typeId: TYPE_B, quantity: 10 },
+      ],
+    });
+
+    expect(created.collectsGrowth).toBeUndefined();
+  });
+
+  it('leaves the flag off on an entry nobody has assigned yet', async () => {
+    const created = await createAssignment(lateOre);
+    expect(created.collectsGrowth).toBeUndefined();
+  });
+
+  it("makes a member a combine creates from a paid day's late ore the collector too", async () => {
+    await db.miningTaxAssignments.put(paidDay());
+
+    const [late, nextDay] = await joinAssignments(
+      [
+        { ...lateOre, assignment: null },
+        {
+          characterId: CHAR_A,
+          date: '2026-09-05',
+          solarSystemId: 1,
+          assignment: null,
+          oreLines: [{ typeId: TYPE_B, quantity: 10 }],
+        },
+      ],
+      'payee-1',
+      10,
+      () =>
+        new Map([
+          [TYPE_A, 10],
+          [TYPE_B, 4],
+        ])
+    );
+
+    expect(late.collectsGrowth).toBe(true);
+    expect(nextDay.collectsGrowth).toBeUndefined();
+  });
+});
+
 describe('Moon / structure label', () => {
   it('createAssignment stores a trimmed label and omits a blank one', async () => {
     const base = {

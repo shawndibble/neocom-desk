@@ -34,6 +34,7 @@ interface Owned {
   truncated: boolean;
 }
 
+/** Longer than assetShipLocation's 8 s: the user is waiting on a visible rolls panel, not a background open. */
 const ROLLS_TIMEOUT_MS = 15_000;
 
 /** Mean quality of `mutation`'s rolls against its base's own values. */

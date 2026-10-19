@@ -6,11 +6,11 @@ import type { PayeeRecord } from '@/db';
 import { GrantNote } from '@/app/GrantNote';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
-import { formatLocalDate } from '@/lib/localDate';
 import type { GroupMember } from './groupRows';
 import { settle } from './ledgerActions';
 import { rememberPayeeEntity } from './payees';
-import { missingPaymentEndpoints, type MadePaymentSources } from './madePayments';
+import { missingPaymentEndpoints, paidOnFromIso, type MadePaymentSources } from './madePayments';
+import { systemLabel } from './names';
 import * as Icon from '@/components/ui/icons';
 import { exactAmountMatches, type MadePayment } from './paymentLinks';
 import { allocateOldestFirst } from './settleAllocation';
@@ -29,16 +29,6 @@ interface LinkWalletPaymentDialogProps {
   paymentSources?: readonly MadePaymentSources[];
   systemNames: ReadonlyMap<number, string>;
   onLinked: () => void;
-}
-
-/**
- * The payment's own date as a local calendar date, falling back to today —
- * same rule as `LinkPaymentDialog`: an unparseable ESI date must not become an
- * Invalid Date in a synced record.
- */
-function paidOnFor(isoDate: string): string {
-  const parsed = new Date(isoDate);
-  return formatLocalDate(Number.isNaN(parsed.getTime()) ? new Date() : parsed);
 }
 
 const FIELD_LABEL = 'text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
@@ -158,8 +148,7 @@ export function LinkWalletPaymentDialog({
     });
   }
 
-  const systemName = (solarSystemId: number) =>
-    systemNames.get(solarSystemId) ?? `#${String(solarSystemId)}`;
+  const systemName = (solarSystemId: number) => systemLabel(systemNames, solarSystemId);
 
   const counterpartyName =
     selected?.counterpartyId === undefined
@@ -173,7 +162,7 @@ export function LinkWalletPaymentDialog({
       settle(
         included.map((m) => m.assignment),
         {
-          paidOn: paidOnFor(selected.date),
+          paidOn: paidOnFromIso(selected.date),
           method: selected.method,
           amount: Math.round(paymentAmount),
           ...(selected.kind === 'journal' ? { journalLinks: link } : { contractLinks: link }),

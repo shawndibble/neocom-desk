@@ -18,6 +18,7 @@ import type {
 import type { MaterialRecipe } from '@/engine/industry/makeOrBuy';
 import { MAX_SUB_BUILD_DEPTH, usable } from '@/engine/industry/materialResolution';
 import { effectiveMaterials } from '@/engine/industry/materials';
+import { clampMe } from '@/engine/industry/efficiency';
 import { sizeRuns } from '@/engine/industry/runSizing';
 import type { SubBuildContext } from '@/engine/industry/subBuild';
 import {
@@ -86,11 +87,6 @@ export interface BlueprintAcquisitionSources {
    * path, same as before this field existed.
    */
   sourcing?: MaterialSourcingMap;
-}
-
-/** ME is 0..10 in the engine, which range-checks it and throws outside that. */
-function clampMe(me: number): number {
-  return Math.min(10, Math.max(0, Math.round(me)));
 }
 
 /** What a recipe consumes, or null when nothing produces the type. Independent of ME, which changes quantities but never the input list. */

@@ -52,10 +52,12 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - run: npm ci
+      # sde-check.mjs imports only repo scripts; the install is for the rebake.
       - name: Check for a new game build
         id: check
         run: node scripts/sde-check.mjs | tee -a "$GITHUB_OUTPUT"
+      - if: steps.check.outputs.update == 'true'
+        run: npm ci
       - name: Skip a build already proposed
         id: branch
         if: steps.check.outputs.update == 'true'

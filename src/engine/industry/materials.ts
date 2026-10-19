@@ -12,6 +12,7 @@ import type {
   FacilityContext,
   IndustryBlueprint,
 } from '@/engine/industry/types';
+import { ME_MAX } from '@/engine/industry/efficiency';
 import { rigBonusPct } from '@/engine/industry/types';
 
 function round2(x: number): number {
@@ -26,8 +27,8 @@ function assertRuns(runs: number): void {
 
 /** Combined material multiplier for ME level + facility + rig. */
 export function materialModifier(me: number, ctx: FacilityContext): number {
-  if (!Number.isInteger(me) || me < 0 || me > 10) {
-    throw new RangeError(`ME must be an integer 0..10, got ${me}`);
+  if (!Number.isInteger(me) || me < 0 || me > ME_MAX) {
+    throw new RangeError(`ME must be an integer 0..${ME_MAX}, got ${me}`);
   }
   const structurePct = ctx.facility.materialBonusPct;
   // Rigs only work on player structures. Reactor rigs scale by security band

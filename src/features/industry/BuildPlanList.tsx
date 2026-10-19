@@ -4,7 +4,7 @@ import {
   selectedRowClassName,
   touchCheckboxLabelClassName,
 } from '@/components/ui/controlStyles';
-import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Fragment, memo, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   DndContext,
@@ -45,6 +45,7 @@ import {
 import * as Icon from '@/components/ui/icons';
 import { gripHitAreaClassName } from '@/components/ui/controlStyles';
 import { rowStateClassName } from './planRowStyles';
+import { useStableCallback } from './useStableCallback';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { useLiftAfterHoldGuard } from '@/components/ui/liftAfterHold';
 import { RowTappableContext } from '@/components/ui/tooltipHold';
@@ -401,7 +402,7 @@ type PlanRowProps = {
   stats: PlanIndexStats | undefined;
 } & Pick<BuildPlanListProps, 'onSelect' | 'onDuplicate' | 'onDelete' | 'onRename'>;
 
-function PlanRow({
+const PlanRow = memo(function PlanRow({
   plan,
   active,
   onSelect,
@@ -617,7 +618,7 @@ function PlanRow({
       </li>
     </RowActionsMenu>
   );
-}
+});
 
 function GroupHeader({
   group,
@@ -779,15 +780,15 @@ export function BuildPlanList({
   plans,
   catalog,
   selectedId,
-  onSelect,
+  onSelect: onSelectProp,
   onCreate,
-  onDuplicate,
-  onDelete,
-  onRename,
+  onDuplicate: onDuplicateProp,
+  onDelete: onDeleteProp,
+  onRename: onRenameProp,
   compareMode,
   compareSelectedIds,
   onToggleCompareMode,
-  onToggleCompareSelected,
+  onToggleCompareSelected: onToggleCompareSelectedProp,
   onOpenCompare,
   groups,
   expandedGroupIds,
@@ -797,7 +798,7 @@ export function BuildPlanList({
   onCreateGroup,
   onRenameGroup,
   onDeleteGroup,
-  onMovePlan,
+  onMovePlan: onMovePlanProp,
   onOpenFitImport,
   note,
   statsByPlanId,
@@ -805,6 +806,14 @@ export function BuildPlanList({
   ownedBlueprints,
 }: BuildPlanListProps) {
   const { t } = useTranslation();
+  // Parents pass inline handlers; stable wrappers keep the memoised PlanRows
+  // from re-rendering on every list render.
+  const onSelect = useStableCallback(onSelectProp);
+  const onDuplicate = useStableCallback(onDuplicateProp);
+  const onDelete = useStableCallback(onDeleteProp);
+  const onRename = useStableCallback(onRenameProp);
+  const onToggleCompareSelected = useStableCallback(onToggleCompareSelectedProp);
+  const onMovePlan = useStableCallback(onMovePlanProp);
   const sensors = useSensors(
     // A bare PointerSensor starts dragging on the first pixel of pointer
     // movement, which fires from ordinary jitter on a click and fights a tap

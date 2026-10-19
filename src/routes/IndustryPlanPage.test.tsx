@@ -376,21 +376,36 @@ describe('IndustryPlanPage: /skills is stale until the character logs in', () =>
   });
 
   it('skips the queue read and shows no reauth notice when the character never granted the queue scope', async () => {
+    // A character of its own, not CHAR_ID: an earlier test's background read
+    // of CHAR_ID's queue can still land after this one starts, and must not
+    // count as this character's read (a CI flake when it shared CHAR_ID).
+    const SCOPELESS_ID = 92;
+    await db.characters.put({
+      characterId: SCOPELESS_ID,
+      name: 'Pilot Two',
+      ownerHash: 'oh2',
+      addedAt: 2,
+    });
     await db.tokens.put({
-      characterId: CHAR_ID,
-      accessToken: 'access-token',
+      characterId: SCOPELESS_ID,
+      accessToken: 'access-token-2',
       refreshToken: 'refresh',
       expiresAt: Date.now() + 3_600_000,
       scopes: [],
     });
+    await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: SCOPELESS_ID });
     let queueRequests = 0;
+    const esi = `https://esi.evetech.net/characters/${SCOPELESS_ID}`;
     server.use(
-      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skillqueue`, () => {
+      http.get(`${esi}/skills`, () => HttpResponse.json(emptySkillsPayload)),
+      http.get(`${esi}/blueprints`, () => HttpResponse.json([])),
+      http.get(`${esi}/industry/jobs`, () => HttpResponse.json([])),
+      http.get(`${esi}/skillqueue`, () => {
         queueRequests += 1;
         return HttpResponse.json([], { status: 403 });
       })
     );
-    await db.buildPlans.add(seedPlan());
+    await db.buildPlans.add(seedPlan({ characterId: SCOPELESS_ID }));
     render(<App />);
 
     // No queue correction applied: base blueprint time stands.
