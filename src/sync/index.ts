@@ -8,11 +8,13 @@
 // uid.ts touch no Firebase and stay synchronous, so the nav dot can subscribe
 // at first paint.
 
-export { getSyncStatus, subscribeSyncStatus, type SyncState, type SyncStatus } from './status';
-export { uidForCharacter } from './uid';
 import { setStatus } from './status';
 import { isOnline } from '@/stores/network';
+import { redactSecrets } from '@/observability/scrub';
 import { reportFailure } from '@/observability/reportFailure';
+
+export { getSyncStatus, subscribeSyncStatus, type SyncState, type SyncStatus } from './status';
+export { uidForCharacter } from './uid';
 export { TOMBSTONE_TTL_MS } from './merge';
 export { clearCharacterSyncBookkeeping } from './localBookkeeping';
 // Touches Dexie only — no Firebase — so it needs no lazy-import wrapper.
@@ -63,7 +65,7 @@ export function scheduleSync(
       reportFailure('sync', error);
       setStatus(characterId, {
         state: 'error',
-        error: error instanceof Error ? error.message : String(error),
+        error: redactSecrets(error instanceof Error ? error.message : String(error)),
         offline: !isOnline(),
       });
     });

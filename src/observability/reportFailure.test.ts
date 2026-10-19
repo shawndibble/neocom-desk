@@ -55,3 +55,26 @@ describe('reportFailure', () => {
     expect(text).toContain('[redacted]');
   });
 });
+
+describe('reportFailure edge cases', () => {
+  beforeEach(() => {
+    vi.mocked(captureException).mockClear();
+    resetReportedFailures();
+    online.value = true;
+  });
+
+  it('reports a TypeError that merely mentions fetch in a property name', () => {
+    reportFailure(
+      'sync',
+      new TypeError("Cannot read properties of undefined (reading 'fetchedAt')")
+    );
+    expect(captureException).toHaveBeenCalledTimes(1);
+  });
+
+  it('wraps a non-Error value with its secrets redacted', () => {
+    reportFailure('auth', { body: 'refresh_token: abc123secret' });
+    const sent = vi.mocked(captureException).mock.calls[0][0] as Error;
+    expect(sent).toBeInstanceOf(Error);
+    expect(sent.message).not.toContain('abc123secret');
+  });
+});

@@ -1,5 +1,6 @@
 import { captureException } from '@sentry/react';
 import { isOnline } from '@/stores/network';
+import { redactSecrets } from './scrub';
 
 /** Infrastructure layer that failed. Sent as the `subsystem` tag, nothing else identifying. */
 export type FailureSubsystem = 'sync' | 'esi' | 'auth' | 'backup';
@@ -23,7 +24,11 @@ const NETWORK_CODES = new Set([
  */
 export function isNetworkFailure(error: unknown): boolean {
   if (!isOnline()) return true;
-  if (error instanceof TypeError && /fetch|network|load failed/i.test(error.message)) return true;
+  if (
+    error instanceof TypeError &&
+    /^(failed to fetch|networkerror|network request failed|load failed)/i.test(error.message)
+  )
+    return true;
   if (error instanceof DOMException && error.name === 'AbortError') return true;
   const { code, status } = (error ?? {}) as { code?: unknown; status?: unknown };
   if (typeof code === 'string' && NETWORK_CODES.has(code.replace(/^[a-z]+\//, ''))) return true;
@@ -50,8 +55,12 @@ export function reportFailure(
     const oldest = lastReported.keys().next().value;
     if (oldest !== undefined) lastReported.delete(oldest);
   }
+  lastReported.delete(key);
   lastReported.set(key, now);
-  captureException(error, { tags: { subsystem } });
+  // A non-Error value serializes into `extra`, which `scrubEvent` does not walk.
+  captureException(error instanceof Error ? error : new Error(redactSecrets(message)), {
+    tags: { subsystem },
+  });
 }
 
 /** Tests only. */
