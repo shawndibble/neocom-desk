@@ -318,7 +318,6 @@ describe('PriceHistoryChart', () => {
           openLines={[
             {
               regionId: 10000002,
-              name: undefined,
               label: 'Jita 4-4',
               region: { color: 'red', dash: undefined },
               primary: true,

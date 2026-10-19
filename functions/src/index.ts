@@ -168,6 +168,8 @@ import {
 import {
   MARKET_OPEN_PRICES_META_PATH,
   OpenPriceFold,
+  SNAPSHOT_HUBS,
+  StationPriceFold,
   findFinalSnapshot,
   groupByDocument,
   implausibleReason,
@@ -179,7 +181,7 @@ import {
 import { publishLpStoreOffersToR2, writeOpenPricesToR2 } from './r2DailySnapshots.js';
 import { publishMiningPricesToR2 } from './r2MiningPrices.js';
 import { createR2Delete } from './r2Client.js';
-import { SNAPSHOT_HUBS, StationPriceFold, stationFoldWrites } from './miningHubPrices.js';
+import { stationFoldWrites } from './miningHubPrices.js';
 import { MINING_TYPE_IDS } from './data/miningTypeIds.js';
 import { fetchJson as fetchEverefJson, foldSnapshotUrl } from './marketOrdersArchive.js';
 import { runWorkbenchSync } from './workbenchFits.js';
@@ -1393,7 +1395,7 @@ export const syncLpStoreOffers = onSchedule(
  * 20261018-121126). Once a day, shortly after the previous UTC day's last
  * EVE Ref market-order snapshot (23:45) is published, folds that snapshot into
  * the highest buy and lowest sell per hub *station* and type (only orders
- * placed at the station; #4279's decision moved this from region-wide) and
+ * placed at the station; decision 20261019-004148 moved it from region-wide) and
  * merges the day into R2's `open-prices/<typeId>.json`, every hub station in
  * one object (~20,000 objects; layout decision 20261018-164126, storage
  * decision 20261018-201511-moving-the-daily-snapshots-to-r2). The region-wide

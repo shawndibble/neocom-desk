@@ -4,9 +4,9 @@
 // scripts/lib/backfillMarketOpenPrices.*) once the backfill has run; the daily
 // `syncMarketOpenPrices` function carries it on from there. Decisions:
 // docs/context/decisions/20261018-121126-*.md, 20261018-164126-*.md,
-// 20261018-201511-moving-the-daily-snapshots-to-r2.md and the #4279 one (prices
-// at the hub stations, not region-wide: a re-run rewrites every day it covers
-// in the station shape and drops that day's old region prices).
+// 20261018-201511-moving-the-daily-snapshots-to-r2.md and 20261019-004148-open-prices-at-the-hub-station-not-region.md (prices
+// at the hub stations, not region-wide: a re-run writes every object it touches
+// in the station shape and drops all of its old region-wide days, `rewriteDays`).
 //
 // Run by the maintainer, with their own R2 credentials. It never runs in CI or
 // from an agent. From the repo root, after `npm ci` in both the root and
@@ -48,7 +48,7 @@
 // downloads ~20MB and takes ~45s. Runs on Node 24 directly on the TypeScript
 // sources in functions/src.
 import { createInterface } from 'node:readline/promises';
-import { findFinalSnapshot, mergeDays } from '../functions/src/marketOpenPrices.ts';
+import { findFinalSnapshot, rewriteDays } from '../functions/src/marketOpenPrices.ts';
 import { writeOpenPricesToR2 } from '../functions/src/r2DailySnapshots.ts';
 import { fetchJson, foldSnapshotUrl } from '../functions/src/marketOrdersArchive.ts';
 import { USAGE, checkBucket, parseArgs, runBackfill } from './lib/backfillMarketOpenPrices.mjs';
@@ -126,7 +126,8 @@ const { written, skipped } = await runBackfill({
   writeDocuments: async (docs, total) => {
     const started = Date.now();
     let logged = 0;
-    const result = await writeOpenPricesToR2(docs, mergeDays, io, (n) => {
+    // rewriteDays, not mergeDays: the re-run also drops the old region-wide days.
+    const result = await writeOpenPricesToR2(docs, rewriteDays, io, (n) => {
       if (n - logged < PROGRESS_EVERY && n !== total) return;
       logged = n;
       const minutes = (Date.now() - started) / 60_000;

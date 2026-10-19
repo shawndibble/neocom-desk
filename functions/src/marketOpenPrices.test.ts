@@ -11,6 +11,7 @@ import {
   implausibleReason,
   isIsoDate,
   mergeDays,
+  rewriteDays,
   openPriceDocId,
   pairKey,
   findFinalSnapshot,
@@ -358,6 +359,16 @@ describe('mergeDays', () => {
         stations: { [JITA]: { buy: [1, 3], sell: [2, 4] } },
       });
       expect('regions' in merged).toBe(false);
+    });
+    it('rewriteDays (the backfill re-run) drops every stored region day, covered or not', () => {
+      const mixed = mergeDays(base, old, [day('2026-10-17', { [JITA]: { buy: 7, sell: 8 } })]);
+      expect(
+        rewriteDays(base, mixed, [day('2026-10-15', { [JITA]: { buy: 1, sell: 2 } })])
+      ).toEqual({
+        typeId: 34,
+        dates: ['2026-10-15', '2026-10-17'],
+        stations: { [JITA]: { buy: [1, 7], sell: [2, 8] } },
+      });
     });
     it('carries a mixed object forward unchanged when the merge adds nothing', () => {
       const mixed = mergeDays(base, old, [day('2026-10-17', { [JITA]: { buy: 7, sell: 8 } })]);

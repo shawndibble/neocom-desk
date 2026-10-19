@@ -9,10 +9,11 @@
  * Since #4279 the prices are the hub *station*'s (Jita 4-4), keyed by station
  * id. Objects written before that hold region-wide series keyed by region id
  * (`regions`), and one the daily job has written into since holds both, on
- * different dates. Both are read: a hub region gets its station's series,
- * unless the object still has more priced region days than station days, in
- * which case it keeps drawing the old region-wide line until the backfill
- * re-run rewrites it. Drop the `regions` read once that has run.
+ * different dates (each date holds one shape). Both are read: a hub region
+ * gets its station's series; an old object, its region-wide series; a mixed
+ * one, the two spliced by date under the station's name, so the chart neither
+ * loses its history nor stops at the deploy date while the backfill re-run is
+ * pending. Drop the `regions` read once that has run.
  *
  * Never fails the history panel: a missing object (a type the backfill has
  * not reached), a region the object does not hold (any non-hub region) and an
@@ -92,12 +93,13 @@ export function parseOpenPricesByType(data: unknown): StoredOpenPrices | null {
   return { stations: seriesById(stations, dates), regions: seriesById(regions, dates) };
 }
 
-function pricedDays(series: OpenPriceSeries): number {
-  let n = 0;
-  series.dates.forEach((_, i) => {
-    if (typeof series.buy[i] === 'number' || typeof series.sell[i] === 'number') n += 1;
-  });
-  return n;
+/** Station prices on station days, the old region prices on the region days before them. */
+function splice(station: OpenPriceSeries, region: OpenPriceSeries): OpenPriceSeries {
+  return {
+    dates: station.dates,
+    buy: station.dates.map((_, i) => station.buy[i] ?? region.buy[i] ?? null),
+    sell: station.dates.map((_, i) => station.sell[i] ?? region.sell[i] ?? null),
+  };
 }
 
 /** The region's series to draw out of a type's object, or null when it has none (any non-hub region). */
@@ -105,8 +107,8 @@ export function pickOpenPrices(stored: StoredOpenPrices, regionId: number): HubO
   const stationId = TRADE_HUBS.find((hub) => hub.regionId === regionId)?.stationId;
   const station = stationId === undefined ? undefined : stored.stations.get(stationId);
   const region = stored.regions.get(regionId);
-  if (station && stationId !== undefined && (!region || pricedDays(station) >= pricedDays(region)))
-    return { series: station, stationId };
+  if (station && stationId !== undefined)
+    return { series: region ? splice(station, region) : station, stationId };
   return region ? { series: region, stationId: null } : null;
 }
 

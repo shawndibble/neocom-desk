@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   MINING_PRICES_MAX_DAYS,
-  SNAPSHOT_HUBS,
-  StationPriceFold,
   expiredMiningMonthKeys,
   groupByMonthObject,
   keepMiningDaysFrom,
@@ -11,6 +9,7 @@ import {
   miningPricesR2Key,
   stationFoldWrites,
 } from './miningHubPrices.js';
+import { SNAPSHOT_HUBS, StationPriceFold } from './marketOpenPrices.js';
 
 const JITA = 60003760;
 const AMARR = 60008494;

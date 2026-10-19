@@ -30,14 +30,20 @@ _Recorded 2026-10-19 · issue #4279. Supersedes the region-level part of
   wrote in the region shape. `mergeDays` keeps a stored region day as a region
   day (null in `stations`) rather than dropping it, so no history is lost while
   the backfill has not been re-run; a station day for the same date replaces
-  it, so the re-run turns every day it covers into a station day, and
-  `regions` is omitted once no region day remains (or the cap ages them out).
-  Dropping region days on the first daily write was rejected: every chart
-  would collapse to one day until the re-run.
-- **The client reads both.** A hub region gets its station's series, unless
-  the object has more priced region days than station days, in which case it
-  keeps drawing the old region-wide lines (labelled as before) until the
-  backfill re-run rewrites it. The `regions` read is removed in a later cleanup
+  it, and `regions` is omitted once no region day remains (or the cap ages
+  them out). The backfill re-run writes with `rewriteDays`, which drops every
+  stored region day of each object it writes, so every type with a station
+  price in the run leaves in the station shape (a day with no station order
+  then has no point). A type with no station price in the whole run is not
+  written and keeps its region days; once the client's old-shape read is
+  removed it simply draws its average line, as a type with no hub orders
+  should. Dropping region days on the first daily write was rejected: every
+  chart would collapse to one day until the re-run.
+- **The client reads both.** A hub region gets its station's series; an old
+  object its region-wide series (labelled as before); a mixed object (between
+  deploy and the backfill re-run) the two spliced by date under the station's
+  name, so the lines neither lose their history nor stop at the deploy date
+  for the hours the window lasts. The `regions` read is removed in a later cleanup
   once the re-run has finished.
 - **Labels name the station.** A station series' Buy and Sell lines, legend,
   tooltip, table columns and CSV headers read "Jita 4-4 buy" whether or not

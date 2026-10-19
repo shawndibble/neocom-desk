@@ -6,7 +6,7 @@
  * per type, holding every hub station, at `open-prices/<typeId>.json` in R2
  * (layout: decision 20261018-164126-open-prices-one-document-per-type-every-hub;
  * storage moved from Firestore to R2 by 20261018-201511-moving-the-daily-snapshots-to-r2;
- * station rather than region-wide since #4279, see that issue's decision).
+ * station rather than region-wide since 20261019-004148-open-prices-at-the-hub-station-not-region).
  *
  * Pure and dependency-free (no Firestore, fetch or relative imports) so the
  * daily function and the one-off backfill script share exactly this code and
@@ -280,7 +280,7 @@ export interface StationPrice extends OpenPrice {
 
 /**
  * Best buy and sell per hub station and type, fed row by row during the
- * snapshot's single pass (decisions 20261018-233051 and the #4279 one: the
+ * snapshot's single pass (decisions 20261018-233051 and 20261019-004148: the
  * Open Prices and the mining prices both come from it). Only orders *placed
  * at* the station count: a buy order's `range` is never read, so a
  * region-range buy placed elsewhere is not a station buy. `typeIds` narrows
@@ -421,7 +421,8 @@ export function mergeDays(
   base: { typeId: number },
   existing: StoredTypeOpenPrices | null,
   days: readonly TypeDay[],
-  maxDays = MARKET_OPEN_PRICES_MAX_DAYS
+  maxDays = MARKET_OPEN_PRICES_MAX_DAYS,
+  keepRegions = true
 ): TypeOpenPrices {
   const byDate = new Map<string, StoredDay>();
   if (existing && Array.isArray(existing.dates)) {
@@ -432,7 +433,7 @@ export function mergeDays(
         byDate.set(date, { shape: 'stations', prices: stations });
         return;
       }
-      const regions = pricesAt(existing.regions, i);
+      const regions = keepRegions ? pricesAt(existing.regions, i) : new Map<string, OpenPrice>();
       if (regions.size > 0) byDate.set(date, { shape: 'regions', prices: regions });
     });
   }
@@ -448,6 +449,22 @@ export function mergeDays(
   const regions = seriesOf(dates, byDate, 'regions');
   if (Object.keys(regions).length > 0) out.regions = regions;
   return out;
+}
+
+/**
+ * `mergeDays` for the backfill re-run: every stored region-wide day is
+ * dropped, inside the run's dates or not, so each object it writes leaves in
+ * the station shape. A day with no order at the station has no point, rather
+ * than keeping a region-wide one. An object for a type with no station price
+ * in the whole run is not written and keeps its region days; the client stops
+ * reading those once the old-shape read is removed.
+ */
+export function rewriteDays(
+  base: { typeId: number },
+  existing: StoredTypeOpenPrices | null,
+  days: readonly TypeDay[]
+): TypeOpenPrices {
+  return mergeDays(base, existing, days, MARKET_OPEN_PRICES_MAX_DAYS, false);
 }
 
 /** Regroups per-day station folds by type object, days ascending. Folds may be passed in any order. */

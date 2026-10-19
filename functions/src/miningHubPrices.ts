@@ -31,9 +31,7 @@ import {
   type StationPriceFold,
 } from './marketOpenPrices.js';
 
-// The station fold and the hub list live with the open prices since #4279
-// (every type is folded per station now); re-exported for the mining callers.
-export { SNAPSHOT_HUBS, StationPriceFold, type PricePair } from './marketOpenPrices.js';
+/** A hub as the mining objects key it; the hub list itself is `SNAPSHOT_HUBS` (marketOpenPrices.ts). */
 
 export type MiningHub = SnapshotHub;
 

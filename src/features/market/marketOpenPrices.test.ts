@@ -109,23 +109,22 @@ describe('loadMarketOpenPrices', () => {
     });
   });
 
-  it('in an object holding both, keeps the region series while it has more priced days', async () => {
-    // The daily job wrote one station day into an object the old backfill wrote.
-    const mixed = {
+  it('splices an object holding both (old days region-wide, new days at the station) under the station', async () => {
+    // The daily job wrote station days into an object the old backfill wrote.
+    serve({
       typeId: 34,
       dates: ['2026-10-01', '2026-10-02', '2026-10-03'],
-      regions: { [FORGE]: { buy: [1, 2, null], sell: [1, 2, null] } },
-      stations: { [JITA]: { buy: [null, null, 3], sell: [null, null, 3] } },
-    };
-    serve(mixed);
-    expect((await loadMarketOpenPrices(FORGE, 34))?.stationId).toBeNull();
-    resetMarketOpenPricesCache();
-    serve({
-      ...mixed,
-      regions: { [FORGE]: { buy: [1, null, null], sell: [1, null, null] } },
-      stations: { [JITA]: { buy: [null, 2, 3], sell: [null, 2, 3] } },
+      regions: { [FORGE]: { buy: [1, 2, null], sell: [1, null, null] } },
+      stations: { [JITA]: { buy: [null, null, 3], sell: [null, null, null] } },
     });
-    expect((await loadMarketOpenPrices(FORGE, 34))?.stationId).toBe(JITA);
+    expect(await loadMarketOpenPrices(FORGE, 34)).toEqual({
+      stationId: JITA,
+      series: {
+        dates: ['2026-10-01', '2026-10-02', '2026-10-03'],
+        buy: [1, 2, 3],
+        sell: [1, null, null],
+      },
+    });
   });
 
   it('holds the answer, a missing object included, so a reopen reads nothing', async () => {

@@ -3,9 +3,9 @@
 // with the script once the backfill has run.
 //
 // Two phases, so each R2 object is read and written once:
-//   1. foldDays: fold each day's final snapshot at the hub stations (#4279;
-//      the region-wide fold only checks the snapshot is plausible) and keep
-//      only the compact result (OpenPriceTable) in memory.
+//   1. foldDays: fold each day's final snapshot at the hub stations (decision
+//      20261019-004148; the region-wide fold only checks the snapshot is
+//      plausible) and keep only the compact result (OpenPriceTable) in memory.
 //   2. one writeOpenPricesToR2 pass over every type object, with all its days.
 import {
   OpenPriceFold,

@@ -106,9 +106,8 @@ const NO_OPEN: readonly RegionOpenSeries[] = [];
 const NO_MISSING: ReadonlySet<number> = new Set();
 
 /** One region drawing Buy / Sell lines instead of an average. */
-export interface OpenLine {
+interface OpenLine {
   regionId: number;
-  name: string | undefined;
   /**
    * What its Buy / Sell labels are named after ("Jita 4-4 buy"): the hub
    * station, always; for an old region-wide series, the region once regions
@@ -211,7 +210,7 @@ function averageLabel(
  * One tooltip body for both strips. Both charts render it and share a
  * `syncId`, so whichever one the pointer is over, the reader gets the whole
  * day — the price strip alone would leave them hunting the bars below to
- * find out how much actually moved.
+ * find out how much actually moved. Exported for its tests.
  */
 export function HistoryTooltip({
   active,
@@ -410,7 +409,6 @@ export default function PriceHistoryChart({
     if (primaryRegionId !== undefined && stationOf.has(primaryRegionId)) {
       lines.push({
         regionId: primaryRegionId,
-        name: primaryRegionName,
         label: labelOf(primaryRegionId, primaryRegionName),
         region: PRIMARY_REGION_STROKE,
         primary: true,
@@ -420,7 +418,6 @@ export default function PriceHistoryChart({
       if (c.status === 'ready' && stationOf.has(c.regionId)) {
         lines.push({
           regionId: c.regionId,
-          name: c.name,
           label: labelOf(c.regionId, c.name),
           region: compareRegionStroke(slot),
           primary: false,
