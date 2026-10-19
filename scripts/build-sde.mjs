@@ -7,24 +7,24 @@
 // tables only CCP's own JSONL export carries, or carries at full precision —
 // see lib/ccpStaticData.mjs.
 
-import { runSanityChecks } from './bakeChecks.mjs';
-import { CACHE_DIR, FILES, SHIP_CATEGORY_ID } from './bakeConstants.mjs';
-import { download, parseCsv } from './bakeCsv.mjs';
-import { bakeIndustry } from './bakeIndustry.mjs';
-import { bakeMarket } from './bakeMarket.mjs';
-import { bakePi } from './bakePi.mjs';
-import { bakeSkills } from './bakeSkills.mjs';
-import { writeOutputs } from './bakeWrite.mjs';
-import { readCcpStaticDataFiles } from './ccpStaticData.mjs';
-import { bakeCertificates } from './certificates.mjs';
-import { bakeCertifiedPlans, factionNames, parseJsonl } from './certifiedPlans.mjs';
-import { USER_AGENT as ESI_USER_AGENT } from './constants.mjs';
-import { bakeShipMass, bakeWormholeMass } from './jumpMass.mjs';
-import { bakeMutaplasmids, dogmaAttributeInfo } from './mutaplasmids.mjs';
-import { ccpBuildFromSdeJsonl, fetchFuzzworkDump } from './sdeBuild.mjs';
-import { buildShipTree } from './shipTree.mjs';
-import { bakeTypeInfoShards } from './typeInfo.mjs';
-import { bakeTypeNames } from './typeNames.mjs';
+import { runSanityChecks } from './lib/bakeChecks.mjs';
+import { CACHE_DIR, FILES, SHIP_CATEGORY_ID } from './lib/bakeConstants.mjs';
+import { download, parseCsv } from './lib/bakeCsv.mjs';
+import { bakeIndustry } from './lib/bakeIndustry.mjs';
+import { bakeMarket } from './lib/bakeMarket.mjs';
+import { bakePi } from './lib/bakePi.mjs';
+import { bakeSkills } from './lib/bakeSkills.mjs';
+import { writeOutputs } from './lib/bakeWrite.mjs';
+import { readCcpStaticDataFiles } from './lib/ccpStaticData.mjs';
+import { bakeCertificates } from './lib/certificates.mjs';
+import { bakeCertifiedPlans, factionNames, parseJsonl } from './lib/certifiedPlans.mjs';
+import { USER_AGENT as ESI_USER_AGENT } from './lib/constants.mjs';
+import { bakeShipMass, bakeWormholeMass } from './lib/jumpMass.mjs';
+import { bakeMutaplasmids, dogmaAttributeInfo } from './lib/mutaplasmids.mjs';
+import { ccpBuildFromSdeJsonl, fetchFuzzworkDump } from './lib/sdeBuild.mjs';
+import { buildShipTree } from './lib/shipTree.mjs';
+import { bakeTypeInfoShards } from './lib/typeInfo.mjs';
+import { bakeTypeNames } from './lib/typeNames.mjs';
 
 async function main() {
   const fuzzwork = await fetchFuzzworkDump(ESI_USER_AGENT);
