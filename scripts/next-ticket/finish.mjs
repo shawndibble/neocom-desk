@@ -8,6 +8,7 @@
 //
 // Prints one line of JSON to stdout:
 //   {"status":"merged","issueClosed":true}
+//   {"status":"merged","issueClosed":false}   (PR body has no "Closes #n")
 //   {"status":"merge-failed","message":"..."}
 
 import { run, gh, ghJson, tryRun, printResult, sleepSync } from './lib.mjs';
@@ -34,20 +35,33 @@ if (!merge.ok) {
   }
 }
 
-let issueClosed = false;
-for (let i = 0; i < 5; i++) {
-  const state = ghJson(['issue', 'view', issueArg, '--json', 'state']).state;
-  if (state === 'CLOSED') {
-    issueClosed = true;
-    break;
-  }
-  sleepSync(2000);
-}
+// Only a closing keyword in the PR body ("Closes #n") should close the issue.
+// A "Part of #n" PR leaves a partly-done ticket open for the next run.
+const prBody = ghJson(['pr', 'view', prArg, '--json', 'body']).body ?? '';
+const closesIssue = new RegExp(`\\b(close[sd]?|fix(e[sd])?|resolve[sd]?)\\s+#${issueArg}\\b`, 'i').test(prBody);
 
-if (!issueClosed) {
-  const prUrl = ghJson(['pr', 'view', prArg, '--json', 'url']).url;
-  gh(['issue', 'close', issueArg, '--comment', `Merged in ${prUrl}`]);
-  issueClosed = true;
+let issueClosed = false;
+if (closesIssue) {
+  for (let i = 0; i < 5; i++) {
+    const state = ghJson(['issue', 'view', issueArg, '--json', 'state']).state;
+    if (state === 'CLOSED') {
+      issueClosed = true;
+      break;
+    }
+    sleepSync(2000);
+  }
+
+  if (!issueClosed) {
+    const prUrl = ghJson(['pr', 'view', prArg, '--json', 'url']).url;
+    gh(['issue', 'close', issueArg, '--comment', `Merged in ${prUrl}`]);
+    issueClosed = true;
+  }
+} else {
+  // Partial work: the issue stays open, unclaimed, for the next run.
+  const state = ghJson(['issue', 'view', issueArg, '--json', 'state']).state;
+  if (state === 'CLOSED') gh(['issue', 'reopen', issueArg]);
+  const login = tryRun('gh', ['api', 'user', '-q', '.login']);
+  if (login.ok) tryRun('gh', ['issue', 'edit', issueArg, '--remove-assignee', login.stdout.trim()]);
 }
 
 tryRun('gh', ['issue', 'edit', issueArg, '--remove-label', 'in-progress']);
