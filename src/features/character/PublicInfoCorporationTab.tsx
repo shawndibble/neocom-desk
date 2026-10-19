@@ -16,17 +16,14 @@
  * for a corporation no player runs.
  */
 import { ExternalLink } from '@/components/ui/ExternalLink';
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { EveMarkupText } from '@/components/EveMarkupText';
 import { isNpcCorporationId } from '@/esi/entityIds';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { allianceLogoUrl, corporationLogoUrl } from '@/lib/eveImages';
-import {
-  corporationZkillUrl,
-  fetchCorporationStats,
-  type PilotStatsResult,
-} from '@/lib/zkillboard';
+import { corporationZkillUrl, fetchCorporationStats } from '@/lib/zkillboard';
 import {
   StatTiles,
   ZkillRatioMeters,
@@ -35,11 +32,7 @@ import {
 } from '@/features/travel/ZkillStatsSection';
 import { killFigures, type StatTileItem } from '@/features/travel/zkillFigures';
 import { corporationAge, corporationTaxPercent } from './corporationInfo';
-import {
-  loadPublicAllianceHistory,
-  type PublicAllianceHistory,
-  type PublicCorporationInfo,
-} from './publicInfoData';
+import { loadPublicAllianceHistory, type PublicCorporationInfo } from './publicInfoData';
 import { loadStationName } from './stations';
 import { useEntityName } from './useEntityName';
 import { AllianceLink } from '@/features/entities';
@@ -72,34 +65,24 @@ export default function PublicInfoCorporationTab({
   const corporationId = data.corporation_id;
   const npc = isNpcCorporationId(corporationId);
   const [now] = useState(() => new Date());
-  const [stats, setStats] = useState<PilotStatsResult | null>(null);
-  const [history, setHistory] = useState<PublicAllianceHistory | null>(null);
-  const [stationName, setStationName] = useState<string | null>(null);
   const factionName = useEntityName(data.faction_id);
 
-  useEffect(() => {
-    let cancelled = false;
-    if (!npc) {
-      void fetchCorporationStats(corporationId).then((result) => {
-        if (!cancelled) setStats(result);
-      });
-      void loadPublicAllianceHistory(corporationId)
-        .then((result) => {
-          if (!cancelled) setHistory(result);
-        })
-        .catch(() => {});
-    }
-    if (data.home_station_id !== undefined) {
-      void loadStationName(data.home_station_id)
-        .then((name) => {
-          if (!cancelled) setStationName(name);
-        })
-        .catch(() => {});
-    }
-    return () => {
-      cancelled = true;
-    };
-  }, [corporationId, npc, data.home_station_id]);
+  const key = String(corporationId);
+  const loadStats = useCallback(() => fetchCorporationStats(corporationId), [corporationId]);
+  const loadHistory = useCallback(
+    () => loadPublicAllianceHistory(corporationId).catch(() => null),
+    [corporationId]
+  );
+  const homeStationId = data.home_station_id;
+  const loadStation = useCallback(
+    () => loadStationName(homeStationId ?? 0).catch(() => null),
+    [homeStationId]
+  );
+  const stats = useKeyedLoad(key, loadStats, npc).data ?? null;
+  const history = useKeyedLoad(key, loadHistory, npc).data ?? null;
+  const stationName =
+    useKeyedLoad(homeStationId === undefined ? null : String(homeStationId), loadStation).data ??
+    null;
 
   const age = corporationAge(data.date_founded, now);
   const website = websiteUrl(data.url);
