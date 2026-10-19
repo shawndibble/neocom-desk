@@ -39,12 +39,12 @@ candidates, and the standing kill-tests. Read it in step 1.
 Reference: [LEDGER.md](LEDGER.md) records surfaces already audited, findings
 filed, and findings killed. Read it in step 1; curate it in step 10.
 
-Work from a sibling worktree off `origin/main`, never the main checkout.
+Work from a sibling worktree off `origin/develop`, never the main checkout.
 Shawn keeps a dev server running there and another agent may be working in it.
 
 ```
-git -C <main-repo> fetch origin main
-git -C <main-repo> worktree add --detach ../neocom-desk.worktrees/improve-ui-<slug> origin/main
+git -C <main-repo> fetch origin develop
+git -C <main-repo> worktree add --detach ../neocom-desk.worktrees/improve-ui-<slug> origin/develop
 ```
 
 Then run `npm ci` inside it; this worktree is for rendering only. Step 10

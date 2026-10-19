@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import '@/i18n';
 import PriceHistoryChart, { HistoryTooltip } from './PriceHistoryChart';
 import type { TooltipContentProps } from 'recharts';
@@ -89,9 +89,21 @@ describe('PriceHistoryChart', () => {
       />
     );
     const legend = screen.getByRole('list');
-    for (const label of ['Daily range', 'Average Price', 'Moving average', 'Volume', 'Orders']) {
+    for (const label of ['Traded range', 'Average Price', 'Moving average', 'Volume', 'Orders']) {
       expect(within(legend).getByText(label)).toBeInTheDocument();
     }
+    expect(within(legend).queryByText('Daily range')).not.toBeInTheDocument();
+  });
+
+  it('explains the traded range from its legend entry', () => {
+    render(<PriceHistoryChart points={POINTS} itemName="Tritanium" />);
+    fireEvent.focus(
+      within(screen.getByRole('list')).getByRole('button', { name: 'About Traded range' })
+    );
+    expect(screen.getByRole('tooltip')).toHaveTextContent(
+      "Traded range is the day's lowest and highest trade."
+    );
+    expect(screen.getByRole('tooltip')).not.toHaveTextContent(/at close/);
   });
 
   it('leaves the moving average out of the legend when there is no line to name', () => {
@@ -256,11 +268,17 @@ describe('PriceHistoryChart', () => {
         />
       );
       const legend = screen.getByRole('list');
-      expect(within(legend).getByText('Jita 4-4 buy')).toBeInTheDocument();
-      expect(within(legend).getByText('Jita 4-4 sell')).toBeInTheDocument();
+      expect(within(legend).getByText('Jita 4-4 buy at close')).toBeInTheDocument();
+      expect(within(legend).getByText('Jita 4-4 sell at close')).toBeInTheDocument();
       expect(within(legend).queryByText('Buy')).not.toBeInTheDocument();
+      // The day table keeps its plain headers; only the chart says "at close".
       const table = screen.getByRole('table');
-      expect(within(table).getByRole('columnheader', { name: /Jita 4-4 buy/ })).toBeInTheDocument();
+      expect(within(table).getByRole('columnheader', { name: 'Jita 4-4 buy' })).toBeInTheDocument();
+      expect(
+        within(table).getByRole('columnheader', { name: 'Jita 4-4 sell' })
+      ).toBeInTheDocument();
+      expect(within(table).getByRole('columnheader', { name: 'Daily range' })).toBeInTheDocument();
+      expect(within(table).queryByRole('columnheader', { name: /at close/ })).toBeNull();
       // Volume and order count stay the region's (ESI).
       expect(within(legend).getByText('Volume')).toBeInTheDocument();
     });
@@ -285,10 +303,10 @@ describe('PriceHistoryChart', () => {
         />
       );
       const legend = screen.getByRole('list');
-      expect(within(legend).getByText('Jita 4-4 sell')).toBeInTheDocument();
-      expect(within(legend).getByText('Amarr VIII buy')).toBeInTheDocument();
-      expect(within(legend).getByText('Sinq Laison buy')).toBeInTheDocument();
-      expect(within(legend).queryByText('The Forge buy')).not.toBeInTheDocument();
+      expect(within(legend).getByText('Jita 4-4 sell at close')).toBeInTheDocument();
+      expect(within(legend).getByText('Amarr VIII buy at close')).toBeInTheDocument();
+      expect(within(legend).getByText('Sinq Laison buy at close')).toBeInTheDocument();
+      expect(within(legend).queryByText(/The Forge buy/)).not.toBeInTheDocument();
     });
 
     it('names the station in the tooltip', () => {
@@ -303,7 +321,10 @@ describe('PriceHistoryChart', () => {
                 payload: {
                   date: '2026-08-01',
                   dateLabel: '2026-08-01',
-                  range: undefined,
+                  average: 10,
+                  lowest: 8,
+                  highest: 14,
+                  range: [8, 14],
                   movingAverage: undefined,
                   comparison: {},
                   buy: { 10000002: 9 },
@@ -326,8 +347,10 @@ describe('PriceHistoryChart', () => {
           series="both"
         />
       );
-      expect(screen.getByText(/Jita 4-4 buy:/)).toBeInTheDocument();
-      expect(screen.getByText(/Jita 4-4 sell: No orders/)).toBeInTheDocument();
+      expect(screen.getByText(/Jita 4-4 buy at close:/)).toBeInTheDocument();
+      expect(screen.getByText(/Jita 4-4 sell at close: No orders/)).toBeInTheDocument();
+      expect(screen.getByText(/^Traded range:/)).toBeInTheDocument();
+      expect(screen.queryByText(/Daily range/)).not.toBeInTheDocument();
     });
   });
 
@@ -357,8 +380,8 @@ describe('PriceHistoryChart', () => {
         />
       );
       const legend = screen.getByRole('list');
-      expect(within(legend).getByText('Buy')).toBeInTheDocument();
-      expect(within(legend).getByText('Sell')).toBeInTheDocument();
+      expect(within(legend).getByText('Best buy at close')).toBeInTheDocument();
+      expect(within(legend).getByText('Best sell at close')).toBeInTheDocument();
       expect(within(legend).queryByText('Average Price')).not.toBeInTheDocument();
       expect(within(legend).queryByText('Moving average')).not.toBeInTheDocument();
     });
@@ -374,8 +397,8 @@ describe('PriceHistoryChart', () => {
         />
       );
       const legend = screen.getByRole('list');
-      expect(within(legend).getByText('Sell')).toBeInTheDocument();
-      expect(within(legend).queryByText('Buy')).not.toBeInTheDocument();
+      expect(within(legend).getByText('Best sell at close')).toBeInTheDocument();
+      expect(within(legend).queryByText(/buy/i)).not.toBeInTheDocument();
     });
 
     it('adds Buy and Sell columns, and keeps ESI figures, in the day table', () => {
@@ -388,11 +411,28 @@ describe('PriceHistoryChart', () => {
         />
       );
       const table = screen.getByRole('table');
-      expect(within(table).getByRole('columnheader', { name: /Buy/ })).toBeInTheDocument();
-      expect(within(table).getByRole('columnheader', { name: /Sell/ })).toBeInTheDocument();
+      expect(within(table).getByRole('columnheader', { name: 'Buy' })).toBeInTheDocument();
+      expect(within(table).getByRole('columnheader', { name: 'Sell' })).toBeInTheDocument();
       expect(within(table).getByRole('columnheader', { name: /Volume/ })).toBeInTheDocument();
       // 2026-08-02 had a buy order but no sell order.
       expect(within(table).getByText('No orders')).toBeInTheDocument();
+    });
+
+    it('explains why best buy/sell at close can sit outside the traded range', () => {
+      render(
+        <PriceHistoryChart
+          points={POINTS}
+          itemName="Tritanium"
+          primaryRegionId={10000002}
+          openPrices={[FORGE_OPEN]}
+        />
+      );
+      fireEvent.focus(
+        within(screen.getByRole('list')).getByRole('button', { name: 'About Traded range' })
+      );
+      expect(screen.getByRole('tooltip')).toHaveTextContent(
+        'Best buy/sell at close is the best order still listed at 23:45 UTC, so it can sit outside the range.'
+      );
     });
 
     it('draws a region without a series as its average beside one with Buy and Sell', () => {
@@ -407,8 +447,8 @@ describe('PriceHistoryChart', () => {
         />
       );
       const legend = screen.getByRole('list');
-      expect(within(legend).getByText('The Forge buy')).toBeInTheDocument();
-      expect(within(legend).getByText('The Forge sell')).toBeInTheDocument();
+      expect(within(legend).getByText('The Forge buy at close')).toBeInTheDocument();
+      expect(within(legend).getByText('The Forge sell at close')).toBeInTheDocument();
       expect(within(legend).getByText('Domain average')).toBeInTheDocument();
       const table = screen.getByRole('table');
       expect(
@@ -431,8 +471,8 @@ describe('PriceHistoryChart', () => {
         />
       );
       const legend = screen.getByRole('list');
-      expect(within(legend).getByText('Domain buy')).toBeInTheDocument();
-      expect(within(legend).getByText('Domain sell')).toBeInTheDocument();
+      expect(within(legend).getByText('Domain buy at close')).toBeInTheDocument();
+      expect(within(legend).getByText('Domain sell at close')).toBeInTheDocument();
       expect(within(legend).queryByText('Domain average')).not.toBeInTheDocument();
     });
 
@@ -455,7 +495,9 @@ describe('PriceHistoryChart', () => {
       expect(within(legend).queryByText(/buy|sell/i)).not.toBeInTheDocument();
       // Average is the chosen line here, not a stand-in, so no note on it.
       expect(within(legend).queryByText(/no order data/)).not.toBeInTheDocument();
-      expect(within(legend).queryByRole('button', { name: /About/ })).not.toBeInTheDocument();
+      expect(
+        within(legend).queryByRole('button', { name: /no order data/ })
+      ).not.toBeInTheDocument();
       const table = screen.getByRole('table');
       expect(
         within(table).getByRole('columnheader', { name: /The Forge buy/ })
@@ -475,7 +517,7 @@ describe('PriceHistoryChart', () => {
         />
       );
       const legend = screen.getByRole('list');
-      expect(within(legend).getByText('The Forge buy')).toBeInTheDocument();
+      expect(within(legend).getByText('The Forge buy at close')).toBeInTheDocument();
       const label = 'Domain average (no order data)';
       expect(within(legend).getByText(label)).toBeInTheDocument();
       expect(within(legend).getByRole('button', { name: `About ${label}` })).toBeInTheDocument();

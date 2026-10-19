@@ -1,7 +1,7 @@
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
 import { tappableRowClassName, touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import { useTranslation } from 'react-i18next';
 import {
@@ -44,7 +44,6 @@ import { craftScope } from '@/engine/industry/craftScope';
 import { ownedStockSale, sellableMaterials } from '@/engine/industry/ownedStockSale';
 import type {
   FacilityKind,
-  HubPrices,
   MaterialPriceBasis,
   MaterialSourcing,
   RigKind,
@@ -96,17 +95,11 @@ import {
   type BlueprintCatalog,
 } from './blueprintCatalog';
 import { breakEvenRuns } from '@/engine/industry/breakEvenRuns';
-import {
-  inventionPricingContextFor,
-  planOwnedBlueprints,
-  resolveBuildPlan,
-  type ResolvedBuildPlan,
-} from './resolveBuildPlan';
+import { inventionPricingContextFor, planOwnedBlueprints } from './resolveBuildPlan';
 import { inventionQuoteFor } from './inventionSources';
 import { buildPlanTypeIds, recipeForLookup } from './recipes';
 import { materialPriceBasisOf } from './priceBasis';
-import { useDepthPrices } from './depthPriceLoader';
-import { depthCandidates, depthPriceMap } from '@/engine/industry/depthPrice';
+import { useResolvedPlan } from './useResolvedPlan';
 import { useMarketSnapshot } from './useMarketSnapshot';
 import { priceVsMedianFor, usePriceVsMedian } from './usePriceVsMedian';
 import { formatDuration } from '@/lib/duration';
@@ -115,7 +108,8 @@ import { TableActionsMenu } from '@/components/ui/TableExport';
 import { writeToClipboard } from '@/lib/clipboard';
 import { parseOrKeep, parseTaxPct } from './planInputParsers';
 import { buildItemMenuProps } from './buildItemMenuProps';
-import { MaterialsTable, SourcingInput, type MaterialsTableHandle } from './MaterialsTable';
+import { MaterialsTable, type MaterialsTableHandle } from './MaterialsTable';
+import { SourcingInput } from './SourcingInput';
 import { BuildRecipeModal } from './BuildRecipeModal';
 import { BlueprintAcquisitionModal } from './BlueprintAcquisitionModal';
 import { buyPricedLine } from './materialRow';
@@ -707,29 +701,10 @@ export function BuildPlanDetail({
    * claims share it, and a re-run of this memo starts from nothing rather
    * than re-claiming against copies a previous run already took.
    */
-  // One resolver for the page's own plan and for Break Even's trial run counts
-  // (each walking its own Depth Prices), so a trial prices as the page would.
-  const resolveWith = useCallback(
-    (candidate: BuildPlanRecord, depthPrices?: HubPrices) =>
-      resolveBuildPlan(
-        candidate,
-        {
-          catalog,
-          pi,
-          ownedBlueprints,
-          corpBlueprints,
-          assumedMe,
-          modifiers,
-          standing,
-          bpcOffersFor,
-          bpcLastResortOffersFor,
-          blueprintPurchaseOffersFor,
-          inventionMarket,
-          communityOffersFor,
-        },
-        { snapshot, reactionSystemCostIndex: reactionSnapshot?.systemCostIndex, depthPrices }
-      ),
-    [
+  const { resolved, depth, resolveAt } = useResolvedPlan({
+    plan,
+    hub,
+    sources: {
       catalog,
       pi,
       ownedBlueprints,
@@ -742,56 +717,11 @@ export function BuildPlanDetail({
       blueprintPurchaseOffersFor,
       inventionMarket,
       communityOffersFor,
-      snapshot,
-      reactionSnapshot?.systemCostIndex,
-    ]
-  );
-  // Depth Prices: the lowest-sell pass says what the plan has to buy;
-  // materials whose need is large against what the hub lists walk the hub's
-  // book, and the plan resolves once more at those prices. One re-resolve,
-  // never iterated: a need is read off the lowest-sell pass only.
-  const depthNeedsOf = useCallback(
-    (candidate: BuildPlanRecord, lowestSell: ResolvedBuildPlan) =>
-      lowestSell.result
-        ? depthCandidates(
-            shoppingListMaterials(lowestSell.result.materials),
-            snapshot?.hubSellVolumes ?? {},
-            candidate.materialSourcing,
-            candidate.materialPriceBasis
-          )
-        : new Map<number, number>(),
-    [snapshot?.hubSellVolumes]
-  );
-  const topOfBook = useMemo(() => resolveWith(plan), [resolveWith, plan]);
-  const depthNeeds = useMemo(() => depthNeedsOf(plan, topOfBook), [depthNeedsOf, plan, topOfBook]);
-  const { depth, walk: walkDepth } = useDepthPrices(hub, depthNeeds, fetchedAt?.getTime());
-  const resolved = useMemo(
-    () => (depth.size > 0 ? resolveWith(plan, depthPriceMap(depth)) : topOfBook),
-    [depth, resolveWith, plan, topOfBook]
-  );
-  // Break Even's trials walk the books for their own run count, as the page would at that count.
-  // Lowest-sell passes by trial run count: only `runs` varies across trials of
-  // this plan, so repeated trials (and the page's own run count) reuse one pass.
-  const lowestSellCache = useRef<{
-    topOfBook: ResolvedBuildPlan;
-    byRuns: Map<number, ResolvedBuildPlan>;
-  } | null>(null);
-  const resolveAt = useCallback(
-    (candidate: BuildPlanRecord) => {
-      if (lowestSellCache.current?.topOfBook !== topOfBook) {
-        lowestSellCache.current = { topOfBook, byRuns: new Map([[plan.runs, topOfBook]]) };
-      }
-      const { byRuns } = lowestSellCache.current;
-      let lowestSell = byRuns.get(candidate.runs);
-      if (!lowestSell) {
-        lowestSell = resolveWith(candidate);
-        byRuns.set(candidate.runs, lowestSell);
-      }
-      const trialDepth = walkDepth(depthNeedsOf(candidate, lowestSell));
-      return trialDepth.size > 0 ? resolveWith(candidate, depthPriceMap(trialDepth)) : lowestSell;
     },
-    [resolveWith, walkDepth, depthNeedsOf, plan, topOfBook]
-  );
+    snapshot,
+    reactionSystemCostIndex: reactionSnapshot?.systemCostIndex,
+    fetchedAtMs: fetchedAt?.getTime(),
+  });
   const { result, error, makeOrBuyContext, resolvedMe, resolvedTe, materialPrices, bpcCoverage } =
     resolved;
 

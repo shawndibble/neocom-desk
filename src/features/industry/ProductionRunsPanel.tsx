@@ -16,7 +16,7 @@ import type { DataTableColumn } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { SkillLevels } from '@/engine/industry/types';
 import type { ResolvedStandings } from '@/engine/market/standings';
-import { SourcingInput } from './MaterialsTable';
+import { SourcingInput } from './SourcingInput';
 import {
   rollupProductionRuns,
   summarizeProductionRun,

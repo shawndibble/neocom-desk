@@ -18,7 +18,7 @@ The issue tracker config is at `docs/agents/issue-tracker.md`.
 
 ### 1. Pin the fixed point
 
-The fixed point is whatever the caller supplies (a commit SHA, branch name, tag, `main`, `HEAD~5`). Inside `/next-ticket` it is the merge-base with `main`.
+The fixed point is whatever the caller supplies (a commit SHA, branch name, tag, `main`, `HEAD~5`). Inside `/next-ticket` it is the merge-base with `develop`.
 
 Capture the diff command once: `git diff <fixed-point>...HEAD` (three-dot, against the merge-base). Note the commits via `git log <fixed-point>..HEAD --oneline`.
 
