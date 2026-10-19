@@ -23,7 +23,7 @@
  * in the DOM. Each row is measured once laid out, so rows of any height fit.
  */
 import { useObservedMeasure } from '@/lib/useObservedMeasure';
-import { useCallback, useEffect, useLayoutEffect, useState, type ReactNode } from 'react';
+import { useCallback, useLayoutEffect, useState, type ReactNode } from 'react';
 import { measureElement, useVirtualizer } from '@tanstack/react-virtual';
 
 interface VirtualFitListProps<T> {
@@ -111,7 +111,7 @@ export function VirtualFitList<T>({
     [capped, list, scrollParent, measureScrollMargin],
     { layout: true }
   );
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (capped) return;
     window.addEventListener('resize', measureScrollMargin);
     return () => window.removeEventListener('resize', measureScrollMargin);

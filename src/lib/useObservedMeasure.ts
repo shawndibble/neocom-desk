@@ -10,7 +10,7 @@ import { useEffect, useLayoutEffect, type DependencyList } from 'react';
  * `layout` measures before paint, for a value that positions something.
  *
  * The caller owns the state and what "equal" means: `measure` sets it.
- * Without `ResizeObserver` (jsdom) it measures once and never again.
+ * `layout` must stay fixed for a call site (it picks the hook). Without `ResizeObserver` (jsdom) it measures once and never again.
  */
 export function useObservedMeasure(
   targets: () => readonly Element[] | null,
