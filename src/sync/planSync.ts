@@ -64,6 +64,7 @@ import {
   type PullCursor,
 } from './localBookkeeping';
 import { isOnline } from '@/stores/network';
+import { reportFailure } from '@/observability/reportFailure';
 import { clearSyncScheduled, setStatus, setSyncScheduled } from './status';
 import { ensureSignedIn } from './syncAuth';
 import {
@@ -477,6 +478,7 @@ async function runPass(job: SyncJob): Promise<void> {
     });
   } catch (error) {
     failure = { error };
+    reportFailure('sync', error);
     setStatus(characterId, {
       state: 'error',
       error: error instanceof Error ? error.message : String(error),
