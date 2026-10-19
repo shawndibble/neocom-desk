@@ -290,3 +290,31 @@ describe('dismissRecords', () => {
     ).toThrow();
   });
 });
+
+describe('regroupMiner', () => {
+  it('parses a fold of stored Miners into one', () => {
+    expect(
+      parseEditAction({
+        action: 'regroupMiner',
+        minerId: 'solo:1',
+        characterIds: [1, 2, 2],
+        mainCharacterId: 2,
+        absorbMinerIds: ['g1', 'g1'],
+      })
+    ).toEqual({
+      action: 'regroupMiner',
+      minerId: 'solo:1',
+      characterIds: [1, 2],
+      mainCharacterId: 2,
+      absorbMinerIds: ['g1'],
+    });
+  });
+
+  it('refuses a main outside the group and a Miner absorbing itself', () => {
+    const base = { action: 'regroupMiner', minerId: 'g0', absorbMinerIds: [] };
+    expect(() => parseEditAction({ ...base, characterIds: [1], mainCharacterId: 9 })).toThrow();
+    expect(() =>
+      parseEditAction({ ...base, characterIds: [1], mainCharacterId: 1, absorbMinerIds: ['g0'] })
+    ).toThrow();
+  });
+});

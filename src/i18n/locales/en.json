@@ -13994,6 +13994,7 @@
         "billableThrough": "Billable through {{date}} (day end + {{hours}}h grace, then a sync). The book warns here once nobody has synced for about 3 days.",
         "noBillable": "No day is Billable until an officer syncs.",
         "failed": "The sync failed: {{message}}",
+        "autoGroupFailed": "The sync worked, but grouping this account's Characters failed: {{message}}",
         "skipped": {
           "missing-mining-scope": "The mining scope is not granted, so nothing was synced.",
           "no-book": "This corporation has no Corp Tax Book to sync.",

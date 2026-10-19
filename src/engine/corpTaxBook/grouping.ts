@@ -1,5 +1,5 @@
 /**
- * Miner grouping (D18, D26/D26b, issue #4194): the `setMiner` / `unlink` edits
+ * Miner grouping (D18, D26/D26b, issue #4194): the `setMiner` / `unlink` / `regroupMiner` edits
  * that put characters into one Miner, planned as pure data so the screen and
  * the sync run the same rules. Pure: no fetch/DOM/Dexie imports.
  *
@@ -15,17 +15,26 @@ export type GroupingEdit =
 const isSolo = (id: string) => id.startsWith('solo:');
 
 /**
- * The edits that fold `absorb` into the target Miner. A character sits in one
- * stored Miner only, so each absorbed group's characters are unlinked first;
- * a `solo:` Miner is not stored and needs no unlink.
+ * The one edit that folds `absorb` into the target Miner. A character sits in
+ * one stored Miner only, so the server dissolves each absorbed stored group
+ * and sets the target in a single transaction: a partial failure cannot leave
+ * characters unlinked. A `solo:` Miner is not stored and is not listed.
  */
+export type RegroupEdit = {
+  action: 'regroupMiner';
+  minerId: string;
+  characterIds: number[];
+  mainCharacterId: number;
+  absorbMinerIds: string[];
+};
+
 export function planRegroup(input: {
   miners: readonly Miner[];
   targetId: string;
   targetCharacterIds: readonly number[];
   absorb: readonly { id: string; characterIds: readonly number[] }[];
   mainCharacterId: number;
-}): GroupingEdit[] {
+}): RegroupEdit {
   const characterIds = [
     ...new Set([...input.targetCharacterIds, ...input.absorb.flatMap((a) => a.characterIds)]),
   ];
@@ -33,20 +42,13 @@ export function planRegroup(input: {
     throw new Error('The main must be one of the grouped characters');
   }
   const stored = new Set(input.miners.map((m) => m.id));
-  const edits: GroupingEdit[] = [];
-  for (const other of input.absorb) {
-    if (isSolo(other.id) || !stored.has(other.id)) continue;
-    for (const characterId of other.characterIds) {
-      edits.push({ action: 'unlink', minerId: other.id, characterId });
-    }
-  }
-  edits.push({
-    action: 'setMiner',
+  return {
+    action: 'regroupMiner',
     minerId: input.targetId,
     characterIds,
     mainCharacterId: input.mainCharacterId,
-  });
-  return edits;
+    absorbMinerIds: input.absorb.filter((o) => !isSolo(o.id) && stored.has(o.id)).map((o) => o.id),
+  };
 }
 
 /**

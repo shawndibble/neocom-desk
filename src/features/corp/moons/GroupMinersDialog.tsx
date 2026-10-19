@@ -57,7 +57,7 @@ export function GroupMinersDialog({
           absorb,
           mainCharacterId: Number(main),
         });
-        for (const step of plan) await edit(step);
+        await edit(plan);
       }}
     >
       <p className="text-text-dim">{t('corpTaxBook.moons.grouping.dialogIntro')}</p>

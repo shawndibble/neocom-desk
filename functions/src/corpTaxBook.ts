@@ -318,6 +318,14 @@ export type EditAction =
   | { action: 'reverseDismissal'; dismissalId: string; reason: string }
   | { action: 'setMiner'; minerId: string; characterIds: number[]; mainCharacterId: number }
   | { action: 'unlink'; minerId: string; characterId: number }
+  | {
+      /** Folds stored Miners into one, atomically (#4194): the "Group with…" dialog's single call. */
+      action: 'regroupMiner';
+      minerId: string;
+      characterIds: number[];
+      mainCharacterId: number;
+      absorbMinerIds: string[];
+    }
   | { action: 'addAdjustment'; minerId: string; date: string; amount: number; reason: string }
   | { action: 'writeOff'; minerId: string; statementId?: string; amount: number; reason: string }
   | { action: 'rebill'; minerId: string; fromDate: string; reason: string }
@@ -416,6 +424,7 @@ export function parseEditAction(data: unknown): EditAction {
     'reverseDismissal',
     'setMiner',
     'unlink',
+    'regroupMiner',
     'addAdjustment',
     'writeOff',
     'rebill',
@@ -493,6 +502,23 @@ export function parseEditAction(data: unknown): EditAction {
         throw new HttpsError('invalid-argument', 'the main must be one of the characters');
       }
       return { action, minerId: docId(d.minerId, 'minerId'), characterIds, mainCharacterId };
+    }
+    case 'regroupMiner': {
+      const characterIds = [
+        ...new Set(list(d.characterIds, 'characterIds', 50).map((x) => int(x, 'characterId'))),
+      ];
+      const mainCharacterId = int(d.mainCharacterId, 'mainCharacterId');
+      if (characterIds.length === 0 || !characterIds.includes(mainCharacterId)) {
+        throw new HttpsError('invalid-argument', 'the main must be one of the characters');
+      }
+      const minerId = docId(d.minerId, 'minerId');
+      const absorbMinerIds = [
+        ...new Set(list(d.absorbMinerIds, 'absorbMinerIds', 50).map((x) => docId(x, 'minerId'))),
+      ];
+      if (absorbMinerIds.includes(minerId)) {
+        throw new HttpsError('invalid-argument', 'a Miner cannot absorb itself');
+      }
+      return { action, minerId, characterIds, mainCharacterId, absorbMinerIds };
     }
     case 'unlink':
       return {

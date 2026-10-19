@@ -163,6 +163,19 @@ export async function readBookSummary(
   };
 }
 
+/** Characters an officer unlinked: automatic grouping leaves them alone (D26). Officer-only. */
+export async function readDeclinedAutoGroup(
+  characterId: number,
+  corporationId: number
+): Promise<Set<number>> {
+  await ensureSignedIn(characterId);
+  const snap = await getDoc(
+    doc(getSyncFirestore(), 'corpTaxBooks', String(corporationId), 'meta', 'declinedAutoGroup')
+  );
+  const ids = snap.data()?.ids;
+  return new Set(Array.isArray(ids) ? (ids as number[]) : []);
+}
+
 /** The book's settings and the collections the sync needs. Officer-only: verify first. */
 export async function readBookState(
   characterId: number,

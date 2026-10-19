@@ -14,7 +14,6 @@ const editBook = vi.fn();
 vi.mock('../taxBook/bookClient', () => ({
   editBook: (...a: unknown[]) => editBook(...a),
 }));
-vi.mock('../taxBook/autoGroupDeclined', () => ({ declineAutoGroup: vi.fn() }));
 
 const CORP = 98000001;
 const verdict: OfficerVerdict = {
@@ -130,10 +129,11 @@ describe('MinerCharacters', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Group 1 Miner' }));
     await waitFor(() =>
       expect(editBook).toHaveBeenCalledWith(7, CORP, {
-        action: 'setMiner',
+        action: 'regroupMiner',
         minerId: 'solo:1',
         characterIds: [1, 2],
         mainCharacterId: 1,
+        absorbMinerIds: [],
       })
     );
     expect(editBook).toHaveBeenCalledTimes(1);

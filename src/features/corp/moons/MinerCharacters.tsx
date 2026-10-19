@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Panel, textActionClassName } from '@/components/ui';
 import type { MinerRow } from '@/engine/corpTaxBook/bookView';
-import { declineAutoGroup } from '../taxBook/autoGroupDeclined';
 import { GroupMinersDialog } from './GroupMinersDialog';
 import { editErrorMessage, useBook } from './useBook';
 
@@ -18,7 +17,7 @@ interface StoredGrouping {
  */
 export function MinerCharacters({ miner }: { miner: MinerRow }) {
   const { t } = useTranslation();
-  const { names, edit, canEdit, data, corporationId } = useBook();
+  const { names, edit, canEdit, data } = useBook();
   const [grouping, setGrouping] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const stored = (data.state.miners as StoredGrouping[]).find((m) => m.id === miner.id);
@@ -43,11 +42,8 @@ export function MinerCharacters({ miner }: { miner: MinerRow }) {
       })
     );
   const unlink = (characterId: number) =>
-    run(async () => {
-      await edit({ action: 'unlink', minerId: miner.id, characterId });
-      // Do not let the next sync put it straight back (D26).
-      await declineAutoGroup(corporationId, characterId);
-    });
+    // The server records the unlink in the book, so no officer's sync puts it straight back (D26).
+    run(() => edit({ action: 'unlink', minerId: miner.id, characterId }));
 
   return (
     <Panel

@@ -17,12 +17,16 @@ describe('planRegroup', () => {
       absorb: [{ id: 'solo:2', characterIds: [2] }],
       mainCharacterId: 1,
     });
-    expect(plan).toEqual([
-      { action: 'setMiner', minerId: 'solo:1', characterIds: [1, 2], mainCharacterId: 1 },
-    ]);
+    expect(plan).toEqual({
+      action: 'regroupMiner',
+      minerId: 'solo:1',
+      characterIds: [1, 2],
+      mainCharacterId: 1,
+      absorbMinerIds: [],
+    });
   });
 
-  it('unlinks a stored group’s characters first, since a character sits in one Miner only', () => {
+  it('names a stored group to dissolve, since a character sits in one Miner only', () => {
     const plan = planRegroup({
       miners: [miner('g1', [2, 3])],
       targetId: 'solo:1',
@@ -30,14 +34,16 @@ describe('planRegroup', () => {
       absorb: [{ id: 'g1', characterIds: [2, 3] }],
       mainCharacterId: 3,
     });
-    expect(plan).toEqual([
-      { action: 'unlink', minerId: 'g1', characterId: 2 },
-      { action: 'unlink', minerId: 'g1', characterId: 3 },
-      { action: 'setMiner', minerId: 'solo:1', characterIds: [1, 2, 3], mainCharacterId: 3 },
-    ]);
+    expect(plan).toEqual({
+      action: 'regroupMiner',
+      minerId: 'solo:1',
+      characterIds: [1, 2, 3],
+      mainCharacterId: 3,
+      absorbMinerIds: ['g1'],
+    });
   });
 
-  it('never unlinks from a solo Miner, which is not stored', () => {
+  it('never dissolves a solo Miner, which is not stored', () => {
     const plan = planRegroup({
       miners: [],
       targetId: 'g1',
@@ -45,7 +51,7 @@ describe('planRegroup', () => {
       absorb: [{ id: 'solo:3', characterIds: [3] }],
       mainCharacterId: 1,
     });
-    expect(plan.map((p) => p.action)).toEqual(['setMiner']);
+    expect(plan.absorbMinerIds).toEqual([]);
   });
 
   it('refuses a main that is not in the group', () => {

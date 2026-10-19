@@ -83,6 +83,17 @@ export function BookHealthStrip({ sync }: { sync: CorpTaxBookSync }) {
       title: t('corpTaxBook.moons.health.failed', { message: sync.run.message }),
     });
   }
+  if (sync.run.phase === 'done' && sync.run.outcome.kind === 'synced') {
+    if (sync.run.outcome.autoGroupError) {
+      items.push({
+        id: 'autoGroupFailed',
+        tone: 'warning',
+        title: t('corpTaxBook.moons.health.autoGroupFailed', {
+          message: sync.run.outcome.autoGroupError,
+        }),
+      });
+    }
+  }
   if (sync.run.phase === 'done' && sync.run.outcome.kind === 'skipped') {
     items.push({
       id: 'skipped',

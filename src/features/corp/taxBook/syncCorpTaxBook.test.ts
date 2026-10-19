@@ -294,7 +294,26 @@ describe('syncCorpTaxBook', () => {
     expect(out).toMatchObject({ kind: 'synced', autoGrouped: 2 });
   });
 
-  it('does not fail a sync that already uploaded when grouping is refused', async () => {
+  it('leaves out characters the book says an officer unlinked', async () => {
+    const d = deps({
+      loadAccountCharacters: async () => [
+        { characterId: 5, corporationId: CORP },
+        { characterId: 6, corporationId: CORP },
+        { characterId: 8, corporationId: CORP },
+      ],
+      declinedGrouping: vi.fn(async () => new Set([8])),
+    });
+    const out = await run(d);
+    expect(d.declinedGrouping).toHaveBeenCalledWith(5, CORP);
+    expect(d.applyGrouping).toHaveBeenCalledWith(
+      5,
+      CORP,
+      expect.objectContaining({ characterIds: [5, 6] })
+    );
+    expect(out).toMatchObject({ autoGrouped: 2 });
+  });
+
+  it('does not fail a sync that already uploaded when grouping is refused, and says so', async () => {
     const d = deps({
       loadAccountCharacters: async () => [
         { characterId: 5, corporationId: CORP },
@@ -304,6 +323,10 @@ describe('syncCorpTaxBook', () => {
         throw new Error('refused');
       },
     });
-    expect(await run(d)).toMatchObject({ kind: 'synced', autoGrouped: 0 });
+    expect(await run(d)).toMatchObject({
+      kind: 'synced',
+      autoGrouped: 0,
+      autoGroupError: 'refused',
+    });
   });
 });
