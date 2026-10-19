@@ -5,13 +5,12 @@
  * a pick into a domain `Fitting`.
  */
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db, type FittingRecord } from '@/db';
 import { decodeFittingShare } from '@/engine/fittings/fittingShare';
 import { esiFittingToFitting } from '@/engine/fittings/esiFittingMapper';
 import { shareToFitting } from '@/engine/fittings/shareMapper';
 import type { Fitting } from '@/engine/fittings/types';
 import { useInGameFittings } from './useLibraryFittings';
+import { useSavedFittingRecords } from './useSavedFittingRecords';
 
 export interface FittingChoice {
   /** A saved Fitting's record id, or `game-<fitting_id>` for an In-game one. */
@@ -34,13 +33,7 @@ const inGameId = (fittingId: number) => `game-${fittingId}`;
 const byName = (a: FittingChoice, b: FittingChoice) => a.name.localeCompare(b.name);
 
 export function useFittingChoices(characterId: number | null): FittingChoices {
-  const records = useLiveQuery(
-    () =>
-      characterId === null
-        ? Promise.resolve([] as FittingRecord[])
-        : db.fittings.where('characterId').equals(characterId).toArray(),
-    [characterId]
-  );
+  const records = useSavedFittingRecords(characterId);
   const { granted, result, error } = useInGameFittings(characterId);
   const inGameFittings = result?.data;
 
