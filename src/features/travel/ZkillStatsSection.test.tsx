@@ -178,8 +178,8 @@ describe('ZkillStatsSection retry focus', () => {
 
 describe('ZkillStatsSection failed hint', () => {
   it.each([
-    ['offline', "You're offline. Reconnect, then try again."],
-    ['rate-limited', 'zKillboard is rate-limiting requests. Try again in a minute.'],
+    ['offline', "Couldn't reach zKillboard. Check your connection, then try again."],
+    ['rate-limited', 'zKillboard is rate-limiting requests. Try again shortly.'],
     ['http', "Their kills and losses aren't available right now."],
     ['parse', "Their kills and losses aren't available right now."],
   ] as const)('says the right thing for %s', (reason, text) => {

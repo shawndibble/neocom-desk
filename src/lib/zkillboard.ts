@@ -50,9 +50,27 @@ const failureReasons = new Map<string, ZkillFailureReason>();
 
 /** Records a load's outcome: clears the key on success, notes the reason on failure. */
 function settle<T>(key: string, value: T | null, reason: ZkillFailureReason): T | null {
-  if (value === null) failureReasons.set(key, reason);
-  else failureReasons.delete(key);
+  failureReasons.delete(key);
+  if (value === null) {
+    failureReasons.set(key, reason);
+    if (failureReasons.size > FAILURE_REASONS_MAX) {
+      const oldest = failureReasons.keys().next().value;
+      if (oldest !== undefined) failureReasons.delete(oldest);
+    }
+  }
   return value;
+}
+
+/** Keeps the map bounded: the oldest note goes first. */
+const FAILURE_REASONS_MAX = 200;
+
+/** Runs a cache loader; a throw is recorded as a failure rather than leaving a stale reason. */
+async function guarded<T>(key: string, load: () => Promise<T | null>): Promise<T | null> {
+  try {
+    return await load();
+  } catch {
+    return settle(key, null, 'parse');
+  }
 }
 
 function failureReason(key: string): ZkillFailureReason {
@@ -140,11 +158,13 @@ const hullLossesInflight = createTtlCache<ZkillHullLoss[]>({ ttlMs: 0, max: 50 }
  */
 export async function fetchHullLosses(shipTypeId: number): Promise<HullLossesResult> {
   const key = `hull:${shipTypeId}`;
-  const losses = await hullLossesInflight.get(String(shipTypeId), async () => {
-    const result = await zkillJson(`https://zkillboard.com/api/losses/shipTypeID/${shipTypeId}/`);
-    if (!result.ok) return settle(key, null, result.reason);
-    return settle(key, Array.isArray(result.body) ? parseHullLosses(result.body) : null, 'parse');
-  });
+  const losses = await hullLossesInflight.get(String(shipTypeId), () =>
+    guarded(key, async () => {
+      const result = await zkillJson(`https://zkillboard.com/api/losses/shipTypeID/${shipTypeId}/`);
+      if (!result.ok) return settle(key, null, result.reason);
+      return settle(key, Array.isArray(result.body) ? parseHullLosses(result.body) : null, 'parse');
+    })
+  );
   return losses === null
     ? { ok: false, losses: [], reason: failureReason(key) }
     : { ok: true, losses };
@@ -261,6 +281,7 @@ const pilotStatsCache = createTtlCache<PilotStatsParse>({
 /** Test seam: forget every cached pilot and corporation. */
 export function resetPilotStatsCache(): void {
   pilotStatsCache.clear();
+  failureReasons.clear();
 }
 
 /**
@@ -273,11 +294,13 @@ export function resetPilotStatsCache(): void {
  */
 async function fetchEntityStats(entity: StatsEntity, id: number): Promise<PilotStatsResult> {
   const key = `${entity}:${id}`;
-  const parsed = await pilotStatsCache.get(key, async () => {
-    const result = await zkillJson(`https://zkillboard.com/api/stats/${entity}/${id}/`);
-    if (!result.ok) return settle(key, null, result.reason);
-    return settle(key, parsePilotStats(result.body), 'parse');
-  });
+  const parsed = await pilotStatsCache.get(key, () =>
+    guarded(key, async () => {
+      const result = await zkillJson(`https://zkillboard.com/api/stats/${entity}/${id}/`);
+      if (!result.ok) return settle(key, null, result.reason);
+      return settle(key, parsePilotStats(result.body), 'parse');
+    })
+  );
   return parsed ?? { kind: 'failed', reason: failureReason(key) };
 }
 
@@ -382,6 +405,7 @@ const pilotListCache = createTtlCache<unknown[]>({
 /** Test seam: forget every cached pilot's kills and losses. */
 export function resetPilotKillmailsCache(): void {
   pilotListCache.clear();
+  failureReasons.clear();
 }
 
 /**
@@ -395,13 +419,15 @@ export function resetPilotKillmailsCache(): void {
  */
 function fetchPilotList(characterId: number, path: PilotListPath): Promise<unknown[] | null> {
   const key = `${path}/${characterId}`;
-  return pilotListCache.get(key, async () => {
-    const result = await zkillJson(
-      `https://zkillboard.com/api/${path}/characterID/${characterId}/`
-    );
-    if (!result.ok) return settle(key, null, result.reason);
-    return settle(key, Array.isArray(result.body) ? result.body : null, 'parse');
-  });
+  return pilotListCache.get(key, () =>
+    guarded(key, async () => {
+      const result = await zkillJson(
+        `https://zkillboard.com/api/${path}/characterID/${characterId}/`
+      );
+      if (!result.ok) return settle(key, null, result.reason);
+      return settle(key, Array.isArray(result.body) ? result.body : null, 'parse');
+    })
+  );
 }
 
 function pilotListFailure(characterId: number, path: PilotListPath): ZkillFailureReason {
@@ -560,6 +586,7 @@ export type PilotKillHistoryResult =
 /** Test seam: forget every cached kill history (and the lists beside it). */
 export function resetPilotKillHistoryCache(): void {
   pilotListCache.clear();
+  failureReasons.clear();
 }
 
 /**
@@ -647,13 +674,19 @@ const systemKillsInflight = createTtlCache<RecentKill[]>({ ttlMs: 0, max: 200 })
  */
 export async function fetchSystemRecentKills(systemId: number): Promise<SystemRecentKillsResult> {
   const key = `system:${systemId}`;
-  const kills = await systemKillsInflight.get(String(systemId), async () => {
-    const result = await zkillJson(
-      `https://zkillboard.com/api/kills/systemID/${systemId}/pastSeconds/3600/`
-    );
-    if (!result.ok) return settle(key, null, result.reason);
-    return settle(key, Array.isArray(result.body) ? parseSystemKills(result.body) : null, 'parse');
-  });
+  const kills = await systemKillsInflight.get(String(systemId), () =>
+    guarded(key, async () => {
+      const result = await zkillJson(
+        `https://zkillboard.com/api/kills/systemID/${systemId}/pastSeconds/3600/`
+      );
+      if (!result.ok) return settle(key, null, result.reason);
+      return settle(
+        key,
+        Array.isArray(result.body) ? parseSystemKills(result.body) : null,
+        'parse'
+      );
+    })
+  );
   return kills === null ? { ok: false, reason: failureReason(key) } : { ok: true, kills };
 }
 

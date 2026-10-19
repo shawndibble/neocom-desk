@@ -12371,8 +12371,8 @@
   },
   "travel": {
     "zkillFailure": {
-      "offline": "You're offline. Reconnect, then try again.",
-      "rateLimited": "zKillboard is rate-limiting requests. Try again in a minute."
+      "offline": "Couldn't reach zKillboard. Check your connection, then try again.",
+      "rateLimited": "zKillboard is rate-limiting requests. Try again shortly."
     },
     "incursions": {
       "title": "Incursions near you",

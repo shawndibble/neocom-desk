@@ -19,7 +19,7 @@ const CACHE_TTL_MS = 10 * 60_000;
 
 /** `ok: false` when zKillboard or ESI couldn't supply the losses. */
 export type PopularFitsResult =
-  { ok: true; fits: PopularFit[] } | { ok: false; reason?: ZkillFailureReason };
+  { ok: true; fits: PopularFit[] } | { ok: false; reason: ZkillFailureReason };
 
 const cache = new Map<number, { at: number; result: PopularFitsResult }>();
 const pending = new Map<number, Promise<PopularFitsResult>>();
@@ -78,7 +78,7 @@ export async function loadPopularFits(
 async function fetchPopularFits(shipTypeId: number, now: number): Promise<PopularFitsResult> {
   try {
     const losses = await resolveLosses(shipTypeId);
-    if (losses === null) return { ok: false };
+    if (losses === null) return { ok: false, reason: 'http' };
     if (!Array.isArray(losses)) return { ok: false, reason: losses.reason };
     const result: PopularFitsResult = {
       ok: true,
@@ -87,7 +87,7 @@ async function fetchPopularFits(shipTypeId: number, now: number): Promise<Popula
     cache.set(shipTypeId, { at: now, result });
     return result;
   } catch {
-    return { ok: false };
+    return { ok: false, reason: 'http' };
   }
 }
 

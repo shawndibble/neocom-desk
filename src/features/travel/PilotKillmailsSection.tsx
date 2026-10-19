@@ -17,10 +17,10 @@ import { FittingModuleList } from '@/features/fittings/FittingModuleList';
 import { fittingEditLocation } from '@/features/fittings/fittingRoutes';
 import { cx } from '@/lib/cx';
 import { useRetryFocus } from '@/lib/useRetryFocus';
-import { zkillFailureKey } from '@/lib/zkillFailureKey';
 import { formatIskCompact } from '@/lib/isk';
 import { useTimeZone } from '@/lib/timeFormat';
 import { formatTimestamp } from '@/lib/timestamp';
+import { zkillFailureKey } from '@/lib/zkillFailureKey';
 import {
   characterZkillUrl,
   fetchPilotKillmails,
