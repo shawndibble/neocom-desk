@@ -1,4 +1,5 @@
 import { idSetKey } from '@/lib/idSetKey';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 /**
  * The Blueprint Acquisition sources automatic tier selection reads beyond
  * public contracts: the cheapest sell order anywhere in the blueprint's
@@ -16,7 +17,7 @@ import { idSetKey } from '@/lib/idSetKey';
  * lookup reads only corps a Character holds LP with — both cached — so this
  * costs no per-blueprint request.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import { db } from '@/db';
 import type { BpcOffer } from '@/engine/industry/blueprintAcquisition';
 import {
@@ -243,31 +244,21 @@ export function useBlueprintPurchaseOffers(
   const rate = useLpValue((state) => state.value);
   const idsKey = idSetKey(blueprintTypeIds);
   const key = `${characterId ?? ''}|${hub.id}|${rate}|${idsKey}`;
-  const [loaded, setLoaded] = useState<{
-    key: string;
-    lookup: BlueprintOffersLookup;
-    inventionMarket: InventionMarket | null;
-  } | null>(null);
   const ids = useMemo(() => (idsKey === '' ? [] : idsKey.split(',').map(Number)), [idsKey]);
-  useEffect(() => {
-    let cancelled = false;
-    void Promise.all([
+  const loader = useCallback(async () => {
+    const [lookup, inventionMarket] = await Promise.all([
       loadBlueprintPurchaseOffers(characterId, hub, ids).catch(() => NO_BLUEPRINT_PURCHASE_OFFERS),
       loadInventionMarket(hub, ids),
-    ]).then(([lookup, inventionMarket]) => {
-      if (!cancelled) setLoaded({ key, lookup, inventionMarket });
-    });
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `key` encodes everything the load reads
-  }, [key]);
+    ]);
+    return { lookup, inventionMarket };
+  }, [characterId, hub, ids]);
+  const { data: loaded } = useKeyedLoad(key, loader);
   return useMemo(
     () => ({
       offersFor: loaded?.lookup ?? NO_BLUEPRINT_PURCHASE_OFFERS,
       inventionMarket: loaded?.inventionMarket ?? null,
-      ready: loaded?.key === key,
+      ready: loaded !== undefined,
     }),
-    [loaded, key]
+    [loaded]
   );
 }
