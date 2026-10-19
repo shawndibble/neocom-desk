@@ -276,7 +276,9 @@ that one spec: `npx playwright test e2e/plans.spec.ts -g "<test name>"`.
 ## 7. Open the PR
 
 - Ensure everything is committed. Conventional Commit subject; body ends with
-  `Closes #<n>`.
+  `Closes #<n>`. If the PR finishes only part of the ticket, use `Part of #<n>`
+  instead (in commit and PR body, never `Closes`): `Closes` makes GitHub close
+  the issue on merge, and a partly-done ticket must stay open.
 - Write the PR body to a scratch file (what changed and why, `Closes #<n>`,
   any deviations from the ticket, and a "Review notes" section for
   unaddressed judgement-call findings from `/code-review`).
@@ -382,8 +384,10 @@ no-op if auto-merge, armed in step 7, already merged it — the script detects
 `state == MERGED` and treats that as success rather than a failure), polls
 the issue for auto-close (the PR body carries `Closes #<n>`; closes it
 directly if auto-close hasn't landed
-after a few seconds), strips the `in-progress` label, then removes and prunes
-the worktree. Prints `{"status":"merged","issueClosed":true}` or
+after a few seconds). If the PR body has no closing keyword for the issue
+("Part of #<n>"), it leaves the issue open — reopening it if GitHub closed it —
+and drops the assignee. Then strips the `in-progress` label, then removes and prunes
+the worktree. Prints `{"status":"merged","issueClosed":true|false}` or
 `{"status":"merge-failed","message":"..."}`.
 
 - On `merge-failed`: this can be a last-second race (something merged to

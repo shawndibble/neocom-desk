@@ -66,7 +66,7 @@ describe('one zKillboard request per list, however many readers', () => {
 
   it('never keeps a failed answer: the next ask goes to zKillboard again', async () => {
     fetchMock.mockImplementationOnce(async () => new Response('nope', { status: 503 }));
-    expect(await fetchPilotKillHistory(PILOT)).toEqual({ ok: false });
+    expect(await fetchPilotKillHistory(PILOT)).toEqual({ ok: false, reason: 'http' });
     const retry = await fetchPilotKillHistory(PILOT);
     expect(retry.ok).toBe(true);
     expect(fetchMock).toHaveBeenCalledTimes(2);

@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { EmptyState, Spinner } from '@/components/ui';
 import type { SkillQueueEntry } from '@/esi/endpoints';
 import type { CachedResult } from '../data';
-import { isQueuePaused } from '../queueStatus';
+import { isQueuePaused } from '@/engine/skills/queueStatus';
 import type { SkillCatalog } from '../skillMap';
 import { CURRENT_QUEUE_HASH } from './currentQueueHash';
 import { NowTrainingCard } from './NowTrainingCard';

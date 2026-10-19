@@ -57,21 +57,19 @@ async function loadPledgeEntries(
   requests: typeof import('./requestStore')
 ): Promise<CommunityAlertEntry[]> {
   const now = Date.now();
-  // Only the Character's own Requests are read (one query on ownerUid), and
-  // each one's Pledges from its own subcollection: no board, no Community sweep.
+  // Only the Character's own Requests are read (one query on ownerUid); their
+  // Pledges then come from one collection-group query for the Community, not
+  // one read per Request.
   const mine = (await requests.loadMyRequests(characterId, community.id)).filter(
     (request) => request.notify.app && isOpenRequest(request, now)
   );
   if (mine.length === 0) return [];
   const base = { communityId: community.id, communityName: community.name };
-  const pledgesOf = await Promise.all(
-    mine.map(async (request) => ({
-      request,
-      pledges: (await requests.loadPledges(characterId, community.id, request.id)).filter(
-        (pledge) => pledge.uid !== myUid
-      ),
-    }))
-  );
+  const allPledges = await requests.loadCommunityPledges(characterId, community.id);
+  const pledgesOf = mine.map((request) => ({
+    request,
+    pledges: (allPledges.get(request.id) ?? []).filter((pledge) => pledge.uid !== myUid),
+  }));
   const names = pledgerNames.get(community.id) ?? new Map<string, string>();
   pledgerNames.set(community.id, names);
   const unseen = pledgesOf.flatMap(({ pledges }) => pledges).filter((p) => !names.has(p.uid));

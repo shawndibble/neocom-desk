@@ -135,10 +135,16 @@ describe('fetchPilotStats', () => {
   });
 
   it('reports a failed request, a network error and an unreadable body as failed', async () => {
-    stubFetch({ ok: false }, new Error('offline'), okBody(null));
-    expect(await fetchPilotStats(1)).toEqual({ kind: 'failed' });
-    expect(await fetchPilotStats(1)).toEqual({ kind: 'failed' });
-    expect(await fetchPilotStats(1)).toEqual({ kind: 'failed' });
+    stubFetch(
+      { ok: false, status: 500 },
+      { ok: false, status: 429 },
+      new Error('offline'),
+      okBody(null)
+    );
+    expect(await fetchPilotStats(1)).toEqual({ kind: 'failed', reason: 'http' });
+    expect(await fetchPilotStats(1)).toEqual({ kind: 'failed', reason: 'rate-limited' });
+    expect(await fetchPilotStats(1)).toEqual({ kind: 'failed', reason: 'offline' });
+    expect(await fetchPilotStats(1)).toEqual({ kind: 'failed', reason: 'parse' });
   });
 
   it('serves a repeat lookup from cache for ten minutes, then asks again', async () => {

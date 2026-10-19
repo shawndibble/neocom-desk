@@ -288,7 +288,9 @@ describe('Overview widget grid', () => {
     await user.click(
       await within(screen.getByRole('main')).findByRole('button', { name: 'Customize' })
     );
-    expect(screen.getByRole('region', { name: 'Customize the Overview' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('region', { name: 'Customize the Overview' })
+    ).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Done' })).toHaveLength(1);
     await user.click(screen.getByRole('button', { name: 'Remove Training' }));
     await user.click(screen.getByRole('button', { name: 'Cancel' }));

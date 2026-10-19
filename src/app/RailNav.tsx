@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/controlStyles';
 import { commandPaletteDisplayKey, isApplePlatform } from '@/lib/shortcuts';
 import { useCorpAccess } from '@/features/corp/useCorpAccess';
+import { useCorpViewCapabilities } from '@/features/corp/useCorpViewCapabilities';
 import { useActiveCorporationId } from '@/features/corp/owner';
 import { useHiddenTabPaths } from './useHiddenTabPaths';
 import { useCommandPalette } from '@/features/commandPalette/store';
@@ -216,7 +217,8 @@ const RailNavBody = memo(function RailNavBody({
   const locked = useLockedRoutes(NAV_LOCK_PATHS);
   const navBadge = useNavBadges();
   // One corp-access read for the rail (`useCorpNavVisible` is the same read).
-  const { state: corpState, capabilities } = useCorpAccess();
+  const { state: corpState } = useCorpAccess();
+  const capabilities = useCorpViewCapabilities();
   const corporationId = useActiveCorporationId();
   const corpVisible = corpState === 'ready' && corporationId !== null;
   const hiddenList = useHiddenNav((state) => state.value);

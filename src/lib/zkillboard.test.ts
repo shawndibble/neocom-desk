@@ -89,15 +89,21 @@ describe('fetchHullLosses', () => {
     });
   });
 
-  it('fails on a rate limit, an empty body or a network error', async () => {
+  it('fails with the cause: rate limit, error status, bad JSON, wrong shape, network', async () => {
     stubFetch({ ok: false, status: 429, json: () => Promise.resolve([]) });
-    expect(await fetchHullLosses(626)).toEqual({ ok: false, losses: [] });
+    expect(await fetchHullLosses(626)).toEqual({ ok: false, losses: [], reason: 'rate-limited' });
+
+    stubFetch({ ok: false, status: 500, json: () => Promise.resolve([]) });
+    expect(await fetchHullLosses(626)).toEqual({ ok: false, losses: [], reason: 'http' });
 
     stubFetch({ ok: true, status: 200, json: () => Promise.reject(new SyntaxError('empty')) });
-    expect(await fetchHullLosses(626)).toEqual({ ok: false, losses: [] });
+    expect(await fetchHullLosses(626)).toEqual({ ok: false, losses: [], reason: 'parse' });
+
+    stubFetch({ ok: true, status: 200, json: () => Promise.resolve({ error: 'x' }) });
+    expect(await fetchHullLosses(626)).toEqual({ ok: false, losses: [], reason: 'parse' });
 
     stubFetch(new TypeError('network'));
-    expect(await fetchHullLosses(626)).toEqual({ ok: false, losses: [] });
+    expect(await fetchHullLosses(626)).toEqual({ ok: false, losses: [], reason: 'offline' });
   });
 });
 
@@ -181,15 +187,18 @@ describe('fetchSystemRecentKills', () => {
     expect(result.ok && result.kills.map((kill) => kill.killmailId)).toEqual([138801220]);
   });
 
-  it('fails on a rate limit, an unreadable body or a network error', async () => {
+  it('fails with the cause on a rate limit, an unreadable body or a network error', async () => {
     stubFetch({ ok: false, status: 429, json: () => Promise.resolve([]) });
-    expect(await fetchSystemRecentKills(1)).toEqual({ ok: false });
+    expect(await fetchSystemRecentKills(1)).toEqual({ ok: false, reason: 'rate-limited' });
 
     stubFetch({ ok: true, status: 200, json: () => Promise.reject(new SyntaxError('empty')) });
-    expect(await fetchSystemRecentKills(1)).toEqual({ ok: false });
+    expect(await fetchSystemRecentKills(1)).toEqual({ ok: false, reason: 'parse' });
+
+    stubFetch({ ok: true, status: 200, json: () => Promise.resolve({ error: 'x' }) });
+    expect(await fetchSystemRecentKills(1)).toEqual({ ok: false, reason: 'parse' });
 
     stubFetch(new TypeError('network'));
-    expect(await fetchSystemRecentKills(1)).toEqual({ ok: false });
+    expect(await fetchSystemRecentKills(1)).toEqual({ ok: false, reason: 'offline' });
   });
 });
 
@@ -275,12 +284,12 @@ describe('fetchRegionRecentKills', () => {
         } as Response)
       )
     );
-    expect(await fetchRegionRecentKills(1)).toEqual({ ok: false });
+    expect(await fetchRegionRecentKills(1)).toEqual({ ok: false, reason: 'parse' });
   });
 
   it('fails on an error body, rather than read it as no kills', async () => {
     stubPages([{ error: 'nope' }]);
-    expect(await fetchRegionRecentKills(1)).toEqual({ ok: false });
+    expect(await fetchRegionRecentKills(1)).toEqual({ ok: false, reason: 'parse' });
   });
 
   it('fails when any page fails, rather than show a partial hour', async () => {
@@ -296,7 +305,7 @@ describe('fetchRegionRecentKills', () => {
         } as Response);
       })
     );
-    expect(await fetchRegionRecentKills(1)).toEqual({ ok: false });
+    expect(await fetchRegionRecentKills(1)).toEqual({ ok: false, reason: 'rate-limited' });
   });
 
   it('fails on a network error or an unreadable body', async () => {
@@ -304,14 +313,14 @@ describe('fetchRegionRecentKills', () => {
       'fetch',
       vi.fn(() => Promise.reject(new TypeError('network')))
     );
-    expect(await fetchRegionRecentKills(1)).toEqual({ ok: false });
+    expect(await fetchRegionRecentKills(1)).toEqual({ ok: false, reason: 'offline' });
     vi.stubGlobal(
       'fetch',
       vi.fn(() =>
         Promise.resolve({ ok: true, json: () => Promise.reject(new SyntaxError('x')) } as Response)
       )
     );
-    expect(await fetchRegionRecentKills(1)).toEqual({ ok: false });
+    expect(await fetchRegionRecentKills(1)).toEqual({ ok: false, reason: 'parse' });
   });
 });
 
@@ -381,6 +390,6 @@ describe('fetchKillmailHash', () => {
     vi.stubGlobal('fetch', hangingFetch());
     const losses = fetchHullLosses(626);
     await vi.advanceTimersByTimeAsync(15_000);
-    expect(await losses).toEqual({ ok: false, losses: [] });
+    expect(await losses).toEqual({ ok: false, losses: [], reason: 'offline' });
   });
 });

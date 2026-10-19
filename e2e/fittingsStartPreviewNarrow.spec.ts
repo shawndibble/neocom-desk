@@ -42,7 +42,7 @@ async function openInGamePreview(page: Page, size: { width: number; height: numb
       ]),
     })
   );
-  await signInAndGoto(page, './fittings');
+  await signInAndGoto(page, './ships/fittings');
   await answerAnyType(page);
   await page.setViewportSize(size);
   await page.getByRole('button', { name: /^PvP Rifter/ }).click();

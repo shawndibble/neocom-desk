@@ -1,7 +1,7 @@
 /**
  * The LP Store search snapshot (issue #2873): every NPC corporation's LP Store
  * offers plus the solar systems the corporation has stations in, republished to
- * `lpStoreOffers` for the LP Store page's item-first search.
+ * R2 (`r2DailySnapshots.ts`) for the LP Store page's item-first search.
  *
  * ESI's offers carry no home station, so the snapshot ships all of a
  * corporation's station systems and the client picks the one nearest the
@@ -10,14 +10,10 @@
  *
  * Fetch- and Firestore-free like `workbenchFits.ts`: the HTTP call and sleep
  * are arguments, so parsing, joining, retry and the drop rules are unit-tested.
- * `index.ts` supplies `fetch` and writes the chunks.
+ * `index.ts` supplies `fetch` and publishes the result.
  */
 import { parseRetryAfterMs } from './workbenchFits.js';
 
-export const LP_STORE_OFFERS_COLLECTION = 'lpStoreOffers';
-export const LP_STORE_OFFERS_META_DOC = 'meta';
-/** Corporation rows per chunk doc: ~170 stores of up to a few hundred offers each stay well under Firestore's 1 MiB doc limit. */
-export const LP_STORE_OFFERS_CHUNK_SIZE = 15;
 const ESI_BASE_URL = 'https://esi.evetech.net';
 /** Courtesy gap between corporation requests (~170 requests a day). */
 export const LP_STORE_REQUEST_GAP_MS = 200;
