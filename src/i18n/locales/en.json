@@ -1026,6 +1026,7 @@
       "layerHp": "{{hp}} HP",
       "rahRow": "Reactive Armor Hardener",
       "fittingMeta": "CPU {{cpu}}% · PG {{pg}}%",
+      "fittingMetaCalibration": "CPU {{cpu}}% · PG {{pg}}% · Cal {{cal}}%",
       "fact": {
         "capacity": "Capacity",
         "align": "Align time",

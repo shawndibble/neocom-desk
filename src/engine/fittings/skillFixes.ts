@@ -7,7 +7,7 @@
  * fits alone are the helpful ones combined, each then lowered as far as the
  * set still fits. Pure.
  */
-import { fitsResourceBudget, resourceOverage } from './skillGaps';
+import { budgetOverages, fitsResourceBudget } from './skillGaps';
 import type { PlanEntry } from '../types';
 import type { FittingStats } from './types';
 
@@ -34,18 +34,10 @@ export interface FindSkillFixesParams {
   isCancelled?: () => boolean;
 }
 
-function overages(stats: FittingStats): number[] {
-  return [
-    resourceOverage(stats.cpuUsed, stats.cpuTotal),
-    resourceOverage(stats.powergridUsed, stats.powergridTotal),
-    resourceOverage(stats.calibrationUsed, stats.calibrationTotal),
-  ];
-}
-
 /** Lowers some overage and raises none. */
 function helps(before: FittingStats, after: FittingStats): boolean {
-  const was = overages(before);
-  const now = overages(after);
+  const was = budgetOverages(before);
+  const now = budgetOverages(after);
   return now.every((o, i) => o <= was[i]!) && now.some((o, i) => o < was[i]!);
 }
 

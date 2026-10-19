@@ -1584,6 +1584,11 @@ describe('FittingStatsSections Fitting section over budget', () => {
     expect(open).toHaveBeenCalledWith('cpu');
   });
 
+  it('names calibration in the header when it is the budget over', () => {
+    renderOver(stats({ calibrationUsed: 425 }));
+    expect(screen.getByText('CPU 25% · PG 50% · Cal 106%')).toHaveClass('text-danger');
+  });
+
   it('shows no red and no Fix link within budget', async () => {
     renderOver(stats());
     expect(screen.getByText('CPU 25% · PG 50%')).not.toHaveClass('text-danger');

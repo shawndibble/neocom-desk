@@ -1207,10 +1207,17 @@ export function FittingStatsSections({
       'fitting',
       figure(
         (s) =>
-          t('fittings.stats.fittingMeta', {
-            cpu: pctOf(s.cpuUsed, s.cpuTotal).toFixed(0),
-            pg: pctOf(s.powergridUsed, s.powergridTotal).toFixed(0),
-          }),
+          // Calibration earns a place only when it is the one over, or the header would go red with no number to say why.
+          t(
+            resourceOverage(s.calibrationUsed, s.calibrationTotal) > 0
+              ? 'fittings.stats.fittingMetaCalibration'
+              : 'fittings.stats.fittingMeta',
+            {
+              cpu: pctOf(s.cpuUsed, s.cpuTotal).toFixed(0),
+              pg: pctOf(s.powergridUsed, s.powergridTotal).toFixed(0),
+              cal: pctOf(s.calibrationUsed, s.calibrationTotal).toFixed(0),
+            }
+          ),
         stats && !fitsResourceBudget(stats) ? OVER_BUDGET_TONE : undefined
       ),
       stats ? (

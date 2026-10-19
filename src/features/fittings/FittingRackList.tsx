@@ -121,12 +121,16 @@ function ResourceBar({ label, used, total, resource }: ResourceBarProps) {
         </span>
       </div>
       {overBudget && (
-        <p className="flex items-baseline justify-end gap-3 pl-30 text-xs">
-          {resource && <MakeItFitTrigger resource={resource} />}
-          <span className="text-danger">
+        <>
+          <p className="pl-30 text-right text-xs text-danger">
             {t('fittings.list.overBy', { amount: overage.toFixed(1) })}
-          </span>
-        </p>
+          </p>
+          {resource && (
+            <div className="flex justify-end">
+              <MakeItFitTrigger resource={resource} />
+            </div>
+          )}
+        </>
       )}
     </div>
   );

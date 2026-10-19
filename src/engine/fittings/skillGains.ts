@@ -13,7 +13,7 @@ import { alignTimeSeconds } from './stats';
 import type { PlanEntry } from '../types';
 import type { FittingStats } from './types';
 import { round } from './fittingStatFields';
-import { resourceOverage } from './skillGaps';
+import { budgetOverages } from './skillGaps';
 import { diffFittingStats, type FittingStatsDelta } from './variationDelta';
 
 /** One calculated object's attributes, and its loaded charge's — the shape of the engine's `ItemResult`. */
@@ -329,23 +329,16 @@ export interface SkillGain extends SkillGainCandidate {
   budgetFreed?: number;
 }
 
-/** Each over budget's share of its overage that `after` clears, summed. */
+/**
+ * Each over budget's share of its overage that `after` clears, summed; 0
+ * when `after` is further over on any budget — a trade, not a step towards
+ * fitting (`findSkillFixes` takes the same view).
+ */
 export function budgetFreed(before: FittingStats, after: FittingStats): number {
-  const pairs: [number, number][] = [
-    [
-      resourceOverage(before.cpuUsed, before.cpuTotal),
-      resourceOverage(after.cpuUsed, after.cpuTotal),
-    ],
-    [
-      resourceOverage(before.powergridUsed, before.powergridTotal),
-      resourceOverage(after.powergridUsed, after.powergridTotal),
-    ],
-    [
-      resourceOverage(before.calibrationUsed, before.calibrationTotal),
-      resourceOverage(after.calibrationUsed, after.calibrationTotal),
-    ],
-  ];
-  return pairs.reduce((sum, [was, now]) => (was > 0 ? sum + (was - now) / was : sum), 0);
+  const was = budgetOverages(before);
+  const now = budgetOverages(after);
+  if (now.some((overage, i) => overage > was[i]!)) return 0;
+  return was.reduce((sum, w, i) => (w > 0 ? sum + (w - now[i]!) / w : sum), 0);
 }
 
 /** What one skill level does to a fit: `SkillGain` without the skill it is for. */

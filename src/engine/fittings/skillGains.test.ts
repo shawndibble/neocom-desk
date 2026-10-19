@@ -497,6 +497,15 @@ describe('evaluateSkillGains', () => {
     expect(gains?.[0]?.budgetFreed).toBeCloseTo(0.4);
   });
 
+  it('counts no freed budget for a level that clears CPU but sinks powergrid further', async () => {
+    const over = withStats({ cpuUsed: 450, powergridUsed: 1100 });
+    const compare = async () => ({
+      before: over,
+      after: withStats({ cpuUsed: 400, powergridUsed: 1200 }),
+    });
+    expect(await evaluateSkillGains([candidates[0]!], compare)).toEqual([]);
+  });
+
   it('still drops a CPU-only level on a fit within budget', async () => {
     const compare = async () => ({ before: baseStats, after: withStats({ cpuUsed: 80 }) });
     expect(await evaluateSkillGains([candidates[0]!], compare)).toEqual([]);
