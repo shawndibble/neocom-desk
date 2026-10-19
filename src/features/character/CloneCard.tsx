@@ -16,6 +16,7 @@ import type { AttributeName } from '@/engine/types';
 /** 44px tap box on a phone; stacked wrapped links must not overlap, so no negative margins here. */
 export const TOUCH_LINK = 'inline-flex min-h-11 items-center md:min-h-0';
 
+/** An implant name linking to Show Info, with its description in a hover/focus tooltip when it has one. */
 function ImplantLink({
   typeId,
   name,
