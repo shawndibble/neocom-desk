@@ -13747,6 +13747,7 @@
       "neverSynced": "Never synced",
       "syncedBy": "Synced {{age}} by {{name}}",
       "syncNow": "Sync now",
+      "viewOnly": "You can view this book. Syncing it needs the Accountant role, and editing needs Director or Accountant.",
       "syncing": "Syncing…",
       "failed": "Couldn't load the Corp Tax Book",
       "declared": "Declared paid, overdue paused",
@@ -13911,6 +13912,7 @@
         "unmatched": {
           "title": "Unmatched donation · {{amount}} from {{name}}",
           "body": "{{date}}. Not a character any Miner has; the player can claim it, or you can assign it.",
+          "bodyInMiner": "{{date}}. {{name}} is in a Miner now; the next sync assigns it, or you can assign it.",
           "assign": "Assign to a Miner…",
           "notTax": "Not tax…"
         },

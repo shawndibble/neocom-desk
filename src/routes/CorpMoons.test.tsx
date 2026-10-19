@@ -21,12 +21,12 @@ vi.mock('@/features/corp/moons/useCorpBook', () => ({
 
 const request = vi.fn();
 
-function mount(ledger: object) {
+function mount(ledger: object, roles: string[] = ['Accountant']) {
   vi.mocked(useCorpAccess).mockReturnValue({
     state: 'ready',
     capabilities: NO_CORP_CAPABILITIES,
     missingScopes: [],
-    roles: ['Accountant'],
+    roles,
     readFailed: false,
     retry: () => {},
   });
@@ -49,8 +49,14 @@ describe('CorpMoons gate', () => {
   });
 
   it('explains a role that cannot read the ledger instead of offering a grant', () => {
-    mount({ state: 'unavailable' });
+    mount({ state: 'unavailable' }, ['Station_Manager']);
     expect(screen.getByText('Moons need the Accountant role')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Allow mining ledger access' })).toBeNull();
+  });
+
+  it('opens the book to a Junior_Accountant, who cannot sync it, without offering the grant', () => {
+    mount({ state: 'unavailable' }, ['Junior_Accountant']);
+    expect(screen.queryByText('Moons need the Accountant role')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Allow mining ledger access' })).toBeNull();
   });
 });

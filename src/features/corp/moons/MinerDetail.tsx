@@ -278,7 +278,7 @@ export function MinerDetail({ id }: { id: string }) {
         meta={
           <span className="flex items-center gap-2 text-xs text-text-dim">
             <StandingWord standing={row.standing} />
-            {row.characterIds.length > 0 && (
+            {row.characterIds.length > 1 && (
               <span>{row.characterIds.map(names.character).join(', ')}</span>
             )}
           </span>

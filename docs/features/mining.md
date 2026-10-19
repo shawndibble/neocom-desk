@@ -247,7 +247,7 @@ The corporation's side of the same tax. A **Corp Tax Book** records, for one cor
 
 ### Officers: `/corp/moons`
 
-Route `/corp/moons`, tab "Moons" in the Corp sub-nav (`docs/features/corp.md`). The entry shows to every Character whose roles can read the refinery ledger (Accountant, Director, CEO), whether or not the mining scope is granted or a book exists (`20261018-172958`). A Junior_Accountant does not open the page: the server would accept the role for viewing, but `canReadMiningLedger` excludes it, so the page says "Moons need the Accountant role". Page states, in order:
+Route `/corp/moons`, tab "Moons" in the Corp sub-nav (`docs/features/corp.md`). The entry shows to every Character whose roles can view the book (D8: CEO, Director, Accountant, Junior_Accountant; `canViewCorpTaxBook`), whether or not the mining scope is granted or a book exists (`20261018-172958`). Syncing stays gated on `canReadMiningLedger` (Accountant, Director), because ESI's observer ledger wants Accountant: a Junior_Accountant opens the page read-only, sees no Sync action and a view-only note, and reads what an Accountant synced. Edit actions follow the server's `canEdit` (CEO, Director, Accountant). Page states, in order:
 
 - **Roles too low**: "Moons need the Accountant role".
 - **Scope missing**: "Allow mining ledger access" asks for `esi-industry.read_corporation_mining.v1`. The scope is additive, so an old grant keeps working elsewhere.

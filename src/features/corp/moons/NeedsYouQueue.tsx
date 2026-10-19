@@ -183,9 +183,16 @@ export function NeedsYouQueue() {
                     amount: isk(item.payment.amount),
                     name: names.character(item.payment.characterId),
                   })}
-                  body={t('corpTaxBook.moons.needs.unmatched.body', {
-                    date: shortDate(item.payment.at),
-                  })}
+                  body={t(
+                    // From the book as it is now: a sender who has since joined a Miner is not a stranger.
+                    view.miners.some((m) => m.characterIds.includes(item.payment.characterId))
+                      ? 'corpTaxBook.moons.needs.unmatched.bodyInMiner'
+                      : 'corpTaxBook.moons.needs.unmatched.body',
+                    {
+                      date: shortDate(item.payment.at),
+                      name: names.character(item.payment.characterId),
+                    }
+                  )}
                   actions={
                     canEdit ? (
                       <>

@@ -4,13 +4,17 @@
  * pages below their tabs, settings behind the header's gear and the audit log
  * behind Activity.
  *
- * Visible to a Character whose roles can read the refinery ledger
- * (`miningLedgerAccess`); one who has not granted the mining scope yet is
- * asked for it here, the first screen that needs it (#4058). The book itself
+ * Visible to a Character whose roles can view the book (D8: Director,
+ * Accountant, Junior_Accountant); syncing it is the refinery ledger's
+ * (`miningLedgerAccess`, Accountant), so a viewer without that role reads what
+ * an Accountant synced and sees no Sync action. An Accountant who has not
+ * granted the mining scope yet is asked for it here, the first screen that
+ * needs it (#4058). The book itself
  * is read through the officer rules, so the Character is verified first
  * (`useCorpBook`), and a corporation with no book shows the Director's turn-on.
  */
 import { useState } from 'react';
+import { canViewCorpTaxBook } from '@/engine/corpRoles';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -93,12 +97,14 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
                   <Icon.Recent size={Icon.ICON_SIZE.sm} aria-hidden="true" />
                   {t('corpTaxBook.moons.activity.button')}
                 </Button>
-                <IconButton
-                  icon={<Icon.Refresh />}
-                  label={t('corpTaxBook.moons.syncNow')}
-                  onClick={() => void sync.sync()}
-                  disabled={sync.run.phase === 'syncing'}
-                />
+                {sync.ledger.state === 'ready' && (
+                  <IconButton
+                    icon={<Icon.Refresh />}
+                    label={t('corpTaxBook.moons.syncNow')}
+                    onClick={() => void sync.sync()}
+                    disabled={sync.run.phase === 'syncing'}
+                  />
+                )}
                 <IconButton
                   icon={<Icon.Settings />}
                   label={t('corpTaxBook.moons.settings.open')}
@@ -114,6 +120,11 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
             onChange={(id) => selectTab(id as typeof tab)}
             tabs={tabBarTabs(MOONS_TABS).map((x) => ({ id: x.id, label: t(x.labelKey) }))}
           />
+          {sync.ledger.state === 'unavailable' && (
+            <p className="text-sm text-text-dim" role="note">
+              {t('corpTaxBook.moons.viewOnly')}
+            </p>
+          )}
           <BookHealthStrip sync={sync} />
           {tab === 'extractions' && <ExtractionsTab />}
           {tab === 'miners' && <MinersTab />}
@@ -219,7 +230,8 @@ export function CorpMoons() {
       </div>
     );
   }
-  if (ledger.state === 'unavailable' || ledger.state === 'unknown') {
+  const viewer = canViewCorpTaxBook(access.roles);
+  if (!viewer && (ledger.state === 'unavailable' || ledger.state === 'unknown')) {
     return (
       <div className="mx-auto max-w-6xl space-y-4 p-4">
         <PageHeader title={t('corp.moons.title')} subNav={<CorpSubNav flush />} />

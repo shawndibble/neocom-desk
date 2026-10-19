@@ -229,3 +229,30 @@ describe('buildBookView', () => {
     expect(row).toMatchObject({ oreSource: 'survey', minedPct: 50, estimatedValue: 1_000_000 });
   });
 });
+
+describe('a day on an issued Statement stays frozen (D22)', () => {
+  it('keeps the Statement line price, quantity and tax when prices move; unbilled days are priced live', () => {
+    const base = input({
+      entries: [entry(1, '2026-08-10', 1000), entry(1, '2026-09-10', 1000)],
+    });
+    const first = buildBookView(base);
+    const plan = planStatementRun(first, { start: '2026-08-01', end: '2026-08-31' });
+    const statement = statementForLine(first, plan, plan.lines[0]);
+    const later = buildBookView({
+      ...base,
+      statements: [statement],
+      pricesOn: () => ({
+        prices: new Map([[ORE, 2000]]),
+        sources: new Map([[ORE, 'saved' as const]]),
+      }),
+    });
+    const days = minerDetail(later, 'solo:1')!.days;
+    const billed = days.find((d) => d.date === '2026-08-10')!;
+    expect(billed.status).toBe('on-statement');
+    expect(billed.tax).toBe(100_000);
+    expect(billed.unitPrices[ORE]).toBe(1000);
+    expect(billed.estimatedValue).toBe(1_000_000);
+    expect(billed.taxPct).toBe(10);
+    expect(days.find((d) => d.date === '2026-09-10')!.tax).toBe(200_000);
+  });
+});
