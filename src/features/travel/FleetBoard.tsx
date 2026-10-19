@@ -1,5 +1,6 @@
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
-import { useEffect, useId, useMemo, useState } from 'react';
+import { useCallback, useId, useMemo, useState } from 'react';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { useTranslation } from 'react-i18next';
 import { EmptyState, Spinner } from '@/components/ui';
 import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
@@ -86,36 +87,32 @@ export function FleetBoard({
   trackHistory?: boolean;
 }) {
   const { t } = useTranslation();
-  const [loaded, setLoaded] = useState<Loaded>();
   const [expanded, setExpanded] = useState(false);
   const [fullOpen, setFullOpen] = useState(false);
   const lanesId = useId();
   const rowsKey = rows.map((r) => `${r.typeId}|${r.name}|${r.distanceKm}`).join(',');
 
-  useEffect(() => {
-    let cancelled = false;
-    void Promise.all([loadTypes(), loadGroupCategories()]).then(([types, categories]) => {
-      if (cancelled) return;
-      const infoOf = (typeId: number) => {
-        const type = types[String(typeId)];
-        return type === undefined
-          ? undefined
-          : { groupId: type.groupID, categoryId: categories[String(type.groupID)] ?? 0 };
-      };
-      const nameOf = (typeId: number) => types[String(typeId)]?.name ?? `#${typeId}`;
-      const board = buildFleetBoard(rows, infoOf);
-      const names = new Map<number, string>();
-      for (const role of board.roles) {
-        for (const { typeId } of role.hulls) names.set(typeId, nameOf(typeId));
-      }
-      setLoaded({ board, names, infoOf, nameOf, at: Date.now() });
-    });
-    return () => {
-      cancelled = true;
+  // A caller re-parsing the same scan hands a new array: hold the rows until their content changes.
+  const [held, setHeld] = useState({ key: rowsKey, rows });
+  if (held.key !== rowsKey) setHeld({ key: rowsKey, rows });
+  const heldRows = held.rows;
+  const loader = useCallback(async (): Promise<Loaded> => {
+    const [types, categories] = await Promise.all([loadTypes(), loadGroupCategories()]);
+    const infoOf = (typeId: number) => {
+      const type = types[String(typeId)];
+      return type === undefined
+        ? undefined
+        : { groupId: type.groupID, categoryId: categories[String(type.groupID)] ?? 0 };
     };
-    // Keyed on the rows themselves: a caller re-parsing the same scan hands a new array.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rowsKey]);
+    const nameOf = (typeId: number) => types[String(typeId)]?.name ?? `#${typeId}`;
+    const board = buildFleetBoard(heldRows, infoOf);
+    const names = new Map<number, string>();
+    for (const role of board.roles) {
+      for (const { typeId } of role.hulls) names.set(typeId, nameOf(typeId));
+    }
+    return { board, names, infoOf, nameOf, at: Date.now() };
+  }, [heldRows]);
+  const loaded = useKeyedLoad(rowsKey, loader).data;
 
   // The age of a live paste, re-read on a slow tick. A Shared D-Scan has none to show.
   // A hook can't be conditional, so a Shared D-Scan joins the idle hourly clock instead.
@@ -134,13 +131,11 @@ export function FleetBoard({
     () =>
       loaded === undefined || (trackHistory && previous === undefined)
         ? undefined
-        : buildDangerRead(rows, loaded.infoOf, loaded.nameOf, {
+        : buildDangerRead(heldRows, loaded.infoOf, loaded.nameOf, {
             ownShipGroupId,
             previous: previous ?? null,
           }),
-    // `rows` is keyed by `rowsKey`: a caller re-parsing the same scan hands a new array.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [loaded, previous, ownShipGroupId, rowsKey, trackHistory]
+    [loaded, previous, ownShipGroupId, heldRows, trackHistory]
   );
   // The ship's name is only stated when its size is known: otherwise the read says it is not set.
   const shipName =
