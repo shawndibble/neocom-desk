@@ -159,7 +159,7 @@ const EMPTY_DATED_PRICES: DatedUnitPrices = {
   unpriced: new Set(),
 };
 
-async function loadSnapshot(characterId: number, signal: RouteSnapshotSignal): Promise<Snapshot> {
+async function loadSnapshot(_characterId: number, signal: RouteSnapshotSignal): Promise<Snapshot> {
   const result = await loadMoonMiningTaxSnapshot();
   if (signal.cancelled) {
     return {
@@ -189,7 +189,6 @@ async function loadSnapshot(characterId: number, signal: RouteSnapshotSignal): P
   ] = await Promise.all([
     resolveRowNames(result.rows, compressed),
     loadDatedUnitPricesByHub(
-      characterId,
       result.rows.flatMap((row) => row.entry.oreLines.map((line) => line.typeId)),
       payeeHubIds,
       dates,

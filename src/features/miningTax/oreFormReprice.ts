@@ -33,7 +33,6 @@ export async function repriceForOreForm(characterId: number): Promise<void> {
     try {
       const payee = payees.find((p) => p.id === assignment.payeeId);
       const { prices, unpriced } = await loadUnitPricesOnDate(
-        characterId,
         assignment.oreLines.map((line) => line.typeId),
         hubForPayee(payee?.hubId),
         assignment.date,

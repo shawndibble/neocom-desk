@@ -1067,7 +1067,6 @@ describe('planNeedsReviewResolution', () => {
     // billed at the hub this Payee bills at — re-pricing at Jita would quietly
     // restate the bill at a book the landlord never quoted.
     expect(pricingMock.loadUnitPricesOnDate).toHaveBeenCalledWith(
-      CHAR_A,
       expect.anything(),
       expect.objectContaining({ id: 'hek' }),
       assignment.date,
@@ -1092,7 +1091,6 @@ describe('planNeedsReviewResolution', () => {
 
     await planAndWrite(dismissed, freshEntry, [dismissed]);
     expect(pricingMock.loadUnitPricesOnDate).toHaveBeenCalledWith(
-      CHAR_A,
       expect.anything(),
       expect.objectContaining({ id: 'jita' }),
       dismissed.date,
@@ -1104,7 +1102,6 @@ describe('planNeedsReviewResolution', () => {
     pricingMock.loadUnitPricesOnDate.mockClear();
     await planAndWrite({ ...dismissed, payeeId: 'gone' }, freshEntry, [dismissed]);
     expect(pricingMock.loadUnitPricesOnDate).toHaveBeenCalledWith(
-      CHAR_A,
       expect.anything(),
       expect.objectContaining({ id: 'jita' }),
       dismissed.date,
