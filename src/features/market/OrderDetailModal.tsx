@@ -20,7 +20,7 @@
  *   `deriveSystemId`) — which must render as "not checked" too, never as
  *   "checked, clean".
  */
-import { useMemo, useRef, useState, type ReactNode } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Modal,
@@ -39,16 +39,10 @@ import { useTableExport } from '@/components/ui/useTableExport';
 import { cx } from '@/lib/cx';
 import { buttonClassName } from '@/components/ui/buttonClassName';
 import { Link } from 'react-router-dom';
-import { formatIsk, formatMarketIsk } from '@/lib/isk';
-import type { JumpsAwayResult } from '@/engine/jumpsAway';
+import { formatMarketIsk } from '@/lib/isk';
 import { JumpsAwayText } from '@/features/character/assetBrowserRows';
-import type { UndercutRival, UndercutScope } from '@/engine/market/undercut';
-import { sellThrough, type SellThrough } from '@/engine/market/orderHealth';
-import { filterPriceHistoryRange } from '@/engine/market/priceHistory';
 import { useIsPhone } from '@/lib/useIsPhone';
 import type { OpenOrderRow } from './openOrdersModel';
-import type { RegionCompetition, StructureCompetition } from './orderCompetition';
-import type { PriceHistoryResult } from './priceHistory';
 import { OrderProblemBadge } from './OrderProblemBadge';
 import { OrderRowSummaryText } from './OrderRowSummaryText';
 import { adviseOrder } from './orderAdvice';
@@ -72,6 +66,21 @@ import { MarketItemLink } from './MarketItemLink';
 import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
 import { StructureFeeLine } from './StructureFeeLine';
 import { scopeOrdersCsvColumns, type ScopeOrderCsvRow } from './scopeOrdersCsv';
+import {
+  deepScopeState,
+  scopeCsvRow,
+  scopeLabelText,
+  stationRank,
+  stationScopeState,
+  structureStationScopeState,
+  tightestRivalScope,
+  CELL,
+  COLUMN_HEADER,
+  computeSellThrough,
+  type LocationState,
+} from './orderScopeState';
+import { ScopeRow } from './OrderScopeRow';
+import { CostLedger } from './OrderCostLedger';
 
 export interface OrderDetailModalProps {
   row: OpenOrderRow;
@@ -115,34 +124,8 @@ export type OrderDetailContentProps = OrderDetailView & {
   onClose: () => void;
 };
 
-type ScopeState =
-  | { kind: 'unavailable' }
-  | { kind: 'notChecked' }
-  | { kind: 'clear' }
-  | { kind: 'rival'; rival: UndercutRival };
-
 /** The modal's four folding sections, all folded on arrival. */
 export type OrderDetailSectionId = 'numbers' | 'whoCheaper' | 'costBasis' | 'exits';
-
-/** The tightest scope carrying a rival, for the "Who is cheaper" disclosure's trailing read — or `'clear'`/`'notChecked'` when none of the three do. */
-function tightestRivalScope(
-  station: ScopeState,
-  system: ScopeState,
-  region: ScopeState
-): { scope: UndercutScope; price: number } | 'clear' | 'notChecked' {
-  for (const [scope, state] of [
-    ['station', station],
-    ['system', system],
-    ['region', region],
-  ] as const) {
-    if (state.kind === 'rival') return { scope, price: state.rival.price };
-  }
-  // `unavailable` (a player structure's market that can't be read at all)
-  // is not proof of "clear" either — only a real `clear` read earns that.
-  return [station, system, region].some((s) => s.kind === 'notChecked' || s.kind === 'unavailable')
-    ? 'notChecked'
-    : 'clear';
-}
 
 /** Money, not status: the ISK delta tokens, with the sign (DESIGN.md §1). */
 function IskDelta({ amount }: { amount: number }) {
@@ -156,315 +139,6 @@ const EXIT_SHORT_KEY: Record<OrderExitKind, string> = {
   dumpToBuyOrder: 'exitShortDumpToBuyOrder',
   reprocess: 'exitShortReprocess',
 };
-
-/**
- * `'known'` — the NPC-station lookup loaded and resolved this location.
- * `'structure'` — it loaded but this location isn't in it (a player
- * structure). `'unknown'` — the lookup itself hasn't loaded, so nothing
- * about this location can be claimed either way.
- */
-type LocationState = 'known' | 'structure' | 'unknown';
-
-function stationScopeState(
-  row: OpenOrderRow,
-  stationChecked: boolean,
-  location: LocationState
-): ScopeState {
-  if (location === 'unknown') return { kind: 'notChecked' };
-  if (location === 'structure') return { kind: 'unavailable' };
-  if (!stationChecked) return { kind: 'notChecked' };
-  if (row.station.bestPrice === null) return { kind: 'clear' };
-  if (row.station.beatsMe) {
-    return {
-      kind: 'rival',
-      rival: {
-        scope: 'station',
-        price: row.station.bestPrice,
-        gapIsk: row.station.gapIsk,
-        gapPct: row.station.gapPct,
-        volumeRemain: 0,
-        locationId: row.locationId,
-        systemId: 0,
-        ordersBeatingMe: 0,
-        unitsBeatingMe: 0,
-      },
-    };
-  }
-  return { kind: 'clear' };
-}
-
-/**
- * The 'station' column for a player structure (issue #538): sourced from
- * `row.deepUndercut.byScope.station`, which `openOrdersModel.ts` only
- * populates once THIS structure's own book was actually fetched — never from
- * `deepScopeState`, whose `deep.truncated` read is the REGION fetch's flag
- * and would misattribute a structure-book truncation to the wrong fetch.
- *
- * 'unavailable' is the default and the failure mode alike: never fetched,
- * the `structureMarkets` scope isn't granted, or this character isn't on the
- * structure's ACL all leave `byScope.station` absent, and all read the same
- * — there is no way, or reason, to tell them apart on the row.
- */
-function structureStationScopeState(
-  row: OpenOrderRow,
-  structureMarket: StructureCompetition | null
-): ScopeState {
-  const byScope = row.deepUndercut?.byScope ?? {};
-  if (!('station' in byScope)) return { kind: 'unavailable' };
-  const rival = byScope.station;
-  if (rival) return { kind: 'rival', rival };
-  // A clean read from a TRUNCATED structure book is only proof of absence for
-  // the pages it actually saw — same reasoning as `deepScopeState` below.
-  if (structureMarket?.truncated) return { kind: 'notChecked' };
-  return { kind: 'clear' };
-}
-
-function deepScopeState(
-  scope: 'system' | 'region',
-  row: OpenOrderRow,
-  deep: RegionCompetition | null,
-  location: LocationState
-): ScopeState {
-  if (scope === 'system' && location === 'unknown') return { kind: 'notChecked' };
-  if (scope === 'system' && location === 'structure') return { kind: 'unavailable' };
-  if (deep === null) return { kind: 'notChecked' };
-  const byScope = row.deepUndercut?.byScope ?? {};
-  if (!(scope in byScope)) return { kind: 'notChecked' };
-  const rival = byScope[scope];
-  if (rival) return { kind: 'rival', rival };
-  // A rival was found here despite truncation, that finding stands. But a
-  // CLEAN read from a truncated book is only proof of absence for the pages
-  // it actually saw — honest is "not checked", not "clear".
-  if (deep.truncated) return { kind: 'notChecked' };
-  return { kind: 'clear' };
-}
-
-/** Scope pill colours: the same station/system/region ladder the row badges use. */
-const SCOPE_PILL: Record<UndercutScope, string> = {
-  station: 'bg-danger/15 text-danger',
-  system: 'bg-warning/15 text-warning',
-  region: 'bg-accent/15 text-accent',
-};
-
-/**
- * One cell of the scope table. Every row is a FRAGMENT of these, not its own
- * grid: three separate grids each size their `auto` columns to their own
- * content, so the price and gap columns landed in a different place on every
- * row. One grid owns the track sizes for the whole table, and the rows only
- * contribute cells.
- *
- * That rules out a row background or a row border — a fragment has no box —
- * so the top rule and the "my order" tint are painted per cell instead.
- */
-const CELL = 'border-t border-line px-2 py-1.5';
-
-/** A scope table column header. */
-const COLUMN_HEADER =
-  'px-2 pt-2 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
-
-type Translate = ReturnType<typeof useTranslation>['t'];
-
-function scopeLabelText(scope: UndercutScope, t: Translate): string {
-  return t(`market.orders.badge.undercut${scope[0].toUpperCase()}${scope.slice(1)}`);
-}
-
-/** Distance as words, the way `JumpsAwayText` renders it. */
-function jumpsText(jumps: JumpsAwayResult, t: Translate): string {
-  return jumps.kind === 'known'
-    ? t('assets.jumpsAway.value', { count: jumps.jumps })
-    : t('assets.jumpsAway.unknown');
-}
-
-/** One scope line of the grid as exported (`scopeOrdersCsv.ts`), mirroring `ScopeRow`. */
-function scopeCsvRow(
-  scope: UndercutScope,
-  state: ScopeState,
-  t: Translate,
-  where: { stationName?: string | null; distance?: string; jumps?: JumpsAwayResult }
-): ScopeOrderCsvRow {
-  const base = { scope: scopeLabelText(scope, t), price: null, gapIsk: null, gapPct: null };
-  if (state.kind !== 'rival') {
-    const seller =
-      state.kind === 'unavailable'
-        ? t('market.orders.structureMarketUnavailable')
-        : state.kind === 'notChecked'
-          ? t('market.orders.scopeNotChecked')
-          : t('market.orders.scopeClear');
-    return { ...base, seller, distance: null };
-  }
-  const { rival } = state;
-  return {
-    ...base,
-    seller: where.stationName ?? t('market.unknownStructure'),
-    price: rival.price,
-    gapIsk: rival.gapIsk,
-    gapPct: rival.gapPct,
-    distance: where.jumps ? jumpsText(where.jumps, t) : (where.distance ?? null),
-  };
-}
-
-/**
- * One scope's line in the "Who is cheaper" table.
- *
- * The seller cell carries the station, the ISK gap and the distance, because
- * the three scopes routinely carry the SAME rival — one seller at your own
- * station is, by construction, also the cheapest in your system and can be
- * the cheapest in the region too. Three identical ISK figures on three bare
- * rows read as a bug; the same three beside where they sit, the gap, and the
- * distance read as what they are.
- *
- * A state that isn't a rival (not checked, clear, structure) has nothing to
- * put in the seller and price columns, so it spans them rather than printing
- * dashes.
- */
-function ScopeRow({
-  scope,
-  state,
-  stationName,
-  distance,
-  jumps,
-}: {
-  scope: UndercutScope;
-  state: ScopeState;
-  /** Where the rival sits, when this app resolved that location. */
-  stationName?: string | null;
-  /** Fixed distance wording for a scope whose answer is structural (station, system). */
-  distance?: string;
-  jumps?: JumpsAwayResult;
-}) {
-  const { t } = useTranslation();
-  const scopeLabel = (
-    <span role="rowheader" className={cx(CELL, 'pl-3')}>
-      <span
-        className={cx(
-          'inline-flex h-5 w-fit items-center rounded-xs px-1.5 text-[0.6875rem] font-semibold tracking-widest uppercase',
-          SCOPE_PILL[scope]
-        )}
-      >
-        {scopeLabelText(scope, t)}
-      </span>
-    </span>
-  );
-
-  if (state.kind !== 'rival') {
-    return (
-      <div role="row" className="contents">
-        {scopeLabel}
-        <span
-          role="cell"
-          className={cx(
-            CELL,
-            'col-span-2 pr-3',
-            state.kind === 'clear' ? 'text-success' : 'text-text-dim'
-          )}
-        >
-          {state.kind === 'unavailable' && t('market.orders.structureMarketUnavailable')}
-          {state.kind === 'notChecked' && t('market.orders.scopeNotChecked')}
-          {state.kind === 'clear' && t('market.orders.scopeClear')}
-        </span>
-      </div>
-    );
-  }
-
-  const { rival } = state;
-  // The station tier is a Fuzzwork aggregate: a price, never an order count.
-  // `stationScopeState` fills those fields with 0, so they are only ever read
-  // when the deep book actually supplied them.
-  const countsKnown = rival.ordersBeatingMe > 0;
-  const distanceText = jumps ? (
-    <JumpsAwayText result={jumps} t={t} locationId={rival.locationId} />
-  ) : (
-    (distance ?? '')
-  );
-  const whoText = countsKnown
-    ? [
-        t('market.orders.rowSummary.sellersUnderMe', { count: rival.ordersBeatingMe }),
-        t('market.orders.scopeUnitsUnder', { count: rival.unitsBeatingMe }),
-      ].join(' · ')
-    : t('market.orders.scopeAggregateOnly');
-
-  return (
-    <div role="row" className="contents">
-      {scopeLabel}
-      <span role="cell" className={cx(CELL, 'flex flex-col gap-0.5')}>
-        <span>{stationName ?? t('market.unknownStructure')}</span>
-        <span className="text-[0.6875rem] text-text-dim">{whoText}</span>
-        {/*
-          The gap and distance ride under the seller as labelled words: the
-          dialog is narrow at every width, and a bare red number under no
-          column header says nothing.
-        */}
-        <span className="text-[0.6875rem] text-text-dim">
-          {t('market.orders.scopeOverBy')}:{' '}
-          <span className="text-danger tabular-nums">
-            {formatMarketIsk(rival.gapIsk)} · {rival.gapPct.toFixed(1)}%
-          </span>
-        </span>
-        {distanceText !== '' && (
-          <span className="text-[0.6875rem] text-text-dim">
-            {t('market.orders.scopeDistance')}: {distanceText}
-          </span>
-        )}
-      </span>
-      <span role="cell" className={cx(CELL, 'pr-3 text-right tabular-nums')}>
-        {formatMarketIsk(rival.price)}
-      </span>
-    </div>
-  );
-}
-
-/**
- * "Sells out in": `sellThrough` fed with this order's remaining volume, the
- * region's recent average daily units (last 30 days of price history — the
- * same window `sellsOutNoSales`'s wording promises), and the player's share
- * of the units listed at their price or better.
- *
- * No usable history at all (never fetched, fetch failed, or ESI genuinely
- * has none) reads as `'noHistory'` — never a fabricated rate.
- *
- * `myShare` comes from the deep competitors already in hand: same side
- * (a buy order only queues behind other buy orders), priced at-or-better
- * than mine, my own remaining volume as a fraction of that whole pool. When
- * the deep book has not been fetched yet there is no honest way to place
- * myself in that queue, so this passes `1` (assume nothing ahead) rather
- * than inventing a number — the only other input, region volume, still
- * carries the interesting signal in that case. A TRUNCATED deep book is
- * used as-is here too: it under-counts the queue ahead of me (rather than
- * over-counting it), so `myShare` — and therefore the days-to-clear estimate
- * — reads as a lower bound in that case, never a false alarm.
- */
-function computeSellThrough(
-  row: OpenOrderRow,
-  deep: RegionCompetition | null,
-  history: PriceHistoryResult | null
-): SellThrough {
-  if (!history || history.points.length === 0) return { kind: 'unknown', reason: 'noHistory' };
-
-  const recentDays = 30;
-  const recent = filterPriceHistoryRange(history.points, '30d');
-  const regionUnitsPerDay = recent.reduce((sum, p) => sum + p.volume, 0) / recentDays;
-
-  let myShare = 1;
-  if (deep) {
-    const queueVolume = deep.competitors
-      .filter(
-        (c) =>
-          c.orderId !== row.orderId &&
-          c.isBuyOrder === row.isBuyOrder &&
-          (row.isBuyOrder ? c.price >= row.price : c.price <= row.price)
-      )
-      .reduce((sum, c) => sum + c.volumeRemain, 0);
-    const totalVolume = row.volumeRemain + queueVolume;
-    myShare = totalVolume > 0 ? row.volumeRemain / totalVolume : 1;
-  }
-
-  return sellThrough({
-    volumeRemain: row.volumeRemain,
-    regionUnitsPerDay,
-    myShare,
-    hasHistory: true,
-  });
-}
 
 /** The modal itself, rendering a finished view — `OrderDetailModal` is what a page mounts. */
 export function OrderDetailContent({
@@ -1218,199 +892,5 @@ export function OrderDetailContent({
         </div>
       </div>
     </Modal>
-  );
-}
-
-/** "What it cost you" once a cost basis is known: build run or wallet buys, fees, floor. */
-function CostLedger({
-  row,
-  costBasis,
-  relistFees,
-  floorShown,
-}: {
-  row: OpenOrderRow;
-  costBasis: NonNullable<OpenOrderRow['costBasis']>;
-  relistFees: OrderDetailView['relistFees'];
-  floorShown: number | null;
-}) {
-  const { t } = useTranslation();
-  return (
-    <>
-      <dl className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1 text-xs">
-        {costBasis.source === 'wallet' ? (
-          <>
-            <LedgerRow
-              label={t('market.orders.walletBasisUnits')}
-              value={costBasis.unitsCovered.toLocaleString()}
-            />
-            <LedgerRow
-              label={t('market.orders.walletBasisBuys')}
-              value={costBasis.buyCount.toLocaleString()}
-            />
-            <LedgerRow
-              label={t('market.orders.walletBasisRange')}
-              value={t('market.orders.walletBasisRangeValue', {
-                from: new Date(costBasis.oldestBuy).toLocaleDateString(),
-                to: new Date(costBasis.newestBuy).toLocaleDateString(),
-              })}
-            />
-          </>
-        ) : (
-          <>
-            <LedgerRow
-              label={t('industry.quantity')}
-              value={costBasis.runQuantity.toLocaleString()}
-            />
-            <LedgerRow
-              label={t('industry.materialCost')}
-              value={`${formatIsk(costBasis.materialCost)} ISK`}
-            />
-            <LedgerRow label={t('industry.jobFee')} value={`${formatIsk(costBasis.jobFee)} ISK`} />
-            <LedgerRow
-              label={t('industry.totalCost')}
-              value={`${formatIsk(costBasis.materialCost + costBasis.jobFee)} ISK`}
-            />
-          </>
-        )}
-        {/*
-          Per unit, not per run — the pivot from the batch totals above to the
-          per-unit figures below. `unitCost` is exactly `totalCost /
-          runQuantity` (orderCostBasis.ts); 2 decimals to match the floor rows
-          it feeds into, not the 0-decimal batch totals above it.
-        */}
-        <LedgerRow
-          label={t('market.orders.costPerUnit')}
-          value={`${formatMarketIsk(costBasis.unitCost)} ISK`}
-        />
-        {costBasis.source === 'wallet' && (
-          <div className="col-span-2 space-y-0.5 text-text-dim">
-            <ul>
-              {costBasis.buys.map((buy, i) => (
-                <li key={i}>
-                  {t('market.orders.walletBasisBuyLine', {
-                    quantity: buy.quantity.toLocaleString(),
-                    price: formatMarketIsk(buy.unitPrice),
-                    date: new Date(buy.date).toLocaleDateString(),
-                  })}
-                </li>
-              ))}
-            </ul>
-            <p>{t('market.orders.walletBasisNoBuyFee')}</p>
-          </div>
-        )}
-        {/*
-          The two fee lines sum with cost per unit to exactly the relist floor
-          below — `relistFees` in `orderDetailView.ts` says why they are read
-          that way.
-        */}
-        {relistFees && (
-          <>
-            <LedgerRow
-              label={t('industry.salesTax')}
-              value={`${formatMarketIsk(relistFees.salesTax)} ISK`}
-            />
-            <LedgerRow
-              label={t('market.orders.relistBrokerFee')}
-              value={`${formatMarketIsk(relistFees.brokerFee)} ISK`}
-            />
-          </>
-        )}
-        {floorShown !== null && (
-          // Only ONE floor is ever shown as a ledger number (design
-          // decision): `floor.fill` — what leaving the order alone would net
-          // once it sells — appears only in the prose below, which is the one
-          // place the smaller number is the answer to something. The ledger
-          // math itself still sums to the exact `row.floor.relist`, never the
-          // rounded figure.
-          <LedgerRow
-            label={t('market.orders.floorLabel')}
-            tooltip={t('market.orders.floorHelp')}
-            value={
-              <span
-                className={row.floor && row.price < row.floor.relist ? 'text-danger' : undefined}
-              >
-                <CopyablePrice price={floorShown} /> ISK
-              </span>
-            }
-          />
-        )}
-      </dl>
-      {row.floor && (
-        <>
-          <p className="text-xs text-text-dim">
-            {t(
-              costBasis.source === 'wallet'
-                ? 'market.orders.statFloorCaptionWallet'
-                : 'market.orders.statFloorCaption'
-            )}{' '}
-            {t('market.orders.floorBreakEvenNote')}
-          </p>
-          <div className="rounded-xs border border-line bg-panel p-2">
-            <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-              {t('market.orders.floorWhyBroker')}
-            </p>
-            <p className="mt-1 text-xs text-text">
-              {t('market.orders.floorWhyBrokerBody', {
-                relist: formatMarketIsk(row.floor.relist),
-              })}
-            </p>
-            <p className="mt-1 text-xs text-text-dim">
-              {t('market.orders.floorWhyBrokerFill', {
-                price: formatMarketIsk(row.price),
-                fill: formatMarketIsk(row.floor.fill),
-                difference: formatMarketIsk(row.floor.relist - row.floor.fill),
-              })}
-            </p>
-          </div>
-        </>
-      )}
-    </>
-  );
-}
-
-/**
- * Where my price sits among the sell orders at my own station.
- *
- * Only from a COMPLETE region book: a truncated fetch under-counts the
- * orders at my station, so both the rank and the total would be a lower
- * bound dressed up as a fact. The station tier cannot answer this at all —
- * an aggregate carries a price and no order count.
- */
-function stationRank(
-  row: OpenOrderRow,
-  deep: RegionCompetition | null
-): { rank: number; total: number } | null {
-  if (!deep || deep.truncated) return null;
-  const atMyStation = deep.competitors.filter(
-    (c) => c.locationId === row.locationId && c.isBuyOrder === row.isBuyOrder
-  );
-  if (atMyStation.length === 0) return null;
-  const better = atMyStation.filter((c) =>
-    row.isBuyOrder ? c.price > row.price : c.price < row.price
-  ).length;
-  // `atMyStation` already includes my own order (`loadRegionCompetition` does
-  // not filter it out), so it is the total, not the total minus me.
-  return { rank: better + 1, total: atMyStation.length };
-}
-
-function LedgerRow({
-  label,
-  value,
-  tooltip,
-}: {
-  label: string;
-  value: ReactNode;
-  /** Explains the label's term, as a "?" after it. */
-  tooltip?: string;
-}) {
-  const { t } = useTranslation();
-  return (
-    <>
-      <dt className="flex items-center gap-1 font-semibold tracking-widest text-text-dim uppercase">
-        {label}
-        {tooltip && <InfoTooltip label={t('common.aboutLabel', { label })} content={tooltip} />}
-      </dt>
-      <dd className="text-right tabular-nums text-text">{value}</dd>
-    </>
   );
 }
