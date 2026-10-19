@@ -25,6 +25,7 @@ import { useTranslation } from 'react-i18next';
 import { Modal, StatChip, StatChips } from '@/components/ui';
 import { formatMarketIsk } from '@/lib/isk';
 import { useIsPhone } from '@/lib/useIsPhone';
+import { useNow } from '@/lib/useNow';
 import type { OpenOrderRow } from './openOrdersModel';
 import { adviseOrder } from './orderAdvice';
 import { useOpenOrderDetail, type OrderDetail } from './useOrderDetail';
@@ -111,6 +112,7 @@ export function OrderDetailContent({
 }: OrderDetailContentProps) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
+  const nowTick = useNow();
   // All folded: verdict, Copy and the facts are the answer, each trailing read
   // its summary. Remounts per orderId, so nothing carries between orders.
   const [openSections, setOpenSections] = useState<ReadonlySet<OrderDetailSectionId>>(
@@ -138,7 +140,7 @@ export function OrderDetailContent({
       : stationScopeState(row, stationChecked, location);
   const system = deepScopeState('system', row, deep, location);
   const region = deepScopeState('region', row, deep, location);
-  const sell = computeSellThrough(row, deep, history);
+  const sell = computeSellThrough(row, deep, history, new Date(nowTick));
 
   // "Cheapest here" is the station tier: the price a buyer standing in this
   // station sees first. Exact, never shorthand.

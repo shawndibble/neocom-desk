@@ -25,7 +25,7 @@ export function shiftDate(date: string, days: number): string {
 }
 
 /** Today's EVE/UTC calendar date. */
-export function eveToday(now: Date = new Date()): string {
+export function eveToday(now: Date): string {
   return now.toISOString().slice(0, 10);
 }
 

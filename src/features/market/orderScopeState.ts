@@ -186,12 +186,13 @@ export function scopeCsvRow(
 export function computeSellThrough(
   row: OpenOrderRow,
   deep: RegionCompetition | null,
-  history: PriceHistoryResult | null
+  history: PriceHistoryResult | null,
+  now: Date
 ): SellThrough {
   if (!history || history.points.length === 0) return { kind: 'unknown', reason: 'noHistory' };
 
   const recentDays = 30;
-  const recent = filterPriceHistoryRange(history.points, '30d');
+  const recent = filterPriceHistoryRange(history.points, '30d', now);
   const regionUnitsPerDay = recent.reduce((sum, p) => sum + p.volume, 0) / recentDays;
 
   let myShare = 1;

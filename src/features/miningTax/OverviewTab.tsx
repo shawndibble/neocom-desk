@@ -39,6 +39,7 @@ import * as Icon from '@/components/ui/icons';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { beginGrant } from '@/app/grantAction';
+import { useNow } from '@/lib/useNow';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { formatVolume } from '@/features/market/format';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
@@ -198,7 +199,8 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
   );
   // EVE/UTC, the ledger's own calendar. Recomputed each render so a tab left
   // open past downtime moves its window with the day.
-  const today = eveToday();
+  const nowMs = useNow();
+  const today = eveToday(new Date(nowMs));
 
   const characters = data?.characters ?? [];
   const showCharacterColumn = characters.length > 1;
