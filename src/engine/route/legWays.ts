@@ -251,22 +251,6 @@ export function pinWaitsOnHoleList(pin: LegPin): pin is Extract<LegPin, { kind: 
   return pin.kind === 'hub' || pin.kind === 'hole';
 }
 
-/** The link token a pin is written as. */
-export function legPinToken(pin: LegPin): string {
-  switch (pin.kind) {
-    case 'gates':
-      return 'gates';
-    case 'hub':
-      return pin.hub;
-    case 'hole':
-      return pin.id;
-    case 'ansiblex':
-      return 'ansiblex';
-    case 'jump':
-      return 'jump';
-  }
-}
-
 /**
  * A pinned leg's route, or why it cannot be flown that way:
  * - `no-hole`: a hub pin, and that hub has no qualifying hole;

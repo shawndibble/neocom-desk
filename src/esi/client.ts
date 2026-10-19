@@ -85,7 +85,7 @@ export interface EsiFetchOptions {
   body?: unknown;
   /**
    * Identifies the call for the activity log (issue #32). Every
-   * `endpoints.ts` wrapper passes its own registry key; omitted only by
+   * `endpoints/` wrapper passes its own registry key; omitted only by
    * direct `esiFetch` callers (tests) that don't need an entry.
    */
   endpointId?: EsiEndpointId;

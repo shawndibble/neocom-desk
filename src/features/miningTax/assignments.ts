@@ -26,7 +26,7 @@ import {
 import { appendTombstones, tombstoneKey } from '@/sync/localBookkeeping';
 import { MINING_TAX_ASSIGNMENTS } from '@/sync/syncedCollections';
 import { computeAssignmentValue } from '@/engine/miningTax/valuation';
-import { linesOwnedBy } from '@/engine/miningTax/ownership';
+import { growthCollector, linesOwnedBy } from '@/engine/miningTax/ownership';
 import { planSplit } from '@/engine/miningTax/split';
 import type { MiningLedgerEntry } from '@/engine/miningTax/types';
 import { normalizePaymentInfo } from './paymentLinks';
@@ -55,21 +55,14 @@ export class AlreadyAssignedError extends Error {
  * claim on growth ESI reported for a type another Assignment already holds
  * (`computeOwnership`'s unassigned residual) from being refused. Without it
  * there is nothing to measure against, so any second claim on a type refuses.
- * Meant to run inside the same transaction as the write it guards.
  */
-async function assertUnclaimed(
-  characterId: number,
-  date: string,
-  solarSystemId: number,
+function assertUnclaimed(
+  covering: readonly MiningTaxAssignmentRecord[],
   oreLines: readonly MiningTaxOreLine[],
   entryOreLines?: readonly MiningTaxOreLine[]
-): Promise<void> {
-  const existing = await db.miningTaxAssignments
-    .where('[characterId+date+solarSystemId]')
-    .equals([characterId, date, solarSystemId])
-    .toArray();
+): void {
   const claimed = new Map<number, number>();
-  for (const a of existing) {
+  for (const a of covering) {
     for (const line of a.oreLines) {
       claimed.set(line.typeId, (claimed.get(line.typeId) ?? 0) + line.quantity);
     }
@@ -82,6 +75,35 @@ async function assertUnclaimed(
     return held === undefined ? true : already + line.quantity > held;
   });
   if (clash) throw new AlreadyAssignedError();
+}
+
+/**
+ * Checks a new Assignment's claim on its entry (`assertUnclaimed`) and
+ * returns what to write: the record, plus, when the entry's growth collector
+ * is paid, that paid record with its `collectsGrowth` flag handed over to the
+ * new one. A paid Assignment never grows (ADR 0024), so its late ore is left
+ * unassigned for the pilot to assign as a new entry; that entry then collects
+ * the rest of the day, so a session still mining after payment folds into one
+ * unpaid row instead of spawning a fresh one on every ledger refresh. Moving
+ * the flag (not adding a second) keeps one collector per entry, which
+ * `SplitDialog` and coalescing rely on; the paid record's status, ore and tax
+ * stay as they are. Meant to run inside the write's transaction.
+ */
+async function claimNewOre(
+  record: MiningTaxAssignmentRecord,
+  entryOreLines?: readonly MiningTaxOreLine[]
+): Promise<MiningTaxAssignmentRecord[]> {
+  const covering = (
+    await db.miningTaxAssignments.where('characterId').equals(record.characterId).toArray()
+  ).filter((a) => a.date === record.date && a.solarSystemId === record.solarSystemId);
+  assertUnclaimed(covering, record.oreLines, entryOreLines);
+  const collector = growthCollector(covering);
+  if (collector?.status !== 'paid') return [record];
+  record.collectsGrowth = true;
+  if (!collector.collectsGrowth) return [record];
+  const handedOver: MiningTaxAssignmentRecord = { ...collector, updatedAt: record.updatedAt };
+  delete handedOver.collectsGrowth;
+  return [record, handedOver];
 }
 
 /** Normalizes each record's `payment` on the way out — see `normalizePaymentInfo`. */
@@ -142,14 +164,7 @@ export async function createAssignment(input: AssignInput): Promise<MiningTaxAss
   // Check and write in one transaction so two tabs cannot both pass the check
   // (under a ledger action this joins the action's own transaction).
   await db.transaction('rw', db.miningTaxAssignments, async () => {
-    await assertUnclaimed(
-      input.characterId,
-      input.date,
-      input.solarSystemId,
-      input.oreLines,
-      input.entryOreLines
-    );
-    await db.miningTaxAssignments.put(record);
+    await db.miningTaxAssignments.bulkPut(await claimNewOre(record, input.entryOreLines));
   });
   return record;
 }
@@ -356,17 +371,12 @@ export async function joinAssignments(
   // Only the members this call would *create* are checked — an already-assigned
   // member is just re-tagged, and adds no claim. Same transaction as the write.
   await db.transaction('rw', db.miningTaxAssignments, async () => {
-    for (const m of members) {
+    const handedOver: MiningTaxAssignmentRecord[] = [];
+    for (const [i, m] of members.entries()) {
       if (m.assignment) continue;
-      await assertUnclaimed(
-        m.characterId,
-        m.date,
-        m.solarSystemId,
-        m.oreLines ?? [],
-        m.entryOreLines
-      );
+      handedOver.push(...(await claimNewOre(records[i], m.entryOreLines)).slice(1));
     }
-    await db.miningTaxAssignments.bulkPut(records);
+    await db.miningTaxAssignments.bulkPut([...records, ...handedOver]);
   });
   return records;
 }

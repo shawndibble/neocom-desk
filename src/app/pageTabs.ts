@@ -19,6 +19,7 @@ import { matchPath } from 'react-router-dom';
 import { legacyAssetsLocation } from '@/engine/assetPath';
 import { INDUSTRY_TABS } from '@/features/industry/industryTabs';
 import { SHIPS_TABS } from '@/features/fittings/shipsTabs';
+import { MOONS_TABS } from '@/features/corp/moons/moonsPaths';
 import { ROUTE_REQUIREMENTS, type AppRoutePath } from './routeScopes';
 
 export const CONTACTS_TABS = definePageTabs('/contacts', [
@@ -146,6 +147,7 @@ export const ASSETS_TABS = definePageTabs('/assets', [
 ]);
 
 export const PAGE_TABS: Partial<Record<AppRoutePath, PageTabs>> = {
+  '/corp/moons': MOONS_TABS,
   '/assets': ASSETS_TABS,
   '/contacts': CONTACTS_TABS,
   '/contracts': CONTRACTS_TABS,

@@ -22,7 +22,7 @@ vi.mock('@/engine/fittings/esiFittingMapper', () => ({
 }));
 vi.mock('./dogmaFittingEngine', () => ({ computeOutgoing: outgoing.computeOutgoing }));
 vi.mock('@/sde/loadSde', () => ({ loadSkills: async () => [{ typeID: 3300 }] }));
-vi.mock('@/engine/fitting/fittingShare', () => ({
+vi.mock('@/engine/fittings/fittingShare', () => ({
   decodeFittingShare: async () => ({
     ok: true,
     value: {
