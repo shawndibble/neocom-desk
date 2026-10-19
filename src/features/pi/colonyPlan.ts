@@ -10,7 +10,6 @@
  *
  * `nearestPin` and `roomSummary` live here because they are inputs to that shared answer, not to one card's markup.
  */
-import { useMemo } from 'react';
 import type { TFunction } from 'i18next';
 import type { PiData, PiPinKind } from '@/sde/types';
 import { EXTRACTOR_HEADS_MAX, spareCapacity } from '@/engine/pi/pinBudget';
@@ -128,21 +127,12 @@ export interface ColonyPlan {
 }
 
 /**
- * A built colony's derived plan. One `useMemo` chain, so the card and the
- * modal read the same object rather than two equal ones.
- */
-export function useColonyPlan(colony: BuiltColonyAdvice, pi: PiData): ColonyPlan {
-  return useMemo(() => colonyPlan(colony, pi), [colony, pi]);
-}
-
-/**
- * The same answer, without a hook.
+ * A built colony's derived plan.
  *
- * The Advisor's worklist needs this for every colony at once, and a hook
- * cannot be called in a loop — so the derivation lives here and
- * `useColonyPlan` only memoises it. Two copies of this arithmetic is exactly
- * how a card and the list would come to disagree about whether a facility is
- * idle, which is what this module exists to prevent.
+ * The Advisor's worklist needs this for every colony at once, and a card needs
+ * it too, so the derivation lives in one function. Two copies of this
+ * arithmetic is exactly how a card and the list would come to disagree about
+ * whether a facility is idle, which is what this module exists to prevent.
  */
 export function colonyPlan(colony: BuiltColonyAdvice, pi: PiData): ColonyPlan {
   {

@@ -40,8 +40,8 @@ import { EXTRACTOR_HEADS_MAX } from '@/engine/pi/pinBudget';
 import { recommendStopTier, type StopTierAdvice } from '@/engine/pi/stopTier';
 import type { PinLoad } from '@/engine/pi/types';
 import { type BuiltColonyAdvice } from './systemPlanetModel';
-import { effectiveLocalResources } from './richnessOverride';
-import { productBySchematicId } from './products';
+import { effectiveLocalResources } from './effectiveResources';
+import { productBySchematicId } from './productMap';
 
 export type ColonyStopTierAdvice =
   | {

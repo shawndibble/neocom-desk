@@ -15,7 +15,7 @@ import { factoryBalance, type FactoryBalance } from '@/engine/pi/factoryBalance'
 import { pinsLoad } from '@/engine/pi/pinBudget';
 import type { PinLoad } from '@/engine/pi/types';
 import type { BuiltColonyAdvice } from './systemPlanetModel';
-import { productBySchematicId } from './products';
+import { productBySchematicId } from './productMap';
 
 /**
  * This colony's factories measured against what it can put into them.

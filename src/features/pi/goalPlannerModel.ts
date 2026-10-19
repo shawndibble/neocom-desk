@@ -61,10 +61,10 @@ import {
   totalColonyEarnings,
   type TotalColonyEarnings,
 } from './colonyEarningsModel';
-import { type CustomsRateSource } from './customsRate';
+import type { CustomsRateSource } from './customsRate';
 import { type CustomsOverrides } from './customsOverride';
 import { resolveColonyCustoms } from './colonyCustoms';
-import { effectiveLocalResources, type RichnessByPlanet } from './richnessOverride';
+import { effectiveLocalResources, type RichnessByPlanet } from './effectiveResources';
 
 /** Heads per ECU when the pilot runs no extractor at all to read one off. */
 export const DEFAULT_PLANNER_HEADS = 10;
