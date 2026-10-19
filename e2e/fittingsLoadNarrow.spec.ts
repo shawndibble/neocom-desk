@@ -6,34 +6,11 @@
  * on a cold CI runner — so this spec asserts on the List view and the Load
  * control only, not on any stat figure.
  */
-import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
+import { answerAnyType } from './support/universeTypes';
 
 const PHONE = { width: 390, height: 844 };
-
-/**
- * The Fitting's skill gaps read each fitted type's requirements from
- * `/universe/types/{id}`, which the shared ESI mock only carries a few
- * fixture types for — answer for any id, with no skill requirements.
- */
-async function answerAnyType(page: Page) {
-  await page.route(/\/universe\/types\/\d+$/, async (route) => {
-    const typeId = Number(/\/universe\/types\/(\d+)$/.exec(route.request().url())![1]);
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        type_id: typeId,
-        name: `Type ${typeId}`,
-        description: '',
-        group_id: 46,
-        published: true,
-        dogma_attributes: [],
-      }),
-    });
-  });
-}
 
 const RIFTER_EFT = [
   '[Rifter, Tracer Test]',

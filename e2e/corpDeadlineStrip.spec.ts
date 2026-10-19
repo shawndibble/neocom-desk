@@ -22,38 +22,9 @@
  */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
-import {
-  CHARACTER_NAME,
-  CHARACTER_ID,
-  CORPORATION_ID,
-  OWNER_HASH,
-  SCOPES,
-} from './support/fixtureData';
+import { CHARACTER_ID, CORPORATION_ID, SCOPES } from './support/fixtureData';
 import { scopesForGroup } from '../src/esi/scopes';
-
-/** Far-future expiry, matching `mockSso.ts`'s own mocked token. */
-const EXP_SECONDS = 4_102_444_800;
-
-function base64url(json: unknown): string {
-  return Buffer.from(JSON.stringify(json), 'utf-8')
-    .toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
-}
-
-function makeAccessTokenWithCorpScopes(): string {
-  const header = base64url({ alg: 'RS256', typ: 'JWT' });
-  const payload = base64url({
-    sub: `CHARACTER:EVE:${CHARACTER_ID}`,
-    name: CHARACTER_NAME,
-    owner: OWNER_HASH,
-    exp: EXP_SECONDS,
-    scp: [...SCOPES, ...scopesForGroup('corp')],
-    iss: 'login.eveonline.com',
-  });
-  return `${header}.${payload}.fakesig`;
-}
+import { makeAccessToken } from './support/mockSso';
 
 async function signInWithMockedDeadline(page: Page) {
   await page.route('https://login.eveonline.com/v2/oauth/token', async (route) => {
@@ -65,7 +36,7 @@ async function signInWithMockedDeadline(page: Page) {
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
-        access_token: makeAccessTokenWithCorpScopes(),
+        access_token: makeAccessToken([...SCOPES, ...scopesForGroup('corp')]),
         token_type: 'Bearer',
         expires_in: 1199,
         refresh_token: 'fake-refresh',

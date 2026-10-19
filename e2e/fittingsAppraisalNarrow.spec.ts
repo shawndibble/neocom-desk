@@ -12,6 +12,8 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
+import { answerAnyType } from './support/universeTypes';
+import { mockFlatHubPrices } from './support/piPrices';
 
 const PHONE = { width: 390, height: 844 };
 const TABLET = { width: 768, height: 1024 };
@@ -25,49 +27,10 @@ const EFT = [
   '125mm Gatling AutoCannon I',
 ].join('\n');
 
-async function answerAnyType(page: Page) {
-  await page.route(/\/universe\/types\/\d+$/, async (route) => {
-    const typeId = Number(/\/universe\/types\/(\d+)$/.exec(route.request().url())![1]);
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        type_id: typeId,
-        name: `Type ${typeId}`,
-        description: '',
-        group_id: 46,
-        published: true,
-        dogma_attributes: [],
-      }),
-    });
-  });
-}
-
-/** Every type at 250M sell, so each gun line totals 500M. */
-async function mockHubPrices(page: Page) {
-  await page.route('https://market.fuzzwork.co.uk/**', async (route) => {
-    const types = new URL(route.request().url()).searchParams.get('types') ?? '';
-    const body = Object.fromEntries(
-      types.split(',').map((raw) => [
-        raw,
-        {
-          buy: { max: '240000000', volume: '900000000', orderCount: '40' },
-          sell: { min: '250000000', volume: '900000000', orderCount: '40' },
-        },
-      ])
-    );
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify(body),
-    });
-  });
-}
-
 async function openBreakdown(page: Page, size: { width: number; height: number }) {
   await signInAndGoto(page, './ships/fittings');
   await answerAnyType(page);
-  await mockHubPrices(page);
+  await mockFlatHubPrices(page, { buy: 240_000_000, sell: 250_000_000 });
   await page.setViewportSize(size);
   await page.getByRole('button', { name: 'Import…', exact: true }).click();
   await page.getByLabel('Link or text').fill(EFT);
