@@ -19,7 +19,7 @@ import type { PlanetType } from '@/engine/pi/goalTypes';
 import type { PiTier } from '@/engine/pi/types';
 import type { PlanAdvice } from './planAdviceModel';
 
-export const PLAN_PICK_COUNT = 3;
+const PLAN_PICK_COUNT = 3;
 
 export interface PlanPick {
   typeId: number;

@@ -29,7 +29,7 @@ import { FittingNameModal } from './SavedFittingModals';
 export type LibraryAction = 'new' | 'import' | 'open';
 
 /** What the header's Alpha/Omega and Mastery badges show; null `mastery` is no logged-in Character. */
-export interface HeaderBadges {
+interface HeaderBadges {
   alpha: {
     blockers: readonly AlphaBlocker[] | null;
     skillName: (skillTypeId: number) => string;

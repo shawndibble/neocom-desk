@@ -349,9 +349,7 @@ export function rankOpportunityRows(
 }
 
 /** Every material typeID any candidate in the list needs owned stock detected for — the union `detectOwnedStock` scans once for the whole batch. */
-export function opportunityMaterialTypeIds(
-  candidates: readonly OpportunityCandidate[]
-): Set<number> {
+function opportunityMaterialTypeIds(candidates: readonly OpportunityCandidate[]): Set<number> {
   const ids = new Set<number>();
   for (const candidate of candidates) {
     for (const material of candidate.catalogEntry.blueprint.materials) ids.add(material.typeID);

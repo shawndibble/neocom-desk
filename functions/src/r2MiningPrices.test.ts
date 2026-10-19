@@ -1,6 +1,7 @@
 import { gunzipSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
-import { MINING_PRICES_MIGRATED_KEY, SNAPSHOT_HUBS } from './miningHubPrices.js';
+import { SNAPSHOT_HUBS } from './marketOpenPrices.js';
+import { MINING_PRICES_MIGRATED_KEY } from './miningHubPrices.js';
 import { publishMiningPricesToR2 } from './r2MiningPrices.js';
 
 type Put = (key: string, body: Buffer | string, headers: Record<string, string>) => Promise<void>;

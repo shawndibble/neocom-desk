@@ -37,7 +37,7 @@ vi.mock('./PriceHistoryChart', () => ({
     series,
     openMissing,
   }: {
-    openPrices?: { regionId: number; points: unknown[] }[];
+    openPrices?: { regionId: number; station?: string; points: unknown[] }[];
     series?: string;
     openMissing?: ReadonlySet<number>;
     points: unknown[];
@@ -49,7 +49,12 @@ vi.mock('./PriceHistoryChart', () => ({
     <div data-testid="chart">
       {itemName}: {points.length} points, {movingAverage?.length ?? 0} ma points
       {primaryRegionName ? ` primary=${primaryRegionName}` : ''}
-      {(openPrices ?? []).map((o) => ` {open ${o.regionId}:${o.points.length}:${series}}`).join('')}
+      {(openPrices ?? [])
+        .map(
+          (o) =>
+            ` {open ${o.regionId}:${o.points.length}:${series}}${o.station ? `@${o.station}` : ''}`
+        )
+        .join('')}
       {(comparisons ?? []).map((c) => ` [${c.name}:${c.status}:${c.points.length}]`).join('')}
       {` series=${series} missing=${[...(openMissing ?? [])].join(',')}`}
     </div>
@@ -459,11 +464,12 @@ describe('PriceHistoryPanel', () => {
   });
 
   describe('open buy and sell prices', () => {
-    const OPEN = {
+    const SERIES = {
       dates: ['2026-08-01', '2026-08-02'],
       buy: [9, 10],
       sell: [12, 13],
     };
+    const OPEN = { stationId: 60003760, series: SERIES };
 
     function renderPanel() {
       mockedLoad.mockResolvedValue({
@@ -508,6 +514,21 @@ describe('PriceHistoryPanel', () => {
       // A region with a series is never reported as missing one.
       expect(screen.getByTestId('chart')).toHaveTextContent(/missing=$/);
       expect(mockedOpen).toHaveBeenCalledTimes(1);
+    });
+
+    it('hands the chart the hub station the series is from, and none for an old region-wide one', async () => {
+      mockedOpen.mockResolvedValue(OPEN);
+      const first = renderPanel();
+      await waitFor(() =>
+        expect(screen.getByTestId('chart')).toHaveTextContent('{open 10000002:2:both}@Jita 4-4')
+      );
+      first.unmount();
+      mockedOpen.mockResolvedValue({ stationId: null, series: SERIES });
+      renderPanel();
+      await waitFor(() =>
+        expect(screen.getByTestId('chart')).toHaveTextContent('{open 10000002:2:both}')
+      );
+      expect(screen.getByTestId('chart')).not.toHaveTextContent('@');
     });
 
     it('remembers the chosen side across panels', async () => {

@@ -65,10 +65,10 @@ const NO_FEEDS: readonly FeedId[] = [];
 
 type Load<T> = (characterId: number, signal: RouteSnapshotSignal) => Promise<T>;
 
-/** A read made through `useRouteSnapshot`, reloaded whenever the refresh epoch moves. */
 /** A stand-in id for a read that does not depend on the header Character. */
 const ACCOUNT_WIDE = 0;
 
+/** A read made through `useRouteSnapshot`, reloaded whenever the refresh epoch moves. */
 function SnapshotSource<K extends FeedId>({
   feed,
   load,

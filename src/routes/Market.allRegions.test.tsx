@@ -332,7 +332,7 @@ describe('Market Browser: All regions', () => {
     // Seeded in Dexie, store left unhydrated (as `beforeEach` sets it) — the
     // realistic "fresh page load" shape. Setting `hydrated: true` directly
     // would skip the read this test exists to cover, and the gate it verifies
-    // (`browserFilterSettingHydrated` in `useOrderBookOrchestration.ts`) would
+    // (`filters.hydrated` gating `useOrderBookFetch.ts`) would
     // pass even if deleted.
     await db.settings.put({
       key: BROWSER_FILTER_SETTING_KEY,

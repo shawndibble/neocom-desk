@@ -41,7 +41,7 @@ export const tombstoneKey = (
  * {@link clearPullCursors} can drop them with a single range scan — which also
  * reaches the Notification Feed's cursor, a collection with no tombstones.
  */
-export const PULL_CURSOR_PREFIX = `${INTERNAL_PREFIX}pullCursor.`;
+const PULL_CURSOR_PREFIX = `${INTERNAL_PREFIX}pullCursor.`;
 export const pullCursorKey = (characterId: number, collectionName: string): string =>
   `${PULL_CURSOR_PREFIX}${characterId}.${collectionName}`;
 

@@ -20,7 +20,7 @@ export interface AllCharacterFills {
 export type AllCharacterFillsState =
   { status: 'loading' } | { status: 'failed' } | { status: 'ready'; data: AllCharacterFills };
 
-export function latestArchiveSince(sinces: readonly (number | null)[]): number | null {
+function latestArchiveSince(sinces: readonly (number | null)[]): number | null {
   let latest: number | null = null;
   for (const since of sinces)
     if (since !== null && (latest === null || since > latest)) latest = since;

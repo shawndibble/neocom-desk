@@ -158,7 +158,7 @@ export const MAX_BUDGET_WAIT_MS = 5000;
 export const DEFAULT_ERROR_WINDOW_MS = 60_000;
 
 /** How long a 429 shuts the door for when it names neither Retry-After nor a rate reset. */
-export const DEFAULT_RATE_WINDOW_MS = 1000;
+const DEFAULT_RATE_WINDOW_MS = 1000;
 
 /** Ceiling on a server-named reset, so one absurd header cannot wedge the app for a day. */
 export const MAX_CIRCUIT_MS = 5 * 60_000;
