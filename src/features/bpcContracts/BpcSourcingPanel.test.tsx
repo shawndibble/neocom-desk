@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, waitFor, within, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useMarketHub } from '@/features/market/hub';
@@ -358,6 +358,9 @@ beforeAll(async () => {
 }, 30_000);
 
 beforeEach(resetSession);
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 /** Every `FilterBar` keeps its controls behind the funnel, so open it first. */
 async function openFilters(user: ReturnType<typeof userEvent.setup>) {
@@ -1603,11 +1606,12 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
 
   describe('BPO availability (issue #1241)', () => {
     it('checks no market Order Book while the search is empty', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
       loadPublicBpcContracts.mockResolvedValue(cachedSnapshot([row({ contractId: 1 })]));
       render(<App />);
       await screen.findByRole('table', { name: 'BPC Sourcing' });
       // Past the lookup debounce, so a pending fan-out would have started.
-      await new Promise((resolve) => setTimeout(resolve, 400));
+      await vi.advanceTimersByTimeAsync(400);
       expect(getOrderBook).not.toHaveBeenCalled();
     });
 
