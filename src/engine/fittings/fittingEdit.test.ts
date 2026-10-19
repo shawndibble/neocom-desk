@@ -20,7 +20,6 @@ import {
   droneTotals,
   fillRack,
   firstFreeSlotIndex,
-  loadChargeIntoAll,
   loadChargeIntoCompatible,
   moveModule,
   nextModuleState,
@@ -122,22 +121,6 @@ describe('newFitting', () => {
       drones: [],
       cargo: [],
     });
-  });
-});
-
-describe('loadChargeIntoAll', () => {
-  it('loads the charge into every fitted module of that type, and leaves the rest', () => {
-    const two = addModule(base, 'high', 1, 2889);
-    const next = loadChargeIntoAll(two, 2889, 186);
-    expect(next.modules.filter((m) => m.typeId === 2889).map((m) => m.chargeTypeId)).toEqual([
-      186, 186,
-    ]);
-    expect(next.modules.find((m) => m.slot === 'low')!.chargeTypeId).toBeUndefined();
-  });
-
-  it('keeps each module’s state', () => {
-    const next = loadChargeIntoAll(base, 2889, 186);
-    expect(next.modules[0].state).toBe('active');
   });
 });
 

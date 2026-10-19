@@ -28,6 +28,7 @@ const STATIC_ROUTES = [
   '/s/:shareId',
   '/communities/join/:code',
   '/share/:shareId',
+  '/corp-tax-book/verify/:token',
   '/error',
 ];
 

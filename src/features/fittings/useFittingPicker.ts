@@ -6,7 +6,7 @@
  * `encodeFittingShare` first.
  */
 import { useCallback, useState } from 'react';
-import { encodeFittingShare } from '@/engine/fitting/fittingShare';
+import { encodeFittingShare } from '@/engine/fittings/fittingShare';
 import type { LoadedFitting, LoadOutcome } from '@/engine/fittings/load';
 import { fittingToShareInput } from '@/engine/fittings/shareMapper';
 import type { Fitting } from '@/engine/fittings/types';

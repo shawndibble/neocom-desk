@@ -124,7 +124,7 @@ Corporation pages that open Show Info links (`CorpRoster`, `CorpTransactionsPane
 7. **How long does a Share Link live and who can read it?** 7 days from creation, not extended by opening; anyone with the id can read all of it; no uid stored (`shareStore.ts:23`, `firestore.rules:243`).
 8. **Can someone enumerate links?** `list` is denied, keys are 6 chars of a 31-letter alphabet (~30 bits) (`firestore.rules:243`, `src/engine/share/shareId.ts`).
 9. **Appraisal limits?** 1000 items (client `MAX_SNAPSHOT_ITEMS` and rule); empty is not shareable (`src/engine/market/appraisalSnapshot.ts:18`).
-10. **Fitting code limits?** 20,100 chars (`src/engine/fitting/fittingSharePayload.ts:15`, rule); over -> "Too large to share as a link."
+10. **Fitting code limits?** 20,100 chars (`src/engine/fittings/fittingSharePayload.ts:15`, rule); over -> "Too large to share as a link."
 11. **What does a logged-in visitor of a fitting link see?** The editor on that code, under their own pilot; the All-V view is only for signed-out visitors (`FittingShared.tsx:146`).
 12. **How does "Open Neocom Desk" survive login?** `setLoginReturnTo(target.path)` stashed before `/login`; the callback consumes it (`ShareShell.tsx:33`, `src/routes/Callback.tsx` `takeLoginReturnTo`).
 13. **Why can the same content produce the same link?** Session reuse map keyed by `type + reuseKey`, unless under 24 h from expiry (`shareStore.ts:69,89`).

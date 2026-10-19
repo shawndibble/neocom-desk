@@ -4,7 +4,7 @@
  * can't know — item names from the SDE, and the Fitting Share Code's encoder
  * and permanent URL.
  */
-import { encodeFittingShare } from '@/engine/fitting/fittingShare';
+import { encodeFittingShare } from '@/engine/fittings/fittingShare';
 import { fittingToEft, fittingToEveXml, fittingToMultibuy } from '@/engine/fittings/fittingExport';
 import { fittingToShareInput } from '@/engine/fittings/shareMapper';
 import type { Fitting } from '@/engine/fittings/types';
