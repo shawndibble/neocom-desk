@@ -16,11 +16,12 @@ import {
   type CustomTargetProfile,
   type NamedTargetProfile,
 } from '@/engine/fittings/targetProfile';
+import {
+  SYNCED_CUSTOM_TARGET_PROFILES_KEY,
+  SYNCED_SELECTED_TARGET_PROFILE_KEY,
+} from '@/sync/syncedSettings';
 import { createSyncedSetting } from '@/lib/useSyncedSetting';
 import { useHydratedStore } from '@/lib/useHydratedStore';
-
-export const SYNCED_CUSTOM_TARGET_PROFILES_KEY = 'sync.fittingTargetProfiles';
-export const SYNCED_SELECTED_TARGET_PROFILE_KEY = 'sync.fittingTargetProfileId';
 
 export const useCustomTargetProfiles = createSyncedSetting<CustomTargetProfile[]>({
   key: SYNCED_CUSTOM_TARGET_PROFILES_KEY,

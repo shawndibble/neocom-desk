@@ -5,6 +5,7 @@
  * this only draws it. Hovering a hull shows the in-game hover card; clicking
  * one opens the Ship Info window (the caller's).
  */
+import { useObservedMeasure } from '@/lib/useObservedMeasure';
 import { useGesture } from '@use-gesture/react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -102,15 +103,14 @@ export function ShipTreeMap({
         ? focusCamera(focusNode, viewport, initial.z, scale)
         : initial;
 
-  useEffect(() => {
-    const vp = viewportRef.current;
-    if (!vp) return;
-    const measure = () => setViewport({ width: vp.clientWidth, height: vp.clientHeight });
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(vp);
-    return () => observer.disconnect();
-  }, []);
+  useObservedMeasure(
+    () => (viewportRef.current ? [viewportRef.current] : null),
+    () => {
+      const vp = viewportRef.current;
+      if (vp) setViewport({ width: vp.clientWidth, height: vp.clientHeight });
+    },
+    []
+  );
 
   const moveTo = (next: Camera) => setMoved({ factionID, scale, cam: next });
   const zoomBy = (factor: number) =>

@@ -279,6 +279,12 @@
 // beside but deliberately not part of the Travel Settings: sync.routeHoles
 // (route through the open Thera / Turnur holes), sync.routeHoleShipSize,
 // sync.routeHoleMinLife and sync.routeHoleHubs. Also set, never unset.
+/** The Fittings damage / target profile settings (read by features/fittings). */
+export const SYNCED_CUSTOM_DAMAGE_PROFILES_KEY = 'sync.fittingDamageProfiles';
+export const SYNCED_SELECTED_DAMAGE_PROFILE_KEY = 'sync.fittingDamageProfileId';
+export const SYNCED_CUSTOM_TARGET_PROFILES_KEY = 'sync.fittingTargetProfiles';
+export const SYNCED_SELECTED_TARGET_PROFILE_KEY = 'sync.fittingTargetProfileId';
+
 export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.avoidEdencom',
   'sync.avoidPodKills',
@@ -291,10 +297,10 @@ export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.corpDarkAfterDays',
   'sync.courierHighCollateralRatio',
   'sync.defaultCharacterFilter',
-  'sync.fittingDamageProfileId',
-  'sync.fittingDamageProfiles',
-  'sync.fittingTargetProfileId',
-  'sync.fittingTargetProfiles',
+  SYNCED_SELECTED_DAMAGE_PROFILE_KEY,
+  SYNCED_CUSTOM_DAMAGE_PROFILES_KEY,
+  SYNCED_SELECTED_TARGET_PROFILE_KEY,
+  SYNCED_CUSTOM_TARGET_PROFILES_KEY,
   'sync.industryAssumedMe',
   'sync.industryAssumedTe',
   'sync.industryBuildGroups',
