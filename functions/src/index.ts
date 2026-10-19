@@ -130,6 +130,7 @@ import {
   type R2Config,
   publishContractOffersToR2,
   publishCourierContractsToR2,
+  publicContractsRunVerdict,
   r2PublishOutcome,
   type CourierR2PublishState,
   type R2PublishOutcome,
@@ -1388,18 +1389,10 @@ export const syncPublicContractOffers = onSchedule(
           logWarn('public contract type hashes write failed', { error: String(err) })
         );
     }
-    // R2 is the only store (issue #4270): a failed publish fails the run. The
-    // fingerprint is stored only once both snapshots are fully published, so a
-    // failed or budget-cut run is retried next cycle rather than skipped as
-    // "archive unchanged".
-    const failures = [
-      courier.kind === 'failed' ? `courier: ${courier.error}` : null,
-      offers.kind === 'failed' ? `offers: ${offers.error}` : null,
-    ].filter((f): f is string => f !== null);
-    if (failures.length > 0) {
-      throw new Error(`Public contracts R2 publish failed — ${failures.join('; ')}`);
-    }
-    if (fingerprint !== null && courier.kind === 'complete' && offers.kind === 'complete') {
+    // R2 is the only store (issue #4270): see `publicContractsRunVerdict`.
+    const verdict = publicContractsRunVerdict(courier, offers);
+    if (verdict.error !== null) throw new Error(verdict.error);
+    if (fingerprint !== null && verdict.storeFingerprint) {
       await fingerprintRef.set({ fingerprint, updatedAt: Date.now() });
     }
   }

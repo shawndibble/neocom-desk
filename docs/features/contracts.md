@@ -96,7 +96,7 @@ Panel without title; table label "Contract Search". Mounts only after snapshot l
 
 States (in order, `ContractSearchPanel.tsx:964-1031`):
 
-1. Build without sync: "Contract search isn't available / requires the app's sync backend".
+1. R2 unreachable with nothing cached: "Couldn't reach the contract index — nothing cached yet" with Try again (no sync backend needed since #4270).
 2. `fromCache`: "offline" or (after a refresh) "refresh failed" line; `revalidating` status line.
 3. Loading with 0 rows: spinner "loading offers" plus visible copy (first sync is slow).
 4. Error: "Couldn't load".
@@ -226,7 +226,7 @@ Dense cards and mobile sort on both search tabs; filters in a funnel sheet; pane
 ## Observed gaps (facts from code)
 
 - No corporation contracts view: no `getCorporationContracts` in `esi/registry.ts`; Corp section is Members/Wallet/Assets only.
-- Item search and Courier are unavailable in a build without sync backend (explicit empty state).
+- Item search and Courier need no sync backend (R2 only since #4270); R2 unreachable with nothing cached shows the unreachable state.
 - Public snapshot is ≤ 30 min old and can list a contract already gone; only discovered on modal open (404 → "no longer listed").
 - Courier endpoints that are player structures show only an id: local snapshots hold NPC stations only; wormhole hauls always unplaced.
 - Courier region filter cannot match unplaced ends; Space chip row hides bands with no data (Wormhole never offered).

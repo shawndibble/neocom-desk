@@ -272,6 +272,28 @@ export function r2PublishOutcome(result: {
   if (failed === 0 && remaining > 0) return { kind: 'resumable', remaining };
   return {
     kind: 'failed',
-    error: `${failed} objects failed, index not written; first error: ${result.firstError ?? 'unknown'}`,
+    error: `${failed > 0 ? `${failed} objects failed` : 'index not written'}; first error: ${result.firstError ?? 'unknown'}`,
+  };
+}
+
+/**
+ * What `syncPublicContractOffers` does with both publishes' outcomes (issue
+ * #4270): any failure fails the run, naming each snapshot that failed; the
+ * archive fingerprint is stored only when both are complete, so a failed or
+ * budget-cut run is retried next cycle rather than skipped as "archive
+ * unchanged".
+ */
+export function publicContractsRunVerdict(
+  courier: R2PublishOutcome,
+  offers: R2PublishOutcome
+): { error: string | null; storeFingerprint: boolean } {
+  const failures = [
+    courier.kind === 'failed' ? `courier: ${courier.error}` : null,
+    offers.kind === 'failed' ? `offers: ${offers.error}` : null,
+  ].filter((failure): failure is string => failure !== null);
+  return {
+    error:
+      failures.length > 0 ? `Public contracts R2 publish failed — ${failures.join('; ')}` : null,
+    storeFingerprint: courier.kind === 'complete' && offers.kind === 'complete',
   };
 }

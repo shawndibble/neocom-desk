@@ -571,7 +571,10 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
   const modeLoadingLabel = t(
     mode === 'courier' ? 'contractSearch.loadingCourier' : 'contractSearch.loadingOffers'
   );
-  const modeError = active.error;
+  // A failed per-type R2 read is an error too: with R2 the only store (issue
+  // #4270) no full snapshot is coming to replace it, and an empty table would
+  // claim nothing matched.
+  const modeError = active.error || (mode === 'items' && early.failed === true);
   /** Last cycle's rows are on screen and this cycle's are on the way (#963). */
   const revalidating = active.data?.revalidating ?? false;
   // A manual Refresh still means "reload the tab", not "reload the mode I am

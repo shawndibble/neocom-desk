@@ -614,8 +614,8 @@ Summary
 ### Data source
 
 - ADR `docs/adr/0013`: scheduled Cloud Function `syncPublicContractOffers` (every 30 min, `functions/src/index.ts:639`) fetches EVE Ref public-contracts dataset and publishes it to Cloudflare R2 (ADR 0019; R2 only since #4270, the chunked Firestore collections are gone). Client reads the offer index and per-type objects (`publicContractOffers.ts`, `publicContractOfferIndex.ts`, `r2OfferSnapshot.ts`) and the courier object (`publicCourierContracts.ts`, <620 rows, via `chunkedSnapshot.ts`); Dexie-cached, stale after 30 min, `useRouteSnapshot` with `staleWhileRevalidate` (#963). Decisions: `20260912-032407-generalized-public-contract-snapshot-schema-and-sizing`, `20260912-050724-contract-search-reads-the-shared-snapshot-as-its`, `20260912-055542-courier-contracts-get-a-sibling-snapshot-not-more`, `20260912-065131-courier-contracts-are-a-sibling-mode-of-contract`, `20260912-160012-each-contract-search-board-loads-on-its-own`.
-- Guarded by `isSyncConfigured()`: build with no sync backend shows `notConfigured` empty state, reads nothing.
-- Needs an active character (cache keyed by character): `Contracts.tsx:550` redirects to `/characters` when none is active (after a hydration spinner), so the panel's own spinner (`ContractSearchPanel.tsx:943`, `!hydrated || activeCharacterId === null`) is only a hydration state in practice. That spinner is checked before `isSyncConfigured()`, so `notConfigured` appears only after hydration. No ESI scope for search itself. Per-contract detail items fetched live (public ESI contract items) in modal.
+- Not gated on a sync backend (R2 only since #4270): R2 unreachable with nothing cached shows the "couldn't reach the contract index" state.
+- Needs an active character (cache keyed by character): `Contracts.tsx:550` redirects to `/characters` when none is active (after a hydration spinner), so the panel's own spinner (`ContractSearchPanel.tsx:943`, `!hydrated || activeCharacterId === null`) is only a hydration state in practice. No ESI scope for search itself. Per-contract detail items fetched live (public ESI contract items) in modal.
 - Name resolution fills behind boards (`contractSearchNames.ts`: type names, region names; `offerLocations.ts`: station/structure system lookup; `courierEndpoints.ts`: NPC stations from `stations.json`, structures left unresolved to avoid 403 fan-out).
 
 ### Item search tab
@@ -646,7 +646,7 @@ Summary
 - Item search table has no bulk action or "seed Build Plan" for all lines (only per-row context menu; decision `20260911-...` all-or-nothing seeds are BPC Sourcing).
 - High-collateral flag is modal-only by decision, not in table rows.
 - Collateral threshold setting lives in settings (`sync.courierHighCollateralRatio`); no control on the Courier tab itself.
-- Both boards depend on a single backend snapshot (30 min, EVE Ref); no live ESI fallback, and unsynced builds show `notConfigured`.
+- Both boards depend on a single backend snapshot (30 min, EVE Ref); no live ESI fallback, and R2 unreachable with nothing cached shows the unreachable state.
 - Mode pref remembers items/courier only; filters not remembered for items (courier filters are).
 
 ## 7. Persistence and sync matrix (verified)

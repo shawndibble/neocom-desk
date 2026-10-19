@@ -2043,7 +2043,7 @@ describe('ContractSearchPanel — search first (issue #2921)', () => {
     renderWithRouter(['/']);
 
     expect(await screen.findByRole('progressbar')).not.toHaveAttribute('aria-valuenow');
-    expect(screen.getByText('Downloading offers…')).toBeInTheDocument();
+    expect(screen.getByText('Loading the offer index…')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Search item name…')).toBeEnabled();
 
     offers.settle(cachedSnapshot([TRIT_FORGE]));
@@ -2100,11 +2100,12 @@ describe('ContractSearchPanel — search first (issue #2921)', () => {
       expect(
         await screen.findByText('Loading public contracts, this may take a moment.')
       ).toBeInTheDocument();
-      await waitFor(() =>
-        expect(
-          screen.queryByText('Loading public contracts, this may take a moment.')
-        ).not.toBeInTheDocument()
-      );
+      expect(
+        await screen.findAllByText("Couldn't reach the contract index — nothing cached yet")
+      ).not.toHaveLength(0);
+      expect(
+        screen.queryByText('Loading public contracts, this may take a moment.')
+      ).not.toBeInTheDocument();
     });
 
     it('does not call a typed query unmatched while the item names are still unknown', async () => {

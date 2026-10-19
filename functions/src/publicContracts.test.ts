@@ -495,60 +495,55 @@ describe('buildContractOfferIndex', () => {
       ...fields,
     }) as PublicContractOfferRow;
 
-  it('says how many offers, the cheapest, and which chunks hold each type', () => {
-    // Already type-sorted, as the writer hands them over; chunks of 2.
+  it('says how many offers and the cheapest for each type, in any row order', () => {
     const rows = [
       offer({ typeId: 34, price: 50 }),
       offer({ typeId: 34, price: 20 }),
       offer({ typeId: 35, price: 70 }),
       offer({ typeId: 36, price: 10 }),
-      offer({ typeId: 36, price: 15 }),
+      offer({ typeId: 34, price: 15 }),
     ];
 
-    const index = buildContractOfferIndex(rows, 2);
+    const index = buildContractOfferIndex(rows);
 
     expect(index.types).toEqual({
-      '34': [2, 20, 0, 0],
-      '35': [1, 70, 1, 1],
-      '36': [2, 10, 1, 2],
+      '34': [3, 15],
+      '35': [1, 70],
+      '36': [1, 10],
     });
   });
 
   it('prices an auction at its buyout, as the client does, not at its starting bid', () => {
-    const index = buildContractOfferIndex(
-      [offer({ typeId: 34, price: 1, isAuction: true, buyout: 2_000_000 })],
-      10
-    );
-    expect(index.types['34']).toEqual([1, 2_000_000, 0, 0]);
+    const index = buildContractOfferIndex([
+      offer({ typeId: 34, price: 1, isAuction: true, buyout: 2_000_000 }),
+    ]);
+    expect(index.types['34']).toEqual([1, 2_000_000]);
   });
 
   it('falls back to the starting bid for an auction with no buyout', () => {
-    const index = buildContractOfferIndex([offer({ typeId: 34, price: 7, isAuction: true })], 10);
-    expect(index.types['34']).toEqual([1, 7, 0, 0]);
+    const index = buildContractOfferIndex([offer({ typeId: 34, price: 7, isAuction: true })]);
+    expect(index.types['34']).toEqual([1, 7]);
   });
 
   it('leaves cheapest null for a type with only unpriced (zero-price) offers', () => {
-    const index = buildContractOfferIndex([offer({ typeId: 34, price: 0 })], 10);
-    expect(index.types['34']).toEqual([1, null, 0, 0]);
+    const index = buildContractOfferIndex([offer({ typeId: 34, price: 0 })]);
+    expect(index.types['34']).toEqual([1, null]);
   });
 
   it('skips a PLEX-asking offer when finding the cheapest, but still counts it', () => {
-    const index = buildContractOfferIndex(
-      [offer({ typeId: 34, price: 5, requestedPlex: 10 }), offer({ typeId: 34, price: 90 })],
-      10
-    );
-    expect(index.types['34']).toEqual([2, 90, 0, 0]);
+    const index = buildContractOfferIndex([
+      offer({ typeId: 34, price: 5, requestedPlex: 10 }),
+      offer({ typeId: 34, price: 90 }),
+    ]);
+    expect(index.types['34']).toEqual([2, 90]);
   });
 
   it('lists each region once, sorted', () => {
-    const index = buildContractOfferIndex(
-      [
-        offer({ typeId: 1, regionId: 10000043 }),
-        offer({ typeId: 2, regionId: 10000002 }),
-        offer({ typeId: 3, regionId: 10000043 }),
-      ],
-      10
-    );
+    const index = buildContractOfferIndex([
+      offer({ typeId: 1, regionId: 10000043 }),
+      offer({ typeId: 2, regionId: 10000002 }),
+      offer({ typeId: 3, regionId: 10000043 }),
+    ]);
     expect(index.regionIds).toEqual([10000002, 10000043]);
   });
 });
