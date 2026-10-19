@@ -1,6 +1,6 @@
 import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
 import { tappableRowClassName, touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import { useTranslation } from 'react-i18next';
 import {
@@ -43,7 +43,6 @@ import { craftScope } from '@/engine/industry/craftScope';
 import { ownedStockSale, sellableMaterials } from '@/engine/industry/ownedStockSale';
 import type {
   FacilityKind,
-  HubPrices,
   MaterialPriceBasis,
   MaterialSourcing,
   RigKind,
@@ -89,35 +88,25 @@ import {
 } from '@/engine/industry/skillGate';
 import { useAccountSkillLevels } from '@/features/skills/useAccountSkillLevels';
 import {
-  ItemContextMenu,
-  ItemMoreActions,
-  type ItemMenuFor,
-} from '@/features/market/ItemContextMenu';
-import {
   nameForType,
   toIndustryBlueprint,
   volumeForType,
   type BlueprintCatalog,
 } from './blueprintCatalog';
 import { breakEvenRuns } from '@/engine/industry/breakEvenRuns';
-import {
-  inventionPricingContextFor,
-  planOwnedBlueprints,
-  resolveBuildPlan,
-  type ResolvedBuildPlan,
-} from './resolveBuildPlan';
+import { inventionPricingContextFor, planOwnedBlueprints } from './resolveBuildPlan';
 import { inventionQuoteFor } from './inventionSources';
 import { buildPlanTypeIds, recipeForLookup } from './recipes';
 import { materialPriceBasisOf } from './priceBasis';
-import { useDepthPrices } from './depthPriceLoader';
-import { depthCandidates, depthPriceMap } from '@/engine/industry/depthPrice';
+import { useResolvedPlan } from './useResolvedPlan';
+import { itemMenuProps } from './itemMenuProps';
+import { parseOrKeep, parseTaxPct } from './planInputParsers';
 import { useMarketSnapshot } from './useMarketSnapshot';
 import { priceVsMedianFor, usePriceVsMedian } from './usePriceVsMedian';
 import { formatDuration } from '@/lib/duration';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { writeToClipboard } from '@/lib/clipboard';
-import { unmaskNumber } from '@/lib/numberMask';
 import { MaterialsTable, SourcingInput, type MaterialsTableHandle } from './MaterialsTable';
 import { BuildRecipeModal } from './BuildRecipeModal';
 import { BlueprintAcquisitionModal } from './BlueprintAcquisitionModal';
@@ -287,32 +276,6 @@ interface BuildPlanDetailProps {
    * `pendingLogProduction` is set.
    */
   pendingLogProductionKey?: string;
-}
-
-/**
- * `SourcingInput.parse` for Runs and the facility taxes: unlike the materials sourcing
- * fields it was built for, these are always-defined numbers with no
- * "unset" state, so blank or unusable input has nowhere to fall but back to
- * `current` — which also, via `SourcingInput`'s "skip onCommit when
- * unchanged" rule, is exactly what makes an emptied-then-abandoned field
- * commit nothing instead of forcing a minimum.
- */
-function parseOrKeep(current: number, raw: string, transform: (n: number) => number): number {
-  const n = unmaskNumber(raw);
-  return n === undefined ? current : transform(n);
-}
-
-/**
- * `SourcingInput.parse` for a facility tax percent. A tax is never large
- * enough to need a thousands separator, so a lone comma followed by one or
- * two digits ("2,5") is a decimal comma — which the old `type="number"`
- * field honoured in comma locales — not "25". Clamped to 0–100; blank or
- * garbage keeps `current`, like `parseOrKeep`.
- */
-function parseTaxPct(current: number, raw: string): number {
-  const trimmed = raw.trim();
-  const normalized = /^\d*,\d{1,2}$/.test(trimmed) ? trimmed.replace(',', '.') : trimmed;
-  return parseOrKeep(current, normalized, (n) => Math.min(100, Math.max(0, n)));
 }
 
 /** Build Plan inputs (runs, ME/TE, facility, rig, security, hub, tax) + materials/results. */
@@ -731,29 +694,10 @@ export function BuildPlanDetail({
    * claims share it, and a re-run of this memo starts from nothing rather
    * than re-claiming against copies a previous run already took.
    */
-  // One resolver for the page's own plan and for Break Even's trial run counts
-  // (each walking its own Depth Prices), so a trial prices as the page would.
-  const resolveWith = useCallback(
-    (candidate: BuildPlanRecord, depthPrices?: HubPrices) =>
-      resolveBuildPlan(
-        candidate,
-        {
-          catalog,
-          pi,
-          ownedBlueprints,
-          corpBlueprints,
-          assumedMe,
-          modifiers,
-          standing,
-          bpcOffersFor,
-          bpcLastResortOffersFor,
-          blueprintPurchaseOffersFor,
-          inventionMarket,
-          communityOffersFor,
-        },
-        { snapshot, reactionSystemCostIndex: reactionSnapshot?.systemCostIndex, depthPrices }
-      ),
-    [
+  const { resolved, depth, resolveAt } = useResolvedPlan({
+    plan,
+    hub,
+    sources: {
       catalog,
       pi,
       ownedBlueprints,
@@ -766,42 +710,11 @@ export function BuildPlanDetail({
       blueprintPurchaseOffersFor,
       inventionMarket,
       communityOffersFor,
-      snapshot,
-      reactionSnapshot?.systemCostIndex,
-    ]
-  );
-  // Depth Prices: the lowest-sell pass says what the plan has to buy;
-  // materials whose need is large against what the hub lists walk the hub's
-  // book, and the plan resolves once more at those prices. One re-resolve,
-  // never iterated: a need is read off the lowest-sell pass only.
-  const depthNeedsOf = useCallback(
-    (candidate: BuildPlanRecord, lowestSell: ResolvedBuildPlan) =>
-      lowestSell.result
-        ? depthCandidates(
-            shoppingListMaterials(lowestSell.result.materials),
-            snapshot?.hubSellVolumes ?? {},
-            candidate.materialSourcing,
-            candidate.materialPriceBasis
-          )
-        : new Map<number, number>(),
-    [snapshot?.hubSellVolumes]
-  );
-  const topOfBook = useMemo(() => resolveWith(plan), [resolveWith, plan]);
-  const depthNeeds = useMemo(() => depthNeedsOf(plan, topOfBook), [depthNeedsOf, plan, topOfBook]);
-  const { depth, walk: walkDepth } = useDepthPrices(hub, depthNeeds, fetchedAt?.getTime());
-  const resolved = useMemo(
-    () => (depth.size > 0 ? resolveWith(plan, depthPriceMap(depth)) : topOfBook),
-    [depth, resolveWith, plan, topOfBook]
-  );
-  // Break Even's trials walk the books for their own run count, as the page would at that count.
-  const resolveAt = useCallback(
-    (candidate: BuildPlanRecord) => {
-      const lowestSell = resolveWith(candidate);
-      const trialDepth = walkDepth(depthNeedsOf(candidate, lowestSell));
-      return trialDepth.size > 0 ? resolveWith(candidate, depthPriceMap(trialDepth)) : lowestSell;
     },
-    [resolveWith, walkDepth, depthNeedsOf]
-  );
+    snapshot,
+    reactionSystemCostIndex: reactionSnapshot?.systemCostIndex,
+    fetchedAtMs: fetchedAt?.getTime(),
+  });
   const { result, error, makeOrBuyContext, resolvedMe, resolvedTe, materialPrices, bpcCoverage } =
     resolved;
 
@@ -1361,46 +1274,7 @@ export function BuildPlanDetail({
     update({ buildHere: [...picked] });
   }
 
-  /**
-   * This page is already a Build Plan and has no Compare drawer, so the menu
-   * leaves out "Build Plan" and "Add to Compare".
-   */
-  function itemContextMenu(typeId: number, trigger: ReactElement) {
-    return (
-      <ItemContextMenu
-        typeId={typeId}
-        itemName={nameForType(catalog, typeId)}
-        blueprintTypeID={catalog.byProductTypeID.get(typeId)?.blueprintTypeID ?? null}
-        hideBuildPlan
-        hideCompare
-      >
-        {trigger}
-      </ItemContextMenu>
-    );
-  }
-
-  /** The same menu on every other item name the page shows — product heading, the recipe and acquisition modals. */
-  const itemMenuFor: ItemMenuFor = (typeId, trigger) => itemContextMenu(typeId, trigger);
-
-  /**
-   * The visible "More actions" button beside the same menu (WCAG 2.1.1,
-   * issue #1498) — every surface `itemContextMenu`/`itemMenuFor` wraps also
-   * renders one of these, built from the identical props so the right-click
-   * menu and the button can never list different actions.
-   */
-  function itemActionsFor(typeId: number, bordered = false): ReactElement {
-    return (
-      <ItemMoreActions
-        variant={bordered ? 'ghost' : undefined}
-        size={bordered ? 'sm' : undefined}
-        typeId={typeId}
-        itemName={nameForType(catalog, typeId)}
-        blueprintTypeID={catalog.byProductTypeID.get(typeId)?.blueprintTypeID ?? null}
-        hideBuildPlan
-        hideCompare
-      />
-    );
-  }
+  const { itemMenuFor, itemActionsFor } = itemMenuProps(catalog);
 
   /**
    * Puts the plan's outstanding materials on the clipboard as multibuy text,
