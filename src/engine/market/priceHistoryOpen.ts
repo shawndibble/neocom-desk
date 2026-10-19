@@ -22,14 +22,23 @@ export interface OpenPricePoint {
   sell: number | null;
 }
 
-/** Which open-price lines the chart draws. */
-export type PriceSeriesChoice = 'both' | 'buy' | 'sell';
+/**
+ * Which lines the chart draws: open buy and/or sell where a region has them,
+ * or `average` — every region's ESI average, so a trade hub and a region
+ * without open prices compare on the same footing.
+ */
+export type PriceSeriesChoice = 'both' | 'buy' | 'sell' | 'average';
 
-export const PRICE_SERIES_CHOICES: readonly PriceSeriesChoice[] = ['both', 'buy', 'sell'];
+export const PRICE_SERIES_CHOICES: readonly PriceSeriesChoice[] = [
+  'both',
+  'buy',
+  'sell',
+  'average',
+];
 
 export type OpenPriceSide = 'buy' | 'sell';
 
-/** Whether `side`'s line is drawn under `choice`. */
+/** Whether `side`'s line is drawn under `choice`; never under `average`. */
 export function seriesShows(choice: PriceSeriesChoice, side: OpenPriceSide): boolean {
   return choice === 'both' || choice === side;
 }

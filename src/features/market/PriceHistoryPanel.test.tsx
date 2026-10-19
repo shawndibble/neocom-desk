@@ -35,9 +35,11 @@ vi.mock('./PriceHistoryChart', () => ({
     primaryRegionName,
     openPrices,
     series,
+    openSettled,
   }: {
     openPrices?: { regionId: number; points: unknown[] }[];
     series?: string;
+    openSettled?: ReadonlySet<number>;
     points: unknown[];
     itemName: string;
     movingAverage?: unknown[];
@@ -49,6 +51,7 @@ vi.mock('./PriceHistoryChart', () => ({
       {primaryRegionName ? ` primary=${primaryRegionName}` : ''}
       {(openPrices ?? []).map((o) => ` {open ${o.regionId}:${o.points.length}:${series}}`).join('')}
       {(comparisons ?? []).map((c) => ` [${c.name}:${c.status}:${c.points.length}]`).join('')}
+      {` series=${series} settled=${[...(openSettled ?? [])].join(',')}`}
     </div>
   ),
 }));
@@ -472,11 +475,27 @@ describe('PriceHistoryPanel', () => {
       );
     }
 
-    it('hides the series select, and hands the chart no open series, when there is none', async () => {
+    it('still offers the Lines select, and tells the chart the region has no series, when there is none', async () => {
       renderPanel();
-      expect(await screen.findByTestId('chart')).not.toHaveTextContent('open');
-      expect(screen.queryByRole('combobox', { name: 'Lines' })).not.toBeInTheDocument();
+      await waitFor(() =>
+        expect(screen.getByTestId('chart')).toHaveTextContent('settled=10000002')
+      );
+      expect(screen.getByTestId('chart')).not.toHaveTextContent('open');
+      expect(screen.getByRole('combobox', { name: 'Lines' })).toHaveTextContent('Buy / Sell');
       expect(mockedOpen).toHaveBeenCalledWith(10000002, 34);
+    });
+
+    it('offers Average, which drops the open medians from the summary', async () => {
+      mockedOpen.mockResolvedValue(OPEN);
+      const user = userEvent.setup();
+      renderPanel();
+      expect(await screen.findByText('Median sell')).toBeInTheDocument();
+      expect(screen.getByText('Median buy')).toBeInTheDocument();
+      await user.click(screen.getByRole('combobox', { name: 'Lines' }));
+      await user.click(await screen.findByRole('option', { name: 'Average' }));
+      expect(screen.getByTestId('chart')).toHaveTextContent('series=average');
+      expect(screen.queryByText('Median sell')).not.toBeInTheDocument();
+      expect(screen.queryByText('Median buy')).not.toBeInTheDocument();
     });
 
     it('reads the series once and hands the chart the days inside the range', async () => {
