@@ -206,17 +206,6 @@ export function unloadCharges(fitting: Fitting, at: readonly ModuleAt[]): Fittin
   };
 }
 
-/** Loads `chargeTypeId` into every fitted module of `moduleTypeId`, cargo untouched — `loadChargeIntoCompatible` narrowed to one type. */
-export function loadChargeIntoAll(
-  fitting: Fitting,
-  moduleTypeId: number,
-  chargeTypeId: number
-): Fitting {
-  return loadChargeIntoCompatible(fitting, chargeTypeId, {
-    accepts: (module) => module.typeId === moduleTypeId,
-  }).fitting;
-}
-
 /**
  * Relative slack on capacity ÷ volume. The engine reports a module's
  * capacity as the SDE's float32 (a Medium Ancillary Armor Repairer's 0.32 m3

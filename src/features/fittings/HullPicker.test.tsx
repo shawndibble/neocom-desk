@@ -67,7 +67,7 @@ describe('HullPicker', () => {
     expect(onStart).toHaveBeenCalledWith(expect.objectContaining({ typeId: 587 }));
   });
 
-  it("shows the picked hull's Popular fits, and opens one", () => {
+  it("shows the picked hull's Popular fits, and opens one", async () => {
     const HULL_ID = 587;
     usePopularFitsMock.mockReturnValue({
       ok: true,
@@ -95,8 +95,8 @@ describe('HullPicker', () => {
     expect(screen.queryByRole('region', { name: 'Popular fits' })).toBeNull();
     search('rift');
     fireEvent.click(screen.getByRole('button', { name: 'Rifter' }));
+    expect(await screen.findByText('4 losses')).toBeTruthy();
     expect(usePopularFitsMock.mock.lastCall?.[0]).toBe(587);
-    expect(screen.getByText('4 losses')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Open' }));
     expect(onOpenPopular).toHaveBeenCalledWith(
       expect.objectContaining({

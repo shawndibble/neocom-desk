@@ -2,6 +2,7 @@
  * The Appraisal's "Minus owned" preference: on/off, the station whose
  * hangars count, or every location. A null station follows the header's Trade Hub. Device-local.
  */
+import type { EsiEndpointId } from '@/esi/registry';
 import { createLocalSetting } from '@/lib/useLocalSetting';
 
 export interface AppraisalOwnedPref {
@@ -32,3 +33,8 @@ export const useAppraisalOwnedPref = createLocalSetting<AppraisalOwnedPref>({
     };
   },
 });
+
+export const ASSETS_ENDPOINTS: readonly EsiEndpointId[] = ['getCharacterAssets'];
+
+/** The "Minus owned" picker's value for every location, apart from any station id. */
+export const OWNED_EVERYWHERE = 'all' as const;

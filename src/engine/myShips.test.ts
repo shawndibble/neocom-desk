@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findShips, sortShipsByJumps, type OwnedAsset, type ShipRow } from './myShips';
+import { findShips, type OwnedAsset } from './myShips';
 
 const SHIP_TYPES = new Set([100, 101]);
 const isShip = (typeId: number) => SHIP_TYPES.has(typeId);
@@ -99,30 +99,5 @@ describe('findShips', () => {
       isShip
     );
     expect(rows).toHaveLength(2);
-  });
-});
-
-function row(itemId: number, locationId: number): ShipRow {
-  return {
-    itemId,
-    typeId: 100,
-    characterId: 1,
-    locationId,
-    locationType: 'station',
-    inCargo: false,
-    trail: [],
-  };
-}
-
-describe('sortShipsByJumps', () => {
-  it('sorts ascending with unknown last, stable among ties', () => {
-    const rows = [row(1, 10), row(2, 20), row(3, 30), row(4, 40), row(5, 20)];
-    const jumps = new Map<number, number | null>([
-      [10, 5],
-      [20, 0],
-      [30, null],
-    ]);
-    const sorted = sortShipsByJumps(rows, (r) => jumps.get(r.locationId));
-    expect(sorted.map((r) => r.itemId)).toEqual([2, 5, 1, 3, 4]);
   });
 });

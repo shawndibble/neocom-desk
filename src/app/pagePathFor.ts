@@ -8,7 +8,7 @@ import { matchPath } from 'react-router-dom';
 import { ROUTE_REQUIREMENTS } from './routeScopes';
 import { tabbedPagePathFor } from './pageTabs';
 
-const STATIC_ROUTE_PATTERNS = ['/', '/login', '/callback', '/styleguide', '/error'] as const;
+const STATIC_ROUTE_PATTERNS = ['/', '/login', '/callback', '/error'] as const;
 const KNOWN_ROUTE_PATTERNS = [...STATIC_ROUTE_PATTERNS, ...Object.keys(ROUTE_REQUIREMENTS)];
 
 export function pagePathFor(pathname: string): string {

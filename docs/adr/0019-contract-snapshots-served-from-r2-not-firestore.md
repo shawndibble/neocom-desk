@@ -2,7 +2,9 @@
 
 ## Status
 
-Proposed (2026-10-14)
+Proposed (2026-10-14). The Firestore fallback clause below is superseded: R2 is
+the only store since issue #4270 (decision
+`20261018-233253-public-contract-snapshots-are-served-from-r2-only`).
 
 ## Context
 

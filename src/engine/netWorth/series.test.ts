@@ -7,7 +7,6 @@ import {
   layerValues,
   listedLayers,
   netWorthOf,
-  partitionByCoverage,
   toggleHidden,
   totalsFor,
 } from './series';
@@ -122,15 +121,6 @@ describe('buildCharacterSeries', () => {
   });
 });
 
-describe('partitionByCoverage', () => {
-  it('leaves Characters missing a permission out', () => {
-    expect(partitionByCoverage([1, 2, 3], new Set([1, 3]))).toEqual({
-      included: [1, 3],
-      missing: [2],
-    });
-  });
-});
-
 describe('totalsFor', () => {
   const latest = new Map([
     [1, layerValues(row('2026-10-01'))],
@@ -193,5 +183,15 @@ describe('listedLayers', () => {
     expect(listedLayers([row('2026-10-01', { ...empty, sellStock: undefined })])).not.toContain(
       'sellOrders'
     );
+  });
+});
+
+describe('dailyWalletFromJournal malformed dates', () => {
+  it('skips an entry whose date does not parse instead of throwing', () => {
+    const m = dailyWalletFromJournal([
+      { date: '2026-10-01T10:00:00Z', balance: 5 },
+      { date: 'garbage', balance: 99 },
+    ]);
+    expect([...m]).toEqual([['2026-10-01', 5]]);
   });
 });

@@ -58,6 +58,7 @@ import {
 } from '@/components/ui';
 import { HintText } from '@/components/ui/HintText';
 import * as Icon from '@/components/ui/icons';
+import { clampMe } from '@/engine/industry/efficiency';
 import type { MaterialSourcing } from '@/engine/industry/types';
 import { romanLevel } from '@/engine/projection';
 import { loadTypeName } from '@/features/character/typeNames';
@@ -257,7 +258,7 @@ export function BlueprintAcquisitionModal({
   }, [hydrateLpValue]);
 
   const contracts = useLoad(async () => {
-    const cached = await loadPublicBpcContracts(characterId);
+    const cached = await loadPublicBpcContracts();
     return cached ? { copies: cached.data.rows, originals: cached.data.originals ?? [] } : null;
   }, String(characterId));
   // Region mode, not Trade Hub mode: every sell order in the hub's region is
@@ -388,7 +389,7 @@ export function BlueprintAcquisitionModal({
     const price = unmaskNumber(manualPrice);
     onSourcingChange(blueprintTypeID, {
       acquisitionTierOverride: {
-        me: Math.min(10, Math.max(0, Math.round(me))),
+        me: clampMe(me),
         te: Math.max(0, Math.round(te)),
       },
       overridePrice: price,

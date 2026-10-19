@@ -7,7 +7,7 @@ import {
   isCharacterEventThresholds,
   setThresholds,
 } from './eventThresholdFields';
-import { ENDING_SOON_MS } from '@/features/skills/queueStatus';
+import { ENDING_SOON_MS } from '@/engine/skills/queueStatus';
 
 describe('THRESHOLD_FIELDS', () => {
   it('lists every stored threshold key, in storage order', () => {

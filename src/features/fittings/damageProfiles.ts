@@ -20,8 +20,8 @@ import {
 } from '@/engine/fittings/damageProfile';
 import { createSyncedSetting } from '@/lib/useSyncedSetting';
 
-export const SYNCED_CUSTOM_DAMAGE_PROFILES_KEY = 'sync.fittingDamageProfiles';
-export const SYNCED_SELECTED_DAMAGE_PROFILE_KEY = 'sync.fittingDamageProfileId';
+const SYNCED_CUSTOM_DAMAGE_PROFILES_KEY = 'sync.fittingDamageProfiles';
+const SYNCED_SELECTED_DAMAGE_PROFILE_KEY = 'sync.fittingDamageProfileId';
 
 export const useCustomDamageProfiles = createSyncedSetting<CustomDamageProfile[]>({
   key: SYNCED_CUSTOM_DAMAGE_PROFILES_KEY,

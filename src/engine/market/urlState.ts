@@ -113,7 +113,7 @@ export function marketLinkParams(
 /**
  * Query params for "where's the closest one?": `typeId` over All regions,
  * narrowed by the order book's Jump Range (`browser.jumps`, see
- * `useOrderBookOrchestration.ts`), which the Market Browser measures from the
+ * `useBrowserFilters.ts`), which the Market Browser measures from the
  * Current System. The Jump Range is URL-only here: the Market Browser never
  * writes a linked filter value into the user's remembered filter default.
  */

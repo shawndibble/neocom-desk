@@ -7,6 +7,7 @@
  * Pure, so `resolveBuildPlan`, Auto Build and the page all apply it through
  * the one helper and cannot disagree on the figure.
  */
+import { clampPct } from '@/lib/clampPct';
 import type { MarketSnapshot } from './marketData';
 
 export type CostIndexSource = 'override' | 'missing' | 'esi';
@@ -43,5 +44,5 @@ export function parseCostIndexPct(raw: string): number | null | undefined {
   if (text === '') return null;
   const value = Number(text);
   if (!Number.isFinite(value)) return undefined;
-  return Math.min(100, Math.max(0, value));
+  return clampPct(value);
 }

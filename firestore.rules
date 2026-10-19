@@ -227,59 +227,16 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
-    // LP Store offers of every NPC corporation plus their station systems
-    // (#2873), written daily by syncLpStoreOffers; read by any signed-in client.
-    match /lpStoreOffers/{docId} {
-      allow read: if request.auth != null;
-      allow write: if false;
-    }
-    // Daily open (end-of-UTC-day) best buy and best sell per Trade Hub region
-    // and type, doc id `<regionId>_<typeId>` (decision 20261018-121126), for the
-    // price-history chart. Public market data, so readable by anyone; written
-    // only by syncMarketOpenPrices and the one-off backfill (admin privileges).
-    match /marketOpenPrices/{docId} {
-      allow read: if true;
-      allow write: if false;
-    }
-    // Public contract search (issues #608, #906, ADR 0013): one of the two
-    // top-level collections that aren't per-Character sync data — the other is
-    // publicCourierContracts just below, fed by the same job. Written only
-    // by the syncPublicContractOffers scheduled function (admin privileges);
-    // read by any signed-in client, since the underlying data (EVE's public
-    // contract market) is not scoped to a Character or its ownerHash at all.
-    // It replaced the blueprint-copies-only publicBpcContracts collection in
-    // #907, which BPC Sourcing now filters out of this one client-side.
-    // Rules end in an implicit deny, so without this block the collection is
-    // unreadable no matter what the sync writes.
-    match /publicContractOffers/{docId} {
-      allow read: if request.auth != null;
-      allow write: if false;
-    }
-    // The courier half of the same crawl (#909): public courier contracts as a
-    // route and a fee, which carry no item lines and so none of the offer row's
-    // fields. Same sync, same admin-only write, same signed-in read — a
-    // sibling collection only because it is a different row shape.
-    // The index beside the offers chunks (#2921): per item type, how many
-    // offers, the cheapest, and which chunk docs hold them. Its own
-    // collection because an older client reads the whole offers collection and
-    // treats every doc that is not `meta` as a chunk of rows.
-    match /publicContractOffersIndex/{docId} {
-      allow read: if request.auth != null;
-      allow write: if false;
-    }
-    match /publicCourierContracts/{docId} {
-      allow read: if request.auth != null;
-      allow write: if false;
-    }
-    // Mining Yield Overview's server-side price history (issue #1279): one
-    // doc per UTC date, written only by the captureMiningPriceSnapshot
-    // scheduled function (admin privileges). Not per-Character sync data —
-    // it's public market history — so it gets the same rule as the two
-    // collections above: read by any signed-in client, never client-written.
-    match /marketHistory/{date} {
-      allow read: if request.auth != null;
-      allow write: if false;
-    }
+    // The LP Store offers and the daily open prices are not in Firestore: both
+    // are static objects in Cloudflare R2 (decision
+    // 20261018-201511-moving-the-daily-snapshots-to-r2). Their rules are gone, so the implicit deny covers any
+    // stale collection left behind.
+
+    // The public contract snapshots (publicContractOffers,
+    // publicContractOffersIndex, publicCourierContracts) are not in Firestore
+    // either: R2 is their only store (ADR 0019, issue #4270). Their rules are
+    // gone too, so the implicit deny covers the orphaned collections.
+
     // Route Safety's lawless (insurgency) systems (issue #2870): one doc,
     // `lawless`, written only by the syncLawlessSystems scheduled function
     // (admin privileges). Public EVE data, so the same rule as the market
@@ -288,24 +245,11 @@ service cloud.firestore {
       allow read: if request.auth != null;
       allow write: if false;
     }
-    // EVE Workbench fits by hull (issue #2484): the Popular fit panel's EVE
-    // Workbench tab. Written only by the syncWorkbenchFits scheduled function
-    // (admin privileges). Readable with no session at all, unlike the public
-    // collections above: the data is EVE Workbench's own public fit list, and
-    // the fitter works with nobody logged in, so a sign-in gate would hide
-    // public fits from exactly the pilot browsing hulls before adding a
-    // Character. `get` only, never `list`: with no sign-in at all, a public
-    // list would let anyone page through all ~38k fits (EFT included) and run
-    // up our read bill. The client reads a hull by id instead — part
-    // `{shipTypeId}_0`, whose `parts` field says how many `_1.._{n-1}` docs to
-    // fetch (features/fittings/workbenchFits.ts). The sync's checkpoint lives
-    // in workbenchFitsSync, which has no rule and so stays denied by the
-    // implicit deny below.
-    match /workbenchFits/{docId} {
-      allow get: if true;
-      allow list: if false;
-      allow write: if false;
-    }
+    // EVE Workbench fits are not in Firestore: each hull is a static object
+    // in Cloudflare R2 (decision
+    // 20261018-232147-eve-workbench-fits-live-in-r2). The workbenchFits rule
+    // is gone, so the implicit deny covers the stale collection, and
+    // workbenchFitsSync (the sync's admin-only checkpoint) never had one.
     // Stored Share Links (src/features/share/shareStore.ts): a short
     // /s/{id} URL whose content lives here for a week. Not per-Character
     // data, and the person opening a link may have no account at all — so
@@ -472,6 +416,105 @@ service cloud.firestore {
         allow update, delete: if false;
       }
     }
+
+    // Corp Tax Book (issue #4061, ADR 0023): a corporation's shared record of
+    // moon mining tax, keyed by corporation id. Nothing here is writable by a
+    // client: every write is a callable (functions/src/corpTaxBookStore.ts)
+    // that appends to the immutable audit log.
+    //
+    // Reads:
+    //  - an officer (CEO, Director, Accountant, Junior_Accountant) reads the
+    //    whole book while their access record exists, was written for this
+    //    ownerHash and has not expired (24h after the last verifyOfficer check);
+    //  - anyone signed in with EVE SSO reads their OWN lines in any corp's
+    //    book, keyed by the verified character id in the uid (`uid` /
+    //    `uids` fields), including after leaving the corp;
+    //  - any signed-in Character may `get` the book's settings doc (terms
+    //    are printed on every mail), but never list books.
+    // The verify-link tokens (`corpTaxBookTokens`) have no client access.
+    match /corpTaxBooks/{corporationId} {
+      function isCharacter() {
+        return request.auth != null && request.auth.uid.matches('char:[0-9]+');
+      }
+      function officerPath() {
+        return /databases/$(database)/documents/corpTaxBooks/$(corporationId)/officers/$(request.auth.uid);
+      }
+      function isOfficer() {
+        return isCharacter()
+          && exists(officerPath())
+          && get(officerPath()).data.canView == true
+          && get(officerPath()).data.ownerHash == request.auth.token.ownerHash
+          && get(officerPath()).data.expiresAt > request.time.toMillis();
+      }
+      function isOwnLine() {
+        return isCharacter() && resource.data.uid == request.auth.uid;
+      }
+      function isOnOwnLine() {
+        return isCharacter() && request.auth.uid in resource.data.uids;
+      }
+
+      allow get: if isCharacter();
+      allow list: if false;
+      allow write: if false;
+
+      match /officers/{officerUid} {
+        allow get: if isCharacter() && request.auth.uid == officerUid
+          && resource.data.ownerHash == request.auth.token.ownerHash;
+        allow list, write: if false;
+      }
+
+      match /observed/{rowId} {
+        allow get, list: if isOfficer() || isOwnLine();
+        allow write: if false;
+      }
+
+      match /payments/{paymentId} {
+        allow get, list: if isOfficer() || isOwnLine();
+        allow write: if false;
+      }
+
+      // The verify link for the mail: editors only, never the miner or a view-only officer.
+      match /statementLinks/{statementId} {
+        allow get, list: if isOfficer() && get(officerPath()).data.canEdit == true;
+        allow write: if false;
+      }
+
+      match /statements/{statementId} {
+        allow get, list: if isOfficer() || isOnOwnLine();
+        allow write: if false;
+      }
+
+      match /dismissals/{dismissalId} {
+        allow get, list: if isOfficer() || isOnOwnLine();
+        allow write: if false;
+      }
+
+      match /miners/{minerId} {
+        allow get, list: if isOfficer() || isOnOwnLine();
+        allow write: if false;
+      }
+
+      match /{officerOnly}/{docId} {
+        allow get, list: if officerOnly in ['extractions', 'declarations', 'adjustments', 'writeOffs', 'rebills', 'meta', 'audit']
+          && isOfficer();
+        allow write: if false;
+      }
+    }
+
+    match /corpTaxBookTokens/{token} {
+      allow read, write: if false;
+    }
+
+    // Corp Tax Book sync grants (issue #4068, ADR 0025): one doc per corporation
+    // holding the encrypted, narrow-scope refresh token of the officer who opted in
+    // to the scheduled sync. Written and read only by the save/revoke callables and
+    // the scheduled function (admin). No client path, not even the holder's: the
+    // token must never reach a device. What officers may see (holder, status, why
+    // it stopped) is `corpTaxBooks/{corp}/meta/scheduledSync`, covered above.
+    match /corpTaxBookSyncGrants/{corporationId} {
+      allow read, write: if false;
+    }
+
     // Communities (issue #3596, ADR 0018): the first collections gated by
     // membership rather than by uid or public visibility. Members can read a
     // Community, each other and each other's Shared Blueprint library; nobody

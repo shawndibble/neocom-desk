@@ -126,6 +126,7 @@ const DOM_TS_TESTS = [
   // sessionStorage / localStorage
   'src/app/loginFlow.test.ts',
   'src/auth/alertsLogin.test.ts',
+  'src/auth/corpSyncLogin.test.ts',
   'src/features/notifications/alertsGrant.test.ts',
   'src/auth/session.test.ts',
   'src/auth/loginReturnTo.test.ts',
@@ -485,8 +486,8 @@ export default defineConfig({
     // Split by environment rather than one `jsdom` run for everything: jsdom
     // instantiation is real, per-file overhead (measured ~0.9s/file on this
     // repo's engine tests alone — see the /code-review test-speed
-    // investigation) that plain logic tests get zero benefit from and 283 of
-    // this repo's 388 test files never touch a DOM at all. `extends: true`
+    // investigation) that plain logic tests get zero benefit from and most
+    // of this repo's test files never touch a DOM at all. `extends: true`
     // on both projects inherits every other option above unchanged.
     projects: [
       {

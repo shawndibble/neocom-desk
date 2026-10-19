@@ -43,7 +43,7 @@ Scope gating: `/ships` and `/ships/fittings/compare` are UNGATED (`src/app/route
 ## Routes and URL state
 
 - `src/features/fittings/shipsTabs.ts`: tabs `fittings`, `tree`, standalone `fittings/edit`. Editor and library are one mounted `<Fittings />` (`src/routes/Ships.tsx`) so workspace state carries across navigation.
-- `fittingRoutes.ts`: `fittingsRedirect` sends `/ships/fittings?f=code` to editor; editor with no `f` goes to library. `legacyShipsLocation` keeps old `/fittings?f=` links (every Share Code ever copied) working; `LegacyShipsRedirect.tsx`.
+- `fittingRoutes.ts`: `fittingsRedirect` sends `/ships/fittings?f=code` to editor; editor with no `f` goes to library.
 - Open Fitting lives in the address bar as `?f=<Fitting Share Code>`; every edit is a history entry, so browser Back is undo (`shortcuts.onPageHint`).
 - Too-large Fitting cannot be carried in a link: warning `fittings.load.tooLargeToShare`, reload loses it; Save to My Fittings and Compare-through-link disabled with tooltip.
 - Router state `fittingLoadText` (`@/lib/shortcuts` `FittingLoadState`) lets `GlobalPasteRouter` (paste of EFT anywhere outside a field) open the Fittings tab and Load it (`src/routes/Fittings.tsx` effect ~line 200).
@@ -69,7 +69,7 @@ One list of every way into a Fitting: saved (My Fittings) + In-game rows.
 - Pick, then Start fitting (double-click starts at once).
 - Popular fits panel per hull (`PopularFitsPanel.tsx`): source tabs zKillboard / EVE Workbench.
   - zKillboard: recent hull losses with full fit (`@/lib/zkillboard` `fetchHullLosses` + ESI `getKillmail`), loss count, last seen, approx ISK value, Open.
-  - EVE Workbench: fits from Firestore `workbenchFits` docs (Cloud Function `syncWorkbenchFits`, `workbenchFits.ts`), created age, price at default Trade Hub (partial price flag, unpriced count), out-of-date check against current game (`WorkbenchOutOfDate`, `workbenchSightings`), sighting badge.
+  - EVE Workbench: fits from the R2 object `workbench-fits/<shipTypeId>.json` (Cloud Function `syncWorkbenchFits`, `workbenchFits.ts`; no Firebase session), created age, price at default Trade Hub (partial price flag, unpriced count), out-of-date check against current game (`WorkbenchOutOfDate`, `workbenchSightings`), sighting badge.
   - Failure/empty/loading states each have copy; "Everything else still works".
 
 ### Load / Import (`FittingLoadCard.tsx`, `loadFittingFromText.ts`, `engine/fittings/load.ts`)
@@ -197,7 +197,7 @@ Unconfirmed: whether the Variations "Fits" column counts CPU and PG or hull/slot
 | My Fittings, notes         | Dexie `fittings` (synced)                                                                                   |
 | In-game Fittings           | ESI GET `/characters/{id}/fittings` (`esi-fittings.read_fittings.v1`), cached key `fittings:inGame`         |
 | Save to EVE                | ESI POST/DELETE fittings (`esi-fittings.write_fittings.v1`)                                                 |
-| Popular fits               | zKillboard + ESI killmail; Firestore `workbenchFits`                                                        |
+| Popular fits               | zKillboard + ESI killmail; R2 `workbench-fits/<shipTypeId>.json`                                            |
 | Prices                     | market hub data (price hub setting)                                                                         |
 | Share Links                | `features/share/shareStore`                                                                                 |
 | Prefs                      | settings `fittingsView`, `fittingsStatsSections`, synced damage/target profile keys, charge picker settings |
@@ -235,7 +235,7 @@ Engine split: `@eveshipfit/dogma-engine` (WASM, ADR 0016) computes attributes, r
 - Charge choice (`chargeChoice.ts`): best value = cheapest per minute among charges with >= 90% of top damage (`BEST_VALUE_SHARE`); dimmed when under 50% of best at the set distance (`WEAK_SHARE`); faction charge flagged when > 10x Tech I cost per minute (`PRICEY_RATIO`); range uses a still 400 m-signature target.
 - Price (`fitSellPrice.ts`): sum of hub sell min x qty at 100%; a type with no sell order is left out and the total is marked partial (never counted as 0 ISK); nothing priced = no price.
 - Popular fits (`popularFits.ts`, `lib/zkillboard.ts:31`): last 40 hull losses; losses grouped by sorted multiset of fitted module ids (charges, drones, cargo, slot index ignored); a fit with fewer than 3 modules dropped; group value = mean of losses carrying a value; most recent loss supplies the Fitting. zKillboard HTTP failure or rate limit returns `ok:false` so "couldn't load" differs from "no losses".
-- Share Code (`engine/fitting/fittingShare.ts`): version `2` (names; v1 still decodes), or version `3` only when a mutated module or drone is present (v2 plus a trailing mutations section: item position, base, mutaplasmid, rolls to 6 significant digits; decision `20261016-093132`), format `hull|modules|drones|fighters|cargo|implants|name`, base36 tokens, gzip + base64url; decode bounds: 8 slots per category, 50 drone stacks, 50 fighters, 500 cargo items, 10 implants, 10 boosters, 40 side effects, name 100 chars, encoded <= 20,000 chars, inflated <= 65,536 B. "Too large" means a count cap or `MAX_FITTING_SHARE_CODE_LENGTH = 20_100` (`fittingSharePayload.ts:15`), not a URL-length guess. Beyond it the Fitting stays editable locally but writes no `?f=`.
+- Share Code (`engine/fittings/fittingShare.ts`): version `2` (names; v1 still decodes), or version `3` only when a mutated module or drone is present (v2 plus a trailing mutations section: item position, base, mutaplasmid, rolls to 6 significant digits; decision `20261016-093132`), format `hull|modules|drones|fighters|cargo|implants|name`, base36 tokens, gzip + base64url; decode bounds: 8 slots per category, 50 drone stacks, 50 fighters, 500 cargo items, 10 implants, 10 boosters, 40 side effects, name 100 chars, encoded <= 20,000 chars, inflated <= 65,536 B. "Too large" means a count cap or `MAX_FITTING_SHARE_CODE_LENGTH = 20_100` (`fittingSharePayload.ts:15`), not a URL-length guess. Beyond it the Fitting stays editable locally but writes no `?f=`.
 - Save to EVE (`saveToEve.ts:63-91`): name clamped to 50 code points, description (My Fittings notes) to 500; POST first, then DELETE old on overwrite; failed POST leaves the old Fitting; failed DELETE after POST returns `overwriteError` (pilot has both). A write auth failure runs `reportWriteAuthFailure`; `grant-needed` surfaces `needsPermission` (re-login with the Fittings write permission).
 - Compare best marking (`fittingCompare.ts:85-110`): per-stat direction table (e.g. DPS higher, signature lower, agility lower, recharge time lower); fields without direction (CPU/PG/mass) never highlighted; nothing marked when all rounded values tie. Capacitor ranks stable above unstable, then higher stable % or longer depletion.
 - Compare cap: 3 (`compareUrl.ts:9`); extra `f` values in a hand-edited URL are dropped (line 16).

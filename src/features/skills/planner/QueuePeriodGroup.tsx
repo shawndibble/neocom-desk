@@ -6,7 +6,7 @@ import { formatCountdown } from '@/lib/duration';
 import { formatLocalDate } from '@/lib/localDate';
 import { skillGroupIcon } from '../skillGroupIcon';
 import type { SkillCatalog } from '../skillMap';
-import type { SkillQueueStatus } from '../queueStatus';
+import type { SkillQueueStatus } from '@/engine/skills/queueStatus';
 import type { QueuePeriodGroup as Group, QueueRowView } from './queueView';
 
 const BADGE_STYLE: Partial<Record<SkillQueueStatus, string>> = {

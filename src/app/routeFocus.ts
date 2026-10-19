@@ -23,6 +23,7 @@ const SUB_NAV_PAGES: Partial<Record<AppRoutePath, AppRoutePath>> = {
   '/corp/members': '/corp',
   '/corp/wallet': '/corp',
   '/corp/assets': '/corp',
+  '/corp/moons': '/corp',
   '/clones': '/overview',
   '/employment-history': '/overview',
 };
