@@ -219,14 +219,32 @@ export function prepareBpcOffers(data: BpcPrepareData, input: BpcPrepareInput): 
   return { spaceFilteredRows, spaceFilteredOriginals, typeOptions, nonTypeFilter, offerStats };
 }
 
-/** Stage 2: the type query's suggestions, per-source rows and the source-ordered merge. */
-export function rankBpcOffers(
+/**
+ * Stage 2's answer before the contract rows become search rows: the contract copies and originals
+ * that pass stay `BpcContractRow`s (so a worker can send indices instead), the rest is final.
+ */
+export interface BpcRankParts {
+  suggestions: BlueprintSuggestion[];
+  /** Contract copies matching every filter (not the source toggles). */
+  filteredRows: BpcContractRow[];
+  /** Contract originals matching every filter. */
+  filteredOriginals: BpcContractRow[];
+  ownedRows: BpcSearchRow[];
+  communityRows: BpcSearchRow[];
+  lpRows: BpcSearchRow[];
+  marketRows: BpcSearchRow[];
+  bpoSourcesByType: Map<number, BpoSources>;
+  bpoByType: Map<number, BpoOffer>;
+  summary: BpcPriceSummary | null;
+}
+
+/** Stage 2's heavy half: the type query's suggestions and every source's filtered rows. */
+export function rankBpcParts(
   prepared: PreparedBpcOffers,
   data: BpcSourceData,
   query: BpcQuery
-): BpcOfferSearch {
+): BpcRankParts {
   const { filter: uiFilter, selectedTypeId, sources } = query;
-  const { contractLocations } = data;
   const { spaceFilteredRows, spaceFilteredOriginals, typeOptions, nonTypeFilter, offerStats } =
     prepared;
   const hasTypeQuery = uiFilter.typeQuery.trim() !== '';
@@ -235,8 +253,6 @@ export function rankBpcOffers(
       primary: (option) => blueprintSearchName(option.name),
       limit,
     });
-  const toSearchRows = (rows: readonly BpcContractRow[]) =>
-    rows.map((row) => contractRowToSearchRow(row, contractLocations.get(row.locationId)));
 
   let typeIds: Set<number> | null = null;
   if (selectedTypeId !== null) typeIds = new Set([selectedTypeId]);
@@ -244,7 +260,6 @@ export function rankBpcOffers(
   const engineFilter: BpcSearchFilter = { ...nonTypeFilter, typeIds };
 
   const filteredRows = filterBpcContracts(spaceFilteredRows, engineFilter);
-  const contractSearchRows = toSearchRows(filteredRows);
 
   const ownedSearchRows = data.ownedBlueprints.map((bp) => {
     const location = data.ownedLocations.get(bp.location_id);
@@ -263,9 +278,7 @@ export function rankBpcOffers(
   });
   const filteredOwnedRows = filterBpcSearchRows(ownedSearchRows, engineFilter);
 
-  const contractBpoSearchRows = toSearchRows(
-    filterBpcContracts(spaceFilteredOriginals, engineFilter)
-  );
+  const filteredOriginals = filterBpcContracts(spaceFilteredOriginals, engineFilter);
 
   // Already limited to the looked-up types, so filtered on everything but the
   // listed-type search (`engineFilter.typeIds` only knows listed types).
@@ -349,27 +362,105 @@ export function rankBpcOffers(
     if (best) bpoByType.set(typeId, best);
   }
 
+  return {
+    suggestions,
+    filteredRows,
+    filteredOriginals,
+    ownedRows: filteredOwnedRows,
+    communityRows: communitySearchRows,
+    lpRows: lpSearchRows,
+    marketRows: filteredMarketRows,
+    bpoSourcesByType,
+    bpoByType,
+    summary: selectedTypeId === null ? null : bpcPriceSummary(filteredRows),
+  };
+}
+
+/** Stage 2's light half: contract rows to search rows, then the source-ordered merge. */
+export function assembleBpcOffers(
+  parts: BpcRankParts,
+  data: Pick<BpcSourceData, 'contractLocations'>,
+  sources: ReadonlySet<SourceToggle>
+): BpcOfferSearch {
+  const toSearchRows = (rows: readonly BpcContractRow[]) =>
+    rows.map((row) => contractRowToSearchRow(row, data.contractLocations.get(row.locationId)));
   // The order here is the table's hidden secondary sort. The panel's sort
   // (and `DataTable`'s own) is stable, so whichever column the pilot sorts by,
   // rows that tie on it fall back to this order: owned, then Community, then
   // LP store, then market and contracts (the synced snapshot can run to six
   // figures while the others number in the dozens).
   const displayRows: BpcSearchRow[] = [
-    ...(sources.has('owned') ? filteredOwnedRows : []),
-    ...(sources.has('community') ? communitySearchRows : []),
-    ...(sources.has('lp') ? lpSearchRows : []),
-    ...(sources.has('market') ? filteredMarketRows : []),
-    ...(sources.has('contractBpo') ? contractBpoSearchRows : []),
-    ...(sources.has('contract') ? contractSearchRows : []),
+    ...(sources.has('owned') ? parts.ownedRows : []),
+    ...(sources.has('community') ? parts.communityRows : []),
+    ...(sources.has('lp') ? parts.lpRows : []),
+    ...(sources.has('market') ? parts.marketRows : []),
+    ...(sources.has('contractBpo') ? toSearchRows(parts.filteredOriginals) : []),
+    ...(sources.has('contract') ? toSearchRows(parts.filteredRows) : []),
   ];
-
   return {
-    suggestions,
-    filteredRows,
-    bpoSourcesByType,
-    bpoByType,
+    suggestions: parts.suggestions,
+    filteredRows: parts.filteredRows,
+    bpoSourcesByType: parts.bpoSourcesByType,
+    bpoByType: parts.bpoByType,
     displayRows,
-    summary: selectedTypeId === null ? null : bpcPriceSummary(filteredRows),
+    summary: parts.summary,
+  };
+}
+
+/** Stage 2: the type query's suggestions, per-source rows and the source-ordered merge. */
+export function rankBpcOffers(
+  prepared: PreparedBpcOffers,
+  data: BpcSourceData,
+  query: BpcQuery
+): BpcOfferSearch {
+  return assembleBpcOffers(rankBpcParts(prepared, data, query), data, query.sources);
+}
+
+/** `BpcRankParts` with the two contract lists as indices into `BpcSourceData.contractRows` / `originals`. */
+export type BpcRankReplyParts = Omit<BpcRankParts, 'filteredRows' | 'filteredOriginals'> & {
+  filteredIndices: Uint32Array;
+  originalIndices: Uint32Array;
+};
+
+/** Where each contract row sits in its source array, built once per snapshot. */
+export interface BpcRowIndex {
+  contracts: ReadonlyMap<BpcContractRow, number>;
+  originals: ReadonlyMap<BpcContractRow, number>;
+}
+
+export function indexBpcRows(data: Pick<BpcSourceData, 'contractRows' | 'originals'>): BpcRowIndex {
+  const index = (rows: readonly BpcContractRow[]) => new Map(rows.map((row, i) => [row, i]));
+  return { contracts: index(data.contractRows), originals: index(data.originals) };
+}
+
+function toIndices(rows: readonly BpcContractRow[], at: ReadonlyMap<BpcContractRow, number>) {
+  const out = new Uint32Array(rows.length);
+  rows.forEach((row, i) => {
+    out[i] = at.get(row) ?? 0;
+  });
+  return out;
+}
+
+/** The worker's side: row lists become index arrays, cheap to send. */
+export function compactBpcRankParts(parts: BpcRankParts, index: BpcRowIndex): BpcRankReplyParts {
+  const { filteredRows, filteredOriginals, ...rest } = parts;
+  return {
+    ...rest,
+    filteredIndices: toIndices(filteredRows, index.contracts),
+    originalIndices: toIndices(filteredOriginals, index.originals),
+  };
+}
+
+/** The page's side: indices back to the rows it already holds. */
+export function expandBpcRankParts(
+  reply: BpcRankReplyParts,
+  data: Pick<BpcSourceData, 'contractRows' | 'originals'>
+): BpcRankParts {
+  const { filteredIndices, originalIndices, ...rest } = reply;
+  return {
+    ...rest,
+    filteredRows: Array.from(filteredIndices, (i) => data.contractRows[i]),
+    filteredOriginals: Array.from(originalIndices, (i) => data.originals[i]),
   };
 }
 
