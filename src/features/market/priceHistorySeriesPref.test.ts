@@ -24,8 +24,14 @@ describe('usePriceHistorySeries', () => {
     expect(usePriceHistorySeries.getState().value).toBe('sell');
   });
 
-  it('falls back to both for a value it does not know', async () => {
+  it('loads a stored average', async () => {
     await db.settings.put({ key: PRICE_HISTORY_SERIES_KEY, value: 'average' });
+    await usePriceHistorySeries.getState().hydrate();
+    expect(usePriceHistorySeries.getState().value).toBe('average');
+  });
+
+  it('falls back to both for a value it does not know', async () => {
+    await db.settings.put({ key: PRICE_HISTORY_SERIES_KEY, value: 'median' });
     await usePriceHistorySeries.getState().hydrate();
     expect(usePriceHistorySeries.getState().value).toBe('both');
   });

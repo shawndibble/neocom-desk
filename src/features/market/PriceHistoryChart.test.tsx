@@ -334,6 +334,72 @@ describe('PriceHistoryChart', () => {
       expect(within(legend).queryByText('Domain average')).not.toBeInTheDocument();
     });
 
+    it('draws every region as its average under Average, keeping the open columns in the table', () => {
+      render(
+        <PriceHistoryChart
+          points={POINTS}
+          itemName="Tritanium"
+          primaryRegionName="The Forge"
+          primaryRegionId={10000002}
+          openPrices={[FORGE_OPEN]}
+          openMissing={new Set([10000043])}
+          comparisons={[DOMAIN]}
+          series="average"
+        />
+      );
+      const legend = screen.getByRole('list');
+      expect(within(legend).getByText('The Forge average')).toBeInTheDocument();
+      expect(within(legend).getByText('Domain average')).toBeInTheDocument();
+      expect(within(legend).queryByText(/buy|sell/i)).not.toBeInTheDocument();
+      // Average is the chosen line here, not a stand-in, so no note on it.
+      expect(within(legend).queryByText(/no order data/)).not.toBeInTheDocument();
+      expect(within(legend).queryByRole('button', { name: /About/ })).not.toBeInTheDocument();
+      const table = screen.getByRole('table');
+      expect(
+        within(table).getByRole('columnheader', { name: /The Forge buy/ })
+      ).toBeInTheDocument();
+    });
+
+    it('says when a compared region draws its average for want of order data', () => {
+      render(
+        <PriceHistoryChart
+          points={POINTS}
+          itemName="Tritanium"
+          primaryRegionName="The Forge"
+          primaryRegionId={10000002}
+          openPrices={[FORGE_OPEN]}
+          openMissing={new Set([10000043])}
+          comparisons={[DOMAIN]}
+        />
+      );
+      const legend = screen.getByRole('list');
+      expect(within(legend).getByText('The Forge buy')).toBeInTheDocument();
+      const label = 'Domain average (no order data)';
+      expect(within(legend).getByText(label)).toBeInTheDocument();
+      expect(within(legend).getByRole('button', { name: `About ${label}` })).toBeInTheDocument();
+    });
+
+    it('says so for the primary region too, and not before its read comes back empty', () => {
+      const { rerender } = render(
+        <PriceHistoryChart points={POINTS} itemName="Tritanium" primaryRegionId={10000060} />
+      );
+      expect(screen.getByText('Average Price', { selector: 'span' })).toBeInTheDocument();
+      rerender(
+        <PriceHistoryChart
+          points={POINTS}
+          itemName="Tritanium"
+          primaryRegionId={10000060}
+          openMissing={new Set([10000060])}
+          series="sell"
+        />
+      );
+      const legend = screen.getByRole('list');
+      expect(within(legend).getByText('Average Price (no order data)')).toBeInTheDocument();
+      expect(
+        within(legend).getByRole('button', { name: 'About Average Price (no order data)' })
+      ).toBeInTheDocument();
+    });
+
     it('tables a day that has an open price but no ESI trade, with dashes for the trade figures', () => {
       render(
         <PriceHistoryChart

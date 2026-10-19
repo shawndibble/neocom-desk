@@ -88,10 +88,15 @@ describe('summarizeOpenPrices', () => {
 
 describe('seriesShows', () => {
   it('maps the choice to the sides drawn', () => {
-    expect(PRICE_SERIES_CHOICES).toEqual(['both', 'buy', 'sell']);
     expect(seriesShows('both', 'buy')).toBe(true);
     expect(seriesShows('both', 'sell')).toBe(true);
     expect(seriesShows('buy', 'sell')).toBe(false);
     expect(seriesShows('sell', 'sell')).toBe(true);
+  });
+
+  it('offers Average last, which draws neither open side', () => {
+    expect(PRICE_SERIES_CHOICES).toEqual(['both', 'buy', 'sell', 'average']);
+    expect(seriesShows('average', 'buy')).toBe(false);
+    expect(seriesShows('average', 'sell')).toBe(false);
   });
 });
