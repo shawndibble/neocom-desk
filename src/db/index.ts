@@ -1206,6 +1206,9 @@ db.on('blocked', (event) => {
   db.close();
 });
 
+// Each version lists only the tables it adds, re-indexes or drops (`null`);
+// Dexie carries the rest forward. Never renumber or remove a version.
+// `upgradeFromHistory.test.ts` opens every one of them.
 db.version(1).stores({
   characters: 'characterId',
   tokens: 'characterId',
@@ -1214,43 +1217,22 @@ db.version(1).stores({
 
 // Additive: v1 stores unchanged, plus Skill Plans + the generic ESI cache.
 db.version(2).stores({
-  characters: 'characterId',
-  tokens: 'characterId',
-  settings: 'key',
   skillPlans: 'id, characterId',
   esiCache: '[characterId+key]',
 });
 
 // Additive: v1/v2 stores unchanged, plus Build Plans.
 db.version(3).stores({
-  characters: 'characterId',
-  tokens: 'characterId',
-  settings: 'key',
-  skillPlans: 'id, characterId',
-  esiCache: '[characterId+key]',
   buildPlans: 'id, characterId',
 });
 
 // Additive: v1/v2/v3 stores unchanged, plus the Quickbar.
 db.version(4).stores({
-  characters: 'characterId',
-  tokens: 'characterId',
-  settings: 'key',
-  skillPlans: 'id, characterId',
-  esiCache: '[characterId+key]',
-  buildPlans: 'id, characterId',
   quickbars: 'id, characterId',
 });
 
 // Additive: v1-v4 stores unchanged, plus Station Pins.
 db.version(5).stores({
-  characters: 'characterId',
-  tokens: 'characterId',
-  settings: 'key',
-  skillPlans: 'id, characterId',
-  esiCache: '[characterId+key]',
-  buildPlans: 'id, characterId',
-  quickbars: 'id, characterId',
   stationPins: 'id, characterId, locationId',
 });
 
@@ -1259,14 +1241,6 @@ db.version(5).stores({
 // every read; the table is capped at NOTIFICATION_FEED_LIMIT rows, so reading
 // it whole is deliberate.
 db.version(6).stores({
-  characters: 'characterId',
-  tokens: 'characterId',
-  settings: 'key',
-  skillPlans: 'id, characterId',
-  esiCache: '[characterId+key]',
-  buildPlans: 'id, characterId',
-  quickbars: 'id, characterId',
-  stationPins: 'id, characterId, locationId',
   notificationFeed: 'id, characterId, firedAt',
 });
 
@@ -1276,30 +1250,13 @@ db.version(6).stores({
 // existed simply do not appear in it until their corporation is learned.
 db.version(7).stores({
   characters: 'characterId, corporationId',
-  tokens: 'characterId',
-  settings: 'key',
-  skillPlans: 'id, characterId',
-  esiCache: '[characterId+key]',
-  buildPlans: 'id, characterId',
-  quickbars: 'id, characterId',
-  stationPins: 'id, characterId, locationId',
-  notificationFeed: 'id, characterId, firedAt',
 });
 
 // Additive: v7 stores unchanged, plus the per-planet resource ranking
 // (issue #425). Indexed by planetId as well as characterId, because the
 // Advisor reads one system's planets at a time.
 db.version(8).stores({
-  characters: 'characterId, corporationId',
-  tokens: 'characterId',
-  settings: 'key',
-  skillPlans: 'id, characterId',
-  esiCache: '[characterId+key]',
-  buildPlans: 'id, characterId',
-  quickbars: 'id, characterId',
-  stationPins: 'id, characterId, locationId',
   planetRichness: 'id, characterId, planetId',
-  notificationFeed: 'id, characterId, firedAt',
 });
 
 // Additive: v1-v8 stores unchanged, plus Production Runs and their two
@@ -1307,16 +1264,6 @@ db.version(8).stores({
 // panel can query one plan's runs directly; `runId` is indexed on both link
 // tables so a run's linked sales/watches can be queried without a table scan.
 db.version(9).stores({
-  characters: 'characterId, corporationId',
-  tokens: 'characterId',
-  settings: 'key',
-  skillPlans: 'id, characterId',
-  esiCache: '[characterId+key]',
-  buildPlans: 'id, characterId',
-  quickbars: 'id, characterId',
-  stationPins: 'id, characterId, locationId',
-  planetRichness: 'id, characterId, planetId',
-  notificationFeed: 'id, characterId, firedAt',
   productionRuns: 'id, characterId, buildPlanId',
   productionSaleLinks: 'id, characterId, runId',
   productionOrderWatches: 'id, characterId, runId',
@@ -1327,19 +1274,6 @@ db.version(9).stores({
 // `[characterId+date+solarSystemId]` key — the Mining Ledger Entry identity —
 // since every assignment/re-diff read is scoped to one entry at a time.
 db.version(10).stores({
-  characters: 'characterId, corporationId',
-  tokens: 'characterId',
-  settings: 'key',
-  skillPlans: 'id, characterId',
-  esiCache: '[characterId+key]',
-  buildPlans: 'id, characterId',
-  quickbars: 'id, characterId',
-  stationPins: 'id, characterId, locationId',
-  planetRichness: 'id, characterId, planetId',
-  notificationFeed: 'id, characterId, firedAt',
-  productionRuns: 'id, characterId, buildPlanId',
-  productionSaleLinks: 'id, characterId, runId',
-  productionOrderWatches: 'id, characterId, runId',
   payees: 'id, characterId',
   miningTaxAssignments: 'id, characterId, [characterId+date+solarSystemId]',
 });
@@ -1348,21 +1282,6 @@ db.version(10).stores({
 // Device-local and character-independent (see `BpcSearchWatchRecord`), so
 // unlike every other new table added here it carries no `characterId` index.
 db.version(11).stores({
-  characters: 'characterId, corporationId',
-  tokens: 'characterId',
-  settings: 'key',
-  skillPlans: 'id, characterId',
-  esiCache: '[characterId+key]',
-  buildPlans: 'id, characterId',
-  quickbars: 'id, characterId',
-  stationPins: 'id, characterId, locationId',
-  planetRichness: 'id, characterId, planetId',
-  notificationFeed: 'id, characterId, firedAt',
-  productionRuns: 'id, characterId, buildPlanId',
-  productionSaleLinks: 'id, characterId, runId',
-  productionOrderWatches: 'id, characterId, runId',
-  payees: 'id, characterId',
-  miningTaxAssignments: 'id, characterId, [characterId+date+solarSystemId]',
   bpcSearchWatches: 'id',
 });
 
@@ -1372,22 +1291,6 @@ db.version(11).stores({
 // to the characters a given load actually saw. Row growth is bounded by
 // `engine/market/orderProblemHistory.ts`'s window and per-order cap.
 db.version(12).stores({
-  characters: 'characterId, corporationId',
-  tokens: 'characterId',
-  settings: 'key',
-  skillPlans: 'id, characterId',
-  esiCache: '[characterId+key]',
-  buildPlans: 'id, characterId',
-  quickbars: 'id, characterId',
-  stationPins: 'id, characterId, locationId',
-  planetRichness: 'id, characterId, planetId',
-  notificationFeed: 'id, characterId, firedAt',
-  productionRuns: 'id, characterId, buildPlanId',
-  productionSaleLinks: 'id, characterId, runId',
-  productionOrderWatches: 'id, characterId, runId',
-  payees: 'id, characterId',
-  miningTaxAssignments: 'id, characterId, [characterId+date+solarSystemId]',
-  bpcSearchWatches: 'id',
   orderProblemSamples: 'orderId, characterId',
 });
 
@@ -1395,23 +1298,6 @@ db.version(12).stores({
 // (mail-reply-and-forward decision). `characterId` is indexed so
 // `removeCharacter` can purge a dropped Character's drafts in one query.
 db.version(13).stores({
-  characters: 'characterId, corporationId',
-  tokens: 'characterId',
-  settings: 'key',
-  skillPlans: 'id, characterId',
-  esiCache: '[characterId+key]',
-  buildPlans: 'id, characterId',
-  quickbars: 'id, characterId',
-  stationPins: 'id, characterId, locationId',
-  planetRichness: 'id, characterId, planetId',
-  notificationFeed: 'id, characterId, firedAt',
-  productionRuns: 'id, characterId, buildPlanId',
-  productionSaleLinks: 'id, characterId, runId',
-  productionOrderWatches: 'id, characterId, runId',
-  payees: 'id, characterId',
-  miningTaxAssignments: 'id, characterId, [characterId+date+solarSystemId]',
-  bpcSearchWatches: 'id',
-  orderProblemSamples: 'orderId, characterId',
   mailDrafts: 'id, characterId',
 });
 
@@ -1419,24 +1305,6 @@ db.version(13).stores({
 // history (issue #1278). One row per Character, keyed by it, so
 // `removeCharacter` drops it with a single delete.
 db.version(14).stores({
-  characters: 'characterId, corporationId',
-  tokens: 'characterId',
-  settings: 'key',
-  skillPlans: 'id, characterId',
-  esiCache: '[characterId+key]',
-  buildPlans: 'id, characterId',
-  quickbars: 'id, characterId',
-  stationPins: 'id, characterId, locationId',
-  planetRichness: 'id, characterId, planetId',
-  notificationFeed: 'id, characterId, firedAt',
-  productionRuns: 'id, characterId, buildPlanId',
-  productionSaleLinks: 'id, characterId, runId',
-  productionOrderWatches: 'id, characterId, runId',
-  payees: 'id, characterId',
-  miningTaxAssignments: 'id, characterId, [characterId+date+solarSystemId]',
-  bpcSearchWatches: 'id',
-  orderProblemSamples: 'orderId, characterId',
-  mailDrafts: 'id, characterId',
   miningLedgerHistory: 'characterId',
 });
 
@@ -1444,102 +1312,23 @@ db.version(14).stores({
 // buy/sell prices (issue #1279). Keyed by date, so the one-year prune is a
 // primary-key range delete.
 db.version(15).stores({
-  characters: 'characterId, corporationId',
-  tokens: 'characterId',
-  settings: 'key',
-  skillPlans: 'id, characterId',
-  esiCache: '[characterId+key]',
-  buildPlans: 'id, characterId',
-  quickbars: 'id, characterId',
-  stationPins: 'id, characterId, locationId',
-  planetRichness: 'id, characterId, planetId',
-  notificationFeed: 'id, characterId, firedAt',
-  productionRuns: 'id, characterId, buildPlanId',
-  productionSaleLinks: 'id, characterId, runId',
-  productionOrderWatches: 'id, characterId, runId',
-  payees: 'id, characterId',
-  miningTaxAssignments: 'id, characterId, [characterId+date+solarSystemId]',
-  bpcSearchWatches: 'id',
-  orderProblemSamples: 'orderId, characterId',
-  mailDrafts: 'id, characterId',
-  miningLedgerHistory: 'characterId',
   jitaPriceSnapshots: 'date',
 });
 
 // Drops BPC Sourcing watches (issue #926), removed as a feature: v15 stores
 // unchanged otherwise. Device-local only, so nothing to clean up in sync.
 db.version(16).stores({
-  characters: 'characterId, corporationId',
-  tokens: 'characterId',
-  settings: 'key',
-  skillPlans: 'id, characterId',
-  esiCache: '[characterId+key]',
-  buildPlans: 'id, characterId',
-  quickbars: 'id, characterId',
-  stationPins: 'id, characterId, locationId',
-  planetRichness: 'id, characterId, planetId',
-  notificationFeed: 'id, characterId, firedAt',
-  productionRuns: 'id, characterId, buildPlanId',
-  productionSaleLinks: 'id, characterId, runId',
-  productionOrderWatches: 'id, characterId, runId',
-  payees: 'id, characterId',
-  miningTaxAssignments: 'id, characterId, [characterId+date+solarSystemId]',
   bpcSearchWatches: null,
-  orderProblemSamples: 'orderId, characterId',
-  mailDrafts: 'id, characterId',
-  miningLedgerHistory: 'characterId',
-  jitaPriceSnapshots: 'date',
 });
 
 // Adds My Fittings (issue #1538): saved Fitting share codes, synced.
 db.version(17).stores({
-  characters: 'characterId, corporationId',
-  tokens: 'characterId',
-  settings: 'key',
-  skillPlans: 'id, characterId',
-  esiCache: '[characterId+key]',
-  buildPlans: 'id, characterId',
-  quickbars: 'id, characterId',
-  stationPins: 'id, characterId, locationId',
-  planetRichness: 'id, characterId, planetId',
-  notificationFeed: 'id, characterId, firedAt',
-  productionRuns: 'id, characterId, buildPlanId',
-  productionSaleLinks: 'id, characterId, runId',
-  productionOrderWatches: 'id, characterId, runId',
-  payees: 'id, characterId',
-  miningTaxAssignments: 'id, characterId, [characterId+date+solarSystemId]',
-  bpcSearchWatches: null,
-  orderProblemSamples: 'orderId, characterId',
-  mailDrafts: 'id, characterId',
-  miningLedgerHistory: 'characterId',
-  jitaPriceSnapshots: 'date',
   fittings: 'id, characterId',
 });
 
 // Adds the saved hull check for the Fitting editor's module browser: additive,
 // device-local, and rebuildable from the engine.
 db.version(18).stores({
-  characters: 'characterId, corporationId',
-  tokens: 'characterId',
-  settings: 'key',
-  skillPlans: 'id, characterId',
-  esiCache: '[characterId+key]',
-  buildPlans: 'id, characterId',
-  quickbars: 'id, characterId',
-  stationPins: 'id, characterId, locationId',
-  planetRichness: 'id, characterId, planetId',
-  notificationFeed: 'id, characterId, firedAt',
-  productionRuns: 'id, characterId, buildPlanId',
-  productionSaleLinks: 'id, characterId, runId',
-  productionOrderWatches: 'id, characterId, runId',
-  payees: 'id, characterId',
-  miningTaxAssignments: 'id, characterId, [characterId+date+solarSystemId]',
-  bpcSearchWatches: null,
-  orderProblemSamples: 'orderId, characterId',
-  mailDrafts: 'id, characterId',
-  miningLedgerHistory: 'characterId',
-  jitaPriceSnapshots: 'date',
-  fittings: 'id, characterId',
   hullFitCache: 'key, savedAt',
 });
 
@@ -1548,180 +1337,33 @@ db.version(18).stores({
 // walking `esiCache` to backfill it would deserialize every cached value at
 // open, before first render. Rows older than this get meta lazily, on first read.
 db.version(19).stores({
-  characters: 'characterId, corporationId',
-  tokens: 'characterId',
-  settings: 'key',
-  skillPlans: 'id, characterId',
-  esiCache: '[characterId+key]',
   esiCacheMeta: '[characterId+key]',
-  buildPlans: 'id, characterId',
-  quickbars: 'id, characterId',
-  stationPins: 'id, characterId, locationId',
-  planetRichness: 'id, characterId, planetId',
-  notificationFeed: 'id, characterId, firedAt',
-  productionRuns: 'id, characterId, buildPlanId',
-  productionSaleLinks: 'id, characterId, runId',
-  productionOrderWatches: 'id, characterId, runId',
-  payees: 'id, characterId',
-  miningTaxAssignments: 'id, characterId, [characterId+date+solarSystemId]',
-  bpcSearchWatches: null,
-  orderProblemSamples: 'orderId, characterId',
-  mailDrafts: 'id, characterId',
-  miningLedgerHistory: 'characterId',
-  jitaPriceSnapshots: 'date',
-  fittings: 'id, characterId',
-  hullFitCache: 'key, savedAt',
 });
 
 // Adds `ansiblexGates`, Route Safety's device-local Ansiblex list (issue #2478).
 // Additive, and never synced.
 db.version(20).stores({
-  characters: 'characterId, corporationId',
-  tokens: 'characterId',
-  settings: 'key',
-  skillPlans: 'id, characterId',
-  esiCache: '[characterId+key]',
-  esiCacheMeta: '[characterId+key]',
-  buildPlans: 'id, characterId',
-  quickbars: 'id, characterId',
-  stationPins: 'id, characterId, locationId',
-  planetRichness: 'id, characterId, planetId',
-  notificationFeed: 'id, characterId, firedAt',
-  productionRuns: 'id, characterId, buildPlanId',
-  productionSaleLinks: 'id, characterId, runId',
-  productionOrderWatches: 'id, characterId, runId',
-  payees: 'id, characterId',
-  miningTaxAssignments: 'id, characterId, [characterId+date+solarSystemId]',
-  bpcSearchWatches: null,
-  orderProblemSamples: 'orderId, characterId',
-  mailDrafts: 'id, characterId',
-  miningLedgerHistory: 'characterId',
-  jitaPriceSnapshots: 'date',
-  fittings: 'id, characterId',
-  hullFitCache: 'key, savedAt',
   ansiblexGates: 'id',
 });
 
 // Adds `industryJobHistory`, delivered industry jobs kept past ESI's window (issue #2866).
 // Additive, and never synced.
 db.version(21).stores({
-  characters: 'characterId, corporationId',
-  tokens: 'characterId',
-  settings: 'key',
-  skillPlans: 'id, characterId',
-  esiCache: '[characterId+key]',
-  esiCacheMeta: '[characterId+key]',
-  buildPlans: 'id, characterId',
-  quickbars: 'id, characterId',
-  stationPins: 'id, characterId, locationId',
-  planetRichness: 'id, characterId, planetId',
-  notificationFeed: 'id, characterId, firedAt',
-  productionRuns: 'id, characterId, buildPlanId',
-  productionSaleLinks: 'id, characterId, runId',
-  productionOrderWatches: 'id, characterId, runId',
-  payees: 'id, characterId',
-  miningTaxAssignments: 'id, characterId, [characterId+date+solarSystemId]',
-  bpcSearchWatches: null,
-  orderProblemSamples: 'orderId, characterId',
-  mailDrafts: 'id, characterId',
-  miningLedgerHistory: 'characterId',
-  jitaPriceSnapshots: 'date',
-  fittings: 'id, characterId',
-  hullFitCache: 'key, savedAt',
-  ansiblexGates: 'id',
   industryJobHistory: 'characterId',
 });
 
 // Adds `netWorthSnapshots`, the daily per-Character net worth history (issue #2865).
 db.version(22).stores({
-  characters: 'characterId, corporationId',
-  tokens: 'characterId',
-  settings: 'key',
-  skillPlans: 'id, characterId',
-  esiCache: '[characterId+key]',
-  esiCacheMeta: '[characterId+key]',
-  buildPlans: 'id, characterId',
-  quickbars: 'id, characterId',
-  stationPins: 'id, characterId, locationId',
-  planetRichness: 'id, characterId, planetId',
-  notificationFeed: 'id, characterId, firedAt',
-  productionRuns: 'id, characterId, buildPlanId',
-  productionSaleLinks: 'id, characterId, runId',
-  productionOrderWatches: 'id, characterId, runId',
-  payees: 'id, characterId',
-  miningTaxAssignments: 'id, characterId, [characterId+date+solarSystemId]',
-  bpcSearchWatches: null,
-  orderProblemSamples: 'orderId, characterId',
-  mailDrafts: 'id, characterId',
-  miningLedgerHistory: 'characterId',
-  jitaPriceSnapshots: 'date',
-  fittings: 'id, characterId',
-  hullFitCache: 'key, savedAt',
-  ansiblexGates: 'id',
-  industryJobHistory: 'characterId',
   netWorthSnapshots: 'id, characterId',
 });
 
 // Adds `productionLosses`, Run Loss records (issue #2851).
 db.version(23).stores({
-  characters: 'characterId, corporationId',
-  tokens: 'characterId',
-  settings: 'key',
-  skillPlans: 'id, characterId',
-  esiCache: '[characterId+key]',
-  esiCacheMeta: '[characterId+key]',
-  buildPlans: 'id, characterId',
-  quickbars: 'id, characterId',
-  stationPins: 'id, characterId, locationId',
-  planetRichness: 'id, characterId, planetId',
-  notificationFeed: 'id, characterId, firedAt',
-  productionRuns: 'id, characterId, buildPlanId',
-  productionSaleLinks: 'id, characterId, runId',
-  productionOrderWatches: 'id, characterId, runId',
-  payees: 'id, characterId',
-  miningTaxAssignments: 'id, characterId, [characterId+date+solarSystemId]',
-  bpcSearchWatches: null,
-  orderProblemSamples: 'orderId, characterId',
-  mailDrafts: 'id, characterId',
-  miningLedgerHistory: 'characterId',
-  jitaPriceSnapshots: 'date',
-  fittings: 'id, characterId',
-  hullFitCache: 'key, savedAt',
-  ansiblexGates: 'id',
-  industryJobHistory: 'characterId',
-  netWorthSnapshots: 'id, characterId',
   productionLosses: 'id, characterId, runId',
 });
 
 // Adds the wallet journal and transaction archives and their coverage.
 db.version(24).stores({
-  characters: 'characterId, corporationId',
-  tokens: 'characterId',
-  settings: 'key',
-  skillPlans: 'id, characterId',
-  esiCache: '[characterId+key]',
-  esiCacheMeta: '[characterId+key]',
-  buildPlans: 'id, characterId',
-  quickbars: 'id, characterId',
-  stationPins: 'id, characterId, locationId',
-  planetRichness: 'id, characterId, planetId',
-  notificationFeed: 'id, characterId, firedAt',
-  productionRuns: 'id, characterId, buildPlanId',
-  productionSaleLinks: 'id, characterId, runId',
-  productionOrderWatches: 'id, characterId, runId',
-  payees: 'id, characterId',
-  miningTaxAssignments: 'id, characterId, [characterId+date+solarSystemId]',
-  bpcSearchWatches: null,
-  orderProblemSamples: 'orderId, characterId',
-  mailDrafts: 'id, characterId',
-  miningLedgerHistory: 'characterId',
-  jitaPriceSnapshots: 'date',
-  fittings: 'id, characterId',
-  hullFitCache: 'key, savedAt',
-  ansiblexGates: 'id',
-  industryJobHistory: 'characterId',
-  netWorthSnapshots: 'id, characterId',
-  productionLosses: 'id, characterId, runId',
   walletJournalArchive: '[characterId+id], characterId, [characterId+date]',
   walletTransactionArchive: '[characterId+transaction_id], characterId, [characterId+date]',
   walletArchiveCoverage: '[characterId+kind], characterId',
@@ -1729,35 +1371,5 @@ db.version(24).stores({
 
 // Adds `dynamicItems`, mutated items' rolled attributes from ESI, kept for good.
 db.version(25).stores({
-  characters: 'characterId, corporationId',
-  tokens: 'characterId',
-  settings: 'key',
-  skillPlans: 'id, characterId',
-  esiCache: '[characterId+key]',
-  esiCacheMeta: '[characterId+key]',
-  buildPlans: 'id, characterId',
-  quickbars: 'id, characterId',
-  stationPins: 'id, characterId, locationId',
-  planetRichness: 'id, characterId, planetId',
-  notificationFeed: 'id, characterId, firedAt',
-  productionRuns: 'id, characterId, buildPlanId',
-  productionSaleLinks: 'id, characterId, runId',
-  productionOrderWatches: 'id, characterId, runId',
-  payees: 'id, characterId',
-  miningTaxAssignments: 'id, characterId, [characterId+date+solarSystemId]',
-  bpcSearchWatches: null,
-  orderProblemSamples: 'orderId, characterId',
-  mailDrafts: 'id, characterId',
-  miningLedgerHistory: 'characterId',
-  jitaPriceSnapshots: 'date',
-  fittings: 'id, characterId',
-  hullFitCache: 'key, savedAt',
-  ansiblexGates: 'id',
-  industryJobHistory: 'characterId',
-  netWorthSnapshots: 'id, characterId',
-  productionLosses: 'id, characterId, runId',
-  walletJournalArchive: '[characterId+id], characterId, [characterId+date]',
-  walletTransactionArchive: '[characterId+transaction_id], characterId, [characterId+date]',
-  walletArchiveCoverage: '[characterId+kind], characterId',
   dynamicItems: 'itemId',
 });
