@@ -21,6 +21,7 @@ import { resolveStanding } from '@/engine/pilotList/standing';
 import { formatAge } from '@/lib/age';
 import { cx } from '@/lib/cx';
 import { useRetryFocus } from '@/lib/useRetryFocus';
+import { zkillFailureKey } from '@/lib/zkillFailureKey';
 import { useNow } from '@/lib/useNow';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { loadViewerContext, type ViewerContext } from './pilotListData';
@@ -94,7 +95,12 @@ export function PilotKillActivityView({
       <section ref={resultRef} tabIndex={-1} className="space-y-2 outline-none">
         {heading}
         <p className="flex flex-wrap items-center gap-3 text-sm text-text-dim">
-          {t('travel.pilot.activity.failed')}
+          {t(
+            zkillFailureKey(
+              history.kind === 'failed' ? history.reason : undefined,
+              'travel.pilot.activity.failed'
+            )
+          )}
           <Button
             size="sm"
             onClick={() => {

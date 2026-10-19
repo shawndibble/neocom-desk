@@ -165,7 +165,7 @@ describe('ZkillTopShips', () => {
 describe('ZkillStatsSection retry focus', () => {
   it('keeps focus in the section from Retry through loading', () => {
     const { rerender } = render(
-      <ZkillStatsSection stats={{ kind: 'failed' }} onRetry={() => {}} />
+      <ZkillStatsSection stats={{ kind: 'failed', reason: 'http' }} onRetry={() => {}} />
     );
     const retry = screen.getByRole('button', { name: 'Try again' });
     retry.focus();
@@ -173,5 +173,17 @@ describe('ZkillStatsSection retry focus', () => {
     rerender(<ZkillStatsSection stats={null} onRetry={() => {}} />);
     expect(document.activeElement).not.toBe(document.body);
     expect(document.activeElement).toHaveAttribute('tabindex', '-1');
+  });
+});
+
+describe('ZkillStatsSection failed hint', () => {
+  it.each([
+    ['offline', "You're offline. Reconnect, then try again."],
+    ['rate-limited', 'zKillboard is rate-limiting requests. Try again in a minute.'],
+    ['http', "Their kills and losses aren't available right now."],
+    ['parse', "Their kills and losses aren't available right now."],
+  ] as const)('says the right thing for %s', (reason, text) => {
+    render(<ZkillStatsSection stats={{ kind: 'failed', reason }} onRetry={() => {}} />);
+    expect(screen.getByText(new RegExp(text.replace(/[.']/g, '\\$&')))).toBeInTheDocument();
   });
 });

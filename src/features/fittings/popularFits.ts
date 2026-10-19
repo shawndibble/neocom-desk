@@ -12,13 +12,14 @@ import { useEffect, useState } from 'react';
 import { groupPopularFits, type HullLoss, type PopularFit } from '@/engine/fittings/popularFits';
 import { getKillmail } from '@/esi/endpoints';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
-import { fetchHullLosses } from '@/lib/zkillboard';
+import { fetchHullLosses, type ZkillFailureReason } from '@/lib/zkillboard';
 import { loadFittingSlots } from '@/sde/loadSde';
 
 const CACHE_TTL_MS = 10 * 60_000;
 
 /** `ok: false` when zKillboard or ESI couldn't supply the losses. */
-export type PopularFitsResult = { ok: true; fits: PopularFit[] } | { ok: false };
+export type PopularFitsResult =
+  { ok: true; fits: PopularFit[] } | { ok: false; reason?: ZkillFailureReason };
 
 const cache = new Map<number, { at: number; result: PopularFitsResult }>();
 const pending = new Map<number, Promise<PopularFitsResult>>();
@@ -29,9 +30,12 @@ export function resetPopularFitsCache(): void {
   pending.clear();
 }
 
-async function resolveLosses(shipTypeId: number): Promise<HullLoss[] | null> {
+/** The losses, or why zKillboard couldn't supply them; null when ESI couldn't read any. */
+async function resolveLosses(
+  shipTypeId: number
+): Promise<HullLoss[] | { reason: ZkillFailureReason } | null> {
   const fetched = await fetchHullLosses(shipTypeId);
-  if (!fetched.ok) return null;
+  if (!fetched.ok) return { reason: fetched.reason };
   const resolved: HullLoss[] = [];
   await mapWithConcurrencyLimit(fetched.losses, ESI_FANOUT_CONCURRENCY, async (loss) => {
     if (loss.victim !== null) {
@@ -75,6 +79,7 @@ async function fetchPopularFits(shipTypeId: number, now: number): Promise<Popula
   try {
     const losses = await resolveLosses(shipTypeId);
     if (losses === null) return { ok: false };
+    if (!Array.isArray(losses)) return { ok: false, reason: losses.reason };
     const result: PopularFitsResult = {
       ok: true,
       fits: groupPopularFits(losses, await loadFittingSlots()),
