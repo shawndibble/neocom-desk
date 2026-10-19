@@ -82,7 +82,7 @@ import {
   type CharacterColumnId,
 } from '@/features/character/characterColumns';
 import { ATTENTION_RANK, ATTENTION_TONE as PI_ATTENTION_TONE } from '@/engine/pi/colonyStatus';
-import { type QueueState } from '@/features/skills/queueStatus';
+import { type QueueState } from '@/engine/skills/queueStatus';
 import { formatCountdown, formatDuration } from '@/lib/duration';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';

@@ -16,7 +16,7 @@ import type { CorpOwnedStockState } from './corpOwnedStock';
 import type { CorpOwnedBlueprintsState } from './corpOwnedBlueprints';
 import { PRICING_INPUTS_FIXTURE } from './pricingInputsFixtures.testutil';
 import { EMPTY_OWNED_STOCK_SNAPSHOT, type OwnedStockSnapshot } from './ownedStockDetection';
-import { applySourcingPatch } from './sourcingEdits';
+import { applySourcingPatch } from '@/engine/industry/sourcingEdits';
 import type { SourcingPatchEntry } from './buildPlanStore';
 import { BuildPlanDetail, type PlanPatch } from './BuildPlanDetail';
 import { FakeItemActions } from '@/features/market/__fixtures__/itemActions';

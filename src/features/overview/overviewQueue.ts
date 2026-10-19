@@ -1,5 +1,5 @@
 import type { SkillQueueEntry } from '@/esi/endpoints';
-import { isQueuePaused } from '@/features/skills/queueStatus';
+import { isQueuePaused } from '@/engine/skills/queueStatus';
 
 /** Entries in `queue_position` order — ESI does not guarantee response order matches queue order. */
 export function sortQueueEntries(entries: readonly SkillQueueEntry[]): SkillQueueEntry[] {

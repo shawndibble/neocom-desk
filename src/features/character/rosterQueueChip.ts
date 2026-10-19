@@ -1,7 +1,7 @@
 import type { StatChipTone } from '@/components/ui';
 import type { QueueInfo } from '@/features/character/rosterView';
 import type { CharacterSortStats } from '@/features/character/groups';
-import type { QueueState } from '@/features/skills/queueStatus';
+import type { QueueState } from '@/engine/skills/queueStatus';
 
 export const UNGROUPED_VALUE = '__ungrouped__';
 

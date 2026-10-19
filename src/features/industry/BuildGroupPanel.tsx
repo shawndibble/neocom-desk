@@ -72,7 +72,7 @@ import {
 import { useOwnedStockBulk } from './useOwnedStockBulk';
 import { PlanScheduleLine } from './PlanScheduleLine';
 import { planJobNodes, usePlanSchedule } from './planJobSlots';
-import { hasShoppingList, shoppingListText } from './shoppingList';
+import { hasShoppingList, shoppingListText } from '@/engine/industry/shoppingList';
 import { useComparedBuildResults } from './useComparedBuildResults';
 import { useDetectedOwnedStock } from './useDetectedOwnedStock';
 import { RetargetGroupDialog, type RetargetTarget } from './RetargetGroupDialog';
