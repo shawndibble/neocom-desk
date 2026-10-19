@@ -1,7 +1,7 @@
 // Per-collection two-way sync passes (pull, merge, push) for one character:
-// every editable collection, the Notification Feed and synced settings.
-// planSync.ts owns the driver (syncCharacter) and the mutation API and calls
-// these; this module never imports it back.
+// every editable collection. The Notification Feed and synced settings passes
+// live in feedSync.ts and settingsSync.ts. planSync.ts owns the driver
+// (syncCharacter) and the mutation API and calls these; none of them import it back.
 // Merge policy is pure and lives in merge.ts.
 
 import {
@@ -15,23 +15,10 @@ import {
   type CollectionReference,
   type Firestore,
 } from 'firebase/firestore/lite';
-import {
-  db,
-  type NotificationFeedRecord,
-  type PlanetRichnessRecord,
-  type StationPinRecord,
-} from '@/db';
+import { db, type PlanetRichnessRecord, type StationPinRecord } from '@/db';
 import { planetRichnessDeletedAtByKey, stationPinDeletedAtByKey } from './accountWideBackfill';
-import {
-  FEED_SYNC_WINDOW_MS,
-  mergeFeedRecord,
-  rowsWithinSyncWindow,
-  trimFeed,
-} from '@/features/notifications/feed';
-import { refreshAppBadge } from '@/features/notifications/appBadge';
 import { mapWithConcurrencyLimit } from '@/lib/concurrency';
 import {
-  INTERNAL_PREFIX,
   readTombstones,
   tombstoneKey,
   pullCursorKey,
@@ -39,72 +26,17 @@ import {
   writePullCursor,
   type PullCursor,
 } from './localBookkeeping';
+import { mergeRecords, TOMBSTONE_TTL_MS, type LocalTombstone, type RemoteDoc } from './merge';
 import {
-  mergeFeed,
-  mergeRecords,
-  mergeSettings,
-  TOMBSTONE_TTL_MS,
-  type LocalTombstone,
-  type RemoteDoc,
-  type RemoteFeedDoc,
-  type RemoteSyncedSetting,
-  type SyncedSettingTombstone,
-  type SyncedSettingValue,
-} from './merge';
-import {
-  NOTIFICATION_FEED,
   PLANET_RICHNESS,
   STATION_PINS,
-  SYNCED_SETTINGS,
   type EditableCollection,
   type EditableRecord,
 } from './syncedCollections';
 
-// ---------------------------------------------------------------------------
-// Local bookkeeping (Dexie settings table). 'sync.__' keys are internal and
-
-// ---------------------------------------------------------------------------
-// Local bookkeeping (Dexie settings table). 'sync.__' keys are internal and
-// never synced; 'sync.' keys are the user settings that DO sync.
-// ---------------------------------------------------------------------------
-
-export const SYNCED_PREFIX = 'sync.';
-// Key builders (ownerHashKey, tombstoneKey) live in localBookkeeping.ts,
-// Firebase-free, so features/character/removeCharacter.ts can clear them
-// without pulling in Firebase.
-export const SETTINGS_META_KEY = `${INTERNAL_PREFIX}settingsMeta`;
-// Synced settings are a single global set (not per-character, like plans), so
-// their tombstones live under one global key too — a delete recorded during
-// one character's sync must be visible on every other character's pass.
-export const SETTINGS_TOMBSTONES_KEY = `${INTERNAL_PREFIX}settingsTombstones`;
-
-export function isSyncedSettingKey(key: string): boolean {
-  return key.startsWith(SYNCED_PREFIX) && !key.startsWith(INTERNAL_PREFIX);
-}
-
-export async function readSettingsMeta(): Promise<Record<string, number>> {
-  const record = await db.settings.get(SETTINGS_META_KEY);
-  return record && typeof record.value === 'object' && record.value !== null
-    ? { ...(record.value as Record<string, number>) }
-    : {};
-}
-
-export async function writeSettingsMeta(meta: Record<string, number>): Promise<void> {
-  await db.settings.put({ key: SETTINGS_META_KEY, value: meta });
-}
-
-export async function readSettingsTombstones(): Promise<SyncedSettingTombstone[]> {
-  const record = await db.settings.get(SETTINGS_TOMBSTONES_KEY);
-  return Array.isArray(record?.value) ? (record.value as SyncedSettingTombstone[]) : [];
-}
-
-export async function writeSettingsTombstones(tombstones: SyncedSettingTombstone[]): Promise<void> {
-  await db.settings.put({ key: SETTINGS_TOMBSTONES_KEY, value: tombstones });
-}
-
 const PUSH_CONCURRENCY = 20;
 
-async function runBounded(writes: (() => Promise<unknown>)[]): Promise<void> {
+export async function runBounded(writes: (() => Promise<unknown>)[]): Promise<void> {
   await mapWithConcurrencyLimit(writes, PUSH_CONCURRENCY, async (write) => {
     await write();
   });
@@ -240,7 +172,7 @@ function isMissingIndex(err: unknown): boolean {
   return (err as { code?: string } | null)?.code === 'failed-precondition';
 }
 
-async function pullOwnedDocs<R extends { ownerHash: string; updatedAt?: number }>(
+export async function pullOwnedDocs<R extends { ownerHash: string; updatedAt?: number }>(
   col: CollectionReference,
   ctx: SyncContext,
   collectionName: string
@@ -356,290 +288,4 @@ export async function syncEditableCollection(
   // Last, and only once every write above landed: a throw mid-pass must leave
   // the cursor where it was so the next pass re-reads the same window.
   await writePullCursor(pull.cursorKey, pull.next);
-}
-
-// ---------------------------------------------------------------------------
-// Notification Feed sync (issue #362)
-//
-// Deliberate departure from the editable-collection sync: this collection has no
-// tombstones (dismissal is a flag — see NotificationFeedRecord.dismissedAt)
-// and its LWW field is `dismissedAt` alone, not a whole-record `updatedAt`
-// (content never changes once a row is fired). merge.ts's `mergeFeed` encodes
-// that directly rather than forcing it through mergeRecords' delete-aware
-// shape.
-//
-// The remote copy is still bounded, though (issue #582): a remote row fired
-// more than FEED_SYNC_WINDOW_MS ago is deleted outright — no tombstone, so
-// nothing accumulates in its place. The same window that decides what a
-// device starts pushing now also decides what stays up there — bounded,
-// though, not expired to the day: an aged row's transport stamp no longer
-// moves, so an incremental pull skips it and the periodic full reconcile is
-// what brings it back into view. Call it 30-60 days. A purged row
-// cannot ping-pong back: the purge cutoff and `pushEligible` are both
-// derived from the one `ctx.now`, so anything purged is already outside the
-// push window, and the device's own 300-row archive keeps the entry
-// regardless.
-//
-// GLOSSARY.md round 45 describes device-detected rows as eventually uploading
-// through the same callable Scheduled Push Projections use (issue #358),
-// once that callable exists. It doesn't yet (#358 is still open, gated on
-// #356/#357). Until then this uses the same ownerHash two-way sync every
-// other Editable-Data-shaped collection here uses — the backend (once #358
-// ships) can still write pushed rows into this same
-// characters/{uid}/notificationFeed collection with admin privileges, which
-// bypasses these rules entirely, so the two approaches aren't in conflict.
-// ---------------------------------------------------------------------------
-
-const NOTIFICATION_FEED_COLLECTION = NOTIFICATION_FEED.remoteName;
-
-/** Remote Firestore doc at /characters/{uid}/notificationFeed/{id}. */
-interface RemoteNotificationFeedDoc extends RemoteFeedDoc {
-  characterId: number;
-  eventId: string;
-  title: string;
-  body: string;
-  eveType?: string;
-  /** The row the alert was about, so the other device's link lands in the same place. */
-  subjectId?: number;
-  /** `subjectId`'s former name — read for rows written by the release that used it. */
-  typeId?: number;
-  fillMatch?: NotificationFeedRecord['fillMatch'];
-  fillSettledAt?: number;
-}
-
-function toRemoteFeedDoc(
-  row: NotificationFeedRecord,
-  ownerHash: string,
-  writeNow: number
-): Record<string, unknown> {
-  return {
-    id: row.id,
-    characterId: row.characterId,
-    eventId: row.eventId,
-    title: row.title,
-    body: row.body,
-    firedAt: row.firedAt,
-    ...(row.eveType !== undefined ? { eveType: row.eveType } : {}),
-    ...(row.subjectId !== undefined ? { subjectId: row.subjectId } : {}),
-    ...(row.dismissedAt !== undefined ? { dismissedAt: row.dismissedAt } : {}),
-    ...(row.fillMatch !== undefined ? { fillMatch: row.fillMatch } : {}),
-    ...(row.fillSettledAt !== undefined ? { fillSettledAt: row.fillSettledAt } : {}),
-    ownerHash,
-    // Transport only — what an incremental pull cursors on (issue #581).
-    // `mergeFeed` still keys on firedAt/dismissedAt and never reads this.
-    //
-    // A wall clock, not the row's own `max(firedAt, dismissedAt)` — see
-    // `LocalFeedRow` for why the derived stamp hid rows from other devices.
-    // `writeNow`, never `ctx.now`: a pass stamps `ctx.now` before a dozen
-    // collections' round trips, and a doc written a minute later under a
-    // stamp a minute old can land below a cursor another device has already
-    // moved past. Nothing here re-dates the row itself — `firedAt` and
-    // `dismissedAt` go up untouched, and stay the only fields `mergeFeed` reads.
-    updatedAt: writeNow,
-  };
-}
-
-/**
- * `local` is this device's own copy, present only when a pull is carrying an
- * existing row's dismissal across (`mergeFeed`'s `pullDismiss`). The merge
- * itself is `features/notifications/feed.mergeFeedRecord`'s — a pull must not
- * be the one writer that re-dates a row.
- */
-function toLocalFeedRecord(
-  remote: RemoteNotificationFeedDoc,
-  writeNow: number,
-  local?: NotificationFeedRecord
-): NotificationFeedRecord {
-  return mergeFeedRecord(local, {
-    // Seen in the remote collection, so the remote side demonstrably holds it
-    // — the same fact a successful push records, learned a step later.
-    syncedAt: writeNow,
-    id: remote.id,
-    characterId: remote.characterId,
-    eventId: remote.eventId,
-    title: remote.title,
-    body: remote.body,
-    firedAt: remote.firedAt,
-    ...(remote.eveType !== undefined ? { eveType: remote.eveType } : {}),
-    ...((remote.subjectId ?? remote.typeId) !== undefined
-      ? { subjectId: remote.subjectId ?? remote.typeId }
-      : {}),
-    ...(remote.dismissedAt !== undefined ? { dismissedAt: remote.dismissedAt } : {}),
-    ...(remote.fillMatch !== undefined ? { fillMatch: remote.fillMatch } : {}),
-    ...(remote.fillSettledAt !== undefined ? { fillSettledAt: remote.fillSettledAt } : {}),
-  });
-}
-
-export async function syncFeed(ctx: SyncContext): Promise<void> {
-  const col = collection(ctx.firestore, 'characters', ctx.uid, NOTIFICATION_FEED_COLLECTION);
-  const pull = await pullOwnedDocs<RemoteNotificationFeedDoc>(
-    col,
-    ctx,
-    NOTIFICATION_FEED_COLLECTION
-  );
-  const remote = pull.remote;
-  // Feed rows for every Character share one local table (the Alerts page
-  // shows them together); only this Character's own rows sync to its uid.
-  const local = await db.notificationFeed
-    .where('characterId')
-    .equals(ctx.characterId)
-    .reverse()
-    .sortBy('firedAt');
-  const pushEligible = new Set(rowsWithinSyncWindow(local, ctx.now).map((row) => row.id));
-
-  const plan = mergeFeed<NotificationFeedRecord, RemoteNotificationFeedDoc>(
-    local,
-    pushEligible,
-    remote,
-    ctx.now,
-    FEED_SYNC_WINDOW_MS
-  );
-
-  const writeNow = Date.now();
-  const remoteById = new Map(remote.map((row) => [row.id, row]));
-  // A re-date pushes the merge of both copies, not the local row alone: the
-  // remote doc is replaced wholesale, and anything only it holds would go.
-  const redated = plan.pushRedate.map((row) => {
-    const remoteRow = remoteById.get(row.id);
-    return remoteRow === undefined ? row : toLocalFeedRecord(remoteRow, writeNow, row);
-  });
-  const pushed = [...plan.pushCreate, ...plan.pushDismiss, ...redated];
-  await runBounded([
-    ...pushed.map(
-      (row) => () => setDoc(doc(col, row.id), toRemoteFeedDoc(row, ctx.ownerHash, writeNow))
-    ),
-    ...plan.purgeRemote.map((id) => () => deleteDoc(doc(col, id))),
-  ]);
-
-  const localById = new Map(local.map((row) => [row.id, row]));
-  // What this pass now knows the remote side holds: what it just wrote, and
-  // what it read back unchanged. Without the second half a row both sides
-  // already had — one the Scheduled Push handler wrote here and the other
-  // device uploaded — would stay unmarked and re-push on every pass.
-  //
-  // Marked only after the writes land: a `syncedAt` on a row that never
-  // reached Firestore is a row this device has silently agreed never to
-  // upload again. A throw here leaves it unmarked and the next pass
-  // re-pushes, which is the harmless direction to fail in.
-  const knownRemote = [
-    ...pushed.map((row) => row.id),
-    ...remote.map((row) => row.id).filter((id) => localById.has(id)),
-  ];
-  if (knownRemote.length > 0) {
-    await db.notificationFeed.where('id').anyOf(knownRemote).modify({ syncedAt: writeNow });
-  }
-
-  const pulled = [...plan.pullCreate, ...plan.pullDismiss, ...plan.pullRedate].map((row) =>
-    toLocalFeedRecord(row, writeNow, localById.get(row.id))
-  );
-  if (pulled.length > 0) {
-    await db.notificationFeed.bulkPut(pulled);
-    // Excluding what this pull just wrote, or a back-dated row would be
-    // trimmed on arrival and pulled again on the next sync, forever.
-    await trimFeed(new Set(pulled.map((row) => row.id)));
-    await refreshAppBadge();
-  }
-
-  await writePullCursor(pull.cursorKey, pull.next);
-}
-
-// ---------------------------------------------------------------------------
-// Synced settings
-// ---------------------------------------------------------------------------
-
-export async function syncSettings(ctx: SyncContext): Promise<void> {
-  const { firestore, uid, ownerHash, now } = ctx;
-  // The second `ownerHash` read, and under the same index constraint as
-  // `fetchOwnedDocs` — see its docstring. Deliberately unwindowed: settings
-  // tombstones never expire and `mergeSettings`' absence semantics differ.
-  const settingsCol = collection(firestore, 'characters', uid, SYNCED_SETTINGS.remoteName);
-  const snapshot = await getDocs(query(settingsCol, where('ownerHash', '==', ownerHash)));
-  // Only honour well-formed synced keys: a hostile or stale doc naming a
-  // non-synced Dexie key ('activeCharacterId') or an internal 'sync.__' key
-  // must never reach Dexie.
-  const remoteSettings = snapshot.docs
-    .map((d) => d.data() as RemoteSyncedSetting)
-    .filter((s) => typeof s.key === 'string' && isSyncedSettingKey(s.key));
-  const meta = await readSettingsMeta();
-  const settingsTombstones = await readSettingsTombstones();
-  const localSettings: SyncedSettingValue[] = (await db.settings.toArray())
-    .filter((record) => isSyncedSettingKey(record.key))
-    .map((record) => ({ key: record.key, value: record.value, updatedAt: meta[record.key] ?? 0 }));
-
-  const settings = mergeSettings(localSettings, settingsTombstones, remoteSettings, now);
-  /** LWW stamps this pass wants to record, applied under the transaction below. */
-  const stamps = new Map<string, number>();
-
-  await Promise.all([
-    ...settings.push.map((s) => {
-      // A key written outside setSyncedSetting has no timestamp yet: stamp now.
-      const updatedAt = s.updatedAt > 0 ? s.updatedAt : now;
-      if (meta[s.key] !== updatedAt) stamps.set(s.key, updatedAt);
-      return setDoc(doc(settingsCol, s.key), {
-        key: s.key,
-        value: s.value,
-        updatedAt,
-        ownerHash,
-        deleted: false,
-      });
-    }),
-    ...settings.pushTombstones.map((t) =>
-      // No `value` field — Firestore rejects undefined, and a tombstone carries none.
-      setDoc(doc(settingsCol, t.key), {
-        key: t.key,
-        updatedAt: t.deletedAt,
-        ownerHash,
-        deleted: true,
-      })
-    ),
-    ...settings.purgeRemote.map((key) => deleteDoc(doc(settingsCol, key))),
-  ]);
-
-  // One transaction for the whole pull rather than a put/delete per key: the
-  // rows and their LWW stamps land together, and a live query over settings
-  // re-runs once instead of once per row. Dexie only inside it — an awaited
-  // Firestore call would let the transaction auto-commit early.
-  //
-  // The meta is re-read inside it: the merge above worked from a snapshot
-  // taken before the network round trips, and a setSyncedSetting /
-  // deleteSyncedSetting landing in between must neither be overwritten by the
-  // pull nor lose its stamp. A key whose stamp moved since the snapshot is
-  // left alone; the next pass merges it properly.
-  if (settings.pull.length > 0 || settings.deleteLocal.length > 0 || stamps.size > 0) {
-    await db.transaction('rw', db.settings, async () => {
-      const current = await readSettingsMeta();
-      const untouched = (key: string) => current[key] === meta[key];
-      const pull = settings.pull.filter((s) => untouched(s.key));
-      const deleteLocal = settings.deleteLocal.filter(untouched);
-      let dirty = false;
-      for (const [key, updatedAt] of stamps) {
-        if (!untouched(key)) continue;
-        current[key] = updatedAt;
-        dirty = true;
-      }
-      for (const s of pull) {
-        current[s.key] = s.updatedAt;
-        dirty = true;
-      }
-      for (const key of deleteLocal) {
-        if (key in current) {
-          delete current[key];
-          dirty = true;
-        }
-      }
-      if (pull.length > 0) {
-        await db.settings.bulkPut(pull.map((s) => ({ key: s.key, value: s.value })));
-      }
-      if (deleteLocal.length > 0) await db.settings.bulkDelete(deleteLocal);
-      if (dirty) await writeSettingsMeta(current);
-    });
-  }
-
-  // Do NOT also clear on settings.pushTombstones: a tombstone that was just
-  // pushed is not yet resolved — see mergeSettings for why it must survive
-  // until a remote write postdates the delete.
-  if (settings.clearLocalTombstones.length > 0) {
-    const cleared = new Set(settings.clearLocalTombstones);
-    await writeSettingsTombstones(settingsTombstones.filter((t) => !cleared.has(t.key)));
-  }
 }
