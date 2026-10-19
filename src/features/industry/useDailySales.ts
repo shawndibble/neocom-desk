@@ -1,3 +1,4 @@
+import { idSetKey } from '@/lib/idSetKey';
 /**
  * `loadDailySales` for the market-wide scan's ranked rows, fetched only while
  * the "rarely sold" filter is on. Results land in batches rather than one
@@ -22,7 +23,7 @@ const IDLE: DailySalesState = { sales: NO_SALES, pending: 0 };
 
 export function useDailySales(typeIds: readonly number[], enabled: boolean): DailySalesState {
   // Value-stable across renders that rebuild the same id list.
-  const key = enabled ? [...typeIds].sort((a, b) => a - b).join(',') : '';
+  const key = enabled ? idSetKey(typeIds) : '';
   const [state, setState] = useState<{ key: string; value: DailySalesState }>({
     key: '',
     value: IDLE,

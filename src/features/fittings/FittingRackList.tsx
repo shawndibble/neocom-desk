@@ -126,7 +126,7 @@ function ResourceBar({ label, used, total }: ResourceBarProps) {
   );
 }
 
-export interface EditContext {
+interface EditContext {
   fitting: Fitting;
   catalogue: FittingCatalogue | null;
   /** The engine, pilot and catalogue for fit checks; null while any of them loads. */
@@ -884,7 +884,7 @@ export function FittingRackList({
  * An Add panel item or charge dropped on it goes in the hold.
  * The List's Cargo section; the Ring shows the same items as tiles.
  */
-export function CargoSection({
+function CargoSection({
   fitting,
   catalogue,
   edit,

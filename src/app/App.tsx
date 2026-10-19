@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, type ReactElement } from 'react';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { industryTabHref } from '@/features/industry/industryTabs';
 import { withSentryReactRouterV7Routing } from '@sentry/react';
@@ -53,6 +54,7 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useFontScale } from '@/lib/fontScale';
 import { useTimeFormat } from '@/lib/timeFormat';
 import { useMobileTabs } from '@/lib/mobileTabs';
+import { useCharacterCountOrLoading } from '@/features/character/useCharacters';
 
 // Wire authenticated ESI calls to stored tokens once, at module load. Wrapped
 // (tokenProvider.ts) so a dead refresh grant is reported centrally instead of
@@ -267,7 +269,7 @@ const FEATURE_ROUTES = Object.entries(ROUTE_ELEMENTS) as [AppRoutePath, ReactEle
  * guard would then have to send back.
  */
 function Root() {
-  const characterCount = useLiveQuery(() => db.characters.count());
+  const characterCount = useCharacterCountOrLoading();
   const hydrated = useActiveCharacter((state) => state.hydrated);
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   // A landing section's hash (`/#login-faq`) survives the hop to the page that has it.
@@ -294,10 +296,7 @@ function AppEffects() {
   // Applies the stored text-scale to <html> as early as possible, regardless
   // of which route the user lands on — it is not something visiting /settings
   // should be required for.
-  const hydrateFontScale = useFontScale((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateFontScale();
-  }, [hydrateFontScale]);
+  useHydratedStore(useFontScale);
 
   // Same reasoning, one level up from any single view: the Time format
   // preference is read by `DataAgeBadge` — which rides on nearly every
@@ -307,29 +306,16 @@ function AppEffects() {
   // would be that many copies of this effect racing for the same Dexie row,
   // and each would still paint its first frame on the default before the
   // read landed. Once here, before any route mounts, covers them all.
-  const hydrateTimeFormat = useTimeFormat((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateTimeFormat();
-  }, [hydrateTimeFormat]);
+  useHydratedStore(useTimeFormat);
 
   // And the phone's chosen bottom tabs, for the same reason one level lower:
   // `Layout` is the only reader, but it renders on every route, so hydrating
   // it there would still paint the default bar first on a cold load. Here it
   // is read once, before the shell mounts.
-  const hydrateMobileTabs = useMobileTabs((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateMobileTabs();
-  }, [hydrateMobileTabs]);
+  useHydratedStore(useMobileTabs);
 
   // The rail's and More sheet's hidden pages and Recent row: same reason.
-  const hydrateHiddenNav = useHiddenNav((state) => state.hydrate);
-  const hydrateRecentNav = useRecentNav((state) => state.hydrate);
-  const hydrateNavSetup = useNavSetupAnswered((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateHiddenNav();
-    void hydrateRecentNav();
-    void hydrateNavSetup();
-  }, [hydrateHiddenNav, hydrateRecentNav, hydrateNavSetup]);
+  useHydratedStore(useHiddenNav, useRecentNav, useNavSetupAnswered);
 
   // `esi` publishes auth failures; the store is subscribed here so `esi` keeps
   // no dependency on `src/stores` (docs/ARCHITECTURE.md §2).

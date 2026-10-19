@@ -1,3 +1,6 @@
+import { NO_NAMES } from '@/lib/emptyCollections';
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { TaxDialogsHost } from '@/features/miningTax/TaxDialogsHost';
 import { isSelectableRow, useTaxColumns } from '@/features/miningTax/useTaxColumns';
 import { useTaxDialogs, useTaxDialogSelector } from '@/features/miningTax/useTaxDialogs';
@@ -149,7 +152,6 @@ interface Snapshot {
 
 const NO_HUBS: ReadonlySet<TradeHub['id']> = new Set();
 const NO_SECURITY: ReadonlyMap<number, number> = new Map();
-const NO_NAMES: ReadonlyMap<number, string> = new Map();
 const NO_PAYEES_BY_CHARACTER: ReadonlyMap<number, PayeeRecord[]> = new Map();
 
 const EMPTY_DATED_PRICES: DatedUnitPrices = {
@@ -344,10 +346,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
   // filtered ones: a Character or Payee filter must not hide the target.
   const [searchParams, setSearchParams] = useSearchParams();
   // Read by the Assign dialog when it opens, long after this has hydrated.
-  const hydrateSurveyPayee = useSurveyPayeeId((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateSurveyPayee();
-  }, [hydrateSurveyPayee]);
+  useHydratedStore(useSurveyPayeeId);
   const [initialPaymentRef] = useState(() =>
     parsePaymentRefParam(searchParams.get(PAYMENT_REF_PARAM))
   );
@@ -1217,10 +1216,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
 
                 {historyRows.length > 0 && (
                   <section aria-labelledby="mining-tax-history" className="space-y-2">
-                    <h2
-                      id="mining-tax-history"
-                      className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
-                    >
+                    <h2 id="mining-tax-history" className={eyebrowClassName}>
                       {t('miningTax.sections.history')}
                     </h2>
                     <Panel padded={false}>

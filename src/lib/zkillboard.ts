@@ -93,7 +93,7 @@ export async function fetchKillmailHash(killmailId: number): Promise<KillmailHas
 }
 
 /** How many of a hull's most recent losses Popular fits reads. */
-export const HULL_LOSS_LIMIT = 40;
+const HULL_LOSS_LIMIT = 40;
 
 /**
  * One loss from zKillboard's losses API. zKillboard sends either the whole

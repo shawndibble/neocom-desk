@@ -1,9 +1,9 @@
-import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import * as Icon from '@/components/ui/icons';
 import { useTicker } from '@/lib/ticker';
 import { arrivalNotice, uncheckedSince, type SettledEntryRef } from '@/engine/miningTax/oreArrival';
 import { useOreArrivalLog } from './oreArrivalLog';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 interface OreArrivalNoticeProps {
   /** The entries ticked for this settlement. */
@@ -26,10 +26,7 @@ export function OreArrivalNotice({ entries, checking, pullStartedAt }: OreArriva
   const { t } = useTranslation();
   const now = useTicker(MINUTE_MS);
   const log = useOreArrivalLog((state) => state.value);
-  const hydrate = useOreArrivalLog((state) => state.hydrate);
-  useEffect(() => {
-    void hydrate();
-  }, [hydrate]);
+  useHydratedStore(useOreArrivalLog);
 
   const notice = arrivalNotice(entries, log, now);
   if (notice.kind === 'none') return null;

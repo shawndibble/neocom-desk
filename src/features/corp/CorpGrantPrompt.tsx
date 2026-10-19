@@ -17,7 +17,9 @@
  * prompt is eligible again — the Settings Corporation Permission row is the durable path
  * back regardless.
  */
-import { useEffect, useRef } from 'react';
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { useRef } from 'react';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useTranslation } from 'react-i18next';
 import { Button, NeedsConnection } from '@/components/ui';
 import { beginEveLogin } from '@/app/loginFlow';
@@ -45,8 +47,7 @@ export function CorpGrantPrompt() {
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const access = useCorpAccess();
   const dismissals = useGrantPromptDismissals((state) => state.value);
-  const hydrated = useGrantPromptDismissals((state) => state.hydrated);
-  const hydrate = useGrantPromptDismissals((state) => state.hydrate);
+  const hydrated = useHydratedStore(useGrantPromptDismissals);
   const setDismissals = useGrantPromptDismissals((state) => state.setValue);
   // Read, never fetched: the corporation name is a nicety this prompt borrows
   // from whatever already loaded it. Firing a public-info read of its own would
@@ -54,10 +55,6 @@ export function CorpGrantPrompt() {
   const corporationName = usePublicInfo(
     (state) => (activeCharacterId === null ? null : state.byCharacterId[activeCharacterId]) ?? null
   )?.corporationName;
-
-  useEffect(() => {
-    void hydrate();
-  }, [hydrate]);
 
   // `unknown` renders as nothing, exactly as everywhere else corp state is
   // read: a banner that flickers in on a cold load is worse than one a beat
@@ -106,9 +103,7 @@ export function CorpGrantPrompt() {
       // #1124) — hence a single offset clear of the phone tab bar.
       className="fixed inset-x-4 bottom-16 z-50 max-w-sm space-y-2 rounded-xs border border-line-bright bg-panel-2 px-3 py-2 text-sm shadow-lg md:bottom-28 md:left-auto"
     >
-      <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-        {t('corp.grantPromptTitle')}
-      </p>
+      <p className={eyebrowClassName}>{t('corp.grantPromptTitle')}</p>
       <p>
         {t('corp.grantPromptBody', {
           roles: access.roles.map(corpRoleLabel).join(', '),

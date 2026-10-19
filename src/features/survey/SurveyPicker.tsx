@@ -20,6 +20,7 @@ import type { SurveyHistoryEntry } from '@/engine/survey/history';
 import { countedScans, summarizeSurvey } from '@/engine/survey/series';
 import { forgetSurvey, useSurveyHistory } from './surveyHistory';
 import { loadSurvey } from './surveyStore';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 /** What a survey's link says about it, kept so a rename relabels it without a reload. */
 type LoadedSurvey = { at: number; mined: { ore: string; percent: number } | null };
@@ -32,10 +33,7 @@ interface SurveyPickerProps {
 export function SurveyPicker({ currentId, onPick }: SurveyPickerProps) {
   const { t, i18n } = useTranslation();
   const history = useSurveyHistory((state) => state.value);
-  const hydrate = useSurveyHistory((state) => state.hydrate);
-  useEffect(() => {
-    void hydrate();
-  }, [hydrate]);
+  useHydratedStore(useSurveyHistory);
   const hintId = useId();
   const [open, setOpen] = useState(false);
   const [loaded, setLoaded] = useState<Record<string, LoadedSurvey>>({});

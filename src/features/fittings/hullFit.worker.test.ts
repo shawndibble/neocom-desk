@@ -4,13 +4,17 @@ import type { HullFitRequest } from './hullFit.worker';
 import { fakeDogmaEngine } from './__fixtures__/fakeDogmaEngine';
 
 const loadDogmaEngine = vi.fn();
+const computeFittingStats = vi.fn();
+const fittingSkillSources = vi.fn();
 const hullRacks = vi.fn<(shipTypeId: number, skills: Map<number, number>) => Set<CandidateRack>>();
 const checkHullCandidate = vi.fn();
 vi.mock('./dogmaFittingEngine', () => ({
   loadDogmaEngine: () => loadDogmaEngine(),
+  computeFittingStats: (...args: unknown[]) => computeFittingStats(...args),
+  fittingSkillSources: (...args: unknown[]) => fittingSkillSources(...args),
 }));
 
-import { runHullFit } from './hullFit.worker';
+import { runEvaluation, runHullFit, type StatsRequest } from './hullFit.worker';
 
 const request = (overrides: Partial<HullFitRequest> = {}): HullFitRequest => ({
   id: 1,
@@ -75,5 +79,54 @@ describe('runHullFit', () => {
     loadDogmaEngine.mockRejectedValue(new Error('offline'));
 
     await expect(runHullFit(request(), () => true)).rejects.toThrow('offline');
+  });
+});
+
+describe('runEvaluation', () => {
+  const job = (overrides: Partial<StatsRequest> = {}): StatsRequest => ({
+    kind: 'stats',
+    id: 7,
+    fitting: { name: 'Fit', shipTypeId: 587, modules: [], drones: [], cargo: [] },
+    pilot: { skillLevels: new Map([[3300, 5]]), implantTypeIds: [], boosterTypeIds: [] },
+    options: { overheated: false },
+    ...overrides,
+  });
+
+  it("answers a stats job from the engine seam, under the job's pilot, profile and options", async () => {
+    computeFittingStats.mockResolvedValue({ ehp: 1 });
+    const request = job();
+
+    expect(await runEvaluation(request, () => false)).toEqual({ id: 7, stats: { ehp: 1 } });
+    expect(computeFittingStats).toHaveBeenCalledWith(
+      request.fitting,
+      request.pilot,
+      undefined,
+      undefined,
+      { overheated: false }
+    );
+  });
+
+  it('answers a skill-sources job with the skills that modify the fit', async () => {
+    fittingSkillSources.mockResolvedValue([3300, 3301]);
+    const request = { ...job(), kind: 'skillSources' as const };
+
+    expect(await runEvaluation(request, () => false)).toEqual({ id: 7, sources: [3300, 3301] });
+    expect(fittingSkillSources).toHaveBeenCalledWith(
+      request.fitting,
+      request.pilot,
+      undefined,
+      request.options
+    );
+  });
+
+  it('skips a job cancelled before it started, without touching the engine', async () => {
+    expect(await runEvaluation(job(), (id) => id === 7)).toEqual({ id: 7, aborted: true });
+    expect(computeFittingStats).not.toHaveBeenCalled();
+  });
+
+  it('rejects when the calculation throws, for the caller to turn into an error reply', async () => {
+    computeFittingStats.mockRejectedValue(new Error('bad fit'));
+
+    await expect(runEvaluation(job(), () => false)).rejects.toThrow('bad fit');
   });
 });

@@ -1,3 +1,5 @@
+import { NO_NAMES, NO_NUMBERS } from '@/lib/emptyCollections';
+import { idSetKey } from '@/lib/idSetKey';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { industryTabHref } from '@/features/industry/industryTabs';
@@ -6,6 +8,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import type { EsiEndpointId } from '@/esi/registry';
 import { clearStationPin, setAccountStationPin, setCharacterStationPin } from '@/sync';
 import { db, type BuildPlanRecord } from '@/db';
+import { useCharacters } from '@/features/character/useCharacters';
 import { nextPinState, pinStateForStation, type PinState } from '@/features/character/stationPins';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
 import {
@@ -24,6 +27,7 @@ import { assetCsvRows, assetsCsvColumns, type AssetCsvRow } from '@/features/cha
 import { withoutAbyssalTypePrices } from '@/engine/market/abyssalValuation';
 import { useAbyssalAssetEstimates } from '@/features/abyssal/useAbyssalAssetEstimates';
 import { parseIskAmount } from '@/lib/isk';
+import { useDebouncedValue } from '@/lib/useDebouncedValue';
 import { assetStackValue } from '@/engine/assetTree';
 import {
   type AssetItemActions,
@@ -38,11 +42,6 @@ import {
   loadCrossCharacterData,
 } from './assetsSnapshot';
 import { locationLabel, matchAssets } from './assetsLogic';
-
-// Matches Market.tsx's/SkillPicker.tsx's own search debounce — the input stays
-// instantly responsive, only the potentially-thousands-of-assets recompute
-// below waits out the debounce.
-const SEARCH_DEBOUNCE_MS = 250;
 
 /**
  * Query-string view state (ADR 0015), beside the drill-down path. The
@@ -60,10 +59,6 @@ const ASSETS_VIEW_PARAMS = {
 };
 
 /** Stable identity, so the fallback doesn't invalidate the grouping memo every render. */
-const NO_NAMES: ReadonlyMap<number, string> = new Map();
-const NO_COPY_VALUES: ReadonlyMap<number, number> = new Map();
-const NO_PRICES: ReadonlyMap<number, number> = new Map();
-const NO_VOLUMES: ReadonlyMap<number, number> = new Map();
 const EMPTY_ITEM_OWNERS: ReadonlyMap<number, number> = new Map();
 const EMPTY_CHARACTER_NAMES: ReadonlyMap<number, string> = new Map();
 export const LOCATION_ENDPOINTS: readonly EsiEndpointId[] = ['getCharacterLocation'];
@@ -95,11 +90,7 @@ export function useAssetsData() {
   // Debounced separately from `search` (issue #415): the input stays
   // instantly responsive, only the matching/grouping memos below — which
   // scan every asset — wait out the debounce.
-  const [debouncedSearch, setDebouncedSearch] = useState(search);
-  useEffect(() => {
-    const id = setTimeout(() => setDebouncedSearch(search), SEARCH_DEBOUNCE_MS);
-    return () => clearTimeout(id);
-  }, [search]);
+  const [debouncedSearch, setDebouncedSearch] = useDebouncedValue(search);
 
   // Permanent "all items across all locations" flat view (issue #414): off by
   // default (unpruned tree browsing, as before), and — like search — flattens
@@ -119,10 +110,10 @@ export function useAssetsData() {
     activeCharacterId
   );
 
-  const allCharactersQuery = useLiveQuery(() => db.characters.toArray(), [], []);
+  const allCharactersQuery = useCharacters();
   const crossCharacterCandidates = useMemo(
     () =>
-      (allCharactersQuery ?? []).map((c) => ({
+      allCharactersQuery.map((c) => ({
         characterId: c.characterId,
         characterName: c.name,
       })),
@@ -134,7 +125,7 @@ export function useAssetsData() {
   const viewedCharacter =
     viewedCharacterId === undefined
       ? undefined
-      : (allCharactersQuery ?? []).find((c) => c.characterId === viewedCharacterId);
+      : allCharactersQuery.find((c) => c.characterId === viewedCharacterId);
   const crossCharacterFilterMeta =
     crossCharacterCandidates.length > 1 && viewedCharacterId === undefined ? (
       <CharacterFilterControl
@@ -183,7 +174,7 @@ export function useAssetsData() {
   const crossCharacterCacheRef = useRef<{ key: string; data: CrossCharacterData } | null>(null);
   useEffect(() => {
     if (otherCharacterIds.length === 0 || activeCharacterId === null) return;
-    const key = [...otherCharacterIds].sort((a, b) => a - b).join(',');
+    const key = idSetKey(otherCharacterIds);
     if (crossCharacterCacheRef.current?.key === key) {
       setCrossCharacterData(crossCharacterCacheRef.current.data);
       return;
@@ -266,9 +257,9 @@ export function useAssetsData() {
   const assetsNeedsReauth = data?.assetsNeedsReauth ?? false;
   const typeNames = data?.typeNames ?? NO_NAMES;
   const locationNames = data?.locationNames ?? NO_NAMES;
-  const typePrices = data?.priceByTypeId ?? NO_PRICES;
-  const ownCopyValues = data?.copyValueByItemId ?? NO_COPY_VALUES;
-  const volumeByTypeId = data?.volumeByTypeId ?? NO_VOLUMES;
+  const typePrices = data?.priceByTypeId ?? NO_NUMBERS;
+  const ownCopyValues = data?.copyValueByItemId ?? NO_NUMBERS;
+  const volumeByTypeId = data?.volumeByTypeId ?? NO_NUMBERS;
 
   // CSV export always stays scoped to the active Character's own assets,
   // regardless of the cross-character toggle — exporting another Character's

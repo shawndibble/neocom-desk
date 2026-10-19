@@ -14,11 +14,12 @@
  * merged into `detectOwnedStock`'s input only for a plan whose own
  * `includeCorpAssets` flag is on.
  */
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect } from 'react';
 import type { OwnedStockSource } from '@/engine/industry/ownedStock';
 import { loadCorporationAssets } from '@/features/corp/assets';
 import { useActiveCorporationId } from '@/features/corp/owner';
 import { useCorpAccess } from '@/features/corp/useCorpAccess';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
 
@@ -69,13 +70,6 @@ const UNAVAILABLE: CorpOwnedStockState = {
   incomplete: false,
 };
 
-/** A fetched result, tagged with who it's for — see the guard in the memo below. */
-interface TaggedResult {
-  characterId: number;
-  corporationId: number;
-  result: CorpOwnedStockResult | null;
-}
-
 /**
  * Call once, above whatever remount boundary switches the open Build Plan —
  * same rule as `useOwnedStockSnapshot`. Re-resolves whenever the active
@@ -93,7 +87,6 @@ export function useCorpOwnedStockSource(): CorpOwnedStockState {
       ? null
       : (state.byCharacterId[activeCharacterId]?.corporationName ?? null)
   );
-  const [tagged, setTagged] = useState<TaggedResult | null>(null);
 
   const available = canReadAssets && activeCharacterId !== null && corporationId !== null;
 
@@ -101,37 +94,18 @@ export function useCorpOwnedStockSource(): CorpOwnedStockState {
     if (activeCharacterId !== null) void loadPublicInfo(activeCharacterId);
   }, [activeCharacterId, loadPublicInfo]);
 
-  useEffect(() => {
-    if (!available || activeCharacterId === null || corporationId === null) return;
-    let cancelled = false;
-    // A read that cannot complete is simply no corp contribution, the same
-    // way a failed personal Character read is in `loadOwnedStockSnapshot` —
-    // detection degrades rather than erroring.
-    void loadCorpOwnedStockSource(activeCharacterId, corporationId).then(
-      (loaded) => {
-        if (!cancelled)
-          setTagged({ characterId: activeCharacterId, corporationId, result: loaded });
-      },
-      () => {
-        if (!cancelled) setTagged({ characterId: activeCharacterId, corporationId, result: null });
-      }
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [available, activeCharacterId, corporationId]);
+  // A read that cannot complete is simply no corp contribution, the same
+  // way a failed personal Character read is in `loadOwnedStockSnapshot` —
+  // detection degrades rather than erroring.
+  const loader = useCallback(
+    () => loadCorpOwnedStockSource(activeCharacterId ?? 0, corporationId ?? 0).catch(() => null),
+    [activeCharacterId, corporationId]
+  );
+  const { data } = useKeyedLoad(available ? `${activeCharacterId}:${corporationId}` : null, loader);
 
   if (!available) return UNAVAILABLE;
 
-  // Guards against a stale result from the previous Character/corporation
-  // still being in state the instant the new one becomes available — the
-  // effect above has already been re-fired and its result isn't in yet.
-  const result =
-    tagged !== null &&
-    tagged.characterId === activeCharacterId &&
-    tagged.corporationId === corporationId
-      ? tagged.result
-      : null;
+  const result = data ?? null;
 
   return {
     source: result?.source ?? null,

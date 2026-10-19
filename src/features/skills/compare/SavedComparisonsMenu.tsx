@@ -1,4 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { cx } from '@/lib/cx';
+import { useRef, useState } from 'react';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useTranslation } from 'react-i18next';
 import { db } from '@/db';
 import {
@@ -139,12 +142,9 @@ export function SavedComparisonsMenu({
   onUnlinked,
 }: SavedComparisonsMenuProps) {
   const { t } = useTranslation();
-  const hydrate = useSkillComparisons((state) => state.hydrate);
   const value = useSkillComparisons((state) => state.value);
   const setValue = useSkillComparisons((state) => state.setValue);
-  useEffect(() => {
-    void hydrate();
-  }, [hydrate]);
+  useHydratedStore(useSkillComparisons);
 
   const [open, setOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -236,7 +236,7 @@ export function SavedComparisonsMenu({
             <h3
               ref={headingRef}
               tabIndex={-1}
-              className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase focus:outline-none"
+              className={cx(eyebrowClassName, 'focus:outline-none')}
             >
               {t('skillCompare.savedTitle')}
             </h3>

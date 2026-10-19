@@ -5,12 +5,13 @@
  * replaces the retired `captureMiningPriceSnapshot` and its Firestore
  * `marketHistory` collection).
  *
- * The open-prices fold is region-wide; billing needs the station ("Jita 4-4
- * sell"), so this keeps the highest buy and lowest sell among the orders
- * *placed at* each hub station. A buy order's `range` is not read: one placed
- * elsewhere in the region never counts as a station buy, the same as
- * Fuzzwork's station aggregate the old job read and `orderBook.ts`'s
- * `filterOrdersByLocation`.
+ * Billing needs the station ("Jita 4-4 sell"): the job's `StationPriceFold`
+ * (marketOpenPrices.ts, which since #4279 also feeds the Open Prices for every
+ * type) keeps the highest buy and lowest sell among the orders *placed at*
+ * each hub station, and this module keeps the mining types' days of it. A buy
+ * order's `range` is not read: one placed elsewhere in the region never
+ * counts as a station buy, the same as Fuzzwork's station aggregate the old
+ * job read and `orderBook.ts`'s `filterOrdersByLocation`.
  *
  * R2 layout: one object per hub per month, `mining-prices/<hubId>/<YYYY-MM>.json`
  * (gzip), `{ hub, month, days: { <date>: { tier, prices: { <typeId>: [buy, sell] } } } }`,
@@ -21,21 +22,18 @@
  *
  * Pure (no Firestore or fetch); the IO lives in r2MiningPrices.ts and index.ts.
  */
-import { MARKET_OPEN_PRICES_MAX_DAYS, addDays, isIsoDate } from './marketOpenPrices.js';
+import {
+  MARKET_OPEN_PRICES_MAX_DAYS,
+  addDays,
+  isIsoDate,
+  type PricePair,
+  type SnapshotHub,
+  type StationPriceFold,
+} from './marketOpenPrices.js';
 
-/** The five Trade Hubs, mirroring `TRADE_HUBS` in src/market/hubs.ts (`functionsParity.test.ts`). */
-export const SNAPSHOT_HUBS = [
-  { id: 'jita', stationId: 60003760, regionId: 10000002 },
-  { id: 'amarr', stationId: 60008494, regionId: 10000043 },
-  { id: 'dodixie', stationId: 60011866, regionId: 10000032 },
-  { id: 'rens', stationId: 60004588, regionId: 10000030 },
-  { id: 'hek', stationId: 60005686, regionId: 10000042 },
-] as const;
+/** A hub as the mining objects key it; the hub list itself is `SNAPSHOT_HUBS` (marketOpenPrices.ts). */
 
-export interface MiningHub {
-  readonly id: string;
-  readonly stationId: number;
-}
+export type MiningHub = SnapshotHub;
 
 export const MINING_PRICES_R2_PREFIX = 'mining-prices/';
 /**
@@ -47,9 +45,6 @@ export const MINING_PRICES_MIGRATED_KEY = `${MINING_PRICES_R2_PREFIX}migrated.js
 export const MINING_PRICES_MAX_DAYS = MARKET_OPEN_PRICES_MAX_DAYS;
 
 export type MiningTier = 'saved' | 'historical';
-/** `[buy, sell]`; a side with no order is null. */
-export type PricePair = [number | null, number | null];
-
 export interface MiningDay {
   tier: MiningTier;
   prices: Record<string, PricePair>;
@@ -78,54 +73,22 @@ export function miningPricesR2Key(hubId: string, month: string): string {
   return `${MINING_PRICES_R2_PREFIX}${hubId}/${month}.json`;
 }
 
-function usablePrice(price: number): boolean {
-  return Number.isFinite(price) && price > 0;
-}
-
-/** Best buy and sell per hub station and mining type, fed row by row during the snapshot's single pass. */
-export class StationPriceFold {
-  private readonly stations: Set<number>;
-  private readonly types: Set<number>;
-  private readonly byStation = new Map<number, Map<number, PricePair>>();
-
-  constructor(hubs: readonly MiningHub[], typeIds: Iterable<number>) {
-    this.stations = new Set(hubs.map((h) => h.stationId));
-    this.types = new Set(typeIds);
-  }
-
-  add(locationId: number, typeId: number, isBuy: boolean, price: number): void {
-    if (!this.stations.has(locationId) || !this.types.has(typeId) || !usablePrice(price)) return;
-    let station = this.byStation.get(locationId);
-    if (!station) {
-      station = new Map();
-      this.byStation.set(locationId, station);
-    }
-    const pair = station.get(typeId) ?? [null, null];
-    if (isBuy) {
-      if (pair[0] === null || price > pair[0]) pair[0] = price;
-    } else if (pair[1] === null || price < pair[1]) {
-      pair[1] = price;
-    }
-    station.set(typeId, pair);
-  }
-
-  /** The station's prices by type id; only types with at least one order. */
-  prices(stationId: number): Record<string, PricePair> {
-    const out: Record<string, PricePair> = {};
-    for (const [typeId, pair] of this.byStation.get(stationId) ?? []) out[typeId] = [...pair];
-    return out;
-  }
-}
-
-/** The fold's day for each hub; a hub with no priced mining type at all is left out rather than stored empty. */
+/**
+ * The fold's day for each hub; a hub with no priced mining type at all is
+ * left out rather than stored empty. `typeIds` keeps only those types: the
+ * daily job's fold holds every type (the Open Prices), the mining objects
+ * only the mining ones.
+ */
 export function stationFoldWrites(
   fold: StationPriceFold,
   hubs: readonly MiningHub[],
-  date: string
+  date: string,
+  typeIds?: Iterable<number>
 ): MiningDayWrite[] {
+  const only = typeIds ? new Set(typeIds) : undefined;
   const writes: MiningDayWrite[] = [];
   for (const hub of hubs) {
-    const prices = fold.prices(hub.stationId);
+    const prices = fold.prices(hub.stationId, only);
     if (Object.keys(prices).length === 0) continue;
     writes.push({ hubId: hub.id, date, day: { tier: 'saved', prices } });
   }
@@ -133,7 +96,7 @@ export function stationFoldWrites(
 }
 
 function nullablePrice(value: unknown): number | null {
-  return typeof value === 'number' && usablePrice(value) ? value : null;
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null;
 }
 
 /**

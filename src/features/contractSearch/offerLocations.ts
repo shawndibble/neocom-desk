@@ -1,3 +1,4 @@
+import { idSetKey } from '@/lib/idSetKey';
 /**
  * System name and raw security status for every distinct item-offer location,
  * out of the same local SDE snapshots `courierEndpoints.ts` resolves courier
@@ -75,10 +76,7 @@ export function useOfferLocations(
   // revalidation — the same trick `useRegionNames` uses, and for the same
   // reason: re-resolving (and briefly emptying the map) on every reload would
   // make a fully-loaded board flicker back to raw ids on its own refresh.
-  const key = useMemo(
-    () => [...new Set(rows.map((row) => row.locationId))].sort((a, b) => a - b).join(','),
-    [rows]
-  );
+  const key = useMemo(() => idSetKey(rows.map((row) => row.locationId)), [rows]);
   const ids = useMemo(() => (key === '' ? [] : key.split(',').map(Number)), [key]);
 
   const [value, setValue] = useState<ReadonlyMap<number, OfferLocation>>(EMPTY_LOCATIONS);

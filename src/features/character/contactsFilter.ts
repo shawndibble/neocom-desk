@@ -17,14 +17,6 @@ export type StandingCategory = 'good' | 'neutral' | 'bad';
 /** Best to worst, which is the order the chips read in. */
 export const STANDING_CATEGORIES: readonly StandingCategory[] = ['good', 'neutral', 'bad'];
 
-/** ESI's own order, and the one `CONTACT_TYPE_KEY` lists. */
-export const ALL_CONTACT_TYPES: readonly ContactType[] = [
-  'character',
-  'corporation',
-  'alliance',
-  'faction',
-];
-
 /**
  * ESI's `contact_type` verbatim was what the table used to print. "Player" is
  * what a pilot calls a character contact (a "character" is also a thing corps

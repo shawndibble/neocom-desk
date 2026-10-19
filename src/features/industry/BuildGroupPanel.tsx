@@ -1,3 +1,4 @@
+import { useCopyFeedback } from '@/lib/useCopyFeedback';
 /**
  * A **Build Group** opened as one thing: every member's materials merged and
  * its costs summed (issue #626, "Group Rollup" in GLOSSARY.md).
@@ -13,7 +14,7 @@
  * outlive their plans by design, so "what did this fit actually cost" is a
  * question this view cannot answer and must not appear to.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { DepthPrice } from '@/engine/industry/depthPrice';
 import { DepthPriceLine } from './DepthPriceLine';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
@@ -149,7 +150,10 @@ export function BuildGroupPanel({
   // Which list the outcome belongs to, not a bare flag: a mixed-hub group
   // shows one copy control per hub, and a shared flag would report Amarr as
   // copied the moment Jita was. `GROUP_COPY` is the whole-group control's key.
-  const [copyState, setCopyState] = useState<{ key: string; status: CopyStatus } | null>(null);
+  const { copied: copyState, flash: flashCopy } = useCopyFeedback<{
+    key: string;
+    status: CopyStatus;
+  }>(2000);
   const [retargeting, setRetargeting] = useState(false);
   const [applyingAutoBuild, setApplyingAutoBuild] = useState(false);
   // computeGroupResult: true — the group total needs each member's tree
@@ -512,16 +516,6 @@ export function BuildGroupPanel({
     columns: buyMaterialsCsv,
   });
 
-  // The copy outcome is a flash, not a state the panel keeps. Cleared by an
-  // effect rather than a `setTimeout` in the handler, so unmounting mid-flash
-  // — or copying another hub before it fades — cancels the pending timer
-  // instead of setting state on a gone component.
-  useEffect(() => {
-    if (copyState === null) return;
-    const timer = setTimeout(() => setCopyState(null), 2000);
-    return () => clearTimeout(timer);
-  }, [copyState]);
-
   const loading = rows.some((row) => row.loading);
   const failed = rows.filter((row) => row.error !== null);
 
@@ -548,9 +542,9 @@ export function BuildGroupPanel({
   async function handleCopy(key: string, materials: readonly MaterialCostLine[]) {
     try {
       await writeToClipboard(shoppingListText(materials, (id) => nameForType(catalog, id)));
-      setCopyState({ key, status: 'copied' });
+      flashCopy({ key, status: 'copied' });
     } catch {
-      setCopyState({ key, status: 'failed' });
+      flashCopy({ key, status: 'failed' });
     }
   }
 

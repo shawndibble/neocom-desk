@@ -21,6 +21,7 @@ import { onReconnect } from '@/stores/network';
 import { useMasteries } from '../useMasteries';
 import type { MasteryMap, ShipTreeData } from '@/sde/types';
 import { shipTreeSkillCatalog } from './shipTreeCatalogs';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 const NO_TRAINED: ReadonlyMap<number, TrainedSkill> = new Map();
 const NO_STATUSES: ReadonlyMap<number, ShipTreeHullStatus> = new Map();
@@ -67,7 +68,6 @@ export function useShipTreeData(characterId: number | null): {
   const [catalog, setCatalog] = useState<SkillCatalog | null>(null);
   const editor = usePlanEditorData(characterId);
   const cloneStates = useCloneStates((state) => state.value);
-  const hydrateCloneStates = useCloneStates((state) => state.hydrate);
   const [now] = useState(() => new Date());
 
   useEffect(() => {
@@ -88,9 +88,7 @@ export function useShipTreeData(characterId: number | null): {
     };
   }, [attempt]);
   useEffect(() => (failed ? onReconnect(retry) : undefined), [failed, retry]);
-  useEffect(() => {
-    void hydrateCloneStates();
-  }, [hydrateCloneStates]);
+  useHydratedStore(useCloneStates);
 
   const trainedSkills = characterId === null ? NO_TRAINED : editor.trainedSkills;
   const cloneState: CloneState =

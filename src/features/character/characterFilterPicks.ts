@@ -10,7 +10,8 @@
  * `useRememberedUrlParams`, which owns the URL-wins rule: a pick is written
  * only from a change to the control, never from a link.
  */
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { createLocalSetting } from '@/lib/useLocalSetting';
 import type { RememberedDefaults, UrlParamSchema, UrlParamValues } from '@/lib/useUrlState';
 import { useDefaultCharacterFilter } from './defaultCharacterFilter';
@@ -68,13 +69,8 @@ export function useCharacterFilterPick(page: CharacterFilterPage): {
   remember: (value: CharacterFilterValue) => Promise<void>;
 } {
   const picks = useCharacterFilterPicks((state) => state.value);
-  const hydratePicks = useCharacterFilterPicks((state) => state.hydrate);
   const storedDefault = useDefaultCharacterFilter((state) => state.value);
-  const hydrateDefault = useDefaultCharacterFilter((state) => state.hydrate);
-  useEffect(() => {
-    void hydratePicks();
-    void hydrateDefault();
-  }, [hydratePicks, hydrateDefault]);
+  useHydratedStore(useCharacterFilterPicks, useDefaultCharacterFilter);
 
   const pick = pickedCharacterFilter(picks, page, fromStoredCharacterFilterValue(storedDefault));
   const remember = useCallback(

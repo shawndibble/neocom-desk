@@ -1,7 +1,6 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '@/db';
 import { BootScreen } from './BootScreen';
+import { useCharacterCountOrLoading } from '@/features/character/useCharacters';
 
 /**
  * Auth gate: the whole feature area sits behind a logged-in Character. A layout
@@ -15,7 +14,7 @@ import { BootScreen } from './BootScreen';
  */
 export function RequireCharacter() {
   const location = useLocation();
-  const characterCount = useLiveQuery(() => db.characters.count());
+  const characterCount = useCharacterCountOrLoading();
 
   if (characterCount === undefined) return <BootScreen gate="require-character" />;
   if (characterCount > 0) return <Outlet />;

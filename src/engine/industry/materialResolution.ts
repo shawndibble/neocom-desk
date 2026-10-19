@@ -347,15 +347,6 @@ function resolveSubBuild(
   };
 }
 
-/** Every sub-job's own installation fee, added up across the whole resolved tree. */
-export function resolvedSubBuildFeeTotal(materials: readonly ResolvedMaterial[]): number {
-  let total = 0;
-  for (const material of materials) {
-    if (material.subBuild) total += material.subBuild.totalFees;
-  }
-  return total;
-}
-
 /** Wall-clock every sub-job in the tree adds, added up — each level runs before its parent can start. */
 export function resolvedSubBuildSeconds(materials: readonly ResolvedMaterial[]): number {
   let seconds = 0;

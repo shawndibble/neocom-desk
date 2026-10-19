@@ -12,6 +12,8 @@
  * drawer open on Attributes (`useCompareSet`'s `openIn`) instead of opening
  * a separate modal that covered the order book.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { cx } from '@/lib/cx';
 import {
   useCallback,
   useEffect,
@@ -492,7 +494,7 @@ export function CompareDrawer({
               <h2
                 ref={headingRef}
                 tabIndex={-1}
-                className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase focus:outline-none"
+                className={cx(eyebrowClassName, 'focus:outline-none')}
               >
                 {t('market.compare.handle', { count: items.length })}
               </h2>

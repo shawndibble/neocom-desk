@@ -70,6 +70,12 @@ export function clipOpenPrices(
 
 export interface RegionOpenSeries {
   regionId: number;
+  /**
+   * The hub station whose orders these are ("Jita 4-4"), which names the
+   * region's Buy and Sell lines. Absent for an object still holding the old
+   * region-wide prices (#4279's transition).
+   */
+  station?: string;
   points: readonly OpenPricePoint[];
 }
 

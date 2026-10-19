@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, type ReactNode, type Ref } from 'react';
+import { useRef, useState, type ReactNode, type Ref } from 'react';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { Button, Checkbox, Disclosure, Modal } from '@/components/ui';
@@ -87,14 +88,11 @@ export function PlanResult({
   const { t } = useTranslation();
   const skipRigWarning = useSkipRigWarning((s) => s.value);
   const setSkipRigWarning = useSkipRigWarning((s) => s.setValue);
-  const hydrateSkip = useSkipRigWarning((s) => s.hydrate);
+  useHydratedStore(useSkipRigWarning);
   const [asking, setAsking] = useState<{ itemId: number; typeId: number; rigs: number } | null>(
     null
   );
   const [dontRemind, setDontRemind] = useState(false);
-  useEffect(() => {
-    void hydrateSkip();
-  }, [hydrateSkip]);
   const focusAfterCommit = useFocusAfterCommit();
   /** Pickup the ship being packed sits in; its heading takes focus once the Pack button is gone. */
   const packFrom = useRef<string | null>(null);
