@@ -14,7 +14,7 @@ import {
 } from '@/engine/fittings/chargeChoice';
 import type { FittingModule, FittingSlotKind } from '@/engine/fittings/types';
 import type { FittingItemActions } from './fittingItemActions';
-import { formatIsk } from './chargeFormat';
+import { formatIskExact } from './chargeFormat';
 import { useChargeChoices } from './useChargeChoices';
 
 /**
@@ -162,7 +162,7 @@ export function ChargePickerMenuItems({
                           ? t('fittings.chargePicker.skillTag')
                           : c.price === null
                             ? t('fittings.chargePicker.noPrice')
-                            : t('fittings.chargePicker.isk', { isk: formatIsk(c.price) })}
+                            : t('fittings.chargePicker.isk', { isk: formatIskExact(c.price) })}
                       </span>
                     </span>
                   </MenuItem>

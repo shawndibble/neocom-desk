@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { NOTICE_MS, useTimedToast } from '@/components/ui/useTimedToast';
 import { writeToClipboard } from '@/lib/clipboard';
 import { OreIcon, OreLink } from './OreIcon';
@@ -97,6 +97,8 @@ interface RowDetailModalProps {
   onSettleUp?: () => void;
   /** Opens "Link a wallet payment" for this entry's Payee, for ISK already sent. */
   onLinkWalletPayment?: () => void;
+  /** What a Corp Tax Book says about this entry (pending record, unattributed), shown under the status line (#4065). */
+  corpNote?: ReactNode;
 }
 
 /** Stand-in so the breakdown hook can run for a row with no assignment (its text is never used). */
@@ -156,6 +158,7 @@ export function RowDetailModal({
   suggestion,
   onSettleUp,
   onLinkWalletPayment,
+  corpNote,
 }: RowDetailModalProps) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
@@ -308,6 +311,10 @@ export function RowDetailModal({
           </span>
           <StatusPill status={status} label={t(`miningTax.status.${STATUS_LABEL_KEY[status]}`)} />
         </div>
+
+        {corpNote && (
+          <p className="rounded-xs border border-line p-2 text-xs text-text-dim">{corpNote}</p>
+        )}
 
         {status === 'paid' && (onLinkTransaction || assignment?.payment) && (
           <PaymentLinksCard

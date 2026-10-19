@@ -233,11 +233,13 @@ service cloud.firestore {
       allow read: if request.auth != null;
       allow write: if false;
     }
-    // Daily open (end-of-UTC-day) best buy and best sell per Trade Hub region
-    // and type, doc id `<regionId>_<typeId>` (decision 20261018-121126), for the
-    // price-history chart. Public market data, so readable by anyone; written
-    // only by syncMarketOpenPrices and the one-off backfill (admin privileges).
-    match /marketOpenPrices/{docId} {
+    // Daily open (end-of-UTC-day) best buy and best sell per type, every Trade
+    // Hub region in one doc, doc id `<typeId>` (decisions 20261018-121126 and
+    // 20261018-164126), for the price-history chart. Public market data, so
+    // readable by anyone; written only by syncMarketOpenPrices and the one-off
+    // backfill (admin privileges). marketOpenPricesMeta matches no rule, so it
+    // stays admin-only.
+    match /marketOpenPricesByType/{typeId} {
       allow read: if true;
       allow write: if false;
     }
@@ -472,6 +474,95 @@ service cloud.firestore {
         allow update, delete: if false;
       }
     }
+
+    // Corp Tax Book (issue #4061, ADR 0023): a corporation's shared record of
+    // moon mining tax, keyed by corporation id. Nothing here is writable by a
+    // client: every write is a callable (functions/src/corpTaxBookStore.ts)
+    // that appends to the immutable audit log.
+    //
+    // Reads:
+    //  - an officer (CEO, Director, Accountant, Junior_Accountant) reads the
+    //    whole book while their access record exists, was written for this
+    //    ownerHash and has not expired (24h after the last verifyOfficer check);
+    //  - anyone signed in with EVE SSO reads their OWN lines in any corp's
+    //    book, keyed by the verified character id in the uid (`uid` /
+    //    `uids` fields), including after leaving the corp;
+    //  - any signed-in Character may `get` the book's settings doc (terms
+    //    are printed on every mail), but never list books.
+    // The verify-link tokens (`corpTaxBookTokens`) have no client access.
+    match /corpTaxBooks/{corporationId} {
+      function isCharacter() {
+        return request.auth != null && request.auth.uid.matches('char:[0-9]+');
+      }
+      function officerPath() {
+        return /databases/$(database)/documents/corpTaxBooks/$(corporationId)/officers/$(request.auth.uid);
+      }
+      function isOfficer() {
+        return isCharacter()
+          && exists(officerPath())
+          && get(officerPath()).data.canView == true
+          && get(officerPath()).data.ownerHash == request.auth.token.ownerHash
+          && get(officerPath()).data.expiresAt > request.time.toMillis();
+      }
+      function isOwnLine() {
+        return isCharacter() && resource.data.uid == request.auth.uid;
+      }
+      function isOnOwnLine() {
+        return isCharacter() && request.auth.uid in resource.data.uids;
+      }
+
+      allow get: if isCharacter();
+      allow list: if false;
+      allow write: if false;
+
+      match /officers/{officerUid} {
+        allow get: if isCharacter() && request.auth.uid == officerUid
+          && resource.data.ownerHash == request.auth.token.ownerHash;
+        allow list, write: if false;
+      }
+
+      match /observed/{rowId} {
+        allow get, list: if isOfficer() || isOwnLine();
+        allow write: if false;
+      }
+
+      match /payments/{paymentId} {
+        allow get, list: if isOfficer() || isOwnLine();
+        allow write: if false;
+      }
+
+      // The verify link for the mail: editors only, never the miner or a view-only officer.
+      match /statementLinks/{statementId} {
+        allow get, list: if isOfficer() && get(officerPath()).data.canEdit == true;
+        allow write: if false;
+      }
+
+      match /statements/{statementId} {
+        allow get, list: if isOfficer() || isOnOwnLine();
+        allow write: if false;
+      }
+
+      match /dismissals/{dismissalId} {
+        allow get, list: if isOfficer() || isOnOwnLine();
+        allow write: if false;
+      }
+
+      match /miners/{minerId} {
+        allow get, list: if isOfficer() || isOnOwnLine();
+        allow write: if false;
+      }
+
+      match /{officerOnly}/{docId} {
+        allow get, list: if officerOnly in ['extractions', 'declarations', 'adjustments', 'writeOffs', 'rebills', 'meta', 'audit']
+          && isOfficer();
+        allow write: if false;
+      }
+    }
+
+    match /corpTaxBookTokens/{token} {
+      allow read, write: if false;
+    }
+
     // Communities (issue #3596, ADR 0018): the first collections gated by
     // membership rather than by uid or public visibility. Members can read a
     // Community, each other and each other's Shared Blueprint library; nobody

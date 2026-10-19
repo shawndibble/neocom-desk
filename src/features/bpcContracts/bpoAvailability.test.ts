@@ -8,7 +8,6 @@ import type { RegionOrder } from '@/esi/endpoints';
 import {
   bpoBadgeRows,
   bpoMayBeCheaper,
-  cheapestBpoByType,
   cheapestBpoSourcesByType,
   cheapestComparableCopy,
   cheapestSourcingCard,
@@ -19,7 +18,6 @@ import {
 const RIFTER_BP = 691;
 const CARACAL_BP = 950;
 const THE_FORGE = 10000002;
-const DOMAIN = 10000043;
 const JITA_44 = 60003760;
 const PERIMETER = 60000001;
 
@@ -67,16 +65,6 @@ function book(sell: RegionOrder[], regionId = THE_FORGE) {
   return { regionId, sell };
 }
 
-function input(overrides: Partial<BpoAvailabilityInput> = {}): BpoAvailabilityInput {
-  return {
-    originals: [],
-    contractRegionId: THE_FORGE,
-    marketBooks: new Map(),
-    hubStationId: JITA_44,
-    ...overrides,
-  };
-}
-
 describe('marketBpoOffers', () => {
   it('lists one region’s sell orders cheapest first, carrying the region and marking the hub station', () => {
     const offers = marketBpoOffers(
@@ -92,112 +80,6 @@ describe('marketBpoOffers', () => {
       [2, THE_FORGE, false],
       [1, THE_FORGE, true],
     ]);
-  });
-});
-
-describe('cheapestBpoByType', () => {
-  it('finds the cheapest contract original in the contract region, skipping other regions', () => {
-    const result = cheapestBpoByType(
-      [RIFTER_BP],
-      input({
-        originals: [
-          original({ contractId: 1, price: 30_000_000, regionId: DOMAIN }),
-          original({ contractId: 2, price: 40_000_000, me: 8, te: 16 }),
-        ],
-      })
-    );
-    const bpo = result.get(RIFTER_BP);
-    expect(bpo?.kind).toBe('contract');
-    expect(bpo?.price).toBe(40_000_000);
-    expect([bpo?.me, bpo?.te]).toEqual([8, 16]);
-  });
-
-  it('reads every region’s contract originals when the contract region is null', () => {
-    const result = cheapestBpoByType(
-      [RIFTER_BP],
-      input({
-        contractRegionId: null,
-        originals: [original({ contractId: 1, price: 30_000_000, regionId: DOMAIN })],
-      })
-    );
-    expect(result.get(RIFTER_BP)?.price).toBe(30_000_000);
-  });
-
-  it('never names a multi-type bundle or a zero-price barter as the cheapest BPO', () => {
-    const result = cheapestBpoByType(
-      [RIFTER_BP],
-      input({
-        originals: [
-          original({ contractId: 1, price: 1, isMultiType: true }),
-          original({ contractId: 2, price: 0 }),
-        ],
-      })
-    );
-    expect(result.has(RIFTER_BP)).toBe(false);
-  });
-
-  it('finds the cheapest market sell order for a checked type', () => {
-    const result = cheapestBpoByType(
-      [RIFTER_BP],
-      input({
-        marketBooks: new Map([
-          [
-            RIFTER_BP,
-            book([
-              order({ order_id: 1, price: 15_000_000 }),
-              order({ order_id: 2, price: 12_500_000 }),
-            ]),
-          ],
-        ]),
-      })
-    );
-    const bpo = result.get(RIFTER_BP);
-    expect(bpo?.kind).toBe('market');
-    expect(bpo?.price).toBe(12_500_000);
-    expect([bpo?.me, bpo?.te]).toEqual([0, 0]);
-  });
-
-  it('takes the cheaper of the two sources, and the contract on a tie (it may be researched)', () => {
-    const cheaperMarket = cheapestBpoByType(
-      [RIFTER_BP],
-      input({
-        originals: [original({ price: 40_000_000 })],
-        marketBooks: new Map([[RIFTER_BP, book([order({ price: 12_500_000 })])]]),
-      })
-    );
-    expect(cheaperMarket.get(RIFTER_BP)?.kind).toBe('market');
-
-    const tie = cheapestBpoByType(
-      [RIFTER_BP],
-      input({
-        originals: [original({ price: 12_500_000 })],
-        marketBooks: new Map([[RIFTER_BP, book([order({ price: 12_500_000 })])]]),
-      })
-    );
-    expect(tie.get(RIFTER_BP)?.kind).toBe('contract');
-  });
-
-  it('carries the region each type’s book was read from (a Global Market Region)', () => {
-    const GPMR = 19000001;
-    const result = cheapestBpoByType(
-      [RIFTER_BP, CARACAL_BP],
-      input({
-        marketBooks: new Map([
-          [RIFTER_BP, book([order()], GPMR)],
-          [CARACAL_BP, book([order({ type_id: CARACAL_BP })])],
-        ]),
-      })
-    );
-    expect(result.get(RIFTER_BP)).toMatchObject({ kind: 'market', regionId: GPMR });
-    expect(result.get(CARACAL_BP)).toMatchObject({ kind: 'market', regionId: THE_FORGE });
-  });
-
-  it('leaves out a type with no BPO anywhere, and one that was never asked for', () => {
-    const result = cheapestBpoByType(
-      [RIFTER_BP],
-      input({ originals: [original({ typeId: CARACAL_BP })] })
-    );
-    expect([...result.keys()]).toEqual([]);
   });
 });
 

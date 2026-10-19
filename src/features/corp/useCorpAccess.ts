@@ -18,7 +18,7 @@ import { useGrantedScopes } from '@/app/useGrantedScopes';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { onReconnect } from '@/stores/network';
 import { corpWideRoles, loadCharacterRoles } from './roles';
-import { missingCorpScopes } from './corpScopes';
+import { corpGrantCoverage } from './corpScopes';
 
 /** Read off the registry rather than hand-copied, like every other derived scope constant in this codebase. */
 const ROLES_SCOPE: Scope = ESI_REGISTRY.getCharacterRoles.scope;
@@ -29,7 +29,9 @@ const ROLES_SCOPE: Scope = ESI_REGISTRY.getCharacterRoles.scope;
  *   granted, so whether this Character even holds a role is unknowable
  * - `none` — the role read succeeded, and this Character holds no corp role
  * - `roles-without-grant` — holds a role, some other corp scope not granted
- * - `ready` — holds a role and the scopes that role needs are granted
+ * - `ready` — holds a role and the scopes that role needs are granted. May
+ *   still carry `missingScopes` for an additive capability (`corpScopes.ts`),
+ *   which stays off until granted without hiding anything else
  *
  * Only `ready` puts corp UI on screen. Every other state renders nothing at
  * all — no nav item, no tab, no lock — and `unknown` renders the same as
@@ -42,7 +44,11 @@ export interface CorpAccess {
   state: CorpAccessState;
   /** What this Character can see. All false unless `state` is `roles-without-grant` or `ready`. */
   capabilities: CorpCapabilities;
-  /** Scopes to ask for, for the capabilities this Character actually holds. Empty unless `roles-without-grant`. */
+  /**
+   * Scopes to ask for, for the capabilities this Character actually holds.
+   * Empty unless `roles-without-grant`, or `ready` short of an additive
+   * capability's scope (issue #4058).
+   */
   missingScopes: readonly Scope[];
   /**
    * The corporation-wide roles ESI reported, raw. Empty while `unknown`, and
@@ -151,11 +157,11 @@ export function useCorpAccess(): CorpAccess {
     const roles = snapshot.roles;
     if (!hasAnyCorpCapability(capabilities)) return { ...NO_CORP_ACCESS, roles };
 
-    const missingScopes = missingCorpScopes(capabilities, granted);
+    const coverage = corpGrantCoverage(capabilities, granted);
     return {
-      state: missingScopes.length === 0 ? 'ready' : 'roles-without-grant',
-      capabilities,
-      missingScopes,
+      state: coverage.blocking ? 'roles-without-grant' : 'ready',
+      capabilities: coverage.capabilities,
+      missingScopes: coverage.missingScopes,
       roles,
     };
   }, [snapshot, activeCharacterId, granted, hasRolesScope]);

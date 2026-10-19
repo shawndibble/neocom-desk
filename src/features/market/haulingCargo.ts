@@ -12,7 +12,7 @@
  * Browser's hub, it describes the ship at this desk.
  */
 import type { FittingRecord } from '@/db';
-import { decodeFittingShare } from '@/engine/fitting/fittingShare';
+import { decodeFittingShare } from '@/engine/fittings/fittingShare';
 import { newFitting } from '@/engine/fittings/fittingEdit';
 import { isHoldKind, type CargoHold } from '@/engine/market/cargoHolds';
 import type { PackHold } from '@/engine/assets/haulPacking';

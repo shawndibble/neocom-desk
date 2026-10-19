@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { describe, it, expect, afterEach, beforeAll, afterAll, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, useLocation } from 'react-router-dom';
+import { MemoryRouter } from 'react-router-dom';
 import { NARROW_QUERY } from '@/lib/useIsNarrow';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -19,6 +19,7 @@ import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { clearOrderBookCache } from './orderBook';
 import type { RegionOrder } from '@/esi/endpoints';
+import { LocationProbe } from '@/test/LocationProbe';
 
 /** Jita/The Forge, the default Trade Hub the modal falls back to unhydrated. */
 const JITA_REGION_ID = 10000002;
@@ -1138,11 +1139,6 @@ describe('ItemDetailModal header actions on a phone', () => {
         removeListener: () => {},
         dispatchEvent: () => false,
       }) as MediaQueryList;
-  }
-
-  function LocationProbe() {
-    const { pathname, search } = useLocation();
-    return <p data-testid="location">{pathname + search}</p>;
   }
 
   it('folds Open market in EVE and View in Market into one ⋮, so the name keeps the room', async () => {
