@@ -42,13 +42,13 @@ import { useRowStartPlan } from './rowStartPlan';
 import { useTradeHubStandings, tradeHubStanding } from '@/features/market/useTradeHubStandings';
 import { nameForType, type BlueprintCatalog, type BlueprintCatalogEntry } from './blueprintCatalog';
 import type { MarketWideDayRow, MarketWideResultRow } from './marketWideOpportunities';
-import { useMarketWideOpportunities } from './useMarketWideOpportunities';
+import { useMarketWideScan } from './useMarketWideScan';
+import { MarketWideShowMore } from './MarketWideShowMore';
 import { useUrlSort } from '@/lib/useUrlState';
 import { MARKET_WIDE_PAGE_SIZE, topRows } from './marketWidePage';
 import { MobileMarketWideList } from './MobileMarketWideList';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import { MarketWideFilterBar } from './MarketWideFilterBar';
-import { sameMembers, type MarketWideFilterState } from './marketWideFilter';
 import { marketWideOpportunitiesCsvColumns } from './opportunitiesCsv';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
@@ -102,27 +102,31 @@ export function MarketWideOpportunitiesPanel({
   const characterNames = useCharacterNames();
   const characterIds = useMemo(() => [...characterNames.keys()], [characterNames]);
   const { filter, setFilter } = useMarketWideFilter();
-  const { rows, loading, hasRun, error, fetchedAt, unavailableSources, run } =
-    useMarketWideOpportunities({
-      hub,
-      trees,
-      catalog,
-      modifiers,
-      standing,
-      characterIds,
-    });
-  // A tier, category or source change re-scans (they apply before the top-N
-  // cut); the build-cost cap only narrows the rows already ranked.
-  const [shownLimit, setShownLimit] = useState(MARKET_WIDE_PAGE_SIZE);
-  // `null` until the pilot opens or folds it: then the default (folded once they own blueprints) holds.
-  const [expandedChoice, setExpandedChoice] = useState<boolean | null>(null);
-  const expanded = expandedChoice ?? !startFolded;
-  const scan = (next: MarketWideFilterState) => {
-    setShownLimit(MARKET_WIDE_PAGE_SIZE);
-    // A scan the pilot asked for shows its results.
-    setExpandedChoice(true);
-    run(next);
-  };
+  const {
+    rows,
+    loading,
+    hasRun,
+    error,
+    fetchedAt,
+    unavailableSources,
+    shownLimit,
+    setShownLimit,
+    expanded,
+    toggleExpanded,
+    scan,
+    applyFilter,
+  } = useMarketWideScan({
+    hub,
+    trees,
+    catalog,
+    modifiers,
+    standing,
+    characterIds,
+    filter,
+    setFilter,
+    online,
+    startFolded,
+  });
   // `aria-disabled` while offline, not the native attribute, so the reason stays reachable.
   const scanButton = (
     <Button
@@ -135,17 +139,6 @@ export function MarketWideOpportunitiesPanel({
         : t('industry.marketOpportunitiesRunScan')}
     </Button>
   );
-  const applyFilter = (next: MarketWideFilterState) => {
-    setFilter(next);
-    // Any narrowing starts the pilot back at the top of the ranking.
-    setShownLimit(MARKET_WIDE_PAGE_SIZE);
-    const rescan =
-      !sameMembers(next.tiers, filter.tiers) ||
-      !sameMembers(next.categories, filter.categories) ||
-      !sameMembers(next.sources, filter.sources);
-    // Mid-scan too: otherwise the scan already running lands with the old filters.
-    if ((hasRun || loading) && rescan && online) scan(next);
-  };
   const { skillGateByProductTypeID, commonGate, gatedCount, dailySales, visibleRows } =
     useMarketWideRanking({ rows, hasRun, hub, catalog, characterIds, filter });
 
@@ -231,7 +224,6 @@ export function MarketWideOpportunitiesPanel({
       ),
     [visibleRows, sort.columnId, sort.direction, shownLimit]
   );
-  const remaining = visibleRows.length - shownRows.length;
 
   const unavailableNote =
     hasRun && unavailableSources.length > 0 ? (
@@ -248,7 +240,7 @@ export function MarketWideOpportunitiesPanel({
     <CollapsiblePanel
       title={t('industry.marketOpportunitiesTitle')}
       expanded={expanded}
-      onToggle={() => setExpandedChoice(!expanded)}
+      onToggle={toggleExpanded}
       labels={{ show: t('industry.showDetails'), hide: t('industry.hideDetails') }}
       meta={
         <InfoTooltip
@@ -367,26 +359,12 @@ export function MarketWideOpportunitiesPanel({
                 onStartPlan={startPlanFor}
               />
             )}
-            {remaining > 0 && (
-              // A full-width bar under the cards; beside the count with a pointer.
-              <div className="flex flex-col items-stretch gap-2 lg:flex-row lg:items-center lg:justify-between">
-                <p className="text-center text-[0.6875rem] text-text-dim tabular-nums lg:text-left">
-                  {t('industry.marketOpportunitiesShowing', {
-                    shown: shownRows.length,
-                    total: visibleRows.length,
-                  })}
-                </p>
-                {/* `sm` only beside the count with a pointer: alone on a phone it is a thumb target. */}
-                <Button
-                  size={isDesktop ? 'sm' : undefined}
-                  onClick={() => setShownLimit((limit) => limit + MARKET_WIDE_PAGE_SIZE)}
-                >
-                  {remaining > MARKET_WIDE_PAGE_SIZE
-                    ? t('industry.marketOpportunitiesShowNext', { count: MARKET_WIDE_PAGE_SIZE })
-                    : t('industry.marketOpportunitiesShowLast', { count: remaining })}
-                </Button>
-              </div>
-            )}
+            <MarketWideShowMore
+              shown={shownRows.length}
+              total={visibleRows.length}
+              isDesktop={isDesktop}
+              onShowMore={() => setShownLimit((limit) => limit + MARKET_WIDE_PAGE_SIZE)}
+            />
             {gatedCount > 0 && (
               <p className="text-[0.6875rem] text-text-dim">
                 {t('industry.marketOpportunitiesSkillGateRule')}
