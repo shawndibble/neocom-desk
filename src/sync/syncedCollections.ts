@@ -134,7 +134,7 @@ export interface EditableCollection<
 export interface FeedOrSettingsCollection extends RemoteCollectionBase {
   /**
    * `feed`: the Notification Feed — no tombstones, merged on dismissal
-   * (planSync's syncFeed). `settings`: the synced settings allow-list, one
+   * (collectionSync's syncFeed). `settings`: the synced settings allow-list, one
    * global set with its own tombstones (planSync's syncCharacter).
    */
   kind: 'feed' | 'settings';
