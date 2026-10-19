@@ -436,6 +436,8 @@ jobs:
       # it counts as median, so a new spec needs no edit to run; refresh the
       # weights with `node scripts/e2e-shard.mjs --weights <ci-log>`.
       - name: Run this shard's specs
+        # The container's default shell is sh, which has no `mapfile`.
+        shell: bash
         run: |
           mapfile -t specs < <(node scripts/e2e-shard.mjs --shard ${{ matrix.shard }}/8)
           if [ "${#specs[@]}" -eq 0 ]; then echo "no specs in this shard"; exit 0; fi
