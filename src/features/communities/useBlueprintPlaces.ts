@@ -1,3 +1,4 @@
+import { idSetKey } from '@/lib/idSetKey';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { db } from '@/db';
@@ -87,7 +88,7 @@ export function usePlaceLabels(
     characterId,
     ids: new Set(),
   });
-  const key = useMemo(() => [...new Set(placeIds)].sort((a, b) => a - b).join(','), [placeIds]);
+  const key = useMemo(() => idSetKey(placeIds), [placeIds]);
 
   // Requests outlive a change of `placeIds` (opening the dialog asks for more
   // places): only a change of Character or unmounting drops their answers.

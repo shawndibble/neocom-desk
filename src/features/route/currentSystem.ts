@@ -8,6 +8,7 @@
  * location is about this session, not a preference to carry across devices.
  */
 import { useEffect, useMemo, useState } from 'react';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import {
   adoptGameBaseline,
   effectiveCurrentSystem,
@@ -53,14 +54,9 @@ export interface CurrentSystemState extends CurrentSystem {
 export function useCurrentSystem(): CurrentSystemState {
   const characterId = useActiveCharacter((state) => state.activeCharacterId);
   const picks = usePickedSystems((state) => state.value);
-  const picksHydrated = usePickedSystems((state) => state.hydrated);
-  const hydratePicks = usePickedSystems((state) => state.hydrate);
+  const picksHydrated = useHydratedStore(usePickedSystems);
   const setPicks = usePickedSystems((state) => state.setValue);
   const [game, setGame] = useState<{ characterId: number; systemId: number | null } | null>(null);
-
-  useEffect(() => {
-    void hydratePicks();
-  }, [hydratePicks]);
 
   useEffect(() => {
     if (characterId === null) return;

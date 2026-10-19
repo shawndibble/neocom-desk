@@ -19,7 +19,7 @@ import { HaulingFlagWord } from './HaulingFlagWord';
 import { formatSignedPct, formatTripM3, formatVolume } from './format';
 import { formatDaysToSell, type HaulingViewRow } from './haulingView';
 import { hubAtAnyEnd, type HaulingAnyEnd } from './haulingHubs';
-import { iskGains, signedIsk } from './signedIsk';
+import { iskGains, signedIsk } from '@/lib/signedIsk';
 
 /**
  * The list's optional (non-identity) columns, for `ColumnPickerMenu`

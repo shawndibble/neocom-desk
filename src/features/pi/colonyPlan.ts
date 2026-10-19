@@ -20,7 +20,7 @@ import { colonyFactoryBalance } from './factoryBalanceModel';
 import { idleFacilityPlan, type IdleFacilityPlan } from './colonyActionModel';
 
 /** The kinds worth offering as headroom, in the order a planner reaches for them. */
-export const HEADROOM_KINDS: readonly PiPinKind[] = [
+const HEADROOM_KINDS: readonly PiPinKind[] = [
   'extractorControlUnit',
   'basic',
   'advanced',
@@ -86,7 +86,7 @@ export function nearestPin(
  * the sentence this lands in is a caveat on another number, not a list.
  */
 /** The pins a fitted layout is made of, as "2x Extractor Control Unit -> 6x Basic". */
-export const LAYOUT_KINDS: readonly PiPinKind[] = [
+const LAYOUT_KINDS: readonly PiPinKind[] = [
   'extractorControlUnit',
   'basic',
   'advanced',

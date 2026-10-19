@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { AddPreviewReadout } from '@/features/fittings/AddPreviewReadout';
 import { useState, type ReactNode } from 'react';
 import { Chart } from '@/features/overview/widgets/charts/Chart';
@@ -57,9 +58,7 @@ const SAMPLE_ROWS = [
 function Cue({ rule, note, children }: { rule: string; note?: string; children: ReactNode }) {
   return (
     <div className="space-y-1.5 rounded-xs border border-line bg-panel p-3">
-      <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-        {rule}
-      </p>
+      <p className={eyebrowClassName}>{rule}</p>
       <div className="flex flex-wrap items-center gap-3 text-sm">{children}</div>
       {note && <p className="text-xs text-text-dim">{note}</p>}
     </div>

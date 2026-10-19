@@ -19,6 +19,8 @@
  * Pure. The caller supplies the jump counts.
  */
 
+import { median } from '../math';
+
 /**
  * How many rates a median needs before it means anything.
  *
@@ -41,10 +43,7 @@ export const MIN_GOING_RATE_SAMPLE = 20;
 export function corpusGoingRate(rates: readonly (number | null)[]): number | null {
   const stated = rates.filter((rate): rate is number => rate !== null).sort((a, b) => a - b);
   if (stated.length < MIN_GOING_RATE_SAMPLE) return null;
-  const middle = stated.length / 2;
-  return stated.length % 2 === 1
-    ? stated[Math.floor(middle)]
-    : (stated[middle - 1] + stated[middle]) / 2;
+  return median(stated);
 }
 
 /** How many times the going rate this haul pays, or `null` without both halves. */

@@ -30,6 +30,8 @@
  * lists, at its global market price). Every line
  * right-clicks into the same item actions the rest of the app offers.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { cx } from '@/lib/cx';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EmptyState, Modal, Spinner, StatChip, StatChips, TypeIcon } from '@/components/ui';
@@ -331,9 +333,7 @@ function ItemGroup({
 }) {
   return (
     <div>
-      <h3 className="flex items-center gap-1.5 pb-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-        {heading}
-      </h3>
+      <h3 className={cx(eyebrowClassName, 'flex items-center gap-1.5 pb-1.5')}>{heading}</h3>
       <ul className="flex flex-col gap-1">
         {lines.map((line) => (
           <ContractItemRow

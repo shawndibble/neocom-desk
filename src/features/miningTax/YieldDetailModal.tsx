@@ -13,6 +13,7 @@
  * Everything here is read-only. A Mining Yield row records what ESI reported;
  * there is nothing about it for a pilot to edit.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { OreIcon, OreLink } from './OreIcon';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -68,7 +69,7 @@ const CARD_HINT = 'mt-0.5 text-[0.6875rem] text-text-dim';
  */
 const TABLE_TITLE =
   'flex items-center justify-between gap-2 border-b border-line bg-panel-2 py-1.5 pr-1 pl-2.5';
-const TABLE_TITLE_TEXT = 'text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
+const TABLE_TITLE_TEXT = eyebrowClassName;
 const TABLE_TITLE_MENU = '-my-1.5 flex';
 
 /**
@@ -483,7 +484,7 @@ export function YieldDetailModal({
             )}
 
             <div className="overflow-hidden rounded-xs border border-line">
-              <p className="border-b border-line bg-panel-2 px-2.5 py-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+              <p className={cx(eyebrowClassName, 'border-b border-line bg-panel-2 px-2.5 py-1.5')}>
                 {t('miningTax.overview.detail.pricingTitle')}
               </p>
               <div className="space-y-1.5 px-2.5 py-2 text-[0.6875rem] leading-relaxed text-text-dim">

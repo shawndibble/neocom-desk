@@ -1,3 +1,4 @@
+import { NO_NAMES } from '@/lib/emptyCollections';
 /**
  * Every active Incursion, nearest first from the pilot's Current System with
  * their own jump basis: the one read behind Route Safety's "Incursions near
@@ -12,8 +13,6 @@ import {
   type JumpDistanceStatus,
 } from '@/features/route/currentSystem';
 import { loadConstellationNames, loadIncursions, type IncursionsFeed } from './incursionsData';
-
-const NO_NAMES: ReadonlyMap<number, string> = new Map();
 
 export interface IncursionsRead {
   /** `undefined` while reading; `null` when the feed could not be read and nothing was cached. */

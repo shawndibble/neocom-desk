@@ -1,9 +1,9 @@
-import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui';
 import { useMarketHub } from '@/features/market/hub';
 import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import { STAT_FIELD_WIDTH } from './statKit';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 /**
  * The Trade Hub the Price section quotes — the same synced "Default Trade Hub"
@@ -20,10 +20,7 @@ export function PriceHubSelect({
   const { t } = useTranslation();
   const hub = useMarketHub((state) => state.value);
   const setHub = useMarketHub((state) => state.setValue);
-  const hydrate = useMarketHub((state) => state.hydrate);
-  useEffect(() => {
-    void hydrate();
-  }, [hydrate]);
+  useHydratedStore(useMarketHub);
   const select = (
     <Select value={hub} onValueChange={(value) => void setHub(value as TradeHub['id'])}>
       <SelectTrigger

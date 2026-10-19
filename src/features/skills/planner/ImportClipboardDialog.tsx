@@ -1,3 +1,4 @@
+import { romanLevel } from '@/engine/projection';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -36,8 +37,6 @@ function isAlreadyTrained(
 ): boolean {
   return (trainedSkills.get(entry.skillTypeID)?.level ?? 0) >= entry.targetLevel;
 }
-
-const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
 
 const DOCUMENT_ERROR_KEYS: Record<PlanXmlDocumentErrorCode, string> = {
   tooLarge: 'plans.importFileTooLarge',
@@ -300,7 +299,7 @@ export function ImportClipboardDialog({
                               alreadyTrained ? 'text-text-dim italic' : ''
                             }`}
                           >
-                            {nameFor(entry.skillTypeID)} {ROMAN[entry.targetLevel - 1]}
+                            {nameFor(entry.skillTypeID)} {romanLevel(entry.targetLevel)}
                             {alreadyTrained && (
                               <span className="ml-2 text-[0.625rem] uppercase">
                                 {t('plans.alreadyTrained')}

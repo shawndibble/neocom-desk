@@ -76,6 +76,7 @@
  * cost once built.
  */
 
+import { clamp } from '../math';
 import { mergeCostLines } from './mergeCostLines';
 import type { BuildResult, MaterialCostLine } from './types';
 
@@ -180,7 +181,7 @@ export interface RollUpBuildGroupOptions {
  * path is display-only for such rows (see `materialCost` below).
  */
 function applyOwnedLedger(line: MaterialCostLine, ledgerQuantity: number): MaterialCostLine {
-  const ownedQuantity = Math.min(Math.max(ledgerQuantity, 0), line.quantity);
+  const ownedQuantity = clamp(ledgerQuantity, 0, line.quantity);
   const remainingQuantity = line.quantity - ownedQuantity;
   const priorRemaining = line.remainingQuantity;
   const lineCost =

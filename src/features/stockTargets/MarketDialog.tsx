@@ -8,6 +8,7 @@
  * (three letters, debounced, and only with the search scope), like the
  * Survey's location box.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGrantedScopes } from '@/app/useGrantedScopes';
@@ -18,13 +19,13 @@ import { ESI_REGISTRY } from '@/esi/registry';
 import { MIN_STRUCTURE_SEARCH_LENGTH, searchStructures } from '@/features/survey/surveyPlaces';
 import { COMBOBOX_NAV_KEYS, moveHighlight, type ComboboxNavKey } from '@/lib/comboboxNav';
 import { cx } from '@/lib/cx';
+import { LOOKUP_DEBOUNCE_MS } from '@/lib/useDebouncedValue';
 import { rankedSearch } from '@/lib/rankedSearch';
 import { loadNpcStations } from '@/sde/loadMarketSde';
 import type { NpcStationEntry } from '@/sde/marketTypes';
 import { loadListedAtMarket, loadSellLocations, type SellLocation } from './stockTargetsData';
 
 const SEARCH_SCOPE = ESI_REGISTRY.getCharacterSearch.scope;
-const DEBOUNCE_MS = 300;
 const STATION_LIMIT = 20;
 
 interface PlaceOption {
@@ -106,7 +107,7 @@ function MarketPlacePicker({
             ),
           });
         });
-    }, DEBOUNCE_MS);
+    }, LOOKUP_DEBOUNCE_MS);
     return () => {
       clearTimeout(timer);
       controller.abort();
@@ -178,7 +179,7 @@ function MarketPlacePicker({
         <li
           role="presentation"
           id={`${listId}-${key}`}
-          className="px-3 pt-2 pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
+          className={cx(eyebrowClassName, 'px-3 pt-2 pb-1')}
         >
           {text}
         </li>

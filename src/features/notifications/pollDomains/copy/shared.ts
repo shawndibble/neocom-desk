@@ -16,7 +16,6 @@ export interface DomainCopy<TFire, TNames> {
 /** Nothing to look up. */
 export type NoNames = Record<string, never>;
 
-export const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
 export const HOUR_MS = 3_600_000;
 export const DAY_MS = 86_400_000;
 

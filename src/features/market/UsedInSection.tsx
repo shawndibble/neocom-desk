@@ -10,6 +10,8 @@
  * filter to reach anything further down. The row's "More actions" button
  * opens the menu `ItemContextMenu` publishes rather than building its own.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { cx } from '@/lib/cx';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigationType } from 'react-router-dom';
@@ -86,7 +88,7 @@ export function UsedInSection({
   return (
     <section>
       <CloseOnNavigate onNavigate={onNavigate} />
-      <h3 className="border-b border-line pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+      <h3 className={cx(eyebrowClassName, 'border-b border-line pb-1')}>
         {t('market.itemDetail.usedInTitle', {
           count: uses.length,
           formatted: uses.length.toLocaleString(),

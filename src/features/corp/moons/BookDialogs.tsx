@@ -39,6 +39,8 @@ interface ShellProps {
   confirmLabel: string;
   canConfirm: boolean;
   run: () => Promise<void>;
+  /** A destructive confirm (§6c): the confirm button is `danger`, not `primary`. */
+  danger?: boolean;
   children: ReactNode;
 }
 
@@ -50,6 +52,7 @@ export function DialogShell({
   confirmLabel,
   canConfirm,
   run,
+  danger = false,
   children,
 }: ShellProps) {
   const { t } = useTranslation();
@@ -79,7 +82,11 @@ export function DialogShell({
           <Button variant="ghost" onClick={onClose}>
             {t('common.cancel')}
           </Button>
-          <Button variant="primary" onClick={() => void confirm()} disabled={!canConfirm || busy}>
+          <Button
+            variant={danger ? 'danger' : 'primary'}
+            onClick={() => void confirm()}
+            disabled={!canConfirm || busy}
+          >
             {confirmLabel}
           </Button>
         </div>

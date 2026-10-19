@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -95,7 +96,7 @@ export function NeedsYouQueue() {
 
   return (
     <div className="space-y-2">
-      <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+      <p className={eyebrowClassName}>
         {t('corpTaxBook.moons.needs.title', { count: view.needsYou.length })}
       </p>
       {notice && (

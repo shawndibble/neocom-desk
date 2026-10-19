@@ -19,9 +19,16 @@ export function signedMarketIsk(value: number): string {
   return signedIsk(value, marketIskDecimals(value));
 }
 
-/** The tone for what `signedMarketIsk` prints: none for `0.00`. */
-export function marketIskTone(value: number): 'text-isk-pos' | 'text-isk-neg' | undefined {
-  const decimals = marketIskDecimals(value);
+/** The tone for what `signedIsk` prints at `decimals`: none for a figure that rounds to zero. */
+export function iskTone(
+  value: number,
+  decimals: number
+): 'text-isk-pos' | 'text-isk-neg' | undefined {
   if (iskGains(value, decimals)) return 'text-isk-pos';
   return iskGains(-value, decimals) ? 'text-isk-neg' : undefined;
+}
+
+/** The tone for what `signedMarketIsk` prints: none for `0.00`. */
+export function marketIskTone(value: number): 'text-isk-pos' | 'text-isk-neg' | undefined {
+  return iskTone(value, marketIskDecimals(value));
 }

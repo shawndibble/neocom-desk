@@ -20,6 +20,7 @@ import {
 } from '@/components/ui';
 import { removeStockTarget, setStockTarget } from '@/engine/stockTargets/stockLists';
 import { useSelectedStockList, useStockLists } from './stockListsStore';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 const STOCK_PATH = '/market/stock';
 
@@ -36,16 +37,11 @@ export function StockTargetDialog({
   const id = useId();
   const navigate = useNavigate();
   const lists = useStockLists((state) => state.value);
-  const hydrated = useStockLists((state) => state.hydrated);
-  const hydrate = useStockLists((state) => state.hydrate);
+  const hydrated = useHydratedStore(useStockLists);
   const setLists = useStockLists((state) => state.setValue);
   const selectedId = useSelectedStockList((state) => state.value);
-  const hydrateSelected = useSelectedStockList((state) => state.hydrate);
   const setSelectedId = useSelectedStockList((state) => state.setValue);
-  useEffect(() => {
-    void hydrate();
-    void hydrateSelected();
-  }, [hydrate, hydrateSelected]);
+  useHydratedStore(useSelectedStockList);
 
   const defaultList = lists.find((l) => l.id === selectedId) ?? lists[0] ?? null;
   const [listChoice, setListChoice] = useState<string | null>(null);

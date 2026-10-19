@@ -1,3 +1,5 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { cx } from '@/lib/cx';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
@@ -75,7 +77,7 @@ export function useBpcColumns({
         header: t('bpcContracts.sourceColumn'),
         sortValue: (row) => row.source,
         render: (row) => (
-          <span className="inline-flex items-center text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+          <span className={cx(eyebrowClassName, 'inline-flex items-center')}>
             {row.source === 'contract'
               ? t('bpcContracts.sourceContractSingular')
               : row.source === 'market'

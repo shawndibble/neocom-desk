@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '@/db';
 import { onReconnect, useOnline } from '@/stores/network';
+import { useCharacterCountOrLoading } from '@/features/character/useCharacters';
 import {
   Button,
   EmptyState,
@@ -72,7 +71,7 @@ export function FittingShareView({
   expiresAt?: number;
 }) {
   const { t } = useTranslation();
-  const characterCount = useLiveQuery(() => db.characters.count());
+  const characterCount = useCharacterCountOrLoading();
 
   const [state, setState] = useState<LoadState>({ status: 'loading' });
   // Bumped by Retry, and by the connection returning, to resolve the code again.

@@ -3,7 +3,7 @@ import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useLiveQuery } from 'dexie-react-hooks';
+import { useCharacterNames } from '@/features/character/useCharacters';
 import { HELP_TABS, SETTINGS_TABS } from '@/app/pageTabs';
 import { markStoresStale } from '@/app/staleStoresReload';
 import { useIsPageIndex, usePageTab } from '@/lib/usePageTab';
@@ -26,7 +26,7 @@ import { PiSettingsForm } from '@/features/settings/PiSettingsForm';
 import { BpcSourcingSettingsForm } from '@/features/settings/BpcSourcingSettingsForm';
 import { MiningTaxSettingsForm } from '@/features/settings/MiningTaxSettingsForm';
 import { ChipRow, DefaultsSyncHint } from '@/features/settings/settingsFields';
-import { useHydratedStore } from '@/features/settings/useHydratedStore';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useDefaultRoutePreference } from '@/features/route/routeRules';
 import { ROUTE_PREFERENCE_LABEL_KEYS } from '@/features/route/routePreferences';
 import { useAvoidedSystems } from '@/features/route/avoidedSystems';
@@ -150,15 +150,6 @@ function ActionConfirmation({ message }: { message: string }) {
     <p role="status" aria-live="polite" className="text-xs text-success">
       {message}
     </p>
-  );
-}
-
-/** Empty until the live query resolves — a lookup miss reads as "unknown", not "no characters". */
-function useCharacterNames(): Map<number, string> {
-  const characters = useLiveQuery(() => db.characters.toArray());
-  return useMemo(
-    () => new Map(characters?.map((c) => [c.characterId, c.name]) ?? []),
-    [characters]
   );
 }
 

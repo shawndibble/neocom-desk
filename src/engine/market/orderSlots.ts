@@ -6,6 +6,7 @@
  * Pure: callers pass the corrected trained-skill map
  * (`features/skills/correctedSkills.ts`), not an ESI payload.
  */
+import { clamp } from '../math';
 import type { TrainedSkill } from '@/engine/types';
 
 /** Slots every character has before training anything. */
@@ -32,7 +33,7 @@ const MAX_SKILL_LEVEL = 5;
 export function maxMarketOrders(trained: ReadonlyMap<number, TrainedSkill>): number {
   return ORDER_SLOT_SKILLS.reduce((total, { typeID, perLevel }) => {
     const level = trained.get(typeID)?.level ?? 0;
-    const clamped = Math.min(Math.max(level, 0), MAX_SKILL_LEVEL);
+    const clamped = clamp(level, 0, MAX_SKILL_LEVEL);
     return total + perLevel * clamped;
   }, BASE_ORDER_SLOTS);
 }

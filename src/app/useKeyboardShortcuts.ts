@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useNavigate } from 'react-router-dom';
 import { isTypingTarget, OVERLAY_SELECTOR, SHORTCUTS } from '@/lib/shortcuts';
 import { advanceSequence, IDLE, type SequenceState } from '@/lib/shortcutSequence';
@@ -24,13 +25,9 @@ const SEQUENCE_BY_KEY = new Map(
  */
 export function useKeyboardShortcuts(): void {
   const navigate = useNavigate();
-  const hydrate = useSingleKeyShortcuts((s) => s.hydrate);
-  const enabled = useSingleKeyShortcuts((s) => s.hydrated && s.value);
+  const hydrated = useHydratedStore(useSingleKeyShortcuts);
+  const enabled = useSingleKeyShortcuts((s) => s.value) && hydrated;
   const sequence = useRef<SequenceState>(IDLE);
-
-  useEffect(() => {
-    void hydrate();
-  }, [hydrate]);
 
   useEffect(() => {
     if (!enabled) return;

@@ -1,4 +1,5 @@
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Fragment, useMemo } from 'react';
+import { MD_UP_QUERY, useMediaQuery } from '@/lib/useMediaQuery';
 import {
   DndContext,
   KeyboardSensor,
@@ -26,23 +27,6 @@ import { EntryRow } from './entryList/EntryRow';
 import { MarkerRow } from './entryList/MarkerRow';
 import { PrereqRow } from './entryList/PrereqRow';
 import { ACTION_SPACER, TIME_CELL } from './entryList/rowChrome';
-
-/** Matches Layout.tsx's phone/desktop line (#114). */
-const DESKTOP_QUERY = '(min-width: 48rem)';
-
-/** True at or above the `md` breakpoint, where a row fits on one line (#114). */
-function useIsDesktop(): boolean {
-  const [isDesktop, setIsDesktop] = useState(
-    () => typeof window !== 'undefined' && window.matchMedia(DESKTOP_QUERY).matches
-  );
-  useEffect(() => {
-    const desktop = window.matchMedia(DESKTOP_QUERY);
-    const onChange = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
-    desktop.addEventListener('change', onChange);
-    return () => desktop.removeEventListener('change', onChange);
-  }, []);
-  return isDesktop;
-}
 
 /** Stable identity: a literal default would be a new object on every render, defeating MarkerRow's memo. */
 const EMPTY_IMPLANTS: Implants = {};
@@ -132,7 +116,7 @@ export function EntryList({
   onRemoveMilestone,
 }: EntryListProps) {
   const { t } = useTranslation();
-  const isDesktop = useIsDesktop();
+  const isDesktop = useMediaQuery(MD_UP_QUERY);
   const sensors = useSensors(
     // A bare PointerSensor starts dragging on the first pixel of pointer
     // movement, which both fires from ordinary jitter on a click (the

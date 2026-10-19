@@ -8,6 +8,7 @@
  * See `docs/context/decisions/20260930-120122-asset-value-prices-blueprint-copies-from-contract-listings.md`.
  */
 
+import { median } from './math';
 import type { BpcContractRow } from './contracts/bpcSearch';
 
 /** One asset row flagged `is_blueprint_copy`, joined to its blueprint record when that is readable. */
@@ -81,12 +82,6 @@ function contractRates(offers: readonly BpcContractRow[]): CopyRate[] {
     });
   }
   return rates;
-}
-
-function median(values: readonly number[]): number {
-  const sorted = [...values].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 === 1 ? sorted[mid]! : (sorted[mid - 1]! + sorted[mid]!) / 2;
 }
 
 /**
