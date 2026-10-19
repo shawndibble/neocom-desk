@@ -10,14 +10,29 @@ import {
 import { LiveStatus } from './LiveStatus';
 import { Popover, PopoverContent, PopoverTrigger } from './Popover';
 import { SearchInput } from './SearchInput';
-import { activeOptionClassName } from './controlStyles';
+import { activeOptionClassName, selectTriggerClassName, type ControlSize } from './controlStyles';
+import { SelectChevron } from './SelectChevron';
 import { menuItemClassName } from './menuStyles';
 
 export type { MultiSelectGroup, MultiSelectOption };
 
 export interface MultiSelectProps<Id> {
-  /** Rendered as the `PopoverTrigger`'s child — typically a `Button`. */
-  trigger: ReactNode;
+  /**
+   * The trigger's visible text: the field's name ("Compare regions"), or a
+   * value that names itself ("All locations"). Defaults to `label`.
+   */
+  triggerLabel?: string;
+  /** A short dim read of the selection after `triggerLabel` — a count ("2 / 4"). */
+  summary?: ReactNode;
+  /**
+   * The trigger's accessible name, when its visible text alone doesn't say
+   * enough (a bare "2 / 4"). Keep the visible text a substring of it (WCAG 2.5.3).
+   */
+  triggerAriaLabel?: string;
+  /** The trigger's control size; share it with the row's other controls (DESIGN.md §3). */
+  size?: ControlSize;
+  /** The trigger's classes — its width in a toolbar row. */
+  className?: string;
   /** Flat, ungrouped options. Ignored if `groups` is given. */
   options?: readonly MultiSelectOption<Id>[];
   /** Grouped options, each under its own heading. Takes precedence over `options`. */
@@ -39,7 +54,7 @@ export interface MultiSelectProps<Id> {
 }
 
 /**
- * A trigger-opened, checkbox-style multiselect with a type-to-filter search
+ * A select-shaped, checkbox-style multiselect with a type-to-filter search
  * box. Built on `Popover` rather than `DropdownMenu`: Radix's menu family
  * expects arrow-key/typeahead navigation between `menuitem`s, which conflicts
  * with a live text input inside the same content — see
@@ -52,7 +67,11 @@ export interface MultiSelectProps<Id> {
  * box must still insert a space, not toggle a row.
  */
 export function MultiSelect<Id>({
-  trigger,
+  triggerLabel,
+  summary,
+  triggerAriaLabel,
+  size = 'md',
+  className,
   options,
   groups,
   selected,
@@ -111,7 +130,20 @@ export function MultiSelect<Id>({
 
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
-      <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+      {/* Field chrome, never a `Button`: a multi-pick opens a list to pick
+          from, the same intent as a `Select` (DESIGN.md §6c). */}
+      <PopoverTrigger
+        aria-label={triggerAriaLabel}
+        className={cx(selectTriggerClassName(size), className)}
+      >
+        <span>
+          {triggerLabel ?? label}
+          {summary !== undefined && (
+            <span className="ml-2 text-text-dim tabular-nums">{summary}</span>
+          )}
+        </span>
+        <SelectChevron size={size} />
+      </PopoverTrigger>
       <PopoverContent aria-label={label} className={cx('w-64 p-0', contentClassName)}>
         {typeof extraContent === 'function' ? extraContent(() => setOpen(false)) : extraContent}
         <div className="p-1">

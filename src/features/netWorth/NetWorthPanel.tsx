@@ -18,8 +18,6 @@ import {
   Spinner,
   type DataTableColumn,
 } from '@/components/ui';
-import { Button } from '@/components/ui/Button';
-import * as Icon from '@/components/ui/icons';
 import { Checkbox } from '@/components/ui/Checkbox';
 import { MultiSelect } from '@/components/ui/MultiSelect';
 import { TableActionsMenu } from '@/components/ui/TableExport';
@@ -119,21 +117,11 @@ function LayerPicker({
   return (
     <MultiSelect
       label={t('wallet.netWorth.layersNoun')}
-      trigger={
-        <Button
-          size="md"
-          aria-label={t('wallet.netWorth.layersButton', {
-            shown: selected.size,
-            total: listed.length,
-          })}
-        >
-          <span aria-hidden="true">{t('wallet.netWorth.layersNoun')}</span>
-          <span aria-hidden="true" className="text-text-dim tabular-nums">
-            {selected.size} / {listed.length}
-          </span>
-          <Icon.Expanded aria-hidden="true" className="text-text-dim" />
-        </Button>
-      }
+      summary={`${selected.size} / ${listed.length}`}
+      triggerAriaLabel={t('wallet.netWorth.layersButton', {
+        shown: selected.size,
+        total: listed.length,
+      })}
       options={options}
       selected={selected}
       // The last series cannot be switched off (`toggleHidden`): an empty chart says nothing.

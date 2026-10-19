@@ -1,7 +1,6 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
-import * as Icon from '@/components/ui/icons';
 import { MultiSelect, type MultiSelectGroup } from '@/components/ui/MultiSelect';
 import { TRADE_HUBS } from '@/market/hubs';
 import { MAX_COMPARE_REGIONS, toggleCompareRegion } from '@/engine/market/priceHistoryCompare';
@@ -86,22 +85,12 @@ export function CompareRegionsPicker({
   return (
     <MultiSelect
       label={t('market.priceHistory.compareRegions')}
-      trigger={
-        <Button
-          size="md"
-          className={className}
-          aria-label={t('market.priceHistory.compareButton', {
-            count: selected.length,
-            max: MAX_COMPARE_REGIONS,
-          })}
-        >
-          <span aria-hidden="true">{t('market.priceHistory.compareRegions')}</span>
-          <span aria-hidden="true" className="text-text-dim tabular-nums">
-            {selected.length} / {MAX_COMPARE_REGIONS}
-          </span>
-          <Icon.Expanded aria-hidden="true" className="text-text-dim" />
-        </Button>
-      }
+      summary={`${selected.length} / ${MAX_COMPARE_REGIONS}`}
+      triggerAriaLabel={t('market.priceHistory.compareButton', {
+        count: selected.length,
+        max: MAX_COMPARE_REGIONS,
+      })}
+      className={className}
       groups={groups}
       selected={selectedSet}
       onToggle={(id) => {
