@@ -340,6 +340,13 @@ async function settle(turns = 20) {
   for (let i = 0; i < turns; i++) await new Promise<void>((resolve) => setImmediate(resolve));
 }
 
+// Only timers are faked (never setImmediate): fake-indexeddb schedules on it.
+const fakeTimers = () => vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 beforeEach(async () => {
   // Helpers like markPlanDeleted schedule a debounced sync that outlives
   // their test; left alone it fires mid-way through a later test and queues
@@ -2152,9 +2159,10 @@ describe('sync orchestration', () => {
     async (_label, priorities) => {
       await addAlts([2, 3]);
       const { order, release } = gateReads((path) => path === 'characters/char:2/plans');
+      fakeTimers();
       const background = [triggerSync(2, 'background'), triggerSync(3, 'background')];
       for (const priority of priorities) scheduleSync(1, 10, priority);
-      await new Promise((resolve) => setTimeout(resolve, 40));
+      await vi.advanceTimersByTimeAsync(40);
 
       release();
       await Promise.all(background);
@@ -2202,6 +2210,7 @@ describe('sync orchestration', () => {
   });
 
   it('debounces scheduleSync into a single run', async () => {
+    fakeTimers();
     scheduleSync(1, 20);
     scheduleSync(1, 20);
     scheduleSync(1, 20);
@@ -2210,7 +2219,7 @@ describe('sync orchestration', () => {
     // productionOrderWatches + payees + miningTaxAssignments +
     // notificationFeed + settings).
     await vi.waitFor(() => expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(COLLECTION_COUNT));
-    await new Promise((resolve) => setTimeout(resolve, 100)); // no extra runs
+    await vi.advanceTimersByTimeAsync(100); // no extra runs
     expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(COLLECTION_COUNT);
     expect(vi.mocked(setDoc)).toHaveBeenCalledTimes(1); // the heartbeat, once
   });
@@ -2251,12 +2260,13 @@ describe('haltSync', () => {
   });
 
   it('cancels a scheduled sync and refuses new ones', async () => {
+    fakeTimers();
     scheduleSync(1, 20);
     await haltSync();
 
     await triggerSync(1);
     scheduleSync(1, 20);
-    await new Promise((resolve) => setTimeout(resolve, 60));
+    await vi.advanceTimersByTimeAsync(60);
 
     expect(vi.mocked(getDocs)).not.toHaveBeenCalled();
   });
