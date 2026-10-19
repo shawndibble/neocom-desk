@@ -12,7 +12,7 @@
  */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { ExternalMark } from '@/components/ui/ExternalLink';
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -35,6 +35,7 @@ import { stripEveMarkup } from '@/features/skills/typeDisplay';
 import { buildIcsFile, googleCalendarUrl, type CalendarExportEvent } from '@/lib/calendarExport';
 import { downloadTextFile } from '@/lib/download';
 import { GrantBanner } from '@/app/GrantNote';
+import { useAsyncLoad } from '@/lib/useAsyncLoad';
 import { formatCalendarTimestamp } from '@/lib/timestamp';
 import type { CachedResult } from '@/esi/cache';
 import type {
@@ -106,10 +107,16 @@ export function EventDetailModal({
   onResponded,
 }: EventDetailModalProps) {
   const { t } = useTranslation();
-  const [state, setState] = useState<DetailState>({ status: 'loading' });
-  // Bumped by Try again to re-run the load in place — closing and reopening
+  // `retry` (Try again) re-runs the load in place — closing and reopening
   // was otherwise the only way back to the network.
-  const [attempt, setAttempt] = useState(0);
+  const load = useAsyncLoad(
+    useCallback(() => loadCalendarEvent(characterId, event.event_id), [characterId, event.event_id])
+  );
+  // The answer just saved, laid over the loaded copy until the next load.
+  const [savedResponse, setSavedResponse] = useState<{
+    eventId: number;
+    response: CalendarRsvpResponse;
+  } | null>(null);
   const [saving, setSaving] = useState(false);
   const [rsvpFailed, setRsvpFailed] = useState<Exclude<RsvpResult, 'saved'> | null>(null);
 
@@ -122,37 +129,26 @@ export function EventDetailModal({
         setRsvpFailed(outcome);
         return;
       }
-      setState((prev) =>
-        prev.status === 'ready'
-          ? { ...prev, detail: { ...prev.detail, data: { ...prev.detail.data, response } } }
-          : prev
-      );
+      setSavedResponse({ eventId: event.event_id, response });
       onResponded?.(event.event_id, response);
     } finally {
       setSaving(false);
     }
   }
 
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      setState({ status: 'loading' });
-      try {
-        const { cached, needsReauth } = await loadCalendarEvent(characterId, event.event_id);
-        if (cancelled) return;
-        setState(
-          cached
-            ? { status: 'ready', detail: cached }
-            : { status: needsReauth ? 'needs-reauth' : 'failed' }
-        );
-      } catch {
-        if (!cancelled) setState({ status: 'failed' });
-      }
-    })();
-    return () => {
-      cancelled = true;
+  let state: DetailState;
+  if (load.status === 'failed') state = { status: 'failed' };
+  else if (load.status !== 'ready') state = { status: 'loading' };
+  else if (load.data.cached) {
+    const { cached } = load.data;
+    state = {
+      status: 'ready',
+      detail:
+        savedResponse?.eventId === event.event_id
+          ? { ...cached, data: { ...cached.data, response: savedResponse.response } }
+          : cached,
     };
-  }, [characterId, event.event_id, attempt]);
+  } else state = { status: load.data.needsReauth ? 'needs-reauth' : 'failed' };
 
   return (
     <Modal open onClose={onClose} title={event.title}>
@@ -174,7 +170,7 @@ export function EventDetailModal({
           title={t('common.loadFailedTitle')}
           hint={t('calendar.detailLoadFailedHint')}
           action={
-            <Button size="sm" onClick={() => setAttempt((n) => n + 1)}>
+            <Button size="sm" onClick={load.retry}>
               {t('common.retry')}
             </Button>
           }
