@@ -39,7 +39,7 @@ import type {
   FittingModuleEntry,
   FittingShareInput,
   SlotCategory,
-} from '@/engine/fitting/fittingShare';
+} from '@/engine/fittings/fittingShare';
 import {
   FITTING_SLOT_KINDS,
   type Fitting,

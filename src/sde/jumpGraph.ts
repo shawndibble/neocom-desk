@@ -14,8 +14,7 @@
  */
 import { loadSolarSystemJumps } from './loadMarketSde';
 import type { JumpGraph } from '@/engine/route/jumpRoute';
-
-let index: Promise<JumpGraph | undefined> | null = null;
+import { memoizeAsync } from '@/lib/memoizeAsync';
 
 /**
  * The stargate graph, or `undefined` when the snapshot could not be read.
@@ -27,26 +26,22 @@ let index: Promise<JumpGraph | undefined> | null = null;
  * Two-valued, unlike `lookupSolarSystem`'s three — there is no "loaded, and
  * this id is absent" to report, because the whole graph is the answer.
  */
-export function loadJumpGraph(): Promise<JumpGraph | undefined> {
-  index ??= loadSolarSystemJumps()
-    .then((data): JumpGraph => {
-      const graph = new Map<number, readonly number[]>();
-      for (const [systemId, neighbours] of Object.entries(data)) {
-        // Shape-checked rather than trusted: the pathfinder iterates these
-        // arrays, so one non-array value from a truncated snapshot would
-        // throw mid-search, past where `undefined` can still be answered.
-        if (Array.isArray(neighbours)) graph.set(Number(systemId), neighbours);
-      }
-      return graph;
-    })
-    .catch(() => {
-      index = null; // allow a retry on the next call
-      return undefined;
-    });
-  return index;
-}
+export const loadJumpGraph = memoizeAsync(
+  async (): Promise<JumpGraph> => {
+    const data = await loadSolarSystemJumps();
+    const graph = new Map<number, readonly number[]>();
+    for (const [systemId, neighbours] of Object.entries(data)) {
+      // Shape-checked rather than trusted: the pathfinder iterates these
+      // arrays, so one non-array value from a truncated snapshot would
+      // throw mid-search, past where `undefined` can still be answered.
+      if (Array.isArray(neighbours)) graph.set(Number(systemId), neighbours);
+    }
+    return graph;
+  },
+  { fallback: undefined }
+);
 
 /** Test-only: drops the memoized index so tests can swap the snapshot between cases. */
 export function clearJumpGraphIndex(): void {
-  index = null;
+  loadJumpGraph.reset();
 }

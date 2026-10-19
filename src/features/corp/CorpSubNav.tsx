@@ -9,7 +9,7 @@ import {
   tabListFlushClassName,
   tabScrollerClassName,
 } from '@/components/ui/tabStyles';
-import { useCorpAccess } from './useCorpAccess';
+import { useCorpViewCapabilities } from './useCorpViewCapabilities';
 
 function subNavClass({ isActive }: { isActive: boolean }): string {
   return cx(tabItemClassName, isActive ? tabItemActiveClassName : tabItemIdleClassName);
@@ -43,7 +43,7 @@ function subNavClass({ isActive }: { isActive: boolean }): string {
  */
 export function CorpSubNav({ flush = false }: { flush?: boolean } = {}) {
   const { t } = useTranslation();
-  const { capabilities } = useCorpAccess();
+  const capabilities = useCorpViewCapabilities();
   return (
     <div className={tabScrollerClassName}>
       <nav aria-label={t('nav.corp')} className={flush ? tabListFlushClassName : tabListClassName}>
@@ -63,6 +63,11 @@ export function CorpSubNav({ flush = false }: { flush?: boolean } = {}) {
         {capabilities.canReadAssets && (
           <NavLink to="/corp/assets" end className={subNavClass}>
             {t('corp.assetsTab')}
+          </NavLink>
+        )}
+        {capabilities.canReadMiningLedger && (
+          <NavLink to="/corp/moons" className={subNavClass}>
+            {t('corp.moonsTab')}
           </NavLink>
         )}
       </nav>

@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { configureClipboard } from '@/lib/clipboard';
-import { decodeFittingShare } from '@/engine/fitting/fittingShare';
+import { decodeFittingShare } from '@/engine/fittings/fittingShare';
 import type { Fitting } from '@/engine/fittings/types';
 import type { Appraisal } from '@/engine/market/appraisal';
 import { createShareLink, existingShareLink } from '@/features/share/shareStore';

@@ -54,8 +54,6 @@ import {
 } from '@/features/contractSearch/contractSearchItemsColumns';
 import {
   contractOfferPriceSummary,
-  contractOfferStats,
-  filterContractOffers,
   isUnpricedOffer,
   listedContractTypeOptions,
   offerAskingPrice,
@@ -65,6 +63,7 @@ import {
   type ContractTypeOption,
 } from '@/engine/contracts/contractSearch';
 import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
+import type { ContractOfferQuery } from '@/engine/contracts/contractSearchQuery';
 import {
   resolveCourierRoutes,
   type PublicCourierContractRow,
@@ -100,13 +99,14 @@ import {
   PublicContractDetailModal,
   type PublicContractDetailModalStatChip,
 } from '@/features/contracts/PublicContractDetailModal';
+import { useContractOfferQuery } from '@/features/contractSearch/useContractOfferQuery';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { useRetryFocus } from '@/lib/useRetryFocus';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { rankedSearch } from '@/lib/rankedSearch';
 import { cx } from '@/lib/cx';
 import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
-import { CONTRACT_ISK_CENTS_BELOW, formatIskAuto } from '@/lib/isk';
+import { CONTRACT_ISK_CENTS_BELOW, formatIskAuto, parseNumeric } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
 import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
@@ -117,12 +117,7 @@ import {
   optionalIdParam,
   textParam,
 } from '@/lib/urlState';
-import {
-  DEFAULT_JUMP_RANGE,
-  JUMP_RANGES,
-  withinJumpRange,
-  type JumpRange,
-} from '@/engine/route/jumpRange';
+import { DEFAULT_JUMP_RANGE, JUMP_RANGES, type JumpRange } from '@/engine/route/jumpRange';
 import {
   useCurrentSystem,
   useJumpRangeFilter,
@@ -199,29 +194,8 @@ const ITEMS_FILTER_PARAMS = {
   /** Below market (#3989): one row per contract, valued at the hub. */
   'items.belowMarket': boolParam(),
 };
+const NO_LOCATION_SYSTEMS: ReadonlyMap<number, number | null> = new Map();
 const ITEMS_SORT = { columnId: 'price', direction: 'asc' } as const;
-
-/** A blank or unparseable field is "no restriction", never `NaN` — which would silently exclude every row. */
-function parseNumeric(value: string): number | null {
-  if (value.trim() === '') return null;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
-/**
- * `offerAskingPrice`, except an unpriced (barter) row sorts last rather than
- * at its literal 0 (issue #1080) — used only for the fixed, ascending
- * "cheapest first" default view below (`displayRows`), a plain array
- * `.sort()` this `Infinity` sentinel is safe for. `DataTable`'s own
- * reversible column sort must not use this: `sortValueForPriceColumn` below
- * returns `undefined` for that instead, since `Infinity` would sort
- * *first* the moment a pilot clicks the Price header to flip it to
- * descending — the exact bug this fix removes, reintroduced from the
- * other direction.
- */
-function sortablePrice(row: PublicContractOfferRow, plexPrice: number | null): number {
-  return isUnpricedOffer(row, plexPrice) ? Infinity : offerAskingPrice(row, plexPrice);
-}
 
 /**
  * The Price column's own `sortValue` — `undefined`, not `Infinity`, for an
@@ -702,9 +676,9 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
     ]
   );
   /**
-   * Jump Range folded in here rather than into `nonTypeFilter`/the engine:
+   * Jump Range folded in here rather than into `nonTypeFilter`:
    * only this layer resolves an offer's system (`useOfferLocations`), so
-   * `filterContractOffers` cannot see it. A row this app has *placed* and
+   * `filterContractOffers` cannot see it; the query gets the resolved systems. A row this app has *placed* and
    * cannot connect to the origin — a player structure, or a system the
    * stargate graph does not reach — drops out the moment a range is active:
    * "within 5 jumps" is a claim an unknown distance cannot back.
@@ -717,15 +691,42 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
    * answer excludes" rule Courier's `narrowToOverRate` follows for its own
    * mid-load rows.
    */
-  const nonTypeRows = useMemo(() => {
-    const engineFiltered = filterContractOffers(rows, nonTypeFilter);
-    const allowed = jumpRangeFilter.allowed;
-    if (allowed === null) return engineFiltered;
-    return engineFiltered.filter((row) => {
-      const location = offerLocations.get(row.locationId);
-      return location === undefined || withinJumpRange(location.systemId, allowed);
-    });
-  }, [rows, nonTypeFilter, offerLocations, jumpRangeFilter.allowed]);
+  const allowedSystems = jumpRangeFilter.allowed;
+  const locationSystems = useMemo(
+    () =>
+      allowedSystems === null
+        ? NO_LOCATION_SYSTEMS
+        : new Map([...offerLocations].map(([id, location]) => [id, location.systemId])),
+    [allowedSystems, offerLocations]
+  );
+  /**
+   * Cheapest first, so the rows arrive in the order the table's default
+   * sort shows them rather than the snapshot's own contract-then-type order.
+   * An unpriced (barter) row sorts last regardless of its raw price (issue
+   * #1080). Below market only reads which contracts pass; the offer table is
+   * not shown, so it skips the sort.
+   *
+   * One query answers rows and per-type stats together, in a worker for a
+   * big snapshot (issue #4128).
+   */
+  // Deferred so a price/region edit keeps the inputs responsive while the
+  // ~370k-row filter reruns at low priority.
+  const deferredNonTypeFilter = useDeferredValue(nonTypeFilter);
+  const itemQuery = useMemo<ContractOfferQuery>(
+    () => ({
+      filter: deferredNonTypeFilter,
+      typeIds,
+      allowedSystems,
+      locationSystems,
+      sort: !belowMarket,
+    }),
+    [deferredNonTypeFilter, typeIds, allowedSystems, locationSystems, belowMarket]
+  );
+  const {
+    displayRows,
+    stats: queryStats,
+    awaitingFirst: awaitingQuery,
+  } = useContractOfferQuery(rows, itemQuery);
   const statsByType = useMemo(() => {
     // Before the full rows land, the index's own per-type count and cheapest
     // stand in. They ignore the other filters, which only matters until the
@@ -740,30 +741,12 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
       // Read through R2 the full rows never arrive, so the types whose rows
       // were read get their real, filter-aware stats; the rest keep the index's.
       if (early.rows !== null) {
-        for (const [typeId, typeStats] of contractOfferStats(nonTypeRows, plexPrice)) {
-          stats.set(typeId, typeStats);
-        }
+        for (const [typeId, typeStats] of queryStats) stats.set(typeId, typeStats);
       }
       return stats;
     }
-    return contractOfferStats(nonTypeRows, plexPrice);
-  }, [haveFull, offerIndex, early.rows, nonTypeRows, plexPrice]);
-
-  /**
-   * Cheapest first, so the rows arrive in the order the table's default
-   * sort shows them rather than the snapshot's own contract-then-type order.
-   *
-   * An unpriced (barter) row sorts last regardless of its raw price (issue
-   * #1080): its 0 ISK is not a real price, and sorting on it as one would
-   * put the row asking for goods at the very top of the default view — the
-   * harm this fix exists to remove.
-   */
-  const displayRows = useMemo(() => {
-    const filtered = filterContractOffers(nonTypeRows, { typeIds });
-    // Below market only reads which contracts pass; the offer table is not shown.
-    if (belowMarket) return filtered;
-    return filtered.sort((a, b) => sortablePrice(a, plexPrice) - sortablePrice(b, plexPrice));
-  }, [nonTypeRows, typeIds, plexPrice, belowMarket]);
+    return queryStats;
+  }, [haveFull, offerIndex, early.rows, queryStats]);
 
   const suggestions = useMemo<Suggestion[]>(() => {
     if (selectedTypeId !== null || uiFilter.typeQuery.trim() === '') return [];
@@ -1363,7 +1346,7 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
                       />
                     )}
                   </div>
-                ) : awaitingRows ? (
+                ) : awaitingRows || awaitingQuery ? (
                   <div className="flex flex-col items-center gap-2 py-16">
                     <Spinner label={modeLoadingLabel} />
                     <p aria-hidden="true" className="text-text-dim">

@@ -43,7 +43,7 @@
 //                                                                 yet within the grace period;
 //                                                                 wait and retry
 
-import { ghJson, tryRun, printResult, log } from './lib.mjs';
+import { ghJson, tryRun, printResult, log, sleepSync } from './lib.mjs';
 
 const [, , prArg] = process.argv;
 if (!prArg) {
@@ -57,10 +57,6 @@ if (!prArg) {
 // on, but enough to absorb normal registration/settling lag.
 const REQUIRED_CONTEXT_POLL_ATTEMPTS = 4;
 const REQUIRED_CONTEXT_POLL_INTERVAL_MS = 15_000;
-
-function sleepSync(ms) {
-  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
-}
 
 // Fallback only — used if the ruleset API call below fails (permissions,
 // API shape change, etc.). The real source of truth is the "Merging"
