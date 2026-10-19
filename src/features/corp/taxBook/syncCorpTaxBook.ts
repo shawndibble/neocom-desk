@@ -19,6 +19,7 @@ import {
   type MoonNotification,
   type SyncExtraction,
 } from '@/engine/corpTaxBook/sync';
+import { matchDonation } from '@/engine/corpTaxBook/allocation';
 import { planAutoGroups, type GroupingEdit } from '@/engine/corpTaxBook/grouping';
 import type { Statement } from '@/engine/corpTaxBook/statements';
 import type { ObservedRow } from '@/engine/corpTaxBook/types';
@@ -86,6 +87,13 @@ export interface SyncDeps {
     corporationId: number,
     edit: GroupingEdit
   ) => Promise<unknown>;
+  /** Gives a stored Unmatched donation to a Miner (`assignPayment`, audited). */
+  assignPayment: (
+    characterId: number,
+    corporationId: number,
+    paymentId: string,
+    minerId: string
+  ) => Promise<unknown>;
 }
 
 export const defaultSyncDeps: SyncDeps = {
@@ -107,6 +115,8 @@ export const defaultSyncDeps: SyncDeps = {
     ),
   declinedGrouping: readDeclinedAutoGroup,
   applyGrouping: (characterId, corporationId, edit) => editBook(characterId, corporationId, edit),
+  assignPayment: (characterId, corporationId, paymentId, minerId) =>
+    editBook(characterId, corporationId, { action: 'assignPayment', paymentId, minerId }),
 };
 
 /** What the Character may read from ESI; the rest of the sync does without a source it cannot reach. */
@@ -252,8 +262,19 @@ export async function syncCorpTaxBook(
     before.miners
   );
 
+  // A donation stored Unmatched stays so forever unless re-matched: its sender may have joined a
+  // Miner (or mined here) since. Assign the ones that match now; the officer's queue keeps the rest.
+  const reassigned = await reassignUnmatched(deps, characterId, corporationId, {
+    before,
+    known,
+    regrouped: autoGrouped > 0,
+  });
+
   // The donations just stored may settle Statements; read the book back to allocate against all of it.
-  const after = donationsAdded > 0 ? await deps.readBookState(characterId, corporationId) : before;
+  const after =
+    donationsAdded > 0 || reassigned > 0
+      ? await deps.readBookState(characterId, corporationId)
+      : before;
   const toSettle = after
     ? planSettlements({
         statements: after.statements as Statement[],
@@ -280,6 +301,42 @@ export async function syncCorpTaxBook(
     autoGrouped,
     ...(autoGroupError ? { autoGroupError } : {}),
   };
+}
+
+/** Re-runs `matchDonation` for stored Unmatched payments and assigns those that now match. A failure is not the sync's. */
+async function reassignUnmatched(
+  deps: SyncDeps,
+  characterId: number,
+  corporationId: number,
+  args: { before: BookState; known: ReadonlySet<number>; regrouped: boolean }
+): Promise<number> {
+  const unmatched = args.before.payments.filter(
+    (p) => p.minerId === undefined && !(p.notTaxAmount && p.notTaxAmount > 0)
+  );
+  if (unmatched.length === 0) return 0;
+  try {
+    const book = args.regrouped
+      ? ((await deps.readBookState(characterId, corporationId)) ?? args.before)
+      : args.before;
+    const known = new Set([...args.known, ...book.miners.flatMap((m) => m.characterIds)]);
+    let assigned = 0;
+    for (const p of unmatched) {
+      const match = matchDonation(
+        { characterId: p.characterId, reason: (p as { reason?: string }).reason },
+        {
+          miners: book.miners,
+          statements: book.statements as Statement[],
+          knownCharacterIds: known,
+        }
+      );
+      if (match.kind === 'unmatched') continue;
+      await deps.assignPayment(characterId, corporationId, p.id, match.minerId);
+      assigned += 1;
+    }
+    return assigned;
+  } catch {
+    return 0;
+  }
 }
 
 /**

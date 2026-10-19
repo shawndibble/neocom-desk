@@ -44,50 +44,59 @@ export function ExtractionTimeline({ rows }: { rows: readonly ExtractionRow[] })
           </span>
         ))}
       </div>
-      {shown.map((e) => {
-        const start = Date.parse(e.startedAt);
-        const ready = Date.parse(e.chunkArrivalAt);
-        const fracture = e.fracturedAt ? Date.parse(e.fracturedAt) : ready;
-        const end = e.expiresAt ? Date.parse(e.expiresAt) : ready;
-        return (
-          <Link
-            key={e.id}
-            to={extractionPath(e.id)}
-            className="group flex flex-col gap-1 rounded-xs py-0.5 hover:bg-panel-2 sm:flex-row sm:items-center sm:gap-0"
-          >
-            <span className="w-48 shrink-0 truncate text-xs">
-              <span className="text-accent group-hover:underline">
-                {names.refinery(e.structureId)}
-              </span>{' '}
-              <StateWord state={e.state} />
-            </span>
-            <div className="relative h-4 w-full rounded-xs bg-panel-2 sm:w-auto sm:flex-1">
-              <span
-                className="absolute inset-y-1 rounded-xs bg-line-bright"
-                style={{ left: pct(start), width: width(start, ready) }}
-              />
-              <span
-                className="absolute inset-y-0 rounded-xs bg-success"
-                style={{
-                  left: pct(ready),
-                  width: width(ready, Math.max(fracture, ready + DAY / 24)),
-                }}
-              />
-              <span
-                className={cx(
-                  'absolute inset-y-0 rounded-xs',
-                  e.state === 'expired' ? 'bg-text-faint' : 'bg-warning'
-                )}
-                style={{ left: pct(fracture), width: width(fracture, end) }}
-              />
-              <span className="absolute inset-y-[-4px] w-px bg-text" style={{ left: pct(now) }} />
-            </div>
-            <span className="hidden w-6 justify-end sm:flex">
-              <RowCaret />
-            </span>
-          </Link>
-        );
-      })}
+      <div className="relative space-y-3">
+        {/* One "now" line over the whole bars column: a line per row froze Chrome's painting. */}
+        <div
+          data-testid="timeline-now"
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-y-0 inset-x-0 sm:left-48 sm:right-6"
+        >
+          <span className="absolute inset-y-0 w-px bg-text" style={{ left: pct(now) }} />
+        </div>
+        {shown.map((e) => {
+          const start = Date.parse(e.startedAt);
+          const ready = Date.parse(e.chunkArrivalAt);
+          const fracture = e.fracturedAt ? Date.parse(e.fracturedAt) : ready;
+          const end = e.expiresAt ? Date.parse(e.expiresAt) : ready;
+          return (
+            <Link
+              key={e.id}
+              to={extractionPath(e.id)}
+              className="group flex flex-col gap-1 rounded-xs py-0.5 hover:bg-panel-2 sm:flex-row sm:items-center sm:gap-0"
+            >
+              <span className="w-48 shrink-0 truncate text-xs">
+                <span className="text-accent group-hover:underline">
+                  {names.refinery(e.structureId)}
+                </span>{' '}
+                <StateWord state={e.state} />
+              </span>
+              <div className="relative h-4 w-full rounded-xs bg-panel-2 sm:w-auto sm:flex-1">
+                <span
+                  className="absolute inset-y-1 rounded-xs bg-line-bright"
+                  style={{ left: pct(start), width: width(start, ready) }}
+                />
+                <span
+                  className="absolute inset-y-0 rounded-xs bg-success"
+                  style={{
+                    left: pct(ready),
+                    width: width(ready, Math.max(fracture, ready + DAY / 24)),
+                  }}
+                />
+                <span
+                  className={cx(
+                    'absolute inset-y-0 rounded-xs',
+                    e.state === 'expired' ? 'bg-text-faint' : 'bg-warning'
+                  )}
+                  style={{ left: pct(fracture), width: width(fracture, end) }}
+                />
+              </div>
+              <span className="hidden w-6 justify-end sm:flex">
+                <RowCaret />
+              </span>
+            </Link>
+          );
+        })}
+      </div>
       <p className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-dim">
         {(
           [

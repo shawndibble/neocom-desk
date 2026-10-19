@@ -108,10 +108,16 @@ describe('buildBookView', () => {
     expect(issued.miners[0].overdueDays).toBe(null);
     expect(nextRunPeriod(issued)).toBeUndefined();
     expect(periodRows(issued).find((r) => r.start === '2026-08-01')).toMatchObject({
-      status: 'sent',
+      status: 'issued',
       billed: 100_000,
       outstanding: 100_000,
     });
+
+    const mailed = buildBookView({
+      ...base,
+      statements: [{ ...statement, mailsSent: 1 } as typeof statement],
+    });
+    expect(periodRows(mailed).find((r) => r.start === '2026-08-01')?.status).toBe('sent');
 
     const paid = buildBookView({
       ...base,
@@ -128,6 +134,7 @@ describe('buildBookView', () => {
       ],
     });
     expect(paid.miners[0].owed).toBe(0);
+    expect(periodRows(paid).find((r) => r.start === '2026-08-01')?.status).toBe('paid');
     expect(paid.miners[0].lastPaidAt).toBe('2026-09-02T00:00:00Z');
     expect(minerDetail(paid, 'solo:1')!.days[0].status).toBe('paid');
   });
@@ -227,5 +234,32 @@ describe('buildBookView', () => {
       input({ ...base, surveyOreLines: new Map([[id, [{ typeId: ORE, quantity: 1000 }]]]) })
     ).extractions[0];
     expect(row).toMatchObject({ oreSource: 'survey', minedPct: 50, estimatedValue: 1_000_000 });
+  });
+});
+
+describe('a day on an issued Statement stays frozen (D22)', () => {
+  it('keeps the Statement line price, quantity and tax when prices move; unbilled days are priced live', () => {
+    const base = input({
+      entries: [entry(1, '2026-08-10', 1000), entry(1, '2026-09-10', 1000)],
+    });
+    const first = buildBookView(base);
+    const plan = planStatementRun(first, { start: '2026-08-01', end: '2026-08-31' });
+    const statement = statementForLine(first, plan, plan.lines[0]);
+    const later = buildBookView({
+      ...base,
+      statements: [statement],
+      pricesOn: () => ({
+        prices: new Map([[ORE, 2000]]),
+        sources: new Map([[ORE, 'saved' as const]]),
+      }),
+    });
+    const days = minerDetail(later, 'solo:1')!.days;
+    const billed = days.find((d) => d.date === '2026-08-10')!;
+    expect(billed.status).toBe('on-statement');
+    expect(billed.tax).toBe(100_000);
+    expect(billed.unitPrices[ORE]).toBe(1000);
+    expect(billed.estimatedValue).toBe(1_000_000);
+    expect(billed.taxPct).toBe(10);
+    expect(days.find((d) => d.date === '2026-09-10')!.tax).toBe(200_000);
   });
 });

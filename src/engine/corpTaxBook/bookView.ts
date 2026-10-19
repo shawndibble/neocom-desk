@@ -19,6 +19,7 @@ import {
   statementPeriod,
   type Adjustment,
   type Statement,
+  type StatementLine,
   type StatementCadence,
   type StatementDraft,
   type StatementPeriod,
@@ -164,6 +165,8 @@ export interface BookView {
   internals: {
     byMiner: Map<string, MinerInternals>;
     placeOf: (structureId: number, date: string) => { moonId?: number; extractionId?: string };
+    /** Per day charge key on an issued Statement: the lines' frozen quantities, value and tax. */
+    frozenByKey: ReadonlyMap<string, { oreLines: OreLine[]; estimatedValue: number; tax: number }>;
   };
 }
 
@@ -204,6 +207,23 @@ function toTaxPayments(payments: readonly SettlePayment[], minerId: string): Tax
   return payments.filter((p): p is TaxPayment => p.minerId === minerId);
 }
 
+/** What the Statement lines billed for one day, as issued: summed quantities and tax, the first line's prices and rate. */
+function frozenDay(lines: readonly StatementLine[]) {
+  const first = lines[0];
+  const byType = new Map<number, number>();
+  for (const l of lines)
+    for (const o of l.oreLines) byType.set(o.typeId, (byType.get(o.typeId) ?? 0) + o.quantity);
+  const taxPct = first?.taxPct;
+  return {
+    oreLines: [...byType].map(([typeId, quantity]) => ({ typeId, quantity })),
+    unitPrices: first?.unitPrices ?? {},
+    estimatedValue: lines.reduce((sum, l) => sum + l.estimatedValue, 0),
+    taxPct: taxPct ?? 0,
+    rateEffectiveFrom: first?.rateEffectiveFrom,
+    tax: lines.reduce((sum, l) => sum + l.tax, 0),
+  };
+}
+
 export function buildBookView(input: BookViewInput): BookView {
   const placeOf = placeOfFactory(input.extractions, input.structureExpiryHours);
   const { charges, beforeBook, unrated } = buildDayCharges(input.entries, {
@@ -234,6 +254,8 @@ export function buildBookView(input: BookViewInput): BookView {
 
   const byMiner = new Map<string, MinerInternals>();
   const miners: MinerRow[] = [];
+  /** Per day charge on an issued Statement: what its lines billed, frozen. */
+  const frozenByKey = new Map<string, ReturnType<typeof frozenDay>>();
   const needsYou: NeedsYouItem[] = [];
   const nowMs = Date.parse(input.now);
 
@@ -269,8 +291,13 @@ export function buildBookView(input: BookViewInput): BookView {
     const dismissedKeys = new Map(draft.dismissed.map((d) => [d.charge.key, d.dismissal.id]));
     const writtenOffKeys = new Set(draft.writtenOff.map((w) => w.chargeKey));
     const billedBy = new Map<string, Statement>();
+    const linesBy = new Map<string, StatementLine[]>();
     for (const s of statements)
-      for (const line of s.lines) if (line.chargeKey) billedBy.set(line.chargeKey, s);
+      for (const line of s.lines) {
+        if (!line.chargeKey) continue;
+        billedBy.set(line.chargeKey, s);
+        linesBy.set(line.chargeKey, [...(linesBy.get(line.chargeKey) ?? []), line]);
+      }
 
     const days: DayRow[] = mine
       .map((c): DayRow => {
@@ -283,6 +310,20 @@ export function buildBookView(input: BookViewInput): BookView {
         else if (statement)
           status = allocation.byStatement.get(statement.id)?.settled ? 'paid' : 'on-statement';
         else status = 'not-billable';
+        // A day on an issued Statement is frozen (D22): its lines, never today's prices.
+        const frozen =
+          statement && (status === 'on-statement' || status === 'paid')
+            ? frozenDay(linesBy.get(c.key) ?? [])
+            : undefined;
+        if (frozen) frozenByKey.set(c.key, frozen);
+        const value = frozen ?? {
+          oreLines: c.oreLines,
+          unitPrices: c.unitPrices,
+          estimatedValue: c.estimatedValue,
+          taxPct: c.taxPct,
+          rateEffectiveFrom: c.rateEffectiveFrom,
+          tax: c.taxOwed,
+        };
         return {
           key: c.key,
           date: c.date,
@@ -290,12 +331,14 @@ export function buildBookView(input: BookViewInput): BookView {
           characterId: c.characterId,
           ...(c.moonId !== undefined ? { moonId: c.moonId } : {}),
           ...(c.extractionId !== undefined ? { extractionId: c.extractionId } : {}),
-          oreLines: c.oreLines,
-          unitPrices: c.unitPrices,
-          estimatedValue: c.estimatedValue,
-          taxPct: c.taxPct,
-          ...(c.rateEffectiveFrom !== undefined ? { rateEffectiveFrom: c.rateEffectiveFrom } : {}),
-          tax: c.taxOwed,
+          oreLines: value.oreLines,
+          unitPrices: value.unitPrices,
+          estimatedValue: value.estimatedValue,
+          taxPct: value.taxPct,
+          ...(value.rateEffectiveFrom !== undefined
+            ? { rateEffectiveFrom: value.rateEffectiveFrom }
+            : {}),
+          tax: value.tax,
           status,
           ...(statement ? { statementId: statement.id } : {}),
           ...(dismissal ? { dismissalId: dismissal.id } : {}),
@@ -402,7 +445,7 @@ export function buildBookView(input: BookViewInput): BookView {
       (a.kind === 'overdue' && b.kind === 'overdue' ? b.days - a.days : 0)
   );
 
-  const extractions = buildExtractionRows(input, charges);
+  const extractions = buildExtractionRows(input, charges, frozenByKey);
   const overdueRows = miners.filter((m) => m.overdueDays !== null);
   return {
     input,
@@ -420,11 +463,15 @@ export function buildBookView(input: BookViewInput): BookView {
       unbilled: miners.reduce((s, m) => s + m.unbilled, 0),
       credit: miners.reduce((s, m) => s + m.credit, 0),
     },
-    internals: { byMiner, placeOf },
+    internals: { byMiner, placeOf, frozenByKey },
   };
 }
 
-function buildExtractionRows(input: BookViewInput, charges: readonly DayCharge[]): ExtractionRow[] {
+function buildExtractionRows(
+  input: BookViewInput,
+  charges: readonly DayCharge[],
+  frozenByKey: ReadonlyMap<string, { tax: number }>
+): ExtractionRow[] {
   const today = input.now.slice(0, 10);
   const todayPrices = input.pricesOn(today).prices;
   return input.extractions
@@ -466,7 +513,7 @@ function buildExtractionRows(input: BookViewInput, charges: readonly DayCharge[]
         oreLines,
         estimatedValue,
         minedPct,
-        tax: mine.reduce((s, c) => s + c.taxOwed, 0),
+        tax: mine.reduce((s, c) => s + (frozenByKey.get(c.key)?.tax ?? c.taxOwed), 0),
         minerCount: new Set(mine.map((c) => c.minerId)).size,
       };
     })
@@ -535,9 +582,10 @@ export function extractionDetail(view: BookView, id: string): ExtractionDetail |
   for (const c of view.charges) {
     if (c.extractionId !== id) continue;
     const held = byMiner.get(c.minerId) ?? { units: 0, value: 0, tax: 0 };
-    held.units += c.oreLines.reduce((s, l) => s + l.quantity, 0);
-    held.value += c.estimatedValue;
-    held.tax += c.taxOwed;
+    const frozen = view.internals.frozenByKey.get(c.key);
+    held.units += (frozen?.oreLines ?? c.oreLines).reduce((s, l) => s + l.quantity, 0);
+    held.value += frozen?.estimatedValue ?? c.estimatedValue;
+    held.tax += frozen?.tax ?? c.taxOwed;
     byMiner.set(c.minerId, held);
   }
   return {
@@ -659,7 +707,8 @@ export function statementForLine(
 export interface PeriodRow {
   start: string;
   end: string;
-  status: 'sent' | 'ready' | 'open';
+  /** issued: on a Statement but not (all) mailed yet; sent: mailed; overdue: a Miner past due on it; paid: settled. */
+  status: 'issued' | 'sent' | 'overdue' | 'paid' | 'ready' | 'open';
   miners: number;
   billed: number;
   paid: number;
@@ -676,7 +725,15 @@ export function periodRows(view: BookView): PeriodRow[] {
   for (const [start, statements] of byStart) {
     let paid = 0;
     let outstanding = 0;
+    let overdue = false;
+    let unmailed = false;
     for (const s of statements) {
+      const settled = view.internals.byMiner
+        .get(s.minerId)
+        ?.allocation.byStatement.get(s.id)?.settled;
+      if (!settled && view.miners.find((m) => m.id === s.minerId)?.overdueDays != null)
+        overdue = true;
+      if (((s as Statement & { mailsSent?: number }).mailsSent ?? 0) === 0) unmailed = true;
       const settlement = view.internals.byMiner.get(s.minerId)?.allocation.byStatement.get(s.id);
       paid += settlement?.credited ?? 0;
       outstanding += settlement && !settlement.settled ? settlement.remaining : 0;
@@ -684,7 +741,7 @@ export function periodRows(view: BookView): PeriodRow[] {
     rows.push({
       start,
       end: statements[0].periodEnd,
-      status: 'sent',
+      status: overdue ? 'overdue' : outstanding === 0 ? 'paid' : unmailed ? 'issued' : 'sent',
       miners: new Set(statements.map((s) => s.minerId)).size,
       billed: statements.reduce((s, x) => s + x.amount, 0),
       paid,

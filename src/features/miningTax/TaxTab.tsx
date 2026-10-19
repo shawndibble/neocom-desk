@@ -169,6 +169,7 @@ import {
   isCorpPayeeId,
 } from '@/features/miningTax/corpBook/corpRows';
 import { useCorpBookView } from '@/features/miningTax/corpBook/useCorpBookView';
+import { useBookSystems } from '@/features/miningTax/corpBook/useBookSystems';
 
 const LinkPaymentDialog = lazy(() =>
   guarded(() => import('@/features/miningTax/LinkPaymentDialog')).then((m) => ({
@@ -226,6 +227,7 @@ interface Snapshot {
 }
 
 const NO_HUBS: ReadonlySet<TradeHub['id']> = new Set();
+const NO_SECURITY: ReadonlyMap<number, number> = new Map();
 const NO_NAMES: ReadonlyMap<number, string> = new Map();
 const NO_PAYEES_BY_CHARACTER: ReadonlyMap<number, PayeeRecord[]> = new Map();
 
@@ -448,6 +450,11 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     madePayments,
     reloadKey: data?.fetchedAt?.getTime(),
   });
+  // Book rows carry a raw solar system id; resolve it like a personal row's.
+  const bookSystems = useBookSystems(corpView, {
+    names: data?.systemNames ?? NO_NAMES,
+    security: data?.systemSecurity ?? NO_SECURITY,
+  });
   const corpStateLabel = useCorpStateLabel();
   const corpStateHint = useCorpStateHint();
   const allDisplayRows = useMemo(
@@ -542,8 +549,8 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
   );
 
   const datedPrices = data?.datedPrices ?? EMPTY_DATED_PRICES;
-  const systemNames = data?.systemNames ?? NO_NAMES;
-  const systemSecurity = data?.systemSecurity;
+  const systemNames = bookSystems.names;
+  const systemSecurity = bookSystems.security;
 
   /**
    * The seam every value-computing dialog reads: prices at whichever hub a
@@ -1537,7 +1544,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
               {duplicateRows.map((row) => (
                 <li key={`${row.characterId}:${row.entry.date}:${row.entry.solarSystemId}`}>
                   {row.characterName} — {row.entry.date} —{' '}
-                  {systemLabel(data.systemNames, row.entry.solarSystemId)}
+                  {systemLabel(systemNames, row.entry.solarSystemId)}
                 </li>
               ))}
             </ul>
@@ -1996,7 +2003,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
               onChanged={refresh}
               owedByPayee={owedByPayee}
               systemsByPayee={payeeSystems}
-              systemNames={data?.systemNames}
+              systemNames={systemNames}
             />
           </Suspense>
         )}
@@ -2271,7 +2278,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
               open
               onClose={() => setSettleUpRows(null)}
               rows={liveSettleUpRows ?? settleUpRows}
-              systemNames={data.systemNames}
+              systemNames={systemNames}
               arrivalCheck={settleUpRecheck}
               onPaid={() => {
                 setSelection(new Set());
@@ -2306,7 +2313,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
               owed={linkWalletOwed}
               candidates={linkWalletCandidates}
               paymentSources={paymentSources}
-              systemNames={data.systemNames}
+              systemNames={systemNames}
               onLinked={() => {
                 setSelection(new Set());
                 refresh();
@@ -2321,7 +2328,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
               open
               onClose={() => setLinkPaymentOpen(false)}
               suggestions={linkSuggestions}
-              systemNames={data.systemNames}
+              systemNames={systemNames}
               showCharacter={characters.length > 1}
               onLinked={refresh}
             />
@@ -2333,7 +2340,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
             open
             onClose={() => setBulkDismissOpen(false)}
             rows={dismissTargets}
-            systemNames={data.systemNames}
+            systemNames={systemNames}
             estimatedValueOf={estimatedValueOf}
             showCharacter={showCharacterColumn}
             onDismissed={() => {
