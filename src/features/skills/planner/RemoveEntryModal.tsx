@@ -1,9 +1,8 @@
+import { romanLevel } from '@/engine/projection';
 import type { RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal } from '@/components/ui';
 import { firstConnected, type FocusCandidate } from '@/lib/useFocusAfterCommit';
-
-const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
 
 interface RemoveEntryModalProps {
   /** The row awaiting confirmation; null while closed. Skill *and* level: a plan holds one entry per level. */
@@ -36,7 +35,7 @@ export function RemoveEntryModal({
           name:
             removing === null
               ? ''
-              : `${nameFor(removing.skillTypeID)} ${ROMAN[removing.targetLevel - 1]}`,
+              : `${nameFor(removing.skillTypeID)} ${romanLevel(removing.targetLevel)}`,
         })}
       </p>
       <div className="mt-3 flex justify-end gap-2">

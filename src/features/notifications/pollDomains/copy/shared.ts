@@ -16,8 +16,6 @@ export interface DomainCopy<TFire, TNames> {
 /** Nothing to look up. */
 export type NoNames = Record<string, never>;
 
-export const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
-
 export function fired(eventId: string, variant: string, vars?: Record<string, unknown>): string {
   return i18n.t(`notifications.fired.${eventId}.${variant}`, vars);
 }

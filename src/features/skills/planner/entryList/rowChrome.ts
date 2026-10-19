@@ -10,7 +10,6 @@ import {
 import type { AttributeName, PlanPriority } from '@/engine/types';
 import { PLAN_HANDLE_ATTR } from '../focusNeighbour';
 
-export const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
 /**
  * A row's icon-only buttons (grip, prereq promote). `iconButtonClassName` on a
  * bare `<button>` rather than `IconButton`, which wraps each one in a Tooltip —
