@@ -95,6 +95,10 @@ export async function readTombstones(key: string): Promise<LocalTombstone[]> {
   return Array.isArray(record?.value) ? (record.value as LocalTombstone[]) : [];
 }
 
+export async function writeTombstones(key: string, tombstones: LocalTombstone[]): Promise<void> {
+  await db.settings.put({ key, value: tombstones });
+}
+
 /**
  * Records `ids` as deleted now under one tombstone key, replacing any older
  * tombstone for the same id. Dexie-only and Firebase-free, so a feature can
