@@ -5,6 +5,7 @@
  * wallet journal come in as arguments.
  */
 import type { KillmailVictim } from '@/engine/fittings/linkLoader';
+import { parseInstant } from '../esiInstant';
 
 export interface LossInsurance {
   amount: number;
@@ -116,7 +117,10 @@ export function matchInsurance(
 ): LossInsurance | null {
   const candidates = journal
     .filter((row) => row.ref_type === 'insurance' && (row.amount ?? 0) > 0)
-    .map((row) => ({ amount: row.amount ?? 0, delta: Date.parse(row.date) - killTimeMs }))
+    .flatMap((row) => {
+      const at = parseInstant(row.date);
+      return at === null ? [] : [{ amount: row.amount ?? 0, delta: at - killTimeMs }];
+    })
     .filter(({ delta }) => delta >= -INSURANCE_SKEW_MS && delta <= INSURANCE_WINDOW_MS)
     .sort((a, b) => a.delta - b.delta);
   if (candidates.length === 0) return null;

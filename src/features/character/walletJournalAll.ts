@@ -4,7 +4,7 @@
  * (scope pre-check, ordering, concurrency). Kept apart from `wallet.ts`, which
  * holds the single-Character loaders.
  */
-import { db } from '@/db';
+import { characterIdsWithScopes } from '@/app/characterIdsWithScopes';
 import type { WalletJournalEntry, WalletTransaction } from '@/esi/endpoints';
 import { ESI_REGISTRY } from '@/esi/registry';
 import {
@@ -74,6 +74,5 @@ export async function loadAllCharactersJournals(
 
 /** Ids of the tracked Characters that granted the wallet permission. */
 export async function loadWalletScopedCharacterIds(): Promise<number[]> {
-  const tokens = await db.tokens.toArray();
-  return tokens.filter((token) => token.scopes.includes(JOURNAL_SCOPE)).map((t) => t.characterId);
+  return characterIdsWithScopes([JOURNAL_SCOPE]);
 }

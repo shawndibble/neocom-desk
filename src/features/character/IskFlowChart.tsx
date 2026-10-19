@@ -15,7 +15,7 @@ import { utcDay } from '@/engine/netWorth/snapshot';
 import type { JournalRow } from '@/engine/journalNetting';
 import { useJournalFlowChartHidden } from '@/features/character/journalFlowChartPref';
 import { journalRefLabel } from '@/features/character/journalRefLabel';
-import { useHydratedStore } from '@/features/settings/useHydratedStore';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import type { WalletJournalFilter } from '@/features/character/walletJournalFilter';
 import { useNow } from '@/lib/useNow';
 import { COARSE_POINTER_QUERY, useMediaQuery } from '@/lib/useMediaQuery';

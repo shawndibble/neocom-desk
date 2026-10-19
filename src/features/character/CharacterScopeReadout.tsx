@@ -8,6 +8,8 @@
  * `all` with `missing` names is the partial case: "All characters · 3 of 4"
  * plus a warning icon, and a tooltip naming who is left out.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { cx } from '@/lib/cx';
 import { useTranslation } from 'react-i18next';
 import * as Icon from '@/components/ui/icons';
 import { Tooltip } from '@/components/ui/Tooltip';
@@ -66,7 +68,7 @@ export function CharacterScopeReadout(props: CharacterScopeReadoutProps) {
       tabIndex={hint ? 0 : undefined}
       role={hint ? 'group' : undefined}
       aria-label={hint ? `${label}. ${hint}` : undefined}
-      className="inline-flex shrink-0 items-center gap-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
+      className={cx(eyebrowClassName, 'inline-flex shrink-0 items-center gap-1.5')}
     >
       {glyph}
       <span>{label}</span>

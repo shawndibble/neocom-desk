@@ -1,10 +1,12 @@
 import { NO_AFFILIATIONS, NO_NAMES } from '@/lib/emptyCollections';
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import {
   focusRingInsetClassName,
   interactiveClassName,
   selectedRowClassName,
 } from '@/components/ui/controlStyles';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -28,6 +30,7 @@ import * as Icon from '@/components/ui/icons';
 import { GrantBanner, GrantNote } from '@/app/GrantNote';
 import { ReauthCachedNote } from '@/app/ReauthCachedNote';
 import { db } from '@/db';
+import { useCharacters } from '@/features/character/useCharacters';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useOnline } from '@/stores/network';
 import { useRetryFocus } from '@/lib/useRetryFocus';
@@ -310,10 +313,7 @@ function MailView({ scope, scopeControl }: MailViewProps) {
   // takes to keep a memoised Set's identity stable.
   const folders = useMailFolders((state) => state.value);
   const setFolders = useMailFolders((state) => state.setValue);
-  const hydrateFolders = useMailFolders((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateFolders();
-  }, [hydrateFolders]);
+  useHydratedStore(useMailFolders);
   function toggleFolder(folder: MailTab) {
     void setFolders(
       folders.includes(folder) ? folders.filter((f) => f !== folder) : [...folders, folder]
@@ -990,7 +990,12 @@ function MailView({ scope, scopeControl }: MailViewProps) {
                 <div className="max-h-[36rem] scroll-pt-8 overflow-y-auto lg:max-h-[44rem]">
                   {rowSections.map((section) => (
                     <div key={section.key}>
-                      <h3 className="sticky top-0 z-10 border-y border-line bg-panel-2 px-3 py-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                      <h3
+                        className={cx(
+                          eyebrowClassName,
+                          'sticky top-0 z-10 border-y border-line bg-panel-2 px-3 py-1.5'
+                        )}
+                      >
                         {mailAgeLabel(section.bucket, t)}
                       </h3>
                       <ul className="divide-y divide-line">
@@ -1416,23 +1421,19 @@ export function Mail() {
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const storedScope = useMailScope((state) => state.value);
   const setStoredScope = useMailScope((state) => state.setValue);
-  const scopeHydrated = useMailScope((state) => state.hydrated);
-  const hydrateScope = useMailScope((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateScope();
-  }, [hydrateScope]);
+  const scopeHydrated = useHydratedStore(useMailScope);
   const scopeParams = useMemo(() => ({ scope: characterFilterParam(storedScope) }), [storedScope]);
   const [scopeView, setScopeView] = useUrlParams(scopeParams);
 
-  const characters = useLiveQuery(() => db.characters.toArray(), [], []);
+  const characters = useCharacters();
   // Cached labels only, live: the menu's unread figures need no fetch of their own.
   const labelsByCharacter = useLiveQuery(
-    async () => readMailLabelsForCharacters((characters ?? []).map((c) => c.characterId)),
+    async () => readMailLabelsForCharacters(characters.map((c) => c.characterId)),
     [characters]
   );
   const unreadByCharacter = useMemo(
     () =>
-      (characters ?? []).map((c) => ({
+      characters.map((c) => ({
         characterId: c.characterId,
         name: c.name,
         unread: totalSystemUnread(labelsByCharacter?.get(c.characterId)?.data.labels ?? []),
@@ -1441,7 +1442,7 @@ export function Mail() {
   );
 
   // A control that cannot change anything (one Character) is not offered.
-  const offered = (characters?.length ?? 0) > 1;
+  const offered = characters.length > 1;
   const scope: CharacterFilterValue = offered ? scopeView.scope : 'current';
   function changeScope(next: CharacterFilterValue) {
     void setStoredScope(next);
@@ -1465,7 +1466,7 @@ export function Mail() {
             activeCharacterId={activeCharacterId}
             value={scope}
             onChange={changeScope}
-            characterCount={characters?.length}
+            characterCount={characters.length}
             unreadByCharacter={unreadByCharacter}
             size="md"
           />

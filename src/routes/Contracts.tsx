@@ -1,5 +1,6 @@
 import { NO_AFFILIATIONS, NO_NAMES } from '@/lib/emptyCollections';
-import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
+import { useCallback, useDeferredValue, useMemo, useState } from 'react';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import type { ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -33,7 +34,7 @@ import {
   CONTRACTS_HISTORY_COLUMN_IDS,
   contractsHistoryColumnsStore,
   type ContractsHistoryColumnId,
-} from './contractsColumns';
+} from '@/features/contracts/contractsColumns';
 import { OpenInEveMenuItem } from '@/features/openInEve/OpenInEveMenuItem';
 import { GrantBanner } from '@/app/GrantNote';
 import { loadContracts } from '@/features/character/contracts';
@@ -423,12 +424,8 @@ export function Contracts() {
   const [searchStatus, setSearchStatus] = useState<ContractSearchStatus | null>(null);
 
   const rememberedMode = useContractSearchMode((state) => state.value);
-  const rememberedModeHydrated = useContractSearchMode((state) => state.hydrated);
-  const hydrateRememberedMode = useContractSearchMode((state) => state.hydrate);
+  const rememberedModeHydrated = useHydratedStore(useContractSearchMode);
   const setRememberedMode = useContractSearchMode((state) => state.setValue);
-  useEffect(() => {
-    void hydrateRememberedMode();
-  }, [hydrateRememberedMode]);
   /**
    * A bare `/contracts` visit lands on whichever of Item search and Courier
    * was last used (issue #1719), while a link naming a tab — even

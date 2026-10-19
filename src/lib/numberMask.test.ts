@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { maskNumber, unmaskNumber } from './numberMask';
+import { maskNumber, unmaskCount, unmaskNumber } from './numberMask';
 
 describe('maskNumber', () => {
   it('groups thousands', () => {
@@ -50,5 +50,17 @@ describe('unmaskNumber', () => {
     expect(unmaskNumber('-5')).toBeUndefined();
     expect(unmaskNumber('Infinity')).toBeUndefined();
     expect(unmaskNumber('1e400')).toBeUndefined();
+  });
+});
+
+describe('unmaskCount', () => {
+  it('floors a typed fraction to whole units', () => {
+    expect(unmaskCount('12.9')).toBe(12);
+    expect(unmaskCount('1,500')).toBe(1500);
+  });
+
+  it('returns undefined for blank or garbage', () => {
+    expect(unmaskCount('')).toBeUndefined();
+    expect(unmaskCount('abc')).toBeUndefined();
   });
 });

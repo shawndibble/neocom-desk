@@ -21,6 +21,7 @@ import { MarketDialog, type MarketChoice } from './MarketDialog';
 import { SHARE_PARAM, STOCK_PATH, StockMarketPage } from './StockMarketPage';
 import { StockMarketsList } from './StockMarketsList';
 import { newStockListId, useSelectedStockList, useStockLists } from './stockListsStore';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 const MARKET_PARAM = 'market';
 
@@ -38,18 +39,11 @@ export function StockTab({ activeCharacterId }: { activeCharacterId: number | nu
   const { t } = useTranslation();
   const navigate = useNavigate();
   const lists = useStockLists((state) => state.value);
-  const hydrated = useStockLists((state) => state.hydrated);
-  const hydrateLists = useStockLists((state) => state.hydrate);
+  const hydrated = useHydratedStore(useStockLists);
   const setLists = useStockLists((state) => state.setValue);
   const setSelectedId = useSelectedStockList((state) => state.setValue);
-  const hydrateSelected = useSelectedStockList((state) => state.hydrate);
   const hubId = useMarketHub((state) => state.value);
-  const hydrateHub = useMarketHub((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateLists();
-    void hydrateSelected();
-    void hydrateHub();
-  }, [hydrateLists, hydrateSelected, hydrateHub]);
+  useHydratedStore(useSelectedStockList, useMarketHub);
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
 
   const listId = listIdFromPath(useParams()['*'] ?? '');

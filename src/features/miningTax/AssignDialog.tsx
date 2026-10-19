@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { typeLabels } from './typeLabels';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { OreIcon, OreLink } from './OreIcon';
@@ -311,9 +312,7 @@ export function AssignDialog({
   return (
     <div className="space-y-3">
       <div className="space-y-1">
-        <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-          {t('miningTax.payeeLabel')}
-        </p>
+        <p className={eyebrowClassName}>{t('miningTax.payeeLabel')}</p>
         <Select
           value={payeeId ?? undefined}
           onValueChange={(value) => {
@@ -343,9 +342,7 @@ export function AssignDialog({
 
       {oreLines.length > 1 && (
         <div className="space-y-1">
-          <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-            {t('miningTax.oreLinesLabel')}
-          </p>
+          <p className={eyebrowClassName}>{t('miningTax.oreLinesLabel')}</p>
           <ul className="divide-y divide-line">
             {oreLines.map((line) => (
               <li
@@ -384,9 +381,7 @@ export function AssignDialog({
             2 digits (rarely a decimal), so it never needs the room the
             two ISK fields do. */}
         <div className="space-y-1 sm:w-16 sm:shrink-0">
-          <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-            {t('miningTax.taxPctLabel')}
-          </p>
+          <p className={eyebrowClassName}>{t('miningTax.taxPctLabel')}</p>
           <TextInput
             type="number"
             min={0}
@@ -400,9 +395,7 @@ export function AssignDialog({
         </div>
 
         <div className="min-w-0 space-y-1 sm:flex-1">
-          <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-            {t('miningTax.estimatedValueLabel')}
-          </p>
+          <p className={eyebrowClassName}>{t('miningTax.estimatedValueLabel')}</p>
           <IskField
             ariaLabel={t('miningTax.estimatedValueLabel')}
             computedDefault={computed.estimatedValue}
@@ -424,9 +417,7 @@ export function AssignDialog({
         </div>
 
         <div className="min-w-0 space-y-1 sm:flex-1">
-          <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-            {t('miningTax.taxOwedLabel')}
-          </p>
+          <p className={eyebrowClassName}>{t('miningTax.taxOwedLabel')}</p>
           <IskField
             ariaLabel={t('miningTax.taxOwedLabel')}
             computedDefault={(estimatedValue * (Number.isFinite(pctValue) ? pctValue : 0)) / 100}

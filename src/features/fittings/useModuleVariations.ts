@@ -29,7 +29,6 @@ import { DEFAULT_TRADE_HUB } from '@/market/hubs';
 import { getHubPrices } from '@/market/prices';
 import { catalogueTypeName, type FittingCatalogue } from './useFittingCatalogue';
 import type { VariantEvaluator } from './useFittingEvaluation';
-import { yieldToEventLoop } from './yieldToEventLoop';
 
 export interface VariationRow {
   typeId: number;
@@ -98,6 +97,7 @@ export function useModuleVariations({
   useEffect(() => {
     if (!variants || members.length === 0) return;
     let cancelled = false;
+    const controller = new AbortController();
     void (async () => {
       const typeIds = members.map((member) => member.typeId);
       const candidateChecks = variants.engine.checkCandidates(
@@ -106,14 +106,11 @@ export function useModuleVariations({
         typeIds,
         variants.profile
       );
-      // One variant at a time, handing the main thread back between them:
-      // each `compare` is a synchronous engine calculation, and with the
-      // engine loaded its `await`s only queue microtasks — run together,
-      // every sibling's calculation would land in one long task and freeze
-      // input for all of them (26 siblings for a Medium Armor Repairer II).
+      // One variant at a time: each `compare` runs in the worker, so the main
+      // thread stays free however many siblings there are (26 for a Medium
+      // Armor Repairer II).
       const entries: [number, ComputedEntry][] = [];
       for (const member of members) {
-        await yieldToEventLoop();
         // A run gone stale (evaluator/slot changed meanwhile) stops here,
         // without calculating the rest — the effect that superseded it
         // already has its own run going.
@@ -124,7 +121,7 @@ export function useModuleVariations({
         // the whole panel on "loading" forever.
         try {
           const swapped = swapModuleType(variants.fitting, slot, slotIndex, member.typeId);
-          const { before, after } = await variants.compare(swapped);
+          const { before, after } = await variants.compare(swapped, controller.signal);
           const check = candidateChecks.get(member.typeId);
           entries.push([
             member.typeId,
@@ -136,7 +133,7 @@ export function useModuleVariations({
             },
           ]);
         } catch {
-          // Left out — see above.
+          // Left out — see above (or dropped: the next check ends the run).
         }
       }
       if (cancelled) return;
@@ -144,6 +141,7 @@ export function useModuleVariations({
     })();
     return () => {
       cancelled = true;
+      controller.abort();
     };
   }, [variants, members, slot, slotIndex]);
 

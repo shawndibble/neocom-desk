@@ -5,13 +5,16 @@
  * EVE Workbench's public list (`GET /v1/fits/public?page=N`) is newest first,
  * 100 a page, and has no hull filter — so the app can't ask it for "this
  * hull's fits". This keeps our own copy instead: every public fit's summary
- * and EFT, grouped by hull into `workbenchFits` docs the client reads by
- * id (`{shipTypeId}_{part}`). See the decision doc this ships with.
+ * and EFT, grouped by hull into one R2 object per hull
+ * (`workbench-fits/<shipTypeId>.json`) the client fetches by hull id. See the
+ * decision doc this shipped with and, for the storage,
+ * docs/context/decisions/20261018-232147-eve-workbench-fits-live-in-r2.md.
  *
- * Everything here is fetch- and Firestore-free: `runWorkbenchSync` takes the
+ * Everything here is fetch- and storage-free: `runWorkbenchSync` takes the
  * HTTP call, the clock and the store as arguments, so paging, stop-at-known,
- * checkpointing, retry and splitting are all unit-tested.
- * `workbenchFitsStore.ts` is the Firestore side; `index.ts` only schedules.
+ * checkpointing, retry and changed-only writes are all unit-tested.
+ * `workbenchFitsStore.ts` is the storage side (hulls in R2, the checkpoint in
+ * Firestore); `index.ts` only schedules.
  *
  * **Passes.** A pass walks the list from page 1 until it reaches a fit an
  * earlier pass already stored (or the end of the list). The first pass walks
@@ -28,21 +31,12 @@
  * deleted since.
  */
 
-export const WORKBENCH_FITS_COLLECTION = 'workbenchFits';
-/** Sync bookkeeping; deliberately its own collection so the public read rule on fits doesn't expose it. */
+/** One public R2 object per hull under this prefix: `workbench-fits/<shipTypeId>.json`. */
+export const WORKBENCH_FITS_R2_PREFIX = 'workbench-fits/';
+/** Sync bookkeeping: an admin-only Firestore doc no client rule reaches. */
 export const WORKBENCH_SYNC_STATE_COLLECTION = 'workbenchFitsSync';
 export const WORKBENCH_SYNC_STATE_DOC = 'state';
 export const WORKBENCH_API_BASE = 'https://api.eveworkbench.com/v1';
-
-/**
- * A hull part's byte ceiling, against Firestore's 1 MiB document limit. The
- * estimate (`fitBytes`) is JSON length, which over-counts Firestore's own
- * encoding (a 13-digit number is 8 bytes stored), so this leaves headroom
- * for the doc's other fields and field names.
- */
-export const HULL_PART_BYTE_BUDGET = 900_000;
-/** Fixed allowance per part for `shipTypeId`, `part`, `parts` and the `fits` field name. */
-const PART_OVERHEAD_BYTES = 64;
 
 /** Attempts per request before a run gives up on it (and stops, checkpointed). */
 const MAX_ATTEMPTS = 3;
@@ -62,7 +56,7 @@ export interface WorkbenchFitSummary {
   dateAdded: number;
 }
 
-/** One fit as stored in a hull part — everything the tab lists, plus the EFT that Loads it. */
+/** One fit as stored in a hull object — everything the tab lists, plus the EFT that Loads it. */
 export interface StoredWorkbenchFit {
   id: string;
   name: string;
@@ -71,30 +65,6 @@ export interface StoredWorkbenchFit {
   dateAdded: number;
   eft: string;
 }
-
-/** One `workbenchFits` document: a slice of one hull's fits, newest first. */
-export interface HullPartDoc {
-  shipTypeId: number;
-  part: number;
-  /**
-   * Part 0 only: how many parts the hull has. Clients can only `get` these
-   * docs by id (listing is denied), so this is how they learn which other
-   * parts to fetch.
-   */
-  parts?: number;
-  fits: StoredWorkbenchFit[];
-}
-
-/** One write in `planHullWrite`'s plan. */
-export type HullWriteOp =
-  { kind: 'set'; docId: string; doc: HullPartDoc } | { kind: 'delete'; docId: string };
-
-/**
- * Part docs per `WriteBatch`. A part can be ~900KB, and `commit()` encodes
- * the whole batch at once — the same reason the public-contract snapshot
- * writes 5 chunk docs per batch, and well under Firestore's request size cap.
- */
-export const PART_DOCS_PER_BATCH = 5;
 
 /** The newest fits a pass saw at its start: what the next pass stops at. */
 export interface PassHead {
@@ -116,65 +86,15 @@ export interface PublicFitsPage {
   fits: WorkbenchFitSummary[];
 }
 
-/** `hullPartDocId(626, 0)` → `626_0`. */
-export function hullPartDocId(shipTypeId: number, part: number): string {
-  return `${shipTypeId}_${part}`;
+/** `workbenchFitsR2Key(626)` → `workbench-fits/626.json`. */
+export function workbenchFitsR2Key(shipTypeId: number): string {
+  return `${WORKBENCH_FITS_R2_PREFIX}${shipTypeId}.json`;
 }
 
-/**
- * How many parts a hull has, from its part 0 doc (`undefined` when there is
- * none: no fits). A part 0 without a usable `parts` count was written before
- * the count existed, when the client still found parts by query — read it as
- * the one part it can vouch for. Mirrored by the client's reader.
- */
-export function hullPartCount(part0: unknown): number {
-  if (!isRecord(part0)) return 0;
-  const { parts } = part0;
-  return typeof parts === 'number' && Number.isInteger(parts) && parts >= 1 ? parts : 1;
-}
-
-/**
- * The writes that replace a hull's `previousPartCount` parts with `parts`, as
- * batches to commit in order. A reader fetches part 0, then the parts its
- * `parts` count claims — so the order guarantees part 0 never claims a part
- * that doesn't exist, after any batch:
- *
- * - Parts are set last first, and part 0 (carrying the new count) after
- *   every other part, so the parts a new count claims all exist before the
- *   count does. Until then the old part 0's old count stands, and the old
- *   parts it claims are still there: nothing is deleted yet. Parts are
- *   newest first, so new fits push older ones into later parts; writing the
- *   later parts first leaves a fit in two parts mid-write (the client dedupes
- *   by id) rather than overwritten out of both. A reader still holding the
- *   old count can miss a fit pushed past it until it reads again — the count
- *   bounds what is fetched, it doesn't make the read a snapshot. Accepted.
- * - Deletes (parts past the new count) go after part 0, by which point no
- *   count claims them. With no parts left at all, part 0 is the first delete,
- *   so the hull reads as empty before its other parts go.
- *
- * A run that dies mid-way leaves pages un-checkpointed, so the next run
- * re-merges the same fits and rewrites the hull — and its `readHull` finds
- * parts by query, past any count, so nothing is stranded.
- */
-export function planHullWrite(
-  shipTypeId: number,
-  parts: readonly StoredWorkbenchFit[][],
-  previousPartCount: number
-): HullWriteOp[][] {
-  const ops: HullWriteOp[] = [];
-  for (let part = parts.length - 1; part >= 0; part -= 1) {
-    const doc: HullPartDoc = { shipTypeId, part, fits: parts[part] };
-    if (part === 0) doc.parts = parts.length;
-    ops.push({ kind: 'set', docId: hullPartDocId(shipTypeId, part), doc });
-  }
-  for (let part = parts.length; part < previousPartCount; part += 1) {
-    ops.push({ kind: 'delete', docId: hullPartDocId(shipTypeId, part) });
-  }
-  const batches: HullWriteOp[][] = [];
-  for (let i = 0; i < ops.length; i += PART_DOCS_PER_BATCH) {
-    batches.push(ops.slice(i, i + PART_DOCS_PER_BATCH));
-  }
-  return batches;
+/** One hull's R2 object: every stored fit for it, newest first. */
+export interface HullObject {
+  shipTypeId: number;
+  fits: StoredWorkbenchFit[];
 }
 
 export function publicFitsPageUrl(page: number): string {
@@ -210,6 +130,44 @@ export function parseWorkbenchDate(value: unknown): number | null {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
+}
+
+/**
+ * The fits of a stored hull object (or a legacy Firestore hull part), one
+ * clean row each; a malformed row, or a body without a `fits` array, gives
+ * none. The fields are rebuilt in `StoredWorkbenchFit`'s order.
+ */
+export function parseStoredFits(body: unknown): StoredWorkbenchFit[] {
+  if (!isRecord(body) || !Array.isArray(body.fits)) return [];
+  const fits: StoredWorkbenchFit[] = [];
+  for (const row of body.fits as unknown[]) {
+    if (!isRecord(row)) continue;
+    const { id, name, authorId, authorName, dateAdded, eft } = row;
+    if (typeof id !== 'string' || typeof eft !== 'string' || typeof dateAdded !== 'number') {
+      continue;
+    }
+    fits.push({
+      id,
+      name: typeof name === 'string' ? name : '',
+      authorId: typeof authorId === 'number' ? authorId : null,
+      authorName: typeof authorName === 'string' ? authorName : '',
+      dateAdded,
+      eft,
+    });
+  }
+  return fits;
+}
+
+function fitKey(fit: StoredWorkbenchFit): string {
+  return JSON.stringify([fit.id, fit.name, fit.authorId, fit.authorName, fit.dateAdded, fit.eft]);
+}
+
+/** Whether two fit lists hold the same fits in the same order, whatever their objects' key order. */
+export function sameFits(
+  a: readonly StoredWorkbenchFit[],
+  b: readonly StoredWorkbenchFit[]
+): boolean {
+  return a.length === b.length && a.every((fit, i) => fitKey(fit) === fitKey(b[i]));
 }
 
 function summaryFrom(row: unknown): WorkbenchFitSummary | null {
@@ -318,37 +276,6 @@ export function mergeHullFits(
   return [...byId.values()].sort(newestFirst);
 }
 
-function fitBytes(fit: StoredWorkbenchFit): number {
-  return Buffer.byteLength(JSON.stringify(fit), 'utf8');
-}
-
-/**
- * Slices a hull's fits (already newest first) into parts that each fit one
- * Firestore document. A fit too big for a document on its own is dropped —
- * no split can store it.
- */
-export function splitHullParts(
-  fits: readonly StoredWorkbenchFit[],
-  byteBudget: number = HULL_PART_BYTE_BUDGET
-): StoredWorkbenchFit[][] {
-  const parts: StoredWorkbenchFit[][] = [];
-  let current: StoredWorkbenchFit[] = [];
-  let used = PART_OVERHEAD_BYTES;
-  for (const fit of fits) {
-    const bytes = fitBytes(fit);
-    if (PART_OVERHEAD_BYTES + bytes > byteBudget) continue;
-    if (used + bytes > byteBudget) {
-      parts.push(current);
-      current = [];
-      used = PART_OVERHEAD_BYTES;
-    }
-    current.push(fit);
-    used += bytes;
-  }
-  if (current.length > 0) parts.push(current);
-  return parts;
-}
-
 /** One HTTP response, reduced to what the sync reads. */
 export interface FetchJsonResult {
   status: number;
@@ -361,18 +288,10 @@ export interface FetchJsonResult {
 export interface WorkbenchFitsStore {
   readState(): Promise<WorkbenchSyncState>;
   saveState(state: WorkbenchSyncState): Promise<void>;
-  /**
-   * Every stored fit for the hull, and how many part docs hold them now —
-   * every part doc that exists, not just the ones part 0's count claims, so a
-   * crashed run's leftovers are re-merged and then deleted.
-   */
-  readHull(shipTypeId: number): Promise<{ fits: StoredWorkbenchFit[]; partCount: number }>;
-  /** Replaces the hull's parts with these, in `planHullWrite`'s order; parts past `parts.length` (up to `previousPartCount`) are deleted. */
-  writeHull(
-    shipTypeId: number,
-    parts: StoredWorkbenchFit[][],
-    previousPartCount: number
-  ): Promise<void>;
+  /** Every stored fit for the hull; none when it has no object yet. */
+  readHull(shipTypeId: number): Promise<StoredWorkbenchFit[]>;
+  /** Replaces the hull's object with these fits. */
+  writeHull(shipTypeId: number, fits: StoredWorkbenchFit[]): Promise<void>;
 }
 
 export interface WorkbenchSyncDeps {
@@ -380,11 +299,10 @@ export interface WorkbenchSyncDeps {
   fetchJson: (url: string) => Promise<FetchJsonResult>;
   now: () => number;
   sleep: (ms: number) => Promise<void>;
-  /** Wall-clock budget for fetching; the flush to Firestore comes after it. */
+  /** Wall-clock budget for fetching; the flush to the store comes after it. */
   budgetMs: number;
   /** Pause before every request but the first — the pacing Workbench gets. */
   requestGapMs: number;
-  partByteBudget?: number;
 }
 
 export interface WorkbenchSyncResult {
@@ -392,6 +310,7 @@ export interface WorkbenchSyncResult {
   pages: number;
   fitsStored: number;
   eftSkipped: number;
+  /** Hulls whose object was rewritten: only those this run actually changed. */
   hullsWritten: number;
   passComplete: boolean;
   /** Why the run stopped short of finishing its pass, if it did. */
@@ -498,12 +417,17 @@ export async function runWorkbenchSync(deps: WorkbenchSyncDeps): Promise<Workben
     stoppedBy = err.message;
   }
 
+  // Changed-only: a hull whose merge adds or alters nothing (a resumed page
+  // re-seeing fits it already stored) costs a read but no write.
+  let hullsWritten = 0;
   for (const [shipTypeId, incoming] of byHull) {
     const existing = await store.readHull(shipTypeId);
-    const parts = splitHullParts(mergeHullFits(existing.fits, incoming), deps.partByteBudget);
-    await store.writeHull(shipTypeId, parts, existing.partCount);
+    const merged = mergeHullFits(existing, incoming);
+    if (sameFits(merged, existing)) continue;
+    await store.writeHull(shipTypeId, merged);
+    hullsWritten += 1;
   }
   await store.saveState(state);
 
-  return { pages, fitsStored, eftSkipped, hullsWritten: byHull.size, passComplete, stoppedBy };
+  return { pages, fitsStored, eftSkipped, hullsWritten, passComplete, stoppedBy };
 }

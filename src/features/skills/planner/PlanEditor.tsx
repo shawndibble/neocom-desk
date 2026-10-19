@@ -1,9 +1,7 @@
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import {
   useCallback,
-  Fragment,
   useEffect,
-  useId,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -20,7 +18,6 @@ import {
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
   IconButton,
   Modal,
@@ -37,39 +34,17 @@ import {
 import * as Icon from '@/components/ui/icons';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import { useAutoDismiss } from '@/lib/useAutoDismiss';
-import {
-  firstConnected,
-  useFocusAfterCommit,
-  type FocusCandidate,
-} from '@/lib/useFocusAfterCommit';
+import { useFocusAfterCommit, type FocusCandidate } from '@/lib/useFocusAfterCommit';
 import { neighbourFocusCandidates, planRowHandle } from './focusNeighbour';
 import { MarketGroupLink } from './MarketGroupLink';
 import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
-import { stepKey, type StepKey } from '@/engine/skillPlanSchedule';
-import { findRemovalBlockers, normalizePlanWithBoundaries, planEntryKey } from '@/engine/plan';
+import { findRemovalBlockers, planEntryKey } from '@/engine/plan';
 import { useSkillDetailModalStore } from '@/stores/skillDetailModal';
-import {
-  milestoneKey,
-  milestoneStates,
-  nextMilestone,
-  type MilestoneStatus,
-} from '@/engine/skillPlanMilestones';
 import { schedulePlanWith, type PlanScheduleInputs, type SchedulablePlan } from './planSchedule';
 import { parseSkillQueue } from '@/engine/queueImport';
 import { exportPlanToClipboard } from '@/engine/clipboardExport';
-import {
-  optimizeAtMarkers,
-  placeRemaps,
-  sortShortestFirst,
-  suggestReorder,
-  ATTRIBUTE_NAMES,
-} from '@/engine/optimizer';
-import type {
-  OptimizeForMeResult,
-  PlaceRemapsOptions,
-  PlaceRemapsResult,
-  RemapSegment,
-} from '@/engine/optimizer';
+import { optimizeAtMarkers, ATTRIBUTE_NAMES } from '@/engine/optimizer';
+import type { PlaceRemapsOptions } from '@/engine/optimizer';
 import type {
   AttributeName,
   Attributes,
@@ -80,17 +55,19 @@ import type {
   PlanStep,
   TrainedSkill,
 } from '@/engine/types';
-import { evaluateFitGoal } from '@/engine/fitGoal';
 import { FitGoalModal } from './FitGoalModal';
-import { fitGoalOptions, isFitGoalPickable, type FitGoalOption } from './fitGoalOptions';
+import { useMilestones } from './useMilestones';
+import { useOptimizeAtMarkers, useOptimizeForMe, useOptimizeRemaps } from './useOptimize';
+import { useReorder } from './useReorder';
 import {
-  addMilestone,
-  reanchorFitGoals,
-  removeMilestone,
-  renameMilestone,
-  upsertFitGoal,
-} from './milestones';
-import { useFitGoalNeeds } from './useFitGoalNeeds';
+  anchorKeysOf,
+  appendedCountMessage,
+  confirmRemapOutcome,
+  type PricingContext,
+} from './optimizeHelpers';
+import { OptimizeMenu, type OptimizeMenuItem } from './OptimizeMenu';
+import { OptimizeForMeModal, RemapPreviewModal } from './RemapPreviewModal';
+import { RemoveEntryModal } from './RemoveEntryModal';
 import { MilestoneModal } from './MilestoneModal';
 import type {
   PlanBooster,
@@ -105,7 +82,7 @@ import { writeToClipboard } from '@/lib/clipboard';
 import type { SkillCatalog } from '../skillMap';
 import { SkillPicker } from './SkillPicker';
 import { EntryList } from './EntryList';
-import type { BandInfo } from './EntryList';
+import type { BandInfo } from './entryList/BandHeader';
 import { useColumnVisibility } from './columnPreference';
 import { useGroupingMode, GROUPING_MODES, type GroupingMode } from './groupingMode';
 import { attributePairBandStarts } from './attributePairBands';
@@ -117,29 +94,24 @@ import { PlanToolsPane, type PlanToolSection } from './PlanToolsPane';
 import { InjectorFactsPanel } from './InjectorFactsPanel';
 import { SkillsToBuyPanel } from './SkillsToBuyPanel';
 import { LiveQueueLead } from './LiveQueueLead';
-import { projectQueueEnd } from '@/features/skills/queueStatus';
+import { projectQueueEnd } from '@/engine/skills/queueStatus';
 import {
   evaluateOptimizationBadge,
   remapSavingsShrank,
   toOptimizationBadge,
 } from './planHeaderStats';
-import { markerVerdict, remapVerdict, type OptimizeVerdict } from './optimizeVerdict';
+import { markerVerdict } from './optimizeVerdict';
 import { cloneStateFor, useCloneStates, withCloneState } from '../cloneState';
 import { acceleratorBonusOf, type AttributeBaseline } from '@/engine/attributeBaseline';
 import { queueCsvColumns } from './queueCsv';
 import { downloadCsv } from '@/lib/downloadCsv';
-import { formatCountdown } from '@/lib/duration';
 import { formatLocalDate } from '@/lib/localDate';
-import { applyReorderSuggestion, dedupeEntries } from './reorder';
+import { dedupeEntries } from './reorder';
 import { buildRows } from './markers';
 import {
   addEntry,
   addRemapMarker,
   appendImport,
-  applyOptimizeForMe,
-  applyOptimizerRemapSegments,
-  applyRemapSegments,
-  applyReorder,
   moveRow,
   promotePrereqRow,
   alignedMarkerAttributes,
@@ -182,8 +154,9 @@ import { BoosterList } from './BoosterList';
 import { ImportClipboardDialog } from './ImportClipboardDialog';
 import type { SkillPlanImportState } from '@/lib/shortcuts';
 import { useScopedState } from './useScopedState';
-import { attributeShort, remapInstruction } from './remapInstruction';
+import { attributeShort } from './remapInstruction';
 import { ATTRIBUTE_ENHANCERS_MARKET_GROUP_ID } from './plannerMarketGroups';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
 
@@ -260,13 +233,6 @@ interface PlanEditorProps {
 
 const NO_QUEUE: readonly SkillQueueEntry[] = [];
 
-/** An Optimize Remaps result, with each segment's first step held by key rather than index. */
-type OptimizeRun = PlaceRemapsResult & {
-  anchorKeys: (StepKey | undefined)[];
-  /** Set when this run's last remap is the on-cooldown yearly one — the modal notes its date. */
-  yearlyRemapAfter?: Date;
-};
-
 export function PlanEditor({
   characterId,
   plan,
@@ -314,10 +280,6 @@ export function PlanEditor({
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [importMenuOpen, setImportMenuOpen] = useState(false);
   const openImportDialogAfterMenuRef = useRef(false);
-  const [optimizeMenuOpen, setOptimizeMenuOpen] = useState(false);
-  // Ties each Optimize menu item's `aria-label` (the mode name) to its hint
-  // span via `aria-describedby`, so the "why" still reaches screen readers.
-  const optimizeHintId = useId();
   const [importOpen, setImportOpen] = useState(importSeed !== null);
   const [importConfirm, setImportConfirm] = useState<string | null>(null);
   // `cancel` covers the early-cancel-on-Undo case below; `show` supersedes a
@@ -355,11 +317,6 @@ export function PlanEditor({
   // Panel/Modal results those same actions already produce below.
   const [markerConfirm, setMarkerConfirm] = useState(false);
   const { show: showMarkerConfirm } = useAutoDismiss<boolean>(setMarkerConfirm, false);
-  const [reorderConfirm, setReorderConfirm] = useState<'attributes' | 'shortest' | null>(null);
-  const { show: showReorderConfirm } = useAutoDismiss<'attributes' | 'shortest' | null>(
-    setReorderConfirm,
-    null
-  );
   // A promoted prereq row is a quieter change than it looks (a dimmed row
   // turns into user data), so it says so. A "that worked" note about the
   // change that just landed, so it clears on its own timer, not with the plan.
@@ -368,17 +325,6 @@ export function PlanEditor({
   // Which marker's manual attribute editor (RemapMarkerModal) is open, by
   // ordinal — the same addressing `onRemoveMarker`/`markerAttributesFor` use.
   const [editingMarkerIndex, setEditingMarkerIndex] = useState<number | null>(null);
-  // The Plan Milestone naming modal (MilestoneModal): 'add' opens it blank,
-  // anchored to a row's skill/level; 'rename' seeds it with the milestone's
-  // current name. One instance shared by every row, like editingMarkerIndex
-  // above.
-  const [milestoneModal, setMilestoneModal] = useState<
-    | { mode: 'add'; skillTypeID: number; level: number }
-    | { mode: 'rename'; id: string; currentName: string }
-    | null
-  >(null);
-  // The fit-goal picker (issue #3564): open while a saved Fitting is being chosen.
-  const [fitGoalOpen, setFitGoalOpen] = useState(false);
   // The entry pending a remove confirmation (#408) — an in-app Modal rather
   // than removing on click, matching the pattern PlanList already uses for
   // deleting a whole plan (GLOSSARY.md's "an in-app Modal replacing
@@ -400,31 +346,21 @@ export function PlanEditor({
   // "Columns" control (#114): a device-local view preference, applying the
   // same way across every plan on this device rather than per-plan.
   const columnVisibility = useColumnVisibility((state) => state.value);
-  const hydrateColumnVisibility = useColumnVisibility((state) => state.hydrate);
   const setColumnVisibility = useColumnVisibility((state) => state.setValue);
-  useEffect(() => {
-    void hydrateColumnVisibility();
-  }, [hydrateColumnVisibility]);
+  useHydratedStore(useColumnVisibility);
 
   // Grouping toggle (#115): priority (default) or attribute-pair band
   // headers — visual only, same device-local preference shape as Columns.
   const groupingMode = useGroupingMode((state) => state.value);
-  const hydrateGroupingMode = useGroupingMode((state) => state.hydrate);
   const setGroupingMode = useGroupingMode((state) => state.setValue);
-  useEffect(() => {
-    void hydrateGroupingMode();
-  }, [hydrateGroupingMode]);
+  useHydratedStore(useGroupingMode);
 
   // Clone State (GLOSSARY.md): per Character, not per plan. The control waits
   // for hydration — a write from the empty default would replace the whole
   // blob and drop every other Character's answer.
   const cloneStates = useCloneStates((state) => state.value);
-  const cloneStatesHydrated = useCloneStates((state) => state.hydrated);
-  const hydrateCloneStates = useCloneStates((state) => state.hydrate);
+  const cloneStatesHydrated = useHydratedStore(useCloneStates);
   const setCloneStates = useCloneStates((state) => state.setValue);
-  useEffect(() => {
-    void hydrateCloneStates();
-  }, [hydrateCloneStates]);
   const cloneState = cloneStateFor(cloneStates, characterId);
   const setCloneState = (next: CloneState): void =>
     void setCloneStates(withCloneState(cloneStates, characterId, next));
@@ -436,31 +372,6 @@ export function PlanEditor({
   // after the plan trains at another.
   const planScope = [plan.id, plan.entries, plan.markers];
   const costingScope = [...planScope, cloneState];
-  const [optimizeResult, setOptimizeResult] = useScopedState<OptimizeRun>(costingScope);
-  // Own scoped state, not `optimizeResult`'s shape: that one anchors segments
-  // to the current order's step keys, which a hypothetical reorder has none of yet.
-  const [optimizeForMePreview, setOptimizeForMePreview] =
-    useScopedState<OptimizeForMeResult>(costingScope);
-  // Why each result came out the way it did (optimizeVerdict.ts). Held
-  // beside the result rather than derived at render: the verdict depends on
-  // the Remaps Available the run actually used, and the user can edit that
-  // input afterwards without invalidating the result itself.
-  const [optimizeVerdict, setOptimizeVerdict] = useScopedState<OptimizeVerdict>(costingScope);
-  // Beside-the-button confirmation (#222) for Optimize Remaps.
-  const [optimizeConfirm, setOptimizeConfirm] = useScopedState<string>(costingScope);
-  const { show: showOptimizeConfirm } = useAutoDismiss<string | null>(setOptimizeConfirm, null);
-  // Whether the "Optimize at my markers" savings/segments panel is showing.
-  // The computation itself is not state — the schedule below derives it live
-  // from `plan.markers` so marker rows always have their target attributes on
-  // hand — this flag exists purely to keep that panel an explicit,
-  // click-revealed finding rather than something that pops up unasked the
-  // moment a plan happens to carry any markers.
-  const [markersPanelOpenHeld, setMarkersPanelOpen] = useScopedState<boolean>(planScope);
-  const markersPanelOpen = markersPanelOpenHeld ?? false;
-  const [reorderPreview, setReorderPreview] = useScopedState<{
-    kind: 'attributes' | 'shortest';
-    steps: PlanStep[];
-  }>(planScope);
   // Outcome of the last drag on the entry list. A drop that would land a
   // skill after something requiring it is refused rather than silently
   // re-normalized back (planDrop.ts), so the refusal has to say why. It
@@ -680,81 +591,37 @@ export function PlanEditor({
     stepByKey,
   } = schedule;
 
-  // Plan Milestone (GLOSSARY.md) statuses against the current schedule —
-  // recomputed whenever the schedule or the milestones themselves change, the
-  // same dependency shape as every other schedule-derived value above.
-  const trackedFittingIds = useMemo(
-    () => (plan.milestones ?? []).flatMap((m) => (m.fittingId === undefined ? [] : [m.fittingId])),
-    [plan.milestones]
-  );
-  const fitGoalData = useFitGoalNeeds(characterId, trackedFittingIds, fitGoalOpen);
-  // Needs the plan can't schedule (catalog-unknown skills) are left out, so a
-  // Fitting using one still resolves instead of staying "missing" forever.
-  const fitNeeds = useMemo(
-    () =>
-      new Map(
-        [...fitGoalData.needs].map(([id, need]) => [
-          id,
-          {
-            ...need,
-            needed: need.needed.filter((entry) => catalog.engineSkills.has(entry.skillTypeID)),
-          },
-        ])
-      ),
-    [fitGoalData.needs, catalog.engineSkills]
-  );
-  const trainedLevels = useMemo(
-    () => new Map([...trainedSkills].map(([id, skill]) => [id, skill.level])),
-    [trainedSkills]
-  );
-  // A fit goal reads orphaned once its Fitting is deleted, or once the plan no
-  // longer covers what the Fitting needs (an edit added a module, an entry went).
-  const goneFittingIds = useMemo(
-    () =>
-      new Set(
-        trackedFittingIds.filter((id) => {
-          if (fitGoalData.savedIds && !fitGoalData.savedIds.has(id)) return true;
-          const need = fitNeeds.get(id);
-          return (
-            need !== undefined &&
-            evaluateFitGoal(need.needed, trainedLevels, scheduled).state === 'missing'
-          );
-        })
-      ),
-    [trackedFittingIds, fitGoalData.savedIds, fitNeeds, trainedLevels, scheduled]
-  );
-  const milestoneStatuses = useMemo(
-    () =>
-      milestoneStates(stepByKey, startDate, plan.milestones ?? [], trainedSkills, goneFittingIds),
-    [stepByKey, startDate, plan.milestones, trainedSkills, goneFittingIds]
-  );
-  const milestoneStatusByKey = useMemo(() => {
-    const map = new Map<StepKey, MilestoneStatus>();
-    for (const status of milestoneStatuses) {
-      map.set(milestoneKey(status.milestone), status);
-    }
-    return map;
-  }, [milestoneStatuses]);
-  const milestoneStatusFor = useCallback(
-    (skillTypeID: number, level: number) =>
-      milestoneStatusByKey.get(stepKey({ skillTypeID, level })),
-    [milestoneStatusByKey]
-  );
-  // Gone from the plan entirely (never trained, never scheduled) — the only
-  // milestones with no row of their own to show on, so the header lists them
-  // separately with a remove action rather than dropping them silently.
-  const orphanedMilestones = useMemo(
-    () => milestoneStatuses.filter((s) => s.state === 'orphaned'),
-    [milestoneStatuses]
-  );
+  // Plan Milestone (GLOSSARY.md) statuses and the fit-goal picker, against the current schedule.
+  const {
+    milestoneModal,
+    setMilestoneModal,
+    fitGoalOpen,
+    setFitGoalOpen,
+    fitGoalPickerOptions,
+    milestoneStatusFor,
+    orphanedMilestones,
+    headerNextMilestone,
+    handleAddMilestone,
+    handleRenameMilestone,
+    handleRemoveMilestone,
+    pickFitGoal,
+    submitMilestoneModal,
+  } = useMilestones({
+    characterId,
+    milestones: plan.milestones,
+    entries: plan.entries,
+    engineSkills: catalog.engineSkills,
+    trainedSkills,
+    editable,
+    scheduled,
+    stepByKey,
+    startDate,
+    onUpdate,
+  });
   const headerProgress = useMemo(
     () => planProgress(plan.entries, catalog.engineSkills, trainedSkills),
     [plan.entries, catalog.engineSkills, trainedSkills]
   );
-  const headerNextMilestone = useMemo(() => {
-    const next = nextMilestone(milestoneStatuses);
-    return next && next.finish ? { name: next.milestone.name, finish: next.finish } : null;
-  }, [milestoneStatuses]);
 
   // One row per skill level (reorder.ts). Plans written before that rule —
   // and any entry added at a level several above the character's trained one
@@ -792,6 +659,77 @@ export function PlanEditor({
   // tell a genuine over-cap request from one the timed remap alone accounts
   // for; `remapCount` is what the optimizer actually gets.
   const { timed: timedRemap, count: requestedRemapCount, evaluatedCount: remapCount } = budget;
+
+  // Remap-placement inputs shared by every optimize flow that calls `placeRemaps` (directly, or via `optimizeForMe`).
+  function buildRemapOptions(): PlaceRemapsOptions {
+    return {
+      remapCount,
+      currentAttributes: attributes,
+      implants: effectiveImplants,
+      cloneState,
+      timedRemap: timedRemap ?? undefined,
+      // The same Boosters the computed queue schedules with, so the savings
+      // figure and the queue total cannot disagree.
+      booster:
+        activeBoosters.length > 0
+          ? { boosters: activeBoosters, startDate: new Date(queueProjection.startMs) }
+          : undefined,
+    };
+  }
+  const pricing: PricingContext = { schedulablePlan, scheduleInputs, loadedAtMs, attributes };
+  const optimizeEnv = {
+    engineSkills: catalog.engineSkills,
+    trainedSkills,
+    editable,
+    scheduled,
+    onUpdate,
+  };
+  const {
+    optimizeResult,
+    optimizeVerdict,
+    optimizeConfirm,
+    handleOptimizeRemaps,
+    acceptOptimizeRemaps,
+    rejectOptimizeRemaps,
+  } = useOptimizeRemaps({
+    ...optimizeEnv,
+    costingScope,
+    buildRemapOptions,
+    remapCount,
+    timedRemap,
+    remapInfo,
+    pricing,
+    stepKeys: schedule.stepKeys,
+  });
+  const { optimizeForMePreview, handleOptimizeForMe, acceptOptimizeForMe, rejectOptimizeForMe } =
+    useOptimizeForMe({
+      ...optimizeEnv,
+      costingScope,
+      buildRemapOptions,
+      pricing,
+      priorityMap,
+      milestones: plan.milestones,
+      loadedAtMs,
+    });
+  const {
+    reorderConfirm,
+    reorderPreview,
+    setReorderPreview,
+    handleSuggestReorder,
+    handleSortShortest,
+    acceptReorder,
+  } = useReorder({
+    planScope,
+    engineSkills: catalog.engineSkills,
+    editable,
+    scheduled,
+    priorityMap,
+    milestones: plan.milestones,
+    attributes,
+    implants: effectiveImplants,
+    cloneState,
+    onUpdate,
+  });
 
   // #112: merge "Your entries" and the computed queue into one row list —
   // one row per entry (own aggregated per-level/cumulative time) plus dimmed
@@ -859,6 +797,17 @@ export function PlanEditor({
     () => (markersAtCurrentPositions ? markerVerdict(markersAtCurrentPositions) : null),
     [markersAtCurrentPositions]
   );
+  const {
+    markersPanelOpen,
+    handleOptimizeAtMarkers,
+    acceptOptimizeAtMarkers,
+    rejectOptimizeAtMarkers,
+  } = useOptimizeAtMarkers({
+    ...optimizeEnv,
+    planScope,
+    markersAtCurrentPositions,
+    markersVerdict,
+  });
 
   // Header badge: live (no click, no spinner) via Booster-blind costing —
   // the only path cheap enough to run on every render. A Booster expiring
@@ -950,16 +899,6 @@ export function PlanEditor({
     timedRemap,
   ]);
 
-  /** Shared "Added N skill(s)" wording for both import paths that only ever append (clipboard, queue Append). */
-  function appendedCountMessage(imported: readonly PlanEntry[]): string {
-    const addedCount = imported.filter(
-      (entry) => (trainedSkills.get(entry.skillTypeID)?.level ?? 0) < entry.targetLevel
-    ).length;
-    return addedCount > 0
-      ? t('plans.importAddedCount', { count: addedCount })
-      : t('plans.importAddedNone');
-  }
-
   async function handleImport() {
     if (queueImporting) return;
     setQueueImporting(true);
@@ -1009,7 +948,7 @@ export function PlanEditor({
     // this (and anything since) instead of just the Replace it was for.
     setUndoImport(null);
     onUpdate(appendImport(editable, parsed));
-    showImportConfirm(appendedCountMessage(parsed), 4000);
+    showImportConfirm(appendedCountMessage(t, trainedSkills, parsed), 4000);
     setPendingQueueImport(null);
   }
 
@@ -1045,239 +984,6 @@ export function PlanEditor({
 
   function handleExportCsv() {
     downloadCsv('skill-queue', scheduled, queueCsvColumns(t, nameFor, userSkillTypeIDs));
-  }
-
-  // Same beside-the-button confirmation for both Optimize Modes: the savings
-  // figure when meaningful, otherwise *why* there is none. A run that placed
-  // no remap at all — nothing to spend, or every marker at the plan's end —
-  // is a no-op, not a finding about the plan, and saying "no meaningful
-  // savings" for it sends the user off fixing the wrong thing.
-  function yearlyRemapAfterNote(date: Date): string {
-    return t('plans.optimizeConfirmYearlyAfter', { date: formatLocalDate(date) });
-  }
-
-  function confirmRemapOutcome(verdict: OptimizeVerdict, yearlyRemapAfter?: Date): string {
-    switch (verdict.kind) {
-      case 'saves': {
-        const saves = t('plans.optimizeConfirmSaves', {
-          duration: formatCountdown(verdict.savingsSeconds),
-        });
-        return yearlyRemapAfter ? `${saves}. ${yearlyRemapAfterNote(yearlyRemapAfter)}` : saves;
-      }
-      case 'noRemapsAvailable':
-        return t('plans.optimizeConfirmNoRemaps');
-      case 'markersAtEnd':
-        return t('plans.optimizeConfirmMarkersAtEnd');
-      case 'noGain':
-        return t('plans.optimizeConfirmNoGain');
-    }
-  }
-
-  /** Remap-placement inputs shared by every optimize flow that calls `placeRemaps` (directly, or via `optimizeForMe`). */
-  function buildRemapOptions(): PlaceRemapsOptions {
-    return {
-      remapCount,
-      currentAttributes: attributes,
-      implants: effectiveImplants,
-      cloneState,
-      timedRemap: timedRemap ?? undefined,
-      // The same Boosters the computed queue schedules with, so the savings
-      // figure and the queue total cannot disagree.
-      booster:
-        activeBoosters.length > 0
-          ? { boosters: activeBoosters, startDate: new Date(queueProjection.startMs) }
-          : undefined,
-    };
-  }
-
-  /**
-   * What `optimizeAtMarkers` (via `schedulePlan`) actually reports for a
-   * candidate `(entries, markers)` pair — the SAME costing Accept's write
-   * will show afterwards, redundant-marker drop and entry-snap included.
-   * Every optimize-and-preview flow re-prices through this before showing a
-   * segment count or a savings figure, so the preview never promises a remap
-   * that Accept goes on to drop as redundant. `markers.length === 0` (every
-   * proposed remap turned out redundant) reports `schedulePlan`'s own
-   * `markersResult: null` as the same "keep current attributes" baseline
-   * `placeRemaps` itself falls back to when no remap beats it.
-   */
-  function pricedAfterApply(
-    finalEntries: readonly PlanEntry[],
-    finalMarkers: readonly number[]
-  ): { order: PlanStep[]; remaps: PlaceRemapsResult } {
-    // Override: candidate entries/markers, and `markerAttributes: []` on purpose —
-    // it matches what `applyOptimizerRemapSegments` writes (skillPlanEdit.ts), so the
-    // preview costs exactly what Accept will leave behind.
-    const finalSchedule = schedulePlanWith(schedulablePlan, scheduleInputs, loadedAtMs, {
-      entries: [...finalEntries],
-      markers: [...finalMarkers],
-      markerAttributes: [],
-    });
-    const remaps: PlaceRemapsResult = finalSchedule.markersResult ?? {
-      segments:
-        finalSchedule.scheduled.length > 0
-          ? [
-              {
-                startIndex: 0,
-                endIndex: finalSchedule.scheduled.length - 1,
-                attributes,
-                seconds: finalSchedule.totalSeconds,
-                remap: false,
-              },
-            ]
-          : [],
-      totalSeconds: finalSchedule.totalSeconds,
-      currentSeconds: finalSchedule.totalSeconds,
-      savingsSeconds: 0,
-    };
-    return { order: finalSchedule.scheduled, remaps };
-  }
-
-  // A "saves" verdict now also opens its own Accept/Reject Modal (below),
-  // beside this beside-the-button confirmation (#222) — the same pairing
-  // "Suggest reorder" already uses: an instant toast plus the Modal that
-  // holds the actual decision.
-  function handleOptimizeRemaps() {
-    if (scheduled.length === 0) return;
-    const searched = placeRemaps(scheduled, catalog.engineSkills, buildRemapOptions());
-    const patch = applyOptimizerRemapSegments(
-      editable,
-      searched.segments,
-      catalog.engineSkills,
-      trainedSkills,
-      buildRemapOptions()
-    );
-    const { remaps: result } = pricedAfterApply(editable.entries, patch.markers ?? []);
-    const verdict = remapVerdict(result, remapCount);
-    // Whether the timed (on-cooldown yearly) slot actually ended up used:
-    // every remap up to `timedRemap.remapCount` counted, not just requested.
-    const usedTimedRemap =
-      !!timedRemap && result.segments.filter((s) => s.remap).length >= timedRemap.remapCount;
-    const yearlyRemapAfter =
-      usedTimedRemap && remapInfo?.cooldownUntil ? remapInfo.cooldownUntil : undefined;
-    setOptimizeResult({
-      ...result,
-      anchorKeys: anchorKeysOf(result.segments),
-      yearlyRemapAfter,
-    });
-    setOptimizeVerdict(verdict);
-    showOptimizeConfirm(confirmRemapOutcome(verdict, yearlyRemapAfter));
-  }
-
-  /**
-   * Accept on the Optimize Remaps preview Modal: turn the SEARCH's own
-   * RemapSegments into actual Remap Markers. Its boundaries can land mid-entry
-   * (a prereq chain spanning two attribute pairs) and snap forward to the
-   * entry after it, which can leave a marker whose re-priced spread matches
-   * the one before it — `applyOptimizerRemapSegments` drops that marker,
-   * since it is the search's own proposal, never a manual one.
-   */
-  function acceptOptimizeRemaps() {
-    if (!optimizeResult) return;
-    onUpdate(
-      applyOptimizerRemapSegments(
-        editable,
-        optimizeResult.segments,
-        catalog.engineSkills,
-        trainedSkills,
-        buildRemapOptions()
-      )
-    );
-    setOptimizeResult(null);
-    setOptimizeVerdict(null);
-  }
-
-  /** Reject on the Optimize Remaps preview Modal: dismiss without applying. */
-  function rejectOptimizeRemaps() {
-    setOptimizeResult(null);
-    setOptimizeVerdict(null);
-  }
-
-  /**
-   * Priority-respecting reorder, then remap placement on that new order,
-   * previewed as one Accept/Reject. `placeRemaps` runs on the order's own
-   * re-expansion (via `schedulePlan`, the same costing `scheduled` itself
-   * goes through), not on `suggestReorder`'s raw step list: a prereq chain
-   * can straddle two attribute pairs inside one entry, so the entries
-   * `applyReorderSuggestion` reconstructs from a step order don't always
-   * re-expand to that exact same order. The preview itself is then re-priced
-   * through `pricedAfterApply` against the exact `(entries, markers)` Accept
-   * will write, so a marker `applyOptimizerRemapSegments` drops as redundant
-   * never shows up as a promised remap here either.
-   */
-  function handleOptimizeForMe() {
-    if (scheduled.length === 0) return;
-    const suggested = suggestReorder(scheduled, catalog.engineSkills, priorityMap, plan.milestones);
-    const reorderedEntries = applyReorderSuggestion(editable.entries, suggested);
-    // Override: only the reordered entries; the plan's own markers and marker
-    // attributes stay, since the new order is re-expanded before remaps are searched.
-    const reorderedSchedule = schedulePlanWith(schedulablePlan, scheduleInputs, loadedAtMs, {
-      entries: reorderedEntries,
-    });
-    const order = reorderedSchedule.scheduled;
-    const searched = placeRemaps(order, catalog.engineSkills, buildRemapOptions());
-    const patch = applyOptimizeForMe(
-      editable,
-      order,
-      searched.segments,
-      catalog.engineSkills,
-      trainedSkills,
-      buildRemapOptions()
-    );
-    setOptimizeForMePreview(
-      pricedAfterApply(patch.entries ?? reorderedEntries, patch.markers ?? [])
-    );
-  }
-
-  /** Accept on the "Optimize for me" preview Modal: one write, new order and remap markers together. */
-  function acceptOptimizeForMe() {
-    if (!optimizeForMePreview) return;
-    onUpdate(
-      applyOptimizeForMe(
-        editable,
-        optimizeForMePreview.order,
-        optimizeForMePreview.remaps.segments,
-        catalog.engineSkills,
-        trainedSkills,
-        buildRemapOptions()
-      )
-    );
-    setOptimizeForMePreview(null);
-  }
-
-  function rejectOptimizeForMe() {
-    setOptimizeForMePreview(null);
-  }
-
-  function handleOptimizeAtMarkers() {
-    if (scheduled.length === 0 || !markersVerdict) return;
-    setMarkersPanelOpen(true);
-  }
-
-  /**
-   * Accept on the Optimize at my markers preview Modal: re-costs the plan's
-   * OWN markers wholesale (a no-op on position, since this round-trips them
-   * through the same conversion `segmentsToMarkers` uses). Goes through
-   * `applyRemapSegments`, not the redundant-marker-dropping variant: these
-   * are markers the user placed themselves, and silently deleting one they
-   * placed is not this accept's call to make.
-   */
-  function acceptOptimizeAtMarkers() {
-    if (!markersAtCurrentPositions) return;
-    onUpdate(
-      applyRemapSegments(
-        editable,
-        markersAtCurrentPositions.segments,
-        catalog.engineSkills,
-        trainedSkills
-      )
-    );
-    setMarkersPanelOpen(false);
-  }
-
-  /** Reject on the Optimize at my markers preview Modal: dismiss, changing nothing. */
-  function rejectOptimizeAtMarkers() {
-    setMarkersPanelOpen(false);
   }
 
   /**
@@ -1442,252 +1148,9 @@ export function PlanEditor({
     [editable, onUpdate]
   );
 
-  /** EntryList's row menu "Add milestone…": opens the naming modal anchored to that row. */
-  const handleAddMilestone = useCallback((skillTypeID: number, level: number) => {
-    setMilestoneModal({ mode: 'add', skillTypeID, level });
-  }, []);
-
-  /** The row menu's "Rename": opens the same modal, seeded with the existing name. */
-  const handleRenameMilestone = useCallback(
-    (milestoneId: string) => {
-      const current = (plan.milestones ?? []).find((m) => m.id === milestoneId);
-      if (!current) return;
-      setMilestoneModal({ mode: 'rename', id: milestoneId, currentName: current.name });
-    },
-    [plan.milestones]
-  );
-
-  const handleRemoveMilestone = useCallback(
-    (milestoneId: string) => {
-      onUpdate({ milestones: removeMilestone(plan.milestones, milestoneId) });
-    },
-    [plan.milestones, onUpdate]
-  );
-
-  const fitGoalPickerOptions = useMemo(
-    () =>
-      fitGoalOpen
-        ? fitGoalOptions(
-            fitGoalData.records,
-            fitNeeds,
-            trainedLevels,
-            scheduled,
-            stepByKey,
-            startDate,
-            fitGoalData.unknownIds
-          )
-        : [],
-    [
-      fitGoalOpen,
-      fitGoalData.records,
-      fitGoalData.unknownIds,
-      fitNeeds,
-      trainedLevels,
-      scheduled,
-      stepByKey,
-      startDate,
-    ]
-  );
-
-  // Keeps each fit goal on the latest step its Fitting needs: follows a
-  // Fitting edit, a rename and a reorder. Only writes when something moved.
-  useEffect(() => {
-    if (!plan.milestones?.some((m) => m.fittingId !== undefined)) return;
-    const next = reanchorFitGoals(plan.milestones, fitNeeds, trainedLevels, scheduled);
-    if (next !== plan.milestones) void onUpdate({ milestones: [...(next ?? [])] });
-  }, [plan.milestones, fitNeeds, trainedLevels, scheduled, onUpdate]);
-
-  /** FitGoalModal's pick: add the Fitting's missing skills (prerequisites follow), then anchor its goal. */
-  function pickFitGoal(option: FitGoalOption) {
-    const need = fitNeeds.get(option.id);
-    if (!need || !isFitGoalPickable(option)) return;
-    const entries =
-      option.state === 'missing' ? (appendImport(editable, option.toAdd).entries ?? []) : null;
-    const known = (entries ?? plan.entries).filter((e) => catalog.engineSkills.has(e.skillTypeID));
-    let steps: PlanStep[];
-    try {
-      steps = normalizePlanWithBoundaries(known, catalog.engineSkills, trainedSkills).steps;
-    } catch {
-      return;
-    }
-    const goal = evaluateFitGoal(need.needed, trainedLevels, steps);
-    if (!goal.anchor) return;
-    onUpdate({
-      ...(entries ? { entries } : {}),
-      milestones: upsertFitGoal(plan.milestones, { id: option.id, name: need.name }, goal.anchor),
-    });
-  }
-
-  /** MilestoneModal's Save, for both 'add' and 'rename'. */
-  function submitMilestoneModal(name: string) {
-    if (!milestoneModal) return;
-    if (milestoneModal.mode === 'add') {
-      onUpdate({
-        milestones: addMilestone(
-          plan.milestones,
-          { skillTypeID: milestoneModal.skillTypeID, level: milestoneModal.level },
-          name
-        ),
-      });
-    } else {
-      onUpdate({ milestones: renameMilestone(plan.milestones, milestoneModal.id, name) });
-    }
-  }
-
   function handleAddMarker() {
     onUpdate(addRemapMarker(editable));
     showMarkerConfirm(true);
-  }
-
-  // Shared per-segment rendering for both optimize modes: a remapped segment
-  // gets the remap instruction; the leading current-attributes segment
-  // (remap: false) is labeled as "keep current attributes" instead.
-  /** Each segment's first step, by key — see `stepKey`. */
-  function anchorKeysOf(segments: readonly RemapSegment[]): (StepKey | undefined)[] {
-    return segments.map((segment) => schedule.stepKeys[segment.startIndex]);
-  }
-
-  function renderSegments(
-    segments: readonly RemapSegment[],
-    /** Resolves a segment's first step: by live-schedule key for an applied order, or directly by `startIndex` for a hypothetical one (Optimize for me's preview, not yet applied). */
-    anchorAt: (segment: RemapSegment, index: number) => PlanStep | undefined,
-    /** Set only for an Optimize Remaps run that spent the on-cooldown yearly slot. */
-    yearlyRemapAfter?: Date
-  ) {
-    const lastRemapIndex = yearlyRemapAfter
-      ? segments.reduce((last, segment, index) => (segment.remap ? index : last), -1)
-      : -1;
-    return (
-      <ul className="space-y-1">
-        {segments.map((segment, index) => {
-          const anchor = anchorAt(segment, index);
-          if (!anchor) return null;
-          return (
-            <li key={index} className="space-y-0.5 border-b border-line pb-1 last:border-b-0">
-              <div className="flex items-center justify-between gap-2">
-                <span className="font-semibold">{t('plans.segment', { index: index + 1 })}</span>
-                <span className="tabular-nums text-text-dim">
-                  {formatCountdown(segment.seconds)}
-                </span>
-              </div>
-              <p className="text-text-dim">
-                {segment.remap
-                  ? t('plans.segmentRemap', {
-                      skill: stepLabel(anchor),
-                      attributes: remapInstruction(segment.attributes, effectiveImplants),
-                    })
-                  : t('plans.segmentCurrent', { skill: stepLabel(anchor) })}
-              </p>
-              {index === lastRemapIndex && yearlyRemapAfter && (
-                <p className="text-text-dim">{yearlyRemapAfterNote(yearlyRemapAfter)}</p>
-              )}
-            </li>
-          );
-        })}
-      </ul>
-    );
-  }
-
-  /**
-   * Shared shape of the two Accept/Reject preview Modals below: like
-   * "Suggest reorder"'s Modal, this opens on every click, not only when
-   * there is something to accept. A `saves` verdict gets the figure, its
-   * segments, and both actions; every other verdict gets its explanatory
-   * text (and, for "Optimize at my markers", still its segments — see the
-   * caller) with a single dismiss action, since there is nothing to accept.
-   * `message` and `segments` are resolved by the caller rather than derived
-   * here: the same verdict `kind` reads differently depending on which
-   * action produced it (e.g. `noGain` blames the entry order for a search,
-   * but blames marker placement for markers already placed).
-   */
-  function renderRemapPreviewModal({
-    title,
-    open,
-    verdict,
-    segments,
-    message,
-    onAccept,
-    onClose,
-  }: {
-    title: string;
-    open: boolean;
-    verdict: OptimizeVerdict | null;
-    segments: {
-      segments: readonly RemapSegment[];
-      anchorKeys: readonly (StepKey | undefined)[];
-      yearlyRemapAfter?: Date;
-    } | null;
-    message: string;
-    onAccept: () => void;
-    onClose: () => void;
-  }) {
-    return (
-      <Modal open={open} onClose={onClose} title={title}>
-        {verdict && (
-          <div className="space-y-2 text-xs">
-            {verdict.kind === 'saves' ? (
-              <p className="font-semibold text-success">
-                {t('plans.remapSaves', { duration: formatCountdown(verdict.savingsSeconds) })}
-              </p>
-            ) : (
-              <p className="text-text-dim">{message}</p>
-            )}
-            {segments && (
-              <div className="max-h-56 overflow-y-auto">
-                {renderSegments(
-                  segments.segments,
-                  (_segment, index) => {
-                    const key = segments.anchorKeys[index];
-                    return key === undefined ? undefined : schedule.stepByKey.get(key);
-                  },
-                  segments.yearlyRemapAfter
-                )}
-              </div>
-            )}
-            <div className="flex gap-2">
-              {verdict.kind === 'saves' && (
-                <Button variant="primary" size="sm" onClick={onAccept}>
-                  {t('plans.remapAccept')}
-                </Button>
-              )}
-              <Button size="sm" onClick={onClose}>
-                {verdict.kind === 'saves' ? t('plans.remapReject') : t('plans.remapDismiss')}
-              </Button>
-            </div>
-          </div>
-        )}
-      </Modal>
-    );
-  }
-
-  function handleSuggestReorder() {
-    if (scheduled.length === 0) return;
-    setReorderPreview({
-      kind: 'attributes',
-      steps: suggestReorder(scheduled, catalog.engineSkills, priorityMap, plan.milestones),
-    });
-    showReorderConfirm('attributes');
-  }
-
-  /** "Shortest first": same preview/Accept-Reject flow as "Reorder only", fastest-ready-step-first instead of attribute-pair grouping. */
-  function handleSortShortest() {
-    if (scheduled.length === 0) return;
-    setReorderPreview({
-      kind: 'shortest',
-      steps: sortShortestFirst(
-        scheduled,
-        catalog.engineSkills,
-        { attributes, implants: effectiveImplants, cloneState, milestones: plan.milestones },
-        priorityMap
-      ),
-    });
-    showReorderConfirm('shortest');
-  }
-
-  function acceptReorder() {
-    if (!reorderPreview) return;
-    onUpdate(applyReorder(editable, reorderPreview.steps));
-    setReorderPreview(null);
   }
 
   /**
@@ -1745,14 +1208,7 @@ export function PlanEditor({
   }
 
   /** The Optimize menu's items, in display order — one shared shape (label, hint, disabled, handler) instead of near-identical `DropdownMenuItem` blocks. */
-  const optimizeMenuItems: {
-    key: string;
-    label: string;
-    hint: string;
-    disabled: boolean;
-    onSelect: () => void;
-    emphasize?: boolean;
-  }[] = [
+  const optimizeMenuItems: OptimizeMenuItem[] = [
     {
       key: 'for-me',
       label: t('plans.optimizeForMeItem'),
@@ -1826,56 +1282,7 @@ export function PlanEditor({
               : t('plans.remapBudgetFallback', { count: plan.remapCount })}
           </p>
           <div className="space-y-1.5">
-            {/* One Optimize control replacing three stacked buttons: "Optimize
-                for me" leads as the default item, single modes stay below it. */}
-            <DropdownMenu open={optimizeMenuOpen} onOpenChange={setOptimizeMenuOpen}>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  size="md"
-                  align="start"
-                  className="w-full"
-                  disabled={scheduled.length === 0}
-                >
-                  <span aria-hidden="true" className="shrink-0 text-text-dim">
-                    <Icon.OptimizeRemaps size={Icon.ICON_SIZE.sm} />
-                  </span>
-                  <span className="flex-1">{t('plans.optimize')}</span>
-                  <Icon.Expanded aria-hidden="true" size={Icon.ICON_SIZE.sm} />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-64">
-                {optimizeMenuItems.map((item, index) => (
-                  <Fragment key={item.key}>
-                    {/* Separates "Optimize for me" (the default) from the
-                        three single modes below it. */}
-                    {index === 1 && <DropdownMenuSeparator />}
-                    <DropdownMenuItem
-                      aria-label={item.label}
-                      aria-describedby={`${optimizeHintId}-${item.key}`}
-                      // Closes the menu itself before invoking its handler, so
-                      // Radix's own close doesn't race the Modal's focus grab —
-                      // same fix as the Export menu's onSelect workaround above.
-                      onSelect={(event) => {
-                        event.preventDefault();
-                        setOptimizeMenuOpen(false);
-                        item.onSelect();
-                      }}
-                      disabled={item.disabled}
-                    >
-                      <span className={item.emphasize ? 'block font-semibold' : 'block'}>
-                        {item.label}
-                      </span>
-                      <span
-                        id={`${optimizeHintId}-${item.key}`}
-                        className="block text-[0.6875rem] text-text-dim"
-                      >
-                        {item.hint}
-                      </span>
-                    </DropdownMenuItem>
-                  </Fragment>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <OptimizeMenu items={optimizeMenuItems} disabled={scheduled.length === 0} />
             {reorderConfirm &&
               confirmation(
                 t(
@@ -1907,7 +1314,7 @@ export function PlanEditor({
                   markersVerdict.kind === 'saves' ? 'text-xs text-success' : 'text-xs text-text-dim'
                 }
               >
-                {confirmRemapOutcome(markersVerdict)}
+                {confirmRemapOutcome(t, markersVerdict)}
               </p>
             )}
           </div>
@@ -2455,7 +1862,7 @@ export function PlanEditor({
             // A pending Undo describes a Replace this doesn't touch — see
             // confirmQueueImportAppend's comment above.
             setUndoImport(null);
-            showImportConfirm(appendedCountMessage(entries), 4000);
+            showImportConfirm(appendedCountMessage(t, trainedSkills, entries), 4000);
             setImportOpen(false);
             setImportSeed(null);
           }}
@@ -2524,87 +1931,65 @@ export function PlanEditor({
         </div>
       </Modal>
 
-      <Modal
-        open={optimizeForMePreview !== null}
-        onClose={rejectOptimizeForMe}
-        title={t('plans.optimizeForMeTitle')}
-      >
-        {optimizeForMePreview && (
-          <div className="space-y-2 text-xs">
-            <p className="font-semibold text-success">
-              {t('plans.optimizeForMeTotal', {
-                before: formatCountdown(totalSeconds),
-                after: formatCountdown(optimizeForMePreview.remaps.totalSeconds),
-              })}
-            </p>
-            <ul className="max-h-56 overflow-y-auto">
-              {optimizeForMePreview.order.map((step, i) => (
-                <li
-                  key={`${step.skillTypeID}-${step.level}-${i}`}
-                  className="border-b border-line py-1 last:border-b-0"
-                >
-                  {nameFor(step.skillTypeID)} {ROMAN[step.level - 1]}
-                </li>
-              ))}
-            </ul>
-            <div className="max-h-56 overflow-y-auto">
-              {renderSegments(
-                optimizeForMePreview.remaps.segments,
-                (segment) => optimizeForMePreview.order[segment.startIndex]
-              )}
-            </div>
-            <div className="flex gap-2">
-              <Button variant="primary" size="sm" onClick={acceptOptimizeForMe}>
-                {t('plans.remapAccept')}
-              </Button>
-              <Button size="sm" onClick={rejectOptimizeForMe}>
-                {t('plans.remapReject')}
-              </Button>
-            </div>
-          </div>
-        )}
-      </Modal>
+      <OptimizeForMeModal
+        preview={optimizeForMePreview}
+        totalSeconds={totalSeconds}
+        nameFor={nameFor}
+        stepLabel={stepLabel}
+        implants={effectiveImplants}
+        onAccept={acceptOptimizeForMe}
+        onReject={rejectOptimizeForMe}
+      />
 
-      {renderRemapPreviewModal({
-        title: t('plans.optimizeRemaps'),
-        open: optimizeResult !== null,
-        verdict: optimizeVerdict,
+      <RemapPreviewModal
+        title={t('plans.optimizeRemaps')}
+        open={optimizeResult !== null}
+        verdict={optimizeVerdict}
         // `remapNoGain` blames the entry order and points at "Suggest
         // reorder" — true only when a remap was actually weighed and lost,
         // never when there was none to spend. No segments on this branch:
         // a search that found nothing to remap has no plan-as-trained to
         // show, unlike the markers Modal below, which already has one.
-        segments: optimizeVerdict?.kind === 'saves' && optimizeResult ? optimizeResult : null,
-        message:
+        segments={optimizeVerdict?.kind === 'saves' && optimizeResult ? optimizeResult : null}
+        message={
           optimizeVerdict?.kind === 'noRemapsAvailable'
             ? t('plans.remapNoneAvailable')
-            : t('plans.remapNoGain'),
-        onAccept: acceptOptimizeRemaps,
-        onClose: rejectOptimizeRemaps,
-      })}
+            : t('plans.remapNoGain')
+        }
+        onAccept={acceptOptimizeRemaps}
+        onClose={rejectOptimizeRemaps}
+        stepByKey={schedule.stepByKey}
+        stepLabel={stepLabel}
+        implants={effectiveImplants}
+      />
 
-      {renderRemapPreviewModal({
-        title: t('plans.optimizeAtMarkers'),
-        open: markersPanelOpen && markersAtCurrentPositions !== null,
-        verdict: markersVerdict,
+      <RemapPreviewModal
+        title={t('plans.optimizeAtMarkers')}
+        open={markersPanelOpen && markersAtCurrentPositions !== null}
+        verdict={markersVerdict}
         // Segments are the plan as the markers would train it — worth
         // seeing even when the trade is poor, but not when no marker split
         // anything: the lone "keep current attributes" row would then read
         // as a contradiction of the message above it.
-        segments:
+        segments={
           markersAtCurrentPositions && markersVerdict?.kind !== 'markersAtEnd'
             ? {
                 segments: markersAtCurrentPositions.segments,
-                anchorKeys: anchorKeysOf(markersAtCurrentPositions.segments),
+                anchorKeys: anchorKeysOf(schedule.stepKeys, markersAtCurrentPositions.segments),
               }
-            : null,
-        message:
+            : null
+        }
+        message={
           markersVerdict?.kind === 'markersAtEnd'
             ? t('plans.markersAtEnd')
-            : t('plans.markersNoGain'),
-        onAccept: acceptOptimizeAtMarkers,
-        onClose: rejectOptimizeAtMarkers,
-      })}
+            : t('plans.markersNoGain')
+        }
+        onAccept={acceptOptimizeAtMarkers}
+        onClose={rejectOptimizeAtMarkers}
+        stepByKey={schedule.stepByKey}
+        stepLabel={stepLabel}
+        implants={effectiveImplants}
+      />
 
       <RemapMarkerModal
         open={editingMarkerIndex !== null}
@@ -2636,29 +2021,13 @@ export function PlanEditor({
         onSave={submitMilestoneModal}
       />
 
-      <Modal
-        open={removingEntry !== null}
+      <RemoveEntryModal
+        removing={removingEntry}
+        nameFor={nameFor}
+        focusRef={removeFocusRef}
         onClose={() => setRemovingEntry(null)}
-        title={t('plans.removeEntryConfirmTitle')}
-        returnFocusFallback={() => firstConnected(removeFocusRef.current)}
-      >
-        <p className="text-xs text-text-dim">
-          {t('plans.removeEntryConfirm', {
-            name:
-              removingEntry === null
-                ? ''
-                : `${nameFor(removingEntry.skillTypeID)} ${ROMAN[removingEntry.targetLevel - 1]}`,
-          })}
-        </p>
-        <div className="mt-3 flex justify-end gap-2">
-          <Button size="sm" onClick={() => setRemovingEntry(null)}>
-            {t('plans.cancel')}
-          </Button>
-          <Button variant="danger" size="sm" onClick={confirmRemoveEntry}>
-            {t('plans.removeEntryAction')}
-          </Button>
-        </div>
-      </Modal>
+        onConfirm={confirmRemoveEntry}
+      />
     </>
   );
 }

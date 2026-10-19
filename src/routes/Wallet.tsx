@@ -1,4 +1,5 @@
 import { NO_NAMES } from '@/lib/emptyCollections';
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -27,6 +28,7 @@ import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { GrantBanner } from '@/app/GrantNote';
 import { db } from '@/db';
+import { useCharacters } from '@/features/character/useCharacters';
 import { miningTaxPaymentHref } from '@/features/miningTax/paymentDeepLink';
 import { linkedRefIds } from '@/features/miningTax/paymentLinks';
 import {
@@ -266,9 +268,9 @@ export function Wallet() {
     );
   }, [setDrilledId, focusAfterCommit, drilledId, t]);
 
-  const allCharacters = useLiveQuery(() => db.characters.toArray(), [], []);
-  const activeCharacter = allCharacters?.find((c) => c.characterId === activeCharacterId);
-  const drilledCharacter = allCharacters?.find((c) => c.characterId === drilledId);
+  const allCharacters = useCharacters();
+  const activeCharacter = allCharacters.find((c) => c.characterId === activeCharacterId);
+  const drilledCharacter = allCharacters.find((c) => c.characterId === drilledId);
   const drilledCharacters = useMemo(
     () =>
       drilledCharacter
@@ -285,13 +287,13 @@ export function Wallet() {
   );
   const multiCharacters = useMemo(
     () =>
-      (allCharacters ?? [])
+      allCharacters
         .filter((c) => resolvedWalletFilter === 'all' || resolvedWalletFilter.has(c.characterId))
         .map((c) => ({ characterId: c.characterId, name: c.name })),
     [allCharacters, resolvedWalletFilter]
   );
   const walletFilterCandidates = useMemo(
-    () => (allCharacters ?? []).map((c) => ({ characterId: c.characterId, characterName: c.name })),
+    () => allCharacters.map((c) => ({ characterId: c.characterId, characterName: c.name })),
     [allCharacters]
   );
   /**
@@ -487,7 +489,7 @@ export function Wallet() {
   );
   const personalNameFor = useMemo(() => typeNameLookup(personalTypeNames), [personalTypeNames]);
   const characterNameFor = useMemo(() => {
-    const names = new Map((allCharacters ?? []).map((c) => [c.characterId, c.name]));
+    const names = new Map(allCharacters.map((c) => [c.characterId, c.name]));
     return (id: number) => names.get(id) ?? `#${id}`;
   }, [allCharacters]);
   // Journal lines a pilot linked to a Moon Mining Tax payment get a way back
@@ -597,11 +599,11 @@ export function Wallet() {
     [journalRows, trackedIds, personalLinkFor]
   );
   const journalCoverageInfo = useMemo(() => {
-    if ((allCharacters?.length ?? 0) < 2) return undefined;
+    if (allCharacters.length < 2) return undefined;
     return allJournalsData
       ? journalCoverage(multiCharacters, new Set(allJournalsData.loaded.map((c) => c.characterId)))
       : journalCoverage(
-          (allCharacters ?? []).map((c) => ({ characterId: c.characterId, name: c.name })),
+          allCharacters.map((c) => ({ characterId: c.characterId, name: c.name })),
           trackedIds
         );
   }, [allCharacters, allJournalsData, multiCharacters, trackedIds]);
@@ -641,7 +643,7 @@ export function Wallet() {
       : highlightedEntryId;
   const journalScopeLabel = !showingBeyondActive
     ? t('character.filter.thisCharacter')
-    : multiCharacters.length === (allCharacters?.length ?? 0)
+    : multiCharacters.length === allCharacters.length
       ? t('character.filter.allCharacters')
       : multiCharacters.length === 1
         ? t('character.scope.one', { name: multiCharacters[0].name })
@@ -783,7 +785,7 @@ export function Wallet() {
                   headingRef={panelHeadingRef}
                   stats={
                     <div>
-                      <p className="flex items-center gap-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                      <p className={cx(eyebrowClassName, 'flex items-center gap-1')}>
                         {t('wallet.everMarks')}
                         <InfoTooltip
                           label={t('wallet.everMarksTooltipLabel')}

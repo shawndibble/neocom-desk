@@ -11,7 +11,7 @@
 // device's upload replaces only its own unfired rows for each Character
 // (issue #2240) — see projectionStore.ts, which holds the Firestore side.
 
-import { ProjectionRowInput } from './registerDevice.js';
+import type { ProjectionRowInput } from './projectionRow.js';
 
 /**
  * One row as stored in the `projections` collection, doc id

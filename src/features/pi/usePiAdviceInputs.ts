@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import type { RebuildPreference } from '@/engine/pi/planAdvice';
 import type { RouteSystem } from '@/engine/pi/planHaul';
-import { routeExposure } from '@/features/route/routeExposure';
+import { localRoutesFromOrigin } from '@/features/route/localRoute';
+import { loadSolarSystemsById } from '@/sde/solarSystems';
 import { useJumpBasis } from '@/features/route/jumpBasis';
 import { useCadence } from './cadencePref';
 import { loadCommandCenterUpgrades } from './colonyBudget';
@@ -12,6 +13,8 @@ import type { PlanPrices } from './planPrices';
 import { loadInterplanetaryConsolidation } from './planetSlots';
 import { usePlanetRichness } from './richnessOverride';
 import { useSellHub } from './sellHub';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 export type PiAdviceInputsState =
   | { status: 'loading' }
@@ -48,61 +51,39 @@ export function usePiAdviceInputs(
 ): PiAdviceInputsState {
   const { hub, buybackPct } = useSellHub();
   const cadence = useCadence((state) => state.value);
-  const hydrateCadence = useCadence((state) => state.hydrate);
   const goalPrefs = useGoalPlannerPrefs((state) => state.value);
-  const hydrateGoalPrefs = useGoalPlannerPrefs((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateCadence();
-    void hydrateGoalPrefs();
-  }, [hydrateCadence, hydrateGoalPrefs]);
+  useHydratedStore(useCadence, useGoalPlannerPrefs);
 
   const richness = usePlanetRichness(characterId);
 
   const pi = snapshot?.pi ?? null;
   // Keyed by hub only: a refresh of the colonies keeps the last prices on
   // screen instead of blanking every figure while they are read again.
-  const [priced, setPriced] = useState<{ hubId: string; prices: PlanPrices | null } | null>(null);
-  useEffect(() => {
-    if (!pi) return;
-    let cancelled = false;
-    loadGoalPlannerPrices(hub, pi).then(
-      (prices) => {
-        if (!cancelled) setPriced({ hubId: hub.id, prices });
-      },
-      () => {
-        if (!cancelled) setPriced({ hubId: hub.id, prices: null });
-      }
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [pi, hub, reloadKey]);
-  const pricedNow = priced?.hubId === hub.id ? priced : null;
-  const prices = pricedNow?.prices ?? null;
+  // `reloadKey` re-reads them: it is a dependency of the loader on purpose.
+  const loadPrices = useCallback(
+    () => (pi ? loadGoalPlannerPrices(hub, pi) : Promise.reject(new Error('no snapshot'))),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `reloadKey` is the caller's "read again" signal, not read by the loader.
+    [pi, hub, reloadKey]
+  );
+  const pricedLoad = useKeyedLoad(pi ? hub.id : null, loadPrices);
+  const pricedNow =
+    pricedLoad.status === 'idle' || pricedLoad.status === 'loading' ? null : pricedLoad;
+  const prices = pricedLoad.data ?? null;
   const pricesFailed = pricedNow !== null && (prices === null || prices.failed);
 
   const nowMs = snapshot?.nowMs ?? null;
   // Keyed by character: a re-read of the colonies keeps the last skills too.
-  const [skillsFor, setSkillsFor] = useState<{ characterId: number; skills: Skills } | null>(null);
-  useEffect(() => {
-    if (characterId === null || nowMs === null) return;
-    let cancelled = false;
-    void Promise.all([
+  const loadSkills = useCallback(async (): Promise<Skills> => {
+    if (characterId === null || nowMs === null) throw new Error('no character');
+    const [commandCenterUpgrades, interplanetaryConsolidation] = await Promise.all([
       loadCommandCenterUpgrades(characterId, nowMs).catch(() => null),
       loadInterplanetaryConsolidation(characterId, nowMs).catch(() => null),
-    ]).then(([commandCenterUpgrades, interplanetaryConsolidation]) => {
-      if (!cancelled) {
-        setSkillsFor({
-          characterId,
-          skills: { commandCenterUpgrades, interplanetaryConsolidation },
-        });
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
+    ]);
+    return { commandCenterUpgrades, interplanetaryConsolidation };
   }, [characterId, nowMs]);
-  const skills = skillsFor?.characterId === characterId ? skillsFor.skills : null;
+  const skills =
+    useKeyedLoad(characterId !== null && nowMs !== null ? String(characterId) : null, loadSkills)
+      .data ?? null;
 
   const basis = useJumpBasis();
   const colonies = snapshot?.colonies;
@@ -114,41 +95,39 @@ export function usePiAdviceInputs(
     [colonies]
   );
   const routesKey = `${basis.key}|${hub.systemId}|${systemKey}`;
-  const [routed, setRouted] = useState<{
-    key: string;
-    routes: Map<number, RouteSystem[] | null>;
-  } | null>(null);
-  useEffect(() => {
-    if (buybackPct !== null || !basis.hydrated || systemKey === '') return;
-    let cancelled = false;
-    const ids = systemKey.split(',').map(Number);
-    void Promise.all(
-      ids.map((id) =>
-        routeExposure(id, hub.systemId, basis.rules, basis.network)
-          .then((result): RouteSystem[] | null =>
-            result.kind === 'known'
-              ? result.path.map((system) => ({
-                  systemId: system.systemId,
-                  security: system.security,
-                }))
-              : null
-          )
-          .catch(() => null)
-      )
-    ).then((routes) => {
-      if (!cancelled) {
-        setRouted({ key: routesKey, routes: new Map(ids.map((id, i) => [id, routes[i]])) });
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [basis, hub.systemId, systemKey, routesKey, buybackPct]);
-  const routes = routed?.key === routesKey ? routed.routes : undefined;
+  const loadRoutes = useCallback(async () => {
+    const ids = systemKey === '' ? [] : systemKey.split(',').map(Number);
+    // One sweep out of the hub answers every colony, not a search per colony.
+    const [swept, systems] = await Promise.all([
+      localRoutesFromOrigin(hub.systemId, ids, basis.rules, basis.network).catch(() => null),
+      loadSolarSystemsById().catch(() => null),
+    ]);
+    return new Map<number, RouteSystem[] | null>(
+      ids.map((id) => {
+        const path = swept?.kind === 'known' ? swept.routes.get(id) : null;
+        return [
+          id,
+          path && systems
+            ? path.map((systemId) => ({
+                systemId,
+                security: systems.get(systemId)?.security ?? null,
+              }))
+            : null,
+        ];
+      })
+    );
+  }, [basis.rules, basis.network, hub.systemId, systemKey]);
+  const routes = useKeyedLoad(
+    routesKey,
+    loadRoutes,
+    buybackPct !== null || !basis.hydrated || systemKey === ''
+  ).data;
 
   return useMemo((): PiAdviceInputsState => {
     if (!snapshot) return { status: 'loading' };
     const usable = pricesFailed ? null : prices;
+    // Hold until the routes settle: ready-without-routes would run the whole advice model, then run it again with them.
+    if (buybackPct === null && systemKey !== '' && !routes) return { status: 'loading' };
     if (!skills || !richness) {
       return pricesFailed ? { status: 'prices-failed', input: null } : { status: 'loading' };
     }
@@ -183,6 +162,7 @@ export function usePiAdviceInputs(
     buybackPct,
     preference,
     routes,
+    systemKey,
     hub.systemName,
   ]);
 }

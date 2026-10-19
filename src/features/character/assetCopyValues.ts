@@ -29,14 +29,14 @@ export type LoadBlueprints = () => Promise<
 >;
 
 /**
- * Imported on demand: it pulls in Firestore, which a page without copies
- * never needs. BPOs ride along so the engine can tell a contract
+ * Imported on demand: it pulls in the R2 snapshot reader and the SDE
+ * blueprints, which a page without copies never needs. BPOs ride along so the engine can tell a contract
  * selling a copy beside its original apart from one selling copies alone.
  */
-async function loadCopyOffers(characterId: number): Promise<readonly BpcContractRow[]> {
+async function loadCopyOffers(): Promise<readonly BpcContractRow[]> {
   try {
     const { loadBpcOfferRows } = await import('@/features/bpcContracts/bpcOfferRows');
-    return (await loadBpcOfferRows(characterId)) ?? [];
+    return (await loadBpcOfferRows()) ?? [];
   } catch {
     return [];
   }

@@ -13,6 +13,7 @@ import {
 } from '@/esi/cachePurge';
 import { revokedScopes } from '@/esi/scopes';
 import { ALERTS_SCOPE } from './alertsScope';
+import { CORP_SYNC_SCOPES } from './corpSyncScopes';
 
 export interface SsoConfig {
   clientId?: string;
@@ -100,11 +101,14 @@ interface PendingLogin {
  * Character's full-scope session with a token that can read nothing else.
  * `characterId` is the Settings row that was pressed; EVE's own page lets the
  * user pick any Character, so the callback compares.
+ *
+ * A Corp Tax Book sync grant (ADR 0025) is the same shape of round trip: its
+ * refresh token goes to the server, never into a device session. `corporationId`
+ * is the book it was pressed from.
  */
-export interface LoginIntent {
-  kind: 'alerts';
-  characterId: number;
-}
+export type LoginIntent =
+  | { kind: 'alerts'; characterId: number }
+  | { kind: 'corpSync'; characterId: number; corporationId: number };
 
 /**
  * Which way a login failed. The callback route recovers from these rather
@@ -150,6 +154,23 @@ export function startLogin(scopes: string[], config?: SsoConfig): Promise<string
  */
 export function startAlertsLogin(characterId: number, config?: SsoConfig): Promise<string> {
   return beginLogin([ALERTS_SCOPE], config, { kind: 'alerts', characterId });
+}
+
+/**
+ * A Corp Tax Book sync grant round trip (ADR 0025) for one book editor and one
+ * corporation: the grant's scopes only, marked so the callback never persists it
+ * as a login. Like `startAlertsLogin`, it leaves `INTENT_KEY` alone.
+ */
+export function startCorpSyncLogin(
+  characterId: number,
+  corporationId: number,
+  config?: SsoConfig
+): Promise<string> {
+  return beginLogin([...CORP_SYNC_SCOPES], config, {
+    kind: 'corpSync',
+    characterId,
+    corporationId,
+  });
 }
 
 async function beginLogin(
@@ -446,7 +467,17 @@ function readPendingLogin(key: string, allowExpired = false): PendingLogin | und
     createdAt,
     ...(intent?.kind === 'alerts' && typeof intent.characterId === 'number'
       ? { intent: { kind: 'alerts', characterId: intent.characterId } satisfies LoginIntent }
-      : {}),
+      : intent?.kind === 'corpSync' &&
+          typeof intent.characterId === 'number' &&
+          typeof intent.corporationId === 'number'
+        ? {
+            intent: {
+              kind: 'corpSync',
+              characterId: intent.characterId,
+              corporationId: intent.corporationId,
+            } satisfies LoginIntent,
+          }
+        : {}),
   };
 }
 
@@ -619,16 +650,42 @@ export async function completeAlertsLogin(
   params: { code: string; state: string },
   config?: SsoConfig
 ): Promise<AlertsLoginResult> {
+  const { intent, ...result } = await completeIntentLogin(params, 'alerts', config);
+  void intent;
+  return result;
+}
+
+/** What a Corp Tax Book sync grant round trip came back with. Nothing here has been stored. */
+export interface CorpSyncLoginResult extends AlertsLoginResult {
+  /** The book the grant was pressed from. */
+  corporationId: number;
+}
+
+/** Handle the callback of a sync grant round trip: like `completeAlertsLogin`, storing nothing. */
+export async function completeCorpSyncLogin(
+  params: { code: string; state: string },
+  config?: SsoConfig
+): Promise<CorpSyncLoginResult> {
+  const { intent, ...result } = await completeIntentLogin(params, 'corpSync', config);
+  return { ...result, corporationId: (intent as { corporationId: number }).corporationId };
+}
+
+async function completeIntentLogin(
+  params: { code: string; state: string },
+  kind: LoginIntent['kind'],
+  config?: SsoConfig
+): Promise<AlertsLoginResult & { intent: LoginIntent }> {
   const { clientId } = resolveConfig(config);
   const { key, pending } = pendingForCallback(params.state);
   removeStorage(key);
-  if (pending.intent?.kind !== 'alerts')
-    throw new LoginError('state-mismatch', 'Not an Alerts login');
+  if (pending.intent?.kind !== kind)
+    throw new LoginError('state-mismatch', 'Not this kind of login');
 
   const tokens = await exchangeCode({ clientId, code: params.code, verifier: pending.verifier });
   if (!tokens.refresh_token) throw new Error('Token response omitted refresh_token');
   const decoded = decodeAccessToken(tokens.access_token);
   return {
+    intent: pending.intent,
     expectedCharacterId: pending.intent.characterId,
     characterId: decoded.characterId,
     name: decoded.name,

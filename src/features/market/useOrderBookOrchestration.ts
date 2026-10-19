@@ -12,27 +12,19 @@
  * Browser tab's own branch and read `orderBookLocation`/`refreshTick` from
  * here regardless of which tab is showing.
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useRememberedUrlParams, useUrlParam, type RememberedDefaults } from '@/lib/useUrlState';
-import { boolParam, enumParam, enumSetParam, intParam, type UrlParamCodec } from '@/lib/urlState';
-import { JUMP_RANGES, DEFAULT_JUMP_RANGE, type JumpRange } from '@/engine/route/jumpRange';
-import { SPACE_KINDS, type SpaceKind } from '@/engine/space';
+
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useUrlParam } from '@/lib/useUrlState';
+import type { UrlParamCodec } from '@/lib/urlState';
 import { intersectSystemSets, systemsInSpace } from '@/engine/market/orderBookFilters';
-import {
-  useCurrentSystem,
-  useJumpRangeFilter,
-  type CurrentSystemState,
-  type JumpRangeFilter,
-} from '@/features/route/currentSystem';
-import { useBrowserFilterSetting } from '@/features/market/browserFilterSetting';
-import { ORDER_BOOK_FANOUT_CONCURRENCY } from '@/features/market/orderBook';
+import type { CurrentSystemState, JumpRangeFilter } from '@/features/route/currentSystem';
+import { useBrowserFilters, type BrowserFilterValue } from '@/features/market/useBrowserFilters';
+import { useOrderBookFetch } from '@/features/market/useOrderBookFetch';
+import { useVariations } from '@/features/market/useVariations';
 import {
   buildOrderBookView,
   clearOrderBookViewCache,
   clearOrderBookViewCacheAcross,
-  fetchOrderBook,
-  fetchOrderBookAcross,
-  loadOrderBookView,
   orderBookLocationFor,
   useGlobalMarketOverrides,
   type OrderBookFetch,
@@ -41,32 +33,27 @@ import {
   type LoadedOrderBookView,
 } from '@/features/market/orderBookView';
 import type { RegionOrder } from '@/esi/endpoints';
-import { mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { loadAllCharactersOpenOrders } from '@/features/market/openOrdersData';
+import { ownOrderIdSet } from '@/features/market/openOrdersModel';
 import {
-  regionsForSystems,
   resolveOrderBookRegion,
   type GlobalMarketOverride,
   type ResolvedOrderBookRegion,
 } from '@/engine/market/locationMode';
-import { getVariationRows, type VariationsResult } from '@/features/market/variations';
+import type { VariationsResult } from '@/features/market/variations';
 import { resolveOrderLocation, type OrderBookSummary } from '@/engine/market/orderBook';
-import type { VariationIndex } from '@/engine/market/variations';
 import {
   bookDepth,
   sortBookSide,
   withoutBaitSells,
   type DepthAt,
 } from '@/engine/market/orderBookDepth';
-import { useLazyRowCache } from '@/lib/useLazyRowCache';
+import type { MarketCatalogue } from '@/features/market/useMarketCatalogue';
 import type { TradeHub } from '@/market/hubs';
 import type { MarketLocationParam } from '@/engine/market/urlState';
-import type {
-  MarketTypeEntry,
-  NpcStationEntry,
-  SolarSystemEntry,
-  MarketRegionEntry,
-} from '@/sde/marketTypes';
+import type { MarketTypeEntry } from '@/sde/marketTypes';
+
+export type { BrowserFilterValue };
 
 /** Stand-in until globalMarkets.json settles; the order book waits for the real one. */
 const NO_GLOBAL_MARKETS: ReadonlyMap<number, GlobalMarketOverride> = new Map();
@@ -82,32 +69,6 @@ const STATION_FILTER_PARAM: UrlParamCodec<number | null> = {
   serialize: (value) => (value === null ? null : String(value)),
 };
 
-/**
- * The order book's filter bar — Jump Range, Security, Min quantity, NPC
- * stations only — as one `useUrlParams` group, so the narrow sheet's Apply
- * lands every changed field in one write rather than four writers racing in
- * one tick (see `navigateTo` in `useMarketBrowser.ts`). Each field's stored
- * default (`browserFilterSetting.ts`) sits behind the URL via
- * `useRememberedUrlParams`, so a filter set once survives a reload or a
- * fresh visit with no matching query string — same pattern as Location
- * Mode/Trade Hub in `useMarketBrowser.ts`.
- */
-const BROWSER_FILTER_PARAMS = {
-  'browser.jumps': enumParam(JUMP_RANGES, DEFAULT_JUMP_RANGE),
-  'browser.sec': enumSetParam(SPACE_KINDS),
-  'browser.minQty': intParam(0, { min: 0 }),
-  'browser.npcOnly': boolParam(),
-  'browser.hideBait': boolParam(),
-};
-
-export interface BrowserFilterValue {
-  jumps: JumpRange;
-  sec: ReadonlySet<SpaceKind>;
-  minQty: number;
-  npcOnly: boolean;
-  hideBait: boolean;
-}
-
 export interface UseOrderBookOrchestrationArgs {
   selectedTypeId: number | null;
   selectedItem: MarketTypeEntry | null;
@@ -117,18 +78,8 @@ export interface UseOrderBookOrchestrationArgs {
   chosenRegionId: number;
   hubHydrated: boolean;
   locationModeHydrated: boolean;
-  catalogueError: boolean;
+  catalogue: MarketCatalogue;
   ensureBlueprintCatalog: () => void;
-  npcStations: NpcStationEntry[] | null;
-  solarSystems: SolarSystemEntry[] | null;
-  marketRegions: MarketRegionEntry[] | null;
-  allMarketRegionIds: number[];
-  systemRegions: ReadonlyMap<number, { regionId: number }>;
-  typesByGroup: ReadonlyMap<number, MarketTypeEntry[]>;
-  typesById: ReadonlyMap<number, MarketTypeEntry>;
-  variationIndex: VariationIndex;
-  npcStationMap: ReadonlyMap<number, { name: string; systemId: number }>;
-  solarSystemMap: ReadonlyMap<number, { name: string; security: number }>;
   t: (key: string, opts?: Record<string, unknown>) => string;
 }
 
@@ -202,31 +153,30 @@ export function useOrderBookOrchestration({
   chosenRegionId,
   hubHydrated,
   locationModeHydrated,
-  catalogueError,
+  catalogue,
   ensureBlueprintCatalog,
-  npcStations,
-  solarSystems,
-  marketRegions,
-  allMarketRegionIds,
-  systemRegions,
-  typesByGroup,
-  typesById,
-  variationIndex,
-  npcStationMap,
-  solarSystemMap,
   t,
 }: UseOrderBookOrchestrationArgs): OrderBookOrchestration {
+  const {
+    catalogueError,
+    npcStations,
+    solarSystems,
+    marketRegions,
+    allMarketRegionIds,
+    systemRegions,
+    typesByGroup,
+    typesById,
+    variationIndex,
+    npcStationMap,
+    solarSystemMap,
+  } = catalogue;
+
   // Loaded independently, not with the SDE catalogue: the order book waits
   // only on this (never on the whole SDE catalogue), and a failed read
   // settles to no overrides rather than leaving the book waiting forever.
   const globalMarkets = useGlobalMarketOverrides();
   const globalMarketsMap = globalMarkets ?? NO_GLOBAL_MARKETS;
 
-  // The selected item's settled fetch, null until it lands. The view itself is
-  // derived below, so the "filter to this station" action narrows it in place
-  // without another request.
-  const [orderBookFetch, setOrderBookFetch] = useState<OrderBookFetch | null>(null);
-  const [orderBookLoading, setOrderBookLoading] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
   // Every authenticated character's own open order ids, across every item —
   // not scoped to the selected type, since matching is by order_id against
@@ -241,86 +191,25 @@ export function useOrderBookOrchestration({
   // round 10); undone via the banner rendered above the tables. URL-backed
   // (ADR 0015), scoped to the Browser tab.
   const [stationFilter, setStationFilter] = useUrlParam('browser.station', STATION_FILTER_PARAM);
-  // The order book's filter bar. The Jump Range applies in every mode: set,
-  // it replaces the header's hub or region with every region in reach.
-  // Security and NPC stations only apply only once the book spans stations —
-  // Region mode, or a set range — since Hub mode alone is one NPC station;
-  // otherwise they're neither shown nor applied, whatever the URL says. Min
-  // quantity applies in both. All narrow the book next to the station filter,
-  // see `orderBookView.ts`'s `allowedSystems`/`minQuantity`/`npcStationIds`.
-  const browserFilterSettingValue = useBrowserFilterSetting((state) => state.value);
-  const browserFilterSettingHydrated = useBrowserFilterSetting((state) => state.hydrated);
-  const hydrateBrowserFilterSetting = useBrowserFilterSetting((state) => state.hydrate);
-  const setBrowserFilterSettingValue = useBrowserFilterSetting((state) => state.setValue);
-  useEffect(() => {
-    void hydrateBrowserFilterSetting();
-  }, [hydrateBrowserFilterSetting]);
-  const rememberedBrowserFilters: RememberedDefaults<typeof BROWSER_FILTER_PARAMS> = useMemo(
-    () => ({
-      values: {
-        'browser.jumps': browserFilterSettingValue.jumps,
-        'browser.sec': browserFilterSettingValue.sec,
-        'browser.minQty': browserFilterSettingValue.minQty,
-        'browser.npcOnly': browserFilterSettingValue.npcOnly,
-        'browser.hideBait': browserFilterSettingValue.hideBait,
-      },
-      hydrated: browserFilterSettingHydrated,
-      remember: (patch) => {
-        void setBrowserFilterSettingValue({
-          jumps: patch['browser.jumps'] ?? browserFilterSettingValue.jumps,
-          sec: patch['browser.sec'] ?? browserFilterSettingValue.sec,
-          minQty: patch['browser.minQty'] ?? browserFilterSettingValue.minQty,
-          npcOnly: patch['browser.npcOnly'] ?? browserFilterSettingValue.npcOnly,
-          hideBait: patch['browser.hideBait'] ?? browserFilterSettingValue.hideBait,
-        });
-      },
-    }),
-    [browserFilterSettingValue, browserFilterSettingHydrated, setBrowserFilterSettingValue]
-  );
-  const [browserFilters, setBrowserFilters] = useRememberedUrlParams(
-    BROWSER_FILTER_PARAMS,
-    rememberedBrowserFilters
-  );
+
   const regionMode = effectiveLocation.mode === 'region';
-  const jumpRange = browserFilters['browser.jumps'];
-  const spaceKinds = browserFilters['browser.sec'];
-  const minQuantity = browserFilters['browser.minQty'];
-  const rangeSet = jumpRange !== DEFAULT_JUMP_RANGE;
-  const spansStations = regionMode || rangeSet;
-  const npcOnly = spansStations && browserFilters['browser.npcOnly'];
-  const hideBait = browserFilters['browser.hideBait'];
-  const currentSystem = useCurrentSystem();
-  const jumpRangeFilter = useJumpRangeFilter(currentSystem, jumpRange);
-  // A set range fans out like All regions, over every region in reach — once
-  // it can be measured. Unmeasurable (no origin, no graph), the book falls
-  // back to the header's hub or region and the note says why.
-  const rangeWaiting = rangeSet && jumpRangeFilter.status === 'loading';
-  const rangeAcross = rangeSet && jumpRangeFilter.status === 'ready';
-  const rangeReaches = rangeAcross || rangeWaiting;
+  const filters = useBrowserFilters(regionMode);
+  const {
+    currentSystem,
+    jumpRangeFilter,
+    rangeAcross,
+    rangeReaches,
+    spansStations,
+    spaceKinds,
+    minQuantity,
+    npcOnly,
+    hideBait,
+  } = filters;
   const fetchesAcross = allRegions || rangeReaches;
 
-  // `allRegions` apart from `chosenRegionId`: The Forge → All regions with
-  // Jita as hub is the same region id, yet a different book.
   // A range that reaches out ignores the header's hub and region entirely, so
   // changing them (or the range resolving) is no new book.
   const resetKey = `${selectedTypeId ?? 'none'}:${rangeReaches ? 'range' : `${chosenRegionId}:${allRegions ? 'all' : 'one'}`}`;
-  const [resetForKey, setResetForKey] = useState<string | null>(null);
-  if (resetKey !== resetForKey) {
-    setResetForKey(resetKey);
-    setSellShowAll(false);
-    setBuyShowAll(false);
-    setOrderBookFetch(null);
-    // `browser.station` clears in `navigateTo` itself, not here — every path
-    // that changes `resetKey` goes through it, and clearing it here too was a
-    // second, independent `useUrlParams` writer landing in the same render as
-    // `navigateTo`'s own write, which silently dropped one of the two.
-    // Set in the same render as the reset above, not left for the fetch
-    // effect a tick later — otherwise the one commit in between paints
-    // `orderBookLoading: false` alongside the just-cleared `orderBookFetch`,
-    // which the table below reads as "loaded, and empty" and flashes the
-    // empty state before the spinner.
-    if (selectedTypeId !== null) setOrderBookLoading(true);
-  }
 
   // Independent of the catalogue and order-book loads: a character with no
   // orders scope, or with no characters signed in at all, simply resolves to
@@ -333,11 +222,7 @@ export function useOrderBookOrchestration({
     void loadAllCharactersOpenOrders()
       .then((snapshot) => {
         if (cancelled) return;
-        const ids = new Set<number>();
-        for (const entry of snapshot.entries) {
-          for (const order of entry.orders) ids.add(order.order_id);
-        }
-        setMyOrderIds(ids);
+        setMyOrderIds(ownOrderIdSet(snapshot));
       })
       .catch(() => {
         // Leaves myOrderIds at whatever it was — a failed fetch must not
@@ -377,84 +262,24 @@ export function useOrderBookOrchestration({
   const hubRegionName =
     marketRegions?.find((r) => r.id === effectiveHub.regionId)?.name ?? effectiveHub.systemName;
 
-  // All regions' (or a set range's) fan-out: every Market Region the picker
-  // lists, or — once a Jump Range is measurable — only those holding an
-  // in-range system, so "within 5 jumps" costs a few regions, not every one.
-  // Waits (null) while the range is still resolving rather than firing every
-  // region and then a few. Keyed by a joined string so an unchanged set never
-  // refetches.
-  const allRegionsFetchKey = useMemo((): string | null => {
-    if (!fetchesAcross || marketRegions === null || jumpRangeFilter.status === 'loading')
-      return null;
-    if (jumpRangeFilter.status === 'ready' && jumpRangeFilter.allowed !== null) {
-      const inReach = regionsForSystems(jumpRangeFilter.allowed, systemRegions);
-      return allMarketRegionIds.filter((id) => inReach.has(id)).join(',');
-    }
-    return allMarketRegionIds.join(',');
-  }, [fetchesAcross, marketRegions, jumpRangeFilter, systemRegions, allMarketRegionIds]);
-  const allRegionsFetchIds = useMemo(
-    () =>
-      allRegionsFetchKey === null
-        ? null
-        : allRegionsFetchKey === ''
-          ? []
-          : allRegionsFetchKey.split(',').map(Number),
-    [allRegionsFetchKey]
-  );
-
-  // Refetches on selection, location, or a manual Refresh click. Gated on all
-  // three *Hydrated flags so this doesn't fire once for the defaults and
-  // again once the persisted settings resolve — for All Regions with a
-  // persisted Jump Range especially, firing once against every region (the
-  // pre-hydration default) and then again against the narrowed in-range set
-  // would cost a slow, wasted full fan-out on every visit. `fetchOrderBook`
-  // never rejects: a 420 or an Error Budget refusal settles as `'failed'`,
-  // which renders its own state rather than an empty book or a spinner that
-  // never clears.
-  useEffect(() => {
-    // Also waits for globalMarkets.json to settle (success or failure):
-    // before it does, a Global Market Region item (a PLEX deep link) would be
-    // read from the wrong region.
-    if (
-      selectedTypeId === null ||
-      !hubHydrated ||
-      !locationModeHydrated ||
-      !browserFilterSettingHydrated ||
-      globalMarkets === null
-    )
-      return;
-    // Waits for the region list and the range (see `allRegionsFetchKey`).
-    if (fetchesAcross && allRegionsFetchIds === null) return;
-    let cancelled = false;
-    void (async () => {
-      setOrderBookLoading(true);
-      const fetched =
-        allRegionsFetchIds !== null
-          ? await fetchOrderBookAcross(
-              selectedTypeId,
-              allRegionsFetchIds,
-              bookLocation,
-              () => cancelled
-            )
-          : await fetchOrderBook(selectedTypeId, bookLocation);
-      if (cancelled) return;
-      setOrderBookFetch(fetched);
-      setOrderBookLoading(false);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [
+  // Gated on the hydrated flags and globalMarkets.json settling (success
+  // or failure) — see `useOrderBookFetch`.
+  const { orderBookFetch, orderBookLoading } = useOrderBookFetch({
     selectedTypeId,
     bookLocation,
+    resetKey,
+    onReset: () => {
+      setSellShowAll(false);
+      setBuyShowAll(false);
+    },
+    ready: hubHydrated && locationModeHydrated && filters.hydrated && globalMarkets !== null,
     fetchesAcross,
-    allRegionsFetchIds,
-    hubHydrated,
-    locationModeHydrated,
-    browserFilterSettingHydrated,
-    globalMarkets,
+    jumpRangeFilter,
+    marketRegions,
+    allMarketRegionIds,
+    systemRegions,
     refreshTick,
-  ]);
+  });
 
   // Location Mode, Trade Hub station, the order-row "filter to this station"
   // action (GLOSSARY.md round 10), the filter bar, split and sort all happen
@@ -555,145 +380,27 @@ export function useOrderBookOrchestration({
     return location.stationName ?? t('market.unknownStructure');
   }, [stationFilter, orderBookFetch, npcStationMap, solarSystemMap, t]);
 
-  const browserFilterValue = useMemo<BrowserFilterValue>(
-    () => ({
-      jumps: jumpRange,
-      sec: spaceKinds,
-      minQty: minQuantity,
-      npcOnly: browserFilters['browser.npcOnly'],
-      hideBait,
-    }),
-    [jumpRange, spaceKinds, minQuantity, browserFilters, hideBait]
-  );
-  // Only what this mode shows counts: a Security filter left in the URL does
-  // nothing on a one-station Hub book, so badging it would claim a filter that
-  // isn't on.
-  const activeFilterCount = [
-    rangeSet,
-    spansStations && spaceKinds.size !== SPACE_KINDS.length,
-    minQuantity > 0,
-    npcOnly,
-    hideBait,
-  ].filter(Boolean).length;
   // Hide bait sells counts on the badge but never empties a side: the best
   // sell can't be bait against itself, and buys are never hidden — so an
   // empty book is no reason to blame it.
-  const filtersNarrowBook = activeFilterCount > (hideBait ? 1 : 0) || stationFilter !== null;
-  function handleBrowserFiltersChange(next: BrowserFilterValue) {
-    setBrowserFilters({
-      'browser.jumps': next.jumps,
-      'browser.sec': next.sec,
-      'browser.minQty': next.minQty,
-      'browser.npcOnly': next.npcOnly,
-      'browser.hideBait': next.hideBait,
-    });
-  }
+  const filtersNarrowBook =
+    filters.activeFilterCount > (hideBait ? 1 : 0) || stationFilter !== null;
 
   const failedRegionCount = loadedView?.failedRegionIds.length ?? 0;
-  // Only "can't measure" earns a line: a range that applies needs no caption.
-  const jumpNoteShown =
-    rangeSet && (jumpRangeFilter.status === 'no-origin' || jumpRangeFilter.status === 'unknown');
 
-  // Variations (GLOSSARY.md round 6): the selected item's Tech/Meta/Faction
-  // variation group, falling back to Market Group siblings, re-anchored
-  // whenever selectedItem changes — including a click on a row itself, which
-  // just becomes the new selectedItem.
-  const variationsResult = useMemo(
-    () =>
-      selectedItem ? getVariationRows(variationIndex, typesByGroup, typesById, selectedItem) : null,
-    [variationIndex, typesByGroup, typesById, selectedItem]
-  );
-  // Latest-ref pattern (useCompareRows.ts): handleRefresh reads this value
-  // only on click, well after it settles — a ref sidesteps the ordering
-  // entirely instead of asking the render function to read ahead.
-  const variationsResultRef = useRef(variationsResult);
-  useEffect(() => {
-    variationsResultRef.current = variationsResult;
-  });
-
-  // Per-row price cache for the Variations table (`useLazyRowCache`), keyed
-  // by typeId AND the location signal (region/mode/station/stationFilter) —
-  // not typeId alone — so changing any of those reads as a brand new key
-  // with nothing cached yet: the table goes blank the instant the row set or
-  // the location changes, the same render, with no Effect-delayed flash of
-  // the old item's prices under the new one. refreshTick deliberately isn't
-  // part of the key: a manual refresh reuses the same key and pairs `reset`
-  // with `load` below to force a fresh fetch that overwrites the value in
-  // place, rather than blanking the table back to a loading state.
-  const variationCache = useLazyRowCache<string, OrderBookSummary>();
-  const variationLocationKey = `${chosenRegionId}:${orderBookLocation.mode}:${orderBookLocation.hubStationId}:${stationFilter ?? 'none'}`;
-  // The selected item rides the same per-row cache at the same location, so
-  // its own price and its variations' can't be read from different books.
-  const priceTargets = useMemo(
-    () => [
-      ...(selectedItem ? [{ typeId: selectedItem.typeId }] : []),
-      ...(variationsResult?.rows ?? []),
-    ],
-    [selectedItem, variationsResult]
-  );
-  const headerScopeSummary =
-    selectedTypeId === null
-      ? undefined
-      : variationCache.byKey.get(`${selectedTypeId}:${variationLocationKey}`);
-  const variationPrices = useMemo(() => {
-    const m = new Map<number, OrderBookSummary | undefined>();
-    for (const row of variationsResult?.rows ?? []) {
-      m.set(row.typeId, variationCache.byKey.get(`${row.typeId}:${variationLocationKey}`));
-    }
-    return m;
-  }, [variationsResult, variationCache.byKey, variationLocationKey]);
-
-  // Fetched independently of the main order book, so a slow row's price
-  // never delays the order book's own render (acceptance criteria). Also
-  // reruns on refreshTick so a manual Refresh — which clears getOrderBook's
-  // cache — refetches row prices too, not just the on-screen tables.
-  useEffect(() => {
-    if (
-      priceTargets.length === 0 ||
-      !hubHydrated ||
-      !locationModeHydrated ||
-      globalMarkets === null
-    ) {
-      return;
-    }
-    let cancelled = false;
-    // Capped, not one Promise.all: ~20 rows fired at once tripped Sentry's
-    // N+1 API Call detector (ORDER_BOOK_FANOUT_CONCURRENCY).
-    void mapWithConcurrencyLimit(priceTargets, ORDER_BOOK_FANOUT_CONCURRENCY, async (row) => {
-      if (cancelled) return;
-      const key = `${row.typeId}:${variationLocationKey}`;
-      // Forces this run to actually fetch even for a key it already
-      // resolved — the refreshTick case the key itself doesn't capture
-      // (see the field doc above). `load` still overwrites `byKey` in
-      // place once it resolves, so the row keeps showing its old price
-      // until the new one lands.
-      variationCache.reset(key);
-      await variationCache.load(key, async () => {
-        const view = await loadOrderBookView(row.typeId, { ...orderBookLocation, stationFilter });
-        // A row's own price is a nice-to-have next to the order book that did
-        // load; a failed fetch reads as "no orders" (the empty summary) rather
-        // than stalling the table on a spinner forever.
-        return view.status === 'failed'
-          ? { bestSell: null, bestBuy: null, spread: null, availableVolume: 0 }
-          : view.summary;
-      });
+  const { variationsResult, variationsResultRef, variationPrices, headerScopeSummary } =
+    useVariations({
+      selectedTypeId,
+      selectedItem,
+      variationIndex,
+      typesByGroup,
+      typesById,
+      orderBookLocation,
+      chosenRegionId,
+      stationFilter,
+      ready: hubHydrated && locationModeHydrated && globalMarkets !== null,
+      refreshTick,
     });
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `variationCache.load`/`.reset` are the only stable, referenced parts of `variationCache` (see their own doc comments); `variationCache` itself is a fresh object every render (its `byKey` changes on every fetch), so depending on the whole object — which is what listing two of its members forces eslint to ask for — would run this effect on every render instead of only when these actually change. `variationLocationKey` is a plain derived string, safe to list directly.
-  }, [
-    priceTargets,
-    orderBookLocation,
-    stationFilter,
-    hubHydrated,
-    locationModeHydrated,
-    globalMarkets,
-    refreshTick,
-    variationLocationKey,
-    variationCache.load,
-    variationCache.reset,
-  ]);
 
   // Manual refresh must bypass getOrderBook's 300s TTL cache (GLOSSARY.md
   // "Data Age": refresh happens on app open + manual button only) — scoped
@@ -704,7 +411,7 @@ export function useOrderBookOrchestration({
   // keep whatever's still within TTL instead of being forced to refetch just
   // because something else on the page was refreshed. Also the failed order
   // book's "Try again".
-  function refresh() {
+  const refresh = useCallback(() => {
     // A fan-out clears the type in every region, not just the ones last
     // fetched: a range change since would otherwise leave some stale.
     if (selectedTypeId !== null) {
@@ -718,44 +425,89 @@ export function useOrderBookOrchestration({
       clearOrderBookViewCache(row.typeId, orderBookLocation);
     }
     setRefreshTick((n) => n + 1);
-  }
-
-  return {
-    orderBookLoading,
-    refreshTick,
-    myOrderIds,
+  }, [
+    selectedTypeId,
+    fetchesAcross,
+    allMarketRegionIds,
+    bookLocation,
     orderBookLocation,
-    resolvedRegion,
-    hubRegionName,
-    currentSystem,
-    jumpRangeFilter,
-    regionMode,
-    rangeAcross,
-    stationFilter,
-    setStationFilter,
-    stationFilterLabel,
-    browserFilterValue,
-    handleBrowserFiltersChange,
-    activeFilterCount,
-    filtersNarrowBook,
-    orderBookFailed,
-    regionsUnavailable,
-    orderBookView,
-    loadedView,
-    sortedSell,
-    sortedBuy,
-    shownSell,
-    hiddenBaitCount,
-    depthByOrder,
-    sellShowAll,
-    setSellShowAll,
-    buyShowAll,
-    setBuyShowAll,
-    failedRegionCount,
-    jumpNoteShown,
-    variationsResult,
-    variationPrices,
-    headerScopeSummary,
-    refresh,
-  };
+    variationsResultRef,
+  ]);
+
+  return useMemo(
+    () => ({
+      orderBookLoading,
+      refreshTick,
+      myOrderIds,
+      orderBookLocation,
+      resolvedRegion,
+      hubRegionName,
+      currentSystem,
+      jumpRangeFilter,
+      regionMode,
+      rangeAcross,
+      stationFilter,
+      setStationFilter,
+      stationFilterLabel,
+      browserFilterValue: filters.browserFilterValue,
+      handleBrowserFiltersChange: filters.handleBrowserFiltersChange,
+      activeFilterCount: filters.activeFilterCount,
+      filtersNarrowBook,
+      orderBookFailed,
+      regionsUnavailable,
+      orderBookView,
+      loadedView,
+      sortedSell,
+      sortedBuy,
+      shownSell,
+      hiddenBaitCount,
+      depthByOrder,
+      sellShowAll,
+      setSellShowAll,
+      buyShowAll,
+      setBuyShowAll,
+      failedRegionCount,
+      jumpNoteShown: filters.jumpNoteShown,
+      variationsResult,
+      variationPrices,
+      headerScopeSummary,
+      refresh,
+    }),
+    [
+      orderBookLoading,
+      refreshTick,
+      myOrderIds,
+      orderBookLocation,
+      resolvedRegion,
+      hubRegionName,
+      currentSystem,
+      jumpRangeFilter,
+      regionMode,
+      rangeAcross,
+      stationFilter,
+      setStationFilter,
+      stationFilterLabel,
+      filters.browserFilterValue,
+      filters.handleBrowserFiltersChange,
+      filters.activeFilterCount,
+      filtersNarrowBook,
+      orderBookFailed,
+      regionsUnavailable,
+      orderBookView,
+      loadedView,
+      sortedSell,
+      sortedBuy,
+      shownSell,
+      hiddenBaitCount,
+      depthByOrder,
+      sellShowAll,
+      buyShowAll,
+      failedRegionCount,
+      filters.jumpNoteShown,
+      variationsResult,
+      variationPrices,
+      headerScopeSummary,
+      refresh,
+    ]
+  );
 }

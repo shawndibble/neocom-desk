@@ -32,7 +32,9 @@
  * Station Manager who is not a Director simply has no People rail: no error,
  * no empty state, nothing (GLOSSARY.md round 35).
  */
-import { useEffect } from 'react';
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { cx } from '@/lib/cx';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { CharacterLink } from '@/features/entities';
@@ -69,10 +71,7 @@ interface CorpPeopleRailProps {
 export function CorpPeopleRail({ members, highlights, names, diff, nowMs }: CorpPeopleRailProps) {
   const { t } = useTranslation();
   const darkAfterDays = useDarkThreshold((state) => state.value);
-  const hydrateDarkThreshold = useDarkThreshold((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateDarkThreshold();
-  }, [hydrateDarkThreshold]);
+  useHydratedStore(useDarkThreshold);
 
   // `memberStanding` and its threshold, not a count of our own: this figure has
   // to equal the one `CorpRosterStats` prints for the same roster — which is
@@ -157,7 +156,7 @@ export function CorpPeopleRail({ members, highlights, names, diff, nowMs }: Corp
         <div className="mt-3 grid gap-x-6 gap-y-3 sm:grid-cols-2">
           {darkNamed.length > 0 && (
             <div>
-              <h3 className="mb-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+              <h3 className={cx(eyebrowClassName, 'mb-1.5')}>
                 {t('corp.people.darkList', { days: darkAfterDays })}
               </h3>
               {darkNamed.map((member) => {
@@ -184,9 +183,7 @@ export function CorpPeopleRail({ members, highlights, names, diff, nowMs }: Corp
           )}
           {rosterChanged && (
             <div>
-              <h3 className="mb-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                {t('corp.people.changeList')}
-              </h3>
+              <h3 className={cx(eyebrowClassName, 'mb-1.5')}>{t('corp.people.changeList')}</h3>
               {highlights.joined.map((characterId) => (
                 <p
                   key={`joined-${characterId}`}

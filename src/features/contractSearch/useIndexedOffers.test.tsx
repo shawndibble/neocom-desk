@@ -25,9 +25,9 @@ beforeEach(() => {
   loadOffersForTypes.mockResolvedValue([ROW]);
 });
 
-describe('useEarlyOffers with an R2 index', () => {
+describe('useEarlyOffers', () => {
   it('reads every listed type for a search that names none, since no full snapshot is downloading', async () => {
-    const { result } = renderHook(() => useEarlyOffers(R2_INDEX, null, 7, true));
+    const { result } = renderHook(() => useEarlyOffers(R2_INDEX, null, true));
 
     await waitFor(() => expect(result.current.rows).toEqual([ROW]));
     const asked = loadOffersForTypes.mock.calls[0][1] as ReadonlySet<number>;
@@ -36,14 +36,14 @@ describe('useEarlyOffers with an R2 index', () => {
 
   it('has no cap on how many objects a named search may read', async () => {
     const typeIds = new Set(Array.from({ length: 20 }, (_, i) => i + 1));
-    const { result } = renderHook(() => useEarlyOffers(R2_INDEX, typeIds, 7, true));
+    const { result } = renderHook(() => useEarlyOffers(R2_INDEX, typeIds, true));
 
     await waitFor(() => expect(result.current.rows).toEqual([ROW]));
   });
 
   it('reports a failed read, since no full snapshot is coming to replace it', async () => {
     loadOffersForTypes.mockResolvedValue(null);
-    const { result } = renderHook(() => useEarlyOffers(R2_INDEX, new Set([1]), 7, true));
+    const { result } = renderHook(() => useEarlyOffers(R2_INDEX, new Set([1]), true));
 
     await waitFor(() => expect(result.current.failed).toBe(true));
     expect(result.current.rows).toBeNull();
@@ -51,23 +51,13 @@ describe('useEarlyOffers with an R2 index', () => {
 
   it('answers an index that lists no type with no offers instead of waiting', () => {
     const empty = offerIndexFromR2({ lastSyncedAt: 5, types: {}, regionIds: [] });
-    const { result } = renderHook(() => useEarlyOffers(empty, null, 7, true));
+    const { result } = renderHook(() => useEarlyOffers(empty, null, true));
 
     expect(result.current.rows).toEqual([]);
   });
 
   it('reads nothing while disabled', () => {
-    const { result } = renderHook(() => useEarlyOffers(R2_INDEX, null, 7, false));
-
-    expect(result.current.rows).toBeNull();
-    expect(loadOffersForTypes).not.toHaveBeenCalled();
-  });
-});
-
-describe('useEarlyOffers with a Firestore index', () => {
-  it('still waits for the full snapshot when no type is named', () => {
-    const firestore = { ...R2_INDEX, r2: undefined };
-    const { result } = renderHook(() => useEarlyOffers(firestore, null, 7, true));
+    const { result } = renderHook(() => useEarlyOffers(R2_INDEX, null, false));
 
     expect(result.current.rows).toBeNull();
     expect(loadOffersForTypes).not.toHaveBeenCalled();

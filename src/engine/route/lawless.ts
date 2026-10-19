@@ -1,8 +1,10 @@
 /**
  * Lawless (insurgency) systems on a route (issue #2870): which stored ids may
- * still be shown. The `syncLawlessSystems` function refreshes the list about
- * every 10 minutes; past `LAWLESS_STALE_AFTER_MS` (six missed runs) the list
- * is not shown at all — a stale list must never read as current.
+ * still be shown. The `syncLawlessSystems` function checks the list every 10
+ * minutes, writing it when it changes and re-confirming an unchanged list
+ * every 30 minutes (issue #4272), so `updatedAt` means "last confirmed"; past
+ * `LAWLESS_STALE_AFTER_MS` the list is not shown at all — a stale list must
+ * never read as current.
  */
 
 export const LAWLESS_STALE_AFTER_MS = 60 * 60 * 1000;

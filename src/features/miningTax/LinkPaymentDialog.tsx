@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal, IskInput, Checkbox, Radio } from '@/components/ui';
@@ -5,9 +6,10 @@ import { selectedRowClassName, tappableRowClassName } from '@/components/ui/cont
 import type { PayeeRecord } from '@/db';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
-import { formatLocalDate } from '@/lib/localDate';
 import { formatDateRange } from './groupRows';
 import { settle } from './ledgerActions';
+import { paidOnFromIso } from './madePayments';
+import { systemLabel } from './names';
 import { rememberPayeeEntity } from './payees';
 import type { LinkSuggestion } from './paymentLinks';
 import { useLedgerAction } from './useLedgerAction';
@@ -22,17 +24,6 @@ interface LinkPaymentDialogProps {
   systemNames: ReadonlyMap<number, string>;
   showCharacter: boolean;
   onLinked: () => void;
-}
-
-/**
- * The payment's own date as a local calendar date, falling back to today.
- * A contract carries `date_completed ?? date_issued` straight from ESI, so an
- * unparseable value would otherwise reach `formatLocalDate` as an Invalid Date
- * and write nonsense into a synced record.
- */
-function paidOnFor(isoDate: string): string {
-  const parsed = new Date(isoDate);
-  return formatLocalDate(Number.isNaN(parsed.getTime()) ? new Date() : parsed);
 }
 
 /**
@@ -87,8 +78,7 @@ export function LinkPaymentDialog({
     setExcluded((previous) => toggleInSet(previous, id));
   }
 
-  const systemName = (solarSystemId: number) =>
-    systemNames.get(solarSystemId) ?? `#${String(solarSystemId)}`;
+  const systemName = (solarSystemId: number) => systemLabel(systemNames, solarSystemId);
 
   /** What goes on the record: the ISK that actually moved, or the pilot's figure for ore handed over. */
   const recordedAmount =
@@ -111,7 +101,7 @@ export function LinkPaymentDialog({
       settle(
         included.map((m) => m.assignment),
         {
-          paidOn: paidOnFor(payment.date),
+          paidOn: paidOnFromIso(payment.date),
           method: payment.method,
           amount: Math.round(recordedAmount),
           ...(payment.kind === 'journal'
@@ -202,7 +192,7 @@ export function LinkPaymentDialog({
         {selected && (
           <>
             <div className="space-y-1">
-              <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+              <p className={eyebrowClassName}>
                 {t('miningTax.linkPaymentCoversLabel', { payee: selected.balance.payee.name })}
               </p>
               <ul className="divide-y divide-line rounded-xs border border-line bg-panel-2">
@@ -241,9 +231,7 @@ export function LinkPaymentDialog({
 
             {selected.payment.amount === null && (
               <div className="space-y-1">
-                <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                  {t('miningTax.linkPaymentAmountLabel')}
-                </p>
+                <p className={eyebrowClassName}>{t('miningTax.linkPaymentAmountLabel')}</p>
                 <IskInput
                   value={amountInKind}
                   onChange={setAmountInKind}

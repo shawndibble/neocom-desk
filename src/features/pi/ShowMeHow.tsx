@@ -9,6 +9,8 @@
  * Route Safety links with the security colour plus its number, "Highsec only"
  * is a checkbox, and the panel takes focus when it opens.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { formatCount } from '@/lib/formatCount';
 import { useEffect, useRef, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Checkbox, IskAmount, TypeIcon } from '@/components/ui';
@@ -67,7 +69,7 @@ function ItemName({ typeId, name }: { typeId: number; name: string }) {
 function Step({ n, title, children }: { n: number; title: string; children: ReactNode }) {
   return (
     <div className="min-w-0 space-y-2 p-3">
-      <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+      <h3 className={eyebrowClassName}>
         {n} · {title}
       </h3>
       {children}
@@ -290,9 +292,9 @@ function RunStep({
       text: (
         <Sentence
           text={t('piPlan.find.runCollect', {
-            units: Math.round(how.unitsPerWeek).toLocaleString('en'),
+            units: formatCount(how.unitsPerWeek),
             item: '{item}',
-            m3: Math.round(how.m3PerWeek).toLocaleString('en'),
+            m3: formatCount(how.m3PerWeek),
           })}
           slots={{ item: <PiProductLink typeId={recipe.typeId}>{recipe.name}</PiProductLink> }}
         />

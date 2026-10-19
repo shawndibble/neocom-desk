@@ -2,7 +2,7 @@
  * Route code-splitting: one chunk per page, fetched on first visit.
  *
  * Before this, `App.tsx` imported every route statically, so the whole app —
- * Industry, Market, PI, Skills, Corp, the styleguide — was one entry chunk the
+ * Industry, Market, PI, Skills, Corp — was one entry chunk the
  * browser pulled and parsed before the login screen could paint. Each loader
  * here is a separate `import()`, which is what gives Rollup a chunk boundary.
  *
@@ -140,6 +140,7 @@ export const loadCorp = named(() => import('@/routes/Corp'), 'Corp');
 export const loadCorpMembers = named(() => import('@/routes/CorpMembers'), 'CorpMembers');
 export const loadCorpAssets = named(() => import('@/routes/CorpAssets'), 'CorpAssets');
 export const loadCorpWallet = named(() => import('@/routes/CorpWallet'), 'CorpWallet');
+export const loadCorpMoons = named(() => import('@/routes/CorpMoons'), 'CorpMoons');
 export const loadMarket = named(() => import('@/routes/Market'), 'Market');
 export const loadWallet = named(() => import('@/routes/Wallet'), 'Wallet');
 export const loadMoonMiningTax = named(() => import('@/routes/MoonMiningTax'), 'MoonMiningTax');
@@ -162,17 +163,19 @@ export const loadEmploymentHistory = named(
 );
 export const loadSettings = named(() => import('@/routes/Settings'), 'Settings');
 export const loadHelp = named(() => import('@/routes/Help'), 'Help');
-export const loadStyleguide = named(() => import('@/routes/Styleguide'), 'Styleguide');
 export const loadFittingShared = named(() => import('@/routes/FittingShared'), 'FittingShared');
 export const loadCommunityJoin = named(() => import('@/routes/CommunityJoin'), 'CommunityJoin');
 export const loadSharedLink = named(() => import('@/routes/SharedLink'), 'SharedLink');
+export const loadCorpTaxBookVerify = named(
+  () => import('@/routes/CorpTaxBookVerify'),
+  'CorpTaxBookVerify'
+);
 export const loadErrorProbe = named(() => import('@/routes/ErrorProbe'), 'ErrorProbe');
 
 /**
  * Every feature route, keyed the way `Layout`'s links are. Exhaustive by type, so a route added to `routeScopes.ts` without
  * a chunk here is a compile error rather than a link that never preloads. The
- * redirect-only paths (`/alerts`, `/skills`, `/bpc-contracts`, `/skills/ships`,
- * `/fittings/*`) preload their target.
+ * redirect-only paths (`/alerts`, `/skills`, `/bpc-contracts`) preload their target.
  */
 const PRELOADERS: Record<AppRoutePath, () => Promise<RouteModule>> = {
   '/characters': loadCharacters,
@@ -188,8 +191,6 @@ const PRELOADERS: Record<AppRoutePath, () => Promise<RouteModule>> = {
   '/industry/plans/:planId': loadIndustryPlanPage,
   '/industry/groups/:groupId': loadIndustryGroupPage,
   '/ships': loadShips,
-  '/skills/ships': loadShips,
-  '/fittings/*': loadShips,
   '/ships/fittings/compare': loadFittingCompare,
   '/market': loadMarket,
   '/wallet': loadWallet,
@@ -206,6 +207,7 @@ const PRELOADERS: Record<AppRoutePath, () => Promise<RouteModule>> = {
   '/corp/members': loadCorpMembers,
   '/corp/wallet': loadCorpWallet,
   '/corp/assets': loadCorpAssets,
+  '/corp/moons': loadCorpMoons,
   '/corp/assets/*': loadCorpAssets,
   '/assets': loadAssets,
   '/mail': loadMail,

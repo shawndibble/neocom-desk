@@ -6,6 +6,7 @@
  * staged; from a pasted URL it is looked up off the type.
  */
 import { Suspense, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { lazyNamed } from '@/app/routeChunks';
 import { loadTypeName } from '@/features/character/typeNames';
 import { ItemActionsContext } from '@/features/market/itemActions';
@@ -25,6 +26,7 @@ export function ItemInfoModal() {
 
 /** Mounted only while open: it brings the page-less Item Actions Used-in's menus need. */
 function ItemInfoHost() {
+  const { t } = useTranslation();
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const { actions } = usePageItemActions({ activeCharacterId, lazyBlueprints: true });
   const request = useItemInfoModalStore((state) => state.request);
@@ -38,14 +40,14 @@ function ItemInfoHost() {
     if (typeId === null || !needsLookup) return;
     let cancelled = false;
     void loadTypeName(typeId)
-      .catch(() => `Type #${typeId}`)
+      .catch(() => t('common.unknownType', { typeId }))
       .then((name) => {
         if (!cancelled) setLooked({ typeId, name });
       });
     return () => {
       cancelled = true;
     };
-  }, [typeId, needsLookup]);
+  }, [typeId, needsLookup, t]);
 
   if (!request) return null;
   const name = request.itemName ?? (looked?.typeId === request.typeId ? looked.name : null);

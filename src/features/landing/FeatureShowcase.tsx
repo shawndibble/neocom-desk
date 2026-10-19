@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { TabPanel, Tabs, useTabsId } from '@/components/ui';
@@ -48,9 +49,7 @@ export function FeatureShowcase() {
             </ul>
             {alsoIncludes.length > 0 && (
               <>
-                <p className="mt-6 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                  {t('login.showcase.covers')}
-                </p>
+                <p className={cx(eyebrowClassName, 'mt-6')}>{t('login.showcase.covers')}</p>
                 <ul className="mt-2 flex flex-wrap gap-2">
                   {alsoIncludes.map(({ icon: Icon, key }) => (
                     <li

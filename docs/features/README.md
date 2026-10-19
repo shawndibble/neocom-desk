@@ -15,7 +15,7 @@ Part indexes: [A](README-A.md) · [B](README-B.md) · [C](README-C.md).
 | Industry       | industry-plans, industry-records-sourcing, planetary-industry                         |
 | Corp           | corp                                                                                  |
 | Exploration    | travel, pilot-lookup                                                                  |
-| Support        | help-faq, styleguide-notfound                                                         |
+| Support        | help-faq, notfound                                                                    |
 
 alerts.md (A) and notifications.md (C) overlap. share-links.md (A) and entities-share.md (C) overlap. Read both.
 
@@ -27,40 +27,40 @@ Each file's "Purpose and user goal" section ranks the pilot's top jobs, names wh
 
 Mobbin fit: **high** = mostly generic patterns; **low** = mostly EVE-specific views, take reference from EVE tools and the client instead. planetary-industry has no section: its Plan, Map and Colonies tabs have their own spec in `docs/design/pi-tabs/`.
 
-| File                      | Top job                                                       | Device, cadence                                                  | Mobbin fit                   |
-| ------------------------- | ------------------------------------------------------------- | ---------------------------------------------------------------- | ---------------------------- |
-| overview                  | What is on a clock, and what runs out first                   | desktop; glance between sessions                                 | high                         |
-| alerts                    | What fired while I was away, worst first                      | desktop; when the bell shows a count                             | high                         |
-| notifications             | Will I be told before things run out, for every Character     | desktop to set, push lands on phone; set once                    | high                         |
-| calendar                  | What happens next for this Character, and when                | desktop; before a session                                        | medium-high                  |
-| command-palette           | Take me to X                                                  | desktop keyboard                                                 | high                         |
-| app-shell                 | Go to a page, as the right Character                          | desktop; every session                                           | high                         |
-| auth-login                | What will this do for me, and is it safe to log in            | desktop; once per Character                                      | high                         |
-| characters                | Scan every alt for what needs attention (table)               | desktop; per session                                             | medium                       |
-| settings                  | Set my defaults once for every device                         | desktop; occasional                                              | high                         |
-| sync-backup               | Is my work synced; move to or wipe a device                   | desktop; rare                                                    | medium                       |
-| share-links               | Sender: copy a link; recipient: what did they send me         | desktop to send; at the moment of opening                        | medium                       |
-| entities-share            | Who or what is this name (Show Info)                          | desktop, mid-task, often                                         | medium                       |
-| clones                    | Which clone should I wear for this queue                      | desktop; when the queue changes                                  | low-medium                   |
-| employment-history        | Which corps has this Character been in, and for how long      | desktop; occasional                                              | high                         |
-| skills                    | How long X, Y and Z take; the full skill list                 | desktop; when planning                                           | medium                       |
-| ships                     | Can I fly hull X, and how long until I can                    | desktop; occasional                                              | low                          |
-| fittings                  | Can I fly this fit, and how does it perform                   | desktop, EFT to and from the client; occasional                  | low-medium                   |
-| mining                    | What did I mine and what's it worth; what does each Payee owe | desktop bookkeeping; after mining or billing                     | high (Tax), medium           |
-| mining-survey             | How much of the field is left, and the ETA                    | desktop, pasted from the client; during an op                    | medium                       |
-| contacts                  | What standing do I have with this name; do my alts agree      | desktop; occasional                                              | medium-high                  |
-| mail                      | What's unread, on which Character                             | desktop; when mail arrives                                       | high                         |
-| wallet                    | Where did the ISK go (Journal); then the net-worth trend      | desktop; wallet alert opens Journal                              | high                         |
-| assets                    | Where is item X, on this Character (or all)                   | desktop; on demand                                               | medium                       |
-| contracts                 | Cheapest public listing of an item (Courier ranks low)        | desktop; contract alerts open History                            | medium                       |
-| market                    | Where is item X within N jumps; fix my orders' problems       | desktop, copy prices to the client; alert-driven                 | medium                       |
-| corp                      | Next corp deadline or fuel running out                        | desktop; fuel alert opens `/corp`                                | medium                       |
-| industry-plans            | Is this build profitable: build or buy                        | desktop; per build                                               | low                          |
-| industry-records-sourcing | What's done and running, for one or many Characters           | desktop; job-complete alert opens Industry                       | medium                       |
-| travel                    | What happened along my route in the last hour                 | desktop; phone for a one-off route view                          | medium                       |
-| pilot-lookup              | Am I in danger (D-Scan), who is in Local                      | desktop, pasted from the client; phone for one-off pilot lookups | low-medium                   |
-| help-faq                  | Which keys and pastes work; what do you store                 | desktop; occasional                                              | high                         |
-| styleguide-notfound       | Developer: check a token or cue; pilot: leave a dead URL      | desk (styleguide); any device (404)                              | low (styleguide), high (404) |
+| File                      | Top job                                                       | Device, cadence                                                  | Mobbin fit         |
+| ------------------------- | ------------------------------------------------------------- | ---------------------------------------------------------------- | ------------------ |
+| overview                  | What is on a clock, and what runs out first                   | desktop; glance between sessions                                 | high               |
+| alerts                    | What fired while I was away, worst first                      | desktop; when the bell shows a count                             | high               |
+| notifications             | Will I be told before things run out, for every Character     | desktop to set, push lands on phone; set once                    | high               |
+| calendar                  | What happens next for this Character, and when                | desktop; before a session                                        | medium-high        |
+| command-palette           | Take me to X                                                  | desktop keyboard                                                 | high               |
+| app-shell                 | Go to a page, as the right Character                          | desktop; every session                                           | high               |
+| auth-login                | What will this do for me, and is it safe to log in            | desktop; once per Character                                      | high               |
+| characters                | Scan every alt for what needs attention (table)               | desktop; per session                                             | medium             |
+| settings                  | Set my defaults once for every device                         | desktop; occasional                                              | high               |
+| sync-backup               | Is my work synced; move to or wipe a device                   | desktop; rare                                                    | medium             |
+| share-links               | Sender: copy a link; recipient: what did they send me         | desktop to send; at the moment of opening                        | medium             |
+| entities-share            | Who or what is this name (Show Info)                          | desktop, mid-task, often                                         | medium             |
+| clones                    | Which clone should I wear for this queue                      | desktop; when the queue changes                                  | low-medium         |
+| employment-history        | Which corps has this Character been in, and for how long      | desktop; occasional                                              | high               |
+| skills                    | How long X, Y and Z take; the full skill list                 | desktop; when planning                                           | medium             |
+| ships                     | Can I fly hull X, and how long until I can                    | desktop; occasional                                              | low                |
+| fittings                  | Can I fly this fit, and how does it perform                   | desktop, EFT to and from the client; occasional                  | low-medium         |
+| mining                    | What did I mine and what's it worth; what does each Payee owe | desktop bookkeeping; after mining or billing                     | high (Tax), medium |
+| mining-survey             | How much of the field is left, and the ETA                    | desktop, pasted from the client; during an op                    | medium             |
+| contacts                  | What standing do I have with this name; do my alts agree      | desktop; occasional                                              | medium-high        |
+| mail                      | What's unread, on which Character                             | desktop; when mail arrives                                       | high               |
+| wallet                    | Where did the ISK go (Journal); then the net-worth trend      | desktop; wallet alert opens Journal                              | high               |
+| assets                    | Where is item X, on this Character (or all)                   | desktop; on demand                                               | medium             |
+| contracts                 | Cheapest public listing of an item (Courier ranks low)        | desktop; contract alerts open History                            | medium             |
+| market                    | Where is item X within N jumps; fix my orders' problems       | desktop, copy prices to the client; alert-driven                 | medium             |
+| corp                      | Next corp deadline or fuel running out                        | desktop; fuel alert opens `/corp`                                | medium             |
+| industry-plans            | Is this build profitable: build or buy                        | desktop; per build                                               | low                |
+| industry-records-sourcing | What's done and running, for one or many Characters           | desktop; job-complete alert opens Industry                       | medium             |
+| travel                    | What happened along my route in the last hour                 | desktop; phone for a one-off route view                          | medium             |
+| pilot-lookup              | Am I in danger (D-Scan), who is in Local                      | desktop, pasted from the client; phone for one-off pilot lookups | low-medium         |
+| help-faq                  | Which keys and pastes work; what do you store                 | desktop; occasional                                              | high               |
+| notfound                  | Pilot: leave a dead URL                                       | any device (404)                                                 | high               |
 
 ## Cross-cutting gaps (from all three passes)
 

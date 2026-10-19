@@ -1,3 +1,4 @@
+import { toggleInSet } from '@/lib/sets';
 /**
  * Market-Wide Build Opportunities (issue #819): a second panel on the
  * Opportunities tab, ranking manufacturable products market-wide by
@@ -6,10 +7,10 @@
  * "Scan".
  */
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
-import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
+import { useCallback, useMemo, useState, type ReactElement } from 'react';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import { useTranslation } from 'react-i18next';
-import { useLiveQuery } from 'dexie-react-hooks';
+import { useCharacterNames } from '@/features/character/useCharacters';
 import {
   Button,
   CollapsiblePanel,
@@ -39,7 +40,6 @@ import {
 } from '@/components/ui';
 import { DataGate } from '@/components/DataGate';
 import { useOnline } from '@/stores/network';
-import { db } from '@/db';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { PriceHistoryPanel } from '@/features/market/PriceHistoryPanel';
 import { useColumnVisibility } from '@/lib/columnVisibility';
@@ -97,7 +97,7 @@ import { vs90dTooltip } from './vs90d';
 import { marketWideOpportunitiesCsvColumns } from './opportunitiesCsv';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
-import { toggleInSet } from '@/lib/sets';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 const ORDER_DEPTH_TONE: Record<OrderDepthLevel, StatChipTone> = {
   deep: 'success',
@@ -257,19 +257,12 @@ export function MarketWideOpportunitiesPanel({
   // Account-wide, not active-character: every character on the account, same
   // precedent `OpportunitiesPanel`'s own multi-character fan-out sets. The
   // scan reads the same set for whose blueprints, contracts and LP count.
-  const allCharacters = useLiveQuery(() => db.characters.toArray(), [], []);
-  const characterNames = useMemo(
-    () => new Map((allCharacters ?? []).map((c) => [c.characterId, c.name])),
-    [allCharacters]
-  );
+  const characterNames = useCharacterNames();
   const characterIds = useMemo(() => [...characterNames.keys()], [characterNames]);
   // The share assumption is a remembered default behind its URL key
   // (`salesSharePref.ts`): a link's `marketWide.share` wins, only an edit is stored.
   const rememberedShare = useSalesShare((state) => state.value);
-  const hydrateRememberedShare = useSalesShare((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateRememberedShare();
-  }, [hydrateRememberedShare]);
+  useHydratedStore(useSalesShare);
   const rememberedParams = useMemo(
     () => ({
       values: { [MARKET_WIDE_FILTER.fieldToParam.salesShare]: rememberedShare },
