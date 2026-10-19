@@ -682,7 +682,14 @@ function DataTableRowImpl<T>({
                     column.align === 'center' && 'justify-center'
                   )}
                 >
-                  <span className="dt-lead-caret inline-flex">
+                  <span
+                    className={cx(
+                      'dt-lead-caret inline-flex',
+                      // A right-aligned first column would otherwise leave the caret
+                      // hugging the figure; pin it to the cell's leading edge.
+                      column.align === 'right' && 'mr-auto'
+                    )}
+                  >
                     <Caret expanded={expanded} />
                   </span>
                   {column.render(row)}
