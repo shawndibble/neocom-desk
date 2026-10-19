@@ -1,11 +1,9 @@
-import { HintText } from '@/components/ui/HintText';
 import { Fragment, useRef, useState, type ReactNode } from 'react';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
 import { useShipDataNeedsConnection } from './useDogmaEngineStatus';
 import { formatSeconds } from '@/lib/duration';
-import { alignTimeSeconds } from '@/engine/fittings/stats';
 import type {
   Fitting,
   FittingModuleResult,
@@ -16,19 +14,24 @@ import { ResistTable } from './stats/ResistTable';
 import { formatEhp } from './stats/resistFormat';
 import { resistRows } from './stats/resistRows';
 import { fleetBoostsMeta, supportMeta } from './stats/sectionMeta';
-import { resourceFacts } from './stats/resourceFacts';
+import {
+  DroneFacts,
+  FighterFacts,
+  FittingBudgetFacts,
+  NavigationFacts,
+  TargetingFacts,
+} from './stats/shipFacts';
 import { PriceBody, IskLabel } from './stats/PriceBody';
 import { priceView } from './stats/priceView';
-import { OVER_BUDGET_TONE, budgetFigure, makeFigure } from './stats/statFigures';
+import { OVER_BUDGET_TONE, makeFigure } from './stats/statFigures';
 import { OffenseRows } from './stats/OffenseRows';
 import { StatSection, YourCharactersSection } from './stats/StatSection';
-import { unknownItemsList } from './stats/unknownItemsList';
 import type { Appraisal } from '@/engine/market/appraisal';
 import type { DogmaAssetProgress } from './dogmaFittingEngine';
 import { useDamageProfileName, type DamageProfiles } from './damageProfiles';
 import { DamageProfilePicker } from './DamageProfilePicker';
 import { AppliedDpsPanel } from './AppliedDpsPanel';
-import { Facts, StatFields, StatNote } from './StatFacts';
+import { StatFields, StatNote } from './StatFacts';
 import { SkillOverridesControl } from './SkillOverridesControl';
 import { StatsToolbar } from './StatsToolbar';
 import { useIsPhone } from '@/lib/useIsPhone';
@@ -382,77 +385,14 @@ export function FittingStatsSections({
       section(
         'drones',
         figure((s) => t('fittings.stats.weaponDps', { value: s.droneDps.toFixed(1) })),
-        stats ? (
-          <Facts
-            items={[
-              {
-                label: t('fittings.stats.fact.droneDps'),
-                value: figure((s) => s.droneDps.toFixed(1)),
-              },
-              {
-                label: t('fittings.stats.fact.bandwidth'),
-                value: figure((s) =>
-                  t('fittings.stats.unit.bandwidth', {
-                    used: s.droneBandwidthUsed.toFixed(0),
-                    total: s.droneBandwidthTotal.toFixed(0),
-                  })
-                ),
-              },
-              {
-                label: t('fittings.stats.fact.droneBay'),
-                value: figure((s) =>
-                  t('fittings.stats.unit.cubicMetres', {
-                    value: s.droneCapacity.toFixed(0),
-                  })
-                ),
-              },
-              {
-                label: t('fittings.stats.fact.maxActiveDrones'),
-                value: figure((s) => String(s.maxActiveDrones)),
-              },
-              {
-                label: t('fittings.stats.fact.droneControlRange'),
-                value: figure((s) =>
-                  t('fittings.stats.unit.km', { value: kmValue(s.applied.droneControlRange) })
-                ),
-              },
-            ]}
-          />
-        ) : (
-          placeholder
-        )
+        stats ? <DroneFacts stats={stats} /> : placeholder
       ),
     stats &&
       stats.fighters.tubes.total > 0 &&
       section(
         'fighters',
         figure((s) => t('fittings.stats.weaponDps', { value: s.fighters.dps.toFixed(1) })),
-        <Facts
-          items={[
-            {
-              label: t('fittings.stats.fact.fighterDps'),
-              value: figure((s) => s.fighters.dps.toFixed(1)),
-            },
-            {
-              label: t('fittings.stats.fact.fighterTubes'),
-              value: figure((s) =>
-                t('fittings.stats.unit.usedOfTotal', {
-                  used: s.fighters.tubes.used.toFixed(0),
-                  total: s.fighters.tubes.total.toFixed(0),
-                })
-              ),
-            },
-            {
-              label: t('fittings.stats.fact.fighterBay'),
-              value: figure((s) =>
-                t('fittings.stats.unit.cubicMetresUsed', {
-                  used: s.fighters.bay.used.toFixed(0),
-                  total: s.fighters.bay.total.toFixed(0),
-                })
-              ),
-            },
-          ]}
-        />
+        <FighterFacts stats={stats} />
       ),
   ];
   const tankSections = [
@@ -498,50 +438,7 @@ export function FittingStatsSections({
       figure((s) =>
         t('fittings.stats.maxVelocityMeta', { value: s.navigation.maxVelocity.toFixed(0) })
       ),
-      stats ? (
-        <Facts
-          items={[
-            {
-              label: t('fittings.stats.fact.maxVelocity'),
-              value: figure((s) =>
-                t('fittings.stats.maxVelocityMeta', {
-                  value: s.navigation.maxVelocity.toFixed(0),
-                })
-              ),
-            },
-            {
-              label: t('fittings.stats.fact.align'),
-              value: figure((s) =>
-                t('fittings.stats.unit.seconds', {
-                  value: alignTimeSeconds(s.navigation.mass, s.navigation.agility).toFixed(1),
-                })
-              ),
-            },
-            {
-              label: t('fittings.stats.fact.agility'),
-              value: figure((s) => s.navigation.agility.toFixed(3)),
-            },
-            {
-              label: t('fittings.stats.fact.mass'),
-              value: figure((s) =>
-                t('fittings.stats.unit.tonnes', {
-                  value: (s.navigation.mass / 1000).toFixed(0),
-                })
-              ),
-            },
-            {
-              label: t('fittings.stats.fact.warpSpeed'),
-              value: figure((s) =>
-                t('fittings.stats.unit.auPerSecond', {
-                  value: s.navigation.warpSpeed.toFixed(1),
-                })
-              ),
-            },
-          ]}
-        />
-      ) : (
-        placeholder
-      )
+      stats ? <NavigationFacts stats={stats} /> : placeholder
     ),
     section(
       'targeting',
@@ -550,46 +447,7 @@ export function FittingStatsSections({
           value: kmValue(s.targeting.maxTargetRange),
         })
       ),
-      stats ? (
-        <Facts
-          items={[
-            {
-              label: t('fittings.stats.fact.targetRange'),
-              value: figure((s) =>
-                t('fittings.stats.unit.km', {
-                  value: kmValue(s.targeting.maxTargetRange),
-                })
-              ),
-            },
-            {
-              label: t('fittings.stats.fact.lockedTargets'),
-              value: figure((s) =>
-                s.lockedTargets.ship === s.lockedTargets.pilot
-                  ? String(s.targeting.maxLockedTargets)
-                  : t('fittings.stats.lockedTargetsValue', { ...s.lockedTargets })
-              ),
-            },
-            {
-              label: t('fittings.stats.fact.scanResolution'),
-              value: figure((s) =>
-                t('fittings.stats.unit.mm', {
-                  value: s.targeting.scanResolution.toFixed(0),
-                })
-              ),
-            },
-            {
-              label: t('fittings.stats.fact.signature'),
-              value: figure((s) =>
-                t('fittings.stats.unit.metres', {
-                  value: s.targeting.signatureRadius.toFixed(0),
-                })
-              ),
-            },
-          ]}
-        />
-      ) : (
-        placeholder
-      )
+      stats ? <TargetingFacts stats={stats} /> : placeholder
     ),
     section(
       'fitting',
@@ -608,62 +466,7 @@ export function FittingStatsSections({
           ),
         stats && !fitsResourceBudget(stats) ? OVER_BUDGET_TONE : undefined
       ),
-      stats ? (
-        <>
-          <Facts
-            items={[
-              {
-                label: t('fittings.stats.fact.cpu'),
-                value: budgetFigure(figure, 'cpu', stats.cpuUsed, stats.cpuTotal, (s) =>
-                  t('fittings.stats.unit.usedOfTotal', {
-                    used: s.cpuUsed.toFixed(1),
-                    total: s.cpuTotal.toFixed(1),
-                  })
-                ),
-              },
-              {
-                label: t('fittings.stats.fact.powergrid'),
-                value: budgetFigure(
-                  figure,
-                  'powergrid',
-                  stats.powergridUsed,
-                  stats.powergridTotal,
-                  (s) =>
-                    t('fittings.stats.unit.usedOfTotal', {
-                      used: s.powergridUsed.toFixed(1),
-                      total: s.powergridTotal.toFixed(1),
-                    })
-                ),
-              },
-              {
-                label: t('fittings.stats.fact.calibration'),
-                value: budgetFigure(
-                  figure,
-                  'calibration',
-                  stats.calibrationUsed,
-                  stats.calibrationTotal,
-                  (s) =>
-                    t('fittings.stats.unit.usedOfTotal', {
-                      used: s.calibrationUsed.toFixed(0),
-                      total: s.calibrationTotal.toFixed(0),
-                    })
-                ),
-              },
-              ...resourceFacts(stats, figure, typeName, t),
-            ]}
-          />
-          {stats.unknownItemTypeIds.length > 0 && (
-            <StatNote tone="warning">
-              {/* Which items, one per line — on hover, focus or a tap. */}
-              <HintText content={unknownItemsList(stats.unknownItemTypeIds, typeName, t)}>
-                {t('fittings.stats.unknownItems', { count: stats.unknownItemTypeIds.length })}
-              </HintText>
-            </StatNote>
-          )}
-        </>
-      ) : (
-        placeholder
-      ),
+      stats ? <FittingBudgetFacts stats={stats} typeName={typeName} /> : placeholder,
       stats && stats.unknownItemTypeIds.length > 0 ? t('fittings.stats.incomplete') : undefined
     ),
     stats &&
