@@ -55,7 +55,7 @@ for where to look; never for what is broken.
 
 Check `git status -sb` for `[behind N]` before trusting local `grep`/`ls`. A
 stale checkout produces findings against code that changed weeks ago; if
-behind, `git fetch origin main` and read `git show origin/main:<path>`.
+behind, `git fetch origin develop` and read `git show origin/develop:<path>`.
 
 Done when you can state, for each rule in RUBRIC.md, where the app defines it.
 
@@ -297,10 +297,10 @@ gh pr list --head chore/improve-mobile-ux-ledger --state open --json number,url
 ```
 
 - **A PR is already open**: branch a sibling worktree off that branch (never
-  the main checkout), rebase onto `origin/main`, merge your curated update into
+  the main checkout), rebase onto `origin/develop`, merge your curated update into
   the existing content — not a second append — commit, push to the same branch.
   Do not open a second PR.
-- **No open PR**: branch a sibling worktree off current `origin/main` with that
+- **No open PR**: branch a sibling worktree off current `origin/develop` with that
   same branch name, commit, push, and open the PR with
   `node scripts/next-ticket/open-pr.mjs "<title>" <body-file>` (which also arms
   auto-merge). The script is generic over any PR number.

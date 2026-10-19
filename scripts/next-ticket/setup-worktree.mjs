@@ -6,7 +6,7 @@
 //
 // Prints one line of JSON to stdout:
 //   {"status":"ready","worktreePath":"...","branch":"claude/83-item-tooltip"}
-//   {"status":"error","step":"worktree-add|npm-ci","message":"..."}
+//   {"status":"error","step":"fetch|worktree-add|npm-ci","message":"..."}
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -34,7 +34,11 @@ fs.mkdirSync(worktreeRoot, { recursive: true });
 
 // Off the remote ref, not a local branch that may be stale (it never moves
 // while the main checkout sits on another branch).
-run('git', ['fetch', 'origin', INTEGRATION_BRANCH], { cwd: repoRoot });
+const fetch = tryRun('git', ['fetch', 'origin', INTEGRATION_BRANCH], { cwd: repoRoot });
+if (!fetch.ok) {
+  printResult({ status: 'error', step: 'fetch', message: fetch.stderr.trim() });
+  process.exit(1);
+}
 const add = tryRun(
   'git',
   ['worktree', 'add', '--no-track', worktreePath, '-b', branch, `origin/${INTEGRATION_BRANCH}`],

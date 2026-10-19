@@ -13,7 +13,7 @@
 // Deliberately `--merge`, not `--squash`: squashing rewrites the branch's
 // commits into a new one, which orphans the base of any PR stacked on this
 // branch and scrambles its diff. A merge commit preserves those commits, so
-// a stack survives the merge. Cost is a noisier `main` history — accepted.
+// a stack survives the merge. Cost is a noisier `develop` history — accepted.
 //
 // Prints one line of JSON to stdout:
 //   {"status":"open","number":123,"url":"...","autoMergeArmed":true}

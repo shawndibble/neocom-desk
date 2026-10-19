@@ -395,8 +395,8 @@ the worktree. Prints `{"status":"merged","issueClosed":true|false}` or
   `node scripts/next-ticket/drive-ci.mjs <pr>` once more; if it now reports
   `conflict`, handle it per step 8 and retry `finish.mjs`. If it still won't
   merge, abandon per the procedure above.
-- Note in your final report: merging to `develop` runs no deploy (production ships only on a develop → main promotion); merging to `main` triggers the `deploy` job
-  (GitHub Pages).
+- Note in your final report: merging to `develop` never deploys production (that ships on a develop → main promotion, which triggers the `deploy` job
+  (GitHub Pages)).
 
 ## 10. Report
 

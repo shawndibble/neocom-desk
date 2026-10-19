@@ -2,7 +2,7 @@ name: CI
 
 on:
   # `develop` is where work lands (PRs into it run the full gate); a push to
-  # `main` is a develop→main promotion and is the only thing that deploys.
+  # `main` is a develop→main promotion and is what deploys production.
   push:
     branches: [main]
   pull_request:
@@ -18,7 +18,7 @@ concurrency:
 jobs:
   # `validate` used to be one serial chain of checks. They are independent, so
   # each is its own job and they run side by side; `validate` below is the
-  # aggregate that keeps the context name the `main` ruleset requires.
+  # aggregate that keeps the context name the `develop`/`main` ruleset requires.
   check-case:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
@@ -120,7 +120,7 @@ jobs:
       - run: npm run typecheck --prefix functions
       - run: npm test --prefix functions
 
-  # The name the `main` ruleset requires. See the `e2e` job below for the full
+  # The name the `develop`/`main` ruleset requires. See the `e2e` job below for the full
   # reasoning; this one aggregates the parallel jobs above instead of a matrix.
   validate:
     if: ${{ !cancelled() && github.event_name == 'pull_request' }}
@@ -174,7 +174,7 @@ jobs:
 
   # Firestore rules tests (rules-tests/): run against the Firestore emulator,
   # which needs a JRE. Kept out of `test-shard` so `npm run test:run` never
-  # needs Java. Not yet a required context in the `main` ruleset.
+  # needs Java. Not yet a required context in the `develop`/`main` ruleset.
   rules:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
@@ -210,7 +210,7 @@ jobs:
       - run: npm ci --prefix functions
       - run: npm run test:rules
 
-  # The name the `main` ruleset requires. See the `e2e` job below for the full
+  # The name the `develop`/`main` ruleset requires. See the `e2e` job below for the full
   # reasoning — a matrix reports as `test-shard (1)`…`(4)`, none of which is
   # the required context, so this turns the four results back into it.
   test:
