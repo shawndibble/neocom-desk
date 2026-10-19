@@ -31,15 +31,33 @@ const REDACTED = '[redacted]';
  */
 const PARAM_RE = /([?&#])([^=&#?\s]+)=([^&#\s]*)/g;
 
+/** `Authorization: Bearer <token>` quoted in an error message. */
+const BEARER_RE = /(\bBearer\s+)[A-Za-z0-9._~+/=-]+/gi;
+
+/** A JWT: EVE SSO access and refresh tokens are three base64url segments. */
+const JWT_RE = /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*/g;
+
+/**
+ * `refresh_token: abc`, `"access_token":"abc"` — a token field quoted as JSON
+ * or prose in an error message or response body, where PARAM_RE's `?`/`&`
+ * prefix does not apply.
+ */
+const TOKEN_FIELD_RE =
+  /(\b(?:access_token|refresh_token|id_token|client_secret|code_verifier)["']?\s*[:=]\s*["']?)[^\s"',&}]+/gi;
+
 /**
  * Redacts secret-bearing parameters anywhere in a string — a bare URL,
  * absolute or relative, or a URL embedded in an error message. Returns the
  * input unchanged when it carries nothing sensitive.
  */
 export function redactSecrets(value: string): string {
-  return value.replace(PARAM_RE, (match, separator: string, key: string) =>
-    SECRET_PARAMS.has(key.toLowerCase()) ? `${separator}${key}=${REDACTED}` : match
-  );
+  return value
+    .replace(PARAM_RE, (match, separator: string, key: string) =>
+      SECRET_PARAMS.has(key.toLowerCase()) ? `${separator}${key}=${REDACTED}` : match
+    )
+    .replace(BEARER_RE, `$1${REDACTED}`)
+    .replace(JWT_RE, REDACTED)
+    .replace(TOKEN_FIELD_RE, `$1${REDACTED}`);
 }
 
 const URL_BEARING_CRUMB_FIELDS = ['url', 'from', 'to'] as const;

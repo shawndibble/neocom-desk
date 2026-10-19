@@ -82,6 +82,7 @@ here — they go one per file in `docs/context/decisions/`.
   than it asks: each line at the default **Trade Hub**'s best buy minus sales
   tax, a line with no market at the cheapest of at least three other offers.
   Contracts that ask for items, and auctions with no buyout, are left out.
+- **Billable**: A day in a **Corp Tax Book** that can go on a **Statement**: the UTC day has ended, the book's grace period (6 hours by default) has passed, and an officer has synced after that, so no more ore can still arrive for it. Before that the day is "Not Billable yet" and owes nothing.
 - **Blueprint Acquisition**: A Build Plan materials-table row — the
   blueprint's own type ID, distinct from the product's — priced whenever a
   buildable node isn't fully covered by an owned **BPO**. It takes whichever
@@ -405,6 +406,7 @@ here — they go one per file in `docs/context/decisions/`.
   at which profit is exactly zero — is always a Net figure, since it answers
   "at what price do I stop losing ISK," which only holds net of the fees an
   actual sale pays.
+- **Guest**: In a **Corp Tax Book**, a character who mined at the corporation's refineries but whose corporation at the time was not that one. Billed like a corp member, under the Guest default rate when no more specific rate applies, and reached only by mail and the verify link, never by logging in. One who was a corp member and left is shown as "Left corp" instead.
 - **Haul between planets**: The PI setting "I will haul between my planets" (`piSettings.haulBetweenPlanets`), off by default. Turning it on is the pilot's opt-in to **Bigger chain** recommendations on Plan; it changes nothing else.
 - **High-Tech Production Plant**: The planetary pin that makes a P3 from two P2s. The tier above an **Advanced Industry Facility**.
 - **Implant Finder**: The "Find by goal" tab of a **Fitting**'s Implants & boosters window: the pilot picks what they want better (CPU, powergrid, missiles, speed) and sees every implant and combat booster that moves it on that Fitting, with where to get each. Distinct from **What-If Implants**, which are a Skill Plan's assumed attribute bonuses.
@@ -464,6 +466,7 @@ here — they go one per file in `docs/context/decisions/`.
 - **Member**: One Character that has joined a **Community**, never a person:
   an account's alts join separately and appear separately. EVE exposes no
   account identity (see **Account**), so none is invented here.
+- **Miner**: In a **Corp Tax Book**, one or more characters billed together as one: payments and balance are kept at this level, and the Miner's main gets the mail. The default is one Miner per character; characters of one app account in the same corporation group automatically. Always "corp member" in prose, never **Member**, which is a **Community** term.
 - **Mining Ledger Entry**: One row of the Moon Mining Tax ledger, derived (not stored) from ESI's personal mining ledger: every moon-goo row for one (character, EVE/UTC date, solar system), summed per ore type.
 - **Multi-Type Contract**: A public contract whose for-sale lines span more than one distinct item type. Its price is a real, indivisible ask for the whole contract, never attributed to any single line as that item's own price.
 - **Mutaplasmid**: The consumable that turns one base module or drone into a
@@ -501,6 +504,7 @@ here — they go one per file in `docs/context/decisions/`.
 - **Ore Form**: Whether mining ore, moon ore and ice are valued and named as their Compressed or Raw type. A synced setting, Compressed by default; a type with no Compressed counterpart is always Raw. Applies to Unassigned and Outstanding rows only; Paid rows keep the ISK they were paid at.
 - **Reprocessing Yield**: What one type breaks down into when refined, per portion size rather than per unit. Combined with the character's skills into an expected output: ore, ice and moon ore use Reprocessing, Reprocessing Efficiency and their own specialisation skill; scrap uses Scrapmetal Processing only. Assumes the base 50% station rate (shown as an assumption); structure rate, rigs and standings tax are deliberately not modelled.
 - **Order Slots**: How many market orders a character may keep open at once: a base 5, plus 4 per level of Trade, 8 per Retail, 16 per Wholesale and 32 per Tycoon, so 305 with all four at V. Derived from trained skills, since ESI never reports the ceiling.
+- **Overdue**: A **Statement** that is still unpaid a set number of days after it was issued (14 by default; settable per book). No interest accrues, and reminders are sent by hand. A Miner's declaration that they paid another way pauses it for at most 14 days.
 - **Overview Layout**: The ordered list of **Widgets** on the Overview, with
   each one's size, view, rename, character scope and range. One per pilot, not
   per Character, and synced as a whole.
@@ -640,7 +644,9 @@ here — they go one per file in `docs/context/decisions/`.
 - **Consolidation Plan**: What each Character would have to move to bring their loose stock (not assembled, not inside a container or ship) to one destination station: per-Character packaged m3, trips against the saved **Cargo Space**, and a **Route Safety** link. A volume estimate, never a safety verdict.
 - **Trip Plan**: The suggested load for one trip's **Cargo Space** on one route: a quantity per item capped by a week of sales, the units worth buying at all, the remaining **Cargo Space** and the optional **Max spend**, with the limit that applied named on each line. A suggestion the user can edit.
 - **Training Progress**: How much SP a Character has already banked toward the level it is training _right now_. Distinct from **Trained Skills**, which is levels finished. Interpolated from the skill queue's training window, as the in-game queue displays it.
+- **Unattributed**: Ore in a corp member's personal Moon Mining Tax ledger on a **Billable** day that no **Corp Tax Book** claims and that the member gave to no **Payee**. Owed to no one. Several books in one system on one day split the entry by the quantity each observed; what none observed stays Unattributed.
 - **Undercut Scope**: Station, system or region: the nested scopes a rival's cheaper order can sit in. A row shows one severity, the tightest scope containing a rival. A scope absent from the result was never checked; a checked scope with no rival is recorded as clean, not absent.
+- **Unmatched**: A donation into the corporation's wallet that a **Corp Tax Book** could not link to a **Miner**: it came from a character no Miner has, with no pay code. It credits no one until the player claims it from their own lines or an officer assigns it to a Miner.
 - **Use-or-Sell Check**: A Build Plan's third read, alongside the **Acquisition Verdict** and **Sale Profitability**, stated in the Costs panel rather than the **Verdict Hero**: is the stock the player already owns worth more sold than consumed? Compares the plan's profit (which counts owned units as free) against what those units would net if liquidated, on a chosen **Liquidation Basis**.
 - **Verdict Hero**: The first panel of a Build Plan: net profit as one large figure, the margin / ISK-hour / duration / break-even line under it, and the **Acquisition Verdict** as a labelled pill. **Sale Profitability** is the big figure itself; the **Use-or-Sell Check** is not in the hero.
 - **Liquidation Basis**: How owned materials would be turned into ISK in the **Use-or-Sell Check**: `instant` (fill the hub's standing buy orders, sales tax only) or `order` (list your own stack at the hub's sell price, sales tax plus broker fee). Independent of a plan's material price basis, which is about buying.

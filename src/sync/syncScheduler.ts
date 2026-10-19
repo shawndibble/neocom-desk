@@ -4,6 +4,7 @@
 // (`runPass`), so this module knows nothing of Firestore and planSync.ts can
 // own the pass without an import cycle.
 import { isOnline } from '@/stores/network';
+import { reportFailure } from '@/observability/reportFailure';
 import { clearSyncScheduled, setStatus, setSyncScheduled } from './status';
 
 /**
@@ -108,6 +109,7 @@ export function createSyncScheduler(
       });
     } catch (error) {
       failure = { error };
+      reportFailure('sync', error);
       setStatus(characterId, {
         state: 'error',
         error: error instanceof Error ? error.message : String(error),
