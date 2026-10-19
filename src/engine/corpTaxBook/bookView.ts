@@ -11,7 +11,15 @@ import { allocatePayments, dismissalCredits, type Allocation, type TaxPayment } 
 import { lastBillableDate } from './billable';
 import { buildDayCharges, type DayCharge, type Miner } from './charges';
 import { activeDismissalFor, type Dismissal } from './dismissals';
-import { extractionStatus, minedDuringExtraction, type ExtractionState } from './extraction';
+import {
+  chunkRateFor,
+  extractionStatus,
+  learnChunkRates,
+  minedDuringExtraction,
+  type ChunkRate,
+  type ExtractionState,
+  type LearnedChunkRate,
+} from './extraction';
 import { overdueStatus, type Declaration } from './overdue';
 import {
   draftStatement,
@@ -43,6 +51,8 @@ export interface BookViewInput {
   hubId: string;
   oreForm: 'compressed' | 'raw';
   structureExpiryHours: Readonly<Record<string, number>>;
+  /** The book's manual chunk rate (m³/h); the fallback behind a refinery's measured one. */
+  chunkM3PerHour?: number;
   /** ISO instant of the book's last sync by anyone. */
   lastSyncedAt?: string;
   rates: readonly TaxRate[];
@@ -117,6 +127,8 @@ export interface ExtractionRow {
   expiresAt?: string;
   oreSource: 'notification' | 'survey' | 'unknown';
   oreLines: OreLine[];
+  /** The chunk rate a survey estimate was made at (D13); absent for the other sources. */
+  chunkRate?: ChunkRate;
   estimatedValue: number | null;
   /** Share of the estimate already mined, 0-100; null when the make-up is unknown or it has not fractured. */
   minedPct: number | null;
@@ -159,6 +171,8 @@ export interface BookView {
   billableThrough: string | undefined;
   miners: MinerRow[];
   extractions: ExtractionRow[];
+  /** Each refinery's measured chunk rate, learned from its ExtractionStarted notifications. */
+  chunkRates: ReadonlyMap<number, LearnedChunkRate>;
   needsYou: NeedsYouItem[];
   totals: { owed: number; overdue: number; overdueCount: number; unbilled: number; credit: number };
   /** Everything the per-Miner and per-Extraction pages read. */
@@ -445,7 +459,8 @@ export function buildBookView(input: BookViewInput): BookView {
       (a.kind === 'overdue' && b.kind === 'overdue' ? b.days - a.days : 0)
   );
 
-  const extractions = buildExtractionRows(input, charges, frozenByKey);
+  const chunkRates = learnChunkRates(input.extractions.map(measurable));
+  const extractions = buildExtractionRows(input, charges, frozenByKey, chunkRates);
   const overdueRows = miners.filter((m) => m.overdueDays !== null);
   return {
     input,
@@ -455,6 +470,7 @@ export function buildBookView(input: BookViewInput): BookView {
     billableThrough,
     miners,
     extractions,
+    chunkRates,
     needsYou,
     totals: {
       owed: miners.reduce((s, m) => s + m.owed, 0),
@@ -467,10 +483,21 @@ export function buildBookView(input: BookViewInput): BookView {
   };
 }
 
+/** A stored Extraction as `learnChunkRates` reads it. */
+export function measurable(x: SyncExtraction) {
+  return {
+    structureId: x.structureId,
+    startedAt: x.extractionStartTime,
+    chunkArrivalAt: x.chunkArrivalTime,
+    ...(x.oreLines ? { oreLines: x.oreLines } : {}),
+  };
+}
+
 function buildExtractionRows(
   input: BookViewInput,
   charges: readonly DayCharge[],
-  frozenByKey: ReadonlyMap<string, { tax: number }>
+  frozenByKey: ReadonlyMap<string, { tax: number }>,
+  chunkRates: ReadonlyMap<number, LearnedChunkRate>
 ): ExtractionRow[] {
   const today = input.now.slice(0, 10);
   const todayPrices = input.pricesOn(today).prices;
@@ -511,6 +538,9 @@ function buildExtractionRows(
         oreSource:
           notified.length > 0 ? 'notification' : surveyed.length > 0 ? 'survey' : 'unknown',
         oreLines,
+        ...(surveyed.length > 0
+          ? { chunkRate: chunkRateFor(chunkRates.get(x.structureId), input.chunkM3PerHour) }
+          : {}),
         estimatedValue,
         minedPct,
         tax: mine.reduce((s, c) => s + (frozenByKey.get(c.key)?.tax ?? c.taxOwed), 0),
