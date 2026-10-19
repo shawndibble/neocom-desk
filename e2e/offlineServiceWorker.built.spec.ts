@@ -64,8 +64,9 @@ test('boots, deep-links and serves a cached lazy SDE file with no network', asyn
   await expect(page.locator('#root > *').first()).toBeVisible();
 
   // A URL that is not in the precache: NavigationRoute -> /index.html.
-  await page.goto('/styleguide');
-  await expect(page.getByRole('table', { name: 'Wide DataTable sample' })).toBeVisible();
+  // (Not `/styleguide`: its route chunk is deliberately kept out of the precache.)
+  await page.goto('/login');
+  await expect(page.locator('#root > *').first()).toBeVisible();
 
   // The lazy file is served from the `sde-data` runtime cache.
   const offline = await page.evaluate(async (url) => {
