@@ -11,8 +11,8 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import { TRADE_HUBS } from '@/market/hubs';
 import { miningPricesUrl } from '@/features/market/hubSnapshot';
-import { SNAPSHOT_HUBS, miningPricesR2Key } from '../functions/src/miningHubPrices';
-import { MARKET_OPEN_PRICES_REGION_IDS } from '../functions/src/marketOpenPrices';
+import { miningPricesR2Key } from '../functions/src/miningHubPrices';
+import { MARKET_OPEN_PRICES_REGION_IDS, SNAPSHOT_HUBS } from '../functions/src/marketOpenPrices';
 import {
   FIRED_RETENTION_MS,
   isDue,
