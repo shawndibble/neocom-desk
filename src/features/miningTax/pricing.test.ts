@@ -221,7 +221,7 @@ describe('loadUnitPricesOnDate', () => {
     expect(pricesMock.getHubPrices).toHaveBeenCalledWith(expect.objectContaining({ id: 'hek' }), [
       VELDSPAR,
     ]);
-    expect(hubSnapshotMock.loadHubSnapshotRange).toHaveBeenCalledWith(DATE, DATE, hek);
+    expect(hubSnapshotMock.loadHubSnapshotRange).toHaveBeenCalledWith(DATE, DATE, [VELDSPAR], hek);
     // Dexie only ever holds Jita — no equivalent for a non-default hub.
     expect(priceSnapshotsMock.loadPriceSnapshots).not.toHaveBeenCalled();
   });

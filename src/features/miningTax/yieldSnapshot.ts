@@ -323,16 +323,17 @@ export async function loadMiningYieldSnapshot(
   }
   const savedByDate = await loadPriceSnapshots().catch(() => new Map<string, SnapshotDay>());
 
-  // The server's daily hub-station mining prices (`hubSnapshot.ts`, read from
+  // The server's daily hub-station Open Prices (`hubSnapshot.ts`, read from
   // R2) cover every day regardless of whether this browser ever saved one —
   // see priceBasis.ts's header comment for the tier ordering. Its `saved` days
   // fold into the same `saved` tier as this browser's own Dexie snapshot,
-  // server winning where both have a value for a day; the retired job's
-  // Adam4EVE days feed the weaker `historical` tier instead.
+  // server winning where both have a value for a day; old region-wide days
+  // feed the weaker `historical` tier instead.
   const entryDates = allEntries.map(({ entry }) => entry.date);
   const hubSnapshot = await loadHubSnapshotRange(
     entryDates.reduce((min, date) => (date < min ? date : min)),
-    entryDates.reduce((max, date) => (date > max ? date : max))
+    entryDates.reduce((max, date) => (date > max ? date : max)),
+    historyTypeIds
   );
   for (const [date, byType] of hubSnapshot.saved) {
     const fresh: SnapshotDay = Object.fromEntries(byType);

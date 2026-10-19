@@ -5,28 +5,22 @@
  * sell-side trades, neither the price a pilot gets selling into buy orders nor
  * the sell-order price — and no row at all for today. So each day is priced
  * from a station buy/sell price instead where one exists — the server's daily
- * end-of-day hub-station prices (`hubSnapshot.ts`, folded by
- * `syncMarketOpenPrices`; decision 20261018-233051) and, for Jita, the snapshot
+ * end-of-day hub-station Open Prices (`hubSnapshot.ts`, published by
+ * `syncMarketOpenPrices`; decision 20261019-091155) and, for Jita, the snapshot
  * this browser saves each time the Overview loads — from the best source it
  * has, in this order:
  *
- *   saved snapshot for that day → Adam4EVE's historical buy/sell split →
+ *   saved snapshot for that day → region-wide historical buy/sell split →
  *   ESI daily average → today's live price (the last only for today and
  *   yesterday, before ESI has published them).
  *
  * The "now" bases skip all of that and value every day at today's live price.
  *
- * `historical` (issue #1279 follow-up) is a real buy/sell split, unlike the
- * blended ESI average, but region-wide rather than station-level (Adam4EVE's
- * `market_price_history` has no station filter) — weaker than `saved`
- * (station-exact) and `live` (station-exact, just the wrong day), stronger
- * than `average` (not even the right side of the book). It only covers Jita
- * days from before the retired `captureMiningPriceSnapshot` job captured live,
- * a one-time backfill since copied into the R2 hub prices; no new day gets it.
- *
- * `saved` is the day's end-of-day best price (the last EVE Ref order snapshot
- * of the UTC day) since decision 20261018-233051; days before that were the
- * old job's average of up to four Fuzzwork captures through the day.
+ * `historical` is a real buy/sell split, unlike the blended ESI average, but
+ * region-wide rather than station-level — weaker than `saved` (station-exact)
+ * and `live` (station-exact, just the wrong day), stronger than `average` (not
+ * even the right side of the book). It is the Open Prices' region-wide days,
+ * which an object keeps until the station backfill re-run (#4279) rewrites it.
  */
 import { shiftDate } from './yieldRange';
 import { LEDGER_HISTORY_DAYS } from './ledgerHistory';
@@ -46,7 +40,7 @@ export interface SidePrices {
 export interface UnitPriceInputs {
   /** This app's saved snapshot for the day, if one was taken. */
   saved?: SidePrices;
-  /** Adam4EVE's region-wide historical buy/sell split for the day, if the server ever had to backfill it. */
+  /** A region-wide historical buy/sell split for the day, where only one is stored. */
   historical?: SidePrices;
   /** ESI market history's daily average for the day. */
   average?: number;
@@ -101,7 +95,7 @@ export type TaxPriceSource = 'saved' | 'historical' | 'live' | 'live-sell' | 'no
 export interface TaxUnitPriceInputs {
   /** This app's saved snapshot for the day, if one was taken. */
   saved?: SidePrices;
-  /** Adam4EVE's region-wide historical buy/sell split for the day, if the server ever had to backfill it. */
+  /** A region-wide historical buy/sell split for the day, where only one is stored. */
   historical?: SidePrices;
   /** Today's live book. */
   live?: SidePrices;
@@ -117,7 +111,7 @@ export interface ResolvedTaxPrice {
  * buy side only — Tax has never had a basis selector, it bills at what a
  * Payee would actually get selling into buy orders — in this order:
  *
- *   saved snapshot for that day → Adam4EVE's historical buy split →
+ *   saved snapshot for that day → region-wide historical buy split →
  *   today's live buy → today's live sell (only when no buy side exists anywhere).
  *
  * Deliberately its own resolver rather than `resolveUnitPrice` with a fixed

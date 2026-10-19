@@ -1,6 +1,6 @@
 // The slice of the Corp Tax Book engine (src/engine/corpTaxBook, issue #4059)
 // that the callables enforce. `functions/` is a separate NodeNext package that
-// cannot import `src/`, so — as miningHubPrices.ts does for the trade hubs —
+// cannot import `src/`, so — as marketOpenPrices.ts does for the trade hubs —
 // this is a small mirror kept honest by a parity test in the root suite
 // (src/engine/corpTaxBook/functionsMirror.test.ts), which runs both copies on
 // the same inputs. Change the engine first, then this file. Dependency-free on
