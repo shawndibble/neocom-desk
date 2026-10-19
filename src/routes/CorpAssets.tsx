@@ -89,10 +89,9 @@ import {
   selectionStateForIds,
   toggleSelection,
 } from '@/features/character/assetSelection';
+import { NodeContainerRow, NodeItemRow } from '@/features/assets/AssetBrowseRows';
 import {
-  ContainerRow,
   ItemColumnLabels,
-  ItemRow,
   LocationRow,
   SearchResultRow,
 } from '@/features/character/assetBrowserRows';
@@ -886,16 +885,14 @@ function NodeRowView({
 
   if (node.kind !== 'item') {
     return (
-      <ContainerRow
+      <NodeContainerRow
+        node={node}
         href={corpAssetHref(pathGroupId, [...pathSegments, assetNodeSegment(node)], query)}
         label={label}
-        itemCount={node.itemCount}
-        estimatedValue={node.estimatedValue}
         characterBadge={null}
-        named={node.kind !== 'bay'}
         selectMode={selectMode}
-        selectionState={selectionStateForIds(collectItemIds(node), selectedIds)}
-        onToggleSelection={() => onToggleSelection(collectItemIds(node))}
+        selectedIds={selectedIds}
+        onToggleSelection={onToggleSelection}
         t={t}
       />
     );
@@ -903,17 +900,16 @@ function NodeRowView({
 
   const { asset } = node;
   return (
-    <ItemRow
-      name={label}
-      quantity={asset.quantity}
+    <NodeItemRow
+      asset={asset}
+      label={label}
       unitVolume={volumeByTypeId.get(asset.type_id)}
       estimatedValue={assetStackValue(asset, priceByTypeId, copyValueByItemId)}
       characterBadge={null}
       blueprintKind={assetBlueprintKind(asset, blueprintTypeIds)}
-      typeId={asset.type_id}
       selectMode={selectMode}
-      selectionState={selectedIds.has(asset.item_id) ? 'checked' : 'unchecked'}
-      onToggleSelection={() => onToggleSelection([asset.item_id])}
+      selectedIds={selectedIds}
+      onToggleSelection={onToggleSelection}
       t={t}
       wrap={(children) => (
         <ItemContextMenu typeId={asset.type_id} itemName={label} blueprintTypeID={null}>
