@@ -6,7 +6,7 @@
  * `models.ts`, `kindModels.ts` and `chartBuilders.ts`.
  */
 import { DAY_MS } from '@/lib/age';
-import type { DeadlineSeverity } from '@/engine/severity';
+import type { DeadlineSeverity } from '@/engine/character/severity';
 import { ORDER_PROBLEMS, type OrderProblem } from '@/engine/market/orderProblems';
 import { isPriceSpike } from '@/engine/market/priceVsMedian';
 import { formatVsMedianPct } from '@/features/market/format';

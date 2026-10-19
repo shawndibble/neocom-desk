@@ -26,7 +26,10 @@ import { extractorProgramsFromPins } from '@/engine/pi/colonyPins';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { loadContracts } from '@/features/character/contracts';
 import { loadContractLocationName } from '@/features/character/contractLocationName';
-import { summarizeContractsBoard, type ContractsBoardSummary } from '@/engine/contractsBoard';
+import {
+  summarizeContractsBoard,
+  type ContractsBoardSummary,
+} from '@/engine/contracts/contractsBoard';
 import { loadCalendarEvents } from '@/features/character/calendar';
 import { loadMailHeaders, loadMailLabels } from '@/features/character/mail';
 import { resolveNames } from '@/features/character/names';

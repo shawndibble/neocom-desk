@@ -1,6 +1,6 @@
 /** Fetch + cache layer for the Contracts view. */
 import { getCharacterContracts, type Contract } from '@/esi/endpoints';
-import { withAcceptedCourierInProgress } from '@/engine/contractStatus';
+import { withAcceptedCourierInProgress } from '@/engine/contracts/contractStatus';
 import {
   conditionalPagedFetch,
   loadPaginatedWithCacheStatus,
@@ -35,4 +35,4 @@ export function loadContracts(characterId: number): Promise<StatusResult<Contrac
 // in `engine/contractStatus.ts`, so `calendarBoardSources.ts` can read it
 // without pulling this module's Dexie-backed loaders in with it. Existing
 // callers keep importing it from here.
-export { isActiveContractStatus } from '@/engine/contractStatus';
+export { isActiveContractStatus } from '@/engine/contracts/contractStatus';

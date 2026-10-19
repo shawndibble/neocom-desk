@@ -76,7 +76,11 @@ import {
   useSpExtractionMonitoringEnabled,
   useSpExtractionThresholdSp,
 } from '@/features/character/spExtractionSettings';
-import { extractionTotalIsk, extractorCount, isSpExtractionReady } from '@/engine/spExtraction';
+import {
+  extractionTotalIsk,
+  extractorCount,
+  isSpExtractionReady,
+} from '@/engine/skills/spExtraction';
 import { formatIskCompact } from '@/lib/isk';
 import { useExtractionPrices } from '@/features/character/useExtractionPrices';
 import { maxJobSlots, type JobSlotCategory, type JobSlotSkills } from '@/engine/industry/jobSlots';

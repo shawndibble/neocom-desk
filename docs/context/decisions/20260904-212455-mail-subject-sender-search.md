@@ -11,7 +11,7 @@ _Recorded 2026-09-04 · issue #416._
   capping. Both together undercut round 18's premise, so the search box this
   round adds is a correction, not a second look at a settled decision.
 - **Search matches subject or resolved sender name, case-insensitively**
-  (`mailSearchMatches`, `engine/mail.ts`), composed with the existing tab and
+  (`mailSearchMatches`, `engine/mail/mail.ts`), composed with the existing tab and
   Custom-Label filters (AND) rather than replacing either — the three
   narrowing mechanisms stack the same way tab-and-chips already did in round 22.
 - **The rendered header list is capped, independent of the fetch/pagination

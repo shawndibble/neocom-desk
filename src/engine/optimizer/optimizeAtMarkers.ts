@@ -17,7 +17,7 @@ import {
 } from '@/engine/optimizer/bestAttributes';
 import type { PlaceRemapsResult, RemapSegment } from '@/engine/optimizer/placeRemaps';
 import { computeSchedule } from '@/engine/schedule';
-import { spBetween, timeToTrain, trainingRate } from '@/engine/sp';
+import { spBetween, timeToTrain, trainingRate } from '@/engine/skills/sp';
 import type { Attributes, CloneState, EngineSkill, Implants, PlanStep } from '@/engine/types';
 
 export interface OptimizeAtMarkersOptions {

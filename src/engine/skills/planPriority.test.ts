@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { effectivePriority, higherPriority, priorityRank } from '@/engine/planPriority';
+import { effectivePriority, higherPriority, priorityRank } from '@/engine/skills/planPriority';
 import type {
   AttributeName,
   EngineSkill,

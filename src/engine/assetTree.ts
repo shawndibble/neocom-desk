@@ -11,7 +11,7 @@
  * there is nothing to expand into either way.
  */
 
-import type { JumpsAwayResult } from './jumpsAway';
+import type { JumpsAwayResult } from './clone/jumpsAway';
 
 export interface EngineAsset {
   item_id: number;

@@ -30,8 +30,8 @@ import {
   recipientKey,
   validateNewMail,
   type ComposeRecipient,
-} from '@/engine/mailCompose';
-import { draftMarkupBody, sanitizeMarkup } from '@/engine/mailEditorDoc';
+} from '@/engine/mail/mailCompose';
+import { draftMarkupBody, sanitizeMarkup } from '@/engine/mail/mailEditorDoc';
 import { sendMail } from './mail';
 import { clearNewMailDraft, loadNewMailDraft, saveNewMailDraft } from './mailDrafts';
 import { MailBodyEditor, type MailBodyEditorProps } from './MailBodyEditor';

@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { normalizePlan, normalizePlanWithBoundaries, findRemovalBlockers } from '@/engine/plan';
+import {
+  normalizePlan,
+  normalizePlanWithBoundaries,
+  findRemovalBlockers,
+} from '@/engine/skills/plan';
 import type { EngineSkill, PlanEntry, TrainedSkill } from '@/engine/types';
 
 function skill(

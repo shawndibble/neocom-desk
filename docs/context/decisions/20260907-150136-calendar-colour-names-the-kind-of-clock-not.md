@@ -12,7 +12,7 @@ _Recorded 2026-09-07._
   surface is how neither gets read.
   - This **reverses the "Severity is one shared ladder" bullet** of
     `20260907-123312-calendar-becomes-the-characters-coming-up-surface.md` as
-    far as the _character_ board is concerned. `engine/severity.ts` stays and
+    far as the _character_ board is concerned. `engine/character/severity.ts` stays and
     the corp ops board still ranks and paints by it — the extraction was still
     worth doing, it just has one caller again. `CharacterBoardItem.severity`
     is gone rather than left unread.

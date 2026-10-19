@@ -6,7 +6,7 @@
 import { loadSkills } from '@/sde/loadSde';
 import type { SkillType } from '@/sde/types';
 import type { CharacterAttributes, CharacterSkill } from '@/esi/endpoints';
-import { buildUnlockIndex } from '@/engine/skillUnlocks';
+import { buildUnlockIndex } from '@/engine/skills/skillUnlocks';
 import { deriveAttributeBaseline, type AttributeBaseline } from '@/engine/attributeBaseline';
 import type { Attributes, EngineSkill, Implants, SkillUnlock, TrainedSkill } from '@/engine/types';
 import type { SkillLevels } from '@/engine/industry/types';

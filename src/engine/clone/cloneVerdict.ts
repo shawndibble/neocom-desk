@@ -4,7 +4,7 @@ import {
   stayThenSwitchEntrySeconds,
   type CloneTrainingInput,
 } from './cloneTrainingTime';
-import type { AttributeName, Implants } from './types';
+import type { AttributeName, Implants } from '../types';
 
 /**
  * Which clone is best for the active training queue, and is jumping worth it?

@@ -6,7 +6,7 @@ import {
   progressToNextLevel,
   trainingRate,
   timeToTrain,
-} from '@/engine/sp';
+} from '@/engine/skills/sp';
 
 // Canonical cumulative SP totals for rank 1 (EVE University wiki, in-game values)
 describe('spForLevel', () => {

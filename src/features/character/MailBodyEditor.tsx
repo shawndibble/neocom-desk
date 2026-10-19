@@ -1,8 +1,8 @@
 import { lazy, Suspense, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Spinner, TextArea } from '@/components/ui';
-import { markupPlainText, parseEveMarkup } from '@/engine/eveMarkup';
-import { plainTextToMarkup } from '@/engine/mailEditorDoc';
+import { markupPlainText, parseEveMarkup } from '@/engine/mail/eveMarkup';
+import { plainTextToMarkup } from '@/engine/mail/mailEditorDoc';
 
 /**
  * The seam between the New Mail composer and whatever edits its body. The

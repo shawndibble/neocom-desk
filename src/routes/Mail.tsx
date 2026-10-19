@@ -73,7 +73,7 @@ import { formatDateOnly, formatTimestamp } from '@/lib/timestamp';
 import { useCalendarWeekStart } from '@/features/character/calendarWeekStart';
 import { useNow } from '@/lib/useNow';
 import { formatMonthLabel } from '@/lib/calendarGrid';
-import { groupMailByAge, type MailAgeBucket } from '@/engine/mailAge';
+import { groupMailByAge, type MailAgeBucket } from '@/engine/mail/mailAge';
 import {
   buildLabelTabMap,
   capHeadersForDisplay,
@@ -86,7 +86,7 @@ import {
   MAIL_FOLDERS,
   type ComposeKind,
   type MailTab,
-} from '@/engine/mail';
+} from '@/engine/mail/mail';
 import type {
   CharacterAffiliation,
   MailBody,

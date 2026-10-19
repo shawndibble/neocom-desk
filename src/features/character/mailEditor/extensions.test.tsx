@@ -1,6 +1,6 @@
 import { Editor } from '@tiptap/core';
 import { afterEach, describe, expect, it } from 'vitest';
-import { docToMarkup, markupToDoc, type EditorDoc } from '@/engine/mailEditorDoc';
+import { docToMarkup, markupToDoc, type EditorDoc } from '@/engine/mail/mailEditorDoc';
 import { mailEditorExtensions } from './extensions';
 
 let editor: Editor | undefined;

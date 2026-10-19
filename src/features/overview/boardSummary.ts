@@ -27,10 +27,10 @@ import {
   openOrderProblemCounts,
 } from '@/features/market/openOrdersModel';
 import type { OpenOrderRow } from '@/features/market/openOrdersModel';
-import { compareSeverity } from '@/engine/severity';
+import { compareSeverity } from '@/engine/character/severity';
 import { formatCountdown } from '@/lib/duration';
-import { upcomingCommittedEvents } from '@/engine/calendarDeadline';
-import { extractableSp, extractorCount, isSpExtractionReady } from '@/engine/spExtraction';
+import { upcomingCommittedEvents } from '@/engine/character/calendarDeadline';
+import { extractableSp, extractorCount, isSpExtractionReady } from '@/engine/skills/spExtraction';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { structureCounts } from './corpCards';
 import type {

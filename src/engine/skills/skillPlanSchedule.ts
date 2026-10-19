@@ -12,8 +12,8 @@
 import { alphaCappedStepIndices } from '@/engine/alphaCap';
 import { boostedStepIndices } from '@/engine/boosterImpact';
 import { optimizeAtMarkers, type PlaceRemapsResult } from '@/engine/optimizer';
-import { normalizePlanWithBoundaries } from '@/engine/plan';
-import { effectivePriority } from '@/engine/planPriority';
+import { normalizePlanWithBoundaries } from '@/engine/skills/plan';
+import { effectivePriority } from '@/engine/skills/planPriority';
 import { markerStepIndices } from '@/engine/remapMarkers';
 import { computeSchedule, type AttributeSegment } from '@/engine/schedule';
 import type {

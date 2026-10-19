@@ -40,7 +40,7 @@ import { cx } from '@/lib/cx';
 import { buttonClassName } from '@/components/ui/buttonClassName';
 import { Link } from 'react-router-dom';
 import { formatIsk, formatMarketIsk } from '@/lib/isk';
-import type { JumpsAwayResult } from '@/engine/jumpsAway';
+import type { JumpsAwayResult } from '@/engine/clone/jumpsAway';
 import { JumpsAwayText } from '@/features/character/assetBrowserRows';
 import type { UndercutRival, UndercutScope } from '@/engine/market/undercut';
 import { sellThrough, type SellThrough } from '@/engine/market/orderHealth';

@@ -83,7 +83,7 @@ import {
   useSpExtractionMonitoringEnabled,
   useSpExtractionThresholdSp,
 } from '@/features/character/spExtractionSettings';
-import { SP_EXTRACTION_CHUNK_SP } from '@/engine/spExtraction';
+import { SP_EXTRACTION_CHUNK_SP } from '@/engine/skills/spExtraction';
 import {
   COLLATERAL_RATIO_OPTIONS,
   useCourierCollateralRatio,

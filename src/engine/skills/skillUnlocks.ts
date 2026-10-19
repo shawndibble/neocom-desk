@@ -1,4 +1,4 @@
-import type { EngineSkill, SkillUnlock } from './types';
+import type { EngineSkill, SkillUnlock } from '../types';
 
 /**
  * Reverse index of EngineSkill.prereqs: for a prerequisite skill, every skill

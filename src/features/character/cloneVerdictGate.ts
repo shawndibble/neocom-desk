@@ -7,7 +7,11 @@
  * only the precedence (an unreadable implant list, then queue, then a paused or
  * empty queue, then an unreadable attribute sheet) and the comparison call.
  */
-import { cloneVerdict, type CloneVerdict, type CloneVerdictResult } from '@/engine/cloneVerdict';
+import {
+  cloneVerdict,
+  type CloneVerdict,
+  type CloneVerdictResult,
+} from '@/engine/clone/cloneVerdict';
 import type { CloneState } from '@/engine/types';
 import type { SkillQueueEntry } from '@/esi/endpoints';
 import { isQueuePaused } from '@/features/skills/queueStatus';

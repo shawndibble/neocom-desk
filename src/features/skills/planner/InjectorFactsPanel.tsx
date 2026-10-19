@@ -6,8 +6,8 @@ import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { useMarketHub } from '@/features/market/hub';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { getHubPricesWithStatus, type HubAggregate } from '@/market/prices';
-import { LARGE_SKILL_INJECTOR_TYPE_ID } from '@/engine/spExtraction';
-import { ALPHA_SP_CAP } from '@/engine/skillInjectors';
+import { LARGE_SKILL_INJECTOR_TYPE_ID } from '@/engine/skills/spExtraction';
+import { ALPHA_SP_CAP } from '@/engine/skills/skillInjectors';
 import type { CloneState } from '@/engine/types';
 import { buildInjectorFacts } from './injectorFacts';
 

@@ -40,8 +40,8 @@ import {
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { cx } from '@/lib/cx';
 import * as Icon from '@/components/ui/icons';
-import { PRIORITY_ORDER } from '@/engine/planPriority';
-import type { MilestoneState, MilestoneStatus } from '@/engine/skillPlanMilestones';
+import { PRIORITY_ORDER } from '@/engine/skills/planPriority';
+import type { MilestoneState, MilestoneStatus } from '@/engine/skills/skillPlanMilestones';
 import type { AttributeName, Attributes, Implants, PlanPriority } from '@/engine/types';
 import { formatCountdown } from '@/lib/duration';
 import { formatLocalDate } from '@/lib/localDate';

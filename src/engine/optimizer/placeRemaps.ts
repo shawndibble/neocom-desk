@@ -50,7 +50,7 @@ import {
   type BoosterContext,
 } from '@/engine/optimizer/bestAttributes';
 import { computeSchedule } from '@/engine/schedule';
-import { spBetween, timeToTrain, trainingRate } from '@/engine/sp';
+import { spBetween, timeToTrain, trainingRate } from '@/engine/skills/sp';
 import type { Attributes, CloneState, EngineSkill, Implants, PlanStep } from '@/engine/types';
 
 export interface RemapSegment {

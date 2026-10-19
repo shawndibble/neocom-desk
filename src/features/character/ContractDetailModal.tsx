@@ -52,7 +52,7 @@ import { contractIssuer, type ContractReceiver } from './contractCounterparty';
 import type { EffectiveStanding } from './contactStandings';
 import { CONTRACT_ISK_CENTS_BELOW, formatIskAuto } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
-import { courierDeliveryDeadlineMs } from '@/engine/courierDeadline';
+import { courierDeliveryDeadlineMs } from '@/engine/contracts/courierDeadline';
 import { useTimeZone } from '@/lib/timeFormat';
 import type { Contract, ContractItem } from '@/esi/endpoints';
 

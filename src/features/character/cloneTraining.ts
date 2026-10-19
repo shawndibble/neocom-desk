@@ -1,4 +1,4 @@
-import type { CloneInput, QueueEntryInput } from '@/engine/cloneTrainingTime';
+import type { CloneInput, QueueEntryInput } from '@/engine/clone/cloneTrainingTime';
 import { acceleratorBonusOf, baselineAttributes } from '@/engine/attributeBaseline';
 import type { Attributes, EngineSkill } from '@/engine/types';
 import type { JumpClone, SkillQueueEntry } from '@/esi/endpoints';

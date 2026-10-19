@@ -19,7 +19,7 @@ import { contractCauseOf } from './walletCause';
 import type { FillMatch } from './market/fillTime';
 import { colonyStatus } from './pi/colonyStatus';
 import { diffRoster } from './corp/members';
-import { isSpExtractionReady } from './spExtraction';
+import { isSpExtractionReady } from './skills/spExtraction';
 import type { StationUndercutState } from './market/stationUndercutState';
 
 export interface SkillQueueEntrySnapshot {

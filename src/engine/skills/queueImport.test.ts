@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseSkillQueue } from '@/engine/queueImport';
+import { parseSkillQueue } from '@/engine/skills/queueImport';
 
 describe('parseSkillQueue', () => {
   it('maps ESI queue rows to plan entries', () => {

@@ -52,7 +52,7 @@ _Recorded 2026-09-07._
     on screen at all times, so a character that wants a different set is one
     click away — which is not true of a preference you must first rediscover.
 
-- **`src/engine/mail.ts` keeps its shape.** `resolveMailTab` still returns
+- **`src/engine/mail/mail.ts` keeps its shape.** `resolveMailTab` still returns
   one canonical tab per header, so the filter is just
   `folders.has(resolveMailTab(...))`. Only `MAIL_TABS` (the four folders in
   display order) and `parseMailFolders` (validation for the stored value) are

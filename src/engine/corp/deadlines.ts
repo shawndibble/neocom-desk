@@ -11,7 +11,7 @@
  * Pure like the rest of `src/engine` (CLAUDE.md): board items and `nowMs` in,
  * plain objects out.
  */
-import { DEADLINE_SEVERITIES } from '../severity';
+import { DEADLINE_SEVERITIES } from '../character/severity';
 import { localMidnight } from '../localDay';
 import { CORP_BOARD_ITEM_KINDS, type CorpBoardItem, type CorpBoardItemKind } from './board';
 import type { CorpBoardSeverity } from './board';

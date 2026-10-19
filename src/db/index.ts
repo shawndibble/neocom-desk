@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie';
-import type { ComposeRecipientType } from '@/engine/mailCompose';
+import type { ComposeRecipientType } from '@/engine/mail/mailCompose';
 import { emitUpgradeBlocked } from './blockedSignal';
 import { esiCacheMetaMiddleware, type CachedPage, type EsiCacheMetaRecord } from './esiCacheMeta';
 import type { Attributes, Implants, PlanEntry, PlanMilestone } from '@/engine/types';

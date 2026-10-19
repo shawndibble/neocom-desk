@@ -87,7 +87,7 @@ import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapsh
 import { useFocusHeading } from '@/lib/useFocusHeading';
 import { useIsPhone } from '@/lib/useIsPhone';
 import type { CharacterAsset } from '@/esi/endpoints';
-import type { JumpsAwayResult } from '@/engine/jumpsAway';
+import type { JumpsAwayResult } from '@/engine/clone/jumpsAway';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { loadAssetCopyValues } from '@/features/character/assetCopyValues';
 import { useBlueprintTypeIds } from '@/features/character/useBlueprintTypeIds';

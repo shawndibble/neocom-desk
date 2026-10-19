@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { computeSchedule } from '@/engine/schedule';
-import { normalizePlan } from '@/engine/plan';
+import { normalizePlan } from '@/engine/skills/plan';
 import {
   computeSkillPlanSchedule,
   stepKey,

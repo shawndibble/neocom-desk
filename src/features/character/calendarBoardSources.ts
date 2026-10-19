@@ -25,12 +25,12 @@ import type {
   PlanetPin,
   SkillQueueEntry,
 } from '@/esi/endpoints';
-import { isActiveContractStatus } from '@/engine/contractStatus';
-import { courierDeliveryDeadlineMs } from '@/engine/courierDeadline';
+import { isActiveContractStatus } from '@/engine/contracts/contractStatus';
+import { courierDeliveryDeadlineMs } from '@/engine/contracts/courierDeadline';
 import { parseInstant } from '@/engine/esiInstant';
 import type { BoardCalendarEventSource, BoardClockSource } from '@/engine/character/board';
 import type { BoardExtractionSource } from '@/engine/corp/board';
-import { stepKey, type SkillPlanSchedule } from '@/engine/skillPlanSchedule';
+import { stepKey, type SkillPlanSchedule } from '@/engine/skills/skillPlanSchedule';
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
 

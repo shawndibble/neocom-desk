@@ -4,7 +4,7 @@
  * (`engine/corp/board.ts`) or the Calendar's moon-chunk adapter; this module
  * only counts them and picks which one may lead the summary strip.
  */
-import { worstSeverity, type DeadlineSeverity } from '@/engine/severity';
+import { worstSeverity, type DeadlineSeverity } from '@/engine/character/severity';
 import { DAY_MS } from '@/lib/age';
 import { buildCorpBoard, type CorpBoardItem } from '@/engine/corp/board';
 import type { BoardClockSource } from '@/engine/character/board';

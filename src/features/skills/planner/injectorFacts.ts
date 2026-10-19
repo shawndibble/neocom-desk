@@ -4,7 +4,7 @@
  * cost, "if injected now". Pure — no fetch/DOM/Dexie — so the bracket walk
  * and price wiring are each testable on their own.
  */
-import { ALPHA_SP_CAP, injectorsToCover } from '@/engine/skillInjectors';
+import { ALPHA_SP_CAP, injectorsToCover } from '@/engine/skills/skillInjectors';
 import type { CloneState } from '@/engine/types';
 
 /** The subset of `HubAggregate` this view model prices against. */

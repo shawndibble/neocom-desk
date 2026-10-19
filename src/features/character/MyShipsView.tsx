@@ -28,7 +28,7 @@ import {
 } from '@/components/ui/controlStyles';
 import type { ShipAssetItem } from '@/engine/fittings/assetShipMapper';
 import { findShips, type OwnedAsset, type ShipRow } from '@/engine/myShips';
-import type { JumpsAwayResult } from '@/engine/jumpsAway';
+import type { JumpsAwayResult } from '@/engine/clone/jumpsAway';
 import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
 import { loadGroupCategories, loadTypes } from '@/sde/loadSde';
 import { loadOtherCharactersAssetsDetailed, type SkippedCharacterAssets } from './assets';

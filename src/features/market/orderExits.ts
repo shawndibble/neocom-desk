@@ -24,7 +24,7 @@
  */
 import type { OpenOrderRow } from './openOrdersModel';
 import type { CompetingOrder } from '@/engine/market/undercut';
-import type { JumpsAwayResult } from '@/engine/jumpsAway';
+import type { JumpsAwayResult } from '@/engine/clone/jumpsAway';
 import type { TradeHub } from '@/market/hubs';
 import type { ReprocessingType } from '@/sde/types';
 import { reprocessingValue, reprocessingYield } from '@/engine/industry/reprocessing';
