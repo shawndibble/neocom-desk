@@ -93,6 +93,9 @@ export function useBpcOfferSearch(
     [prepared, data, query]
   );
   const [settled, setSettled] = useState<Settled | null>(null);
+  const [failure, setFailure] = useState<unknown>(null);
+  // Thrown in render, as the page path would: the error boundary catches it.
+  if (failure !== null) throw failure;
 
   useEffect(() => {
     if (!viaWorker) return;
@@ -106,8 +109,12 @@ export function useBpcOfferSearch(
       (error: unknown) => {
         if (!live || (error instanceof Error && error.message === SUPERSEDED)) return;
         // The worker failed: answer on the page, once.
-        const search = rankBpcOffers(prepareBpcOffers(data, prepareInput), data, query);
-        setSettled({ data, prepareInput, query, search });
+        try {
+          const search = rankBpcOffers(prepareBpcOffers(data, prepareInput), data, query);
+          setSettled({ data, prepareInput, query, search });
+        } catch (thrown) {
+          setFailure(thrown);
+        }
       }
     );
     return () => {
@@ -115,11 +122,11 @@ export function useBpcOfferSearch(
     };
   }, [viaWorker, data, prepareInput, query]);
 
+  const awaiting =
+    viaWorker &&
+    (settled?.data !== data || settled.prepareInput !== prepareInput || settled.query !== query);
   const search = onPage ?? settled?.search ?? NO_OFFERS;
-  return {
-    ...search,
-    awaiting:
-      viaWorker &&
-      (settled?.data !== data || settled.prepareInput !== prepareInput || settled.query !== query),
-  };
+  // Suggestions stay up between keystrokes; everything about the rows waits for the answer.
+  if (awaiting) return { ...NO_OFFERS, suggestions: search.suggestions, awaiting };
+  return { ...search, awaiting };
 }

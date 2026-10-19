@@ -436,7 +436,9 @@ export function indexBpcRows(data: Pick<BpcSourceData, 'contractRows' | 'origina
 function toIndices(rows: readonly BpcContractRow[], at: ReadonlyMap<BpcContractRow, number>) {
   const out = new Uint32Array(rows.length);
   rows.forEach((row, i) => {
-    out[i] = at.get(row) ?? 0;
+    const position = at.get(row);
+    if (position === undefined) throw new Error('row not in snapshot');
+    out[i] = position;
   });
   return out;
 }
