@@ -244,8 +244,7 @@ export function useLpStoreSearch(query: string): LpStoreSearchState {
   }, [catalog, snapshot, matchedOffers, priceBasis, skills, standing, itemNames]);
 
   return {
-    status:
-      stores !== null ? 'ready' : failed || activeCharacterId === null ? 'unavailable' : 'loading',
+    status: stores !== null ? 'ready' : failed ? 'unavailable' : 'loading',
     syncedAt,
     result,
     heldStores,

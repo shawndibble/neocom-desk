@@ -1,7 +1,7 @@
 /**
  * Daily open prices for the Price History chart: the highest buy order and the
  * lowest sell order standing at the end of each UTC day, as the
- * `marketOpenPricesByType` snapshot stores them (docs/context/decisions/
+ * R2 `open-prices/<typeId>.json` objects store them (docs/context/decisions/
  * 20261018-121126-price-history-draws-daily-open-buy-and-sell.md). ESI history
  * only records trades, so it cannot say this. Pure — the loader adapts the
  * stored document.

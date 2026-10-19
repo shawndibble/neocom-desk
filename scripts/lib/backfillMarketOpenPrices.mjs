@@ -5,7 +5,7 @@
 // Two phases, so each R2 object is read and written once:
 //   1. foldDays: fold each day's final snapshot and keep only the compact
 //      result (OpenPriceTable) in memory.
-//   2. one writeOpenPrices pass over every document, with all its days.
+//   2. one writeOpenPricesToR2 pass over every type object, with all its days.
 import {
   OpenPriceFold,
   dateRange,

@@ -123,6 +123,7 @@ import { fetchArchiveFingerprint, streamPublicContractsCsvs } from './publicCont
 import {
   createR2Get,
   createR2Put,
+  type R2Config,
   publishContractOffersToR2,
   publishCourierContractsToR2,
   type CourierR2PublishState,
@@ -1296,12 +1297,7 @@ const R2_SECRET_ACCESS_KEY = defineSecret('R2_SECRET_ACCESS_KEY');
  * prices): unlike the contract publishers, which are additive to Firestore and
  * skip quietly, these throw when the config is missing so the run fails loudly.
  */
-function r2ConfigOrThrow(): {
-  endpoint: string;
-  bucket: string;
-  accessKeyId: string;
-  secretAccessKey: string;
-} {
+function r2ConfigOrThrow(): R2Config {
   const endpoint = process.env.R2_ENDPOINT;
   const bucket = process.env.R2_BUCKET;
   if (!endpoint?.startsWith('https://') || !bucket) {
@@ -1598,6 +1594,8 @@ export const syncLpStoreOffers = onSchedule(
     secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY],
   },
   async () => {
+    // Before the ~170-request crawl, so a missing R2 config fails fast.
+    const r2 = r2ConfigOrThrow();
     const { rows, failed } = await fetchLpStoreRows({
       corporations: LP_CORP_STATION_SYSTEMS,
       fetchJson: async (url) => {
@@ -1620,7 +1618,7 @@ export const syncLpStoreOffers = onSchedule(
       logError('LP store offers sync skipped publishing', { failed });
       return;
     }
-    await publishLpStoreOffersToR2(rows, Date.now(), createR2Put(r2ConfigOrThrow()));
+    await publishLpStoreOffersToR2(rows, Date.now(), createR2Put(r2));
     logInfo('LP store offers published to R2', { corporations: rows.length });
   }
 );
