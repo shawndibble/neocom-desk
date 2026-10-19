@@ -34,18 +34,18 @@ describe('publishLpStoreOffersToR2', () => {
 });
 
 describe('writeOpenPricesToR2', () => {
-  it('merges into the stored object and creates a missing one', async () => {
+  it('merges into the stored object, even one in the old region shape, and creates a missing one', async () => {
     const { get, put, puts } = fakeR2({
       [openPricesR2Key(34)]: {
         typeId: 34,
         dates: ['2026-10-16'],
-        regions: { 1: { buy: [1], sell: [2] } },
+        regions: { 10000002: { buy: [1], sell: [2] } },
       },
     });
     const result = await writeOpenPricesToR2(
       [
-        { typeId: 34, days: [{ date: '2026-10-17', regions: { 1: { buy: 3, sell: 4 } } }] },
-        { typeId: 35, days: [{ date: '2026-10-17', regions: { 1: { buy: null, sell: 5 } } }] },
+        { typeId: 34, days: [{ date: '2026-10-17', stations: { 1: { buy: 3, sell: 4 } } }] },
+        { typeId: 35, days: [{ date: '2026-10-17', stations: { 1: { buy: null, sell: 5 } } }] },
       ],
       mergeDays,
       { get, put }
@@ -55,12 +55,14 @@ describe('writeOpenPricesToR2', () => {
     expect(byKey['open-prices/34.json'].json).toEqual({
       typeId: 34,
       dates: ['2026-10-16', '2026-10-17'],
-      regions: { 1: { buy: [1, 3], sell: [2, 4] } },
+      stations: { 1: { buy: [null, 3], sell: [null, 4] } },
+      regions: { 10000002: { buy: [1, null], sell: [2, null] } },
     });
     expect(byKey['open-prices/35.json'].json).toMatchObject({
       dates: ['2026-10-17'],
-      regions: { 1: { buy: [null], sell: [5] } },
+      stations: { 1: { buy: [null], sell: [5] } },
     });
+    expect(byKey['open-prices/35.json'].json).not.toHaveProperty('regions');
     expect(byKey['open-prices/34.json'].headers['Cache-Control']).toBe('public, max-age=3600');
   });
 
@@ -70,7 +72,7 @@ describe('writeOpenPricesToR2', () => {
       if (key === openPricesR2Key(34)) throw new Error('R2 GET open-prices/34.json failed: 500');
       return null;
     };
-    const day = { date: '2026-10-17', regions: { 1: { buy: 1, sell: 2 } } };
+    const day = { date: '2026-10-17', stations: { 1: { buy: 1, sell: 2 } } };
     const result = await writeOpenPricesToR2(
       [
         { typeId: 34, days: [day] },
@@ -89,7 +91,7 @@ describe('writeOpenPricesToR2', () => {
     const { get, put } = fakeR2();
     function* items() {
       for (let typeId = 1; typeId <= 70; typeId += 1) {
-        yield { typeId, days: [{ date: '2026-10-17', regions: { 1: { buy: 1, sell: 2 } } }] };
+        yield { typeId, days: [{ date: '2026-10-17', stations: { 1: { buy: 1, sell: 2 } } }] };
       }
     }
     const seen: number[] = [];
