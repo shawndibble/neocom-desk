@@ -96,12 +96,12 @@ export function deriveEmploymentSummary(
     return { timeInGameSeconds: 0, corporationCount: 0, currentTenureSeconds: 0, longest: null };
   }
   const earliest = rows[rows.length - 1];
-  const player = rows.filter((r) => !r.npc);
-  let longest = player[0];
-  for (const row of player) if (row.tenureSeconds > longest.tenureSeconds) longest = row;
+  const playerRows = rows.filter((r) => !r.npc);
+  let longest = playerRows[0];
+  for (const row of playerRows) if (row.tenureSeconds > longest.tenureSeconds) longest = row;
   return {
     timeInGameSeconds: Math.max(0, (now - new Date(earliest.startDate).getTime()) / 1000),
-    corporationCount: new Set(player.map((r) => r.corporationId)).size,
+    corporationCount: new Set(playerRows.map((r) => r.corporationId)).size,
     currentTenureSeconds: rows[0].tenureSeconds,
     longest: longest
       ? { corporationId: longest.corporationId, seconds: longest.tenureSeconds }

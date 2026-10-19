@@ -11,3 +11,5 @@ _Recorded 2026-10-19._
   stint, so years of inactivity no longer read as the pilot's longest
   employer. They stay in the list and the CSV (hiding them would hide the
   gaps); a pilot with only NPC history gets no Longest stay.
+  Current tenure still counts an ongoing NPC stint: it answers "how long in
+  this corporation", and an idle pilot's honest answer is the idle spell.

@@ -59,6 +59,7 @@ describe('EmploymentTimeline', () => {
     expect(npc).toHaveTextContent('employmentHistory.npc');
     expect(npc).not.toHaveTextContent('employmentHistory.shortStay');
     expect(npc.querySelector('img')).toBeNull();
+    expect(within(npc).getByText(/ – /)).toBeInTheDocument();
     expect(container.querySelectorAll('[data-tenure-bar]')).toHaveLength(2);
   });
 
