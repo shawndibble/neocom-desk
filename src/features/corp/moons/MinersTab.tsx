@@ -136,7 +136,7 @@ export function MinersTab() {
             amount: isk(view.totals.overdue),
             count: view.totals.overdueCount,
           })}
-          tone="danger"
+          {...(view.totals.overdue > 0 ? { tone: 'danger' as const } : {})}
         />
         <StatChip label={t('corpTaxBook.moons.chips.unbilled')} value={isk(view.totals.unbilled)} />
         <StatChip label={t('corpTaxBook.moons.chips.credit')} value={isk(view.totals.credit)} />

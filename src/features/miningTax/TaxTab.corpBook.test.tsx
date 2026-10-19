@@ -153,8 +153,9 @@ describe('TaxTab with a Corp Tax Book', () => {
       0
     );
     expect(screen.getByText('Billed')).toBeInTheDocument();
-    // The 13 Oct ore is free and no book observed it: nobody is owed.
-    expect(screen.getByText('Unattributed')).toBeInTheDocument();
+    // The 13 Oct ore is free and no book observed it at all: still the member's to assign (D12).
+    expect(screen.queryByText('Unattributed')).not.toBeInTheDocument();
+    expect(screen.getAllByText('Unassigned').length).toBeGreaterThan(0);
     expect(screen.getByText(/Safe to pay — 17 Oct is closed/)).toBeInTheDocument();
     // The corp's balance has Settle up but no "Link payment": the book credits donations itself.
     expect(screen.queryByRole('button', { name: /link payment/i })).not.toBeInTheDocument();

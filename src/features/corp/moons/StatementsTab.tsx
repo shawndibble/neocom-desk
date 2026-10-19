@@ -27,7 +27,9 @@ export function StatementsTab() {
           className={
             r.status === 'ready'
               ? 'text-xs font-semibold text-warning uppercase'
-              : 'text-xs text-text-dim uppercase'
+              : r.status === 'overdue'
+                ? 'text-xs font-semibold text-danger uppercase'
+                : 'text-xs text-text-dim uppercase'
           }
         >
           {t(`corpTaxBook.moons.periodStatus.${r.status}`)}

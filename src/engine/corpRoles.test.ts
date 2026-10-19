@@ -4,6 +4,7 @@ import {
   NO_CORP_CAPABILITIES,
   corpCapabilities,
   hasAnyCorpCapability,
+  canViewCorpTaxBook,
   type CorpCapability,
 } from './corpRoles';
 
@@ -147,5 +148,19 @@ describe('hasAnyCorpCapability', () => {
 describe('CORP_CAPABILITIES', () => {
   it('lists exactly the keys of a capability set, so consumers can iterate it exhaustively', () => {
     expect([...CORP_CAPABILITIES].sort()).toEqual(Object.keys(NO_CORP_CAPABILITIES).sort());
+  });
+});
+
+describe('canViewCorpTaxBook', () => {
+  it('opens the book to Director, Accountant and Junior_Accountant (D8)', () => {
+    expect(canViewCorpTaxBook(['Director'])).toBe(true);
+    expect(canViewCorpTaxBook(['Accountant'])).toBe(true);
+    expect(canViewCorpTaxBook(['Junior_Accountant'])).toBe(true);
+  });
+
+  it('stays closed to every other role, though Junior_Accountant cannot read the ledger', () => {
+    expect(canViewCorpTaxBook(['Station_Manager', 'Factory_Manager'])).toBe(false);
+    expect(canViewCorpTaxBook([])).toBe(false);
+    expect(corpCapabilities(['Junior_Accountant']).canReadMiningLedger).toBe(false);
   });
 });

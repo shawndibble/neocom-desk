@@ -34,11 +34,15 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 function Label({ text, children }: { text: string; children: ReactNode }) {
   return (
     <label className="block space-y-1">
-      <span className="text-xs text-text-dim">{text}</span>
+      <span className="block text-xs text-text-dim">{text}</span>
       {children}
     </label>
   );
 }
+
+/** A UTC day in the viewer's locale, the way a native date input prints it. */
+const displayDate = (iso: string) =>
+  new Date(`${iso}T00:00:00Z`).toLocaleDateString(undefined, { timeZone: 'UTC' });
 
 const DIVISIONS = [1, 2, 3, 4, 5, 6, 7] as const;
 const RATE_SCOPES = ['corp', 'guest', 'miner', 'moon'] as const;
@@ -214,7 +218,8 @@ export function BookSettingsDialog({ open, onClose }: { open: boolean; onClose: 
                   {rateLabel(r, minerName) && ` · ${rateLabel(r, minerName)}`}
                 </span>
                 <span className="tabular-nums text-text-dim">
-                  {r.pct}% · {t('corpTaxBook.moons.settings.from', { date: r.effectiveFrom })}
+                  {r.pct}% ·{' '}
+                  {t('corpTaxBook.moons.settings.from', { date: displayDate(r.effectiveFrom) })}
                 </span>
               </li>
             ))}
@@ -281,6 +286,7 @@ export function BookSettingsDialog({ open, onClose }: { open: boolean; onClose: 
               )}
               <Label text={t('corpTaxBook.moons.settings.pct')}>
                 <TextInput
+                  className="w-full"
                   inputMode="decimal"
                   value={ratePct}
                   onChange={(e) => setRatePct(e.target.value)}
@@ -288,6 +294,7 @@ export function BookSettingsDialog({ open, onClose }: { open: boolean; onClose: 
               </Label>
               <Label text={t('corpTaxBook.moons.settings.effectiveFrom')}>
                 <TextInput
+                  className="w-full"
                   type="date"
                   min={today}
                   value={rateFrom}
@@ -336,15 +343,16 @@ export function BookSettingsDialog({ open, onClose }: { open: boolean; onClose: 
 
         <Section title={t('corpTaxBook.moons.settings.billing')}>
           <div className="grid gap-3 sm:grid-cols-3">
-            <Label text={t('corpTaxBook.moons.settings.startDate')}>
-              <TextInput
-                value={settings.startDate}
-                readOnly
-                aria-label={t('corpTaxBook.moons.settings.startDate')}
-              />
-            </Label>
+            <div className="space-y-1">
+              <span className="block text-xs text-text-dim">
+                {t('corpTaxBook.moons.settings.startDate')}
+              </span>
+              {/* Chosen once when the Director turns the book on (D10); the server never changes it. */}
+              <p className="py-1.5 tabular-nums">{displayDate(settings.startDate)}</p>
+            </div>
             <Label text={t('corpTaxBook.moons.settings.grace')}>
               <TextInput
+                className="w-full"
                 inputMode="numeric"
                 value={grace}
                 onChange={(e) => setGrace(e.target.value)}
@@ -352,6 +360,7 @@ export function BookSettingsDialog({ open, onClose }: { open: boolean; onClose: 
             </Label>
             <Label text={t('corpTaxBook.moons.settings.overdue')}>
               <TextInput
+                className="w-full"
                 inputMode="numeric"
                 value={overdue}
                 onChange={(e) => setOverdue(e.target.value)}
@@ -379,6 +388,7 @@ export function BookSettingsDialog({ open, onClose }: { open: boolean; onClose: 
             {cadence === 'days' && (
               <Label text={t('corpTaxBook.moons.settings.cadenceDays')}>
                 <TextInput
+                  className="w-full"
                   inputMode="numeric"
                   value={cadenceDays}
                   onChange={(e) => setCadenceDays(e.target.value)}
@@ -413,6 +423,7 @@ export function BookSettingsDialog({ open, onClose }: { open: boolean; onClose: 
           <div className="grid gap-3 sm:grid-cols-2">
             <Label text={t('corpTaxBook.moons.settings.chunk')}>
               <TextInput
+                className="w-full"
                 inputMode="numeric"
                 value={chunk}
                 onChange={(e) => setChunk(e.target.value)}
@@ -425,6 +436,7 @@ export function BookSettingsDialog({ open, onClose }: { open: boolean; onClose: 
                 text={t('corpTaxBook.moons.settings.expiry', { name: names.refinery(id) })}
               >
                 <TextInput
+                  className="w-full"
                   inputMode="numeric"
                   value={expiry[String(id)] ?? ''}
                   placeholder="48"
@@ -446,12 +458,11 @@ export function BookSettingsDialog({ open, onClose }: { open: boolean; onClose: 
           </Label>
           <p className="text-xs text-text-dim">
             {verdict.isDirector
-              ? t('corpTaxBook.moons.settings.approvalHint', {
-                  limit:
-                    settings.dismissApprovalAboveIsk === null
-                      ? '—'
-                      : isk(settings.dismissApprovalAboveIsk),
-                })
+              ? settings.dismissApprovalAboveIsk === null
+                ? t('corpTaxBook.moons.settings.approvalHintNone')
+                : t('corpTaxBook.moons.settings.approvalHint', {
+                    limit: isk(settings.dismissApprovalAboveIsk),
+                  })
               : t('corpTaxBook.moons.settings.approvalDirector')}
           </p>
         </Section>

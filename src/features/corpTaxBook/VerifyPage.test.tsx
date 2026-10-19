@@ -36,7 +36,12 @@ vi.mock('@/esi/endpoints/corp', () => ({
   getCorporationPublicInfo: vi.fn().mockResolvedValue({ data: { name: 'Brass Meridian' } }),
 }));
 vi.mock('@/features/character/typeNames', () => ({
-  loadTypeNames: vi.fn().mockResolvedValue(new Map([[45490, 'Zeolites']])),
+  loadTypeNames: vi.fn().mockResolvedValue(
+    new Map([
+      [45490, 'Zeolites'],
+      [45491, 'Jaspet'],
+    ])
+  ),
 }));
 
 function payload(over: Partial<VerifyPayload> = {}): VerifyPayload {
@@ -101,6 +106,39 @@ describe('VerifyPage', () => {
     expect(screen.getByText('+2,500,000 ISK')).toBeInTheDocument();
     expect(screen.getByText('BRML-7Q4K')).toBeInTheDocument();
     expect(await screen.findByText(/Donate ISK to Brass Meridian/)).toBeInTheDocument();
+  });
+
+  it('puts each ore of a day on its own sub-row beside its own price, with the day once', async () => {
+    const base = payload();
+    const line = base.statement.lines[0]!;
+    api.read.mockResolvedValue(
+      payload({
+        statement: {
+          ...base.statement,
+          lines: [
+            {
+              ...line,
+              structureId: undefined,
+              oreLines: [
+                { typeId: 45490, quantity: 100 },
+                { typeId: 45491, quantity: 200 },
+              ],
+              unitPrices: { '45490': 12.5, '45491': 30 },
+              priceSources: { '45490': 'saved', '45491': 'saved' },
+            },
+          ],
+        },
+      })
+    );
+    render(<VerifyPage token="tok" />);
+    const zeo = (await screen.findByText(/Zeolites × 100/)).closest('li')!;
+    expect(zeo).toHaveTextContent('12.50 ISK');
+    expect(zeo).not.toHaveTextContent('30.00 ISK');
+    const jas = screen.getByText(/Jaspet × 200/).closest('li')!;
+    expect(jas).toHaveTextContent('30.00 ISK');
+    const day = zeo.parentElement!.closest('li')!;
+    expect(day.textContent).not.toMatch(/·\s*·/);
+    expect(day.textContent?.match(/Aug 13, 2026/g)).toHaveLength(3);
   });
 
   it('says so when nothing is credited yet', async () => {

@@ -13,7 +13,8 @@
  *   share comes from ore the member gave no Payee first, and ore given to
  *   another Payee is a visible conflict, not owed, that resolves to the corp 14
  *   days after the day closed (`resolveBookShare`).
- * - Free ore no book claims is Unattributed, owed to no one.
+ * - The free ore a book left of an entry it observed is Unattributed, owed to
+ *   no one; ore no book observed at all stays Unassigned.
  * - Payments credit the Miner oldest Statement first (`allocatePayments`), and
  *   a Statement's settled days are Paid for good.
  */
@@ -604,8 +605,11 @@ export function overlayCorpBooks(input: {
       });
       continue;
     }
+    // Unattributed is the unclaimed remainder of an entry some book observed (D12);
+    // ore no book observed at all stays plain Unassigned.
     const closed = prepared.find(
       (p) =>
+        chargesOf(p, key).length > 0 &&
         (p.book.characterIds === undefined || p.book.characterIds.includes(entry.characterId)) &&
         entry.date >= p.book.startDate &&
         isDayBillable(entry.date, {

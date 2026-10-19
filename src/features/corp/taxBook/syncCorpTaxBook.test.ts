@@ -74,6 +74,7 @@ function deps(over: Partial<SyncDeps> = {}) {
     loadAccountCharacters: vi.fn(async () => []),
     declinedGrouping: vi.fn(async () => new Set<number>()),
     applyGrouping: vi.fn(async () => ({})),
+    assignPayment: vi.fn(async () => ({})),
     ...over,
   };
   return d;
@@ -165,6 +166,42 @@ describe('syncCorpTaxBook', () => {
     });
     await run(d);
     expect(vi.mocked(d.uploadSync).mock.calls[0][1].donations).toEqual([]);
+  });
+
+  it('assigns a stored Unmatched donation whose sender has joined a Miner since', async () => {
+    const d = deps({
+      readBookState: async () =>
+        emptyState({
+          miners: [{ id: 'm1', mainCharacterId: 7, characterIds: [7, 8] }] as BookState['miners'],
+          payments: [
+            {
+              id: 'j1_1',
+              characterId: 8,
+              amount: 5,
+              at: '2026-07-19T00:00:00Z',
+              source: 'donation',
+            },
+            {
+              id: 'j1_2',
+              characterId: 99,
+              amount: 5,
+              at: '2026-07-19T00:00:00Z',
+              source: 'donation',
+            },
+            {
+              id: 'j1_3',
+              minerId: 'm1',
+              characterId: 8,
+              amount: 5,
+              at: '2026-07-19T00:00:00Z',
+              source: 'donation',
+            },
+          ],
+        }),
+    });
+    await run(d);
+    expect(d.assignPayment).toHaveBeenCalledTimes(1);
+    expect(d.assignPayment).toHaveBeenCalledWith(5, CORP, 'j1_1', 'm1');
   });
 
   it('reports lost history and keeps earlier gaps on record', async () => {

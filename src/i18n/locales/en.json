@@ -13516,13 +13516,6 @@
         "raw": "raw"
       },
       "linesLabel": "Statement lines",
-      "col": {
-        "day": "Day",
-        "ore": "Ore",
-        "price": "Unit price",
-        "rate": "Rate",
-        "tax": "Tax"
-      },
       "correction": "Correction",
       "lateOre": "Late ore",
       "billed": "Billed",
@@ -13640,6 +13633,9 @@
         "title": "Preview mail",
         "to": "To",
         "subject": "Subject",
+        "previous": "Previous Miner",
+        "next": "Next Miner",
+        "position": "{{position}} of {{count}}",
         "summarised": "This mail is summarised to fit EVE’s 10,000-character limit; the verify link has every line."
       },
       "panelTitle": "Statement mail queue"
@@ -13654,6 +13650,7 @@
       "neverSynced": "Never synced",
       "syncedBy": "Synced {{age}} by {{name}}",
       "syncNow": "Sync now",
+      "viewOnly": "You can view this book. Syncing it needs the Accountant role, and editing needs Director or Accountant.",
       "syncing": "Syncing…",
       "failed": "Couldn't load the Corp Tax Book",
       "declared": "Declared paid, overdue paused",
@@ -13685,7 +13682,10 @@
         "written-off": "Written off"
       },
       "periodStatus": {
+        "issued": "Issued",
         "sent": "Sent",
+        "overdue": "Overdue",
+        "paid": "Paid",
         "ready": "Ready to send",
         "open": "Open"
       },
@@ -13818,6 +13818,7 @@
         "unmatched": {
           "title": "Unmatched donation · {{amount}} from {{name}}",
           "body": "{{date}}. Not a character any Miner has; the player can claim it, or you can assign it.",
+          "bodyInMiner": "{{date}}. {{name}} is in a Miner now; the next sync assigns it, or you can assign it.",
           "assign": "Assign to a Miner…",
           "notTax": "Not tax…"
         },
@@ -14021,6 +14022,7 @@
         "approvals": "Approvals",
         "approvalLimit": "A dismissal above this needs a Director (ISK)",
         "approvalHint": "Currently {{limit}}. Leave it empty for no limit.",
+        "approvalHintNone": "No limit is set. Leave it empty to keep it that way.",
         "approvalDirector": "Only a Director sets the approval limit."
       },
       "grouping": {

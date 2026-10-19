@@ -164,6 +164,17 @@ export function corpCapabilities(roles: readonly string[]): CorpCapabilities {
 }
 
 /**
+ * Who may open the Corp Tax Book (epic #4055, D8): Director (the CEO holds
+ * every role), Accountant and Junior_Accountant. Distinct from
+ * `canReadMiningLedger`, which gates *syncing* because ESI's observer ledger
+ * wants Accountant; a Junior_Accountant views what an Accountant synced.
+ * Mirrors `decideRoles` in `functions/src/corpTaxBook.ts`, which is the real gate.
+ */
+export function canViewCorpTaxBook(roles: readonly string[]): boolean {
+  return roles.some((r) => r === DIRECTOR || r === 'Accountant' || r === 'Junior_Accountant');
+}
+
+/**
  * Whether any corp surface is readable at all. The rendering rule keys off
  * this: a Character with no capability gets no corp UI, not a locked one
  * (GLOSSARY.md round 35).
