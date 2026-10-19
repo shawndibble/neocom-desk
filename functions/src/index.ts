@@ -10,7 +10,7 @@ import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { error as logError, info as logInfo, warn as logWarn } from 'firebase-functions/logger';
 import { initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
-import { getFirestore, type Firestore } from 'firebase-admin/firestore';
+import { getFirestore } from 'firebase-admin/firestore';
 import { getMessaging } from 'firebase-admin/messaging';
 import {
   verifyEveAccessToken,
@@ -132,19 +132,15 @@ import {
 import { removePledge, removeRequest, sweepRequests } from './communityRequestsCleanup.js';
 import { LP_CORP_STATION_SYSTEMS } from './data/lpCorpStationSystems.js';
 import { LP_STORE_REQUEST_GAP_MS, fetchLpStoreRows } from './lpOffersSnapshot.js';
-import { fetchArchiveFingerprint, streamPublicContractsCsvs } from './publicContractsArchive.js';
+import { createR2Get, createR2Put, publicContractsRunVerdict } from './r2Publisher.js';
 import {
-  createR2Get,
-  createR2Put,
-  type R2Config,
-  publishContractOffersToR2,
-  publishCourierContractsToR2,
-  publicContractsRunVerdict,
-  r2PublishOutcome,
-  type CourierR2PublishState,
-  type R2PublishOutcome,
-  type R2PublishState,
-} from './r2Publisher.js';
+  R2_ACCESS_KEY_ID,
+  R2_SECRET_ACCESS_KEY,
+  publishCourierToR2,
+  publishOffersToR2,
+  r2ConfigOrThrow,
+  settleR2Publish,
+} from './r2Publish.js';
 import { measureContractTypeChanges, type ContractTypeHashes } from './contractTypeChanges.js';
 import {
   INSURGENCY_URL,
@@ -1015,118 +1011,6 @@ const PUBLIC_CONTRACTS_ARCHIVE_FINGERPRINT_DOC = 'publicContractsArchiveFingerpr
 /** Doc under `systemConditions` holding the last publish's per-type content hashes (issue #3744). */
 const PUBLIC_CONTRACTS_TYPE_HASHES_DOC = 'publicContractTypeHashes';
 
-/** Doc under `systemConditions` holding what the R2 writer last published (issue #3745). */
-const PUBLIC_CONTRACTS_R2_STATE_DOC = 'publicContractR2State';
-
-/** Doc under `systemConditions` holding what the R2 courier writer last published (issue #3748). */
-const PUBLIC_COURIERS_R2_STATE_DOC = 'publicCourierR2State';
-
-const R2_ACCESS_KEY_ID = defineSecret('R2_ACCESS_KEY_ID');
-const R2_SECRET_ACCESS_KEY = defineSecret('R2_SECRET_ACCESS_KEY');
-
-/**
- * The R2 connection for jobs whose only store is R2 (public contracts, LP
- * offers, open prices): throws when the config is missing so the run fails
- * loudly.
- */
-function r2ConfigOrThrow(): R2Config {
-  const endpoint = process.env.R2_ENDPOINT;
-  const bucket = process.env.R2_BUCKET;
-  if (!endpoint?.startsWith('https://') || !bucket) {
-    throw new Error('R2_ENDPOINT (https) / R2_BUCKET not set');
-  }
-  return {
-    endpoint,
-    bucket,
-    accessKeyId: R2_ACCESS_KEY_ID.value(),
-    secretAccessKey: R2_SECRET_ACCESS_KEY.value(),
-  };
-}
-
-/**
- * Publishes the offers snapshot to R2 (ADR 0019, issue #4270). Errors reading
- * the state doc are tolerated (a full re-upload is the worst case); upload and
- * index failures come back as the outcome, which the run turns into a throw.
- */
-async function publishOffersToR2(
-  db: Firestore,
-  config: R2Config,
-  rows: readonly PublicContractOfferRow[],
-  lastSyncedAt: number
-): Promise<R2PublishOutcome> {
-  const stateRef = db.collection(SYSTEM_CONDITIONS_COLLECTION).doc(PUBLIC_CONTRACTS_R2_STATE_DOC);
-  const previous = await stateRef
-    .get()
-    .then((snap) => (snap.exists ? (snap.data() as R2PublishState) : null))
-    .catch(() => null);
-  const result = await publishContractOffersToR2({
-    rows,
-    lastSyncedAt,
-    previous,
-    now: Date.now(),
-    put: createR2Put(config),
-    onProgress: async (state) => {
-      await stateRef.set(state);
-    },
-  });
-  await stateRef.set(result.state);
-  const outcome = r2PublishOutcome(result);
-  const { uploaded, skipped, failed, remaining, indexWritten, firstError } = result;
-  (outcome.kind === 'complete' ? logInfo : logWarn)('public contract offers R2 publish', {
-    uploaded,
-    skipped,
-    failed,
-    remaining,
-    indexWritten,
-    firstError,
-  });
-  return outcome;
-}
-
-/** Same contract as `publishOffersToR2`, for the courier snapshot (issue #3748). */
-async function publishCourierToR2(
-  db: Firestore,
-  config: R2Config,
-  rows: readonly PublicCourierContractRow[],
-  lastSyncedAt: number
-): Promise<R2PublishOutcome> {
-  const stateRef = db.collection(SYSTEM_CONDITIONS_COLLECTION).doc(PUBLIC_COURIERS_R2_STATE_DOC);
-  const previous = await stateRef
-    .get()
-    .then((snap) => (snap.exists ? (snap.data() as CourierR2PublishState) : null))
-    .catch(() => null);
-  const result = await publishCourierContractsToR2({
-    rows,
-    lastSyncedAt,
-    previous,
-    now: Date.now(),
-    put: createR2Put(config),
-  });
-  await stateRef.set(result.state);
-  const outcome = r2PublishOutcome(result);
-  const { uploaded, indexWritten, firstError } = result;
-  (outcome.kind === 'complete' ? logInfo : logWarn)('public courier contracts R2 publish', {
-    uploaded,
-    indexWritten,
-    firstError,
-  });
-  return outcome;
-}
-
-/**
- * Runs one R2 publish, folding a thrown error (a state-doc write, say) into a
- * failed outcome so the other snapshot's publish still runs before the job fails.
- */
-async function settleR2Publish(
-  publish: () => Promise<R2PublishOutcome>
-): Promise<R2PublishOutcome> {
-  try {
-    return await publish();
-  } catch (error) {
-    return { kind: 'failed', error: String(error) };
-  }
-}
-
 export const syncPublicContractOffers = onSchedule(
   {
     schedule: 'every 30 minutes',
@@ -1141,6 +1025,8 @@ export const syncPublicContractOffers = onSchedule(
     // failed publish) is picked up next run rather than lost. An unreadable fingerprint always syncs.
     // R2 is the only store, so a missing config fails before the download.
     const r2Config = r2ConfigOrThrow();
+    const { fetchArchiveFingerprint, streamPublicContractsCsvs } =
+      await import('./publicContractsArchive.js');
     const db = getFirestore();
     const fingerprintRef = db
       .collection(SYSTEM_CONDITIONS_COLLECTION)
