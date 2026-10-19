@@ -154,6 +154,8 @@ export function usePiAdviceInputs(
   return useMemo((): PiAdviceInputsState => {
     if (!snapshot) return { status: 'loading' };
     const usable = pricesFailed ? null : prices;
+    // Hold until the routes settle: ready-without-routes would run the whole advice model, then run it again with them.
+    if (buybackPct === null && systemKey !== '' && !routes) return { status: 'loading' };
     if (!skills || !richness) {
       return pricesFailed ? { status: 'prices-failed', input: null } : { status: 'loading' };
     }
@@ -188,6 +190,7 @@ export function usePiAdviceInputs(
     buybackPct,
     preference,
     routes,
+    systemKey,
     hub.systemName,
   ]);
 }
