@@ -480,8 +480,3 @@ export function writeOpportunitiesCache(batchKey: string, entry: OpportunitiesCa
 export function deleteOpportunitiesCache(batchKey: string): void {
   rowsCache.delete(batchKey);
 }
-
-/** Test-only: production callers rely on the manual Refresh action instead of clearing. */
-export function clearOpportunitiesCache(): void {
-  rowsCache.clear();
-}
