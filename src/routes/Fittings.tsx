@@ -13,7 +13,6 @@ import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import type { FittingLoadState } from '@/lib/shortcuts';
 import {
   Button,
-  Disclosure,
   LiveStatus,
   Modal,
   Panel,
@@ -21,7 +20,6 @@ import {
   Tabs,
   TabPanel,
   useTabsId,
-  TextInput,
   Toast,
   useTimedToast,
 } from '@/components/ui';
@@ -68,14 +66,12 @@ import { LazySaveToEveDialog } from '@/features/fittings/LazySaveToEveDialog';
 import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
 import { usePageItemActions } from '@/features/market/usePageItemActions';
 import { DroneSection } from '@/features/fittings/FittingDroneSection';
-import { ModuleRow } from '@/features/fittings/FittingModuleRow';
+import { FittingModuleDialog } from '@/features/fittings/FittingModuleDialog';
+import { SaveAsNewDialog } from '@/features/fittings/SaveAsNewDialog';
 import { FittingRackList, RackSlots } from '@/features/fittings/FittingRackList';
 import { FittingRing } from '@/features/fittings/FittingRing';
 import { RING_ROOM_ATTR } from '@/features/fittings/ring/useRingChrome';
 import { FittingStatsSections } from '@/features/fittings/FittingStatsSections';
-import { FittingVariationsPanel } from '@/features/fittings/FittingVariationsPanel';
-import { FittingMutationPanel } from '@/features/fittings/FittingMutationPanel';
-import { FittingAffectedByPanel } from '@/features/fittings/FittingAffectedByPanel';
 import { FittingFightersPanel } from '@/features/fittings/FittingFightersPanel';
 import { TacticalModePicker } from '@/features/fittings/TacticalModePicker';
 import { tacticalModeKind, tacticalModesFor } from '@/engine/fittings/tacticalModes';
@@ -932,40 +928,13 @@ function FittingsPage() {
           />
           {/* No Undo here: the editor has no in-app undo, only the browser's Back (one swap is one history entry). */}
           {fitApplied !== null && <Toast message={fitApplied} />}
-          <Modal
+          <SaveAsNewDialog
             open={saveAsNewOpen}
             onClose={() => setSaveAsNewOpen(false)}
-            title={t('fittings.myFittings.saveAsNewTitle')}
-          >
-            <form
-              className="space-y-3"
-              onSubmit={(e) => {
-                e.preventDefault();
-                const name = saveAsNewName.trim();
-                if (name === '') return;
-                void workspace.saveAsNew(name);
-                setSaveAsNewOpen(false);
-              }}
-            >
-              <label className="block text-xs text-text-dim" htmlFor="fitting-save-as-new-name">
-                {t('fittings.myFittings.saveAsNewLabel')}
-              </label>
-              <TextInput
-                id="fitting-save-as-new-name"
-                className="w-full"
-                value={saveAsNewName}
-                onChange={(e) => setSaveAsNewName(e.target.value)}
-              />
-              <div className="flex justify-end gap-2">
-                <Button onClick={() => setSaveAsNewOpen(false)}>
-                  {t('fittings.myFittings.cancel')}
-                </Button>
-                <Button type="submit" variant="primary" disabled={saveAsNewName.trim() === ''}>
-                  {t('fittings.myFittings.saveAsNewConfirm')}
-                </Button>
-              </div>
-            </form>
-          </Modal>
+            name={saveAsNewName}
+            onNameChange={setSaveAsNewName}
+            onConfirm={(name) => void workspace.saveAsNew(name)}
+          />
           {activeCharacterId !== null && saveToEveOpen && (
             <LazySaveToEveDialog
               open
@@ -1013,74 +982,33 @@ function FittingsPage() {
             workspace={workspace}
             onOpened={closeLibrary}
           />
-          <Modal
-            open={openModule !== null}
+          <FittingModuleDialog
+            module={openModule}
+            moduleIndex={openModuleIndex}
+            fallbackSlot={moduleSlot?.slot ?? 'high'}
             onClose={() => setModuleSlot(null)}
-            title={
-              openModule
-                ? catalogueTypeName(catalogue, openModule.typeId)
-                : t(`fittings.list.rack.${moduleSlot?.slot ?? 'high'}`)
-            }
             placement={isPhone ? 'sheet' : 'wide'}
-          >
-            {openModule && (
-              <div className="space-y-3">
-                <ModuleRow
-                  module={openModule}
-                  result={moduleResults?.[openModuleIndex] ?? null}
-                  cantUse={gaps?.unusableModuleKeys.has(moduleKey(openModule)) ?? false}
-                  fitting={fitting}
-                  catalogue={catalogue}
-                  context={context}
-                  edit={edit}
-                />
-                <Disclosure
-                  label={t('fittings.variations.swapTitle')}
-                  trailing={variationRows.length > 0 ? String(variationRows.length) : undefined}
-                  expanded={variationsOpen}
-                  onToggle={() => setVariationsOpen((open) => !open)}
-                  className="rounded-xs border border-line"
-                >
-                  <div className="p-2">
-                    <FittingVariationsPanel rows={variationRows} onSelect={swapVariation} />
-                  </div>
-                </Disclosure>
-                {itemActions?.canMutate(openModule.typeId) && (
-                  <Disclosure
-                    label={t('fittings.mutation.title')}
-                    expanded={mutationOpen}
-                    onToggle={() => setMutationOpen((open) => !open)}
-                    className="rounded-xs border border-line"
-                  >
-                    <div className="p-2">
-                      <FittingMutationPanel
-                        module={openModule}
-                        catalogue={catalogue}
-                        edit={edit}
-                        characterId={activeCharacterId}
-                      />
-                    </div>
-                  </Disclosure>
-                )}
-                <Disclosure
-                  label={t('fittings.affectedBy.title')}
-                  expanded={affectedOpen}
-                  onToggle={() => setAffectedOpen((open) => !open)}
-                  className="rounded-xs border border-line"
-                >
-                  <div className="p-2">
-                    {affectedOpen && (
-                      <FittingAffectedByPanel
-                        explain={workspace.explainModule}
-                        moduleIndex={openModuleIndex}
-                        typeName={typeName}
-                      />
-                    )}
-                  </div>
-                </Disclosure>
-              </div>
-            )}
-          </Modal>
+            result={moduleResults?.[openModuleIndex] ?? null}
+            cantUse={
+              openModule ? (gaps?.unusableModuleKeys.has(moduleKey(openModule)) ?? false) : false
+            }
+            fitting={fitting}
+            catalogue={catalogue}
+            context={context}
+            edit={edit}
+            variationRows={variationRows}
+            onSwapVariation={swapVariation}
+            variationsOpen={variationsOpen}
+            onToggleVariations={() => setVariationsOpen((open) => !open)}
+            mutationOpen={mutationOpen}
+            onToggleMutation={() => setMutationOpen((open) => !open)}
+            canMutate={openModule ? (itemActions?.canMutate(openModule.typeId) ?? false) : false}
+            affectedOpen={affectedOpen}
+            onToggleAffected={() => setAffectedOpen((open) => !open)}
+            explainModule={workspace.explainModule}
+            typeName={typeName}
+            characterId={activeCharacterId}
+          />
           {isPhone && (
             <Modal
               open={rackSheet !== null}
