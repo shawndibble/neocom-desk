@@ -5,6 +5,7 @@ import { Trans, useTranslation } from 'react-i18next';
 import { Button, Caret, IskAmount, RowMoreActions } from '@/components/ui';
 import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
+import { unpricedSellRows } from './fittingPrice';
 import { useShipDataNeedsConnection } from './useDogmaEngineStatus';
 import { formatSeconds } from '@/lib/duration';
 import {
@@ -650,15 +651,16 @@ export function FittingStatsSections({
   const shipDataNeedsConnection = useShipDataNeedsConnection();
   const profileName = useDamageProfileName()(damageProfiles.selected);
   const [appraisalOpen, setAppraisalOpen] = useState(false);
-  // A fit with nothing priceable totals 0 on both sides — that's "unknown",
+  // A fit with nothing sell-priced totals 0 — that's "unknown",
   // not a free ship, so the price section shows a dash instead of "0 ISK".
-  const nothingPriced = price !== null && price.totals.sell === 0 && price.totals.buy === 0;
+  const nothingPriced = price !== null && price.totals.sell === 0;
   // The price loader names each row by its bare typeId; the section and its
   // breakdown read (and the multibuy pastes) the item's real name.
   const namedPrice =
     price === null
       ? null
       : { ...price, rows: price.rows.map((row) => ({ ...row, name: typeName(row.typeId) })) };
+  const unpriced = namedPrice === null ? [] : unpricedSellRows(namedPrice.rows);
   const iskLabel = (value: number) => (
     <Trans
       i18nKey="fittings.stats.unit.iskAmount"
@@ -1321,24 +1323,18 @@ export function FittingStatsSections({
                 label: t('fittings.stats.fact.sell'),
                 value: nothingPriced ? '—' : iskLabel(price.totals.sell),
               },
-              {
-                label: t('fittings.stats.fact.buy'),
-                value: nothingPriced ? '—' : iskLabel(price.totals.buy),
-              },
             ]}
           />
-          {price.totals.unpricedRows > 0 && (
+          {unpriced.length > 0 && (
             <StatNote tone="warning">
-              <p>{t('fittings.stats.priceUnpriced', { count: price.totals.unpricedRows })}</p>
+              <p>{t('fittings.stats.priceUnpriced', { count: unpriced.length })}</p>
               <ul className="mt-0.5 list-disc pl-4">
-                {namedPrice!.rows
-                  .filter((row) => row.buyTotal === null || row.sellTotal === null)
-                  .map((row) => (
-                    <li key={row.typeId}>
-                      {row.name}
-                      {row.quantity > 1 && ` ×${row.quantity}`}
-                    </li>
-                  ))}
+                {unpriced.map((row) => (
+                  <li key={row.typeId}>
+                    {row.name}
+                    {row.quantity > 1 && ` ×${row.quantity}`}
+                  </li>
+                ))}
               </ul>
             </StatNote>
           )}
@@ -1346,7 +1342,7 @@ export function FittingStatsSections({
       ) : (
         <StatNote>{t('fittings.stats.priceLoading')}</StatNote>
       ),
-      price && price.totals.unpricedRows > 0 ? t('fittings.stats.incomplete') : undefined
+      unpriced.length > 0 ? t('fittings.stats.incomplete') : undefined
     ),
   ];
 

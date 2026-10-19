@@ -67,12 +67,9 @@ import { ImportFittingDialog, NewFromHullDialog } from '@/features/fittings/Fitt
 import { LazySaveToEveDialog } from '@/features/fittings/LazySaveToEveDialog';
 import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
 import { usePageItemActions } from '@/features/market/usePageItemActions';
-import {
-  DroneSection,
-  FittingRackList,
-  ModuleRow,
-  RackSlots,
-} from '@/features/fittings/FittingRackList';
+import { DroneSection } from '@/features/fittings/FittingDroneSection';
+import { ModuleRow } from '@/features/fittings/FittingModuleRow';
+import { FittingRackList, RackSlots } from '@/features/fittings/FittingRackList';
 import { FittingRing, RING_ROOM_ATTR } from '@/features/fittings/FittingRing';
 import { FittingStatsSections } from '@/features/fittings/FittingStatsSections';
 import { FittingVariationsPanel } from '@/features/fittings/FittingVariationsPanel';

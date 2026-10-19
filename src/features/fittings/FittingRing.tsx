@@ -1,6 +1,6 @@
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { useObservedMeasure } from '@/lib/useObservedMeasure';
 import {
-  useLayoutEffect,
   useRef,
   useState,
   type CSSProperties,
@@ -118,23 +118,28 @@ function useRingChrome(
   ring: RefObject<HTMLDivElement | null>
 ): number {
   const [chrome, setChrome] = useState(0);
-  useLayoutEffect(() => {
-    const readoutsEl = readouts.current;
-    const ringEl = ring.current;
-    const column = ringEl?.closest<HTMLElement>(`[${RING_ROOM_ATTR}]`);
-    if (!readoutsEl || !ringEl || !column) return;
-    const measure = () => {
+  const column = () => ring.current?.closest<HTMLElement>(`[${RING_ROOM_ATTR}]`);
+  useObservedMeasure(
+    () => {
+      const readoutsEl = readouts.current;
+      const columnEl = column();
+      if (!readoutsEl || !ring.current || !columnEl) return null;
+      return [readoutsEl, columnEl, ...columnEl.children];
+    },
+    () => {
+      const readoutsEl = readouts.current;
+      const ringEl = ring.current;
+      const columnEl = column();
+      if (!readoutsEl || !ringEl || !columnEl) return;
       const ringBox = ringEl.getBoundingClientRect();
-      const above = ringBox.top - column.getBoundingClientRect().top + column.scrollTop;
+      const above = ringBox.top - columnEl.getBoundingClientRect().top + columnEl.scrollTop;
       const below = readoutsEl.getBoundingClientRect().bottom - ringBox.bottom;
       const next = Math.round(above + below);
       setChrome((prev) => (prev === next ? prev : next));
-    };
-    measure();
-    const observer = new ResizeObserver(measure);
-    for (const el of [readoutsEl, column, ...column.children]) observer.observe(el);
-    return () => observer.disconnect();
-  }, [readouts, ring]);
+    },
+    [readouts, ring],
+    { layout: true }
+  );
   return chrome;
 }
 

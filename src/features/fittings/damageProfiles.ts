@@ -18,11 +18,12 @@ import {
   type CustomDamageProfile,
   type NamedDamageProfile,
 } from '@/engine/fittings/damageProfile';
+import {
+  SYNCED_CUSTOM_DAMAGE_PROFILES_KEY,
+  SYNCED_SELECTED_DAMAGE_PROFILE_KEY,
+} from '@/sync/syncedSettings';
 import { createSyncedSetting } from '@/lib/useSyncedSetting';
 import { useHydratedStore } from '@/lib/useHydratedStore';
-
-const SYNCED_CUSTOM_DAMAGE_PROFILES_KEY = 'sync.fittingDamageProfiles';
-const SYNCED_SELECTED_DAMAGE_PROFILE_KEY = 'sync.fittingDamageProfileId';
 
 export const useCustomDamageProfiles = createSyncedSetting<CustomDamageProfile[]>({
   key: SYNCED_CUSTOM_DAMAGE_PROFILES_KEY,
