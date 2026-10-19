@@ -55,8 +55,7 @@ export function StockMarketsList({
     return () => {
       cancelled = true;
     };
-    // `lists` and `hub` are captured through `loadKey`.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `lists` and `hub` are captured through `loadKey`
   }, [loadKey]);
   const data = loaded?.data ?? null;
   const failed = failedKey === loadKey && loaded?.key !== loadKey;
