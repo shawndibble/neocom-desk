@@ -19,9 +19,9 @@
  * fold, and the old job's 'fuzzwork' days), 'historical' for the old
  * region-wide Adam4EVE backfill days the one-time migration carries over.
  *
- * Pure and dependency-free like marketOpenPrices.ts (no Firestore, fetch or
- * relative imports), so a backfill script can load it under type stripping.
+ * Pure (no Firestore or fetch); the IO lives in r2MiningPrices.ts and index.ts.
  */
+import { MARKET_OPEN_PRICES_MAX_DAYS, addDays, isIsoDate } from './marketOpenPrices.js';
 
 /** The five Trade Hubs, mirroring `TRADE_HUBS` in src/market/hubs.ts (`functionsParity.test.ts`). */
 export const SNAPSHOT_HUBS = [
@@ -43,8 +43,8 @@ export const MINING_PRICES_R2_PREFIX = 'mining-prices/';
  * R2, so the copy runs exactly once (on the first run that finds it missing).
  */
 export const MINING_PRICES_MIGRATED_KEY = `${MINING_PRICES_R2_PREFIX}migrated.json`;
-/** Days kept, counting the published one; the same window as the open prices. */
-export const MINING_PRICES_MAX_DAYS = 400;
+/** Days kept, counting the published one: the open prices' window. */
+export const MINING_PRICES_MAX_DAYS = MARKET_OPEN_PRICES_MAX_DAYS;
 
 export type MiningTier = 'saved' | 'historical';
 /** `[buy, sell]`; a side with no order is null. */
@@ -77,8 +77,6 @@ export interface MiningMonthGroup {
 export function miningPricesR2Key(hubId: string, month: string): string {
   return `${MINING_PRICES_R2_PREFIX}${hubId}/${month}.json`;
 }
-
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 function usablePrice(price: number): boolean {
   return Number.isFinite(price) && price > 0;
@@ -150,7 +148,7 @@ export function marketHistoryWrites(
 ): MiningDayWrite[] {
   const writes: MiningDayWrite[] = [];
   for (const { date, data } of docs) {
-    if (!ISO_DATE.test(date) || typeof data !== 'object' || data === null) continue;
+    if (!isIsoDate(date) || typeof data !== 'object' || data === null) continue;
     const { source, hubs: stored } = data as Record<string, unknown>;
     const tier: MiningTier | null =
       source === 'fuzzwork' ? 'saved' : source === 'adam4eve' ? 'historical' : null;
@@ -221,7 +219,7 @@ export function mergeMiningMonth(
   const merged: Record<string, MiningDay> = {};
   if (typeof storedDays === 'object' && storedDays !== null) {
     for (const [date, day] of Object.entries(storedDays)) {
-      if (ISO_DATE.test(date) && isMiningDay(day)) merged[date] = day;
+      if (isIsoDate(date) && isMiningDay(day)) merged[date] = day;
     }
   }
   Object.assign(merged, days);
@@ -232,15 +230,9 @@ export function mergeMiningMonth(
   return { hub: base.hubId, month: base.month, days: sorted };
 }
 
-function shiftDays(date: string, days: number): string {
-  const d = new Date(`${date}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
-}
-
 /** The first date kept when `date` is published. */
 export function keepMiningDaysFrom(date: string): string {
-  return shiftDays(date, -(MINING_PRICES_MAX_DAYS - 1));
+  return addDays(date, -(MINING_PRICES_MAX_DAYS - 1));
 }
 
 function previousMonth(month: string): string {

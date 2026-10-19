@@ -29,10 +29,12 @@ _Recorded 2026-10-18 · issue #4277. Supersedes
   a date range of every mining type at one hub, so a month object is what one
   read needs: ~150 KB gzip, one or two per typical range. Never one object for
   everything; never one per type. Merge-on-write like the open prices: read,
-  replace the day whole (idempotent), write. 400 days kept: days before the
-  window drop on each merge, and the two month objects wholly before it are
-  deleted each run (a missing key is a no-op; a failed delete is logged and
-  retried next run). The prefix is mutable, so the R2 lifecycle rule must not
+  replace the day whole (idempotent), write. 400 days kept, to month
+  granularity: a rewritten month drops days before the window, and the two
+  month objects wholly before it are deleted each run (a missing key is a
+  no-op; a failed delete is logged and retried next run). The month holding
+  the window's start keeps its older days until it is deleted about a month
+  later, so up to ~430 days can be stored; readers filter by date anyway. The prefix is mutable, so the R2 lifecycle rule must not
   cover it.
 - **The `saved` tier is now the end-of-day price, not a day average.** The
   old job folded up to four Fuzzwork captures into a running mean for the
@@ -49,6 +51,12 @@ _Recorded 2026-10-18 · issue #4277. Supersedes
   both hold. The marker is written only after every object landed, so a
   failed run copies again on retry. After that the collection is never read
   and the maintainer deletes it.
+- **A day the open-prices guards skip has no Hub Station Price either.**
+  When `implausibleReason` or `shrunkRegion` stops a run, nothing is
+  published for that day, mining included, and the tier chain falls back
+  (live buy / sell for Tax). The open-prices backfill script does not pass a
+  station fold, so it does not fill those days; adding that is a later change
+  if such gaps show up. The old Adam4EVE gap-fill is gone with the job.
 - **The client reads R2 directly.** `loadHubSnapshotRange` fetches the month
   objects the range touches from `data.neocomdesk.com`: no Firebase session,
   no Firestore read, and no `characterId` (dropped from the pricing API, which

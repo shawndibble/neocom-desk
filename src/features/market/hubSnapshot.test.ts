@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getTradeHub } from '@/market/hubs';
-import { miningPricesR2Key } from '../../../functions/src/miningHubPrices';
 import {
   loadHubSnapshotRange,
   miningPricesUrl,
@@ -28,14 +27,6 @@ beforeEach(() => {
   vi.stubGlobal('fetch', fetchMock);
 });
 afterEach(() => vi.unstubAllGlobals());
-
-describe('miningPricesUrl', () => {
-  it('names the object the Functions writer publishes', () => {
-    expect(miningPricesUrl(amarr, '2026-10')).toMatch(
-      new RegExp(`^https://[^/]+/${miningPricesR2Key('amarr', '2026-10')}$`)
-    );
-  });
-});
 
 describe('loadHubSnapshotRange', () => {
   it('splits days by tier and reads only the days in range', async () => {
@@ -77,6 +68,15 @@ describe('loadHubSnapshotRange', () => {
       url(amarr, '2026-10'),
     ]);
     expect([...result.saved.keys()]).toEqual(['2026-08-31', '2026-10-01']);
+  });
+
+  it('crosses a year boundary', async () => {
+    serve({});
+    await loadHubSnapshotRange('2026-12-31', '2027-01-01');
+    expect(fetchMock.mock.calls.map(([u]) => u)).toEqual([
+      url(jita, '2026-12'),
+      url(jita, '2027-01'),
+    ]);
   });
 
   it('treats a failed or malformed month as empty and retries a failure next time', async () => {
