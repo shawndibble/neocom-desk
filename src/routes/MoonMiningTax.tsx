@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, startTransition } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Spinner, Tabs, useTabsId } from '@/components/ui';
@@ -69,7 +69,8 @@ export function MoonMiningTax() {
       tabsId={tabsId}
       label={t('miningTax.title')}
       value={tab}
-      onChange={(id) => setTab(id as typeof tab)}
+      // Transition: a cold tab chunk keeps the old tab (and focus) until it lands.
+      onChange={(id) => startTransition(() => setTab(id as typeof tab))}
       tabs={MINING_TABS.tabs.map((item) => ({ id: item.id, label: t(item.labelKey) }))}
     />
   );

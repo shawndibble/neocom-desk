@@ -6,15 +6,15 @@ import { useCommandPalette } from './store';
 
 const APPLE = isApplePlatform();
 
-// Lazy: the shell mounts this host on every page, and Item Detail brings ESI,
-// SDE and skills code the shell chunk should not carry until an item is picked.
-const loadCommandPalette = () => guarded(() => import('./CommandPalette'));
 // Lazy: the palette drags `@/db`, the SDE loader and providers; the shell
-// should not carry them until the palette first opens.
+// should not carry them until the palette first opens. Ctrl+K preloads it.
+const loadCommandPalette = () => guarded(() => import('./CommandPalette'));
 const CommandPalette = lazy(() =>
   loadCommandPalette().then((module) => ({ default: module.CommandPalette }))
 );
 
+// Lazy: Item Detail brings ESI, SDE and skills code the shell chunk should not
+// carry until an item is picked.
 const ItemDetailModal = lazy(() =>
   guarded(() => import('@/features/market/ItemDetailModal')).then((module) => ({
     default: module.ItemDetailModal,
