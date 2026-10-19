@@ -12,6 +12,7 @@
  * (`w-14`/`w-16`/`w-20`) wrap with everything else.
  */
 
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { type ReactElement, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { IconButton, IskAmount, RowMoreActions, Tooltip } from '@/components/ui';
@@ -368,7 +369,10 @@ export function ItemColumnLabels({ t }: ItemColumnLabelsProps) {
     <div
       aria-hidden="true"
       data-testid="item-column-labels"
-      className="sticky top-0 z-10 hidden shrink-0 items-center gap-2.5 border-b border-line bg-panel-2 py-1 pr-3 pl-3 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase md:flex"
+      className={cx(
+        eyebrowClassName,
+        'sticky top-0 z-10 hidden shrink-0 items-center gap-2.5 border-b border-line bg-panel-2 py-1 pr-3 pl-3 md:flex'
+      )}
     >
       <span className={cx('min-w-0 truncate', ITEM_NAME_CELL)}>{t('assets.sort.name')}</span>
       <span className={ITEM_QUANTITY_CELL}>{t('assets.columns.quantity')}</span>

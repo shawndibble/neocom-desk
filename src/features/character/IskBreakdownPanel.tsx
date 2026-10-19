@@ -21,7 +21,7 @@ import type {
   JournalBreakdown,
   RefTypeBreakdownRow,
 } from '@/features/character/walletJournalFilter';
-import { signedIsk } from '@/features/market/signedIsk';
+import { signedIsk } from '@/lib/signedIsk';
 import { formatIsk } from '@/lib/isk';
 
 interface IskBreakdownPanelProps {

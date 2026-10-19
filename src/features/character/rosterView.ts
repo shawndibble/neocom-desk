@@ -14,11 +14,7 @@
  */
 import { jobSlotSkillsFromCharacterSkills } from '@/features/character/jobSlotSkills';
 import type { JobSlotSkills } from '@/engine/industry/jobSlots';
-import {
-  classifySkillQueue,
-  deriveQueueState,
-  type QueueState,
-} from '@/features/skills/queueStatus';
+import { classifySkillQueue, deriveQueueState, type QueueState } from '@/engine/skills/queueStatus';
 import { rosterSortStats, type CharacterSortStats } from './groups';
 import type { RosterEntry } from './roster';
 

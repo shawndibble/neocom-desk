@@ -4,6 +4,7 @@
  * narrows the row set, which is the part a table's `sortValue` callbacks
  * can't express.
  */
+import { median } from '../math';
 import { classifySpace, type SpaceKind } from '@/engine/space';
 
 /** One searched row — a for-sale blueprint copy joined to its contract. Built out of the Public Contract Offers snapshot by `contractOffers.ts`; issue #907 retired the blueprint-only row the sync used to publish, so this shape is the client's alone. */
@@ -636,13 +637,6 @@ export function bpcPriceSummary(rows: readonly BpcContractRow[]): BpcPriceSummar
     .map(effectivePrice)
     .filter((price) => price > 0)
     .sort((a, b) => a - b);
-  const middle = prices.length >> 1;
-  const median =
-    prices.length === 0
-      ? null
-      : prices.length % 2 === 1
-        ? prices[middle]
-        : (prices[middle - 1] + prices[middle]) / 2;
   const perRunRates = rows
     .map((row) => iskPerRun(effectivePrice(row), row.runs, row.quantity, row.isMultiType))
     .filter((rate): rate is number => rate !== null);
@@ -651,7 +645,7 @@ export function bpcPriceSummary(rows: readonly BpcContractRow[]): BpcPriceSummar
     cheapest: prices.length === 0 ? null : prices[0],
     cheapestPerRun:
       perRunRates.length === 0 ? null : perRunRates.reduce((best, rate) => Math.min(best, rate)),
-    median,
+    median: prices.length === 0 ? null : median(prices),
     bestMe: rows.reduce((best, row) => Math.max(best, row.me), rows[0].me),
     bestTe: rows.reduce((best, row) => Math.max(best, row.te), rows[0].te),
   };

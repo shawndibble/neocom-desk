@@ -5,6 +5,7 @@
  * The EVE University wiki shows 1,414 for rank 1 level II; it rounds the
  * other way, so it is not the source of these totals.
  */
+import { clamp } from '../math';
 import type { CloneState } from '@/engine/types';
 
 const SQRT_32_EXP = 2.5; // sqrt(32) = 2^2.5
@@ -60,7 +61,7 @@ export function remainingSpForLevel(rank: number, level: number, currentSp: numb
   }
   const start = spForLevel(rank, level - 1);
   const end = spForLevel(rank, level);
-  const banked = Math.min(Math.max(currentSp, start), end);
+  const banked = clamp(currentSp, start, end);
   return end - banked;
 }
 

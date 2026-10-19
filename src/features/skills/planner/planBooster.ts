@@ -28,6 +28,7 @@
 import type { PlanBooster } from '@/db';
 import { ATTRIBUTE_NAMES } from '@/engine/optimizer';
 import type { Attributes, Booster } from '@/engine/types';
+import { DAY_MS, HOUR_MS, MINUTE_MS } from '@/lib/age';
 
 /**
  * Accelerator tiers run well past the +9 the editor's input once allowed —
@@ -254,10 +255,6 @@ export const BOOSTER_QUICK_PICKS: readonly BoosterQuickPick[] = [
   { hours: 24 * 7 },
   { hours: 24 * 30 },
 ];
-
-const MINUTE_MS = 60 * 1000;
-const HOUR_MS = 60 * MINUTE_MS;
-const DAY_MS = 24 * HOUR_MS;
 
 /**
  * Where a row's duration is measured from: its own start, but never before

@@ -2,8 +2,8 @@ import { execFileSync } from 'node:child_process';
 import { Readable } from 'node:stream';
 import unbzip2Stream from 'unbzip2-stream';
 import { describe, expect, it } from 'vitest';
-import { OpenPriceFold } from './marketOpenPrices.js';
-import { foldOrdersCsv, parseIsBuy } from './marketOrdersArchive.js';
+import { OpenPriceFold, SNAPSHOT_HUBS, StationPriceFold } from './marketOpenPrices.js';
+import { foldBz2Snapshot, foldOrdersCsv, parseIsBuy } from './marketOrdersArchive.js';
 
 const HEADER =
   'duration,is_buy_order,issued,location_id,min_volume,order_id,price,range,system_id,type_id,volume_remain,volume_total,http_last_modified,station_id,region_id,constellation_id';
@@ -25,6 +25,33 @@ describe('foldOrdersCsv', () => {
     const rows = await foldOrdersCsv(Readable.from([CSV]), fold);
     expect(rows).toBe(5);
     expect([...fold.entries()]).toEqual([{ regionId: 10000002, typeId: 34, buy: 5.6, sell: 6.0 }]);
+  });
+
+  it('feeds the station fold from the same pass, keyed on location_id', async () => {
+    const elsewhere = row(true, 99, 34, 10000002).replace(
+      '2026-09-18T15:01:18Z,60003760,',
+      '2026-09-18T15:01:18Z,60003761,'
+    );
+    const fold = new OpenPriceFold();
+    const stations = new StationPriceFold(SNAPSHOT_HUBS, [34]);
+    const rows = await foldOrdersCsv(Readable.from([`${CSV}${elsewhere}\n`]), fold, stations);
+    expect(rows).toBe(6);
+    // The region-wide fold sees the 99 buy placed elsewhere; the station does not.
+    expect([...fold.entries()][0]).toMatchObject({ buy: 99, sell: 6.0 });
+    expect(stations.prices(60003760)).toEqual({ 34: [5.6, 6.0] });
+  });
+
+  it('rejects a station fold when location_id is missing', async () => {
+    const csv = 'is_buy_order,price,type_id,region_id\ntrue,1,34,10000002\n';
+    await expect(
+      foldOrdersCsv(
+        Readable.from([csv]),
+        new OpenPriceFold(),
+        new StationPriceFold(SNAPSHOT_HUBS, [34])
+      )
+    ).rejects.toThrow(/location_id/);
+    // Without a station fold the old columns still suffice (the backfill script).
+    await expect(foldOrdersCsv(Readable.from([csv]), new OpenPriceFold())).resolves.toBe(1);
   });
 
   it('survives chunk boundaries inside a row', async () => {
@@ -68,6 +95,35 @@ describe('foldOrdersCsv', () => {
     await expect(foldOrdersCsv(Readable.from([bad]), new OpenPriceFold())).rejects.toThrow(
       /is_buy_order/
     );
+  });
+});
+
+describe('foldBz2Snapshot', () => {
+  it('decompresses and folds a compressed snapshot stream', async () => {
+    const bz2 = execFileSync('bzip2', ['-c'], { input: CSV });
+    const fold = new OpenPriceFold();
+    expect(await foldBz2Snapshot(Readable.from([bz2]), fold)).toBe(5);
+    expect([...fold.entries()][0]).toMatchObject({ buy: 5.6, sell: 6.0 });
+  });
+
+  it('rejects when the download is corrupt or truncated', async () => {
+    const bz2 = execFileSync('bzip2', ['-c'], { input: CSV.repeat(200) });
+    const cut = bz2.subarray(0, Math.floor(bz2.length / 2));
+    await expect(foldBz2Snapshot(Readable.from([cut]), new OpenPriceFold())).rejects.toThrow();
+  });
+
+  it('keeps the decompressor under the default listener limit (no MaxListenersExceededWarning)', async () => {
+    const warnings: string[] = [];
+    const onWarning = (w: Error) => warnings.push(w.name);
+    process.on('warning', onWarning);
+    try {
+      const bz2 = execFileSync('bzip2', ['-c'], { input: CSV });
+      await foldBz2Snapshot(Readable.from([bz2]), new OpenPriceFold());
+      await new Promise((resolve) => setImmediate(resolve));
+    } finally {
+      process.off('warning', onWarning);
+    }
+    expect(warnings).not.toContain('MaxListenersExceededWarning');
   });
 });
 

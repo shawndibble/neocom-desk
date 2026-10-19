@@ -5,6 +5,7 @@ import { TextInput } from '@/components/ui';
 import { activeOptionClassName } from '@/components/ui/controlStyles';
 import { moveHighlight } from '@/lib/comboboxNav';
 import { cx } from '@/lib/cx';
+import { LOOKUP_DEBOUNCE_MS } from '@/lib/useDebouncedValue';
 import {
   MIN_PAYEE_SEARCH_LENGTH,
   resolvePayeeName,
@@ -13,9 +14,6 @@ import {
 } from './payeeEntitySearch';
 
 const SEARCH_ENDPOINTS = ['getCharacterSearch'] as const;
-/** Same debounce as Mail's recipient search and Pilot Lookup. */
-const SEARCH_DEBOUNCE_MS = 300;
-
 /**
  * The Payee form's Name box: free text, with suggestions of the characters,
  * corporations and alliances it could be. Picking one verifies the Payee. A
@@ -66,7 +64,7 @@ export function PayeeNameField({
           // A failed suggestion lookup leaves a free-text label, never a blocked save.
           if (ticket === latest.current && !controller.signal.aborted) setSuggestions([]);
         });
-    }, SEARCH_DEBOUNCE_MS);
+    }, LOOKUP_DEBOUNCE_MS);
     return () => {
       clearTimeout(timer);
       controller.abort();

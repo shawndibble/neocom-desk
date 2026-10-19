@@ -21,8 +21,8 @@ bold, italic, underline, link, table/row/header/cell (plain-text cells), gapcurs
 and undo/redo, plus two small custom marks (EVE colour and size). Headings,
 lists, images and code are not in the schema, so they cannot arrive by paste.
 
-`src/engine/mail/eveMarkup.ts` remains the **single authority for what is sent**.
-`src/engine/mail/mailEditorDoc.ts` converts the editor's JSON to and from
+`src/engine/mail/mail/eveMarkup.ts` remains the **single authority for what is sent**.
+`src/engine/mail/mail/mailEditorDoc.ts` converts the editor's JSON to and from
 `MarkupNode`s and always passes through `parseEveMarkup` /
 `serializeEveMarkup`; the schema is a convenience for editing, not the safety
 boundary. Tiptap's markdown input and paste rules for bold and italic are

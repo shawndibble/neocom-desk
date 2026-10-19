@@ -102,6 +102,21 @@
         you did not turn it on for.
       </p>
       <p>
+        There is a second opt-in exception for corporation officers. If a CEO, Director or
+        Accountant turns on <strong>Automatic sync</strong> in a corporation's Corp Tax Book
+        settings, they authorize their character a second time on EVE's login page, for a narrow set
+        of permissions: the corporation's mining ledger, the corporation wallet, the character's
+        notifications and corporation roles, and structure locations. An encrypted copy of that
+        separate token is stored on the app operator's server (Google Firebase), one per
+        corporation, and about every 6 hours the server uses it to update the corporation's Corp Tax
+        Book (what each character mined, donations paid into the corporation wallet, and which
+        Statements those payments settle). It cannot read mail, assets or skills, send mail or move
+        ISK, and it never issues a Statement or sends a mail. It is never written to your device or
+        to logs. The token is deleted and revoked with EVE when the officer or the corporation's CEO
+        turns Automatic sync off, when the officer loses the role or leaves the corporation, or
+        after 90 days without a sync.
+      </p>
+      <p>
         <strong>Push notifications</strong> are the other opt-in exception. If you turn them on, the
         app's server (Google Firebase) stores this device's push token, the IDs of the characters on
         it, and the text of the next 72 hours of alerts, so they can arrive while the app is closed.
@@ -294,6 +309,11 @@
         <li>
           Alerts when closed token: until you turn it off, remove the character, log out or delete
           everything, or the 90-day idle clean-up above.
+        </li>
+        <li>
+          Corp Tax Book Automatic sync token: until the officer or the corporation's CEO turns it
+          off, the officer loses the role or leaves the corporation, or the 90-day idle clean-up
+          above.
         </li>
       </ul>
 

@@ -19,7 +19,7 @@ import type { SkillQueueEntry } from '@/esi/endpoints';
 import { loadCharacterAttributes } from '@/features/skills/data';
 import { loadImplantBonuses } from '@/features/skills/typeDetail';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
-import { projectQueueEnd } from '@/features/skills/queueStatus';
+import { projectQueueEnd } from '@/engine/skills/queueStatus';
 import {
   loadSkillCatalog,
   toAttributeBaseline,

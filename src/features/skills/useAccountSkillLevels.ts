@@ -1,3 +1,4 @@
+import { idSetKey } from '@/lib/idSetKey';
 /**
  * Every given character's trained skills, fanned out and cached, for an
  * account-wide question. A character absent from the result had no
@@ -37,7 +38,7 @@ export function useAccountSkillLevels(
   // Stable across renders with the same members, in either order — an
   // upstream caller that rebuilds its id array on every render (a fresh
   // `.map()` over live-query rows, say) must not restart this fan-out.
-  const key = [...characterIds].sort((a, b) => a - b).join(',');
+  const key = idSetKey(characterIds);
   return useWarmLoad(
     `accountSkillLevels:${key}`,
     ACCOUNT_SNAPSHOT_ID,

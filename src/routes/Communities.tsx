@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { usePrefersReducedMotion } from '@/lib/useMediaQuery';
 import { Navigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -117,15 +118,15 @@ export function Communities() {
   }, [characterId, reload, reconnects]);
 
   const openId = params.get('community');
+  const reduced = usePrefersReducedMotion();
   useEffect(() => {
     if (!scrollToDetail.current) return;
     scrollToDetail.current = false;
-    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
     detailRef.current?.scrollIntoView?.({
       block: 'start',
       behavior: reduced ? 'auto' : 'smooth',
     });
-  }, [openId]);
+  }, [openId, reduced]);
 
   // The old Invites tab's `?tab=invites` opens Manage › Invites once. Dropped
   // from the URL as soon as the Community is on screen, so a reload or a

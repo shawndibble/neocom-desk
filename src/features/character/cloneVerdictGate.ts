@@ -14,7 +14,7 @@ import {
 } from '@/engine/clone/cloneVerdict';
 import type { CloneState } from '@/engine/types';
 import type { SkillQueueEntry } from '@/esi/endpoints';
-import { isQueuePaused } from '@/features/skills/queueStatus';
+import { isQueuePaused } from '@/engine/skills/queueStatus';
 import { WORN_CLONE_ID, type CloneTrainingData } from './cloneTraining';
 
 export type CloneVerdictNote = 'implants' | 'queue' | 'paused' | 'empty' | 'attributes';

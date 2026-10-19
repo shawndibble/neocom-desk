@@ -1,3 +1,4 @@
+import { idSetKey } from '@/lib/idSetKey';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -191,7 +192,7 @@ interface SortKeys {
 /** Ship classes (SDE groups) by group id; lands after the list, which never waits on it. */
 function useShipClasses(groupIds: readonly number[]): ReadonlyMap<number, string> {
   const [classes, setClasses] = useState<ReadonlyMap<number, string>>(new Map());
-  const idsKey = [...new Set(groupIds)].sort((a, b) => a - b).join(',');
+  const idsKey = idSetKey(groupIds);
   useEffect(() => {
     if (idsKey === '') return;
     let cancelled = false;
@@ -354,7 +355,7 @@ export function MyShipsView({
   route,
 }: MyShipsViewProps) {
   const { t } = useTranslation();
-  const idsKey = [...characterIds].sort((a, b) => a - b).join(',');
+  const idsKey = idSetKey(characterIds);
   const [state, setState] = useState<ShipsState>({ status: 'loading' });
   const [retryTick, setRetryTick] = useState(0);
   useEffect(() => {
@@ -398,25 +399,37 @@ export function MyShipsView({
     direction: 'asc',
   });
   const [query, setQuery] = useState('');
-  const sorted = useMemo(() => {
+  // Keys that don't depend on the resolving places: built once per rows, not per places tick.
+  const staticKeys = useMemo(() => {
     if (state.status !== 'ready') return [];
     const { data } = state;
-    const describe = (row: ShipRow): SortKeys & { shipClass: string; trail: string } => {
-      const place = places.get(placeKey(row));
+    return rows.map((row) => ({
+      row,
+      ship: data.typeNames.get(row.typeId) ?? '',
+      shipClass: shipClasses.get(data.groupIdByType.get(row.typeId) ?? -1) ?? '',
+      character: data.characterNames.get(row.characterId) ?? '',
+      trail: row.trail.map((id) => data.holderNames.get(id) ?? '').join(' '),
+    }));
+  }, [state, rows, shipClasses]);
+  const sorted = useMemo(() => {
+    const describe = (
+      base: (typeof staticKeys)[number]
+    ): SortKeys & { shipClass: string; trail: string } => {
+      const place = places.get(placeKey(base.row));
       const jumps = place?.jumps;
       return {
-        ship: data.typeNames.get(row.typeId) ?? '',
-        shipClass: shipClasses.get(data.groupIdByType.get(row.typeId) ?? -1) ?? '',
-        character: data.characterNames.get(row.characterId) ?? '',
+        ship: base.ship,
+        shipClass: base.shipClass,
+        character: base.character,
         location: place?.name ?? '',
-        trail: row.trail.map((id) => data.holderNames.get(id) ?? '').join(' '),
+        trail: base.trail,
         security: typeof place?.systemId === 'number' ? (place.security ?? null) : null,
         jumps: jumps?.kind === 'known' ? jumps.jumps : null,
       };
     };
     const needle = query.trim().toLowerCase();
-    const items = rows
-      .map((row) => ({ row, d: describe(row) }))
+    const items = staticKeys
+      .map((base) => ({ row: base.row, d: describe(base) }))
       .filter(
         ({ d }) =>
           needle === '' ||
@@ -435,7 +448,7 @@ export function MyShipsView({
       return cmp * sign;
     });
     return items.map((item) => item.row);
-  }, [state, rows, places, shipClasses, query, sort]);
+  }, [staticKeys, places, query, sort]);
   // One Character's ships need no Character column.
   const showCharacter = characterIds.length > 1;
   const columns = (

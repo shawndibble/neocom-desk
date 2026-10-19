@@ -1,8 +1,6 @@
 import { lazy, Suspense, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Spinner, TextArea } from '@/components/ui';
-import { markupPlainText, parseEveMarkup } from '@/engine/mail/eveMarkup';
-import { plainTextToMarkup } from '@/engine/mail/mailEditorDoc';
+import { Spinner } from '@/components/ui';
 
 /**
  * The seam between the New Mail composer and whatever edits its body. The
@@ -27,32 +25,6 @@ export interface MailBodyEditorProps {
   counter?: ReactNode;
   /** The editor fills the space the composer gives it (full-pane compose is a flex column). */
   className?: string;
-}
-
-/**
- * A plain text area over the body's text: formatting is not shown and is lost
- * on edit, but whatever is typed goes back out through `plainTextToMarkup`, so
- * `< > &` stay literal and it can never put a tag into the markup. The simplest
- * implementation of the contract; the composers default to the rich editor.
- */
-export function PlainBodyEditor({
-  value,
-  onChange,
-  className,
-  counter,
-  ...rest
-}: MailBodyEditorProps) {
-  return (
-    <>
-      <TextArea
-        {...rest}
-        value={markupPlainText(parseEveMarkup(value))}
-        onChange={(e) => onChange(plainTextToMarkup(e.target.value))}
-        className={`text-sm ${className ?? ''}`}
-      />
-      {counter && <div className="flex justify-end">{counter}</div>}
-    </>
-  );
 }
 
 // The rich editor (Tiptap + ProseMirror) is its own chunk: nothing loads until a composer opens.

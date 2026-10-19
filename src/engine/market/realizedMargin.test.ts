@@ -136,3 +136,12 @@ describe('realizedMargins', () => {
     expect(margins.size).toBe(0);
   });
 });
+
+describe('realizedMargins malformed dates', () => {
+  it('ignores a trade whose date does not parse', () => {
+    const buy = trade({ quantity: 10, unitPrice: 100 });
+    const bad = trade({ date: 'garbage', isBuy: false, quantity: 4, unitPrice: 150 });
+    const margins = realizedMargins([buy, bad], new Map());
+    expect(margins.has(bad.transactionId)).toBe(false);
+  });
+});

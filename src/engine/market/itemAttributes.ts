@@ -8,6 +8,7 @@
  * reason: it would silently drop whatever mattered for an item class nobody
  * thought about.
  */
+import { romanLevel } from '../projection';
 import {
   enumUnitLabel,
   idReferenceKind,
@@ -95,8 +96,6 @@ export function collectAttributeIdReferences(
   }
   return { typeIds: [...typeIds], groupIds: [...groupIds] };
 }
-
-const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
 
 /**
  * requiredSkillN -> requiredSkillNLevel dogma attribute id pairs, N = 1..6.
@@ -187,7 +186,7 @@ export function groupItemAttributes(
         name: entry.name,
         unit: null,
         value: skillTypeId,
-        displayValue: `${skillName} ${ROMAN[Math.max(1, Math.min(5, level)) - 1]}`,
+        displayValue: `${skillName} ${romanLevel(Math.max(1, Math.min(5, level)))}`,
       },
       entry.category
     );

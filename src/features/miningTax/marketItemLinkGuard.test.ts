@@ -13,6 +13,7 @@ const ALLOWED = new Set<string>([
   // wider gap left for a follow-up ticket.
   'src/features/miningTax/OverviewTab.tsx',
   'src/features/miningTax/TaxTab.tsx',
+  'src/features/miningTax/useTaxColumns.tsx',
 ]);
 
 const sources = import.meta.glob<string>(['/src/features/miningTax/**/*.tsx'], {

@@ -1,40 +1,36 @@
+import { idSetKey } from '@/lib/idSetKey';
 /**
- * The Items board's early reads, ahead of the full snapshot (issue #2921): the
- * index (so suggestions and the region list exist before any chunk has landed)
- * and, for a search that names a few item types, just those types' chunks.
- * Both are optimisations and report "nothing" when they cannot help, in which
- * case the board waits for the full snapshot as it always did.
+ * The Items board's reads through the R2 offer index (issue #2921, ADR 0019):
+ * the index (so suggestions and the region list exist before any offers have
+ * landed) and the offers of just the item types a search names. R2 is the only
+ * store (issue #4270), so a failed read is reported as such rather than
+ * waiting on a full snapshot that is never coming.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { isSyncConfigured } from '@/app/syncStatus';
 import { onCacheRevalidated } from '@/esi/cache';
 import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
 import {
   loadOfferIndex,
   loadOffersForTypes,
-  readSpan,
   type OfferIndex,
 } from '@/features/contractSearch/publicContractOfferIndex';
 
-/** A search naming more chunk docs than this is cheaper to answer from the full download that is already running. R2 has no such download running (`loadPublicContractOffers`), so it has no cap. */
-const MAX_EARLY_CHUNKS = 12;
 /** Typing re-ranks the matching types on every keystroke; read once the box has settled. */
 const SETTLE_MS = 150;
 
 /**
  * The index, once read. `null` until then, and for good when none is
  * published. A stale cached index is served at once and refreshed behind it;
- * when that refresh lands the index is read again, because after a publish
- * every chunk's stamp disagrees with the stale one and every early read would
- * quietly fall back to the full download.
+ * when that refresh lands the index is read again, so a search reads the
+ * objects the newest publish names.
  */
-export function useOfferIndex(characterId: number | null, enabled: boolean): OfferIndex | null {
+export function useOfferIndex(enabled: boolean): OfferIndex | null {
   const [index, setIndex] = useState<OfferIndex | null>(null);
   useEffect(() => {
-    if (!enabled || characterId === null || !isSyncConfigured()) return;
+    if (!enabled) return;
     let cancelled = false;
     const read = () => {
-      void loadOfferIndex(characterId).then((loaded) => {
+      void loadOfferIndex().then((loaded) => {
         if (!cancelled) setIndex((current) => (sameIndex(current, loaded) ? current : loaded));
       });
     };
@@ -44,7 +40,7 @@ export function useOfferIndex(characterId: number | null, enabled: boolean): Off
       cancelled = true;
       unsubscribe();
     };
-  }, [characterId, enabled]);
+  }, [enabled]);
   return index;
 }
 
@@ -66,19 +62,17 @@ const NO_OFFERS: EarlyOffers = { rows: [] };
 export function useEarlyOffers(
   index: OfferIndex | null,
   typeIds: ReadonlySet<number> | null,
-  characterId: number | null,
   enabled: boolean
 ): EarlyOffers {
-  // With R2 the full snapshot is never downloaded, so a search that names no
-  // type (a region or price filter alone) reads every listed type instead.
+  // The full snapshot is never downloaded, so a search that names no type (a
+  // region or price filter alone) reads every listed type instead.
   const wanted = useMemo<ReadonlySet<number> | null>(
-    () => typeIds ?? (index?.r2 ? new Set(index.types.keys()) : null),
+    () => typeIds ?? (index ? new Set(index.types.keys()) : null),
     [typeIds, index]
   );
   const key = useMemo(() => {
     if (!enabled || index === null || wanted === null || wanted.size === 0) return null;
-    if (!index.r2 && readSpan(index, wanted) > MAX_EARLY_CHUNKS) return null;
-    const scope = typeIds === null ? 'all' : [...typeIds].sort((a, b) => a - b).join(',');
+    const scope = typeIds === null ? 'all' : idSetKey(typeIds);
     return `${index.lastSyncedAt}:${scope}`;
   }, [enabled, index, wanted, typeIds]);
 
@@ -88,10 +82,10 @@ export function useEarlyOffers(
   } | null>(null);
 
   useEffect(() => {
-    if (key === null || index === null || wanted === null || characterId === null) return;
+    if (key === null || index === null || wanted === null) return;
     let cancelled = false;
     const timer = setTimeout(() => {
-      void loadOffersForTypes(index, wanted, characterId).then((rows) => {
+      void loadOffersForTypes(index, wanted).then((rows) => {
         if (!cancelled) setAnswer({ key, rows });
       });
     }, SETTLE_MS);
@@ -101,11 +95,11 @@ export function useEarlyOffers(
     };
     // `key` encodes index and typeIds; listing the objects would re-run on every identity change of an equal set.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, characterId]);
+  }, [key]);
 
   // An R2 index listing no type has nothing to read and nothing coming.
-  if (enabled && index?.r2 && wanted?.size === 0) return NO_OFFERS;
+  if (enabled && index && wanted?.size === 0) return NO_OFFERS;
   if (key === null) return NONE;
   if (answer?.key !== key) return NONE;
-  return answer.rows === null && index?.r2 ? { rows: null, failed: true } : { rows: answer.rows };
+  return answer.rows === null ? { rows: null, failed: true } : { rows: answer.rows };
 }

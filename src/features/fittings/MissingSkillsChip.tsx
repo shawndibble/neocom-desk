@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Popover, PopoverContent, PopoverTrigger } from '@/components/ui';
 import { SkillLink } from '@/features/entities';
@@ -13,6 +13,7 @@ import { buildFitCheckRows } from '@/features/skills/ships/fitCheckRows';
 import { scheduleEntries } from '@/features/skills/ships/scheduleEntries';
 import { isEntryCovered } from '@/features/skills/planner/reorder';
 import { targetPlanEntries, useTargetPlan } from '@/features/skills/useTargetPlan';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 interface MissingSkillsChipProps {
   entries: readonly PlanEntry[];
@@ -32,10 +33,7 @@ export function MissingSkillsChip({ entries, characterId, fittingName }: Missing
   const { catalog, trainedSkills, attributes, implants } = usePlanEditorData(characterId);
   const target = useTargetPlan(characterId);
   const cloneStates = useCloneStates((state) => state.value);
-  const hydrateCloneStates = useCloneStates((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateCloneStates();
-  }, [hydrateCloneStates]);
+  useHydratedStore(useCloneStates);
   const cloneState = cloneStateFor(cloneStates, characterId);
 
   const rows = useMemo(() => {

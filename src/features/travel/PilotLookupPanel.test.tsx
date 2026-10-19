@@ -46,7 +46,7 @@ vi.mock('@/sde/loadSde', () => ({
   loadTypes: mocks.loadTypes,
   loadGroupCategories: async () => ({}),
 }));
-vi.mock('@/engine/fitting/fittingShare', () => ({ encodeFittingShare: mocks.encodeFittingShare }));
+vi.mock('@/engine/fittings/fittingShare', () => ({ encodeFittingShare: mocks.encodeFittingShare }));
 vi.mock('./pilotLookup', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./pilotLookup')>()),
   resolvePilotByName: mocks.resolvePilotByName,

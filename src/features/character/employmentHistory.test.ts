@@ -9,6 +9,7 @@ import {
   deriveEmploymentSummary,
   loadEmploymentHistory,
 } from './employmentHistory';
+import { DAY_MS } from '@/lib/age';
 
 const CHAR_ID = 91;
 const server = setupServer();
@@ -30,7 +31,6 @@ const ENTRY = (
   start_date: startDate,
 });
 
-const DAY_MS = 86_400_000;
 const NOW = new Date('2026-06-01T00:00:00Z').getTime();
 const daysAgo = (d: number) => new Date(NOW - d * DAY_MS).toISOString();
 

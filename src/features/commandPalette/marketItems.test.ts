@@ -7,6 +7,7 @@ import {
   createMarketItemsProvider,
   searchMarketItems,
 } from './marketItems';
+import { deferred } from '@/test/deferred';
 
 const CATALOGUE: MarketTypeEntry[] = [
   { typeId: 1, name: 'Tritanium Bar', marketGroupId: 1, volume: 1 },
@@ -15,16 +16,6 @@ const CATALOGUE: MarketTypeEntry[] = [
   { typeId: 4, name: 'Pyerite', marketGroupId: 1, volume: 1 },
   { typeId: 5, name: 'Atritanium Widget', marketGroupId: 1, volume: 1 },
 ];
-
-function deferred<T>() {
-  let resolve!: (value: T) => void;
-  let reject!: (reason: unknown) => void;
-  const promise = new Promise<T>((res, rej) => {
-    resolve = res;
-    reject = rej;
-  });
-  return { promise, resolve, reject };
-}
 
 const ids = (results: readonly { typeId: number }[]) => results.map((entry) => entry.typeId);
 const signal = new AbortController().signal;

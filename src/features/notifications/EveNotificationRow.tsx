@@ -5,6 +5,7 @@
  * under "Other". Each type is its own aggregate row, so it can be set for every
  * Character at once and opened to fix individual ones.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useTranslation } from 'react-i18next';
 import { SelectionCheckbox } from '@/features/character/SelectionCheckbox';
 import { AggregateRow } from './AggregateRow';
@@ -90,9 +91,7 @@ export function EveNotificationRow({
           return (
             <section key={key} aria-label={familyLabel}>
               <div className="flex items-center justify-between gap-3 border-t border-line/60 px-3 py-1">
-                <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                  {familyLabel}
-                </span>
+                <span className={eyebrowClassName}>{familyLabel}</span>
                 <div className={CHANNEL_COLUMNS}>
                   {NOTIFICATION_CHANNELS.map((channel) => (
                     <SelectionCheckbox

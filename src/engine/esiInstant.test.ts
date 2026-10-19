@@ -1,16 +1,16 @@
-import { describe, expect, it } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { parseInstant } from './esiInstant';
 
 describe('parseInstant', () => {
-  it('parses an ESI timestamp to epoch ms', () => {
-    expect(parseInstant('2026-10-19T12:00:00Z')).toBe(Date.UTC(2026, 9, 19, 12));
+  it('parses an ESI ISO timestamp to epoch ms', () => {
+    expect(parseInstant('2026-01-02T03:04:05Z')).toBe(Date.UTC(2026, 0, 2, 3, 4, 5));
   });
 
   it('returns null for undefined', () => {
     expect(parseInstant(undefined)).toBeNull();
   });
 
-  it('returns null, not NaN, for garbage', () => {
+  it('returns null, not NaN, for an unparseable string', () => {
     expect(parseInstant('not a date')).toBeNull();
     expect(parseInstant('')).toBeNull();
   });

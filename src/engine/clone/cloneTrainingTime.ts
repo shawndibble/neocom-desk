@@ -1,3 +1,4 @@
+import { sum } from '../math';
 import { timeToTrain, trainingRate } from '../skills/sp';
 import type { AttributeName, Attributes, CloneState, Implants } from '../types';
 
@@ -71,8 +72,6 @@ export function queueEntrySeconds(
 ): number[] {
   return queue.map((e) => timeToTrain(e.remainingSp, entryRate(e, base, implants, cloneState)));
 }
-
-const sum = (xs: readonly number[]) => xs.reduce((a, b) => a + b, 0);
 
 /** Seconds to finish `queue` wearing `implants` the whole way. */
 function queueSeconds(

@@ -28,8 +28,7 @@
  * mirrors every delete onto meta.
  */
 import { db, type EsiCacheMetaRecord } from '@/db';
-
-const DAY_MS = 24 * 60 * 60_000;
+import { DAY_MS } from '@/lib/age';
 
 /** Rows `STALE_AFTER.static` (24 h) would already refetch: 30x that. */
 export const STATIC_RETENTION_MS = 30 * DAY_MS;
@@ -97,6 +96,7 @@ export const PRUNE_RULES: readonly PruneRule[] = [
     'public-alliance-corporations',
     'public-employment',
     'station',
+    'moon',
     'universeType',
     'type-volume',
     'corp-name',
@@ -143,6 +143,8 @@ export const PRUNE_RULES: readonly PruneRule[] = [
   { pattern: /^marketPrice:/, maxAgeMs: MARKET_RETENTION_MS },
   { pattern: /^market-history:\d+:\d+$/, maxAgeMs: MARKET_RETENTION_MS },
   { pattern: /^structure-market:\d+$/, maxAgeMs: MARKET_RETENTION_MS },
+  // No longer written (hub mining prices read from R2 since #4277); kept so
+  // rows a browser already holds still age out.
   { pattern: /^marketHistory:/, maxAgeMs: MARKET_RETENTION_MS },
 ];
 

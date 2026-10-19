@@ -12,7 +12,7 @@ import type {
   JournalBreakdown,
   WalletJournalFilter,
 } from '@/features/character/walletJournalFilter';
-import { signedIsk } from '@/features/market/signedIsk';
+import { signedIsk } from '@/lib/signedIsk';
 import { formatIsk } from '@/lib/isk';
 
 interface ActiveFilterRowProps {

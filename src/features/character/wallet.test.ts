@@ -12,7 +12,6 @@ import {
   loadWalletTransactionsWithStatus,
   loadAllCharactersWalletBalances,
   oldestCachedBalanceAt,
-  totalWalletBalance,
   type CharacterWalletBalance,
 } from './wallet';
 
@@ -450,47 +449,5 @@ describe('oldestCachedBalanceAt', () => {
 
   it('keeps a real epoch-zero read as a time, not as missing', () => {
     expect(oldestCachedBalanceAt([entry(1, true, 0)], new Set([1]))).toBe(0);
-  });
-});
-
-describe('totalWalletBalance', () => {
-  function entry(overrides: Partial<CharacterWalletBalance>): CharacterWalletBalance {
-    return {
-      characterId: 1,
-      characterName: 'Alice',
-      balanceResult: { data: 100, fetchedAt: new Date(), fromCache: false, truncated: false },
-      needsReauth: false,
-      ...overrides,
-    };
-  }
-
-  it('sums every entry with a usable balance', () => {
-    const total = totalWalletBalance([
-      entry({
-        characterId: 1,
-        balanceResult: { data: 100, fetchedAt: new Date(), fromCache: false, truncated: false },
-      }),
-      entry({
-        characterId: 2,
-        balanceResult: { data: 250, fetchedAt: new Date(), fromCache: false, truncated: false },
-      }),
-    ]);
-    expect(total).toBe(350);
-  });
-
-  it('excludes a needsReauth entry from the total rather than counting it as zero', () => {
-    const total = totalWalletBalance([
-      entry({
-        characterId: 1,
-        balanceResult: { data: 100, fetchedAt: new Date(), fromCache: false, truncated: false },
-      }),
-      entry({ characterId: 2, needsReauth: true, balanceResult: null }),
-    ]);
-    expect(total).toBe(100);
-  });
-
-  it('excludes a never-fetched entry from the total', () => {
-    const total = totalWalletBalance([entry({ characterId: 1, balanceResult: null })]);
-    expect(total).toBe(0);
   });
 });

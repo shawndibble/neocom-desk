@@ -1,3 +1,4 @@
+import { idSetKey } from '@/lib/idSetKey';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, FilterChip, LiveStatus, Spinner } from '@/components/ui';
@@ -150,7 +151,7 @@ export function MovePlanTab({ onClose, characterIds, activeCharacterId }: MovePl
     skillsKnown: true,
   });
   const hullHolds = useRef(new Map<number, PackHold[]>());
-  const idsKey = characterIds.join(',');
+  const idsKey = idSetKey(characterIds);
   const focusAfterCommit = useFocusAfterCommit();
   const planHeadingRef = useRef<HTMLHeadingElement>(null);
   const deliverHeadingRef = useRef<HTMLHeadingElement>(null);
@@ -194,7 +195,9 @@ export function MovePlanTab({ onClose, characterIds, activeCharacterId }: MovePl
     const out = new Map<number, Map<number, PickerStack[]>>();
     for (const s of loaded?.stacks ?? []) {
       const byPlace = out.get(s.characterId) ?? new Map<number, PickerStack[]>();
-      byPlace.set(s.locationId, [...(byPlace.get(s.locationId) ?? []), s]);
+      const stacks = byPlace.get(s.locationId);
+      if (stacks) stacks.push(s);
+      else byPlace.set(s.locationId, [s]);
       out.set(s.characterId, byPlace);
     }
     if (!loaded) return out;

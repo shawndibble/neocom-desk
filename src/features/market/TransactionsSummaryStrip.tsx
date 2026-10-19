@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { HintText } from '@/components/ui/HintText';
@@ -6,7 +7,7 @@ import { formatDateOnly } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
 import { iskToneClass } from '@/features/character/format';
 import type { WalletTransaction } from '@/esi/endpoints';
-import { signedIsk } from './signedIsk';
+import { signedIsk } from '@/lib/signedIsk';
 import { summarizeTransactions } from './transactionDays';
 import type { TradingSummary } from './tradingSummary';
 
@@ -101,7 +102,7 @@ function SummaryFigure({
 }) {
   return (
     <div className={cx('flex flex-col gap-0.5 whitespace-nowrap', className)}>
-      <dt className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+      <dt className={eyebrowClassName}>
         {tooltip ? <HintText content={tooltip}>{label}</HintText> : label}
       </dt>
       <dd className="text-sm font-semibold">{value}</dd>

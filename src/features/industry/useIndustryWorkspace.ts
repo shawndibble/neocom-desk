@@ -32,6 +32,7 @@ import { useBuildGroups } from './buildGroups';
 import { useBuildPlanPricingInputs, type BuildPlanPricingInputs } from './buildPlanPricingInputs';
 import { useAssumedTe } from './assumedTe';
 import type { OwnedStockSnapshot } from './ownedStockDetection';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 export interface IndustryWorkspace {
   hydrated: boolean;
@@ -82,15 +83,10 @@ export function useIndustryWorkspace(): IndustryWorkspace {
   const pricingInputs = useBuildPlanPricingInputs(activeCharacterId);
 
   const buildGroups = useBuildGroups((state) => state.value);
-  const buildGroupsHydrated = useBuildGroups((state) => state.hydrated);
-  const hydrateBuildGroups = useBuildGroups((state) => state.hydrate);
   const setBuildGroups = useBuildGroups((state) => state.setValue);
   const assumedTe = useAssumedTe((state) => state.value);
-  const hydrateAssumedTe = useAssumedTe((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateBuildGroups();
-    void hydrateAssumedTe();
-  }, [hydrateBuildGroups, hydrateAssumedTe]);
+  const buildGroupsHydrated = useHydratedStore(useBuildGroups);
+  useHydratedStore(useAssumedTe);
 
   // Read once, on mount: every field below starts from the same load.
   const [initial] = useState(() => lastWorkspaceLoad(activeCharacterId));

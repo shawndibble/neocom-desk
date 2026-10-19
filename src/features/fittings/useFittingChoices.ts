@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type FittingRecord } from '@/db';
-import { decodeFittingShare } from '@/engine/fitting/fittingShare';
+import { decodeFittingShare } from '@/engine/fittings/fittingShare';
 import { esiFittingToFitting } from '@/engine/fittings/esiFittingMapper';
 import { shareToFitting } from '@/engine/fittings/shareMapper';
 import type { Fitting } from '@/engine/fittings/types';

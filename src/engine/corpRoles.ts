@@ -34,6 +34,16 @@ export interface CorpCapabilities {
    * panel with nothing of its own to gate on.
    */
   canReadMoonExtractions: boolean;
+  /**
+   * GET /corporation/{id}/mining/observers and /observers/{observer_id} —
+   * who mined how much of what at the corporation's refineries, by
+   * character, ore type and day (issue #4058, epic #4055).
+   *
+   * Not folded into `canReadMoonExtractions` although both read through the
+   * same scope: the extraction schedule answers to Station_Manager, the
+   * ledger to Accountant, so either can hold one without the other.
+   */
+  canReadMiningLedger: boolean;
   /** GET /corporations/{id}/membertracking. */
   canReadMembers: boolean;
   /** GET /corporations/{id}/industry/jobs. */
@@ -67,6 +77,7 @@ export const CORP_CAPABILITIES: readonly CorpCapability[] = [
   'canReadWallet',
   'canReadStructures',
   'canReadMoonExtractions',
+  'canReadMiningLedger',
   'canReadMembers',
   'canReadIndustry',
   'canReadAssets',
@@ -78,6 +89,7 @@ export const NO_CORP_CAPABILITIES: CorpCapabilities = {
   canReadWallet: false,
   canReadStructures: false,
   canReadMoonExtractions: false,
+  canReadMiningLedger: false,
   canReadMembers: false,
   canReadIndustry: false,
   canReadAssets: false,
@@ -100,6 +112,9 @@ const ROLES_FOR_CAPABILITY: Readonly<Record<CorpCapability, readonly string[]>> 
   // `Structure_manager`; that string appears nowhere in ESI's spec, and using
   // it would have denied the moon board to every user entitled to it.
   canReadMoonExtractions: ['Station_Manager'],
+  // `x-required-roles` on both mining/observers paths is ["Accountant"] alone:
+  // unlike the wallet, Junior_Accountant does not open it.
+  canReadMiningLedger: ['Accountant'],
   canReadMembers: [],
   canReadIndustry: ['Factory_Manager'],
   // `x-required-roles` on /corporations/{id}/assets is ["Director"] alone, so
@@ -146,6 +161,17 @@ export function corpCapabilities(roles: readonly string[]): CorpCapabilities {
       isDirector || ROLES_FOR_CAPABILITY[capability].some((role) => held.has(role));
   }
   return capabilities;
+}
+
+/**
+ * Who may open the Corp Tax Book (epic #4055, D8): Director (the CEO holds
+ * every role), Accountant and Junior_Accountant. Distinct from
+ * `canReadMiningLedger`, which gates *syncing* because ESI's observer ledger
+ * wants Accountant; a Junior_Accountant views what an Accountant synced.
+ * Mirrors `decideRoles` in `functions/src/corpTaxBook.ts`, which is the real gate.
+ */
+export function canViewCorpTaxBook(roles: readonly string[]): boolean {
+  return roles.some((r) => r === DIRECTOR || r === 'Accountant' || r === 'Junior_Accountant');
 }
 
 /**

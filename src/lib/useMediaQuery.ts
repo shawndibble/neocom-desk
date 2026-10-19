@@ -31,3 +31,11 @@ export const COARSE_POINTER_QUERY = '(pointer: coarse)';
 export function useTouchContext(): 'touch' | undefined {
   return useMediaQuery(COARSE_POINTER_QUERY) ? 'touch' : undefined;
 }
+
+/** The `md` breakpoint as a *min*-width: `Layout`'s phone/desktop line. */
+export const MD_UP_QUERY = '(min-width: 48rem)';
+
+/** Whether the user asked the OS for less motion; gate JS-driven animation and smooth scrolling on it. */
+export function usePrefersReducedMotion(): boolean {
+  return useMediaQuery('(prefers-reduced-motion: reduce)');
+}

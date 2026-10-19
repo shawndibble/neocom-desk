@@ -334,6 +334,51 @@ describe('eveNotificationText — moon mining', () => {
     expect(body).toContain('Chunk Line 3');
     expect(body).toContain('fractured');
   });
+
+  // Issue #4058: the drill's start, firing and cancellation, so the Corp Tax
+  // Book's Extraction timeline is exact (epic #4055, D14).
+  it('MoonminingExtractionStarted names the refinery and when the chunk arrives', () => {
+    const { title, body } = eveNotificationText(
+      fire({
+        type: 'MoonminingExtractionStarted',
+        text: `${MOON_PAYLOAD}readyTime: 132052104600000000\nstartedBy: 92168909\n`,
+      }),
+      CHARACTER
+    );
+    expect(title).toBe('Moon extraction started');
+    expect(body).toContain('Chunk Line 3');
+    expect(body).toContain('2019');
+    expectNotTheGenericBody(body, 'MoonminingExtractionStarted');
+  });
+
+  it('MoonminingExtractionStarted still names the refinery without a ready time', () => {
+    const { body } = eveNotificationText(
+      fire({ type: 'MoonminingExtractionStarted', text: MOON_PAYLOAD }),
+      CHARACTER
+    );
+    expect(body).toContain('Chunk Line 3');
+    expect(body).toContain('started');
+  });
+
+  it('MoonminingLaserFired reads as the fired case', () => {
+    const { title, body } = eveNotificationText(
+      fire({ type: 'MoonminingLaserFired', text: MOON_PAYLOAD }),
+      CHARACTER
+    );
+    expect(title).toBe('Moon drill fired');
+    expect(body).toContain('Chunk Line 3');
+    expect(body).toContain('fired');
+  });
+
+  it('MoonminingExtractionCancelled reads as the cancelled case', () => {
+    const { title, body } = eveNotificationText(
+      fire({ type: 'MoonminingExtractionCancelled', text: MOON_PAYLOAD }),
+      CHARACTER
+    );
+    expect(title).toBe('Moon extraction cancelled');
+    expect(body).toContain('Chunk Line 3');
+    expect(body).toContain('cancelled');
+  });
 });
 
 describe('eveNotificationText — bills', () => {
@@ -486,7 +531,7 @@ describe('eveNotificationText — wars and applications', () => {
 });
 
 describe('eveNotificationText — the rendered set stays deliberately small', () => {
-  it('covers exactly the types issue #300 and #353 named', () => {
+  it('covers exactly the types issues #300, #353 and #4058 named', () => {
     expect([...EVE_NOTIFICATION_RENDERED_TYPES].sort()).toEqual(
       [
         'AllWarDeclaredMsg',
@@ -498,7 +543,10 @@ describe('eveNotificationText — the rendered set stays deliberately small', ()
         'CorpOfficeExpirationMsg',
         'InfrastructureHubBillAboutToExpire',
         'MoonminingAutomaticFracture',
+        'MoonminingExtractionCancelled',
         'MoonminingExtractionFinished',
+        'MoonminingExtractionStarted',
+        'MoonminingLaserFired',
         'OrbitalAttacked',
         'OrbitalReinforced',
         'StructureDestroyed',

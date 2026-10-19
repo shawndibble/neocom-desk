@@ -29,7 +29,7 @@ export interface JumpTimersWidgetData {
 
 const NEEDS_PERMISSION: JumpTimerRead = { state: 'needsPermission' };
 
-export function loadCharacterFatigue(characterId: number): Promise<StatusResult<CharacterFatigue>> {
+function loadCharacterFatigue(characterId: number): Promise<StatusResult<CharacterFatigue>> {
   const { fetchLive, conditional } = conditionalFetch((options) =>
     getCharacterFatigue(characterId, options)
   );

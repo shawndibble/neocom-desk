@@ -1,4 +1,7 @@
+import { NO_NAMES } from '@/lib/emptyCollections';
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -90,7 +93,6 @@ import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import type { AttributeName } from '@/engine/types';
 
 /** Stable identity, so the fallback doesn't invalidate the column memo every render. */
-const NO_NAMES: ReadonlyMap<number, string> = new Map();
 const NO_DETAILS: ReadonlyMap<number, ImplantDetail> = new Map();
 const NO_CLONES: readonly JumpClone[] = [];
 const NO_SYSTEMS: ReadonlyMap<number, number | null> = new Map();
@@ -583,11 +585,7 @@ export function Clones() {
   // Implant values at the market hub: lowest sell there, else lowest in its
   // region. Another progressive enhancement: the list shows before any price.
   const hubId = useMarketHub((state) => state.value);
-  const hubHydrated = useMarketHub((state) => state.hydrated);
-  const hydrateHub = useMarketHub((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateHub();
-  }, [hydrateHub]);
+  const hubHydrated = useHydratedStore(useMarketHub);
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
   const priceIds = useMemo(
     () => [...new Set([...clones.flatMap((c) => c.implants), ...wornIds])].sort((a, b) => a - b),
@@ -665,18 +663,11 @@ export function Clones() {
   // Which clone is best for the active queue (the engine does the numbers).
   const sort = useClonesSort((state) => state.value);
   const setSort = useClonesSort((state) => state.setValue);
-  const hydrateSort = useClonesSort((state) => state.hydrate);
+  useHydratedStore(useClonesSort);
   const nicknames = useCloneNicknames((state) => state.value);
-  const nicknamesHydrated = useCloneNicknames((state) => state.hydrated);
-  const hydrateNicknames = useCloneNicknames((state) => state.hydrate);
+  const nicknamesHydrated = useHydratedStore(useCloneNicknames);
   const cloneStates = useCloneStates((state) => state.value);
-  const cloneStatesHydrated = useCloneStates((state) => state.hydrated);
-  const hydrateCloneStates = useCloneStates((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateSort();
-    void hydrateCloneStates();
-    void hydrateNicknames();
-  }, [hydrateSort, hydrateCloneStates, hydrateNicknames]);
+  const cloneStatesHydrated = useHydratedStore(useCloneStates);
   const training = data?.training ?? null;
   const readyAt = cooldown.onCooldown ? cooldown.readyAt : null;
   const verdictResult = useMemo(() => {
@@ -792,9 +783,7 @@ export function Clones() {
           <div className="grid grid-cols-[repeat(auto-fit,minmax(15rem,1fr))] gap-4 text-sm">
             <Panel className="h-full">
               <section aria-label={t('clones.cooldown')} className="space-y-1">
-                <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                  {t('clones.cooldownShared')}
-                </h3>
+                <h3 className={eyebrowClassName}>{t('clones.cooldownShared')}</h3>
                 {/* The header above names it; the value wraps rather than sitting in a nowrap chip. */}
                 <p
                   className={`font-medium tabular-nums ${STAT_CHIP_TONE_TEXT_CLASS[cooldownTone]}`}
@@ -816,9 +805,7 @@ export function Clones() {
             </Panel>
             <Panel className="h-full">
               <section aria-label={t('clones.youAreIn')} className="space-y-1">
-                <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                  {t('clones.youAreIn')}
-                </h3>
+                <h3 className={eyebrowClassName}>{t('clones.youAreIn')}</h3>
                 <p>
                   {characterSystemName ?? t('clones.unknownPlace')}{' '}
                   {characterSystemId !== null && securities.has(characterSystemId) && (
@@ -843,9 +830,7 @@ export function Clones() {
             {homeLocationName && (
               <Panel className="h-full">
                 <section aria-label={t('clones.respawn')} className="space-y-1">
-                  <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                    {t('clones.respawn')}
-                  </h3>
+                  <h3 className={eyebrowClassName}>{t('clones.respawn')}</h3>
                   <p className="flex flex-wrap items-center gap-x-2">
                     <span className="[overflow-wrap:anywhere]">{homeLocationName}</span>
                     {homeSecurity !== undefined && <SecurityStatus security={homeSecurity} />}

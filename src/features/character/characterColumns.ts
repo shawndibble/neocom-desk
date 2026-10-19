@@ -8,6 +8,7 @@
  * the SP extraction settings (`spExtractionSettings.ts`), which sync because
  * they're a judgement call about the pilot, not the screen.
  */
+import { createColumnVisibilitySetting } from '@/lib/columnVisibility';
 import { createLocalSetting } from '@/lib/useLocalSetting';
 
 export const CHARACTER_COLUMN_IDS = [
@@ -46,28 +47,16 @@ export const DEFAULT_VISIBLE_CHARACTER_COLUMNS: readonly CharacterColumnId[] = [
   'starred',
 ];
 
-function isCharacterColumnId(raw: unknown): raw is CharacterColumnId {
-  return typeof raw === 'string' && (CHARACTER_COLUMN_IDS as readonly string[]).includes(raw);
-}
-
 export const VISIBLE_CHARACTER_COLUMNS_KEY = 'charactersVisibleColumns';
 
-export const useVisibleCharacterColumns = createLocalSetting<readonly CharacterColumnId[]>({
+// `remove` was a trailing column until it folded into the row's ⋮ menu
+// (decision 20260927-071415, reversed); drop it from a stored list rather
+// than rejecting the whole preference.
+export const useVisibleCharacterColumns = createColumnVisibilitySetting({
   key: VISIBLE_CHARACTER_COLUMNS_KEY,
-  defaultValue: DEFAULT_VISIBLE_CHARACTER_COLUMNS,
-  // An empty stored array is rejected rather than honoured (miningTax's
-  // since-retired statusFilterPref.ts precedent) — it would render a table with only the
-  // row header, no columns and no explanation.
-  // `remove` was a trailing column until it folded into the row's ⋮ menu
-  // (decision 20260927-071415, reversed); drop it from a stored list rather
-  // than rejecting the whole preference.
-  parse: (raw) => {
-    if (!Array.isArray(raw)) return null;
-    const kept = raw.filter((id) => id !== 'remove');
-    return kept.length > 0 && kept.every(isCharacterColumnId)
-      ? (kept as CharacterColumnId[])
-      : null;
-  },
+  ids: CHARACTER_COLUMN_IDS,
+  defaultVisible: DEFAULT_VISIBLE_CHARACTER_COLUMNS,
+  retired: ['remove'],
 });
 
 /**

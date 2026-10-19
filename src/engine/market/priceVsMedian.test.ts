@@ -6,8 +6,8 @@ import {
   priceVsMedianPct,
 } from './priceVsMedian';
 import { historyPoint as point } from './__fixtures__/priceHistory';
+import { DAY_MS } from '@/lib/age';
 
-const DAY_MS = 86_400_000;
 /** 2026-10-16 12:00 UTC. */
 const NOW = Date.parse('2026-10-16T12:00:00Z');
 

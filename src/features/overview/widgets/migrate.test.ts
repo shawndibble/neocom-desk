@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isReturningPilot, migrateFromCards } from './migrate';
+import { isReturningPilot, migrateFromCards, parseHiddenCards } from './migrate';
 
 const kinds = (l: { widgets: { kind: string }[] }) => l.widgets.map((w) => w.kind);
 
@@ -80,5 +80,30 @@ describe('isReturningPilot', () => {
     expect(isReturningPilot(['mining'], [])).toBe(true);
     expect(isReturningPilot([], ['mail'])).toBe(true);
     expect(isReturningPilot(['show:incursions'], [])).toBe(true);
+  });
+});
+
+describe('parseHiddenCards', () => {
+  it('keeps a list of card keys', () => {
+    expect(parseHiddenCards(['mining', 'alerts'])).toEqual(['mining', 'alerts']);
+  });
+
+  /*
+   * The value is last-write-wins as a whole. A build that dropped a key it
+   * did not recognise would write the shortened list back on its next toggle
+   * and un-hide a newer build's card on every device.
+   */
+  it('keeps keys this build has no card for', () => {
+    expect(parseHiddenCards(['mining', 'someFutureCard'])).toEqual(['mining', 'someFutureCard']);
+  });
+
+  it('drops duplicates and anything that is not a string', () => {
+    expect(parseHiddenCards(['mining', 'mining', 3, null, 'orders'])).toEqual(['mining', 'orders']);
+  });
+
+  it('rejects a value that is not a list', () => {
+    expect(parseHiddenCards('mining')).toBeNull();
+    expect(parseHiddenCards({ mining: true })).toBeNull();
+    expect(parseHiddenCards(null)).toBeNull();
   });
 });

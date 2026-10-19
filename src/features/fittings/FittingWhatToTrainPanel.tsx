@@ -18,7 +18,7 @@
  * scheduled ahead of it by the same normalizer the Skill Plan editor runs, so
  * Undo takes back exactly the one entry and what it pulled in goes with it.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import {
@@ -67,6 +67,7 @@ import { rankModuleUpgrades } from '@/engine/fittings/moduleUpgrades';
 import type { SkillPlanRecord } from '@/db';
 import { StatField, StatFields, StatNote } from './StatFacts';
 import { STAT_DETAIL, STAT_FIELD_WIDTH, joinDetail, statRowClassName } from './statKit';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 interface WhatToTrainRow extends SkillGain {
   name: string;
@@ -127,10 +128,7 @@ function WhatToTrainRanking({
   const { catalog, trainedSkills, trainedSkillsKnown, attributes, implants } =
     usePlanEditorData(characterId);
   const cloneStates = useCloneStates((state) => state.value);
-  const hydrateCloneStates = useCloneStates((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateCloneStates();
-  }, [hydrateCloneStates]);
+  useHydratedStore(useCloneStates);
   const cloneState = cloneStateFor(cloneStates, characterId);
 
   // Worked out once per result, not per sort change.

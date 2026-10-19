@@ -11,7 +11,6 @@ import {
 const ZEOLITES = 45490;
 const COMPRESSED_ZEOLITES = 62463;
 const VELDSPAR = 1230; // no compressed pairing seeded — prices as itself
-const CHARACTER_ID = 91;
 const DATE = '2026-09-04';
 
 const pricesMock = vi.hoisted(() => {
@@ -56,7 +55,6 @@ describe('loadUnitPricesOnDate', () => {
     );
 
     const { prices } = await loadUnitPricesOnDate(
-      CHARACTER_ID,
       [ZEOLITES],
       getTradeHub('jita') as TradeHub,
       DATE
@@ -72,7 +70,6 @@ describe('loadUnitPricesOnDate', () => {
     );
 
     const { prices } = await loadUnitPricesOnDate(
-      CHARACTER_ID,
       [ZEOLITES],
       getTradeHub('jita') as TradeHub,
       DATE,
@@ -89,7 +86,6 @@ describe('loadUnitPricesOnDate', () => {
     );
 
     const { prices } = await loadUnitPricesOnDate(
-      CHARACTER_ID,
       [ZEOLITES],
       getTradeHub('jita') as TradeHub,
       DATE
@@ -104,7 +100,6 @@ describe('loadUnitPricesOnDate', () => {
     );
 
     const { prices } = await loadUnitPricesOnDate(
-      CHARACTER_ID,
       [VELDSPAR],
       getTradeHub('jita') as TradeHub,
       DATE
@@ -118,7 +113,6 @@ describe('loadUnitPricesOnDate', () => {
     pricesMock.getHubPrices.mockResolvedValue(new Map());
 
     const { prices } = await loadUnitPricesOnDate(
-      CHARACTER_ID,
       [VELDSPAR],
       getTradeHub('jita') as TradeHub,
       DATE
@@ -131,7 +125,6 @@ describe('loadUnitPricesOnDate', () => {
     pricesMock.getHubPrices.mockResolvedValue(new Map());
 
     const { unpriced } = await loadUnitPricesOnDate(
-      CHARACTER_ID,
       [VELDSPAR],
       getTradeHub('jita') as TradeHub,
       DATE
@@ -146,7 +139,6 @@ describe('loadUnitPricesOnDate', () => {
     );
 
     const { unpriced } = await loadUnitPricesOnDate(
-      CHARACTER_ID,
       [ZEOLITES],
       getTradeHub('jita') as TradeHub,
       DATE
@@ -161,7 +153,6 @@ describe('loadUnitPricesOnDate', () => {
     );
 
     const { prices, unpriced, sellFallback } = await loadUnitPricesOnDate(
-      CHARACTER_ID,
       [VELDSPAR],
       getTradeHub('jita') as TradeHub,
       DATE
@@ -178,7 +169,6 @@ describe('loadUnitPricesOnDate', () => {
     );
 
     const { unpriced } = await loadUnitPricesOnDate(
-      CHARACTER_ID,
       [VELDSPAR],
       getTradeHub('jita') as TradeHub,
       DATE
@@ -189,7 +179,6 @@ describe('loadUnitPricesOnDate', () => {
 
   it('is empty for an empty input, without calling the hub, the SDE, or the snapshot sources', async () => {
     const { prices, unpriced } = await loadUnitPricesOnDate(
-      CHARACTER_ID,
       [],
       getTradeHub('jita') as TradeHub,
       DATE
@@ -213,7 +202,6 @@ describe('loadUnitPricesOnDate', () => {
     );
 
     const { prices } = await loadUnitPricesOnDate(
-      CHARACTER_ID,
       [ZEOLITES, SYLVITE],
       getTradeHub('jita') as TradeHub,
       DATE
@@ -228,17 +216,12 @@ describe('loadUnitPricesOnDate', () => {
     pricesMock.getHubPrices.mockResolvedValue(new Map());
     const hek = getTradeHub('hek') as TradeHub;
 
-    await loadUnitPricesOnDate(CHARACTER_ID, [VELDSPAR], hek, DATE);
+    await loadUnitPricesOnDate([VELDSPAR], hek, DATE);
 
     expect(pricesMock.getHubPrices).toHaveBeenCalledWith(expect.objectContaining({ id: 'hek' }), [
       VELDSPAR,
     ]);
-    expect(hubSnapshotMock.loadHubSnapshotRange).toHaveBeenCalledWith(
-      CHARACTER_ID,
-      DATE,
-      DATE,
-      hek
-    );
+    expect(hubSnapshotMock.loadHubSnapshotRange).toHaveBeenCalledWith(DATE, DATE, hek);
     // Dexie only ever holds Jita — no equivalent for a non-default hub.
     expect(priceSnapshotsMock.loadPriceSnapshots).not.toHaveBeenCalled();
   });
@@ -253,7 +236,6 @@ describe('loadUnitPricesOnDate', () => {
     );
 
     const { prices } = await loadUnitPricesOnDate(
-      CHARACTER_ID,
       [VELDSPAR],
       getTradeHub('jita') as TradeHub,
       DATE
@@ -272,7 +254,6 @@ describe('loadUnitPricesOnDate', () => {
     );
 
     const { prices } = await loadUnitPricesOnDate(
-      CHARACTER_ID,
       [VELDSPAR],
       getTradeHub('jita') as TradeHub,
       DATE
@@ -293,7 +274,6 @@ describe('loadUnitPricesOnDate', () => {
     sdeMock.loadCompressedOreTypeIds.mockResolvedValue({});
 
     const { prices } = await loadUnitPricesOnDate(
-      CHARACTER_ID,
       [VELDSPAR, ZEOLITES],
       getTradeHub('jita') as TradeHub,
       DATE
@@ -310,7 +290,7 @@ describe('unreachable price source', () => {
     pricesMock.status.unreachable = true;
     pricesMock.getHubPrices.mockResolvedValue(new Map());
 
-    const prices = await loadUnitPricesOnDate(CHARACTER_ID, [ZEOLITES], getTradeHub('jita')!, DATE);
+    const prices = await loadUnitPricesOnDate([ZEOLITES], getTradeHub('jita')!, DATE);
 
     expect(prices.unpriced.has(ZEOLITES)).toBe(true);
     expect(prices.liveUnreachable).toBe(true);
@@ -320,7 +300,7 @@ describe('unreachable price source', () => {
     pricesMock.status.unreachable = true;
     pricesMock.getHubPrices.mockResolvedValue(new Map());
 
-    const data = await loadDatedUnitPricesByHub(CHARACTER_ID, [ZEOLITES], [undefined], [DATE]);
+    const data = await loadDatedUnitPricesByHub([ZEOLITES], [undefined], [DATE]);
 
     expect(data.unreachableHubs).toEqual(new Set(['jita']));
     expect(data.unpriced.has(ZEOLITES)).toBe(true);
@@ -330,7 +310,7 @@ describe('unreachable price source', () => {
     pricesMock.status.stations.add(getTradeHub('hek')!.stationId);
     pricesMock.getHubPrices.mockResolvedValue(new Map());
 
-    const data = await loadDatedUnitPricesByHub(CHARACTER_ID, [ZEOLITES], ['hek'], [DATE]);
+    const data = await loadDatedUnitPricesByHub([ZEOLITES], ['hek'], [DATE]);
 
     expect(data.unreachableHubs).toEqual(new Set(['hek']));
   });
@@ -338,7 +318,7 @@ describe('unreachable price source', () => {
   it('does not report it when the hub answered, even with no buy orders', async () => {
     pricesMock.getHubPrices.mockResolvedValue(new Map());
 
-    const data = await loadDatedUnitPricesByHub(CHARACTER_ID, [ZEOLITES], [undefined], [DATE]);
+    const data = await loadDatedUnitPricesByHub([ZEOLITES], [undefined], [DATE]);
 
     expect(data.unreachableHubs).toEqual(new Set());
   });
@@ -384,7 +364,6 @@ describe('loadDatedUnitPricesByHub', () => {
     pricesMock.getHubPrices.mockImplementation(buyMaxByStation({ [JITA.stationId]: 1343 }));
 
     const { byHubAndDate } = await loadDatedUnitPricesByHub(
-      CHARACTER_ID,
       [ZEOLITES],
       [undefined, undefined],
       [DATE]
@@ -399,12 +378,7 @@ describe('loadDatedUnitPricesByHub', () => {
       buyMaxByStation({ [JITA.stationId]: 1343, [HEK.stationId]: 900 })
     );
 
-    const { byHubAndDate } = await loadDatedUnitPricesByHub(
-      CHARACTER_ID,
-      [ZEOLITES],
-      ['hek'],
-      [DATE]
-    );
+    const { byHubAndDate } = await loadDatedUnitPricesByHub([ZEOLITES], ['hek'], [DATE]);
 
     // Two hubs, one lookup each — the default is loaded even though no Payee
     // named it, since unassigned ore is still valued at Jita.
@@ -418,12 +392,7 @@ describe('loadDatedUnitPricesByHub', () => {
       buyMaxByStation({ [JITA.stationId]: 1343, [HEK.stationId]: 900 })
     );
 
-    await loadDatedUnitPricesByHub(
-      CHARACTER_ID,
-      [ZEOLITES],
-      ['hek', 'hek', undefined, 'jita'],
-      [DATE]
-    );
+    await loadDatedUnitPricesByHub([ZEOLITES], ['hek', 'hek', undefined, 'jita'], [DATE]);
 
     expect(pricesMock.getHubPrices).toHaveBeenCalledTimes(2);
   });
@@ -432,12 +401,7 @@ describe('loadDatedUnitPricesByHub', () => {
     // Hek quotes nothing for this ore; Jita does.
     pricesMock.getHubPrices.mockImplementation(buyMaxByStation({ [JITA.stationId]: 1343 }));
 
-    const { unpricedByHub, unpriced } = await loadDatedUnitPricesByHub(
-      CHARACTER_ID,
-      [ZEOLITES],
-      ['hek'],
-      [DATE]
-    );
+    const { unpricedByHub, unpriced } = await loadDatedUnitPricesByHub([ZEOLITES], ['hek'], [DATE]);
 
     expect([...(unpricedByHub.get('hek') ?? [])]).toEqual([ZEOLITES]);
     expect(unpricedByHub.get('jita')?.size).toBe(0);
@@ -451,12 +415,7 @@ describe('loadDatedUnitPricesByHub', () => {
       buyMaxByStation({ [JITA.stationId]: 1343, [HEK.stationId]: 900 })
     );
 
-    const { byHubAndDate } = await loadDatedUnitPricesByHub(
-      CHARACTER_ID,
-      [ZEOLITES, VELDSPAR],
-      ['hek'],
-      [DATE]
-    );
+    const { byHubAndDate } = await loadDatedUnitPricesByHub([ZEOLITES, VELDSPAR], ['hek'], [DATE]);
 
     expect(byHubAndDate.get('hek')?.get(DATE)?.get(VELDSPAR)).toBe(900);
     expect(byHubAndDate.get('hek')?.get(DATE)?.get(ZEOLITES)).toBe(900);
@@ -477,7 +436,6 @@ describe('loadDatedUnitPricesByHub', () => {
     pricesMock.getHubPrices.mockResolvedValue(new Map());
 
     const { byHubAndDate } = await loadDatedUnitPricesByHub(
-      CHARACTER_ID,
       [ZEOLITES],
       [undefined],
       [DATE, OTHER_DATE]
