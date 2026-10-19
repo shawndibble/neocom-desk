@@ -8,7 +8,7 @@ import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import { formatSeconds } from '@/lib/duration';
 import { groupCrystals, type CrystalChoice } from '@/engine/fittings/crystalChoice';
-import { formatIsk } from './chargeFormat';
+import { formatIskExact } from './chargeFormat';
 import { chargeRowClassName } from './chargeRowStyle';
 import type { WeaponChargeGroup } from './useChargeChoices';
 
@@ -40,7 +40,7 @@ function rowLabel(t: TFunction, { choice }: CrystalChoice): string {
     }),
     choice.price === null
       ? t('fittings.capGuide.noPrice')
-      : t('fittings.chargePicker.isk', { isk: formatIsk(choice.price) }),
+      : t('fittings.chargePicker.isk', { isk: formatIskExact(choice.price) }),
     ...(choice.skillMissing ? [t('fittings.chargePicker.needsSkill')] : []),
   ].join(', ');
 }
@@ -212,7 +212,7 @@ export function MiningCrystalGuide({ group, onLoad, wrapRow, pricesLoading }: Pr
                         <span className="text-right">{formatSeconds(mining.cycleSeconds)}</span>
                         <span className="text-right">{m3s(mining.residueM3s)}</span>
                         <span className="text-right">
-                          {choice.price === null ? '—' : formatIsk(choice.price)}
+                          {choice.price === null ? '—' : formatIskExact(choice.price)}
                         </span>
                         {choice.skillMissing && (
                           <span className="col-span-full text-text-dim">

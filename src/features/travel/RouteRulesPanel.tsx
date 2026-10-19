@@ -19,6 +19,7 @@
  *
  * On a phone the panel folds above the route, with chips naming the rules on.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -78,11 +79,7 @@ import {
 import { useIsPhone } from '@/lib/useIsPhone';
 
 function GroupLabel({ children }: { children: string }) {
-  return (
-    <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-      {children}
-    </h3>
-  );
+  return <h3 className={eyebrowClassName}>{children}</h3>;
 }
 
 /** What the Route Safety group needs for Use jump bridges and the Ansiblex list. */

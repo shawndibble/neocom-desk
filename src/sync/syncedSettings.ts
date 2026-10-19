@@ -209,13 +209,13 @@
 // sync.overviewHiddenCards: which Overview board cards the pilot switched off
 // from the board's edit menu — a list of hidden card keys, one for the whole
 // account rather than per Character, because "I don't do mining tax" is about
-// the pilot, not one alt. See features/overview/hiddenCards.ts, whose parse
+// the pilot, not one alt. See features/overview/widgets/migrate.ts, whose parse
 // keeps keys this build does not know so an older build cannot un-hide a
 // newer card. Never deleted via deleteSyncedSetting: showing every card again
 // writes an empty list, so the tombstone-expiry edge does not bite it.
 //
 // sync.overviewCardOrder: the order the pilot dragged those cards into from
-// the same edit menu (features/overview/cardOrder.ts). Its own key rather than
+// the same edit menu (features/overview/widgets/migrate.ts). Its own key rather than
 // part of the hidden list, so hiding a card on one device cannot roll back a
 // reorder made on another. Same parse, same unknown-key rule. Never deleted
 // via deleteSyncedSetting: "Reset order" writes an empty list.

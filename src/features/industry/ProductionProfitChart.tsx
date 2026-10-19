@@ -22,7 +22,10 @@ import { useTranslation } from 'react-i18next';
 import { DataTable, type DataTableColumn } from '@/components/ui';
 import { COMPACT_ISK_Y_AXIS_MARGIN_LEFT, COMPACT_ISK_Y_AXIS_WIDTH } from '@/lib/chartAxis';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
-import type { ProductionProfitPoint, ProductionProfitTrend } from './productionProfitHistory';
+import type {
+  ProductionProfitPoint,
+  ProductionProfitTrend,
+} from '@/engine/industry/productionProfitHistory';
 import { formatDateTick } from '@/lib/formatDateTick';
 
 interface ProductionProfitChartProps {

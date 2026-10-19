@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useTranslation } from 'react-i18next';
 import { EmptyState, Panel, Spinner } from '@/components/ui';
 import { enumParam } from '@/lib/urlState';
@@ -26,8 +27,7 @@ import { usePlanAdvice } from './usePlanAdvice';
 import { useChainEstimates } from './useChainEstimates';
 import { priceSourceLabel } from './priceSource';
 import { useSellHub } from './sellHub';
-import { colonyCountUnknown } from './colonyStripModel';
-import { useHydratedStore } from '@/lib/useHydratedStore';
+import { colonyCountUnknown } from './colonyFillModel';
 
 /** The recipe filter and the picks/all switch ride in the URL, scoped to Find best (ADR 0015). */
 const FIND_BEST_PARAMS = {

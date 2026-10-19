@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import { TextInput } from '@/components/ui';
@@ -15,9 +16,7 @@ export function LabelField({ value, onChange, suggestions = [] }: LabelFieldProp
   const listId = useId();
   return (
     <div className="min-w-0 space-y-1">
-      <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-        {t('miningTax.labelOptionalLabel')}
-      </p>
+      <p className={eyebrowClassName}>{t('miningTax.labelOptionalLabel')}</p>
       <TextInput
         value={value}
         onChange={(e) => onChange(e.target.value)}

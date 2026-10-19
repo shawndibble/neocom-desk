@@ -139,3 +139,17 @@ describe('walletCostBasis', () => {
     expect(result).toMatchObject({ status: 'covered', unitCost: 300 });
   });
 });
+
+describe('walletCostBasis malformed dates', () => {
+  it('ignores a trade whose date does not parse', () => {
+    const result = walletCostBasis({
+      typeId: 34,
+      pool: 10,
+      transactions: [
+        trade({ date: '2026-01-01T00:00:00Z', quantity: 10, unitPrice: 100 }),
+        trade({ date: 'garbage', quantity: 10, unitPrice: 999 }),
+      ],
+    });
+    expect(result).toMatchObject({ status: 'covered', unitCost: 100, buyCount: 1 });
+  });
+});

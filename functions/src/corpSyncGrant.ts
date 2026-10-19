@@ -1,0 +1,608 @@
+// Corp Tax Book sync grant custody and the scheduled run (issue #4068, ADR 0025).
+// Modelled on the Alerts Grant (alertGrant.ts, ADR 0020): a narrow, opt-in second
+// SSO authorization whose refresh token the server holds encrypted and rotates.
+// One holder per corporation, so the grant doc is keyed by corporation id:
+//
+//   corpTaxBookSyncGrants/{corporationId}        function-only (firestore.rules): the encrypted token
+//   corpTaxBooks/{corp}/meta/scheduledSync       what officers may see: holder, status, why it
+//                                                stopped, the last run. No token, ever.
+//
+// A grant exists only while the schedule is active. When it stops (role lost,
+// left the corp, token revoked, book off) or is revoked, the token doc is deleted
+// and the token revoked at SSO, so a stopped schedule holds nothing. Nothing here
+// logs or returns a token.
+
+import type { Firestore } from 'firebase-admin/firestore';
+import { HttpsError } from 'firebase-functions/v2/https';
+import { SsoRefreshError, type RefreshedTokens } from './alertGrant.js';
+import { decryptRefreshToken, encryptRefreshToken, rotateStoredToken } from './alertGrantCrypto.js';
+import { boundedString, record } from './communities.js';
+import { CORP_SYNC_SCOPES } from './corpSyncScopes.js';
+import { META, decideRoles, parseBookCall, type OfficerAccess } from './corpTaxBook.js';
+import {
+  SCHEDULED_VIA,
+  appendAudit,
+  authorizeOfficer,
+  bookRef,
+  type Actor,
+  type BookDeps,
+  type Caller,
+} from './corpTaxBookStore.js';
+import { runBookSync, type BookSyncResult, type StopReason } from './corpTaxBookScheduledSync.js';
+import type { SyncEsi } from './corpTaxBookSyncEsi.js';
+import type { IdentityReader } from './corpTaxBookEsi.js';
+import { characterIdForUid, type EveTokenClaims } from './verifyEveToken.js';
+
+export const CORP_SYNC_GRANTS_COLLECTION = 'corpTaxBookSyncGrants';
+export const SCHEDULED_SYNC_DOC = 'scheduledSync';
+
+export { CORP_SYNC_SCOPES };
+
+/** `corpTaxBookSyncGrants/{corporationId}`. */
+export interface CorpSyncGrantDoc {
+  corporationId: number;
+  characterId: number;
+  characterName: string;
+  /** AES-256-GCM blob, see alertGrantCrypto.ts (purpose `corpSyncGrant`). */
+  encryptedRefreshToken: string;
+  /** The client_id the token was issued to; SSO revoke needs it. */
+  clientId: string;
+  enabledAt: number;
+}
+
+/** `corpTaxBooks/{corp}/meta/scheduledSync`: officers read this, nobody writes it but the functions. */
+export interface ScheduledSyncStatus {
+  status: 'active' | 'stopped';
+  characterId: number;
+  characterName: string;
+  enabledAt: number;
+  stoppedAt?: number;
+  stoppedReason?: StopReason;
+  lastRun?: {
+    at: number;
+    outcome: 'synced' | 'skipped';
+    reason?: string;
+    observedRows?: number;
+    extractions?: number;
+    donationsAdded?: number;
+    settled?: number;
+    missing?: string[];
+  };
+  /** Refinery → solar system, remembered so a scheduled row keeps the system an officer's visit set. */
+  systemIds?: Record<string, number>;
+}
+
+export interface CorpSyncDeps {
+  db: Firestore;
+  now: () => number;
+  /** Lazy: a missing secret must only fail calls that actually need the key. */
+  key: () => Buffer;
+  verify: (accessToken: string) => Promise<EveTokenClaims>;
+  refresh: (clientId: string, refreshToken: string) => Promise<RefreshedTokens>;
+  revoke: (clientId: string, refreshToken: string) => Promise<void>;
+  readIdentity: IdentityReader;
+  /** Receives only messages and ids — never a token. */
+  log: (message: string, data?: Record<string, unknown>) => void;
+}
+
+const PURPOSE = 'corpSyncGrant' as const;
+
+const grantRef = (db: Firestore, corporationId: number) =>
+  db.collection(CORP_SYNC_GRANTS_COLLECTION).doc(String(corporationId));
+const statusRef = (db: Firestore, corporationId: number) =>
+  bookRef(db, corporationId).collection(META).doc(SCHEDULED_SYNC_DOC);
+
+const bookDeps = (deps: CorpSyncDeps): BookDeps => ({
+  db: deps.db,
+  now: deps.now,
+  verifyToken: deps.verify,
+  readIdentity: deps.readIdentity,
+});
+
+function fail(
+  code: ConstructorParameters<typeof HttpsError>[0],
+  message: string,
+  reason: string
+): never {
+  throw new HttpsError(code, message, { reason });
+}
+
+function sameScopes(scopes: readonly string[]): boolean {
+  return (
+    scopes.length === CORP_SYNC_SCOPES.length && CORP_SYNC_SCOPES.every((s) => scopes.includes(s))
+  );
+}
+
+// --- Opt in ----------------------------------------------------------------
+
+export interface SaveCorpSyncGrantInput {
+  corporationId: number;
+  accessToken: string;
+  refreshToken: string;
+}
+
+export function parseSaveCorpSyncGrantInput(data: unknown): SaveCorpSyncGrantInput {
+  const d = record(data);
+  return {
+    corporationId: parseBookCall(data).corporationId,
+    accessToken: boundedString(d.accessToken, 'accessToken', 8192),
+    refreshToken: boundedString(d.refreshToken, 'refreshToken', 8192),
+  };
+}
+
+export async function saveCorpSyncGrant(
+  deps: CorpSyncDeps,
+  caller: Caller,
+  input: SaveCorpSyncGrantInput
+): Promise<{ corporationId: number; characterId: number; enabledAt: number }> {
+  const callerId = characterIdForUid(caller.uid);
+  if (callerId === undefined)
+    fail('unauthenticated', 'Sign in with a Character first', 'not-signed-in');
+
+  const supplied = await verifyGrantToken(deps, input.accessToken);
+  if (supplied.characterId !== callerId || supplied.ownerHash !== caller.ownerHash) {
+    fail('permission-denied', 'The token is for a different Character', 'token-mismatch');
+  }
+
+  // The access token alone proves nothing about the refresh token beside it:
+  // redeeming the refresh token at SSO proves it is a live token for this same
+  // Character, and hands back the rotated one, which is the one to store.
+  let refreshed: RefreshedTokens;
+  try {
+    refreshed = await deps.refresh(supplied.clientId, input.refreshToken);
+  } catch (err) {
+    deps.log('Corp sync grant refresh token rejected', {
+      error: err instanceof Error ? err.message : 'unknown',
+    });
+    throw new HttpsError('unauthenticated', 'EVE refresh token rejected');
+  }
+  const claims = await verifyGrantToken(deps, refreshed.accessToken);
+  if (claims.characterId !== supplied.characterId) {
+    fail('permission-denied', 'Refresh token belongs to another Character', 'token-mismatch');
+  }
+
+  const identity = await deps.readIdentity(claims.characterId, refreshed.accessToken);
+  if (identity.corporationId !== input.corporationId) {
+    fail('permission-denied', 'Not a member of this corporation', 'wrong-corp');
+  }
+  const roles = decideRoles(identity.roles, identity.ceoId === claims.characterId);
+  if (!roles.canEdit) {
+    fail(
+      'permission-denied',
+      'Only a CEO, Director or Accountant can turn this on',
+      'not-an-editor'
+    );
+  }
+  const book = await bookRef(deps.db, input.corporationId).get();
+  if (!book.exists || book.get('active') !== true) {
+    fail('not-found', 'This corporation has no Corp Tax Book', 'no-book');
+  }
+
+  const now = deps.now();
+  const doc: CorpSyncGrantDoc = {
+    corporationId: input.corporationId,
+    characterId: claims.characterId,
+    characterName: claims.name,
+    encryptedRefreshToken: encryptRefreshToken(
+      refreshed.refreshToken,
+      claims.characterId,
+      deps.key(),
+      PURPOSE
+    ),
+    clientId: claims.clientId,
+    enabledAt: now,
+  };
+  const previous = await deps.db.runTransaction(async (tx) => {
+    const ref = grantRef(deps.db, input.corporationId);
+    const held = (await tx.get(ref)).data() as CorpSyncGrantDoc | undefined;
+    const status = statusRef(deps.db, input.corporationId);
+    const hadSystemIds = (await tx.get(status)).data()?.systemIds as
+      Record<string, number> | undefined;
+    tx.set(ref, doc);
+    const next: ScheduledSyncStatus = {
+      status: 'active',
+      characterId: doc.characterId,
+      characterName: doc.characterName,
+      enabledAt: now,
+      ...(hadSystemIds ? { systemIds: hadSystemIds } : {}),
+    };
+    // A fresh document: the previous holder's stop reason and last run do not carry over.
+    tx.set(status, next);
+    appendAudit(
+      tx,
+      bookDeps(deps),
+      input.corporationId,
+      { characterId: doc.characterId, name: doc.characterName },
+      'scheduledSyncOn',
+      held && held.characterId !== doc.characterId
+        ? { replacedCharacterId: held.characterId, replacedName: held.characterName }
+        : { replacedCharacterId: null }
+    );
+    return held;
+  });
+
+  // The replaced token is orphaned; revoke it, best effort. The refresh above
+  // usually rotated a same-Character token already, so skip if it is the one just stored.
+  if (previous) {
+    await revokeStored(deps, previous, refreshed.refreshToken);
+  }
+  return { corporationId: input.corporationId, characterId: doc.characterId, enabledAt: now };
+}
+
+async function verifyGrantToken(deps: CorpSyncDeps, accessToken: string): Promise<EveTokenClaims> {
+  let claims: EveTokenClaims;
+  try {
+    claims = await deps.verify(accessToken);
+  } catch (err) {
+    deps.log('Corp sync grant access token rejected', {
+      error: err instanceof Error ? err.message : 'unknown',
+    });
+    throw new HttpsError('unauthenticated', 'EVE access token rejected');
+  }
+  if (!sameScopes(claims.scopes)) {
+    fail(
+      'permission-denied',
+      'Token must carry exactly the Corp Tax Book sync scopes',
+      'wrong-scopes'
+    );
+  }
+  return claims;
+}
+
+/** Decrypt and revoke a stored token at SSO (unless it equals `keepToken`). False if it could not be done. */
+async function revokeStored(
+  deps: CorpSyncDeps,
+  doc: CorpSyncGrantDoc,
+  keepToken?: string
+): Promise<boolean> {
+  try {
+    const token = decryptRefreshToken(
+      doc.encryptedRefreshToken,
+      doc.characterId,
+      deps.key(),
+      PURPOSE
+    );
+    if (token === keepToken) return true;
+    await deps.revoke(doc.clientId, token);
+    return true;
+  } catch (err) {
+    deps.log('Corp sync grant token revoke failed', {
+      corporationId: doc.corporationId,
+      error: err instanceof Error ? err.message : 'unknown',
+    });
+    return false;
+  }
+}
+
+// --- Revoke ----------------------------------------------------------------
+
+/**
+ * The holder revokes their own grant, or the corporation's CEO revokes anyone's
+ * (the CEO's role is checked live, so the call carries an access token). The
+ * doc goes first: a revoke failure must never leave a token we meant to drop
+ * sitting in Firestore.
+ */
+export async function revokeCorpSyncGrant(
+  deps: CorpSyncDeps,
+  caller: Caller,
+  call: { corporationId: number; accessToken?: string }
+): Promise<{ deleted: boolean; revoked: boolean }> {
+  const callerId = characterIdForUid(caller.uid);
+  if (callerId === undefined)
+    fail('unauthenticated', 'Sign in with a Character first', 'not-signed-in');
+  const grant = (await grantRef(deps.db, call.corporationId).get()).data() as
+    CorpSyncGrantDoc | undefined;
+  if (!grant) return { deleted: false, revoked: false };
+
+  let actor: Actor;
+  let by: 'holder' | 'ceo';
+  if (grant.characterId === callerId) {
+    actor = { characterId: callerId, name: grant.characterName };
+    by = 'holder';
+  } else {
+    const access = await authorizeOfficer(bookDeps(deps), caller, call, 'ceo', { live: true });
+    actor = { characterId: access.characterId, name: access.characterName };
+    by = 'ceo';
+  }
+
+  const deleted = await removeGrant(deps, grant, actor, {
+    by,
+    holderCharacterId: grant.characterId,
+    holderName: grant.characterName,
+  });
+  if (!deleted) return { deleted: false, revoked: false };
+  return { deleted: true, revoked: await revokeStored(deps, grant) };
+}
+
+/**
+ * Delete the grant doc and the status doc together with an audit entry, if the
+ * stored grant is still the one the caller was authorised against: a re-grant
+ * that landed since is someone else's.
+ */
+async function removeGrant(
+  deps: CorpSyncDeps,
+  grant: CorpSyncGrantDoc,
+  actor: Actor,
+  detail: Record<string, unknown>
+): Promise<boolean> {
+  return deps.db.runTransaction(async (tx) => {
+    const ref = grantRef(deps.db, grant.corporationId);
+    const held = (await tx.get(ref)).data() as CorpSyncGrantDoc | undefined;
+    if (!held || held.encryptedRefreshToken !== grant.encryptedRefreshToken) return false;
+    tx.delete(ref);
+    tx.delete(statusRef(deps.db, grant.corporationId));
+    appendAudit(tx, bookDeps(deps), grant.corporationId, actor, 'scheduledSyncOff', detail);
+    return true;
+  });
+}
+
+/** A Character's grants go with it when the account is purged (ADR 0020's rule, for this grant too). */
+export async function deleteCorpSyncGrantsHeldBy(
+  deps: CorpSyncDeps,
+  characterId: number
+): Promise<number> {
+  const snap = await deps.db
+    .collection(CORP_SYNC_GRANTS_COLLECTION)
+    .where('characterId', '==', characterId)
+    .get();
+  let count = 0;
+  for (const doc of snap.docs) {
+    const grant = doc.data() as CorpSyncGrantDoc;
+    const removed = await removeGrant(
+      deps,
+      grant,
+      { characterId: grant.characterId, name: grant.characterName, via: 'account purge' },
+      { by: 'purge', holderCharacterId: grant.characterId, holderName: grant.characterName }
+    );
+    if (removed) {
+      await revokeStored(deps, grant);
+      count += 1;
+    }
+  }
+  return count;
+}
+
+// --- The scheduled run -----------------------------------------------------
+
+export interface RunSummary {
+  grants: number;
+  synced: number;
+  skipped: number;
+  stopped: number;
+  /** True when ESI's shared budget made the run stop early. */
+  budgetStopped: boolean;
+}
+
+/**
+ * Sync every opted-in corporation's book, one at a time (the ESI error budget is
+ * shared by every user of the client id, and each sync is many small writes).
+ * A corporation that fails is skipped and tried again next run; a budget hit
+ * ends the whole run.
+ */
+export async function runScheduledCorpSyncs(deps: CorpSyncDeps, esi: SyncEsi): Promise<RunSummary> {
+  const summary: RunSummary = {
+    grants: 0,
+    synced: 0,
+    skipped: 0,
+    stopped: 0,
+    budgetStopped: false,
+  };
+  const snap = await deps.db.collection(CORP_SYNC_GRANTS_COLLECTION).get();
+  summary.grants = snap.size;
+  for (const doc of snap.docs) {
+    if (summary.budgetStopped || esi.budgetLow()) {
+      summary.budgetStopped = true;
+      summary.skipped += 1;
+      continue;
+    }
+    const grant = doc.data() as CorpSyncGrantDoc;
+    try {
+      const result = await runOne(deps, esi, grant);
+      if (result.kind === 'synced') summary.synced += 1;
+      else if (result.kind === 'stopped') summary.stopped += 1;
+      else {
+        summary.skipped += 1;
+        if (result.reason === 'esi-budget') summary.budgetStopped = true;
+      }
+    } catch (err) {
+      summary.skipped += 1;
+      deps.log('Scheduled Corp Tax Book sync failed', {
+        corporationId: grant.corporationId,
+        error: err instanceof Error ? err.name : 'unknown',
+        ...(err instanceof HttpsError ? { code: err.code } : {}),
+      });
+    }
+  }
+  return summary;
+}
+
+type RefreshOutcome =
+  | { kind: 'ok'; accessToken: string; grant: CorpSyncGrantDoc }
+  | { kind: 'dead' }
+  | { kind: 'unreadable' }
+  | { kind: 'skip' };
+
+// SSO rotates the token, so the SSO call must not run inside a retryable
+// transaction (a retry would redeem the already-rotated token and look like
+// invalid_grant). Read, call SSO once, then write the rotated token back in a
+// transaction that re-reads the doc: if a re-grant replaced the token in the
+// meantime, the rotated one is discarded instead of overwriting it.
+async function refreshGrant(deps: CorpSyncDeps, grant: CorpSyncGrantDoc): Promise<RefreshOutcome> {
+  const key = deps.key();
+  let current: string;
+  try {
+    current = decryptRefreshToken(grant.encryptedRefreshToken, grant.characterId, key, PURPOSE);
+  } catch {
+    // The saved blob cannot be read (a rotated key, a damaged doc): it will never work again.
+    return { kind: 'unreadable' };
+  }
+  let tokens: RefreshedTokens;
+  try {
+    tokens = await deps.refresh(grant.clientId, current);
+  } catch (err) {
+    if (err instanceof SsoRefreshError && err.invalidGrant) return { kind: 'dead' };
+    throw err;
+  }
+  const rotated = rotateStoredToken(
+    grant.encryptedRefreshToken,
+    tokens.refreshToken,
+    grant.characterId,
+    key,
+    PURPOSE
+  );
+  if (rotated === null) return { kind: 'ok', accessToken: tokens.accessToken, grant };
+  const written = await deps.db.runTransaction(async (tx) => {
+    const ref = grantRef(deps.db, grant.corporationId);
+    const latest = (await tx.get(ref)).data() as CorpSyncGrantDoc | undefined;
+    if (latest?.encryptedRefreshToken !== grant.encryptedRefreshToken) return false;
+    tx.update(ref, { encryptedRefreshToken: rotated });
+    return true;
+  });
+  if (!written) return { kind: 'skip' };
+  return {
+    kind: 'ok',
+    accessToken: tokens.accessToken,
+    grant: { ...grant, encryptedRefreshToken: rotated },
+  };
+}
+
+async function runOne(
+  deps: CorpSyncDeps,
+  esi: SyncEsi,
+  initial: CorpSyncGrantDoc
+): Promise<BookSyncResult> {
+  const refreshed = await refreshGrant(deps, initial);
+  if (refreshed.kind === 'skip') return { kind: 'skipped', reason: 'esi-unavailable' };
+  if (refreshed.kind === 'dead') return stopGrant(deps, initial, 'token-revoked');
+  if (refreshed.kind === 'unreadable') return stopGrant(deps, initial, 'grant-unreadable');
+  const { accessToken, grant } = refreshed;
+
+  const claims = await deps.verify(accessToken);
+
+  // Roles are re-checked every run with the holder's own token.
+  let identity;
+  try {
+    identity = await deps.readIdentity(grant.characterId, accessToken);
+  } catch (err) {
+    const reason =
+      err instanceof HttpsError ? (err.details as { reason?: string })?.reason : undefined;
+    if (reason === 'esi-forbidden') return stopGrant(deps, grant, 'esi-refused');
+    if (reason === 'esi-backoff') return { kind: 'skipped', reason: 'esi-budget' };
+    return { kind: 'skipped', reason: 'esi-unavailable' };
+  }
+  if (identity.corporationId !== grant.corporationId) return stopGrant(deps, grant, 'left-corp');
+  const roles = decideRoles(identity.roles, identity.ceoId === grant.characterId);
+  if (!roles.canEdit) return stopGrant(deps, grant, 'role-lost');
+
+  const now = deps.now();
+  const access: OfficerAccess = {
+    ...roles,
+    characterId: grant.characterId,
+    characterName: grant.characterName,
+    ownerHash: claims.ownerHash,
+    corporationId: grant.corporationId,
+    roles: identity.roles,
+    checkedAt: now,
+    expiresAt: now,
+  };
+  const status = (await statusRef(deps.db, grant.corporationId).get()).data() as
+    ScheduledSyncStatus | undefined;
+  const systemHints = Object.fromEntries(
+    Object.entries(status?.systemIds ?? {}).map(([k, v]) => [Number(k), v])
+  );
+
+  const result = await runBookSync({
+    deps: bookDeps(deps),
+    esi,
+    access,
+    accessToken,
+    corporationId: grant.corporationId,
+    systemHints,
+    stillHeld: async () =>
+      ((await grantRef(deps.db, grant.corporationId).get()).data() as CorpSyncGrantDoc | undefined)
+        ?.encryptedRefreshToken === grant.encryptedRefreshToken,
+  });
+  if (result.kind === 'stopped') return stopGrant(deps, grant, result.reason);
+  // One refusal on the ledger after the role check passed only skips the run; the same
+  // refusal on the next run stops the schedule.
+  if (result.kind === 'skipped' && result.reason === 'esi-refused') {
+    if (status?.lastRun?.reason === 'esi-refused') return stopGrant(deps, grant, 'esi-refused');
+  }
+  await recordRun(deps, grant, result, 'systemIds' in result ? result.systemIds : undefined);
+  return result;
+}
+
+async function recordRun(
+  deps: CorpSyncDeps,
+  grant: CorpSyncGrantDoc,
+  result: Exclude<BookSyncResult, { kind: 'stopped' }>,
+  systemIds: Record<number, number> | undefined
+): Promise<void> {
+  const lastRun: NonNullable<ScheduledSyncStatus['lastRun']> =
+    result.kind === 'synced'
+      ? {
+          at: deps.now(),
+          outcome: 'synced',
+          observedRows: result.observedRows,
+          extractions: result.extractions,
+          donationsAdded: result.donationsAdded,
+          settled: result.settled,
+          missing: result.missing,
+        }
+      : { at: deps.now(), outcome: 'skipped', reason: result.reason };
+  // Merge: the status doc may have been replaced (re-grant, revoke) while the sync ran.
+  const ref = statusRef(deps.db, grant.corporationId);
+  await deps.db.runTransaction(async (tx) => {
+    const held = (await tx.get(ref)).data() as ScheduledSyncStatus | undefined;
+    if (!held || held.status !== 'active' || held.characterId !== grant.characterId) return;
+    tx.update(ref, {
+      lastRun,
+      ...(systemIds && Object.keys(systemIds).length > 0
+        ? { systemIds: { ...(held.systemIds ?? {}), ...systemIds } }
+        : {}),
+    });
+  });
+}
+
+/**
+ * Stop the schedule for a corporation: delete the token doc (a stopped schedule
+ * holds nothing), keep the reason where officers can read it, audit it, and revoke
+ * the token at SSO. Guarded on the stored token: a re-grant that landed during the
+ * run keeps its fresh schedule.
+ */
+async function stopGrant(
+  deps: CorpSyncDeps,
+  grant: CorpSyncGrantDoc,
+  reason: StopReason
+): Promise<BookSyncResult> {
+  const stopped = await deps.db.runTransaction(async (tx) => {
+    const ref = grantRef(deps.db, grant.corporationId);
+    const held = (await tx.get(ref)).data() as CorpSyncGrantDoc | undefined;
+    if (!held || held.encryptedRefreshToken !== grant.encryptedRefreshToken) return false;
+    tx.delete(ref);
+    const status: ScheduledSyncStatus = {
+      status: 'stopped',
+      characterId: grant.characterId,
+      characterName: grant.characterName,
+      enabledAt: grant.enabledAt,
+      stoppedAt: deps.now(),
+      stoppedReason: reason,
+    };
+    tx.set(statusRef(deps.db, grant.corporationId), status);
+    appendAudit(
+      tx,
+      bookDeps(deps),
+      grant.corporationId,
+      { characterId: grant.characterId, name: grant.characterName, via: SCHEDULED_VIA },
+      'scheduledSyncStopped',
+      { reason }
+    );
+    return true;
+  });
+  // A dead or unreadable token cannot be sent to SSO to revoke.
+  if (stopped && reason !== 'token-revoked' && reason !== 'grant-unreadable') {
+    await revokeStored(deps, grant);
+  }
+  deps.log('Scheduled Corp Tax Book sync stopped', { corporationId: grant.corporationId, reason });
+  return { kind: 'stopped', reason };
+}

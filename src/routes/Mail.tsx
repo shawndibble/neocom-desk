@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import {
   focusRingInsetClassName,
   interactiveClassName,
@@ -989,7 +990,12 @@ function MailView({ scope, scopeControl }: MailViewProps) {
                 <div className="max-h-[36rem] scroll-pt-8 overflow-y-auto lg:max-h-[44rem]">
                   {rowSections.map((section) => (
                     <div key={section.key}>
-                      <h3 className="sticky top-0 z-10 border-y border-line bg-panel-2 px-3 py-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                      <h3
+                        className={cx(
+                          eyebrowClassName,
+                          'sticky top-0 z-10 border-y border-line bg-panel-2 px-3 py-1.5'
+                        )}
+                      >
                         {mailAgeLabel(section.bucket, t)}
                       </h3>
                       <ul className="divide-y divide-line">

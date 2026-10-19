@@ -8,7 +8,7 @@
 import { createLocalSetting } from '@/lib/useLocalSetting';
 import { DEFAULT_SALES_SHARE_PCT, SALES_SHARE_PCTS } from '@/engine/industry/iskPerDay';
 
-export const SALES_SHARE_SETTING_KEY = 'marketWideSalesShare';
+const SALES_SHARE_SETTING_KEY = 'marketWideSalesShare';
 
 /** The URL/stored form: the percent as a string, e.g. `'10'`. */
 export const SALES_SHARE_OPTIONS = SALES_SHARE_PCTS.map(String);

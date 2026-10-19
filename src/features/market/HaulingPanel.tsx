@@ -16,8 +16,7 @@
  * panel is too narrow for the rail (by its own width, ADR 0017), a sticky bar
  * carries the trip instead, and the trip and the detail open as sheets.
  */
-import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
-import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -27,7 +26,6 @@ import {
   EmptyState,
   FilterBar,
   FilterField,
-  IskInput,
   Modal,
   SlideOver,
   Panel,
@@ -38,25 +36,14 @@ import {
   SelectValue,
   MenuItem,
   Spinner,
-  TextInput,
   Toast,
-  Tooltip,
-  IskAmount,
-  TypeIcon,
-  DataTableDenseCell,
-  useFilterSurface,
-  type DataTableColumn,
 } from '@/components/ui';
-import { focusRingClassName, touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
-import { cx } from '@/lib/cx';
+import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { useIsNarrow } from '@/lib/useIsNarrow';
 import { useElementNarrowerThan } from '@/lib/useElementNarrowerThan';
 import { useIsPhone } from '@/lib/useIsPhone';
-import { multibuyText, planTrip, type TripOverride } from '@/engine/market/haulingPlan';
-import type { DemandKind } from '@/engine/market/haulingMarket';
-import { formatIsk, formatMarketIsk, marketIskDecimals } from '@/lib/isk';
+import { multibuyText } from '@/engine/market/haulingPlan';
 import { writeToClipboard } from '@/lib/clipboard';
-import { createColumnVisibilitySetting, useColumnVisibility } from '@/lib/columnVisibility';
 import { createLocalSetting } from '@/lib/useLocalSetting';
 import { enumParam, intParam, optionalIntParam } from '@/lib/urlState';
 import {
@@ -64,19 +51,17 @@ import {
   type RememberedDefaults,
   type UrlParamValues,
 } from '@/lib/useUrlState';
-import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
+import type { TradeHub } from '@/market/hubs';
 import { loadMarketGroups } from '@/sde/loadMarketSde';
 import type { MarketGroupNode } from '@/sde/marketTypes';
 import { useActiveCharacter } from '@/stores/activeCharacter';
-import { HAULING_THRESHOLDS } from '@/engine/market/haulingMarket';
 import { TableActionsMenu } from '@/components/ui/TableExport';
-import { useTableExport } from '@/components/ui/useTableExport';
 import { HaulingCargoControl } from './HaulingCargoControl';
-import { haulingCsvColumns } from './haulingCsv';
-import { HaulingFlagWord } from './HaulingFlagWord';
-import { HAULING_FLAG_KEY } from './haulingFlagKeys';
+import { HubField, IskCapField, CategorySelect, ModeSelect } from './HaulingFilterFields';
+import { useHaulingExport, useHaulingPlanState } from './useHaulingPlanState';
+import { useHaulingTable } from './useHaulingTable';
 import { HaulingItemActions, HaulingItemDetail } from './HaulingItemDetail';
-import { formatSignedPct, formatTripM3, formatVolume, shownFreeM3 } from './format';
+import { formatTripM3, shownFreeM3 } from './format';
 import {
   HaulingFillList,
   HaulingTripBar,
@@ -93,12 +78,10 @@ import {
 import {
   EVERYTHING_CATEGORY_ID,
   DEFAULT_HAULING_CATEGORY_ID,
-  HAULING_CATEGORY_OPTIONS,
   isHaulingCategoryId,
 } from './haulingCategories';
 import {
   filterHaulingRows,
-  formatDaysToSell,
   toViewRows,
   type HaulingFilters,
   type HaulingViewRow,
@@ -110,12 +93,10 @@ import {
   HAULING_HUB_CHOICES,
   haulingEnd,
   haulingHubDefaults,
-  hubAtAnyEnd,
   pickHaulingHub,
-  type HaulingHubChoice,
 } from './haulingHubs';
 import { rememberHaulingSummary, summarizeHaulingRows } from './haulingSummary';
-import { iskGains, signedIsk } from './signedIsk';
+import { IskDelta } from '@/components/ui/IskDelta';
 import { useHaulingFees, useHaulingScan } from './useHaulingScan';
 import { useHaulingFill, useHaulingFillOffer } from './useHaulingFill';
 import {
@@ -228,58 +209,6 @@ const useIntroDismissed = createLocalSetting<boolean>({
   defaultValue: false,
 });
 
-/**
- * The list's optional (non-identity) columns, for `ColumnPickerMenu`
- * (issue: hauling toolbar redesign). `select`/`item` stay out of `ids` —
- * hiding either loses the row's own identity or the multibuy checkbox.
- * Margin and ISK/m³ start hidden: the margin rides under Profit.
- */
-const HAULING_COLUMN_IDS = [
-  'buy',
-  'expected',
-  'profit',
-  'margin',
-  'iskPerM3',
-  'm3',
-  'days',
-  'bring',
-] as const;
-type HaulingColumnId = (typeof HAULING_COLUMN_IDS)[number];
-const DEFAULT_VISIBLE_COLUMN_IDS: readonly HaulingColumnId[] = HAULING_COLUMN_IDS.filter(
-  (id) => id !== 'margin' && id !== 'iskPerM3'
-);
-
-/** Days to Sell (and the demand it carries) is read for a listing only: an instant sale into buy orders has neither. */
-const LISTING_ONLY_COLUMN_IDS: readonly HaulingColumnId[] = ['days'];
-const INSTANT_COLUMN_IDS = HAULING_COLUMN_IDS.filter((id) => !LISTING_ONLY_COLUMN_IDS.includes(id));
-
-function isHaulingColumnId(id: string): id is HaulingColumnId {
-  return (HAULING_COLUMN_IDS as readonly string[]).includes(id);
-}
-
-/**
- * Not `haulingColumns`: that key stored a visible list of the old ids, which
- * would hide Profit and m³. Old picks start over from the new defaults.
- */
-const useHaulingColumns = createColumnVisibilitySetting<HaulingColumnId>({
-  key: 'haulingTripColumns',
-  ids: HAULING_COLUMN_IDS,
-  defaultVisible: DEFAULT_VISIBLE_COLUMN_IDS,
-});
-
-/**
- * The demand mark: a filled dot, a hollow ring or a square, so the three
- * read apart by shape as well as colour — on a phone the mark stands alone,
- * its words left to screen readers and the row's detail (DESIGN.md §7).
- */
-const DEMAND_MARK: Record<DemandKind, string> = {
-  'most-days': 'rounded-full bg-success',
-  bursts: 'rounded-full border-2 border-warning',
-  rarely: 'rounded-[1px] bg-danger',
-};
-
-const NO_OVERRIDES: ReadonlyMap<number, TripOverride> = new Map();
-
 /** What the page header needs to render Hauling's reload button and Data Age beside the page title. */
 export interface HaulingRefreshInfo {
   refresh: () => void;
@@ -319,7 +248,6 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
   const mode: HaulMode = params.mode;
   const instant = mode === 'instant';
 
-  const columnVisibility = useColumnVisibility(useHaulingColumns, DEFAULT_VISIBLE_COLUMN_IDS);
   const isNarrow = useIsNarrow();
   // A phone's dense card holds Buy, Sell and the margin on one ~200px line, so
   // its figures go compact (`3.41K`). Chosen in JS, not by a hidden/shown
@@ -340,15 +268,6 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
   // the viewport (`max-sm:`) picks by it instead (ADR 0017).
   const cards = isPhone || tableCards;
   const compact = isPhone || tableNarrow;
-  const isk = (value: number, digits: number) =>
-    compact ? <IskAmount value={value} decimals={digits} /> : formatIsk(value, digits);
-  /** A per-unit price: the Market page's cents-below-10,000 rule. */
-  const price = (value: number) =>
-    compact ? (
-      <IskAmount value={value} decimals={marketIskDecimals(value)} />
-    ) : (
-      formatMarketIsk(value)
-    );
 
   const [groups, setGroups] = useState<MarketGroupNode[] | null>(null);
   useEffect(() => {
@@ -429,9 +348,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     if (summary) rememberHaulingSummary(summary);
   }, [viewRows, scanFetchedAt, sameHub, bothAny]);
 
-  // The user's edits belong to one scan: a new route, category or mode starts
-  // a fresh plan — the fill and the items added from it included.
-  const [overrides, setOverrides] = useState<ReadonlyMap<number, TripOverride>>(NO_OVERRIDES);
+  // A new route, category or mode starts a fresh plan — the fill and the items added from it included.
   const [selectedTypeId, setSelectedTypeId] = useState<number | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [tripOpen, setTripOpen] = useState(false);
@@ -443,10 +360,9 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     setTripOpen(false);
   }
   const scanKey = `${params.from}>${params.to}:${categoryId}:${mode}`;
-  const [overridesFor, setOverridesFor] = useState(scanKey);
-  if (overridesFor !== scanKey) {
-    setOverridesFor(scanKey);
-    setOverrides(NO_OVERRIDES);
+  const [selectionFor, setSelectionFor] = useState(scanKey);
+  if (selectionFor !== scanKey) {
+    setSelectionFor(scanKey);
     setSelectedTypeId(null);
     setDetailOpen(false);
   }
@@ -469,6 +385,29 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     groups,
     scannedTypeIds,
   });
+  const tableRows = useMemo(
+    () => (fill.addedRows.length === 0 ? shown : [...shown, ...fill.addedRows]),
+    [shown, fill.addedRows]
+  );
+  const {
+    overrides,
+    setOverrides,
+    tableCandidates,
+    planBase,
+    plan,
+    lineOf,
+    suggestedProfitOf,
+    patchOverride,
+    resetOverrides,
+    clearAll,
+    allSelected,
+  } = useHaulingPlanState({
+    holds: cargo?.holds ?? null,
+    maxSpend,
+    fees,
+    tableRows,
+    scanKey,
+  });
   // A reload re-prices the lane: the fill and the rows added from it were
   // priced from the old books, so they go, and with them Add's pins.
   const resetFill = fill.reset;
@@ -477,43 +416,11 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     const dropped = resetFill();
     if (dropped.size === 0) return;
     setOverrides((current) => new Map([...current].filter(([id]) => !dropped.has(id))));
-  }, [refresh, resetFill]);
+  }, [refresh, resetFill, setOverrides]);
   useEffect(() => {
     onRefreshInfoChange?.({ refresh: reload, disabled: refreshDisabled, fetchedAt });
     return () => onRefreshInfoChange?.(null);
   }, [onRefreshInfoChange, reload, refreshDisabled, fetchedAt]);
-
-  const tableRows = useMemo(
-    () => (fill.addedRows.length === 0 ? shown : [...shown, ...fill.addedRows]),
-    [shown, fill.addedRows]
-  );
-  const tableCandidates = useMemo(() => tableRows.map((r) => r.candidate), [tableRows]);
-
-  // Every candidate carries its own destination's fees; `fees` here is only the fallback.
-  const planBase = useMemo(
-    () => ({ holds: cargo?.holds ?? null, budgetIsk: maxSpend, fees: fees.at(TRADE_HUBS[0]!) }),
-    [cargo, maxSpend, fees]
-  );
-  const plan = useMemo(
-    () => planTrip({ ...planBase, candidates: tableCandidates, overrides }),
-    [planBase, tableCandidates, overrides]
-  );
-  const lineOf = useMemo(() => new Map(plan.lines.map((l) => [l.typeId, l])), [plan]);
-  // The Profit column sorts by the suggestion, not the edited plan: unticking
-  // a row or typing in Bring must not move the row out from under the pointer.
-  // Unedited, the suggestion is the plan itself.
-  const noEdits = overrides.size === 0;
-  const suggestion = useMemo(
-    () =>
-      noEdits
-        ? null
-        : planTrip({ ...planBase, candidates: tableCandidates, overrides: NO_OVERRIDES }),
-    [noEdits, planBase, tableCandidates]
-  );
-  const suggestedProfitOf = useMemo(
-    () => new Map((suggestion ?? plan).lines.map((l) => [l.typeId, l.profit])),
-    [suggestion, plan]
-  );
 
   /** The room left in every hold: one figure for the summary, the fill offer and the trip bar. */
   const freeM3 = shownFreeM3(plan.holds);
@@ -537,21 +444,6 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       }),
   });
 
-  function patchOverride(typeId: number, patch: TripOverride | null) {
-    setOverrides((current) => {
-      const next = new Map(current);
-      if (patch === null) next.delete(typeId);
-      else next.set(typeId, { ...current.get(typeId), ...patch });
-      return next;
-    });
-  }
-
-  /** Unticks every row: Select all's off state, and the menu's Clear all. */
-  const clearAll = () =>
-    setOverrides(new Map(tableRows.map((r) => [r.typeId, { selected: false }])));
-
-  const allSelected =
-    tableRows.length > 0 && tableRows.every((r) => overrides.get(r.typeId)?.selected !== false);
   // What ships, not what is ticked: a ticked row the plan sized to nothing is not in the trip.
   const selectedCount = plan.totals.items;
 
@@ -621,290 +513,23 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     return `${unit}${holdsText}${t(`market.hauling.limit.${line.limitedBy}`)}`;
   };
 
-  const csvColumns = useMemo(
-    () =>
-      haulingCsvColumns(t, {
-        mode,
-        anyEnd,
-        flagText: (flag) => t(`market.hauling.flags.${HAULING_FLAG_KEY[flag]}`),
-        bringFor: (row) => {
-          const line = lineOf.get(row.typeId);
-          if (!line || overrides.get(row.typeId)?.selected === false) return null;
-          return line.quantity;
-        },
-      }),
-    [t, mode, anyEnd, lineOf, overrides]
-  );
-  const tableExport = useTableExport({ surface: 'hauling', rows: tableRows, columns: csvColumns });
+  const tableExport = useHaulingExport({ mode, anyEnd, tableRows, lineOf, overrides });
 
-  const marginVisible = columnVisibility.isVisible('margin');
-
-  // On a phone each row is the dense two-line card: name and profit on top,
-  // Buy · Sell · margin · m³ · days underneath, the tick box and the Bring
-  // box pinned to its edges (`stackEdge`). A tap opens the row's detail.
-  const columns: DataTableColumn<HaulingViewRow>[] = [
-    {
-      id: 'select',
-      header: '',
-      headerClassName: 'w-8',
-      className: 'w-8',
-      stackEdge: 'start',
-      // The label is the 44px touch target on a coarse pointer; it grows the cell, never overlays a neighbour.
-      render: (row) => (
-        <label className={touchCheckboxLabelClassName}>
-          <Checkbox
-            aria-label={t('market.hauling.selectRow', { item: row.name })}
-            checked={overrides.get(row.typeId)?.selected !== false}
-            onChange={(event) => patchOverride(row.typeId, { selected: event.target.checked })}
-          />
-        </label>
-      ),
-    },
-    {
-      id: 'item',
-      header: t('market.hauling.columns.item'),
-      headerClassName: 'whitespace-nowrap',
-      primary: true,
-      // Takes the spare width and wraps a long name, so the longest name never
-      // sets the table's minimum; below `min-w-28` the table scrolls in its wrapper.
-      className: cards ? undefined : 'w-full max-w-0 min-w-28',
-      sortValue: (row) => row.name.toLowerCase(),
-      render: (row) => {
-        // The name is the row's handle, not a link: the row click is its action (§6c).
-        const addedCategory = fill.addedIds.has(row.typeId)
-          ? fill.categoryOf?.get(row.typeId)
-          : undefined;
-        const added = addedCategory === undefined ? null : categoryName(addedCategory);
-        // The name wraps (two lines at most on a card) and the notes go under it, so neither cuts the name.
-        const nameAndNotes = (
-          <span className="flex min-w-0 flex-col">
-            <span
-              className={entityLinkClassName(
-                cx('min-w-0 font-medium leading-snug break-words', cards && 'line-clamp-2')
-              )}
-            >
-              {row.name}
-            </span>
-            {(row.flags.length > 0 || added) && (
-              <span className="flex flex-wrap gap-x-2 leading-tight">
-                {added && (
-                  <span className="text-[0.6875rem] text-text-dim">
-                    {t('market.hauling.addedFrom', { category: added })}
-                  </span>
-                )}
-                {row.flags.map((flag) => (
-                  <HaulingFlagWord key={flag} flag={flag} />
-                ))}
-              </span>
-            )}
-          </span>
-        );
-        if (cards) return nameAndNotes;
-        return (
-          <span className="flex min-w-0 items-center gap-2">
-            <TypeIcon typeId={row.typeId} size={32} className="size-6 shrink-0" />
-            {nameAndNotes}
-          </span>
-        );
-      },
-    },
-    ...(anyEnd === null
-      ? []
-      : [
-          {
-            id: 'hub',
-            header: t('market.hauling.columns.hub'),
-            headerTooltip: t(
-              anyEnd === 'from'
-                ? 'market.hauling.columns.hubFromTip'
-                : 'market.hauling.columns.hubToTip'
-            ),
-            headerClassName: 'whitespace-nowrap',
-            className: 'whitespace-nowrap',
-            sortValue: (row: HaulingViewRow) => hubAtAnyEnd(row, anyEnd).systemName,
-            render: (row: HaulingViewRow) => {
-              const hub = hubAtAnyEnd(row, anyEnd);
-              return hub.systemName;
-            },
-          },
-        ]),
-    {
-      id: 'buy',
-      headerClassName: 'whitespace-nowrap',
-      header: t('market.hauling.columns.buy'),
-      align: 'right',
-      className: 'tabular-nums whitespace-nowrap',
-      stackAffix: { before: `${t('market.hauling.columns.buy')} ` },
-      sortValue: (row) => row.buyLadder[0]?.price,
-      render: (row) => price(row.buyLadder[0]?.price ?? 0),
-    },
-    {
-      id: 'expected',
-      headerClassName: 'whitespace-nowrap',
-      header: t(instant ? 'market.hauling.columns.buyOrder' : 'market.hauling.columns.expected'),
-      headerTooltip: t(
-        instant ? 'market.hauling.columns.buyOrderTip' : 'market.hauling.columns.expectedTip'
-      ),
-      align: 'right',
-      className: 'tabular-nums whitespace-nowrap',
-      stackAffix: {
-        before: `${t(instant ? 'market.hauling.columns.buyOrder' : 'market.hauling.columns.expected')} `,
-      },
-      sortValue: (row) => row.price,
-      render: (row) => price(row.price),
-    },
-    {
-      // This trip's profit on the row: what Bring loads of it. The margin
-      // rides under it in the table; the card has it on its meta line.
-      id: 'profit',
-      headerClassName: 'whitespace-nowrap',
-      header: t('market.hauling.columns.profit'),
-      headerTooltip: t(
-        instant ? 'market.hauling.columns.profitInstantTip' : 'market.hauling.columns.profitTip'
-      ),
-      align: 'right',
-      className: 'tabular-nums whitespace-nowrap',
-      // The phone card's headline figure, on the title line.
-      cardCorner: true,
-      cellClassName: (row) =>
-        iskGains(lineOf.get(row.typeId)?.profit ?? 0, 0) ? 'text-success' : 'text-text-dim',
-      sortValue: (row) => suggestedProfitOf.get(row.typeId) ?? 0,
-      render: (row) => {
-        const line = lineOf.get(row.typeId);
-        const profit =
-          !line || line.quantity === 0 ? (
-            '—'
-          ) : compact ? (
-            <>
-              {iskGains(line.profit, 0) ? '+' : ''}
-              <IskAmount value={line.profit} />
-            </>
-          ) : (
-            signedIsk(line.profit, 0)
-          );
-        if (cards || marginVisible) return <span className="font-semibold">{profit}</span>;
-        return (
-          <span className="flex flex-col items-end leading-tight">
-            <span className="font-semibold">{profit}</span>
-            <span className="text-[0.6875rem] text-text-dim">
-              {t('market.hauling.itemDetail.margin', { pct: formatSignedPct(row.marginPct, 1) })}
-            </span>
-          </span>
-        );
-      },
-    },
-    {
-      id: 'margin',
-      headerClassName: 'whitespace-nowrap',
-      header: t('market.hauling.columns.margin'),
-      headerTooltip: t(
-        instant ? 'market.hauling.columns.marginInstantTip' : 'market.hauling.columns.marginTip'
-      ),
-      align: 'right',
-      className: 'tabular-nums whitespace-nowrap',
-      cellClassName: (row) =>
-        row.marginPct >= HAULING_THRESHOLDS.lowMarginPct ? 'text-success' : 'text-text-dim',
-      sortValue: (row) => row.marginPct,
-      render: (row) => formatSignedPct(row.marginPct, 1),
-    },
-    {
-      id: 'iskPerM3',
-      headerClassName: 'whitespace-nowrap',
-      header: t('market.hauling.columns.iskPerM3'),
-      headerTooltip: t('market.hauling.columns.iskPerM3Tip'),
-      align: 'right',
-      className: 'tabular-nums whitespace-nowrap',
-      stackAffix: { after: t('market.hauling.perM3Short') },
-      sortValue: (row) => row.iskPerM3,
-      render: (row) => isk(row.iskPerM3, 0),
-    },
-    {
-      // The line's hold space: what Bring takes up.
-      id: 'm3',
-      headerClassName: 'whitespace-nowrap',
-      header: t('market.hauling.columns.m3'),
-      align: 'right',
-      className: 'tabular-nums whitespace-nowrap',
-      stackAffix: { after: ` ${t('market.hauling.columns.m3')}` },
-      sortValue: (row) => lineOf.get(row.typeId)?.volumeM3 ?? 0,
-      render: (row) => formatTripM3(lineOf.get(row.typeId)?.volumeM3 ?? 0),
-    },
-    {
-      // Days to sell and how steadily it sells, in one cell: the demand mark
-      // leads, and its words follow in a wide table (a narrower one, and the
-      // phone card, keep the mark's shape, with the words for screen readers only).
-      id: 'days',
-      headerClassName: 'whitespace-nowrap',
-      header: t('market.hauling.columns.days'),
-      headerTooltip: t('market.hauling.columns.daysTip'),
-      className: 'tabular-nums whitespace-nowrap',
-      stackAffix: { after: t('market.hauling.daysShort') },
-      sortValue: (row) => (row.mode === 'list' ? row.sale.daysToSell : undefined),
-      render: (row) =>
-        row.mode === 'list' && (
-          <DataTableDenseCell>
-            <Tooltip content={t('market.hauling.demandDays', { count: row.demand.daysWithTrades })}>
-              <span
-                tabIndex={0}
-                role="img"
-                aria-label={t('market.hauling.demandDays', { count: row.demand.daysWithTrades })}
-                className={`size-2 shrink-0 ${DEMAND_MARK[row.demand.demand]} ${focusRingClassName}`}
-              />
-            </Tooltip>
-            {formatDaysToSell(row.sale.daysToSell)}
-            <span className="text-xs text-text-dim @max-[62rem]:sr-only">
-              · {t(`market.hauling.demand.${row.demand.demand}`)}
-            </span>
-          </DataTableDenseCell>
-        ),
-    },
-    {
-      id: 'bring',
-      headerClassName: 'whitespace-nowrap',
-      header: t('market.hauling.columns.bring'),
-      align: 'right',
-      className: 'whitespace-nowrap',
-      stackEdge: 'end',
-      render: (row) => {
-        const line = lineOf.get(row.typeId);
-        if (!line) return null;
-        return (
-          <BringInput
-            card={cards}
-            label={t('market.hauling.bringRow', { item: row.name })}
-            title={limitTextOf(row)}
-            value={overrides.get(row.typeId)?.selected === false ? '' : formatVolume(line.quantity)}
-            onCommit={(quantity) =>
-              patchOverride(
-                row.typeId,
-                quantity === 0
-                  ? { selected: false, quantity: undefined }
-                  : { selected: true, quantity }
-              )
-            }
-          />
-        );
-      },
-    },
-  ];
-
-  // Hideable columns only — `select` and `item` (the row's own identity)
-  // are always shown, so they're left out of the picker's catalog entirely.
-  const hideableColumnsById = Object.fromEntries(
-    columns
-      .filter((column): column is DataTableColumn<HaulingViewRow> & { id: HaulingColumnId } =>
-        isHaulingColumnId(column.id)
-      )
-      .map((column) => [column.id, column])
-  ) as Record<HaulingColumnId, DataTableColumn<HaulingViewRow>>;
-  const availableColumnIds = instant ? INSTANT_COLUMN_IDS : HAULING_COLUMN_IDS;
-  const visibleColumns = columns.filter(
-    (column) =>
-      !isHaulingColumnId(column.id) ||
-      (availableColumnIds.includes(column.id) &&
-        // The card's meta line carries the margin, picked or not: its Profit has no second line.
-        (columnVisibility.isVisible(column.id) || (cards && column.id === 'margin')))
-  );
+  const { columnVisibility, hideableColumnsById, availableColumnIds, visibleColumns } =
+    useHaulingTable({
+      instant,
+      anyEnd,
+      cards,
+      compact,
+      lineOf,
+      suggestedProfitOf,
+      overrides,
+      patchOverride,
+      addedIds: fill.addedIds,
+      addedCategoryOf: fill.categoryOf,
+      categoryName,
+      limitTextOf,
+    });
 
   // Selling into buy orders reads neither days nor demand.
   const activeFilterCount =
@@ -947,7 +572,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
   );
   const tripMenu = (
     <TableActionsMenu name={t('market.hauling.title')} tableExport={tableExport} size="md">
-      <MenuItem disabled={overrides.size === 0} onSelect={() => setOverrides(NO_OVERRIDES)}>
+      <MenuItem disabled={overrides.size === 0} onSelect={resetOverrides}>
         {t('market.hauling.fillHold')}
       </MenuItem>
       <MenuItem onSelect={clearAll}>{t('market.hauling.clearAll')}</MenuItem>
@@ -961,11 +586,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     <div className="flex flex-col gap-2">
       <p className="flex items-baseline gap-2 text-sm tabular-nums">
         {cargoSet && <b>{t('market.hauling.tripBar.free', { m3: formatTripM3(freeM3) })}</b>}
-        <span
-          className={cx('ml-auto font-semibold', iskGains(plan.totals.profit, 0) && 'text-success')}
-        >
-          {signedIsk(plan.totals.profit, 0)}
-        </span>
+        <IskDelta amount={plan.totals.profit} decimals={0} className="ml-auto font-semibold" />
       </p>
       <div className="flex items-center gap-2">
         {copyButton('md', 'flex-1 justify-center')}
@@ -1096,7 +717,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
             <Checkbox
               aria-label={t('market.hauling.selectAll')}
               checked={allSelected}
-              onChange={(event) => (event.target.checked ? setOverrides(NO_OVERRIDES) : clearAll())}
+              onChange={(event) => (event.target.checked ? resetOverrides() : clearAll())}
             />
           </label>
           {t('market.hauling.inTrip', { selected: selectedCount, total: tableRows.length })}
@@ -1466,239 +1087,4 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       {copyStatus === 'failed' && <Toast message={t('market.hauling.copyFailed')} />}
     </div>
   );
-}
-
-/** A hub picker. Uncaptioned: the `→` between From and To says which is which; the name is its `aria-label`. */
-function HubField({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: HaulingHubChoice;
-  onChange: (id: HaulingHubChoice) => void;
-}) {
-  const { t } = useTranslation();
-  return (
-    <Select value={value} onValueChange={(next) => onChange(next as HaulingHubChoice)}>
-      <SelectTrigger size="sm" aria-label={label} className="w-24 sm:w-32">
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        {TRADE_HUBS.map((h) => (
-          <SelectItem key={h.id} value={h.id}>
-            {h.systemName}
-          </SelectItem>
-        ))}
-        <SelectItem value={ANY_HUB}>{t('market.hauling.anyHub')}</SelectItem>
-      </SelectContent>
-    </Select>
-  );
-}
-
-/** A typed ISK cap not yet committed: none, a whole figure (null = no limit), or a fraction that can't commit. */
-type HeldIsk = 'none' | 'partial' | { amount: number | null };
-
-/**
- * An ISK cap in the filters — Max price per item, Max spend. Blank is no
- * limit. Only a whole, positive figure commits: the URL holds whole ISK.
- * Inline it commits on blur or Enter, not per keystroke: `250m` passes
- * through 2 ISK, which would hide every row and drop the selection. The
- * sheet's draft takes each keystroke; its Apply is the commit.
- */
-function IskCapField({
-  label,
-  hint,
-  value,
-  onChange,
-}: {
-  label: string;
-  hint?: string;
-  value: number | null;
-  onChange: (next: number | null) => void;
-}) {
-  const { t } = useTranslation();
-  const hintId = useId();
-  // Inline the field has no caption, so its placeholder names it; in the sheet the caption does.
-  const inSheet = useFilterSurface() === 'sheet';
-  // `IskInput`'s own last parse, unrounded, handed back as its `value`: a
-  // rounded figure (`2.01m` = 2009999.99… → 2010000) would read as an outside
-  // change and reset the typed text. The URL lands in a transition, so `value` lags.
-  const [typedText, setTypedText] = useState<string | null>(null);
-  // What the typed text says, not yet committed: a whole figure (or null, no
-  // limit) waiting for blur/Enter inline, or a fraction that can't commit.
-  const [held, setHeld] = useState<HeldIsk>('none');
-  const [lastSent, setLastSent] = useState<number | null>(value);
-  const [prevValue, setPrevValue] = useState(value);
-  // A value this field did not send (Reset, a link) replaces what was typed.
-  if (prevValue !== value) {
-    setPrevValue(value);
-    if (value !== lastSent) {
-      setTypedText(null);
-      setHeld('none');
-    }
-  }
-  const shown = typedText ?? (value === null ? '' : String(value));
-  function commit(next: number | null) {
-    setHeld('none');
-    if (next === value) return;
-    setLastSent(next);
-    onChange(next);
-  }
-  /** Blur/Enter: commit a held figure; a fraction reverts to the committed value. */
-  function settle() {
-    if (held === 'partial') {
-      setTypedText(null);
-      setHeld('none');
-    } else if (held !== 'none') commit(held.amount);
-  }
-  return (
-    <FilterField label={label}>
-      <IskInput
-        size="sm"
-        aria-label={label}
-        aria-describedby={hint === undefined ? undefined : hintId}
-        placeholder={inSheet ? t('market.hauling.filters.noLimit') : label}
-        // Inline the echo rides beside the box, not under it, so the row keeps one height.
-        className={inSheet ? 'w-40' : 'flex-row! items-center [&>input]:w-40'}
-        value={shown}
-        onChange={(text) => {
-          setTypedText(text);
-          const amount = Number(text);
-          const whole = text === '' ? null : Math.round(amount);
-          // Shorthand's float noise rounds away; a real fraction (`1.5`, on its way to `1.5b`) waits.
-          const usable =
-            whole === null ||
-            (Math.abs(amount - whole) < 0.001 && Number.isSafeInteger(whole) && whole > 0);
-          if (!usable) setHeld('partial');
-          else if (inSheet) commit(whole);
-          else setHeld({ amount: whole });
-        }}
-        onBlur={settle}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter') settle();
-        }}
-      />
-      {hint !== undefined && (
-        <span id={hintId} className={inSheet ? 'text-[0.6875rem] text-text-dim' : 'sr-only'}>
-          {hint}
-        </span>
-      )}
-    </FilterField>
-  );
-}
-
-/**
- * In the route row Category and Sell by give way before the row wraps: they
- * break the line at a smaller basis and grow back to their full width, so the
- * filter funnel stays on the route's line beside the trip rail.
- */
-const ROUTE_ROW_SELECT = 'grow basis-36';
-
-/** The market category to scan — in the route row on a wide screen, in the filter sheet on a narrow one. */
-function CategorySelect({
-  value,
-  onChange,
-  nameOf,
-  inRouteRow = false,
-}: {
-  value: number;
-  onChange: (cat: number) => void;
-  nameOf: (id: number) => string;
-  inRouteRow?: boolean;
-}) {
-  const { t } = useTranslation();
-  return (
-    <Select value={String(value)} onValueChange={(next) => onChange(Number(next))}>
-      <SelectTrigger
-        size="sm"
-        aria-label={t('market.hauling.category')}
-        className={inRouteRow ? `${ROUTE_ROW_SELECT} max-w-52` : 'w-52'}
-      >
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        {HAULING_CATEGORY_OPTIONS.map((id) => (
-          <SelectItem key={id} value={String(id)}>
-            {nameOf(id)}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  );
-}
-
-/** How the load is sold at the destination — placed like `CategorySelect`. */
-function ModeSelect({
-  value,
-  onChange,
-  inRouteRow = false,
-}: {
-  value: HaulMode;
-  onChange: (mode: HaulMode) => void;
-  inRouteRow?: boolean;
-}) {
-  const { t } = useTranslation();
-  return (
-    <Select value={value} onValueChange={(next) => onChange(next as HaulMode)}>
-      <SelectTrigger
-        size="sm"
-        aria-label={t('market.hauling.mode')}
-        className={inRouteRow ? `${ROUTE_ROW_SELECT} max-w-48` : 'w-48'}
-      >
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        {HAUL_MODES.map((m) => (
-          <SelectItem key={m} value={m}>
-            {t(`market.hauling.modes.${m}`)}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  );
-}
-
-/**
- * The quantity to bring, typed by hand. Keeps what is being typed in its own
- * state so the box can be emptied and retyped: the planned quantity it would
- * otherwise echo back is clamped and re-sized on every keystroke. Emptying it
- * or typing 0 unticks the row. `title` says what capped the suggestion (the
- * row's detail says it too, for touch).
- */
-function BringInput({
-  card,
-  label,
-  title,
-  value,
-  onCommit,
-}: {
-  /** On the dense card rather than in a table row. */
-  card: boolean;
-  label: string;
-  title?: string;
-  value: string;
-  onCommit: (quantity: number) => void;
-}) {
-  const [draft, setDraft] = useState<string | null>(null);
-  const input = (
-    <TextInput
-      size="sm"
-      inputMode="numeric"
-      aria-label={label}
-      // Shorter and narrower on the card: its height sets the meta line's,
-      // and a 360px card still fits it beside that line. 28px is under the
-      // touch tier's 36px on purpose (DESIGN.md §3); `max-md:` because the
-      // `sm` field is already 28px from `md` up.
-      className={cx('text-right tabular-nums', card ? 'w-16 max-md:h-7' : 'w-20')}
-      value={draft ?? value}
-      onChange={(event) => {
-        const raw = event.target.value.replace(/[^\d]/g, '');
-        setDraft(raw);
-        onCommit(raw === '' ? 0 : Number(raw));
-      }}
-      onBlur={() => setDraft(null)}
-    />
-  );
-  return title ? <Tooltip content={title}>{input}</Tooltip> : input;
 }

@@ -8,14 +8,12 @@ import { BiggerChainsPanel } from './BiggerChainsPanel';
 import { assumedCustomsNames } from './colonyCustoms';
 import { PricesUnavailable } from './PricesUnavailable';
 import type { GoalPlannerSnapshot } from './goalPlannerSnapshot';
-import {
-  HaulingPanel,
-  PlanSummaryPanel,
-  QuickWinsPanel,
-  RebuildPanel,
-  YourPlanetsPanel,
-  type Ticks,
-} from './MakeMoreSections';
+import { HaulingPanel } from './makeMore/HaulingPanel';
+import { PlanSummaryPanel } from './makeMore/PlanSummaryPanel';
+import { QuickWinsPanel } from './makeMore/QuickWinsPanel';
+import { RebuildPanel } from './makeMore/RebuildPanel';
+import type { Ticks } from './makeMore/shared';
+import { YourPlanetsPanel } from './makeMore/YourPlanetsPanel';
 import { buildPlanView, coveredPlanets, pruneTicks, tickableIds, type PlanView } from './planView';
 import { usePiSettings, withHaulBetweenPlanets } from './piSettings';
 import { usePlanPreference, usePlanTicks } from './planTicksPref';
@@ -68,7 +66,7 @@ function headlineText(view: PlanView, t: ReturnType<typeof useTranslation>['t'])
 /**
  * "Make more from my planets": the recommendation model, drawn. The page
  * wires reads to `buildPlanAdvice` (`usePlanAdvice`), shapes the answer
- * (`buildPlanView`) and draws it (`MakeMoreSections`).
+ * (`buildPlanView`) and draws it (`makeMore/`).
  */
 export function MakeMorePlan({ snapshot, characterId, onFindBest }: Props) {
   const { t } = useTranslation();

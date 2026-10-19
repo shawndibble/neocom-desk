@@ -17,7 +17,7 @@ import { QueueStrip } from '@/features/skills/planner/QueueStrip';
 import { SkillPlanCard } from '@/features/skills/planner/SkillPlanCard';
 import { buildQueueView } from '@/features/skills/planner/queueView';
 import { useSkillQueue } from '@/features/skills/planner/useSkillQueue';
-import { classifySkillQueue } from '@/features/skills/queueStatus';
+import { classifySkillQueue } from '@/engine/skills/queueStatus';
 import { usePlanEditorData } from '@/features/skills/planner/usePlanEditorData';
 import { useCalendarWeekStart } from '@/features/character/calendarWeekStart';
 import { useTicker } from '@/lib/ticker';

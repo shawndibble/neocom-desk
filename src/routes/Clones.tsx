@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { Navigate } from 'react-router-dom';
@@ -782,9 +783,7 @@ export function Clones() {
           <div className="grid grid-cols-[repeat(auto-fit,minmax(15rem,1fr))] gap-4 text-sm">
             <Panel className="h-full">
               <section aria-label={t('clones.cooldown')} className="space-y-1">
-                <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                  {t('clones.cooldownShared')}
-                </h3>
+                <h3 className={eyebrowClassName}>{t('clones.cooldownShared')}</h3>
                 {/* The header above names it; the value wraps rather than sitting in a nowrap chip. */}
                 <p
                   className={`font-medium tabular-nums ${STAT_CHIP_TONE_TEXT_CLASS[cooldownTone]}`}
@@ -806,9 +805,7 @@ export function Clones() {
             </Panel>
             <Panel className="h-full">
               <section aria-label={t('clones.youAreIn')} className="space-y-1">
-                <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                  {t('clones.youAreIn')}
-                </h3>
+                <h3 className={eyebrowClassName}>{t('clones.youAreIn')}</h3>
                 <p>
                   {characterSystemName ?? t('clones.unknownPlace')}{' '}
                   {characterSystemId !== null && securities.has(characterSystemId) && (
@@ -833,9 +830,7 @@ export function Clones() {
             {homeLocationName && (
               <Panel className="h-full">
                 <section aria-label={t('clones.respawn')} className="space-y-1">
-                  <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                    {t('clones.respawn')}
-                  </h3>
+                  <h3 className={eyebrowClassName}>{t('clones.respawn')}</h3>
                   <p className="flex flex-wrap items-center gap-x-2">
                     <span className="[overflow-wrap:anywhere]">{homeLocationName}</span>
                     {homeSecurity !== undefined && <SecurityStatus security={homeSecurity} />}

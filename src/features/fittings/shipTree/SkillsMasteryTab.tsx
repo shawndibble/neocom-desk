@@ -10,7 +10,9 @@
  * "Show missing" hides what's already trained, in both lists; it sticks.
  * No active Character: names and levels only, nothing to add, no time.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useMemo, useState } from 'react';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useTranslation } from 'react-i18next';
 import { Button, FilterChip } from '@/components/ui';
 import {
@@ -41,7 +43,6 @@ import {
 } from './shipTreeModel';
 import { useShipInfoShowMissing } from './shipTreeViewPreference';
 import type { ShipTreeSource } from './useShipTreeData';
-import { useHydratedStore } from '@/lib/useHydratedStore';
 
 const TIERS = [1, 2, 3, 4, 5] as const;
 
@@ -51,7 +52,7 @@ export interface AddedToPlan {
   planName: string;
   entries: readonly PlanEntry[];
 }
-const heading = 'text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
+const heading = eyebrowClassName;
 
 export function SkillsMasteryTab({
   ship,

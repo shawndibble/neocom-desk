@@ -4,6 +4,7 @@
  * wider scope shows one line per Character with a "Balance by character" table
  * whose rows drill into that Character.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { lazy, Suspense, useMemo, type ReactNode, type RefObject } from 'react';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { GrantMissingLink } from '@/app/GrantMissingLink';
@@ -416,9 +417,7 @@ export function NetWorthPanel({
       )}
       <div className="flex flex-wrap gap-x-8 gap-y-4">
         <div>
-          <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-            {t('wallet.netWorth.total')}
-          </p>
+          <p className={eyebrowClassName}>{t('wallet.netWorth.total')}</p>
           <p className={cx('text-xl font-medium tabular-nums', iskToneClass(total))}>
             {mode === 'single' && !singleLatest ? '—' : formatIsk(total)}
           </p>

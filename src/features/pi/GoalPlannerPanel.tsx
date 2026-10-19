@@ -70,7 +70,7 @@ import {
 import { productOptions } from './products';
 import type { PlanPrices } from './planPrices';
 import { AssumptionsSection, ColoniesSection, GoalsSection } from './GoalPlannerRail';
-import { colonyCountUnknown } from './colonyStripModel';
+import { colonyCountUnknown } from './colonyFillModel';
 import {
   Changes,
   ColonyFit,

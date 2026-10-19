@@ -139,11 +139,6 @@ export function yieldBankedBy(program: ExtractorYieldProgram, nowMs: number): nu
   return sumCycles(program, 0, completedCycles(program, nowMs));
 }
 
-/** Output still to come after `nowMs`; zero once the program has expired. */
-export function yieldRemaining(program: ExtractorYieldProgram, nowMs: number): number {
-  return sumCycles(program, completedCycles(program, nowMs), programCycleCount(program));
-}
-
 /**
  * The in-progress cycle's output over the first cycle's — 1.0 at install,
  * falling as the curve decays. An expired program keeps reporting its final

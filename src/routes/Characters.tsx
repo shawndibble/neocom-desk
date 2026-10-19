@@ -1,12 +1,6 @@
-import { cx } from '@/lib/cx';
-import { useHydratedStore } from '@/lib/useHydratedStore';
-import {
-  focusRingClassName,
-  interactiveClassName,
-  selectedRowClassName,
-} from '@/components/ui/controlStyles';
 import { HintText } from '@/components/ui/HintText';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -36,14 +30,11 @@ import {
   SelectTrigger,
   SelectValue,
   Spinner,
-  StatChip,
-  StatChips,
   STAT_CHIP_TONE_TEXT_CLASS,
   TextInput,
   Toast,
   NeedsConnection,
   type DataTableColumn,
-  type StatChipTone,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { beginAddCharacterLogin } from '@/app/loginFlow';
@@ -51,7 +42,8 @@ import { NeedsLoginNotice } from '@/app/AuthFailureNotice';
 import { useAuthFailure } from '@/stores/authFailure';
 import { CustomizePermissionsDialog } from '@/features/permissions/CustomizePermissionsDialog';
 import { isSyncConfigured } from '@/app/syncStatus';
-import { usePublicInfo, type PublicInfoEntry } from '@/stores/publicInfo';
+import { useShallow } from 'zustand/react/shallow';
+import { usePublicInfo } from '@/stores/publicInfo';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useFontScale, FONT_SCALE_STEPS, type FontScale } from '@/lib/fontScale';
 import { useNow } from '@/lib/useNow';
@@ -91,7 +83,7 @@ import {
   type CharacterColumnId,
 } from '@/features/character/characterColumns';
 import { ATTENTION_RANK, ATTENTION_TONE as PI_ATTENTION_TONE } from '@/engine/pi/colonyStatus';
-import { type QueueState } from '@/features/skills/queueStatus';
+import { type QueueState } from '@/engine/skills/queueStatus';
 import { formatCountdown, formatDuration } from '@/lib/duration';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
@@ -136,51 +128,14 @@ import { useUrlParam, useUrlParams } from '@/lib/useUrlState';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { charactersCsvColumns } from '@/features/character/charactersCsv';
-
-const UNGROUPED_VALUE = '__ungrouped__';
-
-// `idle` is `warning`, not `default`: the app already raises a
-// `characterNotTraining` warning alert for an idle queue, so this chip must
-// not disagree with it (issue #1731). `queueChipTone` below overrides that
-// back to `default` for the one Character-level opt-out that alert has.
-const QUEUE_STATE_TONE: Record<QueueState, StatChipTone> = {
-  training: 'success',
-  endingSoon: 'warning',
-  paused: 'danger',
-  idle: 'warning',
-  unknown: 'default',
-};
-
-// Same "most-needs-attention first" ordering as PI's ATTENTION_RANK, mapped
-// onto training's own tones: paused and idle (both now warning-or-worse)
-// share rank 0, then endingSoon, then unknown (no cached queue yet), then
-// training last since it needs no attention at all.
-const QUEUE_STATE_RANK: Record<QueueState, number> = {
-  paused: 0,
-  idle: 0,
-  endingSoon: 1,
-  unknown: 2,
-  training: 3,
-};
-
-/**
- * `QUEUE_STATE_TONE`, overridden back to `default` for an idle queue when
- * this Character has muted the `characterNotTraining` alert in its feed
- * channel — the alert's own only per-pilot opt-out (issue #1731), e.g. a
- * deliberately parked alt banking skill points. Every other state ignores
- * the opt-out: it exists to silence the idle warning specifically, not to
- * dim a paused or ending-soon queue.
- */
-function queueChipTone(state: QueueState, notTrainingAlertEnabled: boolean): StatChipTone {
-  if (state === 'idle' && !notTrainingAlertEnabled) return 'default';
-  return QUEUE_STATE_TONE[state];
-}
-
-/** `QUEUE_STATE_RANK`, with the same opt-out override as `queueChipTone` — a muted idle Character sorts with `unknown`, not with `paused`, so its position agrees with its now-neutral chip. */
-function queueChipRank(state: QueueState, notTrainingAlertEnabled: boolean): number {
-  if (state === 'idle' && !notTrainingAlertEnabled) return QUEUE_STATE_RANK.unknown;
-  return QUEUE_STATE_RANK[state];
-}
+import { CharacterCard, AffiliationName } from '@/features/character/CharacterCard';
+import { GroupSectionHeader } from '@/features/character/GroupSectionHeader';
+import {
+  UNGROUPED_VALUE,
+  characterLastSynced,
+  queueChipRank,
+  queueChipTone,
+} from '@/features/character/rosterQueueChip';
 
 const DENSITY_LABEL_KEYS = {
   0.875: 'characters.densityCompact',
@@ -244,358 +199,10 @@ function activeRosterFilterCount(filter: RosterFilter): number {
  */
 const TABLE_SORT = optionalSortParam();
 
-interface CharacterCardProps {
-  character: CharacterRecord;
-  info: PublicInfoEntry | undefined;
-  stats: CharacterSortStats | undefined;
-  queue: QueueInfo | undefined;
-  /** Whether this Character's `characterNotTraining` alert is on — false only for its one opt-out (issue #1731). */
-  notTrainingAlertEnabled: boolean;
-  groups: readonly CharacterGroup[];
-  groupId: string | null;
-  starred: boolean;
-  isActive: boolean;
-  alertCount: number;
-  attention: AttentionEntry | undefined;
-  /** One clock shared by every card (`useNow()` called once in `Characters`), not one interval per card — a large roster would otherwise re-render every card every tick regardless of whether it has anything counting down. */
-  now: number;
-  onSelect: (characterId: number) => void;
-  onToggleStar: (characterId: number) => void;
-  onMoveToGroup: (characterId: number, groupId: string | null) => void;
-  onRemove: (characterId: number, name: string) => void;
-}
-
-type PiCardAttention = { kind: 'stopped' } | { kind: 'expiring'; expiryMs: number };
-
-/** Card view's narrower PI signal (decision `20260925-230353`): only `idle`/`expiring-soon` reach a card, gated *before* `isPiExpired` — `decayed` also carries a real `piSoonestExpiryMs` and must stay table-only even once it's passed. */
-function piCardAttention(
-  attention: AttentionEntry | undefined,
-  nowMs: number
-): PiCardAttention | null {
-  const piAttention = attention?.piAttention;
-  if (piAttention !== 'idle' && piAttention !== 'expiring-soon') return null;
-  if (piAttention === 'idle') return { kind: 'stopped' };
-  const expiryMs = attention?.piSoonestExpiryMs;
-  if (isPiExpired(expiryMs, nowMs)) return { kind: 'stopped' };
-  return expiryMs != null ? { kind: 'expiring', expiryMs } : null;
-}
-
-/**
- * The staler of two optional fetch times — the card's one combined age badge
- * reads as "how stale is the worst part of this card", never the freshest
- * field alone, so it can't imply everything is fresher than it is.
- */
-function olderOf(a: Date | null | undefined, b: Date | null | undefined): Date | undefined {
-  if (!a) return b ?? undefined;
-  if (!b) return a;
-  return a.getTime() <= b.getTime() ? a : b;
-}
-
-/** The one "how stale is this character" rule (`olderOf`'s doc comment) — shared by the card badge and the table's `lastSynced` column so they can't drift into disagreeing about the same character. */
-function characterLastSynced(
-  stats: CharacterSortStats | undefined,
-  queue: QueueInfo | undefined
-): Date | undefined {
-  return olderOf(olderOf(stats?.skillPointsFetchedAt, stats?.walletFetchedAt), queue?.fetchedAt);
-}
-
-/**
- * A corp or alliance name, plain: a roster row or card selects the Character,
- * so its Show Info links live in the selected Character's header (§6c).
- */
-function AffiliationName({ name }: { name: string | null | undefined }) {
-  const { t } = useTranslation();
-  return <>{name || t('common.unknown')}</>;
-}
-
-function CharacterCard({
-  character,
-  info,
-  stats,
-  queue,
-  notTrainingAlertEnabled,
-  groups,
-  groupId,
-  starred,
-  isActive,
-  alertCount,
-  attention,
-  now,
-  onSelect,
-  onToggleStar,
-  onMoveToGroup,
-  onRemove,
-}: CharacterCardProps) {
-  const { t } = useTranslation();
-  // One badge for the whole card, not one per stat (that was the actual
-  // complaint — three "Xm ago"s in a row): the oldest of whichever fields
-  // this character has cached, so the card never overstates its freshness.
-  const lastSynced = characterLastSynced(stats, queue);
-  const piChip = piCardAttention(attention, now);
-
-  return (
-    <li
-      aria-current={isActive ? 'true' : undefined}
-      className={cx(
-        'flex flex-col gap-2 rounded-xs border border-line p-3 backdrop-blur-sm hover:border-line-bright hover:bg-panel-2',
-        interactiveClassName,
-        isActive ? selectedRowClassName : 'bg-panel/85'
-      )}
-    >
-      <div className="flex flex-wrap items-start gap-2">
-        <div className="flex min-w-40 flex-1 items-start gap-3">
-          {/* Pointer convenience: the name below is the keyboard and screen-reader
-              control, so this avatar target stays out of both. */}
-          <button
-            type="button"
-            tabIndex={-1}
-            aria-hidden="true"
-            onClick={() => onSelect(character.characterId)}
-            className={cx('shrink-0 rounded-xs', interactiveClassName)}
-          >
-            <CharacterAvatar
-              characterId={character.characterId}
-              size="lg"
-              loading="lazy"
-              alt={t('characters.portraitAlt', { name: character.name })}
-            />
-          </button>
-          <span className="min-w-0">
-            {/* The dot rides the name's own line, not a corner of the card:
-                it needs no room of its own, so the identity block loses
-                nothing to make space for it. `min-w-0` on this row (not just
-                the outer `span`) is what lets the name still truncate instead
-                of pushing the dot off — and shrinking the name never touches
-                the corp/alliance lines below, which are separate rows. */}
-            <span className="flex min-w-0 flex-wrap items-center gap-x-1.5">
-              <button
-                type="button"
-                aria-label={t('characters.select', { name: character.name })}
-                data-character-select={character.characterId}
-                onClick={() => onSelect(character.characterId)}
-                className={cx(
-                  'max-w-full truncate rounded-xs text-left text-sm font-semibold',
-                  interactiveClassName,
-                  focusRingClassName
-                )}
-              >
-                {character.name}
-              </button>
-              {isActive && (
-                <span className="shrink-0 text-[0.6875rem] font-semibold tracking-widest text-accent uppercase">
-                  {t('characters.activeLabel')}
-                </span>
-              )}
-              {lastSynced && (
-                <DataAgeBadge date={lastSynced} dotOnly alwaysVisible className="shrink-0" />
-              )}
-            </span>
-            <span className="block truncate text-xs text-text-dim">
-              <AffiliationName name={info?.corporationName} />
-            </span>
-            <span className="block truncate text-xs text-text-dim">
-              <AffiliationName name={info?.allianceName} />
-            </span>
-          </span>
-        </div>
-        {/* Group and remove: the card's own controls, not part of the
-            name/corp/alliance identity block, so they sit at the top right
-            rather than crowding the stat row below. */}
-        <div className="flex shrink-0 items-center gap-2">
-          {/* Filled when starred, outline when not — the state is on the glyph
-              as well as in the accent `pressed` treatment, so it survives a
-              reader who can't tell the two colours apart. The label says which
-              way the press goes, not just which card it belongs to. */}
-          <IconButton
-            icon={<Icon.Pin weight={starred ? 'fill' : 'light'} />}
-            label={t(starred ? 'characters.unstar' : 'characters.star', { name: character.name })}
-            pressed={starred}
-            onClick={() => onToggleStar(character.characterId)}
-          />
-          {groups.length > 0 && (
-            <Select
-              value={groupId ?? UNGROUPED_VALUE}
-              onValueChange={(value) =>
-                onMoveToGroup(character.characterId, value === UNGROUPED_VALUE ? null : value)
-              }
-            >
-              <SelectTrigger
-                size="sm"
-                aria-label={t('characters.groupFor', { name: character.name })}
-                data-group-select={character.characterId}
-                className="w-32 shrink-0"
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={UNGROUPED_VALUE}>{t('characters.ungrouped')}</SelectItem>
-                {groups.map((group) => (
-                  <SelectItem key={group.id} value={group.id}>
-                    {group.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-          <IconButton
-            icon={<Icon.Close />}
-            tone="danger"
-            label={t('characters.removeButtonLabel', { name: character.name })}
-            onClick={() => onRemove(character.characterId, character.name)}
-          />
-        </div>
-      </div>
-      <StatChips>
-        <StatChip
-          label={t('characters.spLabel')}
-          value={
-            stats?.skillPoints === undefined
-              ? t('common.unknown')
-              : formatCompactNumber(stats.skillPoints)
-          }
-        />
-        <StatChip
-          label={t('characters.walletLabel')}
-          value={
-            stats?.wallet === undefined ? t('common.unknown') : <IskAmount value={stats.wallet} />
-          }
-        />
-        {queue && (
-          <StatChip
-            label={t('characters.queueState')}
-            tone={queueChipTone(queue.state, notTrainingAlertEnabled)}
-            value={t(`characters.queueStates.${queue.state}`)}
-          />
-        )}
-        {alertCount > 0 && (
-          <StatChip label={t('characters.column.alerts')} tone="warning" value={alertCount} />
-        )}
-        {piChip && (
-          <StatChip
-            label={t('characters.column.pi')}
-            tone="warning"
-            value={
-              piChip.kind === 'stopped'
-                ? t('pi.attention.idle')
-                : formatDuration((piChip.expiryMs - now) / 1000)
-            }
-          />
-        )}
-      </StatChips>
-    </li>
-  );
-}
-
-interface GroupSectionHeaderProps {
-  group: CharacterGroup;
-  index: number;
-  groupCount: number;
-  onRename: (id: string, name: string) => void;
-  onRemove: (id: string) => void;
-  onMove: (index: number, direction: -1 | 1) => void;
-}
-
-function GroupSectionHeader({
-  group,
-  index,
-  groupCount,
-  onRename,
-  onRemove,
-  onMove,
-}: GroupSectionHeaderProps) {
-  const { t } = useTranslation();
-  const [renaming, setRenaming] = useState(false);
-  const [draftName, setDraftName] = useState(group.name);
-  const renameButton = useRef<HTMLButtonElement>(null);
-  const focusAfterCommit = useFocusAfterCommit();
-
-  // `returnFocus`: Enter and Escape remove the input, so focus goes back to
-  // the Rename button; a blur means the user already went elsewhere.
-  function commitRename(returnFocus: boolean) {
-    setRenaming(false);
-    if (returnFocus) focusAfterCommit(renameButton);
-    const name = draftName.trim();
-    if (name && name !== group.name) onRename(group.id, name);
-    else setDraftName(group.name);
-  }
-
-  return (
-    <div className="flex items-center gap-2">
-      {renaming ? (
-        <TextInput
-          autoFocus
-          size="sm"
-          value={draftName}
-          aria-label={t('characters.renameGroup')}
-          onChange={(e) => setDraftName(e.target.value)}
-          onBlur={() => commitRename(false)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              // Focus moves to the Rename button below; without this the Enter's own
-              // keypress would land on it and reopen the input.
-              e.preventDefault();
-              commitRename(true);
-            }
-            if (e.key === 'Escape') {
-              setDraftName(group.name);
-              setRenaming(false);
-              focusAfterCommit(renameButton);
-            }
-          }}
-          className="flex-1"
-        />
-      ) : (
-        <h2
-          data-group-heading={group.id}
-          className="flex-1 truncate text-xs font-semibold tracking-widest text-text-dim uppercase focus:outline-none"
-          onDoubleClick={() => setRenaming(true)}
-        >
-          {group.name}
-        </h2>
-      )}
-      {/* Icon actions, like every other editable-row header in the app (the
-          Skill Plan and Build Plan lists): the group name is the row, the
-          actions are the adornment, and four labelled buttons left the name
-          nothing on a phone. Each label names the group so a screen reader
-          hears which one it is on. */}
-      <IconButton
-        size="sm"
-        icon={<Icon.Ascending />}
-        label={t('characters.moveGroupUp', { name: group.name })}
-        data-move-group={`${group.id}:up`}
-        onClick={() => onMove(index, -1)}
-        disabled={index === 0}
-      />
-      <IconButton
-        size="sm"
-        icon={<Icon.Descending />}
-        label={t('characters.moveGroupDown', { name: group.name })}
-        data-move-group={`${group.id}:down`}
-        onClick={() => onMove(index, 1)}
-        disabled={index === groupCount - 1}
-      />
-      <IconButton
-        size="sm"
-        ref={renameButton}
-        icon={<Icon.Rename />}
-        label={`${t('characters.renameGroup')} ${group.name}`}
-        onClick={() => setRenaming(true)}
-      />
-      <IconButton
-        size="sm"
-        icon={<Icon.Close />}
-        tone="danger"
-        label={`${t('characters.deleteGroup')} ${group.name}`}
-        onClick={() => onRemove(group.id)}
-      />
-    </div>
-  );
-}
-
 /** One character's table row — everything a column might render, gathered once per character rather than re-derived per cell. */
 interface CharacterRow {
   character: CharacterRecord;
-  info: PublicInfoEntry | undefined;
+  corporationName: string | undefined;
   stats: CharacterSortStats | undefined;
   queue: QueueInfo | undefined;
   /** Whether this Character's `characterNotTraining` alert is on — false only for its one opt-out (issue #1731). */
@@ -697,8 +304,8 @@ function buildColumns(
       id: 'corp',
       header: t('characters.column.corp'),
       className: 'text-text-dim',
-      sortValue: (row) => row.info?.corporationName ?? '',
-      render: (row) => <AffiliationName name={row.info?.corporationName} />,
+      sortValue: (row) => row.corporationName ?? '',
+      render: (row) => <AffiliationName name={row.corporationName} />,
     },
     // Same Select the card view's group control renders (issue #2077) — a
     // visible, Tab-reachable move-to-group in table view, no context-menu
@@ -901,7 +508,17 @@ export function Characters() {
   const navigate = useNavigate();
   const location = useLocation();
   const characters = useLiveQuery(() => db.characters.orderBy('characterId').toArray());
-  const publicInfo = usePublicInfo((state) => state.byCharacterId);
+  // Corp names only: each card reads its own entry, so a fetch that changes
+  // no corp name does not re-render the page.
+  const corporationNameById = usePublicInfo(
+    useShallow((state) => {
+      const names: Record<number, string> = {};
+      for (const [id, entry] of Object.entries(state.byCharacterId)) {
+        if (entry.corporationName) names[Number(id)] = entry.corporationName;
+      }
+      return names;
+    })
+  );
   const loadPublicInfoMany = usePublicInfo((state) => state.loadMany);
   const setActiveCharacter = useActiveCharacter((state) => state.setActiveCharacter);
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
@@ -1030,7 +647,7 @@ export function Characters() {
   const narrowing = query.length > 0 || activeRosterFilterCount(rosterFilter) > 0;
   /** Search and funnel filters as one test, so card view, table view and the "nothing matches" state can't disagree. */
   function matchesFilters(characterId: number): boolean {
-    const corpName = publicInfo[characterId]?.corporationName ?? '';
+    const corpName = corporationNameById[characterId] ?? '';
     if (query) {
       const character = charactersById.get(characterId);
       const hit =
@@ -1379,7 +996,6 @@ export function Characters() {
             <CharacterCard
               key={characterId}
               character={character}
-              info={publicInfo[characterId]}
               stats={rosterCore.get(characterId)?.stats}
               queue={rosterCore.get(characterId)?.queue}
               notTrainingAlertEnabled={notTrainingAlertEnabledFor(characterId)}
@@ -1425,7 +1041,7 @@ export function Characters() {
       const core = rosterCore.get(character.characterId);
       return {
         character,
-        info: publicInfo[character.characterId],
+        corporationName: corporationNameById[character.characterId],
         stats: core?.stats,
         queue: core?.queue,
         notTrainingAlertEnabled: notTrainingAlertEnabledFor(character.characterId),
@@ -1529,10 +1145,9 @@ export function Characters() {
   // counts it, a filter the pilot can neither see nor clear.
   const corpOptions = [
     ...new Set(
-      [
-        ...allIds.map((id) => publicInfo[id]?.corporationName),
-        rosterFilter.corp ?? undefined,
-      ].filter((name): name is string => !!name)
+      [...allIds.map((id) => corporationNameById[id]), rosterFilter.corp ?? undefined].filter(
+        (name): name is string => !!name
+      )
     ),
   ].sort((a, b) => a.localeCompare(b));
   // Same "keep a stale selection visible so it can be cleared" reasoning as

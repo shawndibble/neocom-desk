@@ -1,5 +1,6 @@
 import { HintText } from '@/components/ui/HintText';
-import { Fragment, useRef, useState, type ReactNode } from 'react';
+import { Fragment, lazy, Suspense, useRef, useState, type ReactNode } from 'react';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { Trans, useTranslation } from 'react-i18next';
 import { Button, Caret, IskAmount, RowMoreActions } from '@/components/ui';
 import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
@@ -41,7 +42,6 @@ import {
 import { STAT_EYEBROW, STAT_EYEBROW_TYPE, joinDetail, statRowClassName } from './statKit';
 import { SkillOverridesControl } from './SkillOverridesControl';
 import { PriceHubSelect } from './PriceHubSelect';
-import { FittingAppraisalModal } from './FittingAppraisalModal';
 import { StatsToolbar } from './StatsToolbar';
 import { useIsPhone } from '@/lib/useIsPhone';
 import {
@@ -73,7 +73,13 @@ import {
   tacticalModeKind,
   tacticalModesFor,
 } from '@/engine/fittings/tacticalModes';
-import { useHydratedStore } from '@/lib/useHydratedStore';
+import { guarded } from '@/app/routeChunks';
+
+const FittingAppraisalModal = lazy(() =>
+  guarded(() => import('./FittingAppraisalModal')).then((m) => ({
+    default: m.FittingAppraisalModal,
+  }))
+);
 
 const DMG_FILL_CLASS = {
   em: 'bg-dmg-em',
@@ -1262,11 +1268,15 @@ export function FittingStatsSections({
               </Button>
             </StatField>
           </StatFields>
-          <FittingAppraisalModal
-            open={appraisalOpen}
-            onClose={() => setAppraisalOpen(false)}
-            price={namedPrice!}
-          />
+          {appraisalOpen && (
+            <Suspense fallback={null}>
+              <FittingAppraisalModal
+                open
+                onClose={() => setAppraisalOpen(false)}
+                price={namedPrice!}
+              />
+            </Suspense>
+          )}
           <Facts
             items={[
               {

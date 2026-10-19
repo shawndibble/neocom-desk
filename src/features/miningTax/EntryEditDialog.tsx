@@ -1,4 +1,6 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useMemo, useState, type ComponentProps } from 'react';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { OreIcon, OreLink } from './OreIcon';
 import { useTranslation } from 'react-i18next';
 import {
@@ -30,7 +32,6 @@ import { useMiningTaxOreValueMode } from './oreValueMode';
 import { LedgerActionError } from './LedgerActionError';
 import { LabelField } from './LabelField';
 import { labelSuggestions } from './assignmentLabel';
-import { useHydratedStore } from '@/lib/useHydratedStore';
 
 interface EntryEditDialogProps {
   open: boolean;
@@ -93,7 +94,7 @@ function DefaultedIskInput({
   );
 }
 
-const LABEL = 'text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
+const LABEL = eyebrowClassName;
 
 /**
  * The one edit form for an assigned entry (mockup F1, scope decision

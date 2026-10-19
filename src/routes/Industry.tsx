@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -18,7 +18,7 @@ import {
   useTimedToast,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { preloadRouteChunk } from '@/app/routeChunks';
+import { guarded, preloadRouteChunk } from '@/app/routeChunks';
 import { useIndustryWorkspace } from '@/features/industry/useIndustryWorkspace';
 import { loadActivityFacilityDefaults } from '@/features/industry/facilityDefaults';
 import { IndustryHeader } from '@/features/industry/IndustryHeader';
@@ -30,19 +30,14 @@ import { findOwnedBlueprint } from '@/features/industry/data';
 import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
 import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
 import { usePageItemActions } from '@/features/market/usePageItemActions';
-import { BuildPlanList } from '@/features/industry/BuildPlanList';
 import type { PlanIndexStats, PlanRollupStats } from '@/features/industry/BuildPlanList';
 import { planReactionLocation } from '@/features/industry/planReactionLocation';
 import { industryActivityOf } from '@/engine/industry/types';
 import { toIndustryBlueprint } from '@/features/industry/blueprintCatalog';
-import { BuildPlanCompare } from '@/features/industry/BuildPlanCompare';
-import { OpportunitiesPanel } from '@/features/industry/OpportunitiesPanel';
-import { MarketWideOpportunitiesPanel } from '@/features/industry/MarketWideOpportunitiesPanel';
 import {
   planForOpportunityCandidate,
   type OpportunityRow,
 } from '@/features/industry/opportunities';
-import { ProductionLogPanel } from '@/features/industry/ProductionLogPanel';
 import {
   BpcSourcingPanel,
   type BpcSourcingHeaderState,
@@ -68,7 +63,6 @@ import {
   removeBuildPlan,
 } from '@/features/industry/buildPlanStore';
 import { useExpandedGroups, withGroupExpanded } from '@/features/industry/expandedGroups';
-import { FitImportDialog } from '@/features/industry/FitImportDialog';
 import { applyFitImport, fitImportGroupName } from '@/features/industry/fitImport';
 import type { FitToBuildPlansResult } from '@/engine/import/fitToBuildPlans';
 import { useComparedBuildResults } from '@/features/industry/useComparedBuildResults';
@@ -87,6 +81,38 @@ import { boolParam } from '@/lib/urlState';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
 import { loadMarketWideTrees } from '@/sde/loadSde';
 import type { MarketWideTreeMap } from '@/sde/types';
+
+// Only one of these renders at a time (per tab / on open): each loads on demand.
+const BuildPlanList = lazy(() =>
+  guarded(() => import('@/features/industry/BuildPlanList')).then((m) => ({
+    default: m.BuildPlanList,
+  }))
+);
+const BuildPlanCompare = lazy(() =>
+  guarded(() => import('@/features/industry/BuildPlanCompare')).then((m) => ({
+    default: m.BuildPlanCompare,
+  }))
+);
+const OpportunitiesPanel = lazy(() =>
+  guarded(() => import('@/features/industry/OpportunitiesPanel')).then((m) => ({
+    default: m.OpportunitiesPanel,
+  }))
+);
+const MarketWideOpportunitiesPanel = lazy(() =>
+  guarded(() => import('@/features/industry/MarketWideOpportunitiesPanel')).then((m) => ({
+    default: m.MarketWideOpportunitiesPanel,
+  }))
+);
+const ProductionLogPanel = lazy(() =>
+  guarded(() => import('@/features/industry/ProductionLogPanel')).then((m) => ({
+    default: m.ProductionLogPanel,
+  }))
+);
+const FitImportDialog = lazy(() =>
+  guarded(() => import('@/features/industry/FitImportDialog')).then((m) => ({
+    default: m.FitImportDialog,
+  }))
+);
 
 const COMPARE_MODE = boolParam();
 
@@ -767,7 +793,13 @@ export function Industry() {
               resetKey={activeCharacterId}
             >
               {plans && catalog && buildGroupsHydrated && expandedGroupsHydrated && (
-                <>
+                <Suspense
+                  fallback={
+                    <div className="flex justify-center py-16">
+                      <Spinner label={t('common.loading')} />
+                    </div>
+                  }
+                >
                   {tab === 'opportunities' ? (
                     <div className="flex flex-col gap-4">
                       {/* "What's profitable" (the market-wide scan) always leads,
@@ -848,7 +880,7 @@ export function Industry() {
                       statsByGroupId={statsByGroupId}
                     />
                   )}
-                </>
+                </Suspense>
               )}
             </DataGate>
           )}
@@ -901,12 +933,14 @@ export function Industry() {
         {blueprintPasteNote && <Toast message={blueprintPasteNote} />}
 
         {fitImportOpen && catalog && (
-          <FitImportDialog
-            catalog={catalog}
-            onApply={(preview) => void handleFitImport(preview)}
-            onClose={closeFitImport}
-            initialText={fitImportSeedText}
-          />
+          <Suspense fallback={null}>
+            <FitImportDialog
+              catalog={catalog}
+              onApply={(preview) => void handleFitImport(preview)}
+              onClose={closeFitImport}
+              initialText={fitImportSeedText}
+            />
+          </Suspense>
         )}
       </div>
     </ItemActionsProvider>

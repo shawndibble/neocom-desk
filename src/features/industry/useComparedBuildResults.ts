@@ -48,6 +48,7 @@ import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
 import { toIndustryBlueprint, type BlueprintCatalog } from './blueprintCatalog';
 import { loadDepthPrices, type DepthPrices } from './depthPriceLoader';
 import { loadPlanSnapshots, type PlanSnapshots } from './planSnapshots';
+import { createYielder } from './yieldToMain';
 import { shoppingListMaterials } from './subBuildPlan';
 import { resolveBuildPlan, type BuildPlanSources } from './resolveBuildPlan';
 import {
@@ -314,7 +315,16 @@ export function useComparedBuildResults({
         shown.forEach(show);
       })();
     } else {
-      for (const plan of currentPlans) void rowFor(plan).then(show);
+      // One plan at a time, yielding once the time budget is spent so a long
+      // index never blocks input (as useOpportunities does).
+      void (async () => {
+        const maybeYield = createYielder();
+        for (const plan of currentPlans) {
+          if (cancelled) return;
+          show(await rowFor(plan));
+          await maybeYield();
+        }
+      })();
     }
 
     return () => {

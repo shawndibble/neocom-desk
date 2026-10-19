@@ -31,6 +31,7 @@
  * from the local SDE snapshot only (`loadContractLocationInfo`) — no ESI
  * call per row; a player structure stays unnamed.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { lpRate } from '@/engine/loyalty/marketLpValue';
 import { loadMarketLpValues } from '@/features/loyalty/marketLpValue';
 import {
@@ -58,6 +59,7 @@ import {
 } from '@/components/ui';
 import { HintText } from '@/components/ui/HintText';
 import * as Icon from '@/components/ui/icons';
+import { clampMe } from '@/engine/industry/efficiency';
 import type { MaterialSourcing } from '@/engine/industry/types';
 import { romanLevel } from '@/engine/projection';
 import { loadTypeName } from '@/features/character/typeNames';
@@ -116,7 +118,7 @@ const ALL_REGIONS = 'all';
 const HUB_REGION = 'hub';
 type ContractScope = typeof HUB_REGION | typeof ALL_REGIONS;
 
-const HEADING_CLASS = 'text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
+const HEADING_CLASS = eyebrowClassName;
 const SECTION_CLASS = 'flex flex-col gap-2 border-t border-line pt-3';
 
 interface BlueprintAcquisitionModalProps {
@@ -255,7 +257,7 @@ export function BlueprintAcquisitionModal({
   useHydratedStore(useLpValue);
 
   const contracts = useLoad(async () => {
-    const cached = await loadPublicBpcContracts(characterId);
+    const cached = await loadPublicBpcContracts();
     return cached ? { copies: cached.data.rows, originals: cached.data.originals ?? [] } : null;
   }, String(characterId));
   // Region mode, not Trade Hub mode: every sell order in the hub's region is
@@ -386,7 +388,7 @@ export function BlueprintAcquisitionModal({
     const price = unmaskNumber(manualPrice);
     onSourcingChange(blueprintTypeID, {
       acquisitionTierOverride: {
-        me: Math.min(10, Math.max(0, Math.round(me))),
+        me: clampMe(me),
         te: Math.max(0, Math.round(te)),
       },
       overridePrice: price,

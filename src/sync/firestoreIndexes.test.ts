@@ -116,13 +116,29 @@ describe('firestore.indexes.json field overrides', () => {
       'surveyTax',
       'surveyIgnores',
       'surveyInfo',
-      'publicContractOffersIndex',
       // R2PublishState keeps ~12k type hashes in one map (#3784).
       'systemConditions',
       // The Community board reads every Pledge in one collection-group query (#3808).
       'pledges',
+      // A guest's pending Miner groupings are found across books (#4210).
+      'miners',
     ]);
     expect(config.fieldOverrides.filter((o) => !groups.has(o.collectionGroup))).toEqual([]);
+  });
+
+  it('indexes pending Miner groupings by character at collection-group scope', () => {
+    // `listPendingGroupings` runs `collectionGroup('miners').where('pendingConfirmation', 'array-contains', id)`.
+    expect(overridesFor('miners')).toEqual([
+      {
+        collectionGroup: 'miners',
+        fieldPath: 'pendingConfirmation',
+        ttl: false,
+        indexes: [
+          { arrayConfig: 'CONTAINS', queryScope: 'COLLECTION' },
+          { arrayConfig: 'CONTAINS', queryScope: 'COLLECTION_GROUP' },
+        ],
+      },
+    ]);
   });
 
   it('indexes pledges by communityId at collection and collection-group scope', () => {
@@ -220,17 +236,6 @@ describe('firestore.indexes.json composite indexes', () => {
           { fieldPath: 'fired', order: 'ASCENDING' },
         ],
       },
-    ]);
-  });
-});
-
-describe('firestore.indexes.json large-map docs', () => {
-  // One map key per item type (~11.9k) blows Firestore's 40,000 index-entries-
-  // per-document limit under automatic indexing (#3779), so the write failed
-  // and clients never got the index. It is only ever read by id.
-  it('exempts every field of publicContractOffersIndex from auto-indexing', () => {
-    expect(overridesFor('publicContractOffersIndex')).toEqual([
-      { collectionGroup: 'publicContractOffersIndex', fieldPath: '*', ttl: false, indexes: [] },
     ]);
   });
 });

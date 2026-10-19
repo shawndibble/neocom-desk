@@ -1,3 +1,5 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { cx } from '@/lib/cx';
 import { HintText } from '@/components/ui/HintText';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -56,7 +58,7 @@ import {
   visibleCorpJobs,
   type CorpJobsSnapshot,
 } from './corpJobs';
-import type { CorporationIndustryJob } from '@/esi/endpoints';
+import type { CorporationIndustryJob, IndustryJob } from '@/esi/endpoints';
 import {
   findMatchingBuildPlans,
   createBuildPlanForJob,
@@ -238,6 +240,46 @@ async function loadActiveJobsSnapshot(characterId: number): Promise<Snapshot> {
  * endpoint never returns a corp job, so a pilot who only runs corp jobs
  * otherwise saw an empty panel.
  */
+/** Progress bar that reads the shared clock itself, so its column needn't rebuild per tick. */
+function JobProgressCell({
+  job,
+  label,
+  tone,
+}: {
+  job: Pick<IndustryJob, 'start_date' | 'end_date'>;
+  label: string;
+  tone: 'accent' | 'warning' | 'success';
+}) {
+  const now = useTicker(TICK_MS);
+  const progress = Math.round(jobProgress(job, now) * 100);
+  return (
+    // Fixed track: `flex-1` in a shrink-to-fit cell has no width to
+    // fill and collapses. Nothing may right-align itself below `sm`
+    // either (docs/DESIGN.md §4a) — hence `sm:text-right`.
+    <span className="flex items-center gap-2 max-sm:w-full">
+      <ProgressBar
+        label={label}
+        value={progress}
+        tone={tone}
+        className="w-16 shrink-0 max-sm:w-auto max-sm:flex-1 sm:w-24"
+      />
+      <span className="w-8 shrink-0 tabular-nums text-text-dim sm:text-right">{progress}%</span>
+    </span>
+  );
+}
+
+/** Time-left text that reads the shared clock itself. */
+function JobEndsInCell({
+  job,
+  doneLabel,
+}: {
+  job: Pick<IndustryJob, 'end_date'>;
+  doneLabel: string;
+}) {
+  const now = useTicker(TICK_MS);
+  return isJobDone(job, now) ? doneLabel : formatDuration(secondsRemaining(job, now));
+}
+
 export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
   const { t } = useTranslation();
   // Shared with every other 30 s clock on screen; paused while the tab is hidden.
@@ -548,6 +590,17 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
     highlightedJobId,
   ]);
   const summary = useMemo(() => summarizeJobs(jobs, now), [jobs, now]);
+  /** Changes only when some job crosses into completing-soon or done: the one thing besides `jobs` that should rebuild the columns. */
+  const toneSig = jobs
+    .map((job) => (isJobDone(job, now) ? 'd' : isCompletingSoon(job, now) ? 's' : '-'))
+    .join('');
+  /**
+   * `now` as of the last tone change. Tone checks against it equal checks
+   * against the live clock (same `toneSig`), and row cells tick themselves
+   * (`JobProgressCell`), so the column array needn't rebuild per tick.
+   */
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally frozen between tone changes
+  const toneNow = useMemo(() => now, [toneSig]);
   // Job History (issue #2866): delivered jobs of the Characters the picker
   // names, read live from Dexie — the loader folds each fetch into it.
   const historyView = jobFilters['jobs.view'] === 'history';
@@ -693,9 +746,9 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
   );
 
   /** One binding of the warning state: the row tint, the stripe, the badge and the bar all read it. */
-  const soon = useCallback((job: ActiveJob) => isCompletingSoon(job, now), [now]);
+  const soon = useCallback((job: ActiveJob) => isCompletingSoon(job, toneNow), [toneNow]);
   /** One binding of the done state: same four places as `soon`, in success tone — mutually exclusive with it (`isCompletingSoon` requires time still remaining). */
-  const done = useCallback((job: ActiveJob) => isJobDone(job, now), [now]);
+  const done = useCallback((job: ActiveJob) => isJobDone(job, toneNow), [toneNow]);
   /** The one precedence rule (`soon` beats `done`, though they're mutually exclusive) shared by every place a job's tone shows up, so the four call sites below each pick a class from a lookup rather than re-deriving the same `soon ? … : done ? … : …` chain. */
   const jobTone = useCallback(
     (job: ActiveJob): 'warning' | 'success' | undefined =>
@@ -718,8 +771,8 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
   // Personal jobs only: the production log has no corp dimension yet
   // (`20260905-181537-production-log-row-per-allocation-sync-accept-wallet.md`).
   const canLog = useCallback(
-    (job: JobRow) => job.owner === 'personal' && canLogProductionFromJob(job, now),
-    [now]
+    (job: JobRow) => job.owner === 'personal' && canLogProductionFromJob(job, toneNow),
+    [toneNow]
   );
   const navigateToPlanWithSeed = useCallback(
     async (planId: string, job: Pick<ActiveJob, 'runs' | 'cost'> & { characterId: number }) => {
@@ -755,9 +808,8 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
   );
 
   /**
-   * Rebuilt on every countdown tick — the remaining time, the progress
-   * fraction and the warning tone are all relative to `now`, so memoising on
-   * `t` alone would freeze the clock.
+   * The countdown and progress cells tick themselves; the warning/done tone
+   * rebuilds the columns only when a job crosses a threshold (`toneSig`).
    */
   const columns = useMemo<DataTableColumn<JobRow>[]>(
     () => [
@@ -793,7 +845,9 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
             )}
             {/* Only once more than one Character's jobs are on screen (`showCharacterColumn`) — same gate as `OpenOrdersPanel`'s `showCharacterStrip`. */}
             {job.owner === 'corporation' && (
-              <span className="shrink-0 rounded-xs bg-panel-2 px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+              <span
+                className={cx(eyebrowClassName, 'shrink-0 rounded-xs bg-panel-2 px-1.5 py-0.5')}
+              >
                 {t('industry.jobsCorpBadge')}
               </span>
             )}
@@ -830,30 +884,16 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
         id: 'progress',
         header: t('industry.jobsColProgress'),
         // Sorts on the raw fraction, not the rounded percent the cell prints.
-        sortValue: (job) => jobProgress(job, now),
+        sortValue: (job) => jobProgress(job, Date.now()),
         // A thin line of its own under the meta line, % at its right end.
         stackEdge: 'below',
-        render: (job) => {
-          const progress = Math.round(jobProgress(job, now) * 100);
-          return (
-            // Fixed track: `flex-1` in a shrink-to-fit cell has no width to
-            // fill and collapses. Nothing may right-align itself below `sm`
-            // either (docs/DESIGN.md §4a) — hence `sm:text-right`.
-            <span className="flex items-center gap-2 max-sm:w-full">
-              <ProgressBar
-                label={t('industry.jobsProgress', {
-                  name: nameForBlueprint(job.blueprint_type_id),
-                })}
-                value={progress}
-                tone={jobTone(job) ?? 'accent'}
-                className="w-16 shrink-0 max-sm:w-auto max-sm:flex-1 sm:w-24"
-              />
-              <span className="w-8 shrink-0 tabular-nums text-text-dim sm:text-right">
-                {progress}%
-              </span>
-            </span>
-          );
-        },
+        render: (job) => (
+          <JobProgressCell
+            job={job}
+            label={t('industry.jobsProgress', { name: nameForBlueprint(job.blueprint_type_id) })}
+            tone={jobTone(job) ?? 'accent'}
+          />
+        ),
       },
       {
         id: 'endsIn',
@@ -868,8 +908,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
           }),
         // The timestamp, never the printed duration: "1d 4h" sorts before "9h" as a string.
         sortValue: (job) => Date.parse(job.end_date),
-        render: (job) =>
-          done(job) ? t('industry.jobsDone') : formatDuration(secondsRemaining(job, now)),
+        render: (job) => <JobEndsInCell job={job} doneLabel={t('industry.jobsDone')} />,
       },
       {
         id: 'ends',
@@ -904,17 +943,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
           ) : null,
       },
     ],
-    [
-      t,
-      now,
-      soon,
-      done,
-      jobTone,
-      nameForBlueprint,
-      showCharacterColumn,
-      canLog,
-      handleLogProduction,
-    ]
+    [t, soon, done, jobTone, nameForBlueprint, showCharacterColumn, canLog, handleLogProduction]
   );
   const planIdSet = useMemo(() => new Set(planIds ?? []), [planIds]);
   const showHistoryCharacterColumn = new Set(historyRows.map((job) => job.characterId)).size > 1;
@@ -948,7 +977,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
             {isLoggableHistoryJob(job) &&
               historyStates.get(job.job_id)?.kind !== 'logged' &&
               dismissedJobIds.has(job.job_id) && (
-                <span className="rounded-xs bg-panel-2 px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                <span className={cx(eyebrowClassName, 'rounded-xs bg-panel-2 px-1.5 py-0.5')}>
                   {t('industry.historyDismissed')}
                 </span>
               )}
@@ -1082,7 +1111,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
       }).join(' · ')}
       className="flex items-center gap-1 text-xs tabular-nums"
     >
-      <span className="hidden text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase sm:inline">
+      <span className={cx(eyebrowClassName, 'hidden sm:inline')}>
         {t('industry.jobSlotSummaryLabel')}
       </span>
       {JOB_SLOT_CATEGORIES.map((category, index) => {

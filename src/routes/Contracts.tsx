@@ -33,7 +33,7 @@ import {
   CONTRACTS_HISTORY_COLUMN_IDS,
   contractsHistoryColumnsStore,
   type ContractsHistoryColumnId,
-} from './contractsColumns';
+} from '@/features/contracts/contractsColumns';
 import { OpenInEveMenuItem } from '@/features/openInEve/OpenInEveMenuItem';
 import { GrantBanner } from '@/app/GrantNote';
 import { loadContracts } from '@/features/character/contracts';

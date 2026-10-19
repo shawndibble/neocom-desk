@@ -10,7 +10,7 @@ import type { CharacterSkill, SkillQueueEntry } from '@/esi/endpoints';
 import type { TrainedSkill } from '@/engine/types';
 import { effectiveSkillLevel } from '@/engine/effectiveSkillLevel';
 import { toTrainedSkillsMap } from './skillMap';
-import { applyCompletedQueueEntries } from './queueStatus';
+import { applyCompletedQueueEntries } from '@/engine/skills/queueStatus';
 
 /**
  * Same as {@link effectiveSkillLevels}, but for a caller that has already
