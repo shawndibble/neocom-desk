@@ -9,7 +9,6 @@ Skills section. Three routed views (and the Compare drawer) under one nav entry 
 | Trained      | `/skills/trained`       | `src/routes/Skills.tsx`                              | Trained skills by group, SP, attributes                |
 | Compare      | drawer on Trained       | `src/features/skills/compare/SkillCompareDrawer.tsx` | Trained levels across Characters, against a baseline   |
 | Certificates | `/skills/certificates`  | `src/routes/SkillCertificates.tsx`                   | CCP combat Certificates graded per Character           |
-| Legacy       | `/skills/ships`         | `LegacyShipsRedirect`                                | Redirects to Ship Tree (see ships.md)                  |
 
 Terms per `GLOSSARY.md`: Skill Plan, Plan Milestone, Certified Plan, Optimize Modes, Remap, Booster, What-If Implants, Effective Skill Level, Clone State.
 

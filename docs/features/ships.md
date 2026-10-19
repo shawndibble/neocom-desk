@@ -12,7 +12,6 @@ User goal (Ship Tree): "which hulls can I fly, how long until I can, what Master
 | Ladder view (filter, only-flyable, nested sections)      | `shipTree/ShipTreeLadder.tsx`                                                                              |
 | Faction bar                                              | `shipTree/FactionBar.tsx`                                                                                  |
 | Ship Info window (4 tabs)                                | `shipTree/ShipInfoWindow.tsx`, `DescriptionTab`, `FittingTab`, `SkillsMasteryTab`, `BlueprintTab`          |
-| Legacy redirects                                         | `LegacyShipsRedirect.tsx`, `fittingRoutes.ts`                                                              |
 | Engine                                                   | `src/engine/shipTree/{status,rules,layout,templates,types}.ts`, `src/engine/tierLadder.ts`                 |
 | Mastery/plan helpers                                     | `shipTree/shipTreeModel.ts`, `src/features/skills/ships/{scheduleEntries,fitCheckRows,unifiedShipRows}.ts` |
 
@@ -49,7 +48,7 @@ All paths under `src/features/fittings/` unless stated.
   - `/ships/tree`: Ship Tree. Only query param: `?faction=<int>` (`intParam(DEFAULT_FACTION_ID, {min: 0})`, `ShipTreeTab.tsx:31`). Default faction Caldari (`shipTreeModel.ts:25`). Unknown/missing id -> `resolveFactionID` falls back to Caldari (test `ShipTreeTab.test.tsx:176`).
 - Nav: `progression` group, `mobileTab: true`, `gating: 'scope'` but route requirement `UNGATED` (`src/app/navDestinations.ts:165`, `src/app/routeScopes.ts:107`): no ESI scope needed to open; Tree works with no Character.
 - Header: `Ships` draws `PageHeader` + `ShipsTabBar` for the Tree tab only; `Fittings` draws its own header and tab bar on its Start screen only (an open Fitting shows neither). Header title is `nav.ships` on both tabs.
-- Legacy redirects (`LegacyShipsRedirect` = `Navigate replace`, keeps search/hash/state so old `/fittings?f=` Share Codes keep working; `legacyShipsLocation`, `fittingRoutes.ts:54`): `/skills/ships` -> `/ships/tree` (the old Skills > Ships page is gone); `/fittings/compare` -> Compare path; any other `/fittings/*` -> editor when a share code is present, else `/ships/fittings`. Mounted at `App.tsx:165,175`. `fittingsRedirect` also bounces `/ships/fittings?f=` -> edit, and edit without a code -> Fittings. Redirects are permanent by decision (every share code ever copied is `/fittings?f=`).
+- `fittingsRedirect` (`fittingRoutes.ts`) bounces `/ships/fittings?f=` -> edit, and edit without a code -> Fittings. The old `/fittings/*` and `/skills/ships` redirects are removed (scope decision `Remove legacy Ships redirects`); those URLs 404.
 
 ## 2. Data and persistence
 

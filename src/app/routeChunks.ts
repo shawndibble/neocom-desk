@@ -165,8 +165,7 @@ export const loadErrorProbe = named(() => import('@/routes/ErrorProbe'), 'ErrorP
 /**
  * Every feature route, keyed the way `Layout`'s links are. Exhaustive by type, so a route added to `routeScopes.ts` without
  * a chunk here is a compile error rather than a link that never preloads. The
- * redirect-only paths (`/alerts`, `/skills`, `/bpc-contracts`, `/skills/ships`,
- * `/fittings/*`) preload their target.
+ * redirect-only paths (`/alerts`, `/skills`, `/bpc-contracts`) preload their target.
  */
 const PRELOADERS: Record<AppRoutePath, () => Promise<RouteModule>> = {
   '/characters': loadCharacters,
@@ -182,8 +181,6 @@ const PRELOADERS: Record<AppRoutePath, () => Promise<RouteModule>> = {
   '/industry/plans/:planId': loadIndustryPlanPage,
   '/industry/groups/:groupId': loadIndustryGroupPage,
   '/ships': loadShips,
-  '/skills/ships': loadShips,
-  '/fittings/*': loadShips,
   '/ships/fittings/compare': loadFittingCompare,
   '/market': loadMarket,
   '/wallet': loadWallet,

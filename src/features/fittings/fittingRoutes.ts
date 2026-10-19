@@ -3,10 +3,6 @@
  * Fittings Start screen (the library: hulls, Load, My and In-game Fittings)
  * is `/ships/fittings`; an open Fitting is `/ships/fittings/edit?f=<Share
  * Link code>`, so opening one is a history entry Back can return from.
- *
- * The section was `/fittings` until it became Ships, and every Fitting Share Code
- * ever copied is `/fittings?f=` — `legacyShipsLocation` keeps each old path
- * landing where it always did.
  */
 import { tabPath } from '@/lib/pageTabs';
 import { SHIPS_TABS } from './shipsTabs';
@@ -43,27 +39,4 @@ export function fittingsRedirect(pathname: string, search: string): string | nul
   if (path === FITTINGS_PATH && hasCode) return `${FITTING_EDIT_PATH}${search}`;
   if (path === FITTING_EDIT_PATH && !hasCode) return FITTINGS_PATH;
   return null;
-}
-
-/**
- * Where an old path lands now, query and hash kept: `/fittings` (and any
- * other path below it) on the Fittings tab — the editor straight away when
- * it carries a Fitting Share Code, so an old link is one redirect, not two —
- * `/fittings/compare` on Compare, and `/skills/ships` on the Ship Tree.
- */
-export function legacyShipsLocation(
-  pathname: string,
-  search: string,
-  hash: string
-): { pathname: string; search: string; hash: string } {
-  const path = pathname.replace(/\/$/, '');
-  const target =
-    path === '/skills/ships'
-      ? SHIP_TREE_PATH
-      : path === '/fittings/compare'
-        ? FITTING_COMPARE_PATH
-        : hasShareCode(search)
-          ? FITTING_EDIT_PATH
-          : FITTINGS_PATH;
-  return { pathname: target, search, hash };
 }

@@ -12,7 +12,6 @@ import { ROUTE_REQUIREMENTS, type AppRoutePath } from './routeScopes';
 import { PAGE_TABS, routePatternFor } from './pageTabs';
 import { tabPath } from '@/lib/pageTabs';
 import { industryTabHref } from '@/features/industry/industryTabs';
-import { legacyShipsLocation } from '@/features/fittings/fittingRoutes';
 import {
   NOTIFICATION_ROUTES,
   NOTIFICATION_FALLBACK_ROUTE,
@@ -75,17 +74,5 @@ describe('every notification event resolves', () => {
 describe('legacy bookmark redirects resolve', () => {
   it('/bpc-contracts redirects into a real Industry tab', () => {
     expect(resolves(industryTabHref('sourcing'))).toBe(true);
-  });
-
-  it.each([
-    ['/fittings', '?f=1.abc'],
-    ['/fittings', ''],
-    ['/fittings/edit', '?f=1.abc'],
-    ['/fittings/edit', ''],
-    ['/fittings/compare', '?f=1.a'],
-    ['/skills/ships', ''],
-  ])('%s%s is mounted, and redirects to a mounted route', (pathname, search) => {
-    expect(resolves(pathname)).toBe(true);
-    expect(resolves(legacyShipsLocation(pathname, search, '').pathname)).toBe(true);
   });
 });

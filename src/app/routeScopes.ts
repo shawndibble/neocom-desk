@@ -67,8 +67,6 @@ export const ROUTE_REQUIREMENTS = {
   // Grades the active Character's already-cached skills against baked
   // certificates; a Character without the skills read sees the empty state.
   '/skills/certificates': UNGATED,
-  // A redirect onto the Ship Tree, in the Ships section (App.tsx); no scope of its own.
-  '/skills/ships': UNGATED,
   // Section index: renders nothing of its own, it redirects to the plan list
   // (App.tsx) — planning is what the Skills section opens on.
   '/skills': UNGATED,
@@ -105,9 +103,6 @@ export const ROUTE_REQUIREMENTS = {
   // compared Fitting's decode, stats and skill-gap check is local/SDE + the
   // pinned dogma engine, no ESI endpoint of its own.
   '/ships/fittings/compare': UNGATED,
-  // The section's old paths, before it became Ships: redirects only
-  // (`LegacyShipsRedirect`), every Fitting Share Code ever copied among them.
-  '/fittings/*': UNGATED,
   // Detail routes off the index (same reasoning as `/skills/plans/:planId`
   // above): each mixes the same blueprints/jobs/skills reads the index does,
   // gated at the panel level, not the route.
