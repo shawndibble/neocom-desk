@@ -38,7 +38,7 @@ if (!merge.ok) {
 // Only a closing keyword in the PR body ("Closes #n") should close the issue.
 // A "Part of #n" PR leaves a partly-done ticket open for the next run.
 const prBody = ghJson(['pr', 'view', prArg, '--json', 'body']).body ?? '';
-const closesIssue = new RegExp(`\\b(close[sd]?|fix(e[sd])?|resolve[sd]?)\\s+#${issueArg}\\b`, 'i').test(prBody);
+const closesIssue = new RegExp(`\\b(close[sd]?|fix(e[sd])?|resolve[sd]?)\\s*:?\\s+#${issueArg}\\b`, 'i').test(prBody);
 
 let issueClosed = false;
 if (closesIssue) {
