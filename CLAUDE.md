@@ -5,12 +5,16 @@
   is reserved for manually running/testing the app in a browser (`npm run
 dev`) — Shawn frequently has another agent working there at the same
   time, and editing it races with that. Branch into a sibling worktree
-  first: `git worktree add ../neocom-desk.worktrees/<name> -b <branch>` (or
+  first: `git worktree add ../neocom-desk.worktrees/<name> -b <branch> origin/develop` (or
   `../neocom-desk-<short-name>`), then `npm ci` inside it — `node_modules`
   isn't shared across worktrees. `scripts/next-ticket/setup-worktree.mjs`
   does this automatically for the ticket loop. For cleanup or admin git
   commands that must target the main repo, use `git -C <main-repo-path>
 ...` rather than `cd`, so the other agent's working tree isn't disturbed.
+- **Branches: PRs target `develop`; `main` is production.** Never open a PR against
+  `main` or push to it except the `develop` → `main` promotion (merge commit, not
+  squash), which is what deploys. Branch worktrees off `origin/develop`. See
+  `docs/agents/issue-tracker.md` "CI and merge".
 - Architecture map: docs/ARCHITECTURE.md — read before locating or adding features.
 - `GLOSSARY.md` is the glossary. Use its terms exactly. Don't read it whole: `grep -n -i "<term>" GLOSSARY.md` for the terms in your task.
 - **Never append a scope decision to `GLOSSARY.md`.** Scope decisions live one
