@@ -1,28 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-
-const { getDocMock, listMock, syncConfigured, firestoreThrows } = vi.hoisted(() => ({
-  getDocMock: vi.fn(),
-  listMock: vi.fn(),
-  syncConfigured: { value: true },
-  firestoreThrows: { value: false },
-}));
-vi.mock('firebase/firestore/lite', () => ({
-  doc: (_db: unknown, collection: string, id: string) => ({ path: `${collection}/${id}` }),
-  getDoc: getDocMock,
-  collection: listMock,
-  getDocs: listMock,
-}));
-vi.mock('@/sync/firebaseApp', () => ({
-  getSyncFirestore: () => {
-    if (firestoreThrows.value) throw new Error('bad config');
-    return {};
-  },
-}));
-vi.mock('@/app/syncStatus', () => ({ isSyncConfigured: () => syncConfigured.value }));
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   loadMarketOpenPrices,
   parseOpenPricesByType,
+  openPricesUrl,
   resetMarketOpenPricesCache,
 } from './marketOpenPrices';
 
@@ -37,16 +18,31 @@ const DOC = {
   },
 };
 
+const fetchMock = vi.fn();
+
+/** Serves `data` for any type; `undefined` is an object R2 does not have (404). */
 function serve(data: unknown) {
-  getDocMock.mockResolvedValue({ exists: () => data !== undefined, data: () => data });
+  fetchMock.mockImplementation(async () =>
+    data === undefined
+      ? new Response('missing', { status: 404 })
+      : new Response(JSON.stringify(data), { status: 200 })
+  );
 }
 
 beforeEach(() => {
-  getDocMock.mockReset();
-  listMock.mockReset();
-  syncConfigured.value = true;
-  firestoreThrows.value = false;
+  fetchMock.mockReset();
+  vi.stubGlobal('fetch', fetchMock);
   resetMarketOpenPricesCache();
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+describe('openPricesUrl', () => {
+  it('is one static object per type', () => {
+    expect(openPricesUrl(34)).toBe('https://data.neocomdesk.com/open-prices/34.json');
+  });
 });
 
 describe('parseOpenPricesByType', () => {
@@ -68,7 +64,7 @@ describe('parseOpenPricesByType', () => {
 });
 
 describe('loadMarketOpenPrices', () => {
-  it('reads one document per type, never listing, and serves every region from it', async () => {
+  it('reads one object per type and serves every region from it', async () => {
     serve(DOC);
     const [forge, domain, other] = await Promise.all([
       loadMarketOpenPrices(FORGE, 34),
@@ -79,39 +75,32 @@ describe('loadMarketOpenPrices', () => {
     expect(domain?.buy).toEqual([1, 2]);
     // A compared non-hub region simply has no open series.
     expect(other).toBeNull();
-    expect(getDocMock.mock.calls.map(([ref]) => (ref as { path: string }).path)).toEqual([
-      'marketOpenPricesByType/34',
-    ]);
-    expect(listMock).not.toHaveBeenCalled();
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([openPricesUrl(34)]);
   });
 
-  it('holds the answer, a missing document included, so a reopen reads nothing', async () => {
+  it('holds the answer, a missing object included, so a reopen reads nothing', async () => {
     serve(undefined);
     expect(await loadMarketOpenPrices(1, 2, 1000)).toBeNull();
     expect(await loadMarketOpenPrices(3, 2, 2000)).toBeNull();
-    expect(getDocMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it('reads again once the hold lapses', async () => {
     serve(DOC);
     await loadMarketOpenPrices(FORGE, 2, 0);
     await loadMarketOpenPrices(FORGE, 2, 2 * 60 * 60_000);
-    expect(getDocMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it('is null, without a read, when Firebase is not configured', async () => {
-    syncConfigured.value = false;
-    expect(await loadMarketOpenPrices(1, 2)).toBeNull();
-    expect(getDocMock).not.toHaveBeenCalled();
-  });
-
-  it('is null, never a rejection, when Firestore cannot even be set up', async () => {
-    firestoreThrows.value = true;
-    await expect(loadMarketOpenPrices(FORGE, 2)).resolves.toBeNull();
+  it('is null, never a rejection, on a server error, and tries again next time', async () => {
+    fetchMock.mockResolvedValueOnce(new Response('boom', { status: 500 }));
+    expect(await loadMarketOpenPrices(FORGE, 2)).toBeNull();
+    serve(DOC);
+    expect((await loadMarketOpenPrices(FORGE, 2))?.buy).toEqual([5, null]);
   });
 
   it('is null on a failed read (offline) and tries again next time', async () => {
-    getDocMock.mockRejectedValueOnce(new Error('offline'));
+    fetchMock.mockRejectedValueOnce(new TypeError('offline'));
     expect(await loadMarketOpenPrices(FORGE, 2)).toBeNull();
     serve(DOC);
     expect((await loadMarketOpenPrices(FORGE, 2))?.buy).toEqual([5, null]);

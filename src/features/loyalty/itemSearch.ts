@@ -1,6 +1,6 @@
 /**
  * Item-first search across every LP Store (issue #2873): which corporations
- * sell an item, nearest first. Pure over the `lpStoreOffers` snapshot rows
+ * sell an item, nearest first. Pure over the LP offers snapshot rows
  * (`functions/src/lpOffersSnapshot.ts`), a name lookup and the jumps from the
  * Current System.
  *
@@ -15,7 +15,7 @@ import { rankedSearch } from '@/lib/rankedSearch';
 /** `[offerId, typeId, quantity, iskCost, lpCost, requiredItems: [typeId, quantity][]]` */
 export type LpSnapshotOffer = [number, number, number, number, number, [number, number][]];
 
-/** One corporation's row of the `lpStoreOffers` snapshot. */
+/** One corporation's row of the LP offers snapshot. */
 export interface LpSnapshotStore {
   corporationId: number;
   systemIds: number[];
