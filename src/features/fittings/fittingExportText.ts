@@ -16,8 +16,7 @@ export type FittingExportKind = 'permanentLink' | 'eft' | 'multibuy' | 'eveXml';
 
 /**
  * The Fittings tab's own URL with the Fitting in `?f=`, which opens it in the
- * editor. Links copied before the section became Ships read `/fittings?f=`
- * and still open (`legacyShipsLocation`).
+ * editor.
  */
 export function fittingShareUrl(payload: string): string {
   const base = import.meta.env.BASE_URL.replace(/\/$/, '');

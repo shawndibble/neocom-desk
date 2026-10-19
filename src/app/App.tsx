@@ -39,7 +39,6 @@ import { ScopeGate } from './ScopeGate';
 import { TabRoute } from './TabRoute';
 import { PAGE_LEGACY_LOCATIONS, PAGE_TABS, routePatternFor } from './pageTabs';
 import { AuthFailureRedirect } from './AuthFailureNotice';
-import { LegacyShipsRedirect } from '@/features/fittings/LegacyShipsRedirect';
 import { LegacyPathRedirect } from './LegacyPathRedirect';
 import { AlertsRedirect } from './AlertsRedirect';
 import { useHiddenNav, useNavSetupAnswered, useRecentNav } from './navPreferences';
@@ -169,8 +168,6 @@ const ROUTE_ELEMENTS = {
   // Retired page: Compare is a drawer over Trained now (`legacyPaths.ts`).
   '/skills/compare': <LegacyPathRedirect />,
   '/skills/certificates': <SkillCertificates />,
-  // The old Skills › Ships page is gone; old bookmarks land on the Ship Tree.
-  '/skills/ships': <LegacyShipsRedirect />,
   '/industry': <Industry />,
   '/industry/plans/:planId': <IndustryPlanPage />,
   '/industry/groups/:groupId': <IndustryGroupPage />,
@@ -178,9 +175,6 @@ const ROUTE_ELEMENTS = {
   // the Ship Tree are all this one route.
   '/ships': <Ships />,
   '/ships/fittings/compare': <FittingCompare />,
-  // The section was `/fittings` before it became Ships. Every Fitting Share Code ever
-  // copied is `/fittings?f=`, so these redirects are for good.
-  '/fittings/*': <LegacyShipsRedirect />,
   '/market': <Market />,
   '/wallet': <Wallet />,
   // LP Store is a Wallet tab (it was a Market tab before; `PAGE_LEGACY_LOCATIONS`
