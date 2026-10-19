@@ -7,10 +7,11 @@
  * A book that fails to load drops that material back to the lowest sell: an
  * Order Book outage must not leave a plan unpriced.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import { walkSellBook, type DepthPrice } from '@/engine/industry/depthPrice';
 import type { HubOrder } from '@/engine/market/haulingMarket';
 import { mapWithConcurrencyLimit } from '@/lib/concurrency';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import type { TradeHub } from '@/market/hubs';
 import { getOrderBook, ORDER_BOOK_FANOUT_CONCURRENCY } from '@/features/market/orderBook';
 
@@ -75,22 +76,15 @@ export function useDepthPrices(
 ): PlanDepthPrices {
   const typeIds = [...needs.keys()].sort((a, b) => a - b);
   const booksKey = typeIds.join(',');
-  const [loaded, setLoaded] = useState<{ regionId: number; books: Books } | null>(null);
-
-  useEffect(() => {
-    if (typeIds.length === 0) return;
-    let cancelled = false;
-    void loadBooks(hub.regionId, typeIds).then((books) => {
-      if (!cancelled) setLoaded({ regionId: hub.regionId, books });
-    });
-    return () => {
-      cancelled = true;
-    };
-    // `booksKey` carries the types by value; the array changes identity every render.
+  const regionId = hub.regionId;
+  // A new loader (types, region or price refresh) re-reads behind the books already held.
+  const loader = useCallback(
+    () => loadBooks(regionId, booksKey === '' ? [] : booksKey.split(',').map(Number)),
+    // `pricesFetchedAt` is the caller's "read again" signal: a new loader re-runs the load.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hub.regionId, booksKey, pricesFetchedAt]);
-
-  const books = loaded?.regionId === hub.regionId ? loaded.books : null;
+    [regionId, booksKey, pricesFetchedAt]
+  );
+  const { data: books = null } = useKeyedLoad(String(regionId), loader, booksKey === '');
   const walk = useCallback(
     (wanted: ReadonlyMap<number, number>) =>
       books && wanted.size > 0 ? walkBooks(books, hub.stationId, wanted) : NO_DEPTH_PRICES,
