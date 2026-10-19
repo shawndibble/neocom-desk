@@ -52,11 +52,8 @@ import {
   plannerPolicy,
   priceBooks,
 } from './goalPlannerModel';
-import {
-  loadGoalPlannerPrices,
-  loadGoalPlannerSnapshot,
-  type GoalPlannerSnapshot,
-} from './goalPlannerSnapshot';
+import { loadGoalPlannerPrices } from './goalPlannerSnapshot';
+import { usePiSnapshot } from './usePiSnapshot';
 import { usePlanetRichness } from './richnessOverride';
 import { parseGoals, plannableGoals, serializeGoals } from './goalsParam';
 import {
@@ -128,28 +125,7 @@ function GoalPlanner({
   const [assumptionsOpen, setAssumptionsOpen] = useState<boolean | null>(null);
 
   // --- Reads ---
-  const [loaded, setLoaded] = useState<{
-    characterId: number;
-    snapshot: GoalPlannerSnapshot;
-  } | null>(null);
-  const [failedFor, setFailedFor] = useState<number | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    loadGoalPlannerSnapshot(characterId).then(
-      (snapshot) => {
-        if (cancelled) return;
-        setFailedFor(null);
-        setLoaded({ characterId, snapshot });
-      },
-      () => {
-        if (!cancelled) setFailedFor(characterId);
-      }
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [characterId]);
-  const snapshot = loaded?.characterId === characterId ? loaded.snapshot : null;
+  const { snapshot, failed } = usePiSnapshot(characterId);
 
   // --- Prefs ---
   const prefs = useGoalPlannerPrefs((state) => state.value);
@@ -307,7 +283,7 @@ function GoalPlanner({
   }, [snapshot, pi, rows, hub, t]);
 
   // --- States ---
-  if (failedFor === characterId) {
+  if (failed) {
     return <EmptyState title={t('piPlan.loadFailedTitle')} hint={t('piPlan.loadFailedHint')} />;
   }
   if (!snapshot || !pi || !names) return <Loading />;
