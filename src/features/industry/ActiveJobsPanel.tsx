@@ -10,6 +10,7 @@ import { captureException } from '@sentry/react';
 import { useHighlightParam } from '@/lib/useHighlightParam';
 import { useTicker } from '@/lib/ticker';
 import { useLiveQuery } from 'dexie-react-hooks';
+import { useAccountCharacters } from '@/features/character/useCharacters';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import {
   Button,
@@ -345,15 +346,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
     resolvedJobsFilter.size !== 1 ||
     !resolvedJobsFilter.has(characterId);
 
-  const allCharacters = useLiveQuery(() => db.characters.toArray(), [], []);
-  const jobsFilterCandidates = useMemo(
-    () => (allCharacters ?? []).map((c) => ({ characterId: c.characterId, characterName: c.name })),
-    [allCharacters]
-  );
-  const characterNameById = useMemo(
-    () => new Map((allCharacters ?? []).map((c) => [c.characterId, c.name])),
-    [allCharacters]
-  );
+  const { candidates: jobsFilterCandidates, namesById: characterNameById } = useAccountCharacters();
 
   // Nothing fetched until the picker actually leaves "current". No separate
   // "loading" state: `jobsFanOut === null` already means "nothing to show
