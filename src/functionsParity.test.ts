@@ -8,19 +8,10 @@
  * `functions/src`; the reverse (`functions/` importing `src/`) cannot.
  */
 import { readFileSync } from 'node:fs';
-import { afterEach, describe, expect, expectTypeOf, it, vi } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 import { TRADE_HUBS } from '@/market/hubs';
-import { fetchAggregates, FUZZWORK_AGGREGATES_URL } from '@/market/fuzzwork';
-import { eveToday, shiftDate } from '@/engine/miningTax/yieldRange';
-import {
-  BACKFILL_HUB,
-  FUZZWORK_AGGREGATES_URL as FN_FUZZWORK_URL,
-  FUZZWORK_TYPE_CHUNK_SIZE,
-  SNAPSHOT_HUBS,
-  parseFuzzworkAggregates,
-  shiftDateString,
-  utcDateString,
-} from '../functions/src/marketSnapshot';
+import { miningPricesUrl } from '@/features/market/hubSnapshot';
+import { SNAPSHOT_HUBS, miningPricesR2Key } from '../functions/src/miningHubPrices';
 import { MARKET_OPEN_PRICES_REGION_IDS } from '../functions/src/marketOpenPrices';
 import {
   FIRED_RETENTION_MS,
@@ -30,21 +21,17 @@ import {
 } from '../functions/src/dispatchProjections';
 import type { ProjectionRowInput } from '../functions/src/registerDevice';
 import { feedPurgeCutoff, isPurgeableFeedRow } from '../functions/src/purgeFeed';
-import { hullPartCount } from '../functions/src/workbenchFits';
+import { workbenchFitsR2Key } from '../functions/src/workbenchFits';
 import { FEED_SYNC_WINDOW_MS, rowsWithinSyncWindow } from '@/features/notifications/feed';
 import { PLEX_TYPE_ID } from '@/engine/contracts/contractOffers';
 import type { ProjectionRow } from '@/engine/projection';
-import { workbenchPartCount } from '@/features/fittings/workbenchFits';
+import { workbenchFitsUrl } from '@/features/fittings/workbenchFits';
 
 describe('trade hubs', () => {
   it('SNAPSHOT_HUBS matches TRADE_HUBS ids, stations and regions, in order', () => {
     expect(SNAPSHOT_HUBS.map((h) => ({ ...h }))).toEqual(
       TRADE_HUBS.map((h) => ({ id: h.id, stationId: h.stationId, regionId: h.regionId }))
     );
-  });
-
-  it('BACKFILL_HUB is the first (default) hub', () => {
-    expect(BACKFILL_HUB.id).toBe(TRADE_HUBS[0].id);
   });
 
   it('MARKET_OPEN_PRICES_REGION_IDS is exactly the hub regions', () => {
@@ -54,105 +41,11 @@ describe('trade hubs', () => {
   });
 });
 
-describe('date helpers', () => {
-  const cases: [string, number][] = [
-    ['2026-09-25', 0],
-    ['2026-09-25', 1],
-    ['2026-09-25', -1],
-    ['2026-09-30', 1],
-    ['2026-10-01', -1],
-    ['2026-12-31', 1],
-    ['2027-01-01', -1],
-    ['2024-02-28', 1],
-    ['2024-02-29', 1],
-    ['2025-02-28', 1],
-    ['2026-03-01', -90],
-    ['2026-09-25', 365],
-    ['2026-09-25', -400],
-  ];
-
-  it.each(cases)('shiftDateString(%s, %i) equals shiftDate', (date, days) => {
-    expect(shiftDateString(date, days)).toBe(shiftDate(date, days));
-  });
-
-  it.each([
-    new Date('2026-09-25T00:00:00Z'),
-    new Date('2026-09-25T23:59:59.999Z'),
-    new Date('2026-12-31T23:59:59Z'),
-    new Date('2024-02-29T12:00:00Z'),
-  ])('utcDateString(%s) equals eveToday', (now) => {
-    expect(utcDateString(now)).toBe(eveToday(now));
-  });
-});
-
-describe('Fuzzwork', () => {
-  afterEach(() => vi.unstubAllGlobals());
-
-  const body = {
-    '34': {
-      buy: { max: '5.5', min: '1', volume: '100', orderCount: '10' },
-      sell: { min: '6.25', max: '9', volume: '50', orderCount: '4' },
-    },
-    // Orders counted but malformed / zero / negative prices.
-    '35': {
-      buy: { max: 'abc', orderCount: '3' },
-      sell: { min: '0', orderCount: '3' },
-    },
-    '36': {
-      buy: { max: '-2', orderCount: '3' },
-      sell: { min: undefined, orderCount: '3' },
-    },
-    // No orders on a side.
-    '37': {
-      buy: { max: '7', orderCount: '0' },
-      sell: { min: '8', orderCount: 'NaN' },
-    },
-    // Numeric (not string) fields.
-    '38': {
-      buy: { max: 3, orderCount: 1 },
-      sell: { min: 4, orderCount: 1 },
-    },
-    // Missing sides / missing entry (39 absent entirely, 40 empty).
-    '40': {},
-  };
-  const typeIds = [34, 35, 36, 37, 38, 39, 40];
-
-  it('buy/sell prices parse identically', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => new Response(JSON.stringify(body)))
+describe('hub station mining prices', () => {
+  it.each(TRADE_HUBS)('the client reads the object the writer publishes for $id', (hub) => {
+    expect(miningPricesUrl(hub, '2026-10')).toMatch(
+      new RegExp(`^https://[^/]+/${miningPricesR2Key(hub.id, '2026-10')}$`)
     );
-    const client = await fetchAggregates(60003760, typeIds);
-    const fn = parseFuzzworkAggregates(body, typeIds);
-
-    expect([...fn.keys()]).toEqual([...client.keys()]);
-    for (const id of typeIds) {
-      expect(fn.get(id), `type ${id}`).toEqual({
-        buy: client.get(id)!.buyMax,
-        sell: client.get(id)!.sellMin,
-      });
-    }
-  });
-
-  it('missing/empty body parses to all-null on both sides', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => new Response('{}'))
-    );
-    const client = await fetchAggregates(60003760, [34]);
-    expect(parseFuzzworkAggregates(null, [34]).get(34)).toEqual({
-      buy: client.get(34)!.buyMax,
-      sell: client.get(34)!.sellMin,
-    });
-  });
-
-  it('shares the endpoint URL and the 200-type chunk size', async () => {
-    expect(FN_FUZZWORK_URL).toBe(FUZZWORK_AGGREGATES_URL);
-    const fetchMock = vi.fn(async () => new Response('{}'));
-    vi.stubGlobal('fetch', fetchMock);
-    const ids = Array.from({ length: FUZZWORK_TYPE_CHUNK_SIZE + 1 }, (_, i) => i + 1);
-    await fetchAggregates(60003760, ids);
-    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -203,18 +96,10 @@ describe('contracts and Workbench fits', () => {
     expect(Number(/const PLEX_TYPE_ID = (\d+);/.exec(source)?.[1])).toBe(PLEX_TYPE_ID);
   });
 
-  it.each([
-    undefined,
-    null,
-    'x',
-    {},
-    { parts: 0 },
-    { parts: -1 },
-    { parts: 1.5 },
-    { parts: '3' },
-    { parts: 1 },
-    { parts: 4 },
-  ])('hullPartCount(%j) equals workbenchPartCount', (part0) => {
-    expect(hullPartCount(part0)).toBe(workbenchPartCount(part0));
-  });
+  it.each([626, 11_567, 0])(
+    'the client reads the object the writer publishes for hull %i',
+    (id) => {
+      expect(workbenchFitsUrl(id)).toMatch(new RegExp(`^https://[^/]+/${workbenchFitsR2Key(id)}$`));
+    }
+  );
 });

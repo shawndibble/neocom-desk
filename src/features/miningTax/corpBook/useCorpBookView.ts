@@ -72,7 +72,6 @@ export function useCorpBookView({
           ];
           const dates = [...new Set(book.observed.map((o) => o.date))];
           const prices = await loadDatedUnitPricesByHub(
-            activeCharacterId,
             typeIds,
             [book.hubId],
             dates,
