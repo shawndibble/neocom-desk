@@ -1,13 +1,16 @@
 /**
- * Labels shared by the Price History chart, its table and its CSV, so a column
- * header, a tooltip row and an export header cannot drift apart. Literal i18n
- * keys, not template strings, so unused-key tooling still sees them.
+ * Labels for the Price History chart, its table and its CSV. The table and the
+ * CSV share one helper so a column header and an export header cannot drift
+ * apart; the chart's legend and tooltip share another, which says what the
+ * line is (the best order still listed at close) because it is drawn beside
+ * the traded range and can sit outside it. Literal i18n keys, not template
+ * strings, so unused-key tooling still sees them.
  */
 import type { OpenPriceSide, PriceSeriesChoice } from '@/engine/market/priceHistoryOpen';
 
 export type Translate = (key: string, options?: Record<string, unknown>) => string;
 
-/** "Domain buy" once regions are compared; plain "Buy" otherwise. */
+/** Table and CSV header: "Domain buy" once regions are compared; plain "Buy" otherwise. */
 export function openSideLabel(t: Translate, side: OpenPriceSide, region?: string): string {
   if (region) {
     return side === 'buy'
@@ -15,6 +18,21 @@ export function openSideLabel(t: Translate, side: OpenPriceSide, region?: string
       : t('market.priceHistory.regionSell', { region });
   }
   return side === 'buy' ? t('market.priceHistory.openBuy') : t('market.priceHistory.openSell');
+}
+
+/**
+ * Chart legend and tooltip: "Jita 4-4 buy at close" with a station or region;
+ * "Best buy at close" otherwise.
+ */
+export function chartOpenSideLabel(t: Translate, side: OpenPriceSide, region?: string): string {
+  if (region) {
+    return side === 'buy'
+      ? t('market.priceHistory.regionBuyAtClose', { region })
+      : t('market.priceHistory.regionSellAtClose', { region });
+  }
+  return side === 'buy'
+    ? t('market.priceHistory.openBuyAtClose')
+    : t('market.priceHistory.openSellAtClose');
 }
 
 /** The Lines select's option text. */

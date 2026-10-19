@@ -285,7 +285,7 @@ here — they go one per file in `docs/context/decisions/`.
   and clears itself once ESI reports the pilot has moved.
 - **Daily Range**: One day's lowest and highest _executed_ price for an item in
   a Region, from ESI's market history. Drawn on **Price History** as a shaded
-  band behind the average line. Distinct from the **Order Book**'s spread,
+  band behind the average line, labelled "Traded range" in the chart. Distinct from the **Order Book**'s spread,
   which is what is being asked for right now; this is what was actually paid.
 - **Craft Scope**: Which **Industry Activity** types an **Auto Build** pass
   is allowed to mark buildable — a multi-select. Only Manufacturing is

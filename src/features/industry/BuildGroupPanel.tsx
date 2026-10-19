@@ -60,7 +60,7 @@ import { AutoBuildControl } from './AutoBuildControl';
 import { groupCraftScope, groupAutoBuildMaxDepth } from './autoBuildGroup';
 import { formatPercent, formatVolume } from './format';
 import { computeGroupRollup } from './groupRollupView';
-import { SourcingInput } from './MaterialsTable';
+import { SourcingInput } from './SourcingInput';
 import { OwnedStockHint } from './OwnedStockHint';
 import { OwnedStockScopeControl } from './OwnedStockScopeControl';
 import type { OwnedStockSnapshot } from './ownedStockDetection';
