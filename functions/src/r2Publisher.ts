@@ -247,3 +247,31 @@ export async function publishCourierContractsToR2(args: {
   }
   return { uploaded, indexWritten, firstError, state };
 }
+
+/**
+ * What one R2 publish means for the run (issue #4270). R2 is the only store,
+ * so a failed upload or index write fails the run; a run cut short by
+ * `UPLOAD_BUDGET_MS` is not a failure — the recorded hashes let the next run
+ * resume — but it is not complete either, so the caller keeps the archive
+ * fingerprint unstored and that next run happens.
+ */
+export type R2PublishOutcome =
+  | { kind: 'complete' }
+  | { kind: 'resumable'; remaining: number }
+  | { kind: 'failed'; error: string };
+
+export function r2PublishOutcome(result: {
+  failed?: number;
+  remaining?: number;
+  indexWritten: boolean;
+  firstError: string | null;
+}): R2PublishOutcome {
+  const failed = result.failed ?? 0;
+  const remaining = result.remaining ?? 0;
+  if (failed === 0 && result.indexWritten) return { kind: 'complete' };
+  if (failed === 0 && remaining > 0) return { kind: 'resumable', remaining };
+  return {
+    kind: 'failed',
+    error: `${failed} objects failed, index not written; first error: ${result.firstError ?? 'unknown'}`,
+  };
+}

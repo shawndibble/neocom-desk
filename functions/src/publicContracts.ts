@@ -1,9 +1,8 @@
 /**
  * Pure decision logic behind the public-contract syncs (issue #608, ADR
  * 0013): parses EVE Ref's `contracts.csv` / `contract_items.csv`, joins them
- * down to the rows worth searching, and chunks the result for Firestore. The
- * `onSchedule` wiring — the archive fetch/decompress and the Firestore
- * writes — lives in index.ts, the same split `dispatchProjections.ts` and
+ * down to the rows worth searching. The `onSchedule` wiring — the archive
+ * fetch/decompress and the R2 publish (`r2Publisher.ts`) — lives in index.ts, the same split `dispatchProjections.ts` and
  * `purgeFeed.ts` use, so this module is unit-testable from fixture CSV text
  * with no emulator.
  *
@@ -17,7 +16,7 @@
  *
  * `PublicCourierContractRow` (issue #909) is the second: public courier
  * contracts, which carry no item lines at all and so are a route and a fee
- * rather than a priced item. It is a separate collection because it is a
+ * rather than a priced item. It is a separate snapshot because it is a
  * separate row shape — not because it needs a separate crawl, which is the
  * mistake #907 undid.
  *
@@ -154,27 +153,6 @@ export function chunkRows<T>(rows: readonly T[], chunkSize: number): T[][] {
     chunks.push(rows.slice(i, i + chunkSize));
   }
   return chunks;
-}
-
-/**
- * A chunk doc as written: its rows plus the publish it belongs to. `meta` is
- * written after every chunk, so for the length of a publish `meta` still names
- * the previous one while the chunks are already new. The stamp is how a reader
- * tells — it compares each chunk's against the `lastSyncedAt` it started from.
- */
-export function chunkDocData<T>(
-  rows: readonly T[],
-  publishedAt: number
-): {
-  rows: readonly T[];
-  publishedAt: number;
-} {
-  return { rows, publishedAt };
-}
-
-/** Zero-padded so lexicographic (Firestore query) and numeric chunk order agree. */
-export function chunkDocId(index: number): string {
-  return `chunk-${String(index).padStart(4, '0')}`;
 }
 
 /**
@@ -401,6 +379,10 @@ export type ContractOfferIndexEntry = [
  * before any chunk has downloaded, and fetch only the chunks of the item being
  * searched. `rows` must already be in `sortContractOfferRows` order, since the
  * chunk range is read off each row's position.
+ *
+ * The Firestore index doc it was built for is gone (issue #4270); its one
+ * caller now is the R2 index (`contractOfferObjects.ts`), which reads only the
+ * count, cheapest ask and regions, so the chunk range is vestigial there.
  */
 export interface ContractOfferIndex {
   types: Record<string, ContractOfferIndexEntry>;
@@ -461,31 +443,6 @@ export function filterAndCompactPublicContractOffers(
 
   return sortContractOfferRows(rows);
 }
-
-/**
- * 3,000 rows/chunk, against the 2,000 the retired blueprint-only snapshot
- * used. Both limits this sits between are shared, and this snapshot holds
- * ~3x the rows that one did:
- *
- * - Firestore's 1MiB per document. The blueprint snapshot measured ~370KB per
- *   2,000 rows (~185 bytes/row); a blueprint row here carries an extra
- *   `isBlueprintCopy` field on top of that, so ~210 bytes/row is the expected
- *   blueprint case and most rows are smaller (plain items carry no ME/TE/runs
- *   at all). The binding number is the *widest* row this shape can produce,
- *   which `publicContracts.test.ts` measures rather than assumes — so a later
- *   field addition fails that test before it fails a live `set()`.
- * - The free tier's 20,000 writes/day, which is the *project's* budget, not
- *   this job's: `dispatchProjections` runs 288x/day beside it. At ~370k rows
- *   this chunks to ~124 docs x 48 runs/day ≈ 6.0k writes. Keeping 2,000 here
- *   would have cost ~8.9k for this job alone.
- */
-export const PUBLIC_CONTRACT_OFFERS_CHUNK_SIZE = 3000;
-
-export const PUBLIC_CONTRACT_OFFERS_COLLECTION = 'publicContractOffers';
-export const PUBLIC_CONTRACT_OFFERS_META_DOC = 'meta';
-/** The index doc's own collection, not a doc in the chunk collection: an older client reads that whole collection and treats every non-`meta` doc as a chunk of rows. */
-export const PUBLIC_CONTRACT_OFFERS_INDEX_COLLECTION = 'publicContractOffersIndex';
-export const PUBLIC_CONTRACT_OFFERS_INDEX_DOC = 'types';
 
 const COURIER_CONTRACT_TYPE = 'courier';
 
@@ -634,19 +591,3 @@ export function filterAndCompactPublicCourierContracts(
   }
   return sortCourierContractRows(rows);
 }
-
-/**
- * The same 3,000 rows/chunk the offers snapshot uses, against the same 1MiB
- * document limit — but nowhere near binding here. ADR 0013's live pull was
- * ~50,300 public contracts, 48,963 item_exchange and 717 auction, so courier
- * and loan together are under 620; at one row per contract this snapshot is a
- * single chunk doc, and publishing it costs ~96 writes/day against the
- * project's shared 20,000/day free tier. Sharing the offers value leaves one
- * number to reason about rather than two, and `publicContracts.test.ts`
- * measures the widest row this shape can produce against the document limit
- * rather than assuming it stays small.
- */
-export const PUBLIC_COURIER_CONTRACTS_CHUNK_SIZE = 3000;
-
-export const PUBLIC_COURIER_CONTRACTS_COLLECTION = 'publicCourierContracts';
-export const PUBLIC_COURIER_CONTRACTS_META_DOC = 'meta';
