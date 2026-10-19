@@ -7,7 +7,7 @@ const NOW = Date.parse('2026-09-29T12:00:00Z');
 function row(overrides: Partial<CharacterCsvRow> = {}): CharacterCsvRow {
   return {
     character: { name: 'Rixx Javix' },
-    info: { corporationName: 'Brave Newbies', allianceName: null },
+    corporationName: 'Brave Newbies',
     groupId: 'g1',
     stats: { name: 'Rixx Javix', skillPoints: 52_000_000, wallet: 1_234_567.89 },
     queue: {
@@ -116,7 +116,7 @@ describe('charactersCsvColumns', () => {
   it('leaves unknown values blank rather than guessing', () => {
     const values = valuesOf(
       row({
-        info: undefined,
+        corporationName: undefined,
         groupId: null,
         stats: undefined,
         queue: undefined,

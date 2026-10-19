@@ -242,6 +242,7 @@ describe('useCorpAccess — ready', () => {
       canReadWallet: true,
       canReadStructures: true,
       canReadMoonExtractions: true,
+      canReadMiningLedger: true,
       canReadMembers: true,
       canReadIndustry: true,
       canReadAssets: true,
@@ -259,6 +260,35 @@ describe('useCorpAccess — ready', () => {
     await waitFor(() => expect(result.current.state).toBe('ready'));
     expect(result.current.capabilities.canReadWallet).toBe(true);
     expect(result.current.capabilities.canReadMembers).toBe(false);
+  });
+
+  /**
+   * Issue #4058's re-grant path: an Accountant whose corp grant predates the
+   * mining scope keeps their wallet (still `ready`), is told the mining scope
+   * is missing so the grant can be offered, and cannot read the ledger until
+   * they grant it.
+   */
+  it('stays ready for an Accountant missing only the mining-ledger scope, and asks for it', async () => {
+    mockedGrantedScopes.mockReturnValue([...CORP_SCOPES_FOR_CAPABILITY.canReadWallet, ROLES_SCOPE]);
+    mockedLoadRoles.mockResolvedValue(rolesResolvingTo(['Accountant']));
+    const { result } = renderHook(() => useCorpAccess());
+    await waitFor(() => expect(result.current.state).toBe('ready'));
+    expect(result.current.capabilities.canReadWallet).toBe(true);
+    expect(result.current.capabilities.canReadMiningLedger).toBe(false);
+    expect(result.current.missingScopes).toEqual(['esi-industry.read_corporation_mining.v1']);
+  });
+
+  it('opens the mining ledger to an Accountant once the mining scope is granted', async () => {
+    mockedGrantedScopes.mockReturnValue([
+      ...CORP_SCOPES_FOR_CAPABILITY.canReadWallet,
+      ...CORP_SCOPES_FOR_CAPABILITY.canReadMiningLedger,
+      ROLES_SCOPE,
+    ]);
+    mockedLoadRoles.mockResolvedValue(rolesResolvingTo(['Accountant']));
+    const { result } = renderHook(() => useCorpAccess());
+    await waitFor(() => expect(result.current.state).toBe('ready'));
+    expect(result.current.capabilities.canReadMiningLedger).toBe(true);
+    expect(result.current.missingScopes).toEqual([]);
   });
 });
 

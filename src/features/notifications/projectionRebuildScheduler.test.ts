@@ -1,18 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createCoalescedRebuild } from './projectionRebuildScheduler';
+import { deferred } from '@/test/deferred';
 
 const DELAY = 1000;
-
-/** A write that resolves (or rejects) only when the test says so. */
-function deferred() {
-  let resolve!: () => void;
-  let reject!: (err: unknown) => void;
-  const promise = new Promise<void>((res, rej) => {
-    resolve = res;
-    reject = rej;
-  });
-  return { promise, resolve, reject };
-}
 
 beforeEach(() => {
   vi.useFakeTimers();

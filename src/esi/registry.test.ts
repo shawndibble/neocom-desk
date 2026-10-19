@@ -3,8 +3,14 @@ import { describe, it, expect } from 'vitest';
 // endpoints.ts only as a type, so this is the test's way of proving at
 // runtime what the compiler already enforces at build time.
 import * as endpointsModule from './endpoints';
-// Raw source of endpoints.ts, for the marker-comment parity check below.
-import endpointsSource from './endpoints.ts?raw';
+// Raw source of every endpoints/ domain file, for the marker-comment parity check below.
+const endpointsSource = Object.values(
+  import.meta.glob<string>(['./endpoints/*.ts', '!./endpoints/index.ts'], {
+    query: '?raw',
+    import: 'default',
+    eager: true,
+  })
+).join('\n');
 import {
   ESI_REGISTRY,
   PUBLIC,

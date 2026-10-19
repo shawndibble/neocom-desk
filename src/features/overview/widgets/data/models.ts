@@ -29,7 +29,7 @@ import { formatCompactNumber } from '@/lib/compactNumber';
 import { formatCountdown, formatDuration } from '@/lib/duration';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
 import { DAY_MS } from '@/lib/age';
-import { sortQueueEntries, selectActiveEntryFromSorted } from '@/routes/overviewQueue';
+import { sortQueueEntries, selectActiveEntryFromSorted } from '@/features/overview/overviewQueue';
 import { dailyWalletFromJournal } from '@/engine/netWorth/series';
 import { getKind } from '../kinds';
 import {
@@ -41,7 +41,7 @@ import {
   ordersSeverity,
   priceAlertsSeverity,
   spExtractionSeverity,
-} from '../../boardSeverity';
+} from '../../data/boardSeverity';
 import {
   comingUpSummary,
   contractsDeadlineNote,
@@ -52,8 +52,8 @@ import {
   priceAlertsSummary,
   spExtractionSummary,
   stockBoardSummary,
-} from '../../boardSummary';
-import type { MailBoardData, MiningTaxBoardData, PriceAlertsBoardData } from '../../boardData';
+} from '../../data/boardSummary';
+import type { MailBoardData, MiningTaxBoardData, PriceAlertsBoardData } from '../../data/boardData';
 import {
   blank,
   count,

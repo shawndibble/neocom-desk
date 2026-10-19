@@ -6,7 +6,7 @@
  * "fitting" basis. Pulled out as its own pure-ish function, rather than
  * copied into the route, so it has its own unit test.
  */
-import { decodeFittingShare } from '@/engine/fitting/fittingShare';
+import { decodeFittingShare } from '@/engine/fittings/fittingShare';
 import { shareToFitting } from '@/engine/fittings/shareMapper';
 import { buildAllVProfile } from '@/engine/fittings/pilotProfile';
 import type { Fitting, PilotProfile } from '@/engine/fittings/types';

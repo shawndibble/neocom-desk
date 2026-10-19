@@ -18,12 +18,6 @@ import {
 import type { NotificationEventId } from './events';
 import type { NotificationFeedRecord as NotificationFeedEntry } from '@/db';
 
-export interface OtherCharacterAlerts {
-  characterId: number;
-  name: string;
-  count: number;
-}
-
 /**
  * Which preference map governs one feed entry's channel state: the per-type
  * opt-out underneath `eveNotification` (issue #274) when the entry carries
@@ -90,39 +84,4 @@ export function visibleFeedEntries(
   prefs: NotificationPreferencesValue
 ): NotificationFeedEntry[] {
   return entries.filter((entry) => isEntryVisible(entry, prefs));
-}
-
-export function entriesForCharacter(
-  entries: readonly NotificationFeedEntry[],
-  characterId: number | null
-): NotificationFeedEntry[] {
-  if (characterId === null) return [];
-  return entries.filter((entry) => entry.characterId === characterId);
-}
-
-/**
- * Every other Character holding alerts, most first. Ties break by name so the
- * row keeps a stable order across polls instead of reshuffling whenever two
- * Characters happen to be level. A Character the device no longer knows (a
- * removed login whose entries outlived it) is skipped — there is nothing to
- * switch to.
- */
-export function otherCharacterAlerts(
-  entries: readonly NotificationFeedEntry[],
-  activeCharacterId: number | null,
-  nameById: ReadonlyMap<number, string>
-): OtherCharacterAlerts[] {
-  const counts = new Map<number, number>();
-  for (const entry of entries) {
-    if (entry.characterId === activeCharacterId) continue;
-    if (!nameById.has(entry.characterId)) continue;
-    counts.set(entry.characterId, (counts.get(entry.characterId) ?? 0) + 1);
-  }
-  return [...counts.entries()]
-    .map(([characterId, count]) => ({
-      characterId,
-      name: nameById.get(characterId) as string,
-      count,
-    }))
-    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
 }

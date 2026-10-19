@@ -155,6 +155,12 @@ export const ROUTE_REQUIREMENTS = {
    * grant.
    */
   '/corp/assets': UNGATED,
+  /**
+   * UNGATED like the other Corp views: the mining scope is additive and asked
+   * for on the page itself (`miningLedgerAccess`, issue #4058), and the roles
+   * that can read the ledger hide the entry rather than lock it.
+   */
+  '/corp/moons': UNGATED,
   // The drill-down's deeper levels (issue #779): every level renders the same
   // component off the same gate, so it gates identically.
   '/corp/assets/*': UNGATED,

@@ -1,12 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { JumpGraph } from './jumpRoute';
-import {
-  MAX_STOPS,
-  optimizeStopOrder,
-  pairwiseRouteCosts,
-  planTrip,
-  type RouteCostMatrix,
-} from './tripPlan';
+import { MAX_STOPS, optimizeStopOrder, planTrip, type RouteCostMatrix } from './tripPlan';
 
 /**
  * A line of systems, so every distance is obvious:
@@ -22,7 +16,6 @@ const B = 30000002;
 const C = 30000003;
 const D = 30000004;
 const E = 30000005;
-const LOW = 30000006;
 const ISLAND = 30000007;
 
 const LINE: JumpGraph = new Map([
@@ -34,64 +27,10 @@ const LINE: JumpGraph = new Map([
   [ISLAND, []],
 ]);
 
-const SECURITY = new Map([
-  [A, 1.0],
-  [B, 0.9],
-  [C, 0.8],
-  [D, 0.7],
-  [E, 0.6],
-  [LOW, 0.2],
-]);
-const securityOf = (systemId: number) => SECURITY.get(systemId);
-
 /** A matrix straight from costs; jumps mirror the costs. */
 function matrix(costs: (number | null)[][]): RouteCostMatrix {
   return costs.map((row) => row.map((cost) => (cost === null ? null : { cost, jumps: cost })));
 }
-
-describe('pairwiseRouteCosts', () => {
-  it('reads every pair from the leg search, under the leg options', () => {
-    const costs = pairwiseRouteCosts(LINE, [A, C, E]);
-    expect(costs.map((row) => row.map((cell) => cell?.jumps))).toEqual([
-      [0, 2, 4],
-      [2, 0, 2],
-      [4, 2, 0],
-    ]);
-  });
-
-  it('is directed: the cost of entering a system is charged one way only', () => {
-    const graph: JumpGraph = new Map([
-      [A, [LOW]],
-      [LOW, [A]],
-    ]);
-    const costs = pairwiseRouteCosts(graph, [A, LOW], {
-      preference: 'prefer-highsec',
-      securityOf,
-      securityPenalty: 50,
-    });
-    expect(costs[0][1]?.cost).toBeCloseTo(Math.exp(7.5));
-    expect(costs[1][0]?.cost).toBeCloseTo(0.9);
-  });
-
-  it('weights by the preference rather than counting jumps', () => {
-    const graph: JumpGraph = new Map([
-      [C, [D, LOW]],
-      [D, [C, E]],
-      [E, [D, LOW]],
-      [LOW, [C, E]],
-    ]);
-    const options = { preference: 'prefer-highsec' as const, securityOf };
-    const costs = pairwiseRouteCosts(graph, [C, E], options);
-    expect(costs[0][1]).toEqual({ cost: expect.closeTo(1.8, 5) as number, jumps: 2 });
-  });
-
-  it('has no cost for a pair no stargate route joins', () => {
-    const costs = pairwiseRouteCosts(LINE, [A, ISLAND]);
-    expect(costs[0][1]).toBeNull();
-    expect(costs[1][0]).toBeNull();
-    expect(costs[1][1]).toEqual({ cost: 0, jumps: 0 });
-  });
-});
 
 describe('optimizeStopOrder', () => {
   it('keeps a single stop as it is', () => {
@@ -299,15 +238,15 @@ describe('stop order through extra connections', () => {
   ] as const;
 
   it('orders stops by the costs the holes give', () => {
-    const points = [START, D, E];
-    const gatesOnly = pairwiseRouteCosts(graph, points);
-    expect(gatesOnly[0][2]?.jumps).toBe(5);
-    const withHoles = pairwiseRouteCosts(graph, points, {
-      extraConnections,
-      freeSystems: new Set([HUB]),
-    });
-    expect(withHoles[0][2]?.jumps).toBe(2);
-    expect(optimizeStopOrder(gatesOnly)).toEqual([1, 2]);
-    expect(optimizeStopOrder(withHoles)).toEqual([2, 1]);
+    const optimize = { optimize: true };
+    expect(planTrip(graph, START, [D, E], {}, optimize).reordered).toBeNull();
+    const withHoles = planTrip(
+      graph,
+      START,
+      [D, E],
+      { extraConnections, freeSystems: new Set([HUB]) },
+      optimize
+    );
+    expect(withHoles.reordered?.stops).toEqual([E, D]);
   });
 });

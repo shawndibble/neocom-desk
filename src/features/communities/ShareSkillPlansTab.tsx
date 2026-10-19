@@ -1,25 +1,18 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { Button, buttonClassName, EmptyState, SearchInput, Spinner } from '@/components/ui';
 import { db, type SkillPlanRecord } from '@/db';
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { AddSharedItemsDialog } from './AddSharedItemsDialog';
+import { namedLike, needleOf, ROW_LIMIT } from './shareLists';
+import { useSerialShareState } from './useSerialShareState';
 import { loadMySharedPlans, sharePlan, syncSharedPlans, unsharePlan } from './sharedPlans';
-
-/** A long list shows this many rows; the search narrows it. */
-const ROW_LIMIT = 100;
 
 interface Loaded {
   plans: SkillPlanRecord[];
   /** Plan ids this Character has in the Community. */
   shared: Set<string>;
-}
-
-function namedLike(plans: readonly SkillPlanRecord[], needle: string): SkillPlanRecord[] {
-  return plans
-    .filter((plan) => plan.name.toLowerCase().includes(needle))
-    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /**
@@ -37,22 +30,11 @@ export function ShareSkillPlansTab({
   communityId: string;
 }) {
   const { t } = useTranslation();
-  const [loaded, setLoaded] = useState<Loaded | null>(null);
-  const [loadFailed, setLoadFailed] = useState(false);
   const [query, setQuery] = useState('');
-  const [notice, setNotice] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const search = useRef<HTMLInputElement>(null);
   const stopButtons = useRef(new Map<string, HTMLButtonElement>());
   const focusAfterCommit = useFocusAfterCommit();
-  const latest = useRef<Loaded | null>(null);
-  const queue = useRef<Promise<void>>(Promise.resolve());
-  const loads = useRef(0);
-
-  const apply = useCallback((next: Loaded) => {
-    latest.current = next;
-    setLoaded(next);
-  }, []);
 
   const fetchAll = useCallback(async (): Promise<Loaded> => {
     // Refresh the copies of plans edited since they were shared before listing.
@@ -63,48 +45,12 @@ export function ShareSkillPlansTab({
     ]);
     return { plans, shared: new Set(shared.keys()) };
   }, [characterId, communityId]);
+  const { loaded, loadFailed, notice, setNotice, run } = useSerialShareState(
+    fetchAll,
+    'communities.plans.failed'
+  );
 
-  useEffect(() => {
-    const mine = ++loads.current;
-    fetchAll().then(
-      (next) => {
-        if (mine !== loads.current) return;
-        apply(next);
-        setLoadFailed(false);
-      },
-      () => {
-        if (mine === loads.current) setLoadFailed(true);
-      }
-    );
-  }, [fetchAll, apply]);
-
-  const reload = useCallback(async () => {
-    const mine = ++loads.current;
-    try {
-      const next = await fetchAll();
-      if (mine === loads.current) apply(next);
-    } catch {
-      if (mine === loads.current) setLoadFailed(true);
-    }
-  }, [fetchAll, apply]);
-
-  /** One change after the one before; a failure reloads the truth rather than guessing an undo. */
-  function run(change: (current: Loaded) => Promise<Loaded>): Promise<void> {
-    setNotice(null);
-    queue.current = queue.current.then(async () => {
-      const current = latest.current;
-      if (current === null) return;
-      try {
-        apply(await change(current));
-      } catch {
-        setNotice(t('communities.plans.failed'));
-        await reload();
-      }
-    });
-    return queue.current;
-  }
-
-  const needle = query.trim().toLowerCase();
+  const needle = needleOf(query);
   const sharedRows = useMemo(
     () =>
       loaded
