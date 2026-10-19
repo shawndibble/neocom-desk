@@ -15,6 +15,7 @@ import { useEffect, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import type { NotificationFeedRecord } from '@/db';
 import type { AlertBadge } from '@/components/ui/unreadAlertsContext';
+import { useTicker } from '@/lib/ticker';
 import { bellBadge } from './dangerAlert';
 import { readFeed } from './feed';
 import { visibleFeedEntries } from './feedSelection';
@@ -34,6 +35,7 @@ import { useSnoozeStore, withoutSnoozed } from './snooze';
 export function useVisibleAlertEntries(): NotificationFeedRecord[] {
   const prefs = useNotificationPreferences((state) => state.value);
   const snoozed = useSnoozeStore((state) => state.value);
+  const now = useTicker(60_000);
 
   /*
    * Hydrated here rather than relied on from elsewhere. The Overview's old
@@ -53,9 +55,8 @@ export function useVisibleAlertEntries(): NotificationFeedRecord[] {
     () =>
       !prefs.masterEnabled || !isFeedChannelEnabled(prefs)
         ? []
-        : // eslint-disable-next-line react-hooks/purity -- a snooze ends by the wall clock; re-reading it on a feed, preference or snooze change is as fresh as the bell needs, and a minute ticker would re-render the whole shell
-          withoutSnoozed(visibleFeedEntries(entries, prefs), snoozed, Date.now()),
-    [entries, prefs, snoozed]
+        : withoutSnoozed(visibleFeedEntries(entries, prefs), snoozed, now),
+    [entries, prefs, snoozed, now]
   );
 }
 

@@ -44,6 +44,7 @@ import { getKind } from './kinds';
 import { Chart } from './charts/Chart';
 import { DEFAULT_RANGE, type Widget as WidgetModel } from './layout';
 import { scopePresentation } from './scope';
+import { OVERVIEW_TICK_MS } from './data/tick';
 import { resolveWidget } from './state';
 import { TableBody, type TableBodyProps } from './TableBody';
 import { useOverviewEdit } from './editContext';
@@ -72,8 +73,6 @@ export interface WidgetProps {
   /** The empty state's Remove widget. */
   onRemove: (id: string) => void;
 }
-
-const TICK_MS = 30_000;
 
 const SECONDARY_TONE = {
   good: 'text-isk-pos',
@@ -287,7 +286,7 @@ function WidgetFrame({
   const { refresh } = useOverviewRefresh();
   const { setRowsPerPage } = useOverviewEdit();
   const characterId = useActiveCharacter((state) => state.activeCharacterId);
-  const now = useTicker(TICK_MS);
+  const now = useTicker(OVERVIEW_TICK_MS);
   const scope = scopePresentation(widget.kind, widget.scope);
   const { state, showLastGood, reauthNote } = resolveWidget(view.status);
 
