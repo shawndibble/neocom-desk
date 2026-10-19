@@ -269,6 +269,8 @@ export function useCorpBook(sync: CorpTaxBookSync): CorpBook {
     const characterIds = new Set<number>();
     for (const m of view.miners) for (const id of m.characterIds) characterIds.add(id);
     for (const p of view.input.payments) characterIds.add(p.characterId);
+    if (fetched.status === 'loaded')
+      for (const a of fetched.data.groupingAnswers ?? []) characterIds.add(a.characterId);
     const refineryIds = new Set<number>([
       ...view.input.extractions.map((x) => x.structureId),
       ...view.charges.map((c) => c.structureId),
@@ -298,7 +300,7 @@ export function useCorpBook(sync: CorpTaxBookSync): CorpBook {
     return () => {
       cancelled = true;
     };
-  }, [view, characterId]);
+  }, [view, characterId, fetched]);
 
   const bookNames: BookNames = useMemo(
     () => ({

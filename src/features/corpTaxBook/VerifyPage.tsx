@@ -29,6 +29,7 @@ import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 
 import { TRADE_HUBS } from '@/market/hubs';
+import { GroupingQuestions } from './GroupingQuestions';
 import { readVerifyStatement, setVerifyRemindersStopped } from './verifyApi';
 
 const isk = (value: number, decimals = 0) => `${formatIsk(value, decimals)} ISK`;
@@ -281,6 +282,14 @@ function VerifyStatement({ token, payload }: { token: string; payload: VerifyPay
         <p className="rounded-xs border border-line p-3 text-sm" role="status">
           {t('corpTaxBook.verify.closed', { corp })}
         </p>
+      )}
+      {payload.pendingCharacterIds.length > 0 && (
+        <GroupingQuestions
+          token={token}
+          corporationId={payload.corporationId}
+          corp={corp}
+          characterIds={payload.pendingCharacterIds}
+        />
       )}
       <div className="flex flex-col gap-4 md:grid md:grid-cols-[minmax(0,1fr)_22rem] md:items-start">
         <div className="order-3 min-w-0 space-y-4 md:order-none md:col-start-1 md:row-span-3 md:row-start-1">

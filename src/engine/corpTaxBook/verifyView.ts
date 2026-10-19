@@ -34,6 +34,8 @@ export interface VerifyPayload {
   settled: boolean;
   remindersStopped: boolean;
   accountClosed: boolean;
+  /** Characters an officer added by hand that still wait for their own confirmation (D26b). */
+  pendingCharacterIds: number[];
 }
 
 export interface VerifyPayloadLine {

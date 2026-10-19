@@ -245,6 +245,21 @@
   ],
   "fieldOverrides": [
     {
+      "collectionGroup": "miners",
+      "fieldPath": "pendingConfirmation",
+      "ttl": false,
+      "indexes": [
+        {
+          "arrayConfig": "CONTAINS",
+          "queryScope": "COLLECTION"
+        },
+        {
+          "arrayConfig": "CONTAINS",
+          "queryScope": "COLLECTION_GROUP"
+        }
+      ]
+    },
+    {
       "collectionGroup": "pledges",
       "fieldPath": "communityId",
       "ttl": false,

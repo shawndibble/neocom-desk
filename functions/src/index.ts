@@ -52,6 +52,7 @@ import {
   parseBookCall,
   parseClaimPaymentInput,
   parseConfirmGroupingInput,
+  parseDeclineByTokenInput,
   parseEditAction,
   parseStopReminders,
   parseSyncInput,
@@ -62,6 +63,9 @@ import { esiIdentityReader } from './corpTaxBookEsi.js';
 import {
   claimPayment,
   confirmGrouping,
+  declineGrouping,
+  declineGroupingByToken,
+  listPendingGroupings,
   editBook,
   readStatementByToken,
   reclaimBook,
@@ -807,10 +811,32 @@ export const confirmCorpTaxBookGroupingCallable = onCall<unknown>(
   }
 );
 
+export const declineCorpTaxBookGroupingCallable = onCall<unknown>(
+  CORP_TAX_BOOK_OPTIONS,
+  (request) => {
+    const { corporationId, minerId } = parseConfirmGroupingInput(request.data);
+    return declineGrouping(corpTaxBookDeps(), callerOf(request), corporationId, minerId);
+  }
+);
+
+export const listPendingCorpTaxBookGroupingsCallable = onCall<unknown>(
+  CORP_TAX_BOOK_OPTIONS,
+  (request) => listPendingGroupings(corpTaxBookDeps(), callerOf(request))
+);
+
 // No session on purpose: the verify link is the credential (D27), so a miner
 // without an EVE login can read their Statement and stop reminders.
 export const readCorpTaxBookStatementCallable = onCall<unknown>(CORP_TAX_BOOK_OPTIONS, (request) =>
   readStatementByToken(corpTaxBookDeps(), parseToken(request.data))
+);
+
+// A decline needs only the link; a confirm never does (it needs the character's own sign-in).
+export const declineCorpTaxBookGroupingByTokenCallable = onCall<unknown>(
+  CORP_TAX_BOOK_OPTIONS,
+  (request) => {
+    const { token, characterId } = parseDeclineByTokenInput(request.data);
+    return declineGroupingByToken(corpTaxBookDeps(), token, characterId);
+  }
 );
 
 export const stopCorpTaxBookRemindersCallable = onCall<unknown>(

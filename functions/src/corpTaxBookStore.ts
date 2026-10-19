@@ -476,6 +476,16 @@ function writeMiner(
   action: { minerId: string; characterIds: number[]; mainCharacterId: number },
   { pending, confirmed }: { pending: number[]; confirmed: Set<number> }
 ): void {
+  // An officer asking again starts a fresh question: the old answer no longer stands.
+  if (pending.length > 0) {
+    c.tx.set(
+      col(c, META).doc(ANSWERS_DOC),
+      {
+        answers: Object.fromEntries(pending.map((x) => [String(x), FieldValue.delete()])),
+      },
+      { merge: true }
+    );
+  }
   c.tx.set(col(c, MINERS).doc(action.minerId), {
     id: action.minerId,
     characterIds: action.characterIds,
@@ -485,6 +495,81 @@ function writeMiner(
     // A guest's character stays out of the readable grouping until it confirms (D26b).
     uids: action.characterIds.filter((x) => !pending.includes(x)).map((x) => `char:${x}`),
   });
+}
+
+/**
+ * Takes a character out of a Miner grouping (or deletes the Miner when one character is left)
+ * and records it in the book so no officer's sync puts it straight back (D26). False when the
+ * character was not in the Miner; nothing is written then.
+ */
+function removeFromMiner(
+  tx: Transaction,
+  ref: DocumentReference,
+  miner: Data,
+  characterId: number
+): boolean {
+  const before = miner.characterIds as number[];
+  const characterIds = before.filter((x) => x !== characterId);
+  if (characterIds.length === before.length) return false;
+  if (characterIds.length <= 1) {
+    tx.delete(ref);
+  } else {
+    tx.update(ref, {
+      characterIds,
+      mainCharacterId: characterIds.includes(miner.mainCharacterId as number)
+        ? miner.mainCharacterId
+        : characterIds[0],
+      pendingConfirmation: (miner.pendingConfirmation as number[]).filter((x) => x !== characterId),
+      confirmedCharacterIds: (miner.confirmedCharacterIds as number[]).filter(
+        (x) => x !== characterId
+      ),
+      uids: characterIds.map((x) => `char:${x}`),
+    });
+  }
+  // D26: every officer's sync must leave this character out of an automatic group.
+  tx.set(
+    ref.parent.parent!.collection(META).doc(DECLINED_DOC),
+    { ids: FieldValue.arrayUnion(characterId) },
+    { merge: true }
+  );
+  return true;
+}
+
+/** What a character answered to a pending grouping, kept for the officers (D26b, #4210). */
+const ANSWERS_DOC = 'groupingAnswers';
+
+function recordAnswer(
+  tx: Transaction,
+  deps: BookDeps,
+  corporationId: number,
+  characterId: number,
+  entry: { minerId: string; answer: 'confirmed' | 'declined'; via: 'character' | 'verify-link' }
+): void {
+  tx.set(
+    sub(deps.db, corporationId, META).doc(ANSWERS_DOC),
+    { answers: { [String(characterId)]: { ...entry, at: new Date(deps.now()).toISOString() } } },
+    { merge: true }
+  );
+}
+
+/** Drops what these characters last answered to a grouping question (D26b, #4210). */
+function clearAnswers(c: EditCtx, characterIds: readonly number[]): void {
+  if (characterIds.length === 0) return;
+  c.tx.set(
+    col(c, META).doc(ANSWERS_DOC),
+    { answers: Object.fromEntries(characterIds.map((x) => [String(x), FieldValue.delete()])) },
+    { merge: true }
+  );
+}
+
+/** A character an officer put in a group on purpose is no longer one to keep out of auto-grouping. */
+function keepInGroup(c: EditCtx, characterIds: readonly number[]): void {
+  if (characterIds.length === 0) return;
+  c.tx.set(
+    col(c, META).doc(DECLINED_DOC),
+    { ids: FieldValue.arrayRemove(...characterIds) },
+    { merge: true }
+  );
 }
 
 async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
@@ -717,6 +802,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       const miners = await tx.get(col(c, MINERS));
       const out = await planMiner(c, miners.docs, action, new Set());
       writeMiner(c, action, out);
+      keepInGroup(c, action.characterIds);
       return {
         detail: {
           minerId: action.minerId,
@@ -744,12 +830,8 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       const out = await planMiner(c, miners.docs, action, absorbed);
       for (const id of absorbed) tx.delete(col(c, MINERS).doc(id));
       writeMiner(c, action, out);
-      // A character an officer put in a group on purpose is no longer one to keep out of auto-grouping.
-      tx.set(
-        col(c, META).doc(DECLINED_DOC),
-        { ids: FieldValue.arrayRemove(...action.characterIds) },
-        { merge: true }
-      );
+      clearAnswers(c, action.characterIds);
+      keepInGroup(c, action.characterIds);
       return {
         detail: {
           minerId: action.minerId,
@@ -763,32 +845,10 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
     case 'unlink': {
       const ref = col(c, MINERS).doc(action.minerId);
       const miner = await mustGet(c, ref, 'Miner');
-      const characterIds = (miner.characterIds as number[]).filter((x) => x !== action.characterId);
-      if (characterIds.length === (miner.characterIds as number[]).length)
+      if (!removeFromMiner(c.tx, ref, miner, action.characterId))
         fail('not-found', 'Not in that Miner', 'not-in-miner');
-      if (characterIds.length <= 1) {
-        tx.delete(ref);
-      } else {
-        tx.update(ref, {
-          characterIds,
-          mainCharacterId: characterIds.includes(miner.mainCharacterId as number)
-            ? miner.mainCharacterId
-            : characterIds[0],
-          pendingConfirmation: (miner.pendingConfirmation as number[]).filter(
-            (x) => x !== action.characterId
-          ),
-          confirmedCharacterIds: (miner.confirmedCharacterIds as number[]).filter(
-            (x) => x !== action.characterId
-          ),
-          uids: characterIds.map((x) => `char:${x}`),
-        });
-      }
-      // D26: every officer's sync must leave this character out of an automatic group.
-      tx.set(
-        col(c, META).doc(DECLINED_DOC),
-        { ids: FieldValue.arrayUnion(action.characterId) },
-        { merge: true }
-      );
+      // The grouping the answer was about is gone, so the answer must not outlive it.
+      clearAnswers(c, [action.characterId]);
       return { detail: { minerId: action.minerId, characterId: action.characterId } };
     }
     case 'addAdjustment': {
@@ -1165,7 +1225,11 @@ export async function editBook(deps: BookDeps, caller: Caller, call: BookCall, a
   });
 }
 
-/** A guest or member confirms their own character into a Miner grouping (D26b). */
+/**
+ * A guest or member confirms their own character into a Miner grouping (D26b). The only
+ * proof accepted is the caller's own signed-in uid, which an EVE SSO sign-in with that
+ * character minted (`verifyEveToken`): a verify token never confirms anything (#4210).
+ */
 export async function confirmGrouping(
   deps: BookDeps,
   caller: Caller,
@@ -1186,7 +1250,86 @@ export async function confirmGrouping(
       confirmedCharacterIds: FieldValue.arrayUnion(characterId),
       uids: FieldValue.arrayUnion(caller.uid),
     });
+    recordAnswer(tx, deps, corporationId, characterId, {
+      minerId,
+      answer: 'confirmed',
+      via: 'character',
+    });
     appendAudit(tx, deps, corporationId, { characterId, name: '' }, 'confirmGrouping', { minerId });
+  });
+}
+
+/** Declines a pending grouping inside a transaction; shared by the two ways to decline. */
+async function declinePending(
+  deps: BookDeps,
+  corporationId: number,
+  minerId: string,
+  characterId: number,
+  actor: Actor
+) {
+  const ref = sub(deps.db, corporationId, MINERS).doc(minerId);
+  await deps.db.runTransaction(async (tx) => {
+    const miner = (await tx.get(ref)).data();
+    if (!miner || !(miner.pendingConfirmation as number[]).includes(characterId)) {
+      fail('not-found', 'Nothing to decline', 'nothing-pending');
+    }
+    removeFromMiner(tx, ref, miner, characterId);
+    recordAnswer(tx, deps, corporationId, characterId, {
+      minerId,
+      answer: 'declined',
+      via: actor.via === 'verify-link' ? 'verify-link' : 'character',
+    });
+    appendAudit(tx, deps, corporationId, actor, 'declineGrouping', { minerId, characterId });
+  });
+}
+
+/** The added character itself declines, signed in as itself. */
+export async function declineGrouping(
+  deps: BookDeps,
+  caller: Caller,
+  corporationId: number,
+  minerId: string
+) {
+  const characterId = characterIdForUid(caller.uid);
+  if (characterId === undefined)
+    fail('unauthenticated', 'Sign in with a Character first', 'not-signed-in');
+  await declinePending(deps, corporationId, minerId, characterId, { characterId, name: '' });
+}
+
+/**
+ * The Miner's verify link may decline a pending character but never confirm one. A decline
+ * only removes a link, so the mail reaching the main is proof enough; a confirm grants the
+ * grouping read access to the added character's lines, which only that character may allow.
+ */
+export async function declineGroupingByToken(deps: BookDeps, token: string, characterId: number) {
+  const snap = await deps.db.collection(TOKENS_COLLECTION).doc(token).get();
+  if (!snap.exists) fail('not-found', 'Verify link is not valid', 'invalid-token');
+  const { corporationId, minerId } = snap.data() as { corporationId: number; minerId: string };
+  await declinePending(deps, corporationId, minerId, characterId, {
+    characterId: null,
+    name: 'Miner (verify link)',
+    via: 'verify-link',
+  });
+}
+
+/**
+ * The groupings waiting for the caller's character to confirm, across every corporation's
+ * book. The caller learns only the corporation, the Miner and who the main is: enough to
+ * recognise the request, nothing of the other characters or any lines.
+ */
+export async function listPendingGroupings(deps: BookDeps, caller: Caller) {
+  const characterId = characterIdForUid(caller.uid);
+  if (characterId === undefined)
+    fail('unauthenticated', 'Sign in with a Character first', 'not-signed-in');
+  const snap = await deps.db
+    .collectionGroup(MINERS)
+    .where('pendingConfirmation', 'array-contains', characterId)
+    .get();
+  return snap.docs.flatMap((d) => {
+    const corporationId = Number(d.ref.parent.parent?.id);
+    if (d.ref.parent.parent?.parent.id !== BOOKS_COLLECTION || !Number.isFinite(corporationId))
+      return [];
+    return [{ corporationId, minerId: d.id, mainCharacterId: d.get('mainCharacterId') as number }];
   });
 }
 
@@ -1268,7 +1411,7 @@ export async function readStatementByToken(deps: BookDeps, token: string) {
   const thisStatement = statements.docs.find((d) => d.id === statementId);
   if (!thisStatement) fail('not-found', 'Verify link is not valid', 'invalid-token');
   const s = thisStatement.data() as Data;
-  // A whitelist: the guest sees no character ids, officer ids or other bookkeeping.
+  // A whitelist: the guest sees no character ids (bar `pendingCharacterIds` below, which they must answer), officer ids or other bookkeeping.
   const shown: Data = {};
   for (const key of [
     'id',
@@ -1347,6 +1490,10 @@ export async function readStatementByToken(deps: BookDeps, token: string) {
     remindersStopped: s.remindersStopped === true,
     // A guest's closed account (epic): set by the `closeAccount` edit (#4184).
     accountClosed: miner.exists && miner.get('closedAt') != null,
+    // Characters an officer added by hand that still wait for their own confirmation (#4210).
+    pendingCharacterIds: miner.exists
+      ? ((miner.get('pendingConfirmation') as number[] | undefined) ?? [])
+      : [],
   };
 }
 

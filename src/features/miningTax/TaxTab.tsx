@@ -154,6 +154,7 @@ import { splitLedger } from '@/features/miningTax/ledgerSections';
 import { suggestPayeeForSystem, systemsByPayee } from '@/features/miningTax/suggestPayee';
 import { claimCorpTaxBookPayment } from '@/features/miningTax/corpBook/corpBookStore';
 import { CorpBookSyncNote } from '@/features/miningTax/corpBook/CorpBookSyncNote';
+import { PendingGroupingNotice } from '@/features/miningTax/corpBook/PendingGroupingNotice';
 import { CorpPayDialog } from '@/features/miningTax/corpBook/CorpPayDialog';
 import { CorpRowDetailModal } from '@/features/miningTax/corpBook/CorpRowDetailModal';
 import { CorpStatusPill } from '@/features/miningTax/corpBook/CorpStatusPill';
@@ -1739,6 +1740,8 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
                   onAssignNext={assignNext}
                   onReviewPayments={() => setLinkPaymentOpen(true)}
                 />
+
+                {data && <PendingGroupingNotice characters={characters} />}
 
                 {corpView?.books.map((book) => (
                   <CorpBookSyncNote
