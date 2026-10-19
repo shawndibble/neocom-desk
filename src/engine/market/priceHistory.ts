@@ -5,6 +5,9 @@
  * `/markets/{region_id}/history`.
  */
 
+import { median } from '../math';
+import { utcDay } from '../localDay';
+
 export interface MarketHistoryPoint {
   date: string;
   /** Volume-weighted mean of the day's fills, as ESI reports it. */
@@ -41,7 +44,7 @@ export function filterPriceHistoryRange<T extends { date: string }>(
 ): T[] {
   const cutoff = new Date(now);
   cutoff.setDate(cutoff.getDate() - RANGE_DAYS[range]);
-  const cutoffDate = cutoff.toISOString().slice(0, 10);
+  const cutoffDate = utcDay(cutoff.getTime());
   return points.filter((p) => p.date >= cutoffDate);
 }
 
@@ -68,19 +71,12 @@ export interface PriceHistorySummary {
   meanOrderCount: number;
 }
 
-/** The middle value; an even count averages the two middle ones. NaN for an empty list. */
-export function medianOf(values: readonly number[]): number {
-  const sorted = [...values].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
-}
-
 /** Range hi/lo, median day, total volume and mean daily order count. Null for an empty range — never a fabricated 0. */
 export function summarizePriceHistory(
   points: readonly MarketHistoryPoint[]
 ): PriceHistorySummary | null {
   if (points.length === 0) return null;
-  const median = medianOf(points.map((p) => p.average));
+  const medianDay = median(points.map((p) => p.average));
   let totalVolume = 0;
   let totalOrderCount = 0;
   // `Math.min`/`Math.max` rather than a seeded comparison: a comparison seeded
@@ -96,7 +92,13 @@ export function summarizePriceHistory(
     hi = Math.max(hi, p.highest);
     lo = Math.min(lo, p.lowest);
   }
-  return { hi, lo, median, totalVolume, meanOrderCount: totalOrderCount / points.length };
+  return {
+    hi,
+    lo,
+    median: medianDay,
+    totalVolume,
+    meanOrderCount: totalOrderCount / points.length,
+  };
 }
 
 export interface MovingAveragePoint {

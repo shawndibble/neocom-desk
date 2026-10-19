@@ -19,6 +19,8 @@
  * of the path has no blueprint twin is added as extra groups.
  */
 
+import { byName } from '../compare';
+
 /** The market-group tree row, as `sde/marketTypes.ts` publishes it. */
 export interface ShareMarketGroup {
   id: number;
@@ -52,8 +54,6 @@ export interface ShareGroup {
 }
 
 export type GroupState = 'none' | 'some' | 'all';
-
-const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name);
 
 function finish(group: Omit<ShareGroup, 'total'>): ShareGroup {
   group.types.sort(byName);

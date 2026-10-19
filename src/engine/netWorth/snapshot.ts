@@ -3,6 +3,7 @@
  * only. Pure — the fetching, the Dexie write and the once-a-day guard live in
  * `features/netWorth`.
  */
+import { utcDay } from '../localDay';
 import { PLEX_TYPE_ID } from '@/engine/contracts/contractOffers';
 import { assetStackValue } from '@/engine/assetTree';
 
@@ -35,9 +36,7 @@ export function lacksLayer(row: NetWorthSnapshotRow): boolean {
   return row.sellStock === undefined;
 }
 
-export function utcDay(ms: number): string {
-  return new Date(ms).toISOString().slice(0, 10);
-}
+export { utcDay };
 
 export function snapshotId(characterId: number, day: string): string {
   return `${characterId}:${day}`;
