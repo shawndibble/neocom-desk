@@ -83,64 +83,17 @@ const { app: appStrings } = JSON.parse(
 ) as { app: { name: string; tagline: string } };
 
 /**
- * Plain `.test.ts` files that need a real `document`/`window` even though
- * nothing in them is `.tsx` — either `@testing-library/react`'s `renderHook`
- * (which mounts into a real `document`), or a browser global the module
- * under test reaches for directly (`sessionStorage`/`localStorage`,
- * `DOMParser`, `document.documentElement`, an `<a>` element for a download
- * link). None of these exist in a plain Node environment, so these files
- * stay on `jsdom` while every other `.test.ts` file (pure logic, verified by
- * actually running the full suite under `node` and fixing up whatever
- * failed) moves to `node` below for its per-file startup cost instead of
- * jsdom's.
+ * Plain `.ts` tests that need a real `document`/`window` — a `renderHook`
+ * (which mounts into a real `document`), or a browser global the module under
+ * test reaches for directly (`sessionStorage`/`localStorage`, `DOMParser`,
+ * `document.documentElement`, an `<a>` download link) — are named
+ * `*.dom.test.ts` and run on `jsdom`. Every other `.test.ts` file (pure
+ * logic) runs on `node` for its lower per-file startup cost. This replaces a
+ * hand-maintained path list that rotted on renames and let a new `renderHook`
+ * test land in `node`, failing with a confusing missing-`document` error;
+ * `src/testEnvironmentSplit.test.ts` now guards that case.
  */
-const DOM_TS_TESTS = [
-  // renderHook
-  'src/app/onboardingBannerSlot.test.ts',
-  'src/app/useGrantedScopes.test.ts',
-  'src/features/character/characterFilterValue.test.ts',
-  'src/features/character/ship.test.ts',
-  'src/features/corp/owner.test.ts',
-  'src/features/corp/useCorpAccess.test.ts',
-  'src/features/corp/useCorpRouteGate.test.ts',
-  'src/features/corp/useCorpSnapshot.test.ts',
-  'src/features/contractSearch/offerLocations.test.ts',
-  'src/features/industry/buildPlanPricingInputs.test.ts',
-  'src/features/industry/corpOwnedBlueprints.test.ts',
-  'src/features/industry/corpOwnedStock.test.ts',
-  'src/features/industry/useComparedBuildResults.test.ts',
-  'src/features/industry/useDetectedOwnedStock.test.ts',
-  'src/features/industry/useMarketSnapshot.test.ts',
-  'src/features/industry/useRunCountsByPlan.test.ts',
-  'src/features/fittings/useModuleAddPreview.test.ts',
-  'src/features/fittings/useModuleVariations.test.ts',
-  'src/features/fittings/useSkillGains.test.ts',
-  'src/features/fittings/useSkillLevelGain.test.ts',
-  'src/features/market/useAppraisal.test.ts',
-  'src/features/market/useCompareAttributes.test.ts',
-  'src/features/market/useCompareRows.test.ts',
-  'src/features/skills/useAccountSkillLevels.test.ts',
-  'src/features/skills/useTargetPlan.test.ts',
-  'src/lib/useAutoDismiss.test.ts',
-  'src/lib/useLazyRowCache.test.ts',
-  // sessionStorage / localStorage
-  'src/app/loginFlow.test.ts',
-  'src/auth/alertsLogin.test.ts',
-  'src/auth/corpSyncLogin.test.ts',
-  'src/features/notifications/alertsGrant.test.ts',
-  'src/auth/session.test.ts',
-  'src/auth/loginReturnTo.test.ts',
-  'src/sync/deviceId.test.ts',
-  // document / window
-  'src/lib/download.test.ts',
-  'src/lib/fontScale.test.ts',
-  'src/sync/deviceRegistration.test.ts',
-  'src/features/market/appraisalShareData.test.ts',
-  // DOMParser
-  'src/features/fittings/fittingXmlDocument.test.ts',
-  'src/features/skills/planner/planXmlDocument.test.ts',
-  'src/features/skills/planner/planXmlImport.test.ts',
-];
+const DOM_TS_TESTS = 'src/**/*.dom.test.ts';
 
 /**
  * Source-map upload is opt-in on the token, which only the deploy job holds:
@@ -504,7 +457,7 @@ export default defineConfig({
           // rest of that directory's one-off tooling stays untested by
           // design, same as before.
           include: ['src/**/*.{test,spec}.ts', 'scripts/lib/**/*.test.mjs'],
-          exclude: [...configDefaults.exclude, ...DOM_TS_TESTS],
+          exclude: [...configDefaults.exclude, DOM_TS_TESTS],
         },
       },
       {
@@ -517,7 +470,7 @@ export default defineConfig({
           // merging with it, so dropping the base file here would silently
           // lose `fake-indexeddb` and the route-snapshot reset.
           setupFiles: ['./vitest.setup.ts', './vitest.setup.dom.ts'],
-          include: ['src/**/*.{test,spec}.tsx', ...DOM_TS_TESTS],
+          include: ['src/**/*.{test,spec}.tsx', DOM_TS_TESTS],
         },
       },
     ],
