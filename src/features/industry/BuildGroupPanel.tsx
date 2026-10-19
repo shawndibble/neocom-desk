@@ -223,11 +223,6 @@ export function BuildGroupPanel({
         </div>
       )}
 
-      {loading && (
-        <div className="flex justify-center py-4">
-          <Spinner label={t('common.loading')} />
-        </div>
-      )}
       {!loading && (
         <GroupVerdictBand view={view} plans={plans} catalog={catalog} groupVolume={groupVolume} />
       )}
