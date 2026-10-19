@@ -33,6 +33,7 @@ import { NotificationEventList } from './NotificationEventList';
 import type { EventRowContext } from './eventRowSupport';
 import { useIsDesktop } from './useIsDesktop';
 import { db } from '@/db';
+import { useCharacters } from '@/features/character/useCharacters';
 import { NOTIFICATION_EVENT_IDS, eventLabelKey } from './events';
 import {
   useNotificationPreferences,
@@ -76,7 +77,11 @@ const SEARCH_PARAM = textParam();
 
 export function NotificationsPanel() {
   const { t } = useTranslation();
-  const characters = useLiveQuery(() => db.characters.orderBy('characterId').toArray());
+  const roster = useCharacters();
+  const characters = useMemo(
+    () => [...roster].sort((a, b) => a.characterId - b.characterId),
+    [roster]
+  );
   const tokens = useLiveQuery(() => db.tokens.toArray());
 
   const prefsValue = useNotificationPreferences((state) => state.value);
@@ -177,7 +182,7 @@ export function NotificationsPanel() {
 
   useEffect(() => {
     let cancelled = false;
-    const ids = (characters ?? []).map((c) => c.characterId);
+    const ids = characters.map((c) => c.characterId);
     if (ids.length === 0) return;
     void (async () => {
       const entries = await Promise.all(
@@ -209,7 +214,7 @@ export function NotificationsPanel() {
   // separate ticks, and rendering Characters before their tokens arrive drew
   // every row scope-less for a frame.
   const characterList = useMemo(
-    () => (characters !== undefined && tokens !== undefined ? characters : []),
+    () => (tokens !== undefined ? characters : []),
     [characters, tokens]
   );
 
