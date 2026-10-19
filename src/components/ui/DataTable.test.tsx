@@ -748,6 +748,14 @@ describe('DataTable', () => {
       expect(lead).toHaveClass('justify-end');
     });
 
+    it('pins the leading caret to the left edge of a right-aligned first column', () => {
+      renderTable({
+        expandableRow: { ...expandableRow, leadingIcon: true },
+        columns: [{ ...columns[0], align: 'right' }, ...columns.slice(1)],
+      });
+      expect(document.querySelector('.dt-lead-caret')).toHaveClass('mr-auto');
+    });
+
     it('keeps at most one row open — opening a second row closes the first', async () => {
       const user = userEvent.setup();
       renderTable({ expandableRow });
