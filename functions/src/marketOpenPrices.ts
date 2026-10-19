@@ -46,7 +46,7 @@ export interface RegionOpenPrices {
   sell: Array<number | null>;
 }
 
-/** The R2 object name suffix for a type: `open-prices/<typeId>.json`. */
+/** One type's object, `open-prices/<typeId>.json` in R2. */
 export interface TypeOpenPrices {
   typeId: number;
   /** Ascending, unique `YYYY-MM-DD`, shared by every region. */
