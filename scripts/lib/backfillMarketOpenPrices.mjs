@@ -3,15 +3,17 @@
 // with the script once the backfill has run.
 //
 // Two phases, so each R2 object is read and written once:
-//   1. foldDays: fold each day's final snapshot and keep only the compact
-//      result (OpenPriceTable) in memory.
+//   1. foldDays: fold each day's final snapshot at the hub stations (#4279;
+//      the region-wide fold only checks the snapshot is plausible) and keep
+//      only the compact result (OpenPriceTable) in memory.
 //   2. one writeOpenPricesToR2 pass over every type object, with all its days.
 import {
   OpenPriceFold,
+  SNAPSHOT_HUBS,
+  StationPriceFold,
   dateRange,
   implausibleReason,
   isIsoDate,
-  pairKey,
 } from '../../functions/src/marketOpenPrices.ts';
 
 export const USAGE = `Usage: node scripts/backfill-market-open-prices.mjs --from YYYY-MM-DD --to YYYY-MM-DD [--bucket <name>] [--write [--yes]] [--dry-run]
@@ -61,18 +63,18 @@ export function checkBucket({ envBucket, bucket, yes }) {
 }
 
 /**
- * Every folded day, held compactly. Each region/type pair gets an index the
+ * Every folded day, held compactly. Each hub station/type pair gets an index the
  * first time a day lists it; each day keeps two Float64Arrays (buy, sell)
  * indexed by pair and sized to the pairs known by then, NaN meaning "no
  * order". The fold only lists a pair with at least one side priced, so both
  * NaN means the day did not list it. 16 bytes per pair per day: 400 days x
  * ~70k pairs is ~450 MB, where the folds' Maps of objects would be several GB.
  * Objects are one per type (`open-prices/<typeId>.json`), so `documents()`
- * gathers each type's pairs, one per region, into one document.
+ * gathers each type's pairs, one per hub station, into one object.
  */
 export class OpenPriceTable {
   #pairIndex = new Map();
-  #regionIds = [];
+  #stationIds = [];
   /** typeId -> its pairs' indexes, in first-seen order: one document each. */
   #pairsByType = new Map();
   #buys = [];
@@ -80,16 +82,16 @@ export class OpenPriceTable {
   /** Ascending as added. */
   dates = [];
 
-  /** @param {string} date @param {OpenPriceFold} fold */
+  /** @param {string} date @param {StationPriceFold} fold */
   addDay(date, fold) {
     const indexes = [];
     for (const e of fold.entries()) {
-      const key = pairKey(e.regionId, e.typeId);
+      const key = `${e.stationId}_${e.typeId}`;
       let i = this.#pairIndex.get(key);
       if (i === undefined) {
-        i = this.#regionIds.length;
+        i = this.#stationIds.length;
         this.#pairIndex.set(key, i);
-        this.#regionIds.push(e.regionId);
+        this.#stationIds.push(e.stationId);
         let pairs = this.#pairsByType.get(e.typeId);
         if (!pairs) {
           pairs = [];
@@ -99,8 +101,8 @@ export class OpenPriceTable {
       }
       indexes.push(i);
     }
-    const buy = new Float64Array(this.#regionIds.length).fill(NaN);
-    const sell = new Float64Array(this.#regionIds.length).fill(NaN);
+    const buy = new Float64Array(this.#stationIds.length).fill(NaN);
+    const sell = new Float64Array(this.#stationIds.length).fill(NaN);
     let n = 0;
     for (const e of fold.entries()) {
       const i = indexes[n++];
@@ -122,26 +124,26 @@ export class OpenPriceTable {
     return this.#buys.reduce((n, a) => n + a.byteLength * 2, 0);
   }
 
-  /** One `TypeDays` per type document, every region of a day together, days ascending. Built lazily. */
+  /** One `TypeDays` per type object, every station of a day together, days ascending. Built lazily. */
   *documents() {
     const buys = this.#buys;
     const sells = this.#sells;
     for (const [typeId, pairs] of this.#pairsByType) {
       const days = [];
       for (let d = 0; d < this.dates.length; d++) {
-        let regions = null;
+        let stations = null;
         for (const p of pairs) {
           if (p >= buys[d].length) continue;
           const b = buys[d][p];
           const s = sells[d][p];
           if (Number.isNaN(b) && Number.isNaN(s)) continue;
-          regions ??= {};
-          regions[String(this.#regionIds[p])] = {
+          stations ??= {};
+          stations[String(this.#stationIds[p])] = {
             buy: Number.isNaN(b) ? null : b,
             sell: Number.isNaN(s) ? null : s,
           };
         }
-        if (regions) days.push({ date: this.dates[d], regions });
+        if (stations) days.push({ date: this.dates[d], stations });
       }
       yield { typeId, days };
     }
@@ -156,7 +158,7 @@ export class OpenPriceTable {
  * @param {{
  *   from: string, to: string, table: OpenPriceTable,
  *   snapshotUrlFor: (date: string) => Promise<string | null>,
- *   foldUrl: (url: string, fold: OpenPriceFold) => Promise<number>,
+ *   foldUrl: (url: string, fold: OpenPriceFold, stations: StationPriceFold) => Promise<number>,
  *   log: (line: string) => void,
  * }} deps
  */
@@ -171,16 +173,17 @@ export async function foldDays({ from, to, table, snapshotUrlFor, foldUrl, log }
       continue;
     }
     const fold = new OpenPriceFold();
-    const rows = await foldUrl(url, fold);
+    const stations = new StationPriceFold(SNAPSHOT_HUBS);
+    const rows = await foldUrl(url, fold, stations);
     const reason = implausibleReason(fold);
     if (reason) {
       skipped.push(date);
       log(`${date}: ${reason}, skipped`);
       continue;
     }
-    table.addDay(date, fold);
+    table.addDay(date, stations);
     log(
-      `${date} (${i + 1}/${dates.length}): ${rows} orders, ${fold.size} priced region/type pairs, from ${url}; ${mb(table.bytes)} MB held`
+      `${date} (${i + 1}/${dates.length}): ${rows} orders, ${stations.size} priced station/type pairs, from ${url}; ${mb(table.bytes)} MB held`
     );
   }
   return { skipped };
@@ -194,7 +197,7 @@ export async function foldDays({ from, to, table, snapshotUrlFor, foldUrl, log }
  * @param {{
  *   from: string, to: string, write: boolean,
  *   snapshotUrlFor: (date: string) => Promise<string | null>,
- *   foldUrl: (url: string, fold: OpenPriceFold) => Promise<number>,
+ *   foldUrl: (url: string, fold: OpenPriceFold, stations: StationPriceFold) => Promise<number>,
  *   writeDocuments: (docs: Iterable<import('../../functions/src/marketOpenPrices.ts').TypeDays>, total: number) => Promise<number>,
  *   log: (line: string) => void,
  * }} deps

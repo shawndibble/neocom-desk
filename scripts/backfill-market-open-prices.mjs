@@ -3,8 +3,10 @@
 // EVE Ref's market-order snapshot history. DELETE THIS SCRIPT (and
 // scripts/lib/backfillMarketOpenPrices.*) once the backfill has run; the daily
 // `syncMarketOpenPrices` function carries it on from there. Decisions:
-// docs/context/decisions/20261018-121126-*.md, 20261018-164126-*.md and
-// 20261018-201511-moving-the-daily-snapshots-to-r2.md.
+// docs/context/decisions/20261018-121126-*.md, 20261018-164126-*.md,
+// 20261018-201511-moving-the-daily-snapshots-to-r2.md and the #4279 one (prices
+// at the hub stations, not region-wide: a re-run rewrites every day it covers
+// in the station shape and drops that day's old region prices).
 //
 // Run by the maintainer, with their own R2 credentials. It never runs in CI or
 // from an agent. From the repo root, after `npm ci` in both the root and
@@ -20,9 +22,9 @@
 //     --bucket neocom-snapshots --write
 //
 // Phase 1 folds every day and keeps only a compact table in memory (two
-// Float64Arrays per day, indexed by region/type pair: ~450 MB for 400 days).
+// Float64Arrays per day, indexed by hub station/type pair: ~450 MB for 400 days).
 // Phase 2 then runs one pass over the type objects (one per type, every hub
-// region in it: ~20k objects), so each is read and merge-written exactly once,
+// station in it: ~20k objects), so each is read and merge-written exactly once,
 // with progress lines as it goes. The merge keeps stored days outside
 // --from..--to (the daily function's) and the 400-day cap; a stored day inside
 // the range is replaced with the same snapshot's prices. Nothing is written
@@ -120,7 +122,7 @@ const { written, skipped } = await runBackfill({
     const found = await findFinalSnapshot(date, (url) => fetchJson(url, USER_AGENT));
     return found.final ? found.snapshot.url : null;
   },
-  foldUrl: (url, fold) => foldSnapshotUrl(url, fold, USER_AGENT),
+  foldUrl: (url, fold, stations) => foldSnapshotUrl(url, fold, USER_AGENT, stations),
   writeDocuments: async (docs, total) => {
     const started = Date.now();
     let logged = 0;

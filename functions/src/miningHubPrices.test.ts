@@ -58,6 +58,16 @@ describe('stationFoldWrites', () => {
       { hubId: 'jita', date: '2026-10-17', day: { tier: 'saved', prices: { 34: [5, null] } } },
     ]);
   });
+
+  it('keeps only the mining types when the fold holds every type (the open-prices fold)', () => {
+    const f = new StationPriceFold(SNAPSHOT_HUBS);
+    f.add(JITA, 34, true, 5);
+    f.add(JITA, 587, true, 9);
+    f.add(AMARR, 587, true, 9);
+    expect(stationFoldWrites(f, SNAPSHOT_HUBS, '2026-10-17', [34])).toEqual([
+      { hubId: 'jita', date: '2026-10-17', day: { tier: 'saved', prices: { 34: [5, null] } } },
+    ]);
+  });
 });
 
 describe('miningPricesR2Key', () => {

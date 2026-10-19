@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   MARKET_OPEN_PRICES_MAX_DAYS,
   OpenPriceFold,
+  SNAPSHOT_HUBS,
+  StationPriceFold,
   addDays,
   dateRange,
   dayIndexUrl,
@@ -21,6 +23,8 @@ import {
 
 const FORGE = 10000002;
 const DOMAIN = 10000043;
+const JITA = 60003760;
+const AMARR = 60008494;
 
 describe('dates', () => {
   it('previousUtcDate is the UTC day before, whatever the time', () => {
@@ -187,130 +191,197 @@ describe('openPriceDocId', () => {
   });
 });
 
+describe('StationPriceFold for every type', () => {
+  it('keeps the best buy and sell per hub station for any type when no type list is given', () => {
+    const f = new StationPriceFold(SNAPSHOT_HUBS);
+    f.add(JITA, 587, true, 10);
+    f.add(JITA, 587, true, 12);
+    f.add(JITA, 587, false, 15);
+    f.add(AMARR, 44992, false, 3);
+    expect(f.prices(JITA)).toEqual({ 587: [12, 15] });
+    expect([...f.entries()]).toEqual([
+      { stationId: JITA, typeId: 587, buy: 12, sell: 15 },
+      { stationId: AMARR, typeId: 44992, buy: null, sell: 3 },
+    ]);
+    expect(f.size).toBe(2);
+  });
+  it('ignores non-hub stations, a non-integer type and unusable prices', () => {
+    const f = new StationPriceFold(SNAPSHOT_HUBS);
+    f.add(60003761, 587, true, 10);
+    f.add(JITA, 1.5, true, 10);
+    f.add(JITA, 587, true, 0);
+    f.add(JITA, 587, false, Number.POSITIVE_INFINITY);
+    expect(f.size).toBe(0);
+  });
+  it('narrows to the given types and reads a subset back', () => {
+    const f = new StationPriceFold(SNAPSHOT_HUBS, [34]);
+    f.add(JITA, 35, true, 1);
+    f.add(JITA, 34, true, 2);
+    expect(f.prices(JITA)).toEqual({ 34: [2, null] });
+    const all = new StationPriceFold(SNAPSHOT_HUBS);
+    all.add(JITA, 35, true, 1);
+    all.add(JITA, 34, true, 2);
+    expect(all.prices(JITA, new Set([34]))).toEqual({ 34: [2, null] });
+  });
+});
+
 describe('mergeDays', () => {
   const base = { typeId: 34 };
   const day = (
     date: string,
-    regions: Record<string, { buy: number | null; sell: number | null }>
+    stations: Record<string, { buy: number | null; sell: number | null }>
   ) => ({
     date,
-    regions,
+    stations,
   });
 
-  it('starts a document from nothing: shared dates, per-region parallel arrays', () => {
+  it('starts an object from nothing: shared dates, per-station parallel arrays', () => {
     expect(
       mergeDays(base, null, [
-        day('2026-10-17', { [FORGE]: { buy: 5, sell: 6 }, [DOMAIN]: { buy: null, sell: 9 } }),
+        day('2026-10-17', { [JITA]: { buy: 5, sell: 6 }, [AMARR]: { buy: null, sell: 9 } }),
       ])
     ).toEqual({
       typeId: 34,
       dates: ['2026-10-17'],
-      regions: { [FORGE]: { buy: [5], sell: [6] }, [DOMAIN]: { buy: [null], sell: [9] } },
+      stations: { [JITA]: { buy: [5], sell: [6] }, [AMARR]: { buy: [null], sell: [9] } },
     });
   });
-  it('a region with no orders on a day reads null there, and no day is invented for a gap', () => {
-    const first = mergeDays(base, null, [day('2026-10-10', { [FORGE]: { buy: 1, sell: 2 } })]);
-    const next = mergeDays(base, first, [day('2026-10-17', { [DOMAIN]: { buy: 3, sell: 4 } })]);
+  it('a station with no orders on a day reads null there, and no day is invented for a gap', () => {
+    const first = mergeDays(base, null, [day('2026-10-10', { [JITA]: { buy: 1, sell: 2 } })]);
+    const next = mergeDays(base, first, [day('2026-10-17', { [AMARR]: { buy: 3, sell: 4 } })]);
     expect(next.dates).toEqual(['2026-10-10', '2026-10-17']);
-    expect(next.regions).toEqual({
-      [FORGE]: { buy: [1, null], sell: [2, null] },
-      [DOMAIN]: { buy: [null, 3], sell: [null, 4] },
+    expect(next.stations).toEqual({
+      [JITA]: { buy: [1, null], sell: [2, null] },
+      [AMARR]: { buy: [null, 3], sell: [null, 4] },
     });
   });
   it('is idempotent: re-running a day replaces that whole day', () => {
     const once = mergeDays(base, null, [
-      day('2026-10-17', { [FORGE]: { buy: 5, sell: 6 }, [DOMAIN]: { buy: 1, sell: 1 } }),
+      day('2026-10-17', { [JITA]: { buy: 5, sell: 6 }, [AMARR]: { buy: 1, sell: 1 } }),
     ]);
-    const again = mergeDays(base, once, [day('2026-10-17', { [FORGE]: { buy: 7, sell: 8 } })]);
+    const again = mergeDays(base, once, [day('2026-10-17', { [JITA]: { buy: 7, sell: 8 } })]);
     expect(again).toEqual({
       typeId: 34,
       dates: ['2026-10-17'],
-      regions: { [FORGE]: { buy: [7], sell: [8] } },
+      stations: { [JITA]: { buy: [7], sell: [8] } },
     });
-    expect(mergeDays(base, again, [day('2026-10-17', { [FORGE]: { buy: 7, sell: 8 } })])).toEqual(
+    expect(mergeDays(base, again, [day('2026-10-17', { [JITA]: { buy: 7, sell: 8 } })])).toEqual(
       again
     );
   });
   it('slots older days in order (backfill after the daily job), keeping the stored ones', () => {
-    const live = mergeDays(base, null, [day('2026-10-17', { [FORGE]: { buy: 5, sell: 6 } })]);
+    const live = mergeDays(base, null, [day('2026-10-17', { [JITA]: { buy: 5, sell: 6 } })]);
     const back = mergeDays(base, live, [
-      day('2026-10-15', { [FORGE]: { buy: 1, sell: 2 } }),
-      day('2026-10-16', { [FORGE]: { buy: 3, sell: 4 } }),
+      day('2026-10-15', { [JITA]: { buy: 1, sell: 2 } }),
+      day('2026-10-16', { [JITA]: { buy: 3, sell: 4 } }),
     ]);
     expect(back.dates).toEqual(['2026-10-15', '2026-10-16', '2026-10-17']);
-    expect(back.regions[FORGE].buy).toEqual([1, 3, 5]);
+    expect(back.stations[JITA].buy).toEqual([1, 3, 5]);
   });
-  it('caps at the newest 400 days and drops a region left with no price', () => {
+  it('caps at the newest 400 days and drops a station left with no price', () => {
     const days = dateRange('2025-01-01', '2026-12-31').map((date, i) =>
-      day(date, i === 0 ? { [DOMAIN]: { buy: 1, sell: 1 } } : { [FORGE]: { buy: i, sell: i } })
+      day(date, i === 0 ? { [AMARR]: { buy: 1, sell: 1 } } : { [JITA]: { buy: i, sell: i } })
     );
     const merged = mergeDays(base, null, days);
     expect(merged.dates).toHaveLength(MARKET_OPEN_PRICES_MAX_DAYS);
     expect(merged.dates.at(-1)).toBe('2026-12-31');
-    expect(merged.regions[FORGE].buy.at(-1)).toBe(days.length - 1);
-    expect(merged.regions[FORGE].buy).toHaveLength(MARKET_OPEN_PRICES_MAX_DAYS);
-    expect(Object.keys(merged.regions)).toEqual([String(FORGE)]);
+    expect(merged.stations[JITA].buy.at(-1)).toBe(days.length - 1);
+    expect(merged.stations[JITA].buy).toHaveLength(MARKET_OPEN_PRICES_MAX_DAYS);
+    expect(Object.keys(merged.stations)).toEqual([String(JITA)]);
   });
-  it('reads a ragged or malformed stored region as null where it falls short', () => {
+  it('reads a ragged or malformed stored station as null where it falls short', () => {
     const merged = mergeDays(
       base,
       {
         dates: ['2026-10-01', '2026-10-02'],
-        regions: { [FORGE]: { buy: [1], sell: [2, 3] }, junk: 'x' } as never,
+        stations: { [JITA]: { buy: [1], sell: [2, 3] }, junk: 'x' } as never,
       },
-      [day('2026-10-03', { [FORGE]: { buy: 9, sell: 9 } })]
+      [day('2026-10-03', { [JITA]: { buy: 9, sell: 9 } })]
     );
     expect(merged.dates).toEqual(['2026-10-01', '2026-10-02', '2026-10-03']);
-    expect(merged.regions).toEqual({
-      [FORGE]: { buy: [1, null, 9], sell: [2, 3, 9] },
+    expect(merged.stations).toEqual({
+      [JITA]: { buy: [1, null, 9], sell: [2, 3, 9] },
     });
   });
-  it('drops a stored date where no region has a price', () => {
+  it('drops a stored date where no station has a price', () => {
     const merged = mergeDays(
       base,
       {
         dates: ['2026-10-01', '2026-10-02'],
-        regions: { [FORGE]: { buy: [null, 1], sell: [null, 2] } },
+        stations: { [JITA]: { buy: [null, 1], sell: [null, 2] } },
       },
       []
     );
     expect(merged).toEqual({
       typeId: 34,
       dates: ['2026-10-02'],
-      regions: { [FORGE]: { buy: [1], sell: [2] } },
+      stations: { [JITA]: { buy: [1], sell: [2] } },
     });
   });
-  it('keeps a document of 400 days x 5 regions well under 1 MB', () => {
-    const regions = [10000002, 10000043, 10000032, 10000030, 10000042];
+
+  describe('an object still in the old, region-wide shape', () => {
+    const old = {
+      typeId: 34,
+      dates: ['2026-10-15', '2026-10-16'],
+      regions: {
+        [FORGE]: { buy: [1, 3], sell: [2, 4] },
+        [DOMAIN]: { buy: [null, 5], sell: [null, 6] },
+      },
+    };
+
+    it('keeps its region days and adds the new station day beside them', () => {
+      const merged = mergeDays(base, old, [day('2026-10-17', { [JITA]: { buy: 7, sell: 8 } })]);
+      expect(merged).toEqual({
+        typeId: 34,
+        dates: ['2026-10-15', '2026-10-16', '2026-10-17'],
+        stations: { [JITA]: { buy: [null, null, 7], sell: [null, null, 8] } },
+        regions: {
+          [FORGE]: { buy: [1, 3, null], sell: [2, 4, null] },
+          [DOMAIN]: { buy: [null, 5, null], sell: [null, 6, null] },
+        },
+      });
+    });
+    it('replaces a region day with the station day for the same date (the backfill re-run)', () => {
+      const merged = mergeDays(base, old, [day('2026-10-16', { [JITA]: { buy: 9, sell: 10 } })]);
+      expect(merged.dates).toEqual(['2026-10-15', '2026-10-16']);
+      expect(merged.stations).toEqual({ [JITA]: { buy: [null, 9], sell: [null, 10] } });
+      expect(merged.regions).toEqual({ [FORGE]: { buy: [1, null], sell: [2, null] } });
+    });
+    it('drops the region series entirely once every region day is replaced', () => {
+      const merged = mergeDays(base, old, [
+        day('2026-10-15', { [JITA]: { buy: 1, sell: 2 } }),
+        day('2026-10-16', { [JITA]: { buy: 3, sell: 4 } }),
+      ]);
+      expect(merged).toEqual({
+        typeId: 34,
+        dates: ['2026-10-15', '2026-10-16'],
+        stations: { [JITA]: { buy: [1, 3], sell: [2, 4] } },
+      });
+      expect('regions' in merged).toBe(false);
+    });
+    it('carries a mixed object forward unchanged when the merge adds nothing', () => {
+      const mixed = mergeDays(base, old, [day('2026-10-17', { [JITA]: { buy: 7, sell: 8 } })]);
+      expect(mergeDays(base, mixed, [])).toEqual(mixed);
+    });
+  });
+
+  it('keeps an object of 400 days x 5 stations well under 1 MB', () => {
+    const stations = SNAPSHOT_HUBS.map((h) => h.stationId);
     const days = dateRange('2025-09-14', '2026-10-17').map((date) =>
-      day(date, Object.fromEntries(regions.map((r) => [r, { buy: 1234567.89, sell: 1234567.99 }])))
+      day(date, Object.fromEntries(stations.map((s) => [s, { buy: 1234567.89, sell: 1234567.99 }])))
     );
-    const merged = mergeDays(base, null, days);
-    // Firestore's documented storage sizes: string = UTF-8 length + 1,
-    // number = 8, null = 1, map = sum of (key length + 1 + value), + 32 per doc.
-    const sizeOf = (v: unknown): number =>
-      v === null
-        ? 1
-        : typeof v === 'string'
-          ? v.length + 1
-          : typeof v === 'number'
-            ? 8
-            : Array.isArray(v)
-              ? v.reduce((n: number, x) => n + sizeOf(x), 0)
-              : Object.entries(v as object).reduce((n, [k, x]) => n + k.length + 1 + sizeOf(x), 0);
-    const size = sizeOf(merged) + 32;
-    expect(size).toBeLessThan(50_000);
+    expect(JSON.stringify(mergeDays(base, null, days)).length).toBeLessThan(60_000);
   });
 });
 
 describe('groupByDocument', () => {
-  it("collects each type's days ascending, every region of a day together", () => {
-    const a = new OpenPriceFold();
-    a.add(FORGE, 34, true, 1);
-    const b = new OpenPriceFold();
-    b.add(FORGE, 34, false, 2);
-    b.add(DOMAIN, 34, true, 3);
-    b.add(DOMAIN, 35, true, 4);
+  it("collects each type's days ascending, every station of a day together", () => {
+    const a = new StationPriceFold(SNAPSHOT_HUBS);
+    a.add(JITA, 34, true, 1);
+    const b = new StationPriceFold(SNAPSHOT_HUBS);
+    b.add(JITA, 34, false, 2);
+    b.add(AMARR, 34, true, 3);
+    b.add(AMARR, 35, true, 4);
     const groups = groupByDocument(
       new Map([
         ['2026-10-02', b],
@@ -321,14 +392,14 @@ describe('groupByDocument', () => {
       {
         typeId: 34,
         days: [
-          { date: '2026-10-01', regions: { [FORGE]: { buy: 1, sell: null } } },
+          { date: '2026-10-01', stations: { [JITA]: { buy: 1, sell: null } } },
           {
             date: '2026-10-02',
-            regions: { [FORGE]: { buy: null, sell: 2 }, [DOMAIN]: { buy: 3, sell: null } },
+            stations: { [JITA]: { buy: null, sell: 2 }, [AMARR]: { buy: 3, sell: null } },
           },
         ],
       },
-      { typeId: 35, days: [{ date: '2026-10-02', regions: { [DOMAIN]: { buy: 4, sell: null } } }] },
+      { typeId: 35, days: [{ date: '2026-10-02', stations: { [AMARR]: { buy: 4, sell: null } } }] },
     ]);
   });
 });
