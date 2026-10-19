@@ -50,7 +50,7 @@ import {
   journalDayLabel,
   newestJournalDays,
 } from '@/features/character/walletJournalDays';
-import { signedIsk } from '@/features/market/signedIsk';
+import { signedIsk } from '@/lib/signedIsk';
 import { useColumnVisibility } from '@/lib/columnVisibility';
 import { useElementNarrowerThan } from '@/lib/useElementNarrowerThan';
 import { useIsPhone } from '@/lib/useIsPhone';

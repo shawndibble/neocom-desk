@@ -1,15 +1,16 @@
 /**
  * Daily open prices for the Price History chart: the highest buy order and the
  * lowest sell order standing at the end of each UTC day, as the
- * `marketOpenPrices` snapshot stores them (docs/context/decisions/
+ * R2 `open-prices/<typeId>.json` objects store them (docs/context/decisions/
  * 20261018-121126-price-history-draws-daily-open-buy-and-sell.md). ESI history
  * only records trades, so it cannot say this. Pure — the loader adapts the
  * stored document.
  */
-import { filterPriceHistoryRange, medianOf, type PriceHistoryRange } from './priceHistory';
+import { median } from '../math';
+import { filterPriceHistoryRange, type PriceHistoryRange } from './priceHistory';
 import type { ComparedHistoryDay } from './priceHistoryCompare';
 
-/** The stored shape: parallel arrays, `null` where no order stood that day. */
+/** One region of a stored type document: parallel arrays, `null` where no order stood that day. */
 export interface OpenPriceSeries {
   dates: readonly string[];
   buy: readonly (number | null)[];
@@ -22,14 +23,23 @@ export interface OpenPricePoint {
   sell: number | null;
 }
 
-/** Which open-price lines the chart draws. */
-export type PriceSeriesChoice = 'both' | 'buy' | 'sell';
+/**
+ * Which lines the chart draws: open buy and/or sell where a region has them,
+ * or `average` — every region's ESI average, so a trade hub and a region
+ * without open prices compare on the same footing.
+ */
+export type PriceSeriesChoice = 'both' | 'buy' | 'sell' | 'average';
 
-export const PRICE_SERIES_CHOICES: readonly PriceSeriesChoice[] = ['both', 'buy', 'sell'];
+export const PRICE_SERIES_CHOICES: readonly PriceSeriesChoice[] = [
+  'both',
+  'buy',
+  'sell',
+  'average',
+];
 
 export type OpenPriceSide = 'buy' | 'sell';
 
-/** Whether `side`'s line is drawn under `choice`. */
+/** Whether `side`'s line is drawn under `choice`; never under `average`. */
 export function seriesShows(choice: PriceSeriesChoice, side: OpenPriceSide): boolean {
   return choice === 'both' || choice === side;
 }
@@ -54,13 +64,19 @@ export function openPricePoints(series: OpenPriceSeries): OpenPricePoint[] {
 export function clipOpenPrices(
   points: readonly OpenPricePoint[],
   range: PriceHistoryRange,
-  now?: Date
+  now: Date
 ): OpenPricePoint[] {
-  return now ? filterPriceHistoryRange(points, range, now) : filterPriceHistoryRange(points, range);
+  return filterPriceHistoryRange(points, range, now);
 }
 
 export interface RegionOpenSeries {
   regionId: number;
+  /**
+   * The hub station whose orders these are ("Jita 4-4"), which names the
+   * region's Buy and Sell lines. Absent for an object still holding the old
+   * region-wide prices (#4279's transition).
+   */
+  station?: string;
   points: readonly OpenPricePoint[];
 }
 
@@ -108,12 +124,12 @@ export interface OpenPriceSummary {
 /** The typical day's open buy and sell. Null for no points — never a fabricated 0. */
 export function summarizeOpenPrices(points: readonly OpenPricePoint[]): OpenPriceSummary | null {
   if (points.length === 0) return null;
-  const median = (values: (number | null)[]): number | null => {
+  const medianOfPresent = (values: (number | null)[]): number | null => {
     const present = values.filter((v): v is number => v !== null);
-    return present.length === 0 ? null : medianOf(present);
+    return present.length === 0 ? null : median(present);
   };
   return {
-    buyMedian: median(points.map((p) => p.buy)),
-    sellMedian: median(points.map((p) => p.sell)),
+    buyMedian: medianOfPresent(points.map((p) => p.buy)),
+    sellMedian: medianOfPresent(points.map((p) => p.sell)),
   };
 }

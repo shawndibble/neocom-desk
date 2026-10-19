@@ -4,6 +4,7 @@
  * regions' daily history.
  */
 import type { MarketHistoryPoint } from '@/engine/market/priceHistory';
+import { parseInstant } from '../esiInstant';
 import { DAY_MS } from '@/lib/age';
 
 /**
@@ -32,7 +33,7 @@ export function reliableSellPrice(
 }
 
 /** How many days back `averageDailyVolume` looks. */
-export const SALES_WINDOW_DAYS = 30;
+const SALES_WINDOW_DAYS = 30;
 
 /** Fewer units a day than this, and a product "rarely sells". */
 export const RARELY_SOLD_PER_DAY = 5;
@@ -50,7 +51,7 @@ export function averageDailyVolume(
   let units = 0;
   for (const history of histories) {
     for (const point of history) {
-      if (Date.parse(`${point.date}T00:00:00Z`) >= since) units += point.volume;
+      if ((parseInstant(`${point.date}T00:00:00Z`) ?? -Infinity) >= since) units += point.volume;
     }
   }
   return units / SALES_WINDOW_DAYS;
@@ -65,7 +66,7 @@ export function averageDailyOrders(history: readonly MarketHistoryPoint[], nowMs
   const since = nowMs - SALES_WINDOW_DAYS * DAY_MS;
   let orders = 0;
   for (const point of history) {
-    if (Date.parse(`${point.date}T00:00:00Z`) >= since) orders += point.orderCount;
+    if ((parseInstant(`${point.date}T00:00:00Z`) ?? -Infinity) >= since) orders += point.orderCount;
   }
   return orders / SALES_WINDOW_DAYS;
 }

@@ -6,7 +6,7 @@ import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { BuildPlanCompare } from './BuildPlanCompare';
 import { useCompareHub } from './compareColumns';
-import { PRICING_INPUTS_FIXTURE } from './pricingInputsFixtures';
+import { PRICING_INPUTS_FIXTURE } from './pricingInputsFixtures.testutil';
 import { useComparedBuildResults, type ComparedBuildRow } from './useComparedBuildResults';
 import type { BuildPlanRecord } from '@/db';
 import type { BlueprintCatalog } from './blueprintCatalog';

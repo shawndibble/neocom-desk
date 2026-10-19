@@ -1,17 +1,22 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import {
   focusRingInsetClassName,
   rowInteractiveClassName,
   selectedRowClassName,
 } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
-import { useMemo, useState } from 'react';
+import { lazy, Suspense, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, SearchInput, TypeIcon } from '@/components/ui';
 import { buildHullCatalogue, searchHulls, type HullEntry } from '@/engine/fittings/hullCatalogue';
 import type { LoadedFitting } from '@/engine/fittings/load';
 import { CatalogueLoadingNote } from './FittingDataNotices';
-import { PopularFitsPanel } from './PopularFitsPanel';
 import type { FittingCatalogue } from './useFittingCatalogue';
+import { guarded } from '@/app/routeChunks';
+
+const PopularFitsPanel = lazy(() =>
+  guarded(() => import('./PopularFitsPanel')).then((m) => ({ default: m.PopularFitsPanel }))
+);
 
 interface HullPickerProps {
   catalogue: FittingCatalogue | null;
@@ -66,7 +71,7 @@ export function HullPicker({ catalogue, onStart, onOpenPopular }: HullPickerProp
           <div className="columns-1 gap-4 sm:columns-2 xl:columns-3">
             {shown.map((hullClass) => (
               <section key={hullClass.id} className="mb-3 break-inside-avoid">
-                <h3 className="mb-1 flex justify-between text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                <h3 className={cx(eyebrowClassName, 'mb-1 flex justify-between')}>
                   <span>{hullClass.name}</span>
                   <span className="tabular-nums">{hullClass.hulls.length}</span>
                 </h3>
@@ -121,11 +126,13 @@ export function HullPicker({ catalogue, onStart, onOpenPopular }: HullPickerProp
         </Button>
       </div>
       {selected && onOpenPopular && (
-        <PopularFitsPanel
-          shipTypeId={selected.typeId}
-          hullName={selected.name}
-          onOpen={onOpenPopular}
-        />
+        <Suspense fallback={null}>
+          <PopularFitsPanel
+            shipTypeId={selected.typeId}
+            hullName={selected.name}
+            onOpen={onOpenPopular}
+          />
+        </Suspense>
       )}
     </div>
   );

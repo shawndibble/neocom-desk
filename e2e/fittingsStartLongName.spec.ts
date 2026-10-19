@@ -45,7 +45,7 @@ for (const size of [
       });
     });
     await page.setViewportSize(size);
-    await signInAndGoto(page, './fittings');
+    await signInAndGoto(page, './ships/fittings');
 
     const list = page.getByRole('navigation', { name: /fittings/i }).first();
     const longRow = page.getByRole('button', { name: new RegExp(`^${LONG_NAME}`) });

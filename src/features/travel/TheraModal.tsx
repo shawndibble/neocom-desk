@@ -13,6 +13,7 @@
  * have no gate route from anywhere, so they fold into a group under the table
  * instead of sinking to its bottom.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -169,10 +170,7 @@ function TheraModalBody({
 function Labelled({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex flex-col items-start gap-1">
-      <span
-        aria-hidden="true"
-        className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
-      >
+      <span aria-hidden="true" className={eyebrowClassName}>
         {label}
       </span>
       {children}

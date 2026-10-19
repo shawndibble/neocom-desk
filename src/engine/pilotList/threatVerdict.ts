@@ -7,6 +7,7 @@
  * deadly they have been, never a statement that anyone is safe: the lowest
  * level is "low", not "safe".
  */
+import { sum } from '../math';
 import type { KillRecord, KillSpace } from './killActivity';
 import { DAY_MS } from '@/lib/age';
 
@@ -126,7 +127,7 @@ export function threatVerdict({
     }
   }
 
-  const placed = [...counts.values()].reduce((sum, n) => sum + n, 0);
+  const placed = sum([...counts.values()]);
   const alsoSpaces = SPACE_PRIORITY.filter(
     (space) =>
       space !== mainSpace && placed > 0 && (counts.get(space) ?? 0) / placed >= ALSO_SPACE_MIN_SHARE

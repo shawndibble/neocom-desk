@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
@@ -476,9 +477,7 @@ export function ResultsSummary({
       {ownedSale && ownedSale.instant.ownedUnits > 0 && (
         <div className="space-y-1">
           <div className="flex items-center justify-between gap-2">
-            <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-              {t('industry.useOrSell.label')}
-            </p>
+            <p className={eyebrowClassName}>{t('industry.useOrSell.label')}</p>
             {ownedSale[saleBasis].lines.length > 0 && (
               <TableActionsMenu
                 name={t('industry.useOrSell.perMaterial')}

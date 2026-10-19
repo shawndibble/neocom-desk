@@ -23,13 +23,13 @@ import { routeToHref } from '@/features/route/routeSafetyLink';
 import { formatCountdown } from '@/lib/duration';
 import { formatIskCompact, formatIskCompactSigned } from '@/lib/isk';
 import { formatCompactNumber } from '@/lib/compactNumber';
-import { jobSeverity, industrySeverity, planetarySeverity } from '../../boardSeverity';
+import { jobSeverity, industrySeverity, planetarySeverity } from '../../data/boardSeverity';
 import {
   industrySummary,
   moonChunksSummary,
   planetarySummary,
   structuresSummary,
-} from '../../boardSummary';
+} from '../../data/boardSummary';
 import {
   moonChunkSeverity,
   moonChunksDeadline,
@@ -38,14 +38,14 @@ import {
   structuresDeadline,
   structuresSeverity,
   structuresView,
-} from '../../corpCards';
+} from '../../data/corpCards';
 import { incursionJumpsWhen, incursionsSeverity, incursionsSummary } from '../../incursionsBoard';
 import type { IncursionsBoardData } from '../../incursionsBoard';
 import type {
   IndustryBoardData,
   IndustryCharacterSlots,
   PlanetaryBoardData,
-} from '../../boardData';
+} from '../../data/boardData';
 import {
   aggregateJobSlotSummary,
   JOB_SLOT_CATEGORIES,

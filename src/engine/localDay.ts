@@ -23,3 +23,14 @@ export function nextLocalDay(dayStartMs: number): number {
   date.setDate(date.getDate() + 1);
   return date.getTime();
 }
+
+/** The UTC (EVE) calendar date of `ms`, as `YYYY-MM-DD`. Defaults to now. */
+export function utcDay(ms: number = Date.now()): string {
+  return new Date(ms).toISOString().slice(0, 10);
+}
+
+/** A `YYYY-MM-DD` UTC date shifted by `days` (negative = earlier). */
+export function shiftUtcDate(date: string, days: number): string {
+  const [y, m, d] = date.split('-').map(Number);
+  return utcDay(Date.UTC(y!, m! - 1, d! + days));
+}

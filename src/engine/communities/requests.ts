@@ -8,14 +8,13 @@
  * entry also reserves `delivered` and `contractIds` for delivery marking
  * (#3809), which this ticket never writes beyond preserving them.
  */
+import { isRecord } from '../guards';
 import { DAY_MS } from '@/lib/age';
 
 /** Mirrors `functions/src/communityRequests.ts`, which enforces them. */
 export const MAX_LINES_PER_REQUEST = 50;
-export const MAX_OPEN_REQUESTS_PER_MEMBER = 10;
 export const MAX_LOCATION_LENGTH = 100;
 export const MAX_TERMS_LENGTH = 140;
-export const REQUEST_LIFETIME_DAYS = 30;
 /** Far above any real stack; the rules enforce the same cap on a Pledge. */
 export const MAX_PLEDGE_QUANTITY = 1_000_000_000_000;
 /** A Pledge with nothing delivered this long after it was last written greys out. */
@@ -386,7 +385,7 @@ export const DEFAULT_NOTIFY: RequestNotify = { app: true, mail: false };
 
 /** A stored `notify`; a missing or malformed flag takes its default. */
 export function readNotify(raw: unknown): RequestNotify {
-  const d = typeof raw === 'object' && raw !== null ? (raw as Record<string, unknown>) : {};
+  const d = isRecord(raw) ? raw : {};
   return {
     app: typeof d.app === 'boolean' ? d.app : DEFAULT_NOTIFY.app,
     mail: typeof d.mail === 'boolean' ? d.mail : DEFAULT_NOTIFY.mail,

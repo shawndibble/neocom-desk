@@ -510,9 +510,9 @@ function scoreProduct(typeId: number, pi: PiData, opts: StopTierOptions): StopTi
   // Asked before `chainCost`, which throws on the first unpriced type and
   // names only that one. A refusal here keeps the rest of the enumeration
   // alive and reports every type the hub is missing.
-  const missing = [typeId, ...plan.chain.nodes.filter((n) => n.tier === 0).map((n) => n.typeId)]
-    .filter((id, index, all) => all.indexOf(id) === index)
-    .filter((id) => priceOf(id, opts.prices) === null);
+  const missing = [
+    ...new Set([typeId, ...plan.chain.nodes.filter((n) => n.tier === 0).map((n) => n.typeId)]),
+  ].filter((id) => priceOf(id, opts.prices) === null);
   if (missing.length > 0) return { ...base, status: 'needs-price', missing };
 
   const cost = chainCost(plan.chain, {

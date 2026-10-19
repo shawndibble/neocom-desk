@@ -6,7 +6,7 @@
  * plan was open before compare mode started (GLOSSARY.md round 25's two-pane
  * idiom: this is a state of the detail pane, not a separate route).
  */
-import { useEffect, useMemo, type ReactNode } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { onPlanLinkClick, planHref } from './planLinkClick';
@@ -55,6 +55,7 @@ import {
 } from './compareColumns';
 import { hubOrderKey, useHubOrderCounts, type HubOrderTarget } from './useHubOrderCounts';
 import { useHubDailyOrders } from './useHubDailyOrders';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 interface BuildPlanCompareProps {
   plans: readonly BuildPlanRecord[];
@@ -141,10 +142,7 @@ export function BuildPlanCompare({
     COMPARE_DEFAULT_COLUMNS
   );
   const setHubChoice = useCompareHub((state) => state.setValue);
-  const hydrateHubChoice = useCompareHub((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateHubChoice();
-  }, [hydrateHubChoice]);
+  useHydratedStore(useCompareHub);
 
   const showHubColumns = HUB_COLUMN_IDS.some(isVisible);
   const showBookColumns = HUB_BOOK_COLUMN_IDS.some(isVisible);

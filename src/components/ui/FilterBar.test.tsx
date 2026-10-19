@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { NARROW_QUERY } from '@/lib/useIsNarrow';
 import { FilterBar, FilterField } from './FilterBar';
+import { countActive } from './countActive';
 import { FilterChip } from './FilterChip';
 import { SearchInput } from './SearchInput';
 import { TextInput } from './TextInput';
@@ -267,5 +268,11 @@ describe('FilterBar', () => {
     await user.click(screen.getByRole('button', { name: 'Unread only' }));
     expect(popover).toContainElement(screen.getByRole('button', { name: 'Unread only' }));
     expect(screen.getByText('unread:true from:')).toBeInTheDocument();
+  });
+});
+
+describe('countActive', () => {
+  it('counts the truthy controls, so 0, empty and false do not count', () => {
+    expect(countActive(['jita', 0, '', false, null, undefined, true, 5])).toBe(3);
   });
 });

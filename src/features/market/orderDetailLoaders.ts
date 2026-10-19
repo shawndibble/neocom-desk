@@ -33,7 +33,7 @@ export interface OrderDetailLoaders {
  * elsewhere that mocks one of these modules without the export this reads
  * must not fail merely for importing a page that mounts Order Detail.
  */
-export const esiOrderDetailLoaders: OrderDetailLoaders = {
+const esiOrderDetailLoaders: OrderDetailLoaders = {
   regionCompetition: (regionId, typeId) => loadRegionCompetition(regionId, typeId),
   structureCompetition: (characterId, structureId) =>
     loadStructureCompetition(characterId, structureId),

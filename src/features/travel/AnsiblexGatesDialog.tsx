@@ -10,11 +10,11 @@
  */
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useLiveQuery } from 'dexie-react-hooks';
 import { beginGrant } from '@/app/grantAction';
 import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
 import { Button, Modal, NeedsConnection, TextArea, textActionClassName } from '@/components/ui';
-import { db, type CharacterRecord } from '@/db';
+import { type CharacterRecord } from '@/db';
+import { useCharacters } from '@/features/character/useCharacters';
 import { parseGateList, type GateListError, type SystemLookup } from '@/engine/route/ansiblex';
 import type { SolarSystemEntry } from '@/sde/marketTypes';
 import {
@@ -128,7 +128,7 @@ export function AnsiblexGatesDialog({
   onClose: () => void;
 }) {
   const { t } = useTranslation();
-  const characters = useLiveQuery(() => db.characters.toArray(), [], []);
+  const characters = useCharacters();
   const gates = useAnsiblexGates() ?? [];
   const lookup = useSystemLookup(systems);
   const [pasted, setPasted] = useState('');

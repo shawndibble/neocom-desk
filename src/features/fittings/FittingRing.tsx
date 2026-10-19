@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import {
   useLayoutEffect,
   useRef,
@@ -137,7 +138,7 @@ function useRingChrome(
   return chrome;
 }
 
-const MICRO_LABEL = 'text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
+const MICRO_LABEL = eyebrowClassName;
 
 /**
  * How each rim gauge is drawn. CPU and powergrid are told apart by form as

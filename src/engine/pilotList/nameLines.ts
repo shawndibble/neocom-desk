@@ -4,6 +4,8 @@
  * suggestions), which names are in it, and what a picked name does to it.
  */
 
+import { clamp } from '../math';
+
 export interface LineSpan {
   start: number;
   end: number;
@@ -12,7 +14,7 @@ export interface LineSpan {
 
 /** The line the caret sits on; a caret at a line's end belongs to that line. */
 export function lineAt(text: string, caret: number): LineSpan {
-  const at = Math.min(Math.max(caret, 0), text.length);
+  const at = clamp(caret, 0, text.length);
   const start = text.lastIndexOf('\n', at - 1) + 1;
   const newline = text.indexOf('\n', at);
   const end = newline === -1 ? text.length : newline;

@@ -1,3 +1,5 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { cx } from '@/lib/cx';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ExternalLink } from '@/components/ui/ExternalLink';
@@ -38,7 +40,7 @@ function Step({
 
 function Arrow({ label }: { label: string }) {
   return (
-    <p className="py-1 pl-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+    <p className={cx(eyebrowClassName, 'py-1 pl-1')}>
       <Icon.Descending size={Icon.ICON_SIZE.sm} aria-hidden="true" className="mr-1 inline" />
       {label}
     </p>
@@ -95,9 +97,7 @@ export function PiExplainer({ open, onClose }: { open: boolean; onClose: () => v
           tier={2}
         />
         <Arrow label={t('piPlan.explainer.toMarket')} />
-        <h3 className="pt-3 pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-          {t('piPlan.explainer.buildings')}
-        </h3>
+        <h3 className={cx(eyebrowClassName, 'pt-3 pb-1')}>{t('piPlan.explainer.buildings')}</h3>
         <Building
           icon={<Icon.PiCommandCenter size={Icon.ICON_SIZE.lg} />}
           name={t('piPlan.explainer.commandCenter')}

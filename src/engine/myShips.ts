@@ -62,12 +62,3 @@ export function findShips(
   }
   return rows;
 }
-
-/** Fewest jumps first; undefined/null (not resolved, no route) sort last. Stable. */
-export function sortShipsByJumps(
-  rows: readonly ShipRow[],
-  jumpsFor: (row: ShipRow) => number | null | undefined
-): ShipRow[] {
-  const key = (row: ShipRow) => jumpsFor(row) ?? Number.POSITIVE_INFINITY;
-  return [...rows].sort((a, b) => key(a) - key(b));
-}

@@ -8,20 +8,19 @@ import { BiggerChainsPanel } from './BiggerChainsPanel';
 import { assumedCustomsNames } from './colonyCustoms';
 import { PricesUnavailable } from './PricesUnavailable';
 import type { GoalPlannerSnapshot } from './goalPlannerSnapshot';
-import {
-  HaulingPanel,
-  PlanSummaryPanel,
-  QuickWinsPanel,
-  RebuildPanel,
-  YourPlanetsPanel,
-  type Ticks,
-} from './MakeMoreSections';
+import { HaulingPanel } from './makeMore/HaulingPanel';
+import { PlanSummaryPanel } from './makeMore/PlanSummaryPanel';
+import { QuickWinsPanel } from './makeMore/QuickWinsPanel';
+import { RebuildPanel } from './makeMore/RebuildPanel';
+import type { Ticks } from './makeMore/shared';
+import { YourPlanetsPanel } from './makeMore/YourPlanetsPanel';
 import { buildPlanView, coveredPlanets, pruneTicks, tickableIds, type PlanView } from './planView';
 import { usePiSettings, withHaulBetweenPlanets } from './piSettings';
 import { usePlanPreference, usePlanTicks } from './planTicksPref';
 import { priceSourceLabel } from './priceSource';
 import { useSellHub } from './sellHub';
 import { usePlanAdvice } from './usePlanAdvice';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 interface Props {
   snapshot: GoalPlannerSnapshot;
@@ -67,22 +66,17 @@ function headlineText(view: PlanView, t: ReturnType<typeof useTranslation>['t'])
 /**
  * "Make more from my planets": the recommendation model, drawn. The page
  * wires reads to `buildPlanAdvice` (`usePlanAdvice`), shapes the answer
- * (`buildPlanView`) and draws it (`MakeMoreSections`).
+ * (`buildPlanView`) and draws it (`makeMore/`).
  */
 export function MakeMorePlan({ snapshot, characterId, onFindBest }: Props) {
   const { t } = useTranslation();
   const location = useLocation();
   const preference = usePlanPreference((state) => state.value);
-  const hydratePreference = usePlanPreference((state) => state.hydrate);
   const setPreference = usePlanPreference((state) => state.setValue);
   const ticked = usePlanTicks((state) => state.value);
-  const ticksHydrated = usePlanTicks((state) => state.hydrated);
-  const hydrateTicks = usePlanTicks((state) => state.hydrate);
   const setTicked = usePlanTicks((state) => state.setValue);
-  useEffect(() => {
-    void hydratePreference();
-    void hydrateTicks();
-  }, [hydratePreference, hydrateTicks]);
+  useHydratedStore(usePlanPreference);
+  const ticksHydrated = useHydratedStore(usePlanTicks);
 
   const state = usePlanAdvice(snapshot, characterId, preference);
   const { buybackPct } = useSellHub();

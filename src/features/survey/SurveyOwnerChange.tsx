@@ -10,14 +10,13 @@ import { useTranslation } from 'react-i18next';
 import { Button, Modal, SearchInput, textActionClassName } from '@/components/ui';
 import { focusRingClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
+import { LOOKUP_DEBOUNCE_MS } from '@/lib/useDebouncedValue';
 import {
   MIN_RECIPIENT_SEARCH_LENGTH,
   searchMailRecipients,
   type RecipientSearchHit,
 } from '@/features/character/mailRecipientSearch';
 import { setSurveyOwner } from './surveyStore';
-
-const DEBOUNCE_MS = 300;
 
 export function SurveyOwnerChange({
   characterId,
@@ -50,7 +49,7 @@ export function SurveyOwnerChange({
         .then((list) => {
           if (!controller.signal.aborted) setHits({ key: searchKey, list });
         });
-    }, DEBOUNCE_MS);
+    }, LOOKUP_DEBOUNCE_MS);
     return () => {
       clearTimeout(timer);
       controller.abort();

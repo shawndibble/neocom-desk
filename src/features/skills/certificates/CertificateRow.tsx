@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Caret } from '@/components/ui';
@@ -167,7 +168,7 @@ export function CertificateRow({
             </p>
           )}
           {!elite && (
-            <p className="mb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+            <p className={cx(eyebrowClassName, 'mb-1')}>
               {t('skills.certificates.missingFor', { grade: nextGrade })}
             </p>
           )}

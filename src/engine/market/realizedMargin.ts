@@ -15,6 +15,7 @@
  *
  * Pure: other types' trades and corp trades are ignored here.
  */
+import { parseInstant } from '../esiInstant';
 import type { WalletTrade } from './walletCostBasis';
 
 export interface RealizedMargin {
@@ -43,7 +44,12 @@ export function realizedMargins(
   const result = new Map<number, RealizedMargin>();
   const trades = transactions
     .filter((t) => t.isPersonal && t.quantity > 0)
-    .sort((a, b) => Date.parse(a.date) - Date.parse(b.date) || a.transactionId - b.transactionId);
+    .flatMap((t) => {
+      const at = parseInstant(t.date);
+      return at === null ? [] : [{ t, at }];
+    })
+    .sort((a, b) => a.at - b.at || a.t.transactionId - b.t.transactionId)
+    .map(({ t }) => t);
 
   const lotsByType = new Map<number, { lots: Lot[]; head: number }>();
   const typeBySale = new Map<number, number>();

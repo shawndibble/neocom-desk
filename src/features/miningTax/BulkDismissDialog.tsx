@@ -6,8 +6,10 @@ import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 import type { DisplayRow } from './groupRows';
 import { dismiss } from './ledgerActions';
+import { systemLabel } from './names';
 import { useLedgerAction } from './useLedgerAction';
 import { LedgerActionError } from './LedgerActionError';
+import { toggleInSet } from '@/lib/sets';
 
 interface BulkDismissDialogProps {
   open: boolean;
@@ -45,16 +47,10 @@ export function BulkDismissDialog({
   const included = useMemo(() => rows.filter((dr) => !excluded.has(dr.key)), [rows, excluded]);
   const total = included.reduce((sum, dr) => sum + estimatedValueOf(dr), 0);
 
-  const systemName = (solarSystemId: number) =>
-    systemNames.get(solarSystemId) ?? `#${String(solarSystemId)}`;
+  const systemName = (solarSystemId: number) => systemLabel(systemNames, solarSystemId);
 
   function toggle(key: string) {
-    setExcluded((previous) => {
-      const next = new Set(previous);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
+    setExcluded((previous) => toggleInSet(previous, key));
   }
 
   async function commit() {

@@ -14,7 +14,21 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  validate:
+  # `validate` used to be one serial chain of checks. They are independent, so
+  # each is its own job and they run side by side; `validate` below is the
+  # aggregate that keeps the context name the `main` ruleset requires.
+  check-case:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      # Needs no dependencies: a script over `git ls-files`.
+      - run: npm run check:case
+
+  lint:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
@@ -24,18 +38,98 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npm run check:case
       - run: npm run lint
+
+  format-check:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
       - run: npm run format:check
+
+  typecheck:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
       - run: npm run typecheck
+
+  # Builds once for the whole run. The `e2e-shard` jobs download this `dist/`
+  # instead of each rebuilding it (four more builds, each after its own
+  # `npm ci`). Build-time env must match what the dev-server project gets (see
+  # E2E_ENV in playwright.config.ts) — these are baked into the bundle here,
+  # not readable from the environment later, and blank Firebase vars are what
+  # keep isSyncConfigured() false so the suite's network guard holds. The
+  # variables change values only, not types or imports, so the same build also
+  # answers "does the app build" for `validate`.
+  build:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
       - run: npm run build
-      # functions/ is its own package, with its own lockfile, tsconfig and
-      # vitest run — neither the root typecheck above nor the pre-commit
-      # hook's copy of it ever reads it, so without these steps the Cloud
-      # Functions ship unchecked (issue #595).
+        env:
+          VITE_EVE_CLIENT_ID: e2e-fake-client
+          VITE_FIREBASE_API_KEY: ''
+          VITE_FIREBASE_AUTH_DOMAIN: ''
+          # A placeholder, not blank: a Share Link's Firestore read needs a
+          # project id to build its (mocked) request — see E2E_ENV.
+          VITE_FIREBASE_PROJECT_ID: neocom-e2e
+          VITE_FIREBASE_APP_ID: ''
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist
+          # dist/.well-known is a dotdir; keep the artifact a faithful copy.
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 1
+
+  # functions/ is its own package, with its own lockfile, tsconfig and vitest
+  # run — neither the root typecheck nor the pre-commit hook's copy of it ever
+  # reads it, so without this job the Cloud Functions ship unchecked (issue
+  # #595). Needs only `functions/` installed, not the root.
+  functions:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
       - run: npm ci --prefix functions
       - run: npm run typecheck --prefix functions
       - run: npm test --prefix functions
+
+  # The name the `main` ruleset requires. See the `e2e` job below for the full
+  # reasoning; this one aggregates the parallel jobs above instead of a matrix.
+  validate:
+    if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+    needs: [check-case, lint, format-check, typecheck, build, functions]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail unless every validate job passed
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped')
+        run: |
+          echo "::error::validate jobs did not all pass (results: ${{ join(needs.*.result, ', ') }})"
+          exit 1
 
   test-shard:
     if: github.event_name == 'pull_request'
@@ -43,7 +137,7 @@ jobs:
     # Sharded for the same reason `e2e-shard` is, and with the same shape.
     # Vitest's own summary says where the time goes: of 1250s of worker time,
     # only 40% is test callbacks — the rest is `import` (33%), `environment`
-    # (13%) and `setup` (12%), all paid once per file across 644 files. That
+    # (13%) and `setup` (12%), all paid once per file across every test file. That
     # is work you divide, not work you speed up, and vitest defaults to
     # `cores - 1` = 3 workers on a 4-vCPU runner at 93% utilisation, so there
     # is nothing left to reclaim on one machine.
@@ -65,7 +159,15 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - run: npm ci
+      # setup-node caches the npm download, not node_modules; restoring the
+      # tree skips the install. A miss falls back to `npm ci`.
+      - uses: actions/cache@v4
+        id: node-modules
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-node24-${{ hashFiles('package-lock.json') }}
+      - if: steps.node-modules.outputs.cache-hit != 'true'
+        run: npm ci
       - run: npm run test:run -- --shard=${{ matrix.shard }}/4
 
   # Firestore rules tests (rules-tests/): run against the Firestore emulator,
@@ -84,7 +186,26 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
-      - run: npm ci
+      # setup-node caches the npm download, not node_modules; restoring the
+      # tree skips the install. A miss falls back to `npm ci`.
+      - uses: actions/cache@v4
+        id: node-modules
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-node24-${{ hashFiles('package-lock.json') }}
+      - if: steps.node-modules.outputs.cache-hit != 'true'
+        run: npm ci
+      # firebase-tools (npx's download) and the Firestore emulator jar are
+      # fetched on every run otherwise. Key carries the version pinned in the
+      # `test:rules` script — bump both together.
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.npm/_npx
+            ~/.cache/firebase
+          key: firebase-tools-14.27.0-${{ runner.os }}
+      # The Corp Tax Book callable tests (functions/) run in the same emulator session.
+      - run: npm ci --prefix functions
       - run: npm run test:rules
 
   # The name the `main` ruleset requires. See the `e2e` job below for the full
@@ -184,6 +305,7 @@ jobs:
 
   e2e-shard:
     if: github.event_name == 'pull_request'
+    needs: [build]
     runs-on: ubuntu-latest
     # Sharded because one runner could not get under the time budget. The
     # suite is ~91 specs at ~15s each — that is 21 minutes of test time, and
@@ -214,7 +336,15 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - run: npm ci
+      # setup-node caches the npm download, not node_modules; restoring the
+      # tree skips the install. A miss falls back to `npm ci`.
+      - uses: actions/cache@v4
+        id: node-modules
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-node24-${{ hashFiles('package-lock.json') }}
+      - if: steps.node-modules.outputs.cache-hit != 'true'
+        run: npm ci
       # Chromium comes from Playwright's own CDN; the only thing `--with-deps`
       # needs apt for is Ubuntu's shared libraries. The runner image ships
       # Google's Chrome repo regardless, so `apt-get update` fetches an index
@@ -257,24 +387,18 @@ jobs:
           done
           echo "::error::playwright install failed after 3 attempts"
           exit 1
-      # The `built` Playwright project renders dist/ via `vite preview`, so
-      # the bundle has to exist before Playwright starts. Build-time env must
-      # match what the dev-server project gets (see E2E_ENV in
-      # playwright.config.ts) — these are baked into the bundle here, not
-      # readable from the environment later, and blank Firebase vars are what
-      # keep isSyncConfigured() false so the suite's network guard holds.
-      - run: npm run build
-        env:
-          VITE_EVE_CLIENT_ID: e2e-fake-client
-          VITE_FIREBASE_API_KEY: ''
-          VITE_FIREBASE_AUTH_DOMAIN: ''
-          # A placeholder, not blank: a Share Link's Firestore read needs a
-          # project id to build its (mocked) request — see E2E_ENV.
-          VITE_FIREBASE_PROJECT_ID: neocom-e2e
-          VITE_FIREBASE_APP_ID: ''
+      # The `built` Playwright project renders dist/ via `vite preview`; the
+      # `build` job made it, with the e2e env baked in. A downloaded file's
+      # mtime says nothing about when it was built, so the preview script's
+      # staleness check is off here — `dist` is by construction this commit's.
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
       - run: npx playwright test --shard=${{ matrix.shard }}/4
         env:
           VITE_EVE_CLIENT_ID: e2e-fake-client
+          E2E_PREVIEW_SKIP_STALE_CHECK: '1'
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

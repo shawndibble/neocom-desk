@@ -1,3 +1,4 @@
+import { idSetKey } from '@/lib/idSetKey';
 /**
  * The Blueprint Acquisition modal (issues #839, #1240): opened from an icon on
  * any Blueprint Acquisition row (the top-level plan or any nested sub-build),
@@ -31,6 +32,7 @@
  * from the local SDE snapshot only (`loadContractLocationInfo`) — no ESI
  * call per row; a player structure stays unnamed.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { lpRate } from '@/engine/loyalty/marketLpValue';
 import { loadMarketLpValues } from '@/features/loyalty/marketLpValue';
 import {
@@ -58,6 +60,7 @@ import {
 } from '@/components/ui';
 import { HintText } from '@/components/ui/HintText';
 import * as Icon from '@/components/ui/icons';
+import { clampMe } from '@/engine/industry/efficiency';
 import type { MaterialSourcing } from '@/engine/industry/types';
 import { romanLevel } from '@/engine/projection';
 import { loadTypeName } from '@/features/character/typeNames';
@@ -103,6 +106,7 @@ import {
 import { loadLpTurnInPricer } from './blueprintPurchaseOffers';
 import { formatPercent } from './format';
 import type { InventionQuoteResult } from './inventionSources';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 export type { AcquisitionOwnedCopy } from './blueprintAcquisitionSources';
 
@@ -115,7 +119,7 @@ const ALL_REGIONS = 'all';
 const HUB_REGION = 'hub';
 type ContractScope = typeof HUB_REGION | typeof ALL_REGIONS;
 
-const HEADING_CLASS = 'text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
+const HEADING_CLASS = eyebrowClassName;
 const SECTION_CLASS = 'flex flex-col gap-2 border-t border-line pt-3';
 
 interface BlueprintAcquisitionModalProps {
@@ -173,7 +177,7 @@ function useNames(
       mounted.current = false;
     };
   }, []);
-  const key = [...new Set(ids)].sort((a, b) => a - b).join(',');
+  const key = idSetKey(ids);
   useEffect(() => {
     for (const id of key === '' ? [] : key.split(',').map(Number)) {
       if (requested.current.has(id)) continue;
@@ -251,13 +255,10 @@ export function BlueprintAcquisitionModal({
   const [contractScope, setContractScope] = useState<ContractScope>(HUB_REGION);
 
   const lpValue = useLpValue((state) => state.value);
-  const hydrateLpValue = useLpValue((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateLpValue();
-  }, [hydrateLpValue]);
+  useHydratedStore(useLpValue);
 
   const contracts = useLoad(async () => {
-    const cached = await loadPublicBpcContracts(characterId);
+    const cached = await loadPublicBpcContracts();
     return cached ? { copies: cached.data.rows, originals: cached.data.originals ?? [] } : null;
   }, String(characterId));
   // Region mode, not Trade Hub mode: every sell order in the hub's region is
@@ -388,7 +389,7 @@ export function BlueprintAcquisitionModal({
     const price = unmaskNumber(manualPrice);
     onSourcingChange(blueprintTypeID, {
       acquisitionTierOverride: {
-        me: Math.min(10, Math.max(0, Math.round(me))),
+        me: clampMe(me),
         te: Math.max(0, Math.round(te)),
       },
       overridePrice: price,

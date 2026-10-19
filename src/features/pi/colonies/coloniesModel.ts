@@ -46,7 +46,7 @@ import {
 import { builtAdvice } from '../systemPlanetModel';
 import { colonyPlan } from '../colonyPlan';
 import { colonyStorage } from '../colonyThroughput';
-import { fillsBeforeHaul } from '../colonyStripModel';
+import { fillsBeforeHaul } from '../colonyFillModel';
 import { HOUR_MS } from '@/lib/age';
 
 /** "Today": the window "expiring today" and one login's worth of work both cover. */

@@ -3,7 +3,7 @@
  * different from per-click plan submenu (removed) — a one-off
  * pick doesn't suit a panel where "Add" repeats.
  */
-import { useCallback, useEffect } from 'react';
+import { useCallback } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type SkillPlanRecord } from '@/db';
 import { isSyncConfigured } from '@/app/syncStatus';
@@ -17,6 +17,7 @@ import {
   withTargetPlanId,
   useTargetSkillPlans,
 } from './targetPlan';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 export interface AddEntriesResult {
   /** The plan `entries` were merged into — existing, or newly created and named `newPlanName`. */
@@ -62,10 +63,7 @@ export function useTargetPlan(characterId: number | null): TargetPlan {
 
   const stored = useTargetSkillPlans((s) => s.value);
   const setStored = useTargetSkillPlans((s) => s.setValue);
-  const hydrateStored = useTargetSkillPlans((s) => s.hydrate);
-  useEffect(() => {
-    void hydrateStored();
-  }, [hydrateStored]);
+  useHydratedStore(useTargetSkillPlans);
 
   const targetPlanId =
     characterId === null || plans === undefined

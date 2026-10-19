@@ -9,7 +9,7 @@ import { db, type CharacterRecord } from '@/db';
 import { readCachedRows, type CachedResult } from '@/esi/cache';
 import type { CharacterSkills, SkillQueueEntry } from '@/esi/endpoints';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
-import { completedQueueLevels, completedSpGain } from '@/features/skills/queueStatus';
+import { completedQueueLevels, completedSpGain } from '@/engine/skills/queueStatus';
 import { loadWalletBalance, KEYS as WALLET_KEYS } from './wallet';
 import {
   loadCharacterSkills,

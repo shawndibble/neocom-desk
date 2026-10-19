@@ -7,7 +7,7 @@ import { writeToClipboard } from '@/lib/clipboard';
 import { downloadTextFile } from '@/lib/download';
 import type { IndustryFitImportState, MarketAppraiseState } from '@/lib/shortcuts';
 import type { Fitting } from '@/engine/fittings/types';
-import { fittingSharePayload } from '@/engine/fitting/fittingSharePayload';
+import { fittingSharePayload } from '@/engine/fittings/fittingSharePayload';
 import { createShareLink, existingShareLink } from '@/features/share/shareStore';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { isSyncConfigured } from '@/app/syncStatus';
