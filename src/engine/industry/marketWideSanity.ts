@@ -31,7 +31,7 @@ export function reliableSellPrice(
 }
 
 /** How many days back `averageDailyVolume` looks. */
-export const SALES_WINDOW_DAYS = 30;
+const SALES_WINDOW_DAYS = 30;
 
 /** Fewer units a day than this, and a product "rarely sells". */
 export const RARELY_SOLD_PER_DAY = 5;
