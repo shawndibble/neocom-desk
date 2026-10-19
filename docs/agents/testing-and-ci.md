@@ -23,7 +23,7 @@ Detail moved out of `CLAUDE.md` so it is read on demand. The short rules stay in
   every push, the `test` job runs `test:run` across four shards, and the
   `e2e` job runs Playwright across four more; that's the gate, not a local
   pre-PR run. Both sharded jobs report through a single aggregate check
-  (`test`, `e2e`) because the `main` ruleset requires those exact names. In ticket-loop work (`/next-ticket`, `/implement`),
+  (`test`, `e2e`) because the `develop` and `main` rulesets require those exact names. In ticket-loop work (`/next-ticket`, `/implement`),
   see `.claude/commands/next-ticket.md`'s "Pre-commit hook, then CI" for the
   exact cadence. `node scripts/next-ticket/gate.mjs [--build]` still exists
   as an optional, manual full-CI-mirror for ad-hoc branches — nothing in the

@@ -1,10 +1,12 @@
 name: CI
 
 on:
+  # `develop` is where work lands (PRs into it run the full gate); a push to
+  # `main` is a develop→main promotion and is the only thing that deploys.
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+    branches: [main, develop]
 
 # Superseding a PR's checks is free; superseding a deploy is not. A second
 # merge landing mid-deploy used to cancel the first outright, which is how

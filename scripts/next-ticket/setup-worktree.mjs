@@ -10,7 +10,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { run, tryRun, log, printResult } from './lib.mjs';
+import { run, tryRun, log, printResult, INTEGRATION_BRANCH } from './lib.mjs';
 import { verifyHuskyHook } from '../verify-husky.mjs';
 
 const [, , issueArg, slug] = process.argv;
@@ -32,9 +32,14 @@ if (fs.existsSync(worktreePath)) {
 
 fs.mkdirSync(worktreeRoot, { recursive: true });
 
-const add = tryRun('git', ['worktree', 'add', worktreePath, '-b', branch, 'main'], {
-  cwd: repoRoot,
-});
+// Off the remote ref, not a local branch that may be stale (it never moves
+// while the main checkout sits on another branch).
+run('git', ['fetch', 'origin', INTEGRATION_BRANCH], { cwd: repoRoot });
+const add = tryRun(
+  'git',
+  ['worktree', 'add', '--no-track', worktreePath, '-b', branch, `origin/${INTEGRATION_BRANCH}`],
+  { cwd: repoRoot }
+);
 if (!add.ok) {
   printResult({ status: 'error', step: 'worktree-add', message: add.stderr.trim() });
   process.exit(1);
