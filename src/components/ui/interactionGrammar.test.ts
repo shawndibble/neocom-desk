@@ -167,6 +167,8 @@ describe('interaction grammar source guards (DESIGN.md §6c)', () => {
       'src/features/character/MyShipsView.tsx',
       // Admin's Member rows: Make admin… and Remove…, reachable nowhere else.
       'src/features/communities/CommunityMemberList.tsx',
+      'src/features/fittings/AddCargoTab.tsx',
+      'src/features/fittings/AddChargesTab.tsx',
       'src/features/fittings/FittingAddPanel.tsx',
       'src/features/fittings/FittingRackList.tsx',
       'src/features/fittings/RackListParts.tsx',
