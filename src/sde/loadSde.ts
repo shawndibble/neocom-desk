@@ -17,20 +17,14 @@ import type {
 } from './types';
 import { sdeDataUrl } from './sdeDataUrl';
 import { fetchJsonWithIdleTimeout } from '@/lib/idleTimeout';
+import { memoizeAsync } from '@/lib/memoizeAsync';
 
 function fetchJson<T>(file: string): Promise<T> {
   return fetchJsonWithIdleTimeout<T>(sdeDataUrl(import.meta.env.BASE_URL, file), file);
 }
 
 function cached<T>(file: string): () => Promise<T> {
-  let promise: Promise<T> | null = null;
-  return () => {
-    promise ??= fetchJson<T>(file).catch((err) => {
-      promise = null; // allow retry after failure
-      throw err;
-    });
-    return promise;
-  };
+  return memoizeAsync(() => fetchJson<T>(file));
 }
 
 export const loadSkills = cached<SkillType[]>('skills.json');

@@ -8,6 +8,11 @@
 // uid.ts touch no Firebase and stay synchronous, so the nav dot can subscribe
 // at first paint.
 
+import { setStatus } from './status';
+import { isOnline } from '@/stores/network';
+import { redactSecrets } from '@/observability/scrub';
+import { reportFailure } from '@/observability/reportFailure';
+
 export { getSyncStatus, subscribeSyncStatus, type SyncState, type SyncStatus } from './status';
 export { uidForCharacter } from './uid';
 export { TOMBSTONE_TTL_MS } from './merge';
@@ -45,7 +50,8 @@ export async function haltSync(): Promise<void> {
 
 /**
  * Debounced sync — call after each edit. Fire-and-forget: a failed driver load
- * (offline before the chunk is precached) is swallowed and no sync happens.
+ * leaves no sync, so it is reported (unless offline before the chunk is
+ * precached) and shown as sync status "error" rather than swallowed.
  * `priority: 'background'` is for the sweep only (planSync.ts `SyncPriority`).
  */
 export function scheduleSync(
@@ -55,7 +61,14 @@ export function scheduleSync(
 ): void {
   void import('./planSync')
     .then((m) => m.scheduleSync(characterId, debounceMs, priority))
-    .catch(() => {});
+    .catch((error: unknown) => {
+      reportFailure('sync', error);
+      setStatus(characterId, {
+        state: 'error',
+        error: redactSecrets(error instanceof Error ? error.message : String(error)),
+        offline: !isOnline(),
+      });
+    });
 }
 
 /**

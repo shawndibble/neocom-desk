@@ -19,7 +19,7 @@ interface NativeSelectProps extends Omit<SelectHTMLAttributes<HTMLSelectElement>
  * the native mobile picker, and the app has since gone the other way: closed,
  * the two are indistinguishable; open, one is the OS menu and the other is our
  * panel, and that difference is visible the moment two selects share a row. So
- * it has no product call sites today — only the Styleguide. It stays for a
+ * it has no product call sites today. It stays for a
  * caller that can name why it needs the platform picker specifically.
  *
  * The two are styled from the same `controlStyles` tokens and carry the same

@@ -20,18 +20,6 @@ export function structureBrokerPct(ownerPct: number): number {
   return STRUCTURE_SCC_SURCHARGE_PCT + ownerPct;
 }
 
-/**
- * The owner's percentage implied by a broker fee actually paid on an order of
- * `price` x `volume`. Null when it cannot be derived sensibly (no order value,
- * or the fee is below the SCC surcharge alone).
- */
-export function impliedOwnerPct(feePaid: number, price: number, volume: number): number | null {
-  const value = price * volume;
-  if (![feePaid, value].every(Number.isFinite) || value <= 0 || feePaid <= 0) return null;
-  const owner = (feePaid / value) * 100 - STRUCTURE_SCC_SURCHARGE_PCT;
-  return owner >= 0 ? owner : null;
-}
-
 export interface ListingNetInputs {
   gross: number;
   accountingLevel: number;

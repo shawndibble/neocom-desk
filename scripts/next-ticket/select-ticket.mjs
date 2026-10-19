@@ -21,7 +21,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { run, gh, ghJson, log, printResult } from './lib.mjs';
+import { run, gh, ghJson, log, printResult, sleepSync } from './lib.mjs';
 
 const args = process.argv.slice(2).filter((a) => a !== '--dry-run');
 const dryRun = process.argv.includes('--dry-run');
@@ -29,10 +29,6 @@ const override = args[0] ? Number(args[0]) : null;
 
 const gitCommonDir = run('git', ['rev-parse', '--git-common-dir']).trim();
 const lockDir = path.join(gitCommonDir, 'next-ticket.lock');
-
-function sleep(ms) {
-  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
-}
 
 function acquireLock() {
   let attempt = 1;
@@ -54,7 +50,7 @@ function acquireLock() {
         continue; // retry right away — reclaiming does not use up an attempt
       }
       log(`lock held, waiting (attempt ${attempt}/12)`);
-      sleep(10_000);
+      sleepSync(10_000);
       attempt++;
     }
   }

@@ -24,6 +24,7 @@ import {
 } from '@/esi/endpoints';
 import {
   conditionalFetch,
+  loadStaticEntity,
   loadWithCache,
   GLOBAL_CACHE_CHARACTER_ID,
   STALE_AFTER,
@@ -92,14 +93,10 @@ export async function loadPublicCharacterInfoWithAge(
 export async function loadPublicCorporationRecord(
   corporationId: number
 ): Promise<(CorporationPublicInfo & { corporation_id: number }) | null> {
-  const { fetchLive, conditional } = conditionalFetch((options) =>
-    getCorporationPublicInfo(corporationId, options)
-  );
-  const result = await loadWithCache(
-    GLOBAL_CACHE_CHARACTER_ID,
-    `public-corporation:${corporationId}`,
-    fetchLive,
-    { staleAfterMs: STALE_AFTER.static, conditional }
+  const result = await loadStaticEntity(
+    'public-corporation',
+    corporationId,
+    getCorporationPublicInfo
   );
   return result ? { ...result.data, corporation_id: corporationId } : null;
 }
@@ -120,15 +117,7 @@ export async function loadPublicCorporationInfo(
 export async function loadPublicAllianceInfo(
   allianceId: number
 ): Promise<PublicAllianceInfo | null> {
-  const { fetchLive, conditional } = conditionalFetch((options) =>
-    getAlliancePublicInfo(allianceId, options)
-  );
-  const result = await loadWithCache(
-    GLOBAL_CACHE_CHARACTER_ID,
-    `public-alliance:${allianceId}`,
-    fetchLive,
-    { staleAfterMs: STALE_AFTER.static, conditional }
-  );
+  const result = await loadStaticEntity('public-alliance', allianceId, getAlliancePublicInfo);
   return result ? { ...result.data, alliance_id: allianceId } : null;
 }
 
@@ -148,14 +137,10 @@ export interface PublicEmploymentHistory {
 export async function loadPublicEmploymentHistory(
   characterId: number
 ): Promise<PublicEmploymentHistory | null> {
-  const { fetchLive, conditional } = conditionalFetch((options) =>
-    getCharacterCorporationHistory(characterId, options)
-  );
-  const result = await loadWithCache(
-    GLOBAL_CACHE_CHARACTER_ID,
-    `public-employment:${characterId}`,
-    fetchLive,
-    { staleAfterMs: STALE_AFTER.static, conditional }
+  const result = await loadStaticEntity(
+    'public-employment',
+    characterId,
+    getCharacterCorporationHistory
   );
   if (!result) return null;
   const now = Date.now();
@@ -178,14 +163,10 @@ export interface PublicAllianceHistory {
 export async function loadPublicAllianceHistory(
   corporationId: number
 ): Promise<PublicAllianceHistory | null> {
-  const { fetchLive, conditional } = conditionalFetch((options) =>
-    getCorporationAllianceHistory(corporationId, options)
-  );
-  const result = await loadWithCache(
-    GLOBAL_CACHE_CHARACTER_ID,
-    `public-alliance-history:${corporationId}`,
-    fetchLive,
-    { staleAfterMs: STALE_AFTER.static, conditional }
+  const result = await loadStaticEntity(
+    'public-alliance-history',
+    corporationId,
+    getCorporationAllianceHistory
   );
   if (!result) return null;
   const rows = deriveAllianceHistoryRows(result.data);
@@ -209,14 +190,10 @@ export interface PublicAllianceCorporations {
 export async function loadPublicAllianceCorporations(
   allianceId: number
 ): Promise<PublicAllianceCorporations | null> {
-  const { fetchLive, conditional } = conditionalFetch((options) =>
-    getAllianceCorporations(allianceId, options)
-  );
-  const result = await loadWithCache(
-    GLOBAL_CACHE_CHARACTER_ID,
-    `public-alliance-corporations:${allianceId}`,
-    fetchLive,
-    { staleAfterMs: STALE_AFTER.static, conditional }
+  const result = await loadStaticEntity(
+    'public-alliance-corporations',
+    allianceId,
+    getAllianceCorporations
   );
   if (!result) return null;
   const names =

@@ -25,8 +25,8 @@ import {
   applyTrainingProgress,
   completedQueueLevels,
   completedSpGain,
-} from './queueStatus';
-import type { CompletedLevel } from './queueStatus';
+} from '@/engine/skills/queueStatus';
+import type { CompletedLevel } from '@/engine/skills/queueStatus';
 
 const QUEUE_SCOPE = ESI_REGISTRY.getCharacterSkillQueue.scope;
 

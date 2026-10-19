@@ -14,22 +14,44 @@
  *   `scrollWidth <= clientWidth` assertion `productionCss.built.spec.ts`
  *   established.
  *
- * `/styleguide` is the target for the same reasons that spec gives: outside
- * `RequireCharacter`, no ESI, and it already carries a `FilterBar` sample.
+ * The target is the signed-in Wallet Journal (`/wallet/journal`), whose
+ * `FilterBar` carries the search box and the "Ref type" select, fed by seeded
+ * sign-in and a mocked journal answer.
  */
 import { test, expect } from './support/testBase';
+import { signInAndGoto } from './support/authSeed';
+import { CHARACTER_ID } from './support/fixtureData';
 
 const PHONE = { width: 390, height: 844 };
 const DESKTOP = { width: 1280, height: 800 };
 
+const JOURNAL = Array.from({ length: 4 }, (_, index) => ({
+  id: index + 1,
+  date: `2026-09-0${index + 1}T00:00:00Z`,
+  ref_type: index % 2 === 0 ? 'bounty_prizes' : 'player_donation',
+  description: `E2E journal entry ${index + 1}`,
+  amount: 1_000_000 * (index + 1),
+  balance: 50_000_000 + index,
+}));
+
+/** Answer the journal before sign-in: boot prefetch would cache the shared mock's empty list. */
+async function signInToJournal(page: import('@playwright/test').Page) {
+  await page.route(
+    (url) => url.pathname === `/characters/${CHARACTER_ID}/wallet/journal`,
+    (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(JOURNAL) })
+  );
+  await signInAndGoto(page, './wallet/journal');
+}
+
 test('collapses the filters behind a trigger at 390px and commits on Apply', async ({ page }) => {
   await page.setViewportSize(PHONE);
-  await page.goto('/styleguide');
+  await signInToJournal(page);
 
   const trigger = page.getByRole('button', { name: /^Filters/ });
   await expect(trigger).toBeVisible();
   // The search box never moves into the sheet.
-  await expect(page.getByRole('searchbox', { name: 'Search entries' })).toBeVisible();
+  await expect(page.getByRole('searchbox', { name: 'Search description' })).toBeVisible();
   await expect(page.getByRole('combobox', { name: 'Ref type' })).toHaveCount(0);
 
   await trigger.click();
@@ -59,9 +81,9 @@ test('keeps the filters behind the funnel, on the search row, on a pointer viewp
   page,
 }) => {
   await page.setViewportSize(DESKTOP);
-  await page.goto('/styleguide');
+  await signInToJournal(page);
 
-  const search = page.getByRole('searchbox', { name: 'Search entries' });
+  const search = page.getByRole('searchbox', { name: 'Search description' });
   const trigger = page.getByRole('button', { name: /^Filters/ });
   await expect(trigger).toBeVisible();
   await expect(page.getByRole('combobox', { name: 'Ref type' })).toHaveCount(0);

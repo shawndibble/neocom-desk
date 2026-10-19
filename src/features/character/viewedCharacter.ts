@@ -40,11 +40,6 @@ export function viewedCharacterIdFromSearch(search: string): number | null {
   return null;
 }
 
-/** `path` with `?char=<id>` — the link a drill-in from another Character's row builds. */
-export function viewedCharacterHref(path: string, characterId: number): string {
-  return `${path}?${VIEWED_CHARACTER_PARAM}=${characterId}`;
-}
-
 /**
  * The Character the URL asks this page to show, when that is not the active
  * one; `undefined` otherwise (no param, the active Character itself, or an id

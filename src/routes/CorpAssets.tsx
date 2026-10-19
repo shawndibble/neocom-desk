@@ -30,7 +30,7 @@
  * before this rework — corp assets still never loads the blueprint catalog.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { measureElement, useVirtualizer } from '@tanstack/react-virtual';
+import { useAssetRowVirtualizer } from '@/features/assets/useAssetRowVirtualizer';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useUrlParam } from '@/lib/useUrlState';
 import { textParam } from '@/lib/urlState';
@@ -113,7 +113,6 @@ import { loadCorporationBlueprints } from '@/features/corp/blueprints';
 import { loadAssetCopyValues } from '@/features/character/assetCopyValues';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { useFocusHeading } from '@/lib/useFocusHeading';
-import { rootFontScale } from '@/lib/fontScale';
 
 const SEARCH_DEBOUNCE_MS = 250;
 const SEARCH_PARAM = textParam();
@@ -331,10 +330,6 @@ function corpAssetHref(
   return corpAssetPathHref(groupId, segments) + query;
 }
 
-function estimateRowHeight(row: BrowseRow): number {
-  return rootFontScale() * baseRowHeight(row);
-}
-
 function baseRowHeight(row: BrowseRow): number {
   switch (row.kind) {
     case 'group':
@@ -435,24 +430,11 @@ function CorpAssetsView({ canReadBlueprints }: { canReadBlueprints: boolean }) {
 
   const showItemColumns = !searchActive && hasItemRows(rows);
 
-  const scrollParentRef = useRef<HTMLDivElement>(null);
-  // eslint-disable-next-line react-hooks/incompatible-library
-  const rowVirtualizer = useVirtualizer({
-    count: rows.length,
-    getScrollElement: () => scrollParentRef.current,
-    estimateSize: (index) => estimateRowHeight(rows[index]),
-    // Rows wrap onto two lines at phone widths, so the estimate is only a first
-    // guess — measure the real height or rows overlap. Zero (jsdom, a row not
-    // laid out yet) falls back to the estimate.
-    measureElement: (element, entry, instance) =>
-      measureElement(element, entry, instance) ||
-      instance.options.estimateSize(instance.indexFromElement(element)),
-    getItemKey: (index) => rows[index].key,
-    overscan: 10,
+  const { scrollParentRef, rowVirtualizer } = useAssetRowVirtualizer({
+    rows,
+    baseRowHeight,
+    resetKey: `${wildcard}|${searchActive}`,
   });
-  useEffect(() => {
-    if (scrollParentRef.current) scrollParentRef.current.scrollTop = 0;
-  }, [wildcard, searchActive]);
 
   // Multi-select + bulk actions (same shape as /assets' issue #90).
   const [selectMode, setSelectMode] = useState(false);

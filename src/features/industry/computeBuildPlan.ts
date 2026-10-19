@@ -8,6 +8,7 @@
  * see FACILITY_PRESETS.npcStation.defaultTaxPct), and never throws.
  */
 import { buildVsBuy } from '@/engine/industry/buildVsBuy';
+import { ME_MAX, TE_MAX } from '@/engine/industry/efficiency';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import { withoutOwnedQuantities } from '@/engine/industry/materialResolution';
 import { FACILITY_PRESETS, MAX_JOB_RUNS, resolveRigFit } from '@/engine/industry/types';
@@ -106,8 +107,8 @@ export function computeBuildPlan({
   // stored plan happens to hold (e.g. a formula picked up in the same
   // ME/TE fields a manufacturing blueprint uses).
   const isReaction = blueprint.activity === 'reaction';
-  const me = isReaction ? 0 : clampInt(plan.me, 0, 10);
-  const te = isReaction ? 0 : clampInt(plan.te, 0, 20);
+  const me = isReaction ? 0 : clampInt(plan.me, 0, ME_MAX);
+  const te = isReaction ? 0 : clampInt(plan.te, 0, TE_MAX);
   const facilityTaxPct = facility.structure ? plan.facilityTaxPct : undefined;
 
   try {

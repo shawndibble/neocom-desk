@@ -85,21 +85,6 @@ export function isUntargetable(system: JumpSystem): boolean {
   );
 }
 
-/** Systems within `rangeLy` of `from` (inclusive) that a drive can target, nearest first. */
-export function jumpTargets(
-  from: SystemPosition & { id: number },
-  rangeLy: number,
-  systems: readonly JumpSystem[]
-): JumpTarget[] {
-  const targets: JumpTarget[] = [];
-  for (const system of systems) {
-    if (system.id === from.id || isUntargetable(system)) continue;
-    const distanceLy = lightYearDistance(from, system);
-    if (distanceLy <= rangeLy) targets.push({ id: system.id, distanceLy });
-  }
-  return targets.sort((a, b) => a.distanceLy - b.distanceLy);
-}
-
 /** Fuel one leg burns; `fuelPerLightYear` is `JumpDriveStats`'s skill-adjusted figure. */
 export function jumpFuel(distanceLy: number, fuelPerLightYear: number): number {
   // Round away float noise first so 4 ly x 1000 does not become 4001.

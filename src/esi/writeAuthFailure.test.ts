@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { db, type TokenRecord } from '@/db';
+import { db } from '@/db';
 import { AuthError } from '@/auth/sso';
 import { EsiError, EsiOfflineError } from './client';
 import { onEsiAuthFailure } from './authFailureSignal';
 import { reportWriteAuthFailure } from './writeAuthFailure';
+import { seedGrant as seedGrantFor } from '@/test/seed';
 
 const CHAR_ID = 91;
 const SEND_MAIL = 'esi-mail.send_mail.v1';
@@ -13,13 +14,11 @@ function refused(status: number): EsiError {
 }
 
 async function seedGrant(scopes: string[]): Promise<void> {
-  await db.tokens.put({
-    characterId: CHAR_ID,
+  await seedGrantFor(CHAR_ID, scopes, {
     accessToken: 'a',
     refreshToken: 'r',
     expiresAt: Date.now() + 600_000,
-    scopes,
-  } as TokenRecord);
+  });
 }
 
 beforeEach(async () => {
