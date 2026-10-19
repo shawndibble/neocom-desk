@@ -107,12 +107,12 @@ export interface InventionQuote {
 }
 
 function sumOrNull(values: readonly (number | null)[]): number | null {
-  let sum = 0;
+  let total = 0;
   for (const value of values) {
     if (value === null) return null;
-    sum += value;
+    total += value;
   }
-  return sum;
+  return total;
 }
 
 function tierFor(

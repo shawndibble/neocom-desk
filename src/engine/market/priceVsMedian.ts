@@ -7,7 +7,7 @@
  * to. Pure; the caller supplies the region's history and the clock.
  */
 import { median } from '../math';
-import { type MarketHistoryPoint } from './priceHistory';
+import type { MarketHistoryPoint } from './priceHistory';
 
 export const VS_MEDIAN_WINDOW_DAYS = 90;
 
