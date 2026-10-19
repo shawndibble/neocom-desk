@@ -6,48 +6,27 @@ import { useTranslation } from 'react-i18next';
 import { useHighlightParam } from '@/lib/useHighlightParam';
 import {
   Button,
-  ColumnPickerMenu,
   DataAgeBadge,
-  DataTable,
   CachedEmptyState,
   EmptyState,
-  FilterChip,
   IconButton,
-  IskAmount,
   PageHeader,
   Panel,
-  RowActionsMenu,
   Spinner,
   Tabs,
   TabPanel,
   useTabsId,
-  Tooltip,
-  type DataTableColumn,
   CachedNotice,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { useColumnVisibility } from '@/lib/columnVisibility';
-import {
-  CONTRACTS_HISTORY_COLUMN_IDS,
-  contractsHistoryColumnsStore,
-  type ContractsHistoryColumnId,
-} from '@/features/contracts/contractsColumns';
-import { OpenInEveMenuItem } from '@/features/openInEve/OpenInEveMenuItem';
+import { CONTRACTS_HISTORY_COLUMN_IDS } from '@/features/contracts/contractsColumns';
 import { GrantBanner } from '@/app/GrantNote';
-import { contractAmount } from '@/features/character/contractAmount';
 import { ContractDetailModal } from '@/features/character/ContractDetailModal';
-import { ContractIdentity } from '@/features/character/ContractIdentity';
-import { CharacterLink, CorporationLink } from '@/features/entities';
-import { ContractReceiverLink } from '@/features/character/ContractReceiverLink';
-import { contractIssuer, contractReceiver } from '@/features/character/contractCounterparty';
-import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
-import { StandingTag } from '@/features/character/StandingTag';
+import { contractIssuer } from '@/features/character/contractCounterparty';
 import type { ContactStandingIndex } from '@/features/character/contactStandings';
 import { characterStanding } from '@/features/character/entityStanding';
 import { CONTRACT_STATUS_KEY, CONTRACT_TYPE_KEY } from '@/features/character/contractLabels';
 import {
-  EMPTY_CONTRACTS_FILTER,
-  isContractsFilterActive,
   contractStatusOptions,
   contractTypeOptions,
   filterContracts,
@@ -60,10 +39,6 @@ import {
 } from '@/features/contractSearch/ContractSearchPanel';
 import type { NameCategory } from '@/features/character/names';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
-import { formatDateOnly } from '@/lib/timestamp';
-import { cx } from '@/lib/cx';
-import { courierDeliveryDeadlineMs } from '@/engine/contracts/courierDeadline';
-import { useTimeZone } from '@/lib/timeFormat';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { contractsCsvColumns } from '@/features/character/contractsCsv';
@@ -73,34 +48,13 @@ import { useContractSearchMode } from '@/features/contractSearch/contractSearchM
 import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
 import { optionalEnumParam, textParam } from '@/lib/urlState';
 import { CONTRACTS_TABS } from '@/app/pageTabs';
-import {
-  ContractDateCell,
-  ContractDayHeader,
-  ContractStatusCell,
-  CourierDeadlineCell,
-} from '@/features/contracts/ContractCells';
-import { ContractsFilterBar } from '@/features/contracts/ContractsFilterBar';
+import { ContractsHistoryTable } from '@/features/contracts/ContractsHistoryTable';
+import { useContractsHistoryColumns } from '@/features/contracts/useContractsHistoryColumns';
 import { loadContractsSnapshot } from '@/features/contracts/contractsSnapshot';
-
-const STATUS_TONE: Record<Contract['status'], string> = {
-  outstanding: 'text-text',
-  in_progress: 'text-warning',
-  finished_issuer: 'text-success',
-  finished_contractor: 'text-success',
-  finished: 'text-success',
-  cancelled: 'text-text-dim',
-  rejected: 'text-danger',
-  failed: 'text-danger',
-  deleted: 'text-text-dim',
-  reversed: 'text-danger',
-};
 
 /** Stable identity, so the fallback doesn't invalidate the column memo every render. */
 const NO_CATEGORIES: ReadonlyMap<number, NameCategory> = new Map();
 const NO_STANDING_INDEX: ContactStandingIndex = new Map();
-
-/** Module-level so the table's windowing and row memo see one stable function. */
-const contractRowKey = (contract: Contract) => contract.contract_id;
 
 const CONTRACT_STATUSES = Object.keys(CONTRACT_STATUS_KEY) as Contract['status'][];
 const CONTRACT_TYPES = Object.keys(CONTRACT_TYPE_KEY) as Contract['type'][];
@@ -117,16 +71,10 @@ const HISTORY_SORT = { columnId: 'issued', direction: 'desc' } as const;
 /** Contracts: table with status chips, stale offers dimmed, detail on click. Read-only, cached for offline. */
 export function Contracts() {
   const { t } = useTranslation();
-  const timeZone = useTimeZone();
   const { data, error, loading, hydrated, activeCharacterId, refresh } = useRouteSnapshot(
     loadContractsSnapshot,
     undefined,
     { cacheKey: 'contracts' }
-  );
-
-  const historyColumnVisibility = useColumnVisibility(
-    contractsHistoryColumnsStore,
-    CONTRACTS_HISTORY_COLUMN_IDS
   );
 
   const contractsResult = data?.contractsResult ?? null;
@@ -214,178 +162,14 @@ export function Contracts() {
     [t]
   );
 
-  // The identity column (never hidden — it opens the detail modal) plus the
-  // optional columns the picker controls, in table order —
-  // `CONTRACTS_HISTORY_COLUMN_IDS`' own order.
-  const receiverFor = useCallback(
-    (contract: Contract) =>
-      activeCharacterId === null
-        ? null
-        : contractReceiver(contract, activeCharacterId, receiverCategories),
-    [activeCharacterId, receiverCategories]
-  );
-  const optionalHistoryColumns = useMemo<
-    Record<ContractsHistoryColumnId, DataTableColumn<Contract>>
-  >(
-    () => ({
-      status: {
-        id: 'status',
-        header: t('contracts.status'),
-        className: 'font-semibold',
-        cellClassName: (contract) => STATUS_TONE[contract.status],
-        sortValue: (contract) => t(CONTRACT_STATUS_KEY[contract.status]),
-        render: (contract) => <ContractStatusCell contract={contract} />,
-      },
-      issuer: {
-        id: 'issuer',
-        header: t('contracts.issuer'),
-        sortValue: (contract) => {
-          const { id } = contractIssuer(contract);
-          return issuerNames.get(id) ?? `#${id}`;
-        },
-        render: (contract) => {
-          const issuer = contractIssuer(contract);
-          const name = issuerNames.get(issuer.id) ?? `#${issuer.id}`;
-          return (
-            <span className="inline-flex items-center gap-1.5">
-              {issuer.kind === 'corporation' ? (
-                <CorporationLink id={issuer.id} className="text-left">
-                  {name}
-                </CorporationLink>
-              ) : (
-                <CharacterLink id={issuer.id} className="text-left">
-                  {name}
-                </CharacterLink>
-              )}
-              {issuer.kind === 'character' && (
-                <StandingTag
-                  standing={characterStanding(standingIndex, issuer.id, issuerAffiliations)}
-                />
-              )}
-            </span>
-          );
-        },
-      },
-      receiver: {
-        id: 'receiver',
-        header: t('contracts.receiver'),
-        sortValue: (contract) => {
-          const receiver = receiverFor(contract);
-          return receiver ? (issuerNames.get(receiver.id) ?? `#${receiver.id}`) : '';
-        },
-        render: (contract) => {
-          const receiver = receiverFor(contract);
-          // No receiver (a public contract nobody took): the phone card's meta
-          // line leaves the placeholder dash off rather than print a bare "—".
-          if (receiver === null)
-            return (
-              <span className="text-text-dim" data-dense-omit>
-                —
-              </span>
-            );
-          return (
-            <ContractReceiverLink
-              receiver={receiver}
-              name={receiver ? (issuerNames.get(receiver.id) ?? `#${receiver.id}`) : ''}
-              standing={
-                receiver?.kind === 'character'
-                  ? characterStanding(standingIndex, receiver.id, issuerAffiliations)
-                  : null
-              }
-            />
-          );
-        },
-      },
-      price: {
-        id: 'price',
-        header: t('contracts.price'),
-        align: 'right',
-        className: 'tabular-nums',
-        // The dense phone card's headline figure, beside the title.
-        cardCorner: true,
-        sortValue: (contract) => contractAmount(contract),
-        render: (contract) => {
-          const amount = contractAmount(contract);
-          return amount !== undefined ? <IskAmount value={amount} /> : t('common.unknown');
-        },
-      },
-      issued: {
-        id: 'issued',
-        header: t('contracts.issued'),
-        className: 'whitespace-nowrap text-text-dim',
-        sortValue: (contract) => new Date(contract.date_issued).getTime(),
-        // Off the phone card: its day section header already says it.
-        render: (contract) => (
-          <span data-dense-omit>
-            <ContractDateCell iso={contract.date_issued} timeZone={timeZone} />
-          </span>
-        ),
-      },
-      expires: {
-        id: 'expires',
-        header: t('contracts.expires'),
-        className: 'whitespace-nowrap text-text-dim',
-        // An accepted courier's clock is delivery, not the accept-by expiry.
-        sortValue: (contract) =>
-          courierDeliveryDeadlineMs(contract) ?? new Date(contract.date_expired).getTime(),
-        render: (contract) => {
-          const deadlineMs = courierDeliveryDeadlineMs(contract);
-          if (deadlineMs === null)
-            return (
-              <span>
-                {/* Phone card only: its meta line has no column labels. */}
-                <span className="sm:hidden">{t('contracts.expiresAffix')}</span>
-                <ContractDateCell iso={contract.date_expired} timeZone={timeZone} />
-              </span>
-            );
-          return <CourierDeadlineCell deadlineMs={deadlineMs} timeZone={timeZone} />;
-        },
-      },
-    }),
-    [t, issuerNames, timeZone, standingIndex, issuerAffiliations, receiverFor]
-  );
-  const columns = useMemo<DataTableColumn<Contract>[]>(
-    () => [
-      {
-        id: 'type',
-        header: t('contracts.type'),
-        sortValue: (contract) => contract.title || t(CONTRACT_TYPE_KEY[contract.type]),
-        render: (contract) => {
-          const opener = (
-            <button
-              type="button"
-              onClick={() => setSelectedContract(contract)}
-              className={entityLinkClassName(
-                cx(
-                  'flex min-h-11 w-full items-center text-left font-medium md:block md:min-h-0 md:w-auto',
-                  contract.title && 'md:max-w-72 md:truncate'
-                )
-              )}
-            >
-              {/* Phone only: the status tone as a dot, so a scan down the card
-                  list reads outcome without the Status column (which the
-                  picker can hide). The word stays on the meta line. */}
-              <span
-                aria-hidden="true"
-                className={cx(
-                  'mr-2 size-2 shrink-0 rounded-full bg-current sm:hidden',
-                  STATUS_TONE[contract.status]
-                )}
-              />
-              <ContractIdentity contract={contract} characterId={activeCharacterId} />
-            </button>
-          );
-          // A title is the only free-text (so truncatable) identity; the full
-          // text reaches the tooltip on hover and touch-and-hold.
-          return contract.title ? <Tooltip content={contract.title}>{opener}</Tooltip> : opener;
-        },
-      },
-      ...CONTRACTS_HISTORY_COLUMN_IDS.filter(historyColumnVisibility.isVisible).map(
-        (id) => optionalHistoryColumns[id]
-      ),
-    ],
-    [t, optionalHistoryColumns, historyColumnVisibility.isVisible, activeCharacterId]
-  );
+  const { columns, optionalColumns, columnVisibility, receiverFor } = useContractsHistoryColumns({
+    activeCharacterId,
+    issuerNames,
+    receiverCategories,
+    standingIndex,
+    issuerAffiliations,
+    onOpen: setSelectedContract,
+  });
   // The full catalog, not just `columns`' currently-visible ids: a sort
   // picked while a column was shown should still resolve once the picker
   // hides it, ready to take effect again the moment it's shown back
@@ -518,123 +302,34 @@ export function Contracts() {
           />
         ) : (
           <Panel padded={false}>
-            {contractsResult.fromCache && (
-              <CachedNotice className="px-3 pt-2" fetchedAt={contractsResult.fetchedAt} />
-            )}
-            {contractsTruncated && (
-              <p className="flex flex-wrap items-center gap-2 px-3 pt-2 text-[0.6875rem] text-warning uppercase">
-                <span>{t('common.incompleteTitle')}</span>
-                <Button size="sm" disabled={loading} onClick={refresh}>
-                  {t('contracts.fetchTruncatedRetry')}
-                </Button>
-              </p>
-            )}
-            <ContractsFilterBar
+            <ContractsHistoryTable
               filter={filter}
-              onChange={setFilter}
+              onFilterChange={setFilter}
               statusOptions={statusOptions}
               typeOptions={typeOptions}
-              actions={
-                <ColumnPickerMenu
-                  available={CONTRACTS_HISTORY_COLUMN_IDS}
-                  visible={historyColumnVisibility.visible}
-                  columnsById={optionalHistoryColumns}
-                  showLabel
-                  onToggle={historyColumnVisibility.toggle}
-                  buttonLabel={t('common.columnsButton')}
-                  menuTitle={t('common.columnsMenuTitle')}
-                  onReset={historyColumnVisibility.reset}
-                  resetLabel={t('common.resetColumns')}
-                />
+              rows={filteredContracts}
+              columns={columns}
+              optionalColumns={optionalColumns}
+              columnVisibility={columnVisibility}
+              tableExport={historyExport}
+              sortProps={historySortProps}
+              highlightedContractId={highlightedContractId}
+              notices={
+                <>
+                  {contractsResult.fromCache && (
+                    <CachedNotice className="px-3 pt-2" fetchedAt={contractsResult.fetchedAt} />
+                  )}
+                  {contractsTruncated && (
+                    <p className="flex flex-wrap items-center gap-2 px-3 pt-2 text-[0.6875rem] text-warning uppercase">
+                      <span>{t('common.incompleteTitle')}</span>
+                      <Button size="sm" disabled={loading} onClick={refresh}>
+                        {t('contracts.fetchTruncatedRetry')}
+                      </Button>
+                    </p>
+                  )}
+                </>
               }
             />
-            {/* Phone only: the filter sheet's status chips, one tap away. */}
-            <div
-              role="group"
-              aria-label={t('contracts.statusFilterLabel')}
-              className="flex gap-2 overflow-x-auto border-b border-line px-3 py-2 sm:hidden"
-            >
-              <FilterChip
-                label={t('contracts.statusAll')}
-                selected={filter.status === null}
-                onToggle={() => setFilter({ ...filter, status: null })}
-              />
-              {statusOptions.map((status) => (
-                <FilterChip
-                  key={status}
-                  label={t(CONTRACT_STATUS_KEY[status])}
-                  selected={filter.status === status}
-                  onToggle={() =>
-                    setFilter({ ...filter, status: filter.status === status ? null : status })
-                  }
-                />
-              ))}
-            </div>
-            {filteredContracts.length === 0 ? (
-              // Zero matches with no active filter can't happen today (an empty
-              // list is caught above), but the reset only belongs where a filter is on.
-              isContractsFilterActive(filter) ? (
-                <EmptyState
-                  title={t('contracts.noFilterMatches')}
-                  hint={t('contracts.noFilterMatchesResetHint')}
-                  className="py-8"
-                  action={
-                    <Button size="sm" onClick={() => setFilter(EMPTY_CONTRACTS_FILTER)}>
-                      {t('common.resetFilters')}
-                    </Button>
-                  }
-                />
-              ) : (
-                <EmptyState
-                  title={t('contracts.noFilterMatches')}
-                  hint={t('contracts.noFilterMatchesHint')}
-                  className="py-8"
-                />
-              )
-            ) : (
-              <div className="relative overflow-x-auto">
-                {/* The desktop table can be wider than the content column beside the
-                  nav rail (#3960): it scrolls inside this wrapper, never the page.
-                  `relative` keeps the cells' absolutely positioned `sr-only` text
-                  (the price's full ISK) inside the clip too, or its containing
-                  block resolves above the wrapper and still widens the page. */}
-                <DataTable
-                  {...historyExport.tableProps}
-                  label={t('contracts.title')}
-                  columns={columns}
-                  rows={filteredContracts}
-                  rowKey={contractRowKey}
-                  virtualize="auto"
-                  rowMoreActions
-                  rowContextMenu={(contract, tr) => (
-                    <RowActionsMenu
-                      name={`${t('contractDetail.contractIdLabel')} ${contract.contract_id}`}
-                      items={<OpenInEveMenuItem kind="contract" id={contract.contract_id} />}
-                    >
-                      {tr}
-                    </RowActionsMenu>
-                  )}
-                  highlightRowKey={highlightedContractId}
-                  {...historySortProps}
-                  stackLayout="dense"
-                  // Issue days are sections on a phone, not folded duplicates:
-                  // open, with members in line with the cards above them.
-                  className="dt-flat-groups"
-                  groupBy={{
-                    key: (contract) => formatDateOnly(new Date(contract.date_issued), timeZone),
-                    minSize: 1,
-                    defaultExpanded: () => true,
-                    renderHeader: (rows) => (
-                      <ContractDayHeader
-                        date={formatDateOnly(new Date(rows[0].date_issued), timeZone)}
-                        count={rows.length}
-                        timeZone={timeZone}
-                      />
-                    ),
-                  }}
-                />
-              </div>
-            )}
           </Panel>
         )}
       </TabPanel>
