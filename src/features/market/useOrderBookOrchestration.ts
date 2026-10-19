@@ -265,7 +265,7 @@ export function useOrderBookOrchestration({
   const hubRegionName =
     marketRegions?.find((r) => r.id === effectiveHub.regionId)?.name ?? effectiveHub.systemName;
 
-  // Gated on all three hydrated flags and globalMarkets.json settling (success
+  // Gated on the hydrated flags and globalMarkets.json settling (success
   // or failure) — see `useOrderBookFetch`.
   const { orderBookFetch, orderBookLoading } = useOrderBookFetch({
     selectedTypeId,

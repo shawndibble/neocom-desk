@@ -119,7 +119,7 @@ Item tabs (`Tabs`, state `itemTab` in URL `browser.itemTab`): **Order book** | *
 Engine / data:
 
 - `features/market/orderBook.ts`: in-memory 300s TTL cache (`ORDER_BOOK_TTL_MS`), coalesces concurrent callers; manual refresh bypasses. `truncated` when page cap bit.
-- All regions / range: fans out one request per Market Region at concurrency 4 (`ORDER_BOOK_FANOUT_CONCURRENCY`); with a Jump Range, only regions containing in-range systems (`regionsForSystems`, `useOrderBookOrchestration.ts:368`). Waits for hub/mode/filter hydration to avoid double fan-out. Per-region failures counted (`failedRegionCount`), partial book shown.
+- All regions / range: fans out one request per Market Region at concurrency 4 (`ORDER_BOOK_FANOUT_CONCURRENCY`); with a Jump Range, only regions containing in-range systems (`regionsForSystems`, `useOrderBookFetch.ts`). Waits for hub/mode/filter hydration to avoid double fan-out. Per-region failures counted (`failedRegionCount`), partial book shown.
 - Filters (`engine/market/orderBookFilters.ts`): Jump Range and Security fold into one allowed-system set; Min quantity drops `volume_remain < n`; NPC-only drops orders at non-NPC `location_id`.
 - Player-structure orders: shown with system + security, never hidden (ADR 0003; ~18% of Tritanium Forge orders).
 - Variations/Compare/Item Detail/Price History always read one region (hub's region) even under All regions (`useMarketBrowser.ts:304-307`).

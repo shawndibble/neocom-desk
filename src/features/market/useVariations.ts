@@ -98,7 +98,7 @@ export function useVariations({
       const key = `${row.typeId}:${variationLocationKey}`;
       // Forces this run to actually fetch even for a key it already
       // resolved — the refreshTick case the key itself doesn't capture
-      // (see the field doc above). `load` still overwrites `byKey` in
+      // (see the comment above `useLazyRowCache`). `load` still overwrites `byKey` in
       // place once it resolves, so the row keeps showing its old price
       // until the new one lands.
       reset(key);
