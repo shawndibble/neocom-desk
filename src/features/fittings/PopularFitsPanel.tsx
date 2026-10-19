@@ -55,7 +55,7 @@ type PopularFitsSource = 'zkillboard' | 'workbench';
 /**
  * Popular fits (issues #2327, #2484), in two tabs. zKillboard: the hull's
  * recent losses grouped into distinct fits. EVE Workbench: the community fits
- * published there for the hull, from our own synced copy (`workbenchFits.ts`).
+ * published there for the hull, from our own synced copy in R2 (`workbenchFits.ts`).
  * Either opens a fit in the editor; a failure is a one-line note — the rest of
  * the page works without it.
  */
