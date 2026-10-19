@@ -32,7 +32,9 @@ import { useTableExport } from '@/components/ui/useTableExport';
 import { CharacterLink, SystemLink } from '@/features/entities';
 import { SecurityValue } from '@/features/character/assetBrowserRows';
 import type { OreLineValuation } from '@/engine/miningTax/yieldValuation';
+import type { PriceBasis } from '@/engine/miningTax/priceBasis';
 import type { MiningYieldRow } from './yieldSnapshot';
+import { basisPriceHint } from './basisLabel';
 import { sumVolume } from './volume';
 import { UnpricedIsk } from './UnpricedIsk';
 import { VolumeDisplay } from './volumeDisplay';
@@ -54,6 +56,9 @@ interface YieldDetailModalProps {
   typeVolumes: ReadonlyMap<number, number>;
   /** Issue #1281's page switch — hides the refined-output section entirely. */
   showRefining: boolean;
+  /** The page's Value choice, which "How this is priced" names. */
+  basis: PriceBasis;
+  buybackRate: number;
 }
 
 const CARD = 'rounded-xs border bg-panel-2 p-2.5';
@@ -92,6 +97,8 @@ export function YieldDetailModal({
   typeNames,
   typeVolumes,
   showRefining,
+  basis,
+  buybackRate,
 }: YieldDetailModalProps) {
   const { t } = useTranslation();
   const { valuation, entry } = row;
@@ -488,7 +495,7 @@ export function YieldDetailModal({
                 {t('miningTax.overview.detail.pricingTitle')}
               </p>
               <div className="space-y-1.5 px-2.5 py-2 text-[0.6875rem] leading-relaxed text-text-dim">
-                <p>{t('miningTax.overview.detail.priceBasisHint', { date: entry.date })}</p>
+                <p>{basisPriceHint(t, basis, buybackRate, entry.date)}</p>
                 {showRefining && (
                   <p>
                     {t('miningTax.overview.detail.refineBasisHint', {

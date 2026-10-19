@@ -1,10 +1,5 @@
 import type { TFunction } from 'i18next';
-import {
-  basisSide,
-  isNowBasis,
-  type DaysBySource,
-  type PriceBasis,
-} from '@/engine/miningTax/priceBasis';
+import { basisSide, isNowBasis, type PriceBasis } from '@/engine/miningTax/priceBasis';
 
 /** "Jita buy", "Jita sell", "Now · Jita buy" — the basis as the Value button and summary name it. */
 export function basisLabel(t: TFunction, basis: PriceBasis): string {
@@ -40,22 +35,22 @@ export function basisSummary(t: TFunction, basis: PriceBasis, buybackRate: numbe
 }
 
 /**
- * How many shown days actually priced on each source (issue #1760): "4 of 6
- * days use saved prices, 1 daily avg, 1 live". Empty under a now basis, where
- * every day is live by definition, and when no day is shown.
+ * The row detail's "How this is priced" line: the chosen side and buyback
+ * rate, and whether that is the mined day's price or today's.
  */
-export function basisUsage(t: TFunction, basis: PriceBasis, counts: DaysBySource): string {
-  if (isNowBasis(basis) || counts.total === 0) return '';
-  const parts = [
-    t('miningTax.overview.basis.usageSaved', { count: counts.saved, total: counts.total }),
-  ];
-  if (counts.historical > 0) {
-    parts.push(t('miningTax.overview.basis.usageHistorical', { count: counts.historical }));
-  }
-  if (counts.average > 0) {
-    parts.push(t('miningTax.overview.basis.usageAverage', { count: counts.average }));
-  }
-  if (counts.live > 0) parts.push(t('miningTax.overview.basis.usageLive', { count: counts.live }));
-  if (counts.none > 0) parts.push(t('miningTax.overview.basis.usageNone', { count: counts.none }));
-  return parts.join(', ');
+export function basisPriceHint(
+  t: TFunction,
+  basis: PriceBasis,
+  buybackRate: number,
+  date: string
+): string {
+  const price = t(`miningTax.overview.basis.${basisSide(basis)}`);
+  const kind = isNowBasis(basis) ? 'Now' : 'Day';
+  return buybackRate < 100
+    ? t(`miningTax.overview.detail.priceBasis${kind}RatedHint`, {
+        percent: buybackRate,
+        price,
+        date,
+      })
+    : t(`miningTax.overview.detail.priceBasis${kind}Hint`, { price, date });
 }
