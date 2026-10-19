@@ -28,16 +28,15 @@ export interface AltCharacterAdvice {
 const UNKNOWN_ACCOUNTING_LEVEL = 0;
 
 /**
- * @param securityBySystem Security of the alt colonies' systems, by id. A colony
- *   whose system is missing or unresolved gets no figure: the model reads an
- *   unknown security as highsec, which would price a nullsec colony at the cheap
- *   customs rate and overstate it.
+ * Alt colonies grouped by owning character. A colony whose system security is
+ * missing or unresolved gets no figure: the model reads an unknown security as
+ * highsec, which would price a nullsec colony at the cheap customs rate and
+ * overstate it.
  */
-export function buildAltAdvice(
-  input: PlanAdviceInput,
+export function groupAltColonies(
   colonies: readonly RosterColony[],
   securityBySystem: ReadonlyMap<number, number | null>
-): ReadonlyMap<number, AltCharacterAdvice> {
+): ReadonlyMap<number, readonly RosterColony[]> {
   const byCharacter = new Map<number, RosterColony[]>();
   for (const colony of colonies) {
     if (securityBySystem.get(colony.planet.solar_system_id) == null) continue;
@@ -45,39 +44,55 @@ export function buildAltAdvice(
     if (list) list.push(colony);
     else byCharacter.set(colony.characterId, [colony]);
   }
+  return byCharacter;
+}
 
+/** One alt's advice: a single `buildPlanAdvice` run, so callers can slice between characters. */
+export function buildOneAltAdvice(
+  input: PlanAdviceInput,
+  owned: readonly RosterColony[],
+  securityBySystem: ReadonlyMap<number, number | null>
+): AltCharacterAdvice {
+  const details = new Map(
+    owned.flatMap((colony) => (colony.detail ? [[colony.planet.planet_id, colony.detail]] : []))
+  );
+  try {
+    const advice = buildPlanAdvice({
+      ...input,
+      snapshot: {
+        ...input.snapshot,
+        colonies: owned.map((colony) => colony.planet),
+        details,
+        securityBySystem,
+        customsSkill: null,
+      },
+      books: { ...input.books, salesTaxPct: salesTaxPct(UNKNOWN_ACCOUNTING_LEVEL) },
+      skills: { commandCenterUpgrades: null, interplanetaryConsolidation: null },
+      whatIfTypes: undefined,
+    });
+    return {
+      byPlanetId: new Map(
+        advice.colonies.map((colony) => [
+          colony.planetId,
+          { quickWins: colony.quickWins, todayPerDay: colony.todayPerDay },
+        ])
+      ),
+      makesPerDay: advice.totals.todayPerDay,
+    };
+  } catch {
+    // Same as the active Character's hook: a model failure is no figure, never a broken tab.
+    return { byPlanetId: new Map(), makesPerDay: null };
+  }
+}
+
+export function buildAltAdvice(
+  input: PlanAdviceInput,
+  colonies: readonly RosterColony[],
+  securityBySystem: ReadonlyMap<number, number | null>
+): ReadonlyMap<number, AltCharacterAdvice> {
   const result = new Map<number, AltCharacterAdvice>();
-  for (const [characterId, owned] of byCharacter) {
-    const details = new Map(
-      owned.flatMap((colony) => (colony.detail ? [[colony.planet.planet_id, colony.detail]] : []))
-    );
-    try {
-      const advice = buildPlanAdvice({
-        ...input,
-        snapshot: {
-          ...input.snapshot,
-          colonies: owned.map((colony) => colony.planet),
-          details,
-          securityBySystem,
-          customsSkill: null,
-        },
-        books: { ...input.books, salesTaxPct: salesTaxPct(UNKNOWN_ACCOUNTING_LEVEL) },
-        skills: { commandCenterUpgrades: null, interplanetaryConsolidation: null },
-        whatIfTypes: undefined,
-      });
-      result.set(characterId, {
-        byPlanetId: new Map(
-          advice.colonies.map((colony) => [
-            colony.planetId,
-            { quickWins: colony.quickWins, todayPerDay: colony.todayPerDay },
-          ])
-        ),
-        makesPerDay: advice.totals.todayPerDay,
-      });
-    } catch {
-      // Same as the active Character's hook: a model failure is no figure, never a broken tab.
-      result.set(characterId, { byPlanetId: new Map(), makesPerDay: null });
-    }
+  for (const [characterId, owned] of groupAltColonies(colonies, securityBySystem)) {
+    result.set(characterId, buildOneAltAdvice(input, owned, securityBySystem));
   }
   return result;
 }
