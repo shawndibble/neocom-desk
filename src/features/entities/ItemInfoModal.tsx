@@ -5,10 +5,11 @@
  * Item Detail chunk loads on first open. Opened from a link the name is
  * staged; from a pasted URL it is looked up off the type.
  */
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { lazyNamed } from '@/app/lazyNamed';
 import { loadTypeName } from '@/features/character/typeNames';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { ItemActionsContext } from '@/features/market/itemActions';
 import { usePageItemActions } from '@/features/market/usePageItemActions';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -32,25 +33,21 @@ function ItemInfoHost() {
   const request = useItemInfoModalStore((state) => state.request);
   const close = useItemInfoModalStore((state) => state.close);
   const clear = useItemInfoModalStore((state) => state.clear);
-  const [looked, setLooked] = useState<{ typeId: number; name: string } | null>(null);
   const typeId = request?.typeId ?? null;
   const needsLookup = request !== null && !request.itemName;
 
-  useEffect(() => {
-    if (typeId === null || !needsLookup) return;
-    let cancelled = false;
-    void loadTypeName(typeId)
-      .catch(() => t('common.unknownType', { typeId }))
-      .then((name) => {
-        if (!cancelled) setLooked({ typeId, name });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [typeId, needsLookup, t]);
+  const lookup = useCallback(
+    () => loadTypeName(typeId ?? 0).catch(() => t('common.unknownType', { typeId })),
+    [typeId, t]
+  );
+  const { data: looked } = useKeyedLoad(
+    typeId === null ? null : String(typeId),
+    lookup,
+    !needsLookup
+  );
 
   if (!request) return null;
-  const name = request.itemName ?? (looked?.typeId === request.typeId ? looked.name : null);
+  const name = request.itemName ?? looked ?? null;
   if (name === null) return null;
   return (
     <ItemActionsContext.Provider value={actions}>
