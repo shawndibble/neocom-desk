@@ -17,12 +17,13 @@
  * Collapsing the last two would let an offline first visit report "no gate
  * route exists" for every haul in the game.
  */
-import { findFlownRoute, flownJumpDistancesFrom } from '@/engine/route/holeDetour';
+import { crossesHole, findFlownRoute, flownJumpDistancesFrom } from '@/engine/route/holeDetour';
 import {
   type FindJumpRouteOptions,
   type JumpGraph,
   type JumpRouteResult,
   type RoutePreferenceKind,
+  routeSweepFrom,
 } from '@/engine/route/jumpRoute';
 import { jumpCountsForRoutes, type RouteEnds } from '@/engine/route/jumpCounts';
 import { planTrip, type TripOptions, type TripPlan } from '@/engine/route/tripPlan';
@@ -154,6 +155,47 @@ export async function localJumpDistances(
     kind: 'known',
     jumps: flownJumpDistancesFrom(graph, originSystemId, engineOptions(rules, securityOf, extras)),
   };
+}
+
+export type LocalRoutesFromOrigin =
+  { kind: 'known'; routes: ReadonlyMap<number, number[] | null> } | { kind: 'unknown' };
+
+/**
+ * The route from each of `systemIds` to `originSystemId`, from one sweep out
+ * of the origin — the shape for many colonies to one hub, where a search per
+ * colony is the fan-out `routeExposure` warns against.
+ *
+ * Each route is flown toward the origin: the sweep's path out, reversed. A
+ * `null` route is a system no stargate joins to the origin. Under a biased
+ * preference the reverse of the outbound route can differ from the best inbound
+ * one by an equal-cost tie; jump counts and security exposure are unchanged
+ * for `shortest`. A route over a hole longer than the gates is re-searched as
+ * `findLocalRoute` would, so only that rare case costs a search of its own.
+ */
+export async function localRoutesFromOrigin(
+  originSystemId: number,
+  systemIds: readonly number[],
+  rules: LocalRouteRules = {},
+  extras: RouteGraphExtras = {}
+): Promise<LocalRoutesFromOrigin> {
+  const [graph, securityOf] = await Promise.all([
+    loadJumpGraph(),
+    securityLookupFor(rules.preference ?? 'shortest'),
+  ]);
+  if (!graph) return { kind: 'unknown' };
+  const options = engineOptions(rules, securityOf, extras);
+  const sweep = routeSweepFrom(graph, originSystemId, options);
+  const holes = Boolean(options.freeSystems?.size);
+  const routes = new Map<number, number[] | null>();
+  for (const systemId of systemIds) {
+    let outbound = sweep.routeTo(systemId);
+    if (outbound && holes && crossesHole(graph, outbound)) {
+      const flown = findFlownRoute(graph, originSystemId, systemId, options);
+      outbound = flown.kind === 'route' ? flown.systems : null;
+    }
+    routes.set(systemId, outbound ? [...outbound].reverse() : null);
+  }
+  return { kind: 'known', routes };
 }
 
 export type LocalJumpCounts =
