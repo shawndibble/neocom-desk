@@ -99,14 +99,14 @@ describe('evaluationService with a Worker', () => {
     expect(await result).toEqual([3300, 3301]);
   });
 
-  it("rejects with the worker's error", async () => {
+  it('works on the page when the worker answers with an error', async () => {
+    computeFittingStats.mockResolvedValue(stats);
     const { computeStatsOffThread } = await import('./evaluationService');
 
     const result = computeStatsOffThread(fitting, pilot, undefined, {});
-    FakeWorker.instances[0].reply({ id: 1, error: 'bad fit' });
+    FakeWorker.instances[0].reply({ id: 1, error: 'engine failed to load' });
 
-    await expect(result).rejects.toThrow('bad fit');
-    expect(computeFittingStats).not.toHaveBeenCalled();
+    expect(await result).toBe(stats);
   });
 
   it('aborts at once and tells the worker to drop the job', async () => {

@@ -11,18 +11,21 @@
  */
 import type { DamageProfile, Fitting, FittingStats, PilotProfile } from '@/engine/fittings/types';
 import { computeFittingStats, fittingSkillSources, type StatsOptions } from './dogmaFittingEngine';
-import { ABORTED, WORKER_FAILED, sendToWorker } from './fittingWorker';
+import { ABORTED, sendToWorker } from './fittingWorker';
 import type { WorkerReply } from './hullFit.worker';
 import { yieldToEventLoop } from './yieldToEventLoop';
 
-/** The worker's answer, or null to work on the page: no worker, or it failed. */
+/**
+ * The worker's answer, or null to work on the page: no worker, or it failed
+ * (crashed, or could not load its engine copy — the page's own may be fine).
+ */
 async function viaWorker(reply: Promise<WorkerReply> | null): Promise<WorkerReply | null> {
   if (reply === null) return null;
   try {
     return await reply;
   } catch (error) {
-    if (error instanceof Error && error.message === WORKER_FAILED) return null;
-    throw error;
+    if (error instanceof Error && error.message === ABORTED) throw error;
+    return null;
   }
 }
 
