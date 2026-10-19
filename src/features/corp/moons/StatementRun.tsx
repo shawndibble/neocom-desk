@@ -136,7 +136,10 @@ export function StatementRun() {
       });
     }
     for (const s of unmailed) {
-      const owed = view.miners.find((m) => m.id === s.minerId)!.owed;
+      // A Miner since unlinked or regrouped has no row to address the mail to; skip it rather than crash.
+      const row = view.miners.find((m) => m.id === s.minerId);
+      if (!row) continue;
+      const owed = row.owed;
       out.push({
         key: `statement:${s.id}`,
         minerId: s.minerId,
