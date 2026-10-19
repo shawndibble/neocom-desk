@@ -1,161 +1,128 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { db } from '@/db';
-import { GLOBAL_CACHE_CHARACTER_ID, resetRevalidationState } from '@/esi/cache';
-import { ensureAnySession } from '@/sync/syncAuth';
-import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
-import { loadHubSnapshotRange } from './hubSnapshot';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { getTradeHub } from '@/market/hubs';
+import { miningPricesR2Key } from '../../../functions/src/miningHubPrices';
+import {
+  loadHubSnapshotRange,
+  miningPricesUrl,
+  parseMiningPricesMonth,
+  resetHubSnapshotCache,
+} from './hubSnapshot';
 
-const getDocs = vi.hoisted(() => vi.fn());
+const fetchMock = vi.fn();
 
-vi.mock('firebase/firestore/lite', () => ({
-  getDocs,
-  collection: (_db: unknown, name: string) => ({ name }),
-  query: (...args: unknown[]) => args,
-  orderBy: (...args: unknown[]) => args,
-  startAt: (...args: unknown[]) => args,
-  endAt: (...args: unknown[]) => args,
-  documentId: () => '__name__',
-}));
-vi.mock('@/sync/firebaseApp', () => ({ getSyncFirestore: () => ({}) }));
-vi.mock('@/sync/syncAuth', () => ({ ensureAnySession: vi.fn(async () => undefined) }));
-vi.mock('@/app/syncStatus', () => ({ isSyncConfigured: () => true }));
-
-const CHARACTER_ID = 91;
-const STATION_KEY = String(DEFAULT_TRADE_HUB.stationId);
-
-function docsResult(byDate: Record<string, unknown>) {
-  return { docs: Object.entries(byDate).map(([id, data]) => ({ id, data: () => data })) };
+function serve(objects: Record<string, unknown>, failing: string[] = []) {
+  fetchMock.mockImplementation(async (url: string) => {
+    if (failing.includes(url)) return new Response('boom', { status: 500 });
+    if (!(url in objects)) return new Response('', { status: 404 });
+    return new Response(JSON.stringify(objects[url]), { status: 200 });
+  });
 }
 
-beforeEach(async () => {
-  await db.esiCache.clear();
-  resetRevalidationState();
-  getDocs.mockReset();
-  vi.mocked(ensureAnySession).mockClear();
+const jita = getTradeHub('jita')!;
+const amarr = getTradeHub('amarr')!;
+const url = (hub = jita, month: string) => miningPricesUrl(hub, month);
+
+beforeEach(() => {
+  resetHubSnapshotCache();
+  fetchMock.mockReset();
+  vi.stubGlobal('fetch', fetchMock);
+});
+afterEach(() => vi.unstubAllGlobals());
+
+describe('miningPricesUrl', () => {
+  it('names the object the Functions writer publishes', () => {
+    expect(miningPricesUrl(amarr, '2026-10')).toMatch(
+      new RegExp(`^https://[^/]+/${miningPricesR2Key('amarr', '2026-10')}$`)
+    );
+  });
 });
 
 describe('loadHubSnapshotRange', () => {
-  it('routes a fuzzwork-sourced day to saved, reading only the default hub', async () => {
-    getDocs.mockResolvedValue(
-      docsResult({
-        '2026-09-24': {
-          source: 'fuzzwork',
-          hubs: {
-            [STATION_KEY]: { '34': { buy: 3.6, sell: 3.8 } },
-            '60008494': { '34': { buy: 3.5, sell: 3.9 } }, // Amarr — not read
-          },
-        },
-      })
-    );
-
-    const result = await loadHubSnapshotRange(CHARACTER_ID, '2026-09-24', '2026-09-24');
-
-    expect(result.saved.get('2026-09-24')?.get(34)).toEqual({ buy: 3.6, sell: 3.8 });
-    expect(result.historical.size).toBe(0);
-  });
-
-  it('routes an adam4eve-sourced day to historical', async () => {
-    getDocs.mockResolvedValue(
-      docsResult({
-        '2026-06-28': {
-          source: 'adam4eve',
-          hubs: { [STATION_KEY]: { '62454': { buy: 933.1, sell: 1141 } } },
-        },
-      })
-    );
-
-    const result = await loadHubSnapshotRange(CHARACTER_ID, '2026-06-28', '2026-06-28');
-
-    expect(result.historical.get('2026-06-28')?.get(62454)).toEqual({ buy: 933.1, sell: 1141 });
-    expect(result.saved.size).toBe(0);
-  });
-
-  it('splits a range across both sources by day', async () => {
-    getDocs.mockResolvedValue(
-      docsResult({
-        '2026-06-28': {
-          source: 'adam4eve',
-          hubs: { [STATION_KEY]: { '34': { buy: 1, sell: 2 } } },
-        },
-        '2026-09-24': {
-          source: 'fuzzwork',
-          hubs: { [STATION_KEY]: { '34': { buy: 3, sell: 4 } } },
-        },
-      })
-    );
-
-    const result = await loadHubSnapshotRange(CHARACTER_ID, '2026-06-28', '2026-09-24');
-
-    expect(result.historical.get('2026-06-28')?.get(34)).toEqual({ buy: 1, sell: 2 });
-    expect(result.saved.get('2026-09-24')?.get(34)).toEqual({ buy: 3, sell: 4 });
-  });
-
-  it('is empty for a doc missing the default hub or with no source tag', async () => {
-    getDocs.mockResolvedValue(
-      docsResult({
-        '2026-09-24': { source: 'fuzzwork', hubs: { '60008494': { '34': { buy: 1, sell: 2 } } } },
-        '2026-09-23': { hubs: { [STATION_KEY]: { '34': { buy: 1, sell: 2 } } } },
-      })
-    );
-
-    const result = await loadHubSnapshotRange(CHARACTER_ID, '2026-09-23', '2026-09-24');
-
-    expect(result.saved.size).toBe(0);
-    expect(result.historical.size).toBe(0);
-  });
-
-  it('reads a non-default hub when one is passed', async () => {
-    const amarr = getTradeHub('amarr')!;
-    getDocs.mockResolvedValue(
-      docsResult({
-        '2026-09-24': {
-          source: 'fuzzwork',
-          hubs: {
-            [STATION_KEY]: { '34': { buy: 3.6, sell: 3.8 } }, // Jita — not read
-            [String(amarr.stationId)]: { '34': { buy: 3.4, sell: 3.7 } },
-          },
-        },
-      })
-    );
-
-    const result = await loadHubSnapshotRange(CHARACTER_ID, '2026-09-24', '2026-09-24', amarr);
-
-    expect(result.saved.get('2026-09-24')?.get(34)).toEqual({ buy: 3.4, sell: 3.7 });
-  });
-
-  it('serves a cached range without waiting on a Firebase sign-in', async () => {
-    await db.esiCache.put({
-      characterId: GLOBAL_CACHE_CHARACTER_ID,
-      key: 'marketHistory:2026-09-24:2026-09-24',
-      value: {
-        '2026-09-24': {
-          source: 'fuzzwork',
-          hubs: { [STATION_KEY]: { '34': { buy: 1, sell: 2 } } },
+  it('splits days by tier and reads only the days in range', async () => {
+    serve({
+      [url(jita, '2026-09')]: {
+        hub: 'jita',
+        month: '2026-09',
+        days: {
+          '2026-09-23': { tier: 'saved', prices: { 34: [9, 9] } }, // before the range
+          '2026-09-24': { tier: 'saved', prices: { 34: [3.6, 3.8], 35: [null, 7] } },
+          '2026-09-25': { tier: 'historical', prices: { 34: [1, 2] } },
         },
       },
-      fetchedAt: Date.now(),
     });
 
-    const result = await loadHubSnapshotRange(CHARACTER_ID, '2026-09-24', '2026-09-24');
+    const result = await loadHubSnapshotRange('2026-09-24', '2026-09-25');
 
-    expect(result.saved.get('2026-09-24')?.get(34)).toEqual({ buy: 1, sell: 2 });
-    expect(ensureAnySession).not.toHaveBeenCalled();
-    expect(getDocs).not.toHaveBeenCalled();
+    expect(result.saved.get('2026-09-24')?.get(34)).toEqual({ buy: 3.6, sell: 3.8 });
+    expect(result.saved.get('2026-09-24')?.get(35)).toEqual({ buy: null, sell: 7 });
+    expect(result.historical.get('2026-09-25')?.get(34)).toEqual({ buy: 1, sell: 2 });
+    expect(result.saved.has('2026-09-23')).toBe(false);
   });
 
-  it('is empty when signing in fails and nothing is cached', async () => {
-    vi.mocked(ensureAnySession).mockRejectedValueOnce(new Error('offline'));
+  it('reads every month object a range spans, and a missing month is just empty', async () => {
+    serve({
+      [url(amarr, '2026-08')]: {
+        days: { '2026-08-31': { tier: 'saved', prices: { 34: [1, 2] } } },
+      },
+      [url(amarr, '2026-10')]: {
+        days: { '2026-10-01': { tier: 'saved', prices: { 34: [5, 6] } } },
+      },
+    });
 
-    const result = await loadHubSnapshotRange(CHARACTER_ID, '2026-09-24', '2026-09-24');
+    const result = await loadHubSnapshotRange('2026-08-31', '2026-10-01', amarr);
 
-    expect(result.saved.size).toBe(0);
-    expect(result.historical.size).toBe(0);
+    expect(fetchMock.mock.calls.map(([u]) => u)).toEqual([
+      url(amarr, '2026-08'),
+      url(amarr, '2026-09'),
+      url(amarr, '2026-10'),
+    ]);
+    expect([...result.saved.keys()]).toEqual(['2026-08-31', '2026-10-01']);
   });
 
-  it('is empty without hitting Firestore when the range is backwards', async () => {
-    const result = await loadHubSnapshotRange(CHARACTER_ID, '2026-09-24', '2026-09-01');
+  it('treats a failed or malformed month as empty and retries a failure next time', async () => {
+    serve({ [url(jita, '2026-09')]: { days: 'nope' } }, [url(jita, '2026-10')]);
 
+    const first = await loadHubSnapshotRange('2026-09-30', '2026-10-01');
+    expect(first.saved.size).toBe(0);
+
+    serve({
+      [url(jita, '2026-10')]: {
+        days: { '2026-10-01': { tier: 'saved', prices: { 34: [1, 2] } } },
+      },
+    });
+    const second = await loadHubSnapshotRange('2026-10-01', '2026-10-01');
+    expect(second.saved.get('2026-10-01')?.get(34)).toEqual({ buy: 1, sell: 2 });
+  });
+
+  it('holds a good month so a second read costs no fetch', async () => {
+    serve({ [url(jita, '2026-10')]: { days: {} } });
+    await loadHubSnapshotRange('2026-10-01', '2026-10-02');
+    await loadHubSnapshotRange('2026-10-03', '2026-10-04');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('is empty without fetching when the range is backwards', async () => {
+    const result = await loadHubSnapshotRange('2026-09-24', '2026-09-01');
     expect(result).toEqual({ saved: new Map(), historical: new Map() });
-    expect(getDocs).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('parseMiningPricesMonth', () => {
+  it('skips malformed days and prices', () => {
+    const parsed = parseMiningPricesMonth({
+      days: {
+        '2026-10-01': { tier: 'saved', prices: { 34: [1, 2], 35: ['x', 2], abc: [1, 1] } },
+        '2026-10-02': { tier: 'other', prices: {} },
+        nope: { tier: 'saved', prices: {} },
+      },
+    });
+    expect([...parsed.keys()]).toEqual(['2026-10-01']);
+    expect([...parsed.get('2026-10-01')!.prices.keys()]).toEqual([34]);
+  });
+
+  it('is empty for something that is not a month object', () => {
+    expect(parseMiningPricesMonth(null).size).toBe(0);
+    expect(parseMiningPricesMonth([]).size).toBe(0);
   });
 });

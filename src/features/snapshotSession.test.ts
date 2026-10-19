@@ -9,7 +9,6 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { signInWithCustomToken } from 'firebase/auth';
 import { db } from '@/db';
 import { resetRevalidationState } from '@/esi/cache';
-import { loadHubSnapshotRange } from './market/hubSnapshot';
 import { loadPublicBpcContracts } from './bpcContracts/syncedContracts';
 import { loadChunkedSnapshot } from './contractSearch/chunkedSnapshot';
 
@@ -69,10 +68,6 @@ beforeEach(async () => {
 
 describe('snapshot readers while an alt sync holds the session', () => {
   it.each([
-    [
-      'hub market history',
-      () => loadHubSnapshotRange(ACTIVE_CHARACTER_ID, '2026-09-24', '2026-09-24'),
-    ],
     ['public BPC contracts', () => loadPublicBpcContracts(ACTIVE_CHARACTER_ID)],
     [
       'chunked snapshot',

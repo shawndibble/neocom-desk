@@ -40,8 +40,12 @@ no app server. Two kinds of data:
   snapshot of the previous UTC day into the R2 object `open-prices/<typeId>.json`:
   per type, every Trade Hub region's highest buy and lowest sell for the day, up
   to 400 days, public static file with no Firebase involved (`functions/src/marketOpenPrices.ts` holds the logic,
-  `marketOrdersArchive.ts` the streaming fetch). The deployment now has eleven
-  scheduled functions, i.e. eleven Cloud Scheduler jobs.
+  `marketOrdersArchive.ts` the streaming fetch). The same pass keeps every
+  mining type's best buy and sell at each hub _station_ and merges the day into
+  `mining-prices/<hubId>/<YYYY-MM>.json` (`functions/src/miningHubPrices.ts`),
+  which the mining pricing reads (`features/market/hubSnapshot.ts`); it replaced
+  the retired `captureMiningPriceSnapshot` job and its Firestore `marketHistory`.
+  The deployment now has ten scheduled functions, i.e. ten Cloud Scheduler jobs.
 
 Auth is browser-only OAuth2 PKCE against `login.eveonline.com`; refresh
 tokens never leave the device. Market prices come from Fuzzwork aggregates,
