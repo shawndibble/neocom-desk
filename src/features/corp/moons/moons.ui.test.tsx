@@ -28,6 +28,11 @@ vi.mock('@/features/corpTaxBook/mailQueue', () => ({
   enqueueReminder: vi.fn(),
 }));
 
+const corpName = vi.hoisted(() => ({ value: 'Ore & Glory' as string | null }));
+vi.mock('@/features/character/useEntityName', () => ({
+  useEntityName: () => corpName.value,
+}));
+
 const CORP = 98000001;
 const ORE = 45490;
 const entry = (
@@ -85,7 +90,7 @@ const verdict: OfficerVerdict = {
 function renderBook(ui: ReactElement, overrides: Partial<BookViewInput> = {}) {
   const view = buildBookView(input(overrides));
   const reload = vi.fn();
-  render(
+  const { unmount } = render(
     <MemoryRouter initialEntries={['/corp/moons/miners']}>
       <BookProvider
         value={{
@@ -108,10 +113,11 @@ function renderBook(ui: ReactElement, overrides: Partial<BookViewInput> = {}) {
       </BookProvider>
     </MemoryRouter>
   );
-  return { view, reload };
+  return { view, reload, unmount };
 }
 
 beforeEach(() => {
+  corpName.value = 'Ore & Glory';
   editBook.mockReset().mockResolvedValue({});
   enqueueStatements.mockReset().mockResolvedValue({ queued: 1, skipped: 0, missingLink: [] });
 });
@@ -128,6 +134,24 @@ describe('MinersTab', () => {
 });
 
 describe('StatementRun', () => {
+  it('keeps Send disabled until the corporation name resolves, then previews with it', async () => {
+    corpName.value = null;
+    const first = renderBook(<StatementRun />);
+    await userEvent.click(screen.getByRole('button', { name: 'Continue to send' }));
+    expect(screen.getByText('Loading corporation name…')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Send 2 Statements' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Preview mail' })).toBeDisabled();
+    expect(editBook).not.toHaveBeenCalled();
+    first.unmount();
+
+    corpName.value = 'Ore & Glory';
+    renderBook(<StatementRun />);
+    await userEvent.click(screen.getByRole('button', { name: 'Continue to send' }));
+    expect(screen.getByRole('button', { name: 'Send 2 Statements' })).toBeEnabled();
+    await userEvent.click(screen.getByRole('button', { name: 'Preview mail' }));
+    expect(await screen.findByText(/Ore & Glory moon tax Statement, Aug 2026/)).toBeInTheDocument();
+  });
+
   it('previews the mail of each Miner from the Send step, before sending', async () => {
     renderBook(<StatementRun />);
     await userEvent.click(screen.getByRole('button', { name: 'Continue to send' }));

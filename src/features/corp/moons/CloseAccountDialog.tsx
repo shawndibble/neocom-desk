@@ -60,8 +60,11 @@ export function CloseAccountDialog({
       onClose={onClose}
       title={t('corpTaxBook.moons.dialogs.close.title', { name: minerName })}
       confirmLabel={t('corpTaxBook.moons.dialogs.close.confirm')}
-      canConfirm={reason.trim().length > 0 && forfeitOk}
+      canConfirm={
+        reason.trim().length > 0 && forfeitOk && (!plan?.statement || corporationName !== null)
+      }
       run={async () => {
+        if (plan?.statement && corporationName === null) return;
         const statement = plan?.statement
           ? {
               ...plan.statement,

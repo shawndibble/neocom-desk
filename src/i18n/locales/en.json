@@ -13948,6 +13948,7 @@
         "previewFor": "Preview mail for",
         "continue": "Continue to send",
         "preview": "Preview mail",
+        "loadingCorporation": "Loading corporation name…",
         "sendIntro_one": "{{count}} mail from {{name}}, one per Miner.",
         "sendIntro_other": "{{count}} mails from {{name}}, one per Miner.",
         "sendButton_one": "Send {{count}} Statement",

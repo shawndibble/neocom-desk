@@ -151,7 +151,7 @@ export function StatementRun() {
     return out;
   }, [view, plan, unmailed]);
 
-  const previewFor = (item: (typeof previews)[number]): MailPreviewContent => {
+  const previewFor = (item: (typeof previews)[number], corpName: string): MailPreviewContent => {
     const target = mailTarget(ctx, item.statement, minerRow(item.minerId), {
       amountDue: item.amountDue,
       carried: item.carried,
@@ -159,7 +159,7 @@ export function StatementRun() {
     const mail = composeStatementMail({
       ...target,
       kind: 'statement',
-      corporationName,
+      corporationName: corpName,
       refineryName: (id) => names.refinery(id),
       verifyUrl: `${window.location.origin}/corp-tax-book/verify/…`,
     });
@@ -179,6 +179,7 @@ export function StatementRun() {
   };
 
   const send = async () => {
+    if (corporationName === null) return;
     setBusy(true);
     setError(null);
     try {
@@ -344,12 +345,21 @@ export function StatementRun() {
                   </SelectContent>
                 </Select>
               )}
+              {corporationName === null && (
+                <p role="status" className="text-text-dim">
+                  {t('corpTaxBook.moons.run.loadingCorporation')}
+                </p>
+              )}
               <div className="flex flex-wrap gap-2">
                 <Button variant="primary" onClick={() => setStep('send')} disabled={!canEdit}>
                   {t('corpTaxBook.moons.run.continue')}
                 </Button>
                 {previewItem && (
-                  <Button variant="ghost" onClick={() => setPreviewOpen(true)}>
+                  <Button
+                    variant="ghost"
+                    onClick={() => setPreviewOpen(true)}
+                    disabled={corporationName === null}
+                  >
                     {t('corpTaxBook.moons.run.preview')}
                   </Button>
                 )}
@@ -365,6 +375,11 @@ export function StatementRun() {
                 })}
               </p>
               <MailLimitNotice count={total} senderName={names.character(characterId)} />
+              {corporationName === null && (
+                <p role="status" className="text-text-dim">
+                  {t('corpTaxBook.moons.run.loadingCorporation')}
+                </p>
+              )}
               {error && (
                 <p role="alert" className="text-danger">
                   {error}
@@ -372,11 +387,19 @@ export function StatementRun() {
               )}
               <div className="flex flex-wrap gap-2">
                 {previewItem && (
-                  <Button variant="ghost" onClick={() => setPreviewOpen(true)} disabled={busy}>
+                  <Button
+                    variant="ghost"
+                    onClick={() => setPreviewOpen(true)}
+                    disabled={busy || corporationName === null}
+                  >
                     {t('corpTaxBook.moons.run.preview')}
                   </Button>
                 )}
-                <Button variant="primary" onClick={() => void send()} disabled={busy}>
+                <Button
+                  variant="primary"
+                  onClick={() => void send()}
+                  disabled={busy || corporationName === null}
+                >
                   {t('corpTaxBook.moons.run.sendButton', { count: total })}
                 </Button>
                 <Button variant="ghost" onClick={() => setStep('check')} disabled={busy}>
@@ -408,7 +431,11 @@ export function StatementRun() {
       <StatementMailPreviewDialog
         open={previewOpen}
         onClose={() => setPreviewOpen(false)}
-        mail={previewOpen && previewItem ? previewFor(previewItem) : null}
+        mail={
+          previewOpen && previewItem && corporationName
+            ? previewFor(previewItem, corporationName)
+            : null
+        }
         {...(previews.length > 1 && previewItem
           ? {
               nav: {
