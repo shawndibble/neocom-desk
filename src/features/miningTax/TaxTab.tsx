@@ -5,7 +5,17 @@ import { UnpricedOreDetail } from './UnpricedOreDetail';
 import { hasReachableUnpricedHub } from './unpricedHubs';
 import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
+import { guarded } from '@/app/routeChunks';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { useStickyClearance } from '@/lib/useStickyClearance';
@@ -130,16 +140,13 @@ import {
   unlinkedRecordedPayments,
   type MadePayment,
 } from '@/features/miningTax/paymentLinks';
-import { LinkPaymentDialog } from '@/features/miningTax/LinkPaymentDialog';
 import { GroupSummaryModal } from '@/features/miningTax/GroupSummaryModal';
-import { SettleUpDialog, type SettleUpRow } from '@/features/miningTax/SettleUpDialog';
+import type { SettleUpRow } from '@/features/miningTax/SettleUpDialog';
 import { useSettleUpRecheck } from '@/features/miningTax/useSettleUpRecheck';
-import { JoinAssignDialog } from '@/features/miningTax/JoinAssignDialog';
-import { PayeeManagerDialog, type PayeeOwed } from '@/features/miningTax/PayeeManagerDialog';
+import type { PayeeOwed } from '@/features/miningTax/PayeeManagerDialog';
 import { RowDetailModal } from '@/features/miningTax/RowDetailModal';
 import { type LinkedTransaction } from '@/features/miningTax/PaymentLinksCard';
 import { LinkTransactionDialog } from '@/features/miningTax/LinkTransactionDialog';
-import { SplitDialog } from '@/features/miningTax/SplitDialog';
 import { findPricingGaps, type PricingGap } from '@/features/miningTax/pricingGaps';
 import { linesOwnedBy } from '@/engine/miningTax/ownership';
 import { taxCsvColumns } from '@/features/miningTax/taxCsv';
@@ -149,8 +156,6 @@ import { useMediaQuery } from '@/lib/useMediaQuery';
 import { AttentionStrip, type AttentionItem } from '@/features/miningTax/AttentionStrip';
 import { OwedBalances } from '@/features/miningTax/OwedBalances';
 import { ContinueSessionCard } from '@/features/miningTax/ContinueSessionCard';
-import { EntryEditDialog } from '@/features/miningTax/EntryEditDialog';
-import { LinkWalletPaymentDialog } from '@/features/miningTax/LinkWalletPaymentDialog';
 import {
   useAutoContinueSessions,
   useDismissedContinuations,
@@ -162,6 +167,42 @@ import {
 import { useLedgerAction } from '@/features/miningTax/useLedgerAction';
 import { splitLedger } from '@/features/miningTax/ledgerSections';
 import { suggestPayeeForSystem, systemsByPayee } from '@/features/miningTax/suggestPayee';
+
+const LinkPaymentDialog = lazy(() =>
+  guarded(() => import('@/features/miningTax/LinkPaymentDialog')).then((m) => ({
+    default: m.LinkPaymentDialog,
+  }))
+);
+const SettleUpDialog = lazy(() =>
+  guarded(() => import('@/features/miningTax/SettleUpDialog')).then((m) => ({
+    default: m.SettleUpDialog,
+  }))
+);
+const JoinAssignDialog = lazy(() =>
+  guarded(() => import('@/features/miningTax/JoinAssignDialog')).then((m) => ({
+    default: m.JoinAssignDialog,
+  }))
+);
+const PayeeManagerDialog = lazy(() =>
+  guarded(() => import('@/features/miningTax/PayeeManagerDialog')).then((m) => ({
+    default: m.PayeeManagerDialog,
+  }))
+);
+const SplitDialog = lazy(() =>
+  guarded(() => import('@/features/miningTax/SplitDialog')).then((m) => ({
+    default: m.SplitDialog,
+  }))
+);
+const EntryEditDialog = lazy(() =>
+  guarded(() => import('@/features/miningTax/EntryEditDialog')).then((m) => ({
+    default: m.EntryEditDialog,
+  }))
+);
+const LinkWalletPaymentDialog = lazy(() =>
+  guarded(() => import('@/features/miningTax/LinkWalletPaymentDialog')).then((m) => ({
+    default: m.LinkWalletPaymentDialog,
+  }))
+);
 
 /**
  * A `MadePayment`'s own timestamp as a local calendar date, falling back to
@@ -2047,17 +2088,19 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
         </PageSettingsModal>
 
         {payeeManagerCharacterId !== null && (
-          <PayeeManagerDialog
-            open={payeeManagerCharacterId !== null}
-            onClose={() => setPayeeManagerCharacterId(null)}
-            characters={characters}
-            payeesByCharacter={data?.payeesByCharacter ?? new Map()}
-            initialCharacterId={payeeManagerCharacterId}
-            onChanged={refresh}
-            owedByPayee={owedByPayee}
-            systemsByPayee={payeeSystems}
-            systemNames={data?.systemNames}
-          />
+          <Suspense fallback={null}>
+            <PayeeManagerDialog
+              open={payeeManagerCharacterId !== null}
+              onClose={() => setPayeeManagerCharacterId(null)}
+              characters={characters}
+              payeesByCharacter={data?.payeesByCharacter ?? new Map()}
+              initialCharacterId={payeeManagerCharacterId}
+              onChanged={refresh}
+              owedByPayee={owedByPayee}
+              systemsByPayee={payeeSystems}
+              systemNames={data?.systemNames}
+            />
+          </Suspense>
         )}
 
         {detailTarget && data && detailTarget.groupMembers && (
@@ -2108,21 +2151,23 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
         )}
 
         {editTarget && data && (
-          <EntryEditDialog
-            open
-            onClose={() => setEditTarget(null)}
-            members={allMembers(editTarget)}
-            systemName={systemName(editTarget)}
-            systemSecurity={systemSecurityOf(editTarget)}
-            payees={allPayees}
-            assignments={everyAssignment}
-            typeNames={data.typeNames}
-            pricesFor={pricesFor}
-            onSaved={() => {
-              setEditTarget(null);
-              refresh();
-            }}
-          />
+          <Suspense fallback={null}>
+            <EntryEditDialog
+              open
+              onClose={() => setEditTarget(null)}
+              members={allMembers(editTarget)}
+              systemName={systemName(editTarget)}
+              systemSecurity={systemSecurityOf(editTarget)}
+              payees={allPayees}
+              assignments={everyAssignment}
+              typeNames={data.typeNames}
+              pricesFor={pricesFor}
+              onSaved={() => {
+                setEditTarget(null);
+                refresh();
+              }}
+            />
+          </Suspense>
         )}
 
         {detailTarget && data && !detailTarget.groupMembers && (
@@ -2208,114 +2253,124 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
           )}
 
         {splitTarget && splitTarget.assignment && data && (
-          <SplitDialog
-            open
-            onClose={() => setSplitTarget(null)}
-            assignment={
-              // A needs-review row splits against what ESI reports now, so the
-              // growth (the ore the pilot usually wants to move) is on offer.
-              splitTarget.assignment.status === 'needs-review'
-                ? {
-                    ...splitTarget.assignment,
-                    oreLines: linesOwnedBy(
-                      splitTarget.row.entry.oreLines,
-                      splitTarget.row.assignments,
-                      splitTarget.assignment.id
-                    ),
-                  }
-                : splitTarget.assignment
-            }
-            row={splitTarget.row}
-            systemName={systemName(splitTarget)}
-            payees={allPayees}
-            assignments={everyAssignment}
-            typeNames={data.typeNames}
-            pricesFor={pricesFor}
-            busy={busy}
-            onSplit={() => {
-              setSplitTarget(null);
-              refresh();
-            }}
-          />
+          <Suspense fallback={null}>
+            <SplitDialog
+              open
+              onClose={() => setSplitTarget(null)}
+              assignment={
+                // A needs-review row splits against what ESI reports now, so the
+                // growth (the ore the pilot usually wants to move) is on offer.
+                splitTarget.assignment.status === 'needs-review'
+                  ? {
+                      ...splitTarget.assignment,
+                      oreLines: linesOwnedBy(
+                        splitTarget.row.entry.oreLines,
+                        splitTarget.row.assignments,
+                        splitTarget.assignment.id
+                      ),
+                    }
+                  : splitTarget.assignment
+              }
+              row={splitTarget.row}
+              systemName={systemName(splitTarget)}
+              payees={allPayees}
+              assignments={everyAssignment}
+              typeNames={data.typeNames}
+              pricesFor={pricesFor}
+              busy={busy}
+              onSplit={() => {
+                setSplitTarget(null);
+                refresh();
+              }}
+            />
+          </Suspense>
         )}
 
         {joinTarget && data && (
-          <JoinAssignDialog
-            open={joinTarget !== null}
-            onClose={() => {
-              setJoinTarget(null);
-              setJoinCandidateOverride(null);
-            }}
-            primary={{ row: joinTarget.row, assignment: joinTarget.assignment }}
-            candidates={
-              joinCandidateOverride
-                ? joinCandidateOverride.map((dr) => ({ row: dr.row, assignment: dr.assignment }))
-                : joinCandidatesFor(joinTarget)
-            }
-            initialSelection={joinCandidateOverride ? 'all' : 'none'}
-            payees={allPayees}
-            typeNames={data.typeNames}
-            pricesFor={pricesFor}
-            busy={busy}
-            onJoined={handleJoined}
-          />
+          <Suspense fallback={null}>
+            <JoinAssignDialog
+              open={joinTarget !== null}
+              onClose={() => {
+                setJoinTarget(null);
+                setJoinCandidateOverride(null);
+              }}
+              primary={{ row: joinTarget.row, assignment: joinTarget.assignment }}
+              candidates={
+                joinCandidateOverride
+                  ? joinCandidateOverride.map((dr) => ({ row: dr.row, assignment: dr.assignment }))
+                  : joinCandidatesFor(joinTarget)
+              }
+              initialSelection={joinCandidateOverride ? 'all' : 'none'}
+              payees={allPayees}
+              typeNames={data.typeNames}
+              pricesFor={pricesFor}
+              busy={busy}
+              onJoined={handleJoined}
+            />
+          </Suspense>
         )}
 
         {settleUpRows && data && (
-          <SettleUpDialog
-            open
-            onClose={() => setSettleUpRows(null)}
-            rows={liveSettleUpRows ?? settleUpRows}
-            systemNames={data.systemNames}
-            arrivalCheck={settleUpRecheck}
-            onPaid={() => {
-              setSelection(new Set());
-              refresh();
-            }}
-            onPickFromWallet={(() => {
-              const payeeIds = [...new Set(settleUpRows.map((r) => r.assignment.payeeId))];
-              const only = payeeIds.length === 1 ? payeeIds[0] : undefined;
-              if (!only) return undefined;
-              // The entries being settled, not the Payee's whole balance.
-              const members = settleUpRows.flatMap((r) =>
-                allDisplayRows
-                  .flatMap(allMembers)
-                  .filter((m) => m.assignment.id === r.assignment.id)
-              );
-              return () => {
-                setSettleUpRows(null);
-                setLinkWalletTarget({ payeeId: only, members });
-              };
-            })()}
-          />
+          <Suspense fallback={null}>
+            <SettleUpDialog
+              open
+              onClose={() => setSettleUpRows(null)}
+              rows={liveSettleUpRows ?? settleUpRows}
+              systemNames={data.systemNames}
+              arrivalCheck={settleUpRecheck}
+              onPaid={() => {
+                setSelection(new Set());
+                refresh();
+              }}
+              onPickFromWallet={(() => {
+                const payeeIds = [...new Set(settleUpRows.map((r) => r.assignment.payeeId))];
+                const only = payeeIds.length === 1 ? payeeIds[0] : undefined;
+                if (!only) return undefined;
+                // The entries being settled, not the Payee's whole balance.
+                const members = settleUpRows.flatMap((r) =>
+                  allDisplayRows
+                    .flatMap(allMembers)
+                    .filter((m) => m.assignment.id === r.assignment.id)
+                );
+                return () => {
+                  setSettleUpRows(null);
+                  setLinkWalletTarget({ payeeId: only, members });
+                };
+              })()}
+            />
+          </Suspense>
         )}
 
         {linkWalletPayee && data && (
-          <LinkWalletPaymentDialog
-            key={linkWalletPayee.id}
-            open
-            onClose={() => setLinkWalletTarget(null)}
-            payee={linkWalletPayee}
-            owed={linkWalletOwed}
-            candidates={linkWalletCandidates}
-            paymentSources={paymentSources}
-            systemNames={data.systemNames}
-            onLinked={() => {
-              setSelection(new Set());
-              refresh();
-            }}
-          />
+          <Suspense fallback={null}>
+            <LinkWalletPaymentDialog
+              key={linkWalletPayee.id}
+              open
+              onClose={() => setLinkWalletTarget(null)}
+              payee={linkWalletPayee}
+              owed={linkWalletOwed}
+              candidates={linkWalletCandidates}
+              paymentSources={paymentSources}
+              systemNames={data.systemNames}
+              onLinked={() => {
+                setSelection(new Set());
+                refresh();
+              }}
+            />
+          </Suspense>
         )}
 
         {linkPaymentOpen && data && linkSuggestions.length > 0 && (
-          <LinkPaymentDialog
-            open
-            onClose={() => setLinkPaymentOpen(false)}
-            suggestions={linkSuggestions}
-            systemNames={data.systemNames}
-            showCharacter={characters.length > 1}
-            onLinked={refresh}
-          />
+          <Suspense fallback={null}>
+            <LinkPaymentDialog
+              open
+              onClose={() => setLinkPaymentOpen(false)}
+              suggestions={linkSuggestions}
+              systemNames={data.systemNames}
+              showCharacter={characters.length > 1}
+              onLinked={refresh}
+            />
+          </Suspense>
         )}
 
         {bulkDismissOpen && data && (

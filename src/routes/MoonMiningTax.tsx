@@ -1,12 +1,23 @@
+import { lazy, Suspense } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Spinner, Tabs, useTabsId } from '@/components/ui';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { usePageTab } from '@/lib/usePageTab';
 import { MINING_TABS } from '@/app/pageTabs';
-import { TaxTab } from '@/features/miningTax/TaxTab';
-import { OverviewTab } from '@/features/miningTax/OverviewTab';
-import { SurveyTab } from '@/features/survey/SurveyTab';
+import { guarded } from '@/app/routeChunks';
+
+const TaxTab = lazy(() =>
+  guarded(() => import('@/features/miningTax/TaxTab')).then((m) => ({ default: m.TaxTab }))
+);
+const OverviewTab = lazy(() =>
+  guarded(() => import('@/features/miningTax/OverviewTab')).then((m) => ({
+    default: m.OverviewTab,
+  }))
+);
+const SurveyTab = lazy(() =>
+  guarded(() => import('@/features/survey/SurveyTab')).then((m) => ({ default: m.SurveyTab }))
+);
 
 /**
  * Mining (issue #671): renamed from "Moon Mining" — every internal
@@ -65,9 +76,17 @@ export function MoonMiningTax() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
-      {tab === 'overview' && <OverviewTab tabBar={tabBar} tabsId={tabsId} />}
-      {tab === 'tax' && <TaxTab tabBar={tabBar} tabsId={tabsId} />}
-      {tab === 'survey' && <SurveyTab tabBar={tabBar} tabsId={tabsId} />}
+      <Suspense
+        fallback={
+          <div className="flex justify-center py-16">
+            <Spinner label={t('common.loading')} />
+          </div>
+        }
+      >
+        {tab === 'overview' && <OverviewTab tabBar={tabBar} tabsId={tabsId} />}
+        {tab === 'tax' && <TaxTab tabBar={tabBar} tabsId={tabsId} />}
+        {tab === 'survey' && <SurveyTab tabBar={tabBar} tabsId={tabsId} />}
+      </Suspense>
     </div>
   );
 }

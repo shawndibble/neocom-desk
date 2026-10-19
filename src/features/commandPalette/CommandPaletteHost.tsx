@@ -1,7 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { guarded } from '@/app/routeChunks';
 import { isApplePlatform, isCommandPaletteShortcut } from '@/lib/shortcuts';
-import { CommandPalette } from './CommandPalette';
 import type { ShownMarketItem } from './marketItems';
 import { useCommandPalette } from './store';
 
@@ -9,6 +8,13 @@ const APPLE = isApplePlatform();
 
 // Lazy: the shell mounts this host on every page, and Item Detail brings ESI,
 // SDE and skills code the shell chunk should not carry until an item is picked.
+const loadCommandPalette = () => guarded(() => import('./CommandPalette'));
+// Lazy: the palette drags `@/db`, the SDE loader and providers; the shell
+// should not carry them until the palette first opens.
+const CommandPalette = lazy(() =>
+  loadCommandPalette().then((module) => ({ default: module.CommandPalette }))
+);
+
 const ItemDetailModal = lazy(() =>
   guarded(() => import('@/features/market/ItemDetailModal')).then((module) => ({
     default: module.ItemDetailModal,
@@ -45,6 +51,7 @@ export function CommandPaletteHost() {
     function onKeyDown(event: KeyboardEvent) {
       if (!isCommandPaletteShortcut(event, APPLE)) return;
       event.preventDefault();
+      void loadCommandPalette().catch(() => {});
       const { open, toggle } = useCommandPalette.getState();
       // Not over another dialog: two stacked modals would leave Escape
       // closing the palette back onto a dialog the pilot had forgotten.
@@ -60,7 +67,11 @@ export function CommandPaletteHost() {
 
   return (
     <>
-      {open && <CommandPalette onClose={hide} onShowItem={setShownItem} />}
+      {open && (
+        <Suspense fallback={null}>
+          <CommandPalette onClose={hide} onShowItem={setShownItem} />
+        </Suspense>
+      )}
       {shownItem && (
         <Suspense fallback={null}>
           <ItemDetailModal

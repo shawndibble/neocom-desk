@@ -43,11 +43,11 @@ import { LegacyShipsRedirect } from '@/features/fittings/LegacyShipsRedirect';
 import { LegacyPathRedirect } from './LegacyPathRedirect';
 import { AlertsRedirect } from './AlertsRedirect';
 import { useHiddenNav, useNavSetupAnswered, useRecentNav } from './navPreferences';
-import { PublicInfoModal } from '@/components/PublicInfoModal';
+import { usePublicInfoModalStore } from '@/stores/publicInfoModal';
 import { EntityInfoRoute } from '@/features/entities';
 import { ItemInfoModal } from '@/features/entities/ItemInfoModal';
 import { PlaceInfoModal } from '@/features/entities/PlaceInfoModal';
-import { SkillDetailModal } from '@/components/SkillDetailModal';
+import { useSkillDetailModalStore } from '@/stores/skillDetailModal';
 import { getAccessTokenReportingFailures } from './tokenProvider';
 import type { AppRoutePath } from './routeScopes';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -64,6 +64,41 @@ configureActiveCharacter(() => useActiveCharacter.getState().activeCharacterId);
 
 // Code-split routes (`routeChunks.ts`). Login, Callback and NotFound stay
 // eager above: a signed-out cold load can land on them before any choice.
+// Info modals load on first open (each renders nothing without a request), so
+// their tabs, skill plan and price code stay out of the boot chunk.
+const LazyPublicInfoModal = lazy(() =>
+  routeChunks
+    .guarded(() => import('@/components/PublicInfoModal'))
+    .then((m) => ({
+      default: m.PublicInfoModal,
+    }))
+);
+const LazySkillDetailModal = lazy(() =>
+  routeChunks
+    .guarded(() => import('@/components/SkillDetailModal'))
+    .then((m) => ({
+      default: m.SkillDetailModal,
+    }))
+);
+
+function PublicInfoModal() {
+  const open = usePublicInfoModalStore((state) => state.request !== null);
+  return open ? (
+    <Suspense fallback={null}>
+      <LazyPublicInfoModal />
+    </Suspense>
+  ) : null;
+}
+
+function SkillDetailModal() {
+  const open = useSkillDetailModalStore((state) => state.request !== null);
+  return open ? (
+    <Suspense fallback={null}>
+      <LazySkillDetailModal />
+    </Suspense>
+  ) : null;
+}
+
 // The signed-in shell is split so a first visit to /login skips it, and
 // preloaded at boot for a returning user (`bootShellPreload.ts`) —
 // `preloadedLazy` then renders it with no fallback frame once it is in.
