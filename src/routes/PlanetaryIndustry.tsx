@@ -162,7 +162,7 @@ export function PlanetaryIndustry() {
 
   return (
     <JumpBasisProvider>
-      <PiSnapshotProvider characterId={activeCharacterId} reloadKey={refreshCount}>
+      <PiSnapshotProvider characterId={activeCharacterId} reloadKey={data?.loadedAt ?? 0}>
         <ItemActionsProvider page={itemActions}>
           <div className={cx('mx-auto space-y-4', tab !== 'map' && 'max-w-6xl')}>
             <PageHeader

@@ -103,4 +103,23 @@ describe('usePiSnapshot', () => {
     await waitFor(() => expect(result.current.snapshot).not.toBeNull());
     expect(load).toHaveBeenCalledWith(8);
   });
+
+  it('re-reads under a provider when its reloadKey changes', async () => {
+    let key = 0;
+    const first = snap('first');
+    const second = snap('second');
+    load.mockResolvedValueOnce(first).mockResolvedValueOnce(second);
+    const { result, rerender } = renderHook(() => usePiSnapshot(7), {
+      wrapper: ({ children }: { children: ReactNode }) => (
+        <PiSnapshotProvider characterId={7} reloadKey={key}>
+          {children}
+        </PiSnapshotProvider>
+      ),
+    });
+    await waitFor(() => expect(result.current.snapshot).toBe(first));
+    key = 1;
+    rerender();
+    await waitFor(() => expect(result.current.snapshot).toBe(second));
+    expect(load).toHaveBeenCalledTimes(2);
+  });
 });
