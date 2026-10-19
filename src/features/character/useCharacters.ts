@@ -21,6 +21,11 @@ export function useCharacterCount(): number {
   return useLiveQuery(() => db.characters.count(), [], 0);
 }
 
+/** Like `useCharacterCount`, but `undefined` until loaded, so a gate can tell "none yet" from "none". */
+export function useCharacterCountOrLoading(): number | undefined {
+  return useLiveQuery(() => db.characters.count());
+}
+
 export interface CharacterCandidate {
   characterId: number;
   characterName: string;

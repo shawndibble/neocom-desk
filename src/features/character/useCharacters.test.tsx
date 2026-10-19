@@ -4,6 +4,7 @@ import { db, type CharacterRecord } from '@/db';
 import {
   useAccountCharacters,
   useCharacterCount,
+  useCharacterCountOrLoading,
   useCharacterNames,
   useCharacters,
 } from './useCharacters';
@@ -30,6 +31,15 @@ describe('useCharacters', () => {
     const { result } = renderHook(() => useCharacters());
     await db.characters.put(row(3, 'Gamma'));
     await waitFor(() => expect(result.current.map((c) => c.name)).toEqual(['Gamma']));
+  });
+});
+
+describe('useCharacterCountOrLoading', () => {
+  it('is undefined while loading, then the count', async () => {
+    await db.characters.put(row(1, 'Alpha'));
+    const { result } = renderHook(() => useCharacterCountOrLoading());
+    expect(result.current).toBeUndefined();
+    await waitFor(() => expect(result.current).toBe(1));
   });
 });
 

@@ -54,6 +54,7 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useFontScale } from '@/lib/fontScale';
 import { useTimeFormat } from '@/lib/timeFormat';
 import { useMobileTabs } from '@/lib/mobileTabs';
+import { useCharacterCountOrLoading } from '@/features/character/useCharacters';
 
 // Wire authenticated ESI calls to stored tokens once, at module load. Wrapped
 // (tokenProvider.ts) so a dead refresh grant is reported centrally instead of
@@ -268,7 +269,7 @@ const FEATURE_ROUTES = Object.entries(ROUTE_ELEMENTS) as [AppRoutePath, ReactEle
  * guard would then have to send back.
  */
 function Root() {
-  const characterCount = useLiveQuery(() => db.characters.count());
+  const characterCount = useCharacterCountOrLoading();
   const hydrated = useActiveCharacter((state) => state.hydrated);
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   // A landing section's hash (`/#login-faq`) survives the hop to the page that has it.
