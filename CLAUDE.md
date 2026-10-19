@@ -14,7 +14,9 @@ dev`) — Shawn frequently has another agent working there at the same
 - **Branches: PRs target `develop`; `main` is production.** Never open a PR against
   `main` or push to it except the `develop` → `main` promotion (merge commit, not
   squash), which is what deploys. Branch worktrees off `origin/develop`. See
-  `docs/agents/issue-tracker.md` "CI and merge".
+  `docs/agents/issue-tracker.md` "CI and merge". Every merge to `develop` ships to
+  `https://dev.neocomdesk.com` (its own EVE app and client ID); Cloud Functions are
+  not auto-deployed, so a new client ID also goes in `functions/.env`'s `EVE_CLIENT_ID`.
 - Architecture map: docs/ARCHITECTURE.md — read before locating or adding features.
 - `GLOSSARY.md` is the glossary. Use its terms exactly. Don't read it whole: `grep -n -i "<term>" GLOSSARY.md` for the terms in your task.
 - **Never append a scope decision to `GLOSSARY.md`.** Scope decisions live one
