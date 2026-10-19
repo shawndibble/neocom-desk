@@ -138,6 +138,7 @@ import {
   INSURGENCY_URL,
   LAWLESS_SYSTEMS_DOC,
   SYSTEM_CONDITIONS_COLLECTION,
+  lawlessWriteNeeded,
   parseLawlessSystemIds,
 } from './lawlessSystems.js';
 import {
@@ -1273,7 +1274,9 @@ export const captureMiningPriceSnapshot = onSchedule(
  * insurgency feed is CORS-locked to eveonline.com, so this fetches it every
  * 10 minutes (its own cache window) and stores the lawless system ids for the
  * app to read. A failed fetch writes nothing: the doc just ages, and the app
- * hides the badge once `updatedAt` passes its staleness limit.
+ * hides the badge once `updatedAt` passes its staleness limit. An unchanged
+ * list is not rewritten each run (issue #4272): only when it changes or the
+ * `LAWLESS_HEARTBEAT_MS` refresh is due, so `updatedAt` means "last confirmed".
  *
  * Another Cloud Scheduler job past the free three, like the jobs above.
  */
@@ -1296,11 +1299,11 @@ export const syncLawlessSystems = onSchedule({ schedule: 'every 10 minutes' }, a
     return;
   }
   const systemIds = parseLawlessSystemIds(body);
-  await getFirestore()
-    .collection(SYSTEM_CONDITIONS_COLLECTION)
-    .doc(LAWLESS_SYSTEMS_DOC)
-    .set({ systemIds, updatedAt: Date.now() });
-  logInfo('lawless systems sync', { count: systemIds.length });
+  const ref = getFirestore().collection(SYSTEM_CONDITIONS_COLLECTION).doc(LAWLESS_SYSTEMS_DOC);
+  const now = Date.now();
+  const written = lawlessWriteNeeded((await ref.get()).data(), systemIds, now);
+  if (written) await ref.set({ systemIds, updatedAt: now });
+  logInfo('lawless systems sync', { count: systemIds.length, written });
 });
 
 /** Doc under `systemConditions` holding the archive version the last publish was built from. */
