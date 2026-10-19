@@ -125,8 +125,10 @@ test.describe('Ring tab on the phone', () => {
     expect(pgBox!.y).toBeLessThan(rackBox!.y);
     expect(cpuBox!.x + cpuBox!.width).toBeLessThanOrEqual(pgBox!.x + 0.5);
     expect(pgBox!.x + pgBox!.width).toBeLessThanOrEqual(390);
-    // Under budget: no Make it fit.
-    await expect(page.getByRole('button', { name: /make it fit/i })).toHaveCount(0);
+    // Under budget: no Fix link.
+    await expect(
+      page.getByRole('button', { name: /^Fix (CPU|powergrid|calibration)$/ })
+    ).toHaveCount(0);
     await expectNoHorizontalOverflow(page);
   });
 });

@@ -489,6 +489,28 @@ describe('evaluateSkillGains', () => {
     expect(gains?.[1]?.metrics.ehp).toBeCloseTo(0.1);
   });
 
+  it('keeps a level that only lowers an overage while the fit is over budget', async () => {
+    const over = withStats({ cpuUsed: 450 });
+    const compare = async () => ({ before: over, after: withStats({ cpuUsed: 430 }) });
+    const gains = await evaluateSkillGains([candidates[0]!], compare);
+    expect(gains).toHaveLength(1);
+    expect(gains?.[0]?.budgetFreed).toBeCloseTo(0.4);
+  });
+
+  it('counts no freed budget for a level that clears CPU but sinks powergrid further', async () => {
+    const over = withStats({ cpuUsed: 450, powergridUsed: 1100 });
+    const compare = async () => ({
+      before: over,
+      after: withStats({ cpuUsed: 400, powergridUsed: 1200 }),
+    });
+    expect(await evaluateSkillGains([candidates[0]!], compare)).toEqual([]);
+  });
+
+  it('still drops a CPU-only level on a fit within budget', async () => {
+    const compare = async () => ({ before: baseStats, after: withStats({ cpuUsed: 80 }) });
+    expect(await evaluateSkillGains([candidates[0]!], compare)).toEqual([]);
+  });
+
   it('keeps a mining skill for a mining fit and lists its role change', async () => {
     const miner = withStats({
       offense: { ...baseStats.offense, dps: 0 },
@@ -588,6 +610,16 @@ describe('rankSkillGains', () => {
     expect(rankSkillGains(gains, 'dps').map((g) => g.skillTypeId)).toEqual([2, 1, 3]);
     // Not in place.
     expect(gains.map((g) => g.skillTypeId)).toEqual([3, 1, 2]);
+  });
+
+  it('puts a level that lowers an overage first, whatever the sort', () => {
+    const gains = [
+      gain(1, { overall: 0.3, dps: 0.3 }),
+      { ...gain(2, {}), budgetFreed: 0.2 },
+      { ...gain(3, {}), budgetFreed: 0.5 },
+    ];
+    expect(rankSkillGains(gains, 'overall').map((g) => g.skillTypeId)).toEqual([3, 2, 1]);
+    expect(rankSkillGains(gains, 'dps').map((g) => g.skillTypeId)).toEqual([3, 2, 1]);
   });
 });
 
