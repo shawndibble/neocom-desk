@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import '@/i18n';
@@ -159,12 +159,16 @@ describe('ShipTreeTab — map', () => {
   it('keeps the hover card open while the pointer crosses onto it, closes on leaving it', async () => {
     renderTab();
     const merlin = await screen.findByRole('button', { name: 'Merlin — Can fly' });
+    vi.useFakeTimers();
     fireEvent.mouseEnter(merlin);
     fireEvent.mouseLeave(merlin);
     const card = screen.getByTestId('ship-tree-hover-card');
     fireEvent.mouseEnter(card);
     // Past the close delay the card is still there: the card cancelled it.
-    await new Promise((r) => setTimeout(r, 300));
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+    vi.useRealTimers();
     expect(screen.getByTestId('ship-tree-hover-card')).toBeInTheDocument();
     fireEvent.mouseLeave(card);
     expect(screen.queryByTestId('ship-tree-hover-card')).not.toBeInTheDocument();
