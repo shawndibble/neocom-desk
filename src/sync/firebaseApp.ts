@@ -12,10 +12,7 @@
 // the public `shares` collection — content a pilot chose to share, carrying no
 // uid or Character id (docs/context/decisions/
 // 20261002-125432-stored-short-share-links-in-firestore.md).
-// Fourth: `features/fittings/workbenchFits.ts` reads the public, admin-write-only
-// `workbenchFits` collection (EVE Workbench fits by hull, issue #2484) with no
-// session at all, by document id only (the rules deny listing it).
-// Fifth: `market/mutamarket.ts` calls the `mutamarketEstimate` function for
+// Fourth: `market/mutamarket.ts` calls the `mutamarketEstimate` function for
 // abyssal module estimates (MutaMarket has no CORS), on any Character's session.
 
 import { connectAuthEmulator, getAuth, type Auth } from 'firebase/auth';

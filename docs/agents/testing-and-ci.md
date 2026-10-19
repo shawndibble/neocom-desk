@@ -96,3 +96,10 @@ touches a real Firebase project: the project id is `demo-neocom-desk`.
    (the `ownerHash` claim of your signed-in ID token). The member and guest
    Characters see their own lines on the personal tab; the verify page needs no
    sign-in.
+
+**Known emulator noise.** The Firestore emulator logs `Cannot find field:
+structuredQuery in message Document` when a query runs under a parent document
+whose id has a colon (`characters/char:<id>`). Its REST adapter mis-routes
+`:runQuery` for such ids (`abc` works; `char:1` and percent-encoded forms
+fail). It is not an index problem and does not happen in production. Firestore
+lite is REST-only, so no tooling-side fix exists; ignore it.

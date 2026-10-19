@@ -69,7 +69,7 @@ One list of every way into a Fitting: saved (My Fittings) + In-game rows.
 - Pick, then Start fitting (double-click starts at once).
 - Popular fits panel per hull (`PopularFitsPanel.tsx`): source tabs zKillboard / EVE Workbench.
   - zKillboard: recent hull losses with full fit (`@/lib/zkillboard` `fetchHullLosses` + ESI `getKillmail`), loss count, last seen, approx ISK value, Open.
-  - EVE Workbench: fits from Firestore `workbenchFits` docs (Cloud Function `syncWorkbenchFits`, `workbenchFits.ts`), created age, price at default Trade Hub (partial price flag, unpriced count), out-of-date check against current game (`WorkbenchOutOfDate`, `workbenchSightings`), sighting badge.
+  - EVE Workbench: fits from the R2 object `workbench-fits/<shipTypeId>.json` (Cloud Function `syncWorkbenchFits`, `workbenchFits.ts`; no Firebase session), created age, price at default Trade Hub (partial price flag, unpriced count), out-of-date check against current game (`WorkbenchOutOfDate`, `workbenchSightings`), sighting badge.
   - Failure/empty/loading states each have copy; "Everything else still works".
 
 ### Load / Import (`FittingLoadCard.tsx`, `loadFittingFromText.ts`, `engine/fittings/load.ts`)
@@ -197,7 +197,7 @@ Unconfirmed: whether the Variations "Fits" column counts CPU and PG or hull/slot
 | My Fittings, notes         | Dexie `fittings` (synced)                                                                                   |
 | In-game Fittings           | ESI GET `/characters/{id}/fittings` (`esi-fittings.read_fittings.v1`), cached key `fittings:inGame`         |
 | Save to EVE                | ESI POST/DELETE fittings (`esi-fittings.write_fittings.v1`)                                                 |
-| Popular fits               | zKillboard + ESI killmail; Firestore `workbenchFits`                                                        |
+| Popular fits               | zKillboard + ESI killmail; R2 `workbench-fits/<shipTypeId>.json`                                            |
 | Prices                     | market hub data (price hub setting)                                                                         |
 | Share Links                | `features/share/shareStore`                                                                                 |
 | Prefs                      | settings `fittingsView`, `fittingsStatsSections`, synced damage/target profile keys, charge picker settings |

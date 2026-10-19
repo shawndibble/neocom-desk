@@ -1,20 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
-  HULL_PART_BYTE_BUDGET,
-  hullPartCount,
-  hullPartDocId,
   mergeHullFits,
   parseEftResponse,
   parsePublicFitsPage,
   parseRetryAfterMs,
   parseWorkbenchDate,
-  planHullWrite,
+  parseStoredFits,
   planPage,
   runWorkbenchSync,
-  splitHullParts,
+  sameFits,
   type FetchJsonResult,
-  type HullPartDoc,
-  type HullWriteOp,
   type StoredWorkbenchFit,
   type WorkbenchFitSummary,
   type WorkbenchFitsStore,
@@ -187,6 +182,37 @@ describe('planPage', () => {
   });
 });
 
+describe('sameFits', () => {
+  it('compares fits field by field, not by object key order', () => {
+    const a = stored('a', 1);
+    const reordered = {
+      eft: a.eft,
+      dateAdded: 1,
+      authorName: a.authorName,
+      authorId: a.authorId,
+      name: a.name,
+      id: 'a',
+    };
+    expect(sameFits([a], [reordered])).toBe(true);
+    expect(sameFits([a], [{ ...a, eft: 'changed' }])).toBe(false);
+    expect(sameFits([a], [a, stored('b', 2)])).toBe(false);
+  });
+});
+
+describe('parseStoredFits', () => {
+  it('keeps clean rows, filling optional fields and dropping rows without an id, EFT or date', () => {
+    expect(
+      parseStoredFits({
+        fits: [stored('a', 1), { id: 'b', eft: 'x', dateAdded: 2 }, { id: 'c', eft: 'x' }, null],
+      })
+    ).toEqual([
+      stored('a', 1),
+      { id: 'b', name: '', authorId: null, authorName: '', dateAdded: 2, eft: 'x' },
+    ]);
+    expect(parseStoredFits('garbage')).toEqual([]);
+  });
+});
+
 describe('mergeHullFits', () => {
   it('dedupes by id (incoming wins) and sorts newest first', () => {
     const merged = mergeHullFits(
@@ -203,136 +229,10 @@ describe('mergeHullFits', () => {
   });
 });
 
-describe('splitHullParts', () => {
-  it('keeps a small hull in one part', () => {
-    expect(splitHullParts([stored('a', 2), stored('b', 1)])).toEqual([
-      [stored('a', 2), stored('b', 1)],
-    ]);
-  });
-
-  it('splits across parts under the byte budget, in order', () => {
-    const big = 'x'.repeat(300);
-    const fits = [stored('a', 3, big), stored('b', 2, big), stored('c', 1, big)];
-    const parts = splitHullParts(fits, 1_000);
-    expect(parts.map((p) => p.map((f) => f.id))).toEqual([['a', 'b'], ['c']]);
-  });
-
-  it('drops a single fit too big for any document', () => {
-    const parts = splitHullParts([stored('a', 2, 'x'.repeat(2_000)), stored('b', 1)], 1_000);
-    expect(parts.map((p) => p.map((f) => f.id))).toEqual([['b']]);
-  });
-
-  it('returns no parts for no fits, and defaults under Firestore 1 MiB', () => {
-    expect(splitHullParts([])).toEqual([]);
-    expect(HULL_PART_BYTE_BUDGET).toBeLessThan(1_048_576);
-  });
-
-  it('names parts by hull and index', () => {
-    expect(hullPartDocId(626, 0)).toBe('626_0');
-  });
-});
-
-describe('hullPartCount', () => {
-  it('is 0 for no part 0, its parts count when it has one, else 1', () => {
-    expect(hullPartCount(undefined)).toBe(0);
-    expect(hullPartCount(null)).toBe(0);
-    expect(hullPartCount({ shipTypeId: 626, part: 0, parts: 3, fits: [] })).toBe(3);
-    // Written before part 0 carried a count: read as the one part it is.
-    expect(hullPartCount({ shipTypeId: 626, part: 0, fits: [] })).toBe(1);
-    expect(hullPartCount({ parts: 0 })).toBe(1);
-    expect(hullPartCount({ parts: 2.5 })).toBe(1);
-    expect(hullPartCount({ parts: '3' })).toBe(1);
-  });
-});
-
-type MemoryDocs = Map<string, HullPartDoc>;
-
-function applyBatch(docs: MemoryDocs, batch: HullWriteOp[]): void {
-  for (const op of batch) {
-    if (op.kind === 'set') docs.set(op.docId, op.doc);
-    else docs.delete(op.docId);
-  }
-}
-
-/** A hull already stored with `count` parts, as `planHullWrite` leaves it. */
-function storedHull(count: number): MemoryDocs {
-  const docs: MemoryDocs = new Map();
-  const parts = Array.from({ length: count }, (_, i) => [stored(`old${i}`, 100 - i)]);
-  for (const batch of planHullWrite(626, parts, 0)) applyBatch(docs, batch);
-  return docs;
-}
-
-/** What a by-id reader would ask for: part 0, then the parts part 0 claims. */
-function claimedPartsExist(docs: MemoryDocs): boolean {
-  const count = hullPartCount(docs.get(hullPartDocId(626, 0)));
-  for (let part = 0; part < count; part += 1) {
-    if (!docs.has(hullPartDocId(626, part))) return false;
-  }
-  return true;
-}
-
-describe('planHullWrite', () => {
-  const newParts = (n: number) => Array.from({ length: n }, (_, i) => [stored(`new${i}`, 50 - i)]);
-
-  it('stamps the part count on part 0 only', () => {
-    const ops = planHullWrite(626, newParts(3), 0).flat();
-    const sets = ops.filter((op) => op.kind === 'set');
-    expect(sets.find((op) => op.docId === '626_0')?.doc).toMatchObject({ part: 0, parts: 3 });
-    expect(sets.find((op) => op.docId === '626_1')?.doc).not.toHaveProperty('parts');
-  });
-
-  it('writes the last part first, part 0 after every other part, deletes last', () => {
-    const ids = planHullWrite(626, newParts(3), 5)
-      .flat()
-      .map((op) => `${op.kind}:${op.docId}`);
-    expect(ids).toEqual(['set:626_2', 'set:626_1', 'set:626_0', 'delete:626_3', 'delete:626_4']);
-  });
-
-  it('batches at most five docs per commit', () => {
-    const batches = planHullWrite(626, newParts(7), 0);
-    expect(batches.map((batch) => batch.length)).toEqual([5, 2]);
-  });
-
-  it('deletes part 0 first when every fit was dropped', () => {
-    const ids = planHullWrite(626, [], 3)
-      .flat()
-      .map((op) => `${op.kind}:${op.docId}`);
-    expect(ids).toEqual(['delete:626_0', 'delete:626_1', 'delete:626_2']);
-  });
-
-  const cases: [string, () => MemoryDocs, number, number][] = [
-    ['an empty hull', () => new Map(), 0, 3],
-    [
-      'a legacy part 0 with no count',
-      () => new Map([['626_0', { shipTypeId: 626, part: 0, fits: [] }]]),
-      1,
-      7,
-    ],
-    ['a hull growing across a batch boundary', () => storedHull(2), 2, 7],
-    ['a hull shrinking', () => storedHull(7), 7, 2],
-    ['a hull shrinking to nothing', () => storedHull(7), 7, 0],
-  ];
-
-  it.each(cases)(
-    'never leaves part 0 claiming a missing part, after any batch, for %s',
-    (_label, before, previousPartCount, nextPartCount) => {
-      const docs = before();
-      expect(claimedPartsExist(docs)).toBe(true);
-      for (const batch of planHullWrite(626, newParts(nextPartCount), previousPartCount)) {
-        applyBatch(docs, batch);
-        expect(claimedPartsExist(docs)).toBe(true);
-      }
-      expect(hullPartCount(docs.get('626_0'))).toBe(nextPartCount);
-      expect([...docs.keys()].sort()).toEqual(
-        Array.from({ length: nextPartCount }, (_, i) => hullPartDocId(626, i)).sort()
-      );
-    }
-  );
-});
-
 class MemoryStore implements WorkbenchFitsStore {
   state: WorkbenchSyncState = { boundary: null, pass: null };
-  hulls = new Map<number, StoredWorkbenchFit[][]>();
+  hulls = new Map<number, StoredWorkbenchFit[]>();
+  writes: number[] = [];
   async readState() {
     return this.state;
   }
@@ -340,11 +240,11 @@ class MemoryStore implements WorkbenchFitsStore {
     this.state = state;
   }
   async readHull(shipTypeId: number) {
-    const parts = this.hulls.get(shipTypeId) ?? [];
-    return { fits: parts.flat(), partCount: parts.length };
+    return this.hulls.get(shipTypeId) ?? [];
   }
-  async writeHull(shipTypeId: number, parts: StoredWorkbenchFit[][]) {
-    this.hulls.set(shipTypeId, parts);
+  async writeHull(shipTypeId: number, fits: StoredWorkbenchFit[]) {
+    this.writes.push(shipTypeId);
+    this.hulls.set(shipTypeId, fits);
   }
 }
 
@@ -420,9 +320,9 @@ describe('runWorkbenchSync', () => {
       requestGapMs: 10,
     });
     expect(result).toMatchObject({ pages: 3, fitsStored: 5, passComplete: true });
-    expect(store.hulls.get(626)![0].map((f) => f.id)).toEqual(['f5', 'f3', 'f2']);
-    expect(store.hulls.get(627)![0].map((f) => f.id)).toEqual(['f4', 'f1']);
-    expect(store.hulls.get(626)![0][0]).toMatchObject({ eft: '[Hull, f5]', authorName: 'Pilot' });
+    expect(store.hulls.get(626)!.map((f) => f.id)).toEqual(['f5', 'f3', 'f2']);
+    expect(store.hulls.get(627)!.map((f) => f.id)).toEqual(['f4', 'f1']);
+    expect(store.hulls.get(626)![0]).toMatchObject({ eft: '[Hull, f5]', authorName: 'Pilot' });
     expect(store.state).toEqual({
       boundary: { ids: ['f5', 'f4'], dateAdded: Date.UTC(2026, 9, 3, 0, 0, 5) },
       pass: null,
@@ -456,7 +356,7 @@ describe('runWorkbenchSync', () => {
     expect(api.calls.filter((u) => u.endsWith('/eft'))).toEqual([
       'https://api.eveworkbench.com/v1/fits/f6/eft',
     ]);
-    expect(store.hulls.get(626)![0].map((f) => f.id)).toEqual(['f6', 'f5', 'f3', 'f2']);
+    expect(store.hulls.get(626)!.map((f) => f.id)).toEqual(['f6', 'f5', 'f3', 'f2']);
   });
 
   it('checkpoints a pass that runs out of time and resumes it next run', async () => {
@@ -476,7 +376,7 @@ describe('runWorkbenchSync', () => {
     expect(store.state.boundary).toBeNull();
     expect(
       [...store.hulls.values()]
-        .flat(2)
+        .flat()
         .map((f) => f.id)
         .sort()
     ).toEqual(['f4', 'f5']);
@@ -490,7 +390,7 @@ describe('runWorkbenchSync', () => {
       requestGapMs: 10,
     });
     expect(second).toMatchObject({ pages: 2, passComplete: true });
-    expect(store.hulls.get(626)![0].map((f) => f.id)).toEqual(['f5', 'f3', 'f2']);
+    expect(store.hulls.get(626)!.map((f) => f.id)).toEqual(['f5', 'f3', 'f2']);
     expect(store.state.boundary?.ids).toEqual(['f5', 'f4']);
   });
 
@@ -510,7 +410,7 @@ describe('runWorkbenchSync', () => {
     expect(store.state.pass?.nextPage).toBe(2);
     expect(
       [...store.hulls.values()]
-        .flat(2)
+        .flat()
         .map((f) => f.id)
         .sort()
     ).toEqual(['f4', 'f5']);
@@ -631,24 +531,25 @@ describe('runWorkbenchSync', () => {
     expect(store.state).toEqual({ boundary: null, pass: null });
   });
 
-  it('splits a hull that outgrows one document', async () => {
+  it('writes only the hulls whose fits changed', async () => {
     const store = new MemoryStore();
     const c = clock();
-    await runWorkbenchSync({
+    const deps = {
       store,
       fetchJson: fakeApi(LIST).fetchJson,
       now: c.now,
       sleep: c.sleep,
       budgetMs: 60_000,
       requestGapMs: 0,
-      partByteBudget: 250,
-    });
-    expect(store.hulls.get(626)!.length).toBeGreaterThan(1);
-    expect(
-      store.hulls
-        .get(626)!
-        .flat()
-        .map((f) => f.id)
-    ).toEqual(['f5', 'f3', 'f2']);
+    };
+    expect(await runWorkbenchSync(deps)).toMatchObject({ hullsWritten: 2 });
+    expect(store.writes.sort()).toEqual([626, 627]);
+
+    // A pass that re-sees only fits already stored (a lost checkpoint) rewrites nothing.
+    store.writes = [];
+    store.state = { boundary: null, pass: null };
+    const again = await runWorkbenchSync({ ...deps, fetchJson: fakeApi(LIST).fetchJson });
+    expect(again).toMatchObject({ fitsStored: 5, hullsWritten: 0 });
+    expect(store.writes).toEqual([]);
   });
 });
