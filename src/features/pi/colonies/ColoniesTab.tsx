@@ -32,8 +32,7 @@ import { PricesUnavailable } from '../PricesUnavailable';
 import { EsiDidntAnswer } from '../EsiDidntAnswer';
 import { piTypeNames } from './coloniesNames';
 import { useColoniesAdvice } from './useColoniesAdvice';
-import { buildOneAltAdvice, groupAltColonies, type AltCharacterAdvice } from './altAdvice';
-import { runSliced } from '../runSliced';
+import { askOneAltAdvice, groupAltColonies, type AltCharacterAdvice } from './altAdvice';
 import { loadSystemNameAndSecurity } from '@/features/character/systemSecurity';
 import { AssumedCustomsNote } from '../AssumedCustomsNote';
 import { assumedCustomsNames } from '../colonyCustoms';
@@ -422,7 +421,7 @@ export function ColoniesTab({
       cancelled = true;
     };
   }, [showAltColonies, roster.colonies, knownSecurity, altSecurity]);
-  // One `buildPlanAdvice` per alt, sliced between frames so a roster of alts never blocks the page.
+  // One `buildPlanAdvice` per alt, off the main thread where there is a worker, so a roster of alts never blocks the page.
   const [altBuilt, setAltBuilt] = useState<{
     input: unknown;
     byCharacter: ReadonlyMap<number, AltCharacterAdvice>;
@@ -433,15 +432,17 @@ export function ColoniesTab({
     const security = new Map([...altSecurity, ...(knownSecurity ?? [])]);
     const todo = [...groupAltColonies(roster.colonies, security)];
     const built = new Map<number, AltCharacterAdvice>();
-    return runSliced(
-      todo,
-      ([characterId, owned]) => {
-        built.set(characterId, buildOneAltAdvice(input, owned, security));
-      },
-      (landed) => {
-        if (landed) setAltBuilt({ input, byCharacter: new Map(built) });
+    let live = true;
+    void (async () => {
+      for (const [characterId, owned] of todo) {
+        built.set(characterId, await askOneAltAdvice(input, owned, security));
+        if (!live) return;
       }
-    );
+      setAltBuilt({ input, byCharacter: new Map(built) });
+    })();
+    return () => {
+      live = false;
+    };
   }, [planAdvice.input, roster.colonies, showAltColonies, altSecurity, knownSecurity]);
   const altAdvice =
     showAltColonies && planAdvice.input && altBuilt?.input === planAdvice.input

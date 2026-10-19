@@ -13,7 +13,9 @@
  * detail gets no figure rather than a zero.
  */
 import { salesTaxPct } from '@/engine/industry/fees';
-import { buildPlanAdvice, type PlanAdviceInput } from '../planAdviceModel';
+import type { PlanAdvice, PlanAdviceInput } from '../planAdviceModel';
+import { buildPlanAdvice } from '../planAdviceModel';
+import { askAdvice } from '../planAdviceAsync';
 import type { RosterColony } from '../roster';
 import type { RowAdvice } from './coloniesModel';
 
@@ -47,41 +49,68 @@ export function groupAltColonies(
   return byCharacter;
 }
 
+/** The model input for one alt's colonies: unknown skills, the full sales tax, no what-if. */
+function altInput(
+  input: PlanAdviceInput,
+  owned: readonly RosterColony[],
+  securityBySystem: ReadonlyMap<number, number | null>
+): PlanAdviceInput {
+  const details = new Map(
+    owned.flatMap((colony) => (colony.detail ? [[colony.planet.planet_id, colony.detail]] : []))
+  );
+  return {
+    ...input,
+    snapshot: {
+      ...input.snapshot,
+      colonies: owned.map((colony) => colony.planet),
+      details,
+      securityBySystem,
+      customsSkill: null,
+    },
+    books: { ...input.books, salesTaxPct: salesTaxPct(UNKNOWN_ACCOUNTING_LEVEL) },
+    skills: { commandCenterUpgrades: null, interplanetaryConsolidation: null },
+    whatIfTypes: undefined,
+  };
+}
+
+function toAltAdvice(advice: PlanAdvice): AltCharacterAdvice {
+  return {
+    byPlanetId: new Map(
+      advice.colonies.map((colony) => [
+        colony.planetId,
+        { quickWins: colony.quickWins, todayPerDay: colony.todayPerDay },
+      ])
+    ),
+    makesPerDay: advice.totals.todayPerDay,
+  };
+}
+
+/** A model failure is no figure, never a broken tab (same as the active Character's hook). */
+const NO_FIGURE: AltCharacterAdvice = { byPlanetId: new Map(), makesPerDay: null };
+
 /** One alt's advice: a single `buildPlanAdvice` run, so callers can slice between characters. */
 export function buildOneAltAdvice(
   input: PlanAdviceInput,
   owned: readonly RosterColony[],
   securityBySystem: ReadonlyMap<number, number | null>
 ): AltCharacterAdvice {
-  const details = new Map(
-    owned.flatMap((colony) => (colony.detail ? [[colony.planet.planet_id, colony.detail]] : []))
-  );
   try {
-    const advice = buildPlanAdvice({
-      ...input,
-      snapshot: {
-        ...input.snapshot,
-        colonies: owned.map((colony) => colony.planet),
-        details,
-        securityBySystem,
-        customsSkill: null,
-      },
-      books: { ...input.books, salesTaxPct: salesTaxPct(UNKNOWN_ACCOUNTING_LEVEL) },
-      skills: { commandCenterUpgrades: null, interplanetaryConsolidation: null },
-      whatIfTypes: undefined,
-    });
-    return {
-      byPlanetId: new Map(
-        advice.colonies.map((colony) => [
-          colony.planetId,
-          { quickWins: colony.quickWins, todayPerDay: colony.todayPerDay },
-        ])
-      ),
-      makesPerDay: advice.totals.todayPerDay,
-    };
+    return toAltAdvice(buildPlanAdvice(altInput(input, owned, securityBySystem)));
   } catch {
-    // Same as the active Character's hook: a model failure is no figure, never a broken tab.
-    return { byPlanetId: new Map(), makesPerDay: null };
+    return NO_FIGURE;
+  }
+}
+
+/** `buildOneAltAdvice` off the main thread where the browser has a Worker. */
+export async function askOneAltAdvice(
+  input: PlanAdviceInput,
+  owned: readonly RosterColony[],
+  securityBySystem: ReadonlyMap<number, number | null>
+): Promise<AltCharacterAdvice> {
+  try {
+    return toAltAdvice(await askAdvice(altInput(input, owned, securityBySystem)));
+  } catch {
+    return NO_FIGURE;
   }
 }
 

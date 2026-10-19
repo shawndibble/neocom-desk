@@ -16,7 +16,6 @@ import { usePiSettings } from '../piSettings';
 import { NO_WHAT_IF_CHAINS, type WhatIfChainsState } from '../useBiggerChains';
 import type { ChainEstimateOf } from '../useChainEstimates';
 import { planPicks } from '../planPicks';
-import { runSliced } from '../runSliced';
 import {
   hrefWithout,
   hrefWithoutPiPlanet,
@@ -380,8 +379,8 @@ export function usePlanMapState({
     [advice, t]
   );
 
-  // A what-if build is a full advice solve: run it on the next tick, not inside the click that
-  // picked the planet type, and show it only once it matches the current pick.
+  // A what-if build is a full advice solve: it runs off the click that picked the planet type
+  // (in the worker where there is one), and shows only once it matches the current pick.
   const [whatIfBuilt, setWhatIfBuilt] = useState<{
     types: ReadonlySet<PlanetType>;
     build: typeof adviceWithWhatIf;
@@ -389,12 +388,17 @@ export function usePlanMapState({
   } | null>(null);
   useEffect(() => {
     if (whatIf.size === 0) return;
-    return runSliced(
-      [whatIf],
-      (types) =>
-        setWhatIfBuilt({ types, build: adviceWithWhatIf, advice: adviceWithWhatIf(types) }),
-      () => {}
-    );
+    let live = true;
+    // The prop may hand back a plain advice; the tick lets the click that picked the type return first.
+    Promise.resolve()
+      .then(() => adviceWithWhatIf(whatIf))
+      .then(
+        (advice) => live && setWhatIfBuilt({ types: whatIf, build: adviceWithWhatIf, advice }),
+        () => {}
+      );
+    return () => {
+      live = false;
+    };
   }, [whatIf, adviceWithWhatIf]);
   const whatIfAdvice =
     whatIf.size > 0 && whatIfBuilt?.types === whatIf && whatIfBuilt.build === adviceWithWhatIf
