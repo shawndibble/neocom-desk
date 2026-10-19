@@ -106,7 +106,7 @@ import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { rankedSearch } from '@/lib/rankedSearch';
 import { cx } from '@/lib/cx';
 import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
-import { CONTRACT_ISK_CENTS_BELOW, formatIskAuto } from '@/lib/isk';
+import { CONTRACT_ISK_CENTS_BELOW, formatIskAuto, parseNumeric } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
 import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
@@ -196,13 +196,6 @@ const ITEMS_FILTER_PARAMS = {
 };
 const NO_LOCATION_SYSTEMS: ReadonlyMap<number, number | null> = new Map();
 const ITEMS_SORT = { columnId: 'price', direction: 'asc' } as const;
-
-/** A blank or unparseable field is "no restriction", never `NaN` — which would silently exclude every row. */
-function parseNumeric(value: string): number | null {
-  if (value.trim() === '') return null;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
-}
 
 /**
  * The Price column's own `sortValue` — `undefined`, not `Infinity`, for an
@@ -716,15 +709,18 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
    * One query answers rows and per-type stats together, in a worker for a
    * big snapshot (issue #4128).
    */
+  // Deferred so a price/region edit keeps the inputs responsive while the
+  // ~370k-row filter reruns at low priority.
+  const deferredNonTypeFilter = useDeferredValue(nonTypeFilter);
   const itemQuery = useMemo<ContractOfferQuery>(
     () => ({
-      filter: nonTypeFilter,
+      filter: deferredNonTypeFilter,
       typeIds,
       allowedSystems,
       locationSystems,
       sort: !belowMarket,
     }),
-    [nonTypeFilter, typeIds, allowedSystems, locationSystems, belowMarket]
+    [deferredNonTypeFilter, typeIds, allowedSystems, locationSystems, belowMarket]
   );
   const {
     displayRows,

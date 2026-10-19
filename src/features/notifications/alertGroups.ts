@@ -83,8 +83,11 @@ const EVE_TYPE_SEVERITY: Readonly<Record<string, DeadlineSeverity>> = {
   CorpBecameWarEligible: 'warning',
   // Happened, needs reading, costs nothing to be late on.
   StructureWentHighPower: 'clear',
+  MoonminingExtractionStarted: 'watch',
   MoonminingExtractionFinished: 'watch',
+  MoonminingLaserFired: 'watch',
   MoonminingAutomaticFracture: 'watch',
+  MoonminingExtractionCancelled: 'watch',
   CorpAppNewMsg: 'watch',
 };
 

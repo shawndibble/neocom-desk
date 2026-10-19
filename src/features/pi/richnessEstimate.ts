@@ -42,24 +42,3 @@ export type AssumedRate =
     }
   /** The pilot has no projectable extraction anywhere, so nothing can be estimated. */
   | { kind: 'no-measured-extraction' };
-
-/**
- * The mean of the pilot's own measured extraction, or a refusal.
- *
- * A non-finite or non-positive rate is dropped rather than averaged in: it
- * would drag the mean toward a number no extractor is actually producing.
- */
-export function assumedExtractionRate(
-  measured: readonly { typeId: number; unitsPerHour: number }[]
-): AssumedRate {
-  const usable = measured.filter(
-    (entry) => Number.isFinite(entry.unitsPerHour) && entry.unitsPerHour > 0
-  );
-  if (usable.length === 0) return { kind: 'no-measured-extraction' };
-  const total = usable.reduce((sum, entry) => sum + entry.unitsPerHour, 0);
-  return {
-    kind: 'measured-own-colonies',
-    unitsPerHour: total / usable.length,
-    sampleSize: usable.length,
-  };
-}

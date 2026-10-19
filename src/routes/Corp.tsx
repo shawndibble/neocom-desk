@@ -41,6 +41,7 @@ import { CorpSubNav } from '@/features/corp/CorpSubNav';
 import { CorpVitalsRail } from '@/features/corp/CorpVitalsRail';
 import { CorpStanding } from '@/features/corp/CorpStanding';
 import { CorpKindCards } from '@/features/corp/CorpKindCards';
+import { useCorpViewCapabilities } from '@/features/corp/useCorpViewCapabilities';
 import { unreadableCardKinds } from '@/features/corp/cardReadability';
 import { CorpOfflineServices } from '@/features/corp/CorpOfflineServices';
 import { CorpPeopleRail } from '@/features/corp/CorpPeopleRail';
@@ -345,6 +346,7 @@ async function loadCorpSnapshot(
  * in flight, so this unmounts and comes back with that character's answer.
  */
 function CorpBoardView({ capabilities }: { capabilities: CorpCapabilities }) {
+  const moonsVisible = useCorpViewCapabilities().canReadMiningLedger;
   const { t } = useTranslation();
   const canReadAnything =
     capabilities.canReadStructures ||
@@ -488,7 +490,12 @@ function CorpBoardView({ capabilities }: { capabilities: CorpCapabilities }) {
             Collapsing them would put "No moon chunks" in front of someone who
             was never allowed to ask, or whose read never came back.
           */}
-            <CorpKindCards grouped={grouped} capabilities={capabilities} unreadable={unreadable} />
+            <CorpKindCards
+              grouped={grouped}
+              capabilities={capabilities}
+              unreadable={unreadable}
+              moonsHref={moonsVisible ? '/corp/moons' : undefined}
+            />
 
             {/*
             The board's one untimed kind, on the one surface that suits it. Absent
