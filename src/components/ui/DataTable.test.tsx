@@ -739,6 +739,15 @@ describe('DataTable', () => {
       expect(screen.queryByText('Detail for Tritanium')).not.toBeInTheDocument();
     });
 
+    it('keeps a right-aligned first column right-aligned beside the leading caret', () => {
+      renderTable({
+        expandableRow: { ...expandableRow, leadingIcon: true },
+        columns: [{ ...columns[0], align: 'right' }, ...columns.slice(1)],
+      });
+      const lead = document.querySelector('.dt-lead-caret')?.parentElement;
+      expect(lead).toHaveClass('justify-end');
+    });
+
     it('keeps at most one row open — opening a second row closes the first', async () => {
       const user = userEvent.setup();
       renderTable({ expandableRow });

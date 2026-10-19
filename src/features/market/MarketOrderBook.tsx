@@ -7,6 +7,7 @@
  * time behind a Sell | Buy toggle; the other card is only hidden by CSS, so a
  * width change never re-mounts a table.
  */
+import { useMemo, useState } from 'react';
 import type { ReactElement, ReactNode, RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -16,8 +17,10 @@ import {
   StatChip,
   StatChips,
   type DataTableColumn,
+  type DataTableSort,
 } from '@/components/ui';
 import { TableActionsMenu } from '@/components/ui/TableExport';
+import { sortRows } from '@/components/ui/dataTableSort';
 import type { UseTableExport } from '@/components/ui/useTableExport';
 import { priceComparison } from '@/engine/market/orderBookDepth';
 import type { OrderBookSummary } from '@/engine/market/orderBook';
@@ -238,8 +241,10 @@ export function BookSideToggle({
 
 export interface OrderSideCardProps {
   side: BookSide;
-  /** Rows on screen: the side's best-first list, capped until "Show all". */
+  /** Every row on this side, best-first; the table sorts them all, then shows `rowCap` of them. */
   rows: readonly RegionOrder[];
+  /** Rows shown until "Show all"; cut after the sort, so a sort reaches rows beyond the first page. */
+  rowCap?: number;
   /** Every order on this side the table can show, for the heading and "Show all". */
   total: number;
   /** Sells Hide bait sells keeps out of the table, stated so the book never silently loses rows. */
@@ -269,6 +274,7 @@ export interface OrderSideCardProps {
 export function OrderSideCard({
   side,
   rows,
+  rowCap,
   total,
   hiddenBaitCount = 0,
   best,
@@ -289,6 +295,16 @@ export function OrderSideCard({
 }: OrderSideCardProps) {
   const { t } = useTranslation();
   const name = t(side === 'sell' ? 'market.sell' : 'market.buy');
+  const [sort, setSort] = useState<DataTableSort>({
+    columnId: 'price',
+    direction: side === 'sell' ? 'asc' : 'desc',
+  });
+  const shownRows = useMemo(() => {
+    // Sorted here, before the cap, so a sort reaches the whole book; the table sorts the slice again (a no-op).
+    const column = columns.find((c) => c.id === sort.columnId);
+    const sorted = column ? sortRows(rows, column, sort.direction) : rows;
+    return rowCap === undefined ? sorted : sorted.slice(0, rowCap);
+  }, [rows, rowCap, columns, sort]);
   return (
     <section
       aria-label={name}
@@ -344,11 +360,12 @@ export function OrderSideCard({
             <DataTable
               {...tableExport.tableProps}
               columns={columns}
-              rows={rows}
+              rows={shownRows}
+              sort={sort}
+              onSortChange={setSort}
               virtualize="auto"
               rowKey={(o) => o.order_id}
               label={name}
-              defaultSort={{ columnId: 'price', direction: side === 'sell' ? 'asc' : 'desc' }}
               // Two lines per order on a phone — station and price, then
               // quantity, distance and security — a long book is scanned,
               // not read.

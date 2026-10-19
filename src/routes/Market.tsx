@@ -601,8 +601,8 @@ export function Market() {
 
   // Hide bait sells trims what the table shows (`shownSell`); export, depth
   // and best prices keep the real book (`sortedSell`).
-  const sellRows = sellShowAll ? shownSell : shownSell.slice(0, ROW_CAP);
-  const buyRows = buyShowAll ? sortedBuy : sortedBuy.slice(0, ROW_CAP);
+  const sellRowCap = sellShowAll ? undefined : ROW_CAP;
+  const buyRowCap = buyShowAll ? undefined : ROW_CAP;
 
   // Every row, not the ROW_CAP the tables mount before "Show all" — hence
   // `source: 'sorted-rows'` (every row, in the order the table is sorted by).
@@ -653,7 +653,7 @@ export function Market() {
     singleStationBook ? ids.filter((id) => id !== 'location') : ids;
   const orderBookWidths = orderBookWidthsRem(
     singleStationBook ? pickedOrderColumns.filter((id) => id !== 'location') : pickedOrderColumns,
-    orderBookFigureChars([...sellRows, ...buyRows], bookBestSell, myOrderIds)
+    orderBookFigureChars([...shownSell, ...sortedBuy], bookBestSell, myOrderIds)
   );
   const [orderBookRef, [orderLocationSqueezed = false, orderBookNarrow = false]] =
     useElementNarrowerThan<HTMLDivElement>([orderBookWidths.roomy, orderBookWidths.cards]);
@@ -1255,7 +1255,8 @@ export function Market() {
                           />
                           <OrderSideCard
                             side="sell"
-                            rows={sellRows}
+                            rows={shownSell}
+                            rowCap={sellRowCap}
                             total={shownSell.length}
                             hiddenBaitCount={hiddenBaitCount}
                             best={loadedView?.summary.bestSell ?? null}
@@ -1318,7 +1319,8 @@ export function Market() {
                           />
                           <OrderSideCard
                             side="buy"
-                            rows={buyRows}
+                            rows={sortedBuy}
+                            rowCap={buyRowCap}
                             total={sortedBuy.length}
                             best={loadedView?.summary.bestBuy ?? null}
                             columns={buyColumns}
