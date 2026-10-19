@@ -37,7 +37,7 @@ import { Widget } from './Widget';
 
 type CategoryFilter = 'all' | KindCategory;
 
-export interface GalleryProps {
+interface GalleryProps {
   open: boolean;
   onClose: () => void;
 }

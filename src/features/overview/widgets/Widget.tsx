@@ -50,7 +50,7 @@ import { useOverviewEdit } from './editContext';
 import { DEFAULT_ROWS_PER_PAGE } from './tableSortPage';
 import { TABLE_ROWS, tableOf } from './tableModel';
 
-export interface WidgetProps {
+interface WidgetProps {
   widget: WidgetModel;
   /** The pilot is customizing: a dashed edge; the controls arrive as `headerStart` and `editControls`. */
   editing?: boolean;
