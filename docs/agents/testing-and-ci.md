@@ -41,14 +41,22 @@ Detail moved out of `CLAUDE.md` so it is read on demand. The short rules stay in
   overflow, one line) rather than pixel-exact thresholds. Screenshot and
   review passes are one-offs, not part of a PR's checks. Everything else is
   CI's job.
-- **A flaky CI test blocking your PR gets fixed, not reran or ignored — even
-  when it's unrelated to your change.** Rerunning the job (or, worse, merging
-  past a known-flaky check) hides the flake instead of closing it, and it
-  will cost the next PR the same CI round trip. Reproduce locally
-  (`npx vitest run <path>`) to tell a real regression from your change apart
-  from a pre-existing flake; if it passes locally but fails intermittently in
-  CI, fix the flake in the same PR before merging, even though the file
-  isn't otherwise part of your diff.
+- **A flaky CI test never holds up your PR, and is never left unfixed.** The
+  fix for the flake ships as its own PR, straight after yours: bundling an
+  unrelated test fix into a feature PR slows the feature, muddies its review
+  and its revert, and a flake fix that is only "queued" is one that gets
+  forgotten.
+  1. Reproduce locally (`npx vitest run <path>`) to tell a real regression
+     from your change apart from a pre-existing flake. If your change caused
+     it, or the failing test is in a file your PR touches, it is not a
+     flake: fix it in your PR.
+  2. If it is unrelated, rerun the failed job (the one rerun is to get your
+     PR through, not the fix) and merge once green.
+  3. **Immediately after the merge**, before picking up any other work, branch
+     a new worktree off `origin/develop`, fix the flake and open a separate
+     PR for it. Name the test and the CI run it failed in. The fix removes the
+     cause (an unawaited assertion, a race on a router or store, a timing
+     assumption); never a retry, a longer timeout or a skip.
 - **Tests stay under 10 seconds each.** `testTimeout` is 10000 in
   `vite.config.ts`, and that is a budget to stay under, not a number to raise.
   A test that needs more is too slow: make it faster instead of adding a
