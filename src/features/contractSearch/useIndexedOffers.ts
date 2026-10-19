@@ -1,3 +1,4 @@
+import { idSetKey } from '@/lib/idSetKey';
 /**
  * The Items board's early reads, ahead of the full snapshot (issue #2921): the
  * index (so suggestions and the region list exist before any chunk has landed)
@@ -78,7 +79,7 @@ export function useEarlyOffers(
   const key = useMemo(() => {
     if (!enabled || index === null || wanted === null || wanted.size === 0) return null;
     if (!index.r2 && readSpan(index, wanted) > MAX_EARLY_CHUNKS) return null;
-    const scope = typeIds === null ? 'all' : [...typeIds].sort((a, b) => a - b).join(',');
+    const scope = typeIds === null ? 'all' : idSetKey(typeIds);
     return `${index.lastSyncedAt}:${scope}`;
   }, [enabled, index, wanted, typeIds]);
 

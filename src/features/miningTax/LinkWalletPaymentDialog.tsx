@@ -16,6 +16,7 @@ import { exactAmountMatches, type MadePayment } from './paymentLinks';
 import { allocateOldestFirst } from './settleAllocation';
 import { useLedgerAction } from './useLedgerAction';
 import { LedgerActionError } from './LedgerActionError';
+import { toggleInSet } from '@/lib/sets';
 
 interface LinkWalletPaymentDialogProps {
   open: boolean;
@@ -150,12 +151,7 @@ export function LinkWalletPaymentDialog({
   }
 
   function toggle(id: string) {
-    setTicked((previous) => {
-      const next = new Set(previous);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+    setTicked((previous) => toggleInSet(previous, id));
   }
 
   const systemName = (solarSystemId: number) =>

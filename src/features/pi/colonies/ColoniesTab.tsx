@@ -1,3 +1,4 @@
+import { NO_NAMES } from '@/lib/emptyCollections';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Trans, useTranslation } from 'react-i18next';
@@ -33,7 +34,7 @@ import { buildAltAdvice } from './altAdvice';
 import { loadSystemNameAndSecurity } from '@/features/character/systemSecurity';
 import { AssumedCustomsNote } from '../AssumedCustomsNote';
 import { assumedCustomsNames } from '../colonyCustoms';
-import { EMPTY_ROSTER, NO_DETAILS, NO_NAMES, mergeNames, type Snapshot } from './coloniesSnapshot';
+import { EMPTY_ROSTER, NO_DETAILS, mergeNames, type Snapshot } from './coloniesSnapshot';
 import {
   colonyCheckRow,
   HOUR_MS,

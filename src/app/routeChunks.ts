@@ -20,7 +20,7 @@
  * repeat `import()`s, so a preload and the later `lazy()` render share one
  * request.
  */
-import type { ComponentType } from 'react';
+import { lazy, type ComponentType, type LazyExoticComponent } from 'react';
 import type { AppRoutePath } from './routeScopes';
 import { staleBuildRecoveryOutcome } from './staleBuildState';
 
@@ -43,6 +43,17 @@ export function named<K extends string>(
   key: K
 ): () => Promise<RouteModule> {
   return () => guarded(importer).then((m) => ({ default: m[key] }));
+}
+
+/**
+ * `lazy()` for a component that takes props, from a named export: `named`'s
+ * re-shape and undefined-module guard, but typed to keep the props.
+ */
+export function lazyNamed<K extends string, P extends object>(
+  importer: () => Promise<Record<K, ComponentType<P>>>,
+  key: K
+): LazyExoticComponent<ComponentType<P>> {
+  return lazy(() => guarded(importer).then((m) => ({ default: m[key] })));
 }
 
 /**

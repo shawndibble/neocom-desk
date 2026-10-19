@@ -1,3 +1,4 @@
+import { idSetKey } from '@/lib/idSetKey';
 /**
  * "Mutation" in a fitted module's dialog (GLOSSARY.md **Mutated module**,
  * **Mutaplasmid**, **Roll**): apply a mutaplasmid to the module, roll each
@@ -122,7 +123,7 @@ function MutationEditor({
   const fromAssets = characterId !== null && (
     <MutationFromAssets
       // Another Character or base starts a fresh search: the old one's items aren't these.
-      key={`${characterId}:${[...assetTypes].sort((a, b) => a - b).join(',')}`}
+      key={`${characterId}:${idSetKey(assetTypes)}`}
       characterId={characterId}
       typeIds={assetTypes}
       lookup={lookup}

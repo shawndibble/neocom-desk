@@ -27,6 +27,7 @@ import type { PayeeSuggestion } from './suggestPayee';
 import { useLedgerAction } from './useLedgerAction';
 import { LabelField } from './LabelField';
 import { LedgerActionError } from './LedgerActionError';
+import { toggleInSet } from '@/lib/sets';
 
 interface AssignDialogProps {
   row: MoonMiningTaxRow;
@@ -222,12 +223,7 @@ export function AssignDialog({
       : (unmaskNumber(taxOwedOverride) ?? NaN);
 
   function toggleLine(typeId: number) {
-    setIncludedTypeIds((previous) => {
-      const next = new Set(previous);
-      if (next.has(typeId)) next.delete(typeId);
-      else next.add(typeId);
-      return next;
-    });
+    setIncludedTypeIds((previous) => toggleInSet(previous, typeId));
   }
 
   /** Tax % changed: recompute tax owed from the *current* estimated value, leaving that value itself untouched. */

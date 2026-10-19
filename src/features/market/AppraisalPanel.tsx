@@ -83,6 +83,7 @@ import { LpStoreLink } from '@/features/loyalty/LpStoreLink';
 import { writeToClipboard } from '@/lib/clipboard';
 import { formatIskAuto } from '@/lib/isk';
 import { useIsPhone } from '@/lib/useIsPhone';
+import { useCopyFeedback } from '@/lib/useCopyFeedback';
 import { useMediaQuery } from '@/lib/useMediaQuery';
 import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import {
@@ -263,12 +264,14 @@ export function AppraisalPanel({
     setShareResult(result);
     setShare({ status: 'idle' });
   }
-  const [copied, setCopied] = useState<{ list: CopyList; count: number } | null>(null);
-  useEffect(() => {
-    if (copied === null) return;
-    const timer = setTimeout(() => setCopied(null), 2500);
-    return () => clearTimeout(timer);
-  }, [copied]);
+  const {
+    copied,
+    flash: flashCopied,
+    clear: clearCopied,
+  } = useCopyFeedback<{
+    list: CopyList;
+    count: number;
+  }>(2500);
   const hubName = hub.systemName;
 
   // Ages in the Recent list are read against when the panel opened.
@@ -395,10 +398,10 @@ export function AppraisalPanel({
   async function handleCopy(list: CopyList) {
     const { count, text } = copyLists[list];
     if (text === '') return;
-    setCopied(null);
+    clearCopied();
     try {
       await writeToClipboard(text);
-      setCopied({ list, count });
+      flashCopied({ list, count });
     } catch {
       // Nothing was copied, so no confirmation either.
     }

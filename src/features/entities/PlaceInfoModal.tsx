@@ -4,15 +4,11 @@
  * can link to it (`PlaceLink`) without its page owning a host. The dialog's
  * chunk loads on first open.
  */
-import { lazy, Suspense } from 'react';
-import { guarded } from '@/app/routeChunks';
+import { Suspense } from 'react';
+import { lazyNamed } from '@/app/routeChunks';
 import { usePlaceInfoModalStore } from '@/stores/placeInfoModal';
 
-const PlaceInfoDialog = lazy(() =>
-  guarded(() => import('./PlaceInfoDialog')).then((module) => ({
-    default: module.PlaceInfoDialog,
-  }))
-);
+const PlaceInfoDialog = lazyNamed(() => import('./PlaceInfoDialog'), 'PlaceInfoDialog');
 
 export function PlaceInfoModal() {
   const request = usePlaceInfoModalStore((state) => state.request);

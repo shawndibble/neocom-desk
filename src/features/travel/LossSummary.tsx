@@ -1,3 +1,4 @@
+import { idSetKey } from '@/lib/idSetKey';
 /**
  * What a lost ship cost (issue #2852): hull, fitted modules and cargo priced at
  * the Settings market hub, minus the insurance payout found in the wallet
@@ -43,7 +44,7 @@ export function LossSummary({ detail, zkbValue }: LossSummaryProps) {
   const typeKey = useMemo(() => {
     const ids = new Set([detail.victim.ship_type_id]);
     for (const item of detail.victim.items ?? []) ids.add(item.item_type_id);
-    return [...ids].sort((a, b) => a - b).join(',');
+    return idSetKey(ids);
   }, [detail]);
 
   useEffect(() => {

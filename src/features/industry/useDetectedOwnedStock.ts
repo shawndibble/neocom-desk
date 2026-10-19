@@ -1,3 +1,4 @@
+import { NO_NAMES } from '@/lib/emptyCollections';
 /**
  * Owned-stock detection for the open Build Plan (issue #181).
  *
@@ -35,7 +36,6 @@ import {
 } from './ownedStockDetection';
 
 const NO_STOCK: DetectedOwnedStockMap = new Map();
-const NO_NAMES: ReadonlyMap<number, string> = new Map();
 
 export interface DetectedOwnedStockResult {
   stock: DetectedOwnedStockMap;

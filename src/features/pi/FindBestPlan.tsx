@@ -27,6 +27,7 @@ import { useChainEstimates } from './useChainEstimates';
 import { priceSourceLabel } from './priceSource';
 import { useSellHub } from './sellHub';
 import { colonyCountUnknown } from './colonyStripModel';
+import { toggleInSet } from '@/lib/sets';
 
 /** The recipe filter and the picks/all switch ride in the URL, scoped to Find best (ADR 0015). */
 const FIND_BEST_PARAMS = {
@@ -37,13 +38,6 @@ const FIND_BEST_PARAMS = {
 interface Props {
   snapshot: GoalPlannerSnapshot;
   characterId: number;
-}
-
-function toggled<T>(set: ReadonlySet<T>, value: T): Set<T> {
-  const next = new Set(set);
-  if (next.has(value)) next.delete(value);
-  else next.add(value);
-  return next;
 }
 
 /**
@@ -152,11 +146,11 @@ export function FindBestPlan({ snapshot, characterId }: Props) {
         chips={best.chips}
         priceSource={priceSource}
         onToggle={(type) => {
-          setOff((current) => toggled(current, type));
+          setOff((current) => toggleInSet(current, type));
           setOpenId(null);
         }}
         onWhatIf={(type) => {
-          setWhatIf((current) => toggled(current, type));
+          setWhatIf((current) => toggleInSet(current, type));
           setOpenId(null);
         }}
       />

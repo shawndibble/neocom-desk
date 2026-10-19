@@ -1,3 +1,4 @@
+import { idSetKey } from '@/lib/idSetKey';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, FilterChip, LiveStatus, Spinner } from '@/components/ui';
@@ -150,7 +151,7 @@ export function MovePlanTab({ onClose, characterIds, activeCharacterId }: MovePl
     skillsKnown: true,
   });
   const hullHolds = useRef(new Map<number, PackHold[]>());
-  const idsKey = characterIds.join(',');
+  const idsKey = idSetKey(characterIds);
   const focusAfterCommit = useFocusAfterCommit();
   const planHeadingRef = useRef<HTMLHeadingElement>(null);
   const deliverHeadingRef = useRef<HTMLHeadingElement>(null);

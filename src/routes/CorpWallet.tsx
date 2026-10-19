@@ -1,3 +1,4 @@
+import { NO_NAMES } from '@/lib/emptyCollections';
 /**
  * `/corp/wallet` — the corporation's wallet, one division at a time: its
  * balance, its journal and its market transactions (issues #298, #570).
@@ -112,7 +113,6 @@ const VIEW_PARAM = enumParam<WalletTable>(['journal', 'transactions'], 'journal'
 const TRANSACTIONS_SORT = { columnId: 'date', direction: 'desc' } as const;
 
 /** Stable identities, so a missing read doesn't invalidate its dependent memos every render. */
-const NO_NAMES: ReadonlyMap<number, string> = new Map();
 const EMPTY_JOURNAL: readonly WalletJournalEntry[] = [];
 const EMPTY_TRANSACTIONS: readonly CorporationWalletTransaction[] = [];
 

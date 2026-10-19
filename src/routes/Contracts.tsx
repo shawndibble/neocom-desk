@@ -1,3 +1,4 @@
+import { NO_AFFILIATIONS, NO_NAMES } from '@/lib/emptyCollections';
 import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
@@ -120,10 +121,8 @@ const STATUS_TONE: Record<Contract['status'], string> = {
 };
 
 /** Stable identity, so the fallback doesn't invalidate the column memo every render. */
-const NO_NAMES: ReadonlyMap<number, string> = new Map();
 const NO_CATEGORIES: ReadonlyMap<number, NameCategory> = new Map();
 const NO_STANDING_INDEX: ContactStandingIndex = new Map();
-const NO_AFFILIATIONS: ReadonlyMap<number, CharacterAffiliation> = new Map();
 
 /**
  * Lapsed and unclaimed — still `outstanding` past its accept-by deadline.

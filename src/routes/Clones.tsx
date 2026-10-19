@@ -1,3 +1,4 @@
+import { NO_NAMES } from '@/lib/emptyCollections';
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -90,7 +91,6 @@ import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import type { AttributeName } from '@/engine/types';
 
 /** Stable identity, so the fallback doesn't invalidate the column memo every render. */
-const NO_NAMES: ReadonlyMap<number, string> = new Map();
 const NO_DETAILS: ReadonlyMap<number, ImplantDetail> = new Map();
 const NO_CLONES: readonly JumpClone[] = [];
 const NO_SYSTEMS: ReadonlyMap<number, number | null> = new Map();

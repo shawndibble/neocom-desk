@@ -1,3 +1,4 @@
+import { NO_NAMES } from '@/lib/emptyCollections';
 import { HintText } from '@/components/ui/HintText';
 import { OreIcon } from './OreIcon';
 import { typeLabels } from './typeLabels';
@@ -251,7 +252,6 @@ interface Snapshot {
 }
 
 const NO_HUBS: ReadonlySet<TradeHub['id']> = new Set();
-const NO_NAMES: ReadonlyMap<number, string> = new Map();
 
 const EMPTY_DATED_PRICES: DatedUnitPrices = {
   byHubAndDate: new Map(),

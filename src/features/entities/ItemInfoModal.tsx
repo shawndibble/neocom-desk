@@ -5,18 +5,17 @@
  * Item Detail chunk loads on first open. Opened from a link the name is
  * staged; from a pasted URL it is looked up off the type.
  */
-import { lazy, Suspense, useEffect, useState } from 'react';
-import { guarded } from '@/app/routeChunks';
+import { Suspense, useEffect, useState } from 'react';
+import { lazyNamed } from '@/app/routeChunks';
 import { loadTypeName } from '@/features/character/typeNames';
 import { ItemActionsContext } from '@/features/market/itemActions';
 import { usePageItemActions } from '@/features/market/usePageItemActions';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useItemInfoModalStore } from '@/stores/itemInfoModal';
 
-const ItemDetailModal = lazy(() =>
-  guarded(() => import('@/features/market/ItemDetailModal')).then((module) => ({
-    default: module.ItemDetailModal,
-  }))
+const ItemDetailModal = lazyNamed(
+  () => import('@/features/market/ItemDetailModal'),
+  'ItemDetailModal'
 );
 
 export function ItemInfoModal() {

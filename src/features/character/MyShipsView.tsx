@@ -1,3 +1,4 @@
+import { idSetKey } from '@/lib/idSetKey';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -191,7 +192,7 @@ interface SortKeys {
 /** Ship classes (SDE groups) by group id; lands after the list, which never waits on it. */
 function useShipClasses(groupIds: readonly number[]): ReadonlyMap<number, string> {
   const [classes, setClasses] = useState<ReadonlyMap<number, string>>(new Map());
-  const idsKey = [...new Set(groupIds)].sort((a, b) => a - b).join(',');
+  const idsKey = idSetKey(groupIds);
   useEffect(() => {
     if (idsKey === '') return;
     let cancelled = false;
@@ -354,7 +355,7 @@ export function MyShipsView({
   route,
 }: MyShipsViewProps) {
   const { t } = useTranslation();
-  const idsKey = [...characterIds].sort((a, b) => a - b).join(',');
+  const idsKey = idSetKey(characterIds);
   const [state, setState] = useState<ShipsState>({ status: 'loading' });
   const [retryTick, setRetryTick] = useState(0);
   useEffect(() => {

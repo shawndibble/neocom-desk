@@ -8,13 +8,13 @@
  * the same place on the grid.
  */
 import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
-import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Tooltip } from '@/components/ui';
 import { SystemLink } from '@/features/entities';
 import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
 import { writeToClipboard } from '@/lib/clipboard';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
+import { useCopyFeedback } from '@/lib/useCopyFeedback';
 import type { HubComparisonRow } from './appraisalData';
 
 /** How long the "copied" confirmation stays up before the bubble goes back to the figure. */
@@ -97,16 +97,7 @@ type CopiedKey = `${string}:${'sell' | 'buy'}`;
 export function HubCompareCards({ rows }: { rows: readonly HubComparisonRow[] }) {
   const { t } = useTranslation();
   const pricesUnavailableLabel = usePricesUnavailableLabel();
-  const [copied, setCopied] = useState<CopiedKey | null>(null);
-  const resetTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
-
-  useEffect(() => () => clearTimeout(resetTimer.current), []);
-
-  function announceCopied(key: CopiedKey) {
-    setCopied(key);
-    clearTimeout(resetTimer.current);
-    resetTimer.current = setTimeout(() => setCopied(null), COPIED_FEEDBACK_MS);
-  }
+  const { copied, flash: announceCopied } = useCopyFeedback<CopiedKey>(COPIED_FEEDBACK_MS);
 
   return (
     <>

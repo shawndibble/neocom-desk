@@ -12,6 +12,7 @@ import { rememberPayeeEntity } from './payees';
 import type { LinkSuggestion } from './paymentLinks';
 import { useLedgerAction } from './useLedgerAction';
 import { LedgerActionError } from './LedgerActionError';
+import { toggleInSet } from '@/lib/sets';
 
 interface LinkPaymentDialogProps {
   open: boolean;
@@ -83,12 +84,7 @@ export function LinkPaymentDialog({
   }
 
   function toggle(id: string) {
-    setExcluded((previous) => {
-      const next = new Set(previous);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+    setExcluded((previous) => toggleInSet(previous, id));
   }
 
   const systemName = (solarSystemId: number) =>
