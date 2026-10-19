@@ -76,6 +76,27 @@ export function planColonyAnchor(name: string | null, planetId: number): string 
   return `plan-${slug || `planet-${planetId}`}`;
 }
 
+const sharedAdvice = new WeakMap<PlanAdviceInput, { advice: PlanAdvice } | { error: unknown }>();
+
+/**
+ * `buildPlanAdvice`, remembered per input object: the PI tabs share their inputs
+ * (`PiAdviceInputsProvider`), so a tab switch reuses the model run instead of
+ * repeating it. A throw is remembered too and rethrown.
+ */
+export function buildSharedPlanAdvice(input: PlanAdviceInput): PlanAdvice {
+  let hit = sharedAdvice.get(input);
+  if (!hit) {
+    try {
+      hit = { advice: buildPlanAdvice(input) };
+    } catch (error) {
+      hit = { error };
+    }
+    sharedAdvice.set(input, hit);
+  }
+  if ('error' in hit) throw hit.error;
+  return hit.advice;
+}
+
 export function buildPlanAdvice(input: PlanAdviceInput): PlanAdvice {
   const { snapshot, preference } = input;
   const { pi, nowMs } = snapshot;

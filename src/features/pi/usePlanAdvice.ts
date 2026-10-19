@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import type { RebuildPreference } from '@/engine/pi/planAdvice';
 import type { GoalPlannerSnapshot } from './goalPlannerSnapshot';
-import { buildPlanAdvice, type PlanAdvice } from './planAdviceModel';
+import { buildSharedPlanAdvice, type PlanAdvice } from './planAdviceModel';
 import { usePiAdviceInputs } from './usePiAdviceInputs';
 
 export type PlanAdviceState =
@@ -24,7 +24,7 @@ export function usePlanAdvice(
       try {
         return {
           status: 'prices-failed',
-          advice: inputs.input ? buildPlanAdvice(inputs.input) : null,
+          advice: inputs.input ? buildSharedPlanAdvice(inputs.input) : null,
         };
       } catch {
         return { status: 'prices-failed', advice: null };
@@ -33,7 +33,7 @@ export function usePlanAdvice(
     try {
       return {
         status: 'ready',
-        advice: buildPlanAdvice(inputs.input),
+        advice: buildSharedPlanAdvice(inputs.input),
         pricesFetchedAt: inputs.prices.fetchedAt,
         hubName: inputs.hubName,
       };
