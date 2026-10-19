@@ -21,6 +21,7 @@ import { PageSettingsButton } from '@/features/settings/PageSettingsModal';
 import { PiSettingsForm } from '@/features/settings/PiSettingsForm';
 import * as Icon from '@/components/ui/icons';
 import { PlanPanel } from '@/features/pi/PlanPanel';
+import { PiSnapshotProvider } from '@/features/pi/usePiSnapshot';
 import { PiExplainer } from '@/features/pi/PiExplainer';
 import { goalsParam, idListParam, seedGoal } from '@/features/pi/goalsParam';
 import { loadPlannableTypeIds } from '@/features/pi/products';
@@ -161,102 +162,104 @@ export function PlanetaryIndustry() {
 
   return (
     <JumpBasisProvider>
-      <ItemActionsProvider page={itemActions}>
-        <div className={cx('mx-auto space-y-4', tab !== 'map' && 'max-w-6xl')}>
-          <PageHeader
-            title={t('pi.title')}
-            meta={planetsResult && <DataAgeBadge date={planetsResult.fetchedAt} />}
-            actions={
-              <>
-                <IconButton
-                  icon={<Icon.Tip />}
-                  label={t('piPlan.newToPi')}
-                  visibleLabel={t('piPlan.newToPi')}
-                  onClick={() => setExplainerOpen(true)}
-                />
-                <PageSettingsButton pageName={t('pi.title')} section="industry">
-                  <PiSettingsForm />
-                </PageSettingsButton>
-                <IconButton
-                  icon={<Icon.Refresh />}
-                  label={t('pi.refresh')}
-                  onClick={refresh}
-                  disabled={loading}
-                />
-              </>
-            }
-          />
-
-          <PiExplainer open={explainerOpen} onClose={() => setExplainerOpen(false)} />
-
-          {(data?.planetsNeedsReauth || planetsRefused) && (
-            <GrantBanner
-              characterId={activeCharacterId}
-              endpoints={['getCharacterPlanets']}
-              title={t('pi.reauthTitle')}
-              hint={t('pi.reauthHint')}
-              actionLabel={t('pi.reauthAction')}
+      <PiSnapshotProvider characterId={activeCharacterId} reloadKey={refreshCount}>
+        <ItemActionsProvider page={itemActions}>
+          <div className={cx('mx-auto space-y-4', tab !== 'map' && 'max-w-6xl')}>
+            <PageHeader
+              title={t('pi.title')}
+              meta={planetsResult && <DataAgeBadge date={planetsResult.fetchedAt} />}
+              actions={
+                <>
+                  <IconButton
+                    icon={<Icon.Tip />}
+                    label={t('piPlan.newToPi')}
+                    visibleLabel={t('piPlan.newToPi')}
+                    onClick={() => setExplainerOpen(true)}
+                  />
+                  <PageSettingsButton pageName={t('pi.title')} section="industry">
+                    <PiSettingsForm />
+                  </PageSettingsButton>
+                  <IconButton
+                    icon={<Icon.Refresh />}
+                    label={t('pi.refresh')}
+                    onClick={refresh}
+                    disabled={loading}
+                  />
+                </>
+              }
             />
-          )}
 
-          {planetsResult?.fromCache && (
-            <CachedNotice fetchedAt={planetsResult.fetchedAt} refreshFailed={refreshCount > 0} />
-          )}
+            <PiExplainer open={explainerOpen} onClose={() => setExplainerOpen(false)} />
 
-          <Tabs
-            tabsId={tabsId}
-            label={t('piPlan.tabsLabel')}
-            value={tab}
-            onChange={(id) => setTab(id as typeof tab)}
-            tabs={[
-              { id: 'plan', label: t('piPlan.planTab') },
-              { id: 'map', label: t('piPlan.mapTab') },
-              { id: 'colonies', label: t('piPlan.coloniesTab') },
-            ]}
-          />
-
-          <PiHeaderStrip
-            colonySystemIds={(planetsResult?.data ?? []).map((planet) => planet.solar_system_id)}
-            colonyCountUnknown={countUnknown}
-            locationCharacterId={
-              planetsResult !== null && !countUnknown && planetsResult.data.length === 0
-                ? activeCharacterId
-                : null
-            }
-            estimate={tab === 'plan' || tab === 'map'}
-            eveTime={tab === 'colonies'}
-          />
-
-          <TabPanel tabsId={tabsId} tabId={tab} className="space-y-4">
-            {tab === 'map' ? (
-              <PiMapTab characterId={activeCharacterId} />
-            ) : tab === 'plan' ? (
-              <PlanPanel
-                seedingGoal={seedTypeId !== null}
+            {(data?.planetsNeedsReauth || planetsRefused) && (
+              <GrantBanner
                 characterId={activeCharacterId}
-                goals={goals}
-                onGoalsChange={setGoals}
-                disabled={disabledColonies}
-                onDisabledChange={setDisabledColonies}
-              />
-            ) : loading && !data ? (
-              <div className="flex justify-center py-16">
-                <Spinner label={t('common.loading')} />
-              </div>
-            ) : (
-              <ColoniesTab
-                characterId={activeCharacterId}
-                snapshot={data}
-                loading={loading}
-                error={error}
-                linkedColonyId={linkedColonyId}
-                onClearLinkedColony={clearLinkedColony}
-                onRetry={refresh}
+                endpoints={['getCharacterPlanets']}
+                title={t('pi.reauthTitle')}
+                hint={t('pi.reauthHint')}
+                actionLabel={t('pi.reauthAction')}
               />
             )}
-          </TabPanel>
-        </div>
-      </ItemActionsProvider>
+
+            {planetsResult?.fromCache && (
+              <CachedNotice fetchedAt={planetsResult.fetchedAt} refreshFailed={refreshCount > 0} />
+            )}
+
+            <Tabs
+              tabsId={tabsId}
+              label={t('piPlan.tabsLabel')}
+              value={tab}
+              onChange={(id) => setTab(id as typeof tab)}
+              tabs={[
+                { id: 'plan', label: t('piPlan.planTab') },
+                { id: 'map', label: t('piPlan.mapTab') },
+                { id: 'colonies', label: t('piPlan.coloniesTab') },
+              ]}
+            />
+
+            <PiHeaderStrip
+              colonySystemIds={(planetsResult?.data ?? []).map((planet) => planet.solar_system_id)}
+              colonyCountUnknown={countUnknown}
+              locationCharacterId={
+                planetsResult !== null && !countUnknown && planetsResult.data.length === 0
+                  ? activeCharacterId
+                  : null
+              }
+              estimate={tab === 'plan' || tab === 'map'}
+              eveTime={tab === 'colonies'}
+            />
+
+            <TabPanel tabsId={tabsId} tabId={tab} className="space-y-4">
+              {tab === 'map' ? (
+                <PiMapTab characterId={activeCharacterId} />
+              ) : tab === 'plan' ? (
+                <PlanPanel
+                  seedingGoal={seedTypeId !== null}
+                  characterId={activeCharacterId}
+                  goals={goals}
+                  onGoalsChange={setGoals}
+                  disabled={disabledColonies}
+                  onDisabledChange={setDisabledColonies}
+                />
+              ) : loading && !data ? (
+                <div className="flex justify-center py-16">
+                  <Spinner label={t('common.loading')} />
+                </div>
+              ) : (
+                <ColoniesTab
+                  characterId={activeCharacterId}
+                  snapshot={data}
+                  loading={loading}
+                  error={error}
+                  linkedColonyId={linkedColonyId}
+                  onClearLinkedColony={clearLinkedColony}
+                  onRetry={refresh}
+                />
+              )}
+            </TabPanel>
+          </div>
+        </ItemActionsProvider>
+      </PiSnapshotProvider>
     </JumpBasisProvider>
   );
 }

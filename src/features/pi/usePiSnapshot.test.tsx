@@ -1,7 +1,8 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { GoalPlannerSnapshot } from './goalPlannerSnapshot';
-import { usePiSnapshot } from './usePiSnapshot';
+import { PiSnapshotProvider, usePiSnapshot } from './usePiSnapshot';
+import type { ReactNode } from 'react';
 
 const load = vi.fn();
 // A spy tracks a rejected promise it returned as unhandled, so a failure is raised outside it.
@@ -79,5 +80,27 @@ describe('usePiSnapshot', () => {
     await act(async () => release(second));
     expect(result.current.snapshot).toBe(second);
     expect(result.current.retrying).toBe(false);
+  });
+
+  it('shares one read between consumers under a provider', async () => {
+    const s = snap('shared');
+    load.mockResolvedValue(s);
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <PiSnapshotProvider characterId={7}>{children}</PiSnapshotProvider>
+    );
+    const { result } = renderHook(() => [usePiSnapshot(7), usePiSnapshot(7)], { wrapper });
+    await waitFor(() => expect(result.current[0].snapshot).toBe(s));
+    expect(result.current[1].snapshot).toBe(s);
+    expect(load).toHaveBeenCalledTimes(1);
+  });
+
+  it('loads its own read for a Character the provider does not serve', async () => {
+    load.mockImplementation((id: number) => Promise.resolve(snap(String(id))));
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <PiSnapshotProvider characterId={7}>{children}</PiSnapshotProvider>
+    );
+    const { result } = renderHook(() => usePiSnapshot(8), { wrapper });
+    await waitFor(() => expect(result.current.snapshot).not.toBeNull());
+    expect(load).toHaveBeenCalledWith(8);
   });
 });

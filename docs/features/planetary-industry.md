@@ -28,7 +28,7 @@ Sources read: `GLOSSARY.md` (Goal Plan, Baseline, Lift, Quick win, Bigger chain,
 - No active character: `Navigate` to `/characters` (`:154`). Not hydrated: spinner.
 - Route is `UNGATED` (`src/app/routeScopes.ts:252`): Plan's Find best and Map need SDE + market only. Only the colony list needs `esi-planets.manage_planets.v1`; the page raises its own banner instead of replacing the page (decision `20261005-210502-pi-route-is-ungated-one-banner-above-the`). `pageOwnsReauth` binds `getCharacterPlanets` to this page (`src/app/pageOwnsReauth.ts:9`) so the shell notice stays quiet.
 - Banner (`GrantBanner`, `pi.reauthTitle`) shows on `planetsNeedsReauth` (403) or when another reader's request to `getCharacterPlanets` was refused for this character (`useAuthFailure`).
-- Snapshot: `useRouteSnapshot(loadPiSnapshot, …, { cacheKey: 'planetary-industry' })`; Colonies tab shows spinner while `loading && !data`; Plan and Map load their own reads.
+- Snapshot: `useRouteSnapshot(loadPiSnapshot, …, { cacheKey: 'planetary-industry' })`; Colonies tab shows spinner while `loading && !data`; `PiSnapshotProvider` (`usePiSnapshot.ts`) reads the goal-planner snapshot once for Plan, Map and Colonies; a manual refresh bumps its `reloadKey`.
 - Hydrates `useExpiringWindowHours` once for the page (not per row).
 - `usePageItemActions({ lazyBlueprints: true })` + `ItemActionsProvider`: Show info / Market for every item name on all 3 tabs.
 - `usePopScrollRestore` restores scroll on Back.
@@ -64,7 +64,7 @@ PI settings form fields (`src/features/settings/PiSettingsForm.tsx`): Sell at (S
 
 ## 4. Plan tab (`src/features/pi/PlanPanel.tsx`)
 
-Loads `loadGoalPlannerSnapshot(characterId)`; failure -> `EmptyState` `piPlan.loadFailedTitle`. `useRetryFocus` moves focus to the result after an ESI retry.
+Reads `loadGoalPlannerSnapshot(characterId)` through the shared `usePiSnapshot`; failure -> `EmptyState` `piPlan.loadFailedTitle`. `useRetryFocus` moves focus to the result after an ESI retry.
 
 ### 4.1 Question picker
 
