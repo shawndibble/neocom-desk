@@ -21,7 +21,11 @@ Detail moved out of `CLAUDE.md` so it is read on demand. The short rules stay in
   the full suite (`npm run test:run`) or `npm run build` locally** — CI's
   `validate` job runs `lint`, `format:check`, `typecheck` and `build` on
   every push, the `test` job runs `test:run` across four shards, and the
-  `e2e` job runs Playwright across four more; that's the gate, not a local
+  `e2e` job runs Playwright across eight (whole spec files dealt out by
+  `e2e/shard-weights.json`; a new spec needs no entry, and
+  `node scripts/e2e-shard.mjs --weights <ci-log>` refreshes the table) inside
+  Playwright's container image, whose tag in `ci.yml` must match
+  `@playwright/test`; that's the gate, not a local
   pre-PR run. Both sharded jobs report through a single aggregate check
   (`test`, `e2e`) because the `develop` and `main` rulesets require those exact names. In ticket-loop work (`/next-ticket`, `/implement`),
   see `.claude/commands/next-ticket.md`'s "Pre-commit hook, then CI" for the
