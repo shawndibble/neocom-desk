@@ -139,7 +139,6 @@ describe('every route must declare its scope requirement', () => {
       '/s/:shareId',
       '/share/:shareId',
       '/share/fitting',
-      '/styleguide',
     ]);
   });
 });

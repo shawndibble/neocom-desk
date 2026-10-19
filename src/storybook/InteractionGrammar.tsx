@@ -133,7 +133,7 @@ function Group({ title, children }: { title: string; children: ReactNode }) {
  */
 export function InteractionGrammar() {
   const { t } = useTranslation();
-  const k = (key: string) => t(`styleguide.interactionGrammar.${key}`);
+  const k = (key: string) => t(`interactionGrammar.${key}`);
   const [expanded, setExpanded] = useState(false);
   const [selected, setSelected] = useState<number | null>(2);
 

@@ -58,7 +58,7 @@ Everything around the feature pages: router and route table, the signed-in `Layo
 - `/` -> `Root` (`:229`): Character count unresolved or active-store not hydrated -> `BootScreen gate="root"`; 0 Characters -> `/login`; Characters but none active -> `/characters`; else `/overview`. Waits on the active-character store as well as the count, so a returning user is not bounced to `/characters` (comment above `Root`).
 - `/login`, `/callback`: eager, outside the shell (`docs/features/auth-login.md`).
 - Under `RequireCharacter` -> `SignedInShell` (lazy `Layout`, preloaded at boot by `signedInShellHint`/`bootShellPreload`) -> every entry of `ROUTE_ELEMENTS` (`:151`) wrapped in `ScopeGate`, and `TabRoute` when the page is tabbed (`PAGE_TABS`, ADR 0015).
-- Outside the shell: `/styleguide` (hidden design reference), `/share/fitting`, `/share/:shareId` (`:370`, no session needed), `/error` (`:372`), `*` -> `NotFound` (`:373`).
+- Outside the shell: `/share/fitting`, `/share/:shareId` (`:370`, no session needed), `/error` (`:372`), `*` -> `NotFound` (`:373`).
 - Mounted once beside the router: `ReloadPrompt`, `EntityInfoRoute`, `PublicInfoModal`, `SkillDetailModal`, `ItemInfoModal`, `InstallPrompt`; trackers `AuthFailureRedirect`, `AnalyticsPageViewTracker`, `DocumentTitleTracker`.
 - `ROUTE_ELEMENTS` is `satisfies Record<AppRoutePath, ...>`: a route without a scope declaration is a compile error; `routeScopes.test.ts` scans `App.tsx` so hand-written feature routes cannot slip through.
 - Boot effects in `App()`: hydrate active Character, font scale, time format, mobile tabs, hidden nav and Recent nav (so first paint is right); subscribe ESI auth-failure, activity log, blocked-upgrade report, DB-wipe reload; schedule cache prune and lazy SDE warm; `triggerSync` of the active Character; `useBackgroundSync`; write `signedInShellHint`; `scheduleBootPrefetch` (idle slot, cancelled on switch).
@@ -176,7 +176,7 @@ No UI. Service worker `registerType: 'prompt'`. A waiting build is applied only 
 
 ## Document title (`src/app/documentTitle.ts`)
 
-`{most specific} — {…} — Neocom Desk` (separator `—`, `:14`), computed per pathname (tabbed pages add the tab label, nested routes add the section; duplicate names collapse so Market's Browser reads once, `:100`); `ROUTE_TITLE_KEYS` is `satisfies Record<AppRoutePath, ...>` so a new route without a title fails to compile; unmatched -> "Page not found"; `/login`, `/callback`, `/styleguide`, `/` -> app name alone. Updates when the language changes (WCAG 2.4.2).
+`{most specific} — {…} — Neocom Desk` (separator `—`, `:14`), computed per pathname (tabbed pages add the tab label, nested routes add the section; duplicate names collapse so Market's Browser reads once, `:100`); `ROUTE_TITLE_KEYS` is `satisfies Record<AppRoutePath, ...>` so a new route without a title fails to compile; unmatched -> "Page not found"; `/login`, `/callback`, `/` -> app name alone. Updates when the language changes (WCAG 2.4.2).
 
 ## Route focus and tab routes
 

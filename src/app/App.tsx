@@ -100,14 +100,13 @@ const Travel = lazy(routeChunks.loadTravel);
 const EmploymentHistory = lazy(routeChunks.loadEmploymentHistory);
 const Settings = lazy(routeChunks.loadSettings);
 const Help = lazy(routeChunks.loadHelp);
-const Styleguide = lazy(routeChunks.loadStyleguide);
 const FittingShared = lazy(routeChunks.loadFittingShared);
 const SharedLink = lazy(routeChunks.loadSharedLink);
 const ErrorProbe = lazy(routeChunks.loadErrorProbe);
 
 /**
- * Suspense fallback for the lazy routes outside `Layout` (`/styleguide`,
- * `/share/fitting`, `/share/:shareId`, `/error`). Feature routes suspend inside `Layout`'s own
+ * Suspense fallback for the lazy routes outside `Layout` (`/share/fitting`,
+ * `/share/:shareId`, `/error`). Feature routes suspend inside `Layout`'s own
  * boundary instead, so the shell stays up. Not `BootScreen`: that one reports
  * a boot stall after ten seconds, and a slow chunk is not a stalled boot.
  */
@@ -386,10 +385,9 @@ export function App() {
                 })}
               </Route>
             </Route>
-            <Route path="/styleguide" element={<Styleguide />} />
             {/* A Fitting Share Code opened with no session (#1544) — it must
               open with no Character, so it sits outside
-              RequireCharacter/ScopeGate the same way /styleguide does. A
+              RequireCharacter/ScopeGate. A
               visitor with a Character never sees it: FittingShared redirects
               straight into the editor instead. routeScopes.test.ts asserts
               this exemption is deliberate. */}

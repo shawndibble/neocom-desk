@@ -11,8 +11,6 @@ const ALLOWED = new Set([
   'src/features/character/EventContextMenu.tsx',
   // Table-only shortcuts to pages the nav already reaches.
   'src/features/character/CharacterRowContextMenu.tsx',
-  // Component gallery demonstrating the primitive.
-  'src/routes/Styleguide.tsx',
 ]);
 
 const sources = import.meta.glob<string>(['/src/features/**/*.tsx', '/src/routes/**/*.tsx'], {

@@ -5,7 +5,7 @@ import '@/i18n';
 import en from '@/i18n/locales/en.json';
 import { InteractionGrammar } from './InteractionGrammar';
 
-describe('InteractionGrammar styleguide section', () => {
+describe('InteractionGrammar', () => {
   it('renders each cue group with its rule name and real components', () => {
     render(
       <MemoryRouter>
@@ -21,7 +21,7 @@ describe('InteractionGrammar styleguide section', () => {
     ]) {
       expect(screen.getByRole('heading', { name: group })).toBeInTheDocument();
     }
-    const rules = Object.values(en.styleguide.interactionGrammar.rules);
+    const rules = Object.values(en.interactionGrammar.rules);
     expect(rules.length).toBeGreaterThan(20);
     for (const rule of rules) expect(screen.getAllByText(rule).length).toBeGreaterThan(0);
     // External links carry the hidden "opens in a new tab" text and a real href.

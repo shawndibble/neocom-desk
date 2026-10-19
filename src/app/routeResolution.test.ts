@@ -25,7 +25,6 @@ const STATIC_ROUTES = [
   '/',
   '/login',
   '/callback',
-  '/styleguide',
   '/s/:shareId',
   '/communities/join/:code',
   '/share/:shareId',
