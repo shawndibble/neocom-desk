@@ -38,7 +38,7 @@ import { RequestsTab } from './RequestsTab';
 import { markRequestsSeen, watchRequestsViewed } from './requestBadge';
 import { useCommunityRequests } from './useCommunityRequests';
 import { CommunityMemberList } from './CommunityMemberList';
-import { ConfirmDialog } from './ConfirmDialog';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { CommunityInvites } from './CommunityInvites';
 import { JoinRequestsList } from './JoinRequestsList';
 import { ShareFittingsTab } from './ShareFittingsTab';

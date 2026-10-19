@@ -5,7 +5,7 @@ import { Button, Checkbox, EmptyState, SearchInput, Spinner } from '@/components
 import { fittingChoiceKey } from '@/engine/communities/sharedFittings';
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { AddSharedItemsDialog } from './AddSharedItemsDialog';
-import { ConfirmDialog } from './ConfirmDialog';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { collectFittingsToShare } from './shareAllFittings';
 import { namedLike, needleOf, ROW_LIMIT } from './shareLists';
 import { loadFittingsAll, saveFittingsAll } from './shareSelection';

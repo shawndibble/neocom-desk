@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Modal } from '@/components/ui';
+import { Button } from './Button';
+import { Modal } from './Modal';
 
-/** A confirm for one Community action: body text, a danger or plain action, and its own failure line. */
+/** A confirm for one action: body text, a danger or plain action, and its own failure line. */
 export function ConfirmDialog({
   open,
   title,
@@ -25,7 +26,7 @@ export function ConfirmDialog({
   onClose: () => void;
   /** Where focus goes on close when the control that opened it is gone (`Modal`'s). */
   returnFocusFallback?: () => HTMLElement | null;
-  /** Defaults to the Communities wording; pass one when used outside Communities. */
+  /** Default to the Communities wording; pass your own outside Communities. */
   cancelLabel?: string;
   failedLabel?: string;
 }) {
