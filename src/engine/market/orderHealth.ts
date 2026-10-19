@@ -26,9 +26,9 @@
  *    confused with a number the UI would otherwise present as gospel.
  */
 import { parseInstant } from '../esiInstant';
+import { DAY_MS } from '@/lib/age';
 
 /** Whole days in milliseconds, used to convert ESI's `duration` (days) to ms. */
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 export interface OrderExpiry {
   /** Epoch ms the order lapses. */

@@ -21,6 +21,7 @@ import { piTier } from '@/engine/pi/chain';
 import * as routeChunks from '@/app/routeChunks';
 import { loadPlanPrices } from '@/features/pi/planPrices';
 import type { PiData } from '@/sde/types';
+import { DAY_MS } from '@/lib/age';
 
 /** A P1 a temperate colony makes from its own Aqueous Liquids. */
 const WATER = 3645;
@@ -166,7 +167,6 @@ const roleCardsDetailPayload = {
  * day. `decayedDetailPayload` below is the aged one.
  */
 const BASE_NOW = Date.now();
-const DAY_MS = 86_400_000;
 
 const agedDetailPayload = {
   links: [],

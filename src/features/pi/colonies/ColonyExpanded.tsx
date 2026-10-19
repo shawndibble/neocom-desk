@@ -26,13 +26,13 @@ import {
   groupFactoryPins,
   pinRole,
 } from '@/engine/pi/colonyPins';
-import { HOUR_MS, type ColonyCheckRow } from './coloniesModel';
+import type { ColonyCheckRow } from './coloniesModel';
 import { eveClock, hoursLabel, schematicOutputTypeId } from './coloniesFormat';
 import { quickWinLine } from './coloniesText';
 import { Sentence } from '../sentence';
+import { DAY_MS, HOUR_MS } from '@/lib/age';
 
 const MICRO = eyebrowClassName;
-const DAY_MS = 86_400_000;
 
 /** Units a day a reinstall would recover right now, from `engine/pi/extraction`'s own curve. */
 function resetGainPerDay(program: ExtractorYieldProgram, nowMs: number): number {

@@ -6,7 +6,7 @@
  * Number that is a headline plus one fact the headline lacks, and a chart that
  * names what it draws.
  */
-import { DAY_MS } from '@/lib/age';
+import { DAY_MS, HOUR_MS } from '@/lib/age';
 import { worstSeverity, type DeadlineSeverity } from '@/engine/severity';
 import { filterYieldRange, eveToday, rangeDates, daysCovered } from '@/engine/miningTax/yieldRange';
 import type { MiningYieldRange } from '@/engine/miningTax/yieldRange';
@@ -68,7 +68,6 @@ import type {
   Translate,
 } from './types';
 
-const HOUR_MS = 3_600_000;
 const C = 'overview.widgets.chart';
 const D = 'overview.widgets.data';
 

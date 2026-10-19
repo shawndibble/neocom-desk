@@ -16,6 +16,7 @@ import type { Dismissal } from './dismissals';
 import { MOON_ORE_M3_PER_UNIT, extractionStatus, type Extraction } from './extraction';
 import type { Statement } from './statements';
 import type { ObservedRow } from './types';
+import { DAY_MS } from '@/lib/age';
 
 /** What ESI is assumed to keep of a refinery's ledger: the character ledger's 30 days; the corp's is unconfirmed. */
 export const ESI_LEDGER_RETENTION_DAYS = 30;
@@ -30,7 +31,6 @@ export const STALE_AFTER_DAYS = 3;
 /** The server keeps at most this many gaps in a sync. */
 export const MAX_GAPS = 20;
 
-const DAY_MS = 86_400_000;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 // --- Observer ledger ------------------------------------------------------

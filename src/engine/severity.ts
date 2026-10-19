@@ -14,14 +14,12 @@
  *
  * Pure (CLAUDE.md): a number in, a string out, no clock read here.
  */
+import { DAY_MS, HOUR_MS } from '@/lib/age';
 
 /** Worst first — the order a legend lists them and a day's tone resolves in. */
 export const DEADLINE_SEVERITIES = ['critical', 'warning', 'watch', 'clear'] as const;
 
 export type DeadlineSeverity = (typeof DEADLINE_SEVERITIES)[number];
-
-const HOUR_MS = 3_600_000;
-const DAY_MS = 86_400_000;
 
 const RANK: Record<DeadlineSeverity, number> = {
   critical: 0,

@@ -8,10 +8,9 @@
  * resolves to the corp 14 days after it was raised.
  */
 import type { OreLine } from './types';
+import { DAY_MS } from '@/lib/age';
 
 export const CONFLICT_RESOLVE_DAYS = 14;
-
-const DAY_MS = 86_400_000;
 
 export interface BookObservation {
   bookId: string;

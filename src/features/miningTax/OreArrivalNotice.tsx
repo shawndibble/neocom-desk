@@ -4,6 +4,7 @@ import { useTicker } from '@/lib/ticker';
 import { arrivalNotice, uncheckedSince, type SettledEntryRef } from '@/engine/miningTax/oreArrival';
 import { useOreArrivalLog } from './oreArrivalLog';
 import { useHydratedStore } from '@/lib/useHydratedStore';
+import { MINUTE_MS } from '@/lib/age';
 
 interface OreArrivalNoticeProps {
   /** The entries ticked for this settlement. */
@@ -13,8 +14,6 @@ interface OreArrivalNoticeProps {
   /** When that pull started; `null` when Settle up started none. */
   pullStartedAt: number | null;
 }
-
-const MINUTE_MS = 60_000;
 
 /**
  * Settle up's one line about ore that may still be on its way (scope decision

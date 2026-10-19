@@ -1,4 +1,5 @@
 import { SIGNED_IN_SHELL_HINT_KEY } from '@/app/signedInShellHint';
+import { DAY_MS } from '@/lib/age';
 
 /**
  * Whether this browser has opened the app before, for Sentry tags — so a
@@ -23,8 +24,6 @@ export const FIRST_SESSION_KEY = 'neocom:first-session';
  * stamp shipped: its real first visit is unknown, and must stay so.
  */
 const LEGACY_PREFIX = 'legacy:';
-
-const DAY_MS = 86_400_000;
 
 export interface VisitorTags {
   visitor: 'new' | 'returning' | 'unknown';
