@@ -67,6 +67,7 @@ import { PriceHubSelect } from './PriceHubSelect';
 import { STAT_EYEBROW_TYPE } from './statKit';
 import { useTargetProfiles } from './targetProfiles';
 import {
+  implantNames,
   slotKey,
   useImplantFinder,
   type FamilyResult,
@@ -144,22 +145,7 @@ export function ImplantFinder({
   const label = (id: ImplantGoalId) => t(`fittings.implantFinder.goals.${id}`);
 
   /** Every item's full name with its grade, for fix options, the set strip and button labels. */
-  const names = useMemo(() => {
-    const map = new Map<number, { full: string; short: string }>();
-    for (const family of catalog?.families ?? []) {
-      for (const grade of family.grades) {
-        map.set(grade.typeId, {
-          full: !grade.code
-            ? family.name
-            : family.kind === 'booster'
-              ? `${grade.code} ${family.name}`
-              : `${family.name} ${grade.code}`,
-          short: grade.code ?? family.name,
-        });
-      }
-    }
-    return map;
-  }, [catalog]);
+  const names = useMemo(() => implantNames(catalog?.families ?? []), [catalog]);
   const nameOf = (id: number) => names.get(id)?.full ?? `#${id}`;
 
   function addAll(typeIds: readonly number[]) {

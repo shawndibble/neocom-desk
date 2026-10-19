@@ -33,7 +33,7 @@ import { boosterSideEffects, withBoosters } from '@/engine/fittings/boosterSideE
 import * as Icon from '@/components/ui/icons';
 import { ItemInfoLink } from '@/features/entities';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
-import type { ImplantBasis } from '@/engine/fittings/implantBasis';
+import { cloneSeedSet, type ImplantBasis } from '@/engine/fittings/implantBasis';
 import { placeInSet } from '@/engine/fittings/implantFinder';
 import type { Fitting, FittingImplantSet, PilotProfile } from '@/engine/fittings/types';
 import { loadItemNameMap } from '@/features/skills/typeCatalog';
@@ -214,15 +214,12 @@ export function ImplantSetPicker({
   const [infoTypeId, setInfoTypeId] = useState<number | null>(null);
 
   const fitting = finder?.fitting;
-  const onClone = finder?.basis === 'clone';
+  const basis = finder?.basis;
   const cloneImplants = finder?.profile.implantTypeIds;
   /** The clone's implants, as the plan to start from — see this file's own doc. */
-  const seed = useMemo<FittingImplantSet | undefined>(
-    () =>
-      onClone && implantSet === undefined && cloneImplants && cloneImplants.length > 0
-        ? { implants: [...cloneImplants], boosters: [] }
-        : undefined,
-    [onClone, implantSet, cloneImplants]
+  const seed = useMemo(
+    () => (basis ? cloneSeedSet(basis, implantSet, cloneImplants) : undefined),
+    [basis, implantSet, cloneImplants]
   );
   // Stable per Fitting and seed: the finder re-screens every family whenever this changes.
   const plannedFitting = useMemo(

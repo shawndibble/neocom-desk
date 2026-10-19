@@ -7,6 +7,8 @@ import { AddRow, Close, DragHandle } from '@/components/ui/icons';
 import type { Fitting } from '@/engine/fittings/types';
 import { useOptionalItemActions } from '@/features/market/itemActions';
 import { useOverBudgetFlash } from './useOverBudgetFlash';
+import { MakeItFitTrigger } from './MakeItFitTrigger';
+import type { FitResource } from './makeItFitContext';
 import { endFittingDrag, startFittingDrag, type FittingDragPayload } from './fittingDrag';
 import { FittingItemMenu } from './FittingItemMenu';
 import type { useFittingDropTarget } from './fittingItemActions';
@@ -21,6 +23,8 @@ interface ResourceBarProps {
   label: string;
   used: number | null;
   total: number | null;
+  /** A budget Make it fit can fix: over budget, it gets its "Fix" link. */
+  resource?: FitResource;
 }
 
 /**
@@ -29,7 +33,7 @@ interface ResourceBarProps {
  * each time the readout goes from within budget to over (a Character switch
  * that re-states it included) — the `null` gap while it recomputes doesn't count.
  */
-export function ResourceBar({ label, used, total }: ResourceBarProps) {
+export function ResourceBar({ label, used, total, resource }: ResourceBarProps) {
   const { t } = useTranslation();
   const { overage, overBudget, flashKey } = useOverBudgetFlash(used, total);
   const known = used !== null && total !== null;
@@ -61,9 +65,16 @@ export function ResourceBar({ label, used, total }: ResourceBarProps) {
         </span>
       </div>
       {overBudget && (
-        <p className="pl-30 text-right text-xs text-danger">
-          {t('fittings.list.overBy', { amount: overage.toFixed(1) })}
-        </p>
+        <>
+          <p className="pl-30 text-right text-xs text-danger">
+            {t('fittings.list.overBy', { amount: overage.toFixed(1) })}
+          </p>
+          {resource && (
+            <div className="flex justify-end">
+              <MakeItFitTrigger resource={resource} />
+            </div>
+          )}
+        </>
       )}
     </div>
   );
