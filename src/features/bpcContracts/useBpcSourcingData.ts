@@ -50,7 +50,6 @@ export function useBpcSourcingData() {
   );
 
   const contractsResult = data?.contractsResult ?? null;
-  const syncConfigured = data?.syncConfigured ?? true;
   const blueprintNames = data?.blueprintNames ?? EMPTY_MAP;
   const reactionFormulaTypeIds = data?.reactionFormulaTypeIds ?? null;
   const regionNames = data?.regionNames ?? EMPTY_MAP;
@@ -270,7 +269,6 @@ export function useBpcSourcingData() {
     activeCharacterId,
     refreshAll,
     contractsResult,
-    syncConfigured,
     blueprintNames,
     reactionFormulaTypeIds,
     regionNames,

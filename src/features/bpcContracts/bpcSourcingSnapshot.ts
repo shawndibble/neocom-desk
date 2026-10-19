@@ -10,7 +10,6 @@ import {
   loadPublicBpcContracts,
   type PublicBpcContractsSnapshot,
 } from '@/features/bpcContracts/syncedContracts';
-import { isSyncConfigured } from '@/app/syncStatus';
 import type { CachedResult } from '@/esi/cache';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import { loadCharacterBlueprints } from '@/features/industry/data';
@@ -19,7 +18,6 @@ import type { RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 
 export interface Snapshot {
   contractsResult: CachedResult<PublicBpcContractsSnapshot> | null;
-  syncConfigured: boolean;
   blueprintNames: Map<number, string>;
   /** Reaction formulas: they cannot be copied, so never "ask to copy" (GLOSSARY Community Offer). */
   reactionFormulaTypeIds: ReadonlySet<number> | null;
@@ -36,21 +34,8 @@ export async function loadBpcContractsSnapshot(
   characterId: number,
   signal: RouteSnapshotSignal
 ): Promise<Snapshot> {
-  if (!isSyncConfigured()) {
-    return {
-      contractsResult: null,
-      syncConfigured: false,
-      blueprintNames: new Map(),
-      reactionFormulaTypeIds: null,
-      regionNames: new Map(),
-      ownedBlueprints: [],
-      contractLocations: new Map(),
-      ownedLocations: new Map(),
-    };
-  }
-
   const [contractsResult, blueprintMap, ownedResult] = await Promise.all([
-    loadPublicBpcContracts(characterId),
+    loadPublicBpcContracts(),
     loadBlueprints(),
     // Same data path Industry's build-plan prefill already uses — not a
     // second ESI call for the same thing.
@@ -103,7 +88,6 @@ export async function loadBpcContractsSnapshot(
 
   return {
     contractsResult,
-    syncConfigured: true,
     blueprintNames,
     reactionFormulaTypeIds,
     regionNames,

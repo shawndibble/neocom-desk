@@ -64,7 +64,6 @@ import {
   type PublicCourierContractRow,
 } from '@/engine/contracts/courierSearch';
 import { loadPublicContractOffers } from '@/features/contractSearch/publicContractOffers';
-import { OFFERS_CACHE_KEY, useChunkProgress } from '@/features/contractSearch/chunkedSnapshot';
 import { isItemsSearchActive } from '@/features/contractSearch/itemsSearchActive';
 import { useEarlyOffers, useOfferIndex } from '@/features/contractSearch/useIndexedOffers';
 import { useBelowMarket } from '@/features/contractSearch/belowMarketData';
@@ -94,7 +93,6 @@ import {
   PublicContractDetailModal,
   type PublicContractDetailModalStatChip,
 } from '@/features/contracts/PublicContractDetailModal';
-import { isSyncConfigured } from '@/app/syncStatus';
 import { useRetryFocus } from '@/lib/useRetryFocus';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { rankedSearch } from '@/lib/rankedSearch';
@@ -136,20 +134,6 @@ const SALE_KINDS: ContractSaleKind[] = ['exchange', 'auction'];
 
 /** Which corpus is showing — the route's Item search or Courier tab. Items is the landing mode. */
 export type ContractMode = 'items' | 'courier';
-
-/**
- * Guarded so a build with no sync backend reads nothing at all — not even the
- * cache. `chunkedSnapshot.ts` refuses the Firestore call on its own, so this is
- * belt and braces rather than the only check; what it buys is that an
- * unconfigured build does no work on the way to saying so.
- */
-const NO_SNAPSHOT = { cached: null, revalidating: false } as const;
-
-const loadOffers = async (characterId: number) =>
-  isSyncConfigured() ? loadPublicContractOffers(characterId) : NO_SNAPSHOT;
-
-const loadCourier = async (characterId: number) =>
-  isSyncConfigured() ? loadPublicCourierContracts(characterId) : NO_SNAPSHOT;
 
 /** Stable identities: the name hooks key their effects on these references. */
 const EMPTY_ROWS: readonly PublicContractOfferRow[] = [];
@@ -331,26 +315,11 @@ function ContractSearchFilterBar({
   );
 }
 
-/** A thin, out-of-the-way bar: how many of the snapshot's chunk docs have landed. Indeterminate until `meta` has said how many there are. */
-function SnapshotProgress({
-  done,
-  total,
-  label,
-}: {
-  done: number;
-  total: number | null;
-  label: string;
-}) {
-  const determinate = total !== null && total > 0;
+/** A thin, out-of-the-way indeterminate bar while the R2 offer index loads. */
+function SnapshotProgress({ label }: { label: string }) {
   return (
     <div className="flex w-full max-w-xs flex-col items-center gap-1">
-      <ProgressBar
-        label={label}
-        value={determinate ? done : null}
-        max={determinate ? total : undefined}
-        size="xs"
-        className="w-full"
-      />
+      <ProgressBar label={label} value={null} size="xs" className="w-full" />
       <p className="text-[0.6875rem] text-text-dim">{label}</p>
     </div>
   );
@@ -395,19 +364,19 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
   /**
    * One hook per corpus, so neither board waits on the other's snapshot. The
    * two used to arrive together out of a single loader, on the argument that
-   * the courier snapshot is one small chunk doc against the offers snapshot's
-   * ~124 — which is true, and is exactly why pairing them was the wrong trade:
+   * the courier snapshot is one small read against the offers snapshot's ~124
+   * chunk docs (as it then was) — which is true, and is exactly why pairing them was the wrong trade:
    * a hauler opening Courier waited on ~370k item-offer rows to be shown ~620
    * hauls (issue #963).
    *
    * `staleWhileRevalidate` keeps the rows on screen across a manual Refresh,
    * which matters more now that a Refresh no longer blanks both boards at once.
    */
-  const offers = useRouteSnapshot(loadOffers, undefined, {
+  const offers = useRouteSnapshot(loadPublicContractOffers, undefined, {
     cacheKey: 'contractSearchOffers',
     staleWhileRevalidate: true,
   });
-  const courier = useRouteSnapshot(loadCourier, undefined, {
+  const courier = useRouteSnapshot(loadPublicCourierContracts, undefined, {
     cacheKey: 'contractSearchCourier',
     staleWhileRevalidate: true,
   });
@@ -418,11 +387,6 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
   const fullRows = offersResult?.data?.rows ?? EMPTY_ROWS;
   const haveFull = fullRows.length > 0;
   const courierRows = courierResult?.data?.rows ?? EMPTY_COURIER_CONTRACT_ROWS;
-
-  // A pure read of the build's own env, so it needs no loader to report it —
-  // this distinguishes "this build has no sync backend at all" from "synced,
-  // and empty", which is what the two boards' own empty states say.
-  const syncConfigured = isSyncConfigured();
 
   const [itemsParams, setItemsParams] = useUrlParams(ITEMS_FILTER_PARAMS);
   const uiFilter = useMemo<UiFilter>(
@@ -448,13 +412,12 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
    */
   // Below market needs no search: it is already a narrowing of the snapshot.
   const searchActive = belowMarket || isItemsSearchActive(uiFilter, selectedTypeId);
-  const downloadProgress = useChunkProgress(OFFERS_CACHE_KEY);
 
   // The index and, for a search naming a few types, just those types' chunks
   // arrive ahead of the full snapshot (issue #2921). Until the full rows land,
   // names, suggestions and the region list come off the index, and the table
   // off the early rows; both quietly hand over to the full snapshot.
-  const offerIndex = useOfferIndex(activeCharacterId, mode === 'items' && syncConfigured);
+  const offerIndex = useOfferIndex(mode === 'items');
   const indexTypeRows = useMemo(
     () =>
       offerIndex ? [...offerIndex.types.keys()].map((typeId) => ({ typeId })) : EMPTY_TYPE_ROWS,
@@ -501,7 +464,6 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
   const early = useEarlyOffers(
     offerIndex,
     belowMarket ? null : typeIds,
-    activeCharacterId,
     mode === 'items' && !haveFull && searchActive
   );
   const rows = haveFull ? fullRows : (early.rows ?? EMPTY_ROWS);
@@ -583,7 +545,10 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
   const modeLoadingLabel = t(
     mode === 'courier' ? 'contractSearch.loadingCourier' : 'contractSearch.loadingOffers'
   );
-  const modeError = active.error;
+  // A failed per-type R2 read is an error too: with R2 the only store (issue
+  // #4270) no full snapshot is coming to replace it, and an empty table would
+  // claim nothing matched.
+  const modeError = active.error || (mode === 'items' && early.failed === true);
   /** Last cycle's rows are on screen and this cycle's are on the way (#963). */
   const revalidating = active.data?.revalidating ?? false;
   // A manual Refresh still means "reload the tab", not "reload the mode I am
@@ -597,11 +562,7 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
   }, [offersRefresh, courierRefresh]);
   // Retry can unmount into the spinner: focus waits on the always-mounted wrapper.
   const [resultRef, , holdRetryFocus] = useRetryFocus(
-    active.loading
-      ? 'busy'
-      : syncConfigured && (active.error || activeResult === null)
-        ? 'failed'
-        : 'ok',
+    active.loading ? 'busy' : active.error || activeResult === null ? 'failed' : 'ok',
     mode
   );
 
@@ -805,8 +766,8 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
         {t('contractSearch.title')}
       </h2>
       <LiveStatus>
-        {/* Only what the visible branch below says, and never for a build with no sync backend. */}
-        {syncConfigured && !active.loading && (active.error || activeResult === null)
+        {/* Only what the visible branch below says. */}
+        {!active.loading && (active.error || activeResult === null)
           ? t('common.contractIndexUnreachableTitle')
           : ''}
       </LiveStatus>
@@ -821,318 +782,280 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
         // Refresh sit on the page header. The table keeps its own accessible
         // name from `contractSearch.title`.
       >
-        {!syncConfigured ? (
-          <EmptyState
-            title={t('contractSearch.notConfiguredTitle')}
-            hint={t('contractSearch.notConfiguredHint')}
-          />
-        ) : (
-          <>
-            {activeResult?.fromCache && (
-              // A Refresh that still falls back to cache is a more alarming
-              // case than the first load finding cache — same banner, different
-              // copy. It is also how a background revalidation that failed
-              // reaches the screen: `esi/cache.ts` re-serves the stored row
-              // with `fromCache` set once the late call reports a failure, so
-              // a refresh that never lands is stated rather than left standing
-              // as a loading state.
-              <CachedNotice
-                className="px-3 pt-2"
-                fetchedAt={activeResult.fetchedAt}
-                refreshFailed={active.refreshCount > 0}
-              />
-            )}
-            {revalidating && (
-              // The visible half of stale-serve: these rows are last publish
-              // cycle's and this cycle's are already on the way. Said beside
-              // the Data Age badge's own reading, not instead of it — the badge
-              // says how old, this says something is being done about it.
-              <p role="status" className="px-3 pt-2 text-[0.6875rem] text-text-dim uppercase">
-                {t('contractSearch.refreshingInBackground')}
-              </p>
-            )}
-            {mode === 'courier' && modeLoading && modeRowCount === 0 ? (
-              <div className="flex flex-col items-center gap-2 py-16">
-                <Spinner label={modeLoadingLabel} />
-                {/* Visible copy of the spinner's own label — the first sync is
+        <>
+          {activeResult?.fromCache && (
+            // A Refresh that still falls back to cache is a more alarming
+            // case than the first load finding cache — same banner, different
+            // copy. It is also how a background revalidation that failed
+            // reaches the screen: `esi/cache.ts` re-serves the stored row
+            // with `fromCache` set once the late call reports a failure, so
+            // a refresh that never lands is stated rather than left standing
+            // as a loading state.
+            <CachedNotice
+              className="px-3 pt-2"
+              fetchedAt={activeResult.fetchedAt}
+              refreshFailed={active.refreshCount > 0}
+            />
+          )}
+          {revalidating && (
+            // The visible half of stale-serve: these rows are last publish
+            // cycle's and this cycle's are already on the way. Said beside
+            // the Data Age badge's own reading, not instead of it — the badge
+            // says how old, this says something is being done about it.
+            <p role="status" className="px-3 pt-2 text-[0.6875rem] text-text-dim uppercase">
+              {t('contractSearch.refreshingInBackground')}
+            </p>
+          )}
+          {mode === 'courier' && modeLoading && modeRowCount === 0 ? (
+            <div className="flex flex-col items-center gap-2 py-16">
+              <Spinner label={modeLoadingLabel} />
+              {/* Visible copy of the spinner's own label — the first sync is
                     slow enough that a bare arc reads as stuck. Hidden from
                     assistive tech, which already hears the status. */}
-                <p aria-hidden="true" className="text-text-dim">
-                  {modeLoadingLabel}
-                </p>
-              </div>
-            ) : modeError || (activeResult === null && !modeLoading) ? (
-              // The read failed, or came back with nothing: the live index was
-              // unreachable and nothing is cached. That is not "no contracts
-              // synced yet".
-              <LoadFailedState
-                title={t('common.contractIndexUnreachableTitle')}
-                hint={t('common.contractIndexUnreachableHint')}
-                onRetry={() => {
-                  holdRetryFocus();
-                  refresh();
-                }}
+              <p aria-hidden="true" className="text-text-dim">
+                {modeLoadingLabel}
+              </p>
+            </div>
+          ) : modeError || (activeResult === null && !modeLoading) ? (
+            // The read failed, or came back with nothing: the live index was
+            // unreachable and nothing is cached. That is not "no contracts
+            // synced yet".
+            <LoadFailedState
+              title={t('common.contractIndexUnreachableTitle')}
+              hint={t('common.contractIndexUnreachableHint')}
+              onRetry={() => {
+                holdRetryFocus();
+                refresh();
+              }}
+            />
+          ) : modeRowCount === 0 && !(mode === 'items' && modeLoading) ? (
+            // Nothing synced for the corpus on screen — distinct from
+            // `noFilterMatches` below, which is "rows exist, the filter just
+            // excludes them all". Per mode, so an empty courier snapshot never
+            // claims the offers never synced either.
+            <EmptyState
+              title={t(
+                mode === 'courier'
+                  ? 'contractSearch.courierEmptyTitle'
+                  : 'contractSearch.emptyTitle'
+              )}
+              hint={t(
+                mode === 'courier' ? 'contractSearch.courierEmptyHint' : 'contractSearch.emptyHint'
+              )}
+            />
+          ) : mode === 'courier' ? (
+            <CourierResults
+              rows={courierRoutes}
+              regionNames={regionNames}
+              characterId={activeCharacterId}
+            />
+          ) : (
+            <>
+              <ContractSearchFilterBar
+                filter={uiFilter}
+                onChange={changeFilter}
+                regionOptions={regionOptions}
+                currentSystem={currentSystem}
+                actions={
+                  <>
+                    {/* A view control, not a filter: it changes the rows and columns at once (§4b). */}
+                    <FilterChip
+                      label={t('contractSearch.belowMarket.chip')}
+                      size="md"
+                      selected={belowMarket}
+                      onToggle={() => setItemsParams({ 'items.belowMarket': !belowMarket })}
+                      tooltip={t('contractSearch.belowMarket.chipTooltip')}
+                    />
+                    {/* Both act on the offer table, which Below market replaces. */}
+                    {!belowMarket && (
+                      <>
+                        <ColumnPickerMenu
+                          available={CONTRACT_SEARCH_ITEMS_COLUMN_IDS}
+                          visible={visibleItemsColumns}
+                          columnsById={itemsColumnsById}
+                          onToggle={toggleItemsColumn}
+                          buttonLabel={t('contractSearch.columnsButton')}
+                          menuTitle={t('contractSearch.columnsMenuTitle')}
+                        />
+                        <TableActionsMenu
+                          name={t('contractSearch.title')}
+                          tableExport={itemsExport}
+                          size="md"
+                        />
+                      </>
+                    )}
+                  </>
+                }
               />
-            ) : modeRowCount === 0 && !(mode === 'items' && modeLoading) ? (
-              // Nothing synced for the corpus on screen — distinct from
-              // `noFilterMatches` below, which is "rows exist, the filter just
-              // excludes them all". Per mode, so an empty courier snapshot never
-              // claims the offers never synced either.
-              <EmptyState
-                title={t(
-                  mode === 'courier'
-                    ? 'contractSearch.courierEmptyTitle'
-                    : 'contractSearch.emptyTitle'
-                )}
-                hint={t(
-                  mode === 'courier'
-                    ? 'contractSearch.courierEmptyHint'
-                    : 'contractSearch.emptyHint'
-                )}
-              />
-            ) : mode === 'courier' ? (
-              <CourierResults
-                rows={courierRoutes}
-                regionNames={regionNames}
-                characterId={activeCharacterId}
-              />
-            ) : (
-              <>
-                <ContractSearchFilterBar
-                  filter={uiFilter}
-                  onChange={changeFilter}
-                  regionOptions={regionOptions}
-                  currentSystem={currentSystem}
-                  actions={
-                    <>
-                      {/* A view control, not a filter: it changes the rows and columns at once (§4b). */}
-                      <FilterChip
-                        label={t('contractSearch.belowMarket.chip')}
-                        size="md"
-                        selected={belowMarket}
-                        onToggle={() => setItemsParams({ 'items.belowMarket': !belowMarket })}
-                        tooltip={t('contractSearch.belowMarket.chipTooltip')}
-                      />
-                      {/* Both act on the offer table, which Below market replaces. */}
-                      {!belowMarket && (
-                        <>
-                          <ColumnPickerMenu
-                            available={CONTRACT_SEARCH_ITEMS_COLUMN_IDS}
-                            visible={visibleItemsColumns}
-                            columnsById={itemsColumnsById}
-                            onToggle={toggleItemsColumn}
-                            buttonLabel={t('contractSearch.columnsButton')}
-                            menuTitle={t('contractSearch.columnsMenuTitle')}
-                          />
-                          <TableActionsMenu
-                            name={t('contractSearch.title')}
-                            tableExport={itemsExport}
-                            size="md"
-                          />
-                        </>
-                      )}
-                    </>
-                  }
-                />
 
-                {/*
+              {/*
                   Outside the bar, not inside its `children`: the funnel box
                   unmounts those the moment the funnel closes, and a range set
                   from a pasted link must still explain itself with the
                   sheet/row shut. `JumpRangeNote` itself renders nothing once
                   it has an origin, so this costs no DOM the rest of the time.
                 */}
-                <div className="px-3 pt-2 text-[0.6875rem] text-text-dim empty:hidden">
-                  <JumpRangeNote status={jumpRangeFilter.status} />
-                </div>
+              <div className="px-3 pt-2 text-[0.6875rem] text-text-dim empty:hidden">
+                <JumpRangeNote status={jumpRangeFilter.status} />
+              </div>
 
-                <LiveStatus>
-                  {suggestions.length > 0 &&
-                    t('contractSearch.suggestionsCount', { count: suggestions.length })}
-                </LiveStatus>
+              <LiveStatus>
+                {suggestions.length > 0 &&
+                  t('contractSearch.suggestionsCount', { count: suggestions.length })}
+              </LiveStatus>
 
-                {suggestions.length > 0 && (
-                  <div className="border-b border-line bg-panel-2 px-3 py-2">
-                    <p className="pb-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                      {t('contractSearch.suggestionsHeading')}
-                    </p>
-                    <ul
-                      aria-label={t('contractSearch.suggestionsLabel')}
-                      className="max-h-72 overflow-y-auto rounded-xs border border-line-bright bg-panel"
-                    >
-                      {suggestions.map((suggestion) => (
-                        <li
-                          key={suggestion.typeId}
-                          className="border-b border-line last:border-b-0"
+              {suggestions.length > 0 && (
+                <div className="border-b border-line bg-panel-2 px-3 py-2">
+                  <p className="pb-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                    {t('contractSearch.suggestionsHeading')}
+                  </p>
+                  <ul
+                    aria-label={t('contractSearch.suggestionsLabel')}
+                    className="max-h-72 overflow-y-auto rounded-xs border border-line-bright bg-panel"
+                  >
+                    {suggestions.map((suggestion) => (
+                      <li key={suggestion.typeId} className="border-b border-line last:border-b-0">
+                        <button
+                          type="button"
+                          onClick={() => selectType(suggestion)}
+                          className={cx(
+                            'flex min-h-11 w-full items-center justify-between gap-3 px-3 py-2 text-left md:min-h-9',
+                            rowInteractiveClassName,
+                            focusRingInsetClassName
+                          )}
                         >
-                          <button
-                            type="button"
-                            onClick={() => selectType(suggestion)}
-                            className={cx(
-                              'flex min-h-11 w-full items-center justify-between gap-3 px-3 py-2 text-left md:min-h-9',
-                              rowInteractiveClassName,
-                              focusRingInsetClassName
-                            )}
-                          >
-                            <span className="truncate">{suggestion.name}</span>
-                            <span className="shrink-0 text-[0.6875rem] text-text-dim">
-                              {t('contractSearch.suggestionOffers', {
-                                count: suggestion.stats.offerCount,
-                              })}
-                              {' · '}
-                              {suggestion.stats.cheapest === null
-                                ? '—'
-                                : formatIskAuto(
-                                    suggestion.stats.cheapest,
-                                    CONTRACT_ISK_CENTS_BELOW
-                                  )}
-                            </span>
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
+                          <span className="truncate">{suggestion.name}</span>
+                          <span className="shrink-0 text-[0.6875rem] text-text-dim">
+                            {t('contractSearch.suggestionOffers', {
+                              count: suggestion.stats.offerCount,
+                            })}
+                            {' · '}
+                            {suggestion.stats.cheapest === null
+                              ? '—'
+                              : formatIskAuto(suggestion.stats.cheapest, CONTRACT_ISK_CENTS_BELOW)}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
 
-                {summary !== null && !belowMarket && (
-                  <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
-                    <StatChips>
-                      <StatChip
-                        label={t('contractSearch.offersLabel')}
-                        value={summary.offerCount.toLocaleString()}
-                      />
-                      <StatChip
-                        label={t('contractSearch.cheapestLabel')}
-                        value={
-                          summary.cheapest === null ? '—' : <IskAmount value={summary.cheapest} />
-                        }
-                      />
-                      <StatChip
-                        label={t('contractSearch.medianLabel')}
-                        value={summary.median === null ? '—' : <IskAmount value={summary.median} />}
-                      />
-                    </StatChips>
-                    <Button size="sm" onClick={clearType}>
-                      {t('contractSearch.clearItem')}
-                    </Button>
-                  </div>
-                )}
-
-                {!searchActive ? (
-                  <div className="flex flex-col items-center gap-3 py-12">
-                    <EmptyState
-                      title={t('contractSearch.searchFirstTitle')}
-                      hint={t('contractSearch.searchFirstHint')}
-                      className="py-0"
+              {summary !== null && !belowMarket && (
+                <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
+                  <StatChips>
+                    <StatChip
+                      label={t('contractSearch.offersLabel')}
+                      value={summary.offerCount.toLocaleString()}
                     />
-                    {modeLoading && (
-                      <SnapshotProgress
-                        done={downloadProgress?.done ?? 0}
-                        total={downloadProgress?.total ?? null}
-                        label={
-                          downloadProgress?.total != null
-                            ? t('contractSearch.downloadProgress', {
-                                done: downloadProgress.done,
-                                total: downloadProgress.total,
-                              })
-                            : t('contractSearch.downloadStarting')
-                        }
-                      />
-                    )}
-                  </div>
-                ) : awaitingRows || awaitingQuery ? (
-                  <div className="flex flex-col items-center gap-2 py-16">
-                    <Spinner label={modeLoadingLabel} />
-                    <p aria-hidden="true" className="text-text-dim">
-                      {modeLoadingLabel}
-                    </p>
-                    {downloadProgress?.total != null && (
-                      <SnapshotProgress
-                        done={downloadProgress.done}
-                        total={downloadProgress.total}
-                        label={t('contractSearch.downloadProgress', {
-                          done: downloadProgress.done,
-                          total: downloadProgress.total,
-                        })}
-                      />
-                    )}
-                  </div>
-                ) : belowMarket ? (
-                  <BelowMarketResults
-                    state={belowMarketState}
-                    contracts={belowMarketRows}
-                    lastSyncedAt={lastSyncedAt}
-                    typeNames={typeNames}
-                    offerLocations={offerLocations}
-                    offerJumps={offerJumps}
-                    onOpen={setSelectedRow}
-                    onResetFilters={resetFilters}
-                  />
-                ) : displayRows.length === 0 ? (
-                  namingTypes && uiFilter.typeQuery.trim() !== '' ? (
-                    // Every type still reads `#34` until the market catalogue
-                    // lands, so a typed query matches nothing yet. "No matches"
-                    // would be a complete answer given mid-load; this says what
-                    // is actually true.
-                    <div className="flex justify-center py-8">
-                      <Spinner label={t('contractSearch.namingTypes')} />
-                    </div>
-                  ) : (
-                    <EmptyState
-                      title={t('contractSearch.noFilterMatches')}
-                      hint={t('contractSearch.noFilterMatchesHint')}
-                      className="py-8"
-                      action={
-                        <Button size="sm" onClick={resetFilters}>
-                          {t('common.resetFilters')}
-                        </Button>
+                    <StatChip
+                      label={t('contractSearch.cheapestLabel')}
+                      value={
+                        summary.cheapest === null ? '—' : <IskAmount value={summary.cheapest} />
                       }
                     />
-                  )
-                ) : (
-                  <>
-                    <DataTable
-                      {...itemsExport.tableProps}
-                      label={t('contractSearch.title')}
-                      columns={columns}
-                      rows={displayRows}
-                      // Index included deliberately: one contract lists the same
-                      // item once per stack, so contractId+typeId is not unique —
-                      // the duplicate React keys left stale rows in the table.
-                      rowKey={(row, index) => `${row.contractId}:${row.typeId}:${index}`}
-                      {...itemsSortProps}
-                      // Two-line cards on a phone: a buyer scans hundreds of
-                      // offers for a price and a place, not reads each one.
-                      stackLayout="dense"
-                      mobileSort
-                      stackSummary={t('contractSearch.mobile.offerCount', {
-                        count: displayRows.length,
-                      })}
-                      onRowClick={setSelectedRow}
-                      rowMoreActions
-                      // The shortcut past the detail modal, which offers the
-                      // same action per line since #933 — hence the shared
-                      // `planSeed` rule, so neither path quotes the copy
-                      // differently.
-                      rowContextMenu={(row, tr) => (
-                        <BuildPlanContextMenu
-                          typeId={row.typeId}
-                          itemName={typeNames.get(row.typeId)}
-                          seed={seedFromOfferRow(row)}
-                          extraItems={<OpenInEveMenuItem kind="contract" id={row.contractId} />}
-                          trigger={tr}
-                        />
-                      )}
-                      // A busy region's snapshot runs to thousands of offers;
-                      // every one stays reachable without mounting them all.
-                      virtualize
+                    <StatChip
+                      label={t('contractSearch.medianLabel')}
+                      value={summary.median === null ? '—' : <IskAmount value={summary.median} />}
                     />
-                  </>
-                )}
-              </>
-            )}
-          </>
-        )}
+                  </StatChips>
+                  <Button size="sm" onClick={clearType}>
+                    {t('contractSearch.clearItem')}
+                  </Button>
+                </div>
+              )}
+
+              {!searchActive ? (
+                <div className="flex flex-col items-center gap-3 py-12">
+                  <EmptyState
+                    title={t('contractSearch.searchFirstTitle')}
+                    hint={t('contractSearch.searchFirstHint')}
+                    className="py-0"
+                  />
+                  {modeLoading && <SnapshotProgress label={t('contractSearch.downloadStarting')} />}
+                </div>
+              ) : awaitingRows || awaitingQuery ? (
+                <div className="flex flex-col items-center gap-2 py-16">
+                  <Spinner label={modeLoadingLabel} />
+                  <p aria-hidden="true" className="text-text-dim">
+                    {modeLoadingLabel}
+                  </p>
+                </div>
+              ) : belowMarket ? (
+                <BelowMarketResults
+                  state={belowMarketState}
+                  contracts={belowMarketRows}
+                  lastSyncedAt={lastSyncedAt}
+                  typeNames={typeNames}
+                  offerLocations={offerLocations}
+                  offerJumps={offerJumps}
+                  onOpen={setSelectedRow}
+                  onResetFilters={resetFilters}
+                />
+              ) : displayRows.length === 0 ? (
+                namingTypes && uiFilter.typeQuery.trim() !== '' ? (
+                  // Every type still reads `#34` until the market catalogue
+                  // lands, so a typed query matches nothing yet. "No matches"
+                  // would be a complete answer given mid-load; this says what
+                  // is actually true.
+                  <div className="flex justify-center py-8">
+                    <Spinner label={t('contractSearch.namingTypes')} />
+                  </div>
+                ) : (
+                  <EmptyState
+                    title={t('contractSearch.noFilterMatches')}
+                    hint={t('contractSearch.noFilterMatchesHint')}
+                    className="py-8"
+                    action={
+                      <Button size="sm" onClick={resetFilters}>
+                        {t('common.resetFilters')}
+                      </Button>
+                    }
+                  />
+                )
+              ) : (
+                <>
+                  <DataTable
+                    {...itemsExport.tableProps}
+                    label={t('contractSearch.title')}
+                    columns={columns}
+                    rows={displayRows}
+                    // Index included deliberately: one contract lists the same
+                    // item once per stack, so contractId+typeId is not unique —
+                    // the duplicate React keys left stale rows in the table.
+                    rowKey={(row, index) => `${row.contractId}:${row.typeId}:${index}`}
+                    {...itemsSortProps}
+                    // Two-line cards on a phone: a buyer scans hundreds of
+                    // offers for a price and a place, not reads each one.
+                    stackLayout="dense"
+                    mobileSort
+                    stackSummary={t('contractSearch.mobile.offerCount', {
+                      count: displayRows.length,
+                    })}
+                    onRowClick={setSelectedRow}
+                    rowMoreActions
+                    // The shortcut past the detail modal, which offers the
+                    // same action per line since #933 — hence the shared
+                    // `planSeed` rule, so neither path quotes the copy
+                    // differently.
+                    rowContextMenu={(row, tr) => (
+                      <BuildPlanContextMenu
+                        typeId={row.typeId}
+                        itemName={typeNames.get(row.typeId)}
+                        seed={seedFromOfferRow(row)}
+                        extraItems={<OpenInEveMenuItem kind="contract" id={row.contractId} />}
+                        trigger={tr}
+                      />
+                    )}
+                    // A busy region's snapshot runs to thousands of offers;
+                    // every one stays reachable without mounting them all.
+                    virtualize
+                  />
+                </>
+              )}
+            </>
+          )}
+        </>
       </Panel>
       {selectedRow && activeCharacterId !== null && (
         <PublicContractDetailModal

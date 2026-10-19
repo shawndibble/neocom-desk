@@ -1,9 +1,8 @@
 // Lazy Firebase initialization from Vite env. Firebase exists ONLY to sync
 // editable data (ADR 0001): no EVE tokens ever flow through it except the
-// short-lived access token sent to the mintFirebaseToken callable. One named
-// exception: `features/bpcContracts/syncedContracts.ts` reads the shared,
-// admin-write-only `publicContractOffers` collection through this same client
-// (ADR 0013) — not per-character data, but still nothing an EVE token touches.
+// short-lived access token sent to the mintFirebaseToken callable. (The first
+// named exception, the public contract snapshots of ADR 0013, is gone: they
+// are read from Cloudflare R2 since issue #4270.)
 // Second named exception: `app/analytics.ts` reads `measurementId` off this
 // same app instance to init Firebase Analytics (GA4) — product usage
 // telemetry, not sync data (see docs/context/decisions/
