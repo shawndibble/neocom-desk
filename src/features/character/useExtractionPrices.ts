@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useCallback } from 'react';
 import { useHydratedStore } from '@/lib/useHydratedStore';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import {
   extractionNet,
   LARGE_SKILL_INJECTOR_TYPE_ID,
@@ -23,29 +24,19 @@ export function useExtractionPrices(): ExtractionPrices {
   const hubHydrated = useHydratedStore(useMarketHub);
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
 
-  const [state, setState] = useState<{ loaded: boolean; net: number | null }>({
-    loaded: false,
-    net: null,
-  });
-  useEffect(() => {
-    if (!hubHydrated) return;
-    let cancelled = false;
-    void getHubPrices(hub, [LARGE_SKILL_INJECTOR_TYPE_ID, SKILL_EXTRACTOR_TYPE_ID])
-      .then((prices) => ({
-        loaded: true,
-        net: extractionNet(
-          prices.get(LARGE_SKILL_INJECTOR_TYPE_ID)?.sellMin ?? null,
-          prices.get(SKILL_EXTRACTOR_TYPE_ID)?.sellMin ?? null
-        ),
-      }))
-      .catch(() => ({ loaded: true, net: null }))
-      .then((next) => {
-        if (!cancelled) setState(next);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [hub, hubHydrated]);
+  const load = useCallback(
+    () =>
+      getHubPrices(hub, [LARGE_SKILL_INJECTOR_TYPE_ID, SKILL_EXTRACTOR_TYPE_ID])
+        .then((prices) =>
+          extractionNet(
+            prices.get(LARGE_SKILL_INJECTOR_TYPE_ID)?.sellMin ?? null,
+            prices.get(SKILL_EXTRACTOR_TYPE_ID)?.sellMin ?? null
+          )
+        )
+        .catch(() => null),
+    [hub]
+  );
+  const result = useKeyedLoad(hubHydrated ? hub.id : null, load);
 
-  return { hubName: hub.systemName, loaded: state.loaded, net: state.net };
+  return { hubName: hub.systemName, loaded: result.status === 'ready', net: result.data ?? null };
 }
