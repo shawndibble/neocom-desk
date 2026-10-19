@@ -93,6 +93,15 @@ export function BookHealthStrip({ sync }: { sync: CorpTaxBookSync }) {
         }),
       });
     }
+    if (sync.run.outcome.reassignError) {
+      items.push({
+        id: 'reassignFailed',
+        tone: 'warning',
+        title: t('corpTaxBook.moons.health.reassignFailed', {
+          message: sync.run.outcome.reassignError,
+        }),
+      });
+    }
   }
   if (sync.run.phase === 'done' && sync.run.outcome.kind === 'skipped') {
     items.push({

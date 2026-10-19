@@ -204,6 +204,28 @@ describe('syncCorpTaxBook', () => {
     expect(d.assignPayment).toHaveBeenCalledWith(5, CORP, 'j1_1', 'm1');
   });
 
+  it('does not fail the sync when re-matching an Unmatched donation is refused, and says so', async () => {
+    const d = deps({
+      readBookState: async () =>
+        emptyState({
+          miners: [{ id: 'm1', mainCharacterId: 7, characterIds: [7, 8] }] as BookState['miners'],
+          payments: [
+            {
+              id: 'j1_1',
+              characterId: 8,
+              amount: 5,
+              at: '2026-07-19T00:00:00Z',
+              source: 'donation',
+            },
+          ],
+        }),
+      assignPayment: vi.fn(async () => {
+        throw new Error('assign refused');
+      }),
+    });
+    expect(await run(d)).toMatchObject({ kind: 'synced', reassignError: 'assign refused' });
+  });
+
   it('reports lost history and keeps earlier gaps on record', async () => {
     const d = deps({
       readBookState: async () =>

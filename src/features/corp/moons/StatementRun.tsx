@@ -13,12 +13,7 @@ import {
   StatChips,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import {
-  nextRunPeriod,
-  planStatementRun,
-  statementForLine,
-  type RunLine,
-} from '@/engine/corpTaxBook/bookView';
+import { nextRunPeriod, planStatementRun, statementForLine } from '@/engine/corpTaxBook/bookView';
 import { mailableAfterClose } from '@/engine/corpTaxBook/closeAccount';
 import { composeStatementMail } from '@/engine/corpTaxBook/statementMail';
 import type { Statement } from '@/engine/corpTaxBook/statements';
@@ -122,12 +117,41 @@ export function StatementRun() {
   const total = (plan?.lines.length ?? 0) + unmailed.length;
   const minerRow = (id: string) => view.miners.find((m) => m.id === id)!;
 
-  const previewFor = (line: RunLine): MailPreviewContent => {
-    const statement = statementForLine(view, plan!, line);
-    const row = minerRow(line.minerId);
-    const target = mailTarget(ctx, statement, row, {
-      amountDue: line.balanceDue,
-      carried: line.carried,
+  /** Everything the run will send: newly drafted Statements, then earlier unmailed ones. */
+  const previews = useMemo(() => {
+    const out: {
+      key: string;
+      minerId: string;
+      statement: Statement;
+      amountDue: number;
+      carried: number;
+    }[] = [];
+    for (const line of plan?.lines ?? []) {
+      out.push({
+        key: `line:${line.minerId}`,
+        minerId: line.minerId,
+        statement: statementForLine(view, plan!, line),
+        amountDue: line.balanceDue,
+        carried: line.carried,
+      });
+    }
+    for (const s of unmailed) {
+      const owed = view.miners.find((m) => m.id === s.minerId)!.owed;
+      out.push({
+        key: `statement:${s.id}`,
+        minerId: s.minerId,
+        statement: s as Statement,
+        amountDue: owed,
+        carried: Math.max(0, owed - s.amount),
+      });
+    }
+    return out;
+  }, [view, plan, unmailed]);
+
+  const previewFor = (item: (typeof previews)[number]): MailPreviewContent => {
+    const target = mailTarget(ctx, item.statement, minerRow(item.minerId), {
+      amountDue: item.amountDue,
+      carried: item.carried,
     });
     const mail = composeStatementMail({
       ...target,
@@ -143,13 +167,12 @@ export function StatementRun() {
       summarised: mail.detail !== 'lines',
     };
   };
-  const previewLine = plan?.lines.find((l) => l.minerId === previewId) ?? plan?.lines[0];
-  /** Previous / Next miner in the run, wrapping round. */
+  const previewItem = previews.find((p) => p.key === previewId) ?? previews[0];
+  /** Previous / Next Statement in the run, wrapping round. */
   const stepPreview = (delta: number) => {
-    const lines = plan?.lines ?? [];
-    if (lines.length === 0 || !previewLine) return;
-    const next = (lines.indexOf(previewLine) + delta + lines.length) % lines.length;
-    setPreviewId(lines[next].minerId);
+    if (previews.length === 0 || !previewItem) return;
+    const next = (previews.indexOf(previewItem) + delta + previews.length) % previews.length;
+    setPreviewId(previews[next].key);
   };
 
   const send = async () => {
@@ -301,8 +324,8 @@ export function StatementRun() {
                   </li>
                 )}
               </ul>
-              {plan && plan.lines.length > 1 && (
-                <Select value={previewLine?.minerId ?? ''} onValueChange={setPreviewId}>
+              {previews.length > 1 && (
+                <Select value={previewItem?.key ?? ''} onValueChange={setPreviewId}>
                   <SelectTrigger
                     aria-label={t('corpTaxBook.moons.run.previewFor')}
                     className="w-full max-w-xs"
@@ -310,9 +333,9 @@ export function StatementRun() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {plan.lines.map((l) => (
-                      <SelectItem key={l.minerId} value={l.minerId}>
-                        {names.character(minerRow(l.minerId).mainCharacterId)}
+                    {previews.map((p) => (
+                      <SelectItem key={p.key} value={p.key}>
+                        {names.character(minerRow(p.minerId).mainCharacterId)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -322,7 +345,7 @@ export function StatementRun() {
                 <Button variant="primary" onClick={() => setStep('send')} disabled={!canEdit}>
                   {t('corpTaxBook.moons.run.continue')}
                 </Button>
-                {previewLine && (
+                {previewItem && (
                   <Button variant="ghost" onClick={() => setPreviewOpen(true)}>
                     {t('corpTaxBook.moons.run.preview')}
                   </Button>
@@ -345,7 +368,7 @@ export function StatementRun() {
                 </p>
               )}
               <div className="flex flex-wrap gap-2">
-                {previewLine && (
+                {previewItem && (
                   <Button variant="ghost" onClick={() => setPreviewOpen(true)} disabled={busy}>
                     {t('corpTaxBook.moons.run.preview')}
                   </Button>
@@ -382,12 +405,12 @@ export function StatementRun() {
       <StatementMailPreviewDialog
         open={previewOpen}
         onClose={() => setPreviewOpen(false)}
-        mail={previewOpen && previewLine ? previewFor(previewLine) : null}
-        {...(plan && plan.lines.length > 1 && previewLine
+        mail={previewOpen && previewItem ? previewFor(previewItem) : null}
+        {...(previews.length > 1 && previewItem
           ? {
               nav: {
-                position: plan.lines.indexOf(previewLine) + 1,
-                count: plan.lines.length,
+                position: previews.indexOf(previewItem) + 1,
+                count: previews.length,
                 onPrevious: () => stepPreview(-1),
                 onNext: () => stepPreview(1),
               },

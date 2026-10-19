@@ -148,6 +148,8 @@ export type SyncOutcome =
       autoGrouped: number;
       /** Why grouping failed this visit, if it did (the sync itself still succeeded). */
       autoGroupError?: string;
+      /** Why re-matching stored Unmatched payments failed this visit, if it did (the sync itself still succeeded). */
+      reassignError?: string;
     };
 
 /** A source this Character could not read this time; the rest still synced. */
@@ -264,11 +266,16 @@ export async function syncCorpTaxBook(
 
   // A donation stored Unmatched stays so forever unless re-matched: its sender may have joined a
   // Miner (or mined here) since. Assign the ones that match now; the officer's queue keeps the rest.
-  const reassigned = await reassignUnmatched(deps, characterId, corporationId, {
-    before,
-    known,
-    regrouped: autoGrouped > 0,
-  });
+  const { assigned: reassigned, error: reassignError } = await reassignUnmatched(
+    deps,
+    characterId,
+    corporationId,
+    {
+      before,
+      known,
+      regrouped: autoGrouped > 0,
+    }
+  );
 
   // The donations just stored may settle Statements; read the book back to allocate against all of it.
   const after =
@@ -300,26 +307,27 @@ export async function syncCorpTaxBook(
     truncated: feed.truncated,
     autoGrouped,
     ...(autoGroupError ? { autoGroupError } : {}),
+    ...(reassignError ? { reassignError } : {}),
   };
 }
 
-/** Re-runs `matchDonation` for stored Unmatched payments and assigns those that now match. A failure is not the sync's. */
+/** Re-runs `matchDonation` for stored Unmatched payments and assigns those that now match. A failure is not the sync's, so it is returned for the page to show. */
 async function reassignUnmatched(
   deps: SyncDeps,
   characterId: number,
   corporationId: number,
   args: { before: BookState; known: ReadonlySet<number>; regrouped: boolean }
-): Promise<number> {
+): Promise<{ assigned: number; error?: string }> {
   const unmatched = args.before.payments.filter(
     (p) => p.minerId === undefined && !(p.notTaxAmount && p.notTaxAmount > 0)
   );
-  if (unmatched.length === 0) return 0;
+  if (unmatched.length === 0) return { assigned: 0 };
+  let assigned = 0;
   try {
     const book = args.regrouped
       ? ((await deps.readBookState(characterId, corporationId)) ?? args.before)
       : args.before;
     const known = new Set([...args.known, ...book.miners.flatMap((m) => m.characterIds)]);
-    let assigned = 0;
     for (const p of unmatched) {
       const match = matchDonation(
         { characterId: p.characterId, reason: (p as { reason?: string }).reason },
@@ -333,9 +341,9 @@ async function reassignUnmatched(
       await deps.assignPayment(characterId, corporationId, p.id, match.minerId);
       assigned += 1;
     }
-    return assigned;
-  } catch {
-    return 0;
+    return { assigned };
+  } catch (e) {
+    return { assigned, error: e instanceof Error ? e.message : String(e) };
   }
 }
 
