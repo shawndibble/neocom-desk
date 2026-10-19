@@ -5,8 +5,10 @@ import {
   parsePublicFitsPage,
   parseRetryAfterMs,
   parseWorkbenchDate,
+  parseStoredFits,
   planPage,
   runWorkbenchSync,
+  sameFits,
   type FetchJsonResult,
   type StoredWorkbenchFit,
   type WorkbenchFitSummary,
@@ -177,6 +179,37 @@ describe('planPage', () => {
     const boundary = { ids: ['a'], dateAdded: 10 };
     const plan = planPage({ boundary, pass: null }, { numberOfPages: 0, rowCount: 0, fits: [] }, 1);
     expect(plan.nextState).toEqual({ boundary, pass: null });
+  });
+});
+
+describe('sameFits', () => {
+  it('compares fits field by field, not by object key order', () => {
+    const a = stored('a', 1);
+    const reordered = {
+      eft: a.eft,
+      dateAdded: 1,
+      authorName: a.authorName,
+      authorId: a.authorId,
+      name: a.name,
+      id: 'a',
+    };
+    expect(sameFits([a], [reordered])).toBe(true);
+    expect(sameFits([a], [{ ...a, eft: 'changed' }])).toBe(false);
+    expect(sameFits([a], [a, stored('b', 2)])).toBe(false);
+  });
+});
+
+describe('parseStoredFits', () => {
+  it('keeps clean rows, filling optional fields and dropping rows without an id, EFT or date', () => {
+    expect(
+      parseStoredFits({
+        fits: [stored('a', 1), { id: 'b', eft: 'x', dateAdded: 2 }, { id: 'c', eft: 'x' }, null],
+      })
+    ).toEqual([
+      stored('a', 1),
+      { id: 'b', name: '', authorId: null, authorName: '', dateAdded: 2, eft: 'x' },
+    ]);
+    expect(parseStoredFits('garbage')).toEqual([]);
   });
 });
 

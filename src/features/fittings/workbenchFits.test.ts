@@ -35,7 +35,15 @@ describe('parseWorkbenchHull', () => {
   it('reads the hull object newest first, one per id, skipping malformed rows', () => {
     const fits = parseWorkbenchHull({
       shipTypeId: 626,
-      fits: [fit('b', 2), fit('a', 1), fit('c', 3), fit('a', 1), { id: 'x' }, null],
+      fits: [
+        fit('b', 2),
+        fit('a', 1),
+        fit('c', 3),
+        fit('a', 1),
+        { id: 'x' },
+        { id: 'y', eft: '[Vexor, y]' },
+        null,
+      ],
     });
     expect(fits.map((f) => f.id)).toEqual(['c', 'b', 'a']);
   });

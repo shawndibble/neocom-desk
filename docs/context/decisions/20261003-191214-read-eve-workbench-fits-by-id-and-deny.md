@@ -1,5 +1,7 @@
 # Scope decisions — Read EVE Workbench fits by id and deny listing workbenchFits
 
+_Storage superseded by `20261018-232147-eve-workbench-fits-live-in-r2.md` (issue #4271): the fits are now one R2 object per hull._
+
 _Recorded 2026-10-03._
 
 Supersedes the "client reads them all with one `shipTypeId` query" half of

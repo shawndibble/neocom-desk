@@ -45,7 +45,12 @@ export function parseWorkbenchHull(data: unknown): WorkbenchFit[] {
   if (!isRecord(data) || !Array.isArray(data.fits)) return [];
   const byId = new Map<string, WorkbenchFit>();
   for (const fit of data.fits as unknown[]) {
-    if (isRecord(fit) && typeof fit.id === 'string' && typeof fit.eft === 'string') {
+    if (
+      isRecord(fit) &&
+      typeof fit.id === 'string' &&
+      typeof fit.eft === 'string' &&
+      typeof fit.dateAdded === 'number'
+    ) {
       byId.set(fit.id, fit as unknown as WorkbenchFit);
     }
   }

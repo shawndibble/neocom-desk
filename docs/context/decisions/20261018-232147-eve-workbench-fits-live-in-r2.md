@@ -15,10 +15,12 @@ separately, folded into the open-prices job._
   (`features/fittings/workbenchFits.ts`) fetches the object from
   `R2_SNAPSHOT_ORIGIN` with no Firebase session; a 404 (the sync hasn't reached
   the hull, or it has no public fits) reads as no fits, not a failure.
-- **Read by hull id, no listing:** objects are reached only by key on the
-  custom domain `data.neocomdesk.com`, which serves objects and offers no bucket
-  listing (the r2.dev listing is not enabled, ADR 0019), so nobody pages through
-  all ~38k fits. That is the guarantee the old get-only, deny-list rule gave.
+- **Read by hull id, no listing:** public reads go only through the custom
+  domain `data.neocomdesk.com` (ADR 0019; `r2.dev` is not used). A Cloudflare
+  custom domain serves an object by its key and has no bucket-listing endpoint
+  (listing is an S3 API call that needs the bucket's credentials), so nobody
+  pages through all ~38k fits. That is the guarantee the old get-only,
+  deny-list rule gave.
 - **`Cache-Control: public, max-age=21600`.** The sync runs every 12 hours and a
   hull only changes when it gains fits; six hours of edge staleness is invisible
   on a list of community fits.
@@ -33,10 +35,18 @@ separately, folded into the open-prices job._
   full every sync; they are not — the sync is incremental and its checkpoint
   stops each pass at fits it already stored, so an empty bucket would never be
   refilled. The first run after deploy therefore copies the Firestore
-  `workbenchFits` collection into R2 (merged with anything R2 already holds) and
-  does nothing else; it then sets `workbenchFitsSync/r2Migration`, and every
-  later run skips the copy without reading Firestore. A failed write throws
-  before the flag is set, so the next run retries; the merge makes that safe.
+  `workbenchFits` collection into R2 (`functions/src/workbenchFitsMigration.ts`,
+  merged with anything R2 already holds) and does nothing else; it then sets
+  `workbenchFitsSync/r2Migration`, and every later run skips the copy without
+  reading Firestore. The legacy docs are streamed 20 at a time in `shipTypeId`
+  order, so the run holds a page and the hulls in flight, not all ~38k fits. A
+  failed write throws before the flag is set, so the next run retries; the merge
+  makes that safe. The module and the flag go once the collection is deleted.
+- **Deploy before the client ships.** CI deploys only the app; functions are
+  deployed by hand. The client reads R2 the moment the app deploys and reads a
+  missing hull object as no fits, so until the function is deployed and its
+  migration run has landed, the EVE Workbench tab shows no fits for every hull.
+  Deploy `syncWorkbenchFits` (and run it once) before or right after merging.
 - **Operation budget:** the migration is one Class B read and one Class A write
   per hull, once (a few hundred to ~1,000 hulls). Steady state is the hulls that
   gained fits each run — tens per run, 60 runs a month, so on the order of

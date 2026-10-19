@@ -203,12 +203,11 @@ import {
 import { publishLpStoreOffersToR2, writeOpenPricesToR2 } from './r2DailySnapshots.js';
 import { fetchJson as fetchEverefJson, foldSnapshotUrl } from './marketOrdersArchive.js';
 import { runWorkbenchSync } from './workbenchFits.js';
+import { r2WorkbenchHulls, workbenchFitsStore } from './workbenchFitsStore.js';
 import {
   firestoreWorkbenchMigration,
   migrateLegacyWorkbenchFits,
-  r2WorkbenchHulls,
-  workbenchFitsStore,
-} from './workbenchFitsStore.js';
+} from './workbenchFitsMigration.js';
 import {
   MutamarketBusyError,
   MutamarketInputError,
@@ -1557,12 +1556,14 @@ export const syncPublicContractOffers = onSchedule(
 /**
  * syncWorkbenchFits: EVE Workbench's public fits, grouped by hull into one R2
  * object per hull (`workbench-fits/<shipTypeId>.json`, issue #4271) for the
- * Popular fit panel's EVE Workbench tab (issue #2484). Workbench's list can't be filtered by hull, so this keeps our own
- * copy — see workbenchFits.ts for the pass/checkpoint design, and the
- * decision doc it ships with.
+ * Popular fit panel's EVE Workbench tab (issue #2484). Workbench's list
+ * can't be filtered by hull, so this keeps our own copy — see
+ * workbenchFits.ts for the pass/checkpoint design, and the decision doc it
+ * ships with.
  *
- * Every 12 hours (cost: it was every 30 minutes), each run fetching for at most `WORKBENCH_FETCH_BUDGET_MS`
- * then flushing to R2 (only hulls whose fits changed). Requests are sequential with a 250ms gap (≤ 4/s
+ * Every 12 hours (cost: it was every 30 minutes), each run fetching for at
+ * most `WORKBENCH_FETCH_BUDGET_MS` then flushing to R2 (only hulls whose fits
+ * changed). Requests are sequential with a 250ms gap (≤ 4/s
  * against a free, unauthenticated API), so a run stores roughly 1,000 fits:
  * the first pass over ~38k fits takes ~40 runs, about 20 days at this cadence, after which a run
  * is one list page plus however many fits were published since.
@@ -1573,8 +1574,9 @@ export const syncPublicContractOffers = onSchedule(
  * every later run would redo the same pages — this margin is what prevents it.
  *
  * 1GiB because a run reads back every hull it touches whole (then merges and
- * gzips it), and the most-fitted hulls are a few MB of EFT each; the one-time
- * migration run holds every legacy fit (~38k) in memory at once.
+ * gzips it), and the most-fitted hulls are a few MB of EFT each. The one-time
+ * migration run streams the legacy docs 20 at a time, so it holds at most a
+ * page plus the hulls being written.
  *
  * Another Cloud Scheduler job past the free three — the same trade
  * `captureMiningPriceSnapshot` already made.
@@ -1592,19 +1594,19 @@ export const syncWorkbenchFits = onSchedule(
   async () => {
     const r2 = r2ConfigOrThrow();
     const db = getFirestore();
-    const io = { get: createR2Get(r2), put: createR2Put(r2) };
+    const hulls = r2WorkbenchHulls({ get: createR2Get(r2), put: createR2Put(r2) });
     // The first run after the move to R2 only copies the Firestore fits over
-    // (workbenchFitsStore.ts's header); every later run skips straight past.
+    // (workbenchFitsMigration.ts); every later run skips straight past.
     const migration = await migrateLegacyWorkbenchFits({
       ...firestoreWorkbenchMigration(db),
-      hulls: r2WorkbenchHulls(io),
+      hulls,
     });
     if (migration.migrated) {
       logInfo('EVE Workbench fits migrated to R2', { ...migration });
       return;
     }
     const result = await runWorkbenchSync({
-      store: workbenchFitsStore(db, io),
+      store: workbenchFitsStore(db, hulls),
       fetchJson: async (url) => {
         const response = await fetch(url, {
           headers: { 'User-Agent': MARKET_HISTORY_USER_AGENT, Accept: 'application/json' },

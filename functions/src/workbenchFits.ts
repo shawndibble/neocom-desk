@@ -132,6 +132,44 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
+/**
+ * The fits of a stored hull object (or a legacy Firestore hull part), one
+ * clean row each; a malformed row, or a body without a `fits` array, gives
+ * none. The fields are rebuilt in `StoredWorkbenchFit`'s order.
+ */
+export function parseStoredFits(body: unknown): StoredWorkbenchFit[] {
+  if (!isRecord(body) || !Array.isArray(body.fits)) return [];
+  const fits: StoredWorkbenchFit[] = [];
+  for (const row of body.fits as unknown[]) {
+    if (!isRecord(row)) continue;
+    const { id, name, authorId, authorName, dateAdded, eft } = row;
+    if (typeof id !== 'string' || typeof eft !== 'string' || typeof dateAdded !== 'number') {
+      continue;
+    }
+    fits.push({
+      id,
+      name: typeof name === 'string' ? name : '',
+      authorId: typeof authorId === 'number' ? authorId : null,
+      authorName: typeof authorName === 'string' ? authorName : '',
+      dateAdded,
+      eft,
+    });
+  }
+  return fits;
+}
+
+function fitKey(fit: StoredWorkbenchFit): string {
+  return JSON.stringify([fit.id, fit.name, fit.authorId, fit.authorName, fit.dateAdded, fit.eft]);
+}
+
+/** Whether two fit lists hold the same fits in the same order, whatever their objects' key order. */
+export function sameFits(
+  a: readonly StoredWorkbenchFit[],
+  b: readonly StoredWorkbenchFit[]
+): boolean {
+  return a.length === b.length && a.every((fit, i) => fitKey(fit) === fitKey(b[i]));
+}
+
 function summaryFrom(row: unknown): WorkbenchFitSummary | null {
   if (!isRecord(row)) return null;
   const { Id, Name, ShipId, CharacterId, CharacterName, DateAdded } = row;
@@ -385,7 +423,7 @@ export async function runWorkbenchSync(deps: WorkbenchSyncDeps): Promise<Workben
   for (const [shipTypeId, incoming] of byHull) {
     const existing = await store.readHull(shipTypeId);
     const merged = mergeHullFits(existing, incoming);
-    if (JSON.stringify(merged) === JSON.stringify(existing)) continue;
+    if (sameFits(merged, existing)) continue;
     await store.writeHull(shipTypeId, merged);
     hullsWritten += 1;
   }
