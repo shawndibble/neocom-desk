@@ -23,6 +23,15 @@ export interface ColumnVisibilityOptions<Id extends string> {
    * on an existing table hides nothing on its own.
    */
   defaultVisible?: readonly Id[];
+  /** Honour a stored empty list (every optional column hidden). Default: reject it. */
+  allowEmpty?: boolean;
+  /** Drop unknown ids from a stored list instead of rejecting the whole list. */
+  dropUnknown?: boolean;
+  /**
+   * Ids retired from the catalog: dropped from a stored list rather than
+   * rejecting it, while any other unknown id still does.
+   */
+  retired?: readonly string[];
 }
 
 /** Call once per key at module scope, like `createLocalSetting`. */
@@ -30,17 +39,22 @@ export function createColumnVisibilitySetting<Id extends string>({
   key,
   ids,
   defaultVisible = ids,
+  allowEmpty = false,
+  dropUnknown = false,
+  retired = [],
 }: ColumnVisibilityOptions<Id>): LocalSettingStore<readonly Id[]> {
   const known = new Set<string>(ids);
+  const isKnown = (id: unknown) => typeof id === 'string' && known.has(id);
   return createLocalSetting<readonly Id[]>({
     key,
     defaultValue: defaultVisible,
-    parse: (raw) =>
-      Array.isArray(raw) &&
-      raw.length > 0 &&
-      raw.every((id) => typeof id === 'string' && known.has(id))
-        ? (raw as Id[])
-        : null,
+    parse: (raw) => {
+      if (!Array.isArray(raw)) return null;
+      const kept = raw.filter((id) => !retired.includes(id));
+      const ok = dropUnknown ? kept.filter(isKnown) : kept;
+      if (!dropUnknown && !ok.every(isKnown)) return null;
+      return allowEmpty || ok.length > 0 ? (ok as Id[]) : null;
+    },
   });
 }
 

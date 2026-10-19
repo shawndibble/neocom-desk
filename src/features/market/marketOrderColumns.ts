@@ -7,7 +7,7 @@
 import { sellOutlierMultiple } from '@/engine/market/orderBookDepth';
 import type { RegionOrder } from '@/esi/endpoints';
 import { formatMarketIsk } from '@/lib/isk';
-import { createLocalSetting } from '@/lib/useLocalSetting';
+import { createColumnVisibilitySetting } from '@/lib/columnVisibility';
 import { formatVolume } from './format';
 
 /**
@@ -48,22 +48,15 @@ export const BUY_ORDER_COLUMN_IDS: readonly MarketOrderColumnId[] = MARKET_ORDER
 export const DEFAULT_VISIBLE_MARKET_ORDER_COLUMNS: readonly MarketOrderColumnId[] =
   MARKET_ORDER_COLUMN_IDS.filter((id) => id !== 'minVolume');
 
-function isMarketOrderColumnId(raw: unknown): raw is MarketOrderColumnId {
-  return typeof raw === 'string' && (MARKET_ORDER_COLUMN_IDS as readonly string[]).includes(raw);
-}
-
 export const VISIBLE_MARKET_ORDER_COLUMNS_KEY = 'marketOrderVisibleColumns';
 
-export const useVisibleMarketOrderColumns = createLocalSetting<readonly MarketOrderColumnId[]>({
+// Unknown ids are dropped rather than voiding the whole preference: a
+// retired column (Cum. qty's `depth`) shouldn't reset a pilot's picks.
+export const useVisibleMarketOrderColumns = createColumnVisibilitySetting({
   key: VISIBLE_MARKET_ORDER_COLUMNS_KEY,
-  defaultValue: DEFAULT_VISIBLE_MARKET_ORDER_COLUMNS,
-  // Unknown ids are dropped rather than voiding the whole preference: a
-  // retired column (Cum. qty's `depth`) shouldn't reset a pilot's picks.
-  parse: (raw) => {
-    if (!Array.isArray(raw)) return null;
-    const known = raw.filter(isMarketOrderColumnId);
-    return known.length > 0 ? known : null;
-  },
+  ids: MARKET_ORDER_COLUMN_IDS,
+  defaultVisible: DEFAULT_VISIBLE_MARKET_ORDER_COLUMNS,
+  dropUnknown: true,
 });
 
 /**
