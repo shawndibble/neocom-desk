@@ -7,7 +7,6 @@ import { db } from '@/db';
 import {
   Button,
   ColumnPickerMenu,
-  DataTable,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -31,18 +30,19 @@ import {
 import * as Icon from '@/components/ui/icons';
 import { beginAddCharacterLogin } from '@/app/loginFlow';
 import { NeedsLoginNotice } from '@/app/AuthFailureNotice';
-import { useAuthFailure } from '@/stores/authFailure';
 import { CustomizePermissionsDialog } from '@/features/permissions/CustomizePermissionsDialog';
-import { isSyncConfigured } from '@/app/syncStatus';
 import { useShallow } from 'zustand/react/shallow';
 import { usePublicInfo } from '@/stores/publicInfo';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useFontScale, FONT_SCALE_STEPS, type FontScale } from '@/lib/fontScale';
 import { useNow } from '@/lib/useNow';
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
-import { loadRosterSnapshot, type RosterEntry } from '@/features/character/roster';
-import { rosterCoreMap, mergeRosterCore, type RosterCore } from '@/features/character/rosterView';
-import { loadRosterAttention, type AttentionEntry } from '@/features/character/rosterAttention';
+import { useRosterData } from '@/features/character/useRosterData';
+import {
+  RemoveCharacterDialog,
+  type RemoveTarget,
+} from '@/features/character/RemoveCharacterDialog';
+import { CharactersTableView } from '@/features/character/CharactersTableView';
 import { useAlertCountsByCharacter } from '@/features/notifications/alertCountsByCharacter';
 import {
   useNotificationPreferences,
@@ -64,10 +64,6 @@ import {
   type CharacterColumnId,
 } from '@/features/character/characterColumns';
 import { useTimeZone } from '@/lib/timeFormat';
-import { removeCharacterAfterSync } from '@/features/character/removeCharacter';
-import { UnsyncedChangesWarning } from '@/features/character/UnsyncedChangesWarning';
-import { RemoveSharedOption } from '@/features/communities/RemoveSharedOption';
-import { CharacterRowContextMenu } from '@/features/character/CharacterRowContextMenu';
 import { updateGroups, useOverviewGroups } from '@/features/character/overviewGroups';
 import {
   isCharacterStarred,
@@ -96,7 +92,7 @@ import { CharacterCard } from '@/features/character/CharacterCard';
 import { GroupSectionHeader } from '@/features/character/GroupSectionHeader';
 import { characterLastSynced } from '@/features/character/rosterQueueChip';
 import { useCharactersView, activeRosterFilterCount } from '@/features/character/useCharactersView';
-import { buildColumns, type CharacterRow } from '@/features/character/charactersTableColumns';
+import { buildColumns } from '@/features/character/charactersTableColumns';
 
 const DENSITY_LABEL_KEYS = {
   0.875: 'characters.densityCompact',
@@ -162,33 +158,14 @@ export function Characters() {
     isNotTrainingAlertEnabledFor(notificationPrefs, characterId);
   const timeZone = useTimeZone();
 
-  const [rosterCore, setRosterCore] = useState<Map<number, RosterCore>>(new Map());
-  const [attentionById, setAttentionById] = useState<Map<number, AttentionEntry>>(new Map());
-
-  /** The one place a fresh roster snapshot becomes `rosterCore` — shared by the cache-only load effect and "Refresh all" so a future added field only needs adding to `rosterView.ts`'s `RosterCore`. */
-  function applyRoster(roster: readonly RosterEntry[], now: number) {
-    setRosterCore(rosterCoreMap(roster, now));
-  }
-
-  /** `applyRoster` for one character that just finished refreshing: merges into `rosterCore` rather than replacing it, so the rest of the roster keeps its rows. */
-  function mergeRosterEntry(entry: RosterEntry, now: number) {
-    setRosterCore((previous) => mergeRosterCore(previous, entry, now));
-  }
+  const { rosterCore, attentionById, refreshingAll, refreshAll } = useRosterData(characters);
 
   const [addingGroup, setAddingGroup] = useState(false);
   const newGroupButton = useRef<HTMLButtonElement>(null);
   const focusAfterCommit = useFocusAfterCommit();
   const [newGroupName, setNewGroupName] = useState('');
   const [deletingGroupId, setDeletingGroupId] = useState<string | null>(null);
-  const [removingCharacter, setRemovingCharacter] = useState<{
-    id: number;
-    name: string;
-  } | null>(null);
-  /** The removal is running: the confirm stays open and busy until it finishes. */
-  const [removing, setRemoving] = useState(false);
-  const cancelRemoveRef = useRef<HTMLButtonElement>(null);
-  /** Also delete this Character's Shared Blueprints from its Communities (issue #3600). */
-  const [removeShared, setRemoveShared] = useState(true);
+  const [removingCharacter, setRemovingCharacter] = useState<RemoveTarget | null>(null);
   /** The Character whose removal just failed — rolled back whole, so it is still listed. */
   const [removeFailedName, setRemoveFailedName] = useState<string | null>(null);
   useEffect(() => {
@@ -196,7 +173,6 @@ export function Characters() {
     const timer = setTimeout(() => setRemoveFailedName(null), 5000);
     return () => clearTimeout(timer);
   }, [removeFailedName]);
-  const [refreshingAll, setRefreshingAll] = useState(false);
   const [customizingPermissions, setCustomizingPermissions] = useState(false);
 
   const {
@@ -275,41 +251,6 @@ export function Characters() {
     }
   }, [characters, loadPublicInfoMany]);
 
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      if (!characters || characters.length === 0) {
-        if (!cancelled) setRosterCore(new Map());
-        return;
-      }
-      const now = Date.now();
-      const roster = await loadRosterSnapshot();
-      if (cancelled) return;
-      applyRoster(roster, now);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [characters]);
-
-  // Mirrors the cache-only effect above, cache-only by default: manufacturing
-  // running counts and PI attention across the whole roster.
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      if (!characters || characters.length === 0) {
-        if (!cancelled) setAttentionById(new Map());
-        return;
-      }
-      const attention = await loadRosterAttention();
-      if (cancelled) return;
-      setAttentionById(new Map(attention.map((entry) => [entry.characterId, entry])));
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [characters]);
-
   // Self-heals dangling group entries: a character removed from this device
   // disappears from its group instead of lingering as a stale id.
   useEffect(() => {
@@ -346,29 +287,6 @@ export function Characters() {
     navigate(from && from !== '/characters' ? from : '/overview');
   }
 
-  /**
-   * Live pull for every character, capped-speed — same "cache-first, one
-   * explicit button for live" rule the PI alt-colonies view already follows,
-   * rather than a new pattern for this page.
-   */
-  async function handleRefreshAll() {
-    // `aria-disabled` keeps the button hoverable so its Tooltip stays readable
-    // mid-refresh, but it still takes the click — so the guard lives here.
-    if (refreshingAll) return;
-    setRefreshingAll(true);
-    try {
-      const now = Date.now();
-      const [roster, attention] = await Promise.all([
-        loadRosterSnapshot({ live: true, now, onEntry: (entry) => mergeRosterEntry(entry, now) }),
-        loadRosterAttention({ live: true }),
-      ]);
-      applyRoster(roster, now);
-      setAttentionById(new Map(attention.map((entry) => [entry.characterId, entry])));
-    } finally {
-      setRefreshingAll(false);
-    }
-  }
-
   function handleToggleColumn(id: CharacterColumnId) {
     const next = visibleColumns.includes(id)
       ? visibleColumns.filter((existing) => existing !== id)
@@ -391,42 +309,7 @@ export function Characters() {
   }
 
   function requestRemoveCharacter(characterId: number, name: string) {
-    setRemoveShared(true);
     setRemovingCharacter({ id: characterId, name });
-  }
-
-  async function confirmRemoveCharacter() {
-    if (!removingCharacter) return;
-    const { id, name } = removingCharacter;
-    // Neighbours are read now: the removed card is gone from the DOM afterwards.
-    const ids = Array.from(
-      document.querySelectorAll<HTMLElement>('[data-character-select]'),
-      (el) => el.dataset.characterSelect
-    );
-    const at = ids.indexOf(String(id));
-    const cardButton = (cardId: string | undefined) => () =>
-      cardId ? document.querySelector<HTMLElement>(`[data-character-select="${cardId}"]`) : null;
-    // The dialog stays open, busy, while the last push and cleanup run (up to
-    // ~24 s offline) — closing it at once looked like the removal had finished.
-    setRemoving(true);
-    try {
-      await removeCharacterAfterSync(id, isSyncConfigured(), removeShared);
-      useAuthFailure.getState().dismissNeedsLogin(id);
-      // Requested in the same batch as the dialog closing (`finally`), so the
-      // request outlives the dialog's own focus return, which it retries past.
-      focusAfterCommit(
-        cardButton(at >= 0 ? ids[at + 1] : undefined),
-        cardButton(at > 0 ? ids[at - 1] : undefined),
-        () => document.querySelector<HTMLElement>('h1')
-      );
-    } catch {
-      // The local removal is one transaction, so a failure left every row in
-      // place — say so rather than leave the click looking ignored.
-      setRemoveFailedName(name);
-    } finally {
-      setRemovingCharacter(null);
-      setRemoving(false);
-    }
   }
 
   async function handleMoveToGroup(characterId: number, groupId: string | null) {
@@ -434,7 +317,7 @@ export function Characters() {
       updateGroups(
         groupsValue,
         (groups) => moveCharacterToGroup(groups, characterId, groupId),
-        // eslint-disable-next-line react-hooks/purity -- fires from a click (the group Select's onValueChange, reached through buildColumns' column-object indirection, same handler CharacterCard's own group Select already calls directly), never during render itself.
+
         Date.now()
       )
     );
@@ -567,12 +450,6 @@ export function Characters() {
     columns: csvColumns,
   });
 
-  /**
-   * Table view — one flat `DataTable` over the whole (filtered) roster, not
-   * one per group section (decision 20260927-071415): the new `group` column
-   * carries membership per row instead, and `GroupSectionHeader`'s
-   * rename/reorder/delete stay card-view only.
-   */
   const extractorsReady = tableRows.reduce(
     (sum, row) =>
       row.totalSp !== undefined && isSpExtractionReady(row.totalSp, spExtractionThreshold)
@@ -590,41 +467,6 @@ export function Characters() {
             each: formatIskCompact(extractionPrices.net),
             hub: extractionPrices.hubName,
           });
-
-  function renderTable(rows: readonly CharacterRow[]) {
-    return (
-      // Deliberate deviation from DataTable's usual `.dt-stack` collapse on
-      // mobile (docs/context/decisions/20260909-130638-characters-table-
-      // view-mobile-scroll-roster-overview-split.md): a real, comparable
-      // table stays a table, and scrolls sideways instead, at every width.
-      <div className="overflow-x-auto">
-        {extractionSummary && (
-          <p className="mb-2 text-[0.6875rem] text-text-dim">{extractionSummary}</p>
-        )}
-        <DataTable
-          {...charactersExport.tableProps}
-          columns={activeColumnIds.map((id) => columnsById[id])}
-          rows={rows}
-          rowKey={(row) => row.character.characterId}
-          label={t('characters.title')}
-          responsive="table"
-          sort={tableSort}
-          onSortChange={setTableSort}
-          onRowClick={(row) => void select(row.character.characterId)}
-          rowMoreActions
-          rowContextMenu={(row, tr) => (
-            <CharacterRowContextMenu
-              characterId={row.character.characterId}
-              name={row.character.name}
-              onRemove={() => requestRemoveCharacter(row.character.characterId, row.character.name)}
-            >
-              {tr}
-            </CharacterRowContextMenu>
-          )}
-        />
-      </div>
-    );
-  }
 
   if (!characters) {
     return (
@@ -655,7 +497,7 @@ export function Characters() {
                 label={refreshingAll ? t('characters.refreshingAll') : t('characters.refreshAll')}
                 tooltip={`${t('characters.refreshAll')}. ${t('characters.refreshAllHint')}`}
                 icon={refreshingAll ? <Spinner size="sm" /> : <Icon.Refresh />}
-                onClick={() => void handleRefreshAll()}
+                onClick={() => void refreshAll()}
                 aria-disabled={refreshingAll || undefined}
                 className="aria-disabled:cursor-default aria-disabled:opacity-40"
               />
@@ -839,7 +681,16 @@ export function Characters() {
             // One flat table over the whole roster, not one per group section
             // (decision 20260927-071415) — the `group` column carries
             // membership per row, and group management stays in card view.
-            renderTable(tableRows)
+            <CharactersTableView
+              rows={tableRows}
+              columns={activeColumnIds.map((id) => columnsById[id])}
+              extractionSummary={extractionSummary}
+              tableProps={charactersExport.tableProps}
+              sort={tableSort}
+              onSortChange={setTableSort}
+              onSelect={(id) => void select(id)}
+              onRemove={requestRemoveCharacter}
+            />
           ) : (
             <div className="space-y-4">
               {groupsValue.groups.map((group, index) => (
@@ -882,49 +733,11 @@ export function Characters() {
         <Toast message={t('characters.removeFailed', { name: removeFailedName })} />
       )}
 
-      <Modal
-        open={removingCharacter !== null}
-        onClose={() => {
-          if (!removing) setRemovingCharacter(null);
-        }}
-        title={t('characters.remove')}
-        initialFocusRef={cancelRemoveRef}
-      >
-        <p className="text-xs text-text-dim">
-          {removingCharacter && t('characters.removeConfirm', { name: removingCharacter.name })}
-        </p>
-        {removingCharacter && (
-          <RemoveSharedOption
-            characterIds={[removingCharacter.id]}
-            checked={removeShared}
-            onChange={setRemoveShared}
-          />
-        )}
-        {removingCharacter && (
-          <UnsyncedChangesWarning
-            characterIds={[removingCharacter.id]}
-            syncConfigured={isSyncConfigured()}
-          />
-        )}
-        <div className="mt-3 flex justify-end gap-2">
-          <Button
-            ref={cancelRemoveRef}
-            size="sm"
-            disabled={removing}
-            onClick={() => setRemovingCharacter(null)}
-          >
-            {t('characters.cancel')}
-          </Button>
-          <Button
-            variant="danger"
-            size="sm"
-            loading={removing}
-            onClick={() => void confirmRemoveCharacter()}
-          >
-            {t('characters.remove')}
-          </Button>
-        </div>
-      </Modal>
+      <RemoveCharacterDialog
+        target={removingCharacter}
+        onClose={() => setRemovingCharacter(null)}
+        onFailed={setRemoveFailedName}
+      />
 
       <Modal
         open={deletingGroupId !== null}
