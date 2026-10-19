@@ -21,7 +21,7 @@
  * Opportunities wait on it too (#2054), just by not mounting until it clears
  * rather than by reading `isPricingReady` themselves — see their own callers.
  */
-import { useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import { loadBpcOfferRows } from '@/features/bpcContracts/bpcOfferRows';
 import { isSyncConfigured } from '@/app/syncStatus';
 import {
@@ -41,6 +41,7 @@ import { useWarmLoad } from '@/lib/useWarmLoad';
 import { useAssumedMe } from './assumedMe';
 import { useCorpOwnedBlueprints, type CorpOwnedBlueprintsState } from './corpOwnedBlueprints';
 import type { BuildPlanSources, CorpBlueprintSource } from './resolveBuildPlan';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 export interface BuildPlanPricingInputs {
   /** The settings below have hydrated. Until then they read their defaults. */
@@ -133,11 +134,7 @@ function useBpcContractRows(characterId: number | null): readonly BpcContractRow
 /** Hydrates and reads every Build Plan pricing input for one Character. */
 export function useBuildPlanPricingInputs(characterId: number | null): BuildPlanPricingInputs {
   const assumedMe = useAssumedMe((state) => state.value);
-  const assumedMeHydrated = useAssumedMe((state) => state.hydrated);
-  const hydrateAssumedMe = useAssumedMe((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateAssumedMe();
-  }, [hydrateAssumedMe]);
+  const assumedMeHydrated = useHydratedStore(useAssumedMe);
 
   const corpBlueprints = useCorpOwnedBlueprints();
   const standings = useTradeHubStandings(characterId);

@@ -11,7 +11,7 @@ import {
   recipientKey,
   type ComposeRecipient,
   type ComposeRecipientType,
-} from '@/engine/mailCompose';
+} from '@/engine/mail/mailCompose';
 
 const AVATAR_SIZE = 'sm';
 

@@ -14,8 +14,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
+import { useCharacters } from '@/features/character/useCharacters';
 import { Button, EmptyState, PageHeader, TabPanel, textActionClassName } from '@/components/ui';
 import { isShareId } from '@/engine/share/shareId';
 import { ownsSurvey } from '@/engine/survey/owner';
@@ -53,6 +53,7 @@ import {
   type SurveyTaxShare,
 } from './surveyStore';
 import { useSurvey } from './useSurvey';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 interface SurveyTabProps {
   /** The route's shared tab bar, rendered under this tab's own `PageHeader`. See `MoonMiningTax`. */
@@ -71,11 +72,7 @@ export function SurveyTab({ tabBar, tabsId }: SurveyTabProps) {
   const characterId = useActiveCharacter((state) => state.activeCharacterId);
   const currentId = useCurrentSurveyId((state) => state.value);
   const setCurrentId = useCurrentSurveyId((state) => state.setValue);
-  const hydrated = useCurrentSurveyId((state) => state.hydrated);
-  const hydrate = useCurrentSurveyId((state) => state.hydrate);
-  useEffect(() => {
-    void hydrate();
-  }, [hydrate]);
+  const hydrated = useHydratedStore(useCurrentSurveyId);
 
   // `?survey=<id>` (from a shared page's "Open Neocom Desk") adopts that survey.
   const adopt = new URLSearchParams(location.search).get('survey');
@@ -89,10 +86,7 @@ export function SurveyTab({ tabBar, tabsId }: SurveyTabProps) {
 
   // The template picked on the empty page, filled into the survey the first scan starts.
   const templates = useSurveyTemplates((s) => s.value);
-  const hydrateTemplates = useSurveyTemplates((s) => s.hydrate);
-  useEffect(() => {
-    void hydrateTemplates();
-  }, [hydrateTemplates]);
+  useHydratedStore(useSurveyTemplates);
   const [startTemplateId, setStartTemplateId] = useState<string | null>(null);
   const startTemplate = templates.find((template) => template.id === startTemplateId);
 
@@ -233,7 +227,7 @@ export function SurveyTab({ tabBar, tabsId }: SurveyTabProps) {
     });
   }, [hydrated, characterId]);
 
-  const characterNames = useLiveQuery(() => db.characters.toArray())?.map((c) => c.name) ?? [];
+  const characterNames = useCharacters().map((c) => c.name);
   const scans = useMemo(() => (state.status === 'ready' ? state.scans : []), [state]);
   const owned = state.status === 'ready' && ownsSurvey(state.owner, characterNames);
   // Only the owner sets a scan aside; the rules can't tell who that is, so this is the guard.

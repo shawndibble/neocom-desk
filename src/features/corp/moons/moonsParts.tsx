@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -104,9 +105,7 @@ export function Crumb({ to, label }: { to: string; label: string }) {
 export function Fact({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div>
-      <dt className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-        {label}
-      </dt>
+      <dt className={eyebrowClassName}>{label}</dt>
       <dd className="text-sm">{value}</dd>
     </div>
   );

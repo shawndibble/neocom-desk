@@ -15,7 +15,7 @@
  * than flooding the notification the first time an already-stalled or
  * already-finished queue is observed.
  */
-import { isSpExtractionReady } from '../spExtraction';
+import { isSpExtractionReady } from '../skills/spExtraction';
 
 export interface SkillQueueEntrySnapshot {
   skillId: number;

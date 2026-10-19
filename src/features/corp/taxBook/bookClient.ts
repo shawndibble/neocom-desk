@@ -399,6 +399,19 @@ export async function turnOnBook(
   });
 }
 
+/**
+ * The CEO reclaims the book (ADR 0023): becomes its owner, re-activates it, and
+ * every other officer loses access until they re-verify. The role is checked
+ * live, so the short-lived access token travels; the refresh token never does.
+ */
+export async function reclaimBook(
+  characterId: number,
+  corporationId: number
+): Promise<{ officersRevoked: number }> {
+  const accessToken = await getValidAccessToken(characterId);
+  return call(characterId, 'reclaimCorpTaxBookCallable', { corporationId, accessToken });
+}
+
 /** The verify token for each Statement id; one with no link doc is left out. Editors only (rules). */
 export async function readVerifyTokens(
   characterId: number,

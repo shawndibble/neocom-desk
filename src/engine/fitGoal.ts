@@ -7,7 +7,7 @@
 import { computeSkillGaps } from '@/engine/fittings/skillGaps';
 import type { Fitting } from '@/engine/fittings/types';
 import type { RequiredSkill } from '@/engine/import/fitToSkills';
-import { planEntryKey } from '@/engine/plan';
+import { planEntryKey } from '@/engine/skills/plan';
 import type { PlanEntry, PlanStep } from '@/engine/types';
 
 export type FitGoalState = 'flyable-now' | 'in-plan' | 'missing';

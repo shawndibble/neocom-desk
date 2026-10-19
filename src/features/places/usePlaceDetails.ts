@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { JumpsAwayResult } from '@/engine/jumpsAway';
+import type { JumpsAwayResult } from '@/engine/clone/jumpsAway';
 import { jumpsBetween, type JumpBasis } from '@/features/route/jumpBasis';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { placeKey, placeKindOf } from './classify';

@@ -1,8 +1,8 @@
-import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui';
 import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import { useSurveyPriceHub } from './surveyPref';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 /**
  * The Trade Hub the Survey's ISK figures are priced at, beside the copy
@@ -13,10 +13,7 @@ export function SurveyHubSelect() {
   const { t } = useTranslation();
   const hub = useSurveyPriceHub((s) => s.value);
   const setHub = useSurveyPriceHub((s) => s.setValue);
-  const hydrate = useSurveyPriceHub((s) => s.hydrate);
-  useEffect(() => {
-    void hydrate();
-  }, [hydrate]);
+  useHydratedStore(useSurveyPriceHub);
   return (
     <Select value={hub} onValueChange={(value) => void setHub(value as TradeHub['id'])}>
       <SelectTrigger aria-label={t('survey.priceHub')} size="sm" className="min-w-0">

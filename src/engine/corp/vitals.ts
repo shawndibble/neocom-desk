@@ -10,6 +10,7 @@
  * journal arrives already reduced to (instant, amount) pairs by
  * `features/corp/boardSources.ts`.
  */
+import { DAY_MS } from '@/lib/age';
 
 /**
  * The window every rate on the rail is measured over.
@@ -21,7 +22,6 @@
  */
 export const VITALS_WINDOW_DAYS = 30;
 
-const DAY_MS = 86_400_000;
 const WINDOW_MS = VITALS_WINDOW_DAYS * DAY_MS;
 
 /** One wallet division's balance. Named by the divisions endpoint, at the view. */

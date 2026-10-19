@@ -30,7 +30,7 @@ import type {
   CharacterBoardItemKind,
 } from '@/engine/character/board';
 import type { CachedResult, StatusResult } from '@/esi/cache';
-import { isActiveContractStatus } from '@/engine/contractStatus';
+import { isActiveContractStatus } from '@/engine/contracts/contractStatus';
 import { loadCalendarEvents } from './calendar';
 import { loadContracts } from './contracts';
 import { loadContractLocationName } from './contractLocationName';

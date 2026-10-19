@@ -18,7 +18,6 @@ const LEGACY_VIEWED_CHARACTER_PARAMS = ['chars'] as const;
 export interface WalletOriginState {
   origin: 'wallet';
 }
-export const WALLET_ORIGIN_STATE: WalletOriginState = { origin: 'wallet' };
 
 export function isFromWallet(state: unknown): boolean {
   return (state as Partial<WalletOriginState> | null)?.origin === 'wallet';

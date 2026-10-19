@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 /**
  * Class strings and small formatters shared by the Show Info Corporation and
  * Alliance tabs, so the two tabs read as one design. Components that share
@@ -15,8 +16,7 @@ export const FACT_COLUMNS: Record<number, string> = {
   6: 'md:grid-cols-6',
 };
 export const sectionHeading = 'text-xs font-semibold tracking-widest text-text-dim uppercase';
-export const termClassName =
-  'text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
+export const termClassName = eyebrowClassName;
 
 /** Only an absolute http(s) URL becomes a link; anything else a corp typed is left out. */
 export function websiteUrl(raw: string | undefined): string | null {

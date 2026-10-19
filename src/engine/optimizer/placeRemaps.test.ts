@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { bestAttributes } from '@/engine/optimizer/bestAttributes';
-import { spBetween, timeToTrain, trainingRate } from '@/engine/sp';
+import { spBetween, timeToTrain, trainingRate } from '@/engine/skills/sp';
 import { placeRemaps, MAX_SUPPORTED_REMAPS } from '@/engine/optimizer/placeRemaps';
 import type { AttributeName, Attributes, EngineSkill, PlanStep } from '@/engine/types';
 

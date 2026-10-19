@@ -8,7 +8,8 @@
  * value would write that default over it.
  */
 import { tappableRowClassName } from '@/components/ui/controlStyles';
-import { useEffect, useMemo, useRef } from 'react';
+import { useHydratedStore } from '@/lib/useHydratedStore';
+import { useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Checkbox, IconButton, LiveStatus, TextInput } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -163,16 +164,9 @@ export function AvoidedSystemsEditor({
   const { t } = useTranslation();
   const avoided = useAvoidedSystems((state) => state.value);
   const setAvoided = useAvoidedSystems((state) => state.setValue);
-  const hydrated = useAvoidedSystems((state) => state.hydrated);
-  const hydrate = useAvoidedSystems((state) => state.hydrate);
   const enabled = useAvoidedSystemsEnabled((state) => state.value);
   const setEnabled = useAvoidedSystemsEnabled((state) => state.setValue);
-  const enabledHydrated = useAvoidedSystemsEnabled((state) => state.hydrated);
-  const hydrateEnabled = useAvoidedSystemsEnabled((state) => state.hydrate);
-  useEffect(() => {
-    void hydrate();
-    void hydrateEnabled();
-  }, [hydrate, hydrateEnabled]);
+  const hydrated = useHydratedStore(useAvoidedSystems, useAvoidedSystemsEnabled);
 
   const { systems, failed: systemsFailed, retry: retrySystems } = useSolarSystemList(true);
   // Retry's note unmounts when the read restarts: focus waits on the section.
@@ -196,7 +190,7 @@ export function AvoidedSystemsEditor({
   const addTriggerRef = useRef<HTMLButtonElement>(null);
   const focusAfterCommit = useFocusAfterCommit();
 
-  if (!hydrated || !enabledHydrated) return null;
+  if (!hydrated) return null;
 
   return (
     <div ref={sectionRef} tabIndex={-1} className="space-y-3 focus:outline-none">

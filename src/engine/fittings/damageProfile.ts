@@ -5,6 +5,7 @@
  * plain relative weights. Pure; the synced-setting stores live in
  * `features/fittings/damageProfiles.ts`.
  */
+import { isRecord } from '../guards';
 import type { DamageProfile } from './types';
 
 /** A profile the picker offers. Built-in ids are `builtin:*`, custom ones `custom:*`, so they never collide. */
@@ -83,10 +84,6 @@ export function resolveDamageProfile(
     custom.find((p) => p.id === selectedId) ??
     UNIFORM
   );
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
 }
 
 /** Strict parse of the synced custom-profile list — pulled values may come from another build. */

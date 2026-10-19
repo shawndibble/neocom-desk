@@ -6,7 +6,8 @@
  * only records trades, so it cannot say this. Pure — the loader adapts the
  * stored document.
  */
-import { filterPriceHistoryRange, medianOf, type PriceHistoryRange } from './priceHistory';
+import { median } from '../math';
+import { filterPriceHistoryRange, type PriceHistoryRange } from './priceHistory';
 import type { ComparedHistoryDay } from './priceHistoryCompare';
 
 /** One region of a stored type document: parallel arrays, `null` where no order stood that day. */
@@ -63,13 +64,19 @@ export function openPricePoints(series: OpenPriceSeries): OpenPricePoint[] {
 export function clipOpenPrices(
   points: readonly OpenPricePoint[],
   range: PriceHistoryRange,
-  now?: Date
+  now: Date
 ): OpenPricePoint[] {
-  return now ? filterPriceHistoryRange(points, range, now) : filterPriceHistoryRange(points, range);
+  return filterPriceHistoryRange(points, range, now);
 }
 
 export interface RegionOpenSeries {
   regionId: number;
+  /**
+   * The hub station whose orders these are ("Jita 4-4"), which names the
+   * region's Buy and Sell lines. Absent for an object still holding the old
+   * region-wide prices (#4279's transition).
+   */
+  station?: string;
   points: readonly OpenPricePoint[];
 }
 
@@ -117,12 +124,12 @@ export interface OpenPriceSummary {
 /** The typical day's open buy and sell. Null for no points — never a fabricated 0. */
 export function summarizeOpenPrices(points: readonly OpenPricePoint[]): OpenPriceSummary | null {
   if (points.length === 0) return null;
-  const median = (values: (number | null)[]): number | null => {
+  const medianOfPresent = (values: (number | null)[]): number | null => {
     const present = values.filter((v): v is number => v !== null);
-    return present.length === 0 ? null : medianOf(present);
+    return present.length === 0 ? null : median(present);
   };
   return {
-    buyMedian: median(points.map((p) => p.buy)),
-    sellMedian: median(points.map((p) => p.sell)),
+    buyMedian: medianOfPresent(points.map((p) => p.buy)),
+    sellMedian: medianOfPresent(points.map((p) => p.sell)),
   };
 }

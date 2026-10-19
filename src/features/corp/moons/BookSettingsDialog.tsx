@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useMemo, useState, type ReactNode } from 'react';
 import { chunkRateFor } from '@/engine/corpTaxBook/extraction';
 import { useTranslation } from 'react-i18next';
@@ -21,13 +22,12 @@ import { TRADE_HUBS } from '@/market/hubs';
 import { editErrorMessage, useBook } from './useBook';
 import { isk } from './moonsFormat';
 import { AutomaticSyncSection } from './AutomaticSyncSection';
+import { ReclaimBookSection } from './ReclaimBookSection';
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="space-y-2">
-      <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-        {title}
-      </h3>
+      <h3 className={eyebrowClassName}>{title}</h3>
       {children}
     </section>
   );
@@ -493,6 +493,8 @@ export function BookSettingsDialog({ open, onClose }: { open: boolean; onClose: 
         </Section>
 
         <AutomaticSyncSection />
+
+        <ReclaimBookSection />
       </div>
     </Modal>
   );

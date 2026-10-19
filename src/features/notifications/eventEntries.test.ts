@@ -9,11 +9,11 @@ import { PROJECTABLE_EVENT_IDS } from '@/engine/projection';
 import { NOTIFICATION_EVENT_IDS, type NotificationEventId } from './events';
 import { THRESHOLD_KEYS } from './eventThresholdFields';
 import { NOTIFICATION_EVENT_ENTRIES, eventEntry } from './eventEntries';
+import { DAY_MS } from '@/lib/age';
 
 const C = 1;
 const PILOT = 'Kestrel';
 const T0 = Date.UTC(2026, 8, 22, 12);
-const DAY_MS = 86_400_000;
 
 describe('NOTIFICATION_EVENT_ENTRIES', () => {
   it('has exactly one entry per catalog event, in catalog order', () => {

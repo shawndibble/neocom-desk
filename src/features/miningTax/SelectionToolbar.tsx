@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
@@ -154,7 +155,7 @@ export function SelectionToolbar({
     // Opaque surface token: the bar is pinned over the scrolling ledger, so a
     // translucent tint lets the rows show through (issue #2984).
     <div className="flex flex-wrap items-center gap-2 rounded-xs border border-accent/40 bg-panel-2 p-2 shadow-lg">
-      <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+      <span className={eyebrowClassName}>
         {t('miningTax.selectionCount', { count: selectedCount })}
       </span>
 

@@ -6,12 +6,6 @@ import type { SkillGainEvaluator } from './useFittingEvaluation';
 import { useSkillGains } from './useSkillGains';
 import { fakeDogmaEngine } from './__fixtures__/fakeDogmaEngine';
 
-// Real macrotask yields by default; a test swaps in a gate it opens by hand.
-const yieldToEventLoop = vi.fn(() => Promise.resolve());
-vi.mock('./yieldToEventLoop', () => ({
-  yieldToEventLoop: () => yieldToEventLoop(),
-}));
-
 function layer(hp: number) {
   return {
     hp,
@@ -101,7 +95,6 @@ function evaluator(sources: number[] = [10, 20, 30, 40]): SkillGainEvaluator {
 describe('useSkillGains', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    yieldToEventLoop.mockImplementation(() => Promise.resolve());
   });
 
   it('lists only unmaxed skills whose next level changes the fit, each at its next level', async () => {
@@ -114,7 +107,7 @@ describe('useSkillGains', () => {
       [40, 1],
     ]);
     expect(skills.compare).not.toHaveBeenCalledWith(10, expect.anything());
-    expect(skills.compare).toHaveBeenCalledWith(20, 3);
+    expect(skills.compare).toHaveBeenCalledWith(20, 3, expect.any(AbortSignal));
   });
 
   it('is idle with no evaluator', () => {
@@ -122,29 +115,37 @@ describe('useSkillGains', () => {
     expect(result.current).toEqual({ gains: null, loading: false, failed: false });
   });
 
-  it('hands the main thread back between calculations', async () => {
+  it('gives each calculation an abort signal, fired when the run is dropped', async () => {
     const skills = evaluator();
-    renderHook(() => useSkillGains(skills));
+    const { unmount } = renderHook(() => useSkillGains(skills));
     await waitFor(() => expect(skills.compare).toHaveBeenCalledTimes(3));
-    expect(yieldToEventLoop.mock.calls.length).toBeGreaterThanOrEqual(3);
+    const signal = vi.mocked(skills.compare).mock.calls[0][2];
+    expect(signal).toBeInstanceOf(AbortSignal);
+    expect(signal?.aborted).toBe(false);
+    unmount();
+    expect(signal?.aborted).toBe(true);
   });
 
   it('drops a run whose evaluator changed mid-way, never showing its rows', async () => {
     const gates: (() => void)[] = [];
-    yieldToEventLoop.mockImplementation(() => new Promise<void>((resolve) => gates.push(resolve)));
     const first = evaluator();
+    first.compare = vi.fn(
+      () =>
+        new Promise<{ before: FittingStats; after: FittingStats }>((resolve) =>
+          gates.push(() => resolve({ before: baseStats, after: baseStats }))
+        )
+    );
     const second = evaluator([40]);
     const { result, rerender } = renderHook(({ skills }) => useSkillGains(skills), {
       initialProps: { skills: first },
     });
     await waitFor(() => expect(gates.length).toBe(1));
     rerender({ skills: second });
-    yieldToEventLoop.mockImplementation(() => Promise.resolve());
     await act(async () => {
       gates.forEach((open) => open());
     });
     await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(first.compare).not.toHaveBeenCalled();
+    expect(first.compare).toHaveBeenCalledTimes(1);
     expect(result.current.gains?.map((gain) => gain.skillTypeId)).toEqual([40]);
   });
 

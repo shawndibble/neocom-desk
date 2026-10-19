@@ -2,7 +2,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import '@/i18n';
-import { emptyFormatState, type FormatState } from '@/engine/mailFormat';
+import { emptyFormatState, type FormatState } from '@/engine/mail/mailFormat';
 import type { MailEditorCommands } from './commands';
 import { MailFormatBar } from './MailFormatBar';
 

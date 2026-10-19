@@ -1,6 +1,5 @@
+import { romanLevel } from './projection';
 import type { EngineSkill, PlanStep } from '@/engine/types';
-
-const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
 
 /**
  * Serialize a plan to EVE's in-game "import skill plan from clipboard" format:
@@ -17,7 +16,7 @@ export function exportPlanToClipboard(
       if (!Number.isInteger(step.level) || step.level < 1 || step.level > 5) {
         throw new RangeError(`level must be an integer 1..5, got ${step.level}`);
       }
-      return `${skill.name} ${ROMAN[step.level - 1]}`;
+      return `${skill.name} ${romanLevel(step.level)}`;
     })
     .join('\n');
 }

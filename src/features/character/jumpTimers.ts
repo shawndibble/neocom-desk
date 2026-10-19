@@ -7,8 +7,8 @@
  * scope is a "needs permission" read, never a live 403 that would raise the
  * app-wide re-auth banner. Reached from the Overview through `import()`.
  */
-import { cloneJumpCooldown, INFOMORPH_SYNCHRONIZING_SKILL_ID } from '@/engine/cloneJump';
-import { fatigueEndsAt } from '@/engine/jumpTimers';
+import { cloneJumpCooldown, INFOMORPH_SYNCHRONIZING_SKILL_ID } from '@/engine/clone/cloneJump';
+import { fatigueEndsAt } from '@/engine/clone/jumpTimers';
 import { db } from '@/db';
 import { conditionalFetch, loadWithCacheStatus, type StatusResult } from '@/esi/cache';
 import { getCharacterFatigue, type CharacterFatigue } from '@/esi/endpoints';
@@ -29,7 +29,7 @@ export interface JumpTimersWidgetData {
 
 const NEEDS_PERMISSION: JumpTimerRead = { state: 'needsPermission' };
 
-export function loadCharacterFatigue(characterId: number): Promise<StatusResult<CharacterFatigue>> {
+function loadCharacterFatigue(characterId: number): Promise<StatusResult<CharacterFatigue>> {
   const { fetchLive, conditional } = conditionalFetch((options) =>
     getCharacterFatigue(characterId, options)
   );

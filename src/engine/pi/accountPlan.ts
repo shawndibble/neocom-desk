@@ -34,6 +34,7 @@
  *
  * Pure: colonies, policy, prices, jumps and `PiData` are parameters.
  */
+import { sum as sumAll } from '../math';
 import type { PiData } from '@/sde/types';
 import { estimateChain } from './chainEstimate';
 import { baselineTotal } from './baseline';
@@ -165,8 +166,7 @@ function chainOnColonies(
 
 const sum = (ids: readonly number[], figure: ReadonlyMap<number, number>) =>
   ids.reduce((total, id) => total + (figure.get(id) ?? 0), 0);
-const totalOf = (figure: ReadonlyMap<number, number>) =>
-  [...figure.values()].reduce((a, b) => a + b, 0);
+const totalOf = (figure: ReadonlyMap<number, number>) => sumAll([...figure.values()]);
 
 function groupOf(chain: Chain, apartPerDay: number): AccountGroup {
   return {

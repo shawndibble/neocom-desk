@@ -1,3 +1,4 @@
+import { idSetKey } from './idSetKey';
 /**
  * Codecs for short-lived view state kept in the URL's query string (ADR 0015):
  * a page's search text, filter chips and table sort, so a reload — or a link
@@ -137,8 +138,7 @@ export function idListParam(): UrlParamCodec<readonly number[]> {
       if (ids.some((id) => id === null)) return [];
       return [...new Set(ids as number[])].sort((a, b) => a - b);
     },
-    serialize: (value) =>
-      value.length === 0 ? null : [...new Set(value)].sort((a, b) => a - b).join(','),
+    serialize: (value) => (value.length === 0 ? null : idSetKey(value)),
   };
 }
 

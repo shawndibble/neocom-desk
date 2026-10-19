@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { SkillQueueEntry } from '@/esi/endpoints';
-import type { CloneVerdictResult } from '@/engine/cloneVerdict';
+import type { CloneVerdictResult } from '@/engine/clone/cloneVerdict';
 import { cloneVerdictGate, runCloneVerdict } from './cloneVerdictGate';
 import type { CloneTrainingData } from './cloneTraining';
 

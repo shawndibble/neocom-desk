@@ -18,7 +18,7 @@ import {
 import { useMarketHub } from '@/features/market/hub';
 import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import { DefaultsSyncHint } from './settingsFields';
-import { useHydratedStore } from './useHydratedStore';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 /** BPC Sourcing's settings: Settings → Industry, and the BPC Sourcing tab's settings modal. */
 export function BpcSourcingSettingsForm() {

@@ -1,3 +1,4 @@
+import { romanLevel } from '@/engine/projection';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import {
   useCallback,
@@ -38,10 +39,10 @@ import { useFocusAfterCommit, type FocusCandidate } from '@/lib/useFocusAfterCom
 import { neighbourFocusCandidates, planRowHandle } from './focusNeighbour';
 import { MarketGroupLink } from './MarketGroupLink';
 import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
-import { findRemovalBlockers, planEntryKey } from '@/engine/plan';
+import { findRemovalBlockers, planEntryKey } from '@/engine/skills/plan';
 import { useSkillDetailModalStore } from '@/stores/skillDetailModal';
 import { schedulePlanWith, type PlanScheduleInputs, type SchedulablePlan } from './planSchedule';
-import { parseSkillQueue } from '@/engine/queueImport';
+import { parseSkillQueue } from '@/engine/skills/queueImport';
 import { exportPlanToClipboard } from '@/engine/clipboardExport';
 import { optimizeAtMarkers, ATTRIBUTE_NAMES } from '@/engine/optimizer';
 import type { PlaceRemapsOptions } from '@/engine/optimizer';
@@ -87,7 +88,7 @@ import { useColumnVisibility } from './columnPreference';
 import { useGroupingMode, GROUPING_MODES, type GroupingMode } from './groupingMode';
 import { attributePairBandStarts } from './attributePairBands';
 import { PlanHeader } from './PlanHeader';
-import { planProgress } from '@/engine/planProgress';
+import { planProgress } from '@/engine/skills/planProgress';
 import { assumptionsSummary } from './assumptionsSummary';
 import { PlanEditorLayout } from './PlanEditorLayout';
 import { PlanToolsPane, type PlanToolSection } from './PlanToolsPane';
@@ -156,8 +157,7 @@ import type { SkillPlanImportState } from '@/lib/shortcuts';
 import { useScopedState } from './useScopedState';
 import { attributeShort } from './remapInstruction';
 import { ATTRIBUTE_ENHANCERS_MARKET_GROUP_ID } from './plannerMarketGroups';
-
-const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 /** The persisted fields the editor may change. */
 export type PlanPatch = Partial<
@@ -345,31 +345,21 @@ export function PlanEditor({
   // "Columns" control (#114): a device-local view preference, applying the
   // same way across every plan on this device rather than per-plan.
   const columnVisibility = useColumnVisibility((state) => state.value);
-  const hydrateColumnVisibility = useColumnVisibility((state) => state.hydrate);
   const setColumnVisibility = useColumnVisibility((state) => state.setValue);
-  useEffect(() => {
-    void hydrateColumnVisibility();
-  }, [hydrateColumnVisibility]);
+  useHydratedStore(useColumnVisibility);
 
   // Grouping toggle (#115): priority (default) or attribute-pair band
   // headers — visual only, same device-local preference shape as Columns.
   const groupingMode = useGroupingMode((state) => state.value);
-  const hydrateGroupingMode = useGroupingMode((state) => state.hydrate);
   const setGroupingMode = useGroupingMode((state) => state.setValue);
-  useEffect(() => {
-    void hydrateGroupingMode();
-  }, [hydrateGroupingMode]);
+  useHydratedStore(useGroupingMode);
 
   // Clone State (GLOSSARY.md): per Character, not per plan. The control waits
   // for hydration — a write from the empty default would replace the whole
   // blob and drop every other Character's answer.
   const cloneStates = useCloneStates((state) => state.value);
-  const cloneStatesHydrated = useCloneStates((state) => state.hydrated);
-  const hydrateCloneStates = useCloneStates((state) => state.hydrate);
+  const cloneStatesHydrated = useHydratedStore(useCloneStates);
   const setCloneStates = useCloneStates((state) => state.setValue);
-  useEffect(() => {
-    void hydrateCloneStates();
-  }, [hydrateCloneStates]);
   const cloneState = cloneStateFor(cloneStates, characterId);
   const setCloneState = (next: CloneState): void =>
     void setCloneStates(withCloneState(cloneStates, characterId, next));
@@ -466,7 +456,7 @@ export function PlanEditor({
   }
 
   const stepLabel = (step: PlanStep): string =>
-    `${nameFor(step.skillTypeID)} ${ROMAN[step.level - 1]}`;
+    `${nameFor(step.skillTypeID)} ${romanLevel(step.level)}`;
 
   const pickerSkills = useMemo(
     () => [...catalog.bySkillTypeID.values()].sort((a, b) => a.name.localeCompare(b.name)),
@@ -500,7 +490,7 @@ export function PlanEditor({
       const blocker = removalBlockers.get(planEntryKey(skillTypeID, targetLevel));
       if (!blocker) return undefined;
       return t('plans.removeBlockedByDependent', {
-        blocker: `${nameFor(blocker.skillTypeID)} ${ROMAN[blocker.targetLevel - 1]}`,
+        blocker: `${nameFor(blocker.skillTypeID)} ${romanLevel(blocker.targetLevel)}`,
       });
     },
     [removalBlockers, nameFor, t]
@@ -1033,7 +1023,7 @@ export function PlanEditor({
 
   /** "{Skill} III" — how a promoted prereq is named back to the user. */
   const levelLabel = useCallback(
-    (skillTypeID: number, level: number): string => `${nameFor(skillTypeID)} ${ROMAN[level - 1]}`,
+    (skillTypeID: number, level: number): string => `${nameFor(skillTypeID)} ${romanLevel(level)}`,
     [nameFor]
   );
 
@@ -1074,8 +1064,8 @@ export function PlanEditor({
           result.skillTypeID === result.blockedBy
             ? t('plans.dropBlockedSameSkill', {
                 skill: nameFor(result.skillTypeID),
-                level: ROMAN[result.targetLevel - 1],
-                blockerLevel: ROMAN[result.blockedByLevel - 1],
+                level: romanLevel(result.targetLevel),
+                blockerLevel: romanLevel(result.blockedByLevel),
               })
             : t('plans.dropBlocked', {
                 skill: nameFor(result.skillTypeID),
@@ -1926,7 +1916,7 @@ export function PlanEditor({
               key={`${step.skillTypeID}-${step.level}-${i}`}
               className="border-b border-line py-1 last:border-b-0"
             >
-              {nameFor(step.skillTypeID)} {ROMAN[step.level - 1]}
+              {nameFor(step.skillTypeID)} {romanLevel(step.level)}
             </li>
           ))}
         </ul>

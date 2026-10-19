@@ -20,6 +20,7 @@ import { ESI_REGISTRY } from '@/esi/registry';
 import { useSolarSystemList } from '@/features/route/useSolarSystems';
 import { moveHighlight, COMBOBOX_NAV_KEYS, type ComboboxNavKey } from '@/lib/comboboxNav';
 import { cx } from '@/lib/cx';
+import { LOOKUP_DEBOUNCE_MS } from '@/lib/useDebouncedValue';
 import { loadNpcStations } from '@/sde/loadMarketSde';
 import type { NpcStationEntry } from '@/sde/marketTypes';
 import {
@@ -31,7 +32,6 @@ import {
 } from './surveyPlaces';
 
 const SEARCH_SCOPE = ESI_REGISTRY.getCharacterSearch.scope;
-const DEBOUNCE_MS = 300;
 
 export function SurveyLocationPicker({
   value,
@@ -86,7 +86,7 @@ export function SurveyLocationPicker({
         .then((places) => {
           if (!controller.signal.aborted) setStructureHits({ key: searchKey, places });
         });
-    }, DEBOUNCE_MS);
+    }, LOOKUP_DEBOUNCE_MS);
     return () => {
       clearTimeout(timer);
       controller.abort();

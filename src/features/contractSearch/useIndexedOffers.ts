@@ -1,3 +1,4 @@
+import { idSetKey } from '@/lib/idSetKey';
 /**
  * The Items board's reads through the R2 offer index (issue #2921, ADR 0019):
  * the index (so suggestions and the region list exist before any offers have
@@ -71,7 +72,7 @@ export function useEarlyOffers(
   );
   const key = useMemo(() => {
     if (!enabled || index === null || wanted === null || wanted.size === 0) return null;
-    const scope = typeIds === null ? 'all' : [...typeIds].sort((a, b) => a - b).join(',');
+    const scope = typeIds === null ? 'all' : idSetKey(typeIds);
     return `${index.lastSyncedAt}:${scope}`;
   }, [enabled, index, wanted, typeIds]);
 
@@ -92,8 +93,7 @@ export function useEarlyOffers(
       cancelled = true;
       clearTimeout(timer);
     };
-    // `key` encodes index and typeIds; listing the objects would re-run on every identity change of an equal set.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `key` encodes index and typeIds; listing the objects would re-run on every identity change of an equal set
   }, [key]);
 
   // An R2 index listing no type has nothing to read and nothing coming.

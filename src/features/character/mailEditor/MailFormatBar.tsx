@@ -15,7 +15,7 @@ import { useTranslation } from 'react-i18next';
 import { IconButton } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
-import { markupColorToCss } from '@/engine/eveMarkup';
+import { markupColorToCss } from '@/engine/mail/eveMarkup';
 import type { MailEditorCommands } from './commands';
 import { ColorDialog, LinkDialog, SizeDialog, TableDialog } from './FormatDialogs';
 

@@ -10,6 +10,7 @@
  * `TableActionsMenu`, the phone sort picker, and `AttentionStrip`. The row
  * detail mirrors `RowDetailModal` for an owed row.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useState } from 'react';
 import {
   Button,
@@ -480,10 +481,7 @@ export function PersonalF({ detail, diff }: { detail?: boolean; diff?: boolean }
         </section>
       </div>
       <section aria-labelledby="mining-tax-history" className="space-y-2">
-        <h2
-          id="mining-tax-history"
-          className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
-        >
+        <h2 id="mining-tax-history" className={eyebrowClassName}>
           History
         </h2>
         <Panel padded={false}>
@@ -563,9 +561,7 @@ function RowDetail({ open }: { open: boolean }) {
           <CorpStatusPill row={BILLED} />
         </div>
         <div className="space-y-1 rounded-xs border border-line bg-panel-2 p-2">
-          <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-            Ore
-          </p>
+          <p className={eyebrowClassName}>Ore</p>
           <ul className="divide-y divide-line text-xs">
             <li className="flex items-center gap-1.5 py-1 first:pt-0 last:pb-0">
               <OreIcon typeId={45490} size={32} className="h-4 w-4 shrink-0" />

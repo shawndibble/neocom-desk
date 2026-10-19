@@ -7,8 +7,8 @@ import {
   useExpiringWindowHours,
 } from './expiringWindow';
 import { colonyAttention, extractorState } from '@/engine/pi/colonyStatus';
+import { HOUR_MS } from '@/lib/age';
 
-const HOUR_MS = 3_600_000;
 const NOW = Date.parse('2026-09-07T00:00:00Z');
 
 beforeEach(async () => {

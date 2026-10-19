@@ -5,20 +5,15 @@
  * synced, and per device: an anonymous visitor on a shared page has no account
  * to remember it on.
  */
+import { readLocal, writeLocal } from '@/lib/safeLocalStorage';
+
 const KEY = 'miningSurveySubmitted';
 
 export function hasSubmittedScan(): boolean {
-  try {
-    return localStorage.getItem(KEY) === '1';
-  } catch {
-    return false;
-  }
+  return readLocal(KEY) === '1';
 }
 
 export function noteSubmittedScan(): void {
-  try {
-    localStorage.setItem(KEY, '1');
-  } catch {
-    // Best-effort: the pilot is asked once more.
-  }
+  // Best-effort: if blocked, the pilot is asked once more.
+  writeLocal(KEY, '1');
 }

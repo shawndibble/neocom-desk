@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom';
 import { Button, Panel, Tooltip } from '@/components/ui';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import type { AttributeName } from '@/engine/types';
-import type { VerdictSegment } from '@/engine/cloneVerdict';
+import type { VerdictSegment } from '@/engine/clone/cloneVerdict';
 import { useViewRoute } from '@/features/route/useViewRoute';
 import { CURRENT_QUEUE_HASH } from '@/features/skills/planner/currentQueueHash';
 import { formatDuration } from '@/lib/duration';

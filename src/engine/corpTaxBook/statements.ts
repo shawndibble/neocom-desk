@@ -13,6 +13,7 @@ import { activeDismissalFor, type Dismissal } from './dismissals';
 import type { DayCharge } from './charges';
 import type { TaxPriceSource } from '../miningTax/priceBasis';
 import type { OreLine } from './types';
+import { DAY_MS } from '@/lib/age';
 
 export const DEFAULT_MINIMUM_STATEMENT = 5_000_000;
 
@@ -26,8 +27,6 @@ export interface StatementPeriod {
   /** Inclusive. */
   end: string;
 }
-
-const DAY_MS = 86_400_000;
 
 function daysBetween(from: string, to: string): number {
   return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY_MS);

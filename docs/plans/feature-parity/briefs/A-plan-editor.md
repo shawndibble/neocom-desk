@@ -97,18 +97,18 @@ corrected item 05 below).
 
 **Verified baseline (field by field):**
 
-| Timeline value                                                  | Present?  | Citation                                                                                                                                                                                  |
-| --------------------------------------------------------------- | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| per-segment attributes                                          | YES       | `RemapSegment.attributes: Attributes` (`placeRemaps.ts`)                                                                                                                                  |
-| per-segment duration                                            | YES       | `RemapSegment.seconds` (`placeRemaps.ts`)                                                                                                                                                 |
-| per-segment start/end step                                      | YES       | `RemapSegment.startIndex`/`endIndex`, inclusive (`placeRemaps.ts`)                                                                                                                        |
-| "this segment is a remap" flag                                  | YES       | `RemapSegment.remap: boolean` (`placeRemaps.ts`; leading current-attrs segment is `false`)                                                                                                |
-| `savingsSeconds`                                                | YES       | `PlaceRemapsResult.savingsSeconds` (`placeRemaps.ts`)                                                                                                                                     |
-| no-remap-is-better case                                         | YES       | `noRemapResult()` (`placeRemaps.ts`), taken when `remapCount <= 0` and when current attrs already beat the best reachable allocation                                                      |
-| baseline for "% faster"                                         | YES       | `PlaceRemapsResult.currentSeconds` (`placeRemaps.ts`) — `savings/currentSeconds` is the percentage, no new field needed                                                                   |
-| **projected finish date**                                       | **NO**    | nothing in `src/engine` touches `Date`; `ScheduledStep` (`engine/types.ts:57-61`) carries only `seconds`/`cumulativeSeconds`                                                              |
-| **"REMAP BEFORE \<skill\>" divider position in the entry list** | **NO**    | `segment.startIndex` indexes the _computed queue_; `markers.ts:132` `markerStepIndices` maps entry→step, never step→entry                                                                 |
-| per-segment "why here" evidence                                 | DERIVABLE | `aggregateSpByPair` is exported (`optimizer/index.ts:3`); counterfactual seconds computable from `engine/sp.ts` `spBetween`/`trainingRate`/`timeToTrain` (all exported, `sp.ts:31/39/47`) |
+| Timeline value                                                  | Present?  | Citation                                                                                                                                                                                         |
+| --------------------------------------------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| per-segment attributes                                          | YES       | `RemapSegment.attributes: Attributes` (`placeRemaps.ts`)                                                                                                                                         |
+| per-segment duration                                            | YES       | `RemapSegment.seconds` (`placeRemaps.ts`)                                                                                                                                                        |
+| per-segment start/end step                                      | YES       | `RemapSegment.startIndex`/`endIndex`, inclusive (`placeRemaps.ts`)                                                                                                                               |
+| "this segment is a remap" flag                                  | YES       | `RemapSegment.remap: boolean` (`placeRemaps.ts`; leading current-attrs segment is `false`)                                                                                                       |
+| `savingsSeconds`                                                | YES       | `PlaceRemapsResult.savingsSeconds` (`placeRemaps.ts`)                                                                                                                                            |
+| no-remap-is-better case                                         | YES       | `noRemapResult()` (`placeRemaps.ts`), taken when `remapCount <= 0` and when current attrs already beat the best reachable allocation                                                             |
+| baseline for "% faster"                                         | YES       | `PlaceRemapsResult.currentSeconds` (`placeRemaps.ts`) — `savings/currentSeconds` is the percentage, no new field needed                                                                          |
+| **projected finish date**                                       | **NO**    | nothing in `src/engine` touches `Date`; `ScheduledStep` (`engine/types.ts:57-61`) carries only `seconds`/`cumulativeSeconds`                                                                     |
+| **"REMAP BEFORE \<skill\>" divider position in the entry list** | **NO**    | `segment.startIndex` indexes the _computed queue_; `markers.ts:132` `markerStepIndices` maps entry→step, never step→entry                                                                        |
+| per-segment "why here" evidence                                 | DERIVABLE | `aggregateSpByPair` is exported (`optimizer/index.ts:3`); counterfactual seconds computable from `engine/skills/sp.ts` `spBetween`/`trainingRate`/`timeToTrain` (all exported, `sp.ts:31/39/47`) |
 
 Both optimize modes return the same `PlaceRemapsResult` — `optimizeAtMarkers.ts:14`
 imports the type rather than defining its own, so a single timeline component
@@ -439,7 +439,7 @@ which the current cap makes moot.
   Its grouping key is hardcoded to `pairKey(skill.primary, skill.secondary)`
   (`:88`) and the helpers are module-private. There is also a ready-made
   validator, `isValidOrder` (`:66-76`), exported at `optimizer/index.ts:20`.
-- Separately, `normalizePlan` (`src/engine/plan.ts:22-38`) already guarantees
+- Separately, `normalizePlan` (`src/engine/skills/plan.ts:22-38`) already guarantees
   prereqs land ahead of dependents _in the computed queue_ — so item 08's
   prereq rule matters for the **entry list** the user sees and drags, not for
   training correctness.
@@ -496,7 +496,7 @@ attribution mapping item 01 needs — same shared primitive, one owner.
   `dedupeEntries` (`:23-34`) must preserve/merge `priority` (dedupe currently
   rebuilds bare `{ skillTypeID, targetLevel }` objects at `:33` and would
   **silently drop priority** — this is the real bug to catch).
-- `src/features/skills/planner/clipboardImport.ts`, `src/engine/queueImport.ts`
+- `src/features/skills/planner/clipboardImport.ts`, `src/engine/skills/queueImport.ts`
   — check that entries they mint get a default priority rather than `undefined`.
 - `src/i18n/locales/en.json`.
 

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Button, Disclosure, NeedsConnection, SearchInput, Spinner } from '@/components/ui';
 import { activeOptionClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
+import { LOOKUP_DEBOUNCE_MS } from '@/lib/useDebouncedValue';
 import { beginEveLogin } from '@/app/loginFlow';
 import { ESI_REGISTRY } from '@/esi/registry';
 import { useGrantedScopes } from '@/app/useGrantedScopes';
@@ -38,9 +39,6 @@ interface BuildLocationPickerProps {
 
 /** Read off the registry rather than spelled out here — this file stays hand-edit-free. */
 const SEARCH_SCOPE = ESI_REGISTRY.getCharacterSearch.scope;
-
-/** Long enough that a typed word is one request, short enough to feel live. */
-const DEBOUNCE_MS = 300;
 
 /**
  * Finds the station or structure the job runs in, and fills the fields that
@@ -160,7 +158,7 @@ export function BuildLocationPicker({
           setFailed(true);
           setSearching(false);
         });
-    }, DEBOUNCE_MS);
+    }, LOOKUP_DEBOUNCE_MS);
     return () => {
       clearTimeout(timer);
       controller.abort();

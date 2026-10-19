@@ -27,6 +27,7 @@ import {
   type ReactNode,
 } from 'react';
 import { Navigate } from 'react-router-dom';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useTranslation } from 'react-i18next';
 import { Spinner } from '@/components/ui';
 import { guarded } from '@/app/routeChunks';
@@ -159,25 +160,18 @@ export function Overview() {
   const activeHydrated = useActiveCharacter((state) => state.hydrated);
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const stored = useOverviewLayout((state) => state.value);
-  const layoutHydrated = useOverviewLayout((state) => state.hydrated);
-  const hydrateLayout = useOverviewLayout((state) => state.hydrate);
   const setLayout = useOverviewLayout((state) => state.setValue);
   // The old board's two settings: read for a returning pilot's first layout.
   // Only their read side is kept.
   const hidden = useOverviewHiddenCards((state) => state.value);
-  const hiddenHydrated = useOverviewHiddenCards((state) => state.hydrated);
-  const hydrateHidden = useOverviewHiddenCards((state) => state.hydrate);
   const order = useOverviewCardOrder((state) => state.value);
-  const orderHydrated = useOverviewCardOrder((state) => state.hydrated);
-  const hydrateOrder = useOverviewCardOrder((state) => state.hydrate);
 
-  useEffect(() => {
-    void hydrateLayout();
-    void hydrateHidden();
-    void hydrateOrder();
-  }, [hydrateLayout, hydrateHidden, hydrateOrder]);
-
-  const hydrated = activeHydrated && layoutHydrated && hiddenHydrated && orderHydrated;
+  const storesHydrated = useHydratedStore(
+    useOverviewLayout,
+    useOverviewHiddenCards,
+    useOverviewCardOrder
+  );
+  const hydrated = activeHydrated && storesHydrated;
   const returning = isReturningPilot(hidden, order);
   // An absent layout is a first run only once a second device's pull has had its say.
   const firstRunReady = useFirstRunReady(hydrated);

@@ -24,6 +24,7 @@ import {
   isFeedChannelEnabled,
   useNotificationPreferences,
 } from './preferences';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useSnoozeStore, withoutSnoozed } from './snooze';
 
 /**
@@ -37,17 +38,10 @@ export function useVisibleAlertEntries(): NotificationFeedRecord[] {
   const snoozed = useSnoozeStore((state) => state.value);
   const now = useTicker(60_000);
 
-  /*
-   * Hydrated here rather than relied on from elsewhere. The Overview's old
-   * feed panel used to do it on the one route that showed alerts; this badge
-   * is in the rail, so it is on every route, and the only other hydrator is
-   * the Foreground Poller — which is not this hook's dependency and should not
-   * quietly become one. `hydrate` returns early once done, so the extra call
-   * costs nothing.
-   */
+  // Hydrated here, not relied on from elsewhere: the rail badge is on every route.
+  useHydratedStore(useSnoozeStore);
   useEffect(() => {
     void hydrateNotificationPreferences();
-    void useSnoozeStore.getState().hydrate();
   }, []);
 
   const entries = useLiveQuery(() => readFeed(), [], []);

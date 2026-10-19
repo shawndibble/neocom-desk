@@ -7,7 +7,7 @@
  * Conditions, never verdicts, as on Route Safety: a row says where, what
  * state and how far, never whether it is worth flying to.
  */
-import type { DeadlineSeverity } from '@/engine/severity';
+import type { DeadlineSeverity } from '@/engine/character/severity';
 import type { IncursionRow } from '@/engine/incursions/incursionRows';
 import type { JumpDistanceStatus } from '@/features/route/currentSystem';
 import type { Translate } from './data/boardSummary';

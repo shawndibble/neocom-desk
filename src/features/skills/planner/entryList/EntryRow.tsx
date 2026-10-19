@@ -1,3 +1,4 @@
+import { romanLevel } from '@/engine/projection';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -9,7 +10,7 @@ import {
   useOpenAfterMenu,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import type { MilestoneStatus } from '@/engine/skillPlanMilestones';
+import type { MilestoneStatus } from '@/engine/skills/skillPlanMilestones';
 import type { PlanPriority } from '@/engine/types';
 import { formatCountdown } from '@/lib/duration';
 import { SkillLink } from '@/features/entities';
@@ -20,7 +21,7 @@ import type { MergedRow, PinnedInProgressEntry } from '../queueRows';
 import { formatLevelLabel } from '../rowAnnouncer';
 import { AttributePairBadge, MetaValue, PriorityPill, TimeCell } from './cells';
 import { AlphaCapMark, BoosterMark, MilestoneMark } from './marks';
-import { GRIP_BUTTON, NAME_CELL, ROMAN, useRowSortable } from './rowChrome';
+import { GRIP_BUTTON, NAME_CELL, useRowSortable } from './rowChrome';
 
 interface EntryRowProps {
   row: Extract<MergedRow, { kind: 'entry' }>;
@@ -132,7 +133,7 @@ export const EntryRow = memo(function EntryRow({
         {name}
       </SkillLink>{' '}
       <span className="shrink-0">
-        <span>{ROMAN[entry.targetLevel - 1]}</span>
+        <span>{romanLevel(entry.targetLevel)}</span>
         {boosted && <BoosterMark />}
         {alphaCapped && <AlphaCapMark />}
       </span>
