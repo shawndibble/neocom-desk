@@ -18,7 +18,7 @@ import {
 } from '@/engine/communities/shareMode';
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { AddBlueprintsDialog, type DialogPlaces } from './AddBlueprintsDialog';
-import { ConfirmDialog } from './ConfirmDialog';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { publishSharedLibrary, type PublishResult } from './libraryPush';
 import { BlueprintName, PlaceName } from './sharedBlueprintRows';
 import { namedLike, needleOf, ROW_LIMIT } from './shareLists';

@@ -22,7 +22,7 @@ import { itemsSummary, mailSubject } from '@/engine/communities/requestMail';
 import { mailSafe } from '@/lib/mailSafe';
 import { characterIdForUid } from '@/sync/uid';
 import { communityRequestsUrl } from './communityStore';
-import { ConfirmDialog } from './ConfirmDialog';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { MessageRequesterButton } from './MessageRequesterButton';
 import { PledgeRow } from './PledgeRow';
 import { callableErrorReason } from './callableError';
