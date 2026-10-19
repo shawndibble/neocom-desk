@@ -1,6 +1,6 @@
 import { idSetKey } from '@/lib/idSetKey';
+import { useCallback, useMemo, useState } from 'react';
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
-import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -135,27 +135,20 @@ function placeRefOf(row: ShipRow) {
  * effort: each lands as it resolves and the list never waits on them.
  */
 function usePlaces(rows: readonly ShipRow[], activeCharacterId: number | null, route: JumpBasis) {
-  const [origin, setOrigin] = useState<{ forCharacterId: number; systemId: number | null } | null>(
-    null
+  const loadOrigin = useCallback(
+    () => loadCharacterSolarSystemId(activeCharacterId ?? 0).catch(() => null),
+    [activeCharacterId]
   );
-  useEffect(() => {
-    if (activeCharacterId === null) return;
-    let cancelled = false;
-    void loadCharacterSolarSystemId(activeCharacterId)
-      .catch(() => null)
-      .then((systemId) => {
-        if (!cancelled) setOrigin({ forCharacterId: activeCharacterId, systemId });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [activeCharacterId]);
-  const originKnown = activeCharacterId === null || origin?.forCharacterId === activeCharacterId;
+  const origin = useKeyedLoad(
+    activeCharacterId === null ? null : String(activeCharacterId),
+    loadOrigin
+  );
+  const originKnown = activeCharacterId === null || origin.status === 'ready';
   const refs = useMemo(() => rows.map(placeRefOf), [rows]);
   return usePlaceDetails(refs, {
     scopeId: activeCharacterId,
     origin: {
-      systemId: activeCharacterId === null ? null : (origin?.systemId ?? null),
+      systemId: activeCharacterId === null ? null : (origin.data ?? null),
       resolved: originKnown,
     },
     basis: route,
@@ -190,23 +183,17 @@ interface SortKeys {
   jumps: number | null;
 }
 
+const NO_CLASSES: ReadonlyMap<number, string> = new Map();
+
 /** Ship classes (SDE groups) by group id; lands after the list, which never waits on it. */
 function useShipClasses(groupIds: readonly number[]): ReadonlyMap<number, string> {
-  const [classes, setClasses] = useState<ReadonlyMap<number, string>>(new Map());
   const idsKey = idSetKey(groupIds);
-  useEffect(() => {
-    if (idsKey === '') return;
-    let cancelled = false;
-    void loadGroupNames(idsKey.split(',').map(Number))
-      .then((names) => {
-        if (!cancelled) setClasses(names);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [idsKey]);
-  return classes;
+  const loadClasses = useCallback(
+    () => loadGroupNames(idsKey.split(',').map(Number)).catch(() => NO_CLASSES),
+    [idsKey]
+  );
+  const { data } = useKeyedLoad(idsKey === '' ? null : idsKey, loadClasses);
+  return data ?? NO_CLASSES;
 }
 
 interface ShipRowViewProps {
