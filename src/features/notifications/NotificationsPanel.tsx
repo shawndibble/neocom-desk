@@ -31,7 +31,7 @@ import { inlineLinkClassName, tappableRowClassName } from '@/components/ui/contr
 import { AlertsWhenClosedSection } from './AlertsWhenClosedSection';
 import { NotificationEventList } from './NotificationEventList';
 import type { EventRowContext } from './eventRowSupport';
-import { useIsDesktop } from './useIsDesktop';
+import { MD_UP_QUERY, useMediaQuery } from '@/lib/useMediaQuery';
 import { db } from '@/db';
 import { NOTIFICATION_EVENT_IDS, eventLabelKey } from './events';
 import {
@@ -153,7 +153,7 @@ export function NotificationsPanel() {
 
   const [search, setSearch] = useUrlParam('search', SEARCH_PARAM);
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
-  const isDesktop = useIsDesktop();
+  const isDesktop = useMediaQuery(MD_UP_QUERY);
 
   const scopesByCharacterId = useMemo(() => {
     const map = new Map<number, ReadonlySet<string>>();
