@@ -886,6 +886,32 @@ suite('Corp Tax Book callables (emulator)', () => {
         expect((await answers())['61']).toBeUndefined();
       });
 
+      it('keeps a confirmation when an officer regroups a Miner that still holds the character', async () => {
+        await pendingGuest();
+        await confirmGrouping(deps(), who(61), CORP, 'm-a');
+        await edit(ACCOUNTANT, {
+          action: 'regroupMiner',
+          minerId: 'm-a',
+          characterIds: [60, 61, 63],
+          mainCharacterId: 60,
+          absorbMinerIds: [],
+        });
+        expect((await answers())['61']).toMatchObject({ answer: 'confirmed' });
+      });
+
+      it('refuses a decline once the Miner account is closed, and keeps the Miner', async () => {
+        await pendingGuest();
+        await edit(ACCOUNTANT, {
+          action: 'closeAccount',
+          minerId: 'm-a',
+          reason: 'Guest left the area',
+          credit: { kind: 'refund' },
+          statement: statement('final_m-a', { minerId: 'm-a', characterIds: [60] }),
+        });
+        expect(await reason(declineGrouping(deps(), who(61), CORP, 'm-a'))).toBe('account-closed');
+        expect((await miner()).get('closedAt')).toBe(new Date(T0).toISOString());
+      });
+
       it('forgets an answer when an officer regroups the character', async () => {
         await pendingGuest();
         await declineGrouping(deps(), who(61), CORP, 'm-a');
