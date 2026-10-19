@@ -13877,6 +13877,9 @@
         "empty": "Nothing has been done in the book yet.",
         "system": "System",
         "viaScheduled": "scheduled sync",
+        "officersRevoked_zero": "no other officer had access",
+        "officersRevoked_one": "{{count}} officer must re-verify",
+        "officersRevoked_other": "{{count}} officers must re-verify",
         "actions": {
           "scheduledSyncOn": "turned on the scheduled sync",
           "scheduledSyncOff": "turned off the scheduled sync",
@@ -14088,7 +14091,18 @@
         "approvalLimit": "A dismissal above this needs a Director (ISK)",
         "approvalHint": "Currently {{limit}}. Leave it empty for no limit.",
         "approvalHintNone": "No limit is set. Leave it empty to keep it that way.",
-        "approvalDirector": "Only a Director sets the approval limit."
+        "approvalDirector": "Only a Director sets the approval limit.",
+        "reclaim": {
+          "title": "Ownership",
+          "hint": "As CEO you can reclaim the book at any time.",
+          "open": "Reclaim the book…",
+          "confirmTitle": "Reclaim the book?",
+          "body": "You become the book's owner. Every other officer loses access until they open Moons again and re-verify.",
+          "confirm": "Reclaim the book",
+          "done_zero": "Book reclaimed; no other officer had access",
+          "done_one": "Book reclaimed; {{count}} officer must re-verify",
+          "done_other": "Book reclaimed; {{count}} officers must re-verify"
+        }
       },
       "grouping": {
         "title": "Characters",

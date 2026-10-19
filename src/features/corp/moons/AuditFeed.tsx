@@ -1,13 +1,17 @@
+import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import type { AuditEntry } from '../taxBook/bookClient';
 import { shortDateTime } from './moonsFormat';
 
-function detailLine(entry: AuditEntry): string {
+function detailLine(entry: AuditEntry, t: TFunction): string {
+  const revoked = entry.detail.officersRevoked;
+  if (entry.action === 'reclaim' && typeof revoked === 'number')
+    return t('corpTaxBook.moons.activity.officersRevoked', { count: revoked });
   const reason = entry.detail.reason;
   return typeof reason === 'string' && reason ? reason : '';
 }
 
-/** One line per entry: when, who, what, and the reason when it had one. */
+/** One line per entry: when, who, what, and the reason (or a reclaim's revoked count) when it had one. */
 export function AuditFeed({ entries, empty }: { entries: readonly AuditEntry[]; empty?: string }) {
   const { t } = useTranslation();
   if (entries.length === 0)
@@ -17,7 +21,7 @@ export function AuditFeed({ entries, empty }: { entries: readonly AuditEntry[]; 
   return (
     <ul className="divide-y divide-line text-sm">
       {entries.map((a) => {
-        const why = detailLine(a);
+        const why = detailLine(a, t);
         return (
           <li key={a.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 py-1.5">
             <span className="w-28 shrink-0 text-xs text-text-dim tabular-nums">
