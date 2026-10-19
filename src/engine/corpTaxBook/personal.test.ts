@@ -178,21 +178,43 @@ describe('overlayCorpBooks', () => {
     expect(out.labels.size).toBe(0);
   });
 
-  it('marks free ore no book claims as Unattributed once the day is closed', () => {
+  it('marks the free ore a book did not claim as Unattributed once the day is closed', () => {
+    const out = overlay(
+      [
+        entry({
+          oreLines: [
+            { typeId: ZEO, quantity: 41_200 },
+            { typeId: SYL, quantity: 5_000 },
+          ],
+          freeOreLines: [
+            { typeId: ZEO, quantity: 41_200 },
+            { typeId: SYL, quantity: 5_000 },
+          ],
+        }),
+      ],
+      [book()] // the book observed Zeolites only
+    );
+    expect(out.labels.get(`${ME}:2026-10-17:${SYSTEM}`)).toMatchObject({
+      state: 'unattributed',
+      corporationId: CORP,
+    });
+  });
+
+  it('leaves ore no book observed at all as plain Unassigned, not Unattributed', () => {
     const out = overlay(
       [entry({ date: '2026-10-13' })],
       [book({ observed: [] })] // synced after the day closed, book saw nothing
     );
     expect(out.rows).toEqual([]);
-    expect(out.labels.get(`${ME}:2026-10-13:${SYSTEM}`)).toMatchObject({ state: 'unattributed' });
+    expect(out.labels.size).toBe(0);
   });
 
-  it('says Unattributed only of the Characters the book is read for', () => {
-    const open = overlay(
-      [entry({ date: '2026-10-13' })],
-      [book({ observed: [], characterIds: [42] })]
+  it('leaves ore in a system no book observed Unassigned even when it observed another system that day', () => {
+    const out = overlay(
+      [entry({ solarSystemId: 30000142 })],
+      [book()] // the book's observation is in SYSTEM
     );
-    expect(open.labels.size).toBe(0);
+    expect(out.labels.size).toBe(0);
   });
 
   it('does not call a share of a split entry a dispute', () => {

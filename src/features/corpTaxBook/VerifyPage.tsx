@@ -1,16 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  Button,
-  Checkbox,
-  DataTable,
-  EmptyState,
-  Panel,
-  Spinner,
-  StatChip,
-  StatChips,
-  type DataTableColumn,
-} from '@/components/ui';
+import { Button, Checkbox, EmptyState, Panel, Spinner, StatChip, StatChips } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import {
@@ -190,77 +180,6 @@ function VerifyStatement({ token, payload }: { token: string; payload: VerifyPay
   const remaining = settlement?.remaining ?? Math.max(0, statement.amount - credited);
   const rates = ratesUsed(rows);
 
-  const columns: DataTableColumn<VerifyRow>[] = [
-    {
-      id: 'date',
-      header: t('corpTaxBook.verify.col.day'),
-      render: (r) => shortDate(r.date, locale),
-    },
-    {
-      id: 'ore',
-      header: t('corpTaxBook.verify.col.ore'),
-      primary: true,
-      render: (r) =>
-        r.ores.length === 0 ? (
-          <span>
-            {r.kind === 'correction'
-              ? t('corpTaxBook.verify.correction')
-              : t('corpTaxBook.verify.lateOre')}
-            {r.reason && <span className="block text-xs text-text-dim">{r.reason}</span>}
-          </span>
-        ) : (
-          <span>
-            {r.ores.map((o) => (
-              <span key={o.typeId} className="block">
-                {oreNames.get(o.typeId) ?? `#${o.typeId}`} × {o.quantity.toLocaleString(locale)}
-              </span>
-            ))}
-            <span className="block text-xs text-text-dim">
-              {refinery(r.structureId)}
-              {r.kind === 'late-ore' && ` · ${t('corpTaxBook.verify.lateOre')}`}
-            </span>
-          </span>
-        ),
-    },
-    {
-      id: 'price',
-      header: t('corpTaxBook.verify.col.price'),
-      align: 'right',
-      className: 'tabular-nums',
-      render: (r) =>
-        r.ores.length === 0 ? (
-          '—'
-        ) : (
-          <span>
-            {r.ores.map((o) => (
-              <span key={o.typeId} className="block">
-                {o.unitPrice === undefined ? '—' : isk(o.unitPrice, 2)}
-                <span className="block text-xs text-text-dim">
-                  {shortDate(r.date, locale)}
-                  {o.source && ` · ${t(`miningTax.detail.breakdown.source.${o.source}`)}`}
-                </span>
-              </span>
-            ))}
-          </span>
-        ),
-    },
-    {
-      id: 'rate',
-      header: t('corpTaxBook.verify.col.rate'),
-      align: 'right',
-      className: 'tabular-nums',
-      render: (r) => (r.taxPct === undefined ? '—' : `${r.taxPct}%`),
-    },
-    {
-      id: 'tax',
-      header: t('corpTaxBook.verify.col.tax'),
-      align: 'right',
-      className: 'tabular-nums',
-      cardCorner: true,
-      render: (r) => isk(r.tax),
-    },
-  ];
-
   const lastDeclaration = payload.declarations.at(-1);
 
   return (
@@ -282,12 +201,12 @@ function VerifyStatement({ token, payload }: { token: string; payload: VerifyPay
           {t('corpTaxBook.verify.closed', { corp })}
         </p>
       )}
-      <div className="flex flex-col gap-4 md:grid md:grid-cols-[minmax(0,1fr)_22rem] md:items-start">
+      <div className="flex flex-col gap-4 md:grid md:grid-cols-[minmax(0,1fr)_22rem] md:grid-rows-[auto_auto_minmax(0,1fr)] md:items-start">
         <div className="order-3 min-w-0 space-y-4 md:order-none md:col-start-1 md:row-span-3 md:row-start-1">
           <Panel
             title={t('corpTaxBook.verify.mined')}
             meta={
-              <span className="text-xs text-text-dim">
+              <span className="text-xs text-text-dim max-md:basis-full">
                 {t('corpTaxBook.verify.minedMeta', {
                   hub,
                   form: t(`corpTaxBook.verify.oreForm.${statement.oreForm}`),
@@ -295,15 +214,19 @@ function VerifyStatement({ token, payload }: { token: string; payload: VerifyPay
               </span>
             }
             padded={false}
+            wrapMeta
           >
-            <DataTable
-              label={t('corpTaxBook.verify.linesLabel')}
-              columns={columns}
-              rows={rows}
-              rowKey={(r) => r.key}
-              density="compact"
-              stackLayout="dense"
-            />
+            <ul aria-label={t('corpTaxBook.verify.linesLabel')} className="divide-y divide-line">
+              {rows.map((r) => (
+                <MinedDay
+                  key={r.key}
+                  row={r}
+                  oreNames={oreNames}
+                  refineryName={refinery(r.structureId)}
+                  locale={locale}
+                />
+              ))}
+            </ul>
             <p className="border-t border-line px-3 py-2 text-right text-sm tabular-nums">
               {t('corpTaxBook.verify.billed')}{' '}
               <span className="font-semibold">{isk(statement.amount)}</span>
@@ -424,6 +347,83 @@ function VerifyStatement({ token, payload }: { token: string; payload: VerifyPay
         </div>
       </div>
     </>
+  );
+}
+
+/** The segments of a day's meta line, with empty ones (an unnamed refinery, no rate) dropped. */
+function metaSegments(parts: readonly (string | undefined | false)[]): string[] {
+  return parts.filter((p): p is string => typeof p === 'string' && p.trim() !== '');
+}
+
+/**
+ * One mined day: the day, refinery, rate and the day's tax once, then one
+ * sub-row per ore (ore × quantity, its unit price, the price's date and source)
+ * so every price sits beside its own ore.
+ */
+function MinedDay({
+  row: r,
+  oreNames,
+  refineryName,
+  locale,
+}: {
+  row: VerifyRow;
+  oreNames: ReadonlyMap<number, string>;
+  refineryName: string | undefined;
+  locale: string;
+}) {
+  const { t } = useTranslation();
+  const segments = metaSegments([
+    shortDate(r.date, locale),
+    refineryName,
+    r.kind === 'late-ore' && t('corpTaxBook.verify.lateOre'),
+    r.taxPct === undefined ? undefined : `${r.taxPct}%`,
+  ]);
+  return (
+    <li className="px-3 py-2 text-sm">
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="min-w-0 text-text-dim">
+          {r.ores.length === 0 && (
+            <span className="text-text">
+              {r.kind === 'correction'
+                ? t('corpTaxBook.verify.correction')
+                : t('corpTaxBook.verify.lateOre')}
+              {' · '}
+            </span>
+          )}
+          {segments.map((seg, i) => (
+            <span key={`${i}${seg}`}>
+              {i > 0 && <span aria-hidden="true"> · </span>}
+              <span>{seg}</span>
+            </span>
+          ))}
+        </span>
+        <span className="shrink-0 font-semibold tabular-nums">{isk(r.tax)}</span>
+      </div>
+      {r.reason && <p className="text-xs text-text-dim">{r.reason}</p>}
+      {r.ores.length > 0 && (
+        <ul className="mt-1 space-y-1">
+          {r.ores.map((o) => (
+            <li
+              key={o.typeId}
+              className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 md:grid-cols-[minmax(0,1fr)_10rem_14rem]"
+            >
+              <span>
+                {oreNames.get(o.typeId) ?? `#${o.typeId}`} × {o.quantity.toLocaleString(locale)}
+              </span>
+              <span className="text-right tabular-nums">
+                {o.unitPrice === undefined ? '—' : isk(o.unitPrice, 2)}
+              </span>
+              <span className="col-span-2 text-xs text-text-dim md:col-span-1 md:text-right">
+                {metaSegments([
+                  shortDate(r.date, locale),
+                  o.source && t(`miningTax.detail.breakdown.source.${o.source}`),
+                ]).join(' · ')}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </li>
   );
 }
 

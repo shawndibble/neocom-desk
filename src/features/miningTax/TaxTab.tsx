@@ -177,6 +177,7 @@ import {
   isCorpPayeeId,
 } from '@/features/miningTax/corpBook/corpRows';
 import { useCorpBookView } from '@/features/miningTax/corpBook/useCorpBookView';
+import { useBookSystems } from '@/features/miningTax/corpBook/useBookSystems';
 
 /** A short display line for a linked ref, from the same `MadePayment[]` the Payments-to-link card already loaded — `null` when it's no longer in the cached wallet journal/contracts. */
 function labelForLinkedRef(
@@ -256,6 +257,7 @@ interface Snapshot {
 
 const NO_HUBS: ReadonlySet<TradeHub['id']> = new Set();
 const NO_NAMES: ReadonlyMap<number, string> = new Map();
+const NO_SECURITY: ReadonlyMap<number, number> = new Map();
 const NO_PAYEES_BY_CHARACTER: ReadonlyMap<number, PayeeRecord[]> = new Map();
 
 const EMPTY_DATED_PRICES: DatedUnitPrices = {
@@ -524,6 +526,11 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     activeCharacterId,
     madePayments,
     reloadKey: data?.fetchedAt?.getTime(),
+  });
+  // Book rows carry a raw solar system id; resolve it like a personal row's.
+  const bookSystems = useBookSystems(corpView, {
+    names: data?.systemNames ?? NO_NAMES,
+    security: data?.systemSecurity ?? NO_SECURITY,
   });
   const corpStateLabel = useCorpStateLabel();
   const corpStateHint = useCorpStateHint();
@@ -1012,11 +1019,11 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
 
   function systemName(dr: DisplayRow): string {
     if (dr.row.entry.solarSystemId === 0) return '—';
-    return systemLabel(data?.systemNames ?? NO_NAMES, dr.row.entry.solarSystemId);
+    return systemLabel(bookSystems.names, dr.row.entry.solarSystemId);
   }
 
   function systemSecurityOf(dr: DisplayRow): number | undefined {
-    return data?.systemSecurity.get(dr.row.entry.solarSystemId);
+    return bookSystems.security.get(dr.row.entry.solarSystemId);
   }
 
   /** Both the table's Value column and the sole Assignment-less rows: an unassigned entry has no `estimatedValue` of its own, so it's priced live from its still-unclaimed ore lines instead. A combined row sums every member's own value — never a blended re-price across dates. */
@@ -1747,7 +1754,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
               {duplicateRows.map((row) => (
                 <li key={`${row.characterId}:${row.entry.date}:${row.entry.solarSystemId}`}>
                   {row.characterName} — {row.entry.date} —{' '}
-                  {systemLabel(data.systemNames, row.entry.solarSystemId)}
+                  {systemLabel(bookSystems.names, row.entry.solarSystemId)}
                 </li>
               ))}
             </ul>
@@ -2203,7 +2210,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
             onChanged={refresh}
             owedByPayee={owedByPayee}
             systemsByPayee={payeeSystems}
-            systemNames={data?.systemNames}
+            systemNames={bookSystems.names}
           />
         )}
 
@@ -2470,7 +2477,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
             open
             onClose={() => setSettleUpRows(null)}
             rows={liveSettleUpRows ?? settleUpRows}
-            systemNames={data.systemNames}
+            systemNames={bookSystems.names}
             arrivalCheck={settleUpRecheck}
             onPaid={() => {
               setSelection(new Set());
@@ -2503,7 +2510,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
             owed={linkWalletOwed}
             candidates={linkWalletCandidates}
             paymentSources={paymentSources}
-            systemNames={data.systemNames}
+            systemNames={bookSystems.names}
             onLinked={() => {
               setSelection(new Set());
               refresh();
@@ -2516,7 +2523,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
             open
             onClose={() => setLinkPaymentOpen(false)}
             suggestions={linkSuggestions}
-            systemNames={data.systemNames}
+            systemNames={bookSystems.names}
             showCharacter={characters.length > 1}
             onLinked={refresh}
           />
@@ -2527,7 +2534,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
             open
             onClose={() => setBulkDismissOpen(false)}
             rows={dismissTargets}
-            systemNames={data.systemNames}
+            systemNames={bookSystems.names}
             estimatedValueOf={estimatedValueOf}
             showCharacter={showCharacterColumn}
             onDismissed={() => {
