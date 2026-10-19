@@ -7,6 +7,7 @@
  * Amarr, Dodixie, Rens, Hek) is the order at every width: a hub is always in
  * the same place on the grid.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -81,9 +82,7 @@ function HubFigure({
 }) {
   return (
     <div>
-      <dt className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-        {label}
-      </dt>
+      <dt className={eyebrowClassName}>{label}</dt>
       <dd className="text-base text-text tabular-nums">
         {value === null ? '—' : <CopyableTotal value={value} copied={copied} onCopied={onCopied} />}
       </dd>

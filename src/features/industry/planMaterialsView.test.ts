@@ -19,7 +19,7 @@ import {
 } from '@/engine/industry/ownedStockOffer';
 import { normalizeMaterialSourcingMap } from '@/engine/industry/sourcing';
 import type { MaterialSourcingMap } from '@/engine/industry/types';
-import { applySourcingPatch } from './sourcingEdits';
+import { applySourcingPatch } from '@/engine/industry/sourcingEdits';
 import {
   applyToGroupOwnedStock,
   groupOwnedDifference,

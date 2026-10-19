@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useState, type ComponentProps } from 'react';
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { useMemo, useState, type ComponentProps } from 'react';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { OreIcon, OreLink } from './OreIcon';
 import { useTranslation } from 'react-i18next';
 import {
@@ -92,7 +94,7 @@ function DefaultedIskInput({
   );
 }
 
-const LABEL = 'text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
+const LABEL = eyebrowClassName;
 
 /**
  * The one edit form for an assigned entry (mockup F1, scope decision
@@ -130,12 +132,9 @@ export function EntryEditDialog({
   const { t } = useTranslation();
   const isPhone = useIsPhone();
   const perOre = useMiningTaxOreValueMode((state) => state.value);
-  const hydrateOreValueMode = useMiningTaxOreValueMode((state) => state.hydrate);
   // Nothing else on the Tax tab loads this setting — only Settings did, so a
   // pilot who came straight here got the per-day boxes despite turning it on.
-  useEffect(() => {
-    void hydrateOreValueMode();
-  }, [hydrateOreValueMode]);
+  useHydratedStore(useMiningTaxOreValueMode);
   const current = useMemo(
     () => [...members].sort((a, b) => a.row.entry.date.localeCompare(b.row.entry.date)),
     [members]

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { Modal } from './Modal';
@@ -32,6 +32,22 @@ async function open() {
 }
 
 describe('Modal', () => {
+  it('Escape in a Modal opened inside another closes only the inner one', () => {
+    const outerClose = vi.fn();
+    const innerClose = vi.fn();
+    render(
+      <Modal open onClose={outerClose} title="Settings">
+        <Modal open onClose={innerClose} title="Confirm">
+          <p>Sure?</p>
+        </Modal>
+      </Modal>
+    );
+    const inner = screen.getByRole('dialog', { name: 'Confirm' });
+    fireEvent(inner, new Event('cancel', { cancelable: true }));
+    expect(innerClose).toHaveBeenCalledTimes(1);
+    expect(outerClose).not.toHaveBeenCalled();
+  });
+
   it('opens as a modal dialog with an accessible name and content', async () => {
     const { dialog } = await open();
     expect(dialog).toHaveAttribute('open');

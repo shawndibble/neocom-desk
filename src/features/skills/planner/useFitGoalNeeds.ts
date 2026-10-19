@@ -13,7 +13,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type FittingRecord } from '@/db';
-import { decodeFittingShare } from '@/engine/fitting/fittingShare';
+import { decodeFittingShare } from '@/engine/fittings/fittingShare';
 import { fittingNeededSkills } from '@/engine/fitGoal';
 import { fittingRequirementTypeIds } from '@/engine/fittings/skillGaps';
 import { shareToFitting } from '@/engine/fittings/shareMapper';

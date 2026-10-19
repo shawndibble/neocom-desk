@@ -10,6 +10,7 @@
  * this modal's backdrop, so recovery (Try again, or Log in again for an auth
  * failure) has to live in the body — `SkillDetailModal`'s pattern.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { ExternalMark } from '@/components/ui/ExternalLink';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -197,10 +198,7 @@ export function EventDetailModal({
           </p>
           <div className="space-y-2 border-t border-line pt-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p
-                id="rsvp-response-label"
-                className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
-              >
+              <p id="rsvp-response-label" className={eyebrowClassName}>
                 {t('calendar.yourResponse')}
               </p>
               {/*
@@ -254,9 +252,7 @@ export function EventDetailModal({
             )}
           </div>
           <div className="space-y-2 border-t border-line pt-2">
-            <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-              {t('calendar.export')}
-            </p>
+            <p className={eyebrowClassName}>{t('calendar.export')}</p>
             <div className="flex flex-wrap gap-2">
               <Button
                 size="sm"

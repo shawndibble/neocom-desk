@@ -22,6 +22,7 @@
  * The journal is the same table `/wallet` draws (`WalletJournalTable.tsx`) —
  * ESI returns the same schema for both.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import {
   focusRingInsetClassName,
   interactiveClassName,
@@ -214,7 +215,7 @@ function CorpDivisionsPanel({
         selectedEntry ? (
           <>
             <p className="flex min-w-0 items-baseline justify-between gap-3">
-              <span className="min-w-0 truncate text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+              <span className={cx(eyebrowClassName, 'min-w-0 truncate')}>
                 {divisionLabel(selectedEntry)}
               </span>
               <span
@@ -261,7 +262,7 @@ function CorpDivisionsPanel({
                   )}
                 >
                   <Tooltip content={divisionLabel(entry)}>
-                    <span className="block truncate text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                    <span className={cx(eyebrowClassName, 'block truncate')}>
                       {divisionLabel(entry)}
                     </span>
                   </Tooltip>

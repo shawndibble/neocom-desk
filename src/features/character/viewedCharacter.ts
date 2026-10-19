@@ -18,7 +18,6 @@ const LEGACY_VIEWED_CHARACTER_PARAMS = ['chars'] as const;
 export interface WalletOriginState {
   origin: 'wallet';
 }
-export const WALLET_ORIGIN_STATE: WalletOriginState = { origin: 'wallet' };
 
 export function isFromWallet(state: unknown): boolean {
   return (state as Partial<WalletOriginState> | null)?.origin === 'wallet';
@@ -38,11 +37,6 @@ export function viewedCharacterIdFromSearch(search: string): number | null {
     if (id !== null) return id;
   }
   return null;
-}
-
-/** `path` with `?char=<id>` — the link a drill-in from another Character's row builds. */
-export function viewedCharacterHref(path: string, characterId: number): string {
-  return `${path}?${VIEWED_CHARACTER_PARAM}=${characterId}`;
 }
 
 /**

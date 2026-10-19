@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { OreIcon, OreLink } from './OreIcon';
 import { useState } from 'react';
@@ -180,9 +181,7 @@ export function JoinAssignDialog({
     >
       <div className="space-y-3 text-sm">
         <div className="space-y-1">
-          <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-            {t('miningTax.joinCandidateLabel')}
-          </p>
+          <p className={eyebrowClassName}>{t('miningTax.joinCandidateLabel')}</p>
           {candidates.length === 0 ? (
             <p className="text-xs text-text-dim">{t('miningTax.joinNoCandidatesHint')}</p>
           ) : (
@@ -228,9 +227,7 @@ export function JoinAssignDialog({
 
         {selected.length > 0 && (
           <div className="space-y-1 rounded-xs border border-line bg-panel-2 p-2">
-            <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-              {t('miningTax.oreColumn')}
-            </p>
+            <p className={eyebrowClassName}>{t('miningTax.oreColumn')}</p>
             <ul className="divide-y divide-line text-xs">
               {[primary, ...selected].flatMap((candidate) =>
                 (candidate.assignment
@@ -271,9 +268,7 @@ export function JoinAssignDialog({
           selected.length > 0 && (
             <div className="flex flex-col gap-3 sm:flex-row">
               <div className="min-w-0 space-y-1 sm:flex-1">
-                <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                  {t('miningTax.payeeLabel')}
-                </p>
+                <p className={eyebrowClassName}>{t('miningTax.payeeLabel')}</p>
                 <Select
                   value={payeeId ?? undefined}
                   onValueChange={(value) => {
@@ -295,9 +290,7 @@ export function JoinAssignDialog({
                 </Select>
               </div>
               <div className="space-y-1 sm:w-16 sm:shrink-0">
-                <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                  {t('miningTax.taxPctLabel')}
-                </p>
+                <p className={eyebrowClassName}>{t('miningTax.taxPctLabel')}</p>
                 <TextInput
                   type="number"
                   min={0}

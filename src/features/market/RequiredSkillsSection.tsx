@@ -6,6 +6,7 @@
  * row expand (the same section, so a pilot who never opens Show Info still
  * sees it from the order book directly).
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useTranslation } from 'react-i18next';
 import type { TrainedSkill } from '@/engine/types';
 import type { RequiredSkill } from '@/features/skills/dogma';
@@ -53,9 +54,7 @@ export function RequiredSkillsSection({
   return (
     <div>
       <div className="flex items-center justify-between border-b border-line pb-1">
-        <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-          {t('skills.requiredSkills.title')}
-        </h3>
+        <h3 className={eyebrowClassName}>{t('skills.requiredSkills.title')}</h3>
         {hasCharacter && <TargetPlanPicker target={target} />}
       </div>
       <div className="mt-1 space-y-1">

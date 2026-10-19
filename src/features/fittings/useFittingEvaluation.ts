@@ -56,6 +56,7 @@ import { loadSkills } from '@/sde/loadSde';
 import { useDogmaEngine } from './fittingContext';
 import { computeStatsOffThread, skillSourcesOffThread } from './evaluationService';
 import { onReconnect } from '@/stores/network';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 /**
  * Changes to the open Fitting (Variations' swap candidates), worked out
@@ -442,11 +443,7 @@ export function useFittingEvaluation({
 
   // Priced at the pilot's Trade Hub (Settings, or the Price section's select).
   const hubId = useMarketHub((state) => state.value);
-  const hubHydrated = useMarketHub((state) => state.hydrated);
-  const hydrateHub = useMarketHub((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateHub();
-  }, [hydrateHub]);
+  const hubHydrated = useHydratedStore(useMarketHub);
 
   // The clone's implants are already bought: priced like the multibuy list, without them.
   const cloneImplants = profile?.implantTypeIds;

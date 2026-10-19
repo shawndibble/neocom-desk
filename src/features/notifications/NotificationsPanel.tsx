@@ -69,6 +69,7 @@ import { useUrlParam } from '@/lib/useUrlState';
 import { textParam } from '@/lib/urlState';
 import { androidNotificationSettingsUrl, isPlayStoreApp } from '@/lib/playStoreApp';
 import { assignLocation } from '@/app/navigation';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 /** Module scope so `useUrlParam` sees a stable codec identity across renders. */
 const SEARCH_PARAM = textParam();
@@ -82,9 +83,7 @@ export function NotificationsPanel() {
   // Types the server has seen for each Character (issue #3755): a toggle for
   // one appears the next time Settings opens, so this is read, not awaited.
   const seenEveTypes = useSeenEveTypesStore((state) => state.value);
-  useEffect(() => {
-    void useSeenEveTypesStore.getState().hydrate();
-  }, []);
+  useHydratedStore(useSeenEveTypesStore);
   const extraTypesByCharacter = useMemo(
     () =>
       new Map(
@@ -119,9 +118,7 @@ export function NotificationsPanel() {
   const setPromptState = useNotificationPromptState((state) => state.setValue);
   const pushFailure = usePushFailure((state) => state.value);
   const [retrying, setRetrying] = useState(false);
-  useEffect(() => {
-    void usePushFailure.getState().hydrate();
-  }, []);
+  useHydratedStore(usePushFailure);
 
   // Records the ask here too, so someone who ignored the one-time explainer and
   // came to Settings instead is not offered it again on the next load.

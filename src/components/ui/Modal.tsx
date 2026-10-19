@@ -1,3 +1,5 @@
+import { eyebrowClassName } from './eyebrowClassName';
+import { cx } from '@/lib/cx';
 import {
   useCallback,
   useEffect,
@@ -186,6 +188,9 @@ export function Modal({
         // every close path routes through `onClose` and the parent's `open`,
         // which the effect turns into dialog.close().
         event.preventDefault();
+        // React carries `cancel` up its own tree: a Modal opened from inside
+        // another (a confirm over Settings) must close only itself.
+        event.stopPropagation();
         onClose();
       }}
       onClick={(event) => {
@@ -214,10 +219,7 @@ export function Modal({
                 </div>
               )}
               <header className="flex min-h-11 items-center justify-between gap-2 border-b border-line bg-panel-2 px-3 py-1 md:min-h-9">
-                <h2
-                  id={titleId}
-                  className="min-w-0 flex-1 truncate text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
-                >
+                <h2 id={titleId} className={cx(eyebrowClassName, 'min-w-0 flex-1 truncate')}>
                   {title}
                 </h2>
                 {titleActions}

@@ -6,6 +6,7 @@
  * the rule. The level word is the one red on a pilot's profile. The small
  * `ThreatBadge` belongs to the Local list rows, not here.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useTranslation } from 'react-i18next';
 import { InfoTooltip } from '@/components/ui';
 import type { KillSpace } from '@/engine/pilotList/killActivity';
@@ -120,9 +121,7 @@ export function PilotThreatBand({
           THREAT_FILL_CLASS[tone]
         )}
       >
-        <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-          {t('travel.pilot.threat.label')}
-        </span>
+        <span className={eyebrowClassName}>{t('travel.pilot.threat.label')}</span>
         <span className={cx('text-lg font-bold tracking-wider uppercase', THREAT_TEXT_CLASS[tone])}>
           {t(`travel.pilot.threat.level.${verdict.level}`)}
         </span>

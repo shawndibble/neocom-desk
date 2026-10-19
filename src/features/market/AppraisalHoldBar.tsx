@@ -25,7 +25,6 @@ export function AppraisalHoldBar({
   const { t } = useTranslation();
   const capacity = totalCargoM3(cargo);
   const fits = totals.volume <= capacity;
-  const pct = capacity > 0 ? Math.min(100, (totals.volume / capacity) * 100) : 0;
   return (
     <div className="flex flex-col gap-1" data-testid="hold-bar">
       <div className="flex flex-wrap items-baseline justify-between gap-2 text-[0.6875rem]">
@@ -55,7 +54,8 @@ export function AppraisalHoldBar({
       </div>
       <ProgressBar
         label={t('market.appraisal.holdBarLabel', { ship: cargo.label })}
-        value={Math.round(pct)}
+        value={totals.volume}
+        max={capacity}
         tone={fits ? 'accent' : 'warning'}
       />
       <p className="text-[0.6875rem] text-text-dim">

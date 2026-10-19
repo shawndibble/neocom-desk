@@ -1,25 +1,16 @@
 /**
- * Reads the Public Contract Offers snapshot (issues #906, #907, ADR 0013): a
- * shared, admin-write-only Firestore collection populated by the
- * `syncPublicContractOffers` scheduled function, narrowed here to the
- * blueprint copies BPC Search searches. Until #907 that narrowing was a
- * second, blueprint-only ingestion pipeline and its own collection; the
- * snapshot now carries every for-sale item type and each consumer takes the
- * slice it wants.
+ * Reads the Public Contract Offers snapshot (issues #906, #907, ADR 0013) from
+ * Cloudflare R2 (ADR 0019), published by the `syncPublicContractOffers`
+ * scheduled function and narrowed here to the blueprint copies (and originals)
+ * BPC Search searches. Until #907 that narrowing was a second, blueprint-only
+ * ingestion pipeline; the snapshot now carries every for-sale item type and
+ * each consumer takes the slice it wants.
  *
  * It is not per-character data, so it goes through `esi/cache.ts`'s
  * `GLOBAL_CACHE_CHARACTER_ID` sentinel, same trade every other
  * character-independent public lookup makes (`stations.ts`,
- * `regionNames.ts`). Reading still requires being signed in to Firebase as
- * *some* character (the collection's rule is `request.auth != null`), so
- * `ensureAnySession` reuses whichever session the sync feature already holds
- * rather than swapping it to the active character mid-sync (issue #2262).
+ * `regionNames.ts`). R2 objects are public, so no Firebase session is needed.
  */
-import { collection, getDocs } from 'firebase/firestore/lite';
-import { getSyncFirestore } from '@/sync/firebaseApp';
-import { ensureAnySession } from '@/sync/syncAuth';
-import { isSyncConfigured } from '@/app/syncStatus';
-import { readUnchangedSnapshot } from '@/features/contractSearch/chunkedSnapshot';
 import {
   loadWithCache,
   readCached,
@@ -32,22 +23,18 @@ import type { BpcContractRow } from '@/engine/contracts/bpcSearch';
 import {
   bpcRowsFromContractOffers,
   bpoRowsFromContractOffers,
-  type PublicContractOfferRow,
 } from '@/engine/contracts/contractOffers';
 
-const COLLECTION = 'publicContractOffers';
-const META_DOC_ID = 'meta';
+/** The Dexie cache key; unchanged since the Firestore read so existing caches carry over. */
 const CACHE_KEY = 'publicContractOffers';
 
 /**
  * How often the backend republishes the snapshot, and therefore the soonest a
  * refetch can return anything new. `STALE_AFTER.default`'s ten minutes is the
  * app-wide promise for a *Character's* own mutable data; against a twice-hourly
- * publish it just re-downloads a byte-identical snapshot up to three times per
- * cycle, which is a much worse trade now that the shared snapshot carries every
- * item type and is ~3x the size the blueprint-only one was. The panel's own
- * Refresh still bypasses this, and the UI shows the snapshot's `lastSyncedAt`
- * rather than when this browser last read Firestore.
+ * publish it just re-reads a byte-identical snapshot up to three times per
+ * cycle. The UI shows the snapshot's `lastSyncedAt` rather than when this
+ * browser last read it.
  */
 const SNAPSHOT_PUBLISH_INTERVAL_MS = 30 * 60_000;
 
@@ -60,30 +47,22 @@ export interface PublicBpcContractsSnapshot {
    * listed originals" until the next refetch.
    */
   originals?: BpcContractRow[];
-  /** When the backend last pulled EVE Ref's archive — the freshness that actually matters here, distinct from when this browser last read Firestore. Null when nothing has synced yet. */
+  /** When the backend last pulled EVE Ref's archive — the freshness that actually matters here, distinct from when this browser last read it. Null when nothing has synced yet. */
   lastSyncedAt: number | null;
 }
 
-interface ChunkDocData {
-  rows: PublicContractOfferRow[];
-}
-
-interface MetaDocData {
-  lastSyncedAt: number;
-}
-
 /**
- * The same snapshot from R2 (ADR 0019, issue #3746): only the blueprint types
- * are read, found by crossing the index's listed types with the SDE's
- * blueprints, instead of every type. `null` when R2 or the SDE cannot answer,
- * and the Firestore read takes over.
+ * Only the blueprint types are read, found by crossing the R2 index's listed
+ * types with the SDE's blueprints, instead of every type (ADR 0019, issue
+ * #3746). `null` when R2 or the SDE cannot answer: R2 is the only store (issue
+ * #4270), so that is the panel's "unavailable" state, never a Firestore read.
  *
  * One consequence: a contract's other lines are not read, so a bundle mixing
  * one blueprint with ordinary items tallies as a single-type contract and is
  * not flagged `isMultiType` (issue #1076). A bundle of two or more blueprint
  * types still is.
  */
-async function fetchSnapshotFromR2(): Promise<PublicBpcContractsSnapshot | null> {
+async function fetchSnapshot(): Promise<PublicBpcContractsSnapshot | null> {
   const index = await loadR2OfferIndex();
   if (!index) return null;
   const { lastSyncedAt } = index.data;
@@ -108,59 +87,12 @@ async function fetchSnapshotFromR2(): Promise<PublicBpcContractsSnapshot | null>
 }
 
 /**
- * Every chunk's raw rows are accumulated before narrowing, rather than each
- * chunk being narrowed as it is read: `bpcRowsFromContractOffers` tallies
- * distinct for-sale types per contract (issue #1076), and a contract's own
- * lines are not guaranteed to land in one chunk — the backend sorts by
- * contract before slicing into fixed-size chunks (`functions/src/index.ts`'s
- * `chunkRows`), so a contract can still straddle a chunk boundary if its own
- * line count is large enough (a real case: one archived bundle ran to 493
- * lines). Narrowing per chunk would tally each half of such a contract as
- * its own single-type listing — silently wrong in exactly the case this
- * fix exists for.
- *
- * `getDocs` already pulls every chunk doc into memory in one round trip (this
- * loop's `snapshot.docs` is not a network stream), so accumulating raw rows
- * first costs one transient array for the duration of this call, not a
- * second live copy — discarded the moment `bpcRowsFromContractOffers`
- * returns the narrowed rows below.
- */
-async function fetchSnapshot(characterId: number): Promise<PublicBpcContractsSnapshot | null> {
-  const fromR2 = await fetchSnapshotFromR2();
-  if (fromR2) return fromR2;
-  if (!isSyncConfigured()) return null;
-  await ensureAnySession(characterId);
-
-  // Stale but unchanged: one `meta` read instead of the whole collection.
-  const unchanged = await readUnchangedSnapshot<PublicBpcContractsSnapshot>(CACHE_KEY, COLLECTION);
-  if (unchanged) return unchanged;
-
-  const snapshot = await getDocs(collection(getSyncFirestore(), COLLECTION));
-  const offers: PublicContractOfferRow[] = [];
-  let lastSyncedAt: number | null = null;
-  for (const docSnap of snapshot.docs) {
-    if (docSnap.id === META_DOC_ID) {
-      lastSyncedAt = (docSnap.data() as MetaDocData).lastSyncedAt ?? null;
-    } else {
-      offers.push(...(docSnap.data() as ChunkDocData).rows);
-    }
-  }
-  return {
-    rows: bpcRowsFromContractOffers(offers),
-    originals: bpoRowsFromContractOffers(offers),
-    lastSyncedAt,
-  };
-}
-
-/**
  * Cache-through the same way every ESI-backed view loads (`fromCache` for
  * the offline banner, a manual refresh re-fetches) even though the live side
- * is Firestore, not ESI — `loadWithCache` only needs a `fetchLive`.
+ * is R2, not ESI — `loadWithCache` only needs a `fetchLive`.
  */
-export function loadPublicBpcContracts(
-  characterId: number
-): Promise<CachedResult<PublicBpcContractsSnapshot> | null> {
-  return loadWithCache(GLOBAL_CACHE_CHARACTER_ID, CACHE_KEY, () => fetchSnapshot(characterId), {
+export function loadPublicBpcContracts(): Promise<CachedResult<PublicBpcContractsSnapshot> | null> {
+  return loadWithCache(GLOBAL_CACHE_CHARACTER_ID, CACHE_KEY, fetchSnapshot, {
     staleAfterMs: SNAPSHOT_PUBLISH_INTERVAL_MS,
   });
 }

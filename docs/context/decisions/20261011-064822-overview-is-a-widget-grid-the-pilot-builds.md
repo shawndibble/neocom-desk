@@ -6,8 +6,8 @@ _Recorded 2026-10-11._
   renames and removes.** The fixed board of domain cards, the summary strip and
   the phone "Everything else" fold are retired. Each Widget is a Widget Kind
   instance shown as a Number, Chart or List. Full record and verification
-  checklist: `docs/design/overview-widgets.md`; mockup:
-  `docs/design/mockups/overview-widgets.html`.
+  checklist: `docs/design/overview-widgets.md`; mockup deleted when its tickets
+  closed (in git history).
 - **Size is width, not height.** S, M, L and Full are a third, half, two thirds
   and all of a row. Rows are packed in order with no gap-filling, so reading
   order is screen order.

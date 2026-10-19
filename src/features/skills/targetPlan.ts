@@ -7,7 +7,7 @@
 import { parseCharacterKeyedRecord } from '@/lib/characterKeyedRecord';
 import { createSyncedSetting } from '@/lib/useSyncedSetting';
 
-export const SYNCED_TARGET_SKILL_PLAN_KEY = 'sync.targetSkillPlan';
+const SYNCED_TARGET_SKILL_PLAN_KEY = 'sync.targetSkillPlan';
 
 export type TargetSkillPlanByCharacter = Record<number, string>;
 

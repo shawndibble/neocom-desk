@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { cx } from '@/lib/cx';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Trans, useTranslation } from 'react-i18next';
 import {
@@ -44,6 +46,7 @@ import {
 import { ColonyListHeader, ColonyRowView } from './ColonyRowView';
 import { PlanetImage } from '../PlanetImage';
 import { TodayPanel } from './TodayPanel';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 const PLAN_HREF = '/planetary-industry/plan';
 
@@ -89,7 +92,10 @@ function CharacterGroupHeader({
   return (
     <div
       data-character-group-header
-      className="flex items-center justify-between gap-x-2 gap-y-1 border-b max-md:flex-wrap border-line bg-panel-2 px-3 py-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
+      className={cx(
+        eyebrowClassName,
+        'flex items-center justify-between gap-x-2 gap-y-1 border-b max-md:flex-wrap border-line bg-panel-2 px-3 py-1.5'
+      )}
     >
       <div className="flex min-w-0 items-baseline gap-x-2 gap-y-0.5 max-md:flex-wrap">
         <span className="max-w-full truncate">{name}</span>
@@ -211,31 +217,45 @@ export function ColoniesTab({
   const setActiveCharacter = useActiveCharacter((state) => state.setActiveCharacter);
 
   const showAltColonies = useShowAltColonies((state) => state.value);
-  const hydrateShowAltColonies = useShowAltColonies((state) => state.hydrate);
   const setShowAltColonies = useShowAltColonies((state) => state.setValue);
-  useEffect(() => {
-    void hydrateShowAltColonies();
-  }, [hydrateShowAltColonies]);
+  useHydratedStore(useShowAltColonies);
 
   // Multi-open accordion, keyed by `${characterId}:${planetId}`: two characters
   // can each hold a colony on the same planet.
   const [expandedKeys, setExpandedKeys] = useState<ReadonlySet<string>>(() => new Set());
   const linkedKey = linkedColonyId !== null ? `${characterId}:${linkedColonyId}` : null;
   const isExpanded = (key: string) => expandedKeys.has(key) || key === linkedKey;
-  const setOpen = (key: string, open: boolean) =>
-    setExpandedKeys((current) => {
-      const next = new Set(current);
-      if (open) next.add(key);
-      else next.delete(key);
-      return next;
-    });
-  const toggle = (key: string) => {
-    const open = isExpanded(key);
-    // A `?colony=` link is a way in, not a lock: closing it drops the param.
-    if (key === linkedKey && open) onClearLinkedColony();
-    setOpen(key, !open);
-  };
-  const expand = (key: string) => setOpen(key, true);
+  const setOpen = useCallback(
+    (key: string, open: boolean) =>
+      setExpandedKeys((current) => {
+        const next = new Set(current);
+        if (open) next.add(key);
+        else next.delete(key);
+        return next;
+      }),
+    []
+  );
+  // Read through a ref so `toggle` stays one stable function: a memoised row
+  // would otherwise re-render on every open/close anywhere in the list.
+  const latest = useRef({ isExpanded, linkedKey, onClearLinkedColony });
+  useEffect(() => {
+    latest.current = { isExpanded, linkedKey, onClearLinkedColony };
+  });
+  const toggle = useCallback(
+    (key: string) => {
+      const {
+        isExpanded: expandedNow,
+        linkedKey: linked,
+        onClearLinkedColony: clear,
+      } = latest.current;
+      const open = expandedNow(key);
+      // A `?colony=` link is a way in, not a lock: closing it drops the param.
+      if (key === linked && open) clear();
+      setOpen(key, !open);
+    },
+    [setOpen]
+  );
+  const expand = useCallback((key: string) => setOpen(key, true), [setOpen]);
 
   // Scrolled to and focused once per link, not on every refresh of the data.
   const focusedLink = useRef<string | null>(null);
@@ -463,6 +483,19 @@ export function ColoniesTab({
     });
   }, [roster, pi, planAdvice.snapshot, altAdvice, nowMs, expiringWindowMs, haulHours]);
 
+  // Stable per group, so a memoised alt row skips re-rendering with its siblings.
+  const switchTargets = useMemo(
+    () =>
+      new Map(
+        altGroups.map((g) => [g.characterId, { name: g.characterName, characterId: g.characterId }])
+      ),
+    [altGroups]
+  );
+  const switchCharacter = useCallback(
+    (id: number) => void setActiveCharacter(id),
+    [setActiveCharacter]
+  );
+
   const otherCharacterCount =
     altGroups.length + roster.skipped.length + roster.notLoaded.length + roster.noColonies.length;
   const hasOtherCharacters = otherCharacterCount > 0;
@@ -588,8 +621,8 @@ export function ColoniesTab({
                       productNames={productNames}
                       schematicNames={schematicNames}
                       expanded={isExpanded(row.key)}
-                      onToggle={() => toggle(row.key)}
-                      onExpand={() => expand(row.key)}
+                      onToggle={toggle}
+                      onExpand={expand}
                       primary={index === 0}
                       own
                       haulLabel={haulLabel}
@@ -639,14 +672,12 @@ export function ColoniesTab({
                         productNames={productNames}
                         schematicNames={schematicNames}
                         expanded={isExpanded(row.key)}
-                        onToggle={() => toggle(row.key)}
-                        onExpand={() => expand(row.key)}
+                        onToggle={toggle}
+                        onExpand={expand}
                         primary={false}
                         own={false}
-                        switchTo={{
-                          name: group.characterName,
-                          onSwitch: () => void setActiveCharacter(group.characterId),
-                        }}
+                        switchTo={switchTargets.get(group.characterId)}
+                        onSwitch={switchCharacter}
                         haulLabel={haulLabel}
                       />
                     ))}

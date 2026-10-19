@@ -3,16 +3,14 @@
  * outstanding public courier contract as a route and a fee — for the
  * Contracts page's Courier tab (issue #910).
  *
- * The sibling of `publicContractOffers.ts` beside it; the chunk/meta layout
- * and the caching trade the two share live in `chunkedSnapshot.ts`.
- *
  * Far smaller than the offers snapshot: ADR 0013's live pull put courier and
- * loan contracts together under 620 against ~370k offer rows, so this is a
- * single chunk doc. That is why the panel reads it on mount rather than on the
- * first Courier click — deferring it would buy nothing and cost a fetch on the
- * way in. It comes from R2 when that answers and from Firestore otherwise
- * (`r2CourierSnapshot.ts`). It is read *separately* from the offers snapshot, though: see
- * `ContractSearchPanel.tsx` for why pairing the two was the wrong trade.
+ * loan contracts together under 620 against ~370k offer rows, so it is one R2
+ * object (`r2CourierSnapshot.ts`, ADR 0019). That is why the panel reads it on
+ * mount rather than on the first Courier click — deferring it would buy
+ * nothing and cost a fetch on the way in. R2 is the only store (issue #4270):
+ * unreachable with nothing cached reads as no snapshot, which the panel shows
+ * as "unavailable". It is read *separately* from the offers snapshot, though:
+ * see `ContractSearchPanel.tsx` for why pairing the two was the wrong trade.
  */
 import {
   loadChunkedSnapshot,
@@ -22,18 +20,16 @@ import {
 import { readR2CourierSnapshot } from '@/features/contractSearch/r2CourierSnapshot';
 import type { PublicCourierContractRow } from '@/engine/contracts/courierSearch';
 
-const SOURCE: ChunkedSnapshotSource = {
-  collectionName: 'publicCourierContracts',
-  /** Its own key: three payload shapes across these collections, three entries. */
+const SOURCE: ChunkedSnapshotSource<PublicCourierContractRow> = {
+  /** Its own key: one payload shape per entry. */
   cacheKey: 'publicCourierContracts',
   /** Published by the same job as the offers snapshot, so the same window. */
   staleAfterMs: 30 * 60_000,
-  /** R2 first (ADR 0019, issue #3748); the Firestore chunk is the fallback. */
-  readFirst: readR2CourierSnapshot,
+  read: readR2CourierSnapshot,
 };
 
-export function loadPublicCourierContracts(
-  characterId: number
-): Promise<ChunkedSnapshotRead<PublicCourierContractRow>> {
-  return loadChunkedSnapshot<PublicCourierContractRow>(SOURCE, characterId);
+export function loadPublicCourierContracts(): Promise<
+  ChunkedSnapshotRead<PublicCourierContractRow>
+> {
+  return loadChunkedSnapshot(SOURCE);
 }

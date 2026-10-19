@@ -57,3 +57,49 @@ Detail moved out of `CLAUDE.md` so it is read on demand. The short rules stay in
   render (lazy route chunks, jsdom, React warm-up), which lands on whichever
   test happens to run first. Pay it once in a `beforeAll` warm-up render with
   its own hook timeout, as `src/routes/IndustryPlanPage.test.tsx` does.
+
+## Running the app against the Firebase emulators (local only)
+
+CI doesn't deploy Cloud Functions or rules, and agents can't deploy to prod, so
+anything that needs a callable or a rules change (the Corp Tax Book, epic
+#4055) is checked in a browser against local emulators instead. Nothing here
+touches a real Firebase project: the project id is `demo-neocom-desk`.
+
+1. **Java.** The Firestore emulator is a JAR, so a JRE (11+, 21 is fine) must be
+   on `PATH`. WSL/Ubuntu: `sudo apt install openjdk-21-jre-headless`. Without
+   root, unpack a portable Temurin JRE and prepend its `bin/` to `PATH` for the
+   shell that runs the emulators and the seed.
+2. **Flag.** Add `VITE_FIREBASE_EMULATORS=1` to `.env.local` and restart
+   `npm run dev`. `src/sync/firebaseApp.ts` then connects Auth (9099), Firestore
+   lite (8080) and Functions (5001), the ports in `firebase.json`, and uses the
+   project id `demo-neocom-desk` instead of `VITE_FIREBASE_PROJECT_ID` (data and
+   function URLs are namespaced by it). It is off by
+   default and also requires `import.meta.env.DEV`, so a production build never
+   connects to an emulator (`src/sync/firebaseApp.test.ts` pins both).
+3. **Emulators.** `npm run emulators` builds `functions/` and starts
+   `auth,firestore,functions`. It passes `EVE_CLIENT_ID` through from the
+   environment, else from `VITE_EVE_CLIENT_ID` in `.env.local`/`.env`: the
+   emulator's function discovery doesn't read `functions/.env`. `mintFirebaseToken`
+   still verifies your EVE access token against CCP SSO (real network), then
+   signs the custom token through the Auth emulator, so sign in with EVE as usual.
+4. **Seed.** With the emulators up:
+   `npm run emulators:seed -- --corp <corporationId> --corp-name "<name>" --officer <characterId> --member <characterId> [--guest <characterId>] [--owner-hash <hash>] [--port <vite port>]`.
+   It wipes the Firestore emulator and writes a sample book (settings, officer
+   access, Observed Mining Entries, Extractions in every state, matched /
+   Unmatched / not-tax / manual Tax Payments, a dismissal, a declaration and an
+   issued, unpaid Statement with its verify token) in the schema of
+   `functions/src/corpTaxBookStore.ts`, then prints the verify URL. The officer
+   record carries `--owner-hash`; the Firestore rules compare it to the signed-in
+   token's `ownerHash` claim. The seeded value is a placeholder, and opening
+   `/corp/moons` as a real officer of that corporation rewrites the record with
+   your real hash through `verifyCorpOfficerCallable`. The live role check reads real ESI, so use your real corporation id for `--corp` when you want that route. Otherwise pass your own
+   (the `ownerHash` claim of your signed-in ID token). The member and guest
+   Characters see their own lines on the personal tab; the verify page needs no
+   sign-in.
+
+**Known emulator noise.** The Firestore emulator logs `Cannot find field:
+structuredQuery in message Document` when a query runs under a parent document
+whose id has a colon (`characters/char:<id>`). Its REST adapter mis-routes
+`:runQuery` for such ids (`abc` works; `char:1` and percent-encoded forms
+fail). It is not an index problem and does not happen in production. Firestore
+lite is REST-only, so no tooling-side fix exists; ignore it.

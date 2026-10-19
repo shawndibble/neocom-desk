@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { fittingCompareHref, fittingsRedirect } from '@/features/fittings/fittingRoutes';
 import { ShipsTabBar } from '@/features/fittings/ShipsTabBar';
 import { SHIPS_TABS_ID } from '@/features/fittings/shipsTabs';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
+import { useCharacters } from '@/features/character/useCharacters';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useOnline } from '@/stores/network';
 import { useTranslation } from 'react-i18next';
@@ -62,7 +64,7 @@ import { FittingSaveButton } from '@/features/fittings/FittingSaveButton';
 import { LoadWarnings } from '@/features/fittings/FittingLoadCard';
 import { FittingStartScreen } from '@/features/fittings/FittingStartScreen';
 import { ImportFittingDialog, NewFromHullDialog } from '@/features/fittings/FittingStartDialogs';
-import { SaveToEveDialog } from '@/features/fittings/SaveToEveDialog';
+import { LazySaveToEveDialog } from '@/features/fittings/LazySaveToEveDialog';
 import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
 import { usePageItemActions } from '@/features/market/usePageItemActions';
 import {
@@ -166,12 +168,8 @@ function FittingsPage() {
   useTimedToast(swapped, () => setSwapped(null));
   const openMakeItFit = useCallback(() => setMakeItFitOpen(true), []);
   const storedView = useFittingViewPreference((state) => state.value);
-  const viewHydrated = useFittingViewPreference((state) => state.hydrated);
-  const hydrateView = useFittingViewPreference((state) => state.hydrate);
+  const viewHydrated = useHydratedStore(useFittingViewPreference);
   const setView = useFittingViewPreference((state) => state.setValue);
-  useEffect(() => {
-    void hydrateView();
-  }, [hydrateView]);
   const view = resolveFittingView(storedView, isPhone);
   // Below desktop the Ring, the List and the stats are one set of tabs.
   const [phoneTab, setPhoneTab] = useState<'editor' | 'stats'>('editor');
@@ -197,7 +195,7 @@ function FittingsPage() {
     () => (activeCharacterId === null ? undefined : db.characters.get(activeCharacterId)),
     [activeCharacterId]
   )?.name;
-  const allCharacters = useLiveQuery(() => db.characters.toArray(), [], []);
+  const allCharacters = useCharacters();
   const yourCharacters = useMemo(
     () => allCharacters.map(({ characterId, name }) => ({ characterId, name })),
     [allCharacters]
@@ -946,9 +944,9 @@ function FittingsPage() {
               </div>
             </form>
           </Modal>
-          {activeCharacterId !== null && (
-            <SaveToEveDialog
-              open={saveToEveOpen}
+          {activeCharacterId !== null && saveToEveOpen && (
+            <LazySaveToEveDialog
+              open
               onClose={() => setSaveToEveOpen(false)}
               characterId={activeCharacterId}
               fitting={fitting}

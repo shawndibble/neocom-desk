@@ -11,10 +11,11 @@
  * (the caller still has the snapshot, and shows status without money), and an
  * unknown skill is `null`, which the model prices conservatively.
  */
-import { useEffect, useMemo, useState } from 'react';
-import { loadGoalPlannerSnapshot, type GoalPlannerSnapshot } from '../goalPlannerSnapshot';
+import { useMemo } from 'react';
+import type { GoalPlannerSnapshot } from '../goalPlannerSnapshot';
 import { buildPlanAdvice, type PlanAdvice, type PlanAdviceInput } from '../planAdviceModel';
 import { usePiAdviceInputs } from '../usePiAdviceInputs';
+import { usePiSnapshot } from '../usePiSnapshot';
 
 export interface ColoniesAdviceState {
   /** The colony reads the advice was built from; null while loading or after a failure. */
@@ -37,30 +38,7 @@ export function useColoniesAdvice(
   characterId: number | null,
   reloadKey: number
 ): ColoniesAdviceState {
-  const [loaded, setLoaded] = useState<{
-    characterId: number;
-    snapshot: GoalPlannerSnapshot;
-  } | null>(null);
-  const [failedFor, setFailedFor] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (characterId === null) return;
-    let cancelled = false;
-    loadGoalPlannerSnapshot(characterId).then(
-      (snapshot) => {
-        if (cancelled) return;
-        setFailedFor(null);
-        setLoaded({ characterId, snapshot });
-      },
-      () => {
-        if (!cancelled) setFailedFor(characterId);
-      }
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [characterId, reloadKey]);
-  const snapshot = loaded?.characterId === characterId ? loaded.snapshot : null;
+  const { snapshot, failed } = usePiSnapshot(characterId, reloadKey);
 
   const inputs = usePiAdviceInputs(snapshot, characterId, 'isk', reloadKey);
   const advice = useMemo(() => {
@@ -76,7 +54,7 @@ export function useColoniesAdvice(
     snapshot,
     advice,
     input: inputs.status === 'ready' ? inputs.input : null,
-    failed: failedFor === characterId && characterId !== null,
+    failed,
     pricesFailed: inputs.status === 'prices-failed',
   };
 }

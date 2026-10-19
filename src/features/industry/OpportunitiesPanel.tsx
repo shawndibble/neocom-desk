@@ -16,6 +16,7 @@ import { useCharacterModifiersByCharacter } from '@/features/character/character
 import { useTradeHubStandingsByCharacter } from '@/features/market/useTradeHubStandings';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
+import { useAccountCharacters } from '@/features/character/useCharacters';
 import { db, type BuildPlanRecord } from '@/db';
 import {
   Button,
@@ -176,15 +177,7 @@ export function OpportunitiesPanel({
   const unknown = t('common.unknown');
   const isDesktop = useIsDesktop();
 
-  const allCharacters = useLiveQuery(() => db.characters.toArray(), [], []);
-  const characterCandidates = useMemo(
-    () => (allCharacters ?? []).map((c) => ({ characterId: c.characterId, characterName: c.name })),
-    [allCharacters]
-  );
-  const characterNames = useMemo(
-    () => new Map((allCharacters ?? []).map((c) => [c.characterId, c.name])),
-    [allCharacters]
-  );
+  const { candidates: characterCandidates, namesById: characterNames } = useAccountCharacters();
 
   const [view, setView] = useUrlParam('opps.view', VIEW_PARAM);
   const [stockFilter, setStockFilter] = useUrlParam('opps.stock', STOCK_PARAM);

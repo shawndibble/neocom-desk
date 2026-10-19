@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
 import { tappableRowClassName, touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
@@ -117,6 +118,7 @@ import { formatDuration } from '@/lib/duration';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { writeToClipboard } from '@/lib/clipboard';
+import { clampPct } from '@/lib/clampPct';
 import { unmaskNumber } from '@/lib/numberMask';
 import { MaterialsTable, SourcingInput, type MaterialsTableHandle } from './MaterialsTable';
 import { BuildRecipeModal } from './BuildRecipeModal';
@@ -124,7 +126,11 @@ import { BlueprintAcquisitionModal } from './BlueprintAcquisitionModal';
 import { buyPricedLine } from './materialRow';
 import { materialsCsvColumns } from './materialsCsv';
 import { GroupOwnedDiffersHint } from './GroupOwnedDiffersHint';
-import { blueprintsLeftOutCount, hasShoppingList, shoppingListText } from './shoppingList';
+import {
+  blueprintsLeftOutCount,
+  hasShoppingList,
+  shoppingListText,
+} from '@/engine/industry/shoppingList';
 import {
   buildRecipe,
   hasSubBuilds,
@@ -312,7 +318,7 @@ function parseOrKeep(current: number, raw: string, transform: (n: number) => num
 function parseTaxPct(current: number, raw: string): number {
   const trimmed = raw.trim();
   const normalized = /^\d*,\d{1,2}$/.test(trimmed) ? trimmed.replace(',', '.') : trimmed;
-  return parseOrKeep(current, normalized, (n) => Math.min(100, Math.max(0, n)));
+  return parseOrKeep(current, normalized, clampPct);
 }
 
 /** Build Plan inputs (runs, ME/TE, facility, rig, security, hub, tax) + materials/results. */
@@ -794,13 +800,27 @@ export function BuildPlanDetail({
     [depth, resolveWith, plan, topOfBook]
   );
   // Break Even's trials walk the books for their own run count, as the page would at that count.
+  // Lowest-sell passes by trial run count: only `runs` varies across trials of
+  // this plan, so repeated trials (and the page's own run count) reuse one pass.
+  const lowestSellCache = useRef<{
+    topOfBook: ResolvedBuildPlan;
+    byRuns: Map<number, ResolvedBuildPlan>;
+  } | null>(null);
   const resolveAt = useCallback(
     (candidate: BuildPlanRecord) => {
-      const lowestSell = resolveWith(candidate);
+      if (lowestSellCache.current?.topOfBook !== topOfBook) {
+        lowestSellCache.current = { topOfBook, byRuns: new Map([[plan.runs, topOfBook]]) };
+      }
+      const { byRuns } = lowestSellCache.current;
+      let lowestSell = byRuns.get(candidate.runs);
+      if (!lowestSell) {
+        lowestSell = resolveWith(candidate);
+        byRuns.set(candidate.runs, lowestSell);
+      }
       const trialDepth = walkDepth(depthNeedsOf(candidate, lowestSell));
       return trialDepth.size > 0 ? resolveWith(candidate, depthPriceMap(trialDepth)) : lowestSell;
     },
-    [resolveWith, walkDepth, depthNeedsOf]
+    [resolveWith, walkDepth, depthNeedsOf, plan, topOfBook]
   );
   const { result, error, makeOrBuyContext, resolvedMe, resolvedTe, materialPrices, bpcCoverage } =
     resolved;
@@ -1456,9 +1476,7 @@ export function BuildPlanDetail({
   // a bordered, filled box reads as a button, and nothing here is clickable.
   const setupFact = (label: string, value: string, warn = false) => (
     <div key={label} className="min-w-0">
-      <dt className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-        {label}
-      </dt>
+      <dt className={eyebrowClassName}>{label}</dt>
       <dd className={cx('text-xs tabular-nums', warn ? 'text-warning' : 'text-text')}>
         {warn && <Icon.Warn size={Icon.ICON_SIZE.sm} aria-hidden="true" className="mr-1 inline" />}
         {value}
@@ -1567,7 +1585,7 @@ export function BuildPlanDetail({
         {setupOpen ? (
           <div className="space-y-4">
             <div>
-              <h3 className="border-b border-line pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+              <h3 className={cx(eyebrowClassName, 'border-b border-line pb-1')}>
                 {t('industry.groupBlueprint')}
               </h3>
               {bpcCoverage && (
@@ -1623,7 +1641,12 @@ export function BuildPlanDetail({
             </div>
 
             <div>
-              <h3 className="flex items-center justify-between gap-2 border-b border-line pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+              <h3
+                className={cx(
+                  eyebrowClassName,
+                  'flex items-center justify-between gap-2 border-b border-line pb-1'
+                )}
+              >
                 {t('industry.groupLocationMarket')}
                 <GroupTargetLink
                   plan={plan}

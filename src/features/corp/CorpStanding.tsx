@@ -13,6 +13,7 @@
  * panel at all, which is why both props are nullable and the empty case returns
  * `null` rather than an empty state.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { IskAmount, Panel } from '@/components/ui';
@@ -61,9 +62,7 @@ function Figure({
 }) {
   return (
     <div className="flex min-w-[8rem] flex-col justify-center gap-1">
-      <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-        {label}
-      </p>
+      <p className={eyebrowClassName}>{label}</p>
       <p className={`text-3xl leading-tight font-semibold tabular-nums ${tone}`}>
         {value}
         {unit && <span className="text-base font-medium text-text-dim"> {unit}</span>}

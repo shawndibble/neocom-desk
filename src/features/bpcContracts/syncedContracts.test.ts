@@ -1,15 +1,9 @@
 /**
- * `fetchSnapshot`'s own read path, not just `bpcRowsFromContractOffers`'s
- * pure narrowing (issue #1076): the fix here is specifically that raw rows
- * from every chunk doc are accumulated *before* `bpcRowsFromContractOffers`
- * runs, so a contract whose lines straddle a chunk boundary is still tallied
- * as one contract. A pure-function test of `bpcRowsFromContractOffers` alone
- * cannot exercise that — it always hands the function one complete array —
- * so this file mocks the Firestore read the same way
- * `contractSearch/chunkedSnapshot.test.ts` does and asserts across chunk
- * boundaries directly.
+ * `loadPublicBpcContracts`' read path from R2 (ADR 0019): which objects it
+ * reads, how it narrows them, and that R2 being unreachable reads as
+ * unavailable rather than falling back to Firestore (issue #4270).
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { db } from '@/db';
 import { resetRevalidationState, GLOBAL_CACHE_CHARACTER_ID } from '@/esi/cache';
 import { loadPublicBpcContracts } from './syncedContracts';
@@ -19,33 +13,46 @@ import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
 const getDocs = vi.hoisted(() => vi.fn());
 const getDoc = vi.hoisted(() => vi.fn());
 
+// R2 is the only store: these spies prove nothing reaches Firestore.
 vi.mock('firebase/firestore/lite', () => ({
   getDocs,
   getDoc,
-  doc: (_db: unknown, collectionName: string, id: string) => ({ path: `${collectionName}/${id}` }),
-  collection: (_db: unknown, name: string) => ({ name }),
+  doc: vi.fn(),
+  collection: vi.fn(),
 }));
-vi.mock('@/sync/firebaseApp', () => ({ getSyncFirestore: () => ({}) }));
-vi.mock('@/sync/syncAuth', () => ({ ensureAnySession: vi.fn(async () => undefined) }));
-vi.mock('@/app/syncStatus', () => ({ isSyncConfigured: () => true }));
 
 vi.mock('@/sde/loadSde', () => ({ loadBlueprints: async () => ({ '32858': {}, '32859': {} }) }));
 
-const CHARACTER_ID = 91;
+const ORIGIN = 'https://data.neocomdesk.com';
+const INDEX_URL = `${ORIGIN}/contract-offers/index.json`;
+const objectName = (typeId: number) => `contract-offers/types/${typeId}.hash.json`;
 
-function snapshotDocs(
-  lastSyncedAt: number,
-  chunks: readonly (readonly PublicContractOfferRow[])[]
-) {
+function r2Index(lastSyncedAt: number) {
   return {
-    docs: [
-      { id: 'meta', data: () => ({ lastSyncedAt }) },
-      ...chunks.map((rows, i) => ({
-        id: `chunk-${String(i).padStart(4, '0')}`,
-        data: () => ({ rows }),
-      })),
-    ],
+    lastSyncedAt,
+    types: {
+      '32858': { count: 1, cheapest: 1, objects: [objectName(32858)] },
+      '32859': { count: 1, cheapest: 1, objects: [objectName(32859)] },
+      // Not a blueprint: must never be downloaded.
+      '34': { count: 9, cheapest: 1, objects: [objectName(34)] },
+    },
+    regionIds: [10000002],
   };
+}
+
+/** Serves the index and each blueprint type's object; anything else is a 404. */
+function serveR2(index: unknown, byType: Record<number, PublicContractOfferRow[]> = {}) {
+  const fetchMock = vi.fn(async (url: string) => {
+    if (url === INDEX_URL) return new Response(JSON.stringify(index), { status: 200 });
+    for (const [typeId, lines] of Object.entries(byType)) {
+      if (url === `${ORIGIN}/${objectName(Number(typeId))}`) {
+        return new Response(JSON.stringify(lines), { status: 200 });
+      }
+    }
+    return new Response('missing', { status: 404 });
+  });
+  vi.stubGlobal('fetch', fetchMock);
+  return fetchMock;
 }
 
 function copyLine(overrides: Partial<PublicContractOfferRow> = {}): PublicContractOfferRow {
@@ -69,26 +76,27 @@ function copyLine(overrides: Partial<PublicContractOfferRow> = {}): PublicContra
 beforeEach(async () => {
   await db.esiCache.clear();
   resetRevalidationState();
-  // R2 unreachable: these tests cover the Firestore path (ADR 0019 fallback).
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(async () => {
-      throw new Error('offline');
-    })
-  );
   resetR2ObjectMemo();
   getDocs.mockReset();
   getDoc.mockReset();
 });
 
-describe('loadPublicBpcContracts', () => {
-  it('narrows every chunk to blueprint copies', async () => {
-    getDocs.mockResolvedValue(snapshotDocs(1_700_000_000_000, [[copyLine()]]));
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
-    const result = await loadPublicBpcContracts(CHARACTER_ID);
+describe('loadPublicBpcContracts', () => {
+  it('reads only the blueprint types the index lists', async () => {
+    const fetchMock = serveR2(r2Index(50), { 32858: [copyLine()], 32859: [] });
+
+    const result = await loadPublicBpcContracts();
 
     expect(result?.data.rows).toEqual([expect.objectContaining({ typeId: 32858 })]);
-    expect(result?.data.lastSyncedAt).toBe(1_700_000_000_000);
+    expect(result?.data.lastSyncedAt).toBe(50);
+    const urls = fetchMock.mock.calls.map(([url]) => String(url));
+    expect(urls).toContain(`${ORIGIN}/${objectName(32858)}`);
+    expect(urls).not.toContain(`${ORIGIN}/${objectName(34)}`);
+    expect(getDocs).not.toHaveBeenCalled();
   });
 
   it('carries blueprint originals separately from the copies (issue #1240)', async () => {
@@ -97,9 +105,9 @@ describe('loadPublicBpcContracts', () => {
       isBlueprintCopy: undefined,
       runs: undefined,
     };
-    getDocs.mockResolvedValue(snapshotDocs(1_700_000_000_000, [[copyLine(), original]]));
+    serveR2(r2Index(50), { 32858: [copyLine(), original], 32859: [] });
 
-    const result = await loadPublicBpcContracts(CHARACTER_ID);
+    const result = await loadPublicBpcContracts();
 
     expect(result?.data.rows.map((row) => row.contractId)).toEqual([1]);
     expect(result?.data.originals).toEqual([
@@ -107,157 +115,59 @@ describe('loadPublicBpcContracts', () => {
     ]);
   });
 
-  it('tallies a contract as multi-type even when its lines straddle a chunk boundary (issue #1076)', async () => {
-    // One contract's two lines land in two different chunk docs — exactly
-    // the case fixed-size chunking over a contract-then-type sorted array
-    // can produce for a large enough contract. Narrowing per chunk (the old
-    // behaviour) would see each half alone and wrongly call it single-type.
-    getDocs.mockResolvedValue(
-      snapshotDocs(1, [
-        [copyLine({ contractId: 1, typeId: 638 })],
-        [{ ...copyLine({ contractId: 1, typeId: 621 }), isBlueprintCopy: undefined }],
+  it('tallies a bundle of two blueprint types as multi-type across their objects (issue #1076)', async () => {
+    serveR2(r2Index(50), {
+      32858: [copyLine({ contractId: 1, typeId: 32858 })],
+      32859: [
+        copyLine({ contractId: 1, typeId: 32859 }),
+        copyLine({ contractId: 2, typeId: 32859 }),
+      ],
+    });
+
+    const result = await loadPublicBpcContracts();
+
+    expect(result?.data.rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ contractId: 1, isMultiType: true }),
+        expect.objectContaining({ contractId: 2, isMultiType: false }),
       ])
     );
-
-    const result = await loadPublicBpcContracts(CHARACTER_ID);
-
-    expect(result?.data.rows).toEqual([
-      expect.objectContaining({ contractId: 1, typeId: 638, isMultiType: true }),
-    ]);
   });
 
-  it('keeps two different contracts’ tallies independent across chunks', async () => {
-    getDocs.mockResolvedValue(
-      snapshotDocs(1, [
-        [copyLine({ contractId: 1, typeId: 638 })],
-        [copyLine({ contractId: 2, typeId: 870 })],
-      ])
-    );
-
-    const result = await loadPublicBpcContracts(CHARACTER_ID);
-
-    expect(result?.data.rows).toEqual([
-      expect.objectContaining({ contractId: 1, isMultiType: false }),
-      expect.objectContaining({ contractId: 2, isMultiType: false }),
-    ]);
-  });
-});
-
-describe('loadPublicBpcContracts when the cached snapshot lapsed', () => {
-  async function seedLapsed(lastSyncedAt: number): Promise<void> {
+  it('serves the cached snapshot when a lapsed one is still the published one', async () => {
     await db.esiCache.put({
       characterId: GLOBAL_CACHE_CHARACTER_ID,
       key: 'publicContractOffers',
-      value: { rows: [], originals: [], lastSyncedAt, marker: 'cached' },
+      value: { rows: [], originals: [], lastSyncedAt: 50, marker: 'cached' },
       fetchedAt: Date.now() - 31 * 60_000,
     });
-  }
+    const fetchMock = serveR2(r2Index(50));
 
-  it('costs one meta read and no collection read when lastSyncedAt is unchanged', async () => {
-    await seedLapsed(5);
-    getDoc.mockResolvedValue({ data: () => ({ lastSyncedAt: 5 }) });
-
-    const result = await loadPublicBpcContracts(CHARACTER_ID);
+    const result = await loadPublicBpcContracts();
 
     expect(result?.data).toMatchObject({ marker: 'cached' });
-    expect(getDoc).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls.map(([url]) => String(url))).toEqual([INDEX_URL]);
+  });
+
+  it('reads as unavailable when R2 serves no usable index, with no Firestore fallback', async () => {
+    serveR2({ nonsense: true });
+
+    expect(await loadPublicBpcContracts()).toBeNull();
     expect(getDocs).not.toHaveBeenCalled();
-  });
-
-  it('does the full read when lastSyncedAt changed', async () => {
-    await seedLapsed(5);
-    getDoc.mockResolvedValue({ data: () => ({ lastSyncedAt: 6 }) });
-    getDocs.mockResolvedValue(snapshotDocs(6, [[copyLine()]]));
-
-    const result = await loadPublicBpcContracts(CHARACTER_ID);
-
-    expect(result?.data.lastSyncedAt).toBe(6);
-    expect(getDocs).toHaveBeenCalledTimes(1);
-  });
-
-  it('does the full read when nothing is cached', async () => {
-    getDocs.mockResolvedValue(snapshotDocs(6, [[copyLine()]]));
-
-    await loadPublicBpcContracts(CHARACTER_ID);
-
     expect(getDoc).not.toHaveBeenCalled();
-    expect(getDocs).toHaveBeenCalledTimes(1);
   });
 
-  it('falls back to the full read when the meta check fails', async () => {
-    await seedLapsed(5);
-    getDoc.mockRejectedValue(new Error('offline'));
-    getDocs.mockResolvedValue(snapshotDocs(5, [[copyLine()]]));
+  it('reads as unavailable when a named object cannot be read, with no Firestore fallback', async () => {
+    serveR2(r2Index(50));
 
-    const result = await loadPublicBpcContracts(CHARACTER_ID);
-
-    expect(result?.data.rows).toHaveLength(1);
-    expect(getDocs).toHaveBeenCalledTimes(1);
-  });
-});
-
-describe('loadPublicBpcContracts through R2 (ADR 0019)', () => {
-  const ORIGIN = 'https://data.neocomdesk.com';
-  const objectName = (typeId: number) => `contract-offers/types/${typeId}.hash.json`;
-  const r2Index = (lastSyncedAt: number) => ({
-    lastSyncedAt,
-    types: {
-      '32858': { count: 1, cheapest: 1, objects: [objectName(32858)] },
-      // Not a blueprint: must never be downloaded.
-      '34': { count: 9, cheapest: 1, objects: [objectName(34)] },
-    },
-    regionIds: [10000002],
-  });
-
-  function serveR2(index: unknown, lines: PublicContractOfferRow[]) {
-    const fetchMock = vi.fn(async (url: string) => {
-      if (url === `${ORIGIN}/contract-offers/index.json`) {
-        return new Response(JSON.stringify(index), { status: 200 });
-      }
-      if (url === `${ORIGIN}/${objectName(32858)}`) {
-        return new Response(JSON.stringify(lines), { status: 200 });
-      }
-      return new Response('missing', { status: 404 });
-    });
-    vi.stubGlobal('fetch', fetchMock);
-    return fetchMock;
-  }
-
-  it('reads only the blueprint types the index lists, and no Firestore chunk', async () => {
-    const fetchMock = serveR2(r2Index(50), [copyLine()]);
-
-    const result = await loadPublicBpcContracts(CHARACTER_ID);
-
-    expect(result?.data.rows).toEqual([expect.objectContaining({ typeId: 32858 })]);
-    expect(result?.data.lastSyncedAt).toBe(50);
-    expect(fetchMock.mock.calls.map(([url]) => String(url))).toEqual([
-      `${ORIGIN}/contract-offers/index.json`,
-      `${ORIGIN}/${objectName(32858)}`,
-    ]);
+    expect(await loadPublicBpcContracts()).toBeNull();
     expect(getDocs).not.toHaveBeenCalled();
   });
 
-  it('falls back to Firestore when R2 serves no usable index', async () => {
-    serveR2({ nonsense: true }, []);
-    getDocs.mockResolvedValue(snapshotDocs(6, [[copyLine()]]));
+  it('reads as unavailable when R2 is unreachable', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
 
-    const result = await loadPublicBpcContracts(CHARACTER_ID);
-
-    expect(result?.data.lastSyncedAt).toBe(6);
-    expect(getDocs).toHaveBeenCalledTimes(1);
-  });
-
-  it('falls back to Firestore when a named object cannot be read', async () => {
-    const fetchMock = serveR2(r2Index(50), []);
-    fetchMock.mockImplementation(async (url: string) =>
-      url.endsWith('index.json')
-        ? new Response(JSON.stringify(r2Index(50)), { status: 200 })
-        : new Response('gone', { status: 404 })
-    );
-    getDocs.mockResolvedValue(snapshotDocs(6, [[copyLine()]]));
-
-    const result = await loadPublicBpcContracts(CHARACTER_ID);
-
-    expect(result?.data.lastSyncedAt).toBe(6);
+    expect(await loadPublicBpcContracts()).toBeNull();
+    expect(getDocs).not.toHaveBeenCalled();
   });
 });

@@ -9,7 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { Button, Caret, Spinner, TypeIcon } from '@/components/ui';
 import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
-import { encodeFittingShare } from '@/engine/fitting/fittingShare';
+import { encodeFittingShare } from '@/engine/fittings/fittingShare';
 import { fittingToShareInput } from '@/engine/fittings/shareMapper';
 import type { Fitting } from '@/engine/fittings/types';
 import { resolveNames } from '@/features/character/names';
@@ -20,6 +20,7 @@ import { useRetryFocus } from '@/lib/useRetryFocus';
 import { formatIskCompact } from '@/lib/isk';
 import { useTimeZone } from '@/lib/timeFormat';
 import { formatTimestamp } from '@/lib/timestamp';
+import { zkillFailureKey } from '@/lib/zkillFailureKey';
 import {
   characterZkillUrl,
   fetchPilotKillmails,
@@ -156,7 +157,7 @@ export function PilotKillmailsSection({ characterId }: { characterId: number }) 
         </p>
       ) : !result.ok ? (
         <div role="status" className="flex items-center gap-2 text-xs text-warning">
-          <span>{t('travel.pilot.recent.failed')}</span>
+          <span>{t(zkillFailureKey(result.reason, 'travel.pilot.recent.failed'))}</span>
           <Button
             size="sm"
             onClick={() => {
