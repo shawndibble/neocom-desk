@@ -1,5 +1,6 @@
 import { FromWalletCrumb } from '@/features/netWorth/FromWalletCrumb';
-import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
+import { guarded } from '@/app/routeChunks';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { usePageTab } from '@/lib/usePageTab';
@@ -67,11 +68,7 @@ import { buttonClassName } from '@/components/ui/buttonClassName';
 import { focusRingInsetClassName, interactiveClassName } from '@/components/ui/controlStyles';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { orderBookCsvColumns } from '@/features/market/orderBookCsv';
-import { OpenOrdersPanel } from '@/features/market/OpenOrdersPanel';
 import { usePageHeaderSlots } from '@/features/market/pageHeaderSlots';
-import { StockTab } from '@/features/stockTargets/StockTab';
-import { TransactionsPanel } from '@/features/market/TransactionsPanel';
-import { AppraisalPanel } from '@/features/market/AppraisalPanel';
 import { useAppraisal } from '@/features/market/useAppraisal';
 import { tradeHubStanding, useTradeHubStandings } from '@/features/market/useTradeHubStandings';
 import {
@@ -108,6 +105,28 @@ import {
   type MarketOrderColumnId,
   useVisibleMarketOrderColumns,
 } from '@/features/market/marketOrderColumns';
+
+// One tab renders at a time: each panel loads on first visit.
+const OpenOrdersPanel = lazy(() =>
+  guarded(() => import('@/features/market/OpenOrdersPanel')).then((m) => ({
+    default: m.OpenOrdersPanel,
+  }))
+);
+const StockTab = lazy(() =>
+  guarded(() => import('@/features/stockTargets/StockTab')).then((m) => ({
+    default: m.StockTab,
+  }))
+);
+const TransactionsPanel = lazy(() =>
+  guarded(() => import('@/features/market/TransactionsPanel')).then((m) => ({
+    default: m.TransactionsPanel,
+  }))
+);
+const AppraisalPanel = lazy(() =>
+  guarded(() => import('@/features/market/AppraisalPanel')).then((m) => ({
+    default: m.AppraisalPanel,
+  }))
+);
 
 /** Rows shown per side before "show all" (GLOSSARY.md). */
 const ROW_CAP = 15;
@@ -896,25 +915,27 @@ export function Market() {
         />
 
         <TabPanel tabsId={viewsTabsId} tabId={tab}>
-          {tab === 'orders' && <OpenOrdersPanel headerSlots={headerSlots} />}
-          {tab === 'stock' && <StockTab activeCharacterId={activeCharacterId} />}
+          <Suspense fallback={null}>
+            {tab === 'orders' && <OpenOrdersPanel headerSlots={headerSlots} />}
+            {tab === 'stock' && <StockTab activeCharacterId={activeCharacterId} />}
 
-          {tab === 'history' && <TransactionsPanel headerSlots={headerSlots} />}
+            {tab === 'history' && <TransactionsPanel headerSlots={headerSlots} />}
 
-          {/* The list itself lives in `useAppraisal` at route level, so switching
+            {/* The list itself lives in `useAppraisal` at route level, so switching
           to the Browser and back does not throw away a forty-line paste. */}
-          {tab === 'appraisal' && (
-            <AppraisalPanel
-              controller={appraisal}
-              pricePercent={pricePercent}
-              onPricePercentChange={handlePricePercentChange}
-              hub={effectiveHub}
-              onHubChange={handleHubChange}
-              standing={tradeHubStanding(tradeHubStandings, effectiveHub.id)}
-              characterId={activeCharacterId}
-              defaultCompareExpanded={expandCompareOnAppraisal}
-            />
-          )}
+            {tab === 'appraisal' && (
+              <AppraisalPanel
+                controller={appraisal}
+                pricePercent={pricePercent}
+                onPricePercentChange={handlePricePercentChange}
+                hub={effectiveHub}
+                onHubChange={handleHubChange}
+                standing={tradeHubStanding(tradeHubStandings, effectiveHub.id)}
+                characterId={activeCharacterId}
+                defaultCompareExpanded={expandCompareOnAppraisal}
+              />
+            )}
+          </Suspense>
 
           {tab === 'browser' && (
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-[22rem_1fr] lg:items-start">

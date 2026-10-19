@@ -23,6 +23,9 @@ export const ACCOUNT_INACTIVITY_MS = ACCOUNT_INACTIVITY_DAYS * 24 * 3_600_000;
 /** Firestore's hard cap on writes in a single `WriteBatch`. */
 export const STALE_ACCOUNT_BATCH_SIZE = 500;
 
+/** Parent docs read per `getAll` call when checking heartbeats. */
+export const STALE_ACCOUNT_READ_PAGE_SIZE = 500;
+
 /**
  * Delete passes per run across all accounts, so one invocation can't spin
  * unboundedly on a backlog. A larger backlog continues on the next tick: the

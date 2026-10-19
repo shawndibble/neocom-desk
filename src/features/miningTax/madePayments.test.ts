@@ -3,6 +3,7 @@ import type { Contract, WalletJournalEntry } from '@/esi/endpoints';
 import {
   loadMadePaymentsWithStatus,
   missingPaymentEndpoints,
+  paidOnFromIso,
   type MadePaymentSources,
 } from './madePayments';
 
@@ -93,5 +94,15 @@ describe('missingPaymentEndpoints', () => {
         contracts: 'skipped-no-permission',
       })
     ).toEqual(['getCharacterWalletJournal', 'getCharacterContracts']);
+  });
+});
+
+describe('paidOnFromIso', () => {
+  it('formats a valid ISO timestamp as a local calendar date', () => {
+    expect(paidOnFromIso('2026-09-06T12:00:00Z')).toMatch(/^2026-09-0[5-7]$/);
+  });
+
+  it('falls back to today for an unparseable value', () => {
+    expect(paidOnFromIso('not a date')).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 });

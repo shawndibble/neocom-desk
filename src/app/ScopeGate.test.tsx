@@ -10,6 +10,7 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { ScopeGate } from './ScopeGate';
 import { useGrantedScopes } from './useGrantedScopes';
 import type { AppRoutePath } from './routeScopes';
+import { seedGrant as seedGrantFor } from '@/test/seed';
 
 vi.mock('./loginFlow', () => ({ beginEveLogin: vi.fn().mockResolvedValue(undefined) }));
 
@@ -33,13 +34,7 @@ function GrantProbe() {
 }
 
 async function seedGrant(scopes: readonly string[]): Promise<void> {
-  await db.tokens.put({
-    characterId: CHARACTER_ID,
-    accessToken: 'access',
-    refreshToken: 'refresh',
-    expiresAt: Date.now() + 60_000,
-    scopes: [...scopes],
-  });
+  await seedGrantFor(CHARACTER_ID, scopes);
 }
 
 function renderGate(path: AppRoutePath = '/mail') {

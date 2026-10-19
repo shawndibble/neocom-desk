@@ -142,6 +142,9 @@ export function Skills() {
     const params = new URLSearchParams(search);
     return params.has('ids') || params.has('comparisonId');
   });
+  // Mounted from the first open on, so closing still plays its exit animation.
+  const [compareMounted, setCompareMounted] = useState(compareOpen);
+  if (compareOpen && !compareMounted) setCompareMounted(true);
   const { data, error, loading, hydrated, activeCharacterId, refresh } = useRouteSnapshot(
     loadSkillsSnapshot,
     undefined,
@@ -461,11 +464,13 @@ export function Skills() {
           )}
         </>
       )}
-      <SkillCompareDrawer
-        open={compareOpen}
-        onClose={() => setCompareOpen(false)}
-        activeCharacterId={activeCharacterId}
-      />
+      {compareMounted && (
+        <SkillCompareDrawer
+          open={compareOpen}
+          onClose={() => setCompareOpen(false)}
+          activeCharacterId={activeCharacterId}
+        />
+      )}
     </div>
   );
 }

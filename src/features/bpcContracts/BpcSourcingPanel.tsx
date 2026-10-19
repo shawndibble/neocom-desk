@@ -1,5 +1,6 @@
 import {
   useCallback,
+  useDeferredValue,
   useEffect,
   useId,
   useMemo,
@@ -868,6 +869,9 @@ export function BpcSourcingPanel({
   // keystroke's `sourcing.q` write doesn't rerun stage 1.
   const sourcesKey = sourceToggleKey(sources);
   const stableSources = useMemo(() => sourceToggleSet(sourcesKey), [sourcesKey]);
+  // Deferred so a filter edit doesn't block input while the full snapshot reruns.
+  const deferredStableFilter = useDeferredValue(stableFilter);
+  const deferredQuery = useDeferredValue(query);
   const prepared = useMemo(
     () =>
       prepareBpcOffers(
@@ -880,7 +884,7 @@ export function BpcSourcingPanel({
           communityRows: communityOffers.rows,
         },
         {
-          filter: stableFilter,
+          filter: deferredStableFilter,
           sources: stableSources,
           spaceKinds: activeSpaceKinds,
           allowedSystems: jumpFilter.allowed,
@@ -893,15 +897,15 @@ export function BpcSourcingPanel({
       blueprintNames,
       ownedBlueprints,
       communityOffers.rows,
-      stableFilter,
+      deferredStableFilter,
       stableSources,
       activeSpaceKinds,
       jumpFilter.allowed,
     ]
   );
   const { suggestions, filteredRows, bpoSourcesByType, bpoByType, displayRows, summary } = useMemo(
-    () => rankBpcOffers(prepared, sourceData, query),
-    [prepared, sourceData, query]
+    () => rankBpcOffers(prepared, sourceData, deferredQuery),
+    [prepared, sourceData, deferredQuery]
   );
 
   const selectedName =
