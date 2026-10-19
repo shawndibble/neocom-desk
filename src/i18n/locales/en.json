@@ -13877,6 +13877,7 @@
         "empty": "Nothing has been done in the book yet.",
         "system": "System",
         "viaScheduled": "scheduled sync",
+        "officersRevoked_zero": "no other officer had access",
         "officersRevoked_one": "{{count}} officer must re-verify",
         "officersRevoked_other": "{{count}} officers must re-verify",
         "actions": {

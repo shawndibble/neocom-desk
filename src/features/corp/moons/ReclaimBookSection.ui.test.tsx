@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { BookProvider } from './BookContext';
 import { ReclaimBookSection } from './ReclaimBookSection';
 import { AuditFeed } from './AuditFeed';
+import { Modal } from '@/components/ui';
 import type { BookContextValue } from './bookContextValue';
 import type { OfficerVerdict } from '../taxBook/bookClient';
 
@@ -18,8 +19,15 @@ vi.mock('../taxBook/bookClient', () => ({
 const CORP = 98000001;
 const ME = 7;
 
-function renderSection(verdict: Partial<OfficerVerdict>) {
+function renderSection(verdict: Partial<OfficerVerdict>, onSettingsClose?: () => void) {
   const reload = vi.fn();
+  const section = onSettingsClose ? (
+    <Modal open onClose={onSettingsClose} title="Settings">
+      <ReclaimBookSection />
+    </Modal>
+  ) : (
+    <ReclaimBookSection />
+  );
   render(
     <MemoryRouter>
       <BookProvider
@@ -32,7 +40,7 @@ function renderSection(verdict: Partial<OfficerVerdict>) {
           } as unknown as Omit<BookContextValue, 'edit' | 'canEdit'>
         }
       >
-        <ReclaimBookSection />
+        {section}
       </BookProvider>
     </MemoryRouter>
   );
@@ -66,7 +74,14 @@ describe('ReclaimBookSection', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Reclaim the book' }));
     expect(reclaimBook).toHaveBeenCalledWith(ME, CORP);
     expect(reload).toHaveBeenCalled();
-    expect(await screen.findByText('Book reclaimed; 3 officers must re-verify')).toBeVisible();
+    // The toast's live region announces it (its visible copy is aria-hidden).
+    await waitFor(() =>
+      expect(
+        screen
+          .getAllByRole('status')
+          .some((el) => el.textContent === 'Book reclaimed; 3 officers must re-verify')
+      ).toBe(true)
+    );
   });
 
   it('cancelling calls nothing', async () => {
@@ -74,6 +89,16 @@ describe('ReclaimBookSection', () => {
     await userEvent.click(openButton()!);
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(reclaimBook).not.toHaveBeenCalled();
+  });
+
+  it('Escape in the confirm step closes only the confirm, not the settings under it', async () => {
+    const onSettingsClose = vi.fn();
+    renderSection({ isCeo: true }, onSettingsClose);
+    await userEvent.click(openButton()!);
+    const confirm = screen.getByRole('dialog', { name: 'Reclaim the book?' });
+    fireEvent(confirm, new Event('cancel', { cancelable: true }));
+    expect(screen.queryByRole('dialog', { name: 'Reclaim the book?' })).not.toBeInTheDocument();
+    expect(onSettingsClose).not.toHaveBeenCalled();
   });
 
   it("shows the server's refusal in the confirm step", async () => {
