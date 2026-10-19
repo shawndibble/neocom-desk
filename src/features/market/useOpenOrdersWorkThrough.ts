@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '@/db';
+import { useCharacterIdsWithScopes } from '@/app/characterIdsWithScopes';
 import { requiredScopesForEndpoints } from '@/esi/registry';
 import { OPEN_IN_EVE_ENDPOINTS } from '@/features/openInEve/sendOpenInEve';
 import type { MarketOrder } from '@/esi/endpoints';
@@ -32,16 +31,9 @@ export function useOpenOrdersWorkThrough({
   onSeeExits,
 }: UseOpenOrdersWorkThroughOptions) {
   const workQueue = useMemo(() => workThroughQueue(sortedRows), [sortedRows]);
-  // Only the answer leaves the query, never a `TokenRecord` (ADR 0001).
-  const openInEveCharacterIds = useLiveQuery(async () => {
-    const required = requiredScopesForEndpoints(OPEN_IN_EVE_ENDPOINTS);
-    const tokens = await db.tokens.toArray();
-    return new Set(
-      tokens
-        .filter((token) => required.every((scope) => token.scopes.includes(scope)))
-        .map((token) => token.characterId)
-    );
-  }, []);
+  const openInEveCharacterIds = useCharacterIdsWithScopes(
+    requiredScopesForEndpoints(OPEN_IN_EVE_ENDPOINTS)
+  );
   const canOpenInEve = useCallback(
     (characterId: number) => openInEveCharacterIds?.has(characterId) ?? false,
     [openInEveCharacterIds]
