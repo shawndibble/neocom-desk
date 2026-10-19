@@ -1,20 +1,25 @@
 import { HintText } from '@/components/ui/HintText';
-import { Fragment, lazy, Suspense, useRef, useState, type ReactNode } from 'react';
+import { Fragment, useRef, useState, type ReactNode } from 'react';
 import { useHydratedStore } from '@/lib/useHydratedStore';
-import { Trans, useTranslation } from 'react-i18next';
-import { Button, IskAmount } from '@/components/ui';
-import { unpricedSellRows } from './fittingPrice';
+import { useTranslation } from 'react-i18next';
+import { Button } from '@/components/ui';
 import { useShipDataNeedsConnection } from './useDogmaEngineStatus';
 import { formatSeconds } from '@/lib/duration';
-import { alignTimeSeconds, resistPct, unheatedIfChanged } from '@/engine/fittings/stats';
+import { alignTimeSeconds } from '@/engine/fittings/stats';
 import type {
   Fitting,
   FittingModuleResult,
   FittingStats,
   StatsErrorReason,
 } from '@/engine/fittings/types';
-import { ResistTable, type ResistRow } from './stats/ResistTable';
-import { RESIST_TYPES, RESONANCE_KEY, formatEhp } from './stats/resistFormat';
+import { ResistTable } from './stats/ResistTable';
+import { formatEhp } from './stats/resistFormat';
+import { resistRows } from './stats/resistRows';
+import { fleetBoostsMeta, supportMeta } from './stats/sectionMeta';
+import { resourceFacts } from './stats/resourceFacts';
+import { PriceBody, IskLabel } from './stats/PriceBody';
+import { priceView } from './stats/priceView';
+import { OVER_BUDGET_TONE, budgetFigure, makeFigure } from './stats/statFigures';
 import { OffenseRows } from './stats/OffenseRows';
 import { StatSection, YourCharactersSection } from './stats/StatSection';
 import { unknownItemsList } from './stats/unknownItemsList';
@@ -23,9 +28,8 @@ import type { DogmaAssetProgress } from './dogmaFittingEngine';
 import { useDamageProfileName, type DamageProfiles } from './damageProfiles';
 import { DamageProfilePicker } from './DamageProfilePicker';
 import { AppliedDpsPanel } from './AppliedDpsPanel';
-import { Facts, HeatFigure, StatField, StatFields, StatNote, type Fact } from './StatFacts';
+import { Facts, StatFields, StatNote } from './StatFacts';
 import { SkillOverridesControl } from './SkillOverridesControl';
-import { PriceHubSelect } from './PriceHubSelect';
 import { StatsToolbar } from './StatsToolbar';
 import { useIsPhone } from '@/lib/useIsPhone';
 import {
@@ -54,19 +58,7 @@ import {
   tacticalModeKind,
   tacticalModesFor,
 } from '@/engine/fittings/tacticalModes';
-import { guarded } from '@/app/routeChunks';
 import { fitsResourceBudget, resourceOverage } from '@/engine/fittings/skillGaps';
-import { MakeItFitTrigger } from './MakeItFitTrigger';
-import type { FitResource } from './makeItFitContext';
-
-/** An over-budget CPU, powergrid or calibration figure, as the ring and List show theirs. */
-const OVER_BUDGET_TONE = 'font-semibold text-danger';
-
-const FittingAppraisalModal = lazy(() =>
-  guarded(() => import('./FittingAppraisalModal')).then((m) => ({
-    default: m.FittingAppraisalModal,
-  }))
-);
 
 const CAPACITOR_TONE_CLASS = {
   success: 'text-success',
@@ -208,23 +200,8 @@ export function FittingStatsSections({
   // The ship data never downloaded and there is no connection to fetch it: say so, not "couldn't load".
   const shipDataNeedsConnection = useShipDataNeedsConnection();
   const profileName = useDamageProfileName()(damageProfiles.selected);
-  const [appraisalOpen, setAppraisalOpen] = useState(false);
-  // A fit with nothing sell-priced totals 0 — that's "unknown",
-  // not a free ship, so the price section shows a dash instead of "0 ISK".
-  const nothingPriced = price !== null && price.totals.sell === 0;
-  // The price loader names each row by its bare typeId; the section and its
-  // breakdown read (and the multibuy pastes) the item's real name.
-  const namedPrice =
-    price === null
-      ? null
-      : { ...price, rows: price.rows.map((row) => ({ ...row, name: typeName(row.typeId) })) };
-  const unpriced = namedPrice === null ? [] : unpricedSellRows(namedPrice.rows);
-  const iskLabel = (value: number) => (
-    <Trans
-      i18nKey="fittings.stats.unit.iskAmount"
-      components={{ isk: <IskAmount value={value} /> }}
-    />
-  );
+  const priceInfo = priceView(price, typeName);
+  const { nothingPriced, unpriced } = priceInfo;
   // A RAH's resists move with the profile (the engine adapts it), so the
   // armor row does too — label that, and show the RAH's own adapted resists.
   const adaptedHardeners = (stats?.modules ?? []).flatMap((module) =>
@@ -324,31 +301,7 @@ export function FittingStatsSections({
 
   const pctOf = (used: number, total: number) => (total > 0 ? (used / total) * 100 : 0);
 
-  /**
-   * A figure off the stats as `format` shows it, in the warning tone under
-   * "Overheat all" only where heat changed it; nothing until the stats are in.
-   */
-  const figure = (format: (s: FittingStats) => string, toneClassName?: string) =>
-    stats ? <HeatFigure stats={stats} format={format} toneClassName={toneClassName} /> : undefined;
-  /** A CPU/PG/calibration figure: red when over, with its "Fix" link beneath. */
-  const budgetFigure = (
-    resource: FitResource,
-    used: number,
-    total: number,
-    format: (s: FittingStats) => string
-  ) => {
-    const over = resourceOverage(used, total) > 0;
-    return (
-      <>
-        {figure(format, over ? OVER_BUDGET_TONE : undefined)}
-        {over && (
-          <span className="block">
-            <MakeItFitTrigger resource={resource} />
-          </span>
-        )}
-      </>
-    );
-  };
+  const figure = makeFigure(stats);
 
   function section(
     id: Section,
@@ -383,131 +336,6 @@ export function FittingStatsSections({
         {shown}
       </Fragment>
     );
-  }
-
-  function resistRows(s: FittingStats): ResistRow[] {
-    const layers = [
-      {
-        key: 'shield' as const,
-        label: t('fittings.stats.shield'),
-        layer: s.shield,
-      },
-      {
-        key: 'armor' as const,
-        label: t('fittings.stats.armor'),
-        layer: s.armor,
-      },
-      {
-        key: 'hull' as const,
-        label: t('fittings.stats.hull'),
-        layer: s.hull,
-      },
-    ];
-    const rows: ResistRow[] = [];
-    for (const { key, label, layer } of layers) {
-      // "Overheat all": the cells heat changed, with what they read unheated.
-      const unheated: NonNullable<ResistRow['unheated']> = {};
-      for (const type of RESIST_TYPES) {
-        const was = unheatedIfChanged(s, (x) => resistPct(x[key][RESONANCE_KEY[type]]).toFixed(0));
-        if (was !== null) unheated[type] = `${was}%`;
-      }
-      const wasEhp = unheatedIfChanged(s, (x) => formatEhp(x[key].ehp));
-      if (wasEhp !== null) unheated.ehp = wasEhp;
-      rows.push({
-        key,
-        label,
-        sub: t('fittings.stats.layerHp', { hp: layer.hp.toFixed(0) }),
-        resonances: layer,
-        ehp: layer.ehp,
-        unheated,
-      });
-    }
-    adaptedHardeners.forEach((resonances, index) =>
-      rows.push({
-        key: `rah-${index}`,
-        label: t('fittings.stats.rahRow'),
-        sub: profileName,
-        resonances,
-        tone: 'note',
-      })
-    );
-    return rows;
-  }
-
-  /** Support out's headline: remote repair handed out, else how many modules reach another ship. */
-  function supportMeta(s: FittingStats): string {
-    const { remoteRepair, rows } = s.support;
-    const repair = remoteRepair.shield + remoteRepair.armor + remoteRepair.hull;
-    if (repair > 0) return t('fittings.stats.unit.hpPerSecond', { value: repair.toFixed(1) });
-    return t('fittings.stats.support.modules', {
-      count: rows.reduce((sum, row) => sum + row.count, 0),
-    });
-  }
-
-  /** Fleet boosts' headline: how far the first burst reaches, else the compressor. */
-  function fleetBoostsMeta(s: FittingStats): string {
-    const { bursts, compressors } = s.fleetSupport;
-    const meters = bursts[0]?.rangeMeters ?? compressors[0]?.rangeMeters ?? 0;
-    return t('fittings.stats.unit.km', { value: kmValue(meters) });
-  }
-
-  /** Holds, jump drive and sensors: what the hull carries, beside what the fit asks of it. */
-  function resourceFacts(s: FittingStats): Fact[] {
-    const facts: Fact[] = [
-      {
-        label: t('fittings.stats.fact.cargo'),
-        value: figure((x) =>
-          t('fittings.stats.unit.cubicMetres', { value: x.holds.cargo.toFixed(0) })
-        ),
-      },
-    ];
-    if (s.holds.fleetHangar > 0)
-      facts.push({
-        label: t('fittings.stats.fact.fleetHangar'),
-        value: figure((x) =>
-          t('fittings.stats.unit.cubicMetres', { value: x.holds.fleetHangar.toFixed(0) })
-        ),
-      });
-    if (s.holds.miningHold > 0)
-      facts.push({
-        label: t('fittings.stats.fact.miningHold'),
-        value: figure((x) =>
-          t('fittings.stats.unit.cubicMetres', { value: x.holds.miningHold.toFixed(0) })
-        ),
-      });
-    if (s.sensor.type !== null)
-      facts.push({
-        label: t('fittings.stats.fact.sensorStrength'),
-        value: figure((x) =>
-          t('fittings.stats.unit.sensor', {
-            value: x.sensor.strength.toFixed(1),
-            type: t(`fittings.stats.sensorType.${x.sensor.type}`),
-          })
-        ),
-      });
-    if (s.jumpDrive) {
-      const { fuelTypeId } = s.jumpDrive;
-      facts.push(
-        {
-          label: t('fittings.stats.fact.jumpRange'),
-          value: figure((x) =>
-            t('fittings.stats.unit.lightYears', {
-              value: (x.jumpDrive?.rangeLightYears ?? 0).toFixed(2),
-            })
-          ),
-        },
-        {
-          label: t('fittings.stats.fact.jumpFuel'),
-          value: figure((x) =>
-            t('fittings.stats.unit.fuelPerLightYear', {
-              value: (x.jumpDrive?.fuelPerLightYear ?? 0).toFixed(0),
-              fuel: typeName(fuelTypeId),
-            })
-          ),
-        }
-      );
-    }
-    return facts;
   }
 
   const damageSections = [
@@ -637,7 +465,7 @@ export function FittingStatsSections({
         </StatFields>
         {stats ? (
           <>
-            <ResistTable rows={resistRows(stats)} />
+            <ResistTable rows={resistRows(stats, adaptedHardeners, profileName, t)} />
             {adaptedHardeners.length > 0 && (
               <StatNote>{t('fittings.stats.armorIncludesRah', { profile: profileName })}</StatNote>
             )}
@@ -786,7 +614,7 @@ export function FittingStatsSections({
             items={[
               {
                 label: t('fittings.stats.fact.cpu'),
-                value: budgetFigure('cpu', stats.cpuUsed, stats.cpuTotal, (s) =>
+                value: budgetFigure(figure, 'cpu', stats.cpuUsed, stats.cpuTotal, (s) =>
                   t('fittings.stats.unit.usedOfTotal', {
                     used: s.cpuUsed.toFixed(1),
                     total: s.cpuTotal.toFixed(1),
@@ -795,16 +623,22 @@ export function FittingStatsSections({
               },
               {
                 label: t('fittings.stats.fact.powergrid'),
-                value: budgetFigure('powergrid', stats.powergridUsed, stats.powergridTotal, (s) =>
-                  t('fittings.stats.unit.usedOfTotal', {
-                    used: s.powergridUsed.toFixed(1),
-                    total: s.powergridTotal.toFixed(1),
-                  })
+                value: budgetFigure(
+                  figure,
+                  'powergrid',
+                  stats.powergridUsed,
+                  stats.powergridTotal,
+                  (s) =>
+                    t('fittings.stats.unit.usedOfTotal', {
+                      used: s.powergridUsed.toFixed(1),
+                      total: s.powergridTotal.toFixed(1),
+                    })
                 ),
               },
               {
                 label: t('fittings.stats.fact.calibration'),
                 value: budgetFigure(
+                  figure,
                   'calibration',
                   stats.calibrationUsed,
                   stats.calibrationTotal,
@@ -815,7 +649,7 @@ export function FittingStatsSections({
                     })
                 ),
               },
-              ...resourceFacts(stats),
+              ...resourceFacts(stats, figure, typeName, t),
             ]}
           />
           {stats.unknownItemTypeIds.length > 0 && (
@@ -834,7 +668,11 @@ export function FittingStatsSections({
     ),
     stats &&
       stats.support.rows.length > 0 &&
-      section('support', figure(supportMeta), <SupportFacts stats={stats} typeName={typeName} />),
+      section(
+        'support',
+        figure((s) => supportMeta(s, t)),
+        <SupportFacts stats={stats} typeName={typeName} />
+      ),
     stats &&
       stats.mining.rows.length > 0 &&
       section(
@@ -850,53 +688,14 @@ export function FittingStatsSections({
       hasFleetSupport(stats.fleetSupport) &&
       section(
         'fleetBoosts',
-        figure(fleetBoostsMeta),
+        figure((s) => fleetBoostsMeta(s, t)),
         <FleetBoostFacts stats={stats} typeName={typeName} />
       ),
     section(
       'price',
-      price ? (nothingPriced ? '—' : iskLabel(price.totals.sell)) : undefined,
-      price ? (
-        <>
-          <StatFields>
-            <StatField label={t('fittings.stats.priceHub')}>
-              <PriceHubSelect size="sm" bare />
-              <Button size="sm" onClick={() => setAppraisalOpen(true)}>
-                {t('fittings.appraisal.open')}
-              </Button>
-            </StatField>
-          </StatFields>
-          {appraisalOpen && (
-            <Suspense fallback={null}>
-              <FittingAppraisalModal
-                open
-                onClose={() => setAppraisalOpen(false)}
-                price={namedPrice!}
-              />
-            </Suspense>
-          )}
-          <Facts
-            items={[
-              {
-                label: t('fittings.stats.fact.sell'),
-                value: nothingPriced ? '—' : iskLabel(price.totals.sell),
-              },
-            ]}
-          />
-          {unpriced.length > 0 && (
-            <StatNote tone="warning">
-              <p>{t('fittings.stats.priceUnpriced', { count: unpriced.length })}</p>
-              <ul className="mt-0.5 list-disc pl-4">
-                {unpriced.map((row) => (
-                  <li key={row.typeId}>
-                    {row.name}
-                    {row.quantity > 1 && ` ×${row.quantity}`}
-                  </li>
-                ))}
-              </ul>
-            </StatNote>
-          )}
-        </>
+      price ? nothingPriced ? '—' : <IskLabel value={price.totals.sell} /> : undefined,
+      priceInfo.named ? (
+        <PriceBody view={{ ...priceInfo, named: priceInfo.named }} />
       ) : (
         <StatNote>{t('fittings.stats.priceLoading')}</StatNote>
       ),
