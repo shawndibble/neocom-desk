@@ -14,7 +14,7 @@
  * hit for an already-seen rack slot is folded into that module's
  * `chargeTypeId` instead of read as a second module.
  */
-import { MAX_SLOTS_PER_CATEGORY } from '@/engine/fitting/fittingShare';
+import { MAX_SLOTS_PER_CATEGORY } from '@/engine/fittings/fittingShare';
 import { resolveTypeId, type EftTypeLookup } from '@/engine/fittings/eftLoader';
 import type { LoadParts, LoadWarning } from '@/engine/fittings/load';
 import { squadronsOf } from '@/engine/fittings/fighters';

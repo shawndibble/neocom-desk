@@ -18,8 +18,7 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '@/db';
+import { useRosterNames } from './useRosterNames';
 import { CharacterScopeReadout } from '@/features/character/CharacterScopeReadout';
 import {
   Button,
@@ -44,6 +43,7 @@ import { getKind } from './kinds';
 import { Chart } from './charts/Chart';
 import { DEFAULT_RANGE, type Widget as WidgetModel } from './layout';
 import { scopePresentation } from './scope';
+import { OVERVIEW_TICK_MS } from './data/tick';
 import { resolveWidget } from './state';
 import { TableBody, type TableBodyProps } from './TableBody';
 import { useOverviewEdit } from './editContext';
@@ -72,8 +72,6 @@ interface WidgetProps {
   /** The empty state's Remove widget. */
   onRemove: (id: string) => void;
 }
-
-const TICK_MS = 30_000;
 
 const SECONDARY_TONE = {
   good: 'text-isk-pos',
@@ -218,18 +216,16 @@ function ChartBody({
 
 /** The fixed scope readout (DESIGN §6c): this widget reads every Character on the device. */
 function AllCharactersReadout({ compact }: { compact: boolean }) {
-  const total = useLiveQuery(() => db.characters.count(), []);
+  const total = useRosterNames()?.size;
   if (!total) return null;
   return <CharacterScopeReadout scope="all" total={total} compact={compact} />;
 }
 
 /** The same readout in its "Name only" form: All was asked for, but this kind reads one Character. */
 function HeaderCharacterReadout({ characterId }: { characterId: number }) {
-  const character = useLiveQuery(() => db.characters.get(characterId), [characterId]);
-  if (!character) return null;
-  return (
-    <CharacterScopeReadout scope="one" characterId={characterId} characterName={character.name} />
-  );
+  const name = useRosterNames()?.get(characterId);
+  if (name === undefined) return null;
+  return <CharacterScopeReadout scope="one" characterId={characterId} characterName={name} />;
 }
 
 function Skeleton() {
@@ -287,7 +283,7 @@ function WidgetFrame({
   const { refresh } = useOverviewRefresh();
   const { setRowsPerPage } = useOverviewEdit();
   const characterId = useActiveCharacter((state) => state.activeCharacterId);
-  const now = useTicker(TICK_MS);
+  const now = useTicker(OVERVIEW_TICK_MS);
   const scope = scopePresentation(widget.kind, widget.scope);
   const { state, showLastGood, reauthNote } = resolveWidget(view.status);
 

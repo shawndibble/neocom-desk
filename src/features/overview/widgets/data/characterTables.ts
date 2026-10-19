@@ -14,7 +14,7 @@ import { formatCompactNumber } from '@/lib/compactNumber';
 import { DAY_MS } from '@/lib/age';
 import { formatCountdown } from '@/lib/duration';
 import { formatIskCompact } from '@/lib/isk';
-import type { BoardMail } from '../../boardData';
+import type { BoardMail } from '../../data/boardData';
 import { UNKNOWN } from './builderKit';
 import { fractionBar } from './cellKit';
 import { placeHead, shortPlaceName } from './placeName';

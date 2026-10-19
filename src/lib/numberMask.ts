@@ -29,3 +29,12 @@ export function unmaskNumber(raw: string): number | undefined {
   const value = Number(bare);
   return Number.isFinite(value) && value >= 0 ? value : undefined;
 }
+
+/**
+ * `unmaskNumber` for whole-unit quantities: a typed fraction is floored, not
+ * refused. Blank or garbage is still `undefined`.
+ */
+export function unmaskCount(raw: string): number | undefined {
+  const value = unmaskNumber(raw);
+  return value === undefined ? undefined : Math.floor(value);
+}

@@ -4,8 +4,8 @@
  * content-addressed object holding every row. Written by
  * `functions/src/courierContractObjects.ts`.
  *
- * Reports "unavailable" as `null`, never a throw: `chunkedSnapshot.ts` then
- * takes the Firestore chunk read, whole. The index and the object are read
+ * Reports "unavailable" as `null`, never a throw: R2 is the only store (issue
+ * #4270), so the Courier board shows its "unavailable" state. The index and the object are read
  * together, so rows and `lastSyncedAt` always come from one publish. The
  * object's name carries its hash, so the browser and the service worker keep
  * it; only the tiny index is re-read.

@@ -31,7 +31,11 @@ import { cx } from '@/lib/cx';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { useUrlParams } from '@/lib/useUrlState';
 import { boolParam, idListParam, nullableTextParam, optionalIdParam } from '@/lib/urlState';
-import { buildComparisonRows, resolveBaseline, splitDiffering } from '../compareSkills';
+import {
+  buildComparisonRows,
+  resolveBaseline,
+  splitDiffering,
+} from '@/engine/skills/compareSkills';
 import { skillCompareCsvColumns } from '../skillCompareCsv';
 import { useCompareSkills } from '../useCompareSkills';
 import { SavedComparisonsMenu } from './SavedComparisonsMenu';

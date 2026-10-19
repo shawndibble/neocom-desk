@@ -186,6 +186,9 @@ export function Modal({
         // every close path routes through `onClose` and the parent's `open`,
         // which the effect turns into dialog.close().
         event.preventDefault();
+        // React carries `cancel` up its own tree: a Modal opened from inside
+        // another (a confirm over Settings) must close only itself.
+        event.stopPropagation();
         onClose();
       }}
       onClick={(event) => {

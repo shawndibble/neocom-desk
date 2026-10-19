@@ -28,7 +28,7 @@ import {
   type EftItem,
   type EftMutationBlock,
 } from '@/engine/import/eftFit';
-import { MAX_DRONE_STACKS, MAX_SLOTS_PER_CATEGORY } from '@/engine/fitting/fittingShare';
+import { MAX_DRONE_STACKS, MAX_SLOTS_PER_CATEGORY } from '@/engine/fittings/fittingShare';
 import type { FittingSlotAssignment } from '@/sde/types';
 import type { LoadParts, LoadWarning } from './load';
 import {

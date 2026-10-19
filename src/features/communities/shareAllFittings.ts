@@ -4,7 +4,7 @@
  * give them. An In-game Fitting the app can't read right now is simply left
  * out, never an error: the saved ones still go.
  */
-import { encodeFittingShare } from '@/engine/fitting/fittingShare';
+import { encodeFittingShare } from '@/engine/fittings/fittingShare';
 import { esiFittingToFitting } from '@/engine/fittings/esiFittingMapper';
 import { fittingToShareInput } from '@/engine/fittings/shareMapper';
 import { loadInGameFittings } from '@/features/fittings/inGameFittings';
