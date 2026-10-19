@@ -11,8 +11,11 @@ import { App } from '@/app/App';
 import * as routeChunks from '@/app/routeChunks';
 import type { SkillType } from '@/sde/types';
 import { PHONE_QUERY } from '@/lib/useIsPhone';
-import { useOverviewCardOrder } from '@/features/overview/cardOrder';
-import { OVERVIEW_HIDDEN_CARDS_KEY, useOverviewHiddenCards } from '@/features/overview/hiddenCards';
+import {
+  OVERVIEW_HIDDEN_CARDS_KEY,
+  useOverviewCardOrder,
+  useOverviewHiddenCards,
+} from '@/features/overview/widgets/migrate';
 import { OVERVIEW_LAYOUT_KEY, useOverviewLayout } from '@/features/overview/widgets/layoutStore';
 import type { OverviewLayout, Widget } from '@/features/overview/widgets/layout';
 import { priceAlertDomain } from '@/features/notifications/pollDomains/priceAlerts';

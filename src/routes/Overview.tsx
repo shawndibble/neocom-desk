@@ -32,8 +32,6 @@ import {
   OverviewNext,
 } from '@/features/overview/OverviewHeader';
 import { useOverviewSummary } from '@/features/overview/useOverviewSummary';
-import { useOverviewCardOrder } from '@/features/overview/cardOrder';
-import { useOverviewHiddenCards } from '@/features/overview/hiddenCards';
 import { OverviewRefreshProvider } from '@/features/overview/widgets/data/OverviewRefreshProvider';
 import { WidgetDataProvider } from '@/features/overview/widgets/data/WidgetDataProvider';
 import { CustomizeBar } from '@/features/overview/widgets/CustomizeBar';
@@ -42,7 +40,12 @@ import { Gallery } from '@/features/overview/widgets/Gallery';
 import { makeWidgetId } from '@/features/overview/widgets/ids';
 import type { OverviewLayout } from '@/features/overview/widgets/layout';
 import { useOverviewLayout } from '@/features/overview/widgets/layoutStore';
-import { isReturningPilot, migrateFromCards } from '@/features/overview/widgets/migrate';
+import {
+  isReturningPilot,
+  migrateFromCards,
+  useOverviewCardOrder,
+  useOverviewHiddenCards,
+} from '@/features/overview/widgets/migrate';
 import { OverviewEditProvider } from '@/features/overview/widgets/OverviewEditProvider';
 import { PhoneCustomizeList } from '@/features/overview/widgets/PhoneCustomizeList';
 import { RoleChooser, RoleChooserDialog } from '@/features/overview/widgets/RoleChooser';

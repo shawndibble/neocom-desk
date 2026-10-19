@@ -2,12 +2,40 @@
  * Turns the old board's two settings (hidden cards, card order) into an
  * Overview Layout for a pilot who had them before the widget grid shipped.
  *
- * Pure, and deliberately free of `hiddenCards.ts`/`cardOrder.ts` (those open
- * the settings store): the old key names are restated here as the migration's
- * own frozen contract.
+ * The two retired settings are read here and nowhere else: nothing writes them
+ * any more. A non-empty list is also how the page knows the pilot is returning.
+ *
+ * Both keys stay on the synced-settings allow-list and `parseHiddenCards` keeps
+ * keys this build has no meaning for: the value merges last-write-wins as a
+ * whole, so a build that dropped a key it did not recognise would corrupt
+ * another device's copy.
  */
+import { createSyncedSetting } from '@/lib/useSyncedSetting';
 import { isAddable, type WidgetKindId } from './kinds';
 import { newWidget, type MakeId, type OverviewLayout, type Widget } from './layout';
+
+export const OVERVIEW_HIDDEN_CARDS_KEY = 'sync.overviewHiddenCards';
+export const OVERVIEW_CARD_ORDER_KEY = 'sync.overviewCardOrder';
+
+/** Any list of strings, deduped — including keys this build has no meaning for. */
+export function parseHiddenCards(raw: unknown): string[] | null {
+  if (!Array.isArray(raw)) return null;
+  return [...new Set(raw.filter((key): key is string => typeof key === 'string'))];
+}
+
+/** The old board's hidden-cards list (read side only). */
+export const useOverviewHiddenCards = createSyncedSetting<string[]>({
+  key: OVERVIEW_HIDDEN_CARDS_KEY,
+  defaultValue: [],
+  parse: parseHiddenCards,
+});
+
+/** The old board's card order, as the pilot dragged it (read side only). */
+export const useOverviewCardOrder = createSyncedSetting<string[]>({
+  key: OVERVIEW_CARD_ORDER_KEY,
+  defaultValue: [],
+  parse: parseHiddenCards,
+});
 
 /** Old card key -> Widget Kind, in the old board's built-in order. */
 const CARD_TO_KIND: readonly [string, WidgetKindId][] = [

@@ -105,7 +105,7 @@ function knownPaths(raw: unknown, keep: (path: string) => boolean): string[] | n
  * The pilot's hidden pages and views, once each, in nav order. A path this
  * build does not know is kept (last), not dropped: it was synced from a newer
  * build, and dropping it here would un-hide it there the next time this device
- * writes — the rule `features/overview/hiddenCards.ts` follows for cards. A
+ * writes — the rule `features/overview/widgets/migrate.ts` follows for cards. A
  * path that must never hide is dropped.
  */
 export function parseHiddenNav(raw: unknown): string[] | null {
