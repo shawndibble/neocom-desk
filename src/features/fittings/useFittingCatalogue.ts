@@ -6,7 +6,7 @@
  * why search works before the ship data has downloaded.
  */
 import { useEffect, useState, useSyncExternalStore } from 'react';
-import { onReconnect } from '@/stores/network';
+import { useRetryOnReconnect } from '@/lib/useRetryOnReconnect';
 import type { CandidateRack } from '@/engine/fittings/candidates';
 import { loadFittingSlots, loadTypes } from '@/sde/loadSde';
 import { loadMarketGroups, loadMarketTypes, loadVariations } from '@/sde/loadMarketSde';
@@ -190,6 +190,6 @@ export function useFittingCatalogue(): FittingCatalogue | null {
       cancelled = true;
     };
   }, [epoch]);
-  useEffect(() => (failed ? onReconnect(retryFittingCatalogue) : undefined), [failed]);
+  useRetryOnReconnect(failed, retryFittingCatalogue);
   return catalogue;
 }

@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
-import { onReconnect } from '@/stores/network';
+import { useCallback, useState } from 'react';
+import { useRetryOnReconnect } from './useRetryOnReconnect';
 
 /**
  * The bookkeeping every "load, and if it fails, say so and let the pilot retry"
@@ -19,6 +19,6 @@ export function useRetryableLoad() {
   }, []);
   const fail = useCallback(() => setFailed(true), []);
   const clear = useCallback(() => setFailed(false), []);
-  useEffect(() => (failed ? onReconnect(retry) : undefined), [failed, retry]);
+  useRetryOnReconnect(failed, retry);
   return { failed, attempt, fail, clear, retry };
 }
