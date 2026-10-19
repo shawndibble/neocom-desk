@@ -1,9 +1,8 @@
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useLiveQuery } from 'dexie-react-hooks';
 import { Button, NeedsConnection } from '@/components/ui';
-import { db, type CharacterRecord } from '@/db';
-import { useCharacterCount } from '@/features/character/useCharacters';
+import type { CharacterRecord } from '@/db';
+import { useCharacters } from '@/features/character/useCharacters';
 import {
   useNotificationPromptState,
   useNotificationPermission,
@@ -42,12 +41,15 @@ export function NotificationPermissionPrompt() {
   const { t } = useTranslation();
   const { value, setValue } = useNotificationPromptState();
   const { permission, refresh } = useNotificationPermission();
-  const characterCount = useCharacterCount();
-  const newestCharacter = useLiveQuery(async () =>
-    (await db.characters.toArray()).reduce<CharacterRecord | undefined>(
-      (newest, c) => (newest === undefined || c.addedAt > newest.addedAt ? c : newest),
-      undefined
-    )
+  const characters = useCharacters();
+  const characterCount = characters.length;
+  const newestCharacter = useMemo(
+    () =>
+      characters.reduce<CharacterRecord | undefined>(
+        (newest, c) => (newest === undefined || c.addedAt > newest.addedAt ? c : newest),
+        undefined
+      ),
+    [characters]
   );
   const { value: alertsOfferSeen, setValue: setAlertsOfferSeen } = useAlertsOfferSeen();
   // True only after this banner's own Enable ended in a grant, so the offer
