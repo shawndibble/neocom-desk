@@ -1392,7 +1392,7 @@ export async function readStatementByToken(deps: BookDeps, token: string) {
   const thisStatement = statements.docs.find((d) => d.id === statementId);
   if (!thisStatement) fail('not-found', 'Verify link is not valid', 'invalid-token');
   const s = thisStatement.data() as Data;
-  // A whitelist: the guest sees no character ids, officer ids or other bookkeeping.
+  // A whitelist: the guest sees no character ids (bar `pendingCharacterIds` below, which they must answer), officer ids or other bookkeeping.
   const shown: Data = {};
   for (const key of [
     'id',
