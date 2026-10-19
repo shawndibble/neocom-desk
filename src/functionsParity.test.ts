@@ -19,7 +19,7 @@ import {
   isPastRetention,
   type StoredProjectionRow,
 } from '../functions/src/dispatchProjections';
-import type { ProjectionRowInput } from '../functions/src/registerDevice';
+import type { ProjectionRowInput } from '../functions/src/projectionRow';
 import { feedPurgeCutoff, isPurgeableFeedRow } from '../functions/src/purgeFeed';
 import { workbenchFitsR2Key } from '../functions/src/workbenchFits';
 import { FEED_SYNC_WINDOW_MS, rowsWithinSyncWindow } from '@/features/notifications/feed';
