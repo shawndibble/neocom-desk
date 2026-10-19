@@ -240,11 +240,6 @@ export function AppraisalPanel({
       pricePercent
     );
   }, [result, accountingLevel, brokerRelationsLevel, standing, pricePercent]);
-  // Undefined per row when the type has no reprocessing data at all — the
-  // column only earns its place on screen when at least one row has
-  // something to show, which is also exactly when there is nothing to show
-  // with no active Character (`appraisalData.ts` never sets `refine` then).
-
   const pasteFolded = !isDesktop && rows.length > 0 && !editingList;
   // Abyssal modules are real items with no market price: said apart from the
   // unmatched lines, with where to price one instead.
