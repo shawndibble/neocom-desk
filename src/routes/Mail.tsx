@@ -66,6 +66,7 @@ import { useFocusHeading } from '@/lib/useFocusHeading';
 import { stripEveMarkup } from '@/features/skills/typeDisplay';
 import { useMailFolders } from '@/features/character/mailFolderPref';
 import { cx } from '@/lib/cx';
+import { useDebouncedValue } from '@/lib/useDebouncedValue';
 import { useUrlParams } from '@/lib/useUrlState';
 import { boolParam, textParam } from '@/lib/urlState';
 import { useTimeZone } from '@/lib/timeFormat';
@@ -94,9 +95,6 @@ import type {
   MailLabel,
   MailingList,
 } from '@/esi/endpoints';
-
-// Matches Market.tsx's/SkillPicker.tsx's/Assets.tsx's own search debounce.
-const SEARCH_DEBOUNCE_MS = 250;
 
 const SEARCH_PARAM = textParam();
 const HIDE_READ_PARAM = boolParam();
@@ -438,11 +436,7 @@ function MailView({ scope, scopeControl }: MailViewProps) {
   // SkillPicker.tsx's own search debounce, issue #416): the input stays
   // instantly responsive, only the filter over potentially hundreds of
   // headers below waits out the debounce.
-  const [debouncedSearch, setDebouncedSearch] = useState(search);
-  useEffect(() => {
-    const id = setTimeout(() => setDebouncedSearch(search), SEARCH_DEBOUNCE_MS);
-    return () => clearTimeout(id);
-  }, [search]);
+  const [debouncedSearch, setDebouncedSearch] = useDebouncedValue(search);
   const [bodySnapshot, setBodySnapshot] = useState<{
     key: string;
     result: CachedResult<MailBody> | null;

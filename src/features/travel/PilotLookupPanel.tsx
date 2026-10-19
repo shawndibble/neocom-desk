@@ -40,6 +40,7 @@ import { isMultiLine, lineAt, namesOf, replaceLine } from '@/engine/pilotList/na
 import { classifyPilotPaste, type PilotPaste } from '@/engine/pilotList/parsePilotPaste';
 import { moveHighlight } from '@/lib/comboboxNav';
 import { cx } from '@/lib/cx';
+import { LOOKUP_DEBOUNCE_MS } from '@/lib/useDebouncedValue';
 import { useRetryFocus } from '@/lib/useRetryFocus';
 import { useTouchContext } from '@/lib/useMediaQuery';
 import type { PilotListState } from '@/lib/shortcuts';
@@ -60,9 +61,6 @@ import type { TravelTabProps } from './travelTab';
 
 const PILOT_PARAMS = { pilot: optionalIdParam() };
 const SEARCH_ENDPOINTS = ['getCharacterSearch'] as const;
-/** Same debounce as Mail's recipient search, which calls the same ESI search. */
-const SEARCH_DEBOUNCE_MS = 300;
-
 export function PilotLookupPanel({ tabBar, tabsId }: TravelTabProps) {
   const { t } = useTranslation();
   const [params, setParams] = useUrlParams(PILOT_PARAMS);
@@ -206,7 +204,7 @@ function PilotSearch({
           if (ticket !== latestSearch.current || controller.signal.aborted) return;
           setSuggestions([]);
         });
-    }, SEARCH_DEBOUNCE_MS);
+    }, LOOKUP_DEBOUNCE_MS);
     return () => {
       clearTimeout(id);
       controller.abort();
