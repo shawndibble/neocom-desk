@@ -12,7 +12,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { buildBookView, type BookView, type BookViewInput } from '@/engine/corpTaxBook/bookView';
 import { groupObservedEntries } from '@/engine/corpTaxBook/observed';
-import { loadCorporationMemberIds } from '@/features/corp/members';
+import { surveyFractions, estimateChunk } from '@/engine/corpTaxBook/extraction';
+import { toEngineExtraction } from '@/engine/corpTaxBook/sync';
+import { countedScans } from '@/engine/survey/series';
+import { loadCurrentMemberIds } from '../currentMembers';
+import { loadMoonNames } from '@/features/character/moonNames';
+import { loadSurvey } from '@/features/survey/surveyStore';
+import { loadMoonOreTypeIds, loadTypes } from '@/sde/loadSde';
 import { resolveNames } from '@/features/character/names';
 import { loadStructureName } from '@/features/character/structures';
 import { loadTypeNames } from '@/features/character/typeNames';
@@ -24,7 +30,6 @@ import {
 } from '@/features/miningTax/pricing';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useActiveCorporationId } from '../owner';
-import { useCorpAccess } from '../useCorpAccess';
 import {
   readBookData,
   verifyOfficer,
@@ -45,6 +50,7 @@ const EMPTY_NAMES = {
   characters: new Map<number, string>(),
   refineries: new Map<number, string>(),
   ores: new Map<number, string>(),
+  moons: new Map<number, string>(),
 };
 
 type Fetched =
@@ -90,12 +96,12 @@ function utcNow() {
 export function useCorpBook(sync: CorpTaxBookSync): CorpBook {
   const characterId = useActiveCharacter((s) => s.activeCharacterId);
   const corporationId = useActiveCorporationId();
-  const access = useCorpAccess();
   const [fetched, setFetched] = useState<Fetched>({ status: 'loading' });
   const [attempt, setAttempt] = useState(0);
   const [now, setNow] = useState(utcNow);
   const [names, setNames] = useState(EMPTY_NAMES);
   const [memberIds, setMemberIds] = useState<ReadonlySet<number> | undefined>(undefined);
+  const [surveyOreLines, setSurveyOreLines] = useState<BookViewInput['surveyOreLines']>(undefined);
   const reload = useCallback(() => setAttempt((n) => n + 1), []);
 
   // A page left open turns stale and rolls a day over (the sync hook's known gap).
@@ -106,7 +112,6 @@ export function useCorpBook(sync: CorpTaxBookSync): CorpBook {
 
   // A finished sync changes the book: read it again.
   const finishedAt = sync.run.phase === 'done' ? sync.run.finishedAt : 0;
-  const canReadMembers = access.capabilities.canReadMembers;
 
   useEffect(() => {
     if (characterId === null || corporationId === null) return;
@@ -165,20 +170,65 @@ export function useCorpBook(sync: CorpTaxBookSync): CorpBook {
     };
   }, [characterId, corporationId, attempt, finishedAt]);
 
-  // The roster (Director-only) tells members from leavers; without it standing comes from the ledger.
+  // Current membership comes from the public affiliation endpoint, so an Accountant sees leavers too (#4194).
   useEffect(() => {
-    if (characterId === null || corporationId === null || !canReadMembers) return;
+    if (fetched.status !== 'loaded' || corporationId === null) return;
+    const { data } = fetched;
+    const ids = [
+      ...data.observed.map((r) => r.characterId),
+      ...data.state.miners.flatMap((m) => m.characterIds),
+    ];
     let cancelled = false;
-    loadCorporationMemberIds(characterId, corporationId).then(
-      (result) => {
-        if (!cancelled && result.cached) setMemberIds(new Set(result.cached.data));
+    loadCurrentMemberIds(ids, corporationId).then(
+      (members) => {
+        if (!cancelled) setMemberIds(members);
       },
       () => undefined
     );
     return () => {
       cancelled = true;
     };
-  }, [characterId, corporationId, canReadMembers]);
+  }, [fetched, corporationId]);
+
+  // A chunk with no notification takes its ore from a linked Moon Ore Survey (D13).
+  useEffect(() => {
+    if (fetched.status !== 'loaded') return;
+    const { data } = fetched;
+    const wanted = data.state.extractions.filter(
+      (x) => x.surveyId !== undefined && (x.oreLines ?? []).length === 0
+    );
+    let cancelled = false;
+    (async () => {
+      const found = new Map<string, { typeId: number; quantity: number }[]>();
+      if (wanted.length > 0) {
+        const [moonIds, types] = await Promise.all([loadMoonOreTypeIds(), loadTypes()]);
+        const typeIdByName = new Map<string, number>();
+        for (const id of moonIds) {
+          const name = types[String(id)]?.name;
+          if (name) typeIdByName.set(name, id);
+        }
+        await Promise.all(
+          wanted.map(async (x) => {
+            const survey = await loadSurvey(x.surveyId!);
+            if (!survey.ok) return;
+            const [first] = countedScans(survey.scans, survey.ignored);
+            if (!first) return;
+            const ex = toEngineExtraction(x);
+            const estimate = estimateChunk(ex, {
+              survey: surveyFractions(first.rocks, (ore) => typeIdByName.get(ore)),
+              chunkM3PerHour: data.settings.chunkM3PerHour ?? undefined,
+            });
+            if (estimate.oreLines.length > 0) found.set(ex.id, estimate.oreLines);
+          })
+        );
+      }
+      await Promise.resolve();
+      if (!cancelled) setSurveyOreLines(found.size > 0 ? found : undefined);
+    })().catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [fetched]);
 
   const view = useMemo(() => {
     if (fetched.status !== 'loaded' || corporationId === null) return null;
@@ -208,8 +258,9 @@ export function useCorpBook(sync: CorpTaxBookSync): CorpBook {
       paidStatementIds: data.state.paidStatementIds,
       pricesOn: fetched.pricesOn,
       memberIds,
+      surveyOreLines,
     });
-  }, [fetched, now, corporationId, memberIds]);
+  }, [fetched, now, corporationId, memberIds, surveyOreLines]);
 
   // Names, resolved after the figures so the tables never wait on them.
   useEffect(() => {
@@ -222,13 +273,18 @@ export function useCorpBook(sync: CorpTaxBookSync): CorpBook {
       ...view.input.extractions.map((x) => x.structureId),
       ...view.charges.map((c) => c.structureId),
     ]);
+    const moonIds = [
+      ...view.input.extractions.map((x) => x.moonId),
+      ...view.charges.flatMap((c) => (c.moonId === undefined ? [] : [c.moonId])),
+    ];
     const typeIds = new Set<number>();
     for (const c of view.charges) for (const l of c.oreLines) typeIds.add(l.typeId);
     for (const x of view.input.extractions) for (const l of x.oreLines ?? []) typeIds.add(l.typeId);
     (async () => {
-      const [characters, ores] = await Promise.all([
+      const [characters, ores, moons] = await Promise.all([
         resolveNames([...characterIds]).catch(() => new Map<number, string>()),
         loadTypeNames([...typeIds]).catch(() => new Map<number, string>()),
+        loadMoonNames(moonIds).catch(() => new Map<number, string>()),
       ]);
       const refineries = new Map<number, string>();
       await Promise.all(
@@ -237,7 +293,7 @@ export function useCorpBook(sync: CorpTaxBookSync): CorpBook {
           if (name) refineries.set(id, name);
         })
       );
-      if (!cancelled) setNames({ characters, refineries, ores });
+      if (!cancelled) setNames({ characters, refineries, ores, moons });
     })();
     return () => {
       cancelled = true;
@@ -248,7 +304,7 @@ export function useCorpBook(sync: CorpTaxBookSync): CorpBook {
     () => ({
       character: (id) => names.characters.get(id) ?? `#${id}`,
       refinery: (id) => names.refineries.get(id) ?? `Refinery ${id}`,
-      moon: (id) => `Moon ${id}`,
+      moon: (id) => names.moons.get(id) ?? `Moon ${id}`,
       ore: (typeId) => names.ores.get(typeId) ?? `#${typeId}`,
     }),
     [names]

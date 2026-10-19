@@ -565,6 +565,10 @@ export const ESI_REGISTRY = {
     route: '/universe/regions/{region_id}',
     scope: PUBLIC,
   },
+  getUniverseMoon: {
+    route: '/universe/moons/{moon_id}',
+    scope: PUBLIC,
+  },
   getUniverseStation: {
     route: '/universe/stations/{station_id}',
     scope: PUBLIC,
