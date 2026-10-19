@@ -24,8 +24,8 @@ export type OpportunitiesStockFilter = 'any' | 'mostly' | 'full';
 /**
  * Below `lg` the view picker *is* the panel's title: a bordered select
  * reading "Ranked builds" / "Owned blueprints", so the title, the view, the
- * Character filter and the actions all fit one line on a phone. Desktop keeps
- * the plain title and the segmented control, so this renders nothing there.
+ * Character filter and the actions all fit one line on a phone. The panel
+ * mounts this only there; desktop keeps the plain title and segmented control.
  */
 export function OpportunitiesViewPicker({
   view,
@@ -35,8 +35,6 @@ export function OpportunitiesViewPicker({
   onViewChange: (next: OpportunitiesView) => void;
 }) {
   const { t } = useTranslation();
-  const isDesktop = useIsDesktop();
-  if (isDesktop) return undefined;
   return (
     <span className="flex min-w-0 items-center pl-2">
       <h2 className="sr-only">{t('industry.opportunitiesTitle')}</h2>
