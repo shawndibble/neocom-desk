@@ -316,6 +316,8 @@ export type EditAction =
       reason: string;
     }
   | { action: 'reverseDismissal'; dismissalId: string; reason: string }
+  /** Links a Moon Ore Survey (a Share Link id) as a chunk's ore source, or unlinks it with null (D13). */
+  | { action: 'linkSurvey'; extractionId: string; surveyId: string | null }
   | { action: 'setMiner'; minerId: string; characterIds: number[]; mainCharacterId: number }
   | { action: 'unlink'; minerId: string; characterId: number }
   | {
@@ -422,6 +424,7 @@ export function parseEditAction(data: unknown): EditAction {
     'dismiss',
     'dismissRecords',
     'reverseDismissal',
+    'linkSurvey',
     'setMiner',
     'unlink',
     'regroupMiner',
@@ -493,6 +496,12 @@ export function parseEditAction(data: unknown): EditAction {
     }
     case 'reverseDismissal':
       return { action, dismissalId: docId(d.dismissalId, 'dismissalId'), reason: reason(d.reason) };
+    case 'linkSurvey':
+      return {
+        action,
+        extractionId: docId(d.extractionId, 'extractionId'),
+        surveyId: d.surveyId === null ? null : docId(d.surveyId, 'surveyId'),
+      };
     case 'setMiner': {
       const characterIds = [
         ...new Set(list(d.characterIds, 'characterIds', 50).map((x) => int(x, 'characterId'))),

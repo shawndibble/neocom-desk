@@ -242,6 +242,8 @@ export interface SyncExtraction {
   laserFiredAt?: string;
   cancelledAt?: string;
   oreLines?: { typeId: number; quantity: number }[];
+  /** A Moon Ore Survey (Share Link id) an officer linked as the ore source when there is no notification (D13). */
+  surveyId?: string;
 }
 
 export const extractionId = (x: Pick<SyncExtraction, 'structureId' | 'extractionStartTime'>) =>

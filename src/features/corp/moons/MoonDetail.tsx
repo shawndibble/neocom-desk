@@ -8,11 +8,13 @@ import {
   EmptyState,
   PageHeader,
   Panel,
+  textActionClassName,
   type DataTableColumn,
 } from '@/components/ui';
 import { extractionDetail, type ExtractionRow } from '@/engine/corpTaxBook/bookView';
 import { useBook } from './useBook';
 import { ReasonDialog } from './BookDialogs';
+import { LinkSurveyDialog } from './LinkSurveyDialog';
 import { isk, shortDateTime } from './moonsFormat';
 import { minerPath } from './moonsPaths';
 import { Crumb, Fact, MinedBar, OreLine, StateWord } from './moonsParts';
@@ -23,6 +25,7 @@ export function MoonDetail({ id }: { id: string }) {
   const { view, names, edit, canEdit } = useBook();
   const navigate = useNavigate();
   const [dismissing, setDismissing] = useState(false);
+  const [linking, setLinking] = useState(false);
   const detail = extractionDetail(view, id);
   if (!detail) {
     return (
@@ -147,7 +150,22 @@ export function MoonDetail({ id }: { id: string }) {
           <Fact label={t('corpTaxBook.moons.cols.ore')} value={<OreLine row={row} />} />
           <Fact
             label={t('corpTaxBook.moons.moon.oreFrom')}
-            value={t(`corpTaxBook.moons.moon.source.${row.oreSource}`)}
+            value={
+              <span>
+                {t(`corpTaxBook.moons.moon.source.${row.oreSource}`)}
+                {canEdit && row.oreSource !== 'notification' && (
+                  <button
+                    type="button"
+                    className={textActionClassName('ml-2')}
+                    onClick={() => setLinking(true)}
+                  >
+                    {row.oreSource === 'survey'
+                      ? t('corpTaxBook.moons.moon.link.change')
+                      : t('corpTaxBook.moons.moon.link.open')}
+                  </button>
+                )}
+              </span>
+            }
           />
           <Fact
             label={t('corpTaxBook.moons.cols.estValue')}
@@ -190,6 +208,7 @@ export function MoonDetail({ id }: { id: string }) {
           />
         )}
       </Panel>
+      {linking && <LinkSurveyDialog open onClose={() => setLinking(false)} extractionId={row.id} />}
       <ReasonDialog
         open={dismissing}
         onClose={() => setDismissing(false)}
