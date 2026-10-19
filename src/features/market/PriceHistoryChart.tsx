@@ -146,8 +146,9 @@ const BAND_FILL_OPACITY = 0.14;
  * Every series is `linear`: one point per day, joined by straight lines. A
  * smoothed curve (`monotone`) turned a one-day swing into a wave that
  * overshot between days, inventing prices nobody traded or listed. One
- * constant for the band, the price lines and the order-count line, so the
- * average cannot render outside its own range between points.
+ * constant for every series on both strips: the band, the average, the
+ * Buy/Sell lines, the moving average, the compared averages and the
+ * order-count line.
  */
 const CURVE_TYPE = 'linear';
 
@@ -455,6 +456,7 @@ export default function PriceHistoryChart({
       : t('market.priceHistory.averageNoOrderData');
   };
   const comparedAverageLabel = (c: ComparedRegionSeries) => lineAverageLabel(c.regionId, c.name);
+  const tradedRangeLabel = t('market.priceHistory.tradedRange');
   const noOrderDataTip = (regionId: number | undefined, label: string) =>
     lacksOpen(regionId) ? (
       <InfoTooltip
@@ -766,7 +768,7 @@ export default function PriceHistoryChart({
                 // breaking there. With nothing compared there is no such day,
                 // so the single-region chart draws exactly as before.
                 connectNulls
-                name={t('market.priceHistory.tradedRange')}
+                name={tradedRangeLabel}
               />
               {!primaryOpen && (
                 <Line
@@ -926,7 +928,7 @@ export default function PriceHistoryChart({
         <ul className="flex flex-wrap items-center gap-x-3.5 gap-y-1.5 px-3 pt-2 pb-1 text-[0.6875rem] text-text-dim">
           <li>
             <LegendItem
-              label={t('market.priceHistory.tradedRange')}
+              label={tradedRangeLabel}
               shape="swatch"
               color="var(--color-accent-dim)"
               opacity={BAND_FILL_OPACITY}
@@ -935,7 +937,7 @@ export default function PriceHistoryChart({
               // reader meets the two marks, so that reads as data, not a bug.
               note={
                 <InfoTooltip
-                  label={t('common.aboutLabel', { label: t('market.priceHistory.tradedRange') })}
+                  label={t('common.aboutLabel', { label: tradedRangeLabel })}
                   content={
                     drawnOpenLines.length > 0
                       ? t('market.priceHistory.tradedRangeAtCloseTip')
