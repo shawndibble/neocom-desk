@@ -176,4 +176,78 @@ describe('OrderSideCard', () => {
       await screen.findByRole('button', { name: 'More actions for Tritanium' })
     ).toBeInTheDocument();
   });
+
+  it('sorts the whole book before cutting to the row cap', async () => {
+    const make = (id: number, price: number, volume_remain: number) => ({
+      duration: 90,
+      is_buy_order: false,
+      issued: '2026-01-01T00:00:00Z',
+      location_id: 60003760,
+      min_volume: 1,
+      order_id: id,
+      price,
+      range: 'region',
+      system_id: 30000142,
+      type_id: 34,
+      volume_remain,
+      volume_total: 10,
+    });
+    const orders = [make(1, 100, 900), make(2, 200, 500), make(3, 300, 100)];
+    type Order = (typeof orders)[number];
+    const columns = [
+      {
+        id: 'price',
+        header: 'Price',
+        render: (o: Order) => `price ${o.price}`,
+        sortValue: (o: Order) => o.price,
+      },
+      {
+        id: 'quantity',
+        header: 'Qty',
+        render: (o: Order) => `qty ${o.volume_remain}`,
+        sortValue: (o: Order) => o.volume_remain,
+      },
+    ];
+    function Harness() {
+      const tableExport = useTableExport({
+        surface: 'market-appraisal',
+        rows: orders,
+        columns: [],
+      });
+      return (
+        <OrderSideCard
+          side="sell"
+          rows={orders}
+          rowCap={1}
+          total={3}
+          best={100}
+          columns={columns}
+          availableColumns={[]}
+          visibleColumns={[]}
+          columnsById={{} as never}
+          onToggleColumn={vi.fn()}
+          tableExport={tableExport}
+          empty={null}
+          onShowAll={vi.fn()}
+          renderDetail={() => <div>detail</div>}
+          rowContextMenu={(_o, tr) => tr}
+          rowClassName={() => undefined}
+          hiddenOnPhone={false}
+          cards={false}
+        />
+      );
+    }
+    render(
+      withItemActions(
+        <MemoryRouter>
+          <Harness />
+        </MemoryRouter>,
+        fakeItemActions()
+      )
+    );
+    expect(await screen.findByText('price 100')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /Qty/ }));
+    expect(screen.getByText('qty 100')).toBeInTheDocument();
+    expect(screen.queryByText('qty 900')).not.toBeInTheDocument();
+  });
 });
