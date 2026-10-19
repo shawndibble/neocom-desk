@@ -34,5 +34,6 @@ export const useVisibleAppraisalColumns = createColumnVisibilitySetting({
   key: VISIBLE_APPRAISAL_COLUMNS_KEY,
   ids: APPRAISAL_COLUMN_IDS,
   defaultVisible: DEFAULT_VISIBLE_APPRAISAL_COLUMNS,
+  // Empty stays valid: Quantity and Item always remain.
   allowEmpty: true,
 });

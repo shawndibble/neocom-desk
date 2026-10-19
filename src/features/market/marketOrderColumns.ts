@@ -6,8 +6,8 @@
  */
 import { sellOutlierMultiple } from '@/engine/market/orderBookDepth';
 import type { RegionOrder } from '@/esi/endpoints';
-import { formatMarketIsk } from '@/lib/isk';
 import { createColumnVisibilitySetting } from '@/lib/columnVisibility';
+import { formatMarketIsk } from '@/lib/isk';
 import { formatVolume } from './format';
 
 /**

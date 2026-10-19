@@ -1,10 +1,9 @@
 /**
  * A table's device-local visible-columns preference, for `ColumnPickerMenu`.
  *
- * The shape `courierColumns.ts`, `bpcSearchColumns.ts` and friends each
- * hand-roll — an id catalog, a `createLocalSetting` store that rejects a stored
- * list naming an id the catalog no longer has, and toggle/reset wiring — so a
- * new picker is one call here plus one hook call in the component.
+ * An id catalog, a `createLocalSetting` store that rejects a stored list naming
+ * an id the catalog no longer has (or an empty one), and toggle/reset wiring —
+ * so a new picker is one call here plus one hook call in the component.
  *
  * Leave the table's identity column (item name, character name) out of `ids`:
  * a table that can lose the column naming its rows has lost its rows.
@@ -23,7 +22,7 @@ export interface ColumnVisibilityOptions<Id extends string> {
    * on an existing table hides nothing on its own.
    */
   defaultVisible?: readonly Id[];
-  /** Honour a stored empty list (every optional column hidden). Default: reject it. */
+  /** Honour a stored empty list. Default: reject it — a table with no optional columns and no explanation. */
   allowEmpty?: boolean;
   /** Drop unknown ids from a stored list instead of rejecting the whole list. */
   dropUnknown?: boolean;
