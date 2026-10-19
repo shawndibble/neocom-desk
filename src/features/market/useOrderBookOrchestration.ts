@@ -67,6 +67,7 @@ import type {
   SolarSystemEntry,
   MarketRegionEntry,
 } from '@/sde/marketTypes';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 /** Stand-in until globalMarkets.json settles; the order book waits for the real one. */
 const NO_GLOBAL_MARKETS: ReadonlyMap<number, GlobalMarketOverride> = new Map();
@@ -249,12 +250,8 @@ export function useOrderBookOrchestration({
   // quantity applies in both. All narrow the book next to the station filter,
   // see `orderBookView.ts`'s `allowedSystems`/`minQuantity`/`npcStationIds`.
   const browserFilterSettingValue = useBrowserFilterSetting((state) => state.value);
-  const browserFilterSettingHydrated = useBrowserFilterSetting((state) => state.hydrated);
-  const hydrateBrowserFilterSetting = useBrowserFilterSetting((state) => state.hydrate);
+  const browserFilterSettingHydrated = useHydratedStore(useBrowserFilterSetting);
   const setBrowserFilterSettingValue = useBrowserFilterSetting((state) => state.setValue);
-  useEffect(() => {
-    void hydrateBrowserFilterSetting();
-  }, [hydrateBrowserFilterSetting]);
   const rememberedBrowserFilters: RememberedDefaults<typeof BROWSER_FILTER_PARAMS> = useMemo(
     () => ({
       values: {

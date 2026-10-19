@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ComponentProps } from 'react';
+import { useMemo, useState, type ComponentProps } from 'react';
 import { OreIcon, OreLink } from './OreIcon';
 import { useTranslation } from 'react-i18next';
 import {
@@ -30,6 +30,7 @@ import { useMiningTaxOreValueMode } from './oreValueMode';
 import { LedgerActionError } from './LedgerActionError';
 import { LabelField } from './LabelField';
 import { labelSuggestions } from './assignmentLabel';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 interface EntryEditDialogProps {
   open: boolean;
@@ -130,12 +131,9 @@ export function EntryEditDialog({
   const { t } = useTranslation();
   const isPhone = useIsPhone();
   const perOre = useMiningTaxOreValueMode((state) => state.value);
-  const hydrateOreValueMode = useMiningTaxOreValueMode((state) => state.hydrate);
   // Nothing else on the Tax tab loads this setting — only Settings did, so a
   // pilot who came straight here got the per-day boxes despite turning it on.
-  useEffect(() => {
-    void hydrateOreValueMode();
-  }, [hydrateOreValueMode]);
+  useHydratedStore(useMiningTaxOreValueMode);
   const current = useMemo(
     () => [...members].sort((a, b) => a.row.entry.date.localeCompare(b.row.entry.date)),
     [members]

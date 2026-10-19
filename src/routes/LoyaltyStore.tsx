@@ -13,6 +13,7 @@
  * corporation is the landing state).
  */
 import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { PageSettingsButton } from '@/features/settings/PageSettingsModal';
 import { LpValueSettingsForm } from '@/features/settings/LpValueSettingsForm';
@@ -521,27 +522,14 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
   const isDesktop = useIsDesktop();
   const tabsId = useTabsId();
 
-  const hydrateHub = useMarketHub((s) => s.hydrate);
   const hubId = useMarketHub((s) => s.value);
   const setHubId = useMarketHub((s) => s.setValue);
-  useEffect(() => {
-    void hydrateHub();
-  }, [hydrateHub]);
+  useHydratedStore(useMarketHub, usePriceBasis, useLpBasis);
 
-  const hydratePriceBasis = usePriceBasis((s) => s.hydrate);
   const priceBasis = usePriceBasis((s) => s.value);
   const setPriceBasis = usePriceBasis((s) => s.setValue);
-  useEffect(() => {
-    void hydratePriceBasis();
-  }, [hydratePriceBasis]);
-
-  const hydrateLpBasis = useLpBasis((s) => s.hydrate);
   const lpBasis = useLpBasis((s) => s.value);
   const setLpBasis = useLpBasis((s) => s.setValue);
-  useEffect(() => {
-    void hydrateLpBasis();
-  }, [hydrateLpBasis]);
-
   // The exchange rate is a faction rule keyed off the corporation's faction,
   // which the offers feed does not carry: it comes from the bundled LP corporation list.
   // `undefined` until the list loads (or when it fails), so a corporation that does have an

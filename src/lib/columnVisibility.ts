@@ -9,7 +9,8 @@
  * Leave the table's identity column (item name, character name) out of `ids`:
  * a table that can lose the column naming its rows has lost its rows.
  */
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
+import { useHydratedStore } from './useHydratedStore';
 import { useIsPhone } from './useIsPhone';
 import { createLocalSetting, type LocalSettingStore } from './useLocalSetting';
 
@@ -79,11 +80,7 @@ export function useColumnVisibility<Id extends string>(
   const resetTo = isPhone ? phoneDefault : defaultVisible;
   const visible = isPhone && stored === defaultVisible ? phoneDefault : stored;
   const setValue = store((state) => state.setValue);
-  const hydrate = store((state) => state.hydrate);
-
-  useEffect(() => {
-    void hydrate();
-  }, [hydrate]);
+  useHydratedStore(store);
 
   const isVisible = useCallback((id: Id) => visible.includes(id), [visible]);
   const toggle = useCallback(

@@ -1,5 +1,5 @@
 import { HintText } from '@/components/ui/HintText';
-import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Fragment, useRef, useState, type ReactNode } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { Button, Caret, IskAmount, RowMoreActions } from '@/components/ui';
 import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
@@ -73,6 +73,7 @@ import {
   tacticalModeKind,
   tacticalModesFor,
 } from '@/engine/fittings/tacticalModes';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 const DMG_FILL_CLASS = {
   em: 'bg-dmg-em',
@@ -662,11 +663,8 @@ export function FittingStatsSections({
   // says on desktop and starts collapsed on a phone.
   const isPhone = useIsPhone();
   const storedSections = useStatsSectionsPreference((state) => state.value);
-  const hydrateSections = useStatsSectionsPreference((state) => state.hydrate);
   const setSections = useStatsSectionsPreference((state) => state.setValue);
-  useEffect(() => {
-    void hydrateSections();
-  }, [hydrateSections]);
+  useHydratedStore(useStatsSectionsPreference);
   const isExpanded = (section: Section) =>
     isSectionExpanded(storedSections, section, {
       isPhone,

@@ -80,6 +80,7 @@ import {
   Shortfalls,
   type PlanNames,
 } from './GoalPlannerResults';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 const HOURS_PER_DAY = 24;
 const MD_UP = '(min-width: 48rem)';
@@ -151,14 +152,9 @@ function GoalPlanner({
 
   // --- Prefs ---
   const prefs = useGoalPlannerPrefs((state) => state.value);
-  const hydratePrefs = useGoalPlannerPrefs((state) => state.hydrate);
   const setPrefs = useGoalPlannerPrefs((state) => state.setValue);
   const cadence = useCadence((state) => state.value);
-  const hydrateCadence = useCadence((state) => state.hydrate);
-  useEffect(() => {
-    void hydratePrefs();
-    void hydrateCadence();
-  }, [hydratePrefs, hydrateCadence]);
+  useHydratedStore(useGoalPlannerPrefs, useCadence);
 
   // Where the plan sells, and what it may buy there, are the shared PI
   // settings: the page strip and the settings form edit the same record.

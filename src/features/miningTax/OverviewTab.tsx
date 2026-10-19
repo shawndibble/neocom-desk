@@ -92,6 +92,7 @@ import { sumVolume, volumeDisplayMode } from './volume';
 import { VolumeDisplay } from './volumeDisplay';
 import { UnpricedIsk } from './UnpricedIsk';
 import type { DailyRatePoint, TypeComparisonPoint } from './MiningYieldCharts';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 const LazyMiningYieldCharts = lazy(() => guarded(() => import('./MiningYieldCharts')));
 
@@ -144,7 +145,6 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
   const { t } = useTranslation();
   const showRefining = useMiningShowRefining((state) => state.value);
   const setShowRefining = useMiningShowRefining((state) => state.setValue);
-  const hydrateShowRefining = useMiningShowRefining((state) => state.hydrate);
   // `showRefining` decides what the loader itself fetches (issue #1281), so
   // unlike basis/buyback-rate — which only rescale already-loaded rows — it
   // must be part of the load closure. `useRouteSnapshot` only re-runs it on
@@ -169,34 +169,22 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
   const resolvedCharacterFilter = useResolvedCharacterFilter(characterFilter, activeCharacterId);
   const range = useMiningYieldRange((state) => state.value);
   const setRange = useMiningYieldRange((state) => state.setValue);
-  const hydrateRange = useMiningYieldRange((state) => state.hydrate);
   const basis = useMiningPriceBasis((state) => state.value);
   const setBasis = useMiningPriceBasis((state) => state.setValue);
-  const hydrateBasis = useMiningPriceBasis((state) => state.hydrate);
   const buybackRate = useMiningBuybackRate((state) => state.value);
   const setBuybackRate = useMiningBuybackRate((state) => state.setValue);
-  const hydrateBuybackRate = useMiningBuybackRate((state) => state.hydrate);
   const visibleColumns = useVisibleOverviewColumns((state) => state.value);
   const setVisibleColumns = useVisibleOverviewColumns((state) => state.setValue);
-  const hydrateVisibleColumns = useVisibleOverviewColumns((state) => state.hydrate);
   const chartMetric = useMiningChartMetric((state) => state.value);
   const setChartMetric = useMiningChartMetric((state) => state.setValue);
-  const hydrateChartMetric = useMiningChartMetric((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateRange();
-    void hydrateBasis();
-    void hydrateBuybackRate();
-    void hydrateShowRefining();
-    void hydrateVisibleColumns();
-    void hydrateChartMetric();
-  }, [
-    hydrateRange,
-    hydrateBasis,
-    hydrateBuybackRate,
-    hydrateShowRefining,
-    hydrateVisibleColumns,
-    hydrateChartMetric,
-  ]);
+  useHydratedStore(
+    useMiningYieldRange,
+    useMiningPriceBasis,
+    useMiningBuybackRate,
+    useMiningShowRefining,
+    useVisibleOverviewColumns,
+    useMiningChartMetric
+  );
   const handleShowRefiningChange = useCallback(
     (next: boolean) => {
       void setShowRefining(next);

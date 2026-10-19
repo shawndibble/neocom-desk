@@ -184,6 +184,7 @@ import type { SkillPlanImportState } from '@/lib/shortcuts';
 import { useScopedState } from './useScopedState';
 import { attributeShort, remapInstruction } from './remapInstruction';
 import { ATTRIBUTE_ENHANCERS_MARKET_GROUP_ID } from './plannerMarketGroups';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
 
@@ -400,31 +401,21 @@ export function PlanEditor({
   // "Columns" control (#114): a device-local view preference, applying the
   // same way across every plan on this device rather than per-plan.
   const columnVisibility = useColumnVisibility((state) => state.value);
-  const hydrateColumnVisibility = useColumnVisibility((state) => state.hydrate);
   const setColumnVisibility = useColumnVisibility((state) => state.setValue);
-  useEffect(() => {
-    void hydrateColumnVisibility();
-  }, [hydrateColumnVisibility]);
+  useHydratedStore(useColumnVisibility);
 
   // Grouping toggle (#115): priority (default) or attribute-pair band
   // headers — visual only, same device-local preference shape as Columns.
   const groupingMode = useGroupingMode((state) => state.value);
-  const hydrateGroupingMode = useGroupingMode((state) => state.hydrate);
   const setGroupingMode = useGroupingMode((state) => state.setValue);
-  useEffect(() => {
-    void hydrateGroupingMode();
-  }, [hydrateGroupingMode]);
+  useHydratedStore(useGroupingMode);
 
   // Clone State (GLOSSARY.md): per Character, not per plan. The control waits
   // for hydration — a write from the empty default would replace the whole
   // blob and drop every other Character's answer.
   const cloneStates = useCloneStates((state) => state.value);
-  const cloneStatesHydrated = useCloneStates((state) => state.hydrated);
-  const hydrateCloneStates = useCloneStates((state) => state.hydrate);
+  const cloneStatesHydrated = useHydratedStore(useCloneStates);
   const setCloneStates = useCloneStates((state) => state.setValue);
-  useEffect(() => {
-    void hydrateCloneStates();
-  }, [hydrateCloneStates]);
   const cloneState = cloneStateFor(cloneStates, characterId);
   const setCloneState = (next: CloneState): void =>
     void setCloneStates(withCloneState(cloneStates, characterId, next));

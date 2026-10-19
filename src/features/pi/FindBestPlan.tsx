@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EmptyState, Panel, Spinner } from '@/components/ui';
 import { enumParam } from '@/lib/urlState';
@@ -27,6 +27,7 @@ import { useChainEstimates } from './useChainEstimates';
 import { priceSourceLabel } from './priceSource';
 import { useSellHub } from './sellHub';
 import { colonyCountUnknown } from './colonyStripModel';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 /** The recipe filter and the picks/all switch ride in the URL, scoped to Find best (ADR 0015). */
 const FIND_BEST_PARAMS = {
@@ -56,10 +57,7 @@ function toggled<T>(set: ReadonlySet<T>, value: T): Set<T> {
 export function FindBestPlan({ snapshot, characterId }: Props) {
   const { t } = useTranslation();
   const preference = usePlanPreference((state) => state.value);
-  const hydratePreference = usePlanPreference((state) => state.hydrate);
-  useEffect(() => {
-    void hydratePreference();
-  }, [hydratePreference]);
+  useHydratedStore(usePlanPreference);
   const { buybackPct } = useSellHub();
   const restartDays = useCadence((state) => state.value.restartDays);
 

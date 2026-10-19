@@ -135,6 +135,7 @@ import {
   JumpRangeSelect,
 } from '@/features/route/JumpRangeControls';
 import { renderJumpsCell } from '@/features/route/jumpsCell';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 /** How many candidate types the suggestion list offers at once. */
 const SUGGESTION_LIMIT = 8;
@@ -608,10 +609,7 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
   const jumpRangeFilter = useJumpRangeFilter(currentSystem, uiFilter.jumps);
   const visibleItemsColumns = useVisibleContractSearchItemsColumns((state) => state.value);
   const setVisibleItemsColumns = useVisibleContractSearchItemsColumns((state) => state.setValue);
-  const hydrateVisibleItemsColumns = useVisibleContractSearchItemsColumns((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateVisibleItemsColumns();
-  }, [hydrateVisibleItemsColumns]);
+  useHydratedStore(useVisibleContractSearchItemsColumns);
   function toggleItemsColumn(id: ContractSearchItemsColumnId) {
     const next = visibleItemsColumns.includes(id)
       ? visibleItemsColumns.filter((existing) => existing !== id)

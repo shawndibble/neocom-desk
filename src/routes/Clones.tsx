@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -583,11 +584,7 @@ export function Clones() {
   // Implant values at the market hub: lowest sell there, else lowest in its
   // region. Another progressive enhancement: the list shows before any price.
   const hubId = useMarketHub((state) => state.value);
-  const hubHydrated = useMarketHub((state) => state.hydrated);
-  const hydrateHub = useMarketHub((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateHub();
-  }, [hydrateHub]);
+  const hubHydrated = useHydratedStore(useMarketHub);
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
   const priceIds = useMemo(
     () => [...new Set([...clones.flatMap((c) => c.implants), ...wornIds])].sort((a, b) => a - b),
@@ -665,18 +662,11 @@ export function Clones() {
   // Which clone is best for the active queue (the engine does the numbers).
   const sort = useClonesSort((state) => state.value);
   const setSort = useClonesSort((state) => state.setValue);
-  const hydrateSort = useClonesSort((state) => state.hydrate);
+  useHydratedStore(useClonesSort);
   const nicknames = useCloneNicknames((state) => state.value);
-  const nicknamesHydrated = useCloneNicknames((state) => state.hydrated);
-  const hydrateNicknames = useCloneNicknames((state) => state.hydrate);
+  const nicknamesHydrated = useHydratedStore(useCloneNicknames);
   const cloneStates = useCloneStates((state) => state.value);
-  const cloneStatesHydrated = useCloneStates((state) => state.hydrated);
-  const hydrateCloneStates = useCloneStates((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateSort();
-    void hydrateCloneStates();
-    void hydrateNicknames();
-  }, [hydrateSort, hydrateCloneStates, hydrateNicknames]);
+  const cloneStatesHydrated = useHydratedStore(useCloneStates);
   const training = data?.training ?? null;
   const readyAt = cooldown.onCooldown ? cooldown.readyAt : null;
   const verdictResult = useMemo(() => {

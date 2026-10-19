@@ -10,7 +10,7 @@
  * "Show missing" hides what's already trained, in both lists; it sticks.
  * No active Character: names and levels only, nothing to add, no time.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, FilterChip } from '@/components/ui';
 import {
@@ -41,6 +41,7 @@ import {
 } from './shipTreeModel';
 import { useShipInfoShowMissing } from './shipTreeViewPreference';
 import type { ShipTreeSource } from './useShipTreeData';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 const TIERS = [1, 2, 3, 4, 5] as const;
 
@@ -72,10 +73,7 @@ export function SkillsMasteryTab({
   const [tier, setTier] = useState(() => Math.min(5, mastery + 1));
   const storedShowMissing = useShipInfoShowMissing((state) => state.value);
   const setShowMissing = useShipInfoShowMissing((state) => state.setValue);
-  const hydrateShowMissing = useShipInfoShowMissing((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateShowMissing();
-  }, [hydrateShowMissing]);
+  useHydratedStore(useShipInfoShowMissing);
   // Without a Character nothing is trained, so there is nothing to hide.
   const showMissing = hasCharacter && storedShowMissing;
   const missing = (p: { skillTypeID: number; level: number }) =>

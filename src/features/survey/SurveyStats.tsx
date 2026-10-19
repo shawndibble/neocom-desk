@@ -4,7 +4,7 @@
  * Bigger than a `StatChip` on purpose: these are what the pilot reads at a
  * glance and says in fleet chat, not small counts beside a title.
  */
-import { useEffect, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatDuration, formatEveClock } from '@/engine/survey/chatMessage';
 import { formatDuration as formatTotalTime } from '@/lib/duration';
@@ -14,6 +14,7 @@ import { IskAmount, Tooltip } from '@/components/ui';
 import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
 import { formatLocalClock } from './localClock';
 import { useDoneAtClock, useDoneAtOverride } from './surveyPref';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 // Accent says it's pressable; no underline, since that reads as a link to
 // somewhere. The tooltip names what a press does.
@@ -57,10 +58,7 @@ export function SurveyStats({ summary }: { summary: SurveySummary }) {
   const now = useNow();
   const clock = useDoneAtClock();
   const local = clock === 'local';
-  const hydrateClock = useDoneAtOverride((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateClock();
-  }, [hydrateClock]);
+  useHydratedStore(useDoneAtOverride);
   const setClock = useDoneAtOverride((state) => state.setValue);
   const n = (value: number, digits = 0) =>
     value.toLocaleString(i18n.language, { maximumFractionDigits: digits });

@@ -161,6 +161,7 @@ import { moveHighlight, type ComboboxNavKey } from '@/lib/comboboxNav';
 import { CONTRACT_ISK_CENTS_BELOW, formatIskAuto } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 interface Snapshot {
   contractsResult: CachedResult<PublicBpcContractsSnapshot> | null;
@@ -607,17 +608,11 @@ export function BpcSourcingPanel({
 
   const spaceFilter = useSpaceFilter((state) => state.value);
   const setSpaceFilter = useSpaceFilter((state) => state.setValue);
-  const hydrateSpaceFilter = useSpaceFilter((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateSpaceFilter();
-  }, [hydrateSpaceFilter]);
+  useHydratedStore(useSpaceFilter);
 
   const visibleColumns = useVisibleBpcSearchColumns((state) => state.value);
   const setVisibleColumns = useVisibleBpcSearchColumns((state) => state.setValue);
-  const hydrateVisibleColumns = useVisibleBpcSearchColumns((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateVisibleColumns();
-  }, [hydrateVisibleColumns]);
+  useHydratedStore(useVisibleBpcSearchColumns);
 
   function toggleColumn(id: BpcSearchColumnId) {
     const next = visibleColumns.includes(id)
@@ -631,12 +626,7 @@ export function BpcSourcingPanel({
   // several at once writes them in one navigation.
   const hideAuctionsDefault = useBpcHideAuctionsDefault((state) => state.value);
   const hidePlexDefault = useBpcHidePlexDefault((state) => state.value);
-  const hydrateHideAuctionsDefault = useBpcHideAuctionsDefault((state) => state.hydrate);
-  const hydrateHidePlexDefault = useBpcHidePlexDefault((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateHideAuctionsDefault();
-    void hydrateHidePlexDefault();
-  }, [hydrateHideAuctionsDefault, hydrateHidePlexDefault]);
+  useHydratedStore(useBpcHideAuctionsDefault, useBpcHidePlexDefault);
   const sourcingParams = useMemo(
     () => bpcSourcingParams({ hideAuctions: hideAuctionsDefault, hidePlex: hidePlexDefault }),
     [hideAuctionsDefault, hidePlexDefault]
@@ -646,10 +636,7 @@ export function BpcSourcingPanel({
   // wins, and only an edit is stored. Same group, so it writes in the same
   // navigation as the rest.
   const rememberedSources = useBpcSources((state) => state.value);
-  const hydrateRememberedSources = useBpcSources((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateRememberedSources();
-  }, [hydrateRememberedSources]);
+  useHydratedStore(useBpcSources);
   const rememberedParams = useMemo(
     () => ({
       values: { 'sourcing.src': new Set(rememberedSources) },
@@ -716,11 +703,7 @@ export function BpcSourcingPanel({
   // an Order Book is one region's, so it falls back to the pilot's own market
   // hub rather than guessing (issue #1241).
   const marketHubId = useMarketHub((state) => state.value);
-  const marketHubHydrated = useMarketHub((state) => state.hydrated);
-  const hydrateMarketHub = useMarketHub((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateMarketHub();
-  }, [hydrateMarketHub]);
+  const marketHubHydrated = useHydratedStore(useMarketHub);
   const marketHub = getTradeHub(marketHubId) ?? DEFAULT_TRADE_HUB;
   const [marketRefreshTick, setMarketRefreshTick] = useState(0);
   // Refresh lives in the page header, not in this panel: it re-reads the
@@ -784,11 +767,7 @@ export function BpcSourcingPanel({
   const market = useMarketBpoOrders(marketRegionId, marketLookup.typeIds, marketRefreshTick);
 
   const lpValue = useLpValue((state) => state.value);
-  const lpValueHydrated = useLpValue((state) => state.hydrated);
-  const hydrateLpValue = useLpValue((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateLpValue();
-  }, [hydrateLpValue]);
+  const lpValueHydrated = useHydratedStore(useLpValue);
   const blueprintTypeIds = useMemo(() => [...blueprintNames.keys()], [blueprintNames]);
   const lpOffers = useLpBlueprintOffers({
     characterId: activeCharacterId,

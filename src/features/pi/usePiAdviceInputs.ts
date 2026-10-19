@@ -12,6 +12,7 @@ import type { PlanPrices } from './planPrices';
 import { loadInterplanetaryConsolidation } from './planetSlots';
 import { usePlanetRichness } from './richnessOverride';
 import { useSellHub } from './sellHub';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 export type PiAdviceInputsState =
   | { status: 'loading' }
@@ -48,13 +49,8 @@ export function usePiAdviceInputs(
 ): PiAdviceInputsState {
   const { hub, buybackPct } = useSellHub();
   const cadence = useCadence((state) => state.value);
-  const hydrateCadence = useCadence((state) => state.hydrate);
   const goalPrefs = useGoalPlannerPrefs((state) => state.value);
-  const hydrateGoalPrefs = useGoalPlannerPrefs((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateCadence();
-    void hydrateGoalPrefs();
-  }, [hydrateCadence, hydrateGoalPrefs]);
+  useHydratedStore(useCadence, useGoalPlannerPrefs);
 
   const richness = usePlanetRichness(characterId);
 

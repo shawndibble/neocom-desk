@@ -111,6 +111,7 @@ import { ItemContextMenu } from './ItemContextMenu';
 import { MarketItemLink } from './MarketItemLink';
 import { isValidPricePercent, MAX_PRICE_PERCENT, MIN_PRICE_PERCENT } from './pricePercent';
 import type { AppraisalController } from './useAppraisal';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 const ASSETS_ENDPOINTS: readonly EsiEndpointId[] = ['getCharacterAssets'];
 
@@ -274,19 +275,12 @@ export function AppraisalPanel({
   // Ages in the Recent list are read against when the panel opened.
   const [openedAt] = useState(Date.now);
   const recent = useRecentAppraisals((state) => state.value);
-  const hydrateRecent = useRecentAppraisals((state) => state.hydrate);
   const setRecent = useRecentAppraisals((state) => state.setValue);
   const ownedPref = useAppraisalOwnedPref((state) => state.value);
-  const hydrateOwnedPref = useAppraisalOwnedPref((state) => state.hydrate);
   const setOwnedPref = useAppraisalOwnedPref((state) => state.setValue);
   const cargo = useHaulingCargo((state) => state.value);
-  const hydrateCargo = useHaulingCargo((state) => state.hydrate);
   const setCargo = useHaulingCargo((state) => state.setValue);
-  useEffect(() => {
-    void hydrateRecent();
-    void hydrateOwnedPref();
-    void hydrateCargo();
-  }, [hydrateRecent, hydrateOwnedPref, hydrateCargo]);
+  useHydratedStore(useRecentAppraisals, useAppraisalOwnedPref, useHaulingCargo);
 
   const lacksAssets = useCharacterLacksEndpoints(characterId, ASSETS_ENDPOINTS);
   const minusOwned = ownedPref.enabled && !lacksAssets && characterId !== null;
@@ -313,10 +307,7 @@ export function AppraisalPanel({
           ? DEFAULT_VISIBLE_APPRAISAL_COLUMNS.filter((id) => !COMPACT_OFF_BY_DEFAULT.includes(id))
           : storedColumns;
   const setVisibleColumns = useVisibleAppraisalColumns((state) => state.setValue);
-  const hydrateVisibleColumns = useVisibleAppraisalColumns((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateVisibleColumns();
-  }, [hydrateVisibleColumns]);
+  useHydratedStore(useVisibleAppraisalColumns);
   function toggleColumn(id: AppraisalColumnId) {
     const next = visibleColumns.includes(id)
       ? visibleColumns.filter((existing) => existing !== id)

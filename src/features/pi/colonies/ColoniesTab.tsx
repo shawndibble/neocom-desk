@@ -44,6 +44,7 @@ import {
 import { ColonyListHeader, ColonyRowView } from './ColonyRowView';
 import { PlanetImage } from '../PlanetImage';
 import { TodayPanel } from './TodayPanel';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 const PLAN_HREF = '/planetary-industry/plan';
 
@@ -211,11 +212,8 @@ export function ColoniesTab({
   const setActiveCharacter = useActiveCharacter((state) => state.setActiveCharacter);
 
   const showAltColonies = useShowAltColonies((state) => state.value);
-  const hydrateShowAltColonies = useShowAltColonies((state) => state.hydrate);
   const setShowAltColonies = useShowAltColonies((state) => state.setValue);
-  useEffect(() => {
-    void hydrateShowAltColonies();
-  }, [hydrateShowAltColonies]);
+  useHydratedStore(useShowAltColonies);
 
   // Multi-open accordion, keyed by `${characterId}:${planetId}`: two characters
   // can each hold a colony on the same planet.

@@ -1,4 +1,5 @@
 import { FromWalletCrumb } from '@/features/netWorth/FromWalletCrumb';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import {
   createContext,
   useCallback,
@@ -1039,22 +1040,16 @@ export function Assets() {
   const routePreference = assetsRoute.rules.preference;
 
   const stationSortField = useStationSort((state) => state.value);
-  const hydrateStationSort = useStationSort((state) => state.hydrate);
+  useHydratedStore(useStationSort);
   const setStationSortField = useStationSort((state) => state.setValue);
-  useEffect(() => {
-    void hydrateStationSort();
-  }, [hydrateStationSort]);
 
   // The flat (search / All Items) list's own sort, remembered the same way the
   // station list's is. Ungated on `hydrated`: this only reorders a list that is
   // already in memory, so the worst a late hydrate does is re-sort it — there
   // is no request to spend on the default first.
   const sortField = useAssetSort((state) => state.value);
-  const hydrateAssetSort = useAssetSort((state) => state.hydrate);
+  useHydratedStore(useAssetSort);
   const setSortField = useAssetSort((state) => state.setValue);
-  useEffect(() => {
-    void hydrateAssetSort();
-  }, [hydrateAssetSort]);
 
   // Jumps-away distances (issue #87): the active character's current solar
   // system, fetched once per page load (not polled) via ESI's location

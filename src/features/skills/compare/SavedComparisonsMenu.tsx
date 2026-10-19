@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { db } from '@/db';
 import {
@@ -21,6 +21,7 @@ import {
   useSkillComparisons,
   type SavedComparison,
 } from '../comparisons';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 interface SavedComparisonRowProps {
   comparison: SavedComparison;
@@ -139,12 +140,9 @@ export function SavedComparisonsMenu({
   onUnlinked,
 }: SavedComparisonsMenuProps) {
   const { t } = useTranslation();
-  const hydrate = useSkillComparisons((state) => state.hydrate);
   const value = useSkillComparisons((state) => state.value);
   const setValue = useSkillComparisons((state) => state.setValue);
-  useEffect(() => {
-    void hydrate();
-  }, [hydrate]);
+  useHydratedStore(useSkillComparisons);
 
   const [open, setOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);

@@ -162,6 +162,7 @@ import {
 import { useLedgerAction } from '@/features/miningTax/useLedgerAction';
 import { splitLedger } from '@/features/miningTax/ledgerSections';
 import { suggestPayeeForSystem, systemsByPayee } from '@/features/miningTax/suggestPayee';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 /**
  * A `MadePayment`'s own timestamp as a local calendar date, falling back to
@@ -384,14 +385,9 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
   );
   const autoContinue = useAutoContinueSessions((state) => state.value);
   const setAutoContinue = useAutoContinueSessions((state) => state.setValue);
-  const hydrateAutoContinue = useAutoContinueSessions((state) => state.hydrate);
   const dismissedContinuations = useDismissedContinuations((state) => state.value);
   const setDismissedContinuations = useDismissedContinuations((state) => state.setValue);
-  const hydrateDismissedContinuations = useDismissedContinuations((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateAutoContinue();
-    void hydrateDismissedContinuations();
-  }, [hydrateAutoContinue, hydrateDismissedContinuations]);
+  useHydratedStore(useAutoContinueSessions, useDismissedContinuations);
 
   const [payeeManagerCharacterId, setPayeeManagerCharacterId] = useState<number | null>(null);
   // Unconditional, deliberately. Hiding this behind "the pilot has at least
@@ -480,10 +476,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
   // filtered ones: a Character or Payee filter must not hide the target.
   const [searchParams, setSearchParams] = useSearchParams();
   // Read by the Assign dialog when it opens, long after this has hydrated.
-  const hydrateSurveyPayee = useSurveyPayeeId((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateSurveyPayee();
-  }, [hydrateSurveyPayee]);
+  useHydratedStore(useSurveyPayeeId);
   const [initialPaymentRef] = useState(() =>
     parsePaymentRefParam(searchParams.get(PAYMENT_REF_PARAM))
   );

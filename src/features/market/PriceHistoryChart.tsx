@@ -18,7 +18,7 @@ import {
   Line,
   type TooltipContentProps,
 } from 'recharts';
-import { Fragment, useEffect, useMemo } from 'react';
+import { Fragment, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DataTable, type DataTableColumn } from '@/components/ui';
 import { TableActionsMenu } from '@/components/ui/TableExport';
@@ -57,6 +57,7 @@ import {
   type PriceSeriesChoice,
   type RegionOpenSeries,
 } from '@/engine/market/priceHistoryOpen';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 /** One compared region's average line, as the panel has it so far. */
 export interface ComparedRegionSeries {
@@ -484,11 +485,8 @@ export default function PriceHistoryChart({
     priceDomain[0] >= 10_000 ? 0 : priceTickDecimals(priceDomain[1] - priceDomain[0]);
 
   const storedColumns = useVisiblePriceHistoryColumns((state) => state.value);
-  const hydrateColumns = useVisiblePriceHistoryColumns((state) => state.hydrate);
   const setStoredColumns = useVisiblePriceHistoryColumns((state) => state.setValue);
-  useEffect(() => {
-    void hydrateColumns();
-  }, [hydrateColumns]);
+  useHydratedStore(useVisiblePriceHistoryColumns);
   // A phone with nothing stored starts lean; an explicit pick is read as saved.
   const visibleColumns =
     isPhone && storedColumns === DEFAULT_VISIBLE_PRICE_HISTORY_COLUMNS

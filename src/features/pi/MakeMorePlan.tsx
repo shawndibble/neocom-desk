@@ -22,6 +22,7 @@ import { usePlanPreference, usePlanTicks } from './planTicksPref';
 import { priceSourceLabel } from './priceSource';
 import { useSellHub } from './sellHub';
 import { usePlanAdvice } from './usePlanAdvice';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 interface Props {
   snapshot: GoalPlannerSnapshot;
@@ -73,16 +74,11 @@ export function MakeMorePlan({ snapshot, characterId, onFindBest }: Props) {
   const { t } = useTranslation();
   const location = useLocation();
   const preference = usePlanPreference((state) => state.value);
-  const hydratePreference = usePlanPreference((state) => state.hydrate);
   const setPreference = usePlanPreference((state) => state.setValue);
   const ticked = usePlanTicks((state) => state.value);
-  const ticksHydrated = usePlanTicks((state) => state.hydrated);
-  const hydrateTicks = usePlanTicks((state) => state.hydrate);
   const setTicked = usePlanTicks((state) => state.setValue);
-  useEffect(() => {
-    void hydratePreference();
-    void hydrateTicks();
-  }, [hydratePreference, hydrateTicks]);
+  useHydratedStore(usePlanPreference);
+  const ticksHydrated = useHydratedStore(usePlanTicks);
 
   const state = usePlanAdvice(snapshot, characterId, preference);
   const { buybackPct } = useSellHub();

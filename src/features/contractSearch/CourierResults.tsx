@@ -95,6 +95,7 @@ import {
   useCourierFilterPref,
   type StoredCourierFilter,
 } from '@/features/contractSearch/courierFilterPref';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 /** The filter as the controls hold it: text fields stay strings until they are parsed into the engine's filter. */
 interface CourierUiFilter {
@@ -879,10 +880,7 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
   // leaves out, never mirrored back into the URL (decision
   // `20260922-221531` / ADR 0015) — see `courierFilterPref.ts`.
   const rememberedFilter = useCourierFilterPref((state) => state.value);
-  const hydrateRememberedFilter = useCourierFilterPref((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateRememberedFilter();
-  }, [hydrateRememberedFilter]);
+  useHydratedStore(useCourierFilterPref);
   const remembered = useMemo(
     () => ({
       values: rememberedParams(rememberedFilter),
@@ -1009,10 +1007,7 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
   const jumps = useJumpCounts(rows, routeQuery);
   const visibleColumns = useVisibleCourierColumns((state) => state.value);
   const setVisibleColumns = useVisibleCourierColumns((state) => state.setValue);
-  const hydrateVisibleColumns = useVisibleCourierColumns((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateVisibleColumns();
-  }, [hydrateVisibleColumns]);
+  useHydratedStore(useVisibleCourierColumns);
   function toggleColumn(id: CourierColumnId) {
     const next = visibleColumns.includes(id)
       ? visibleColumns.filter((existing) => existing !== id)

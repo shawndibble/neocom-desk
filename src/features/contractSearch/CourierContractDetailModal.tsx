@@ -59,6 +59,7 @@ import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
 import { endpointName, endpointSystemName } from '@/features/contractSearch/courierEndpointNames';
 import { useCourierCollateralRatio } from '@/features/contractSearch/collateralThreshold';
 import { RISK_COPY, WARNING_RISKS } from '@/features/contractSearch/courierRiskLabels';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 /**
  * This haul's distance, in the states the board itself has.
@@ -224,10 +225,7 @@ export function CourierContractDetailModal({
   const volumeRate = iskPerVolume(row.reward, row.volume);
   const collateralRatio = collateralToRewardRatio(collateral, row.reward);
   const collateralThreshold = useCourierCollateralRatio((state) => state.value);
-  const hydrateCollateralThreshold = useCourierCollateralRatio((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateCollateralThreshold();
-  }, [hydrateCollateralThreshold]);
+  useHydratedStore(useCourierCollateralRatio);
   const jumpCount = jumps.kind === 'known' ? jumps.count : null;
   const jumpRate = jumps.kind === 'known' ? iskPerJump(row.reward, jumpCount) : null;
   // Spelled out here, where the decision is actually made — the row only has

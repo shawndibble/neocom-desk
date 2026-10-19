@@ -110,6 +110,7 @@ import {
 } from './openOrdersColumns';
 import { useOpenOrderTableColumns } from './openOrdersTableColumns';
 import { FixListSummary, HealthyFold, ListNotes } from './OpenOrdersFixListParts';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 /** A bare visit opens on Needs you, every funnel field clear. */
 const DEFAULT_FILTER: OpenOrdersFilter = EMPTY_OPEN_ORDERS_FILTER;
@@ -173,10 +174,7 @@ export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
    * is never mirrored back into it.
    */
   const rememberedLocationIds = useOpenOrdersLocationFilterPref((state) => state.value);
-  const hydrateRememberedLocationIds = useOpenOrdersLocationFilterPref((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateRememberedLocationIds();
-  }, [hydrateRememberedLocationIds]);
+  useHydratedStore(useOpenOrdersLocationFilterPref);
   // `orders.characters` remembers the This character / All characters pick the
   // same way the other pages do, then the synced Settings default. `'current'`
   // is `[activeCharacterId]` here, so it keeps following the active Character.
@@ -244,9 +242,7 @@ export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
    */
   const orderDetail = useOrderDetail();
   const structureFees = useStructureFees((state) => state.value);
-  useEffect(() => {
-    void useStructureFees.getState().hydrate();
-  }, []);
+  useHydratedStore(useStructureFees);
 
   const {
     visible: visibleColumnIds,

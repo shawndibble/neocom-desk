@@ -1,4 +1,5 @@
 import { FromWalletCrumb } from '@/features/netWorth/FromWalletCrumb';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
@@ -301,11 +302,8 @@ export function Market() {
 
   // The Appraisal tab's other half of the same control pair as the header's hub picker.
   const savedPricePercent = useMarketPricePercent((state) => state.value);
-  const hydratePricePercent = useMarketPricePercent((state) => state.hydrate);
   const setPricePercent = useMarketPricePercent((state) => state.setValue);
-  useEffect(() => {
-    void hydratePricePercent();
-  }, [hydratePricePercent]);
+  useHydratedStore(useMarketPricePercent);
   // `?percent=` overrides the saved Price Percent for this visit, the way
   // `?hub=` overrides the saved hub — what a Shared Appraisal's "Open Neocom
   // Desk" lands with. Typing a percent writes the setting and drops the
