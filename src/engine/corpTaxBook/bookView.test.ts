@@ -259,6 +259,49 @@ describe('buildBookView', () => {
       input({ ...base, surveyOreLines: new Map([[id, [{ typeId: ORE, quantity: 1000 }]]]) })
     ).extractions[0];
     expect(row).toMatchObject({ oreSource: 'survey', minedPct: 50, estimatedValue: 1_000_000 });
+    expect(row.chunkRate).toEqual({ m3PerHour: 30_000, basis: 'default' });
+    expect(
+      buildBookView(
+        input({
+          ...base,
+          chunkM3PerHour: 20_000,
+          surveyOreLines: new Map([[id, [{ typeId: ORE, quantity: 1000 }]]]),
+        })
+      ).extractions[0].chunkRate
+    ).toEqual({ m3PerHour: 20_000, basis: 'manual' });
+  });
+
+  it('learns each refinery chunk rate from its notified extractions and names it on a survey row', () => {
+    // 100h at 34,000 m³/h = 340,000 units of 10 m³.
+    const noted = {
+      structureId: 1001,
+      moonId: 7,
+      extractionStartTime: '2026-08-01T00:00:00Z',
+      chunkArrivalTime: '2026-08-05T04:00:00Z',
+      naturalDecayTime: '2026-08-05T07:00:00Z',
+      oreLines: [{ typeId: ORE, quantity: 340_000 }],
+    };
+    const surveyed = {
+      structureId: 1001,
+      moonId: 7,
+      extractionStartTime: '2026-09-01T10:00:00Z',
+      chunkArrivalTime: '2026-09-15T10:00:00Z',
+      naturalDecayTime: '2026-09-15T13:00:00Z',
+    };
+    const first = buildBookView(input({ extractions: [noted, surveyed] }));
+    expect(first.chunkRates.get(1001)).toEqual({ m3PerHour: 34_000, cycles: 1 });
+    const id = first.extractions.find((r) => r.oreSource === 'unknown')!.id;
+    const view = buildBookView(
+      input({
+        extractions: [noted, surveyed],
+        surveyOreLines: new Map([[id, [{ typeId: ORE, quantity: 1 }]]]),
+      })
+    );
+    expect(view.extractions.find((r) => r.id === id)?.chunkRate).toEqual({
+      m3PerHour: 34_000,
+      basis: 'measured',
+      cycles: 1,
+    });
   });
 });
 

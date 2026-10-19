@@ -153,6 +153,14 @@ export function MoonDetail({ id }: { id: string }) {
             value={
               <span>
                 {t(`corpTaxBook.moons.moon.source.${row.oreSource}`)}
+                {row.chunkRate && (
+                  <span className="block text-xs text-text-dim">
+                    {t(`corpTaxBook.moons.moon.rate.${row.chunkRate.basis}`, {
+                      rate: row.chunkRate.m3PerHour.toLocaleString('en'),
+                      count: row.chunkRate.cycles,
+                    })}
+                  </span>
+                )}
                 {canEdit && row.oreSource !== 'notification' && (
                   <button
                     type="button"
