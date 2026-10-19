@@ -16,6 +16,7 @@ import { usePiSettings } from '../piSettings';
 import { NO_WHAT_IF_CHAINS, type WhatIfChainsState } from '../useBiggerChains';
 import type { ChainEstimateOf } from '../useChainEstimates';
 import { planPicks } from '../planPicks';
+import { runSliced } from '../runSliced';
 import {
   hrefWithout,
   hrefWithoutPiPlanet,
@@ -379,10 +380,26 @@ export function usePlanMapState({
     [advice, t]
   );
 
-  const whatIfAdvice = useMemo(
-    () => (whatIf.size > 0 ? adviceWithWhatIf(whatIf) : null),
-    [whatIf, adviceWithWhatIf]
-  );
+  // A what-if build is a full advice solve: run it on the next tick, not inside the click that
+  // picked the planet type, and show it only once it matches the current pick.
+  const [whatIfBuilt, setWhatIfBuilt] = useState<{
+    types: ReadonlySet<PlanetType>;
+    build: typeof adviceWithWhatIf;
+    advice: PlanAdvice;
+  } | null>(null);
+  useEffect(() => {
+    if (whatIf.size === 0) return;
+    return runSliced(
+      [whatIf],
+      (types) =>
+        setWhatIfBuilt({ types, build: adviceWithWhatIf, advice: adviceWithWhatIf(types) }),
+      () => {}
+    );
+  }, [whatIf, adviceWithWhatIf]);
+  const whatIfAdvice =
+    whatIf.size > 0 && whatIfBuilt?.types === whatIf && whatIfBuilt.build === adviceWithWhatIf
+      ? whatIfBuilt.advice
+      : null;
   const whatIfRecipe = useMemo(
     () => (whatIfAdvice ? unlockedRecipe(whatIfAdvice, whatIf, [...owned]) : null),
     [whatIf, whatIfAdvice, owned]
