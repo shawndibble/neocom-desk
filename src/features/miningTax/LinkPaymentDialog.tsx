@@ -5,11 +5,10 @@ import { selectedRowClassName, tappableRowClassName } from '@/components/ui/cont
 import type { PayeeRecord } from '@/db';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
-import { formatLocalDate } from '@/lib/localDate';
 import { formatDateRange } from './groupRows';
 import { settle } from './ledgerActions';
 import { rememberPayeeEntity } from './payees';
-import type { LinkSuggestion } from './paymentLinks';
+import { paidOnFor, type LinkSuggestion } from './paymentLinks';
 import { useLedgerAction } from './useLedgerAction';
 import { LedgerActionError } from './LedgerActionError';
 
@@ -21,17 +20,6 @@ interface LinkPaymentDialogProps {
   systemNames: ReadonlyMap<number, string>;
   showCharacter: boolean;
   onLinked: () => void;
-}
-
-/**
- * The payment's own date as a local calendar date, falling back to today.
- * A contract carries `date_completed ?? date_issued` straight from ESI, so an
- * unparseable value would otherwise reach `formatLocalDate` as an Invalid Date
- * and write nonsense into a synced record.
- */
-function paidOnFor(isoDate: string): string {
-  const parsed = new Date(isoDate);
-  return formatLocalDate(Number.isNaN(parsed.getTime()) ? new Date() : parsed);
 }
 
 /**

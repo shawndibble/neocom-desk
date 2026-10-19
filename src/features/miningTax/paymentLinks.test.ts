@@ -1,12 +1,17 @@
 import { describe, expect, it } from 'vitest';
+import type { TFunction } from 'i18next';
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import type { PayeeBalance } from './balances';
-import type { GroupMember } from './groupRows';
+import type { DisplayRow, GroupMember } from './groupRows';
 import type { MoonMiningTaxRow } from './snapshot';
 import {
+  assignmentsForLinkTarget,
   autoMatchRecordedPayments,
   exactAmountMatches,
+  labelForLinkedRef,
+  linkedTransactionsFor,
   normalizePaymentInfo,
+  paidOnFor,
   suggestLink,
   unlinkedPayments,
   unlinkedRecordedPayments,
@@ -480,5 +485,98 @@ describe('exactAmountMatches', () => {
   it('never matches a payment in kind, which carries no ISK figure', () => {
     const inKind = payment({ kind: 'contract', key: 'contract:1', amount: null });
     expect(exactAmountMatches([inKind], 0)).toEqual([]);
+  });
+});
+
+// Echoes the key so the assertions read the branch taken, not a locale string.
+const t = ((key: string) => key) as unknown as TFunction;
+
+describe('paidOnFor', () => {
+  it('reads the timestamp as a local calendar date', () => {
+    expect(paidOnFor('2026-09-06T12:00:00')).toBe('2026-09-06');
+  });
+
+  it('falls back to today for an unparseable timestamp', () => {
+    expect(paidOnFor('not a date')).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+});
+
+describe('labelForLinkedRef', () => {
+  it('is null once the payment has left the cached journal', () => {
+    expect(labelForLinkedRef([], t, 'journal', 11)).toBeNull();
+  });
+
+  it('joins amount, date and label', () => {
+    expect(labelForLinkedRef([payment()], t, 'journal', 11)).toBe(
+      '100 ISK · 2026-09-06 — Player donation'
+    );
+  });
+
+  it('names a payment in kind and an untitled contract by key', () => {
+    const inKind = payment({
+      key: 'contract:5',
+      kind: 'contract',
+      refId: 5,
+      amount: null,
+      label: '',
+    });
+    expect(labelForLinkedRef([inKind], t, 'contract', 5)).toBe(
+      'miningTax.linkPaymentInKind · 2026-09-06 — miningTax.linkPaymentUntitledContract'
+    );
+  });
+});
+
+describe('linkedTransactionsFor', () => {
+  const info = (journalRefIds: number[], contractIds: number[] = []) => ({
+    paymentId: 'p1',
+    paidOn: '2026-09-06',
+    method: 'donation' as const,
+    amount: 100,
+    journalLinks: journalRefIds.map((refId) => ({ refId, source: 'manual' as const })),
+    contractLinks: contractIds.map((refId) => ({ refId, source: 'auto' as const })),
+  });
+
+  it('lists each linked ref once across assignments sharing a payment', () => {
+    const a = assignment({ id: 'a', payment: info([11]) });
+    const b = assignment({ id: 'b', payment: info([11], [5]) });
+    const out = linkedTransactionsFor([a, b], [payment()], t);
+    expect(out.map((l) => `${l.kind}:${l.refId}`)).toEqual(['journal:11', 'contract:5']);
+    expect(out[0]?.label).toBe('100 ISK · 2026-09-06 — Player donation');
+    expect(out[1]?.label).toBeNull();
+  });
+
+  it('skips an assignment with no payment', () => {
+    expect(linkedTransactionsFor([assignment()], [], t)).toEqual([]);
+  });
+});
+
+describe('assignmentsForLinkTarget', () => {
+  function displayRow(a: MiningTaxAssignmentRecord | null, groupMembers?: GroupMember[]) {
+    const first = member(a ?? assignment());
+    return {
+      key: a?.id ?? 'residual',
+      row: first.row,
+      assignment: a,
+      status: 'outstanding',
+      groupMembers,
+    } as DisplayRow;
+  }
+
+  it('is every member of a joined group', () => {
+    const a = assignment({ id: 'a' });
+    const b = assignment({ id: 'b' });
+    const dr = displayRow(a, [member(b)]);
+    expect(assignmentsForLinkTarget(dr, [a, b]).map((x) => x.id)).toEqual(['a', 'b']);
+  });
+
+  it('is the shared-payment group for a single row', () => {
+    const a = assignment({ id: 'a', payment: { ...recorded().payment!, paymentId: 'p1' } });
+    const b = assignment({ id: 'b', payment: { ...recorded().payment!, paymentId: 'p1' } });
+    const c = assignment({ id: 'c' });
+    expect(assignmentsForLinkTarget(displayRow(a), [a, b, c]).map((x) => x.id)).toEqual(['a', 'b']);
+  });
+
+  it('is empty for an unassigned residual', () => {
+    expect(assignmentsForLinkTarget(displayRow(null), [])).toEqual([]);
   });
 });

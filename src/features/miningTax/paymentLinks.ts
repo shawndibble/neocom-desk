@@ -13,9 +13,13 @@ import type {
   MiningTaxPaymentMethod,
   PayeeRecord,
 } from '@/db';
+import type { TFunction } from 'i18next';
 import { DAY_MS } from '@/lib/age';
+import { formatIsk } from '@/lib/isk';
+import { formatLocalDate } from '@/lib/localDate';
 import type { PayeeBalance } from './balances';
-import type { GroupMember } from './groupRows';
+import { allMembers, type DisplayRow, type GroupMember } from './groupRows';
+import type { LinkedTransaction } from './PaymentLinksCard';
 import { amountsMatch, LINK_WINDOW_DAYS } from './paymentMatches';
 
 /**
@@ -405,4 +409,76 @@ export function suggestLinks(
       (a, b) =>
         rank[a.confidence] - rank[b.confidence] || b.payment.date.localeCompare(a.payment.date)
     );
+}
+
+/**
+ * A `MadePayment`'s own timestamp as a local calendar date, falling back to
+ * today. A contract carries `date_completed ?? date_issued` straight from ESI,
+ * so an unparseable value would otherwise reach `formatLocalDate` as an
+ * Invalid Date and write nonsense into a synced record.
+ */
+export function paidOnFor(isoDate: string): string {
+  const parsed = new Date(isoDate);
+  return formatLocalDate(Number.isNaN(parsed.getTime()) ? new Date() : parsed);
+}
+
+/** A short display line for a linked ref, from the same `MadePayment[]` the Payments-to-link card already loaded — `null` when it's no longer in the cached wallet journal/contracts. */
+export function labelForLinkedRef(
+  madePayments: readonly MadePayment[],
+  t: TFunction,
+  kind: 'journal' | 'contract',
+  refId: number
+): string | null {
+  const mp = madePayments.find((p) => p.key === `${kind}:${refId}`);
+  if (!mp) return null;
+  const amount =
+    mp.amount === null ? t('miningTax.linkPaymentInKind') : `${formatIsk(mp.amount)} ISK`;
+  const label = mp.label || t('miningTax.linkPaymentUntitledContract');
+  return `${amount} · ${mp.date.slice(0, 10)} — ${label}`;
+}
+
+/** The dedup'd `LinkedTransaction[]` across `assignments`' payments — the same shape whether it's one row's shared-payment group or a joined group's members. */
+export function linkedTransactionsFor(
+  assignments: readonly MiningTaxAssignmentRecord[],
+  madePayments: readonly MadePayment[],
+  t: TFunction
+): LinkedTransaction[] {
+  const seen = new Set<string>();
+  const out: LinkedTransaction[] = [];
+  for (const a of assignments) {
+    if (!a.payment) continue;
+    for (const kind of ['journal', 'contract'] as const) {
+      for (const l of (kind === 'journal' ? a.payment.journalLinks : a.payment.contractLinks) ??
+        []) {
+        const key = `${kind}:${l.refId}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push({
+          kind,
+          refId: l.refId,
+          source: l.source,
+          label: labelForLinkedRef(madePayments, t, kind, l.refId),
+        });
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Every Assignment a "Link transaction" action on `dr` should apply to:
+ * every member of a joined group at once (issue #540 follow-up — a joined
+ * group is billed as one obligation, so a linked transaction covers all of
+ * it), or the single row's own shared-`paymentId` group otherwise.
+ */
+export function assignmentsForLinkTarget(
+  dr: DisplayRow,
+  everyAssignment: readonly MiningTaxAssignmentRecord[]
+): MiningTaxAssignmentRecord[] {
+  if (dr.groupMembers) return allMembers(dr).map((m) => m.assignment);
+  if (!dr.assignment) return [];
+  // The same rule as `assignmentsSharingPayment`, which only `ledgerActions` may import.
+  const paymentId = dr.assignment.payment?.paymentId;
+  if (paymentId === undefined) return [dr.assignment];
+  return everyAssignment.filter((a) => a.payment?.paymentId === paymentId);
 }
