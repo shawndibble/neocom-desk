@@ -335,6 +335,11 @@ async function readLocalSettingsTombstones(): Promise<SyncedSettingTombstone[]> 
   return Array.isArray(record?.value) ? (record.value as SyncedSettingTombstone[]) : [];
 }
 
+/** Lets queued microtasks and IO callbacks run, without waiting on wall-clock time. */
+async function settle(turns = 20) {
+  for (let i = 0; i < turns; i++) await new Promise<void>((resolve) => setImmediate(resolve));
+}
+
 beforeEach(async () => {
   // Helpers like markPlanDeleted schedule a debounced sync that outlives
   // their test; left alone it fires mid-way through a later test and queues
@@ -2010,7 +2015,7 @@ describe('sync orchestration', () => {
     const p1 = triggerSync(1);
     const p2 = triggerSync(2);
     // Give character 2 every chance to (incorrectly) start while 1 is blocked.
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    await settle();
     expect(order.some((path) => path.includes('char:2'))).toBe(false);
 
     release();
@@ -2087,7 +2092,7 @@ describe('sync orchestration', () => {
     const p1 = triggerSync(1);
     const p2 = triggerSync(2);
     const p1Settled = p1.catch(() => {});
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    await settle();
     // The plans pull of character 1 has failed, but its buildPlans pull is
     // still running under the char:1 session — char:2 must not sign in over it.
     expect(firstReadOf(order, 2)).toBe(-1);
@@ -2106,7 +2111,7 @@ describe('sync orchestration', () => {
     await addAlts([2, 3]);
     const { order, release } = gateReads((path) => path === 'characters/char:2/plans');
     const background = [triggerSync(2, 'background'), triggerSync(3, 'background')];
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await settle();
 
     const edit = triggerSync(1);
     release();
@@ -2125,7 +2130,7 @@ describe('sync orchestration', () => {
       triggerSync(3, 'background'),
       triggerSync(1, 'background'),
     ];
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await settle();
 
     const edit = triggerSync(1);
     expect(edit).toBe(queued[2]);
@@ -2162,7 +2167,7 @@ describe('sync orchestration', () => {
   it('runs one more pass for a request that arrives mid-sync, and holds its promise until then', async () => {
     const { release } = gateReads((path) => path === PLANS_PATH);
     const first = triggerSync(1);
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await settle();
 
     // An edit lands after the running pass already read its local rows —
     // what flushSync (removeCharacter.ts) does right before deleting them.
@@ -2267,7 +2272,7 @@ describe('haltSync', () => {
       return fake.getDocsImpl(target);
     }) as never);
     const syncs = [triggerSync(1, 'background'), triggerSync(2, 'background')];
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await settle();
     const halt = haltSync();
 
     release();
@@ -2294,7 +2299,7 @@ describe('haltSync', () => {
       halted = true;
     });
 
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    await settle();
     expect(halted).toBe(false);
     release();
     await Promise.all([running, halt]);
