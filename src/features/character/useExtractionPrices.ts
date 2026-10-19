@@ -4,7 +4,7 @@ import {
   extractionNet,
   LARGE_SKILL_INJECTOR_TYPE_ID,
   SKILL_EXTRACTOR_TYPE_ID,
-} from '@/engine/spExtraction';
+} from '@/engine/skills/spExtraction';
 import { useMarketHub } from '@/features/market/hub';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { getHubPrices } from '@/market/prices';

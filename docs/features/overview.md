@@ -89,12 +89,12 @@ Page ungated; see card table. Missing scope: that card goes warning with a re-lo
 
 ## Formulas and thresholds
 
-- Severity rank critical < warning < watch < clear; `worstSeverity` takes minimum (`src/engine/severity.ts`). `severityForRemaining`: null warning; <= 24 h critical; <= 3 d warning; <= 7 d watch; else clear.
-- SP extraction (`engine/spExtraction.ts`): floor 5,000,000 SP; `extractable = max(0,total-floor)`; extractor = 500,000 SP; ready when extractable >= threshold (default one chunk); off monitoring = clear.
-- Contracts (`engine/contractsBoard.ts`): counts accepted couriers where this Character is acceptor; deadline = courier deliver-by, falls back to offer expiry; overdue = deadline <= now; due soon = within 24 h (`LISTING_WINDOW_MS`); own outstanding non-corp listings count only in their last 24 h; soonest drives strip clock.
+- Severity rank critical < warning < watch < clear; `worstSeverity` takes minimum (`src/engine/character/severity.ts`). `severityForRemaining`: null warning; <= 24 h critical; <= 3 d warning; <= 7 d watch; else clear.
+- SP extraction (`engine/skills/spExtraction.ts`): floor 5,000,000 SP; `extractable = max(0,total-floor)`; extractor = 500,000 SP; ready when extractable >= threshold (default one chunk); off monitoring = clear.
+- Contracts (`engine/contracts/contractsBoard.ts`): counts accepted couriers where this Character is acceptor; deadline = courier deliver-by, falls back to offer expiry; overdue = deadline <= now; due soon = within 24 h (`LISTING_WINDOW_MS`); own outstanding non-corp listings count only in their last 24 h; soonest drives strip clock.
 - Industry: completing soon = remaining in (0, 1 h] (`features/industry/jobs.ts`); next-job clock severity fixed watch.
 - Mining tax warning age `MINING_TAX_WARNING_DAYS = 30`.
-- Coming up: only `accepted`/`tentative` (`engine/calendarDeadline.ts`); watch if within 24 h.
+- Coming up: only `accepted`/`tentative` (`engine/character/calendarDeadline.ts`); watch if within 24 h.
 - Queue: active entry = [start,finish) spans now, else earliest future (BUG #10); depth empty / paused / training (`overviewQueue.ts`).
 
 ## Tests (what they assert)

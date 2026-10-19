@@ -3,7 +3,7 @@
  * Pure — `now` is a parameter. The clone jump cooldown itself is
  * `cloneJump.ts`'s; this only reads times off ESI's jump fatigue and compares.
  */
-import { parseInstant } from './esiInstant';
+import { parseInstant } from '../esiInstant';
 
 /** When jump fatigue expires, ms since the epoch; null when ESI gave no (valid) date. */
 export function fatigueEndsAt(expireDate: string | null | undefined): number | null {

@@ -8,7 +8,7 @@ import {
 } from '@/components/ui/controlStyles';
 import { Caret } from '@/components/ui/Disclosure';
 import { cx } from '@/lib/cx';
-import { progressToNextLevel } from '@/engine/sp';
+import { progressToNextLevel } from '@/engine/skills/sp';
 import { SkillLink } from '@/features/entities/EntityLink';
 import { useSkillDetailModal } from '@/stores/skillDetailModal';
 import type { BoardGroup, BoardSkill } from './skillBoard';

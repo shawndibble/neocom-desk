@@ -7,7 +7,7 @@
  * lead the board the way a real deadline does.
  */
 import type { CalendarEventSummary } from '@/esi/endpoints';
-import { parseInstant } from './esiInstant';
+import { parseInstant } from '../esiInstant';
 
 export interface CalendarDeadlineItem {
   eventId: number;

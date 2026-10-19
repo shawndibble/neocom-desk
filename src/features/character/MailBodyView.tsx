@@ -2,7 +2,7 @@ import { useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ExternalLink } from '@/components/ui/ExternalLink';
 import { HintText } from '@/components/ui/HintText';
-import { linkifyText } from '@/engine/linkifyText';
+import { linkifyText } from '@/engine/mail/linkifyText';
 import {
   markupColorToCss,
   markupPlainText,
@@ -11,8 +11,8 @@ import {
   splitMarkupLines,
   type MarkupLinkTarget,
   type MarkupNode,
-} from '@/engine/eveMarkup';
-import { splitMailLines, type MailLineBlock } from '@/engine/mailBodyBlocks';
+} from '@/engine/mail/eveMarkup';
+import { splitMailLines, type MailLineBlock } from '@/engine/mail/mailBodyBlocks';
 import {
   AllianceLink,
   CharacterLink,

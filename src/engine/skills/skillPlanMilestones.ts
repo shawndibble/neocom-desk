@@ -7,7 +7,7 @@
  * stale index.
  */
 import { stepKey, type StepKey } from './skillPlanSchedule';
-import type { PlanMilestone, ScheduledStep, TrainedSkill } from './types';
+import type { PlanMilestone, ScheduledStep, TrainedSkill } from '../types';
 
 export type MilestoneState = 'projected' | 'reached' | 'orphaned';
 

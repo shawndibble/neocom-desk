@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { cx } from '@/lib/cx';
 import { formatMarketIsk } from '@/lib/isk';
-import type { JumpsAwayResult } from '@/engine/jumpsAway';
+import type { JumpsAwayResult } from '@/engine/clone/jumpsAway';
 import type { UndercutScope } from '@/engine/market/undercut';
 import { JumpsAwayText } from '@/features/character/assetBrowserRows';
 import { CELL, scopeLabelText, type ScopeState } from './orderScopeState';

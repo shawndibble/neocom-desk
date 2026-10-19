@@ -1,6 +1,6 @@
 import { TextArea } from '@/components/ui';
-import { markupPlainText, parseEveMarkup } from '@/engine/eveMarkup';
-import { plainTextToMarkup } from '@/engine/mailEditorDoc';
+import { markupPlainText, parseEveMarkup } from '@/engine/mail/eveMarkup';
+import { plainTextToMarkup } from '@/engine/mail/mailEditorDoc';
 import type { MailBodyEditorProps } from './MailBodyEditor';
 
 export function PlainBodyEditor({

@@ -5,7 +5,7 @@
  * rows. No JSX — `OrderDetailModal.tsx` renders them.
  */
 import type { useTranslation } from 'react-i18next';
-import type { JumpsAwayResult } from '@/engine/jumpsAway';
+import type { JumpsAwayResult } from '@/engine/clone/jumpsAway';
 import type { UndercutRival, UndercutScope } from '@/engine/market/undercut';
 import { sellThrough, type SellThrough } from '@/engine/market/orderHealth';
 import { filterPriceHistoryRange } from '@/engine/market/priceHistory';

@@ -25,7 +25,7 @@ import { ItemInfoLink } from '@/features/entities';
 import { formatUnitVolume } from '@/lib/volume';
 import { securityStatusColor } from '@/engine/securityStatus';
 import { formatBadge } from './assetBrowserFormat';
-import type { JumpsAwayResult } from '@/engine/jumpsAway';
+import type { JumpsAwayResult } from '@/engine/clone/jumpsAway';
 import type { PinState } from '@/features/character/stationPins';
 import type { SelectionState } from '@/features/character/assetSelection';
 import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';

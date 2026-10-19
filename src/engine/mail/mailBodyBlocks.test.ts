@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { splitMailLines } from '@/engine/mailBodyBlocks';
+import { splitMailLines } from '@/engine/mail/mailBodyBlocks';
 
 type Block =
   { kind: 'text'; text: string } | { kind: 'table'; rows: string[][]; align: ('left' | 'right')[] };

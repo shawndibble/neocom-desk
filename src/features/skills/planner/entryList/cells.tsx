@@ -7,7 +7,7 @@ import {
 } from '@/components/ui';
 import { controlHeightClassName, interactiveClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
-import { PRIORITY_ORDER } from '@/engine/planPriority';
+import { PRIORITY_ORDER } from '@/engine/skills/planPriority';
 import type { PlanPriority } from '@/engine/types';
 import type { AttributePair } from '../attributePairBands';
 import { TIME_CELL, attributePairLabel, priorityLabelKey } from './rowChrome';

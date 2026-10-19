@@ -16,7 +16,7 @@ import {
 } from '@dnd-kit/sortable';
 import { useTranslation } from 'react-i18next';
 import { EmptyState } from '@/components/ui';
-import type { MilestoneStatus } from '@/engine/skillPlanMilestones';
+import type { MilestoneStatus } from '@/engine/skills/skillPlanMilestones';
 import type { Attributes, Implants, PlanPriority } from '@/engine/types';
 import type { AttributePair } from './attributePairBands';
 import type { ColumnVisibility } from './columnPreference';

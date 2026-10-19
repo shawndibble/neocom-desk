@@ -10,13 +10,13 @@
  * inside a source's effect, so time-dependent text stays true as the clock
  * ticks and a build never invents a new object per render of a source.
  */
-import { severityForRemaining, type DeadlineSeverity } from '@/engine/severity';
+import { severityForRemaining, type DeadlineSeverity } from '@/engine/character/severity';
 import {
   soonestCalendarDeadline,
   upcomingCommittedEvents,
   upcomingEvents,
-} from '@/engine/calendarDeadline';
-import { extractableSp, extractorCount } from '@/engine/spExtraction';
+} from '@/engine/character/calendarDeadline';
+import { extractableSp, extractorCount } from '@/engine/skills/spExtraction';
 import {
   buildOpenOrderRows,
   needsAttentionCount,

@@ -5,11 +5,11 @@
  * decide what survives a narrow widget. Pure: figures and a translate function
  * in, a `TableModel` out.
  */
-import type { DeadlineSeverity } from '@/engine/severity';
-import { extractableSp, extractorCount } from '@/engine/spExtraction';
+import type { DeadlineSeverity } from '@/engine/character/severity';
+import { extractableSp, extractorCount } from '@/engine/skills/spExtraction';
 import type { SkillQueueEntry } from '@/esi/endpoints';
-import type { ContractTableRow } from '@/engine/contractsBoard';
-import type { UpcomingCalendarEvent } from '@/engine/calendarDeadline';
+import type { ContractTableRow } from '@/engine/contracts/contractsBoard';
+import type { UpcomingCalendarEvent } from '@/engine/character/calendarDeadline';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { DAY_MS } from '@/lib/age';
 import { formatCountdown } from '@/lib/duration';

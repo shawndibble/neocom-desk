@@ -1,6 +1,6 @@
-import { sum } from './math';
-import { timeToTrain, trainingRate } from './sp';
-import type { AttributeName, Attributes, CloneState, Implants } from './types';
+import { sum } from '../math';
+import { timeToTrain, trainingRate } from '../skills/sp';
+import type { AttributeName, Attributes, CloneState, Implants } from '../types';
 
 /**
  * How long does the active training queue take if the Character wore each of

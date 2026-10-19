@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { planProgress } from '@/engine/planProgress';
-import { spForLevel } from '@/engine/sp';
+import { planProgress } from '@/engine/skills/planProgress';
+import { spForLevel } from '@/engine/skills/sp';
 import type { EngineSkill, PlanEntry, TrainedSkill } from '@/engine/types';
 
 function skill(

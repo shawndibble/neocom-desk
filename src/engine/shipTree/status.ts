@@ -2,7 +2,7 @@
  * Each hull's standing for one pilot: can they fly it, how long until they
  * can, and which Mastery tier they've reached.
  */
-import { computeSkillPlanSchedule } from '@/engine/skillPlanSchedule';
+import { computeSkillPlanSchedule } from '@/engine/skills/skillPlanSchedule';
 import type { Attributes, CloneState, EngineSkill, Implants, TrainedSkill } from '@/engine/types';
 import type { MasteryMap, ShipTreeShip } from '@/sde/types';
 import type { ShipTreeHullStatus } from './types';

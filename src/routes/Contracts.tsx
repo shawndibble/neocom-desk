@@ -77,7 +77,7 @@ import { focusRingClassName } from '@/components/ui/controlStyles';
 import { HintText } from '@/components/ui/HintText';
 import { formatCountdown } from '@/lib/duration';
 import { useTicker } from '@/lib/ticker';
-import { courierDeliveryDeadlineMs } from '@/engine/courierDeadline';
+import { courierDeliveryDeadlineMs } from '@/engine/contracts/courierDeadline';
 import { useTimeZone } from '@/lib/timeFormat';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';

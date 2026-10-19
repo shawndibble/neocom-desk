@@ -21,7 +21,7 @@ import {
   filterMailingLists,
   recipientKey,
   type ComposeRecipient,
-} from '@/engine/mailCompose';
+} from '@/engine/mail/mailCompose';
 import { loadMailingLists } from './mail';
 import { RecipientAvatar } from './RecipientAvatar';
 import { MIN_RECIPIENT_SEARCH_LENGTH, searchTypedMailRecipients } from './mailRecipientSearch';

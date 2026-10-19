@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildUnlockIndex } from './skillUnlocks';
-import type { EngineSkill } from './types';
+import type { EngineSkill } from '../types';
 
 function skill(overrides: Partial<EngineSkill> & { typeID: number }): EngineSkill {
   return {

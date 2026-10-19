@@ -1,4 +1,4 @@
-import { normalizePlan } from '@/engine/plan';
+import { normalizePlan } from '@/engine/skills/plan';
 import type { EngineSkill, PlanEntry, TrainedSkill } from '@/engine/types';
 import type { CharacterAttribute } from '@/sde/types';
 import type { SkillCatalog } from './skillMap';

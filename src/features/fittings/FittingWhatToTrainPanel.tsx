@@ -43,7 +43,7 @@ import {
 } from '@/engine/fittings/skillGains';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { hasSkillOverrides } from '@/engine/fittings/skillOverrides';
-import { normalizePlan } from '@/engine/plan';
+import { normalizePlan } from '@/engine/skills/plan';
 import { romanLevel } from '@/engine/projection';
 import type { EngineSkill, PlanEntry, ScheduledStep, TrainedSkill } from '@/engine/types';
 import { formatCountdown } from '@/lib/duration';

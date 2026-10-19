@@ -51,7 +51,7 @@ import { cooldownProgress, sumImplantValue } from '@/engine/implantValue';
 import { loadCharacterImplantsWithStatus } from '@/features/skills/data';
 import { JumpsAwayText } from '@/features/character/assetBrowserRows';
 import { jumpsBetween, useJumpBasis } from '@/features/route/jumpBasis';
-import type { JumpsAwayResult } from '@/engine/jumpsAway';
+import type { JumpsAwayResult } from '@/engine/clone/jumpsAway';
 import { loadTypeNames } from '@/features/character/typeNames';
 import type { CachedResult } from '@/esi/cache';
 import type { CharacterClones, JumpClone, SkillQueueEntry } from '@/esi/endpoints';
@@ -63,7 +63,7 @@ import {
   cloneJumpCooldown,
   cloneJumpCooldownHours,
   INFOMORPH_SYNCHRONIZING_SKILL_ID,
-} from '@/engine/cloneJump';
+} from '@/engine/clone/cloneJump';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { clonesCsvColumns } from '@/features/character/clonesCsv';
@@ -82,7 +82,7 @@ import {
   useClonesSort,
   type ClonesSort,
 } from '@/features/character/clonesSort';
-import { MIN_JUMP_GAIN_SECONDS, type CloneRow } from '@/engine/cloneVerdict';
+import { MIN_JUMP_GAIN_SECONDS, type CloneRow } from '@/engine/clone/cloneVerdict';
 import {
   CLONE_NOTE_KEY,
   cloneVerdictGate,

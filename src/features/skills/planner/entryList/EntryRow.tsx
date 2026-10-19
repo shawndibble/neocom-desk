@@ -10,7 +10,7 @@ import {
   useOpenAfterMenu,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import type { MilestoneStatus } from '@/engine/skillPlanMilestones';
+import type { MilestoneStatus } from '@/engine/skills/skillPlanMilestones';
 import type { PlanPriority } from '@/engine/types';
 import { formatCountdown } from '@/lib/duration';
 import { SkillLink } from '@/features/entities';

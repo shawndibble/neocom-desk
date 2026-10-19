@@ -10,7 +10,7 @@ import { db, type PlanBooster, type SkillPlanRecord } from '@/db';
 import type { CachedResult } from '@/features/skills/data';
 import type { CharacterAttributes, SkillQueueEntry } from '@/esi/endpoints';
 import { ESI_REGISTRY } from '@/esi/registry';
-import { buildUnlockIndex } from '@/engine/skillUnlocks';
+import { buildUnlockIndex } from '@/engine/skills/skillUnlocks';
 import { configureClipboard, type ClipboardWriter } from '@/lib/clipboard';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import type { SkillCatalog } from '../skillMap';

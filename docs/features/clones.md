@@ -2,18 +2,18 @@
 
 Route `/clones` (`src/routes/Clones.tsx`). Second tab of the Character overview (`OverviewSubNav`). Sub-view of Overview in nav (`src/app/navDestinations.ts:117`), not a rail item.
 
-| Feature                                                     | Where                                        |
-| ----------------------------------------------------------- | -------------------------------------------- |
-| Shared Character header + sub-nav                           | `CharacterHeader`, `OverviewSubNav`          |
-| Top strip: shared Jump Cooldown, You are in, Respawn        | `Clones.tsx`, `src/engine/cloneJump.ts`      |
-| Clone list: Wearing now first, then one card per jump clone | `CloneCard`                                  |
-| Implant link (Show Info) + description tooltip              | `ImplantLink`                                |
-| Implant count and ISK value (hub sell, region fallback)     | `CloneCard`, `engine/implantValue.ts`        |
-| Jumps away (route-planner link) per place                   | `JumpsAwayText`                              |
-| Data age, Refresh, Export (CSV/XLSX/copy)                   | `Panel actions`, `clonesCsv.ts`              |
-| Re-login banners (clones grant, implants grant)             | `GrantBanner`                                |
-| Training verdict card, queue bars, per-clone time + badge   | `CloneVerdictCard`, `engine/cloneVerdict.ts` |
-| Sort control (Best for training / Nearest / Value)          | `clonesSort.ts`                              |
+| Feature                                                     | Where                                              |
+| ----------------------------------------------------------- | -------------------------------------------------- |
+| Shared Character header + sub-nav                           | `CharacterHeader`, `OverviewSubNav`                |
+| Top strip: shared Jump Cooldown, You are in, Respawn        | `Clones.tsx`, `src/engine/clone/cloneJump.ts`      |
+| Clone list: Wearing now first, then one card per jump clone | `CloneCard`                                        |
+| Implant link (Show Info) + description tooltip              | `ImplantLink`                                      |
+| Implant count and ISK value (hub sell, region fallback)     | `CloneCard`, `engine/implantValue.ts`              |
+| Jumps away (route-planner link) per place                   | `JumpsAwayText`                                    |
+| Data age, Refresh, Export (CSV/XLSX/copy)                   | `Panel actions`, `clonesCsv.ts`                    |
+| Re-login banners (clones grant, implants grant)             | `GrantBanner`                                      |
+| Training verdict card, queue bars, per-clone time + badge   | `CloneVerdictCard`, `engine/clone/cloneVerdict.ts` |
+| Sort control (Best for training / Nearest / Value)          | `clonesSort.ts`                                    |
 
 ## Purpose and user goal
 
@@ -74,13 +74,13 @@ Spinner (first load, until hydrated) -> no active Character: `Navigate('/charact
 
 ## Tests (what they assert)
 
-- `ClonesVerdict.test.tsx`: worth a jump (saving, reason, route button, bars, badge), stay put, empty queue, paused queue, missing implants grant (list still works), sort order and persistence. `engine/cloneVerdict.test.ts` / `features/character/clonesSort.test.ts`: the verdict outcomes, 60 s threshold, cooldown frame, sort comparators.
+- `ClonesVerdict.test.tsx`: worth a jump (saving, reason, route button, bars, badge), stay put, empty queue, paused queue, missing implants grant (list still works), sort order and persistence. `engine/clone/cloneVerdict.test.ts` / `features/character/clonesSort.test.ts`: the verdict outcomes, 60 s threshold, cooldown frame, sort comparators.
 - `Clones.test.tsx`: cooldown stated once, labelled shared, one progress bar; Wearing now card first with implant link target, count, value and "unpriced"; lists clones with resolved locations/implant names; implant names link to Show Info; description tooltip on hover while still linking; home station + last-change date; implants stay "Type #id" when the names batch is rate-limited (no fan-out); inaccessible structure shows id fallback with no reauth banner; named clone shown beside trimmed location, blank name ignored; empty state; same header as Overview, data age/Refresh below tabs; Refresh offered when empty; re-login prompt when scope revoked.
 - `clones.test.ts`: fetch+cache, offline cache fallback, `needsReauth` on 403 with empty cache; `loadImplantDescriptions` strips markup and omits failures/empties.
 - `engine/implantValue.test.ts`: implant value sums priced ones and counts unpriced; cooldown progress clamps 0..1.
 - `e2e/clonesNames.spec.ts`: names beside place, long name wraps, no horizontal overflow at 1440/1024/390.
 - `clonesCsv.test.ts`: column order name/location/implants; name split from location (blank if unnamed); unresolved location labelled by type+id; implants by name with id fallback.
-- `engine/cloneJump.test.ts`: 24h base, -1h per level, floor 0; never jumped = ready; ready once `readyAt` passed; on cooldown while future; unparseable date = no history.
+- `engine/clone/cloneJump.test.ts`: 24h base, -1h per level, floor 0; never jumped = ready; ready once `readyAt` passed; on cooldown while future; unparseable date = no history.
 
 ## Interview Q&A
 

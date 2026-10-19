@@ -22,7 +22,7 @@ import {
   MARKUP_MIN_SIZE,
   classifyMarkupLink,
   markupColorToCss,
-} from '@/engine/eveMarkup';
+} from '@/engine/mail/eveMarkup';
 import { BASE_SIZE_PX } from '../MailBodyView';
 
 const COLOR_ATTR = /^#[0-9a-f]{8}$/;

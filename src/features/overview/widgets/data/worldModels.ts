@@ -7,7 +7,7 @@
  * names what it draws.
  */
 import { DAY_MS, HOUR_MS } from '@/lib/age';
-import { worstSeverity, type DeadlineSeverity } from '@/engine/severity';
+import { worstSeverity, type DeadlineSeverity } from '@/engine/character/severity';
 import { filterYieldRange, eveToday, rangeDates, daysCovered } from '@/engine/miningTax/yieldRange';
 import type { MiningYieldRange } from '@/engine/miningTax/yieldRange';
 import type { CorpBoardItem } from '@/engine/corp/board';

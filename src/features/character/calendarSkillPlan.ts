@@ -12,7 +12,7 @@
  * with nothing left to train), and a plan the scheduler could not cost.
  */
 import { db } from '@/db';
-import type { SkillPlanSchedule } from '@/engine/skillPlanSchedule';
+import type { SkillPlanSchedule } from '@/engine/skills/skillPlanSchedule';
 import { parseCharacterKeyedRecord } from '@/lib/characterKeyedRecord';
 import { createLocalSetting } from '@/lib/useLocalSetting';
 import { loadPlanScheduleInputs, schedulePlan } from '@/features/skills/planner/planSchedule';
