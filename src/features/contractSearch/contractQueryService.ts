@@ -7,8 +7,10 @@
  * same pure query on the page.
  */
 import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
-import type { ContractOfferQueryResult } from '@/engine/contracts/contractSearchQuery';
-import type { ContractOfferQuery } from '@/engine/contracts/contractSearchQuery';
+import type {
+  ContractOfferQuery,
+  ContractOfferQueryResult,
+} from '@/engine/contracts/contractSearchQuery';
 import type { ContractQueryReply, ContractQueryRequest } from './contractQuery.worker';
 
 let worker: Worker | null = null;
@@ -48,12 +50,15 @@ function ensureWorker(): Worker | null {
       waiting.reject(new Error('superseded' in reply ? SUPERSEDED : reply.error));
     }
   };
-  worker.onerror = () => {
+  const fail = () => {
     workerBroken = true;
+    worker?.terminate();
     worker = null;
     loaded = null;
     failPending(new Error('worker failed'));
   };
+  worker.onerror = fail;
+  worker.onmessageerror = fail;
   return worker;
 }
 
@@ -69,19 +74,22 @@ export function askContractQuery(
 ): Promise<ContractOfferQueryResult> {
   const target = ensureWorker();
   if (!target) return Promise.reject(new Error('no worker'));
-  if (loaded?.rows !== rows) {
-    loaded = { rows, snapshot: ++nextSnapshot };
-    const load: ContractQueryRequest = {
-      kind: 'load',
-      snapshot: loaded.snapshot,
-      rows: rows as PublicContractOfferRow[],
-    };
-    target.postMessage(load);
-  }
   const id = ++nextRequest;
-  const request: ContractQueryRequest = { kind: 'query', id, snapshot: loaded.snapshot, query };
   return new Promise((resolve, reject) => {
     pending.set(id, { resolve, reject });
-    target.postMessage(request);
+    try {
+      if (loaded?.rows !== rows) {
+        loaded = { rows, snapshot: ++nextSnapshot };
+        const load: ContractQueryRequest = { kind: 'load', snapshot: loaded.snapshot, rows };
+        target.postMessage(load);
+      }
+      const request: ContractQueryRequest = { kind: 'query', id, snapshot: loaded.snapshot, query };
+      target.postMessage(request);
+    } catch (error) {
+      // Cloning the snapshot can fail (memory): the page answers instead.
+      pending.delete(id);
+      loaded = null;
+      reject(error instanceof Error ? error : new Error('post failed'));
+    }
   });
 }

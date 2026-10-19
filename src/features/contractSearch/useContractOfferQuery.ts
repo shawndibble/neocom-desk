@@ -19,12 +19,17 @@ export interface ContractOfferQueryAnswer {
   displayRows: PublicContractOfferRow[];
   /** Per type, over the rows passing everything but the type set. */
   stats: ReadonlyMap<number, ContractOfferStats>;
-  /** The worker has not answered even once yet; there is nothing to show. */
+  /**
+   * The worker has not answered this exact question yet. `displayRows` may be
+   * the previous answer (or empty); callers show a spinner, not those rows,
+   * so a new selection never sits under the last one's table and summary.
+   */
   awaitingFirst: boolean;
 }
 
 interface Settled {
   rows: readonly PublicContractOfferRow[];
+  query: ContractOfferQuery;
   result: ContractOfferQueryResult;
 }
 
@@ -40,8 +45,8 @@ function pickRows(
 /**
  * `queryContractOffers` over the snapshot — in the worker for a big one, on
  * the page for a small one or where there is no Worker. While the worker is
- * on a newer query the previous answer stays up, so the table never flashes
- * empty between keystrokes.
+ * on a newer query the previous stats stay up, so the suggestion list never
+ * flashes empty between keystrokes.
  */
 export function useContractOfferQuery(
   rows: readonly PublicContractOfferRow[],
@@ -59,12 +64,12 @@ export function useContractOfferQuery(
     let live = true;
     askContractQuery(rows, query).then(
       (result) => {
-        if (live) setSettled({ rows, result });
+        if (live) setSettled({ rows, query, result });
       },
       (error: unknown) => {
         if (!live || (error instanceof Error && error.message === SUPERSEDED)) return;
         // The worker failed: answer on the page, once.
-        setSettled({ rows, result: queryContractOffers(rows, query) });
+        setSettled({ rows, query, result: queryContractOffers(rows, query) });
       }
     );
     return () => {
@@ -72,7 +77,7 @@ export function useContractOfferQuery(
     };
   }, [viaWorker, rows, query]);
 
-  const source: Settled | null = onPage ? { rows, result: onPage } : settled;
+  const source: Settled | null = onPage ? { rows, query, result: onPage } : settled;
   const sourceRows = source?.rows;
   const sourceResult = source?.result;
   const displayRows = useMemo(
@@ -82,6 +87,6 @@ export function useContractOfferQuery(
   return {
     displayRows,
     stats: sourceResult?.stats ?? NO_STATS,
-    awaitingFirst: viaWorker && settled === null,
+    awaitingFirst: viaWorker && (settled?.rows !== rows || settled.query !== query),
   };
 }

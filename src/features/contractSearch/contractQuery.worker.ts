@@ -14,7 +14,7 @@ import {
 } from '@/engine/contracts/contractSearchQuery';
 
 export type ContractQueryRequest =
-  | { kind: 'load'; snapshot: number; rows: PublicContractOfferRow[] }
+  | { kind: 'load'; snapshot: number; rows: readonly PublicContractOfferRow[] }
   | { kind: 'query'; id: number; snapshot: number; query: ContractOfferQuery };
 
 export type ContractQueryReply =

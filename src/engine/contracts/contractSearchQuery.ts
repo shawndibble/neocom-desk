@@ -57,7 +57,7 @@ export function queryContractOffers(
       if (system !== undefined && !withinJumpRange(system, allowedSystems)) continue;
     }
     addToOfferStats(stats, row, plexPrice);
-    if (typeIds === null || typeIds.has(rows[i].typeId)) passing.push(i);
+    if (typeIds === null || typeIds.has(row.typeId)) passing.push(i);
   }
   const indices = Uint32Array.from(passing);
   if (sort) {
