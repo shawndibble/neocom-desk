@@ -6,7 +6,12 @@ import {
   writeDeviceRegistration,
   type PushSender,
 } from './projectionStore.js';
-import { STALE_UNSENT_MS } from './dispatchProjections.js';
+import {
+  STALE_UNSENT_MS,
+  FIRED_RETENTION_MS,
+  isDue,
+  isPastRetention,
+} from './dispatchProjections.js';
 import type { ProjectionRowInput } from './registerDevice.js';
 
 // A deliberately tiny in-memory Firestore: only what projectionStore.ts uses
@@ -496,4 +501,40 @@ describe('dispatchDueProjections', () => {
     expect(db.get('deviceRegistrations', 'A')).toBeDefined();
     expect(db.get('projections', projectionDocId('A', due.occurrenceKey))?.fired).toBe(false);
   });
+});
+
+// The Firestore queries in `dispatchDueProjections` re-express `isDue` and
+// `isPastRetention` as `where` filters (a query cannot call them), so these
+// pin each query's boundary to the function it mirrors.
+describe('dispatchDueProjections query boundaries', () => {
+  it.each([-1, 0, 1])(
+    'dispatches a row exactly when isDue says so (fireAt = now %i)',
+    async (d) => {
+      const db = new FakeFirestore();
+      const messaging = new FakeMessaging();
+      const r = row('industryJobComplete', NOW + d);
+      await upload(db, 'A', [{ characterId: CHAR, rows: [r] }]);
+
+      await dispatchDueProjections(asFirestore(db), messaging, NOW);
+
+      expect(messaging.sent.length > 0).toBe(isDue(r, NOW));
+    }
+  );
+
+  it.each([-1, 0, 1])(
+    'purges a fired row exactly when isPastRetention says so (age = retention %i)',
+    async (d) => {
+      const db = new FakeFirestore();
+      const r = row('industryJobComplete', NOW - 60_000);
+      await upload(db, 'A', [{ characterId: CHAR, rows: [r] }]);
+      await dispatchDueProjections(asFirestore(db), new FakeMessaging(), NOW);
+      const id = projectionDocId('A', r.occurrenceKey);
+      expect(db.get('projections', id)).toMatchObject({ fired: true, firedAt: NOW });
+
+      const later = NOW + FIRED_RETENTION_MS + d;
+      await dispatchDueProjections(asFirestore(db), new FakeMessaging(), later);
+
+      expect(db.get('projections', id) === undefined).toBe(isPastRetention(NOW, later));
+    }
+  );
 });
