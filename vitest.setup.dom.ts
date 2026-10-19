@@ -5,7 +5,7 @@
  * `@testing-library/jest-dom/vitest` alone is ~67ms of import each time, and
  * the 462 files in the `node` project call none of its matchers — checked for
  * `toBeInTheDocument`, `toHaveClass`, `toHaveAttribute`, `toBeVisible` and
- * nine more across every `.test.ts` outside the DOM allowlist, zero hits. They
+ * nine more across every `.test.ts` outside the `*.dom.test.ts` set, zero hits. They
  * were paying about half that project's total runtime for a DOM matcher
  * library they never use. Measured: the node project's setup bucket went from
  * 30.6s to 12.4s.
