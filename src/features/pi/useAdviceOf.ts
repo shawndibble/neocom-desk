@@ -60,7 +60,8 @@ export function useAdviceOf(input: PlanAdviceInput | null): AdviceOf {
   useEffect(() => {
     if (!input || onPage || peeked(input)) return;
     let live = true;
-    askPlanAdvice(input).then(
+    const abort = new AbortController();
+    askPlanAdvice(input, abort.signal).then(
       (advice) => live && setLanded({ input, result: ready(advice) }),
       (error: unknown) => {
         if (!live) return;
@@ -72,6 +73,7 @@ export function useAdviceOf(input: PlanAdviceInput | null): AdviceOf {
     );
     return () => {
       live = false;
+      abort.abort();
     };
   }, [input, onPage]);
 

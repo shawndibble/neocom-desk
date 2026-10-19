@@ -13,26 +13,15 @@ import type {
   BpcRankReplyParts,
   BpcSourceData,
 } from './searchBpcOffers';
+import { createWorkerClient } from '@/lib/workerClient';
 import type { BpcQueryReply, BpcQueryRequest, BpcRestData } from './bpcQuery.worker';
 
-let worker: Worker | null = null;
-let workerBroken = false;
-let nextRequest = 0;
 let nextPrepareVersion = 0;
 let loadedRows: Pick<BpcSourceData, 'contractRows' | 'originals'> | null = null;
 let loadedRest: BpcRestData | null = null;
 let sentPrepare: { input: BpcPrepareInput; version: number } | null = null;
-const pending = new Map<
-  number,
-  { resolve: (parts: BpcRankReplyParts) => void; reject: (reason: Error) => void }
->();
 
 export const SUPERSEDED = 'superseded';
-
-function failPending(reason: Error) {
-  for (const { reject } of pending.values()) reject(reason);
-  pending.clear();
-}
 
 function forgetLoaded() {
   loadedRows = null;
@@ -40,39 +29,18 @@ function forgetLoaded() {
   sentPrepare = null;
 }
 
-function ensureWorker(): Worker | null {
-  if (workerBroken || typeof Worker === 'undefined') return null;
-  if (worker) return worker;
-  try {
-    worker = new Worker(new URL('./bpcQuery.worker.ts', import.meta.url), { type: 'module' });
-  } catch {
-    workerBroken = true;
-    return null;
-  }
-  worker.onmessage = (event: MessageEvent<BpcQueryReply>) => {
-    const reply = event.data;
-    const waiting = pending.get(reply.id);
-    if (!waiting) return;
-    pending.delete(reply.id);
+const client = createWorkerClient<BpcQueryReply, BpcRankReplyParts>({
+  spawn: () => new Worker(new URL('./bpcQuery.worker.ts', import.meta.url), { type: 'module' }),
+  settle: (reply, waiting) => {
     if ('parts' in reply) waiting.resolve(reply.parts);
     else waiting.reject(new Error('superseded' in reply ? SUPERSEDED : reply.error));
-  };
-  const fail = () => {
-    workerBroken = true;
-    worker?.terminate();
-    worker = null;
-    forgetLoaded();
-    failPending(new Error('worker failed'));
-  };
-  worker.onerror = fail;
-  worker.onmessageerror = fail;
-  return worker;
-}
+  },
+  unavailable: (message) => new Error(message),
+  reset: forgetLoaded,
+});
 
 /** Whether a query can go to the worker; false once it has failed. */
-export function bpcQueryWorkerAvailable(): boolean {
-  return !workerBroken && typeof Worker !== 'undefined';
-}
+export const bpcQueryWorkerAvailable = client.available;
 
 function splitSourceData(data: BpcSourceData): {
   rows: Pick<BpcSourceData, 'contractRows' | 'originals'>;
@@ -96,44 +64,28 @@ export function askBpcQuery(
   prepareInput: BpcPrepareInput,
   query: BpcQuery
 ): Promise<BpcRankReplyParts> {
-  const target = ensureWorker();
-  if (!target) return Promise.reject(new Error('no worker'));
-  const id = ++nextRequest;
-  return new Promise((resolve, reject) => {
-    pending.set(id, { resolve, reject });
-    try {
-      const { rows, rest } = splitSourceData(data);
-      if (
-        loadedRows?.contractRows !== rows.contractRows ||
-        loadedRows.originals !== rows.originals
-      ) {
-        loadedRows = rows;
-        const load: BpcQueryRequest = { kind: 'rows', ...rows };
-        target.postMessage(load);
-      }
-      if (!loadedRest || !sameFields(loadedRest, rest)) {
-        loadedRest = rest;
-        const load: BpcQueryRequest = { kind: 'rest', rest };
-        target.postMessage(load);
-      }
-      const isNewInput = sentPrepare?.input !== prepareInput;
-      const sent = isNewInput
-        ? { input: prepareInput, version: ++nextPrepareVersion }
-        : sentPrepare!;
-      sentPrepare = sent;
-      const request: BpcQueryRequest = {
-        kind: 'query',
-        id,
-        prepareVersion: sent.version,
-        ...(isNewInput ? { prepareInput } : {}),
-        query,
-      };
-      target.postMessage(request);
-    } catch (error) {
-      // Cloning the snapshot can fail (memory): the page answers instead.
-      pending.delete(id);
-      forgetLoaded();
-      reject(error instanceof Error ? error : new Error('post failed'));
+  return client.send((target, id) => {
+    const { rows, rest } = splitSourceData(data);
+    if (loadedRows?.contractRows !== rows.contractRows || loadedRows.originals !== rows.originals) {
+      loadedRows = rows;
+      const load: BpcQueryRequest = { kind: 'rows', ...rows };
+      target.postMessage(load);
     }
+    if (!loadedRest || !sameFields(loadedRest, rest)) {
+      loadedRest = rest;
+      const load: BpcQueryRequest = { kind: 'rest', rest };
+      target.postMessage(load);
+    }
+    const isNewInput = sentPrepare?.input !== prepareInput;
+    const sent = isNewInput ? { input: prepareInput, version: ++nextPrepareVersion } : sentPrepare!;
+    sentPrepare = sent;
+    const request: BpcQueryRequest = {
+      kind: 'query',
+      id,
+      prepareVersion: sent.version,
+      ...(isNewInput ? { prepareInput } : {}),
+      query,
+    };
+    target.postMessage(request);
   });
 }
