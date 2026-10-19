@@ -1,6 +1,5 @@
 import { NO_NAMES } from '@/lib/emptyCollections';
-import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -12,8 +11,6 @@ import {
   Panel,
   SegmentedControl,
   Spinner,
-  STAT_CHIP_TONE_TEXT_CLASS,
-  type StatChipTone,
   CachedNotice,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -28,21 +25,15 @@ import {
 } from '@/features/character/cloneNicknames';
 import { getLastKnownSpSummary } from '@/stores/characterSp';
 import { OverviewSubNav } from '@/features/character/OverviewSubNav';
-import { SecurityStatus } from '@/components/SecurityStatus';
-import { IskAmount, ProgressBar } from '@/components/ui';
-import { useMarketHub } from '@/features/market/hub';
-import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
-import { getHubPrices, getRegionSellPrices } from '@/market/prices';
-import { cooldownProgress, sumImplantValue } from '@/engine/implantValue';
+import { sumImplantValue } from '@/engine/implantValue';
 import { JumpsAwayText } from '@/features/character/assetBrowserRows';
-import { jumpsBetween, useJumpBasis } from '@/features/route/jumpBasis';
-import type { JumpsAwayResult } from '@/engine/clone/jumpsAway';
+import { useCloneJumpsAway } from '@/features/character/useCloneJumpsAway';
+import { useImplantPrices } from '@/features/character/useImplantPrices';
+import { ClonesSummaryCards } from '@/features/character/ClonesSummaryCards';
 import type { JumpClone } from '@/esi/endpoints';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
-import { formatDuration } from '@/lib/duration';
-import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
-import { cloneJumpCooldown, cloneJumpCooldownHours } from '@/engine/clone/cloneJump';
+import { cloneJumpCooldown } from '@/engine/clone/cloneJump';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { clonesCsvColumns } from '@/features/character/clonesCsv';
@@ -64,7 +55,7 @@ import {
 } from '@/features/character/cloneVerdictGate';
 import { cloneStateFor, useCloneStates } from '@/features/skills/cloneState';
 import { loadClonesSnapshot } from '@/features/character/clonesSnapshot';
-import { CloneCard, TOUCH_LINK, type PriceMap } from '@/features/character/CloneCard';
+import { CloneCard, TOUCH_LINK } from '@/features/character/CloneCard';
 
 /** Stable identity, so the fallback doesn't invalidate the column memo every render. */
 const NO_DETAILS: ReadonlyMap<number, ImplantDetail> = new Map();
@@ -115,82 +106,14 @@ export function Clones() {
     [lastCloneJumpDate, infomorphLevel, loadedAt]
   );
 
-  // Jumps away from where the Character is now, on the saved route preference
-  // (the Travel route rule). Filled in after the first paint: a progressive
-  // enhancement, so a slow graph never holds the clones back.
-  const basis = useJumpBasis();
-  const [jumpsAway, setJumpsAway] = useState<{
-    key: string;
-    byLocation: ReadonlyMap<number, JumpsAwayResult>;
-  } | null>(null);
-  const jumpsKey = `${basis.key}:${characterSystemId}:${loadedAt}`;
-  useEffect(() => {
-    if (!basis.hydrated || loadedAt === 0) return;
-    let cancelled = false;
-    void Promise.all(
-      [...systemIds].map(async ([locationId, systemId]): Promise<[number, JumpsAwayResult]> => {
-        if (characterSystemId === null) {
-          return [locationId, { kind: 'unknown', reason: 'noLocation' }];
-        }
-        if (systemId === null) return [locationId, { kind: 'unknown', reason: 'noRoute' }];
-        return [locationId, await jumpsBetween(characterSystemId, systemId, basis)];
-      })
-    ).then((entries) => {
-      if (!cancelled) setJumpsAway({ key: jumpsKey, byLocation: new Map(entries) });
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [basis, characterSystemId, systemIds, loadedAt, jumpsKey]);
-  const jumpsByLocation = jumpsAway?.key === jumpsKey ? jumpsAway.byLocation : undefined;
+  const jumpsByLocation = useCloneJumpsAway(systemIds, characterSystemId, loadedAt);
 
-  // Implant values at the market hub: lowest sell there, else lowest in its
-  // region. Another progressive enhancement: the list shows before any price.
-  const hubId = useMarketHub((state) => state.value);
-  const hubHydrated = useHydratedStore(useMarketHub);
-  const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
   const priceIds = useMemo(
-    () => [...new Set([...clones.flatMap((c) => c.implants), ...wornIds])].sort((a, b) => a - b),
+    () => [...clones.flatMap((c) => c.implants), ...wornIds],
     [clones, wornIds]
   );
-  const priceKey = `${hub.id}:${priceIds.join(',')}`;
-  const [priced, setPriced] = useState<{ key: string; prices: PriceMap } | null>(null);
-  useEffect(() => {
-    if (!hubHydrated || priceIds.length === 0) return;
-    let cancelled = false;
-    void Promise.all([getHubPrices(hub, priceIds), getRegionSellPrices(hub.regionId, priceIds)])
-      .then(([hubAgg, region]) => {
-        if (cancelled) return;
-        const prices = new Map<number, number | null>();
-        for (const id of priceIds)
-          prices.set(id, hubAgg.get(id)?.sellMin ?? region.get(id) ?? null);
-        setPriced({ key: priceKey, prices });
-      })
-      .catch(() => {
-        // A failed read leaves every implant unpriced rather than an endless wait.
-        if (!cancelled) setPriced({ key: priceKey, prices: new Map() });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [hub, hubHydrated, priceIds, priceKey]);
-  const prices = priced?.key === priceKey ? priced.prices : undefined;
+  const prices = useImplantPrices(priceIds);
   const wornValue = prices ? sumImplantValue(wornIds, prices) : null;
-
-  const cooldownHours = cloneJumpCooldownHours(infomorphLevel);
-  const cooldownFraction = cooldownProgress(lastCloneJumpDate, cooldownHours, new Date(loadedAt));
-
-  // Empty (no element at all) when there is no last jump and no reduction to state.
-  const cooldownNote = [
-    lastCloneJumpDate &&
-      t('clones.lastJump', {
-        date: formatTimestamp(new Date(lastCloneJumpDate), timeZone),
-      }),
-    infomorphLevel > 0 && t('clones.infomorphReduction', { hours: Math.min(infomorphLevel, 24) }),
-  ]
-    .filter(Boolean)
-    .join(' · ');
-  const cooldownTone: StatChipTone = cooldown.onCooldown ? 'warning' : 'success';
 
   const homeJumps =
     homeLocation?.location_id === undefined
@@ -342,78 +265,24 @@ export function Clones() {
 
       {showSummary && (
         <div className="flex flex-col gap-4">
-          <div className="grid grid-cols-[repeat(auto-fit,minmax(15rem,1fr))] gap-4 text-sm">
-            <Panel className="h-full">
-              <section aria-label={t('clones.cooldown')} className="space-y-1">
-                <h3 className={eyebrowClassName}>{t('clones.cooldownShared')}</h3>
-                {/* The header above names it; the value wraps rather than sitting in a nowrap chip. */}
-                <p
-                  className={`font-medium tabular-nums ${STAT_CHIP_TONE_TEXT_CLASS[cooldownTone]}`}
-                >
-                  {cooldown.onCooldown && cooldown.readyAt
-                    ? t('clones.cooldownOnCooldownValue', {
-                        date: formatTimestamp(cooldown.readyAt, timeZone),
-                        duration: formatDuration((cooldown.readyAt.getTime() - loadedAt) / 1000),
-                      })
-                    : t('clones.cooldownReadyValue')}
-                </p>
-                <ProgressBar
-                  label={t('clones.cooldown')}
-                  value={Math.round(cooldownFraction * 100)}
-                  tone={cooldown.onCooldown ? 'warning' : 'success'}
-                />
-                {cooldownNote && <p className="text-xs text-text-dim">{cooldownNote}</p>}
-              </section>
-            </Panel>
-            <Panel className="h-full">
-              <section aria-label={t('clones.youAreIn')} className="space-y-1">
-                <h3 className={eyebrowClassName}>{t('clones.youAreIn')}</h3>
-                <p>
-                  {characterSystemName ?? t('clones.unknownPlace')}{' '}
-                  {characterSystemId !== null && securities.has(characterSystemId) && (
-                    <SecurityStatus security={securities.get(characterSystemId) ?? 0} />
-                  )}
-                </p>
-                {hasWorn && (
-                  <p className="text-xs text-text-dim">
-                    {t('clones.implantCount', { count: wornIds.length })}
-                    {wornValue && wornValue.unpriced < wornIds.length && (
-                      <>
-                        {' · '}
-                        <IskAmount value={wornValue.total} /> {t('clones.atRisk')}
-                        {wornValue.unpriced > 0 &&
-                          ` · ${t('clones.unpriced', { count: wornValue.unpriced })}`}
-                      </>
-                    )}
-                  </p>
-                )}
-              </section>
-            </Panel>
-            {homeLocationName && (
-              <Panel className="h-full">
-                <section aria-label={t('clones.respawn')} className="space-y-1">
-                  <h3 className={eyebrowClassName}>{t('clones.respawn')}</h3>
-                  <p className="flex flex-wrap items-center gap-x-2">
-                    <span className="[overflow-wrap:anywhere]">{homeLocationName}</span>
-                    {homeSecurity !== undefined && <SecurityStatus security={homeSecurity} />}
-                    <JumpsAwayText
-                      result={homeJumps}
-                      t={t}
-                      locationId={homeLocation?.location_id}
-                      linkClassName={TOUCH_LINK}
-                    />
-                  </p>
-                  {lastStationChangeDate && (
-                    <p className="text-xs text-text-dim">
-                      {t('clones.lastStationChange', {
-                        date: formatTimestamp(new Date(lastStationChangeDate), timeZone),
-                      })}
-                    </p>
-                  )}
-                </section>
-              </Panel>
-            )}
-          </div>
+          <ClonesSummaryCards
+            cooldown={cooldown}
+            lastCloneJumpDate={lastCloneJumpDate}
+            infomorphLevel={infomorphLevel}
+            loadedAt={loadedAt}
+            timeZone={timeZone}
+            characterSystemId={characterSystemId}
+            characterSystemName={characterSystemName}
+            securities={securities}
+            hasWorn={hasWorn}
+            wornIds={wornIds}
+            wornValue={wornValue}
+            homeLocationId={homeLocation?.location_id}
+            homeLocationName={homeLocationName}
+            homeSecurity={homeSecurity}
+            homeJumps={homeJumps}
+            lastStationChangeDate={lastStationChangeDate}
+          />
           {/* One DOM: below md the answer leads, from md up the order is as before. */}
           {verdictCard && (
             <div className="order-first md:order-none">
