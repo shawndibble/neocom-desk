@@ -3,8 +3,6 @@ import {
   buildSnapshotRow,
   findMissingDays,
   lacksLayer,
-  mergeSnapshotRows,
-  snapshotId,
   utcDay,
   type NetWorthSnapshotRow,
 } from './snapshot';
@@ -95,32 +93,6 @@ describe('buildSnapshotRow', () => {
     expect(buildSnapshotRow({ ...base, wallet: null })).toBeNull();
     expect(buildSnapshotRow({ ...base, assets: null })).toBeNull();
     expect(buildSnapshotRow({ ...base, orders: null })).toBeNull();
-  });
-});
-
-describe('mergeSnapshotRows', () => {
-  const row = (day: string, updatedAt: number, wallet: number): NetWorthSnapshotRow => ({
-    id: snapshotId(1, day),
-    characterId: 1,
-    day,
-    wallet,
-    assetValue: 0,
-    plexValue: 0,
-    escrow: 0,
-    hubId: 'jita',
-    updatedAt,
-  });
-
-  it('keeps the last write for the same character and day, and the union of days', () => {
-    const merged = mergeSnapshotRows(
-      [row('2026-10-01', 1, 10), row('2026-10-02', 5, 20)],
-      [row('2026-10-02', 9, 99), row('2026-10-03', 1, 30)]
-    );
-    expect(merged.map((r) => [r.day, r.wallet])).toEqual([
-      ['2026-10-01', 10],
-      ['2026-10-02', 99],
-      ['2026-10-03', 30],
-    ]);
   });
 });
 

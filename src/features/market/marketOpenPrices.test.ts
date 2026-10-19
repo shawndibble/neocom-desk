@@ -1,95 +1,108 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-
-const { getDocMock, listMock, syncConfigured } = vi.hoisted(() => ({
-  getDocMock: vi.fn(),
-  listMock: vi.fn(),
-  syncConfigured: { value: true },
-}));
-vi.mock('firebase/firestore/lite', () => ({
-  doc: (_db: unknown, collection: string, id: string) => ({ path: `${collection}/${id}` }),
-  getDoc: getDocMock,
-  collection: listMock,
-  getDocs: listMock,
-}));
-vi.mock('@/sync/firebaseApp', () => ({ getSyncFirestore: () => ({}) }));
-vi.mock('@/app/syncStatus', () => ({ isSyncConfigured: () => syncConfigured.value }));
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   loadMarketOpenPrices,
-  parseOpenPriceSeries,
+  parseOpenPricesByType,
+  openPricesUrl,
   resetMarketOpenPricesCache,
 } from './marketOpenPrices';
 
+const FORGE = 10000002;
+const DOMAIN = 10000043;
 const DOC = {
-  regionId: 10000002,
   typeId: 34,
   dates: ['2026-10-01', '2026-10-02'],
-  buy: [5, null],
-  sell: [6, 7],
+  regions: {
+    [FORGE]: { buy: [5, null], sell: [6, 7] },
+    [DOMAIN]: { buy: [1, 2], sell: [3, 4] },
+  },
 };
 
+const fetchMock = vi.fn();
+
+/** Serves `data` for any type; `undefined` is an object R2 does not have (404). */
 function serve(data: unknown) {
-  getDocMock.mockResolvedValue({ exists: () => data !== undefined, data: () => data });
+  fetchMock.mockImplementation(async () =>
+    data === undefined
+      ? new Response('missing', { status: 404 })
+      : new Response(JSON.stringify(data), { status: 200 })
+  );
 }
 
 beforeEach(() => {
-  getDocMock.mockReset();
-  listMock.mockReset();
-  syncConfigured.value = true;
+  fetchMock.mockReset();
+  vi.stubGlobal('fetch', fetchMock);
   resetMarketOpenPricesCache();
 });
 
-describe('parseOpenPriceSeries', () => {
-  it('reads the parallel arrays', () => {
-    expect(parseOpenPriceSeries(DOC)).toEqual({
-      dates: DOC.dates,
-      buy: DOC.buy,
-      sell: DOC.sell,
-    });
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+describe('openPricesUrl', () => {
+  it('is one static object per type', () => {
+    expect(openPricesUrl(34)).toBe('https://data.neocomdesk.com/open-prices/34.json');
+  });
+});
+
+describe('parseOpenPricesByType', () => {
+  it('reads each region as a series over the shared dates', () => {
+    const parsed = parseOpenPricesByType(DOC);
+    expect(parsed?.get(FORGE)).toEqual({ dates: DOC.dates, buy: [5, null], sell: [6, 7] });
+    expect(parsed?.get(DOMAIN)?.buy).toEqual([1, 2]);
   });
 
-  it('rejects anything not shaped like a series', () => {
-    expect(parseOpenPriceSeries(undefined)).toBeNull();
-    expect(parseOpenPriceSeries({ dates: [], buy: [], sell: [] })).toBeNull();
-    expect(parseOpenPriceSeries({ dates: ['2026-10-01'], buy: ['x'], sell: [1] })).toBeNull();
+  it('skips a malformed region and rejects anything not shaped like a type document', () => {
+    expect(
+      parseOpenPricesByType({ ...DOC, regions: { ...DOC.regions, 1: { buy: ['x'], sell: [] } } })
+        ?.size
+    ).toBe(2);
+    expect(parseOpenPricesByType(undefined)).toBeNull();
+    expect(parseOpenPricesByType({ dates: [], regions: {} })).toBeNull();
+    expect(parseOpenPricesByType({ dates: ['2026-10-01'] })).toBeNull();
   });
 });
 
 describe('loadMarketOpenPrices', () => {
-  it('reads one document by region_type id, never listing', async () => {
+  it('reads one object per type and serves every region from it', async () => {
     serve(DOC);
-    const series = await loadMarketOpenPrices(10000002, 34);
-    expect(series?.dates).toEqual(DOC.dates);
-    expect(getDocMock.mock.calls.map(([ref]) => (ref as { path: string }).path)).toEqual([
-      'marketOpenPrices/10000002_34',
+    const [forge, domain, other] = await Promise.all([
+      loadMarketOpenPrices(FORGE, 34),
+      loadMarketOpenPrices(DOMAIN, 34),
+      loadMarketOpenPrices(10000001, 34),
     ]);
-    expect(listMock).not.toHaveBeenCalled();
+    expect(forge?.sell).toEqual([6, 7]);
+    expect(domain?.buy).toEqual([1, 2]);
+    // A compared non-hub region simply has no open series.
+    expect(other).toBeNull();
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([openPricesUrl(34)]);
   });
 
-  it('holds the answer, a missing document included, so a reopen reads nothing', async () => {
+  it('holds the answer, a missing object included, so a reopen reads nothing', async () => {
     serve(undefined);
     expect(await loadMarketOpenPrices(1, 2, 1000)).toBeNull();
-    expect(await loadMarketOpenPrices(1, 2, 2000)).toBeNull();
-    expect(getDocMock).toHaveBeenCalledTimes(1);
+    expect(await loadMarketOpenPrices(3, 2, 2000)).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it('reads again once the hold lapses', async () => {
     serve(DOC);
-    await loadMarketOpenPrices(1, 2, 0);
-    await loadMarketOpenPrices(1, 2, 2 * 60 * 60_000);
-    expect(getDocMock).toHaveBeenCalledTimes(2);
+    await loadMarketOpenPrices(FORGE, 2, 0);
+    await loadMarketOpenPrices(FORGE, 2, 2 * 60 * 60_000);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it('is null, without a read, when Firebase is not configured', async () => {
-    syncConfigured.value = false;
-    expect(await loadMarketOpenPrices(1, 2)).toBeNull();
-    expect(getDocMock).not.toHaveBeenCalled();
+  it('is null, never a rejection, on a server error, and tries again next time', async () => {
+    fetchMock.mockResolvedValueOnce(new Response('boom', { status: 500 }));
+    expect(await loadMarketOpenPrices(FORGE, 2)).toBeNull();
+    serve(DOC);
+    expect((await loadMarketOpenPrices(FORGE, 2))?.buy).toEqual([5, null]);
   });
 
   it('is null on a failed read (offline) and tries again next time', async () => {
-    getDocMock.mockRejectedValueOnce(new Error('offline'));
-    expect(await loadMarketOpenPrices(1, 2)).toBeNull();
+    fetchMock.mockRejectedValueOnce(new TypeError('offline'));
+    expect(await loadMarketOpenPrices(FORGE, 2)).toBeNull();
     serve(DOC);
-    expect((await loadMarketOpenPrices(1, 2))?.buy).toEqual(DOC.buy);
+    expect((await loadMarketOpenPrices(FORGE, 2))?.buy).toEqual([5, null]);
   });
 });

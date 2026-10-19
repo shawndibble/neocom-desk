@@ -51,6 +51,7 @@
 import type { PiData, PiInfrastructure, PiPinKind } from '@/sde/types';
 import { chainCost, piTier } from './chain';
 import { singleFactoryChain, spareCapacity } from './pinBudget';
+import { rawById } from './rawIndex';
 import type { PinLoad, PiTier } from './types';
 
 const SECONDS_PER_HOUR = 3_600;
@@ -253,11 +254,7 @@ export interface NetworkPlan {
 
 /** The name a product goes by, from whichever half of the payload carries it. */
 function nameOf(typeId: number, pi: PiData): string {
-  return (
-    pi.schematics[String(typeId)]?.name ??
-    pi.raw.find((resource) => resource.typeID === typeId)?.name ??
-    String(typeId)
-  );
+  return pi.schematics[String(typeId)]?.name ?? rawById(pi).get(typeId)?.name ?? String(typeId);
 }
 
 function priceOf(typeId: number, prices: Readonly<Record<number, number>>): number | null {

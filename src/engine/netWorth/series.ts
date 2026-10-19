@@ -96,17 +96,6 @@ export function buildCharacterSeries(input: {
   return { points, firstSnapshotDay, gapDays: findMissingDays(snapDays) };
 }
 
-/** Characters that hold every needed permission count toward totals; the rest are named in the scope readout. */
-export function partitionByCoverage(
-  ids: readonly number[],
-  covered: ReadonlySet<number>
-): { included: number[]; missing: number[] } {
-  return {
-    included: ids.filter((id) => covered.has(id)),
-    missing: ids.filter((id) => !covered.has(id)),
-  };
-}
-
 export function totalsFor(
   latest: ReadonlyMap<number, LayerValues>,
   opts: { included: readonly number[]; hidden: readonly number[]; shown: readonly LayerId[] }

@@ -89,6 +89,35 @@ export interface EveNotificationPayload {
   aggressorAllianceId?: number;
   /** `reinforceExitTime`, converted from EVE ticks to epoch ms — an instant, not a duration. */
   reinforceExitMs?: number;
+  /** `moonID` — the drilled moon, on the Moonmining types. */
+  moonId?: number;
+  /** Link text of `moonLink` (`<a href="showinfo:14//40161708">Dital II - Moon 1</a>`). */
+  moonName?: string;
+  /** `readyTime` — when the chunk arrives, from EVE ticks to epoch ms. */
+  readyTimeMs?: number;
+  /** `autoTime` — when an unfired chunk fractures on its own, from EVE ticks to epoch ms. */
+  autoTimeMs?: number;
+  /** `startedBy` — the character who started the extraction. */
+  startedById?: number;
+  /** `firedBy` — the character who fired the moon drill. */
+  firedById?: number;
+  /** `cancelledBy` — the character who cancelled the extraction; absent when CCP writes `null`. */
+  cancelledById?: number;
+  /**
+   * `oreVolumeByType` — the chunk's ore, in m³ per ore type, on
+   * MoonminingExtractionStarted and the drill types after it. The exact ore
+   * a moon chunk estimate prefers over a survey (epic #4055, D13).
+   * Unverified against live data, so read line by line: a malformed line is
+   * dropped, the rest kept, and a block with no usable line is absent.
+   */
+  oreVolumes?: readonly MoonOreVolume[];
+}
+
+/** One ore type's share of a moon chunk. */
+export interface MoonOreVolume {
+  typeId: number;
+  /** m³, not units: moon ore is 10 m³ a unit. */
+  volumeM3: number;
 }
 
 /** Drops a matching pair of surrounding quotes, leaving an unbalanced one alone. */
@@ -154,6 +183,69 @@ function num(fields: Map<string, string>, key: string): number | undefined {
   // rendering, and the empty case is exactly what a truncated payload looks
   // like.
   return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+const ORE_BLOCK_KEY = 'orevolumebytype';
+
+/** One `typeId: volume` pair, or null unless the id is a positive integer and the volume a positive finite number. */
+function oreVolumePair(rawKey: string, rawValue: string): MoonOreVolume | null {
+  const key = rawKey.trim();
+  const value = rawValue.trim();
+  if (!/^\d+$/.test(key) || value.length === 0) return null;
+  const typeId = Number(key);
+  const volumeM3 = Number(value);
+  if (!Number.isSafeInteger(typeId) || typeId <= 0) return null;
+  if (!Number.isFinite(volumeM3) || volumeM3 <= 0) return null;
+  return { typeId, volumeM3 };
+}
+
+/** Splits `a: b` on the first colon, or null when there is none. */
+function splitPair(text: string): [string, string] | null {
+  const colon = text.indexOf(':');
+  return colon <= 0 ? null : [text.slice(0, colon), text.slice(colon + 1)];
+}
+
+/**
+ * The `oreVolumeByType` mapping, block style (`oreVolumeByType:` then
+ * indented `46300: 6022254.47` lines, which is what the public samples show)
+ * or flow style (`oreVolumeByType: {46300: 6022254.47}`, which a different
+ * emitter would write). Only lines at the block's own first indent count, so
+ * a deeper nested map is not mistaken for ore. Later duplicates of a type
+ * replace earlier ones, keeping the first one's position.
+ */
+function oreVolumes(text: string): MoonOreVolume[] | undefined {
+  if (typeof text !== 'string') return undefined;
+  const byType = new Map<number, number>();
+  const add = (pair: [string, string] | null) => {
+    const ore = pair === null ? null : oreVolumePair(pair[0], pair[1]);
+    if (ore !== null) byType.set(ore.typeId, ore.volumeM3);
+  };
+  const lines = text.split('\n').map((line) => line.replace(/\r$/, ''));
+  for (let i = 0; i < lines.length; i++) {
+    const header = splitPair(lines[i]);
+    if (header === null || header[0].trim().toLowerCase() !== ORE_BLOCK_KEY) continue;
+    // A leading space means this is someone else's nested key, not the block.
+    if (/^\s/.test(lines[i])) continue;
+    // `&id001` — an anchor on the block itself, as CCP writes on structure ids.
+    const inline = header[1].trim().replace(/^&\S+\s*/, '');
+    if (inline.startsWith('{') && inline.endsWith('}')) {
+      for (const entry of inline.slice(1, -1).split(',')) add(splitPair(entry));
+      continue;
+    }
+    if (inline.length > 0) continue;
+    let indent: string | null = null;
+    for (let j = i + 1; j < lines.length; j++) {
+      const line = lines[j];
+      if (line.trim().length === 0) continue;
+      const leading = /^[ \t]*/.exec(line)?.[0] ?? '';
+      if (leading.length === 0) break;
+      indent ??= leading;
+      if (leading !== indent) continue;
+      add(splitPair(line));
+    }
+  }
+  if (byType.size === 0) return undefined;
+  return [...byType].map(([typeId, volumeM3]) => ({ typeId, volumeM3 }));
 }
 
 /** EVE tick count (100ns since 1601) as epoch ms, or undefined if it is not a real instant. */
@@ -231,5 +323,13 @@ export function parseEveNotificationPayload(text: string): EveNotificationPayloa
     aggressorCorpId: num(fields, 'aggressorcorpid'),
     aggressorAllianceId: num(fields, 'aggressorallianceid'),
     reinforceExitMs: ticksToEpochMs(num(fields, 'reinforceexittime')),
+    moonId: num(fields, 'moonid'),
+    moonName: linkText(fields.get('moonlink')),
+    readyTimeMs: ticksToEpochMs(num(fields, 'readytime')),
+    autoTimeMs: ticksToEpochMs(num(fields, 'autotime')),
+    startedById: num(fields, 'startedby'),
+    firedById: num(fields, 'firedby'),
+    cancelledById: num(fields, 'cancelledby'),
+    oreVolumes: oreVolumes(text),
   };
 }

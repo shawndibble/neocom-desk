@@ -3,6 +3,7 @@
  * a tooltip or screen reader gets in place of the shorthand figure. One
  * source, so All products, the Map's tiles and its drawer say the same thing.
  */
+import { formatCount } from '@/lib/formatCount';
 import type { TFunction } from 'i18next';
 import { formatIsk } from '@/lib/isk';
 import type { ChainEstimateView } from './chainEstimateModel';
@@ -35,7 +36,7 @@ export function planetTypeList(t: TFunction, planets: readonly string[]): string
 /** Every assumption behind the figure, in words. */
 export function chainAssumptions(t: TFunction, view: ChainEstimateView): string {
   const types = planetTypeList(t, view.planets);
-  const rate = Math.round(view.ratePerHour).toLocaleString('en');
+  const rate = formatCount(view.ratePerHour);
   return [
     t('piShared.chain.assumesPlanets', {
       count: view.planets.length,
@@ -53,8 +54,8 @@ export function chainAssumptions(t: TFunction, view: ChainEstimateView): string 
     ),
     t('piShared.chain.assumesSale'),
     t('piShared.chain.assumesHaul', {
-      m3: Math.round(view.m3PerWeek).toLocaleString('en'),
-      perHaul: Math.round(view.m3PerHaul).toLocaleString('en'),
+      m3: formatCount(view.m3PerWeek),
+      perHaul: formatCount(view.m3PerHaul),
       count: view.haulDays,
     }),
   ].join(' ');

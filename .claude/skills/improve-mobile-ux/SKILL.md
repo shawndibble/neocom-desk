@@ -68,7 +68,7 @@ findings; the depth is in reading one page's actual DOM decisions end to end.
 Route inventory: `ls src/routes/` and `docs/ARCHITECTURE.md` §6. Prefer
 surfaces that are **data-dense and phone-relevant** — a page someone checks
 between docks (Wallet, Assets, Industry jobs, Orders, Contracts, Alerts) beats
-one nobody opens on a phone (Styleguide, Settings).
+one nobody opens on a phone (Settings).
 
 ## 3. Audit against the rubric
 

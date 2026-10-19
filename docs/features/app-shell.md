@@ -58,7 +58,7 @@ Everything around the feature pages: router and route table, the signed-in `Layo
 - `/` -> `Root` (`:229`): Character count unresolved or active-store not hydrated -> `BootScreen gate="root"`; 0 Characters -> `/login`; Characters but none active -> `/characters`; else `/overview`. Waits on the active-character store as well as the count, so a returning user is not bounced to `/characters` (comment above `Root`).
 - `/login`, `/callback`: eager, outside the shell (`docs/features/auth-login.md`).
 - Under `RequireCharacter` -> `SignedInShell` (lazy `Layout`, preloaded at boot by `signedInShellHint`/`bootShellPreload`) -> every entry of `ROUTE_ELEMENTS` (`:151`) wrapped in `ScopeGate`, and `TabRoute` when the page is tabbed (`PAGE_TABS`, ADR 0015).
-- Outside the shell: `/styleguide` (hidden design reference), `/share/fitting`, `/share/:shareId` (`:370`, no session needed), `/error` (`:372`), `*` -> `NotFound` (`:373`).
+- Outside the shell: `/share/fitting`, `/share/:shareId` (`:370`, no session needed), `/error` (`:372`), `*` -> `NotFound` (`:373`).
 - Mounted once beside the router: `ReloadPrompt`, `EntityInfoRoute`, `PublicInfoModal`, `SkillDetailModal`, `ItemInfoModal`, `InstallPrompt`; trackers `AuthFailureRedirect`, `AnalyticsPageViewTracker`, `DocumentTitleTracker`.
 - `ROUTE_ELEMENTS` is `satisfies Record<AppRoutePath, ...>`: a route without a scope declaration is a compile error; `routeScopes.test.ts` scans `App.tsx` so hand-written feature routes cannot slip through.
 - Boot effects in `App()`: hydrate active Character, font scale, time format, mobile tabs, hidden nav and Recent nav (so first paint is right); subscribe ESI auth-failure, activity log, blocked-upgrade report, DB-wipe reload; schedule cache prune and lazy SDE warm; `triggerSync` of the active Character; `useBackgroundSync`; write `signedInShellHint`; `scheduleBootPrefetch` (idle slot, cancelled on switch).
@@ -66,7 +66,7 @@ Everything around the feature pages: router and route table, the signed-in `Layo
 
 ### Legacy redirects (`src/app/legacyPaths.ts:8`)
 
-Prefix moves, carrying suffix, query (less dropped params) and hash, via history `replace`: `/wallet/loyalty` -> `/market/lp-store`; `/pilot-lookup` -> `/travel/pilot` (Pilot Lookup is a Travel tab again, `20261009-163837-pinned-rail-alerts-bell-pilot-lookup-back-under`); `/settings/shortcuts|faq|help` -> `/help/shortcuts|faq|support`; `/planetary-industry/advisor` -> `/planetary-industry/colonies` dropping `?system`. Elsewhere in `App.tsx`: `/skills` -> `/skills/plans`; `/bpc-contracts` -> Industry sourcing tab; `/skills/ships` and `/fittings/*` -> Ships (`LegacyShipsRedirect`); a tabbed page's bare path or unknown segment -> default tab with `replace` and `tabRouteDefaulted` state (`src/app/TabRoute.tsx`). Mobile-tab values `/moon-mining` and `/fittings` stored by older builds are remapped (`src/lib/mobileTabs.ts:63`).
+Prefix moves, carrying suffix, query (less dropped params) and hash, via history `replace`: `/wallet/loyalty` -> `/market/lp-store`; `/pilot-lookup` -> `/travel/pilot` (Pilot Lookup is a Travel tab again, `20261009-163837-pinned-rail-alerts-bell-pilot-lookup-back-under`); `/settings/shortcuts|faq|help` -> `/help/shortcuts|faq|support`; `/planetary-industry/advisor` -> `/planetary-industry/colonies` dropping `?system`. Elsewhere in `App.tsx`: `/skills` -> `/skills/plans`; `/bpc-contracts` -> Industry sourcing tab; a tabbed page's bare path or unknown segment -> default tab with `replace` and `tabRouteDefaulted` state (`src/app/TabRoute.tsx`). Mobile-tab values `/moon-mining` and `/fittings` stored by older builds are remapped (`src/lib/mobileTabs.ts:63`).
 
 ## Nav model (`src/app/navDestinations.ts`)
 
@@ -176,7 +176,7 @@ No UI. Service worker `registerType: 'prompt'`. A waiting build is applied only 
 
 ## Document title (`src/app/documentTitle.ts`)
 
-`{most specific} — {…} — Neocom Desk` (separator `—`, `:14`), computed per pathname (tabbed pages add the tab label, nested routes add the section; duplicate names collapse so Market's Browser reads once, `:100`); `ROUTE_TITLE_KEYS` is `satisfies Record<AppRoutePath, ...>` so a new route without a title fails to compile; unmatched -> "Page not found"; `/login`, `/callback`, `/styleguide`, `/` -> app name alone. Updates when the language changes (WCAG 2.4.2).
+`{most specific} — {…} — Neocom Desk` (separator `—`, `:14`), computed per pathname (tabbed pages add the tab label, nested routes add the section; duplicate names collapse so Market's Browser reads once, `:100`); `ROUTE_TITLE_KEYS` is `satisfies Record<AppRoutePath, ...>` so a new route without a title fails to compile; unmatched -> "Page not found"; `/login`, `/callback`, `/` -> app name alone. Updates when the language changes (WCAG 2.4.2).
 
 ## Route focus and tab routes
 
@@ -243,7 +243,6 @@ Footer page (not a setting: FAQ and Support left Settings, decision `20261002-14
 
 ## Observed gaps
 
-- Old permanent Fitting Share Code links `/fittings?f=` (and `/fittings/*`) are redirected by a route that sits inside `RequireCharacter` (`src/app/App.tsx:175`, `src/features/fittings/LegacyShipsRedirect.tsx`); a signed-out visitor is sent to `/login` and, because `Login` ignores `state.from`, loses the fit. Only `/share/fitting?f=` is public. See `entities-share.md`.
 - `Login` never reads `location.state.from` (no `useLocation`/`state` use in `src/routes/Login.tsx`); `RequireCharacter` (`src/app/RequireCharacter.tsx:26`) and `AuthFailureRedirect` (`src/app/AuthFailureNotice.tsx:37`) write it and nothing consumes it (the post-login landing uses a separate stash, `src/auth/loginReturnTo` via `rememberThisPage` in `src/app/loginFlow.ts`). Worse, `/login` with any Character present redirects to `/characters` (`src/routes/Login.tsx:264`), so a total auth failure navigates to `/login` and bounces on to `/characters`; the code shows no re-login prompt on that path (no `authFailure` consumer in `src/routes/Characters.tsx`; `AuthFailureNotice.test.tsx` only asserts the redirect lands on a stubbed `/login`). Cross-doc note: `docs/features/auth-login.md` says the redirect "remembers `from`" — nothing reads it.
 - `CustomizePermissionsDialog` header says "all 13 Permissions" (`:11`) while `SCOPE_GROUPS` has 15 and the counter reads "of 15" (`src/esi/registry.ts:53`).
 - Most pages are `gating: 'scope'` in `NAV_PAGES` (Overview, Alerts, Skills, Industry, Ships, Mining, PI, Market, Wallet, Contracts, Mail, Calendar, Contacts, Assets: `navDestinations.ts:109`) but only Assets, Mail, Contacts, Mining, plus the Clones and LP Store views, are non-`UNGATED` in `routeScopes.ts`, so every other page's lock dot can never appear; the descriptor's gating label overstates what the router enforces.

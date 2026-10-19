@@ -109,16 +109,6 @@ function tickerFor(intervalMs: number): Ticker {
   return ticker;
 }
 
-/** Subscribes to the shared clock ticking every `intervalMs`; returns the unsubscribe. */
-export function subscribeTicker(intervalMs: number, listener: () => void): () => void {
-  return tickerFor(intervalMs).subscribe(listener);
-}
-
-/** The shared clock's current reading for `intervalMs`. */
-export function readTicker(intervalMs: number): number {
-  return tickerFor(intervalMs).getSnapshot();
-}
-
 /** `Date.now()`, re-rendering every `intervalMs` off one interval shared by every caller at that cadence. */
 export function useTicker(intervalMs: number): number {
   const ticker = tickerFor(intervalMs);

@@ -15,12 +15,15 @@
  * alternative — it catches exactly one regression and breaks whenever the
  * minifier changes its mind.
  *
- * `/styleguide` is the target because it sits outside `RequireCharacter`,
- * needs no ESI data, and already carries a six-column table built for this
- * exact question ("Six columns of real-world width: the shape that forced
- * the responsive collapse").
+ * The signed-in Wallet Journal (`/wallet/journal`) is the target: a six-column
+ * `DataTable` ("Journal") that stacks into cards below `sm`, fed by seeded
+ * sign-in and a mocked journal answer, so nothing real is hit. Its rows are
+ * `display: table-row` as a table and a block/flex card once `.dt-stacked`'s
+ * stylesheet rule applies, which is what the phone assertion reads.
  */
 import { test, expect } from './support/testBase';
+import { signInAndGoto } from './support/authSeed';
+import { CHARACTER_ID } from './support/fixtureData';
 
 const PHONE = { width: 390, height: 844 };
 const DESKTOP = { width: 1280, height: 800 };
@@ -33,11 +36,40 @@ const DESKTOP = { width: 1280, height: 800 };
  */
 const BASELINE_TOLERANCE_PX = 2;
 
-const TABLE_NAME = 'Wide DataTable sample';
+const TABLE_NAME = 'Journal';
 
-/** The first row's title cell and the cell beside it in source order. */
+const JOURNAL = Array.from({ length: 4 }, (_, index) => ({
+  id: index + 1,
+  date: `2026-09-0${index + 1}T00:00:00Z`,
+  ref_type: index % 2 === 0 ? 'bounty_prizes' : 'player_donation',
+  description: `E2E journal entry ${index + 1}`,
+  amount: 1_000_000 * (index + 1),
+  balance: 50_000_000 + index,
+}));
+
+/** Answer the journal before sign-in: boot prefetch would cache the shared mock's empty list. */
+async function signInToJournal(page: import('@playwright/test').Page) {
+  await page.route(
+    (url) => url.pathname === `/characters/${CHARACTER_ID}/wallet/journal`,
+    (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(JOURNAL) })
+  );
+  await signInAndGoto(page, './wallet/journal');
+}
+
+/** The first journal row, once it has rendered. */
+async function firstRow(page: import('@playwright/test').Page) {
+  const row = page
+    .getByRole('table', { name: TABLE_NAME })
+    .locator('tbody tr[data-row-key]')
+    .first();
+  await expect(row).toBeVisible();
+  return row;
+}
+
+/** The first row's Date cell and the Type cell beside it in source order. */
 async function firstRowCellTops(page: import('@playwright/test').Page) {
-  const row = page.getByRole('table', { name: TABLE_NAME }).locator('tbody tr').first();
+  const row = await firstRow(page);
   const item = row.locator('td').nth(0);
   const quantity = row.locator('td').nth(1);
   await expect(item).toBeVisible();
@@ -52,7 +84,7 @@ test.describe('production bundle — phone width', () => {
   test.use({ viewport: PHONE });
 
   test('the page does not scroll sideways and the table has collapsed', async ({ page }) => {
-    await page.goto('./styleguide');
+    await signInToJournal(page);
     await expect(page.getByRole('table', { name: TABLE_NAME })).toBeVisible();
 
     // `scrollWidth` is never below `clientWidth`, so "not wider" is the whole
@@ -63,7 +95,7 @@ test.describe('production bundle — phone width', () => {
     // The offender list is not decoration: this assertion is page-wide, and
     // CI is the first place it ever runs against real production CSS. Without
     // it a failure says only "something is too wide", leaving "`.dt-stack`
-    // regressed" and "an unrelated styleguide sample got wider" impossible to
+    // regressed" and "an unrelated journal element got wider" impossible to
     // tell apart from the log.
     const { scrollWidth, clientWidth, offenders } = await page.evaluate(() => {
       const root = document.documentElement;
@@ -88,20 +120,22 @@ test.describe('production bundle — phone width', () => {
       }`
     ).toBeLessThanOrEqual(clientWidth);
 
-    // Collapsed: each cell is its own block in a column flexbox, so the
-    // second cell sits a line below the first rather than beside it.
-    const tops = await firstRowCellTops(page);
-    expect(tops.quantity).toBeGreaterThan(tops.item + BASELINE_TOLERANCE_PX);
+    // Collapsed: the row is a card, not a table row. This reads the computed
+    // `display`, which only the stylesheet's `.dt-stacked` rules can change.
+    const row = await firstRow(page);
+    expect(await row.evaluate((tr) => getComputedStyle(tr).display)).not.toBe('table-row');
   });
 });
 
 test.describe('production bundle — desktop width', () => {
   test.use({ viewport: DESKTOP });
 
-  test('the same two cells share a baseline', async ({ page }) => {
-    await page.goto('./styleguide');
+  test('the same two cells share a baseline as a real table row', async ({ page }) => {
+    await signInToJournal(page);
     await expect(page.getByRole('table', { name: TABLE_NAME })).toBeVisible();
 
+    const row = await firstRow(page);
+    expect(await row.evaluate((tr) => getComputedStyle(tr).display)).toBe('table-row');
     const tops = await firstRowCellTops(page);
     expect(Math.abs(tops.quantity - tops.item)).toBeLessThanOrEqual(BASELINE_TOLERANCE_PX);
   });
