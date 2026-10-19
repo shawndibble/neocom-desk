@@ -2219,6 +2219,8 @@ describe('sync orchestration', () => {
     // productionOrderWatches + payees + miningTaxAssignments +
     // notificationFeed + settings).
     await vi.waitFor(() => expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(COLLECTION_COUNT));
+    // The heartbeat lands after the last read, so wait for it rather than assume.
+    await vi.waitFor(() => expect(vi.mocked(setDoc)).toHaveBeenCalledTimes(1));
     await vi.advanceTimersByTimeAsync(100); // no extra runs
     expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(COLLECTION_COUNT);
     expect(vi.mocked(setDoc)).toHaveBeenCalledTimes(1); // the heartbeat, once
