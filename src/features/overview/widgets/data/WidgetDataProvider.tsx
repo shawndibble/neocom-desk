@@ -29,7 +29,7 @@ import {
   loadPlanetaryBoard,
   loadPriceAlertsBoard,
   loadStructuresBoard,
-} from '../../boardData';
+} from '../../data/boardData';
 import { IncursionsBoardSource } from '../../IncursionsBoardSource';
 import type { IncursionsBoardData } from '../../incursionsBoard';
 import { createFeedStore } from './feedStore';

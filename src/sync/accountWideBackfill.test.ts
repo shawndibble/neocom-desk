@@ -4,15 +4,7 @@ import type { StationPinRecord } from '@/db';
 import { tombstoneKey } from './localBookkeeping';
 import { STATION_PINS } from './syncedCollections';
 import { backfillAccountWideData } from './accountWideBackfill';
-
-async function seedCharacter(characterId: number): Promise<void> {
-  await db.characters.put({
-    characterId,
-    name: `Pilot ${characterId}`,
-    ownerHash: `hash-${characterId}`,
-    addedAt: 1,
-  });
-}
+import { seedCharacter } from '@/test/seed';
 
 async function seedPin(
   characterId: number,

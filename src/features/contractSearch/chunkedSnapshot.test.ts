@@ -1,6 +1,6 @@
 /**
- * The read half of the published contract snapshots. These assertions exist
- * because `ContractSearchPanel.test.tsx` mocks `publicContractOffers` and
+ * The cache-through read behind the R2-served public snapshots. These
+ * assertions exist because `ContractSearchPanel.test.tsx` mocks
  * `publicCourierContracts` outright, so nothing there exercises this module or
  * the cache path underneath it — a green panel suite says nothing about
  * whether a lapsed snapshot renders or blocks (issue #963).
@@ -9,56 +9,24 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { db } from '@/db';
 import { GLOBAL_CACHE_CHARACTER_ID, STALE_GRACE_MS, resetRevalidationState } from '@/esi/cache';
 import {
-  chunkDocId,
   loadChunkedSnapshot,
-  useChunkProgressStore,
+  type ChunkedSnapshot,
   type ChunkedSnapshotSource,
 } from './chunkedSnapshot';
 
-const getDocs = vi.hoisted(() => vi.fn());
-const getDoc = vi.hoisted(() => vi.fn());
-
-vi.mock('firebase/firestore/lite', () => ({
-  getDocs,
-  getDoc,
-  collection: (_db: unknown, name: string) => ({ name }),
-  doc: (_db: unknown, collectionName: string, id: string) => ({ path: `${collectionName}/${id}` }),
-}));
-vi.mock('@/sync/firebaseApp', () => ({ getSyncFirestore: () => ({}) }));
-vi.mock('@/sync/syncAuth', () => ({ ensureAnySession: vi.fn(async () => undefined) }));
-vi.mock('@/app/syncStatus', () => ({ isSyncConfigured: () => true }));
-
 const STALE_AFTER_MS = 30 * 60_000;
-const SOURCE: ChunkedSnapshotSource = {
-  collectionName: 'publicCourierContracts',
-  cacheKey: 'publicCourierContracts',
-  staleAfterMs: STALE_AFTER_MS,
-};
-const CHARACTER_ID = 91;
+const CACHE_KEY = 'chunkedSnapshotTest';
 
-/** Serves `meta` and each chunk by path, the way Firestore answers per-doc reads. */
-function serveDocs(
-  lastSyncedAt: number,
-  chunks: readonly (readonly unknown[])[],
-  withChunkCount = true
-): void {
-  const data = new Map<string, unknown>([
-    [
-      'publicCourierContracts/meta',
-      withChunkCount ? { lastSyncedAt, chunkCount: chunks.length } : { lastSyncedAt },
-    ],
-    ...chunks.map(
-      (rows, i) =>
-        [`publicCourierContracts/${chunkDocId(i)}`, { rows, publishedAt: lastSyncedAt }] as const
-    ),
-  ]);
-  getDoc.mockImplementation(async (ref: { path: string }) => ({ data: () => data.get(ref.path) }));
+function source(
+  read: () => Promise<ChunkedSnapshot<{ id: string }> | null>
+): ChunkedSnapshotSource<{ id: string }> {
+  return { cacheKey: CACHE_KEY, staleAfterMs: STALE_AFTER_MS, read };
 }
 
 async function seedLapsedRow(value: unknown): Promise<void> {
   await db.esiCache.put({
     characterId: GLOBAL_CACHE_CHARACTER_ID,
-    key: SOURCE.cacheKey,
+    key: CACHE_KEY,
     value,
     fetchedAt: Date.now() - STALE_AFTER_MS - 60_000,
   });
@@ -72,129 +40,25 @@ async function expireGrace(): Promise<void> {
 beforeEach(async () => {
   await db.esiCache.clear();
   resetRevalidationState();
-  getDocs.mockReset();
-  getDoc.mockReset();
-  useChunkProgressStore.setState({ byKey: {} });
-});
-
-describe('chunkDocId', () => {
-  it('matches the id scheme functions/src/publicContracts.ts writes', () => {
-    expect(chunkDocId(0)).toBe('chunk-0000');
-    expect(chunkDocId(123)).toBe('chunk-0123');
-  });
 });
 
 describe('loadChunkedSnapshot', () => {
-  it('concatenates every chunk doc in order and reads lastSyncedAt off meta', async () => {
-    serveDocs(1_700_000_000_000, [[{ id: 1 }, { id: 2 }], [{ id: 3 }]]);
-
-    const result = await loadChunkedSnapshot<{ id: number }>(SOURCE, CHARACTER_ID);
-
-    expect(result.cached?.data.rows).toEqual([{ id: 1 }, { id: 2 }, { id: 3 }]);
-    expect(result.cached?.data.lastSyncedAt).toBe(1_700_000_000_000);
-    expect(result.revalidating).toBe(false);
-  });
-
-  it('reports chunks landed against the count meta states, then clears', async () => {
-    serveDocs(5, [[{ id: 1 }], [{ id: 2 }], [{ id: 3 }]]);
-    const seen: Array<{ done: number; total: number | null } | undefined> = [];
-    const unsubscribe = useChunkProgressStore.subscribe((state) =>
-      seen.push(state.byKey[SOURCE.cacheKey])
-    );
-
-    await loadChunkedSnapshot<{ id: number }>(SOURCE, CHARACTER_ID);
-    unsubscribe();
-
-    expect(seen[0]).toEqual({ done: 0, total: 3 });
-    expect(seen).toContainEqual({ done: 3, total: 3 });
-    expect(seen.at(-1)).toBeUndefined();
-    expect(useChunkProgressStore.getState().byKey[SOURCE.cacheKey]).toBeUndefined();
-  });
-
-  it('re-reads once when a chunk belongs to a newer publish than the meta it began with', async () => {
-    // First pass: meta says 1, but chunk 1 was already rewritten by publish 2.
-    let pass = 0;
-    getDoc.mockImplementation(async (ref: { path: string }) => {
-      if (ref.path.endsWith('/meta')) {
-        pass += 1;
-        return { data: () => ({ lastSyncedAt: pass === 1 ? 1 : 2, chunkCount: 2 }) };
-      }
-      const stamp = pass === 1 && ref.path.endsWith('chunk-0001') ? 2 : pass;
-      return { data: () => ({ rows: [{ id: `${ref.path}@${stamp}` }], publishedAt: stamp }) };
-    });
-
-    const result = await loadChunkedSnapshot<{ id: string }>(SOURCE, CHARACTER_ID);
-
-    expect(result.cached?.data.lastSyncedAt).toBe(2);
-    expect(result.cached?.data.rows.map((r) => r.id)).toEqual([
-      'publicCourierContracts/chunk-0000@2',
-      'publicCourierContracts/chunk-0001@2',
-    ]);
-  });
-
-  it('accepts a chunk with no stamp, as written before stamps existed', async () => {
-    getDoc.mockImplementation(async (ref: { path: string }) => ({
-      data: () =>
-        ref.path.endsWith('/meta')
-          ? { lastSyncedAt: 4, chunkCount: 1 }
-          : { rows: [{ id: 'legacy' }] },
-    }));
-
-    const result = await loadChunkedSnapshot<{ id: string }>(SOURCE, CHARACTER_ID);
-
-    expect(result.cached?.data.rows).toEqual([{ id: 'legacy' }]);
-    expect(getDoc).toHaveBeenCalledTimes(2);
-  });
-
-  it('stops reading and clears progress when a chunk read fails', async () => {
-    getDoc.mockImplementation(async (ref: { path: string }) => {
-      if (ref.path.endsWith('/meta')) return { data: () => ({ lastSyncedAt: 1, chunkCount: 40 }) };
-      throw new Error('unavailable');
-    });
-
-    const result = await loadChunkedSnapshot<{ id: string }>(SOURCE, CHARACTER_ID);
-
-    expect(result.cached).toBeNull();
-    // Six workers each hit one failure at most; none keeps walking the rest.
-    expect(getDoc.mock.calls.length).toBeLessThanOrEqual(1 + 6);
-    expect(useChunkProgressStore.getState().byKey[SOURCE.cacheKey]).toBeUndefined();
-  });
-
-  it('falls back to one whole-collection read when meta has no chunk count', async () => {
-    serveDocs(7, [], false);
-    getDocs.mockResolvedValue({
-      docs: [
-        { id: 'meta', data: () => ({ lastSyncedAt: 7 }) },
-        { id: 'chunk-0000', data: () => ({ rows: [{ id: 'legacy' }] }) },
-      ],
-    });
-
-    const result = await loadChunkedSnapshot<{ id: string }>(SOURCE, CHARACTER_ID);
-
-    expect(result.cached?.data.rows).toEqual([{ id: 'legacy' }]);
-  });
-
-  it('renders a lapsed snapshot without waiting for the chunk reads', async () => {
+  it('renders a lapsed snapshot without waiting for the live read', async () => {
     await seedLapsedRow({ rows: [{ id: 'last-cycle' }], lastSyncedAt: 1 });
     let released!: () => void;
     const gate = new Promise<void>((resolve) => {
       released = resolve;
     });
-    getDoc.mockImplementation(async (ref: { path: string }) => {
+    const read = vi.fn(async () => {
       await gate;
-      return {
-        data: () =>
-          ref.path.endsWith('/meta')
-            ? { lastSyncedAt: 2, chunkCount: 1 }
-            : { rows: [{ id: 'this-cycle' }] },
-      };
+      return { rows: [{ id: 'this-cycle' }], lastSyncedAt: 2 };
     });
 
-    const pending = loadChunkedSnapshot<{ id: string }>(SOURCE, CHARACTER_ID);
+    const pending = loadChunkedSnapshot(source(read));
     await expireGrace();
     const result = await pending;
 
-    // Settled while the 124-doc read is still in flight — the whole point.
+    // Settled while the live read is still in flight — the whole point.
     expect(result.cached?.data.rows).toEqual([{ id: 'last-cycle' }]);
     // Nothing has failed yet, so no view raises its offline banner.
     expect(result.cached?.fromCache).toBe(false);
@@ -203,91 +67,24 @@ describe('loadChunkedSnapshot', () => {
     released();
     // Let the background read land before the next test clears the cache.
     await vi.waitFor(async () =>
-      expect(
-        (await db.esiCache.get([GLOBAL_CACHE_CHARACTER_ID, SOURCE.cacheKey]))?.value
-      ).toMatchObject({ rows: [{ id: 'this-cycle' }] })
+      expect((await db.esiCache.get([GLOBAL_CACHE_CHARACTER_ID, CACHE_KEY]))?.value).toMatchObject({
+        rows: [{ id: 'this-cycle' }],
+      })
     );
   });
 
-  it('takes the readFirst snapshot without touching Firestore, and falls back whole when it is null', async () => {
-    const readFirst = vi.fn().mockResolvedValueOnce({ rows: [{ id: 'r2' }], lastSyncedAt: 7 });
-    const source = { ...SOURCE, readFirst };
-    const first = await loadChunkedSnapshot(source, CHARACTER_ID);
-    expect(first.cached?.data).toEqual({ rows: [{ id: 'r2' }], lastSyncedAt: 7 });
-    expect(getDoc).not.toHaveBeenCalled();
-    expect(getDocs).not.toHaveBeenCalled();
-
-    await db.esiCache.clear();
-    resetRevalidationState();
-    readFirst.mockResolvedValueOnce(null);
-    serveDocs(9, [[{ id: 'fs' }]]);
-    const second = await loadChunkedSnapshot(source, CHARACTER_ID);
-    expect(second.cached?.data).toEqual({ rows: [{ id: 'fs' }], lastSyncedAt: 9 });
-  });
-
-  it('still blocks when there is no stored snapshot to show', async () => {
-    serveDocs(3, [[{ id: 'cold' }]]);
-
-    const result = await loadChunkedSnapshot<{ id: string }>(SOURCE, CHARACTER_ID);
+  it('blocks on the live read when there is no stored snapshot to show', async () => {
+    const result = await loadChunkedSnapshot(
+      source(async () => ({ rows: [{ id: 'cold' }], lastSyncedAt: 3 }))
+    );
 
     expect(result.cached?.data.rows).toEqual([{ id: 'cold' }]);
     expect(result.revalidating).toBe(false);
   });
 
-  describe('a lapsed snapshot whose meta.lastSyncedAt is unchanged', () => {
-    const chunkReads = () =>
-      getDoc.mock.calls.filter(([ref]) => !(ref as { path: string }).path.endsWith('/meta'));
+  it('reads as no snapshot when the live read is unavailable and nothing is cached', async () => {
+    const result = await loadChunkedSnapshot(source(async () => null));
 
-    async function storedFetchedAt(): Promise<number | undefined> {
-      return (await db.esiCache.get([GLOBAL_CACHE_CHARACTER_ID, SOURCE.cacheKey]))?.fetchedAt;
-    }
-
-    it('costs one meta read, zero chunk reads, and restarts the stale clock', async () => {
-      await seedLapsedRow({ rows: [{ id: 'kept' }], lastSyncedAt: 7 });
-      const before = await storedFetchedAt();
-      serveDocs(7, [[{ id: 'new' }]]);
-
-      const result = await loadChunkedSnapshot<{ id: string }>(SOURCE, CHARACTER_ID);
-      await vi.waitFor(async () => expect(await storedFetchedAt()).toBeGreaterThan(before ?? 0));
-
-      expect(result.cached?.data.rows).toEqual([{ id: 'kept' }]);
-      expect(getDoc).toHaveBeenCalledTimes(1);
-      expect(chunkReads()).toHaveLength(0);
-    });
-
-    it('does the full read when lastSyncedAt changed', async () => {
-      await seedLapsedRow({ rows: [{ id: 'old' }], lastSyncedAt: 7 });
-      serveDocs(8, [[{ id: 'new' }]]);
-
-      await loadChunkedSnapshot<{ id: string }>(SOURCE, CHARACTER_ID);
-      await vi.waitFor(() => expect(chunkReads()).toHaveLength(1));
-    });
-
-    it('does the full read when nothing is cached', async () => {
-      serveDocs(7, [[{ id: 'new' }]]);
-
-      await loadChunkedSnapshot<{ id: string }>(SOURCE, CHARACTER_ID);
-
-      expect(chunkReads()).toHaveLength(1);
-    });
-
-    it('falls back to the full read when the meta check fails', async () => {
-      await seedLapsedRow({ rows: [{ id: 'old' }], lastSyncedAt: 7 });
-      const data = new Map<string, unknown>([
-        ['publicCourierContracts/meta', { lastSyncedAt: 7, chunkCount: 1 }],
-        [`publicCourierContracts/${chunkDocId(0)}`, { rows: [{ id: 'new' }], publishedAt: 7 }],
-      ]);
-      let metaCalls = 0;
-      getDoc.mockImplementation(async (ref: { path: string }) => {
-        if (ref.path.endsWith('/meta')) {
-          metaCalls += 1;
-          if (metaCalls === 1) throw new Error('offline');
-        }
-        return { data: () => data.get(ref.path) };
-      });
-
-      await loadChunkedSnapshot<{ id: string }>(SOURCE, CHARACTER_ID);
-      await vi.waitFor(() => expect(chunkReads()).toHaveLength(1));
-    });
+    expect(result.cached).toBeNull();
   });
 });

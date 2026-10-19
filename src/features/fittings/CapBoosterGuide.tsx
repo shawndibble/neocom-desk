@@ -13,7 +13,7 @@ import {
 } from '@/engine/fittings/capBoosterChoice';
 import type { ChargeChoice } from '@/engine/fittings/chargeChoice';
 import type { CapacitorStatus } from '@/engine/fittings/types';
-import { formatIsk } from './chargeFormat';
+import { formatIskExact } from './chargeFormat';
 import { chargeRowClassName } from './chargeRowStyle';
 import type { WeaponChargeGroup } from './useChargeChoices';
 
@@ -60,7 +60,7 @@ function rowLabel(t: TFunction, c: ChargeChoice, worse: ChargeChoice | null): st
     t('fittings.capGuide.perLoad', { count: cap.boostsPerLoad }),
     c.price === null
       ? t('fittings.capGuide.noPrice')
-      : t('fittings.chargePicker.isk', { isk: formatIsk(c.price) }),
+      : t('fittings.chargePicker.isk', { isk: formatIskExact(c.price) }),
     ...(perGj === null ? [] : [t('fittings.capGuide.iskPerGj', { value: iskGjText(perGj) })]),
     // The dimmed row's reason, which the label would otherwise hide.
     ...(c.skillMissing
@@ -207,7 +207,9 @@ export function CapBoosterGuide({ group, onLoad, wrapRow, pricesLoading }: Props
                   </span>
                   <span className="text-right">{gjText(cap.gjPerSecond)}</span>
                   <span className="text-right">{cap.boostsPerLoad}</span>
-                  <span className="text-right">{c.price === null ? '—' : formatIsk(c.price)}</span>
+                  <span className="text-right">
+                    {c.price === null ? '—' : formatIskExact(c.price)}
+                  </span>
                   <span className="text-right">{perGj === null ? '—' : iskGjText(perGj)}</span>
                   {(worse || c.skillMissing) && (
                     <span className="col-span-full text-text-dim">

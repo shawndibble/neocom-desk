@@ -131,10 +131,17 @@ export async function loadMoonMiningTaxSnapshot(): Promise<MoonMiningTaxSnapshot
     payeesByCharacter.set(ledger.characterId, payeesByLedger[index]);
     const assignments = assignmentsByLedger[index];
 
+    // One pass instead of a scan of every Assignment per entry.
+    const byDaySystem = new Map<string, MiningTaxAssignmentRecord[]>();
+    for (const a of assignments) {
+      const key = `${a.date}|${String(a.solarSystemId)}`;
+      const bucket = byDaySystem.get(key);
+      if (bucket) bucket.push(a);
+      else byDaySystem.set(key, [a]);
+    }
+
     for (const entry of ledger.entries) {
-      const covering = assignments.filter(
-        (a) => a.date === entry.date && a.solarSystemId === entry.solarSystemId
-      );
+      const covering = byDaySystem.get(`${entry.date}|${String(entry.solarSystemId)}`) ?? [];
       rows.push({
         characterId: ledger.characterId,
         characterName: ledger.characterName,

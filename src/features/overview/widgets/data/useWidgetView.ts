@@ -1,4 +1,4 @@
-import { useMemo, useSyncExternalStore } from 'react';
+import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import {
@@ -8,12 +8,11 @@ import {
 import { useTicker } from '@/lib/ticker';
 import { DEFAULT_PLEX_PER_30_DAYS } from '@/engine/omegaCoverage';
 import { DEFAULT_RANGE, type CalendarEventsChoice, type WidgetRange } from '../layout';
+import type { FeedStore } from './feedStore';
 import { useFeedStore } from './feedStoreContext';
-import { buildView } from './models';
-import type { KindView } from './types';
-
-/** Countdowns read in whole minutes, so half a minute keeps them honest without a render storm. */
-const TICK_MS = 30_000;
+import { buildView, KIND_FEEDS } from './models';
+import { OVERVIEW_TICK_MS } from './tick';
+import type { BuildContext, FeedId, KindView } from './types';
 
 export interface ViewRequest {
   kind: string;
@@ -30,38 +29,107 @@ export interface ViewRequest {
 export const viewKey = (request: ViewRequest): string =>
   `${request.kind}:${request.scopeAll ? 1 : 0}:${request.range ?? DEFAULT_RANGE}:${request.plexPer30Days ?? DEFAULT_PLEX_PER_30_DAYS}:${request.calendarEvents === 'all' ? 1 : 0}`;
 
-/** Views for several kinds at once, rebuilt as their feeds change and as the clock ticks. */
+const NO_FEEDS: readonly FeedId[] = [];
+
+/** The feed reads a kind builds from, as the store's per-feed state objects (identity-stable until that feed changes). */
+const feedSlice = (store: FeedStore, feedIds: readonly FeedId[]): readonly unknown[] => {
+  const feeds = store.get();
+  return feedIds.map((id) => feeds[id]);
+};
+
+const sameItems = (a: readonly unknown[], b: readonly unknown[]): boolean =>
+  a.length === b.length && a.every((item, i) => item === b[i]);
+
+interface CachedView {
+  deps: readonly unknown[];
+  view: KindView;
+}
+
+/**
+ * Built views, shared by every widget and the header summary on one store: the
+ * same request is built once per change, not once per reader. An entry is reused
+ * while its inputs (own feeds, clock, context) are identical.
+ */
+const viewCaches = new WeakMap<FeedStore, Map<string, CachedView>>();
+
+function cachedView(
+  store: FeedStore,
+  request: ViewRequest,
+  feedIds: readonly FeedId[],
+  ctx: Omit<BuildContext, 'scopeAll' | 'range' | 'plexPer30Days' | 'calendarEvents'>
+): KindView {
+  let cache = viewCaches.get(store);
+  if (!cache) viewCaches.set(store, (cache = new Map()));
+  const id = viewKey(request);
+  const deps = [
+    ...feedSlice(store, feedIds),
+    ctx.t,
+    ctx.now,
+    ctx.activeCharacterId,
+    ctx.notTrainingAlert,
+  ];
+  const hit = cache.get(id);
+  if (hit && sameItems(hit.deps, deps)) return hit.view;
+  const view = buildView(request.kind, store.get(), {
+    ...ctx,
+    scopeAll: request.scopeAll,
+    range: request.range ?? DEFAULT_RANGE,
+    plexPer30Days: request.plexPer30Days ?? DEFAULT_PLEX_PER_30_DAYS,
+    calendarEvents: request.calendarEvents === 'all' ? 'all' : 'committed',
+  });
+  cache.set(id, { deps, view });
+  return view;
+}
+
+/** Views for several kinds at once, rebuilt as their own feeds change and as the clock ticks. */
 export function useKindViews(requests: readonly ViewRequest[]): ReadonlyMap<string, KindView> {
   const store = useFeedStore();
-  const feeds = useSyncExternalStore(store.subscribe, store.get);
-  const now = useTicker(TICK_MS);
+  const now = useTicker(OVERVIEW_TICK_MS);
   const { t } = useTranslation();
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const prefs = useNotificationPreferences((state) => state.value);
   const notTrainingAlert =
     activeCharacterId !== null && isNotTrainingAlertEnabledFor(prefs, activeCharacterId);
-  // The requests arrive as a fresh array each render; key on their content.
-  const key = requests.map(viewKey).join('|');
+  // The requests arrive as a fresh array each render; hold the last one with the same content.
+  const signature = requests.map(viewKey).join('|');
+  const [held, setHeld] = useState({ signature, requests });
+  let stable = held.requests;
+  if (held.signature !== signature) {
+    stable = requests;
+    setHeld({ signature, requests });
+  }
+  const feedIds = useMemo(() => {
+    const ids = new Set<FeedId>();
+    for (const request of stable)
+      for (const id of KIND_FEEDS[request.kind] ?? NO_FEEDS) ids.add(id);
+    return [...ids];
+  }, [stable]);
+  // Re-render only when a feed these kinds read changes, not on any feed's update.
+  const last = useRef<readonly unknown[]>([]);
+  const getSlice = useCallback(() => {
+    const next = feedSlice(store, feedIds);
+    if (sameItems(last.current, next)) return last.current;
+    last.current = next;
+    return next;
+  }, [store, feedIds]);
+  const slice = useSyncExternalStore(store.subscribe, getSlice);
   return useMemo(() => {
     const views = new Map<string, KindView>();
-    for (const id of key === '' ? [] : key.split('|')) {
-      const [kind, scope, range, plex, allEvents] = id.split(':');
+    for (const request of stable) {
       views.set(
-        id,
-        buildView(kind, feeds, {
+        viewKey(request),
+        cachedView(store, request, KIND_FEEDS[request.kind] ?? NO_FEEDS, {
           t,
           now,
           activeCharacterId,
-          scopeAll: scope === '1',
-          range: Number(range) as WidgetRange,
-          plexPer30Days: Number(plex),
-          calendarEvents: allEvents === '1' ? 'all' : 'committed',
           notTrainingAlert,
         })
       );
     }
     return views;
-  }, [key, feeds, now, t, activeCharacterId, notTrainingAlert]);
+    // `slice` is the signal that an own feed changed; the store read inside is current.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stable, store, slice, now, t, activeCharacterId, notTrainingAlert]);
 }
 
 /** The view for one widget. */

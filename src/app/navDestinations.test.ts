@@ -12,8 +12,18 @@ import type { AppRoutePath } from './routeScopes';
 /** Echoes the key, so a label reads as the keys it was built from. */
 const t = (key: string) => key;
 const NO_LOCKS: ReadonlySet<AppRoutePath> = new Set();
-const ALL_CORP_VIEWS = { canReadMembers: true, canReadWallet: true, canReadAssets: true };
-const NO_CORP_VIEWS = { canReadMembers: false, canReadWallet: false, canReadAssets: false };
+const ALL_CORP_VIEWS = {
+  canReadMembers: true,
+  canReadWallet: true,
+  canReadAssets: true,
+  canReadMiningLedger: true,
+};
+const NO_CORP_VIEWS = {
+  canReadMembers: false,
+  canReadWallet: false,
+  canReadAssets: false,
+  canReadMiningLedger: false,
+};
 
 describe('NAV_PAGES', () => {
   it('holds each path once', () => {
@@ -230,6 +240,19 @@ describe('listNavDestinations', () => {
     const corp = accountant.filter((entry) => entry.pagePath === '/corp');
     expect(corp.map((entry) => entry.path)).toEqual(['/corp', '/corp/wallet']);
     expect(corp.every((entry) => entry.gating === 'corp' && !entry.locked)).toBe(true);
+  });
+
+  it('lists Moons for a Character whose roles can read the refinery ledger', () => {
+    const accountant = listNavDestinations({
+      locked: NO_LOCKS,
+      corpVisible: true,
+      corpCapabilities: { ...NO_CORP_VIEWS, canReadMiningLedger: true },
+      t,
+    });
+    expect(accountant.filter((entry) => entry.pagePath === '/corp').map((e) => e.path)).toEqual([
+      '/corp',
+      '/corp/moons',
+    ]);
   });
 
   it("hides Settings' Corporation section with the Corp entry", () => {

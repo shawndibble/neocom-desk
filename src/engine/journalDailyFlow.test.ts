@@ -98,3 +98,13 @@ describe('journalFlowWindow', () => {
     expect(old.from <= '2026-06-01' && '2026-06-01' <= old.to).toBe(true);
   });
 });
+
+describe('journalDailyFlow malformed dates', () => {
+  it('skips a row whose date does not parse instead of throwing', () => {
+    const days = journalDailyFlow([
+      row({ id: 1, amount: 100 }),
+      row({ id: 2, date: 'garbage', amount: 999 }),
+    ]);
+    expect(days).toEqual([{ day: '2026-10-07', in: 100, out: 0, net: 100 }]);
+  });
+});

@@ -1,7 +1,7 @@
 /**
  * Trade-hub price lookups for the Moon Mining Tax ledger (issue #523), via
- * Fuzzwork for today's live book (ADR 0002), the server's own hub-price
- * snapshot for a saved or historical day, and the app's per-browser Dexie
+ * Fuzzwork for today's live book (ADR 0002), the server's daily hub-station
+ * mining prices in R2 (`hubSnapshot.ts`) for a saved or historical day, and the app's per-browser Dexie
  * snapshot as a further Jita-only fallback (`priceBasis.ts`'s
  * `resolveTaxUnitPrice` — issue #1279 follow-up, "Mining Tax: price at the
  * entry's mined date, not today's live price").
@@ -23,11 +23,12 @@
  * covers buy-vs-sell and compressed-vs-raw; which *day's* price to use is a
  * separate decision, recorded in this fix's own decision doc.
  */
-import { getHubPricesWithStatus } from '@/market/prices';
+import { getHubPrices, getHubPricesWithStatus } from '@/market/prices';
 import { DEFAULT_TRADE_HUB, TRADE_HUBS, type TradeHub } from '@/market/hubs';
-import { loadCompressedOreTypeIds } from '@/sde/loadSde';
+import { loadCompressedOreTypeIds, loadOreAndIceTypeIds, loadTypes } from '@/sde/loadSde';
 import { oreFormTypeId } from '@/engine/miningTax/oreForm';
 import { loadHubSnapshotRange } from '@/features/market/hubSnapshot';
+import { readCompressedOre } from './oreForm';
 import { loadPriceSnapshots } from './priceSnapshots';
 import {
   mergeSnapshotDay,
@@ -90,7 +91,6 @@ function toSidePricesMap(day: SnapshotDay): Map<number, SidePrices> {
  * respectively.
  */
 async function resolvePricesForHubAcrossDates(
-  characterId: number,
   typeIds: readonly number[],
   hub: TradeHub,
   dates: readonly string[],
@@ -110,7 +110,7 @@ async function resolvePricesForHubAcrossDates(
   const end = sortedDates[sortedDates.length - 1];
 
   const [{ saved: serverSaved, historical }, live, dexieSaved] = await Promise.all([
-    loadHubSnapshotRange(characterId, start, end, hub),
+    loadHubSnapshotRange(start, end, hub),
     getHubPricesWithStatus(hub, pricingTypeIds),
     // Dexie only ever holds Jita — no equivalent for the other 4 hubs.
     hub.id === DEFAULT_TRADE_HUB.id
@@ -120,8 +120,8 @@ async function resolvePricesForHubAcrossDates(
 
   for (const date of sortedDates) {
     // Server wins over the per-browser Dexie snapshot for the same day/type —
-    // the server captures 4x/day regardless of who's online, Dexie only when
-    // this browser happened to load the page that day.
+    // the server folds each day's end-of-day book regardless of who's online,
+    // Dexie only when this browser happened to load the page that day.
     const serverDay = serverSaved.get(date);
     const dexieDay = dexieSaved.get(date);
     const mergedSaved =
@@ -173,19 +173,12 @@ async function resolvePricesForHubAcrossDates(
  * does for `TaxTab`.
  */
 export async function loadUnitPricesOnDate(
-  characterId: number,
   typeIds: readonly number[],
   hub: TradeHub,
   date: string,
   compressed = true
 ): Promise<UnitPrices> {
-  const { byDate } = await resolvePricesForHubAcrossDates(
-    characterId,
-    typeIds,
-    hub,
-    [date],
-    compressed
-  );
+  const { byDate } = await resolvePricesForHubAcrossDates(typeIds, hub, [date], compressed);
   return byDate.get(date) ?? { prices: new Map(), unpriced: new Set(), sellFallback: new Set() };
 }
 
@@ -282,7 +275,6 @@ export function sourcesAtHubOnDate(
  * ledger (the common case) still makes exactly one of each.
  */
 export async function loadDatedUnitPricesByHub(
-  characterId: number,
   typeIds: readonly number[],
   hubIds: Iterable<string | undefined>,
   dates: readonly string[],
@@ -297,10 +289,7 @@ export async function loadDatedUnitPricesByHub(
   const loaded = await Promise.all(
     [...hubs.values()].map(
       async (hub) =>
-        [
-          hub.id,
-          await resolvePricesForHubAcrossDates(characterId, typeIds, hub, dates, compressed),
-        ] as const
+        [hub.id, await resolvePricesForHubAcrossDates(typeIds, hub, dates, compressed)] as const
     )
   );
 
@@ -344,4 +333,38 @@ export async function loadDatedUnitPricesByHub(
     sourcesByHubAndDate,
     unreachableHubs,
   };
+}
+
+/**
+ * Live ISK per unit for named ores at `hub`: the highest buy order of each
+ * ore's priced form (Compressed when the Ore Form setting is on and the SDE has
+ * one). Ores with no buy order are absent. `compressed` is the setting read, so
+ * a caller can say which form it priced.
+ */
+export async function oreUnitPrices(
+  oreNames: readonly string[],
+  hub: TradeHub
+): Promise<{ prices: ReadonlyMap<string, number>; compressed: boolean }> {
+  const [types, oreIds, compressedByRaw, compressed] = await Promise.all([
+    loadTypes(),
+    loadOreAndIceTypeIds(),
+    loadCompressedOreTypeIds(),
+    readCompressedOre(),
+  ]);
+  const wanted = new Set(oreNames);
+  const rawByName = new Map<string, number>();
+  for (const id of oreIds) {
+    const name = types[String(id)]?.name;
+    if (name !== undefined && wanted.has(name)) rawByName.set(name, id);
+  }
+  const priced = new Map(
+    [...rawByName].map(([n, id]) => [n, oreFormTypeId(id, compressedByRaw, compressed)])
+  );
+  const aggregates = await getHubPrices(hub, [...new Set(priced.values())]);
+  const prices = new Map<string, number>();
+  for (const [name, typeId] of priced) {
+    const buy = aggregates.get(typeId)?.buyMax;
+    if (buy) prices.set(name, buy);
+  }
+  return { prices, compressed };
 }

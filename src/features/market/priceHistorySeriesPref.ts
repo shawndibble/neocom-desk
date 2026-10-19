@@ -1,6 +1,6 @@
 /**
  * Device-local: which open-price lines the Price History chart draws (Buy /
- * Sell, Buy, Sell). Remembered like the range (`priceHistoryRangePref.ts`) for
+ * Sell, Buy, Sell, Average). Remembered like the range (`priceHistoryRangePref.ts`) for
  * the same reason: the panel remounts per item, and which side a trader reads
  * is a habit, not a property of the item.
  */

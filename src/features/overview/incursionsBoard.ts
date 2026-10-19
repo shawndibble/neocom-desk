@@ -2,7 +2,7 @@
  * The Overview's Incursions card (issue #3541): the nearest Incursions from
  * the pilot's Current System, read through Route Safety's own loader and jump
  * basis (#3540) — see `IncursionsBoardSource` for the reads. Off by default
- * (`hiddenCards.ts`).
+ * (`widgets/migrate.ts`).
  *
  * Conditions, never verdicts, as on Route Safety: a row says where, what
  * state and how far, never whether it is worth flying to.
@@ -10,7 +10,7 @@
 import type { DeadlineSeverity } from '@/engine/severity';
 import type { IncursionRow } from '@/engine/incursions/incursionRows';
 import type { JumpDistanceStatus } from '@/features/route/currentSystem';
-import type { Translate } from './boardSummary';
+import type { Translate } from './data/boardSummary';
 
 export interface IncursionsBoardData {
   /** `failed`: the feed could not be read and nothing was cached — not "no incursions". */

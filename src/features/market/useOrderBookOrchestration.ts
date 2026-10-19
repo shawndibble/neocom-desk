@@ -34,6 +34,7 @@ import {
 } from '@/features/market/orderBookView';
 import type { RegionOrder } from '@/esi/endpoints';
 import { loadAllCharactersOpenOrders } from '@/features/market/openOrdersData';
+import { ownOrderIdSet } from '@/features/market/openOrdersModel';
 import {
   resolveOrderBookRegion,
   type GlobalMarketOverride,
@@ -221,11 +222,7 @@ export function useOrderBookOrchestration({
     void loadAllCharactersOpenOrders()
       .then((snapshot) => {
         if (cancelled) return;
-        const ids = new Set<number>();
-        for (const entry of snapshot.entries) {
-          for (const order of entry.orders) ids.add(order.order_id);
-        }
-        setMyOrderIds(ids);
+        setMyOrderIds(ownOrderIdSet(snapshot));
       })
       .catch(() => {
         // Leaves myOrderIds at whatever it was — a failed fetch must not

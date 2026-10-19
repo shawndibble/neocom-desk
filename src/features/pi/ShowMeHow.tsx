@@ -9,6 +9,7 @@
  * Route Safety links with the security colour plus its number, "Highsec only"
  * is a checkbox, and the panel takes focus when it opens.
  */
+import { formatCount } from '@/lib/formatCount';
 import { useEffect, useRef, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Checkbox, IskAmount, TypeIcon } from '@/components/ui';
@@ -290,9 +291,9 @@ function RunStep({
       text: (
         <Sentence
           text={t('piPlan.find.runCollect', {
-            units: Math.round(how.unitsPerWeek).toLocaleString('en'),
+            units: formatCount(how.unitsPerWeek),
             item: '{item}',
-            m3: Math.round(how.m3PerWeek).toLocaleString('en'),
+            m3: formatCount(how.m3PerWeek),
           })}
           slots={{ item: <PiProductLink typeId={recipe.typeId}>{recipe.name}</PiProductLink> }}
         />

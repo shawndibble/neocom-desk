@@ -18,6 +18,18 @@ export type HistoryJobWithCharacter = IndustryJob & { characterId: number };
 
 const NONE: never[] = [];
 
+/** Keeps only the fields the matching reads, so live-query results hold no run bodies. */
+export function projectRuns(rows: readonly LoggedRunRef[]): LoggedRunRef[] {
+  return rows.map((r) => ({
+    id: r.id,
+    characterId: r.characterId,
+    buildPlanId: r.buildPlanId,
+    productTypeID: r.productTypeID,
+    loggedAt: r.loggedAt,
+    sourceJobId: r.sourceJobId,
+  }));
+}
+
 /** Every stored delivered job, tagged with its Character, plus the runs to classify them against. Both `undefined` until Dexie answers. */
 export function useJobHistoryData(): {
   jobs: HistoryJobWithCharacter[] | undefined;
@@ -26,7 +38,7 @@ export function useJobHistoryData(): {
   dismissedJobIds: ReadonlySet<number>;
 } {
   const history = useLiveQuery(() => db.industryJobHistory.toArray(), []);
-  const runs = useLiveQuery(() => db.productionRuns.toArray(), []);
+  const runs = useLiveQuery(() => db.productionRuns.toArray().then(projectRuns), []);
   const jobs = useMemo(
     () =>
       history?.flatMap((row) => row.jobs.map((job) => ({ ...job, characterId: row.characterId }))),
@@ -51,7 +63,7 @@ export function useHistoryStates(
 export function useUnloggedDeliveryCount(characterId: number, blueprintTypeId: number): number {
   const stored = useLiveQuery(() => db.industryJobHistory.get(characterId), [characterId]);
   const runs = useLiveQuery(
-    () => db.productionRuns.where('characterId').equals(characterId).toArray(),
+    () => db.productionRuns.where('characterId').equals(characterId).toArray().then(projectRuns),
     [characterId]
   );
   return useMemo(() => {

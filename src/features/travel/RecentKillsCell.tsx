@@ -12,6 +12,7 @@ import { ExternalLink } from '@/components/ui/ExternalLink';
 import { useTranslation } from 'react-i18next';
 import { Spinner } from '@/components/ui';
 import type { KillTags, RecentKillLocation } from '@/engine/route/recentKills';
+import { zkillFailureKey } from '@/lib/zkillFailureKey';
 import { systemZkillUrl } from '@/lib/zkillboard';
 import type { RouteKillsCell } from './useRouteKills';
 
@@ -69,7 +70,11 @@ export function RecentKillsCell({ systemId, cell }: { systemId: number; cell: Ro
   const { t } = useTranslation();
   if (cell.status === 'loading') return <Spinner size="sm" label={t('travel.kills.loading')} />;
   if (cell.status === 'unavailable') {
-    return <span className="text-text-dim">{t('travel.kills.unavailable')}</span>;
+    return (
+      <span className="text-text-dim">
+        {t(zkillFailureKey(cell.reason, 'travel.kills.unavailable'))}
+      </span>
+    );
   }
   const { summary } = cell;
   return (
