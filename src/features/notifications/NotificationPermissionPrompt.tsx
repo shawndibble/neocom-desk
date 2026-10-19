@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Button, NeedsConnection } from '@/components/ui';
 import { db, type CharacterRecord } from '@/db';
+import { useCharacterCount } from '@/features/character/useCharacters';
 import {
   useNotificationPromptState,
   useNotificationPermission,
@@ -41,7 +42,7 @@ export function NotificationPermissionPrompt() {
   const { t } = useTranslation();
   const { value, setValue } = useNotificationPromptState();
   const { permission, refresh } = useNotificationPermission();
-  const characterCount = useLiveQuery(() => db.characters.count());
+  const characterCount = useCharacterCount();
   const newestCharacter = useLiveQuery(async () =>
     (await db.characters.toArray()).reduce<CharacterRecord | undefined>(
       (newest, c) => (newest === undefined || c.addedAt > newest.addedAt ? c : newest),
@@ -68,7 +69,7 @@ export function NotificationPermissionPrompt() {
   const visible = shouldShowPermissionExplainer({
     hydrated,
     seen: value.seen,
-    hasCharacter: (characterCount ?? 0) > 0,
+    hasCharacter: characterCount > 0,
     permission,
     installRequired,
     hasLeftFirstScreen,

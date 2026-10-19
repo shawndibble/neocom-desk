@@ -5,6 +5,7 @@ import { ShipsTabBar } from '@/features/fittings/ShipsTabBar';
 import { SHIPS_TABS_ID } from '@/features/fittings/shipsTabs';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
+import { useCharacters } from '@/features/character/useCharacters';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useOnline } from '@/stores/network';
 import { useTranslation } from 'react-i18next';
@@ -194,7 +195,7 @@ function FittingsPage() {
     () => (activeCharacterId === null ? undefined : db.characters.get(activeCharacterId)),
     [activeCharacterId]
   )?.name;
-  const allCharacters = useLiveQuery(() => db.characters.toArray(), [], []);
+  const allCharacters = useCharacters();
   const yourCharacters = useMemo(
     () => allCharacters.map(({ characterId, name }) => ({ characterId, name })),
     [allCharacters]
