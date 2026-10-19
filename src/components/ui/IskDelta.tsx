@@ -1,4 +1,5 @@
-import { iskGains, marketIskTone, signedIsk, signedMarketIsk } from '@/lib/signedIsk';
+import { marketIskDecimals } from '@/lib/isk';
+import { iskTone, signedIsk } from '@/lib/signedIsk';
 
 interface IskDeltaProps {
   /** The signed amount: positive earns `isk-pos` and a "+", negative `isk-neg` and its minus, zero neither. */
@@ -21,15 +22,7 @@ interface IskDeltaProps {
  * @summary A signed ISK change with its "+" and the isk-pos / isk-neg tone.
  */
 export function IskDelta({ amount, decimals, className }: IskDeltaProps) {
-  const text = decimals === undefined ? signedMarketIsk(amount) : signedIsk(amount, decimals);
-  const tone =
-    decimals === undefined
-      ? marketIskTone(amount)
-      : iskGains(amount, decimals)
-        ? 'text-isk-pos'
-        : iskGains(-amount, decimals)
-          ? 'text-isk-neg'
-          : undefined;
-  const classes = [className, tone].filter(Boolean).join(' ');
-  return <span className={classes || undefined}>{text}</span>;
+  const places = decimals ?? marketIskDecimals(amount);
+  const classes = [className, iskTone(amount, places)].filter(Boolean).join(' ');
+  return <span className={classes || undefined}>{signedIsk(amount, places)}</span>;
 }
