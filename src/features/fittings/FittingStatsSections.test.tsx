@@ -1295,6 +1295,32 @@ describe('FittingStatsSections price', () => {
     expect(body.getByRole('combobox', { name: 'Priced at' })).toBeInTheDocument();
   });
 
+  it('prices on sell orders alone: no Buy fact, and a missing buy order is not "unpriced"', async () => {
+    // Sells at the hub, no buy order there (the order book's usual state for a rare module).
+    const sellOnly = { ...row(1, 2, 1500), buyEach: null, buyTotal: null };
+    const price = {
+      rows: [sellOnly],
+      totals: { buy: 0, sell: 3000, spread: 0, unpricedRows: 1 },
+    } as unknown as Appraisal;
+    render(
+      <FittingStatsSections
+        stats={stats()}
+        statsProgress={null}
+        statsError={false}
+        price={price}
+        damageProfiles={damageProfiles()}
+        targetProfiles={targetProfiles()}
+        typeName={priceTypeName}
+      />
+    );
+    await userEvent.click(screen.getByRole('button', { name: /^Price/ }));
+    const body = within(sectionBody('Price'));
+
+    expect(body.queryByText(/no price at this hub/)).toBeNull();
+    expect(body.queryByText('Buy')).toBeNull();
+    expect(body.getByText('Sell')).toBeInTheDocument();
+  });
+
   afterEach(() => configureClipboard(null));
 
   it('breaks the price down per item and copies it as a multibuy list', async () => {

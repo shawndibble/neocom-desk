@@ -149,7 +149,8 @@ describe('PilotLookupPanel', () => {
     expect(await screen.findByRole('heading', { name: 'Some Pilot' })).toBeTruthy();
     expect(mocks.resolvePilotByName).toHaveBeenCalledWith('some pilot');
     expect(mocks.searchMailRecipients).not.toHaveBeenCalled();
-    expect(probe.search).toBe('?pilot=42');
+    // The heading can render a tick before the router's search param lands.
+    await waitFor(() => expect(probe.search).toBe('?pilot=42'));
     expect(await screen.findByText('1,043 kills')).toBeTruthy();
     expect(screen.queryByText('99.2%')).toBeNull();
     expect(screen.getByRole('meter', { name: 'Danger' })).toHaveAttribute('aria-valuenow', '68');
@@ -310,7 +311,8 @@ describe('PilotLookupPanel', () => {
     expect(mocks.searchMailRecipients).toHaveBeenCalledWith(1, 'some', expect.any(AbortSignal));
     fireEvent.mouseDown(option);
     expect(await screen.findByRole('heading', { name: 'Some Pilot' })).toBeTruthy();
-    expect(probe.search).toBe('?pilot=42');
+    // The heading can render a tick before the router's search param lands.
+    await waitFor(() => expect(probe.search).toBe('?pilot=42'));
   });
 
   it('tells an empty page that a Local list or D-Scan can be pasted', () => {
@@ -334,7 +336,8 @@ describe('PilotLookupPanel', () => {
 
     expect(await screen.findByRole('heading', { name: 'Some Pilot' })).toBeTruthy();
     expect(screen.queryByText('3 names, Local list')).toBeNull();
-    expect(probe.search).toBe('?pilot=42');
+    // The heading can render a tick before the router's search param lands.
+    await waitFor(() => expect(probe.search).toBe('?pilot=42'));
   });
 
   describe('a name box with one name per line', () => {
