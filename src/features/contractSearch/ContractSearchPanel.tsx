@@ -20,7 +20,6 @@
  * Mounts under a Router: every item row is a Build Plan context-menu
  * trigger (#931), and so is each line of the detail modal's contents.
  */
-import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { useCallback, useDeferredValue, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -45,7 +44,6 @@ import {
   TextInput,
   IskAmount,
   LiveStatus,
-  type DataTableColumn,
   CachedNotice,
 } from '@/components/ui';
 import {
@@ -55,16 +53,13 @@ import {
 } from '@/features/contractSearch/contractSearchItemsColumns';
 import {
   contractOfferPriceSummary,
-  isUnpricedOffer,
   listedContractTypeOptions,
   offerAskingPrice,
-  type ContractOfferFilter,
   type ContractOfferStats,
   type ContractSaleKind,
   type ContractTypeOption,
 } from '@/engine/contracts/contractSearch';
 import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
-import type { ContractOfferQuery } from '@/engine/contracts/contractSearchQuery';
 import {
   resolveCourierRoutes,
   type PublicCourierContractRow,
@@ -80,10 +75,11 @@ import {
   rememberBelowMarketSummary,
 } from '@/features/contractSearch/belowMarketSummary';
 import { loadPublicCourierContracts } from '@/features/contractSearch/publicCourierContracts';
+import { useContractSearchRows } from '@/features/contractSearch/useContractSearchRows';
+import { useItemsColumns } from '@/features/contractSearch/useItemsColumns';
 import { CourierResults } from '@/features/contractSearch/CourierResults';
 import { useOfferLocations } from '@/features/contractSearch/offerLocations';
 import { usePlexPrice } from '@/features/market/plexPrice';
-import { SecurityStatus } from '@/components/SecurityStatus';
 import {
   useCourierEndpoints,
   useListedTypeNames,
@@ -91,7 +87,6 @@ import {
 } from '@/features/contractSearch/contractSearchNames';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
-import { contractSearchCsvColumns } from './contractSearchCsv';
 import { BuildPlanContextMenu } from '@/features/industry/BuildPlanContextMenu';
 import { OpenInEveMenuItem } from '@/features/openInEve/OpenInEveMenuItem';
 import { seedFromOfferRow } from '@/features/industry/planSeed';
@@ -99,15 +94,12 @@ import {
   PublicContractDetailModal,
   type PublicContractDetailModalStatChip,
 } from '@/features/contracts/PublicContractDetailModal';
-import { useContractOfferQuery } from '@/features/contractSearch/useContractOfferQuery';
 import { useRetryFocus } from '@/lib/useRetryFocus';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { rankedSearch } from '@/lib/rankedSearch';
 import { cx } from '@/lib/cx';
 import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
-import { CONTRACT_ISK_CENTS_BELOW, formatIskAuto, parseNumeric } from '@/lib/isk';
-import { formatTimestamp } from '@/lib/timestamp';
-import { useTimeZone } from '@/lib/timeFormat';
+import { CONTRACT_ISK_CENTS_BELOW, formatIskAuto } from '@/lib/isk';
 import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
 import {
   boolParam,
@@ -121,14 +113,12 @@ import {
   useCurrentSystem,
   useJumpRangeFilter,
   type CurrentSystemState,
-  type JumpsCellValue,
 } from '@/features/route/currentSystem';
 import {
   CurrentSystemPicker,
   JumpRangeNote,
   JumpRangeSelect,
 } from '@/features/route/JumpRangeControls';
-import { renderJumpsCell } from '@/features/route/jumpsCell';
 
 /** How many candidate types the suggestion list offers at once. */
 const SUGGESTION_LIMIT = 8;
@@ -179,22 +169,7 @@ const ITEMS_FILTER_PARAMS = {
   /** Below market (#3989): one row per contract, valued at the hub. */
   'items.belowMarket': boolParam(),
 };
-const NO_LOCATION_SYSTEMS: ReadonlyMap<number, number | null> = new Map();
 const ITEMS_SORT = { columnId: 'price', direction: 'asc' } as const;
-
-/**
- * The Price column's own `sortValue` — `undefined`, not `Infinity`, for an
- * unpriced row: `DataTable.sortRows` appends every `undefined` row after
- * the sorted, valued ones regardless of sort direction, the same
- * "unknowable sorts last either way" rule `BpcSourcingPanel.tsx`'s ISK/run
- * column already follows for its own `undefined`.
- */
-function sortValueForPriceColumn(
-  row: PublicContractOfferRow,
-  plexPrice: number | null
-): number | undefined {
-  return isUnpricedOffer(row, plexPrice) ? undefined : offerAskingPrice(row, plexPrice);
-}
 
 interface RegionOption {
   id: number;
@@ -387,7 +362,6 @@ interface ContractSearchPanelProps {
 /** Search every public item_exchange/auction contract line, any item type. Read-only, cached for offline. */
 export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPanelProps) {
   const { t } = useTranslation();
-  const timeZone = useTimeZone();
   /**
    * One hook per corpus, so neither board waits on the other's snapshot. The
    * two used to arrive together out of a single loader, on the argument that
@@ -609,106 +583,18 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
     return ids.map((id) => ({ id, name: regionNames.get(id) ?? `#${id}` }));
   }, [rows, haveFull, offerIndex, regionNames]);
 
-  /**
-   * Everything except the item type. Split out so a keystroke in the search
-   * box re-runs only the cheap type narrowing below rather than a fresh pass
-   * over the whole snapshot — and so the suggestion list's counts are
-   * computed against the same region/price/kind restrictions the results
-   * are, which is what stops a suggestion reading "40 offers" from landing on
-   * a table of two.
-   */
-  const nonTypeFilter = useMemo<ContractOfferFilter>(
-    () => ({
-      regionId: uiFilter.regionId,
-      maxPrice: parseNumeric(uiFilter.maxPrice),
-      minQuantity: parseNumeric(uiFilter.minQuantity),
-      saleKind: uiFilter.saleKind,
-      hideAuctions: uiFilter.hideAuctions,
-      hidePlexRequests: uiFilter.hidePlex,
-      plexPrice,
-    }),
-    [
-      uiFilter.regionId,
-      uiFilter.maxPrice,
-      uiFilter.minQuantity,
-      uiFilter.saleKind,
-      uiFilter.hideAuctions,
-      uiFilter.hidePlex,
-      plexPrice,
-    ]
-  );
-  /**
-   * Jump Range folded in here rather than into `nonTypeFilter`:
-   * only this layer resolves an offer's system (`useOfferLocations`), so
-   * `filterContractOffers` cannot see it; the query gets the resolved systems. A row this app has *placed* and
-   * cannot connect to the origin — a player structure, or a system the
-   * stargate graph does not reach — drops out the moment a range is active:
-   * "within 5 jumps" is a claim an unknown distance cannot back.
-   *
-   * A row still *resolving* (no entry in `offerLocations` yet) is a
-   * different case and stays. `useOfferLocations` can still be working
-   * through the snapshot's ids while the distances have already landed, and
-   * dropping an unresolved row here would read as "nothing in range" for an
-   * answer that has simply not arrived yet — the same "only a finished
-   * answer excludes" rule Courier's `narrowToOverRate` follows for its own
-   * mid-load rows.
-   */
-  const allowedSystems = jumpRangeFilter.allowed;
-  const locationSystems = useMemo(
-    () =>
-      allowedSystems === null
-        ? NO_LOCATION_SYSTEMS
-        : new Map([...offerLocations].map(([id, location]) => [id, location.systemId])),
-    [allowedSystems, offerLocations]
-  );
-  /**
-   * Cheapest first, so the rows arrive in the order the table's default
-   * sort shows them rather than the snapshot's own contract-then-type order.
-   * An unpriced (barter) row sorts last regardless of its raw price (issue
-   * #1080). Below market only reads which contracts pass; the offer table is
-   * not shown, so it skips the sort.
-   *
-   * One query answers rows and per-type stats together, in a worker for a
-   * big snapshot (issue #4128).
-   */
-  // Deferred so a price/region edit keeps the inputs responsive while the
-  // ~370k-row filter reruns at low priority.
-  const deferredNonTypeFilter = useDeferredValue(nonTypeFilter);
-  const itemQuery = useMemo<ContractOfferQuery>(
-    () => ({
-      filter: deferredNonTypeFilter,
-      typeIds,
-      allowedSystems,
-      locationSystems,
-      sort: !belowMarket,
-    }),
-    [deferredNonTypeFilter, typeIds, allowedSystems, locationSystems, belowMarket]
-  );
-  const {
-    displayRows,
-    stats: queryStats,
-    awaitingFirst: awaitingQuery,
-  } = useContractOfferQuery(rows, itemQuery);
-  const statsByType = useMemo(() => {
-    // Before the full rows land, the index's own per-type count and cheapest
-    // stand in. They ignore the other filters, which only matters until the
-    // snapshot arrives and the stats are computed as before.
-    if (!haveFull && offerIndex) {
-      const stats = new Map<number, ContractOfferStats>(
-        [...offerIndex.types.values()].map((entry) => [
-          entry.typeId,
-          { offerCount: entry.count, cheapest: entry.cheapest },
-        ])
-      );
-      // Read through R2 the full rows never arrive, so the types whose rows
-      // were read get their real, filter-aware stats; the rest keep the index's.
-      if (early.rows !== null) {
-        for (const [typeId, typeStats] of queryStats) stats.set(typeId, typeStats);
-      }
-      return stats;
-    }
-    return queryStats;
-  }, [haveFull, offerIndex, early.rows, queryStats]);
+  const { displayRows, statsByType, awaitingQuery } = useContractSearchRows({
+    uiFilter,
+    rows,
+    haveFull,
+    offerIndex,
+    earlyRows: early.rows,
+    plexPrice,
+    offerLocations,
+    allowedSystems: jumpRangeFilter.allowed,
+    typeIds,
+    belowMarket,
+  });
 
   const suggestions = useMemo<Suggestion[]>(() => {
     if (selectedTypeId !== null || uiFilter.typeQuery.trim() === '') return [];
@@ -810,213 +696,21 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
     });
   }
 
-  /**
-   * A row's own distance from the Current System, independent of whether a
-   * Jump Range filter is even active (`jumpRangeFilter.jumps`/`jumpsStatus`
-   * are populated at every range). Pending while *either* the offer's own
-   * location (`offerLocations`) or the distance map is still resolving; a
-   * settled but unplaced offer (a player structure, or nothing this app
-   * could place) is a `value` of `null`, same as an unreachable system.
-   */
-  const offerJumps = useCallback(
-    (row: PublicContractOfferRow): JumpsCellValue => {
-      const location = offerLocations.get(row.locationId);
-      if (location === undefined) return { kind: 'loading' };
-      if (location.systemId === null) return { kind: 'value', count: null };
-      if (jumpRangeFilter.jumpsStatus !== 'ready') return { kind: jumpRangeFilter.jumpsStatus };
-      return { kind: 'value', count: jumpRangeFilter.jumps?.get(location.systemId) ?? null };
-    },
-    [offerLocations, jumpRangeFilter]
-  );
+  const { columns, itemsColumnsById, itemsCsvColumns, offerJumps, plexAskLabel } = useItemsColumns({
+    typeNames,
+    regionNames,
+    offerLocations,
+    jumpRangeFilter,
+    plexPrice,
+    visibleItemsColumns,
+  });
 
-  /**
-   * A PLEX ask as the contract states it — "100 PLEX", or "20M ISK + 10 PLEX"
-   * when it wants both — for wherever no PLEX price is in hand to fold it into
-   * one ISK figure.
-   */
-  const plexAskLabel = useCallback(
-    (row: PublicContractOfferRow): string => {
-      const plex = (row.requestedPlex ?? 0).toLocaleString();
-      return row.price > 0
-        ? t('contractSearch.iskPlusPlexPrice', {
-            isk: formatIskAuto(row.price, CONTRACT_ISK_CENTS_BELOW),
-            plex,
-          })
-        : t('contractSearch.plexPrice', { plex });
-    },
-    [t]
-  );
-
-  const itemsColumnsById = useMemo<
-    Record<ContractSearchItemsColumnId, DataTableColumn<PublicContractOfferRow>>
-  >(
-    () => ({
-      qty: {
-        id: 'qty',
-        header: t('contractSearch.qtyColumn'),
-        align: 'right',
-        className: 'tabular-nums',
-        sortValue: (row) => row.quantity,
-        render: (row) => row.quantity.toLocaleString(),
-        // The dense phone card has no header row, and a bare "12" beside a
-        // system name says nothing about what it counts.
-        stackAffix: { before: t('contractSearch.mobile.qtyAffix') },
-      },
-      price: {
-        id: 'price',
-        header: t('contractSearch.priceColumn'),
-        align: 'right',
-        // The headline figure of the dense phone card, on the title line.
-        cardCorner: true,
-        className: 'tabular-nums whitespace-nowrap',
-        sortValue: (row) => sortValueForPriceColumn(row, plexPrice),
-        render: (row) => (
-          <>
-            {row.requestedPlex && plexPrice === null ? (
-              // No PLEX price to convert at yet: state the ask as it stands.
-              plexAskLabel(row)
-            ) : (
-              // Long press, not tap: the row's own tap opens the offer's detail modal.
-              <IskAmount value={offerAskingPrice(row, plexPrice)} />
-            )}
-            {row.isAuction && (
-              // An auction's number is a starting bid unless the seller set a
-              // buyout, so the figure alone would read as a fixed ask.
-              <span className="ml-1 text-[0.6875rem] text-text-dim uppercase">
-                {row.buyout
-                  ? t('contractSearch.buyoutShort')
-                  : t('contractSearch.startingBidShort')}
-              </span>
-            )}
-            {row.requestedPlex
-              ? plexPrice !== null && (
-                  // The figure above already counts the PLEX at market; say so,
-                  // since the contract itself asks for PLEX, not that much ISK.
-                  <span className="block text-[0.625rem] text-text-dim">
-                    {t('contractSearch.includesPlex', {
-                      plex: row.requestedPlex.toLocaleString(),
-                    })}
-                  </span>
-                )
-              : isUnpricedOffer(row) && (
-                  // A barter's 0 ISK is real but not a price (issue #1080) — the
-                  // row's own tap already opens the detail modal, which shows
-                  // both sides of the exchange correctly.
-                  <span className="block text-[0.625rem] text-text-dim">
-                    {t('contractSearch.unpricedOfferMarker')}
-                  </span>
-                )}
-          </>
-        ),
-      },
-      system: {
-        // The system, with its security, is what a buyer actually weighs —
-        // whether the pickup is a hop from home or a trip into lowsec — and a
-        // region alone cannot say either. After Price so the phone card's
-        // meta line reads "Qty · System · Region · Exp", narrowest place last.
-        id: 'system',
-        header: t('contractSearch.systemColumn'),
-        className: 'whitespace-nowrap',
-        // Unplaced or still resolving sinks in either direction, rather than
-        // sorting as a name — the Price column's "unknowable sorts last" rule.
-        sortValue: (row) => offerLocations.get(row.locationId)?.systemName ?? undefined,
-        render: (row) => {
-          const location = offerLocations.get(row.locationId);
-          // Missing key: the local lookup has not answered yet. Distinct from
-          // a null name, which is a finished answer — a player structure, or
-          // a table that could not be read — and must not read as pending.
-          if (location === undefined) return <span className="text-text-dim">…</span>;
-          if (location.systemName === null) return <span className="text-text-dim">—</span>;
-          return (
-            <>
-              {/* Plain: the row opens the contract modal, which carries the system link. */}
-              <span className={entityLinkClassName()}>{location.systemName}</span>
-              {location.security !== null && (
-                <>
-                  {' '}
-                  <SecurityStatus security={location.security} />
-                </>
-              )}
-            </>
-          );
-        },
-      },
-      jumps: {
-        id: 'jumps',
-        header: t('contractSearch.itemsJumpsColumn'),
-        align: 'right',
-        className: 'tabular-nums',
-        sortValue: (row) => {
-          const cell = offerJumps(row);
-          return cell.kind === 'value' ? (cell.count ?? undefined) : undefined;
-        },
-        stackAffix: { before: t('contractSearch.mobile.jumpsAffix') },
-        render: (row) =>
-          renderJumpsCell(
-            offerJumps(row),
-            t,
-            'contractSearch.jumpsUnavailableHint',
-            offerLocations.get(row.locationId)?.systemId
-          ),
-      },
-      region: {
-        id: 'region',
-        header: t('contractSearch.regionColumn'),
-        sortValue: (row) => regionNames.get(row.regionId) ?? `#${row.regionId}`,
-        render: (row) => regionNames.get(row.regionId) ?? `#${row.regionId}`,
-      },
-      expires: {
-        id: 'expires',
-        header: t('contractSearch.expiresColumn'),
-        className: 'whitespace-nowrap text-text-dim',
-        sortValue: (row) => row.dateExpired,
-        render: (row) => formatTimestamp(new Date(row.dateExpired), timeZone),
-        stackAffix: { before: t('contractSearch.mobile.expiresAffix') },
-      },
-    }),
-    [t, regionNames, offerLocations, timeZone, offerJumps, plexPrice, plexAskLabel]
-  );
-
-  const columns = useMemo<DataTableColumn<PublicContractOfferRow>[]>(() => {
-    const cols: DataTableColumn<PublicContractOfferRow>[] = [
-      {
-        id: 'item',
-        header: t('contractSearch.itemColumn'),
-        primary: true,
-        sortValue: (row) => typeNames.get(row.typeId) ?? `#${row.typeId}`,
-        render: (row) => (
-          // Plain: the row opens the contract modal, whose item lines link to Market.
-          <span className={entityLinkClassName()}>
-            {typeNames.get(row.typeId) ?? `#${row.typeId}`}
-          </span>
-        ),
-      },
-    ];
-    for (const id of CONTRACT_SEARCH_ITEMS_COLUMN_IDS) {
-      if (visibleItemsColumns.includes(id)) cols.push(itemsColumnsById[id]);
-    }
-    return cols;
-  }, [t, typeNames, visibleItemsColumns, itemsColumnsById]);
   const itemsSortProps = useUrlSort(
     'items.sort',
     ITEMS_SORT,
     columns.map((column) => column.id)
   );
 
-  const itemsCsvColumns = useMemo(
-    () =>
-      contractSearchCsvColumns(t, {
-        typeName: (typeId) => typeNames.get(typeId) ?? `#${typeId}`,
-        regionName: (regionId) => regionNames.get(regionId) ?? `#${regionId}`,
-        systemName: (row) => offerLocations.get(row.locationId)?.systemName ?? null,
-        jumps: (row) => {
-          const cell = offerJumps(row);
-          return cell.kind === 'value' ? cell.count : null;
-        },
-        plexPrice,
-      }),
-    [t, typeNames, regionNames, offerLocations, offerJumps, plexPrice]
-  );
   const itemsExport = useTableExport({
     surface: 'contract-search',
     rows: displayRows,

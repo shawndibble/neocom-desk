@@ -30,11 +30,11 @@ import {
   PRICE_SERIES_CHOICES,
   seriesShows,
   summarizeOpenPrices,
-  type OpenPriceSeries,
   type PriceSeriesChoice,
   type RegionOpenSeries,
 } from '@/engine/market/priceHistoryOpen';
-import { loadMarketOpenPrices } from './marketOpenPrices';
+import { loadMarketOpenPrices, type HubOpenPrices } from './marketOpenPrices';
+import { TRADE_HUBS } from '@/market/hubs';
 import { seriesChoiceLabel } from './priceHistoryLabels';
 import { usePriceHistoryRange } from './priceHistoryRangePref';
 import { usePriceHistorySeries } from './priceHistorySeriesPref';
@@ -160,7 +160,7 @@ function useComparedHistories(typeId: number, regionIds: readonly number[]) {
  * simply leaves that region on its average line until the panel is reopened.
  */
 function useOpenSeries(typeId: number, regionIds: readonly number[]) {
-  const [byKey, setByKey] = useState<ReadonlyMap<string, OpenPriceSeries | null>>(new Map());
+  const [byKey, setByKey] = useState<ReadonlyMap<string, HubOpenPrices | null>>(new Map());
   const requested = useRef(new Set<string>());
   useEffect(() => {
     for (const regionId of regionIds) {
@@ -173,7 +173,7 @@ function useOpenSeries(typeId: number, regionIds: readonly number[]) {
     }
   }, [typeId, regionIds]);
   return useMemo(() => {
-    const series = new Map<number, OpenPriceSeries>();
+    const series = new Map<number, HubOpenPrices>();
     const missing = new Set<number>();
     for (const regionId of regionIds) {
       const key = `${regionId}:${typeId}`;
@@ -347,8 +347,8 @@ interface RangedHistoryProps {
   /** Normalized picks, parallel to `comparedHistories`. */
   compareIds: readonly number[];
   comparedHistories: readonly RegionHistoryState[];
-  /** Open buy/sell series by region id, for the regions that have one. */
-  openSeries: ReadonlyMap<number, OpenPriceSeries>;
+  /** Open buy/sell series by region id (its hub station's), for the regions that have one. */
+  openSeries: ReadonlyMap<number, HubOpenPrices>;
   /** Regions whose open read came back with no series at all. */
   openMissing: ReadonlySet<number>;
 }
@@ -381,7 +381,8 @@ function RangedHistory({
       [...openSeries.entries()]
         .map(([regionId, stored]) => ({
           regionId,
-          points: clipOpenPrices(openPricePoints(stored), range, now),
+          station: TRADE_HUBS.find((hub) => hub.stationId === stored.stationId)?.stationLabel,
+          points: clipOpenPrices(openPricePoints(stored.series), range, now),
         }))
         .filter((o) => o.points.length > 0),
     [openSeries, range, now]

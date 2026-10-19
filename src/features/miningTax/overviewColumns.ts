@@ -9,7 +9,7 @@
  * column and always shows, so it is never offered in the picker and never
  * stored in the preference.
  */
-import { createLocalSetting } from '@/lib/useLocalSetting';
+import { createColumnVisibilitySetting } from '@/lib/columnVisibility';
 
 export const OVERVIEW_COLUMN_IDS = [
   'character',
@@ -35,22 +35,12 @@ export const DEFAULT_VISIBLE_OVERVIEW_COLUMNS: readonly OverviewColumnId[] = [
   'pricing',
 ];
 
-function isOverviewColumnId(raw: unknown): raw is OverviewColumnId {
-  return typeof raw === 'string' && (OVERVIEW_COLUMN_IDS as readonly string[]).includes(raw);
-}
-
 export const VISIBLE_OVERVIEW_COLUMNS_KEY = 'miningYieldOverviewVisibleColumns';
 
-export const useVisibleOverviewColumns = createLocalSetting<readonly OverviewColumnId[]>({
+export const useVisibleOverviewColumns = createColumnVisibilitySetting({
   key: VISIBLE_OVERVIEW_COLUMNS_KEY,
-  defaultValue: DEFAULT_VISIBLE_OVERVIEW_COLUMNS,
-  // An empty stored array is rejected rather than honoured (characterColumns.ts
-  // precedent) — it would render a table with only the date column and no
-  // explanation.
-  parse: (raw) =>
-    Array.isArray(raw) && raw.length > 0 && raw.every(isOverviewColumnId)
-      ? (raw as OverviewColumnId[])
-      : null,
+  ids: OVERVIEW_COLUMN_IDS,
+  defaultVisible: DEFAULT_VISIBLE_OVERVIEW_COLUMNS,
 });
 
 /**

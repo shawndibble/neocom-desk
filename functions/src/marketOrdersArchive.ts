@@ -12,11 +12,10 @@
 import { Readable, pipeline } from 'node:stream';
 import { parse } from 'csv-parse';
 import unbzip2Stream from 'unbzip2-stream';
-import type { OpenPriceFold } from './marketOpenPrices.js';
-import type { StationPriceFold } from './miningHubPrices.js';
+import type { OpenPriceFold, StationPriceFold } from './marketOpenPrices.js';
 
 const REQUIRED_COLUMNS = ['is_buy_order', 'price', 'type_id', 'region_id'] as const;
-/** Read only when a station fold rides along (the daily job's mining prices). */
+/** Read only when a station fold rides along (the daily job and the backfill). */
 const LOCATION_COLUMN = 'location_id';
 
 /**
