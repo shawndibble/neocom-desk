@@ -64,10 +64,12 @@ async function assertUnclaimed(
   oreLines: readonly MiningTaxOreLine[],
   entryOreLines?: readonly MiningTaxOreLine[]
 ): Promise<void> {
-  const existing = await db.miningTaxAssignments.where('characterId').equals(characterId).toArray();
+  const existing = await db.miningTaxAssignments
+    .where('[characterId+date+solarSystemId]')
+    .equals([characterId, date, solarSystemId])
+    .toArray();
   const claimed = new Map<number, number>();
   for (const a of existing) {
-    if (a.date !== date || a.solarSystemId !== solarSystemId) continue;
     for (const line of a.oreLines) {
       claimed.set(line.typeId, (claimed.get(line.typeId) ?? 0) + line.quantity);
     }
