@@ -6,13 +6,14 @@ import { onEsiAuthFailure } from '@/esi/authFailureSignal';
 import { db } from '@/db';
 import { STALE_AFTER, resetRevalidationState } from '@/esi/cache';
 import { loadStructureName } from './structures';
+import { seedCharacter as seedCharacterRow } from '@/test/seed';
 
 const CHARACTER_ID = 42;
 const OTHER_CHARACTER_ID = 43;
 const THIRD_CHARACTER_ID = 44;
 
 function seedCharacter(characterId: number, name = `char-${characterId}`): Promise<unknown> {
-  return db.characters.put({ characterId, name, ownerHash: 'oh', addedAt: 0 });
+  return seedCharacterRow(characterId, name, { ownerHash: 'oh', addedAt: 0 });
 }
 
 const server = setupServer();

@@ -6,7 +6,7 @@ import { useOnline } from '@/stores/network';
 
 /**
  * The strip itself, without the connection logic: what the shell shows, and
- * what the styleguide's interaction grammar renders as the cue's sample.
+ * what the Interaction grammar story renders as the cue's sample.
  */
 export function OfflineStrip({
   children,

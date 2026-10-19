@@ -4,6 +4,7 @@
  * that scrolls sideways on its own. Tapping a product opens the bottom sheet;
  * tapping the one you traced again clears it.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
@@ -124,10 +125,7 @@ export function MapPhone(props: MapPhoneProps) {
           onChange={(v) => setTier(Number(v) as MapTier)}
           options={TIERS.map((value) => ({ value: String(value), label: `P${value}` }))}
         />
-        <h3
-          id="pi-map-phone-tier"
-          className="mt-3 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
-        >
+        <h3 id="pi-map-phone-tier" className={cx(eyebrowClassName, 'mt-3')}>
           {t('piMap.phone.tierHeading', {
             name: tierName(t, tier),
             tier,

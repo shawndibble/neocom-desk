@@ -1,16 +1,18 @@
 /**
  * Daily open prices (docs/context/decisions/20261018-121126-price-history-draws-daily-open-buy-and-sell.md):
- * for each tracked region and type, the highest buy order and the lowest sell
- * order standing at the end of a UTC day, read from EVE Ref's twice-hourly
- * market-order snapshots and stored one document per region and type in
- * `marketOpenPrices`.
+ * for each hub station and type, the highest buy order and the lowest sell
+ * order placed at that station and standing at the end of a UTC day, read
+ * from EVE Ref's twice-hourly market-order snapshots and stored one object
+ * per type, holding every hub station, at `open-prices/<typeId>.json` in R2
+ * (layout: decision 20261018-164126-open-prices-one-document-per-type-every-hub;
+ * storage moved from Firestore to R2 by 20261018-201511-moving-the-daily-snapshots-to-r2;
+ * station rather than region-wide since 20261019-004148-open-prices-at-the-hub-station-not-region).
  *
  * Pure and dependency-free (no Firestore, fetch or relative imports) so the
  * daily function and the one-off backfill script share exactly this code and
  * it runs under plain Node type stripping too.
  */
 
-export const MARKET_OPEN_PRICES_COLLECTION = 'marketOpenPrices';
 /** Days kept per document; the oldest entries drop first. */
 export const MARKET_OPEN_PRICES_MAX_DAYS = 400;
 
@@ -39,18 +41,33 @@ export interface OpenPrice {
   sell: number | null;
 }
 
+/** One station's (or, in an old object, one region's) prices in a type object, parallel to its `dates`; `null` where that side had no order that day. */
 export interface OpenPriceSeries {
-  regionId: number;
-  typeId: number;
-  /** Ascending, unique `YYYY-MM-DD`. */
-  dates: string[];
-  /** Parallel to `dates`. */
   buy: Array<number | null>;
-  /** Parallel to `dates`. */
   sell: Array<number | null>;
 }
 
-export function openPriceDocId(regionId: number, typeId: number): string {
+/** One type's object, `open-prices/<typeId>.json` in R2. */
+export interface TypeOpenPrices {
+  typeId: number;
+  /** Ascending, unique `YYYY-MM-DD`, shared by every series. */
+  dates: string[];
+  /** Keyed by hub station id; a station with no price in any kept day is absent. */
+  stations: Record<string, OpenPriceSeries>;
+  /**
+   * Transitional (#4279): the region-wide days an object written before the
+   * station change still holds, keyed by region id and null on every station
+   * day. Absent once the backfill re-run has rewritten them.
+   */
+  regions?: Record<string, OpenPriceSeries>;
+}
+
+export function openPriceDocId(typeId: number): string {
+  return String(typeId);
+}
+
+/** The fold's key for one region and type. */
+export function pairKey(regionId: number, typeId: number): string {
   return `${regionId}_${typeId}`;
 }
 
@@ -84,35 +101,74 @@ export function dayIndexUrl(date: string): string {
   return `${EVEREF_ORDERS_BASE}/${date.slice(0, 4)}/${date}/index.json`;
 }
 
+export interface DaySnapshot {
+  url: string;
+  /** EVE Ref's `file_time`, e.g. `2026-10-17T23:45:06Z`. */
+  fileTime: string;
+}
+
 /**
  * The last snapshot of `date` from that day's `index.json`: the file with the
  * greatest `file_time` on that UTC day, or `null` when the listing has none
  * (a missing day, a malformed body). Only `.csv.bz2` market-order files count.
  */
-export function pickLastSnapshotUrl(listing: unknown, date: string): string | null {
+export function pickLastSnapshot(listing: unknown, date: string): DaySnapshot | null {
   if (typeof listing !== 'object' || listing === null) return null;
   const files = (listing as { files?: unknown }).files;
   if (!Array.isArray(files)) return null;
-  let bestTime = '';
-  let bestUrl: string | null = null;
+  let best: DaySnapshot | null = null;
   for (const file of files as unknown[]) {
     if (typeof file !== 'object' || file === null) continue;
     const { file_time: time, name, url } = file as Record<string, unknown>;
     if (typeof time !== 'string' || typeof url !== 'string') continue;
     if (typeof name !== 'string' || !name.endsWith('.csv.bz2')) continue;
     if (!time.startsWith(`${date}T`)) continue;
-    if (time > bestTime) {
-      bestTime = time;
-      bestUrl = url;
-    }
+    if (!best || time > best.fileTime) best = { url, fileTime: time };
   }
-  return bestUrl;
+  return best;
+}
+
+/**
+ * EVE Ref snapshots every half hour, at :15 and :45, and lists each about five
+ * minutes later. A snapshot from the day's last half hour (23:30 onward) is
+ * the 23:45 one: the day's final.
+ */
+export function isFinalSlot(fileTime: string, date: string): boolean {
+  return fileTime >= `${date}T23:30:00Z` && fileTime.startsWith(`${date}T`);
+}
+
+export type FinalSnapshotResult =
+  | { final: true; snapshot: DaySnapshot }
+  /** Nothing listed, or only an earlier snapshot while the 23:45 one may still be coming. */
+  | { final: false; snapshot: DaySnapshot | null };
+
+/**
+ * The day's final snapshot, or why it is not known yet. The last listed
+ * snapshot is final when it sits in the day's last slot, or when the next day
+ * already has a snapshot listed: EVE Ref has moved on, so a skipped 23:45 slot
+ * is never coming and the earlier one really is the day's last. Otherwise the
+ * 23:45 snapshot may simply not be listed yet, and reading the earlier one
+ * would store a price that is not the day's last. `fetchListing` returns the
+ * parsed `index.json`, or `null` when there is none.
+ */
+export async function findFinalSnapshot(
+  date: string,
+  fetchListing: (url: string) => Promise<unknown>
+): Promise<FinalSnapshotResult> {
+  const snapshot = pickLastSnapshot(await fetchListing(dayIndexUrl(date)), date);
+  if (!snapshot) return { final: false, snapshot: null };
+  if (isFinalSlot(snapshot.fileTime, date)) return { final: true, snapshot };
+  const next = addDays(date, 1);
+  const movedOn = pickLastSnapshot(await fetchListing(dayIndexUrl(next)), next) !== null;
+  return movedOn ? { final: true, snapshot } : { final: false, snapshot };
 }
 
 /**
  * Folds order rows into the best buy and best sell per tracked region and
- * type. Region-wide on purpose: every order in the region counts, wherever it
- * sits. Rows from untracked regions and malformed rows are ignored.
+ * type: every order in the region counts, wherever it sits. Rows from
+ * untracked regions and malformed rows are ignored. Since #4279 this is only
+ * the snapshot's plausibility check (`implausibleReason`, `shrunkRegion`);
+ * the stored prices come from `StationPriceFold`.
  */
 export class OpenPriceFold {
   private readonly tracked: ReadonlySet<number>;
@@ -125,7 +181,7 @@ export class OpenPriceFold {
   add(regionId: number, typeId: number, isBuy: boolean, price: number): void {
     if (!this.tracked.has(regionId)) return;
     if (!Number.isInteger(typeId) || !Number.isFinite(price) || price <= 0) return;
-    const key = openPriceDocId(regionId, typeId);
+    const key = pairKey(regionId, typeId);
     let entry = this.prices.get(key);
     if (!entry) {
       entry = { regionId, typeId, buy: null, sell: null };
@@ -199,64 +255,238 @@ export function shrunkRegion(
   return null;
 }
 
-export interface DayPrice extends OpenPrice {
-  date: string;
+/** The five Trade Hubs, mirroring `TRADE_HUBS` in src/market/hubs.ts (`functionsParity.test.ts`). */
+export const SNAPSHOT_HUBS = [
+  { id: 'jita', stationId: 60003760, regionId: 10000002 },
+  { id: 'amarr', stationId: 60008494, regionId: 10000043 },
+  { id: 'dodixie', stationId: 60011866, regionId: 10000032 },
+  { id: 'rens', stationId: 60004588, regionId: 10000030 },
+  { id: 'hek', stationId: 60005686, regionId: 10000042 },
+] as const;
+
+export interface SnapshotHub {
+  readonly id: string;
+  readonly stationId: number;
+}
+
+/** `[buy, sell]`; a side with no order is null. */
+export type PricePair = [number | null, number | null];
+
+/** One station and type out of a `StationPriceFold`. */
+export interface StationPrice extends OpenPrice {
+  stationId: number;
+  typeId: number;
 }
 
 /**
- * Merges `days` into a series (or starts one). Idempotent: a date already
- * present is replaced in place, so re-running a day never duplicates it.
- * Dates stay ascending and unique, and only the newest
- * `MARKET_OPEN_PRICES_MAX_DAYS` are kept. Days nobody supplied get no entry
- * (no invented nulls); a `null` only means that side had no orders that day.
+ * Best buy and sell per hub station and type, fed row by row during the
+ * snapshot's single pass (decisions 20261018-233051 and 20261019-004148: the
+ * Open Prices and the mining prices both come from it). Only orders *placed
+ * at* the station count: a buy order's `range` is never read, so a
+ * region-range buy placed elsewhere is not a station buy. `typeIds` narrows
+ * the fold; without it every type is kept.
  */
-export function mergeDays(
-  base: { regionId: number; typeId: number },
-  existing: Pick<OpenPriceSeries, 'dates' | 'buy' | 'sell'> | null,
-  days: readonly DayPrice[],
-  maxDays = MARKET_OPEN_PRICES_MAX_DAYS
-): OpenPriceSeries {
-  const byDate = new Map<string, OpenPrice>();
-  if (existing) {
-    // Parallel arrays that disagree in length are trusted only up to the shortest.
-    const n = Math.min(existing.dates.length, existing.buy.length, existing.sell.length);
-    for (let i = 0; i < n; i++) {
-      byDate.set(existing.dates[i], {
-        buy: existing.buy[i] ?? null,
-        sell: existing.sell[i] ?? null,
-      });
+export class StationPriceFold {
+  private readonly stations: Set<number>;
+  private readonly types: Set<number> | null;
+  private readonly byStation = new Map<number, Map<number, PricePair>>();
+
+  constructor(hubs: readonly SnapshotHub[], typeIds?: Iterable<number>) {
+    this.stations = new Set(hubs.map((h) => h.stationId));
+    this.types = typeIds ? new Set(typeIds) : null;
+  }
+
+  add(locationId: number, typeId: number, isBuy: boolean, price: number): void {
+    if (!this.stations.has(locationId) || !Number.isInteger(typeId)) return;
+    if (this.types && !this.types.has(typeId)) return;
+    if (!Number.isFinite(price) || price <= 0) return;
+    let station = this.byStation.get(locationId);
+    if (!station) {
+      station = new Map();
+      this.byStation.set(locationId, station);
+    }
+    let pair = station.get(typeId);
+    if (!pair) {
+      pair = [null, null];
+      station.set(typeId, pair);
+    }
+    if (isBuy) {
+      if (pair[0] === null || price > pair[0]) pair[0] = price;
+    } else if (pair[1] === null || price < pair[1]) {
+      pair[1] = price;
     }
   }
-  for (const day of days) byDate.set(day.date, { buy: day.buy, sell: day.sell });
+
+  /** Station/type pairs with at least one side priced. */
+  get size(): number {
+    let n = 0;
+    for (const station of this.byStation.values()) n += station.size;
+    return n;
+  }
+
+  /** The station's prices by type id, optionally only `typeIds`; only types with at least one order. */
+  prices(stationId: number, typeIds?: ReadonlySet<number>): Record<string, PricePair> {
+    const out: Record<string, PricePair> = {};
+    for (const [typeId, pair] of this.byStation.get(stationId) ?? []) {
+      if (!typeIds || typeIds.has(typeId)) out[typeId] = [...pair];
+    }
+    return out;
+  }
+
+  *entries(): IterableIterator<StationPrice> {
+    for (const [stationId, station] of this.byStation) {
+      for (const [typeId, [buy, sell]] of station) yield { stationId, typeId, buy, sell };
+    }
+  }
+}
+
+/** One day of one type: the hub stations that had a price, the others omitted. */
+export interface TypeDay {
+  date: string;
+  stations: Record<string, OpenPrice>;
+}
+
+/** One object's worth of new days, ready for `mergeDays`. */
+export interface TypeDays {
+  typeId: number;
+  days: TypeDay[];
+}
+
+/** What `mergeDays` accepts as the stored object: either shape, or both mid-transition, or junk. */
+export type StoredTypeOpenPrices = Partial<Pick<TypeOpenPrices, 'dates' | 'stations' | 'regions'>>;
+
+function priceAt(values: unknown, i: number): number | null {
+  if (!Array.isArray(values)) return null;
+  const v: unknown = values[i];
+  return typeof v === 'number' && Number.isFinite(v) ? v : null;
+}
+
+/** The prices stored at index `i` of a `stations` or `regions` map, keyed as stored. */
+function pricesAt(stored: unknown, i: number): Map<string, OpenPrice> {
+  const out = new Map<string, OpenPrice>();
+  if (typeof stored !== 'object' || stored === null) return out;
+  for (const [id, series] of Object.entries(stored)) {
+    if (typeof series !== 'object' || series === null) continue;
+    const { buy: buys, sell: sells } = series as Record<string, unknown>;
+    const buy = priceAt(buys, i);
+    const sell = priceAt(sells, i);
+    if (buy !== null || sell !== null) out.set(id, { buy, sell });
+  }
+  return out;
+}
+
+type StoredDay = { shape: 'stations' | 'regions'; prices: Map<string, OpenPrice> };
+
+function seriesOf(
+  dates: readonly string[],
+  byDate: ReadonlyMap<string, StoredDay>,
+  shape: StoredDay['shape']
+): Record<string, OpenPriceSeries> {
+  const ids = new Set<string>();
+  for (const date of dates) {
+    const day = byDate.get(date)!;
+    if (day.shape === shape) for (const id of day.prices.keys()) ids.add(id);
+  }
+  const at = (date: string, id: string): OpenPrice | undefined => {
+    const day = byDate.get(date)!;
+    return day.shape === shape ? day.prices.get(id) : undefined;
+  };
+  const out: Record<string, OpenPriceSeries> = {};
+  for (const id of [...ids].sort()) {
+    out[id] = {
+      buy: dates.map((d) => at(d, id)?.buy ?? null),
+      sell: dates.map((d) => at(d, id)?.sell ?? null),
+    };
+  }
+  return out;
+}
+
+/**
+ * Merges `days` into a type's object (or starts one). Idempotent: a date
+ * already present is replaced whole, every station with it, so re-running a
+ * day never duplicates it. Dates stay ascending and unique, and only the
+ * newest `MARKET_OPEN_PRICES_MAX_DAYS` are kept. Days nobody supplied get no
+ * entry (no invented gaps); a `null` means that station had no order on that
+ * side that day. A stored array that falls short reads as null, and a station
+ * left with no price at all is dropped.
+ *
+ * The region-wide transition (#4279): each date holds one shape. A stored
+ * date with region prices (and no station prices) is kept as a region day
+ * under `regions`, so the daily job writing into an object the old backfill
+ * wrote loses no history; a station day for that date replaces it, so the
+ * backfill re-run rewrites every region day, and `regions` is left out once
+ * none remains (or the 400-day cap ages them out).
+ */
+export function mergeDays(
+  base: { typeId: number },
+  existing: StoredTypeOpenPrices | null,
+  days: readonly TypeDay[],
+  maxDays = MARKET_OPEN_PRICES_MAX_DAYS,
+  keepRegions = true
+): TypeOpenPrices {
+  const byDate = new Map<string, StoredDay>();
+  if (existing && Array.isArray(existing.dates)) {
+    existing.dates.forEach((date, i) => {
+      if (typeof date !== 'string') return;
+      const stations = pricesAt(existing.stations, i);
+      if (stations.size > 0) {
+        byDate.set(date, { shape: 'stations', prices: stations });
+        return;
+      }
+      const regions = keepRegions ? pricesAt(existing.regions, i) : new Map<string, OpenPrice>();
+      if (regions.size > 0) byDate.set(date, { shape: 'regions', prices: regions });
+    });
+  }
+  for (const day of days) {
+    byDate.set(day.date, { shape: 'stations', prices: new Map(Object.entries(day.stations)) });
+  }
   const dates = [...byDate.keys()].sort().slice(-maxDays);
-  return {
-    regionId: base.regionId,
+  const out: TypeOpenPrices = {
     typeId: base.typeId,
     dates,
-    buy: dates.map((d) => byDate.get(d)!.buy),
-    sell: dates.map((d) => byDate.get(d)!.sell),
+    stations: seriesOf(dates, byDate, 'stations'),
   };
+  const regions = seriesOf(dates, byDate, 'regions');
+  if (Object.keys(regions).length > 0) out.regions = regions;
+  return out;
 }
 
-/** One document's worth of new days, ready for `mergeDays`. */
-export interface KeyedDays {
-  regionId: number;
-  typeId: number;
-  days: DayPrice[];
+/**
+ * `mergeDays` for the backfill re-run: every stored region-wide day is
+ * dropped, inside the run's dates or not, so each object it writes leaves in
+ * the station shape. A day with no order at the station has no point, rather
+ * than keeping a region-wide one. An object for a type with no station price
+ * in the whole run is not written and keeps its region days; the client stops
+ * reading those once the old-shape read is removed.
+ */
+export function rewriteDays(
+  base: { typeId: number },
+  existing: StoredTypeOpenPrices | null,
+  days: readonly TypeDay[]
+): TypeOpenPrices {
+  return mergeDays(base, existing, days, MARKET_OPEN_PRICES_MAX_DAYS, false);
 }
 
-/** Regroups per-day folds by document, days ascending. Folds may be passed in any order. */
-export function groupByDocument(folds: ReadonlyMap<string, OpenPriceFold>): KeyedDays[] {
-  const groups = new Map<string, KeyedDays>();
+/** Regroups per-day station folds by type object, days ascending. Folds may be passed in any order. */
+export function groupByDocument(
+  folds: ReadonlyMap<string, { entries(): Iterable<StationPrice> }>
+): TypeDays[] {
+  const groups = new Map<number, TypeDays>();
   for (const date of [...folds.keys()].sort()) {
+    const today = new Map<number, TypeDay>();
     for (const e of folds.get(date)!.entries()) {
-      const key = openPriceDocId(e.regionId, e.typeId);
-      let group = groups.get(key);
-      if (!group) {
-        group = { regionId: e.regionId, typeId: e.typeId, days: [] };
-        groups.set(key, group);
+      let day = today.get(e.typeId);
+      if (!day) {
+        day = { date, stations: {} };
+        today.set(e.typeId, day);
+        let group = groups.get(e.typeId);
+        if (!group) {
+          group = { typeId: e.typeId, days: [] };
+          groups.set(e.typeId, group);
+        }
+        group.days.push(day);
       }
-      group.days.push({ date, buy: e.buy, sell: e.sell });
+      day.stations[String(e.stationId)] = { buy: e.buy, sell: e.sell };
     }
   }
   return [...groups.values()];

@@ -1,10 +1,9 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { lazy, Suspense, useMemo, useState } from 'react';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { guarded } from '@/app/routeChunks';
 import { useTranslation } from 'react-i18next';
-import { useLiveQuery } from 'dexie-react-hooks';
 import {
-  db,
   type BuildPlanRecord,
   type ProductionLossRecord,
   type ProductionOrderWatchRecord,
@@ -36,7 +35,10 @@ import {
   filterProductionRunsByDate,
   type ProductionLogFilter,
 } from './productionLogFilter';
-import { productionProfitHistory, productionProfitTrend } from './productionProfitHistory';
+import {
+  productionProfitHistory,
+  productionProfitTrend,
+} from '@/engine/industry/productionProfitHistory';
 import { summarizeProductionRun, type ProductionRunSummary } from './productionRunSummary';
 import { productionLogItemsCsvColumns, productionLogRunsCsvColumns } from './productionRunsCsv';
 import { TableActionsMenu } from '@/components/ui/TableExport';
@@ -54,6 +56,7 @@ import { SaleLinkingModals } from './SaleLinkingControls';
 import { RunLossModals } from './RunLossModals';
 import { useRunLoss } from './useRunLoss';
 import { useSaleLinking } from './useSaleLinking';
+import { useProductionLedger } from './useProductionLedger';
 import { iskToneClass } from '@/features/character/format';
 import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
 import { formatIsk } from '@/lib/isk';
@@ -95,12 +98,6 @@ interface ItemRow {
   unsoldCost: number;
 }
 
-// Stable empty fallbacks for `useLiveQuery(...) ?? []`: a fresh `[]` literal
-// on every render defeats `useMemo`'s dependency check below during the one
-// or two renders before the live query first resolves — these are read-only
-// and module-level, so they never change identity.
-const NO_RUNS: ProductionRunRecord[] = [];
-
 /** The date range in the URL (ADR 0015); both ends open by default. */
 const DATE_RANGE_PARAMS = { 'records.from': isoDateParam(), 'records.to': isoDateParam() };
 /** Both tables start unsorted, in the order the rollup builds them. */
@@ -110,9 +107,6 @@ const TABLE_SORT = optionalSortParam();
 function knownSort(sort: UrlSort | null, columns: readonly { id: string }[]): UrlSort | null {
   return sort !== null && columns.some((column) => column.id === sort.columnId) ? sort : null;
 }
-const NO_SALE_LINKS: ProductionSaleLinkRecord[] = [];
-const NO_LOSSES: ProductionLossRecord[] = [];
-const NO_ORDER_WATCHES: ProductionOrderWatchRecord[] = [];
 
 /** Every row this run's own id backs, grouped once instead of `.filter()`-ed once per run. */
 function groupByRunId<T extends { runId: string }>(rows: readonly T[]): Map<string, T[]> {
@@ -331,26 +325,7 @@ export function ProductionLogPanel({
   // says what is making money, the run list is the audit trail behind it.
   const [runsExpanded, setRunsExpanded] = useState(false);
 
-  const runs =
-    useLiveQuery(
-      () => db.productionRuns.where('characterId').equals(characterId).toArray(),
-      [characterId]
-    ) ?? NO_RUNS;
-  const saleLinks =
-    useLiveQuery(
-      () => db.productionSaleLinks.where('characterId').equals(characterId).toArray(),
-      [characterId]
-    ) ?? NO_SALE_LINKS;
-  const orderWatches =
-    useLiveQuery(
-      () => db.productionOrderWatches.where('characterId').equals(characterId).toArray(),
-      [characterId]
-    ) ?? NO_ORDER_WATCHES;
-  const losses =
-    useLiveQuery(
-      () => db.productionLosses.where('characterId').equals(characterId).toArray(),
-      [characterId]
-    ) ?? NO_LOSSES;
+  const { runs, saleLinks, orderWatches, losses } = useProductionLedger(characterId);
 
   const sale = useSaleLinking(characterId, saleLinks, orderWatches);
   const runLoss = useRunLoss(characterId, losses);
@@ -559,7 +534,7 @@ export function ProductionLogPanel({
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[20rem_minmax(0,1fr)] lg:items-start">
         <div className="space-y-2">
           <div className="flex flex-col gap-1 rounded-xs border border-line bg-panel-2 px-3 py-2">
-            <span className="flex items-center gap-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+            <span className={cx(eyebrowClassName, 'flex items-center gap-1')}>
               {t('industry.totalRealizedProfit')}
               <InfoTooltip
                 label={t('industry.totalRealizedProfitTooltipLabel')}
@@ -630,9 +605,7 @@ export function ProductionLogPanel({
           <div className="mt-4 min-w-0 space-y-4">
             <div>
               <div className="flex items-center justify-between gap-2 border-b border-line pb-1">
-                <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                  {t('industry.byItem')}
-                </h3>
+                <h3 className={eyebrowClassName}>{t('industry.byItem')}</h3>
                 <TableActionsMenu name={t('industry.byItem')} tableExport={itemsExport} />
               </div>
               <DataTable

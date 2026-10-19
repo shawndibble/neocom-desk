@@ -19,7 +19,7 @@ import {
   type SharedFittingKey,
 } from '@/engine/communities/sharedFittings';
 import type { CommunitySummary } from '@/features/communities/communityStore';
-import { decodeFittingShare, encodeFittingShare } from '@/engine/fitting/fittingShare';
+import { decodeFittingShare, encodeFittingShare } from '@/engine/fittings/fittingShare';
 import { esiFittingToFitting } from '@/engine/fittings/esiFittingMapper';
 import { fittingToShareInput, shareToFitting } from '@/engine/fittings/shareMapper';
 import type { Fitting } from '@/engine/fittings/types';
@@ -28,9 +28,9 @@ import { exportFitting } from './fittingExportText';
 import { fittingCompareHref } from './fittingRoutes';
 import { saveFitting } from './myFittings';
 import { useOnline } from '@/stores/network';
-import { SaveToEveDialog } from './SaveToEveDialog';
 import type { LibraryRow } from './useLibraryFittings';
 import { useTimedToast, NOTICE_MS } from '@/components/ui/useTimedToast';
+import { LazySaveToEveDialog } from './LazySaveToEveDialog';
 
 /** The row's Fitting and its Fitting Share Code (null when too large for one); null when a saved code no longer decodes. */
 async function rowFitting(
@@ -251,7 +251,7 @@ export function useLibraryRowActions({
 
   const dialog =
     saving !== null && characterId !== null ? (
-      <SaveToEveDialog
+      <LazySaveToEveDialog
         open
         onClose={() => setSaving(null)}
         characterId={characterId}

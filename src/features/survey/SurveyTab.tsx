@@ -53,6 +53,7 @@ import {
   type SurveyTaxShare,
 } from './surveyStore';
 import { useSurvey } from './useSurvey';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 interface SurveyTabProps {
   /** The route's shared tab bar, rendered under this tab's own `PageHeader`. See `MoonMiningTax`. */
@@ -71,11 +72,7 @@ export function SurveyTab({ tabBar, tabsId }: SurveyTabProps) {
   const characterId = useActiveCharacter((state) => state.activeCharacterId);
   const currentId = useCurrentSurveyId((state) => state.value);
   const setCurrentId = useCurrentSurveyId((state) => state.setValue);
-  const hydrated = useCurrentSurveyId((state) => state.hydrated);
-  const hydrate = useCurrentSurveyId((state) => state.hydrate);
-  useEffect(() => {
-    void hydrate();
-  }, [hydrate]);
+  const hydrated = useHydratedStore(useCurrentSurveyId);
 
   // `?survey=<id>` (from a shared page's "Open Neocom Desk") adopts that survey.
   const adopt = new URLSearchParams(location.search).get('survey');
@@ -89,10 +86,7 @@ export function SurveyTab({ tabBar, tabsId }: SurveyTabProps) {
 
   // The template picked on the empty page, filled into the survey the first scan starts.
   const templates = useSurveyTemplates((s) => s.value);
-  const hydrateTemplates = useSurveyTemplates((s) => s.hydrate);
-  useEffect(() => {
-    void hydrateTemplates();
-  }, [hydrateTemplates]);
+  useHydratedStore(useSurveyTemplates);
   const [startTemplateId, setStartTemplateId] = useState<string | null>(null);
   const startTemplate = templates.find((template) => template.id === startTemplateId);
 

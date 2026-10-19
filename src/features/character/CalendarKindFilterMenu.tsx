@@ -25,6 +25,8 @@
  * That is deliberate: the hues are picked *here*, so the place they are picked
  * is the place to learn them.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { cx } from '@/lib/cx';
 import { useTranslation } from 'react-i18next';
 import {
   DropdownMenu,
@@ -113,9 +115,7 @@ export function CalendarKindFilterMenu({
         />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-56">
-        <p className="px-2 py-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-          {t('calendar.filter.title')}
-        </p>
+        <p className={cx(eyebrowClassName, 'px-2 py-1.5')}>{t('calendar.filter.title')}</p>
         {CHARACTER_BOARD_ITEM_KINDS.filter(
           // A source the Character was never allowed to ask about gets no row,
           // rather than an "Unavailable" hinting at corp access they lack.
@@ -143,9 +143,7 @@ export function CalendarKindFilterMenu({
           </DropdownMenuCheckboxItem>
         ))}
         <DropdownMenuSeparator />
-        <p className="px-2 py-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-          {t('calendar.skillPlan.title')}
-        </p>
+        <p className={cx(eyebrowClassName, 'px-2 py-1.5')}>{t('calendar.skillPlan.title')}</p>
         {skillPlanChoices.length === 0 ? (
           <p className="px-2 py-1.5 text-xs text-text-dim">{t('calendar.skillPlan.none')}</p>
         ) : (

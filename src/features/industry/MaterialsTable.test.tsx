@@ -21,7 +21,7 @@ import type { MakeOrBuy } from '@/engine/industry/makeOrBuy';
 import { FACILITY_PRESETS } from '@/engine/industry/types';
 import type { SkillGateVerdict } from '@/engine/industry/skillGate';
 import { resolveMaterial } from '@/engine/industry/materialResolution';
-import { applySourcingPatch } from './sourcingEdits';
+import { applySourcingPatch } from '@/engine/industry/sourcingEdits';
 import { MaterialsTable, type MaterialsTableHandle } from './MaterialsTable';
 import type { GroupStockClaims } from '@/engine/industry/groupStockClaims';
 import { PHONE_QUERY } from '@/lib/useIsPhone';

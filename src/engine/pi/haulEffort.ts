@@ -16,12 +16,13 @@
 
 import type { PiData } from '@/sde/types';
 import type { FlowEnd, HaulEffort, JumpsFn } from './goalTypes';
+import { rawById } from './rawIndex';
 
 /** m3 of one unit of a planetary commodity. */
 export function volumeOf(typeId: number, pi: PiData): number {
   const schematic = pi.schematics[String(typeId)];
   if (schematic) return schematic.volume;
-  const raw = pi.raw.find((r) => r.typeID === typeId);
+  const raw = rawById(pi).get(typeId);
   if (!raw) throw new Error(`${typeId} is not a planetary commodity`);
   return raw.volume;
 }

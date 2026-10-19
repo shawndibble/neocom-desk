@@ -22,6 +22,7 @@
  * Mutated module (`itemId`), else nothing. On a Mutated module the attributes
  * are its own, from ESI's dynamic item.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { cx } from '@/lib/cx';
 import {
   fieldBaseClassName,
@@ -465,7 +466,7 @@ export function ItemDetailModal({
               ) : (
                 attributeGroups.map((group) => (
                   <div key={group.category}>
-                    <h3 className="border-b border-line pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                    <h3 className={cx(eyebrowClassName, 'border-b border-line pb-1')}>
                       {group.category}
                     </h3>
                     <dl className="mt-1 grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 text-xs">
@@ -806,7 +807,7 @@ function PlanetaryProduction({ pi, typeId }: { pi: PiData | null; typeId: number
   if (!schematic && !raw) return null;
   return (
     <div>
-      <h3 className="border-b border-line pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+      <h3 className={cx(eyebrowClassName, 'border-b border-line pb-1')}>
         {t('market.itemDetail.planetaryTitle')}
       </h3>
       {schematic ? (

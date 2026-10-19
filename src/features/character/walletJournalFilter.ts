@@ -72,11 +72,6 @@ export function filterWalletJournal<T extends WalletJournalEntry>(
   });
 }
 
-/** Net ISK across a set of journal entries — a missing `amount` (a partial fetch) counts as zero. Lines between the pilot's own Characters net to nothing and are left out. */
-export function journalNetTotal(entries: readonly JournalRow[]): number {
-  return entries.reduce((total, entry) => total + (entry.internal ? 0 : (entry.amount ?? 0)), 0);
-}
-
 export interface RefTypeBreakdownRow {
   refType: string;
   /** Sum of the positive amounts. */

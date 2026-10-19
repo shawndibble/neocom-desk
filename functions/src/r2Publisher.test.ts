@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   publishContractOffersToR2,
+  r2PublishOutcome,
+  publicContractsRunVerdict,
   PROGRESS_FLUSH_EVERY,
   REFRESH_AFTER_MS,
   type R2Put,
@@ -281,5 +283,78 @@ describe('publishContractOffersToR2 time budget', () => {
       },
     });
     expect(flushed).toEqual([PROGRESS_FLUSH_EVERY]);
+  });
+});
+
+describe('r2PublishOutcome', () => {
+  it('is complete once the index is written', () => {
+    expect(
+      r2PublishOutcome({ failed: 0, remaining: 0, indexWritten: true, firstError: null })
+    ).toEqual({ kind: 'complete' });
+  });
+
+  it('fails when an object upload failed, naming the first error', () => {
+    expect(
+      r2PublishOutcome({ failed: 2, remaining: 0, indexWritten: false, firstError: 'boom' })
+    ).toEqual({ kind: 'failed', error: '2 objects failed; first error: boom' });
+  });
+
+  it('fails when only the index write failed', () => {
+    expect(
+      r2PublishOutcome({ failed: 0, remaining: 0, indexWritten: false, firstError: 'denied' })
+    ).toEqual({
+      kind: 'failed',
+      error: 'index not written; first error: denied',
+    });
+  });
+
+  it('is resumable, not failed, when the time budget ran out', () => {
+    expect(
+      r2PublishOutcome({ failed: 0, remaining: 40, indexWritten: false, firstError: null })
+    ).toEqual({ kind: 'resumable', remaining: 40 });
+  });
+
+  it('reads a courier result, which has no per-object counts', () => {
+    expect(r2PublishOutcome({ indexWritten: true, firstError: null })).toEqual({
+      kind: 'complete',
+    });
+    expect(r2PublishOutcome({ indexWritten: false, firstError: 'boom' })).toEqual({
+      kind: 'failed',
+      error: 'index not written; first error: boom',
+    });
+  });
+});
+
+describe('publicContractsRunVerdict', () => {
+  const complete = { kind: 'complete' } as const;
+
+  it('stores the fingerprint only when both snapshots published completely', () => {
+    expect(publicContractsRunVerdict(complete, complete)).toEqual({
+      error: null,
+      storeFingerprint: true,
+    });
+  });
+
+  it('fails the run naming every failed snapshot, and stores no fingerprint', () => {
+    expect(
+      publicContractsRunVerdict({ kind: 'failed', error: 'a' }, { kind: 'failed', error: 'b' })
+    ).toEqual({
+      error: 'Public contracts R2 publish failed — courier: a; offers: b',
+      storeFingerprint: false,
+    });
+  });
+
+  it('fails the run when only one snapshot failed', () => {
+    expect(publicContractsRunVerdict(complete, { kind: 'failed', error: 'b' })).toEqual({
+      error: 'Public contracts R2 publish failed — offers: b',
+      storeFingerprint: false,
+    });
+  });
+
+  it('does not fail a budget-cut run, but leaves the fingerprint for the next run to resume', () => {
+    expect(publicContractsRunVerdict(complete, { kind: 'resumable', remaining: 9 })).toEqual({
+      error: null,
+      storeFingerprint: false,
+    });
   });
 });

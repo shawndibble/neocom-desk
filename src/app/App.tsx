@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, type ReactElement } from 'react';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { industryTabHref } from '@/features/industry/industryTabs';
 import { withSentryReactRouterV7Routing } from '@sentry/react';
@@ -39,15 +40,14 @@ import { ScopeGate } from './ScopeGate';
 import { TabRoute } from './TabRoute';
 import { PAGE_LEGACY_LOCATIONS, PAGE_TABS, routePatternFor } from './pageTabs';
 import { AuthFailureRedirect } from './AuthFailureNotice';
-import { LegacyShipsRedirect } from '@/features/fittings/LegacyShipsRedirect';
 import { LegacyPathRedirect } from './LegacyPathRedirect';
 import { AlertsRedirect } from './AlertsRedirect';
 import { useHiddenNav, useNavSetupAnswered, useRecentNav } from './navPreferences';
-import { PublicInfoModal } from '@/components/PublicInfoModal';
+import { usePublicInfoModalStore } from '@/stores/publicInfoModal';
 import { EntityInfoRoute } from '@/features/entities';
 import { ItemInfoModal } from '@/features/entities/ItemInfoModal';
 import { PlaceInfoModal } from '@/features/entities/PlaceInfoModal';
-import { SkillDetailModal } from '@/components/SkillDetailModal';
+import { useSkillDetailModalStore } from '@/stores/skillDetailModal';
 import { getAccessTokenReportingFailures } from './tokenProvider';
 import type { AppRoutePath } from './routeScopes';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -64,6 +64,41 @@ configureActiveCharacter(() => useActiveCharacter.getState().activeCharacterId);
 
 // Code-split routes (`routeChunks.ts`). Login, Callback and NotFound stay
 // eager above: a signed-out cold load can land on them before any choice.
+// Info modals load on first open (each renders nothing without a request), so
+// their tabs, skill plan and price code stay out of the boot chunk.
+const LazyPublicInfoModal = lazy(() =>
+  routeChunks
+    .guarded(() => import('@/components/PublicInfoModal'))
+    .then((m) => ({
+      default: m.PublicInfoModal,
+    }))
+);
+const LazySkillDetailModal = lazy(() =>
+  routeChunks
+    .guarded(() => import('@/components/SkillDetailModal'))
+    .then((m) => ({
+      default: m.SkillDetailModal,
+    }))
+);
+
+function PublicInfoModal() {
+  const open = usePublicInfoModalStore((state) => state.request !== null);
+  return open ? (
+    <Suspense fallback={null}>
+      <LazyPublicInfoModal />
+    </Suspense>
+  ) : null;
+}
+
+function SkillDetailModal() {
+  const open = useSkillDetailModalStore((state) => state.request !== null);
+  return open ? (
+    <Suspense fallback={null}>
+      <LazySkillDetailModal />
+    </Suspense>
+  ) : null;
+}
+
 // The signed-in shell is split so a first visit to /login skips it, and
 // preloaded at boot for a returning user (`bootShellPreload.ts`) —
 // `preloadedLazy` then renders it with no fallback frame once it is in.
@@ -82,6 +117,7 @@ const FittingCompare = lazy(routeChunks.loadFittingCompare);
 const Corp = lazy(routeChunks.loadCorp);
 const CorpMembers = lazy(routeChunks.loadCorpMembers);
 const CorpAssets = lazy(routeChunks.loadCorpAssets);
+const CorpMoons = lazy(routeChunks.loadCorpMoons);
 const CorpWallet = lazy(routeChunks.loadCorpWallet);
 const Market = lazy(routeChunks.loadMarket);
 const Wallet = lazy(routeChunks.loadWallet);
@@ -100,14 +136,14 @@ const Travel = lazy(routeChunks.loadTravel);
 const EmploymentHistory = lazy(routeChunks.loadEmploymentHistory);
 const Settings = lazy(routeChunks.loadSettings);
 const Help = lazy(routeChunks.loadHelp);
-const Styleguide = lazy(routeChunks.loadStyleguide);
 const FittingShared = lazy(routeChunks.loadFittingShared);
 const SharedLink = lazy(routeChunks.loadSharedLink);
+const CorpTaxBookVerify = lazy(routeChunks.loadCorpTaxBookVerify);
 const ErrorProbe = lazy(routeChunks.loadErrorProbe);
 
 /**
- * Suspense fallback for the lazy routes outside `Layout` (`/styleguide`,
- * `/share/fitting`, `/share/:shareId`, `/error`). Feature routes suspend inside `Layout`'s own
+ * Suspense fallback for the lazy routes outside `Layout` (`/share/fitting`,
+ * `/share/:shareId`, `/error`). Feature routes suspend inside `Layout`'s own
  * boundary instead, so the shell stays up. Not `BootScreen`: that one reports
  * a boot stall after ten seconds, and a slow chunk is not a stalled boot.
  */
@@ -169,8 +205,6 @@ const ROUTE_ELEMENTS = {
   // Retired page: Compare is a drawer over Trained now (`legacyPaths.ts`).
   '/skills/compare': <LegacyPathRedirect />,
   '/skills/certificates': <SkillCertificates />,
-  // The old Skills › Ships page is gone; old bookmarks land on the Ship Tree.
-  '/skills/ships': <LegacyShipsRedirect />,
   '/industry': <Industry />,
   '/industry/plans/:planId': <IndustryPlanPage />,
   '/industry/groups/:groupId': <IndustryGroupPage />,
@@ -178,9 +212,6 @@ const ROUTE_ELEMENTS = {
   // the Ship Tree are all this one route.
   '/ships': <Ships />,
   '/ships/fittings/compare': <FittingCompare />,
-  // The section was `/fittings` before it became Ships. Every Fitting Share Code ever
-  // copied is `/fittings?f=`, so these redirects are for good.
-  '/fittings/*': <LegacyShipsRedirect />,
   '/market': <Market />,
   '/wallet': <Wallet />,
   // LP Store is a Wallet tab (it was a Market tab before; `PAGE_LEGACY_LOCATIONS`
@@ -200,6 +231,7 @@ const ROUTE_ELEMENTS = {
   '/corp/members': <CorpMembers />,
   '/corp/wallet': <CorpWallet />,
   '/corp/assets': <CorpAssets />,
+  '/corp/moons': <CorpMoons />,
   '/corp/assets/*': <CorpAssets />,
   '/assets': <Assets />,
   '/mail': <Mail />,
@@ -246,7 +278,14 @@ function Root() {
   return <Navigate to={activeCharacterId === null ? '/characters' : '/overview'} replace />;
 }
 
-export function App() {
+const NO_CHARACTER_IDS: number[] = [];
+
+/**
+ * Boot wiring and the Dexie/store subscriptions that go with it. Its own
+ * component, rendering nothing, so a character change re-renders only this and
+ * not the `<BrowserRouter>` tree (and its route table) below.
+ */
+function AppEffects() {
   const hydrate = useActiveCharacter((state) => state.hydrate);
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   useEffect(() => {
@@ -256,10 +295,7 @@ export function App() {
   // Applies the stored text-scale to <html> as early as possible, regardless
   // of which route the user lands on — it is not something visiting /settings
   // should be required for.
-  const hydrateFontScale = useFontScale((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateFontScale();
-  }, [hydrateFontScale]);
+  useHydratedStore(useFontScale);
 
   // Same reasoning, one level up from any single view: the Time format
   // preference is read by `DataAgeBadge` — which rides on nearly every
@@ -269,29 +305,16 @@ export function App() {
   // would be that many copies of this effect racing for the same Dexie row,
   // and each would still paint its first frame on the default before the
   // read landed. Once here, before any route mounts, covers them all.
-  const hydrateTimeFormat = useTimeFormat((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateTimeFormat();
-  }, [hydrateTimeFormat]);
+  useHydratedStore(useTimeFormat);
 
   // And the phone's chosen bottom tabs, for the same reason one level lower:
   // `Layout` is the only reader, but it renders on every route, so hydrating
   // it there would still paint the default bar first on a cold load. Here it
   // is read once, before the shell mounts.
-  const hydrateMobileTabs = useMobileTabs((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateMobileTabs();
-  }, [hydrateMobileTabs]);
+  useHydratedStore(useMobileTabs);
 
   // The rail's and More sheet's hidden pages and Recent row: same reason.
-  const hydrateHiddenNav = useHiddenNav((state) => state.hydrate);
-  const hydrateRecentNav = useRecentNav((state) => state.hydrate);
-  const hydrateNavSetup = useNavSetupAnswered((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateHiddenNav();
-    void hydrateRecentNav();
-    void hydrateNavSetup();
-  }, [hydrateHiddenNav, hydrateRecentNav, hydrateNavSetup]);
+  useHydratedStore(useHiddenNav, useRecentNav, useNavSetupAnswered);
 
   // `esi` publishes auth failures; the store is subscribed here so `esi` keeps
   // no dependency on `src/stores` (docs/ARCHITECTURE.md §2).
@@ -320,7 +343,10 @@ export function App() {
   // The above covers the active Character at boot. This covers the rest of
   // them, and covers a tab that has been open long enough for another device
   // to have changed something — see backgroundSync.ts.
-  const characterIds = useLiveQuery(() => db.characters.toCollection().primaryKeys(), [], []);
+  // One query serves the three consumers and the shell hint below. No default:
+  // `undefined` is "not read yet", which must not clear the hint.
+  const readIds = useLiveQuery(() => db.characters.toCollection().primaryKeys());
+  const characterIds = readIds ?? NO_CHARACTER_IDS;
   useBackgroundSync(characterIds, activeCharacterId);
   // Keeps what Characters share with their Communities current (issue #3600).
   usePublishSharedLibraries(characterIds, activeCharacterId);
@@ -328,9 +354,8 @@ export function App() {
   useSyncRequestDeliveries(characterIds, activeCharacterId);
 
   // Keeps `bootShellPreload.ts`'s hint in step with Dexie, so the next cold
-  // load knows to fetch the signed-in shell early. No default on the query:
-  // `undefined` is "not read yet", which must not clear the hint.
-  const characterCount = useLiveQuery(() => db.characters.count());
+  // load knows to fetch the signed-in shell early.
+  const characterCount = readIds?.length;
   useEffect(() => {
     if (characterCount !== undefined) writeSignedInShellHint(characterCount > 0);
   }, [characterCount]);
@@ -346,8 +371,13 @@ export function App() {
     return scheduleBootPrefetch(activeCharacterId);
   }, [activeCharacterId]);
 
+  return null;
+}
+
+export function App() {
   return (
     <ErrorBoundary>
+      <AppEffects />
       <BrowserRouter basename={ROUTER_BASENAME}>
         <AuthFailureRedirect />
         <AnalyticsPageViewTracker />
@@ -386,10 +416,9 @@ export function App() {
                 })}
               </Route>
             </Route>
-            <Route path="/styleguide" element={<Styleguide />} />
             {/* A Fitting Share Code opened with no session (#1544) — it must
               open with no Character, so it sits outside
-              RequireCharacter/ScopeGate the same way /styleguide does. A
+              RequireCharacter/ScopeGate. A
               visitor with a Character never sees it: FittingShared redirects
               straight into the editor instead. routeScopes.test.ts asserts
               this exemption is deliberate. */}
@@ -402,6 +431,8 @@ export function App() {
             {/* The invite link: a signed-out visitor sees what it is for before logging in. */}
             <Route path="/communities/join/:code" element={<CommunityJoin />} />
             <Route path="/share/:shareId" element={<SharedLink />} />
+            {/* A Statement's verify link (#4066): read-only, no login, the token is the credential. */}
+            <Route path="/corp-tax-book/verify/:token" element={<CorpTaxBookVerify />} />
             {/* Undisclosed Sentry probe — see routes/ErrorProbe.tsx. */}
             <Route path="/error" element={<ErrorProbe />} />
             <Route path="*" element={<NotFound />} />

@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { SETTINGS_TABS } from '@/app/pageTabs';
@@ -88,10 +89,7 @@ export function SettingsIndex({ groups, summaries }: SettingsIndexProps) {
     <nav aria-label={t('settings.navLabel')} className="space-y-4">
       {groups.map((group) => (
         <section key={group.id} aria-labelledby={`settings-index-${group.id}`}>
-          <h2
-            id={`settings-index-${group.id}`}
-            className="px-1 pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
-          >
+          <h2 id={`settings-index-${group.id}`} className={cx(eyebrowClassName, 'px-1 pb-1')}>
             {t(group.labelKey)}
           </h2>
           <ul className="divide-y divide-line border border-line bg-panel">

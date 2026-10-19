@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { PlanEntry } from '@/engine/types';
@@ -52,9 +53,7 @@ export function SkillRequirementsList({
   return (
     <div className={`space-y-3 ${className}`}>
       <section>
-        <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-          {t('skills.inspector.prereqsTitle')}
-        </h3>
+        <h3 className={eyebrowClassName}>{t('skills.inspector.prereqsTitle')}</h3>
         {prereqs.length === 0 ? (
           <p className="mt-1 text-xs text-text-dim">{t('skills.inspector.noPrereqs')}</p>
         ) : (
@@ -91,9 +90,7 @@ export function SkillRequirementsList({
       </section>
 
       <section>
-        <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-          {t('skills.inspector.unlocksTitle')}
-        </h3>
+        <h3 className={eyebrowClassName}>{t('skills.inspector.unlocksTitle')}</h3>
         {unlocks.length === 0 ? (
           <p className="mt-1 text-xs text-text-dim">{t('skills.inspector.noUnlocks')}</p>
         ) : (

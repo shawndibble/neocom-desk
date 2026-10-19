@@ -97,6 +97,7 @@ export const PRUNE_RULES: readonly PruneRule[] = [
     'public-alliance-corporations',
     'public-employment',
     'station',
+    'moon',
     'universeType',
     'type-volume',
     'corp-name',
@@ -143,6 +144,8 @@ export const PRUNE_RULES: readonly PruneRule[] = [
   { pattern: /^marketPrice:/, maxAgeMs: MARKET_RETENTION_MS },
   { pattern: /^market-history:\d+:\d+$/, maxAgeMs: MARKET_RETENTION_MS },
   { pattern: /^structure-market:\d+$/, maxAgeMs: MARKET_RETENTION_MS },
+  // No longer written (hub mining prices read from R2 since #4277); kept so
+  // rows a browser already holds still age out.
   { pattern: /^marketHistory:/, maxAgeMs: MARKET_RETENTION_MS },
 ];
 

@@ -32,7 +32,7 @@ import type { CurrentSystemState } from '@/features/route/currentSystem';
 import { CurrentSystemPicker, JumpRangeSelect } from '@/features/route/JumpRangeControls';
 import { useSystemName } from '@/features/route/useSolarSystems';
 import { useIsPhone } from '@/lib/useIsPhone';
-import type { BrowserFilterValue } from './useOrderBookOrchestration';
+import type { BrowserFilterValue } from './useBrowserFilters';
 
 /** A Min quantity box's text as a count; blank or junk is no minimum. */
 function parseMinQuantity(raw: string): number {

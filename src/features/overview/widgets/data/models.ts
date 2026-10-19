@@ -29,9 +29,8 @@ import { formatCompactNumber } from '@/lib/compactNumber';
 import { formatCountdown, formatDuration } from '@/lib/duration';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
 import { DAY_MS } from '@/lib/age';
-import { sortQueueEntries, selectActiveEntryFromSorted } from '@/routes/overviewQueue';
+import { sortQueueEntries, selectActiveEntryFromSorted } from '@/features/overview/overviewQueue';
 import { dailyWalletFromJournal } from '@/engine/netWorth/series';
-import { getKind } from '../kinds';
 import {
   comingUpEventSeverity,
   comingUpSeverity,
@@ -41,7 +40,7 @@ import {
   ordersSeverity,
   priceAlertsSeverity,
   spExtractionSeverity,
-} from '../../boardSeverity';
+} from '../../data/boardSeverity';
 import {
   comingUpSummary,
   contractsDeadlineNote,
@@ -52,8 +51,8 @@ import {
   priceAlertsSummary,
   spExtractionSummary,
   stockBoardSummary,
-} from '../../boardSummary';
-import type { MailBoardData, MiningTaxBoardData, PriceAlertsBoardData } from '../../boardData';
+} from '../../data/boardSummary';
+import type { MailBoardData, MiningTaxBoardData, PriceAlertsBoardData } from '../../data/boardData';
 import {
   blank,
   count,
@@ -821,9 +820,4 @@ function zeroIsClear(view: KindView): KindView {
   const { number } = view;
   if (number.value !== '0' || number.tone === 'clear') return view;
   return { ...view, number: { ...number, tone: 'clear' } };
-}
-
-/** Whether `kind` is in the catalogue at all (a kind from a newer build is not). */
-export function isKnownKindId(kind: string): boolean {
-  return getKind(kind) !== undefined;
 }

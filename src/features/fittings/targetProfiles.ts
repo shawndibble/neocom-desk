@@ -4,7 +4,7 @@
  * same reason, as `damageProfiles.ts`. The selection is global, not per
  * Fitting, and stays out of the `?f=` Fitting Share Code.
  */
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   CUSTOM_TARGET_PROFILE_ID_PREFIX,
@@ -17,6 +17,7 @@ import {
   type NamedTargetProfile,
 } from '@/engine/fittings/targetProfile';
 import { createSyncedSetting } from '@/lib/useSyncedSetting';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 export const SYNCED_CUSTOM_TARGET_PROFILES_KEY = 'sync.fittingTargetProfiles';
 export const SYNCED_SELECTED_TARGET_PROFILE_KEY = 'sync.fittingTargetProfileId';
@@ -60,15 +61,10 @@ export interface TargetProfiles {
 export function useTargetProfiles(): TargetProfiles {
   const custom = useCustomTargetProfiles((s) => s.value);
   const setCustom = useCustomTargetProfiles((s) => s.setValue);
-  const hydrateCustom = useCustomTargetProfiles((s) => s.hydrate);
   const selectedId = useSelectedTargetProfileId((s) => s.value);
   const select = useSelectedTargetProfileId((s) => s.setValue);
-  const hydrateSelected = useSelectedTargetProfileId((s) => s.hydrate);
 
-  useEffect(() => {
-    void hydrateCustom();
-    void hydrateSelected();
-  }, [hydrateCustom, hydrateSelected]);
+  useHydratedStore(useCustomTargetProfiles, useSelectedTargetProfileId);
 
   const selected = useMemo(() => resolveTargetProfile(selectedId, custom), [selectedId, custom]);
 

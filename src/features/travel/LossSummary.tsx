@@ -5,6 +5,7 @@
  * loss-row expansion.
  */
 import { useEffect, useMemo, useState } from 'react';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useTranslation } from 'react-i18next';
 import { computeNetLoss, matchInsurance, type LossInsurance } from '@/engine/losses/netLoss';
 import { useMutaplasmidLookup } from '@/features/abyssal/mutaplasmidData';
@@ -28,16 +29,12 @@ type Insurance =
 export function LossSummary({ detail, zkbValue }: LossSummaryProps) {
   const { t } = useTranslation();
   const hubId = useMarketHub((state) => state.value);
-  const hubHydrated = useMarketHub((state) => state.hydrated);
-  const hydrateHub = useMarketHub((state) => state.hydrate);
+  const hubHydrated = useHydratedStore(useMarketHub);
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const mutaplasmids = useMutaplasmidLookup();
   const [prices, setPrices] = useState<ReadonlyMap<number, number | null> | null>(null);
   const [pricesFailed, setPricesFailed] = useState(false);
   const [payout, setPayout] = useState<Insurance>({ state: 'loading' });
-  useEffect(() => {
-    void hydrateHub();
-  }, [hydrateHub]);
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
 
   const typeKey = useMemo(() => {

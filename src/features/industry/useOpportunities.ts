@@ -57,8 +57,8 @@ import {
   type OpportunityRow,
   type UnrankedOpportunityRow,
 } from './opportunities';
+import { YIELD_BUDGET_MS, yieldToMain } from './yieldToMain';
 
-const CHUNK_SIZE = 5;
 /** How often a progress frame re-ranks the rows found so far (`throttledRanker`). */
 const PROGRESS_RANK_INTERVAL_MS = 500;
 
@@ -197,9 +197,11 @@ export function useOpportunities({
       const unranked: UnrankedOpportunityRow[] = [];
       const rankProgress = throttledRanker(rankOpportunityRows, PROGRESS_RANK_INTERVAL_MS);
 
-      for (let i = 0; i < currentCandidates.length; i += CHUNK_SIZE) {
+      let sliceStart = performance.now();
+      for (let i = 0; i < currentCandidates.length; i++) {
         if (cancelled) return;
-        for (const candidate of currentCandidates.slice(i, i + CHUNK_SIZE)) {
+        {
+          const candidate = currentCandidates[i]!;
           const recipeFor = recipeForLookup({
             catalog,
             pi,
@@ -226,7 +228,12 @@ export function useOpportunities({
           );
           if (row) unranked.push(row);
         }
-        const done = Math.min(i + CHUNK_SIZE, currentCandidates.length);
+        const done = i + 1;
+        // Yield on elapsed time, not item count: a progress frame and a turn
+        // of the event loop once the time budget is spent.
+        if (done < currentCandidates.length && performance.now() - sliceStart < YIELD_BUDGET_MS) {
+          continue;
+        }
         setState({
           ...EMPTY_STATE,
           rows: rankProgress(unranked),
@@ -234,7 +241,8 @@ export function useOpportunities({
           loading: true,
         });
         if (done < currentCandidates.length) {
-          await new Promise((resolve) => setTimeout(resolve, 0));
+          await yieldToMain();
+          sliceStart = performance.now();
         }
       }
       if (cancelled) return;

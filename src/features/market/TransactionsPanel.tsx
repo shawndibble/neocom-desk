@@ -134,8 +134,7 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
   );
   const characterFilter = characterValues['txn.chars'];
   const resolvedCharacterFilter = useResolvedCharacterFilter(characterFilter, activeCharacterId);
-  const storedCharacters = useLiveQuery(() => db.characters.toArray(), [], []);
-  const characterCount = storedCharacters?.length ?? 0;
+  const characterCount = useLiveQuery(() => db.characters.count(), [], 0);
   const showCharacterFilter = characterCount > 1;
   const allScope = showCharacterFilter && resolvedCharacterFilter === 'all';
   const allFills = useAllCharacterFills(allScope, refreshCount);

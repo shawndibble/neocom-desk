@@ -86,3 +86,5 @@ export function useCharacterLacksEndpoints(
   // holds the previous Character's answer for a frame.
   return answer?.characterId === characterId && answer.lacks;
 }
+
+export { characterIdsWithScopes, useCharacterIdsWithScopes } from './characterIdsWithScopes';

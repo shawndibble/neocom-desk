@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { CurrentQueuePanel } from './CurrentQueuePanel';
 import { buildQueueView } from './queueView';
-import { classifySkillQueue } from '../queueStatus';
+import { classifySkillQueue } from '@/engine/skills/queueStatus';
 import type { CachedResult } from '../data';
 import type { SkillQueueEntry } from '@/esi/endpoints';
 import type { SkillCatalog } from '../skillMap';

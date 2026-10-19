@@ -7,10 +7,12 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import type { KillRecord } from '@/engine/pilotList/killActivity';
-import { fetchPilotKillHistory } from '@/lib/zkillboard';
+import { fetchPilotKillHistory, type ZkillFailureReason } from '@/lib/zkillboard';
 
 export type PilotKillHistoryState =
-  { kind: 'loading' } | { kind: 'failed' } | { kind: 'ready'; kills: KillRecord[] };
+  | { kind: 'loading' }
+  | { kind: 'failed'; reason: ZkillFailureReason }
+  | { kind: 'ready'; kills: KillRecord[] };
 
 export function usePilotKillHistory(characterId: number): {
   history: PilotKillHistoryState;
@@ -23,7 +25,11 @@ export function usePilotKillHistory(characterId: number): {
     let cancelled = false;
     void fetchPilotKillHistory(characterId).then((result) => {
       if (!cancelled)
-        setHistory(result.ok ? { kind: 'ready', kills: result.kills } : { kind: 'failed' });
+        setHistory(
+          result.ok
+            ? { kind: 'ready', kills: result.kills }
+            : { kind: 'failed', reason: result.reason }
+        );
     });
     return () => {
       cancelled = true;

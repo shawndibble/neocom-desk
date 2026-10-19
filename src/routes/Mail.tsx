@@ -1,9 +1,11 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import {
   focusRingInsetClassName,
   interactiveClassName,
   selectedRowClassName,
 } from '@/components/ui/controlStyles';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -311,10 +313,7 @@ function MailView({ scope, scopeControl }: MailViewProps) {
   // takes to keep a memoised Set's identity stable.
   const folders = useMailFolders((state) => state.value);
   const setFolders = useMailFolders((state) => state.setValue);
-  const hydrateFolders = useMailFolders((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateFolders();
-  }, [hydrateFolders]);
+  useHydratedStore(useMailFolders);
   function toggleFolder(folder: MailTab) {
     void setFolders(
       folders.includes(folder) ? folders.filter((f) => f !== folder) : [...folders, folder]
@@ -991,7 +990,12 @@ function MailView({ scope, scopeControl }: MailViewProps) {
                 <div className="max-h-[36rem] scroll-pt-8 overflow-y-auto lg:max-h-[44rem]">
                   {rowSections.map((section) => (
                     <div key={section.key}>
-                      <h3 className="sticky top-0 z-10 border-y border-line bg-panel-2 px-3 py-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                      <h3
+                        className={cx(
+                          eyebrowClassName,
+                          'sticky top-0 z-10 border-y border-line bg-panel-2 px-3 py-1.5'
+                        )}
+                      >
                         {mailAgeLabel(section.bucket, t)}
                       </h3>
                       <ul className="divide-y divide-line">
@@ -1417,11 +1421,7 @@ export function Mail() {
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const storedScope = useMailScope((state) => state.value);
   const setStoredScope = useMailScope((state) => state.setValue);
-  const scopeHydrated = useMailScope((state) => state.hydrated);
-  const hydrateScope = useMailScope((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateScope();
-  }, [hydrateScope]);
+  const scopeHydrated = useHydratedStore(useMailScope);
   const scopeParams = useMemo(() => ({ scope: characterFilterParam(storedScope) }), [storedScope]);
   const [scopeView, setScopeView] = useUrlParams(scopeParams);
 

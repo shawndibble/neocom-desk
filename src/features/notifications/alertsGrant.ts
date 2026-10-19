@@ -11,6 +11,7 @@
  */
 import { completeAlertsLogin } from '@/auth/session';
 import { db } from '@/db';
+import { reportFailure } from '@/observability/reportFailure';
 
 const GRANTS_KEY = 'alertsGrants';
 const QUEUE_KEY = 'neocom.alerts.queue';
@@ -105,7 +106,8 @@ export async function completeAlertsGrant(params: {
       accessToken: result.accessToken,
       refreshToken: result.refreshToken,
     });
-  } catch {
+  } catch (error) {
+    reportFailure('auth', error);
     return { status: 'failed', characterId: result.characterId };
   }
   await writeGrants((grants) => {
@@ -119,7 +121,8 @@ export async function turnOffAlerts(characterId: number): Promise<boolean> {
   try {
     const { deleteAlertGrantRemote } = await import('@/sync/alertsGrantApi');
     await deleteAlertGrantRemote(characterId);
-  } catch {
+  } catch (error) {
+    reportFailure('auth', error);
     return false;
   }
   await forgetAlertsGrants([characterId]);
