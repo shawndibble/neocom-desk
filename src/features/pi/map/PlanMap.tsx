@@ -46,6 +46,7 @@
  *   a toggle or "Clear trace" ends it. With no trace, the docked panel shows
  *   the what-if planet, if one is ticked.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { withArticle } from '../article';
 import { AssumedCustomsNote } from '../AssumedCustomsNote';
 import { assumedCustomsNames } from '../colonyCustoms';
@@ -777,7 +778,7 @@ export function PlanMap({
       aria-label={t('piMap.picksLabel')}
       className="flex flex-wrap items-center gap-x-3.5 gap-y-1 border-b border-line px-3 py-1.5 text-xs"
     >
-      <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+      <span className={eyebrowClassName}>
         {picks.kind === 'recipes' ? t('piMap.picksRecipes') : t('piMap.picksTitle')}
       </span>
       {picks.kind === 'none' ? (

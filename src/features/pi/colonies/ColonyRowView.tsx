@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Trans, useTranslation } from 'react-i18next';
@@ -39,7 +40,7 @@ import { formatAge } from '@/lib/age';
 import { PlanetImage } from '../PlanetImage';
 import { StatusWord } from './TodayPanel';
 
-const MICRO = 'text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
+const MICRO = eyebrowClassName;
 
 function Meter({
   fraction,

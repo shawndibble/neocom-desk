@@ -31,6 +31,7 @@
  * from the local SDE snapshot only (`loadContractLocationInfo`) — no ESI
  * call per row; a player structure stays unnamed.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { lpRate } from '@/engine/loyalty/marketLpValue';
 import { loadMarketLpValues } from '@/features/loyalty/marketLpValue';
 import {
@@ -115,7 +116,7 @@ const ALL_REGIONS = 'all';
 const HUB_REGION = 'hub';
 type ContractScope = typeof HUB_REGION | typeof ALL_REGIONS;
 
-const HEADING_CLASS = 'text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
+const HEADING_CLASS = eyebrowClassName;
 const SECTION_CLASS = 'flex flex-col gap-2 border-t border-line pt-3';
 
 interface BlueprintAcquisitionModalProps {

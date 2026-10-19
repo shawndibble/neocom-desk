@@ -7,6 +7,7 @@
  * means "tick or click me", the "alternative" disclosure has a rotating leading
  * caret, and static facts are `StatChip`s and type, not boxes.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useId, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -100,9 +101,7 @@ function Hero({ value, caption }: { value: number; caption: ReactNode }) {
         {value < 0 ? '−' : '+'}
         <IskAmount value={Math.abs(value)} decimals={0} />
       </span>
-      <span className="max-w-72 text-[0.6875rem] leading-snug font-semibold tracking-widest text-text-dim uppercase">
-        {caption}
-      </span>
+      <span className={cx(eyebrowClassName, 'max-w-72 leading-snug')}>{caption}</span>
     </div>
   );
 }
@@ -111,9 +110,7 @@ function Hero({ value, caption }: { value: number; caption: ReactNode }) {
 function StatBlock({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="min-w-0 px-3 py-2.5">
-      <dt className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-        {label}
-      </dt>
+      <dt className={eyebrowClassName}>{label}</dt>
       <dd className="mt-0.5 text-lg font-semibold text-text tabular-nums">{value}</dd>
     </div>
   );
@@ -143,9 +140,7 @@ export function PlanSummaryPanel({
   // and the label would overlap the title.
   const mattersToggle = (
     <span className="flex flex-wrap items-center justify-end gap-2">
-      <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-        {t('piPlan.make.matters')}
-      </span>
+      <span className={eyebrowClassName}>{t('piPlan.make.matters')}</span>
       <SegmentedControl<RebuildPreference>
         label={t('piPlan.make.matters')}
         size={mdUp ? 'sm' : 'md'}

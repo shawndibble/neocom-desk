@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import type { ReactNode } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import {
@@ -461,9 +462,7 @@ function PhoneRow({ row }: { row: Row }) {
           <Mark name="WorkThroughRowControls">
             <div className="flex flex-wrap items-end justify-between gap-2">
               <span className="flex flex-col">
-                <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                  New price
-                </span>
+                <span className={eyebrowClassName}>New price</span>
                 <span className="text-2xl font-semibold text-text tabular-nums">
                   {formatIskAuto(row.newPrice)}
                 </span>

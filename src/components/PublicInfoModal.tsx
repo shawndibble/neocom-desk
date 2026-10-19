@@ -23,6 +23,8 @@
  *
  * A link inside the modal that changes page (Open in Fittings) closes it.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { cx } from '@/lib/cx';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { OpenInEveButton } from '@/features/openInEve/OpenInEveButton';
@@ -446,9 +448,7 @@ function NpcCharacterCard({
     <div className="flex flex-wrap items-start gap-4 text-sm">
       <CharacterAvatar characterId={profile.characterId} size="lg" alt={profile.name} />
       <div className="min-w-0 flex-1 space-y-3">
-        <span className="block text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-          {t('publicInfo.npcAgent')}
-        </span>
+        <span className={cx(eyebrowClassName, 'block')}>{t('publicInfo.npcAgent')}</span>
         <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
           <dt className="text-text-dim">{t('publicInfo.corporation')}</dt>
           <dd>

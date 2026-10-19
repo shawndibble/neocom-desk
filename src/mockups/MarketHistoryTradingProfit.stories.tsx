@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import type { ReactNode } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import {
@@ -231,9 +232,7 @@ function Figure({
 }) {
   return (
     <div className={cx('flex flex-col gap-0.5', className)}>
-      <dt className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-        {label}
-      </dt>
+      <dt className={eyebrowClassName}>{label}</dt>
       <dd className="text-sm font-semibold">{value}</dd>
       {sub && <dd className="text-xs text-text-dim">{sub}</dd>}
     </div>

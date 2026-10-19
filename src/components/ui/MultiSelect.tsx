@@ -1,3 +1,4 @@
+import { eyebrowClassName } from './eyebrowClassName';
 import { useEffect, useId, useMemo, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { cx } from '@/lib/cx';
 import { COMBOBOX_NAV_KEYS, moveHighlight, type ComboboxNavKey } from '@/lib/comboboxNav';
@@ -144,11 +145,7 @@ export function MultiSelect<Id>({
           )}
           {filteredGroups.map((group) => (
             <div key={group.label}>
-              {group.label && (
-                <p className="px-2 py-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                  {group.label}
-                </p>
-              )}
+              {group.label && <p className={cx(eyebrowClassName, 'px-2 py-1.5')}>{group.label}</p>}
               {group.options.map((option) => {
                 const checked = selected.has(option.id);
                 const index = ++flatIndex;

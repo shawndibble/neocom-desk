@@ -20,6 +20,7 @@
  *   `deriveSystemId`) — which must render as "not checked" too, never as
  *   "checked, clean".
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -1124,9 +1125,7 @@ export function OrderDetailContent({
                     than anyone here" needs no cost basis behind it.
                   */}
                   <div className="border-t border-line pt-1.5">
-                    <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                      {t('market.orders.exitHaulTitle')}
-                    </p>
+                    <p className={eyebrowClassName}>{t('market.orders.exitHaulTitle')}</p>
                     {hubs === undefined ? (
                       <p className="mt-1 text-text-dim">
                         {t(
@@ -1346,9 +1345,7 @@ function CostLedger({
             {t('market.orders.floorBreakEvenNote')}
           </p>
           <div className="rounded-xs border border-line bg-panel p-2">
-            <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-              {t('market.orders.floorWhyBroker')}
-            </p>
+            <p className={eyebrowClassName}>{t('market.orders.floorWhyBroker')}</p>
             <p className="mt-1 text-xs text-text">
               {t('market.orders.floorWhyBrokerBody', {
                 relist: formatMarketIsk(row.floor.relist),

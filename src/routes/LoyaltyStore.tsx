@@ -12,6 +12,7 @@
  * store's "Change store" link returns to it (`/wallet/lp-store` with no
  * corporation is the landing state).
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { PageSettingsButton } from '@/features/settings/PageSettingsModal';
@@ -254,7 +255,7 @@ function OfferDetail({
 
       <div className="flex flex-wrap gap-6">
         <div>
-          <div className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+          <div className={eyebrowClassName}>
             {t(
               lpBasis === 'concord' ? 'loyaltyStore.colIskPerConcordLp' : 'loyaltyStore.colIskPerLp'
             )}
@@ -268,9 +269,7 @@ function OfferDetail({
           </div>
         </div>
         <div>
-          <div className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-            {t('loyaltyStore.netProfit')}
-          </div>
+          <div className={eyebrowClassName}>{t('loyaltyStore.netProfit')}</div>
           <div className={`text-xl font-semibold tabular-nums ${iskPerLpTone(profit.profit)}`}>
             {profit.profit === null ? '—' : <IskAmount value={profit.profit} decimals={0} />}
           </div>

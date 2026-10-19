@@ -4,6 +4,8 @@
  * `MobileOpportunityList` and `MobileOwnedBlueprintList`; each keeps its own
  * URL sort state and passes it in.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { cx } from '@/lib/cx';
 import { useTranslation } from 'react-i18next';
 import {
   DropdownMenu,
@@ -61,9 +63,7 @@ export function MobileSortToolbar<Id extends string>({
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <p className="px-2 py-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-            {t('industry.opportunitiesSortBy')}
-          </p>
+          <p className={cx(eyebrowClassName, 'px-2 py-1.5')}>{t('industry.opportunitiesSortBy')}</p>
           {fields.map((field) => (
             <DropdownMenuItem
               key={field.id}

@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { lazy, Suspense, useMemo, useState } from 'react';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { guarded } from '@/app/routeChunks';
@@ -559,7 +560,7 @@ export function ProductionLogPanel({
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[20rem_minmax(0,1fr)] lg:items-start">
         <div className="space-y-2">
           <div className="flex flex-col gap-1 rounded-xs border border-line bg-panel-2 px-3 py-2">
-            <span className="flex items-center gap-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+            <span className={cx(eyebrowClassName, 'flex items-center gap-1')}>
               {t('industry.totalRealizedProfit')}
               <InfoTooltip
                 label={t('industry.totalRealizedProfitTooltipLabel')}
@@ -630,9 +631,7 @@ export function ProductionLogPanel({
           <div className="mt-4 min-w-0 space-y-4">
             <div>
               <div className="flex items-center justify-between gap-2 border-b border-line pb-1">
-                <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                  {t('industry.byItem')}
-                </h3>
+                <h3 className={eyebrowClassName}>{t('industry.byItem')}</h3>
                 <TableActionsMenu name={t('industry.byItem')} tableExport={itemsExport} />
               </div>
               <DataTable

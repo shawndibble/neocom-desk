@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useState } from 'react';
 import { NOTICE_MS, useTimedToast } from '@/components/ui/useTimedToast';
 import { writeToClipboard } from '@/lib/clipboard';
@@ -330,9 +331,7 @@ export function RowDetailModal({
 
         {showOreCard && (
           <div className="space-y-1 rounded-xs border border-line bg-panel-2 p-2">
-            <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-              {t('miningTax.oreColumn')}
-            </p>
+            <p className={eyebrowClassName}>{t('miningTax.oreColumn')}</p>
             <ul className="divide-y divide-line text-xs">
               {oreLines.map((line) => (
                 <li

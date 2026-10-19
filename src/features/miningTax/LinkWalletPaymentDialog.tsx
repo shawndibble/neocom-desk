@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Checkbox, IskInput, Modal, Radio, SearchInput } from '@/components/ui';
@@ -41,7 +42,7 @@ function paidOnFor(isoDate: string): string {
   return formatLocalDate(Number.isNaN(parsed.getTime()) ? new Date() : parsed);
 }
 
-const FIELD_LABEL = 'text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
+const FIELD_LABEL = eyebrowClassName;
 
 /**
  * "Link a wallet payment": the pilot picks, from their own wallet, the Made

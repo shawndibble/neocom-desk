@@ -32,6 +32,8 @@
  * Station Manager who is not a Director simply has no People rail: no error,
  * no empty state, nothing (GLOSSARY.md round 35).
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { cx } from '@/lib/cx';
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
@@ -157,7 +159,7 @@ export function CorpPeopleRail({ members, highlights, names, diff, nowMs }: Corp
         <div className="mt-3 grid gap-x-6 gap-y-3 sm:grid-cols-2">
           {darkNamed.length > 0 && (
             <div>
-              <h3 className="mb-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+              <h3 className={cx(eyebrowClassName, 'mb-1.5')}>
                 {t('corp.people.darkList', { days: darkAfterDays })}
               </h3>
               {darkNamed.map((member) => {
@@ -184,9 +186,7 @@ export function CorpPeopleRail({ members, highlights, names, diff, nowMs }: Corp
           )}
           {rosterChanged && (
             <div>
-              <h3 className="mb-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                {t('corp.people.changeList')}
-              </h3>
+              <h3 className={cx(eyebrowClassName, 'mb-1.5')}>{t('corp.people.changeList')}</h3>
               {highlights.joined.map((characterId) => (
                 <p
                   key={`joined-${characterId}`}

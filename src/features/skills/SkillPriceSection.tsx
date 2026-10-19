@@ -12,6 +12,7 @@
  * not at the hub station at all, which read as "No sell orders" while the
  * region had dozens.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
@@ -90,9 +91,7 @@ export function SkillPriceSection({
   return (
     <section>
       <div className="flex items-center justify-between border-b border-line pb-1">
-        <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-          {t('skills.inspector.priceTitle')}
-        </h3>
+        <h3 className={eyebrowClassName}>{t('skills.inspector.priceTitle')}</h3>
         <PriceHubSelect />
       </div>
       <dl className="mt-1 space-y-0.5 text-xs">

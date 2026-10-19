@@ -3,6 +3,7 @@
  * figure. Its "What if I add a planet?" part, and the Map's add-planet panel,
  * draw a what-if planet's chains with `WhatIfChainCards`.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -338,10 +339,7 @@ function WhatIfSection({
   return (
     <section aria-labelledby="pi-chains-whatif" className="border-t border-line">
       <div className={`flex items-center gap-1.5 px-3 pt-2 ${noSlot ? '' : 'pb-1'}`}>
-        <h3
-          id="pi-chains-whatif"
-          className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
-        >
+        <h3 id="pi-chains-whatif" className={eyebrowClassName}>
           {t('piPlan.chains.whatIfTitle')}
         </h3>
         {!noSlot && (

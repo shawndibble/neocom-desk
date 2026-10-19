@@ -4,6 +4,8 @@
  * `market/PriceHistoryChart.tsx` — this must only ever be reached through a
  * dynamic `import()` from `OverviewTab.tsx`, never imported eagerly.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { cx } from '@/lib/cx';
 import { scalePx } from '@/lib/fontScale';
 import { ChartTooltipShell } from '@/components/ui/ChartTooltipShell';
 import {
@@ -309,9 +311,7 @@ function IskCharts({
   return (
     <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
       <Panel padded>
-        <p className="mb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-          {t('miningTax.overview.dayChartTitle')}
-        </p>
+        <p className={cx(eyebrowClassName, 'mb-1')}>{t('miningTax.overview.dayChartTitle')}</p>
         <p className="mb-1 text-[0.6875rem] text-text-dim">
           {t('miningTax.overview.dayChartBasis')}
         </p>
@@ -374,9 +374,7 @@ function IskCharts({
       </Panel>
 
       <Panel padded>
-        <p className="mb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-          {compareChartTitle}
-        </p>
+        <p className={cx(eyebrowClassName, 'mb-1')}>{compareChartTitle}</p>
         <div
           role="img"
           aria-label={compareChartTitle}
@@ -551,9 +549,7 @@ function MetricCharts({
   return (
     <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
       <Panel padded>
-        <p className="mb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-          {rateChartTitle}
-        </p>
+        <p className={cx(eyebrowClassName, 'mb-1')}>{rateChartTitle}</p>
         <p className="mb-1 text-[0.6875rem] text-text-dim">{rateChartBasis}</p>
         <div role="img" aria-label={rateChartTitle} className="h-64 w-full">
           <ResponsiveContainer width="100%" height="100%">
@@ -596,9 +592,7 @@ function MetricCharts({
       </Panel>
 
       <Panel padded>
-        <p className="mb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-          {compareChartTitle}
-        </p>
+        <p className={cx(eyebrowClassName, 'mb-1')}>{compareChartTitle}</p>
         <div
           role="img"
           aria-label={compareChartTitle}

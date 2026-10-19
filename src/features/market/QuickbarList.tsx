@@ -3,6 +3,7 @@
  * shortcuts, rendered in the Market Browser's left column below the tree.
  * Drag-and-drop mirrors the Skill Plan entry list (EntryList.tsx).
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import {
   DndContext,
   KeyboardSensor,
@@ -164,9 +165,7 @@ export function QuickbarList({
   return (
     <div className="mt-3 shrink-0 border-t border-line pt-2" data-testid="quickbar">
       <div className="flex items-center justify-between pb-1">
-        <h2 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-          {t('market.quickbar.title')}
-        </h2>
+        <h2 className={eyebrowClassName}>{t('market.quickbar.title')}</h2>
         <IconButton
           size="sm"
           icon={<Icon.Market />}

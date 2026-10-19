@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CharacterAvatar, SkillBar } from '@/components/ui';
@@ -209,7 +210,7 @@ function BandCards({
     <>
       {bands.map((band) => (
         <section key={band.groupName} aria-label={band.groupName || t('skillCompare.ungrouped')}>
-          <h3 className="px-1 pt-3 pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+          <h3 className={cx(eyebrowClassName, 'px-1 pt-3 pb-1')}>
             {band.groupName || t('skillCompare.ungrouped')}
           </h3>
           <ul className="space-y-2">
@@ -319,7 +320,10 @@ export function SkillCompareView({
         <tr>
           <th
             scope="col"
-            className="sticky top-0 left-0 z-20 border-b border-line-bright bg-panel px-3 py-2 text-left text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
+            className={cx(
+              eyebrowClassName,
+              'sticky top-0 left-0 z-20 border-b border-line-bright bg-panel px-3 py-2 text-left'
+            )}
           >
             {t('skillCompare.skillColumn')}
           </th>

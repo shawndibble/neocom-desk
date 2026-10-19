@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { Fragment, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal } from '@/components/ui';
@@ -79,9 +80,7 @@ export function BuildRecipeModal({
           </p>
 
           <section className="space-y-1.5">
-            <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-              {t('industry.buildRecipe.inputsTitle')}
-            </h3>
+            <h3 className={eyebrowClassName}>{t('industry.buildRecipe.inputsTitle')}</h3>
             {/*
               A list, not a `DataTable`: three columns of headers over at most
               a handful of ingredients is more chrome than content, and the

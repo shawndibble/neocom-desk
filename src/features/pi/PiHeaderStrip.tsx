@@ -1,3 +1,5 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { cx } from '@/lib/cx';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -214,7 +216,7 @@ export function PiHeaderStrip({
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-2" data-testid="pi-header-strip">
       <div className="flex items-center gap-2">
-        <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase max-md:sr-only">
+        <span className={cx(eyebrowClassName, 'max-md:sr-only')}>
           {t('piPlan.strip.sellAtShort')}
         </span>
         <Select

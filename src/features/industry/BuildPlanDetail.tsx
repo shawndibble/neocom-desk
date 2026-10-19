@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
 import { tappableRowClassName, touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
@@ -1456,9 +1457,7 @@ export function BuildPlanDetail({
   // a bordered, filled box reads as a button, and nothing here is clickable.
   const setupFact = (label: string, value: string, warn = false) => (
     <div key={label} className="min-w-0">
-      <dt className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-        {label}
-      </dt>
+      <dt className={eyebrowClassName}>{label}</dt>
       <dd className={cx('text-xs tabular-nums', warn ? 'text-warning' : 'text-text')}>
         {warn && <Icon.Warn size={Icon.ICON_SIZE.sm} aria-hidden="true" className="mr-1 inline" />}
         {value}
@@ -1567,7 +1566,7 @@ export function BuildPlanDetail({
         {setupOpen ? (
           <div className="space-y-4">
             <div>
-              <h3 className="border-b border-line pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+              <h3 className={cx(eyebrowClassName, 'border-b border-line pb-1')}>
                 {t('industry.groupBlueprint')}
               </h3>
               {bpcCoverage && (
@@ -1623,7 +1622,12 @@ export function BuildPlanDetail({
             </div>
 
             <div>
-              <h3 className="flex items-center justify-between gap-2 border-b border-line pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+              <h3
+                className={cx(
+                  eyebrowClassName,
+                  'flex items-center justify-between gap-2 border-b border-line pb-1'
+                )}
+              >
                 {t('industry.groupLocationMarket')}
                 <GroupTargetLink
                   plan={plan}

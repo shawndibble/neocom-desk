@@ -9,6 +9,7 @@
  * and it carries the two destinations that link displaced: View in Market and
  * Show info.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { OpenInEveButton } from '@/features/openInEve/OpenInEveButton';
 import { interactiveClassName, focusRingClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
@@ -96,11 +97,7 @@ function NameChain({
 }
 
 function Heading({ children }: { children: React.ReactNode }) {
-  return (
-    <h3 className="mt-4 mb-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-      {children}
-    </h3>
-  );
+  return <h3 className={cx(eyebrowClassName, 'mt-4 mb-1.5')}>{children}</h3>;
 }
 
 export function ProductDetail(props: ProductDetailProps) {
@@ -175,7 +172,7 @@ export function ProductDetail(props: ProductDetailProps) {
           <div className="text-[1.875rem] leading-[1.1] font-semibold text-isk-pos tabular-nums">
             ≈ <IskAmount value={figure.iskPerDay} decimals={0} />
           </div>
-          <div className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+          <div className={eyebrowClassName}>
             {t('piMap.detail.perPlanet', { type: planetName(t, figure.useType) })}
           </div>
           {figure.needsCcLevel && (
@@ -217,7 +214,7 @@ export function ProductDetail(props: ProductDetailProps) {
           >
             ≈ <IskAmount value={view.money.estimate.iskPerDay} decimals={0} />
           </div>
-          <div className="flex flex-wrap items-center gap-2 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+          <div className={cx(eyebrowClassName, 'flex flex-wrap items-center gap-2')}>
             {t('piShared.chain.perDayAcross', { count: view.money.estimate.planets.length })}
             <EstimateBadge />
           </div>

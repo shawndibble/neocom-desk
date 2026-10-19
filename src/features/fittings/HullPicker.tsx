@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import {
   focusRingInsetClassName,
   rowInteractiveClassName,
@@ -66,7 +67,7 @@ export function HullPicker({ catalogue, onStart, onOpenPopular }: HullPickerProp
           <div className="columns-1 gap-4 sm:columns-2 xl:columns-3">
             {shown.map((hullClass) => (
               <section key={hullClass.id} className="mb-3 break-inside-avoid">
-                <h3 className="mb-1 flex justify-between text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                <h3 className={cx(eyebrowClassName, 'mb-1 flex justify-between')}>
                   <span>{hullClass.name}</span>
                   <span className="tabular-nums">{hullClass.hulls.length}</span>
                 </h3>

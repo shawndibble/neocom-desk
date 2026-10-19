@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -333,9 +334,7 @@ export function ProductionRunsPanel({
             />
             {(editingRow.saleLinks.length > 0 || editingRow.orderWatches.length > 0) && (
               <div className="space-y-1 border-t border-line pt-3">
-                <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                  {t('industry.linkedSales')}
-                </p>
+                <p className={eyebrowClassName}>{t('industry.linkedSales')}</p>
                 <ul className="space-y-1">
                   {editingRow.saleLinks.map((link) => (
                     <li

@@ -8,6 +8,7 @@
  * pilot is. The profile's Threat verdict (`PilotThreatBand`) is read from the
  * same kills.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Spinner } from '@/components/ui';
@@ -131,7 +132,7 @@ export function PilotKillActivityView({
       aria-label={t('travel.pilot.activity.title')}
       className="@container/kills flex h-full flex-col gap-2.5 rounded-xs border border-line bg-panel px-3.5 py-3 outline-none"
     >
-      <div className="flex items-baseline justify-between gap-2 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+      <div className={cx(eyebrowClassName, 'flex items-baseline justify-between gap-2')}>
         <h3>
           {t('travel.pilot.activity.chart')}
           <span className="hidden @sm/kills:inline">{t('travel.pilot.activity.chartBySpace')}</span>
@@ -193,9 +194,7 @@ export function PilotKillActivityView({
         </div>
       </div>
 
-      <h4 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-        {t('travel.pilot.activity.last30')}
-      </h4>
+      <h4 className={eyebrowClassName}>{t('travel.pilot.activity.last30')}</h4>
       <ul className={cx('grid gap-2', spaces.length === 4 ? 'grid-cols-4' : 'grid-cols-3')}>
         {spaces.map((space) => {
           const { count, lastMs } = summary.bySpace[space];

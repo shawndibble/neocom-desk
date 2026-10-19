@@ -17,6 +17,7 @@
  * `Panel` (its header carries the Compare Hubs toggle) beneath the summary
  * and, when open, the Compare Hubs cards, once something has been appraised.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { useEffect, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -815,10 +816,7 @@ export function AppraisalPanel({
             />
 
             <div className="flex items-center gap-2">
-              <label
-                className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
-                htmlFor="market-appraisal-percent"
-              >
+              <label className={eyebrowClassName} htmlFor="market-appraisal-percent">
                 {t('market.appraisal.pricePercentLabel')}
               </label>
               <TextInput
@@ -934,7 +932,7 @@ export function AppraisalPanel({
           <div className="flex flex-col gap-2">
             <div className="flex flex-wrap items-center gap-2">
               {minusOwned && (
-                <span className="w-full text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                <span className={cx(eyebrowClassName, 'w-full')}>
                   {ownedPref.everywhere
                     ? t('market.appraisal.minusOwnedChipEverywhere')
                     : t('market.appraisal.minusOwnedChip', { station: ownedStation.systemName })}
@@ -1112,10 +1110,7 @@ export function AppraisalPanel({
             <>
               {share.status === 'manual' && (
                 <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
-                  <label
-                    htmlFor="market-appraisal-share-url"
-                    className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
-                  >
+                  <label htmlFor="market-appraisal-share-url" className={eyebrowClassName}>
                     {t('market.appraisal.shareReady')}
                   </label>
                   <TextInput

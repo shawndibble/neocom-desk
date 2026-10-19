@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { HintText } from '@/components/ui/HintText';
 import { OreIcon } from './OreIcon';
 import { typeLabels } from './typeLabels';
@@ -1931,10 +1932,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
 
                 {historyRows.length > 0 && (
                   <section aria-labelledby="mining-tax-history" className="space-y-2">
-                    <h2
-                      id="mining-tax-history"
-                      className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
-                    >
+                    <h2 id="mining-tax-history" className={eyebrowClassName}>
                       {t('miningTax.sections.history')}
                     </h2>
                     <Panel padded={false}>

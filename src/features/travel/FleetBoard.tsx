@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useEffect, useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EmptyState, Spinner } from '@/components/ui';
@@ -276,7 +277,7 @@ function ShareBar({
           focusRingInsetClassName
         )}
       >
-        <span className="flex items-center gap-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+        <span className={cx(eyebrowClassName, 'flex items-center gap-1.5')}>
           <Caret expanded={expanded} />
           {t('travel.pilot.dscan.boardLabel')}
         </span>
@@ -375,9 +376,7 @@ function Lanes({ roles }: { roles: readonly FleetRole[] }) {
   const { t } = useTranslation();
   return (
     <>
-      <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-        {t('travel.pilot.dscan.lanesTitle')}
-      </h3>
+      <h3 className={eyebrowClassName}>{t('travel.pilot.dscan.lanesTitle')}</h3>
       {roles.map((r) => {
         const label = t(`travel.pilot.dscan.role.${r.role}`);
         const summary =

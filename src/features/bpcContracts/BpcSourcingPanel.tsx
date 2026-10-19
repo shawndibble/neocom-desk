@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import {
   useCallback,
   useEffect,
@@ -1215,7 +1216,7 @@ export function BpcSourcingPanel({
         header: t('bpcContracts.sourceColumn'),
         sortValue: (row) => row.source,
         render: (row) => (
-          <span className="inline-flex items-center text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+          <span className={cx(eyebrowClassName, 'inline-flex items-center')}>
             {row.source === 'contract'
               ? t('bpcContracts.sourceContractSingular')
               : row.source === 'market'
@@ -1843,7 +1844,7 @@ export function BpcSourcingPanel({
             </span>
             {openSuggestions !== null && (
               <div className="border-b border-line bg-panel-2 px-3 py-2">
-                <p className="pb-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                <p className={cx(eyebrowClassName, 'pb-1.5')}>
                   {t('bpcContracts.suggestionsHeading')}
                 </p>
                 <ul
@@ -1970,7 +1971,7 @@ export function BpcSourcingPanel({
                             )}
                           >
                             <HintText
-                              className="max-w-full self-start truncate text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
+                              className={cx(eyebrowClassName, 'max-w-full self-start truncate')}
                               content={cell.reasons
                                 .map((reason) => t(`bpcContracts.regionReason.${reason}`))
                                 .join(' · ')}

@@ -8,6 +8,7 @@
  * Only facts about the order. The item's own (its required skills) are the
  * same on every row, so they sit once in the item header instead.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useState, type ReactNode } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { Button, IskAmount, ProgressBar } from '@/components/ui';
@@ -50,9 +51,7 @@ export interface OrderRowDetailProps {
 function Fact({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="min-w-0">
-      <div className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-        {label}
-      </div>
+      <div className={eyebrowClassName}>{label}</div>
       <div className="text-text tabular-nums">{children}</div>
     </div>
   );

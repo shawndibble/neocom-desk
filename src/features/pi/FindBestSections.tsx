@@ -9,6 +9,7 @@
  * caret and `aria-expanded`; what a what-if planet unlocks is labelled, never
  * colour alone.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, FilterChip, IskAmount, Panel, SegmentedControl, TypeIcon } from '@/components/ui';
@@ -86,9 +87,7 @@ export function PlanetTypesPanel({
         </div>
         {hasColonies && chips.length > 0 && (
           <div className="space-y-1.5">
-            <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-              {t('piPlan.find.whatIfTitle')}
-            </p>
+            <p className={eyebrowClassName}>{t('piPlan.find.whatIfTitle')}</p>
             <div
               role="group"
               aria-label={t('piPlan.find.whatIfTitle')}
@@ -159,9 +158,7 @@ export function FindBestControls({
       />
       {mode === 'picks' && (
         <span className="flex max-w-full flex-wrap items-center gap-2">
-          <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase max-md:basis-full">
-            {t('piPlan.find.make')}
-          </span>
+          <span className={cx(eyebrowClassName, 'max-md:basis-full')}>{t('piPlan.find.make')}</span>
           <span className="max-w-full overflow-x-auto max-md:basis-full">
             <SegmentedControl<RecipeFilter>
               label={t('piPlan.find.make')}
@@ -347,9 +344,7 @@ function RecipeCard({
         </div>
       </div>
       <div className="min-w-0 space-y-1">
-        <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-          {t('piPlan.find.youNeed', { count: card.hosts.length })}
-        </p>
+        <p className={eyebrowClassName}>{t('piPlan.find.youNeed', { count: card.hosts.length })}</p>
         <ul className="space-y-0.5">
           {card.hosts.map((host) => (
             <li key={host.type} className="flex items-center gap-1.5 text-xs">
@@ -443,7 +438,7 @@ export function RecipeListPanel({
               return (
                 <li key={card.recipe.typeId}>
                   {card.rank === addDividerBefore && (
-                    <p className="bg-panel-2 px-3 py-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                    <p className={cx(eyebrowClassName, 'bg-panel-2 px-3 py-1.5')}>
                       {t('piPlan.find.addToUnlock')}
                     </p>
                   )}

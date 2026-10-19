@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -377,7 +378,7 @@ export function PayeeManagerDialog({
 
         {showForm && (
           <div className="space-y-3 border-t border-line pt-3">
-            <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+            <p className={eyebrowClassName}>
               {draft.id ? t('miningTax.editPayeeTitle') : t('miningTax.addPayeeTitle')}
             </p>
             <Fields>
