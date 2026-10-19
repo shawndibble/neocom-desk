@@ -20,20 +20,19 @@ import {
   NativeSelect,
   Toast,
   textActionClassName,
-  type DataTableColumn,
 } from '@/components/ui';
 import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import type { UseTableExport } from '@/components/ui/useTableExport';
 import type { MakeOrBuy } from '@/engine/industry/makeOrBuy';
-import { rowVolume } from '@/engine/industry/materialVolume';
 import type { MaterialSourcing, MaterialSourcingMap } from '@/engine/industry/types';
 import type { SkillGateVerdict } from '@/engine/industry/skillGate';
 import { cx } from '@/lib/cx';
 import { formatIskCompact } from '@/lib/isk';
 import { unmaskCount, unmaskNumber } from '@/lib/numberMask';
 import { ItemInfoLink } from '@/features/entities';
-import { formatVolume } from './format';
+import { buildMaterialsColumns } from './MaterialsColumns';
+import { NotApplicable } from './NotApplicable';
 import { materialRowState } from './materialRow';
 import { DepthPriceLine } from './DepthPriceLine';
 import type { DepthPrice } from '@/engine/industry/depthPrice';
@@ -150,15 +149,6 @@ const PHONE_SORTS: readonly PhoneSort[] = ['plan', 'total', 'toBuy', 'name'];
 /** A material being built here rather than bought. */
 function isBuilt(material: MaterialTableRow): boolean {
   return material.subBuilds.length > 0;
-}
-
-/** A plain "—" for a cell with nothing to say on this kind of row. */
-function NotApplicable() {
-  return (
-    <span className="text-text-faint" aria-hidden="true">
-      —
-    </span>
-  );
 }
 
 /**
@@ -660,83 +650,18 @@ export function MaterialsTable({
   // hold and toggle machinery above, and a stale closure there would commit
   // an edit through an outdated sourcing map.
   const anyDepth = materials.some((m) => depthOf(m) !== undefined);
-  const columns: DataTableColumn<MaterialTableRow>[] = [
-    {
-      id: 'material',
-      header: t('industry.material'),
-      sortValue: (material) => nameFor(material.typeID),
-      render: (material) => renderName(material, true),
-    },
-    {
-      id: 'quantity',
-      header: t('industry.errands.need'),
-      align: 'right',
-      className: 'tabular-nums',
-      headerCellClassName: 'w-20',
-      sortValue: (material) => material.quantity,
-      render: (material) => <span>{material.quantity.toLocaleString()}</span>,
-    },
-    {
-      id: 'owned',
-      header: t('industry.errands.haveColumn'),
-      align: 'right',
-      // The field's own width plus the compact cell padding, and no more.
-      headerCellClassName: 'w-24',
-      render: renderHave,
-    },
-    {
-      id: 'toBuy',
-      header: t('industry.errands.toBuyColumn'),
-      align: 'right',
-      className: 'tabular-nums',
-      headerCellClassName: 'w-20',
-      // A built row is not bought at all, so it sinks rather than sorting as zero.
-      sortValue: (material) =>
-        material.subBuilds.length > 0 ? undefined : material.remainingQuantity,
-      render: (material) =>
-        material.subBuilds.length > 0 ? (
-          <NotApplicable />
-        ) : (
-          <span>{material.remainingQuantity.toLocaleString()}</span>
-        ),
-    },
-    {
-      id: 'price',
-      header: t('industry.price'),
-      align: 'right',
-      // Wider only while a row carries a Depth Price's second line.
-      headerCellClassName: anyDepth ? 'w-44' : 'w-28',
-      render: renderPrice,
-    },
-    {
-      id: 'volume',
-      header: t('industry.volume'),
-      align: 'right',
-      className: 'tabular-nums',
-      headerCellClassName: 'w-24',
-      sortValue: (material) =>
-        material.subBuilds.length > 0 ? undefined : (rowVolume(material, volumeFor) ?? undefined),
-      render: (material) => {
-        // A built row's own volume is never hauled at this typeID — its
-        // inputs carry it in their own rows.
-        if (material.subBuilds.length > 0) return <NotApplicable />;
-        const volume = rowVolume(material, volumeFor);
-        return <span>{volume === null ? t('common.unknown') : formatVolume(volume)}</span>;
-      },
-    },
-    {
-      id: 'lineTotal',
-      header: t('industry.errands.total'),
-      align: 'right',
-      className: 'tabular-nums',
-      headerCellClassName: 'w-24',
-      sortValue: (material) =>
-        material.subBuilds.length > 0
-          ? undefined
-          : (materialRowState(material, sourcing, pricesReady).lineCost ?? undefined),
-      render: renderTotal,
-    },
-  ];
+  const columns = buildMaterialsColumns({
+    t,
+    nameFor,
+    volumeFor,
+    sourcing,
+    pricesReady,
+    anyDepth,
+    renderName,
+    renderHave,
+    renderPrice,
+    renderTotal,
+  });
 
   // Dropped only where Materials shares its row with Costs & revenue (`xl`
   // up to `2xl`): that panel already totals the plan's volume, and the
