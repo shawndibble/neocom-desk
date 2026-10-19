@@ -1,5 +1,6 @@
 import { eyebrowClassName } from './eyebrowClassName';
 import { useEffect, useId, useMemo, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { cx } from '@/lib/cx';
 import { COMBOBOX_NAV_KEYS, moveHighlight, type ComboboxNavKey } from '@/lib/comboboxNav';
 import {
@@ -26,7 +27,11 @@ export interface MultiSelectProps<Id> {
   summary?: ReactNode;
   /**
    * The trigger's accessible name, when its visible text alone doesn't say
-   * enough (a bare "2 / 4"). Keep the visible text a substring of it (WCAG 2.5.3).
+   * enough ("Compare regions, 2 of 4 picked" for "Compare regions 2 / 4").
+   * Start it with the visible field name, so a speech user can say what they
+   * see (WCAG 2.5.3). Without it, a `triggerLabel` that differs from `label`
+   * is named "label: triggerLabel" ("Location: All locations"), the way
+   * `CheckboxSelect` names its trigger; otherwise the visible text names it.
    */
   triggerAriaLabel?: string;
   /** The trigger's control size; share it with the row's other controls (DESIGN.md §3). */
@@ -82,6 +87,7 @@ export function MultiSelect<Id>({
   extraContent,
   contentClassName,
 }: MultiSelectProps<Id>) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [highlight, setHighlight] = useState<number | null>(null);
@@ -133,7 +139,12 @@ export function MultiSelect<Id>({
       {/* Field chrome, never a `Button`: a multi-pick opens a list to pick
           from, the same intent as a `Select` (DESIGN.md §6c). */}
       <PopoverTrigger
-        aria-label={triggerAriaLabel}
+        aria-label={
+          triggerAriaLabel ??
+          (triggerLabel !== undefined && triggerLabel !== label
+            ? t('common.checkboxSelect.labelled', { label, value: triggerLabel })
+            : undefined)
+        }
         className={cx(selectTriggerClassName(size), className)}
       >
         <span>

@@ -26,7 +26,7 @@ const GROUPS = [
 
 async function openMenu() {
   const user = userEvent.setup();
-  await user.click(screen.getByRole('button', { name: 'Open' }));
+  await user.click(screen.getByRole('button', { name: /Open$/ }));
   return user;
 }
 
@@ -332,7 +332,7 @@ describe('MultiSelect', () => {
     expect(screen.getByRole('dialog', { name: 'People' })).toBeInTheDocument();
   });
 
-  it('names the trigger by its visible text when no aria label is given', () => {
+  it('names a self-named trigger "label: value" when no aria label is given', () => {
     render(
       <MultiSelect
         label="Location"
@@ -344,6 +344,6 @@ describe('MultiSelect', () => {
         noResultsLabel="No matches"
       />
     );
-    expect(screen.getByRole('button', { name: 'All locations' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Location: All locations' })).toBeInTheDocument();
   });
 });

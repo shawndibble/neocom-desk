@@ -167,10 +167,6 @@ export function OpenOrdersFilterFields({
           label={t('market.orders.filter.location')}
           size="sm"
           triggerLabel={locationSummary}
-          triggerAriaLabel={t('common.checkboxSelect.labelled', {
-            label: t('market.orders.filter.location'),
-            value: locationSummary,
-          })}
           options={locationOptions.map((option) => ({
             id: option.locationId,
             label: option.label,

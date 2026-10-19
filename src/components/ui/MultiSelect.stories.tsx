@@ -70,7 +70,7 @@ export const SmallSelfNamedTrigger: Story = {
     size: 'sm',
     triggerLabel: 'All hubs',
     summary: undefined,
-    triggerAriaLabel: 'Hubs: All hubs',
+    triggerAriaLabel: undefined,
     selected: new Set(),
   },
 };
