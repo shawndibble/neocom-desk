@@ -355,7 +355,10 @@ beforeAll(async () => {
   await Promise.all([routeChunks.loadLayout(), routeChunks.loadMarket()]);
 });
 afterAll(() => server.close());
-afterEach(() => server.resetHandlers());
+afterEach(() => {
+  vi.useRealTimers();
+  server.resetHandlers();
+});
 beforeEach(async () => {
   await db.characters.clear();
   await db.settings.clear();
@@ -1928,14 +1931,15 @@ describe('Shareable Market Browser URLs (issue #4)', () => {
   });
 
   it('keeps the selected item when an item is picked before the search text has settled', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
     server.use(ordersHandler({ count: 0 }));
-    const user = userEvent.setup();
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<App />);
 
     await user.type(await screen.findByRole('searchbox'), 'rift');
     await user.click(await screen.findByText('Rifter'));
     // Past the search debounce: a late write must not undo the selection.
-    await new Promise((resolve) => setTimeout(resolve, 450));
+    await vi.advanceTimersByTimeAsync(450);
     const params = Object.fromEntries(new URLSearchParams(window.location.search));
     expect(params).toEqual({ 'browser.q': 'rift', type: '587', hub: 'jita' });
   });

@@ -3,7 +3,7 @@
  * search mocked. The rules themselves (caps, validation) are covered in
  * `engine/mailCompose.test.ts`.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
@@ -32,6 +32,10 @@ const lacks = vi.hoisted(() => ({ value: false }));
 vi.mock('@/app/useGrantedScopes', () => ({ useCharacterLacksEndpoints: () => lacks.value }));
 
 const CHAR_ID = 91;
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -336,12 +340,13 @@ describe('draft survives leaving without Close', () => {
   });
 
   it('does not write after a send finished', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
     const { user, onSent } = setup();
     await addList(user);
     await user.click(screen.getByRole('button', { name: 'Send' }));
     await waitFor(() => expect(onSent).toHaveBeenCalled());
     drafts.saveNewMailDraft.mockClear();
-    await new Promise((r) => setTimeout(r, 600));
+    await vi.advanceTimersByTimeAsync(600);
     expect(drafts.saveNewMailDraft).not.toHaveBeenCalled();
   });
 });
