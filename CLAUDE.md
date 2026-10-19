@@ -17,6 +17,8 @@ dev`) — Shawn frequently has another agent working there at the same
   `docs/agents/issue-tracker.md` "CI and merge". Every merge to `develop` ships to
   `https://dev.neocomdesk.com` (its own EVE app and client ID); Cloud Functions are
   not auto-deployed, so a new client ID also goes in `functions/.env`'s `EVE_CLIENT_ID`.
+  Dev and production share one Firebase project and its data, so Firestore changes from
+  `develop` stay additive and backward-compatible (docs/context/decisions/).
 - Architecture map: docs/ARCHITECTURE.md — read before locating or adding features.
 - `GLOSSARY.md` is the glossary. Use its terms exactly. Don't read it whole: `grep -n -i "<term>" GLOSSARY.md` for the terms in your task.
 - **Never append a scope decision to `GLOSSARY.md`.** Scope decisions live one
