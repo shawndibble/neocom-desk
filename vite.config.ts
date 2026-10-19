@@ -393,6 +393,10 @@ export default defineConfig({
   },
   test: {
     globals: true,
+    // Undo `vi.stubGlobal` and restore `vi.spyOn` spies after every test, so a
+    // file that forgets to clean up cannot leak into the next test (#4117).
+    unstubGlobals: true,
+    restoreMocks: true,
     // Tests run in UTC, matching the CI runners, so a suite that passes here
     // passes there and vice versa.
     //

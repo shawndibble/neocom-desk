@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 
@@ -65,7 +65,12 @@ describe('useRouteSnapshot cache-revalidation storm', () => {
     cache.__resetEmitCap();
   });
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('does not re-run the loader once per revalidation signal forever', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     const { useRouteSnapshot } = await import('./useRouteSnapshot');
     const cache = (await import('@/esi/cache')) as unknown as { __emit: () => void };
     let callCount = 0;
@@ -86,7 +91,7 @@ describe('useRouteSnapshot cache-revalidation storm', () => {
     // microtasks/effect passes, so this comfortably covers MAX_EMITS rounds
     // if nothing bounds it, without the test itself hanging.
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 300));
+      await vi.advanceTimersByTimeAsync(300);
     });
 
     // Unbounded would mean callCount tracks MAX_EMITS + 1 (one run per
@@ -99,6 +104,7 @@ describe('useRouteSnapshot cache-revalidation storm', () => {
   });
 
   it('bounds the chain even when every reload takes longer than any plausible cooldown', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     // Regression for a real gap CodeRabbit caught in review: a first version
     // of this fix throttled by wall-clock spacing between reloads. A single
     // reload slow enough to outlast that window (ordinary on the slow mobile
@@ -129,9 +135,10 @@ describe('useRouteSnapshot cache-revalidation storm', () => {
     // small steps lets each round's reload actually commit and re-render.
     for (let i = 0; i < 20; i += 1) {
       await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 30));
+        await vi.advanceTimersByTimeAsync(30);
       });
     }
+    vi.useRealTimers();
 
     expect(callCount).toBeLessThan(6);
     await waitFor(() => expect(result.current.loading).toBe(false));

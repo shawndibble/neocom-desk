@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ensureAnySession } from '@/sync/syncAuth';
 import { db } from '@/db';
 import {
@@ -36,6 +36,10 @@ vi.mock('@/sync/firebaseApp', () => ({ getSyncFirestore: () => ({}) }));
 vi.mock('@/sync/syncAuth', () => ({ ensureAnySession: vi.fn(async () => 'char:1') }));
 
 const NOW = Date.UTC(2026, 9, 2, 12);
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 beforeEach(async () => {
   vi.useFakeTimers({ now: NOW, toFake: ['Date'] });
