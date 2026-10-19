@@ -12370,6 +12370,10 @@
     "unconfirmed": "The connection timed out. Couldn't confirm it opened in EVE — check your client."
   },
   "travel": {
+    "zkillFailure": {
+      "offline": "Couldn't reach zKillboard. Check your connection, then try again.",
+      "rateLimited": "zKillboard is rate-limiting requests. Try again shortly."
+    },
     "incursions": {
       "title": "Incursions near you",
       "show": "Show incursions",
