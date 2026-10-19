@@ -559,7 +559,10 @@ export function OpportunitiesPanel({
     columns.map((column) => column.id)
   );
 
-  const viewPicker = <OpportunitiesViewPicker view={view} onViewChange={setView} />;
+  // `undefined` on desktop, not an empty element: `Panel` pads its header by `leading`'s truthiness.
+  const viewPicker = isDesktop ? undefined : (
+    <OpportunitiesViewPicker view={view} onViewChange={setView} />
+  );
   const meta = (
     <OpportunitiesFilterBar
       view={view}
