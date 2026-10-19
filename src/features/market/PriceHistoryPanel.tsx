@@ -13,6 +13,7 @@ import {
   CachedNotice,
 } from '@/components/ui';
 import { cx } from '@/lib/cx';
+import { useNow } from '@/lib/useNow';
 import { formatMeanCount, formatVolume } from './format';
 import { loadPriceHistory } from './priceHistory';
 import {
@@ -194,10 +195,12 @@ export function PriceHistoryPanel({
   regionId,
   typeId,
   itemName,
-  now,
+  now: nowProp,
   compare,
 }: PriceHistoryPanelProps) {
   const { t } = useTranslation();
+  const tick = useNow();
+  const now = useMemo(() => nowProp ?? new Date(tick), [nowProp, tick]);
   const compareIds = useMemo(
     () => normalizeCompareRegions(compare?.regionIds ?? NO_REGIONS, regionId),
     [compare?.regionIds, regionId]
@@ -335,7 +338,7 @@ interface RangedHistoryProps {
   range: PriceHistoryRange;
   onRangeChange: (range: PriceHistoryRange) => void;
   itemName: string;
-  now?: Date;
+  now: Date;
   primaryRegionId: number;
   compare: PriceHistoryCompare | undefined;
   /** Normalized picks, parallel to `comparedHistories`. */
@@ -401,11 +404,7 @@ function RangedHistory({
       }),
     [compareIds, comparedHistories, regions, range, now]
   );
-  const filtered = useMemo(
-    () =>
-      now ? filterPriceHistoryRange(points, range, now) : filterPriceHistoryRange(points, range),
-    [points, range, now]
-  );
+  const filtered = useMemo(() => filterPriceHistoryRange(points, range, now), [points, range, now]);
   const summary = useMemo(() => summarizePriceHistory(filtered), [filtered]);
   // Computed over the full unfiltered `points`, then sliced to `range` —
   // computing it over `filtered` instead would understate the window for

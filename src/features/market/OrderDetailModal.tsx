@@ -46,6 +46,7 @@ import type { UndercutRival, UndercutScope } from '@/engine/market/undercut';
 import { sellThrough, type SellThrough } from '@/engine/market/orderHealth';
 import { filterPriceHistoryRange } from '@/engine/market/priceHistory';
 import { useIsPhone } from '@/lib/useIsPhone';
+import { useNow } from '@/lib/useNow';
 import type { OpenOrderRow } from './openOrdersModel';
 import type { RegionCompetition, StructureCompetition } from './orderCompetition';
 import type { PriceHistoryResult } from './priceHistory';
@@ -436,12 +437,13 @@ function ScopeRow({
 function computeSellThrough(
   row: OpenOrderRow,
   deep: RegionCompetition | null,
-  history: PriceHistoryResult | null
+  history: PriceHistoryResult | null,
+  now: Date
 ): SellThrough {
   if (!history || history.points.length === 0) return { kind: 'unknown', reason: 'noHistory' };
 
   const recentDays = 30;
-  const recent = filterPriceHistoryRange(history.points, '30d');
+  const recent = filterPriceHistoryRange(history.points, '30d', now);
   const regionUnitsPerDay = recent.reduce((sum, p) => sum + p.volume, 0) / recentDays;
 
   let myShare = 1;
@@ -488,6 +490,7 @@ export function OrderDetailContent({
 }: OrderDetailContentProps) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
+  const nowTick = useNow();
   // All folded: verdict, Copy and the facts are the answer, each trailing read
   // its summary. Remounts per orderId, so nothing carries between orders.
   const [openSections, setOpenSections] = useState<ReadonlySet<OrderDetailSectionId>>(
@@ -522,7 +525,7 @@ export function OrderDetailContent({
   const system = deepScopeState('system', row, deep, location);
   const region = deepScopeState('region', row, deep, location);
 
-  const sell = computeSellThrough(row, deep, history);
+  const sell = computeSellThrough(row, deep, history, new Date(nowTick));
   const sellValue =
     sell.kind === 'known'
       ? `${sell.daysToClear}d`

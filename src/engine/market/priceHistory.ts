@@ -37,7 +37,7 @@ const RANGE_DAYS: Record<PriceHistoryRange, number> = { '7d': 7, '30d': 30, '90d
 export function filterPriceHistoryRange<T extends { date: string }>(
   points: readonly T[],
   range: PriceHistoryRange,
-  now: Date = new Date()
+  now: Date
 ): T[] {
   const cutoff = new Date(now);
   cutoff.setDate(cutoff.getDate() - RANGE_DAYS[range]);

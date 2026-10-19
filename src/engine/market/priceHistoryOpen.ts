@@ -54,9 +54,9 @@ export function openPricePoints(series: OpenPriceSeries): OpenPricePoint[] {
 export function clipOpenPrices(
   points: readonly OpenPricePoint[],
   range: PriceHistoryRange,
-  now?: Date
+  now: Date
 ): OpenPricePoint[] {
-  return now ? filterPriceHistoryRange(points, range, now) : filterPriceHistoryRange(points, range);
+  return filterPriceHistoryRange(points, range, now);
 }
 
 export interface RegionOpenSeries {

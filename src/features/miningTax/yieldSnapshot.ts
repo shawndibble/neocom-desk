@@ -301,7 +301,7 @@ export async function loadMiningYieldSnapshot(
   // before anything reads the snapshots back — so today prices as "saved".
   // `getHubPrices` never throws (a null price per type when Fuzzwork is down);
   // a failed save only costs today's snapshot, never the page.
-  const today = eveToday();
+  const today = eveToday(new Date());
   const hubPrices = await getHubPrices(DEFAULT_TRADE_HUB, historyTypeIds);
   const livePrices = new Map<number, SidePrices>();
   const todaySnapshot: SnapshotDay = {};
