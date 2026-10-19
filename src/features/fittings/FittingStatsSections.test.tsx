@@ -160,6 +160,7 @@ const [frigate, cruiser] = BUILT_IN_TARGET_PROFILES;
 
 function targetProfiles(overrides: Partial<TargetProfiles> = {}): TargetProfiles {
   return {
+    hydrated: true,
     custom: [],
     selected: cruiser,
     select: vi.fn(),
