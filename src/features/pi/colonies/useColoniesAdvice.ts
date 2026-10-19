@@ -32,7 +32,7 @@ export interface ColoniesAdviceState {
 
 /**
  * @param reloadKey Any value that changes when the colonies must be re-read
- *   (the route's own load stamp), so a manual refresh reaches this read too.
+ *   (the route's own load stamp); the PI page's `PiSnapshotProvider` owns the snapshot re-read, so this reaches only the prices load there.
  */
 export function useColoniesAdvice(
   characterId: number | null,
