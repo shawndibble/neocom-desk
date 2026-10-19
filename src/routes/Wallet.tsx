@@ -1,19 +1,15 @@
 import { NO_NAMES } from '@/lib/emptyCollections';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
   DataAgeBadge,
-  DataTable,
-  CachedEmptyState,
   EmptyState,
   IconButton,
   InfoTooltip,
   PageHeader,
-  Panel,
-  LoadFailedState,
   Spinner,
   RowCaret,
   TabPanel,
@@ -24,44 +20,28 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
-import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { GrantBanner } from '@/app/GrantNote';
 import { db } from '@/db';
 import { useCharacters } from '@/features/character/useCharacters';
 import { miningTaxPaymentHref } from '@/features/miningTax/paymentDeepLink';
 import { linkedRefIds } from '@/features/miningTax/paymentLinks';
-import {
-  loadWalletBalanceWithStatus,
-  loadWalletJournalHistory,
-  loadWalletTransactionsHistory,
-  loadAllCharactersWalletBalances,
-  oldestCachedBalanceAt,
-  type WalletBalancesSnapshot,
-} from '@/features/character/wallet';
-import { LpStorePicker } from '@/features/loyalty/LpStorePicker';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
 import { useViewedCharacterId } from '@/features/character/viewedCharacter';
-import { WalletOriginCrumb } from '@/features/character/WalletOriginCrumb';
 import {
   useResolvedCharacterFilter,
   type CharacterFilterValue,
 } from '@/features/character/characterFilterValue';
 import { useRememberedCharacterFilter } from '@/features/character/characterFilterPicks';
-import { loadCharacterLoyaltyPoints, splitEverMarks } from '@/features/character/loyalty';
-import { resolveNames } from '@/features/character/names';
-import type { CachedResult } from '@/esi/cache';
-import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
+import { splitEverMarks } from '@/features/character/loyalty';
+import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { useCorpSnapshot } from '@/features/corp/useCorpSnapshot';
 import { usePageTab } from '@/lib/usePageTab';
-import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
-import { useRememberedUrlParams, useUrlFilter, useUrlParam, useUrlSort } from '@/lib/useUrlState';
+import { useRememberedUrlParams, useUrlFilter, useUrlSort } from '@/lib/useUrlState';
 import { WALLET_TABS } from '@/app/pageTabs';
 import { tabPath } from '@/lib/pageTabs';
 import { characterFilterParam } from '@/features/character/characterFilterUrlParam';
 import { useHighlightParam } from '@/lib/useHighlightParam';
-import { loadTypeNames } from '@/features/character/typeNames';
-import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { walletJournalCsvColumns } from '@/features/character/walletJournalCsv';
 import { FromWalletCrumb } from '@/features/netWorth/FromWalletCrumb';
@@ -87,100 +67,25 @@ import {
   useJournalColumnsBuilder,
   useJournalFilterResult,
 } from '@/features/character/walletJournal';
-import { JournalTable } from '@/features/character/WalletJournalTable';
-import { WalletHistoryNote } from '@/features/character/WalletHistoryNote';
-import { loadWalletArchiveInfo, type WalletArchiveInfo } from '@/features/character/walletArchive';
+import { WalletJournalPanel } from '@/features/character/WalletJournalPanel';
+import { WalletLoyaltyPanel } from '@/features/character/WalletLoyaltyPanel';
+import { useWalletBalances } from '@/features/character/useWalletBalances';
+import { useWalletDrill } from '@/features/character/useWalletDrill';
+import {
+  EMPTY_FILLS,
+  EMPTY_JOURNAL,
+  loadPersonalFills,
+  loadWalletSnapshot,
+  type PersonalFillsSnapshot,
+} from '@/features/character/walletSnapshot';
 import type {
   CharacterLoyaltyPoints,
   WalletJournalEntry,
   WalletTransactionCommon,
 } from '@/esi/endpoints';
-import { intParam } from '@/lib/urlState';
 
-/** Stable identity, so the fallback doesn't invalidate the column memo every render. */
-/** Stable identity, so a missing journal doesn't invalidate its dependent memos every render. */
-const EMPTY_JOURNAL: readonly WalletJournalEntry[] = [];
-/** Same, for the personal fills the journal links its market lines to. */
-const EMPTY_FILLS: readonly (WalletTransactionCommon & { characterId?: number })[] = [];
-
-/**
- * `?drill=<id>`: the Character the net worth view is drilled into; 0 = none. Not
- * `?character=`: that param is the alert deep link, which `AlertCharacterSwitch`
- * strips and turns into an active-Character switch.
- */
-const DRILL_PARAM = intParam(0);
 const WALLET_CHARACTER_PARAMS = { char: characterFilterParam('current') };
 const LOYALTY_SORT = { columnId: 'points', direction: 'desc' } as const;
-
-interface Snapshot {
-  balanceResult: CachedResult<number> | null;
-  /** 401/403 (or a failed token refresh) means "log in again", not "offline". */
-  balanceNeedsReauth: boolean;
-  journalResult: CachedResult<WalletJournalEntry[]> | null;
-  /** 401/403 (or a failed token refresh) means "log in again", not "offline". */
-  journalNeedsReauth: boolean;
-  /** Fewer pages came back than ESI advertised — the list below is partial. */
-  journalTruncated: boolean;
-  /** What the device-kept history reaches back to. */
-  archive: WalletArchiveInfo;
-  loyaltyResult: CachedResult<CharacterLoyaltyPoints[]> | null;
-  /** 401/403 (or a failed token refresh) means "log in again", not "offline". */
-  loyaltyNeedsReauth: boolean;
-  corporationNames: Map<number, string>;
-}
-
-async function loadWalletSnapshot(
-  characterId: number,
-  signal: RouteSnapshotSignal
-): Promise<Snapshot> {
-  const [balanceStatus, journalStatus, loyaltyStatus] = await Promise.all([
-    loadWalletBalanceWithStatus(characterId),
-    loadWalletJournalHistory(characterId),
-    loadCharacterLoyaltyPoints(characterId),
-  ]);
-  // After the journal load: that fetch is what extends the coverage read here.
-  const archive = await loadWalletArchiveInfo(characterId);
-  const { cached: balanceResult, needsReauth: balanceNeedsReauth } = balanceStatus;
-  const { cached: loyaltyResult, needsReauth: loyaltyNeedsReauth } = loyaltyStatus;
-  const { cached: journalResult, needsReauth: journalNeedsReauth } = journalStatus;
-  const journalTruncated = journalResult?.truncated ?? false;
-  // Already superseded: skip the ESI name resolve, its result would be discarded.
-  const corporationIds = signal.cancelled
-    ? []
-    : (loyaltyResult?.data ?? []).map((entry) => entry.corporation_id);
-  const corporationNames = await resolveNames(corporationIds);
-  return {
-    balanceResult,
-    balanceNeedsReauth,
-    journalResult,
-    journalNeedsReauth,
-    journalTruncated,
-    archive,
-    loyaltyResult,
-    loyaltyNeedsReauth,
-    corporationNames,
-  };
-}
-
-/**
- * The Character's recent fills, read only so a journal line can name the item
- * behind it (the fills themselves are listed on Market's History tab). Its
- * own load, not part of `loadWalletSnapshot`: the Balance tab would
- * otherwise wait on a cursor walk it never shows.
- */
-interface PersonalFillsSnapshot {
-  transactions: readonly WalletTransactionCommon[];
-  typeNames: Map<number, string>;
-  /** The fetch stopped at its page cap: older journal lines stay unnamed. */
-  truncated: boolean;
-}
-
-async function loadPersonalFills(characterId: number): Promise<PersonalFillsSnapshot> {
-  const result = await loadWalletTransactionsHistory(characterId);
-  const transactions = result?.data ?? [];
-  const typeNames = await loadTypeNames([...new Set(transactions.map((txn) => txn.type_id))]);
-  return { transactions, typeNames, truncated: result?.truncated ?? false };
-}
 
 /**
  * Wallet: the pilot's own ISK — balance and journal, for the active Character
@@ -241,32 +146,7 @@ export function Wallet() {
     resolvedWalletFilter.size !== 1 ||
     !resolvedWalletFilter.has(activeCharacterId ?? -1);
 
-  // Drilling into one Character is route state, so the browser Back button undoes it.
-  const [drilledId, setDrilledId] = useUrlParam('drill', DRILL_PARAM);
-  // The drill swaps one panel for another, so the focused row or button is
-  // removed; hand focus to its counterpart in the panel that replaces it.
-  const focusAfterCommit = useFocusAfterCommit();
-  const panelHeadingRef = useRef<HTMLHeadingElement>(null);
-  const backButtonRef = useRef<HTMLButtonElement>(null);
-  const drillInto = useCallback(
-    (id: number) => {
-      setDrilledId(id, { push: true });
-      focusAfterCommit(backButtonRef);
-    },
-    [setDrilledId, focusAfterCommit]
-  );
-  const leaveDrill = useCallback(() => {
-    setDrilledId(0, { push: true });
-    focusAfterCommit(
-      () =>
-        document.querySelector<HTMLElement>(
-          `[aria-label="${CSS.escape(t('wallet.balanceByCharacter'))}"] [data-row-key="${drilledId}"]`
-        ),
-      // The old drilled panel's heading is still mounted until the route
-      // commits, so only fall back to it once the back button is gone.
-      () => (backButtonRef.current?.isConnected ? null : panelHeadingRef.current)
-    );
-  }, [setDrilledId, focusAfterCommit, drilledId, t]);
+  const { drilledId, drillInto, leaveDrill, backButtonRef, panelHeadingRef } = useWalletDrill();
 
   const allCharacters = useCharacters();
   const activeCharacter = allCharacters.find((c) => c.characterId === activeCharacterId);
@@ -316,39 +196,7 @@ export function Wallet() {
       />
     ) : undefined;
 
-  // Nothing fetched until the Character filter actually asks for more than
-  // the active Character. No separate "loading" state: `walletBalancesSnapshot
-  // === null` already means "nothing to show yet," and a manual refresh
-  // deliberately leaves the previous snapshot in place while it re-fetches —
-  // same retained-snapshot idiom `useRouteSnapshot`/`useCorpSnapshot` use
-  // elsewhere in this app, and the only way to give the effect below no
-  // synchronous `setState` call of its own (`react-hooks/set-state-in-effect`).
-  const [walletBalancesSnapshot, setWalletBalancesSnapshot] =
-    useState<WalletBalancesSnapshot | null>(null);
-  const [walletBalancesRefreshCount, setWalletBalancesRefreshCount] = useState(0);
-  useEffect(() => {
-    if (!showingBeyondActive && !drilledCharacter) return;
-    let cancelled = false;
-    void loadAllCharactersWalletBalances().then((snapshot) => {
-      if (!cancelled) setWalletBalancesSnapshot(snapshot);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [showingBeyondActive, drilledCharacter, walletBalancesRefreshCount]);
-  const refreshWalletBalances = useCallback(
-    () => setWalletBalancesRefreshCount((count) => count + 1),
-    []
-  );
-  const walletBalancesLoading = walletBalancesSnapshot === null;
-  // The all-characters totals add up one balance read per character: if any of
-  // them is the saved copy the total is only as fresh as the oldest of those.
-  const walletBalancesCachedAt = useMemo(() => {
-    return oldestCachedBalanceAt(
-      walletBalancesSnapshot?.entries ?? [],
-      new Set(multiCharacters.map((c) => c.characterId))
-    );
-  }, [walletBalancesSnapshot, multiCharacters]);
+  const balances = useWalletBalances(showingBeyondActive || !!drilledCharacter, multiCharacters);
 
   // Opt-in: fetched only once the Journal tab is open, and kept alive once
   // visited, so a tab toggle doesn't walk the cursor again.
@@ -551,7 +399,7 @@ export function Wallet() {
   );
   const liveWallet = useMemo(() => {
     const map = new Map<number, { balance: number | null; needsReauth: boolean }>();
-    for (const entry of walletBalancesSnapshot?.entries ?? []) {
+    for (const entry of balances.snapshot?.entries ?? []) {
       map.set(entry.characterId, {
         balance: entry.balanceResult?.data ?? null,
         needsReauth: entry.needsReauth,
@@ -565,7 +413,7 @@ export function Wallet() {
       });
     }
     return map;
-  }, [walletBalancesSnapshot, activeCharacterId, balanceResult, balanceNeedsReauth]);
+  }, [balances.snapshot, activeCharacterId, balanceResult, balanceNeedsReauth]);
   // Lines between the pilot's own Characters are netted against every Character
   // with the wallet permission, picked or not: a donation from your own alt is
   // internal even in the one-Character view.
@@ -751,11 +599,11 @@ export function Wallet() {
                 characters={multiCharacters}
                 liveWallet={liveWallet}
                 notices={
-                  walletBalancesCachedAt !== null && (
+                  balances.cachedAt !== null && (
                     <CachedNotice
                       className="mt-3"
-                      fetchedAt={walletBalancesCachedAt}
-                      refreshFailed={walletBalancesRefreshCount > 0}
+                      fetchedAt={balances.cachedAt}
+                      refreshFailed={balances.refreshCount > 0}
                     />
                   )
                 }
@@ -768,8 +616,8 @@ export function Wallet() {
                     size="sm"
                     icon={<Icon.Refresh />}
                     label={t('wallet.refresh')}
-                    onClick={refreshWalletBalances}
-                    disabled={walletBalancesLoading}
+                    onClick={balances.refresh}
+                    disabled={balances.loading}
                   />
                 }
               />
@@ -842,175 +690,52 @@ export function Wallet() {
               </>
             )}
 
-            {loyaltyResult && !loyaltyNeedsReauth && otherLoyalty.length === 0 ? (
-              // Nothing to list: one muted line instead of an empty panel. The
-              // picker stays as the way into any corp's store (issue #2321).
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-1 text-xs text-text-dim">
-                <span>{t('loyalty.noneLine')}</span>
-                <LpStorePicker corporationName={null} size="sm" className="w-44" />
-              </div>
-            ) : (
-              <Panel
-                // Lifts this panel's stacking context over the next one, so the
-                // picker's popover isn't painted under it.
-                className="relative z-10"
-                padded={false}
-                title={t('loyalty.title')}
-                actions={
-                  <span className="flex items-center gap-2">
-                    {/* Always shown, LP or not (issue #2321): the way into any
-                    corp's store for a pilot who holds LP nowhere yet. */}
-                    <LpStorePicker corporationName={null} size="sm" className="w-44" />
-                    {loyaltyResult && !loyaltyNeedsReauth && otherLoyalty.length > 0 && (
-                      <TableActionsMenu name={t('loyalty.title')} tableExport={loyaltyExport} />
-                    )}
-                  </span>
-                }
-              >
-                {loyaltyNeedsReauth ? (
-                  <div className="p-3">
-                    <GrantBanner
-                      characterId={activeCharacterId}
-                      endpoints={['getCharacterLoyaltyPoints']}
-                      title={t('loyalty.reauthTitle')}
-                      hint={t('loyalty.reauthHint')}
-                      actionLabel={t('loyalty.reauthAction')}
-                    />
-                  </div>
-                ) : !loyaltyResult || otherLoyalty.length === 0 ? (
-                  <CachedEmptyState
-                    result={loyaltyResult}
-                    title={t('loyalty.emptyTitle')}
-                    hint={t('loyalty.emptyHint')}
-                    fetchedTitle={t('loyalty.emptyTitle')}
-                    className="py-8"
-                  />
-                ) : (
-                  <DataTable
-                    {...loyaltyExport.tableProps}
-                    label={t('loyalty.title')}
-                    columns={loyaltyColumns}
-                    rows={otherLoyalty}
-                    rowKey={(entry) => entry.corporation_id}
-                    sort={loyaltySortProps.sort}
-                    onSortChange={loyaltySortProps.onSortChange}
-                    responsive="table"
-                    rowClassName={() => 'group'}
-                    onRowClick={(entry) => navigate(`/wallet/lp-store/${entry.corporation_id}`)}
-                  />
-                )}
-              </Panel>
-            )}
+            <WalletLoyaltyPanel
+              activeCharacterId={activeCharacterId}
+              loyaltyResult={loyaltyResult}
+              loyaltyNeedsReauth={loyaltyNeedsReauth}
+              otherLoyalty={otherLoyalty}
+              columns={loyaltyColumns}
+              sortProps={loyaltySortProps}
+              tableExport={loyaltyExport}
+            />
           </div>
         ) : (
-          <Panel
-            padded={false}
-            title={t('wallet.journalTab')}
-            wrapMeta
-            // Beside the open panel the page is narrow at any viewport, so the
-            // Character filter drops under the title instead of crowding the actions.
-            className={iskPanelOpen ? '[&>header>div:first-child]:flex-wrap' : undefined}
-            meta={
-              <span
-                className={cx(
-                  'flex flex-wrap items-center gap-2 max-md:basis-full',
-                  iskPanelOpen && 'md:basis-full'
-                )}
-              >
-                <WalletOriginCrumb />
-                {walletCharacterFilterMeta}
-              </span>
-            }
-            actions={
-              <span className="flex items-center gap-2">
-                <Link
-                  to="/market/history"
-                  className={cx(
-                    'inline-flex min-h-11 min-w-11 items-center justify-center text-xs md:min-h-0 md:min-w-0',
-                    inlineLinkClassName
-                  )}
-                >
-                  {t('wallet.transactionsLink')}
-                </Link>
-                {journalFetchedAt && (
-                  <>
-                    <TableActionsMenu name={t('wallet.journalTab')} tableExport={journalExport} />
-                    <DataAgeBadge date={journalFetchedAt} />
-                  </>
-                )}
-              </span>
-            }
-          >
-            {showingBeyondActive && !allJournalsData ? (
-              allJournals.loading || journalSelectionKey === null ? (
-                <div className="flex justify-center py-8">
-                  <Spinner label={t('common.loading')} />
-                </div>
-              ) : (
-                <LoadFailedState onRetry={allJournals.refresh} className="py-8" />
-              )
-            ) : !showingBeyondActive && journalNeedsReauth ? (
-              <div className="p-3">
-                <GrantBanner
-                  characterId={activeCharacterId}
-                  endpoints={['getCharacterWalletJournal']}
-                  title={t('wallet.reauthTitle')}
-                  hint={t('wallet.reauthHint')}
-                  actionLabel={t('wallet.reauthAction')}
-                />
-              </div>
-            ) : !showingBeyondActive && (!journalResult || journal.length === 0) ? (
-              <CachedEmptyState
-                result={journalResult}
-                title={t('wallet.journalEmptyTitle')}
-                hint={t('wallet.journalEmptyHint')}
-                fetchedTitle={t('wallet.journalEmptyFetchedTitle')}
-                className="py-8"
-              />
-            ) : (
-              <>
-                {!showingBeyondActive && journalResult?.fromCache && (
-                  <CachedNotice
-                    className="px-3 pt-2"
-                    fetchedAt={journalResult.fetchedAt}
-                    refreshFailed={refreshCount > 0}
-                  />
-                )}
-                {journalIsTruncated && (
-                  <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
-                    {t('common.incompleteTitle')} — {t('wallet.journalTruncatedHint')}
-                  </p>
-                )}
-                {itemNamesTruncated && (
-                  <p className="px-3 pt-2 text-[0.6875rem] text-text-dim">
-                    {t('wallet.journalItemNamesCappedHint')}
-                  </p>
-                )}
-                <WalletHistoryNote info={data?.archive} />
-                <JournalTable
-                  filter={journalFilter}
-                  onFilterChange={setJournalFilter}
-                  refTypeOptions={refTypeOptions}
-                  filteredJournal={filteredJournal}
-                  breakdownJournal={breakdownJournal}
-                  chartJournal={chartJournal}
-                  journalColumns={journalColumns}
-                  label={t('wallet.journalTab')}
-                  sort={journalSortProps.sort}
-                  onSortChange={journalSortProps.onSortChange}
-                  highlightRowKey={journalHighlightKey}
-                  keyByCharacter={keyByCharacter}
-                  tableExport={journalExport}
-                  panel={{
-                    open: iskPanelOpen,
-                    onOpenChange: setIskPanelOpen,
-                    scopeLabel: journalScopeLabel,
-                    coverage: journalCoverageInfo,
-                  }}
-                />
-              </>
-            )}
-          </Panel>
+          <WalletJournalPanel
+            activeCharacterId={activeCharacterId}
+            showingBeyondActive={showingBeyondActive}
+            iskPanelOpen={iskPanelOpen}
+            filterMeta={walletCharacterFilterMeta}
+            refreshCount={refreshCount}
+            archive={data?.archive}
+            journalResult={journalResult}
+            journalNeedsReauth={journalNeedsReauth}
+            journalLength={journal.length}
+            allJournalsData={allJournalsData}
+            allJournalsLoading={allJournals.loading}
+            hasJournalSelection={journalSelectionKey !== null}
+            onRetryAllJournals={allJournals.refresh}
+            journalFetchedAt={journalFetchedAt}
+            journalExport={journalExport}
+            journalIsTruncated={journalIsTruncated}
+            itemNamesTruncated={itemNamesTruncated}
+            table={{
+              filter: journalFilter,
+              onFilterChange: setJournalFilter,
+              refTypeOptions,
+              filteredJournal,
+              breakdownJournal,
+              chartJournal,
+              journalColumns,
+              sort: journalSortProps.sort,
+              onSortChange: journalSortProps.onSortChange,
+              highlightRowKey: journalHighlightKey,
+              keyByCharacter,
+            }}
+            onIskPanelOpenChange={setIskPanelOpen}
+            scopeLabel={journalScopeLabel}
+            coverage={journalCoverageInfo}
+          />
         )}
       </TabPanel>
     </div>
