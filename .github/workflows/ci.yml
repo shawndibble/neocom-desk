@@ -397,6 +397,10 @@ jobs:
       options: --init --ipc=host
     steps:
       - uses: actions/checkout@v4
+      # The container runs as root over a checkout owned by the runner user, so
+      # git refuses the repo ("dubious ownership") and `npm ci`'s husky
+      # postinstall check then reports no hook installed.
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - uses: actions/setup-node@v4
         with:
           node-version: 24
