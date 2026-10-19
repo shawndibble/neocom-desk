@@ -552,6 +552,26 @@ function recordAnswer(
   );
 }
 
+/** Drops what these characters last answered to a grouping question (D26b, #4210). */
+function clearAnswers(c: EditCtx, characterIds: readonly number[]): void {
+  if (characterIds.length === 0) return;
+  c.tx.set(
+    col(c, META).doc(ANSWERS_DOC),
+    { answers: Object.fromEntries(characterIds.map((x) => [String(x), FieldValue.delete()])) },
+    { merge: true }
+  );
+}
+
+/** A character an officer put in a group on purpose is no longer one to keep out of auto-grouping. */
+function keepInGroup(c: EditCtx, characterIds: readonly number[]): void {
+  if (characterIds.length === 0) return;
+  c.tx.set(
+    col(c, META).doc(DECLINED_DOC),
+    { ids: FieldValue.arrayRemove(...characterIds) },
+    { merge: true }
+  );
+}
+
 async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
   const { tx, now } = c;
   const iso = new Date(now).toISOString();
@@ -782,6 +802,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       const miners = await tx.get(col(c, MINERS));
       const out = await planMiner(c, miners.docs, action, new Set());
       writeMiner(c, action, out);
+      keepInGroup(c, action.characterIds);
       return {
         detail: {
           minerId: action.minerId,
@@ -809,12 +830,8 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       const out = await planMiner(c, miners.docs, action, absorbed);
       for (const id of absorbed) tx.delete(col(c, MINERS).doc(id));
       writeMiner(c, action, out);
-      // A character an officer put in a group on purpose is no longer one to keep out of auto-grouping.
-      tx.set(
-        col(c, META).doc(DECLINED_DOC),
-        { ids: FieldValue.arrayRemove(...action.characterIds) },
-        { merge: true }
-      );
+      clearAnswers(c, action.characterIds);
+      keepInGroup(c, action.characterIds);
       return {
         detail: {
           minerId: action.minerId,
@@ -830,6 +847,8 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       const miner = await mustGet(c, ref, 'Miner');
       if (!removeFromMiner(c.tx, ref, miner, action.characterId))
         fail('not-found', 'Not in that Miner', 'not-in-miner');
+      // The grouping the answer was about is gone, so the answer must not outlive it.
+      clearAnswers(c, [action.characterId]);
       return { detail: { minerId: action.minerId, characterId: action.characterId } };
     }
     case 'addAdjustment': {

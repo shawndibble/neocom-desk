@@ -878,6 +878,42 @@ suite('Corp Tax Book callables (emulator)', () => {
         expect((await answers())['61']).toBeUndefined();
       });
 
+      it('forgets a confirmation when an officer unlinks the character', async () => {
+        await pendingGuest();
+        await confirmGrouping(deps(), who(61), CORP, 'm-a');
+        expect((await answers())['61']).toMatchObject({ answer: 'confirmed' });
+        await edit(ACCOUNTANT, { action: 'unlink', minerId: 'm-a', characterId: 61 });
+        expect((await answers())['61']).toBeUndefined();
+      });
+
+      it('forgets an answer when an officer regroups the character', async () => {
+        await pendingGuest();
+        await declineGrouping(deps(), who(61), CORP, 'm-a');
+        expect((await answers())['61']).toMatchObject({ answer: 'declined' });
+        await edit(ACCOUNTANT, {
+          action: 'regroupMiner',
+          minerId: 'm-b',
+          characterIds: [61, 62],
+          mainCharacterId: 62,
+          absorbMinerIds: [],
+        });
+        expect((await answers())['61']).toBeUndefined();
+      });
+
+      it('takes a deliberately added character off the keep-out list', async () => {
+        await pendingGuest();
+        await declineGrouping(deps(), who(61), CORP, 'm-a');
+        const declined = () => book().collection('meta').doc('declinedAutoGroup').get();
+        expect((await declined()).get('ids')).toEqual([61]);
+        await edit(ACCOUNTANT, {
+          action: 'setMiner',
+          minerId: 'm-a',
+          characterIds: [60, 61],
+          mainCharacterId: 60,
+        });
+        expect((await declined()).get('ids')).toEqual([]);
+      });
+
       it('refuses a confirm or decline from any character but the added one', async () => {
         await pendingGuest();
         for (const other of [60, 62, ACCOUNTANT]) {
