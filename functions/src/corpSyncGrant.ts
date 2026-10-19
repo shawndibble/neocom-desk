@@ -510,6 +510,9 @@ async function runOne(
     accessToken,
     corporationId: grant.corporationId,
     systemHints,
+    stillHeld: async () =>
+      ((await grantRef(deps.db, grant.corporationId).get()).data() as CorpSyncGrantDoc | undefined)
+        ?.encryptedRefreshToken === grant.encryptedRefreshToken,
   });
   if (result.kind === 'stopped') return stopGrant(deps, grant, result.reason);
   await recordRun(deps, grant, result, 'systemIds' in result ? result.systemIds : undefined);
@@ -562,7 +565,7 @@ async function stopGrant(
   const stopped = await deps.db.runTransaction(async (tx) => {
     const ref = grantRef(deps.db, grant.corporationId);
     const held = (await tx.get(ref)).data() as CorpSyncGrantDoc | undefined;
-    if (!held || held.characterId !== grant.characterId) return false;
+    if (!held || held.encryptedRefreshToken !== grant.encryptedRefreshToken) return false;
     tx.delete(ref);
     const status: ScheduledSyncStatus = {
       status: 'stopped',

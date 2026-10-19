@@ -403,9 +403,7 @@ export async function syncBookAs(
       lastSync: {
         at: now,
         byCharacterId: access.characterId,
-        byName: options.scheduled
-          ? `Scheduled sync (${access.characterName})`
-          : access.characterName,
+        byName: access.characterName,
         ...(options.scheduled ? { scheduled: true } : {}),
         gaps: input.gaps,
       },

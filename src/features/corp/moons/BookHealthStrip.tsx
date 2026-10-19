@@ -76,7 +76,12 @@ export function BookHealthStrip({ sync }: { sync: CorpTaxBookSync }) {
         status.kind === 'stale'
           ? 'corpTaxBook.moons.health.stale'
           : 'corpTaxBook.moons.health.synced',
-        { age: formatAge(status.ageMs, t), name: status.byName }
+        {
+          age: formatAge(status.ageMs, t),
+          name: status.scheduled
+            ? t('corpTaxBook.moons.scheduledBy', { name: status.byName })
+            : status.byName,
+        }
       ),
       detail: (
         <p>

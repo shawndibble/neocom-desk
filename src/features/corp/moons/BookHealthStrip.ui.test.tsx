@@ -11,7 +11,7 @@ import type { CorpTaxBookSync } from '../taxBook/useCorpTaxBook';
 vi.mock('../taxBook/bookClient', () => ({ editBook: vi.fn(), readAudit: vi.fn() }));
 
 const sync = {
-  status: { kind: 'fresh', ageMs: 3_600_000, byName: 'Scheduled sync (Pilot 9)', gaps: [] },
+  status: { kind: 'fresh', ageMs: 3_600_000, byName: 'Pilot 9', scheduled: true, gaps: [] },
   run: { phase: 'idle' },
   sync: vi.fn(),
 } as unknown as CorpTaxBookSync;

@@ -13649,6 +13649,7 @@
       },
       "neverSynced": "Never synced",
       "syncedBy": "Synced {{age}} by {{name}}",
+      "scheduledBy": "Scheduled sync ({{name}})",
       "syncNow": "Sync now",
       "viewOnly": "You can view this book. Syncing it needs the Accountant role, and editing needs Director or Accountant.",
       "syncing": "Syncing…",

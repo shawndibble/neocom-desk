@@ -172,6 +172,12 @@ export interface RunBookSyncArgs {
   access: OfficerAccess;
   accessToken: string;
   corporationId: number;
+  /**
+   * Whether the grant this run started under is still the one held. Checked once the
+   * ESI reads are in and before anything is written, so a revoke or replacement that
+   * landed during the (slow) reads does not leave the old holder writing.
+   */
+  stillHeld: () => Promise<boolean>;
   /** Refinery → solar system, remembered from earlier runs. */
   systemHints: Readonly<Record<number, number>>;
 }
@@ -296,6 +302,8 @@ export async function runBookSync(
   );
   const batches = chunks(placed, OBSERVED_PER_CALL);
   const extraCalls = chunks(extractions, EXTRACTIONS_PER_CALL);
+
+  if (!(await args.stillHeld())) return { kind: 'skipped', reason: 'esi-unavailable' };
 
   // --- Upload (the first call carries everything but the overflow) ----------
   const call = (part: Partial<Record<'observed' | 'extractions' | 'donations', unknown[]>>) =>

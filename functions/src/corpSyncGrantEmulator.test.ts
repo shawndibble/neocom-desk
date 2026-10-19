@@ -353,6 +353,8 @@ suite('Corp Tax Book scheduled sync (emulator)', () => {
 
     it('replaces the previous holder and revokes their token', async () => {
       await optIn(ACCOUNTANT);
+      // Audit ids sort by time, so the second opt-in must be later.
+      now = T0 + 1000;
       await optIn(OTHER_ACCOUNTANT);
       const doc = (await grantDoc())!;
       expect(doc.characterId).toBe(OTHER_ACCOUNTANT);
@@ -451,7 +453,7 @@ suite('Corp Tax Book scheduled sync (emulator)', () => {
       expect(lastSync).toMatchObject({
         at: T0 + 6 * 3_600_000,
         byCharacterId: ACCOUNTANT,
-        byName: 'Scheduled sync (Pilot 2)',
+        byName: 'Pilot 2',
         scheduled: true,
       });
       const actions = (await audit())
@@ -590,6 +592,21 @@ suite('Corp Tax Book scheduled sync (emulator)', () => {
       expect((await book().get()).data()?.lastSync).toBeNull();
       esiState.observers = ok([5000]);
       expect(await runScheduledCorpSyncs(syncDeps(), fakeEsi())).toMatchObject({ synced: 1 });
+    });
+
+    it('writes nothing if the grant was revoked while the run was reading ESI', async () => {
+      await optIn(ACCOUNTANT);
+      const esi = fakeEsi();
+      const observers = esi.observers;
+      esi.observers = async (...args) => {
+        await revokeCorpSyncGrant(syncDeps(), who(ACCOUNTANT), { corporationId: CORP });
+        return observers(...args);
+      };
+      const summary = await runScheduledCorpSyncs(syncDeps(), esi);
+      expect(summary).toMatchObject({ synced: 0, skipped: 1 });
+      expect((await book().collection('observed').get()).size).toBe(0);
+      expect((await book().get()).data()?.lastSync).toBeNull();
+      expect(await status()).toBeUndefined();
     });
 
     it('ends the run when ESI says the error budget is gone, without stopping anyone', async () => {

@@ -149,6 +149,8 @@ export type SyncStatus =
       ageMs: number;
       byCharacterId: number;
       byName: string;
+      /** The scheduled server sync made it (ADR 0025); `byName` is then the grant holder. */
+      scheduled: boolean;
       gaps: SyncGap[];
     };
 
@@ -161,6 +163,7 @@ export function syncStatus(lastSync: LastSync | null | undefined, now: number): 
     ageMs,
     byCharacterId: lastSync.byCharacterId,
     byName: lastSync.byName,
+    scheduled: lastSync.scheduled === true,
     gaps: lastSync.gaps ?? [],
   };
 }

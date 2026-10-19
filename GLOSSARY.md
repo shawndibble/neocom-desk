@@ -272,6 +272,7 @@ here — they go one per file in `docs/context/decisions/`.
   corporation endpoints, so a Character can grant a corp scope and still be
   refused. Director implicitly holds every other role in game, and ESI does
   **not** expand that.
+- **Automatic sync**: A **Corp Tax Book** setting: every 6 hours our server syncs and settles the book with a narrow-scope token one book editor (the holder) gave for their own Character, so the book stays current without an officer visiting. One holder per corporation. It never issues a **Statement** or sends mail. If the holder loses the role or the token dies it stops, and the book says why (ADR 0025).
 - **Corp Tax Book**: A corporation's shared record of moon mining tax: its rates, start date, trade hub and Ore Form, every **Observed Mining Entry**, **Extraction**, **Tax Payment**, dismissal and sent **Statement**, and who did each. Kept for the corporation, not for one officer, so every officer sees the same book; a miner sees only their own lines. Mining before its start date is kept as history and owes nothing. Distinct from the personal Moon Mining Tax ledger, which a pilot keeps for themselves against a **Payee**.
 - **Cost Index**: A solar system's current manufacturing activity level
   (read live from ESI). Higher activity in a system drives its Job Fee up;
