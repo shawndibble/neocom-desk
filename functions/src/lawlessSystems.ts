@@ -4,7 +4,7 @@
  * CCP's public insurgency feed is CORS-locked to eveonline.com, so a scheduled
  * job (`syncLawlessSystems` in index.ts) fetches it and stores the lawless
  * system ids in Firestore for the app to read. This module is the pure parse
- * step, testable from fixture JSON with no emulator.
+ * step and the write-or-skip decision, testable with no emulator.
  */
 
 export const INSURGENCY_URL = 'https://www.eveonline.com/api/warzone/insurgency';

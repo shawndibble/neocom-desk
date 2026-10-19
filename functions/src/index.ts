@@ -1301,12 +1301,9 @@ export const syncLawlessSystems = onSchedule({ schedule: 'every 10 minutes' }, a
   const systemIds = parseLawlessSystemIds(body);
   const ref = getFirestore().collection(SYSTEM_CONDITIONS_COLLECTION).doc(LAWLESS_SYSTEMS_DOC);
   const now = Date.now();
-  if (!lawlessWriteNeeded((await ref.get()).data(), systemIds, now)) {
-    logInfo('lawless systems unchanged', { count: systemIds.length });
-    return;
-  }
-  await ref.set({ systemIds, updatedAt: now });
-  logInfo('lawless systems sync', { count: systemIds.length });
+  const written = lawlessWriteNeeded((await ref.get()).data(), systemIds, now);
+  if (written) await ref.set({ systemIds, updatedAt: now });
+  logInfo('lawless systems sync', { count: systemIds.length, written });
 });
 
 /** Doc under `systemConditions` holding the archive version the last publish was built from. */
