@@ -1,4 +1,4 @@
-import { MAX_DRONE_STACKS } from '@/engine/fitting/fittingShare';
+import { MAX_DRONE_STACKS } from '@/engine/fittings/fittingShare';
 import { describe, expect, it } from 'vitest';
 import { loadEftFitting, type EftTypeLookup } from './eftLoader';
 import type { FittingSlotAssignment } from '@/sde/types';

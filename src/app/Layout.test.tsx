@@ -14,6 +14,7 @@ import { KEYBOARD_OVERLAY_ATTRIBUTE } from '@/lib/shortcuts';
 import { useSingleKeyShortcuts } from '@/lib/singleKeyShortcuts';
 import { Layout } from './Layout';
 import { useHiddenNav, useRecentNav } from './navPreferences';
+import { seedGrant as seedGrantFor } from '@/test/seed';
 
 vi.mock('@/features/corp/useCorpAccess', () => ({ useCorpAccess: vi.fn() }));
 const mockedCorpAccess = vi.mocked(useCorpAccess);
@@ -159,7 +160,7 @@ describe('Layout mobile "More" sheet (UX-REVIEW #4)', () => {
     expect(within(mobileNav).getByRole('button', { name: 'More' })).toBeInTheDocument();
   });
 
-  it('opens a dialog listing Wallet, Assets, Mail, Calendar and Contracts (not Orders or Styleguide)', async () => {
+  it('opens a dialog listing Wallet, Assets, Mail, Calendar and Contracts (not Orders)', async () => {
     mockIsSyncConfigured.mockReturnValue(false);
     const user = userEvent.setup();
     renderLayout();
@@ -177,7 +178,6 @@ describe('Layout mobile "More" sheet (UX-REVIEW #4)', () => {
     for (const label of ['Wallet', 'Assets', 'Mail', 'Calendar', 'Contracts']) {
       expect(within(sheet).getByRole('link', { name: label })).toBeInTheDocument();
     }
-    expect(within(sheet).queryByRole('link', { name: 'Styleguide' })).not.toBeInTheDocument();
     // Desktop-only for now: Orders has no primary tab-bar slot to spare here.
     expect(within(sheet).queryByRole('link', { name: 'Orders' })).not.toBeInTheDocument();
     // Overview tabs now, reached from the Overview page rather than the sheet.
@@ -340,13 +340,7 @@ describe('Layout mobile "More" sheet (UX-REVIEW #4)', () => {
 const CHARACTER_ID = 77;
 
 async function seedGrant(scopes: readonly string[]): Promise<void> {
-  await db.tokens.put({
-    characterId: CHARACTER_ID,
-    accessToken: 'access',
-    refreshToken: 'refresh',
-    expiresAt: Date.now() + 60_000,
-    scopes: [...scopes],
-  });
+  await seedGrantFor(CHARACTER_ID, scopes);
   useActiveCharacter.setState({ activeCharacterId: CHARACTER_ID, hydrated: true });
 }
 

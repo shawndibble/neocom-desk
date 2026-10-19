@@ -121,9 +121,18 @@ function rememberThisPage(): void {
  * whose Retry fallback restarts the very login that landing belongs to, and
  * `/s` and `/share` (the old spelling), whose "Log in" stashes the shared page
  * before it starts (#3075), and `/communities/join`, whose invite page does the
- * same so a visitor lands back on the invite after EVE's login.
+ * same so a visitor lands back on the invite after EVE's login, and
+ * `/corp-tax-book/verify`, where a guest signs in as the character they are
+ * confirming into a grouping and returns to the Statement (#4210).
  */
-const LANDING_KEEPING_ROUTES = ['/login', '/callback', '/s', '/share', '/communities/join'];
+const LANDING_KEEPING_ROUTES = [
+  '/login',
+  '/callback',
+  '/s',
+  '/share',
+  '/communities/join',
+  '/corp-tax-book/verify',
+];
 
 function forgetStrayLanding(): void {
   const here = currentRouterPath();

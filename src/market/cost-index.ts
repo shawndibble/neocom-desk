@@ -2,7 +2,7 @@
  * ESI system cost indices (public, no auth) — drives a Build Plan's
  * live job cost per solar system (GLOSSARY.md: "live system cost index
  * (ESI)"). Routed through the getIndustrySystemCostIndices wrapper
- * (src/esi/endpoints.ts) rather than esiFetch directly, so the registry
+ * (src/esi/endpoints/) rather than esiFetch directly, so the registry
  * stays the one place every ESI call is accounted for.
  */
 import { getIndustrySystemCostIndices } from '@/esi/endpoints';

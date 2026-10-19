@@ -4,11 +4,11 @@
  * The board's row is a fixed-width countdown column (`w-full sm:w-24`) beside
  * flex-wrapping text (`min-w-0 flex-1` + `truncate`) — untested at the low
  * end before this. Rather than `productionCss.built.spec.ts`'s pattern
- * (production CSS, `/styleguide`, no ESI needed), this runs against the dev
- * server: `/corp` needs a signed-in character and mocked ESI, which that
- * spec's target deliberately avoids needing at all. The overflow assertion
- * itself is the same one that file established — `scrollWidth` must not
- * exceed `clientWidth` — reused here rather than invented fresh.
+ * (production CSS, a signed-in wallet journal), this runs against the dev
+ * server: `/corp` needs a signed-in character and mocked corp ESI roles. The
+ * overflow assertion itself is the same one that file established —
+ * `scrollWidth` must not exceed `clientWidth` — reused here rather than
+ * invented fresh.
  *
  * `mockEsi.ts`'s own comment invites exactly this override: "A corp spec
  * should override this route" (the `/roles` fixture answering `{}` puts

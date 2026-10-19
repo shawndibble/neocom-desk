@@ -24,7 +24,8 @@
  */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { LiveStatus, Panel } from '@/components/ui';
+import { Link } from 'react-router-dom';
+import { LiveStatus, Panel, RowCaret } from '@/components/ui';
 import {
   disabledClassName,
   focusRingClassName,
@@ -100,6 +101,8 @@ interface CorpKindCardsProps {
    * every permitted kind is taken to have loaded.
    */
   unreadable?: ReadonlySet<CorpBoardItemKind>;
+  /** The Corp Tax Book page, linked from the moon card. */
+  moonsHref?: string;
 }
 
 /** A permitted kind whose read failed: its title, and one line saying so. */
@@ -112,7 +115,16 @@ function UnreadableCard({ kind }: { kind: CorpCardKind }) {
   );
 }
 
-function KindCard({ kind, items }: { kind: CorpCardKind; items: readonly CorpBoardItem[] }) {
+function KindCard({
+  kind,
+  items,
+  moonsHref,
+}: {
+  kind: CorpCardKind;
+  items: readonly CorpBoardItem[];
+  /** Where the moon card's "Open Moons" link goes; absent when the viewer cannot open the Corp Tax Book. */
+  moonsHref?: string;
+}) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const shown = expanded ? items : items.slice(0, ROWS_PER_CARD);
@@ -180,11 +192,28 @@ function KindCard({ kind, items }: { kind: CorpCardKind; items: readonly CorpBoa
           )}
         </>
       )}
+      {kind === 'moonExtraction' && moonsHref && (
+        <Link
+          to={moonsHref}
+          className={cx(
+            'flex min-h-11 w-full items-center gap-1.5 border-t border-line px-3 py-2 text-xs font-semibold text-accent hover:underline md:min-h-0',
+            focusRingClassName
+          )}
+        >
+          {t('corp.cards.openMoons')}
+          <RowCaret />
+        </Link>
+      )}
     </Panel>
   );
 }
 
-export function CorpKindCards({ grouped, capabilities, unreadable }: CorpKindCardsProps) {
+export function CorpKindCards({
+  grouped,
+  capabilities,
+  unreadable,
+  moonsHref,
+}: CorpKindCardsProps) {
   const { t } = useTranslation();
   const permitted = CARD_KINDS.filter((kind) => capabilities[CAPABILITY_FOR_KIND[kind]]);
   if (permitted.length === 0) return null;
@@ -220,7 +249,12 @@ export function CorpKindCards({ grouped, capabilities, unreadable }: CorpKindCar
             failed(kind) ? (
               <UnreadableCard key={kind} kind={kind} />
             ) : (
-              <KindCard key={kind} kind={kind} items={grouped.get(kind) ?? []} />
+              <KindCard
+                key={kind}
+                kind={kind}
+                items={grouped.get(kind) ?? []}
+                moonsHref={moonsHref}
+              />
             )
           )}
         </div>

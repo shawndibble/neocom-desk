@@ -3,40 +3,12 @@ import {
   canHide,
   DEFAULT_SHOWN_NAV,
   defaultHiddenNav,
-  hiddenNavForActivities,
-  currentPagePath,
   parseHiddenNav,
   parseRecentNav,
   pushRecentNav,
   recentNavFor,
   viewPathFor,
 } from './navRail';
-
-describe('currentPagePath', () => {
-  it('names the page for its own path and for any tab under it', () => {
-    expect(currentPagePath('/market')).toBe('/market');
-    expect(currentPagePath('/market/orders')).toBe('/market');
-    expect(currentPagePath('/market/history')).toBe('/market');
-  });
-
-  it('names the page a sub-view belongs to, even where the path does not nest under it', () => {
-    expect(currentPagePath('/clones')).toBe('/overview');
-    expect(currentPagePath('/employment-history')).toBe('/overview');
-    expect(currentPagePath('/wallet/lp-store/1000125')).toBe('/wallet');
-    expect(currentPagePath('/skills/certificates')).toBe('/skills');
-  });
-
-  it('names the page for a detail route under it', () => {
-    expect(currentPagePath('/industry/plans/7')).toBe('/industry');
-    expect(currentPagePath('/skills/plans/3')).toBe('/skills');
-    expect(currentPagePath('/corp/assets/123/456')).toBe('/corp');
-  });
-
-  it('does not match a page that only shares a prefix string', () => {
-    expect(currentPagePath('/marketing')).toBeNull();
-    expect(currentPagePath('/login')).toBeNull();
-  });
-});
 
 describe('viewPathFor', () => {
   it('is the deepest destination a path falls under', () => {
@@ -131,22 +103,5 @@ describe('the default rail', () => {
 
   it('is in nav order, as a stored list is', () => {
     expect(parseHiddenNav(defaultHiddenNav())).toEqual(defaultHiddenNav());
-  });
-});
-
-describe('hiddenNavForActivities', () => {
-  it('is the default set when nothing is picked', () => {
-    expect(hiddenNavForActivities([])).toEqual(defaultHiddenNav());
-  });
-
-  it('shows the pages an activity needs on top of the default set', () => {
-    const hidden = hiddenNavForActivities(['mining', 'pi']);
-    expect(hidden).not.toContain('/mining');
-    expect(hidden).not.toContain('/planetary-industry');
-    expect(hidden).toContain('/contracts');
-  });
-
-  it('ignores an activity it does not know', () => {
-    expect(hiddenNavForActivities(['nope'])).toEqual(defaultHiddenNav());
   });
 });

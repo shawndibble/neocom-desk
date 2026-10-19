@@ -3,6 +3,7 @@ import { db } from '@/db';
 import { loadMoonMiningTaxSnapshot } from './snapshot';
 import { computePayeeBalances } from './balances';
 import { flatten } from './groupRows';
+import { seedCharacter as seedCharacterRow } from '@/test/seed';
 
 const MOON_ORE = 45490;
 
@@ -28,7 +29,7 @@ beforeEach(async () => {
 });
 
 async function seedCharacter(characterId: number, name: string): Promise<void> {
-  await db.characters.put({ characterId, name, ownerHash: 'oh', addedAt: 0 });
+  await seedCharacterRow(characterId, name, { ownerHash: 'oh', addedAt: 0 });
 }
 
 describe('loadMoonMiningTaxSnapshot', () => {

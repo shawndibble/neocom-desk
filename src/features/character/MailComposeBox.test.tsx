@@ -10,7 +10,7 @@ import { act, render, screen, waitFor, fireEvent, within } from '@testing-librar
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { EsiError, EsiOfflineError, EsiTimeoutError } from '@/esi/errors';
-import { PlainBodyEditor } from './MailBodyEditor';
+import { PlainBodyEditor } from './PlainBodyEditor.testHelper';
 import { MailComposeBox } from './MailComposeBox';
 import type { MailHeader } from '@/esi/endpoints';
 
