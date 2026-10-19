@@ -1,3 +1,4 @@
+import { romanLevel } from '@/engine/projection';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import {
   useCallback,
@@ -156,8 +157,6 @@ import type { SkillPlanImportState } from '@/lib/shortcuts';
 import { useScopedState } from './useScopedState';
 import { attributeShort } from './remapInstruction';
 import { ATTRIBUTE_ENHANCERS_MARKET_GROUP_ID } from './plannerMarketGroups';
-
-const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
 
 /** The persisted fields the editor may change. */
 export type PlanPatch = Partial<
@@ -466,7 +465,7 @@ export function PlanEditor({
   }
 
   const stepLabel = (step: PlanStep): string =>
-    `${nameFor(step.skillTypeID)} ${ROMAN[step.level - 1]}`;
+    `${nameFor(step.skillTypeID)} ${romanLevel(step.level)}`;
 
   const pickerSkills = useMemo(
     () => [...catalog.bySkillTypeID.values()].sort((a, b) => a.name.localeCompare(b.name)),
@@ -500,7 +499,7 @@ export function PlanEditor({
       const blocker = removalBlockers.get(planEntryKey(skillTypeID, targetLevel));
       if (!blocker) return undefined;
       return t('plans.removeBlockedByDependent', {
-        blocker: `${nameFor(blocker.skillTypeID)} ${ROMAN[blocker.targetLevel - 1]}`,
+        blocker: `${nameFor(blocker.skillTypeID)} ${romanLevel(blocker.targetLevel)}`,
       });
     },
     [removalBlockers, nameFor, t]
@@ -1033,7 +1032,7 @@ export function PlanEditor({
 
   /** "{Skill} III" — how a promoted prereq is named back to the user. */
   const levelLabel = useCallback(
-    (skillTypeID: number, level: number): string => `${nameFor(skillTypeID)} ${ROMAN[level - 1]}`,
+    (skillTypeID: number, level: number): string => `${nameFor(skillTypeID)} ${romanLevel(level)}`,
     [nameFor]
   );
 
@@ -1074,8 +1073,8 @@ export function PlanEditor({
           result.skillTypeID === result.blockedBy
             ? t('plans.dropBlockedSameSkill', {
                 skill: nameFor(result.skillTypeID),
-                level: ROMAN[result.targetLevel - 1],
-                blockerLevel: ROMAN[result.blockedByLevel - 1],
+                level: romanLevel(result.targetLevel),
+                blockerLevel: romanLevel(result.blockedByLevel),
               })
             : t('plans.dropBlocked', {
                 skill: nameFor(result.skillTypeID),
@@ -1926,7 +1925,7 @@ export function PlanEditor({
               key={`${step.skillTypeID}-${step.level}-${i}`}
               className="border-b border-line py-1 last:border-b-0"
             >
-              {nameFor(step.skillTypeID)} {ROMAN[step.level - 1]}
+              {nameFor(step.skillTypeID)} {romanLevel(step.level)}
             </li>
           ))}
         </ul>
