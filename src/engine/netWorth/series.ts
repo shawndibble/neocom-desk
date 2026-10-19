@@ -4,6 +4,7 @@
  * daily balances come in, display-ready numbers go out.
  */
 import { findMissingDays, utcDay, type NetWorthSnapshotRow } from './snapshot';
+import { parseInstant } from '../esiInstant';
 
 export const LAYER_IDS = ['isk', 'assets', 'escrow', 'sellOrders'] as const;
 export type LayerId = (typeof LAYER_IDS)[number];
@@ -126,8 +127,12 @@ export function dailyWalletFromJournal(
 ): Map<string, number> {
   const sorted = entries
     .filter((e): e is { date: string; balance: number } => typeof e.balance === 'number')
-    .sort((a, b) => Date.parse(a.date) - Date.parse(b.date));
+    .flatMap((e) => {
+      const at = parseInstant(e.date);
+      return at === null ? [] : [{ at, balance: e.balance }];
+    })
+    .sort((a, b) => a.at - b.at);
   const byDay = new Map<string, number>();
-  for (const e of sorted) byDay.set(utcDay(Date.parse(e.date)), e.balance);
+  for (const e of sorted) byDay.set(utcDay(e.at), e.balance);
   return byDay;
 }

@@ -8,6 +8,7 @@
 import type { EftSlotLookup } from './eftLoader';
 import { killmailVictimToLoadResult, type KillmailVictim } from './linkLoader';
 import type { LoadedFitting, LoadParts } from './load';
+import { parseInstant } from '../esiInstant';
 
 /** A fit this thin is a pod-and-a-prayer, not a fit worth showing. */
 const MIN_FITTED_MODULES = 3;
@@ -39,8 +40,7 @@ export interface PopularFit {
 }
 
 function timeMs(loss: HullLoss): number {
-  const ms = loss.time === null ? Number.NaN : Date.parse(loss.time);
-  return Number.isNaN(ms) ? Number.NEGATIVE_INFINITY : ms;
+  return parseInstant(loss.time ?? undefined) ?? Number.NEGATIVE_INFINITY;
 }
 
 /** Newest first: by time, then by killmail id (ids rise with time). */
