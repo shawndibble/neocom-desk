@@ -7,7 +7,7 @@
  * the palette is open, so typing never costs a request. A contact whose name
  * has never been resolved on this device is left out rather than fetched.
  */
-import { db } from '@/db';
+import { characterIdsWithScopes } from '@/app/useGrantedScopes';
 import type { CharacterContact } from '@/esi/endpoints';
 import { requiredScopesForEndpoints } from '@/esi/registry';
 import {
@@ -73,12 +73,7 @@ const CONTACTS_SCOPES = requiredScopesForEndpoints(['getCharacterContacts']);
  * scope contributes nothing, so with no grant anywhere the group never shows.
  */
 export async function loadPaletteContacts(): Promise<PaletteContact[]> {
-  const tokens = await db.tokens.toArray();
-  const granted = new Set(
-    tokens
-      .filter((token) => CONTACTS_SCOPES.every((scope) => token.scopes.includes(scope)))
-      .map((token) => token.characterId)
-  );
+  const granted = new Set(await characterIdsWithScopes(CONTACTS_SCOPES));
   if (granted.size === 0) return [];
   const lists = (await loadContactsAcrossCharacters()).filter((list) =>
     granted.has(list.characterId)

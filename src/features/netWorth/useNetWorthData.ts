@@ -14,6 +14,7 @@ import { loadWalletJournal } from '@/features/character/wallet';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { REQUIRED_SCOPES } from './recordSnapshots';
 
+const NO_IDS: ReadonlySet<number> = new Set();
 const NO_ROWS: readonly NetWorthSnapshotRow[] = [];
 const WALLET_SCOPE = ESI_REGISTRY.getCharacterWallet.scope;
 
@@ -48,7 +49,7 @@ export function useNetWorthData(characterIds: readonly number[]): NetWorthData {
     return byId;
   }, [rows]);
 
-  const covered = useMemo(() => new Set(coveredIds), [coveredIds]);
+  const covered = coveredIds ?? NO_IDS;
 
   // The journal is read only for Characters that granted the wallet scope, so a
   // missing permission never provokes a live 403 and its app-wide re-auth banner.
