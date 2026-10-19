@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Panel } from '@/components/ui';
@@ -170,7 +171,7 @@ export function OwedBalances({
           <span className="text-base font-semibold">
             {t('miningTax.unlinkedPaymentsCardTitle')}
           </span>,
-          <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+          <span className={eyebrowClassName}>
             {t('miningTax.unlinkedPaymentsCount', { count: unlinkedPaymentCount })}
           </span>,
           t('miningTax.unlinkedPaymentsHint'),
@@ -268,7 +269,7 @@ export function OwedBalances({
                   <span className="flex-1 text-base font-semibold">
                     {t('miningTax.unlinkedPaymentsCardTitle')}
                   </span>
-                  <span className="shrink-0 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                  <span className={cx(eyebrowClassName, 'shrink-0')}>
                     {t('miningTax.unlinkedPaymentsCount', { count: unlinkedPaymentCount })}
                   </span>
                 </div>

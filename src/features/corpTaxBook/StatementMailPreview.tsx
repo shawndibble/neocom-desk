@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { Button, Modal } from '@/components/ui';
-import { markupPlainText, parseEveMarkup } from '@/engine/eveMarkup';
+import { markupPlainText, parseEveMarkup } from '@/engine/mail/eveMarkup';
 import { MailBodyView } from '@/features/character/MailBodyView';
 
 export interface MailPreviewContent {

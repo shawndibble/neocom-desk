@@ -7,7 +7,7 @@ _Recorded 2026-09-05._
   is removed from Mail.** The System Label Tabs strip (All/Inbox/Corp/
   Alliance/Sent) is unaffected — this only reverses round 22's own filter
   chips, not the tab strip round 18 established. `buildCustomLabelList`
-  (`src/engine/mail.ts`) and its test suite are removed along with it: no
+  (`src/engine/mail/mail/mail.ts`) and its test suite are removed along with it: no
   remaining caller needs a character's own custom labels for anything.
 
 - **The mark-read/unread `IconButton` in each mail row is removed in favor

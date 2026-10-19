@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { toggleInSet } from '@/lib/sets';
+import { useMemo, useState } from 'react';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useTranslation } from 'react-i18next';
 import { EmptyState, Panel, Spinner } from '@/components/ui';
 import { enumParam } from '@/lib/urlState';
@@ -39,13 +41,6 @@ interface Props {
   characterId: number;
 }
 
-function toggled<T>(set: ReadonlySet<T>, value: T): Set<T> {
-  const next = new Set(set);
-  if (next.has(value)) next.delete(value);
-  else next.add(value);
-  return next;
-}
-
 /**
  * "Find the best thing to build": ranked one-planet recipes for the pilot's
  * planet types and what-if planets, a planet finder per recipe, and every
@@ -56,10 +51,7 @@ function toggled<T>(set: ReadonlySet<T>, value: T): Set<T> {
 export function FindBestPlan({ snapshot, characterId }: Props) {
   const { t } = useTranslation();
   const preference = usePlanPreference((state) => state.value);
-  const hydratePreference = usePlanPreference((state) => state.hydrate);
-  useEffect(() => {
-    void hydratePreference();
-  }, [hydratePreference]);
+  useHydratedStore(usePlanPreference);
   const { buybackPct } = useSellHub();
   const restartDays = useCadence((state) => state.value.restartDays);
 
@@ -152,11 +144,11 @@ export function FindBestPlan({ snapshot, characterId }: Props) {
         chips={best.chips}
         priceSource={priceSource}
         onToggle={(type) => {
-          setOff((current) => toggled(current, type));
+          setOff((current) => toggleInSet(current, type));
           setOpenId(null);
         }}
         onWhatIf={(type) => {
-          setWhatIf((current) => toggled(current, type));
+          setWhatIf((current) => toggleInSet(current, type));
           setOpenId(null);
         }}
       />

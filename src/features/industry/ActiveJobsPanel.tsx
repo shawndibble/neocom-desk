@@ -1,3 +1,5 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { cx } from '@/lib/cx';
 import { HintText } from '@/components/ui/HintText';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -7,6 +9,7 @@ import { captureException } from '@sentry/react';
 import { useHighlightParam } from '@/lib/useHighlightParam';
 import { useTicker } from '@/lib/ticker';
 import { useLiveQuery } from 'dexie-react-hooks';
+import { useAccountCharacters } from '@/features/character/useCharacters';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import {
   Button,
@@ -262,15 +265,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
     resolvedJobsFilter.size !== 1 ||
     !resolvedJobsFilter.has(characterId);
 
-  const allCharacters = useLiveQuery(() => db.characters.toArray(), [], []);
-  const jobsFilterCandidates = useMemo(
-    () => (allCharacters ?? []).map((c) => ({ characterId: c.characterId, characterName: c.name })),
-    [allCharacters]
-  );
-  const characterNameById = useMemo(
-    () => new Map((allCharacters ?? []).map((c) => [c.characterId, c.name])),
-    [allCharacters]
-  );
+  const { candidates: jobsFilterCandidates, namesById: characterNameById } = useAccountCharacters();
 
   const {
     snapshot: jobsFanOut,
@@ -674,7 +669,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
       }).join(' · ')}
       className="flex items-center gap-1 text-xs tabular-nums"
     >
-      <span className="hidden text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase sm:inline">
+      <span className={cx(eyebrowClassName, 'hidden sm:inline')}>
         {t('industry.jobSlotSummaryLabel')}
       </span>
       {JOB_SLOT_CATEGORIES.map((category, index) => {

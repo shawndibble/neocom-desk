@@ -1,15 +1,15 @@
 /**
  * A table's device-local visible-columns preference, for `ColumnPickerMenu`.
  *
- * The shape `courierColumns.ts`, `bpcSearchColumns.ts` and friends each
- * hand-roll — an id catalog, a `createLocalSetting` store that rejects a stored
- * list naming an id the catalog no longer has, and toggle/reset wiring — so a
- * new picker is one call here plus one hook call in the component.
+ * An id catalog, a `createLocalSetting` store that rejects a stored list naming
+ * an id the catalog no longer has (or an empty one), and toggle/reset wiring —
+ * so a new picker is one call here plus one hook call in the component.
  *
  * Leave the table's identity column (item name, character name) out of `ids`:
  * a table that can lose the column naming its rows has lost its rows.
  */
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
+import { useHydratedStore } from './useHydratedStore';
 import { useIsPhone } from './useIsPhone';
 import { createLocalSetting, type LocalSettingStore } from './useLocalSetting';
 
@@ -23,6 +23,15 @@ export interface ColumnVisibilityOptions<Id extends string> {
    * on an existing table hides nothing on its own.
    */
   defaultVisible?: readonly Id[];
+  /** Honour a stored empty list. Default: reject it — a table with no optional columns and no explanation. */
+  allowEmpty?: boolean;
+  /** Drop unknown ids from a stored list instead of rejecting the whole list. */
+  dropUnknown?: boolean;
+  /**
+   * Ids retired from the catalog: dropped from a stored list rather than
+   * rejecting it, while any other unknown id still does.
+   */
+  retired?: readonly string[];
 }
 
 /** Call once per key at module scope, like `createLocalSetting`. */
@@ -30,17 +39,22 @@ export function createColumnVisibilitySetting<Id extends string>({
   key,
   ids,
   defaultVisible = ids,
+  allowEmpty = false,
+  dropUnknown = false,
+  retired = [],
 }: ColumnVisibilityOptions<Id>): LocalSettingStore<readonly Id[]> {
   const known = new Set<string>(ids);
+  const isKnown = (id: unknown) => typeof id === 'string' && known.has(id);
   return createLocalSetting<readonly Id[]>({
     key,
     defaultValue: defaultVisible,
-    parse: (raw) =>
-      Array.isArray(raw) &&
-      raw.length > 0 &&
-      raw.every((id) => typeof id === 'string' && known.has(id))
-        ? (raw as Id[])
-        : null,
+    parse: (raw) => {
+      if (!Array.isArray(raw)) return null;
+      const kept = raw.filter((id) => !retired.includes(id));
+      const ok = dropUnknown ? kept.filter(isKnown) : kept;
+      if (!dropUnknown && !ok.every(isKnown)) return null;
+      return allowEmpty || ok.length > 0 ? (ok as Id[]) : null;
+    },
   });
 }
 
@@ -79,11 +93,7 @@ export function useColumnVisibility<Id extends string>(
   const resetTo = isPhone ? phoneDefault : defaultVisible;
   const visible = isPhone && stored === defaultVisible ? phoneDefault : stored;
   const setValue = store((state) => state.setValue);
-  const hydrate = store((state) => state.hydrate);
-
-  useEffect(() => {
-    void hydrate();
-  }, [hydrate]);
+  useHydratedStore(store);
 
   const isVisible = useCallback((id: Id) => visible.includes(id), [visible]);
   const toggle = useCallback(

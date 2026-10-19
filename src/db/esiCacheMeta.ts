@@ -26,8 +26,8 @@
  */
 import type { DBCore, DBCoreMutateRequest, DBCoreTable, Middleware } from 'dexie';
 
-export const ESI_CACHE_TABLE = 'esiCache';
-export const ESI_CACHE_META_TABLE = 'esiCacheMeta';
+const ESI_CACHE_TABLE = 'esiCache';
+const ESI_CACHE_META_TABLE = 'esiCacheMeta';
 
 /** One page of a paginated `esiCache` row: its ETag, and how many items it holds. */
 export interface CachedPage {

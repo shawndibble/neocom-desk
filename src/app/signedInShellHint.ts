@@ -12,24 +12,19 @@
  * blocked outright (a privacy mode, a sandboxed frame), and a boot-path read
  * must not be what takes the app down.
  */
+import { readLocal, removeLocal, writeLocal } from '@/lib/safeLocalStorage';
+
 export const SIGNED_IN_SHELL_HINT_KEY = 'neocom:has-character';
 
 export function readSignedInShellHint(): boolean {
-  try {
-    return localStorage.getItem(SIGNED_IN_SHELL_HINT_KEY) === '1';
-  } catch {
-    return false;
-  }
+  return readLocal(SIGNED_IN_SHELL_HINT_KEY) === '1';
 }
 
 export function writeSignedInShellHint(hasCharacter: boolean): void {
-  try {
-    if (hasCharacter) localStorage.setItem(SIGNED_IN_SHELL_HINT_KEY, '1');
-    else localStorage.removeItem(SIGNED_IN_SHELL_HINT_KEY);
-  } catch {
-    // Blocked storage: the preload just never fires, and the lazy route loads
-    // on demand as it would for a first visit.
-  }
+  // Blocked storage: the preload just never fires, and the lazy route loads
+  // on demand as it would for a first visit.
+  if (hasCharacter) writeLocal(SIGNED_IN_SHELL_HINT_KEY, '1');
+  else removeLocal(SIGNED_IN_SHELL_HINT_KEY);
 }
 
 /**

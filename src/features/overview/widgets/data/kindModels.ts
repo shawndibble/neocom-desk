@@ -11,7 +11,7 @@ import { journalRefTypeBreakdown } from '@/features/character/walletJournalFilte
 import { formatEveClock } from '@/engine/survey/chatMessage';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { eveToday, rangeDates, type MiningYieldRange } from '@/engine/miningTax/yieldRange';
-import { longestRemainingSeconds, secondsLeft } from '@/engine/jumpTimers';
+import { longestRemainingSeconds, secondsLeft } from '@/engine/clone/jumpTimers';
 import { formatCountdown, formatDuration } from '@/lib/duration';
 import { formatIskCompact, formatIskCompactSigned } from '@/lib/isk';
 import type { LayerId } from '@/engine/netWorth/series';

@@ -29,6 +29,7 @@ import {
   rowInteractiveClassName,
 } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
+import { MD_UP_QUERY, useMediaQuery, usePrefersReducedMotion } from '@/lib/useMediaQuery';
 import { AlertCharacterSwitch } from './AlertCharacterSwitch';
 import { AuthFailureNotice } from './AuthFailureNotice';
 import { StandingsScopeNotice } from './StandingsScopeNotice';
@@ -226,11 +227,12 @@ function CharacterFooterLink({
 function useRouteFade(pageKey: string) {
   const ref = useRef<HTMLDivElement>(null);
   const running = useRef<Animation | null>(null);
+  const reduced = usePrefersReducedMotion();
 
   useLayoutEffect(() => {
     const node = ref.current;
     if (node === null || typeof node.animate !== 'function') return;
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (reduced) return;
     // Navigating again mid-fade would otherwise leave two animations driving
     // the same property, and the abandoned one still holds its own opacity.
     running.current?.cancel();
@@ -238,7 +240,7 @@ function useRouteFade(pageKey: string) {
       duration: 140,
       easing: 'ease-out',
     });
-  }, [pageKey]);
+  }, [pageKey, reduced]);
 
   return ref;
 }
@@ -347,18 +349,11 @@ export const Layout = memo(function Layout() {
   // holding the whole app hostage. Unmounting instead lets `Modal`'s cleanup
   // close it and restore focus; `moreOpen` resets so a resize back to mobile
   // doesn't reopen it unasked.
-  const [isDesktop, setIsDesktop] = useState(
-    () => typeof window !== 'undefined' && window.matchMedia('(min-width: 48rem)').matches
-  );
+  const isDesktop = useMediaQuery(MD_UP_QUERY);
   useEffect(() => {
-    const desktop = window.matchMedia('(min-width: 48rem)');
-    const onChange = (e: MediaQueryListEvent) => {
-      setIsDesktop(e.matches);
-      if (e.matches) setMoreOpen(false);
-    };
-    desktop.addEventListener('change', onChange);
-    return () => desktop.removeEventListener('change', onChange);
-  }, []);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset the sheet when the viewport grows past `md`
+    if (isDesktop) setMoreOpen(false);
+  }, [isDesktop]);
 
   return (
     <UnreadAlertsContext.Provider value={alertBadge}>

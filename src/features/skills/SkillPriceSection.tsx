@@ -12,6 +12,7 @@
  * not at the hub station at all, which read as "No sell orders" while the
  * region had dozens.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
@@ -23,6 +24,7 @@ import { getOrderBook } from '@/features/market/orderBook';
 import { buildMarketParams, marketNearbyParams } from '@/engine/market/urlState';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { skillSellPrices, type SkillSellPrices } from './skillSellPrices';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 const NEARBY_JUMPS = '10';
 
@@ -40,11 +42,7 @@ export function SkillPriceSection({
 }) {
   const { t } = useTranslation();
   const hubId = useMarketHub((state) => state.value);
-  const hubHydrated = useMarketHub((state) => state.hydrated);
-  const hydrateHub = useMarketHub((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateHub();
-  }, [hydrateHub]);
+  const hubHydrated = useHydratedStore(useMarketHub);
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
   // What the currently-rendered prices (if any) were fetched for — a hub or
   // typeID change invalidates them immediately on render, rather than showing
@@ -90,9 +88,7 @@ export function SkillPriceSection({
   return (
     <section>
       <div className="flex items-center justify-between border-b border-line pb-1">
-        <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-          {t('skills.inspector.priceTitle')}
-        </h3>
+        <h3 className={eyebrowClassName}>{t('skills.inspector.priceTitle')}</h3>
         <PriceHubSelect />
       </div>
       <dl className="mt-1 space-y-0.5 text-xs">

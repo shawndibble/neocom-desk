@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, type ComponentProps } from 'react';
 import { assetBlueprintKind } from '@/engine/blueprintKind';
 import {
   assetStackValue,
@@ -8,7 +8,7 @@ import {
   type AssetTreeStation,
 } from '@/engine/assetTree';
 import { assetNodeSegment } from '@/engine/assetPath';
-import type { JumpsAwayResult } from '@/engine/jumpsAway';
+import type { JumpsAwayResult } from '@/engine/clone/jumpsAway';
 import type { CharacterAsset } from '@/esi/endpoints';
 import type { AbyssalAssetEstimates } from '@/features/abyssal/useAbyssalAssetEstimates';
 import { abyssalValueHint } from '@/features/abyssal/abyssalValueHint';
@@ -34,6 +34,99 @@ import {
   type BrowseRow,
   type CharacterBadgeContext,
 } from './assetBrowseModel';
+
+/** Selection wiring every browse row shares. */
+interface RowSelectionProps {
+  selectMode: boolean;
+  selectedIds: ReadonlySet<number>;
+  onToggleSelection: (ids: readonly number[]) => void;
+  t: Translate;
+}
+
+/**
+ * A ship, bay or container node — descends one more step. Shared by the
+ * personal and corp browse; each supplies its own drill-down `href`.
+ */
+export function NodeContainerRow({
+  node,
+  href,
+  label,
+  characterBadge,
+  selectMode,
+  selectedIds,
+  onToggleSelection,
+  t,
+}: RowSelectionProps & {
+  node: Exclude<AssetTreeNode, { kind: 'item' }>;
+  href: string;
+  label: string;
+  characterBadge: string | null;
+}) {
+  return (
+    <ContainerRow
+      href={href}
+      label={label}
+      itemCount={node.itemCount}
+      estimatedValue={node.estimatedValue}
+      characterBadge={characterBadge}
+      named={node.kind !== 'bay'}
+      selectMode={selectMode}
+      selectionState={selectionStateForIds(collectItemIds(node), selectedIds)}
+      onToggleSelection={() => onToggleSelection(collectItemIds(node))}
+      t={t}
+    />
+  );
+}
+
+/**
+ * An item leaf. The caller owns what differs — pricing, volume, badges and the
+ * context-menu wrapper — and passes it in; selection wiring lives here.
+ */
+export function NodeItemRow({
+  asset,
+  label,
+  unitVolume,
+  estimatedValue,
+  valueHint,
+  characterBadge,
+  blueprintKind,
+  itemId,
+  wrap,
+  selectMode,
+  selectedIds,
+  onToggleSelection,
+  t,
+}: RowSelectionProps & {
+  asset: Pick<CharacterAsset, 'item_id' | 'type_id' | 'quantity'>;
+  label: string;
+  unitVolume: number | undefined;
+  estimatedValue: number;
+  valueHint?: string;
+  characterBadge: string | null;
+  blueprintKind: ComponentProps<typeof ItemRow>['blueprintKind'];
+  /** Set for a Mutated module only. */
+  itemId?: number;
+  wrap: ComponentProps<typeof ItemRow>['wrap'];
+}) {
+  return (
+    <ItemRow
+      name={label}
+      quantity={asset.quantity}
+      unitVolume={unitVolume}
+      estimatedValue={estimatedValue}
+      valueHint={valueHint}
+      characterBadge={characterBadge}
+      blueprintKind={blueprintKind}
+      typeId={asset.type_id}
+      itemId={itemId}
+      selectMode={selectMode}
+      selectionState={selectedIds.has(asset.item_id) ? 'checked' : 'unchecked'}
+      onToggleSelection={() => onToggleSelection([asset.item_id])}
+      t={t}
+      wrap={wrap}
+    />
+  );
+}
 
 interface BrowseRowViewProps {
   row: BrowseRow;
@@ -173,16 +266,14 @@ function NodeRowView({
   );
   if (node.kind !== 'item') {
     return (
-      <ContainerRow
+      <NodeContainerRow
+        node={node}
         href={assetHref(pathStationId, [...pathSegments, assetNodeSegment(node)], query)}
         label={label}
-        itemCount={node.itemCount}
-        estimatedValue={node.estimatedValue}
         characterBadge={badge}
-        named={node.kind !== 'bay'}
         selectMode={selectMode}
-        selectionState={selectionStateForIds(collectItemIds(node), selectedIds)}
-        onToggleSelection={() => onToggleSelection(collectItemIds(node))}
+        selectedIds={selectedIds}
+        onToggleSelection={onToggleSelection}
         t={t}
       />
     );
@@ -203,19 +294,18 @@ function NodeRowView({
     : undefined;
 
   return (
-    <ItemRow
-      name={label}
-      quantity={asset.quantity}
+    <NodeItemRow
+      asset={asset}
+      label={label}
       unitVolume={actions.volumeByTypeId.get(asset.type_id)}
       estimatedValue={estimatedValue}
       valueHint={valueHint}
       characterBadge={badge}
       blueprintKind={assetBlueprintKind(asset, actions.blueprintTypeIds)}
-      typeId={asset.type_id}
       itemId={itemId}
       selectMode={selectMode}
-      selectionState={selectedIds.has(asset.item_id) ? 'checked' : 'unchecked'}
-      onToggleSelection={() => onToggleSelection([asset.item_id])}
+      selectedIds={selectedIds}
+      onToggleSelection={onToggleSelection}
       t={t}
       wrap={(children) => (
         <OreItemMenu

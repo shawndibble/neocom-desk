@@ -20,7 +20,7 @@
  * cost, so asking it gave Assets a different number than the route it links to.
  */
 import { useMemo } from 'react';
-import type { JumpsAwayResult } from '@/engine/jumpsAway';
+import type { JumpsAwayResult } from '@/engine/clone/jumpsAway';
 import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
 import { routeSafetyNetwork } from '@/engine/route/routeSafetyTrip';
 import type { TheraConnection } from '@/engine/route/theraConnections';

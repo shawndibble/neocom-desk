@@ -13,7 +13,7 @@
 import { useContext, useEffect, useLayoutEffect, useMemo } from 'react';
 import { useJumpBasis } from '@/features/route/jumpBasis';
 import { useLazyRowCache } from '@/lib/useLazyRowCache';
-import type { JumpsAwayResult } from '@/engine/jumpsAway';
+import type { JumpsAwayResult } from '@/engine/clone/jumpsAway';
 import { TRADE_HUBS } from '@/market/hubs';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import type { RegionCompetition, StructureCompetition } from './orderCompetition';

@@ -38,7 +38,6 @@ import { ArrowLineUp } from '@phosphor-icons/react/dist/csr/ArrowLineUp';
 import { DiscordLogo } from '@phosphor-icons/react/dist/csr/DiscordLogo';
 import { GithubLogo } from '@phosphor-icons/react/dist/csr/GithubLogo';
 import { ArrowSquareOut } from '@phosphor-icons/react/dist/csr/ArrowSquareOut';
-import { ArrowsDownUp } from '@phosphor-icons/react/dist/csr/ArrowsDownUp';
 import { ArrowsLeftRight } from '@phosphor-icons/react/dist/csr/ArrowsLeftRight';
 import { ArrowUp } from '@phosphor-icons/react/dist/csr/ArrowUp';
 import { Bell } from '@phosphor-icons/react/dist/csr/Bell';
@@ -57,7 +56,6 @@ import { Check } from '@phosphor-icons/react/dist/csr/Check';
 import { CloudCheck } from '@phosphor-icons/react/dist/csr/CloudCheck';
 import { CloudWarning } from '@phosphor-icons/react/dist/csr/CloudWarning';
 import { CheckCircle } from '@phosphor-icons/react/dist/csr/CheckCircle';
-import { Checks } from '@phosphor-icons/react/dist/csr/Checks';
 import { Clipboard } from '@phosphor-icons/react/dist/csr/Clipboard';
 import { ClockCounterClockwise } from '@phosphor-icons/react/dist/csr/ClockCounterClockwise';
 import { CloudSlash } from '@phosphor-icons/react/dist/csr/CloudSlash';
@@ -106,7 +104,6 @@ import { Play } from '@phosphor-icons/react/dist/csr/Play';
 import { Plus } from '@phosphor-icons/react/dist/csr/Plus';
 import { Prohibit } from '@phosphor-icons/react/dist/csr/Prohibit';
 import { Question } from '@phosphor-icons/react/dist/csr/Question';
-import { Queue } from '@phosphor-icons/react/dist/csr/Queue';
 import { Receipt } from '@phosphor-icons/react/dist/csr/Receipt';
 import { Rocket } from '@phosphor-icons/react/dist/csr/Rocket';
 import { RocketLaunch } from '@phosphor-icons/react/dist/csr/RocketLaunch';
@@ -114,7 +111,6 @@ import { Scales } from '@phosphor-icons/react/dist/csr/Scales';
 import { ShareNetwork } from '@phosphor-icons/react/dist/csr/ShareNetwork';
 import { ShieldCheck } from '@phosphor-icons/react/dist/csr/ShieldCheck';
 import { ShoppingCart } from '@phosphor-icons/react/dist/csr/ShoppingCart';
-import { SignIn as SignInGlyph } from '@phosphor-icons/react/dist/csr/SignIn';
 import { Sliders } from '@phosphor-icons/react/dist/csr/Sliders';
 import { SquaresFour } from '@phosphor-icons/react/dist/csr/SquaresFour';
 import { Stack } from '@phosphor-icons/react/dist/csr/Stack';
@@ -233,7 +229,7 @@ export const BuildGroup = withWeight(FolderSimple);
 export const Compare = withWeight(Scales);
 /** Route preference (shortest vs safest). */
 export const Route = withWeight(ArrowsLeftRight);
-/** Bulk-writes a chosen hub/facility/security/build-system onto every plan in a Build Group (issue #632) — the same crosshair `OptimizeAtMarkers`/`PriceAlert` use, for retargeting a group. */
+/** Bulk-writes a chosen hub/facility/security/build-system onto every plan in a Build Group (issue #632) — the same crosshair `PriceAlert` uses, for retargeting a group. */
 export const RetargetGroup = withWeight(Target);
 /** Something is incomplete or unresolved — pairs with `warning` text, never used alone. */
 export const Warn = withWeight(Warning);
@@ -290,8 +286,6 @@ export const Done = withWeight(Check);
 export const More = withWeight(DotsThreeVertical);
 /** Send the plan queue to the clipboard or a CSV download (#224 icon-only toolbar). */
 export const Export = withWeight(ExportIcon);
-/** Pull the character's live skill queue into the plan (#224 icon-only toolbar). */
-export const ImportQueue = withWeight(Queue);
 /** Parse a pasted skill queue into the plan (#224 icon-only toolbar) — a plain clipboard, for "paste in". */
 export const ImportClipboard = withWeight(Clipboard);
 /** Tune remaps for the lowest total training time (#224 icon-only toolbar). */
@@ -300,12 +294,8 @@ export const OptimizeRemaps = withWeight(Sliders);
 export const AddMarker = withWeight(Flag);
 /** Pins a named goal ("Fly Loki") to a plan entry row — GLOSSARY.md "Plan Milestone". Same glyph as `AddMarker`, named for the goal-marking sense rather than the remap sense. */
 export const Milestone = withWeight(Flag);
-/** Tune remaps against the plan's existing markers (#224 icon-only toolbar). */
-export const OptimizeAtMarkers = withWeight(Target);
 /** Open the mobile filter sheet — the one control a narrow filter row collapses to (`FilterBar`). */
 export const Filter = withWeight(Funnel);
-/** Reorder the queue by priority/attribute pair (#224 icon-only toolbar). */
-export const SuggestReorder = withWeight(ArrowsDownUp);
 /** A build plan material this character is better off manufacturing or growing than buying. */
 export const Build = withWeight(Hammer);
 /** The same verdict the other way: buying the material beats producing it. */
@@ -334,9 +324,7 @@ export const ShowLabels = withWeight(TextAa);
  * property of the event, not of a channel.
  */
 export const ScheduledPush = withWeight(Broadcast);
-/** Hide a Notification Feed row's type from the feed (issue #364) — one-way from here, reversible in Settings. */
-export const HideInFeed = withWeight(EyeSlash);
-/** A Quickbar item's price alert target (issue #680) — the same crosshair `OptimizeAtMarkers` uses for a different feature, distinct by name here. */
+/** A Quickbar item's price alert target (issue #680) — the same crosshair `RetargetGroup` uses for a different feature, distinct by name here. */
 export const PriceAlert = withWeight(Target);
 /** Open every collapsible group at once. */
 export const ExpandAll = withWeight(CaretDoubleDown);
@@ -415,12 +403,6 @@ export const Notifications = withWeight(Bell);
  * button that changes something.
  */
 export const Settings = withWeight(Gear);
-/**
- * Clear every alert currently listed. A double check, not a bin: dismissal is
- * a flag and the rows stay stored (GLOSSARY.md, Notification Feed) — a delete
- * glyph would promise a destruction that does not happen.
- */
-export const DismissAll = withWeight(Checks);
 /** Works with no connection: the installed PWA serving what it last fetched. */
 export const Offline = withWeight(CloudSlash);
 /** A character's own open market orders, as distinct from `Market`'s general price lookup. */
@@ -437,8 +419,6 @@ export const OpenSource = withWeight(Code);
 export const Discord = withWeight(DiscordLogo);
 /** The source repository link in the landing header. */
 export const Github = withWeight(GithubLogo);
-/** Start the EVE SSO round trip. Replaces the `▶` dingbat the login button used to draw (DESIGN.md §5). */
-export const SignIn = withWeight(SignInGlyph);
 /**
  * A contact this character has flagged to watch. Same glyph as
  * `SeverityWatch`, kept separate because that one is a notification severity

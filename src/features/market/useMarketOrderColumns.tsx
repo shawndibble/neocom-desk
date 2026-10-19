@@ -3,7 +3,7 @@
  * show (`MARKET_ORDER_COLUMN_IDS`), which of them are actually visible (a
  * device-local preference, `marketOrderColumns.ts`), and per-column render.
  */
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import type { TFunction } from 'i18next';
 import type { DataTableColumn } from '@/components/ui';
 import {
@@ -32,6 +32,7 @@ import type { RegionOrder } from '@/esi/endpoints';
 import { formatMarketIsk } from '@/lib/isk';
 import { rangeLabel } from '@/features/market/orderBookCsv';
 import { sellOutlierMultiple } from '@/engine/market/orderBookDepth';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 /**
  * Ordinal rank for an order's `range`: station, then solarsystem, then a
@@ -98,10 +99,7 @@ export function useMarketOrderColumns({
     [hideLocation, pickedOrderColumns]
   );
   const setVisibleOrderColumns = useVisibleMarketOrderColumns((state) => state.setValue);
-  const hydrateVisibleOrderColumns = useVisibleMarketOrderColumns((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateVisibleOrderColumns();
-  }, [hydrateVisibleOrderColumns]);
+  useHydratedStore(useVisibleMarketOrderColumns);
   function toggleOrderColumn(id: MarketOrderColumnId) {
     const next = pickedOrderColumns.includes(id)
       ? pickedOrderColumns.filter((existing) => existing !== id)

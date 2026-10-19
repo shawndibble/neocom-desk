@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
+import { readLocal, writeLocal } from '@/lib/safeLocalStorage';
 import type { EsiEndpointId } from '@/esi/registry';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { GrantBanner } from './GrantNote';
@@ -11,19 +12,12 @@ const STANDINGS_ENDPOINTS: readonly EsiEndpointId[] = ['getCharacterStandings'];
 const dismissKey = (characterId: number) => `standingsScopeNoticeDismissed:${characterId}`;
 
 function readDismissed(characterId: number): boolean {
-  try {
-    return localStorage.getItem(dismissKey(characterId)) === '1';
-  } catch {
-    return false;
-  }
+  return readLocal(dismissKey(characterId)) === '1';
 }
 
+// Storage blocked: the notice just comes back next load.
 function writeDismissed(characterId: number): void {
-  try {
-    localStorage.setItem(dismissKey(characterId), '1');
-  } catch {
-    // Storage blocked: the notice just comes back next load.
-  }
+  writeLocal(dismissKey(characterId), '1');
 }
 
 /**

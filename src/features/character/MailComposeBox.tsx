@@ -15,12 +15,12 @@ import {
   prefixSubject,
   quoteMailBody,
   type ComposeKind,
-} from '@/engine/mail';
+} from '@/engine/mail/mail';
 import { isOfflineFailure } from '@/esi/client';
 import { EsiOfflineError, EsiTimeoutError } from '@/esi/errors';
 import { isOnline, useOnline } from '@/stores/network';
 import { sendMail } from './mail';
-import { draftMarkupBody, plainTextToMarkup, sanitizeMarkup } from '@/engine/mailEditorDoc';
+import { draftMarkupBody, plainTextToMarkup, sanitizeMarkup } from '@/engine/mail/mailEditorDoc';
 import { MailBodyEditor, type MailBodyEditorProps } from './MailBodyEditor';
 import { loadDraft, saveDraft, clearDraft, type MailDraftRecipient } from './mailDrafts';
 import { loadContacts } from './contacts';
@@ -33,7 +33,7 @@ import {
   addRecipient,
   composeBodyLength,
   type ComposeRecipient,
-} from '@/engine/mailCompose';
+} from '@/engine/mail/mailCompose';
 import type { MailHeader } from '@/esi/endpoints';
 
 /** One chip in the recipient row — a name is always resolved before it is added, so the row never shows a bare id. */

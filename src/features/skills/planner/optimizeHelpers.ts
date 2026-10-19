@@ -1,6 +1,6 @@
 import type { TFunction } from 'i18next';
 import type { PlaceRemapsResult, RemapSegment } from '@/engine/optimizer';
-import type { StepKey } from '@/engine/skillPlanSchedule';
+import type { StepKey } from '@/engine/skills/skillPlanSchedule';
 import type { Attributes, PlanEntry, PlanStep, TrainedSkill } from '@/engine/types';
 import { formatCountdown } from '@/lib/duration';
 import { formatLocalDate } from '@/lib/localDate';

@@ -19,7 +19,7 @@
  * device-local life to seed from.
  */
 import { createSyncedSetting } from '@/lib/useSyncedSetting';
-import { SP_EXTRACTION_CHUNK_SP } from '@/engine/spExtraction';
+import { SP_EXTRACTION_CHUNK_SP } from '@/engine/skills/spExtraction';
 
 export const SP_EXTRACTION_ENABLED_KEY = 'sync.spExtractionMonitoringEnabled';
 export const SP_EXTRACTION_THRESHOLD_KEY = 'sync.spExtractionThresholdSp';

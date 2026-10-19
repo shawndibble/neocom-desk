@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from 'react';
+import { useId } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { EmptyState, InfoTooltip, Panel, Spinner } from '@/components/ui';
@@ -14,7 +14,7 @@ import { EsiDidntAnswer } from './EsiDidntAnswer';
 import { colonyCountUnknown } from './colonyFillModel';
 import { FindBestPlan } from './FindBestPlan';
 import { GoalPlannerPanel, type GoalPlannerPanelProps } from './GoalPlannerPanel';
-import { loadGoalPlannerSnapshot, type GoalPlannerSnapshot } from './goalPlannerSnapshot';
+import { usePiSnapshot } from './usePiSnapshot';
 import { MakeMorePlan } from './MakeMorePlan';
 import { useRetryFocus } from '@/lib/useRetryFocus';
 import {
@@ -81,33 +81,7 @@ export function PlanPanel(props: Props) {
   const { t } = useTranslation();
   const { characterId, goals, seedingGoal } = props;
   const pickerHeadingId = useId();
-  const [loaded, setLoaded] = useState<{
-    characterId: number;
-    snapshot: GoalPlannerSnapshot;
-  } | null>(null);
-  const [failedFor, setFailedFor] = useState<number | null>(null);
-  const [reloadKey, setReloadKey] = useState(0);
-  const [retrying, setRetrying] = useState(false);
-  useEffect(() => {
-    let cancelled = false;
-    loadGoalPlannerSnapshot(characterId).then(
-      (snapshot) => {
-        if (cancelled) return;
-        setFailedFor(null);
-        setLoaded({ characterId, snapshot });
-        setRetrying(false);
-      },
-      () => {
-        if (cancelled) return;
-        setFailedFor(characterId);
-        setRetrying(false);
-      }
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [characterId, reloadKey]);
-  const snapshot = loaded?.characterId === characterId ? loaded.snapshot : null;
+  const { snapshot, failed, retrying, retry } = usePiSnapshot(characterId);
   const { hash } = useLocation();
   const [urlQuestion, setUrlQuestion] = useUrlParam('q', planQuestionParam);
   // `#customs` (the "Set the rate" links) opens the Goal Planner, where the rate is edited,
@@ -121,7 +95,7 @@ export function PlanPanel(props: Props) {
     characterId
   );
 
-  if (failedFor === characterId) {
+  if (failed) {
     return <EmptyState title={t('piPlan.loadFailedTitle')} hint={t('piPlan.loadFailedHint')} />;
   }
   if (!snapshot) {
@@ -166,8 +140,7 @@ export function PlanPanel(props: Props) {
           retrying={retrying}
           onRetry={() => {
             armRetryFocus();
-            setRetrying(true);
-            setReloadKey((key) => key + 1);
+            retry();
           }}
         />
       )}

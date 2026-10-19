@@ -6,7 +6,7 @@ import {
   type PlaceRemapsOptions,
   type PlaceRemapsResult,
 } from '@/engine/optimizer';
-import type { StepKey } from '@/engine/skillPlanSchedule';
+import type { StepKey } from '@/engine/skills/skillPlanSchedule';
 import type { EngineSkill, PlanStep, TrainedSkill } from '@/engine/types';
 import type { SkillPlanRecord } from '@/db';
 import { useAutoDismiss } from '@/lib/useAutoDismiss';

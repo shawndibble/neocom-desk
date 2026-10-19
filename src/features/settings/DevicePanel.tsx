@@ -1,9 +1,8 @@
+import { useCharacters } from '@/features/character/useCharacters';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useLiveQuery } from 'dexie-react-hooks';
 import { Button, Checkbox, Field, Fields, Modal, Panel } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
-import { db } from '@/db';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { logoutAllCharacters } from '@/features/character/logoutAll';
 import { UnsyncedChangesWarning } from '@/features/character/UnsyncedChangesWarning';
@@ -27,7 +26,7 @@ type Dialog = 'logout' | 'delete';
  */
 export function DevicePanel() {
   const { t, i18n } = useTranslation();
-  const characters = useLiveQuery(() => db.characters.toArray());
+  const characters = useCharacters();
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const [working, setWorking] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -93,11 +92,11 @@ export function DevicePanel() {
       window.location.replace('/');
     });
 
-  const loggedIn = characters?.length ?? 0;
+  const loggedIn = characters.length;
   const listNames = (ids: readonly number[]) =>
     new Intl.ListFormat(i18n.language, { style: 'long', type: 'conjunction' }).format(
       ids.map(
-        (id) => characters?.find((character) => character.characterId === id)?.name ?? String(id)
+        (id) => characters.find((character) => character.characterId === id)?.name ?? String(id)
       )
     );
   const unpurgedNames = unpurged ? listNames(unpurged) : '';
@@ -156,12 +155,12 @@ export function DevicePanel() {
           {t('settings.deviceLogoutConfirm', { count: loggedIn })}
         </p>
         <RemoveSharedOption
-          characterIds={(characters ?? []).map((character) => character.characterId)}
+          characterIds={characters.map((character) => character.characterId)}
           checked={removeShared}
           onChange={setRemoveShared}
         />
         <UnsyncedChangesWarning
-          characterIds={(characters ?? []).map((character) => character.characterId)}
+          characterIds={characters.map((character) => character.characterId)}
           syncConfigured={syncConfigured}
         />
         {failed && (

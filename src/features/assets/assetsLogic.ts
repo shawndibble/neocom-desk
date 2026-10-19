@@ -1,6 +1,6 @@
 import { type PinState } from '@/features/character/stationPins';
 import type { CharacterAsset } from '@/esi/endpoints';
-import type { JumpsAwayResult } from '@/engine/jumpsAway';
+import type { JumpsAwayResult } from '@/engine/clone/jumpsAway';
 import {
   compareStations,
   type AssetTreeNode,

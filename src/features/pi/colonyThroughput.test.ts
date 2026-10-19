@@ -7,6 +7,7 @@ import { sustainedRatePerHour } from '@/engine/pi/extraction';
 import type { ExtractorYieldProgram } from '@/engine/pi/types';
 import type { BuiltColonyAdvice } from './systemPlanetModel';
 import { colonyThroughputCheck, peakRatePerHour } from './colonyThroughput';
+import { DAY_MS } from '@/lib/age';
 
 // The real snapshot, same reasoning as pinBudget.test.ts: the volumes and
 // schematic rates below are claims about the shipped recipe graph, so a
@@ -21,7 +22,6 @@ const BACTERIA_SCHEMATIC_ID = pi.schematics[String(BACTERIA)].schematicId;
 /** A Temperate Extractor Control Unit typeID, from the shipped payload. */
 const ECU_TYPE_ID = 3068;
 
-const DAY_MS = 86_400_000;
 const INSTALL_MS = Date.parse('2026-09-01T00:00:00Z');
 
 /**

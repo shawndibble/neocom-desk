@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
 import type { ReactElement, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -206,7 +207,7 @@ export function PlanVerdictHero({
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div className="flex min-w-0 flex-1 flex-col gap-4 md:flex-row md:items-start md:gap-6">
           <div className="min-w-0 space-y-1 md:flex-1">
-            <p className="flex flex-wrap items-baseline gap-x-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+            <p className={cx(eyebrowClassName, 'flex flex-wrap items-baseline gap-x-1.5')}>
               {/* A real heading, not decoration: it is what names the open plan to a screen reader. */}
               {/* The heading alone, not the line: the breakdown modal below is
                   this component's React child, and a right-click inside it

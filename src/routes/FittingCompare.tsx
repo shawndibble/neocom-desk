@@ -1,3 +1,4 @@
+import { useCharacters } from '@/features/character/useCharacters';
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
@@ -23,8 +24,6 @@ import {
 } from '@/engine/fittings/fittingCompare';
 import { firstResourceOverage } from '@/engine/fittings/skillGaps';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
@@ -70,7 +69,7 @@ export function FittingCompare() {
     skillsKnown,
     retry: retryProfile,
   } = usePilotProfile(activeCharacterId);
-  const allCharacters = useLiveQuery(() => db.characters.toArray(), [], []);
+  const allCharacters = useCharacters();
   const characterOptions = useMemo(
     () => allCharacters.map(({ characterId, name }) => ({ characterId, name })),
     [allCharacters]

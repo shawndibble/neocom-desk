@@ -17,6 +17,7 @@
  * Facts only, never verdicts (decision `20260912-172628`): no way is called
  * better, safer or riskier than another.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Caret, textActionClassName } from '@/components/ui';
@@ -246,7 +247,7 @@ function LegWaysPanel({
   const ends = { number, from: nameOf(leg.from), to: nameOf(leg.to) };
   return (
     <section aria-label={t('travel.ways.label', { number })} className="space-y-1.5">
-      <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+      <h3 className={eyebrowClassName}>
         {multiStop ? t('travel.ways.title', ends) : t('travel.ways.titleRoute', ends)}
       </h3>
       <ul className="grid gap-1.5 @xl:grid-cols-2 @3xl:grid-cols-3 @5xl:grid-cols-1">

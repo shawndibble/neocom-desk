@@ -5,6 +5,7 @@
  * on a phone all three live in one bottom sheet behind a single header
  * button.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -108,7 +109,7 @@ export function PriceBasisOptions({ value, onChange }: PriceBasisOptionsProps) {
   const choices: BasisChoice[] = ['buy', 'sell', 'now'];
   return (
     <fieldset className="space-y-1">
-      <legend className="mb-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+      <legend className={cx(eyebrowClassName, 'mb-1.5')}>
         {t('miningTax.overview.basis.title')}
       </legend>
       {choices.map((choice) => (
@@ -191,9 +192,7 @@ export function ValueMenu({
     <Popover>
       <PopoverTrigger asChild>
         <button type="button" className={triggerClassName}>
-          <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-            {t('miningTax.overview.valueMenu')}
-          </span>
+          <span className={eyebrowClassName}>{t('miningTax.overview.valueMenu')}</span>
           <span>{valueButtonLabel(t, basis, buybackRate)}</span>
           {triggerCaret}
         </button>
@@ -271,10 +270,7 @@ export function BuybackRateInput({ value, onChange }: BuybackRateInputProps) {
 
   return (
     <div className="flex items-center gap-2">
-      <label
-        className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
-        htmlFor="mining-overview-buyback-rate"
-      >
+      <label className={eyebrowClassName} htmlFor="mining-overview-buyback-rate">
         {t('miningTax.overview.buybackRateLabel')}
       </label>
       <TextInput

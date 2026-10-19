@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import {
   focusRingInsetClassName,
   rowInteractiveClassName,
@@ -342,7 +343,7 @@ export function FittingStartScreen({
               )}
               {groups.map((group) => (
                 <section key={group.hull ?? ''} className="pb-1">
-                  <h3 className="px-3 pt-3 pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                  <h3 className={cx(eyebrowClassName, 'px-3 pt-3 pb-1')}>
                     {group.hull ?? t('fittings.myFittings.unknownHull')}
                   </h3>
                   <ul>

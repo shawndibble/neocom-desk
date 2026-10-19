@@ -1,7 +1,7 @@
 import type { NotificationFire } from '@/engine/notificationDiffs';
 import { renderSharedWording } from '@/engine/notificationWording';
 import { assertProjectionWording, romanLevel, type PushCopy } from '@/engine/projection';
-import { type DomainCopy, simple, HOUR_MS, ROMAN } from './shared';
+import { type DomainCopy, simple, HOUR_MS } from './shared';
 
 export interface SkillNames {
   readonly skill?: string;
@@ -23,7 +23,7 @@ export const skillQueueCopy: DomainCopy<NotificationFire, SkillNames> & {
     }
     // Live copy drops an out-of-range level; push below prints it as a number.
     const level =
-      fire.level !== null && fire.level >= 1 && fire.level <= 5 ? ROMAN[fire.level - 1] : '';
+      fire.level !== null && fire.level >= 1 && fire.level <= 5 ? romanLevel(fire.level) : '';
     return simple('skillLevelComplete', {
       character,
       skill: names.skill ?? `#${fire.skillId}`,

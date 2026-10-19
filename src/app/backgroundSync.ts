@@ -24,6 +24,7 @@ import { useEffect, useRef } from 'react';
 import { getSyncStatus, scheduleSync } from '@/sync';
 import { isSyncConfigured } from './syncStatus';
 import { joinTabElection, type TabElectionSeat } from '@/lib/tabLeader';
+import { readLocal, writeLocal } from '@/lib/safeLocalStorage';
 
 /**
  * Smallest gap between two sweeps *of the active Character*. Five minutes is
@@ -63,7 +64,7 @@ export const SWEEP_STAMPS_KEY = 'neocom.backgroundSync.lastSweptAt';
 /** Fold the other tabs' stamps into `into`, keeping the later of each. */
 function mergeSharedStamps(into: Map<number, number>): void {
   try {
-    const raw: unknown = JSON.parse(localStorage.getItem(SWEEP_STAMPS_KEY) ?? '{}');
+    const raw: unknown = JSON.parse(readLocal(SWEEP_STAMPS_KEY) ?? '{}');
     if (typeof raw !== 'object' || raw === null) return;
     for (const [id, at] of Object.entries(raw)) {
       if (typeof at === 'number' && at > (into.get(Number(id)) ?? -Infinity)) {
@@ -76,11 +77,8 @@ function mergeSharedStamps(into: Map<number, number>): void {
 }
 
 function writeSharedStamps(stamps: ReadonlyMap<number, number>): void {
-  try {
-    localStorage.setItem(SWEEP_STAMPS_KEY, JSON.stringify(Object.fromEntries(stamps)));
-  } catch {
-    // Blocked or full storage: other tabs just fall back to their own stamps.
-  }
+  // Blocked or full storage: other tabs just fall back to their own stamps.
+  writeLocal(SWEEP_STAMPS_KEY, JSON.stringify(Object.fromEntries(stamps)));
 }
 
 /**

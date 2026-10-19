@@ -18,7 +18,7 @@ import {
   tabScrollerClassName,
 } from '@/components/ui/tabStyles';
 import { DataAgePopover } from '@/features/overview/DataAgePopover';
-import type { DeadlineSeverity } from '@/engine/severity';
+import type { DeadlineSeverity } from '@/engine/character/severity';
 import { MINUTE_MS } from '@/lib/age';
 import { cx } from '@/lib/cx';
 import { formatCountdown } from '@/lib/duration';

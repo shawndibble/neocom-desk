@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeSkillPlanSchedule } from '@/engine/skillPlanSchedule';
+import { computeSkillPlanSchedule } from '@/engine/skills/skillPlanSchedule';
 import type { Attributes, EngineSkill, PlanEntry } from '@/engine/types';
 import type { SkillCatalog } from '@/features/skills/skillMap';
 import type { SkillQueueEntry } from '@/esi/endpoints';

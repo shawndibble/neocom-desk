@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useTranslation } from 'react-i18next';
 import { Modal } from '@/components/ui';
 import { cx } from '@/lib/cx';
@@ -69,7 +70,7 @@ export function CorpBookDiffModal({ open, onClose, view, systemName, typeNames }
         </p>
         <table className="w-full border-collapse text-sm">
           <thead>
-            <tr className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+            <tr className={eyebrowClassName}>
               <th className="py-1 text-left" />
               <th className="py-1 text-right">{t('miningTax.corpBook.diff.you')}</th>
               <th className="py-1 text-right">{t('miningTax.corpBook.diff.book')}</th>

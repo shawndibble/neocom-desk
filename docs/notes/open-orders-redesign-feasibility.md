@@ -20,12 +20,12 @@ the modal.
 
 ## Data cost per tier — decides row vs. modal
 
-| Tier              | Source                                                                                        | Cost                                                                                                |
-| ----------------- | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| Station           | `market/fuzzwork.ts` aggregates, `?station={id}&types={csv}`, 200 types/request               | Cheap — a few calls cover 100+ orders. **Verify** fuzzwork accepts arbitrary (non-hub) station ids. |
-| System + Region   | `features/market/orderBook.ts` `getOrderBook(regionId, typeId)`                               | One paginated ESI call **per type**, 300 s TTL. 80 distinct types = 80 fan-outs. Not eager.         |
-| Nearest-hub gap   | fuzzwork station aggregate for the hub + `/route/` for jumps                                  | Cheap per order, batched by hub.                                                                    |
-| Region jumps-away | ESI `/route/` origin=my order's system, dest=undercutter's system, then `engine/jumpsAway.ts` | One call per distinct system pair; cache hard.                                                      |
+| Tier              | Source                                                                                              | Cost                                                                                                |
+| ----------------- | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Station           | `market/fuzzwork.ts` aggregates, `?station={id}&types={csv}`, 200 types/request                     | Cheap — a few calls cover 100+ orders. **Verify** fuzzwork accepts arbitrary (non-hub) station ids. |
+| System + Region   | `features/market/orderBook.ts` `getOrderBook(regionId, typeId)`                                     | One paginated ESI call **per type**, 300 s TTL. 80 distinct types = 80 fan-outs. Not eager.         |
+| Nearest-hub gap   | fuzzwork station aggregate for the hub + `/route/` for jumps                                        | Cheap per order, batched by hub.                                                                    |
+| Region jumps-away | ESI `/route/` origin=my order's system, dest=undercutter's system, then `engine/clone/jumpsAway.ts` | One call per distinct system pair; cache hard.                                                      |
 
 One `getOrderBook` call yields station, system and region tiers at once
 (`RegionOrder` carries `location_id` **and** `system_id`), so the split above is

@@ -10,6 +10,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
 import { useSurveyPriceHub } from './surveyPref';
 import { loadOrePrices } from './orePrices';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 export interface OrePrices {
   /** Ore name as the scanner prints it -> ISK per unit; empty until loaded or when unreachable. */
@@ -20,11 +21,7 @@ export interface OrePrices {
 
 export function useOrePrices(oreNames: readonly string[]): OrePrices {
   const hubId = useSurveyPriceHub((s) => s.value);
-  const hydrated = useSurveyPriceHub((s) => s.hydrated);
-  const hydrate = useSurveyPriceHub((s) => s.hydrate);
-  useEffect(() => {
-    void hydrate();
-  }, [hydrate]);
+  const hydrated = useHydratedStore(useSurveyPriceHub);
   const hub = (hydrated ? getTradeHub(hubId) : undefined) ?? DEFAULT_TRADE_HUB;
   const key = [...new Set(oreNames)].sort().join('\n');
   const [loaded, setLoaded] = useState<{

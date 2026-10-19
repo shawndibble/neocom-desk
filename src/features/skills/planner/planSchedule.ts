@@ -9,7 +9,10 @@
  * hook to lean on.
  */
 import { db, type SkillPlanRecord } from '@/db';
-import { computeSkillPlanSchedule, type SkillPlanSchedule } from '@/engine/skillPlanSchedule';
+import {
+  computeSkillPlanSchedule,
+  type SkillPlanSchedule,
+} from '@/engine/skills/skillPlanSchedule';
 import { baselineAttributes, type AttributeBaseline } from '@/engine/attributeBaseline';
 import type { Attributes, CloneState, Implants, TrainedSkill } from '@/engine/types';
 import type { SkillQueueEntry } from '@/esi/endpoints';

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type SkillPlanRecord } from '@/db';
+import { useCharacters } from '@/features/character/useCharacters';
 import { Panel, Spinner } from '@/components/ui';
 import { markPlanDeleted, scheduleSync } from '@/sync';
 import { isSyncConfigured } from '@/app/syncStatus';
@@ -100,8 +101,8 @@ export function PlanListPane({
 
   const headingRef = useRef<HTMLHeadingElement>(null);
 
-  const characters = useLiveQuery(async () => db.characters.toArray(), []);
-  const otherCharacters = (characters ?? []).filter((c) => c.characterId !== activeCharacterId);
+  const characters = useCharacters();
+  const otherCharacters = characters.filter((c) => c.characterId !== activeCharacterId);
 
   function copyOf(source: SkillPlanRecord, characterId: number): SkillPlanRecord {
     return {

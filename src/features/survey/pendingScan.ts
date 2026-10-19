@@ -6,24 +6,23 @@
  * login can open in another tab). Taken once and short-lived: a stale paste must
  * not turn up in a survey days later.
  */
+import { readLocal, removeLocal, writeLocal } from '@/lib/safeLocalStorage';
+
 export const PENDING_SCAN_TTL_MS = 30 * 60 * 1000;
 
 const KEY = 'miningSurveyPendingScan';
 
 export function stashPendingScan(text: string, now: number = Date.now()): void {
-  try {
-    localStorage.setItem(KEY, JSON.stringify({ text, at: now }));
-  } catch {
-    // Best-effort: the pilot can paste again after logging in.
-  }
+  // Best-effort: the pilot can paste again after logging in.
+  writeLocal(KEY, JSON.stringify({ text, at: now }));
 }
 
 /** The stashed text if it is fresh; clears the stash either way. */
 export function takePendingScan(now: number = Date.now()): string | null {
+  const raw = readLocal(KEY);
+  if (raw === null) return null;
+  removeLocal(KEY);
   try {
-    const raw = localStorage.getItem(KEY);
-    if (raw === null) return null;
-    localStorage.removeItem(KEY);
     const parsed = JSON.parse(raw) as { text?: unknown; at?: unknown };
     if (typeof parsed.text !== 'string' || typeof parsed.at !== 'number') return null;
     return now - parsed.at <= PENDING_SCAN_TTL_MS ? parsed.text : null;

@@ -10,13 +10,13 @@
  * read has not landed printing "Clear" beside a note saying "Checking…" is
  * the same silence the old card board was rebuilt to remove.
  */
-import { worstSeverity, type DeadlineSeverity } from '@/engine/severity';
+import { worstSeverity, type DeadlineSeverity } from '@/engine/character/severity';
 import { isCompletingSoon, isJobDone } from '@/features/industry/jobs';
 import type { IndustryJob } from '@/esi/endpoints';
 import { openOrderProblemCounts } from '@/features/market/openOrdersModel';
 import type { OpenOrderRow } from '@/features/market/openOrdersModel';
-import { upcomingCommittedEvents } from '@/engine/calendarDeadline';
-import { isSpExtractionReady } from '@/engine/spExtraction';
+import { upcomingCommittedEvents } from '@/engine/character/calendarDeadline';
+import { isSpExtractionReady } from '@/engine/skills/spExtraction';
 import { DAY_MS } from '@/lib/age';
 import type {
   CalendarEventsBoardData,

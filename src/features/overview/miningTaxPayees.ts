@@ -4,6 +4,7 @@
  * hands in the rows and the payee names), so the grouping is pinned by a plain
  * test.
  */
+import { DAY_MS } from '@/lib/age';
 
 export interface PayeeOwed {
   /** Empty for an outstanding assignment that names no payee. */
@@ -21,8 +22,6 @@ interface OwedRow {
   entry: { date: string };
   assignments: readonly { status: string; taxOwed: number; payeeId?: string }[];
 }
-
-const DAY_MS = 86_400_000;
 
 /** Outstanding assignments grouped by payee, the most owed first. */
 export function payeesOwed(

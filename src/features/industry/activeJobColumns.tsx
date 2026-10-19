@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import type { TFunction } from 'i18next';
+import { Pill } from '@/components/ui/Pill';
 import { Button, type DataTableColumn } from '@/components/ui';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { ItemInfoLink, CharacterLink } from '@/features/entities';
@@ -76,21 +77,11 @@ export function activeJobColumns({
           <ItemInfoLink typeId={job.product_type_id ?? job.blueprint_type_id}>
             {nameForBlueprint(job.blueprint_type_id)}
           </ItemInfoLink>
-          {soon(job) && (
-            <span className="rounded-xs bg-warning/15 px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest text-warning uppercase">
-              {t('industry.jobsCompletingSoon')}
-            </span>
-          )}
-          {done(job) && (
-            <span className="rounded-xs bg-success/15 px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest text-success uppercase">
-              {t('industry.jobsDone')}
-            </span>
-          )}
+          {soon(job) && <Pill tone="warning">{t('industry.jobsCompletingSoon')}</Pill>}
+          {done(job) && <Pill tone="success">{t('industry.jobsDone')}</Pill>}
           {/* Only once more than one Character's jobs are on screen (`showCharacterColumn`) — same gate as `OpenOrdersPanel`'s `showCharacterStrip`. */}
           {job.owner === 'corporation' && (
-            <span className="shrink-0 rounded-xs bg-panel-2 px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-              {t('industry.jobsCorpBadge')}
-            </span>
+            <Pill className="shrink-0">{t('industry.jobsCorpBadge')}</Pill>
           )}
           {showCharacterColumn && job.characterName !== '' && (
             <span className="ml-1.5 shrink-0 rounded-xs bg-panel-2 px-1 py-0.5 text-[0.6875rem]">
@@ -222,17 +213,11 @@ export function historyColumns({
             {nameForBlueprint(job.blueprint_type_id)}
           </ItemInfoLink>
           {isLoggableHistoryJob(job) && historyStates.get(job.job_id)?.kind === 'logged' && (
-            <span className="rounded-xs bg-success/15 px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest text-success uppercase">
-              {t('industry.historyLogged')}
-            </span>
+            <Pill tone="success">{t('industry.historyLogged')}</Pill>
           )}
           {isLoggableHistoryJob(job) &&
             historyStates.get(job.job_id)?.kind !== 'logged' &&
-            dismissedJobIds.has(job.job_id) && (
-              <span className="rounded-xs bg-panel-2 px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                {t('industry.historyDismissed')}
-              </span>
-            )}
+            dismissedJobIds.has(job.job_id) && <Pill>{t('industry.historyDismissed')}</Pill>}
           {showHistoryCharacterColumn && job.characterName !== '' && (
             <span className="ml-1.5 shrink-0 rounded-xs bg-panel-2 px-1 py-0.5 text-[0.6875rem]">
               <CharacterLink id={job.characterId}>{job.characterName}</CharacterLink>

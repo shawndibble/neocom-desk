@@ -2,11 +2,9 @@ import { ExternalLink } from '@/components/ui/ExternalLink';
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Navigate } from 'react-router-dom';
-import { useLiveQuery } from 'dexie-react-hooks';
 import { BootScreen } from '@/app/BootScreen';
 import { releaseLandingShell } from '@/app/landingShell';
 import { beginAddCharacterLogin } from '@/app/loginFlow';
-import { db } from '@/db';
 import { EveSsoButton, LogoMark, plainTextActionClassName } from '@/components/ui';
 import { CommunitySection } from '@/features/landing/CommunitySection';
 import { FeatureShowcase } from '@/features/landing/FeatureShowcase';
@@ -23,6 +21,7 @@ import { focusRingClassName, interactiveClassName } from '@/components/ui/contro
 import { cx } from '@/lib/cx';
 import { DISCORD_URL, REPO_URL } from '@/lib/links';
 import { isPlayStoreApp } from '@/lib/playStoreApp';
+import { useCharacterCountOrLoading } from '@/features/character/useCharacters';
 
 /** Landing page for signed-out users: what Neocom Desk does, and the EVE SSO login button. */
 export function Login() {
@@ -42,7 +41,7 @@ export function Login() {
 
   // Bookmark/back-button case: a Character already exists, so the marketing
   // page is not the right thing to show — mirror App.tsx's root gate.
-  const characterCount = useLiveQuery(() => db.characters.count());
+  const characterCount = useCharacterCountOrLoading();
 
   // The prerendered hero (`app/landingShell.ts`) stands in through the boot
   // screen. Let it go once this page knows what it renders: a layout effect,

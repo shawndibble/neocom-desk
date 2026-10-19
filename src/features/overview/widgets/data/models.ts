@@ -10,13 +10,13 @@
  * inside a source's effect, so time-dependent text stays true as the clock
  * ticks and a build never invents a new object per render of a source.
  */
-import { severityForRemaining, type DeadlineSeverity } from '@/engine/severity';
+import { severityForRemaining, type DeadlineSeverity } from '@/engine/character/severity';
 import {
   soonestCalendarDeadline,
   upcomingCommittedEvents,
   upcomingEvents,
-} from '@/engine/calendarDeadline';
-import { extractableSp, extractorCount } from '@/engine/spExtraction';
+} from '@/engine/character/calendarDeadline';
+import { extractableSp, extractorCount } from '@/engine/skills/spExtraction';
 import {
   buildOpenOrderRows,
   needsAttentionCount,
@@ -31,7 +31,6 @@ import { formatIsk, formatIskCompact } from '@/lib/isk';
 import { DAY_MS } from '@/lib/age';
 import { sortQueueEntries, selectActiveEntryFromSorted } from '@/features/overview/overviewQueue';
 import { dailyWalletFromJournal } from '@/engine/netWorth/series';
-import { getKind } from '../kinds';
 import {
   comingUpEventSeverity,
   comingUpSeverity,
@@ -821,9 +820,4 @@ function zeroIsClear(view: KindView): KindView {
   const { number } = view;
   if (number.value !== '0' || number.tone === 'clear') return view;
   return { ...view, number: { ...number, tone: 'clear' } };
-}
-
-/** Whether `kind` is in the catalogue at all (a kind from a newer build is not). */
-export function isKnownKindId(kind: string): boolean {
-  return getKind(kind) !== undefined;
 }

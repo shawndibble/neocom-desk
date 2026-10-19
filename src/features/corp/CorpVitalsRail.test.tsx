@@ -21,9 +21,9 @@ import '@/i18n';
 import { CorpVitalsRail } from './CorpVitalsRail';
 import type { WalletDivision } from './divisions';
 import type { VitalsJournalEntry } from '@/engine/corp/vitals';
+import { DAY_MS } from '@/lib/age';
 
 const NOW = Date.UTC(2026, 8, 7, 12, 0, 0);
-const DAY_MS = 86_400_000;
 
 /**
  * One month's spending out of division 1: 300M over the 30-day window is

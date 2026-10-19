@@ -7,14 +7,13 @@
  * text is unit-testable without simulating a dnd-kit drag, which needs real
  * layout measurement jsdom doesn't provide.
  */
+import { romanLevel } from '@/engine/projection';
 import type { Announcements } from '@dnd-kit/core';
 import type { MergedRow } from './queueRows';
 
-const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
-
 /** "{name} {level}" in Roman numerals — shared with EntryList.tsx's `EntryRow`/`PrereqRow` labels so a row's on-screen name and its announced name can't drift apart. */
 export function formatLevelLabel(name: string, level: number): string {
-  return `${name} ${ROMAN[level - 1]}`;
+  return `${name} ${romanLevel(level)}`;
 }
 
 interface RowAnnouncer {

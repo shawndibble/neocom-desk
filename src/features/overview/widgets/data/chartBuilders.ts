@@ -7,7 +7,7 @@
  * Honesty rules from the design record: bars carry their max and their time
  * range; every model carries a hidden text summary; no series is red.
  */
-import type { DeadlineSeverity } from '@/engine/severity';
+import type { DeadlineSeverity } from '@/engine/character/severity';
 import type { SkillQueueEntry } from '@/esi/endpoints';
 import type {
   AreaChartModel,

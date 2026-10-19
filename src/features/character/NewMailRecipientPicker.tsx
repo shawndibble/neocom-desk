@@ -13,6 +13,7 @@ import { activeOptionClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import { isOfflineFailure } from '@/esi/client';
 import { cx } from '@/lib/cx';
+import { LOOKUP_DEBOUNCE_MS } from '@/lib/useDebouncedValue';
 import { moveHighlight } from '@/lib/comboboxNav';
 import { useOnline } from '@/stores/network';
 import {
@@ -20,12 +21,11 @@ import {
   filterMailingLists,
   recipientKey,
   type ComposeRecipient,
-} from '@/engine/mailCompose';
+} from '@/engine/mail/mailCompose';
 import { loadMailingLists } from './mail';
 import { RecipientAvatar } from './RecipientAvatar';
 import { MIN_RECIPIENT_SEARCH_LENGTH, searchTypedMailRecipients } from './mailRecipientSearch';
 
-const SEARCH_DEBOUNCE_MS = 300;
 const MAX_QUICK_PICKS = 8;
 const SEARCH_ENDPOINTS = ['getCharacterSearch'] as const;
 
@@ -118,7 +118,7 @@ export function NewMailRecipientPicker({
           setFailure(isOfflineFailure(err) ? 'offline' : 'error');
           setHits([]);
         });
-    }, SEARCH_DEBOUNCE_MS);
+    }, LOOKUP_DEBOUNCE_MS);
     return () => {
       clearTimeout(id);
       controller.abort();

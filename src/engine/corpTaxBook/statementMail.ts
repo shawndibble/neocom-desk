@@ -6,7 +6,7 @@
  * verify link carries pricing, terms and payments credited, so none of that is
  * mailed. Pure: names and the link arrive from the caller.
  */
-import { EVE_MARKUP_LIMIT, serializeEveMarkup, type MarkupNode } from '../eveMarkup';
+import { EVE_MARKUP_LIMIT, serializeEveMarkup, type MarkupNode } from '../mail/eveMarkup';
 import { formatIsk } from '../../lib/isk';
 import type { MailKind } from './mailQueue';
 import type { StatementLine } from './statements';

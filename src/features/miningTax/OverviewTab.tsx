@@ -10,6 +10,7 @@
  * and the vocabulary note in the issue: this is deliberately not the Tax
  * tab's `MiningLedgerEntry`/`Assignment`/`Payee` model).
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { guarded } from '@/app/routeChunks';
@@ -38,6 +39,7 @@ import * as Icon from '@/components/ui/icons';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { beginGrant } from '@/app/grantAction';
+import { useNow } from '@/lib/useNow';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { formatVolume } from '@/features/market/format';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
@@ -93,6 +95,7 @@ import { VolumeDisplay } from './volumeDisplay';
 import { UnpricedIsk } from './UnpricedIsk';
 import { systemLabel } from './names';
 import type { DailyRatePoint, TypeComparisonPoint } from './MiningYieldCharts';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 const LazyMiningYieldCharts = lazy(() => guarded(() => import('./MiningYieldCharts')));
 
@@ -147,7 +150,6 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
   const { t } = useTranslation();
   const showRefining = useMiningShowRefining((state) => state.value);
   const setShowRefining = useMiningShowRefining((state) => state.setValue);
-  const hydrateShowRefining = useMiningShowRefining((state) => state.hydrate);
   // `showRefining` decides what the loader itself fetches (issue #1281), so
   // unlike basis/buyback-rate — which only rescale already-loaded rows — it
   // must be part of the load closure. `useRouteSnapshot` only re-runs it on
@@ -172,34 +174,22 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
   const resolvedCharacterFilter = useResolvedCharacterFilter(characterFilter, activeCharacterId);
   const range = useMiningYieldRange((state) => state.value);
   const setRange = useMiningYieldRange((state) => state.setValue);
-  const hydrateRange = useMiningYieldRange((state) => state.hydrate);
   const basis = useMiningPriceBasis((state) => state.value);
   const setBasis = useMiningPriceBasis((state) => state.setValue);
-  const hydrateBasis = useMiningPriceBasis((state) => state.hydrate);
   const buybackRate = useMiningBuybackRate((state) => state.value);
   const setBuybackRate = useMiningBuybackRate((state) => state.setValue);
-  const hydrateBuybackRate = useMiningBuybackRate((state) => state.hydrate);
   const visibleColumns = useVisibleOverviewColumns((state) => state.value);
   const setVisibleColumns = useVisibleOverviewColumns((state) => state.setValue);
-  const hydrateVisibleColumns = useVisibleOverviewColumns((state) => state.hydrate);
   const chartMetric = useMiningChartMetric((state) => state.value);
   const setChartMetric = useMiningChartMetric((state) => state.setValue);
-  const hydrateChartMetric = useMiningChartMetric((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateRange();
-    void hydrateBasis();
-    void hydrateBuybackRate();
-    void hydrateShowRefining();
-    void hydrateVisibleColumns();
-    void hydrateChartMetric();
-  }, [
-    hydrateRange,
-    hydrateBasis,
-    hydrateBuybackRate,
-    hydrateShowRefining,
-    hydrateVisibleColumns,
-    hydrateChartMetric,
-  ]);
+  useHydratedStore(
+    useMiningYieldRange,
+    useMiningPriceBasis,
+    useMiningBuybackRate,
+    useMiningShowRefining,
+    useVisibleOverviewColumns,
+    useMiningChartMetric
+  );
   const handleShowRefiningChange = useCallback(
     (next: boolean) => {
       void setShowRefining(next);
@@ -209,7 +199,8 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
   );
   // EVE/UTC, the ledger's own calendar. Recomputed each render so a tab left
   // open past downtime moves its window with the day.
-  const today = eveToday();
+  const nowMs = useNow();
+  const today = eveToday(new Date(nowMs));
 
   const characters = data?.characters ?? [];
   const showCharacterColumn = characters.length > 1;
@@ -674,9 +665,7 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
                 </p>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                   <Panel>
-                    <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                      {t('miningTax.overview.totalValueStat')}
-                    </p>
+                    <p className={eyebrowClassName}>{t('miningTax.overview.totalValueStat')}</p>
                     <p className="mt-1 text-xl font-semibold tabular-nums">
                       <IskAmount value={totals.rawValue} decimals={0} />
                     </p>
@@ -688,9 +677,7 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
                     )}
                   </Panel>
                   <Panel>
-                    <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                      {t('miningTax.overview.iskPerDayStat')}
-                    </p>
+                    <p className={eyebrowClassName}>{t('miningTax.overview.iskPerDayStat')}</p>
                     <p className="mt-1 text-xl font-semibold tabular-nums">
                       {totals.iskPerDay !== null ? (
                         <IskAmount value={totals.iskPerDay} decimals={0} />
@@ -703,9 +690,7 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
                     </p>
                   </Panel>
                   <Panel>
-                    <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                      {t('miningTax.overview.volumeStat')}
-                    </p>
+                    <p className={eyebrowClassName}>{t('miningTax.overview.volumeStat')}</p>
                     <p className="mt-1 text-xl font-semibold tabular-nums">
                       {volumeDisplayMode(totals.volume).kind === 'complete'
                         ? `${formatVolume(totals.volume.m3)} m³`
@@ -722,9 +707,7 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
                     )}
                   </Panel>
                   <Panel>
-                    <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                      {t('miningTax.overview.daysMinedStat')}
-                    </p>
+                    <p className={eyebrowClassName}>{t('miningTax.overview.daysMinedStat')}</p>
                     <p className="mt-1 text-xl font-semibold tabular-nums">
                       {t('miningTax.overview.daysCoveredValue', {
                         count: coverage.daysWithData,

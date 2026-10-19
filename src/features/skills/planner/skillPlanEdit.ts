@@ -17,7 +17,7 @@
  * extra synced write.
  */
 import type { SkillPlanRecord } from '@/db';
-import { normalizePlan } from '@/engine/plan';
+import { normalizePlan } from '@/engine/skills/plan';
 import { optimizeAtMarkers } from '@/engine/optimizer';
 import type { BoosterContext, RemapSegment } from '@/engine/optimizer';
 import { hasKnownSkill } from '@/engine/remapMarkers';

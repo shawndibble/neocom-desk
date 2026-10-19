@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { normalizePlan } from '@/engine/plan';
+import { normalizePlan } from '@/engine/skills/plan';
 import { placeRemaps, suggestReorder } from '@/engine/optimizer';
 import type { Attributes, EngineSkill, PlanEntry, TrainedSkill } from '@/engine/types';
 import { applyOptimizeForMe, type RemapPricingContext } from './skillPlanEdit';
