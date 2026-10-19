@@ -18,12 +18,22 @@ export interface TaxCsvContext {
   estimatedValue: (row: DisplayRow) => number;
   /** Null for a row with no Assignment — the table's dash, not a zero owed. */
   taxOwed: (row: DisplayRow) => number | null;
+  /** A row's status as the table prints it, when it is not just the personal status (a Corp Tax Book state). */
+  statusLabel?: (row: DisplayRow) => string | undefined;
 }
 
 /** Export columns for the Mining Tax table, in its column order (the select and edit columns carry no data). */
 export function taxCsvColumns(
   t: CsvTranslate,
-  { showCharacter, dateLabel, systemName, payeeName, estimatedValue, taxOwed }: TaxCsvContext
+  {
+    showCharacter,
+    dateLabel,
+    systemName,
+    payeeName,
+    estimatedValue,
+    taxOwed,
+    statusLabel,
+  }: TaxCsvContext
 ): CsvColumn<DisplayRow>[] {
   const columns: CsvColumn<DisplayRow>[] = [];
   if (showCharacter) {
@@ -38,7 +48,7 @@ export function taxCsvColumns(
     { header: t('miningTax.taxOwedColumn'), value: taxOwed },
     {
       header: t('miningTax.statusColumn'),
-      value: (dr) => t(`miningTax.status.${STATUS_LABEL_KEY[dr.status]}`),
+      value: (dr) => statusLabel?.(dr) ?? t(`miningTax.status.${STATUS_LABEL_KEY[dr.status]}`),
     }
   );
   return columns;

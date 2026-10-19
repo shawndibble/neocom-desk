@@ -3,7 +3,7 @@
  * both EFT exporters. Rolls sorted by internal name; a block with no known
  * rolls stops after the mutaplasmid line.
  */
-import { quantiseRoll } from '@/engine/fitting/fittingShare';
+import { quantiseRoll } from '@/engine/fittings/fittingShare';
 import type { ItemMutation } from './types';
 
 /** A dogma attribute's internal name (`capacitorNeed`) — `MutaplasmidLookup.attributeName`. */

@@ -226,7 +226,7 @@ describe('schema upgrade v6 -> v7', () => {
   });
 
   it('the shipped database is at its current version with v7’s index live', () => {
-    expect(db.verno).toBe(25);
+    expect(db.verno).toBe(26);
     expect(db.characters.schema.indexes.map((i) => i.name)).toContain('corporationId');
   });
 });
@@ -266,6 +266,7 @@ describe('schema upgrade v8 -> v9 (Production Log, issue #525)', () => {
         'ansiblexGates',
         'buildPlans',
         'characters',
+        'corpMailQueue',
         'dynamicItems',
         'esiCache',
         'esiCacheMeta',
@@ -379,6 +380,17 @@ describe('schema upgrade v24 -> v25 (mutated items’ dynamic attributes)', () =
   it('adds dynamicItems keyed by item id, with no other index', () => {
     expect(db.dynamicItems.schema.primKey.name).toBe('itemId');
     expect(db.dynamicItems.schema.indexes.map((i) => i.name)).toEqual([]);
+  });
+});
+
+describe('schema upgrade v25 -> v26 (Corp Tax Book send queue)', () => {
+  it('adds corpMailQueue keyed by id, indexed for a corporation, batch and sender', () => {
+    expect(db.corpMailQueue.schema.primKey.name).toBe('id');
+    expect(db.corpMailQueue.schema.indexes.map((i) => i.name)).toEqual([
+      'corporationId',
+      'batchId',
+      'senderCharacterId',
+    ]);
   });
 });
 

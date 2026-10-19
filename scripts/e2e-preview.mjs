@@ -62,9 +62,12 @@ if (distIndexMtime === 0) {
   );
 }
 
-const newestSourceMtime = Math.max(
-  ...SOURCE_INPUTS.map((input) => newestMtimeMs(join(repoRoot, input)))
-);
+// CI builds `dist/` in one job and downloads it into the shards, so its mtimes
+// carry no information there; that job opts out of the comparison.
+const skipStaleCheck = process.env.E2E_PREVIEW_SKIP_STALE_CHECK === '1';
+const newestSourceMtime = skipStaleCheck
+  ? 0
+  : Math.max(...SOURCE_INPUTS.map((input) => newestMtimeMs(join(repoRoot, input))));
 if (newestSourceMtime > distIndexMtime) {
   fail(
     'dist/ is older than the sources it was built from, so the `built` ' +
