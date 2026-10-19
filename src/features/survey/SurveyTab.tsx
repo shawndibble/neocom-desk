@@ -14,8 +14,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
+import { useCharacters } from '@/features/character/useCharacters';
 import { Button, EmptyState, PageHeader, TabPanel, textActionClassName } from '@/components/ui';
 import { isShareId } from '@/engine/share/shareId';
 import { ownsSurvey } from '@/engine/survey/owner';
@@ -227,7 +227,7 @@ export function SurveyTab({ tabBar, tabsId }: SurveyTabProps) {
     });
   }, [hydrated, characterId]);
 
-  const characterNames = useLiveQuery(() => db.characters.toArray())?.map((c) => c.name) ?? [];
+  const characterNames = useCharacters().map((c) => c.name);
   const scans = useMemo(() => (state.status === 'ready' ? state.scans : []), [state]);
   const owned = state.status === 'ready' && ownsSurvey(state.owner, characterNames);
   // Only the owner sets a scan aside; the rules can't tell who that is, so this is the guard.

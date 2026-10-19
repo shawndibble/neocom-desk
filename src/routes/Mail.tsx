@@ -29,6 +29,7 @@ import * as Icon from '@/components/ui/icons';
 import { GrantBanner, GrantNote } from '@/app/GrantNote';
 import { ReauthCachedNote } from '@/app/ReauthCachedNote';
 import { db } from '@/db';
+import { useCharacters } from '@/features/character/useCharacters';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useOnline } from '@/stores/network';
 import { useRetryFocus } from '@/lib/useRetryFocus';
@@ -1425,15 +1426,15 @@ export function Mail() {
   const scopeParams = useMemo(() => ({ scope: characterFilterParam(storedScope) }), [storedScope]);
   const [scopeView, setScopeView] = useUrlParams(scopeParams);
 
-  const characters = useLiveQuery(() => db.characters.toArray(), [], []);
+  const characters = useCharacters();
   // Cached labels only, live: the menu's unread figures need no fetch of their own.
   const labelsByCharacter = useLiveQuery(
-    async () => readMailLabelsForCharacters((characters ?? []).map((c) => c.characterId)),
+    async () => readMailLabelsForCharacters(characters.map((c) => c.characterId)),
     [characters]
   );
   const unreadByCharacter = useMemo(
     () =>
-      (characters ?? []).map((c) => ({
+      characters.map((c) => ({
         characterId: c.characterId,
         name: c.name,
         unread: totalSystemUnread(labelsByCharacter?.get(c.characterId)?.data.labels ?? []),
@@ -1442,7 +1443,7 @@ export function Mail() {
   );
 
   // A control that cannot change anything (one Character) is not offered.
-  const offered = (characters?.length ?? 0) > 1;
+  const offered = characters.length > 1;
   const scope: CharacterFilterValue = offered ? scopeView.scope : 'current';
   function changeScope(next: CharacterFilterValue) {
     void setStoredScope(next);
@@ -1466,7 +1467,7 @@ export function Mail() {
             activeCharacterId={activeCharacterId}
             value={scope}
             onChange={changeScope}
-            characterCount={characters?.length}
+            characterCount={characters.length}
             unreadByCharacter={unreadByCharacter}
             size="md"
           />

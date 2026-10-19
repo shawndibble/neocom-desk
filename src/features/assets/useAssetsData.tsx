@@ -6,6 +6,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import type { EsiEndpointId } from '@/esi/registry';
 import { clearStationPin, setAccountStationPin, setCharacterStationPin } from '@/sync';
 import { db, type BuildPlanRecord } from '@/db';
+import { useCharacters } from '@/features/character/useCharacters';
 import { nextPinState, pinStateForStation, type PinState } from '@/features/character/stationPins';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
 import {
@@ -119,10 +120,10 @@ export function useAssetsData() {
     activeCharacterId
   );
 
-  const allCharactersQuery = useLiveQuery(() => db.characters.toArray(), [], []);
+  const allCharactersQuery = useCharacters();
   const crossCharacterCandidates = useMemo(
     () =>
-      (allCharactersQuery ?? []).map((c) => ({
+      allCharactersQuery.map((c) => ({
         characterId: c.characterId,
         characterName: c.name,
       })),
@@ -134,7 +135,7 @@ export function useAssetsData() {
   const viewedCharacter =
     viewedCharacterId === undefined
       ? undefined
-      : (allCharactersQuery ?? []).find((c) => c.characterId === viewedCharacterId);
+      : allCharactersQuery.find((c) => c.characterId === viewedCharacterId);
   const crossCharacterFilterMeta =
     crossCharacterCandidates.length > 1 && viewedCharacterId === undefined ? (
       <CharacterFilterControl
