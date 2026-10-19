@@ -120,3 +120,10 @@ export function parseIskAmount(input: string): number | null {
   const multiplier = suffix ? ISK_SHORTHAND_MULTIPLIERS[suffix] : 1;
   return numeric * multiplier;
 }
+
+/** A blank or unparseable field is "no restriction", never `NaN` — which would silently exclude every row. */
+export function parseNumeric(value: string): number | null {
+  if (value.trim() === '') return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}

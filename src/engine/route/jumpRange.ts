@@ -12,10 +12,6 @@ export type JumpRange = (typeof JUMP_RANGES)[number];
 
 export const DEFAULT_JUMP_RANGE: JumpRange = 'any';
 
-export function isJumpRange(value: unknown): value is JumpRange {
-  return typeof value === 'string' && (JUMP_RANGES as readonly string[]).includes(value);
-}
-
 function maxJumps(range: Exclude<JumpRange, 'any'>): number {
   return range === 'system' ? 0 : Number(range);
 }

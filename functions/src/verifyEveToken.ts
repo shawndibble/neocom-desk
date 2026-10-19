@@ -112,14 +112,20 @@ export async function verifyEveAccessToken(
  * prod are separate EVE application registrations sharing this one deployed
  * function. Env overrides exist for tests (EVE_JWKS_URL, EVE_ISSUER,
  * EVE_AUDIENCE).
+ *
+ * `allowMissingClientId` is only for the Firebase emulator's function-discovery
+ * pass, which loads the module without the user's env files; the options it
+ * yields have no client ids, so they verify nothing.
  */
-export function verifyOptionsFromEnv(): VerifyOptions {
+export function verifyOptionsFromEnv(
+  options: { allowMissingClientId?: boolean } = {}
+): VerifyOptions {
   const raw = process.env.EVE_CLIENT_ID;
   const clientIds = (raw ?? '')
     .split(',')
     .map((id) => id.trim())
     .filter((id) => id.length > 0);
-  if (clientIds.length === 0) {
+  if (clientIds.length === 0 && !options.allowMissingClientId) {
     throw new Error(
       'EVE_CLIENT_ID is not set. Set it (functions/.env or deploy-time env) to this ' +
         "deployment's EVE application client_id(s) — without it, access tokens minted " +

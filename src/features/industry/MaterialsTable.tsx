@@ -33,7 +33,7 @@ import type { MaterialSourcing, MaterialSourcingMap } from '@/engine/industry/ty
 import type { SkillGateVerdict } from '@/engine/industry/skillGate';
 import { cx } from '@/lib/cx';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
-import { maskNumber, unmaskNumber } from '@/lib/numberMask';
+import { maskNumber, unmaskCount, unmaskNumber } from '@/lib/numberMask';
 import { ItemInfoLink } from '@/features/entities';
 import { formatVolume } from './format';
 import { materialRowState } from './materialRow';
@@ -133,14 +133,6 @@ interface MaterialsTableProps {
 export interface MaterialsTableHandle {
   fillAll: () => void;
   clearAll: () => void;
-}
-
-/** Blank or garbage clears the field; anything real is kept as-is (the engine clamps). */
-function parseCount(raw: string): number | undefined {
-  const value = unmaskNumber(raw);
-  // Materials are consumed in whole units everywhere in the engine, so a
-  // typed fraction is floored rather than refused.
-  return value === undefined ? undefined : Math.floor(value);
 }
 
 const parsePrice = unmaskNumber;
@@ -981,7 +973,7 @@ export function MaterialsTable({
           autoFocus={autoFocus}
           placeholder="0"
           mine={owned !== undefined && owned > 0}
-          parse={parseCount}
+          parse={unmaskCount}
           onCommit={(ownedQuantity) => commitOwned(material.typeID, ownedQuantity)}
         />
         {withHint && renderOwnedHint(material)}
