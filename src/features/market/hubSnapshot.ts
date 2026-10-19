@@ -6,11 +6,10 @@
  * draw Price History's Buy and Sell lines, so the mining pages and the chart
  * agree on a day's price and share one read.
  *
- * A station day feeds the price basis's `saved` tier (`priceBasis.ts`), merged
- * with the per-browser Dexie snapshot for Jita (`priceSnapshots.ts`, no
- * equivalent for the other 4 hubs). An object written before the station
- * backfill re-run (#4279) still holds region-wide days; those feed the weaker
- * `historical` tier on dates the station has no price.
+ * A station day feeds the tax ledgers' `saved` tier (`priceBasis.ts`). An
+ * object written before the station backfill re-run (#4279) still holds
+ * region-wide days; those feed the weaker `historical` tier on dates the
+ * station has no price. The Overview takes either, station first.
  *
  * Never fails a caller: a type with no object (404), a failed read and a
  * malformed object all count as no days, and the tier chain falls further back.

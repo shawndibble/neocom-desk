@@ -41,7 +41,7 @@ describe('MiningYieldCharts — ISK metric', () => {
     render(
       <MiningYieldCharts
         metric="isk"
-        dailyRate={[{ date: '2026-09-01', iskValue: 1234567, source: 'saved' }]}
+        dailyRate={[{ date: '2026-09-01', iskValue: 1234567 }]}
         dailyVolume={[]}
         dailyCount={[]}
         typeComparison={typeComparison}
@@ -60,37 +60,15 @@ describe('MiningYieldCharts — ISK metric', () => {
     expect(within(compare).getByText('1,200 ISK')).toBeInTheDocument();
   });
 
-  it("names each day's price source in the rate table", () => {
-    render(
-      <MiningYieldCharts
-        metric="isk"
-        dailyRate={[{ date: '2026-09-01', iskValue: 1234567, source: 'live' }]}
-        dailyVolume={[]}
-        dailyCount={[]}
-        typeComparison={typeComparison}
-        typeVolumeComparison={[]}
-        typeCountComparison={[]}
-        showRefining
-      />
-    );
-    const rate = screen.getByRole('table', { name: 'ISK mined per day' });
-    expect(within(rate).getByRole('columnheader', { name: 'Source' })).toBeInTheDocument();
-    expect(within(rate).getByRole('cell', { name: 'Live' })).toBeInTheDocument();
-  });
+  it('names the day, its figure and the basis in the rate tooltip, and no price source', () => {
+    const props = {
+      active: true,
+      label: '2026-09-01',
+      payload: [{ payload: { date: '2026-09-01', iskValue: 1234567 } }],
+    } as unknown as Parameters<typeof RateTooltip>[0];
 
-  it("names the day's price source in the rate tooltip, and nothing on a day with no source", () => {
-    const tooltipProps = (source: 'live' | null) =>
-      ({
-        active: true,
-        label: '2026-09-01',
-        payload: [{ payload: { date: '2026-09-01', iskValue: 1234567, source } }],
-      }) as unknown as Parameters<typeof RateTooltip>[0];
-
-    const { unmount } = render(<RateTooltip {...tooltipProps('live')} />);
-    expect(screen.getByText('Source: Live')).toBeInTheDocument();
-    unmount();
-
-    render(<RateTooltip {...tooltipProps(null)} />);
+    render(<RateTooltip {...props} />);
+    expect(screen.getByText("Total value of each day's ore")).toBeInTheDocument();
     expect(screen.queryByText(/^Source:/)).not.toBeInTheDocument();
   });
 
@@ -98,7 +76,7 @@ describe('MiningYieldCharts — ISK metric', () => {
     render(
       <MiningYieldCharts
         metric="isk"
-        dailyRate={[{ date: '2026-09-01', iskValue: 1234567, source: 'saved' }]}
+        dailyRate={[{ date: '2026-09-01', iskValue: 1234567 }]}
         dailyVolume={[]}
         dailyCount={[]}
         typeComparison={typeComparison}

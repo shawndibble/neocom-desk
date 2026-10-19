@@ -48,27 +48,28 @@ const ORE_LINES = [
 const ORE_TABLE = 'Ore mined';
 const OVERVIEW_TABLE = 'Overview';
 
+/** Jita 4-4, the default Trade Hub's station. */
+const JITA_STATION_ID = 60003760;
+
 /**
- * Answers `/markets/{region}/history` for any type it is asked about, with a
- * point on the mined date itself. That date is the whole point: `yieldSnapshot`
- * keys `priceByTypeAndDate` by typeId *and* date, so history that misses
- * `ENTRY_DATE` prices every line at nothing and the layout assertions below
- * would pass happily on a card of em dashes. A glob rather than a computed
- * URL because the ids requested include each ore's Compressed counterpart and
- * every material it refines into, and the region comes from
- * `DEFAULT_TRADE_HUB` — none of which this spec should have to re-derive.
+ * Answers every type's Open Prices object (`marketOpenPrices.ts`) with a Jita
+ * 4-4 day on the mined date itself. That date is the whole point: the Overview
+ * prices each line on its own mined day, so prices that miss `ENTRY_DATE`
+ * value every line at nothing and the layout assertions below would pass
+ * happily on a card of em dashes. A glob rather than a computed URL because
+ * the ids requested include each ore's Compressed counterpart and every
+ * material it refines into, none of which this spec should have to re-derive.
  * A later `page.route` wins over an earlier one — see `support/testBase.ts`.
  */
-async function mockMarketHistory(page: Page): Promise<void> {
-  await page.route('https://esi.evetech.net/markets/*/history*', async (route) => {
-    const body = [daysAgo(5), daysAgo(4), ENTRY_DATE].map((date) => ({
-      date,
-      average: 4200.5,
-      highest: 4400,
-      lowest: 4000,
-      volume: 900_000_000,
-      order_count: 40,
-    }));
+async function mockOpenPrices(page: Page): Promise<void> {
+  await page.route('https://data.neocomdesk.com/open-prices/*.json', async (route) => {
+    const dates = [daysAgo(5), daysAgo(4), ENTRY_DATE];
+    const body = {
+      dates,
+      stations: {
+        [JITA_STATION_ID]: { buy: dates.map(() => 4000), sell: dates.map(() => 4400) },
+      },
+    };
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -133,7 +134,7 @@ async function openYieldDetail(page: Page): Promise<void> {
       `tr[data-row-key="${CHARACTER_ID}:${ENTRY_DATE}:${SOLAR_SYSTEM_ID}"]`
   );
   // Well past the 5s default: the Overview tab awaits the SDE bake plus a
-  // market-history round-trip per priced type, cold on a CI runner.
+  // price read per priced type, cold on a CI runner.
   await expect(day).toBeVisible({ timeout: 20_000 });
   await day.click();
   await expect(page.getByRole('table', { name: ORE_TABLE })).toBeVisible();
@@ -151,7 +152,7 @@ async function visibleHeaders(page: Page): Promise<string[]> {
 
 test.describe('Yield Detail — ore-mined table', () => {
   test.beforeEach(async ({ page }) => {
-    await mockMarketHistory(page);
+    await mockOpenPrices(page);
     await signInAndGoto(page);
     await seedMiningDay(page);
   });

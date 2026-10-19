@@ -34,9 +34,6 @@ vi.mock('@/sde/loadSde', () => sdeMock);
 const hubSnapshotMock = vi.hoisted(() => ({ loadHubSnapshotRange: vi.fn() }));
 vi.mock('@/features/market/hubSnapshot', () => hubSnapshotMock);
 
-const priceSnapshotsMock = vi.hoisted(() => ({ loadPriceSnapshots: vi.fn() }));
-vi.mock('./priceSnapshots', () => priceSnapshotsMock);
-
 const EMPTY_HUB_SNAPSHOT = { saved: new Map(), historical: new Map() };
 
 beforeEach(() => {
@@ -45,7 +42,6 @@ beforeEach(() => {
   pricesMock.status.stations.clear();
   sdeMock.loadCompressedOreTypeIds.mockResolvedValue({ [ZEOLITES]: COMPRESSED_ZEOLITES });
   hubSnapshotMock.loadHubSnapshotRange.mockResolvedValue(EMPTY_HUB_SNAPSHOT);
-  priceSnapshotsMock.loadPriceSnapshots.mockResolvedValue(new Map());
 });
 
 describe('loadUnitPricesOnDate', () => {
@@ -222,8 +218,6 @@ describe('loadUnitPricesOnDate', () => {
       VELDSPAR,
     ]);
     expect(hubSnapshotMock.loadHubSnapshotRange).toHaveBeenCalledWith(DATE, DATE, [VELDSPAR], hek);
-    // Dexie only ever holds Jita — no equivalent for a non-default hub.
-    expect(priceSnapshotsMock.loadPriceSnapshots).not.toHaveBeenCalled();
   });
 
   it("prefers the server's saved snapshot for the date over today's live price", async () => {
@@ -262,30 +256,6 @@ describe('loadUnitPricesOnDate', () => {
     expect(prices.get(VELDSPAR)).toBe(40);
   });
 
-  it('merges in the per-browser Dexie snapshot for Jita, server winning over it', async () => {
-    priceSnapshotsMock.loadPriceSnapshots.mockResolvedValue(
-      new Map([[DATE, { [VELDSPAR]: { buy: 20, sell: 25 }, [ZEOLITES]: { buy: 5, sell: 6 } }]])
-    );
-    hubSnapshotMock.loadHubSnapshotRange.mockResolvedValue({
-      saved: new Map([[DATE, new Map([[VELDSPAR, { buy: 50, sell: 60 }]])]]),
-      historical: new Map(),
-    });
-    pricesMock.getHubPrices.mockResolvedValue(new Map());
-    sdeMock.loadCompressedOreTypeIds.mockResolvedValue({});
-
-    const { prices } = await loadUnitPricesOnDate(
-      [VELDSPAR, ZEOLITES],
-      getTradeHub('jita') as TradeHub,
-      DATE
-    );
-
-    // Server (50) wins over Dexie (20) for VELDSPAR; Dexie alone fills ZEOLITES.
-    expect(prices.get(VELDSPAR)).toBe(50);
-    expect(prices.get(ZEOLITES)).toBe(5);
-  });
-});
-
-describe('unreachable price source', () => {
   it('flags the live lookup as unreachable on an unpriced type, so the UI can say why', async () => {
     pricesMock.status.unreachable = true;
     pricesMock.getHubPrices.mockResolvedValue(new Map());

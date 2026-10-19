@@ -14,8 +14,6 @@ import {
   DropdownMenuTrigger,
   EmptyState,
   FilterBar,
-  FilterChip,
-  FilterField,
   IconButton,
   Modal,
   PageHeader,
@@ -89,22 +87,15 @@ import {
   reorderGroups,
   sortCharacterIds,
   type CharacterGroup,
-  type CharacterSortKey,
 } from '@/features/character/groups';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { charactersCsvColumns } from '@/features/character/charactersCsv';
+import { CharactersFilterFields } from '@/features/character/CharactersFilterFields';
 import { CharacterCard } from '@/features/character/CharacterCard';
 import { GroupSectionHeader } from '@/features/character/GroupSectionHeader';
-import { UNGROUPED_VALUE, characterLastSynced } from '@/features/character/rosterQueueChip';
-import {
-  useCharactersView,
-  activeRosterFilterCount,
-  ALL_CORPS_VALUE,
-  ALL_GROUPS_VALUE,
-  QUEUE_FILTER_STATES,
-  SORT_KEYS,
-} from '@/features/character/useCharactersView';
+import { characterLastSynced } from '@/features/character/rosterQueueChip';
+import { useCharactersView, activeRosterFilterCount } from '@/features/character/useCharactersView';
 import { buildColumns, type CharacterRow } from '@/features/character/charactersTableColumns';
 
 const DENSITY_LABEL_KEYS = {
@@ -763,130 +754,13 @@ export function Characters() {
             }
           >
             {(draft, setDraft) => (
-              <>
-                <div
-                  role="group"
-                  aria-label={t('characters.filterQueueLabel')}
-                  className="flex flex-wrap gap-2"
-                >
-                  {QUEUE_FILTER_STATES.map((state) => (
-                    <FilterChip
-                      key={state}
-                      label={t(`characters.queueStates.${state}`)}
-                      selected={draft.queue === state}
-                      onToggle={() =>
-                        setDraft({ ...draft, queue: draft.queue === state ? null : state })
-                      }
-                    />
-                  ))}
-                </div>
-                {/* One corp has nothing to narrow to — unless a link already set one, which must stay visible to be cleared. */}
-                {(corpOptions.length > 1 || draft.corp !== null) && (
-                  <FilterField label={t('characters.filterCorpLabel')}>
-                    <Select
-                      value={draft.corp ?? ALL_CORPS_VALUE}
-                      onValueChange={(value) =>
-                        setDraft({ ...draft, corp: value === ALL_CORPS_VALUE ? null : value })
-                      }
-                    >
-                      <SelectTrigger
-                        size="sm"
-                        aria-label={t('characters.filterCorpLabel')}
-                        className="w-48"
-                      >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={ALL_CORPS_VALUE}>
-                          {t('characters.allCorporations')}
-                        </SelectItem>
-                        {corpOptions.map((name) => (
-                          <SelectItem key={name} value={name}>
-                            {name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </FilterField>
-                )}
-                {/* No Groups yet has nothing to narrow to — same gate as the corp filter above. */}
-                {groupsValue.groups.length > 0 && (
-                  <FilterField label={t('characters.filterGroupLabel')}>
-                    <Select
-                      value={draft.group ?? ALL_GROUPS_VALUE}
-                      onValueChange={(value) =>
-                        setDraft({ ...draft, group: value === ALL_GROUPS_VALUE ? null : value })
-                      }
-                    >
-                      <SelectTrigger
-                        size="sm"
-                        aria-label={t('characters.filterGroupLabel')}
-                        className="w-48"
-                      >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={ALL_GROUPS_VALUE}>
-                          {t('characters.allGroups')}
-                        </SelectItem>
-                        <SelectItem value={UNGROUPED_VALUE}>{t('characters.ungrouped')}</SelectItem>
-                        {groupFilterOptions.map((group) => (
-                          <SelectItem key={group.id} value={group.id}>
-                            {group.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </FilterField>
-                )}
-                <FilterChip
-                  label={t('characters.filterStarredOnly')}
-                  selected={draft.starredOnly}
-                  onToggle={() => setDraft({ ...draft, starredOnly: !draft.starredOnly })}
-                />
-                <FilterChip
-                  label={t('characters.filterHasAlerts')}
-                  selected={draft.alertsOnly}
-                  onToggle={() => setDraft({ ...draft, alertsOnly: !draft.alertsOnly })}
-                />
-                <FilterField label={t('characters.sortBy')}>
-                  <Select
-                    value={draft.sortKey}
-                    onValueChange={(value) =>
-                      setDraft({ ...draft, sortKey: value as CharacterSortKey })
-                    }
-                  >
-                    <SelectTrigger size="sm" aria-label={t('characters.sortBy')} className="w-40">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {SORT_KEYS.map((key) => (
-                        <SelectItem key={key} value={key}>
-                          {t(`characters.sortKeys.${key}`)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </FilterField>
-                <FilterField label={t('characters.sortDirection')} stretch={false}>
-                  <IconButton
-                    size="sm"
-                    icon={draft.sortDirection === 'asc' ? <Icon.Ascending /> : <Icon.Descending />}
-                    label={t(
-                      draft.sortDirection === 'asc'
-                        ? 'characters.sortDirectionAsc'
-                        : 'characters.sortDirectionDesc'
-                    )}
-                    tooltip={t('characters.sortDirection')}
-                    onClick={() =>
-                      setDraft({
-                        ...draft,
-                        sortDirection: draft.sortDirection === 'asc' ? 'desc' : 'asc',
-                      })
-                    }
-                  />
-                </FilterField>
-              </>
+              <CharactersFilterFields
+                draft={draft}
+                setDraft={setDraft}
+                corpOptions={corpOptions}
+                hasGroups={groupsValue.groups.length > 0}
+                groupFilterOptions={groupFilterOptions}
+              />
             )}
           </FilterBar>
           <div className="flex flex-wrap items-center justify-between gap-3">

@@ -49,8 +49,10 @@ plus a small index, and have the client fetch only the types a search needs.
 
 - **Bucket:** `neocom-snapshots`; public reads through the custom domain
   `data.neocomdesk.com` (not `r2.dev`, which Cloudflare documents as
-  rate-limited and for development only). CORS allows `https://neocomdesk.com`
-  and the dev origins, with GET only.
+  rate-limited and for development only). CORS allows `https://neocomdesk.com`,
+  `https://dev.neocomdesk.com` and the local dev origins, with GET only. A
+  missing origin is silent: the client reads the blocked fetch as "no snapshot"
+  (the price history draws its average line labelled "no order data").
 - **Layout:** `contract-offers/index.json` (the `lastSyncedAt` stamp, each
   type's count, cheapest ask and object name, and the region list — what
   `publicContractOfferIndex.ts` carries today) and one object per type,
