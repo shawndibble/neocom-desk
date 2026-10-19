@@ -15,7 +15,8 @@ import type { PilotProfile } from '@/engine/fittings/types';
 import type { CandidateCheck, DogmaEngine } from './dogmaFittingEngine';
 import type { FittingContext } from './fittingContext';
 import { loadSavedHullFit, saveHullFit } from './hullFitCache';
-import type { HullFitReply, HullFitRequest } from './hullFit.worker';
+import { sendToWorker } from './fittingWorker';
+import type { HullFitRequest } from './hullFit.worker';
 import type { FittingCatalogue } from './useFittingCatalogue';
 
 export type HullFitChecks = ReadonlyMap<number, CandidateCheck>;
@@ -81,64 +82,24 @@ function jobsFor(catalogue: FittingCatalogue): [CandidateRack, number[]][] {
 const memory = new Map<string, HullFitChecks>();
 const running = new Map<string, Promise<HullFitChecks>>();
 
-let worker: Worker | null = null;
-let workerBroken = false;
-let nextRequest = 0;
-const pending = new Map<
-  number,
-  { resolve: (checks: HullFitChecks) => void; reject: (reason: Error) => void }
->();
-
-function failPending(reason: Error) {
-  for (const { reject } of pending.values()) reject(reason);
-  pending.clear();
-}
-
-function ensureWorker(): Worker | null {
-  if (workerBroken || typeof Worker === 'undefined') return null;
-  if (worker) return worker;
-  try {
-    worker = new Worker(new URL('./hullFit.worker.ts', import.meta.url), { type: 'module' });
-  } catch {
-    workerBroken = true;
-    return null;
-  }
-  worker.onmessage = (event: MessageEvent<HullFitReply>) => {
-    const reply = event.data;
-    const waiting = pending.get(reply.id);
-    if (!waiting) return;
-    pending.delete(reply.id);
-    if ('entries' in reply) {
-      waiting.resolve(new Map(reply.entries.map(([typeId, bits]) => [typeId, unpackCheck(bits)])));
-    } else {
-      waiting.reject(new Error('aborted' in reply ? 'superseded' : reply.error));
-    }
-  };
-  worker.onerror = () => {
-    workerBroken = true;
-    worker = null;
-    failPending(new Error('worker failed'));
-  };
-  return worker;
-}
-
 function computeInWorker(
-  target: Worker,
   shipTypeId: number,
   jobs: [CandidateRack, number[]][],
   profile: PilotProfile
-): Promise<HullFitChecks> {
-  const id = ++nextRequest;
-  const request: HullFitRequest = {
+): Promise<HullFitChecks> | null {
+  const reply = sendToWorker((id): HullFitRequest => ({
     id,
     shipTypeId,
     jobs,
     skillLevels: [...profile.skillLevels],
-  };
-  return new Promise((resolve, reject) => {
-    pending.set(id, { resolve, reject });
-    target.postMessage(request);
-  });
+  }));
+  return (
+    reply &&
+    reply.then((answer) => {
+      if (!('entries' in answer)) throw new Error('unexpected reply');
+      return new Map(answer.entries.map(([typeId, bits]) => [typeId, unpackCheck(bits)]));
+    })
+  );
 }
 
 /** The page's own path: every item through the memoizing engine call, in slices that yield. */
@@ -175,10 +136,10 @@ async function compute(
   shipTypeId: number
 ): Promise<HullFitChecks> {
   const jobs = jobsFor(catalogue);
-  const target = ensureWorker();
-  if (target) {
+  const inWorker = computeInWorker(shipTypeId, jobs, profile);
+  if (inWorker) {
     try {
-      return await computeInWorker(target, shipTypeId, jobs, profile);
+      return await inWorker;
     } catch (error) {
       // Asked about another hull meanwhile: the caller has moved on too.
       if (error instanceof Error && error.message === 'superseded') throw error;
