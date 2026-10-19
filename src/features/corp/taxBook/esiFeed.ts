@@ -15,6 +15,7 @@ import { parseEveNotificationPayload } from '@/engine/eveNotificationPayload';
 import {
   donationsFromJournal,
   observedRowsFromLedger,
+  MOON_NOTIFICATION_TYPES,
   type JournalDonation,
   type MoonNotification,
 } from '@/engine/corpTaxBook/sync';
@@ -117,11 +118,7 @@ export async function loadDonations(
   return found;
 }
 
-const MOON_TYPES: ReadonlySet<string> = new Set([
-  'MoonminingExtractionStarted',
-  'MoonminingLaserFired',
-  'MoonminingExtractionCancelled',
-]);
+const MOON_TYPES: ReadonlySet<string> = new Set(MOON_NOTIFICATION_TYPES);
 
 /** This Character's moon drill notifications. Empty when the notifications scope is not granted. */
 export async function loadMoonNotifications(characterId: number): Promise<MoonNotification[]> {

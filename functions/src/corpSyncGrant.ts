@@ -419,6 +419,7 @@ export async function runScheduledCorpSyncs(deps: CorpSyncDeps, esi: SyncEsi): P
 type RefreshOutcome =
   | { kind: 'ok'; accessToken: string; grant: CorpSyncGrantDoc }
   | { kind: 'dead' }
+  | { kind: 'unreadable' }
   | { kind: 'skip' };
 
 // SSO rotates the token, so the SSO call must not run inside a retryable
@@ -428,7 +429,13 @@ type RefreshOutcome =
 // meantime, the rotated one is discarded instead of overwriting it.
 async function refreshGrant(deps: CorpSyncDeps, grant: CorpSyncGrantDoc): Promise<RefreshOutcome> {
   const key = deps.key();
-  const current = decryptRefreshToken(grant.encryptedRefreshToken, grant.characterId, key, PURPOSE);
+  let current: string;
+  try {
+    current = decryptRefreshToken(grant.encryptedRefreshToken, grant.characterId, key, PURPOSE);
+  } catch {
+    // The saved blob cannot be read (a rotated key, a damaged doc): it will never work again.
+    return { kind: 'unreadable' };
+  }
   let tokens: RefreshedTokens;
   try {
     tokens = await deps.refresh(grant.clientId, current);
@@ -467,6 +474,7 @@ async function runOne(
   const refreshed = await refreshGrant(deps, initial);
   if (refreshed.kind === 'skip') return { kind: 'skipped', reason: 'esi-unavailable' };
   if (refreshed.kind === 'dead') return stopGrant(deps, initial, 'token-revoked');
+  if (refreshed.kind === 'unreadable') return stopGrant(deps, initial, 'grant-unreadable');
   const { accessToken, grant } = refreshed;
 
   const claims = await deps.verify(accessToken);
@@ -515,6 +523,11 @@ async function runOne(
         ?.encryptedRefreshToken === grant.encryptedRefreshToken,
   });
   if (result.kind === 'stopped') return stopGrant(deps, grant, result.reason);
+  // One refusal on the ledger after the role check passed only skips the run; the same
+  // refusal on the next run stops the schedule.
+  if (result.kind === 'skipped' && result.reason === 'esi-refused') {
+    if (status?.lastRun?.reason === 'esi-refused') return stopGrant(deps, grant, 'esi-refused');
+  }
   await recordRun(deps, grant, result, 'systemIds' in result ? result.systemIds : undefined);
   return result;
 }
@@ -586,7 +599,10 @@ async function stopGrant(
     );
     return true;
   });
-  if (stopped && reason !== 'token-revoked') await revokeStored(deps, grant);
+  // A dead or unreadable token cannot be sent to SSO to revoke.
+  if (stopped && reason !== 'token-revoked' && reason !== 'grant-unreadable') {
+    await revokeStored(deps, grant);
+  }
   deps.log('Scheduled Corp Tax Book sync stopped', { corporationId: grant.corporationId, reason });
   return { kind: 'stopped', reason };
 }

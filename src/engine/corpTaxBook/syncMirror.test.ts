@@ -4,6 +4,7 @@ import { parseEveNotificationPayload } from '../eveNotificationPayload';
 import { matchDonation } from './allocation';
 import type { Dismissal } from './dismissals';
 import {
+  MOON_NOTIFICATION_TYPES,
   detectGaps,
   donationsFromJournal,
   mergeGaps,
@@ -16,6 +17,7 @@ import {
   type SyncExtraction,
 } from './sync';
 import type { Statement } from './statements';
+import { SCHEDULED_STOP_REASONS } from './scheduledSync';
 
 // The scheduled server sync (ADR 0025) runs a mirror of the officer sync's pure
 // half (functions/src/corpTaxBookSyncEngine.ts), because `functions/` cannot
@@ -24,6 +26,11 @@ import type { Statement } from './statements';
 const NOW = Date.parse('2026-10-18T12:00:00Z');
 
 describe('functions mirror of the Corp Tax Book sync engine', () => {
+  it('reads the same moon notification types and uses the same stop reasons as the client', () => {
+    expect([...mirror.MOON_NOTIFICATION_TYPES]).toEqual([...MOON_NOTIFICATION_TYPES]);
+    expect([...mirror.SCHEDULED_STOP_REASONS]).toEqual([...SCHEDULED_STOP_REASONS]);
+  });
+
   it('shapes the observer ledger the same way', () => {
     const rows = [
       {

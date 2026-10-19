@@ -13926,7 +13926,7 @@
         "failed": "The sync failed: {{message}}",
         "autoGroupFailed": "The sync worked, but grouping this account's Characters failed: {{message}}",
         "reassignFailed": "The sync worked, but matching earlier unmatched payments to Miners failed: {{message}}",
-        "scheduledStopped": "Scheduled sync stopped: {{reason}}",
+        "scheduledStopped": "Automatic sync stopped: {{reason}}",
         "scheduledStoppedDetail": "Until someone turns it back on in the book's settings (Automatic sync), the book is only as fresh as the last officer sync.",
         "skipped": {
           "missing-mining-scope": "The mining scope is not granted, so nothing was synced.",
@@ -14008,6 +14008,7 @@
           "token-revoked": "{{name}}'s EVE authorization was revoked or expired",
           "esi-refused": "EVE no longer lets {{name}}'s authorization read the mining ledger",
           "book-off": "the Corp Tax Book was turned off",
+          "grant-unreadable": "the saved grant can't be read — turn it on again",
           "unknown": "it could not continue"
         },
         "neverRan": "It has not run yet; the first run is within 6 hours.",
@@ -14020,6 +14021,7 @@
         "lastSkipped": "Last run {{age}} was skipped: {{reason}}.",
         "skipped": {
           "esi-unavailable": "EVE's servers did not answer",
+          "esi-refused": "EVE refused the mining ledger to the authorization (it stops if this repeats next run)",
           "esi-budget": "EVE asked the app to slow down"
         },
         "turnOn": "Turn on for {{name}}",

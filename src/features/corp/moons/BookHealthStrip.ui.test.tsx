@@ -42,7 +42,7 @@ describe('BookHealthStrip, scheduled sync', () => {
   it('shows the last scheduled run as the sync line', () => {
     renderStrip(null);
     expect(screen.getByText(/Last synced .* by Scheduled sync \(Pilot 9\)/)).toBeInTheDocument();
-    expect(screen.queryByText(/Scheduled sync stopped/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Automatic sync stopped/)).not.toBeInTheDocument();
   });
 
   it.each([
@@ -51,6 +51,7 @@ describe('BookHealthStrip, scheduled sync', () => {
     ['token-revoked', "Pilot 9's EVE authorization was revoked or expired"],
     ['esi-refused', "EVE no longer lets Pilot 9's authorization read the mining ledger"],
     ['book-off', 'the Corp Tax Book was turned off'],
+    ['grant-unreadable', "the saved grant can't be read — turn it on again"],
   ] as const)('says why a stopped schedule stopped (%s)', (stoppedReason, why) => {
     renderStrip({
       status: 'stopped',
@@ -60,11 +61,11 @@ describe('BookHealthStrip, scheduled sync', () => {
       stoppedAt: 2,
       stoppedReason,
     });
-    expect(screen.getByText(`Scheduled sync stopped: ${why}`)).toBeInTheDocument();
+    expect(screen.getByText(`Automatic sync stopped: ${why}`)).toBeInTheDocument();
   });
 
   it('says nothing extra while the schedule is running', () => {
     renderStrip({ status: 'active', characterId: 9, characterName: 'Pilot 9', enabledAt: 1 });
-    expect(screen.queryByText(/Scheduled sync stopped/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Automatic sync stopped/)).not.toBeInTheDocument();
   });
 });

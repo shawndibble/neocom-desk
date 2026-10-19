@@ -35,6 +35,8 @@ import type { SyncEsi } from './corpTaxBookSyncEsi.js';
 import {
   detectGaps,
   donationsFromJournal,
+  MOON_NOTIFICATION_TYPES,
+  SCHEDULED_STOP_REASONS,
   matchDonation,
   mergeGaps,
   observedRowsFromLedger,
@@ -61,19 +63,14 @@ export const EXTRACTIONS_PER_CALL = 200;
 export const SETTLE_PER_CALL = 200;
 
 /** Why the schedule for a corporation stopped; the health strip words each of these. */
-export type StopReason =
-  /** The holder no longer holds an editing role (CEO, Director or Accountant). */
-  | 'role-lost'
-  /** The holder left the corporation. */
-  | 'left-corp'
-  /** SSO no longer honours the refresh token (revoked or expired). */
-  | 'token-revoked'
-  /** ESI refused the holder's token (a scope or the ledger is no longer readable). */
-  | 'esi-refused'
-  /** The corporation's book was turned off or no longer exists. */
-  | 'book-off';
+export type StopReason = (typeof SCHEDULED_STOP_REASONS)[number];
 
-export type SkipReason = 'esi-unavailable' | 'esi-budget';
+/**
+ * `esi-refused`: ESI refused the holder's token on the observer list or a ledger
+ * even though the role check passed. One refusal skips the run; the same one on
+ * the next run stops the schedule (`runOne`).
+ */
+export type SkipReason = 'esi-unavailable' | 'esi-budget' | 'esi-refused';
 
 export type BookSyncResult =
   | {
@@ -150,11 +147,7 @@ function chunks<T>(items: readonly T[], size: number): T[][] {
   return out;
 }
 
-const MOON_TYPES: ReadonlySet<string> = new Set([
-  'MoonminingExtractionStarted',
-  'MoonminingLaserFired',
-  'MoonminingExtractionCancelled',
-]);
+const MOON_TYPES: ReadonlySet<string> = new Set(MOON_NOTIFICATION_TYPES);
 
 const paymentId = (d: JournalDonation) => `j${d.division}_${d.refId}`;
 
@@ -193,7 +186,7 @@ export async function runBookSync(
 
   // --- ESI reads (nothing is written until all of them are in) -------------
   const observers = await esi.observers(corporationId, accessToken);
-  if (observers.kind === 'forbidden') return { kind: 'stopped', reason: 'esi-refused' };
+  if (observers.kind === 'forbidden') return { kind: 'skipped', reason: 'esi-refused' };
   if (observers.kind === 'backoff') return { kind: 'skipped', reason: 'esi-budget' };
   if (observers.kind !== 'ok') return { kind: 'skipped', reason: 'esi-unavailable' };
 
@@ -206,7 +199,7 @@ export async function runBookSync(
   const systemIds: Record<number, number> = {};
   for (const structureId of observers.data) {
     const ledger = await esi.ledger(corporationId, structureId, accessToken);
-    if (ledger.kind === 'forbidden') return { kind: 'stopped', reason: 'esi-refused' };
+    if (ledger.kind === 'forbidden') return { kind: 'skipped', reason: 'esi-refused' };
     if (ledger.kind === 'backoff') return { kind: 'skipped', reason: 'esi-budget' };
     // A refinery that did not answer is a missing read, not an empty ledger: abandon the run.
     if (ledger.kind !== 'ok') return { kind: 'skipped', reason: 'esi-unavailable' };

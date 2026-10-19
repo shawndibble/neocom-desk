@@ -19,6 +19,12 @@ import type { ObservedRow } from './types';
 
 /** What ESI is assumed to keep of a refinery's ledger: the character ledger's 30 days; the corp's is unconfirmed. */
 export const ESI_LEDGER_RETENTION_DAYS = 30;
+/** The moon drill notification types the sync reads (the server mirrors the list; a test pins it). */
+export const MOON_NOTIFICATION_TYPES = [
+  'MoonminingExtractionStarted',
+  'MoonminingLaserFired',
+  'MoonminingExtractionCancelled',
+] as const;
 /** After this long without a sync the book warns (D9). */
 export const STALE_AFTER_DAYS = 3;
 /** The server keeps at most this many gaps in a sync. */

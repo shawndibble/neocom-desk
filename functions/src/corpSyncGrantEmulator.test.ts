@@ -556,14 +556,6 @@ suite('Corp Tax Book scheduled sync (emulator)', () => {
       expect(revokedAtSso).toEqual([]);
     });
 
-    it('stops the schedule when ESI refuses the holder the mining ledger', async () => {
-      await optIn(ACCOUNTANT);
-      esiState.ledger = { kind: 'forbidden' };
-      await runScheduledCorpSyncs(syncDeps(), fakeEsi());
-      expect(await status()).toMatchObject({ status: 'stopped', stoppedReason: 'esi-refused' });
-      expect(await grantDoc()).toBeUndefined();
-    });
-
     it('stops the schedule when the book was turned off', async () => {
       await optIn(ACCOUNTANT);
       await book().update({ active: false });

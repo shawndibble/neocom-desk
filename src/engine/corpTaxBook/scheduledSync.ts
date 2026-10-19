@@ -17,6 +17,8 @@ export const SCHEDULED_STOP_REASONS = [
   'esi-refused',
   /** The corporation's book was turned off. */
   'book-off',
+  /** The saved grant could not be decrypted, so it could never run again. */
+  'grant-unreadable',
 ] as const;
 
 export type ScheduledStopReason = (typeof SCHEDULED_STOP_REASONS)[number];

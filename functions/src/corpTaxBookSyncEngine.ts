@@ -350,6 +350,23 @@ export function parseMoonPayload(text: string): MoonPayload {
 
 // --- Extractions ----------------------------------------------------------
 
+/** The moon drill notification types the sync reads (client: `MOON_NOTIFICATION_TYPES` in sync.ts). */
+export const MOON_NOTIFICATION_TYPES = [
+  'MoonminingExtractionStarted',
+  'MoonminingLaserFired',
+  'MoonminingExtractionCancelled',
+] as const;
+
+/** Why a schedule can stop (client: `SCHEDULED_STOP_REASONS` in scheduledSync.ts). */
+export const SCHEDULED_STOP_REASONS = [
+  'role-lost',
+  'left-corp',
+  'token-revoked',
+  'esi-refused',
+  'book-off',
+  'grant-unreadable',
+] as const;
+
 /** Moon ore is 10 m³ a unit (engine `MOON_ORE_M3_PER_UNIT`). */
 export const MOON_ORE_M3_PER_UNIT = 10;
 
