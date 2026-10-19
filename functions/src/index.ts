@@ -3,6 +3,7 @@
 // the client sends only its short-lived access token, which is verified
 // against EVE's published JWKS before any Firebase credential is minted.
 
+import { setTimeout as sleep } from 'node:timers/promises';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { defineSecret } from 'firebase-functions/params';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
@@ -29,7 +30,7 @@ import {
 } from './alertGrant.js';
 import { parseAlertsKey } from './alertGrantCrypto.js';
 import { firestoreAlertGrantStore, firestorePollerStore } from './alertGrantStore.js';
-import { fetchNotifications as fetchEsiNotifications } from './esiNotifications.js';
+import { ESI_USER_AGENT, fetchNotifications as fetchEsiNotifications } from './esiNotifications.js';
 import { pollEveNotifications as pollEveNotificationsRun } from './pollEveNotifications.js';
 import { buildDeviceRegistration, parseRegisterDeviceInput } from './registerDevice.js';
 import { dispatchDueProjections, writeDeviceRegistration } from './projectionStore.js';
@@ -42,10 +43,38 @@ import {
 import {
   LAST_SYNCED_FIELD,
   STALE_ACCOUNT_BATCH_SIZE,
+  STALE_ACCOUNT_READ_PAGE_SIZE,
   STALE_ACCOUNT_MAX_PASSES,
   decideAccountAction,
   lastSyncedAtOf,
 } from './purgeStaleAccounts.js';
+import {
+  parseBookCall,
+  parseClaimPaymentInput,
+  parseConfirmGroupingInput,
+  parseDeclineByTokenInput,
+  parseEditAction,
+  parseStopReminders,
+  parseSyncInput,
+  parseToken,
+  parseTurnOnInput,
+} from './corpTaxBook.js';
+import { esiIdentityReader } from './corpTaxBookEsi.js';
+import {
+  claimPayment,
+  confirmGrouping,
+  declineGrouping,
+  declineGroupingByToken,
+  listPendingGroupings,
+  editBook,
+  readStatementByToken,
+  reclaimBook,
+  setRemindersByToken,
+  syncBook,
+  turnOnBook,
+  verifyOfficer,
+  type BookDeps,
+} from './corpTaxBookStore.js';
 import {
   parseCommunityIdInput,
   parseCreateInput,
@@ -93,16 +122,12 @@ import {
 } from './communityRequestsStore.js';
 import { removePledge, removeRequest, sweepRequests } from './communityRequestsCleanup.js';
 import { LP_CORP_STATION_SYSTEMS } from './data/lpCorpStationSystems.js';
-import {
-  LP_STORE_OFFERS_CHUNK_SIZE,
-  LP_STORE_OFFERS_COLLECTION,
-  LP_STORE_OFFERS_META_DOC,
-  LP_STORE_REQUEST_GAP_MS,
-  fetchLpStoreRows,
-} from './lpOffersSnapshot.js';
+import { LP_STORE_REQUEST_GAP_MS, fetchLpStoreRows } from './lpOffersSnapshot.js';
 import { fetchArchiveFingerprint, streamPublicContractsCsvs } from './publicContractsArchive.js';
 import {
+  createR2Get,
   createR2Put,
+  type R2Config,
   publishContractOffersToR2,
   publishCourierContractsToR2,
   type CourierR2PublishState,
@@ -164,19 +189,17 @@ import {
   type PublicCourierContractRow,
 } from './publicContracts.js';
 import {
-  MARKET_OPEN_PRICES_COLLECTION,
   MARKET_OPEN_PRICES_META_PATH,
   OpenPriceFold,
-  dayIndexUrl,
+  findFinalSnapshot,
   groupByDocument,
   implausibleReason,
   mergeDays,
-  pickLastSnapshotUrl,
   previousUtcDate,
   regionCounts,
   shrunkRegion,
 } from './marketOpenPrices.js';
-import { writeOpenPrices } from './marketOpenPricesStore.js';
+import { publishLpStoreOffersToR2, writeOpenPricesToR2 } from './r2DailySnapshots.js';
 import { fetchJson as fetchEverefJson, foldSnapshotUrl } from './marketOrdersArchive.js';
 import { runWorkbenchSync } from './workbenchFits.js';
 import { firestoreWorkbenchFitsStore } from './workbenchFitsStore.js';
@@ -192,7 +215,11 @@ initializeApp();
 
 // Built at cold start so a missing EVE_CLIENT_ID fails deployment/startup
 // loudly instead of silently accepting any EVE app's tokens per request.
-const verifyOptions = verifyOptionsFromEnv();
+// The Firebase emulator's discovery pass loads this module without the env
+// files (the running functions get them), so only there a missing id is allowed.
+const verifyOptions = verifyOptionsFromEnv({
+  allowMissingClientId: process.env.FUNCTIONS_EMULATOR === 'true',
+});
 
 export const mintFirebaseToken = onCall<{ accessToken?: unknown }>(
   // Hobby-scale abuse cap; also bounds the JWKS fetch fan-out.
@@ -450,9 +477,20 @@ export const purgeStaleAccounts = onSchedule(
     let passes = 0;
     let purged = 0;
 
-    for (const ref of await db.collection('characters').listDocuments()) {
-      const snap = await ref.get();
-      const action = decideAccountAction(lastSyncedAtOf(snap.data()), now);
+    const refs = await db.collection('characters').listDocuments();
+    const snaps = new Map<string, FirebaseFirestore.DocumentSnapshot>();
+    // Heartbeat reads are batched and masked to the one field the decision
+    // needs; the rest of each parent doc is never loaded.
+    for (let i = 0; i < refs.length; i += STALE_ACCOUNT_READ_PAGE_SIZE) {
+      const page = refs.slice(i, i + STALE_ACCOUNT_READ_PAGE_SIZE);
+      for (const snap of await db.getAll(...page, { fieldMask: [LAST_SYNCED_FIELD] })) {
+        snaps.set(snap.ref.path, snap);
+      }
+    }
+
+    for (const ref of refs) {
+      const snap = snaps.get(ref.path);
+      const action = decideAccountAction(lastSyncedAtOf(snap?.data()), now);
       if (action === 'keep') continue;
       if (action === 'seed') {
         await ref.set({ [LAST_SYNCED_FIELD]: now }, { merge: true });
@@ -717,6 +755,98 @@ export const removeCommunityPledgeCallable = onCall<unknown>(
   }
 );
 
+// Corp Tax Book (issue #4061, ADR 0023). Every write to a corporation's book
+// goes through these callables (corpTaxBookStore.ts) and lands in its audit
+// log; the client only reads, under firestore.rules. The caller sends a
+// short-lived EVE access token for the role check; it is used for ESI reads
+// and dropped, never stored or logged.
+const corpTaxBookDeps = (): BookDeps => ({
+  db: getFirestore(),
+  now: Date.now,
+  verifyToken: (token) => verifyEveAccessToken(token, verifyOptions),
+  readIdentity: esiIdentityReader(),
+});
+
+const CORP_TAX_BOOK_OPTIONS = { maxInstances: 5 };
+
+export const verifyCorpOfficerCallable = onCall<unknown>(CORP_TAX_BOOK_OPTIONS, (request) =>
+  verifyOfficer(corpTaxBookDeps(), callerOf(request), parseBookCall(request.data))
+);
+
+export const turnOnCorpTaxBookCallable = onCall<unknown>(CORP_TAX_BOOK_OPTIONS, (request) =>
+  turnOnBook(corpTaxBookDeps(), callerOf(request), parseTurnOnInput(request.data))
+);
+
+export const reclaimCorpTaxBookCallable = onCall<unknown>(CORP_TAX_BOOK_OPTIONS, (request) =>
+  reclaimBook(corpTaxBookDeps(), callerOf(request), parseBookCall(request.data))
+);
+
+// A sync is many small transactions (up to 2000 observer rows), so give it room.
+export const syncCorpTaxBookCallable = onCall<unknown>(
+  { ...CORP_TAX_BOOK_OPTIONS, timeoutSeconds: 120 },
+  (request) =>
+    syncBook(corpTaxBookDeps(), callerOf(request), parseSyncInput(request.data, Date.now()))
+);
+
+export const editCorpTaxBookCallable = onCall<unknown>(CORP_TAX_BOOK_OPTIONS, (request) =>
+  editBook(
+    corpTaxBookDeps(),
+    callerOf(request),
+    parseBookCall(request.data),
+    parseEditAction(request.data)
+  )
+);
+
+// A player claims their own Unmatched donation (D5): uid-authorised, no officer role.
+export const claimCorpTaxBookPaymentCallable = onCall<unknown>(CORP_TAX_BOOK_OPTIONS, (request) => {
+  const { corporationId, paymentId } = parseClaimPaymentInput(request.data);
+  return claimPayment(corpTaxBookDeps(), callerOf(request), corporationId, paymentId);
+});
+
+export const confirmCorpTaxBookGroupingCallable = onCall<unknown>(
+  CORP_TAX_BOOK_OPTIONS,
+  (request) => {
+    const { corporationId, minerId } = parseConfirmGroupingInput(request.data);
+    return confirmGrouping(corpTaxBookDeps(), callerOf(request), corporationId, minerId);
+  }
+);
+
+export const declineCorpTaxBookGroupingCallable = onCall<unknown>(
+  CORP_TAX_BOOK_OPTIONS,
+  (request) => {
+    const { corporationId, minerId } = parseConfirmGroupingInput(request.data);
+    return declineGrouping(corpTaxBookDeps(), callerOf(request), corporationId, minerId);
+  }
+);
+
+export const listPendingCorpTaxBookGroupingsCallable = onCall<unknown>(
+  CORP_TAX_BOOK_OPTIONS,
+  (request) => listPendingGroupings(corpTaxBookDeps(), callerOf(request))
+);
+
+// No session on purpose: the verify link is the credential (D27), so a miner
+// without an EVE login can read their Statement and stop reminders.
+export const readCorpTaxBookStatementCallable = onCall<unknown>(CORP_TAX_BOOK_OPTIONS, (request) =>
+  readStatementByToken(corpTaxBookDeps(), parseToken(request.data))
+);
+
+// A decline needs only the link; a confirm never does (it needs the character's own sign-in).
+export const declineCorpTaxBookGroupingByTokenCallable = onCall<unknown>(
+  CORP_TAX_BOOK_OPTIONS,
+  (request) => {
+    const { token, characterId } = parseDeclineByTokenInput(request.data);
+    return declineGroupingByToken(corpTaxBookDeps(), token, characterId);
+  }
+);
+
+export const stopCorpTaxBookRemindersCallable = onCall<unknown>(
+  CORP_TAX_BOOK_OPTIONS,
+  (request) => {
+    const { token, stopped } = parseStopReminders(request.data);
+    return setRemindersByToken(corpTaxBookDeps(), token, stopped);
+  }
+);
+
 /**
  * sweepCommunityRequests (issue #3812, ADR 0021): deletes Requests expired a
  * week ago and Requests closed a week ago, with their Pledges. Bounded to 500
@@ -831,13 +961,6 @@ async function writeChunkedSnapshot<Row>(
   return publishedAt;
 }
 
-const LP_STORE_OFFERS_SNAPSHOT: ChunkedSnapshot = {
-  collection: LP_STORE_OFFERS_COLLECTION,
-  metaDoc: LP_STORE_OFFERS_META_DOC,
-  chunkSize: LP_STORE_OFFERS_CHUNK_SIZE,
-  chunkDocsPerBatch: PUBLIC_CONTRACT_CHUNK_DOCS_PER_BATCH,
-};
-
 const PUBLIC_CONTRACT_OFFERS_SNAPSHOT: ChunkedSnapshot = {
   collection: PUBLIC_CONTRACT_OFFERS_COLLECTION,
   metaDoc: PUBLIC_CONTRACT_OFFERS_META_DOC,
@@ -937,14 +1060,9 @@ async function writePublicCourierContractsSnapshot(
  * per billing account ADR 0013 budgeted against, now that the blueprint-only
  * sync it briefly ran beside is gone.
  */
-// Same contact string ESI calls send (src/esi/client.ts's USER_AGENT) —
-// functions/ has no `@/` alias to import it, and Adam4EVE's own docs ask for
-// a User-Agent naming this app rather than a personal contact.
-const MARKET_HISTORY_USER_AGENT = 'Neocom Desk (github.com/shawndibble/neocom-desk)';
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+// Adam4EVE's own docs ask for a User-Agent naming this app rather than a
+// personal contact; reuse the ESI one.
+const MARKET_HISTORY_USER_AGENT = ESI_USER_AGENT;
 
 async function fetchAdam4eveChunk(
   typeIds: readonly number[],
@@ -1036,6 +1154,9 @@ async function backfillFromAdam4eve(db: Firestore, missingDates: readonly string
   });
 }
 
+/** Fuzzwork chunk requests in flight at once, per hub. */
+const FUZZWORK_CONCURRENCY = 4;
+
 /**
  * Captures every hub's current live book and folds it into today's running
  * average (marketSnapshot.ts's `foldHubPriceCapture`). Runs every 6 hours;
@@ -1050,7 +1171,8 @@ async function captureLiveHubPrices(db: Firestore, today: string): Promise<void>
 
   for (const hub of SNAPSHOT_HUBS) {
     const captured = new Map<number, SidePrices>();
-    for (const typeIdChunk of chunk(PRICED_TYPE_IDS, FUZZWORK_TYPE_CHUNK_SIZE)) {
+    const typeIdChunks = chunk(PRICED_TYPE_IDS, FUZZWORK_TYPE_CHUNK_SIZE);
+    const fetchChunk = async (typeIdChunk: number[]): Promise<Map<number, SidePrices>> => {
       const url = buildFuzzworkUrl(hub.stationId, typeIdChunk);
       let response: Response;
       try {
@@ -1060,14 +1182,21 @@ async function captureLiveHubPrices(db: Firestore, today: string): Promise<void>
           hub: hub.id,
           error: err instanceof Error ? err.message : String(err),
         });
-        continue;
+        return new Map();
       }
       if (!response.ok) {
         logWarn('Fuzzwork aggregates request failed', { hub: hub.id, status: response.status });
-        continue;
+        return new Map();
       }
-      for (const [typeId, prices] of parseFuzzworkAggregates(await response.json(), typeIdChunk)) {
-        captured.set(typeId, prices);
+      return parseFuzzworkAggregates(await response.json(), typeIdChunk);
+    };
+    // A small concurrency cap keeps the burst polite to Fuzzwork.
+    for (let i = 0; i < typeIdChunks.length; i += FUZZWORK_CONCURRENCY) {
+      const results = await Promise.all(
+        typeIdChunks.slice(i, i + FUZZWORK_CONCURRENCY).map(fetchChunk)
+      );
+      for (const prices of results) {
+        for (const [typeId, p] of prices) captured.set(typeId, p);
       }
     }
 
@@ -1115,9 +1244,11 @@ export const captureMiningPriceSnapshot = onSchedule(
     const db = getFirestore();
     const today = utcDateString(new Date());
 
-    const snapshot = await db.collection(MARKET_HISTORY_COLLECTION).get();
-    const existingDates = new Set(snapshot.docs.map((doc) => doc.id));
-    const staleDocs = snapshot.docs.filter((doc) => isOutsideRetention(doc.id, today));
+    // Only the day ids matter here, so list refs instead of loading every
+    // day doc's hub/price payload.
+    const dayRefs = await db.collection(MARKET_HISTORY_COLLECTION).listDocuments();
+    const existingDates = new Set(dayRefs.map((ref) => ref.id));
+    const staleDocs = dayRefs.filter((ref) => isOutsideRetention(ref.id, today));
 
     try {
       await backfillFromAdam4eve(db, missingBackfillDates(existingDates, today));
@@ -1130,7 +1261,7 @@ export const captureMiningPriceSnapshot = onSchedule(
 
     if (staleDocs.length > 0) {
       const batch = db.batch();
-      for (const doc of staleDocs) batch.delete(doc.ref);
+      for (const ref of staleDocs) batch.delete(ref);
       await batch.commit();
       logInfo('market history prune', { deleted: staleDocs.length });
     }
@@ -1186,6 +1317,25 @@ const PUBLIC_COURIERS_R2_STATE_DOC = 'publicCourierR2State';
 
 const R2_ACCESS_KEY_ID = defineSecret('R2_ACCESS_KEY_ID');
 const R2_SECRET_ACCESS_KEY = defineSecret('R2_SECRET_ACCESS_KEY');
+
+/**
+ * The R2 connection for jobs whose only store is R2 (the LP offers and open
+ * prices): unlike the contract publishers, which are additive to Firestore and
+ * skip quietly, these throw when the config is missing so the run fails loudly.
+ */
+function r2ConfigOrThrow(): R2Config {
+  const endpoint = process.env.R2_ENDPOINT;
+  const bucket = process.env.R2_BUCKET;
+  if (!endpoint?.startsWith('https://') || !bucket) {
+    throw new Error('R2_ENDPOINT (https) / R2_BUCKET not set');
+  }
+  return {
+    endpoint,
+    bucket,
+    accessKeyId: R2_ACCESS_KEY_ID.value(),
+    secretAccessKey: R2_SECRET_ACCESS_KEY.value(),
+  };
+}
 
 /**
  * Additive to the Firestore snapshot (ADR 0019): never throws, so an R2 outage
@@ -1447,8 +1597,11 @@ export const syncWorkbenchFits = onSchedule(
 /**
  * syncLpStoreOffers: the LP Store page's item-first search (issue #2873). Reads
  * every LP corporation's public offers from ESI (~170 requests, paced) and
- * republishes them with each corporation's station systems to `lpStoreOffers`,
- * so the app can search an item across all stores and rank corporations by jumps.
+ * republishes them with each corporation's station systems to R2
+ * (`lp-store-offers/snapshot.json`), so the app can search an item across all
+ * stores and rank corporations by jumps. R2, not Firestore: the whole snapshot is
+ * read by every visitor to the page, and R2 has no egress fee.
+ * Needs the R2 secrets and env like `syncPublicContractOffers`.
  *
  * Once a day: store offers change on patch days, not by the hour. A run that
  * lost more than a tenth of the corporations (ESI down) publishes nothing and
@@ -1460,8 +1613,15 @@ export const syncWorkbenchFits = onSchedule(
 const LP_STORE_MAX_FAILED_SHARE = 0.1;
 
 export const syncLpStoreOffers = onSchedule(
-  { schedule: 'every 24 hours', memory: '512MiB', timeoutSeconds: 540 },
+  {
+    schedule: 'every 24 hours',
+    memory: '512MiB',
+    timeoutSeconds: 540,
+    secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY],
+  },
   async () => {
+    // Before the ~170-request crawl, so a missing R2 config fails fast.
+    const r2 = r2ConfigOrThrow();
     const { rows, failed } = await fetchLpStoreRows({
       corporations: LP_CORP_STATION_SYSTEMS,
       fetchJson: async (url) => {
@@ -1484,7 +1644,8 @@ export const syncLpStoreOffers = onSchedule(
       logError('LP store offers sync skipped publishing', { failed });
       return;
     }
-    await writeChunkedSnapshot(getFirestore(), LP_STORE_OFFERS_SNAPSHOT, rows);
+    await publishLpStoreOffersToR2(rows, Date.now(), createR2Put(r2));
+    logInfo('LP store offers published to R2', { corporations: rows.length });
   }
 );
 
@@ -1493,16 +1654,27 @@ export const syncLpStoreOffers = onSchedule(
  * 20261018-121126). Once a day, shortly after the previous UTC day's last
  * EVE Ref market-order snapshot (23:45) is published, folds that snapshot into
  * the highest buy and lowest sell per tracked region and type and merges the
- * day into `marketOpenPrices/<regionId>_<typeId>` (~70,000 documents).
+ * day into R2's `open-prices/<typeId>.json`, every tracked region in one
+ * object (~20,000 objects; layout decision 20261018-164126, storage decision
+ * 20261018-201511-moving-the-daily-snapshots-to-r2). Only the small meta doc stays in
+ * Firestore, for the shrink guard.
  *
- * Idempotent (re-running a day replaces its entry). A missing snapshot, a stream
- * that errors or ends truncated, a tracked region implausibly thin, or one
- * under half its size on the previous published day publishes nothing, the same stance as
- * `syncLpStoreOffers`: that day simply has no point, and the backfill script
- * can fill it later. 1GiB because the decompress-and-fold peaked at ~300MB RSS
+ * Idempotent (re-running a day replaces its entry). The day's 23:45 snapshot is
+ * normally listed by ~23:50, but a run that finds only an earlier one (EVE Ref
+ * lagging) or none must not store a price that is not the day's last, so it
+ * throws and Cloud Scheduler retries it (`retryCount`, 15 then 30 minutes
+ * apart); an earlier snapshot is accepted once the next day is listed, since
+ * then the 23:45 slot was skipped for good (`findFinalSnapshot`). A stream that
+ * errors or ends truncated also throws and retries. A tracked region
+ * implausibly thin, or one under half its size on the previous published day,
+ * publishes nothing, the same stance as `syncLpStoreOffers`: retrying the same
+ * file would not change it, that day simply has no point, and the backfill
+ * script can fill it later. 1GiB because the decompress-and-fold peaked at ~300MB RSS
  * in a local measurement and the contracts job has OOM'd before; 540s because
  * the same measurement took ~45s to download and fold, leaving room for the
- * ~140 read-merge-write batches.
+ * ~20,000 read-merge-write round trips of ~37 KB objects (32 at a time). A
+ * type that fails to read or write throws the run, so it is retried whole; the
+ * merge is idempotent.
  *
  * Another Cloud Scheduler job past the free three; the deployment now has eleven
  * scheduled functions.
@@ -1510,18 +1682,34 @@ export const syncLpStoreOffers = onSchedule(
 export const syncMarketOpenPrices = onSchedule(
   // A cron, unlike the other jobs' 'every N' strings, runs in the scheduler's
   // default zone; pinning Etc/UTC keeps it right after the 23:45 UTC snapshot.
-  { schedule: '45 0 * * *', timeZone: 'Etc/UTC', memory: '1GiB', timeoutSeconds: 540 },
+  {
+    schedule: '45 0 * * *',
+    timeZone: 'Etc/UTC',
+    memory: '1GiB',
+    timeoutSeconds: 540,
+    // A thrown run (the final snapshot not listed yet, a broken download) is
+    // retried at ~01:00, ~01:30 and ~02:00 UTC; `previousUtcDate` still names
+    // the same day on every retry.
+    retryCount: 3,
+    minBackoffSeconds: 900,
+    maxBackoffSeconds: 1800,
+    secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY],
+  },
   async () => {
     const date = previousUtcDate(new Date());
-    const listing = await fetchEverefJson(dayIndexUrl(date), MARKET_HISTORY_USER_AGENT);
-    const snapshotUrl = pickLastSnapshotUrl(listing, date);
-    if (!snapshotUrl) {
-      logError('Market open prices sync skipped publishing: no snapshot listed', { date });
-      return;
+    const found = await findFinalSnapshot(date, (url) =>
+      fetchEverefJson(url, MARKET_HISTORY_USER_AGENT)
+    );
+    if (!found.final) {
+      // Thrown, not returned, so the run fails and is retried.
+      throw new Error(
+        `Market open prices: no final snapshot listed for ${date} (last listed: ${found.snapshot?.fileTime ?? 'none'}); retried, and after the last retry the day has no point`
+      );
     }
+    const { url: snapshotUrl, fileTime } = found.snapshot;
     const fold = new OpenPriceFold();
     const rows = await foldSnapshotUrl(snapshotUrl, fold, MARKET_HISTORY_USER_AGENT);
-    logInfo('Market open prices fold', { date, snapshotUrl, rows, pairs: fold.size });
+    logInfo('Market open prices fold', { date, fileTime, snapshotUrl, rows, pairs: fold.size });
     const reason = implausibleReason(fold);
     if (reason) {
       logError('Market open prices sync skipped publishing', { date, reason });
@@ -1538,12 +1726,18 @@ export const syncMarketOpenPrices = onSchedule(
       });
       return;
     }
-    const written = await writeOpenPrices(
-      db,
-      MARKET_OPEN_PRICES_COLLECTION,
+    const r2 = r2ConfigOrThrow();
+    const { written, failed, firstError } = await writeOpenPricesToR2(
       groupByDocument(new Map([[date, fold]])),
-      mergeDays
+      mergeDays,
+      { get: createR2Get(r2), put: createR2Put(r2) }
     );
+    if (failed > 0) {
+      // Thrown so the run is retried; meta is only recorded for a complete day.
+      throw new Error(
+        `Market open prices: ${failed} types failed to write to R2 (${written} written); first error: ${firstError}`
+      );
+    }
     await meta.set({ date, regions: regionCounts(fold) });
     logInfo('Market open prices sync', { date, written });
   }

@@ -13,6 +13,7 @@ import {
   findLocalRoute,
   localJumpCountsForRoutes,
   localJumpDistances,
+  localRoutesFromOrigin,
 } from './localRoute';
 import { clearJumpGraphIndex } from '@/sde/jumpGraph';
 import { clearSolarSystemIndex } from '@/sde/solarSystems';
@@ -207,5 +208,34 @@ describe('Avoided Systems', () => {
     expect(
       await localJumpCountsForRoutes([{ originSystemId: HUB, destinationSystemId: FAR }], { avoid })
     ).toEqual({ kind: 'known', counts: [4] });
+  });
+});
+
+describe('localRoutesFromOrigin', () => {
+  it('gives each system its route to the origin, flown toward it, from one sweep', async () => {
+    const result = await localRoutesFromOrigin(HUB, [FAR, A, WORMHOLE]);
+    expect(result).toEqual({
+      kind: 'known',
+      routes: new Map([
+        [FAR, [FAR, LOW, HUB]],
+        [A, [A, HUB]],
+        [WORMHOLE, null],
+      ]),
+    });
+  });
+
+  it('gives the origin itself a one-system route', async () => {
+    const result = await localRoutesFromOrigin(HUB, [HUB]);
+    expect(result).toEqual({ kind: 'known', routes: new Map([[HUB, [HUB]]]) });
+  });
+
+  it('follows the preference, as a single route does', async () => {
+    const result = await localRoutesFromOrigin(HUB, [FAR], { preference: 'prefer-highsec' });
+    expect(result).toEqual({ kind: 'known', routes: new Map([[FAR, [FAR, C, B, A, HUB]]]) });
+  });
+
+  it('says unknown when the graph snapshot cannot be read', async () => {
+    loadSolarSystemJumps.mockRejectedValue(new Error('offline'));
+    await expect(localRoutesFromOrigin(HUB, [FAR])).resolves.toEqual({ kind: 'unknown' });
   });
 });

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, useLocation } from 'react-router-dom';
+import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import type { CachedResult, StatusResult } from '@/esi/cache';
@@ -24,6 +24,7 @@ import {
   useVisibleCorpRosterColumns,
 } from '@/features/corp/corpRosterColumns';
 import { CorpMembers } from './CorpMembers';
+import { LocationProbe } from '@/test/LocationProbe';
 
 vi.mock('@/features/corp/useCorpAccess', () => ({ useCorpAccess: vi.fn() }));
 vi.mock('@/features/corp/boardData', async (importOriginal) => ({
@@ -109,12 +110,6 @@ function labels(overrides: Partial<corpMembers.MemberLabels> = {}): corpMembers.
     locations: new Map([[60003760, 'Jita IV - Moon 4']]),
     ...overrides,
   };
-}
-
-/** Prints the router's current location, so a test can read what the page wrote. */
-function LocationProbe() {
-  const location = useLocation();
-  return <div data-testid="location">{`${location.pathname}${location.search}`}</div>;
 }
 
 function renderMembers(initialEntry = '/corp/members') {

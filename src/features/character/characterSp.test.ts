@@ -5,6 +5,7 @@ import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
 import { loadCharacterSpSummary } from './characterSp';
 import { getLastKnownSpSummary, NO_SP_SUMMARY } from '@/stores/characterSp';
+import { seedGrant as seedGrantFor } from '@/test/seed';
 
 const CHAR_ID = 91;
 const NOW = Date.parse('2026-09-01T00:00:00Z');
@@ -34,13 +35,7 @@ const queuePayload = [
 const server = setupServer();
 
 async function seedGrant(scopes: readonly string[], characterId = CHAR_ID): Promise<void> {
-  await db.tokens.put({
-    characterId,
-    accessToken: 'access',
-    refreshToken: 'refresh',
-    expiresAt: Date.now() + 3_600_000,
-    scopes: [...scopes],
-  });
+  await seedGrantFor(characterId, scopes, { expiresAt: Date.now() + 3_600_000 });
 }
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '@/db';
 import { loadAllCharacterLedgers, loadAllCharacterYields } from './ledger';
 import { tagAsIgnored, tagAsMoonOre } from './typeOverrides';
+import { seedCharacter as seedCharacterRow } from '@/test/seed';
 
 const MOON_ORE = 45490; // Zeolites
 const ORDINARY_ORE = 1230; // Veldspar — recognized, not moon ore
@@ -31,7 +32,7 @@ beforeEach(async () => {
 });
 
 async function seedCharacter(characterId: number, name: string): Promise<void> {
-  await db.characters.put({ characterId, name, ownerHash: 'oh', addedAt: 0 });
+  await seedCharacterRow(characterId, name, { ownerHash: 'oh', addedAt: 0 });
 }
 
 async function seedLedger(characterId: number, rows: unknown[]): Promise<void> {

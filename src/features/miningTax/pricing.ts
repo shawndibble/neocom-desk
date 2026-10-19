@@ -23,11 +23,12 @@
  * covers buy-vs-sell and compressed-vs-raw; which *day's* price to use is a
  * separate decision, recorded in this fix's own decision doc.
  */
-import { getHubPricesWithStatus } from '@/market/prices';
+import { getHubPrices, getHubPricesWithStatus } from '@/market/prices';
 import { DEFAULT_TRADE_HUB, TRADE_HUBS, type TradeHub } from '@/market/hubs';
-import { loadCompressedOreTypeIds } from '@/sde/loadSde';
+import { loadCompressedOreTypeIds, loadOreAndIceTypeIds, loadTypes } from '@/sde/loadSde';
 import { oreFormTypeId } from '@/engine/miningTax/oreForm';
 import { loadHubSnapshotRange } from '@/features/market/hubSnapshot';
+import { readCompressedOre } from './oreForm';
 import { loadPriceSnapshots } from './priceSnapshots';
 import {
   mergeSnapshotDay,
@@ -344,4 +345,38 @@ export async function loadDatedUnitPricesByHub(
     sourcesByHubAndDate,
     unreachableHubs,
   };
+}
+
+/**
+ * Live ISK per unit for named ores at `hub`: the highest buy order of each
+ * ore's priced form (Compressed when the Ore Form setting is on and the SDE has
+ * one). Ores with no buy order are absent. `compressed` is the setting read, so
+ * a caller can say which form it priced.
+ */
+export async function oreUnitPrices(
+  oreNames: readonly string[],
+  hub: TradeHub
+): Promise<{ prices: ReadonlyMap<string, number>; compressed: boolean }> {
+  const [types, oreIds, compressedByRaw, compressed] = await Promise.all([
+    loadTypes(),
+    loadOreAndIceTypeIds(),
+    loadCompressedOreTypeIds(),
+    readCompressedOre(),
+  ]);
+  const wanted = new Set(oreNames);
+  const rawByName = new Map<string, number>();
+  for (const id of oreIds) {
+    const name = types[String(id)]?.name;
+    if (name !== undefined && wanted.has(name)) rawByName.set(name, id);
+  }
+  const priced = new Map(
+    [...rawByName].map(([n, id]) => [n, oreFormTypeId(id, compressedByRaw, compressed)])
+  );
+  const aggregates = await getHubPrices(hub, [...new Set(priced.values())]);
+  const prices = new Map<string, number>();
+  for (const [name, typeId] of priced) {
+    const buy = aggregates.get(typeId)?.buyMax;
+    if (buy) prices.set(name, buy);
+  }
+  return { prices, compressed };
 }

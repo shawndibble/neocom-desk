@@ -21,5 +21,6 @@ export function openSideLabel(t: Translate, side: OpenPriceSide, region?: string
 export function seriesChoiceLabel(t: Translate, choice: PriceSeriesChoice): string {
   if (choice === 'buy') return t('market.priceHistory.seriesBuy');
   if (choice === 'sell') return t('market.priceHistory.seriesSell');
+  if (choice === 'average') return t('market.priceHistory.seriesAverage');
   return t('market.priceHistory.seriesBoth');
 }
