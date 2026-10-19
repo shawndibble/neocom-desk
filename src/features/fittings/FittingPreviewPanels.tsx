@@ -5,7 +5,7 @@ import { ItemInfoLink } from '@/features/entities';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { formatSeconds } from '@/lib/duration';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
-import { ResistTable, type ResistRow } from './FittingStatsSections';
+import { ResistTable, type ResistRow } from './stats/ResistTable';
 import { MissingSkillsChip } from './MissingSkillsChip';
 import { IN_GAME_FITTING_DESCRIPTION_MAX } from './saveToEve';
 import { useFittingSkillGaps } from './useFittingSkillGaps';

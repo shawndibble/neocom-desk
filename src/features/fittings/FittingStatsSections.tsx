@@ -2,45 +2,28 @@ import { HintText } from '@/components/ui/HintText';
 import { Fragment, lazy, Suspense, useRef, useState, type ReactNode } from 'react';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { Trans, useTranslation } from 'react-i18next';
-import { Button, Caret, IskAmount, RowMoreActions } from '@/components/ui';
-import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
-import { cx } from '@/lib/cx';
+import { Button, IskAmount } from '@/components/ui';
 import { unpricedSellRows } from './fittingPrice';
 import { useShipDataNeedsConnection } from './useDogmaEngineStatus';
 import { formatSeconds } from '@/lib/duration';
-import {
-  alignTimeSeconds,
-  resistPct,
-  unheatedIfChanged,
-  weaponRowKey,
-} from '@/engine/fittings/stats';
+import { alignTimeSeconds, resistPct, unheatedIfChanged } from '@/engine/fittings/stats';
 import type {
-  DamageFigures as DamageFiguresValue,
   Fitting,
-  FittingItemState,
-  FittingModule,
   FittingModuleResult,
   FittingStats,
-  Resonances,
   StatsErrorReason,
-  WeaponRow,
 } from '@/engine/fittings/types';
+import { ResistTable, type ResistRow } from './stats/ResistTable';
+import { RESIST_TYPES, RESONANCE_KEY, formatEhp } from './stats/resistFormat';
+import { OffenseRows } from './stats/OffenseRows';
+import { StatSection, YourCharactersSection } from './stats/StatSection';
+import { unknownItemsList } from './stats/unknownItemsList';
 import type { Appraisal } from '@/engine/market/appraisal';
 import type { DogmaAssetProgress } from './dogmaFittingEngine';
 import { useDamageProfileName, type DamageProfiles } from './damageProfiles';
 import { DamageProfilePicker } from './DamageProfilePicker';
 import { AppliedDpsPanel } from './AppliedDpsPanel';
-import {
-  Facts,
-  HeatFigure,
-  StatField,
-  StatFields,
-  StatNote,
-  StatRowContent,
-  StatRows,
-  type Fact,
-} from './StatFacts';
-import { STAT_EYEBROW, STAT_EYEBROW_TYPE, joinDetail, statRowClassName } from './statKit';
+import { Facts, HeatFigure, StatField, StatFields, StatNote, type Fact } from './StatFacts';
 import { SkillOverridesControl } from './SkillOverridesControl';
 import { PriceHubSelect } from './PriceHubSelect';
 import { StatsToolbar } from './StatsToolbar';
@@ -52,8 +35,7 @@ import {
 } from './statsSectionsPreference';
 import { CapacitorFacts, TankFacts } from './FittingTankStats';
 import { capacitorTone, type CapacitorTone } from './capacitorTone';
-import { FittingYourCharactersPanel } from './FittingYourCharactersPanel';
-import { useCharacterGaps, type GapCharacter } from './useCharacterGaps';
+import { type GapCharacter } from './useCharacterGaps';
 import { SupportFacts } from './FittingSupportStats';
 import { MiningFacts } from './FittingMiningStats';
 import { FleetBoostFacts } from './FittingFleetBoostStats';
@@ -62,9 +44,7 @@ import { ProjectedEffectsPanel } from './ProjectedEffectsPanel';
 import { useOverheatAll, useProjectedSources } from './statsConditions';
 import type { TargetProfiles } from './targetProfiles';
 import type { OverlayFitting } from './useOverlayFitting';
-import { FittingItemMenu, WeaponMenuItems } from './FittingItemMenu';
-import { kmValue, rangeLines } from './rangeText';
-import { useFittingItemActions } from './fittingItemActions';
+import { kmValue } from './rangeText';
 import { AbyssalRunPlanner, AbyssalWeatherMeta, type WeatherCompare } from './AbyssalRunPlanner';
 import { useAbyssalWeather, useWeatherName } from './abyssalWeatherSelection';
 import { StatsHeadingLabel } from './StatsHeadingLabel';
@@ -88,216 +68,11 @@ const FittingAppraisalModal = lazy(() =>
   }))
 );
 
-const DMG_FILL_CLASS = {
-  em: 'bg-dmg-em',
-  thermal: 'bg-dmg-thermal',
-  kinetic: 'bg-dmg-kinetic',
-  explosive: 'bg-dmg-explosive',
-} as const;
-
-const DMG_TEXT_CLASS = {
-  em: 'text-dmg-em',
-  thermal: 'text-dmg-thermal',
-  kinetic: 'text-dmg-kinetic',
-  explosive: 'text-dmg-explosive',
-} as const;
-
-type DamageType = keyof typeof DMG_FILL_CLASS;
-
-const RESIST_TYPES = Object.keys(DMG_FILL_CLASS) as DamageType[];
-
-const RESONANCE_KEY = {
-  em: 'emResonance',
-  thermal: 'thermalResonance',
-  kinetic: 'kineticResonance',
-  explosive: 'explosiveResonance',
-} as const satisfies Record<DamageType, keyof Resonances>;
-
 const CAPACITOR_TONE_CLASS = {
   success: 'text-success',
   warning: 'text-warning',
   danger: 'text-danger',
 } as const satisfies Record<CapacitorTone, string>;
-
-const EHP_FORMAT = new Intl.NumberFormat('en', { maximumFractionDigits: 0 });
-
-/** Whole hit points, grouped: "64,745". */
-function formatEhp(ehp: number): string {
-  return EHP_FORMAT.format(ehp);
-}
-
-/** One resist, as the game draws it: the damage type's colour filling the share resisted. */
-function ResistCell({
-  resonance,
-  tone,
-  unheated,
-}: {
-  resonance: number;
-  tone: DamageType;
-  /** The unheated resist as shown, when heat changed it ("Overheat all"). */
-  unheated?: string;
-}) {
-  const { t } = useTranslation();
-  const pct = resistPct(resonance);
-  return (
-    <td className="px-0.5 py-0.5">
-      <div className="relative h-5 overflow-hidden rounded-xs bg-panel-2 text-center text-[0.6875rem] leading-5 tabular-nums">
-        <div
-          className={`absolute inset-y-0 left-0 opacity-45 ${DMG_FILL_CLASS[tone]}`}
-          style={{ width: `${pct}%` }}
-        />
-        {unheated === undefined ? (
-          <span className="relative">{pct.toFixed(0)}%</span>
-        ) : (
-          <HintText
-            content={t('fittings.stats.unheated', { value: unheated })}
-            className="relative text-warning"
-          >
-            {pct.toFixed(0)}%
-            <span className="sr-only"> ({t('fittings.stats.unheated', { value: unheated })})</span>
-          </HintText>
-        )}
-      </div>
-    </td>
-  );
-}
-
-export interface ResistRow {
-  key: string;
-  label: string;
-  sub?: string;
-  resonances: Resonances;
-  ehp?: number;
-  /** Adapted rows read as a note on the row above. */
-  tone?: 'note';
-  /** Under "Overheat all", each cell heat changed: its unheated value as shown. */
-  unheated?: Partial<Record<DamageType | 'ehp', string>>;
-}
-
-/**
- * The Defense table (mockup A): a row per layer — its raw HP beneath the
- * name, a cell per damage type, EHP last — and the Reactive Armor
- * Hardener's adapted resists.
- */
-export function ResistTable({ rows }: { rows: ResistRow[] }) {
-  const { t } = useTranslation();
-  return (
-    <table className="w-full table-fixed border-collapse">
-      <thead>
-        <tr>
-          <th className="w-[26%]" />
-          {RESIST_TYPES.map((type) => (
-            <th
-              key={type}
-              scope="col"
-              className={`pb-1 text-center ${STAT_EYEBROW_TYPE} ${DMG_TEXT_CLASS[type]}`}
-            >
-              {t(`fittings.stats.damageTypeShort.${type}`)}
-            </th>
-          ))}
-          <th scope="col" className={`w-[18%] pb-1 text-right ${STAT_EYEBROW}`}>
-            {t('fittings.stats.ehpColumn')}
-          </th>
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((row) => (
-          <tr key={row.key}>
-            <th
-              scope="row"
-              className={`pr-1 text-left align-middle text-xs font-normal ${row.tone ? 'text-warning' : ''}`}
-            >
-              <span className={row.tone ? '' : 'font-semibold'}>{row.label}</span>
-              {row.sub && (
-                <span className="block text-[0.6875rem] text-text-dim tabular-nums">{row.sub}</span>
-              )}
-            </th>
-            {RESIST_TYPES.map((type) => (
-              <ResistCell
-                key={type}
-                tone={type}
-                resonance={row.resonances[RESONANCE_KEY[type]]}
-                unheated={row.unheated?.[type]}
-              />
-            ))}
-            <td className="text-right text-xs tabular-nums">
-              {row.unheated?.ehp === undefined ? (
-                row.ehp === undefined ? (
-                  ''
-                ) : (
-                  formatEhp(row.ehp)
-                )
-              ) : (
-                <HintText
-                  content={t('fittings.stats.unheated', { value: row.unheated.ehp })}
-                  className="text-warning"
-                >
-                  {row.ehp === undefined ? '' : formatEhp(row.ehp)}
-                  <span className="sr-only">
-                    {' '}
-                    ({t('fittings.stats.unheated', { value: row.unheated.ehp })})
-                  </span>
-                </HintText>
-              )}
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
-}
-
-/**
- * A row's DPS and volley — under "Overheat all", in the warning tone where
- * heat changed them. `figures` picks the same row out of either calculation.
- * Sustained DPS (with reload), where reloading costs anything, is a dim
- * `line` under the figures (the total) or their `tooltip` (a weapon row).
- */
-function DamageFigures({
-  stats,
-  figures,
-  sustained = 'tooltip',
-}: {
-  stats: FittingStats;
-  figures: (stats: FittingStats) => DamageFiguresValue;
-  sustained?: 'tooltip' | 'line';
-}) {
-  const { t } = useTranslation();
-  const sustainedLabel = (s: FittingStats) =>
-    t('fittings.stats.sustainedDps', { value: figures(s).sustainedDps.toFixed(1) });
-  // Only where reloading costs something as shown: never lasers or drones.
-  const { dps, sustainedDps } = figures(stats);
-  const reloads = sustainedDps.toFixed(1) !== dps.toFixed(1);
-  const tooltip = sustained === 'tooltip' && reloads ? sustainedLabel(stats) : undefined;
-  const numbers = (
-    <span className="ml-auto shrink-0 text-right tabular-nums">
-      <span>
-        <HeatFigure
-          stats={stats}
-          format={(s) => t('fittings.stats.weaponDps', { value: figures(s).dps.toFixed(1) })}
-          note={tooltip}
-        />
-      </span>
-      <span className="text-text-dim"> · </span>
-      <span>
-        <HeatFigure
-          stats={stats}
-          format={(s) => t('fittings.stats.weaponVolley', { value: figures(s).volley.toFixed(0) })}
-        />
-      </span>
-      {tooltip && <span className="sr-only"> ({tooltip})</span>}
-    </span>
-  );
-  if (sustained === 'tooltip' || !reloads) return numbers;
-  return (
-    <>
-      {numbers}
-      <span className="block text-right text-[0.6875rem] font-normal text-text-dim tabular-nums">
-        <HeatFigure stats={stats} format={sustainedLabel} />
-      </span>
-    </>
-  );
-}
 
 /** Stable ids — the remembered layout (`statsSectionsPreference.ts`) is keyed on them. */
 type Section =
@@ -334,99 +109,6 @@ const OPEN_BY_DEFAULT: ReadonlySet<Section> = new Set([
   'drones',
   'fighters',
 ]);
-
-function StatSection({
-  title,
-  meta,
-  warning,
-  expanded,
-  onToggle,
-  level: Heading,
-  children,
-}: {
-  title: string;
-  /** The headline figure, on the row itself. */
-  meta: ReactNode;
-  /** Shown on the row itself, so a warning inside a collapsed section isn't missed. */
-  warning?: string;
-  expanded: boolean;
-  onToggle: () => void;
-  /** `h4` under a column group label; `h3` in a side panel, under its title. */
-  level: 'h3' | 'h4';
-  children: ReactNode;
-}) {
-  return (
-    <section className="border-b border-line last:border-b-0">
-      {/* Every section's row looks alike, open or shut: its small-caps title, the headline figure beside. Hover fills it `panel-2`, so it rests unfilled. */}
-      <div className={cx('flex items-center gap-2 pr-3', rowInteractiveClassName)}>
-        <Heading className="min-w-0 flex-1">
-          <button
-            type="button"
-            aria-expanded={expanded}
-            onClick={onToggle}
-            className={cx(
-              'flex min-h-11 w-full items-center gap-2 pl-3 text-left text-xs font-semibold tracking-widest uppercase md:min-h-9',
-              focusRingInsetClassName
-            )}
-          >
-            <Caret expanded={expanded} />
-            {title}
-          </button>
-        </Heading>
-        {/* Status text, never boxed: a box would read as a control (DESIGN.md §6). */}
-        {warning && <span className={`shrink-0 text-warning ${STAT_EYEBROW_TYPE}`}>{warning}</span>}
-        {meta && <span className="shrink-0 text-sm font-semibold tabular-nums">{meta}</span>}
-      </div>
-      {expanded && <div className="space-y-3 p-3 text-xs">{children}</div>}
-    </section>
-  );
-}
-
-/** The "Your Characters" row: the headline shows closed too; gaps are only worked out while open. */
-function YourCharactersSection({
-  fitting,
-  characters,
-  expanded,
-  render,
-}: {
-  fitting: Fitting;
-  characters: readonly GapCharacter[];
-  expanded: boolean;
-  render: (meta: ReactNode, body: ReactNode) => ReactNode;
-}) {
-  const { t } = useTranslation();
-  const { rows, headline } = useCharacterGaps(fitting, characters, expanded);
-  return render(
-    headline ? t('fittings.yourCharacters.headline', headline) : undefined,
-    <FittingYourCharactersPanel rows={rows} />
-  );
-}
-
-/** Lines the "no data" tooltip lists before it sums up the rest — a tooltip is no place for a long list. */
-const UNKNOWN_ITEMS_SHOWN = 10;
-
-/**
- * The items with no data in this build, one per line — "Name ×2" where the
- * Fitting has several, so the lines add up to the count beside them.
- */
-function unknownItemsList(
-  typeIds: readonly number[],
-  typeName: (typeId: number) => string,
-  t: (key: string, options?: Record<string, unknown>) => string
-): string {
-  const counts = new Map<number, number>();
-  for (const typeId of typeIds) counts.set(typeId, (counts.get(typeId) ?? 0) + 1);
-  const lines = [...counts].map(([typeId, count]) =>
-    count > 1
-      ? t('fittings.stats.unknownItemCount', { name: typeName(typeId), count })
-      : typeName(typeId)
-  );
-  if (lines.length <= UNKNOWN_ITEMS_SHOWN) return lines.join('\n');
-  return [
-    ...lines.slice(0, UNKNOWN_ITEMS_SHOWN),
-    t('fittings.stats.unknownItemsMore', { count: lines.length - UNKNOWN_ITEMS_SHOWN }),
-  ].join('\n');
-}
 
 interface FittingStatsSectionsProps {
   stats: FittingStats | null;
@@ -488,130 +170,6 @@ interface FittingStatsSectionsProps {
    */
   fitting?: Fitting | null;
   moduleResults?: FittingModuleResult[] | null;
-}
-
-const FIRING: readonly FittingItemState[] = ['active', 'overload'];
-const STATE_ORDER: readonly FittingItemState[] = ['offline', 'online', 'active', 'overload'];
-
-/**
- * The fitted modules an Offense row stands for — its type, holding its
- * charge, firing — with the state they share and the highest all can reach.
- */
-function weaponGroup(
-  row: WeaponRow,
-  fitting: Fitting,
-  moduleResults: FittingModuleResult[] | null
-): { modules: FittingModule[]; shownState?: FittingItemState; maxState?: FittingItemState } {
-  const members = fitting.modules.flatMap((module, index) => {
-    const result = moduleResults?.[index];
-    const state = result?.state ?? module.state;
-    return module.typeId === row.typeId &&
-      module.chargeTypeId === row.chargeTypeId &&
-      FIRING.includes(state)
-      ? [{ module, state, maxState: result?.maxState }]
-      : [];
-  });
-  const states = new Set(members.map((member) => member.state));
-  const maxStates = members.map((member) => member.maxState);
-  const maxState = maxStates.every((state) => state !== undefined)
-    ? maxStates.reduce<FittingItemState | undefined>(
-        (lowest, state) =>
-          lowest === undefined || STATE_ORDER.indexOf(state!) < STATE_ORDER.indexOf(lowest)
-            ? state
-            : lowest,
-        undefined
-      )
-    : undefined;
-  return {
-    modules: members.map((member) => member.module),
-    ...(states.size === 1 ? { shownState: [...states][0] } : {}),
-    ...(maxState === undefined ? {} : { maxState }),
-  };
-}
-
-/** The Offense section's rows — a weapon group, drone stack or squadron each — and their total. */
-function OffenseRows({
-  stats,
-  typeName,
-  fitting,
-  moduleResults,
-}: {
-  stats: FittingStats;
-  typeName: (typeId: number) => string;
-  fitting: Fitting | null;
-  moduleResults: FittingModuleResult[] | null;
-}) {
-  const { t } = useTranslation();
-  const actions = useFittingItemActions();
-  return (
-    <StatRows>
-      {stats.offense.weapons.map((row) => {
-        const group =
-          actions !== null && fitting !== null && !row.isDrone
-            ? weaponGroup(row, fitting, moduleResults)
-            : null;
-        const name = t('fittings.stats.weaponRow', {
-          count: row.count,
-          name: typeName(row.typeId),
-        });
-        const hasMenu = group !== null && group.modules.length > 0;
-        // Its charge and reach on one dim line, the reach as the HUD tooltip reads it (`rangeText.ts`).
-        const detail = joinDetail([
-          row.chargeTypeId === undefined ? undefined : typeName(row.chargeTypeId),
-          row.isDrone
-            ? t(
-                row.isFighter
-                  ? 'fittings.stats.fightersNoOverheat'
-                  : 'fittings.stats.dronesNoOverheat'
-              )
-            : undefined,
-          ...(row.range ? rangeLines(t, row.range.optimal, row.range.falloff) : []),
-        ]);
-        const content = (
-          <StatRowContent
-            name={name}
-            detail={detail}
-            figure={
-              <DamageFigures
-                stats={stats}
-                figures={(s) =>
-                  s.offense.weapons.find((other) => weaponRowKey(other) === weaponRowKey(row)) ??
-                  row
-                }
-              />
-            }
-            action={hasMenu ? <RowMoreActions /> : undefined}
-          />
-        );
-        return hasMenu ? (
-          <FittingItemMenu
-            key={weaponRowKey(row)}
-            name={name}
-            items={
-              <WeaponMenuItems
-                modules={group.modules}
-                shownState={group.shownState}
-                maxState={group.maxState}
-              />
-            }
-          >
-            <li className={statRowClassName()}>{content}</li>
-          </FittingItemMenu>
-        ) : (
-          <li key={weaponRowKey(row)} className={statRowClassName()}>
-            {content}
-          </li>
-        );
-      })}
-      <li className={statRowClassName(true)}>
-        <StatRowContent
-          name={t('fittings.stats.offenseTotal')}
-          inline
-          figure={<DamageFigures stats={stats} figures={(s) => s.offense} sustained="line" />}
-        />
-      </li>
-    </StatRows>
-  );
 }
 
 /**
