@@ -31,7 +31,7 @@ import { planBest, type BestPlan } from '@/engine/pi/planBest';
 import { planDiff } from '@/engine/pi/planDiff';
 import type { Goal, JumpsFn } from '@/engine/pi/goalTypes';
 import { scheduleSync, setSyncedSetting } from '@/sync';
-import { useJumpBasis, jumpsBetween } from '@/features/route/jumpBasis';
+import { useSharedJumpBasis, jumpsBetween } from '@/features/route/jumpBasis';
 import { useMediaQuery } from '@/lib/useMediaQuery';
 import { PricesUnavailable } from './PricesUnavailable';
 import { useCadence } from './cadencePref';
@@ -203,7 +203,7 @@ function GoalPlanner({
   // between colony systems for the host choice. The plan does not wait for
   // them: until they resolve every leg is unknown (no host is penalised) and
   // the plan is re-made when they land.
-  const basis = useJumpBasis();
+  const basis = useSharedJumpBasis();
   const systemKey = useMemo(() => idSetKey(rows.map((row) => row.systemId)), [rows]);
   const [jumps, setJumps] = useState<{
     key: string;

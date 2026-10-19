@@ -21,7 +21,7 @@ import { securityStatusColor, shownSecurity } from '@/engine/securityStatus';
 import { routeExposure } from '@/features/route/routeExposure';
 import { loadCharacterSolarSystemId } from '@/features/character/location';
 import { loadSystemNameAndSecurity } from '@/features/character/systemSecurity';
-import { useJumpBasis } from '@/features/route/jumpBasis';
+import { useSharedJumpBasis } from '@/features/route/jumpBasis';
 import { useNow } from '@/lib/useNow';
 import { getTradeHub, TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import { eveClock } from './colonies/coloniesFormat';
@@ -85,7 +85,7 @@ export function PiHeaderStrip({
 }: Props) {
   const { t } = useTranslation();
   const { hub, buybackPct, hubChosen, setHub, setBuyback, keepHub } = useSellHub();
-  const basis = useJumpBasis();
+  const basis = useSharedJumpBasis();
   const colonyHome = homeSystemId(colonySystemIds);
   const [located, setLocated] = useState<{
     characterId: number;
@@ -340,7 +340,7 @@ export function PiHeaderStrip({
 async function hubRouteFigures(
   homeId: number,
   hubSystemId: number,
-  basis: ReturnType<typeof useJumpBasis>
+  basis: ReturnType<typeof useSharedJumpBasis>
 ): Promise<RouteFigures | null> {
   const result = await routeExposure(homeId, hubSystemId, basis.rules, basis.network).catch(() => ({
     kind: 'unknown' as const,

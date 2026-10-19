@@ -3,7 +3,7 @@ import type { RebuildPreference } from '@/engine/pi/planAdvice';
 import type { RouteSystem } from '@/engine/pi/planHaul';
 import { localRoutesFromOrigin } from '@/features/route/localRoute';
 import { loadSolarSystemsById } from '@/sde/solarSystems';
-import { useJumpBasis } from '@/features/route/jumpBasis';
+import { useSharedJumpBasis } from '@/features/route/jumpBasis';
 import { useCadence } from './cadencePref';
 import { loadCommandCenterUpgrades } from './colonyBudget';
 import { useGoalPlannerPrefs } from './goalPlannerPrefs';
@@ -85,7 +85,7 @@ export function usePiAdviceInputs(
     useKeyedLoad(characterId !== null && nowMs !== null ? String(characterId) : null, loadSkills)
       .data ?? null;
 
-  const basis = useJumpBasis();
+  const basis = useSharedJumpBasis();
   const colonies = snapshot?.colonies;
   const systemKey = useMemo(
     () =>

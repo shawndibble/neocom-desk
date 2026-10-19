@@ -14,7 +14,7 @@ import { resetBiggerChains, useBiggerChains, useWhatIfChains } from './useBigger
 const basisStub = { key: 'k', hydrated: true, rules: {}, network: {}, podKillsUnavailable: false };
 const jumpsBetween = vi.fn(async () => ({ kind: 'known' as const, jumps: 4 }));
 vi.mock('@/features/route/jumpBasis', () => ({
-  useJumpBasis: () => basisStub,
+  useSharedJumpBasis: () => basisStub,
   jumpsBetween: (...args: unknown[]) => jumpsBetween(...(args as [])),
 }));
 
