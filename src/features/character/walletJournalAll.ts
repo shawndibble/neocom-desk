@@ -4,7 +4,7 @@
  * (scope pre-check, ordering, concurrency). Kept apart from `wallet.ts`, which
  * holds the single-Character loaders.
  */
-import { characterIdsWithScopes } from '@/app/useGrantedScopes';
+import { characterIdsWithScopes } from '@/app/characterIdsWithScopes';
 import type { WalletJournalEntry, WalletTransaction } from '@/esi/endpoints';
 import { ESI_REGISTRY } from '@/esi/registry';
 import {

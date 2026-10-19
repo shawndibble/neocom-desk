@@ -9,7 +9,7 @@
  * never costs a request, and never trips the re-auth banner for an alt.
  */
 import { db } from '@/db';
-import { characterIdsWithScopes } from '@/app/useGrantedScopes';
+import { characterIdsWithScopes } from '@/app/characterIdsWithScopes';
 import { readCachedRows } from '@/esi/cache';
 import type { CharacterAsset } from '@/esi/endpoints';
 import { requiredScopesForEndpoints } from '@/esi/registry';

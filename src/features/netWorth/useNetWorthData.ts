@@ -6,7 +6,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
-import { useCharacterIdsWithScopes } from '@/app/useGrantedScopes';
+import { useCharacterIdsWithScopes } from '@/app/characterIdsWithScopes';
 import { ESI_REGISTRY } from '@/esi/registry';
 import { dailyWalletFromJournal } from '@/engine/netWorth/series';
 import type { NetWorthSnapshotRow } from '@/engine/netWorth/snapshot';

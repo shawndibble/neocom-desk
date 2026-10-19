@@ -7,7 +7,7 @@
  * the palette is open, so typing never costs a request. A contact whose name
  * has never been resolved on this device is left out rather than fetched.
  */
-import { characterIdsWithScopes } from '@/app/useGrantedScopes';
+import { characterIdsWithScopes } from '@/app/characterIdsWithScopes';
 import type { CharacterContact } from '@/esi/endpoints';
 import { requiredScopesForEndpoints } from '@/esi/registry';
 import {

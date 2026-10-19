@@ -11,7 +11,7 @@ import type { StockAlertEntry } from '@/engine/stockTargets/stockAlert';
 import { buildStockRows, summarizeStock, type StockRow } from '@/engine/stockTargets/stockRows';
 import type { StockList, StockTarget } from '@/engine/stockTargets/stockLists';
 import { db } from '@/db';
-import { characterIdsWithScopes } from '@/app/useGrantedScopes';
+import { characterIdsWithScopes } from '@/app/characterIdsWithScopes';
 import type { CharacterAsset, MarketOrder } from '@/esi/endpoints';
 import { readCachedRows } from '@/esi/cache';
 import { ESI_REGISTRY } from '@/esi/registry';

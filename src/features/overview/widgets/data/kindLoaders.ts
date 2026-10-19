@@ -10,7 +10,7 @@
  * `@/sync`, Firebase or recharts from here.
  */
 import { db } from '@/db';
-import { characterIdsWithScopes } from '@/app/useGrantedScopes';
+import { characterIdsWithScopes } from '@/app/characterIdsWithScopes';
 import { ESI_REGISTRY, requiredScopesForEndpoints } from '@/esi/registry';
 import { layerValues, type LayerValues } from '@/engine/netWorth/series';
 import type { HistoryCoverage } from '@/engine/omegaCoverage';

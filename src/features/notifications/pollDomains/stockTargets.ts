@@ -1,4 +1,4 @@
-import { characterIdsWithScopes } from '@/app/useGrantedScopes';
+import { characterIdsWithScopes } from '@/app/characterIdsWithScopes';
 import { ESI_REGISTRY } from '@/esi/registry';
 import { useStockLists } from '@/features/stockTargets/stockListsStore';
 import { loadStockAlertEntries } from '@/features/stockTargets/stockTargetsData';

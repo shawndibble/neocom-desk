@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { useCharacterIdsWithScopes } from '@/app/useGrantedScopes';
+import { useCharacterIdsWithScopes } from '@/app/characterIdsWithScopes';
 import { requiredScopesForEndpoints } from '@/esi/registry';
 import { OPEN_IN_EVE_ENDPOINTS } from '@/features/openInEve/sendOpenInEve';
 import type { MarketOrder } from '@/esi/endpoints';
