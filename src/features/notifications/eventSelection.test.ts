@@ -2,9 +2,7 @@ import { describe, it, expect } from 'vitest';
 import type { NotificationEventId } from './events';
 import {
   isEventEnabledFor,
-  selectionStateForEvents,
   toggleEventChannel,
-  toggleAllEventsOnChannel,
   isEveTypeAllowed,
   isEveTypeEnabledFor,
   enabledEveTypesForBrowser,
@@ -13,13 +11,7 @@ import {
   EVE_ALLOWED_TYPES,
   NOTIFICATION_FAMILIES,
   eveTypesByFamily,
-  selectionStateForEveTypes,
-  toggleAllEveTypesOnChannel,
-  selectionStateForEventAcrossCharacters,
-  selectionStateForAllCharactersAllEvents,
   broadcastEventChannelFlags,
-  broadcastAllEventsChannelFlags,
-  selectionStateForEveTypeAcrossCharacters,
   selectionStateForAllCharactersEveTypes,
   broadcastEveTypeChannelFlags,
   broadcastAllEveTypesChannelFlags,
@@ -75,19 +67,6 @@ describe('isEventEnabledFor — feed-only defaults', () => {
   });
 });
 
-describe('selectionStateForEvents', () => {
-  it('is per column', () => {
-    const map: EventEnabledMap = { [A]: { browser: false }, [B]: { browser: false } };
-    expect(selectionStateForEvents([A, B], map, 'browser')).toBe('unchecked');
-    expect(selectionStateForEvents([A, B], map, 'feed')).toBe('checked');
-  });
-
-  it('is indeterminate on a partial column', () => {
-    const map: EventEnabledMap = { [A]: { browser: false } };
-    expect(selectionStateForEvents([A, B], map, 'browser')).toBe('indeterminate');
-  });
-});
-
 describe('toggleEventChannel', () => {
   it('flips one channel and leaves the other alone', () => {
     const next = toggleEventChannel({}, A, 'browser');
@@ -104,74 +83,6 @@ describe('toggleEventChannel', () => {
   it('does not disturb other events', () => {
     const next = toggleEventChannel({ [B]: { feed: false } }, A, 'browser');
     expect(isEventEnabledFor(next, B, 'feed')).toBe(false);
-  });
-});
-
-describe('toggleAllEventsOnChannel', () => {
-  it('clears a fully-enabled column, keeping the other column intact', () => {
-    const next = toggleAllEventsOnChannel([A, B], {}, 'browser');
-    expect(isEventEnabledFor(next, A, 'browser')).toBe(false);
-    expect(isEventEnabledFor(next, B, 'browser')).toBe(false);
-    expect(isEventEnabledFor(next, A, 'feed')).toBe(true);
-    expect(isEventEnabledFor(next, B, 'feed')).toBe(true);
-  });
-
-  it('fills in a partial column rather than clearing it', () => {
-    const map: EventEnabledMap = { [A]: { browser: false } };
-    const next = toggleAllEventsOnChannel([A, B], map, 'browser');
-    expect(isEventEnabledFor(next, A, 'browser')).toBe(true);
-    expect(isEventEnabledFor(next, B, 'browser')).toBe(true);
-  });
-});
-
-describe('selectionStateForEventAcrossCharacters (issue #738)', () => {
-  it('is checked when every Character agrees on', () => {
-    const perCharacter = { 1: {}, 2: {} };
-    expect(selectionStateForEventAcrossCharacters([1, 2], A, perCharacter, 'browser')).toBe(
-      'checked'
-    );
-  });
-
-  it('is unchecked when every Character agrees off', () => {
-    const perCharacter = { 1: { [A]: { browser: false } }, 2: { [A]: { browser: false } } };
-    expect(selectionStateForEventAcrossCharacters([1, 2], A, perCharacter, 'browser')).toBe(
-      'unchecked'
-    );
-  });
-
-  it('is indeterminate when Characters disagree', () => {
-    const perCharacter = { 1: { [A]: { browser: false } }, 2: {} };
-    expect(selectionStateForEventAcrossCharacters([1, 2], A, perCharacter, 'browser')).toBe(
-      'indeterminate'
-    );
-  });
-
-  it('reads a Character absent from the map as its default (on)', () => {
-    const perCharacter = { 1: {} };
-    expect(selectionStateForEventAcrossCharacters([1, 2], A, perCharacter, 'browser')).toBe(
-      'checked'
-    );
-  });
-});
-
-describe('selectionStateForAllCharactersAllEvents (issue #738)', () => {
-  it('is checked only when every Character agrees every Event is on', () => {
-    const perCharacter = { 1: {}, 2: {} };
-    expect(selectionStateForAllCharactersAllEvents([1, 2], [A, B], perCharacter, 'browser')).toBe(
-      'checked'
-    );
-  });
-
-  it('is indeterminate when one Character disagrees on one Event', () => {
-    const perCharacter = { 1: { [A]: { browser: false } }, 2: {} };
-    expect(selectionStateForAllCharactersAllEvents([1, 2], [A, B], perCharacter, 'browser')).toBe(
-      'indeterminate'
-    );
-  });
-
-  it('is unchecked with no Characters or no Events', () => {
-    expect(selectionStateForAllCharactersAllEvents([], [A, B], {}, 'browser')).toBe('unchecked');
-    expect(selectionStateForAllCharactersAllEvents([1], [], {}, 'browser')).toBe('unchecked');
   });
 });
 
@@ -198,31 +109,13 @@ describe('broadcastEventChannelFlags (issue #738)', () => {
   });
 });
 
-describe('broadcastAllEventsChannelFlags (issue #738)', () => {
-  it('turns every Character and Event on when the whole grid is not already fully on', () => {
-    const perCharacter = { 1: { [A]: { browser: false } }, 2: {} };
-    const next = broadcastAllEventsChannelFlags([1, 2], [A, B], perCharacter, 'browser');
-    expect(isEventEnabledFor(next[1], A, 'browser')).toBe(true);
-    expect(isEventEnabledFor(next[1], B, 'browser')).toBe(true);
-    expect(isEventEnabledFor(next[2], A, 'browser')).toBe(true);
-    expect(isEventEnabledFor(next[2], B, 'browser')).toBe(true);
-  });
-
-  it('clears the whole grid only when it was already fully on', () => {
-    const perCharacter = { 1: {}, 2: {} };
-    const next = broadcastAllEventsChannelFlags([1, 2], [A, B], perCharacter, 'browser');
-    expect(isEventEnabledFor(next[1], A, 'browser')).toBe(false);
-    expect(isEventEnabledFor(next[2], B, 'browser')).toBe(false);
-  });
-});
-
 const TYPE_A = 'BillOutOfMoneyMsg';
 const TYPE_B = 'AllWarDeclaredMsg';
 
 describe('EVE_ALLOWED_TYPES / isEveTypeAllowed', () => {
-  it('holds exactly the 26 types with hand-written bodies', () => {
-    expect(EVE_ALLOWED_TYPES).toHaveLength(26);
-    expect(new Set(EVE_ALLOWED_TYPES).size).toBe(26);
+  it('holds exactly the 29 types with hand-written bodies', () => {
+    expect(EVE_ALLOWED_TYPES).toHaveLength(29);
+    expect(new Set(EVE_ALLOWED_TYPES).size).toBe(29);
   });
 
   it('allows every type on the list', () => {
@@ -328,6 +221,18 @@ describe('NOTIFICATION_FAMILIES / eveTypesByFamily', () => {
     expect([...grouped].sort()).toEqual([...EVE_ALLOWED_TYPES].sort());
   });
 
+  // Issue #4058: the whole drill cycle, so a corp moon Extraction
+  // timeline is exact (epic #4055, D14).
+  it('groups the moonMining family: the whole drill cycle', () => {
+    expect([...eveTypesByFamily('moonMining')].sort()).toEqual([
+      'MoonminingAutomaticFracture',
+      'MoonminingExtractionCancelled',
+      'MoonminingExtractionFinished',
+      'MoonminingExtractionStarted',
+      'MoonminingLaserFired',
+    ]);
+  });
+
   it('groups the pi family (customs-office types only)', () => {
     expect(eveTypesByFamily('pi')).toEqual(['OrbitalAttacked', 'OrbitalReinforced']);
   });
@@ -335,78 +240,6 @@ describe('NOTIFICATION_FAMILIES / eveTypesByFamily', () => {
   it('groups the structures family correctly', () => {
     expect(eveTypesByFamily('structures')).toEqual(
       expect.arrayContaining(['StructureUnderAttack', 'StructureFuelAlert'])
-    );
-  });
-});
-
-describe('selectionStateForEveTypes', () => {
-  it('defaults an unset column to its per-channel default: checked for feed, unchecked for browser', () => {
-    expect(selectionStateForEveTypes([TYPE_A, TYPE_B], {}, 'feed')).toBe('checked');
-    expect(selectionStateForEveTypes([TYPE_A, TYPE_B], {}, 'browser')).toBe('unchecked');
-  });
-
-  it('is indeterminate on a partial column', () => {
-    const map: EveTypeEnabledMap = { [TYPE_A]: { browser: true } };
-    expect(selectionStateForEveTypes([TYPE_A, TYPE_B], map, 'browser')).toBe('indeterminate');
-  });
-
-  it('reports unchecked for an empty list', () => {
-    expect(selectionStateForEveTypes([], {}, 'browser')).toBe('unchecked');
-  });
-
-  it('is indeterminate on the real structures family, which mixes browser-on and browser-off defaults', () => {
-    const structures = eveTypesByFamily('structures');
-    expect(selectionStateForEveTypes(structures, {}, 'browser')).toBe('indeterminate');
-    expect(selectionStateForEveTypes(structures, {}, 'feed')).toBe('checked');
-  });
-});
-
-describe('toggleAllEveTypesOnChannel', () => {
-  it('clears a fully-enabled column, keeping the other column intact', () => {
-    const next = toggleAllEveTypesOnChannel([TYPE_A, TYPE_B], {}, 'feed');
-    expect(isEveTypeEnabledFor(next, TYPE_A, 'feed')).toBe(false);
-    expect(isEveTypeEnabledFor(next, TYPE_B, 'feed')).toBe(false);
-    expect(isEveTypeEnabledFor(next, TYPE_A, 'browser')).toBe(false);
-    expect(isEveTypeEnabledFor(next, TYPE_B, 'browser')).toBe(false);
-  });
-
-  it('fills in a partial column rather than clearing it', () => {
-    const map: EveTypeEnabledMap = { [TYPE_A]: { browser: true } };
-    const next = toggleAllEveTypesOnChannel([TYPE_A, TYPE_B], map, 'browser');
-    expect(isEveTypeEnabledFor(next, TYPE_A, 'browser')).toBe(true);
-    expect(isEveTypeEnabledFor(next, TYPE_B, 'browser')).toBe(true);
-  });
-});
-
-describe('selectionStateForEveTypeAcrossCharacters (issue #745)', () => {
-  it('is checked when every Character agrees on', () => {
-    const perCharacter = { 1: { [TYPE_A]: { feed: true } }, 2: { [TYPE_A]: { feed: true } } };
-    expect(selectionStateForEveTypeAcrossCharacters([1, 2], TYPE_A, perCharacter, 'feed')).toBe(
-      'checked'
-    );
-  });
-
-  it('is unchecked when every Character agrees off', () => {
-    const perCharacter = { 1: { [TYPE_A]: { feed: false } }, 2: { [TYPE_A]: { feed: false } } };
-    expect(selectionStateForEveTypeAcrossCharacters([1, 2], TYPE_A, perCharacter, 'feed')).toBe(
-      'unchecked'
-    );
-  });
-
-  it('is indeterminate when Characters disagree', () => {
-    const perCharacter = { 1: { [TYPE_A]: { feed: false } }, 2: {} };
-    expect(selectionStateForEveTypeAcrossCharacters([1, 2], TYPE_A, perCharacter, 'feed')).toBe(
-      'indeterminate'
-    );
-  });
-
-  it('reads a Character absent from the map as its per-type default', () => {
-    const perCharacter = { 1: {} };
-    expect(selectionStateForEveTypeAcrossCharacters([1, 2], TYPE_A, perCharacter, 'feed')).toBe(
-      'checked'
-    );
-    expect(selectionStateForEveTypeAcrossCharacters([1, 2], TYPE_A, perCharacter, 'browser')).toBe(
-      'unchecked'
     );
   });
 });

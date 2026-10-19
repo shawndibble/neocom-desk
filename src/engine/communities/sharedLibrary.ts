@@ -81,15 +81,6 @@ export function splitSharedBlueprints<B extends OwnedBlueprintInput>(
   return { shared: shared.sort(compareShared), skipped };
 }
 
-export function selectSharedBlueprints<B extends OwnedBlueprintInput>(
-  owned: readonly B[],
-  share: BlueprintShare,
-  placeIdOf: (blueprint: B) => number | null,
-  placeOf: (placeId: number) => ResolvedPlace | null
-): SharedBlueprint[] {
-  return splitSharedBlueprints(owned, share, placeIdOf, placeOf).shared;
-}
-
 function compareShared(a: SharedBlueprint, b: SharedBlueprint): number {
   return (
     a.typeId - b.typeId ||

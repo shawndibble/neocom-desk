@@ -81,27 +81,3 @@ export function backwardBucketSums<T>(
   }
   return sums;
 }
-
-/**
- * Counts how many of `times` land in each of `count` buckets of `bucketMs`
- * starting at `now`. A time already past counts in the first bucket (it is
- * "ready now"); one beyond the last bucket is reported as `later`.
- */
-export function forwardBucketCounts(
-  times: readonly number[],
-  now: number,
-  bucketMs: number,
-  count: number
-): { counts: number[]; later: number } {
-  const counts = Array<number>(count).fill(0);
-  let later = 0;
-  for (const at of times) {
-    const ahead = at - now;
-    if (ahead >= count * bucketMs) {
-      later += 1;
-      continue;
-    }
-    counts[Math.max(0, Math.floor(ahead / bucketMs))]! += 1;
-  }
-  return { counts, later };
-}

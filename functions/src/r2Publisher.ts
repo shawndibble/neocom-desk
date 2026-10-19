@@ -13,7 +13,7 @@
  * `REFRESH_AFTER_MS` the writer re-uploads every object; the rule's age must
  * stay comfortably above that.
  */
-import { AwsClient } from 'aws4fetch';
+import type { R2Put } from './r2Client.js';
 import {
   R2_INDEX_KEY,
   buildContractOfferR2Index,
@@ -27,6 +27,9 @@ import {
 } from './courierContractObjects.js';
 import type { PublicContractOfferRow, PublicCourierContractRow } from './publicContracts.js';
 
+export { createR2Get, createR2Put } from './r2Client.js';
+export type { R2Config, R2Get, R2Put } from './r2Client.js';
+
 export const REFRESH_AFTER_MS = 2 * 24 * 60 * 60_000;
 /**
  * ~12k small PUTs, each dominated by round-trip latency rather than bandwidth,
@@ -38,12 +41,6 @@ const UPLOAD_CONCURRENCY = 32;
 export const UPLOAD_BUDGET_MS = 360_000;
 /** Flush recorded hashes this often, so a killed run still leaves progress behind. */
 export const PROGRESS_FLUSH_EVERY = 1000;
-
-export type R2Put = (
-  key: string,
-  body: Buffer | string,
-  headers: Record<string, string>
-) => Promise<void>;
 
 /** What the writer remembers between publishes (one Firestore doc). */
 export interface R2PublishState {
@@ -74,27 +71,6 @@ const INDEX_HEADERS = {
   'Content-Type': 'application/json',
   'Cache-Control': 'public, max-age=60',
 };
-
-export interface R2Config {
-  endpoint: string;
-  bucket: string;
-  accessKeyId: string;
-  secretAccessKey: string;
-}
-
-export function createR2Put(config: R2Config): R2Put {
-  const client = new AwsClient({
-    accessKeyId: config.accessKeyId,
-    secretAccessKey: config.secretAccessKey,
-    service: 's3',
-    region: 'auto',
-  });
-  const base = `${config.endpoint.replace(/\/+$/, '')}/${config.bucket}`;
-  return async (key, body, headers) => {
-    const response = await client.fetch(`${base}/${key}`, { method: 'PUT', headers, body });
-    if (!response.ok) throw new Error(`R2 PUT ${key} failed: ${response.status}`);
-  };
-}
 
 async function runPool<T>(
   items: readonly T[],

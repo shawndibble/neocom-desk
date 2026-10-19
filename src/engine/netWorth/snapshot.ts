@@ -106,21 +106,6 @@ export function buildSnapshotRow(input: SnapshotInputs): NetWorthSnapshotRow | n
   };
 }
 
-/** Union by id; the later `updatedAt` wins a collision (same Character, same day on two devices). */
-export function mergeSnapshotRows(
-  local: readonly NetWorthSnapshotRow[],
-  remote: readonly NetWorthSnapshotRow[]
-): NetWorthSnapshotRow[] {
-  const byId = new Map<string, NetWorthSnapshotRow>();
-  for (const row of [...local, ...remote]) {
-    const held = byId.get(row.id);
-    if (!held || row.updatedAt > held.updatedAt) byId.set(row.id, row);
-  }
-  return [...byId.values()].sort(
-    (a, b) => a.characterId - b.characterId || a.day.localeCompare(b.day)
-  );
-}
-
 /** Days between the first and last with no row. Gaps stay gaps — nothing is interpolated. */
 export function findMissingDays(days: readonly string[]): string[] {
   if (days.length === 0) return [];

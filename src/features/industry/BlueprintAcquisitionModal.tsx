@@ -58,6 +58,7 @@ import {
 } from '@/components/ui';
 import { HintText } from '@/components/ui/HintText';
 import * as Icon from '@/components/ui/icons';
+import { clampMe } from '@/engine/industry/efficiency';
 import type { MaterialSourcing } from '@/engine/industry/types';
 import { romanLevel } from '@/engine/projection';
 import { loadTypeName } from '@/features/character/typeNames';
@@ -388,7 +389,7 @@ export function BlueprintAcquisitionModal({
     const price = unmaskNumber(manualPrice);
     onSourcingChange(blueprintTypeID, {
       acquisitionTierOverride: {
-        me: Math.min(10, Math.max(0, Math.round(me))),
+        me: clampMe(me),
         te: Math.max(0, Math.round(te)),
       },
       overridePrice: price,
