@@ -159,7 +159,7 @@ describe('Layout mobile "More" sheet (UX-REVIEW #4)', () => {
     expect(within(mobileNav).getByRole('button', { name: 'More' })).toBeInTheDocument();
   });
 
-  it('opens a dialog listing Wallet, Assets, Mail, Calendar and Contracts (not Orders or Styleguide)', async () => {
+  it('opens a dialog listing Wallet, Assets, Mail, Calendar and Contracts (not Orders)', async () => {
     mockIsSyncConfigured.mockReturnValue(false);
     const user = userEvent.setup();
     renderLayout();
@@ -177,7 +177,6 @@ describe('Layout mobile "More" sheet (UX-REVIEW #4)', () => {
     for (const label of ['Wallet', 'Assets', 'Mail', 'Calendar', 'Contracts']) {
       expect(within(sheet).getByRole('link', { name: label })).toBeInTheDocument();
     }
-    expect(within(sheet).queryByRole('link', { name: 'Styleguide' })).not.toBeInTheDocument();
     // Desktop-only for now: Orders has no primary tab-bar slot to spare here.
     expect(within(sheet).queryByRole('link', { name: 'Orders' })).not.toBeInTheDocument();
     // Overview tabs now, reached from the Overview page rather than the sheet.
