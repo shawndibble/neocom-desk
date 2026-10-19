@@ -64,18 +64,6 @@ export interface TripPlan {
  */
 const TIE = 1e-2;
 
-/**
- * Directed, because a step's cost is charged for the system entered: from
- * highsec into lowsec costs more than the way back. Each row is its own sweep.
- */
-export function pairwiseRouteCosts(
-  graph: JumpGraph,
-  points: readonly number[],
-  options: FindJumpRouteOptions = {}
-): RouteCostMatrix {
-  return sweepPoints(graph, points, options).matrix;
-}
-
 /** One sweep per point, and the matrix read off them — the legs reuse the sweeps. */
 function sweepPoints(
   graph: JumpGraph,

@@ -651,6 +651,20 @@ describe('triggerSync: plans', () => {
     expect((await db.settings.get('sync.__ownerHash.1'))?.value).toBe(HASH);
   });
 
+  it('rolls the whole owner-change wipe back when a step fails midway', async () => {
+    await db.settings.put({ key: 'sync.__ownerHash.1', value: 'previous-owner-hash' });
+    await db.skillPlans.put(plan());
+    await db.quickbars.put(quickbar());
+    const spy = vi.spyOn(db.settings, 'bulkPut').mockRejectedValueOnce(new Error('boom'));
+
+    await expect(triggerSync(1)).rejects.toThrow('boom');
+    spy.mockRestore();
+
+    expect(await db.skillPlans.count()).toBe(1);
+    expect(await db.quickbars.count()).toBe(1);
+    expect((await db.settings.get('sync.__ownerHash.1'))?.value).toBe('previous-owner-hash');
+  });
+
   it('leaves the ownerHash bookmark unadvanced when the purge only reached suppression', async () => {
     // Suppression can be memory-only, so advancing the bookmark would burn the
     // last retry: after a reload the marker is gone, the hash matches and the

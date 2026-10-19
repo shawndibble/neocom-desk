@@ -39,6 +39,7 @@ import type { BuildPlanRecord } from '@/db';
 import { DEFAULT_TRADE_HUB, TRADE_HUBS, getTradeHub } from '@/market/hubs';
 import { BuildSystemInput } from './BuildSystemInput';
 import { BuildLocationPicker } from './BuildLocationPicker';
+import { clampPct } from '@/lib/clampPct';
 import { buildLocationLabel } from './buildLocationLabel';
 import { rigKindLabelKey } from './rigFitLabels';
 import { RigMatchHelper } from './RigMatchHelper';
@@ -139,7 +140,7 @@ export function RetargetGroupDialog({ group, plans, onApply, onClose }: Retarget
       setTaxText(String(target.facilityTaxPct ?? 0));
       return;
     }
-    const facilityTaxPct = Math.min(100, Math.max(0, n));
+    const facilityTaxPct = clampPct(n);
     setTaxText(String(facilityTaxPct));
     setTarget((current) => ({ ...current, facilityTaxPct }));
   }
