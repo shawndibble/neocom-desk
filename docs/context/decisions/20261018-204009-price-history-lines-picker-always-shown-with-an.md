@@ -15,12 +15,15 @@ _Recorded 2026-10-18._
   day table and its CSV export keep their Buy / Sell columns: they are the day
   list, not the drawing, as before.
 - **Under Buy / Sell, Buy or Sell, a region without open prices keeps its
-  average line, now labelled "<Region> · Average (no order data)"** (plain
-  "Average (no order data)" for an uncompared primary) in the legend, the
-  tooltip and the line's name, with an info tip saying Buy and Sell are
-  recorded for the five trade hubs only. The label waits for the region's
-  open-price read to settle, so a hub is never briefly mislabelled while its
-  series loads. Under Average no region gets the note: average is the choice.
+  average line, now labelled "<Region> average (no order data)"** (plain
+  "Average Price (no order data)" for an uncompared primary, matching the
+  existing average labels) in the legend, the tooltip and the line's name,
+  with an info tip saying Buy and Sell are recorded for the five Trade Hubs
+  only. The label applies only once the region's open-price read has come
+  back with no series at all: not while it loads, and not for a hub whose
+  series simply has no day in the selected range (that one keeps the plain
+  average label). Under Average no region gets the note: average is the
+  choice.
 - **The stored choice keeps its key (`marketPriceHistorySeries`).** Old values
   (`both`, `buy`, `sell`) load as before; anything unknown falls back to Buy /
   Sell.

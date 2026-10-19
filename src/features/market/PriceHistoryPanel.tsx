@@ -152,8 +152,8 @@ function useComparedHistories(typeId: number, regionIds: readonly number[]) {
  * The daily open buy/sell series for the primary region and each compared one,
  * one read per region and item, started when the panel mounts (so only while
  * the history is open). `loadMarketOpenPrices` never throws; a region without
- * a series maps to `null`, and one still being read is absent from the map
- * and from `settled`.
+ * a series maps to `null` (and is listed in `missing`), and one still being
+ * read is in neither.
  * The chart draws its average line for either until the series lands.
  * A read that came back `null` is not retried for the life of the panel (and
  * the loader holds a good answer for an hour, never a failure): a failed read
@@ -174,15 +174,15 @@ function useOpenSeries(typeId: number, regionIds: readonly number[]) {
   }, [typeId, regionIds]);
   return useMemo(() => {
     const series = new Map<number, OpenPriceSeries>();
-    const settled = new Set<number>();
+    const missing = new Set<number>();
     for (const regionId of regionIds) {
       const key = `${regionId}:${typeId}`;
       if (!byKey.has(key)) continue;
-      settled.add(regionId);
       const stored = byKey.get(key);
       if (stored) series.set(regionId, stored);
+      else missing.add(regionId);
     }
-    return { series, settled };
+    return { series, missing };
   }, [byKey, regionIds, typeId]);
 }
 
@@ -219,7 +219,7 @@ export function PriceHistoryPanel({
     points && points.length > 0 ? compareIds : NO_REGIONS
   );
   const openRegionIds = useMemo(() => [regionId, ...compareIds], [regionId, compareIds]);
-  const { series: openSeries, settled: openSettled } = useOpenSeries(typeId, openRegionIds);
+  const { series: openSeries, missing: openMissing } = useOpenSeries(typeId, openRegionIds);
   // The window a trader reads in is a habit, not a property of the item, and
   // this panel remounts per item — so it comes from disk. Ungated on
   // `hydrated`, and hydrated above the early returns below so a loading or
@@ -308,7 +308,7 @@ export function PriceHistoryPanel({
         compareIds={compareIds}
         comparedHistories={comparedHistories}
         openSeries={openSeries}
-        openSettled={openSettled}
+        openMissing={openMissing}
       />
     </>
   );
@@ -349,8 +349,8 @@ interface RangedHistoryProps {
   comparedHistories: readonly RegionHistoryState[];
   /** Open buy/sell series by region id, for the regions that have one. */
   openSeries: ReadonlyMap<number, OpenPriceSeries>;
-  /** Regions whose open read has come back, with a series or without. */
-  openSettled: ReadonlySet<number>;
+  /** Regions whose open read came back with no series at all. */
+  openMissing: ReadonlySet<number>;
 }
 
 /** Range control + hi/lo/median summary, both derived from the already-fetched points — neither needs the lazy chart loaded. */
@@ -365,7 +365,7 @@ function RangedHistory({
   compareIds,
   comparedHistories,
   openSeries,
-  openSettled,
+  openMissing,
 }: RangedHistoryProps) {
   const { t } = useTranslation();
   const series = usePriceHistorySeries((state) => state.value);
@@ -570,7 +570,7 @@ function RangedHistory({
           primaryRegionId={primaryRegionId}
           openPrices={openPrices}
           series={series}
-          openSettled={openSettled}
+          openMissing={openMissing}
         />
       </Suspense>
     </div>

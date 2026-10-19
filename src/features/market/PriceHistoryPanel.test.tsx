@@ -35,11 +35,11 @@ vi.mock('./PriceHistoryChart', () => ({
     primaryRegionName,
     openPrices,
     series,
-    openSettled,
+    openMissing,
   }: {
     openPrices?: { regionId: number; points: unknown[] }[];
     series?: string;
-    openSettled?: ReadonlySet<number>;
+    openMissing?: ReadonlySet<number>;
     points: unknown[];
     itemName: string;
     movingAverage?: unknown[];
@@ -51,7 +51,7 @@ vi.mock('./PriceHistoryChart', () => ({
       {primaryRegionName ? ` primary=${primaryRegionName}` : ''}
       {(openPrices ?? []).map((o) => ` {open ${o.regionId}:${o.points.length}:${series}}`).join('')}
       {(comparisons ?? []).map((c) => ` [${c.name}:${c.status}:${c.points.length}]`).join('')}
-      {` series=${series} settled=${[...(openSettled ?? [])].join(',')}`}
+      {` series=${series} missing=${[...(openMissing ?? [])].join(',')}`}
     </div>
   ),
 }));
@@ -478,7 +478,7 @@ describe('PriceHistoryPanel', () => {
     it('still offers the Lines select, and tells the chart the region has no series, when there is none', async () => {
       renderPanel();
       await waitFor(() =>
-        expect(screen.getByTestId('chart')).toHaveTextContent('settled=10000002')
+        expect(screen.getByTestId('chart')).toHaveTextContent('missing=10000002')
       );
       expect(screen.getByTestId('chart')).not.toHaveTextContent('open');
       expect(screen.getByRole('combobox', { name: 'Lines' })).toHaveTextContent('Buy / Sell');
@@ -505,6 +505,8 @@ describe('PriceHistoryPanel', () => {
         expect(screen.getByTestId('chart')).toHaveTextContent('{open 10000002:2:both}')
       );
       expect(screen.getByRole('combobox', { name: 'Lines' })).toHaveTextContent('Buy / Sell');
+      // A region with a series is never reported as missing one.
+      expect(screen.getByTestId('chart')).toHaveTextContent(/missing=$/);
       expect(mockedOpen).toHaveBeenCalledTimes(1);
     });
 

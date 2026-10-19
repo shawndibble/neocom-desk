@@ -92,17 +92,18 @@ interface PriceHistoryChartProps {
    */
   series?: PriceSeriesChoice;
   /**
-   * Regions whose open-price read has settled. One of these drawing its
-   * average under a Buy / Sell choice says so in the legend and tooltip — the
-   * five trade hubs are the only regions with open prices. A region still
-   * being read is absent, so its line is not mislabelled meanwhile.
+   * Regions whose open-price read came back with no series at all — outside
+   * the five Trade Hubs. Under a Buy / Sell choice their average line says so
+   * in the legend and tooltip. A region still being read is absent, and so is
+   * a hub whose series merely has no day in the range, so neither is
+   * mislabelled.
    */
-  openSettled?: ReadonlySet<number>;
+  openMissing?: ReadonlySet<number>;
 }
 
 const NO_COMPARISONS: readonly ComparedRegionSeries[] = [];
 const NO_OPEN: readonly RegionOpenSeries[] = [];
-const NO_SETTLED: ReadonlySet<number> = new Set();
+const NO_MISSING: ReadonlySet<number> = new Set();
 
 /** One region drawing Buy / Sell lines instead of an average. */
 interface OpenLine {
@@ -379,7 +380,7 @@ export default function PriceHistoryChart({
   primaryRegionId,
   openPrices = NO_OPEN,
   series = 'both',
-  openSettled = NO_SETTLED,
+  openMissing = NO_MISSING,
 }: PriceHistoryChartProps) {
   const { t } = useTranslation();
   // Below `sm` the two grouped-integer gutters the desktop chart reserves
@@ -438,10 +439,7 @@ export default function PriceHistoryChart({
    * to look like a missing line or a hub's figure.
    */
   const lacksOpen = (regionId: number | undefined) =>
-    drawsOpen &&
-    regionId !== undefined &&
-    openSettled.has(regionId) &&
-    !openLines.some((l) => l.regionId === regionId);
+    drawsOpen && regionId !== undefined && openMissing.has(regionId);
   const lineAverageLabel = (regionId: number | undefined, region: string | undefined) => {
     if (!lacksOpen(regionId)) return averageLabel(t, region);
     return region

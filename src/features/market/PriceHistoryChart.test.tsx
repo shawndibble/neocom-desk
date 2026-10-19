@@ -342,7 +342,7 @@ describe('PriceHistoryChart', () => {
           primaryRegionName="The Forge"
           primaryRegionId={10000002}
           openPrices={[FORGE_OPEN]}
-          openSettled={new Set([10000002, 10000043])}
+          openMissing={new Set([10000043])}
           comparisons={[DOMAIN]}
           series="average"
         />
@@ -368,18 +368,18 @@ describe('PriceHistoryChart', () => {
           primaryRegionName="The Forge"
           primaryRegionId={10000002}
           openPrices={[FORGE_OPEN]}
-          openSettled={new Set([10000002, 10000043])}
+          openMissing={new Set([10000043])}
           comparisons={[DOMAIN]}
         />
       );
       const legend = screen.getByRole('list');
       expect(within(legend).getByText('The Forge buy')).toBeInTheDocument();
-      const label = 'Domain · Average (no order data)';
+      const label = 'Domain average (no order data)';
       expect(within(legend).getByText(label)).toBeInTheDocument();
       expect(within(legend).getByRole('button', { name: `About ${label}` })).toBeInTheDocument();
     });
 
-    it('says so for the primary region too, and not while its read is still out', () => {
+    it('says so for the primary region too, and not before its read comes back empty', () => {
       const { rerender } = render(
         <PriceHistoryChart points={POINTS} itemName="Tritanium" primaryRegionId={10000060} />
       );
@@ -389,14 +389,14 @@ describe('PriceHistoryChart', () => {
           points={POINTS}
           itemName="Tritanium"
           primaryRegionId={10000060}
-          openSettled={new Set([10000060])}
+          openMissing={new Set([10000060])}
           series="sell"
         />
       );
       const legend = screen.getByRole('list');
-      expect(within(legend).getByText('Average (no order data)')).toBeInTheDocument();
+      expect(within(legend).getByText('Average Price (no order data)')).toBeInTheDocument();
       expect(
-        within(legend).getByRole('button', { name: 'About Average (no order data)' })
+        within(legend).getByRole('button', { name: 'About Average Price (no order data)' })
       ).toBeInTheDocument();
     });
 
