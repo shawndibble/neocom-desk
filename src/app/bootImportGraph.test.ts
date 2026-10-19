@@ -192,6 +192,8 @@ describe('startup import graph', () => {
       // Import-free state `routeChunks` reads (a cancelled import waits for a
       // running stale-build recovery); the recovery code itself stays out.
       '/src/app/staleBuildState.ts',
+      // Import-free guarded localStorage access `signedInShellHint` reads through.
+      '/src/lib/safeLocalStorage.ts',
     ]);
   });
 
