@@ -6,7 +6,6 @@ import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-rou
 import { TabRoute } from '@/app/TabRoute';
 import { routePatternFor } from '@/app/pageTabs';
 import { SHIPS_TABS } from '@/features/fittings/shipsTabs';
-import { LegacyShipsRedirect } from '@/features/fittings/LegacyShipsRedirect';
 import { Ships } from './Ships';
 import '@/i18n';
 
@@ -37,7 +36,7 @@ function LocationProbe() {
   );
 }
 
-/** The routes as `App.tsx` mounts them: the tabbed page at `/ships/*`, Compare nested, the old paths. */
+/** The routes as `App.tsx` mounts them: the tabbed page at `/ships/*`, Compare nested. */
 function renderAt(path: string) {
   mounts.count = 0;
   return render(
@@ -53,8 +52,6 @@ function renderAt(path: string) {
           }
         />
         <Route path="/ships/fittings/compare" element={<p>compare page</p>} />
-        <Route path="/fittings/*" element={<LegacyShipsRedirect />} />
-        <Route path="/skills/ships" element={<LegacyShipsRedirect />} />
       </Routes>
     </MemoryRouter>
   );
@@ -103,25 +100,5 @@ describe('Ships', () => {
   it('sends an unknown segment to the Fittings tab', () => {
     renderAt('/ships/nope?q=1');
     expect(at()).toBe('/ships/fittings?q=1');
-  });
-});
-
-describe('the Ships section’s old paths', () => {
-  it('opens an old Share Link in the editor', () => {
-    renderAt('/fittings?f=1.abc');
-    expect(at()).toBe('/ships/fittings/edit?f=1.abc');
-    expect(screen.getByText('fittings page')).toBeInTheDocument();
-  });
-
-  it.each([
-    ['/fittings', '/ships/fittings'],
-    ['/fittings#top', '/ships/fittings#top'],
-    ['/fittings/edit?f=1.abc', '/ships/fittings/edit?f=1.abc'],
-    ['/fittings/edit', '/ships/fittings'],
-    ['/fittings/compare?f=1.a&f=1.b', '/ships/fittings/compare?f=1.a&f=1.b'],
-    ['/skills/ships', '/ships/tree'],
-  ])('%s lands on %s', (from, to) => {
-    renderAt(from);
-    expect(at()).toBe(to);
   });
 });

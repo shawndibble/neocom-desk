@@ -838,6 +838,14 @@ export function parseConfirmGroupingInput(data: unknown): {
   };
 }
 
+/** A verify link declines a pending character; `characterId` names which one. */
+export function parseDeclineByTokenInput(data: unknown): { token: string; characterId: number } {
+  const characterId = record(data).characterId;
+  if (typeof characterId !== 'number' || !Number.isSafeInteger(characterId) || characterId <= 0)
+    throw new HttpsError('invalid-argument', 'characterId must be a positive integer');
+  return { token: parseToken(data), characterId };
+}
+
 /** A player claims one of their own Unmatched donations (D5). */
 export function parseClaimPaymentInput(data: unknown): {
   corporationId: number;
