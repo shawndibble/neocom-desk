@@ -1,11 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { adviceInput } from './map/mapFixtures.testutil';
 import { buildPlanAdvice } from './planAdviceModel';
-import {
-  answerPlanAdvice,
-  emptyPlanAdviceState,
-  type PlanAdviceRequest,
-} from './planAdvice.worker';
+import { answerPlanAdvice, emptyPlanAdviceState } from './planAdvice.worker';
+import type { PlanAdviceRequest } from './planAdviceWire';
 
 /** A Worker that answers on a later tick with the real worker logic, structured-cloning each way. */
 class FakeWorker {
@@ -102,6 +99,21 @@ describe('askPlanAdvice', () => {
     await expect(waiting).rejects.toBeInstanceOf(PlanAdviceWorkerUnavailable);
     expect(planAdviceWorkerAvailable()).toBe(false);
     expect(FakeWorker.instances[0].terminated).toBe(true);
+  });
+
+  it('treats a request that outran its SDE slice as a worker fault, not a model error', async () => {
+    const { askPlanAdvice, PlanAdviceWorkerUnavailable } = await loadService();
+    const original = FakeWorker.prototype.postMessage;
+    FakeWorker.prototype.postMessage = function (message: PlanAdviceRequest) {
+      if (message.kind !== 'pi') original.call(this, message);
+    };
+    try {
+      await expect(askPlanAdvice(adviceInput('lean'))).rejects.toBeInstanceOf(
+        PlanAdviceWorkerUnavailable
+      );
+    } finally {
+      FakeWorker.prototype.postMessage = original;
+    }
   });
 
   it('is unavailable where there is no Worker', async () => {

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { buildPlanAdvice } from './planAdviceModel';
 import { adviceInput } from './map/mapFixtures.testutil';
-import { answerPlanAdvice, emptyPlanAdviceState, toWireInput } from './planAdvice.worker';
+import { answerPlanAdvice, emptyPlanAdviceState } from './planAdvice.worker';
+import { toWireInput } from './planAdviceWire';
 
 describe('answerPlanAdvice', () => {
   it('answers like the model, once the SDE slice has been loaded', () => {

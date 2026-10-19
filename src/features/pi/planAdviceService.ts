@@ -11,8 +11,12 @@
  */
 import type { PiData } from '@/sde/types';
 import type { PlanAdvice, PlanAdviceInput } from './planAdvice/types';
-import type { PlanAdviceReply, PlanAdviceRequest } from './planAdvice.worker';
-import { toWireInput } from './planAdvice.worker';
+import {
+  PI_NOT_LOADED,
+  toWireInput,
+  type PlanAdviceReply,
+  type PlanAdviceRequest,
+} from './planAdviceWire';
 
 /** The worker could not take or answer the request: the page should run the model itself. */
 export class PlanAdviceWorkerUnavailable extends Error {}
@@ -50,7 +54,11 @@ function ensureWorker(): Worker | null {
     if (!waiting) return;
     pending.delete(reply.id);
     if ('advice' in reply) waiting.resolve(reply.advice);
-    else waiting.reject(new Error(reply.error));
+    else if (reply.error === PI_NOT_LOADED) {
+      // The slice never arrived (a failed clone): the page answers instead.
+      sentPi = null;
+      waiting.reject(new PlanAdviceWorkerUnavailable(reply.error));
+    } else waiting.reject(new Error(reply.error));
   };
   const fail = () => {
     workerBroken = true;

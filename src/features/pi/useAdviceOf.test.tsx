@@ -73,4 +73,34 @@ describe('useAdviceOf with a worker', () => {
     const { result } = renderHook(() => useAdviceOf(input));
     await waitFor(() => expect(result.current).toEqual({ status: 'error' }));
   });
+
+  it('returns one result object across renders once ready', async () => {
+    const input = adviceInput('lean');
+    const advice = buildPlanAdvice(input);
+    const { useAdviceOf } = await withService(() => Promise.resolve(advice));
+    const { result, rerender } = renderHook(() => useAdviceOf(input));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    const first = result.current;
+    rerender();
+    expect(result.current).toBe(first);
+  });
+
+  it('keeps the last answer while a same-colonies input is pending, never another pilot’s', async () => {
+    const a = adviceInput('lean');
+    const sameColonies = { ...a, preference: 'least-hauling' as never };
+    const otherPilot = { ...adviceInput('lean') };
+    const advice = buildPlanAdvice(a);
+    let calls = 0;
+    const { useAdviceOf } = await withService(() =>
+      ++calls === 1 ? Promise.resolve(advice) : new Promise(() => {})
+    );
+    const { result, rerender } = renderHook(({ input }) => useAdviceOf(input), {
+      initialProps: { input: a },
+    });
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    rerender({ input: sameColonies });
+    expect(result.current).toEqual({ status: 'ready', advice });
+    rerender({ input: otherPilot });
+    expect(result.current).toEqual({ status: 'pending' });
+  });
 });
