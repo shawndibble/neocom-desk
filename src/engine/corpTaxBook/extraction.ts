@@ -8,6 +8,7 @@
  * linked Moon Ore Survey, else it is unknown.
  */
 import type { ObservedMiningEntry, OreLine } from './types';
+import { HOUR_MS } from '@/lib/age';
 
 export const DEFAULT_EXPIRY_HOURS = 48;
 export const MAX_EXPIRY_HOURS = 96;
@@ -15,8 +16,6 @@ export const MAX_EXPIRY_HOURS = 96;
 export const DEFAULT_CHUNK_M3_PER_HOUR = 30_000;
 /** Every moon ore is 10 m³ per unit. */
 export const MOON_ORE_M3_PER_UNIT = 10;
-
-const HOUR_MS = 3_600_000;
 
 export interface Extraction {
   id: string;

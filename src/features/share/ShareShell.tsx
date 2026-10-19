@@ -1,8 +1,7 @@
+import { useCharacterCountOrLoading } from '@/features/character/useCharacters';
 import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '@/db';
 import { setLoginReturnTo } from '@/auth/loginReturnTo';
 import { beginAddCharacterLogin } from '@/app/loginFlow';
 import { buttonClassName, EveSsoButton, LogoMark, plainTextActionClassName } from '@/components/ui';
@@ -37,7 +36,7 @@ interface ShareShellProps {
  */
 export function ShareShell({ title, hideTitle, actions, openInApp, children }: ShareShellProps) {
   const { t } = useTranslation();
-  const characterCount = useLiveQuery(() => db.characters.count());
+  const characterCount = useCharacterCountOrLoading();
   const signedOut = characterCount === 0;
   // Until the count loads, the link goes straight to the target but still
   // stashes it: a visitor who turns out to have no Character is bounced to

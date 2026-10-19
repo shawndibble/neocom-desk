@@ -12,9 +12,9 @@ import { calendarDomain } from './pollDomains/calendar';
 import type { PollerState } from './pollerState';
 import { useSeenEveTypesStore } from './seenEveTypes';
 import { rebuildProjection, type ProjectionRebuildDependencies } from './projectionRebuild';
+import { HOUR_MS } from '@/lib/age';
 
 const NOW = 1_000_000;
-const HOUR_MS = 3_600_000;
 const CHAR: CharacterRef = { characterId: 1, name: 'Test Pilot' };
 const CHAR_B: CharacterRef = { characterId: 2, name: 'Second Pilot' };
 const CALENDAR_SCOPE = 'esi-calendar.read_calendar_events.v1';

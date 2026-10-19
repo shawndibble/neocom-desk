@@ -1,3 +1,4 @@
+import { idSetKey } from '@/lib/idSetKey';
 /**
  * The Plan tab: a **Goal Plan** over the active Character's colonies — "here
  * are my colonies and the products I want per day; what does each colony do,
@@ -52,11 +53,8 @@ import {
   plannerPolicy,
   priceBooks,
 } from './goalPlannerModel';
-import {
-  loadGoalPlannerPrices,
-  loadGoalPlannerSnapshot,
-  type GoalPlannerSnapshot,
-} from './goalPlannerSnapshot';
+import { loadGoalPlannerPrices } from './goalPlannerSnapshot';
+import { usePiSnapshot } from './usePiSnapshot';
 import { usePlanetRichness } from './richnessOverride';
 import { parseGoals, plannableGoals, serializeGoals } from './goalsParam';
 import {
@@ -69,6 +67,7 @@ import {
 } from './goalPlanView';
 import { productOptions } from './products';
 import type { PlanPrices } from './planPrices';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { AssumptionsSection, ColoniesSection, GoalsSection } from './GoalPlannerRail';
 import { colonyCountUnknown } from './colonyFillModel';
 import {
@@ -80,6 +79,7 @@ import {
   Shortfalls,
   type PlanNames,
 } from './GoalPlannerResults';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 const HOURS_PER_DAY = 24;
 const MD_UP = '(min-width: 48rem)';
@@ -126,39 +126,13 @@ function GoalPlanner({
   const [assumptionsOpen, setAssumptionsOpen] = useState<boolean | null>(null);
 
   // --- Reads ---
-  const [loaded, setLoaded] = useState<{
-    characterId: number;
-    snapshot: GoalPlannerSnapshot;
-  } | null>(null);
-  const [failedFor, setFailedFor] = useState<number | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    loadGoalPlannerSnapshot(characterId).then(
-      (snapshot) => {
-        if (cancelled) return;
-        setFailedFor(null);
-        setLoaded({ characterId, snapshot });
-      },
-      () => {
-        if (!cancelled) setFailedFor(characterId);
-      }
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [characterId]);
-  const snapshot = loaded?.characterId === characterId ? loaded.snapshot : null;
+  const { snapshot, failed } = usePiSnapshot(characterId);
 
   // --- Prefs ---
   const prefs = useGoalPlannerPrefs((state) => state.value);
-  const hydratePrefs = useGoalPlannerPrefs((state) => state.hydrate);
   const setPrefs = useGoalPlannerPrefs((state) => state.setValue);
   const cadence = useCadence((state) => state.value);
-  const hydrateCadence = useCadence((state) => state.hydrate);
-  useEffect(() => {
-    void hydratePrefs();
-    void hydrateCadence();
-  }, [hydratePrefs, hydrateCadence]);
+  useHydratedStore(useGoalPlannerPrefs, useCadence);
 
   // Where the plan sells, and what it may buy there, are the shared PI
   // settings: the page strip and the settings form edit the same record.
@@ -167,19 +141,12 @@ function GoalPlanner({
   const buysP1 = buyTiers.includes(1);
 
   // --- Prices, keyed on the hub so a hub switch never refetches colonies ---
-  const [priced, setPriced] = useState<{ hubId: string; prices: PlanPrices } | null>(null);
   const pi = snapshot?.pi ?? null;
-  useEffect(() => {
-    if (!pi) return;
-    let cancelled = false;
-    void loadGoalPlannerPrices(hub, pi).then((prices) => {
-      if (!cancelled) setPriced({ hubId: hub.id, prices });
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [pi, hub]);
-  const prices = priced?.hubId === hub.id ? priced.prices : null;
+  const loadPrices = useCallback(
+    () => (pi ? loadGoalPlannerPrices(hub, pi) : Promise.reject(new Error('no snapshot'))),
+    [pi, hub]
+  );
+  const prices: PlanPrices | null = useKeyedLoad(pi ? hub.id : null, loadPrices).data ?? null;
 
   // --- Customs: edits layered over the snapshot, written through to the synced setting ---
   const [customsEdits, setCustomsEdits] = useState<CustomsOverrides | null>(null);
@@ -237,10 +204,7 @@ function GoalPlanner({
   // them: until they resolve every leg is unknown (no host is penalised) and
   // the plan is re-made when they land.
   const basis = useJumpBasis();
-  const systemKey = useMemo(
-    () => [...new Set(rows.map((row) => row.systemId))].sort((a, b) => a - b).join(','),
-    [rows]
-  );
+  const systemKey = useMemo(() => idSetKey(rows.map((row) => row.systemId)), [rows]);
   const [jumps, setJumps] = useState<{
     key: string;
     bySystem: Map<number, number | null>;
@@ -317,7 +281,7 @@ function GoalPlanner({
   }, [snapshot, pi, rows, hub, t]);
 
   // --- States ---
-  if (failedFor === characterId) {
+  if (failed) {
     return <EmptyState title={t('piPlan.loadFailedTitle')} hint={t('piPlan.loadFailedHint')} />;
   }
   if (!snapshot || !pi || !names) return <Loading />;

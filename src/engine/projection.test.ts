@@ -23,9 +23,9 @@ import {
   skillQueueCopy,
   structureFuelCopy,
 } from '@/features/notifications/domainCopy';
+import { HOUR_MS } from '@/lib/age';
 
 const T0 = 1_700_000_000_000;
-const HOUR_MS = 3_600_000;
 
 describe('projectionWording', () => {
   // A refuel falsifies the first two; a reset run falsifies the planetary

@@ -12,7 +12,7 @@ import {
   type EngineAsset,
   type StationSortContext,
 } from './assetTree';
-import type { JumpsAwayResult } from './jumpsAway';
+import type { JumpsAwayResult } from './clone/jumpsAway';
 
 const asset = (overrides: Partial<EngineAsset> & Pick<EngineAsset, 'item_id'>): EngineAsset => ({
   type_id: 34,

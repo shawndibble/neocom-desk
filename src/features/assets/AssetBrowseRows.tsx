@@ -8,7 +8,7 @@ import {
   type AssetTreeStation,
 } from '@/engine/assetTree';
 import { assetNodeSegment } from '@/engine/assetPath';
-import type { JumpsAwayResult } from '@/engine/jumpsAway';
+import type { JumpsAwayResult } from '@/engine/clone/jumpsAway';
 import type { CharacterAsset } from '@/esi/endpoints';
 import type { AbyssalAssetEstimates } from '@/features/abyssal/useAbyssalAssetEstimates';
 import { abyssalValueHint } from '@/features/abyssal/abyssalValueHint';

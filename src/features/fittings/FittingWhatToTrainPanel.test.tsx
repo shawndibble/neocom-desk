@@ -5,7 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { EntityInfoRoute } from '@/features/entities';
 import '@/i18n';
 import { db } from '@/db';
-import { normalizePlan } from '@/engine/plan';
+import { normalizePlan } from '@/engine/skills/plan';
 import type { EngineSkill, PlanEntry, TrainedSkill } from '@/engine/types';
 import type { SkillGain } from '@/engine/fittings/skillGains';
 import { newPlan } from '@/features/skills/planner/newPlan';

@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { piFixture } from '@/sde/__fixtures__/pi';
 import type { CharacterPlanet, CharacterPlanetDetail, PlanetPin } from '@/esi/endpoints';
 import { systemAdvice } from './systemPlanetModel';
+import { DAY_MS } from '@/lib/age';
 
-const DAY_MS = 86_400_000;
 const INSTALL = Date.parse('2026-09-01T00:00:00Z');
 /** Mid-program for every fixture extractor below (`extractorPin`'s 14-day program), so the existing fixtures read as still running unless a test says otherwise. */
 const NOW = INSTALL + 3 * DAY_MS;

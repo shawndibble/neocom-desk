@@ -43,6 +43,54 @@ describe('createColumnVisibilitySetting', () => {
     await store.getState().hydrate();
     expect(store.getState().value).toEqual(['c']);
   });
+
+  it('falls back to the default on an empty stored list', async () => {
+    const key = freshKey();
+    await db.settings.put({ key, value: [] });
+    const store = createColumnVisibilitySetting({ key, ids: IDS });
+    await store.getState().hydrate();
+    expect(store.getState().value).toEqual(['a', 'b', 'c']);
+  });
+
+  it('honours an empty stored list when allowEmpty is set', async () => {
+    const key = freshKey();
+    await db.settings.put({ key, value: [] });
+    const store = createColumnVisibilitySetting({ key, ids: IDS, allowEmpty: true });
+    await store.getState().hydrate();
+    expect(store.getState().value).toEqual([]);
+  });
+
+  it('with dropUnknown, keeps the known ids and drops the rest', async () => {
+    const key = freshKey();
+    await db.settings.put({ key, value: ['a', 'gone', 'c'] });
+    const store = createColumnVisibilitySetting({ key, ids: IDS, dropUnknown: true });
+    await store.getState().hydrate();
+    expect(store.getState().value).toEqual(['a', 'c']);
+  });
+
+  it('with dropUnknown, falls back to the default when nothing known is left', async () => {
+    const key = freshKey();
+    await db.settings.put({ key, value: ['gone'] });
+    const store = createColumnVisibilitySetting({ key, ids: IDS, dropUnknown: true });
+    await store.getState().hydrate();
+    expect(store.getState().value).toEqual(['a', 'b', 'c']);
+  });
+
+  it('drops retired ids from a stored list instead of rejecting it', async () => {
+    const key = freshKey();
+    await db.settings.put({ key, value: ['a', 'old', 'b'] });
+    const store = createColumnVisibilitySetting({ key, ids: IDS, retired: ['old'] });
+    await store.getState().hydrate();
+    expect(store.getState().value).toEqual(['a', 'b']);
+  });
+
+  it('still rejects a list with an unknown id that is not retired', async () => {
+    const key = freshKey();
+    await db.settings.put({ key, value: ['a', 'old', 'gone'] });
+    const store = createColumnVisibilitySetting({ key, ids: IDS, retired: ['old'] });
+    await store.getState().hydrate();
+    expect(store.getState().value).toEqual(['a', 'b', 'c']);
+  });
 });
 
 describe('useColumnVisibility', () => {

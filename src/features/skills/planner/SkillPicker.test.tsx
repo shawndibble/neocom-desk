@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import type { SkillType } from '@/sde/types';
 import type { TrainedSkill } from '@/engine/types';
-import { buildUnlockIndex } from '@/engine/skillUnlocks';
+import { buildUnlockIndex } from '@/engine/skills/skillUnlocks';
 import type { SkillCatalog } from '../skillMap';
 import { SkillPicker } from './SkillPicker';
 

@@ -52,7 +52,7 @@ _Recorded 2026-09-07._
 
 - **Severity is one shared ladder, not a copy per board.**
   `severityForRemaining` (24h critical, 3d warning, 7d watch, else clear) moved
-  out of `engine/corp/board.ts` into `engine/severity.ts`, and both boards
+  out of `engine/corp/board.ts` into `engine/character/severity.ts`, and both boards
   import it. Duplicating the thresholds was the first plan — cheaper on paper,
   since the corp type had five import sites — but the function itself turned out
   to have no importer outside `engine/corp/`, so the extraction cost one moved

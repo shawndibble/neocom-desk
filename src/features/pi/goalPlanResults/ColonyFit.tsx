@@ -1,4 +1,6 @@
 /** Whether it fits: each colony's role, load against its budget, and slots. */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { cx } from '@/lib/cx';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { InfoTooltip, Panel } from '@/components/ui';
@@ -108,7 +110,7 @@ export function ColonyFit({
                 <span className="truncate text-sm">
                   <ColonyLink planetId={assignment.planetId} names={names} />
                 </span>
-                <span className="shrink-0 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                <span className={cx(eyebrowClassName, 'shrink-0')}>
                   {stepById.get(assignment.planetId)?.kind === 'as-is'
                     ? t('piPlan.roleBaseline')
                     : roleText(assignment.role, t)}

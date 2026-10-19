@@ -128,8 +128,7 @@ export function StockMarketPage({
     return () => {
       cancelled = true;
     };
-    // `list` and `hub` are captured through `loadKey`, which names everything that changes the result.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `list` and `hub` are captured through `loadKey`, which names everything that changes the result
   }, [loadKey]);
 
   // Last good rows stay up while a refresh after an edit runs, so the table doesn't flash —

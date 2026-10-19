@@ -16,10 +16,6 @@ export interface DomainCopy<TFire, TNames> {
 /** Nothing to look up. */
 export type NoNames = Record<string, never>;
 
-export const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
-export const HOUR_MS = 3_600_000;
-export const DAY_MS = 86_400_000;
-
 export function fired(eventId: string, variant: string, vars?: Record<string, unknown>): string {
   return i18n.t(`notifications.fired.${eventId}.${variant}`, vars);
 }
@@ -28,3 +24,5 @@ export function fired(eventId: string, variant: string, vars?: Record<string, un
 export function simple(eventId: string, vars: Record<string, unknown>): NotificationCopy {
   return { title: fired(eventId, 'title'), body: fired(eventId, 'body', vars) };
 }
+
+export { DAY_MS, HOUR_MS } from '@/lib/age';

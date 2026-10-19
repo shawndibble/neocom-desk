@@ -5,10 +5,9 @@
  * has synced after that, so the book holds the day's final quantities.
  */
 import { shiftDate } from '../miningTax/yieldRange';
+import { HOUR_MS } from '@/lib/age';
 
 export const DEFAULT_GRACE_HOURS = 6;
-
-const HOUR_MS = 3_600_000;
 
 export interface DayClosingClock {
   now: string;

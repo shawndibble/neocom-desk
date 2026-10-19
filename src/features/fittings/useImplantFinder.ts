@@ -1,3 +1,4 @@
+import { idSetKey } from '@/lib/idSetKey';
 /**
  * The Implant Finder's engine half: tries implants and boosters on the open
  * Fitting and works out where to get them, so the window can say "this one
@@ -199,8 +200,7 @@ async function runBaselines(
 }
 
 function setKey(set: FittingImplantSet): string {
-  const sorted = (ids: readonly number[] | undefined) =>
-    [...(ids ?? [])].sort((a, b) => a - b).join(',');
+  const sorted = (ids: readonly number[] | undefined) => idSetKey(ids ?? []);
   return `${sorted(set.implants)}|${sorted(set.boosters)}|${sorted(set.boosterSideEffects)}`;
 }
 

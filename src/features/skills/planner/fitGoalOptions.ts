@@ -3,7 +3,7 @@
  * the active Character under this plan, from `evaluateFitGoal`.
  */
 import { evaluateFitGoal } from '@/engine/fitGoal';
-import { stepKey, type StepKey } from '@/engine/skillPlanSchedule';
+import { stepKey, type StepKey } from '@/engine/skills/skillPlanSchedule';
 import type { PlanEntry, ScheduledStep } from '@/engine/types';
 import type { FitGoalNeed } from './useFitGoalNeeds';
 

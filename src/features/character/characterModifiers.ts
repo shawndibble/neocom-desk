@@ -1,3 +1,4 @@
+import { idSetKey } from '@/lib/idSetKey';
 /**
  * The one feature-side place that gathers a Character's snapshot — corrected
  * trained skills plus active-clone implants — and turns it into Character
@@ -64,7 +65,7 @@ export function useCharacterModifiersByCharacter(
   const [modifiersByCharacter, setModifiersByCharacter] = useState<
     ReadonlyMap<number, CharacterModifiers>
   >(new Map());
-  const key = [...characterIds].sort((a, b) => a - b).join(',');
+  const key = idSetKey(characterIds);
 
   useEffect(() => {
     let cancelled = false;

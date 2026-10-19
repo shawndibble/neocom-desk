@@ -3,7 +3,7 @@ import { Tooltip } from '@/components/ui';
 import { focusRingClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import * as Icon from '@/components/ui/icons';
-import type { MilestoneState, MilestoneStatus } from '@/engine/skillPlanMilestones';
+import type { MilestoneState, MilestoneStatus } from '@/engine/skills/skillPlanMilestones';
 import { formatLocalDate } from '@/lib/localDate';
 
 /** An inline row glyph: shared by entry and prereq rows. */

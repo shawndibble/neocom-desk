@@ -1,5 +1,5 @@
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
-import { isSpExtractionReady } from '@/engine/spExtraction';
+import { isSpExtractionReady } from '@/engine/skills/spExtraction';
 import { maxJobSlots, type JobSlotCategory, type JobSlotSkills } from '@/engine/industry/jobSlots';
 import type { CharacterSortStats } from './groups';
 import type { QueueInfo } from './rosterView';

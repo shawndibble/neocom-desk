@@ -16,7 +16,7 @@
  * names get resolved — the engine ranks, it does not look anything up.
  */
 
-import { severityForRemaining, type DeadlineSeverity } from '../severity';
+import { severityForRemaining, type DeadlineSeverity } from '../character/severity';
 
 /**
  * The kinds of clock the board merges, in the order that breaks a deadline tie.

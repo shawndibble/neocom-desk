@@ -1,5 +1,6 @@
 import { HintText } from '@/components/ui/HintText';
-import { Fragment, lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Fragment, lazy, Suspense, useRef, useState, type ReactNode } from 'react';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { Trans, useTranslation } from 'react-i18next';
 import { Button, Caret, IskAmount, RowMoreActions } from '@/components/ui';
 import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
@@ -668,11 +669,8 @@ export function FittingStatsSections({
   // says on desktop and starts collapsed on a phone.
   const isPhone = useIsPhone();
   const storedSections = useStatsSectionsPreference((state) => state.value);
-  const hydrateSections = useStatsSectionsPreference((state) => state.hydrate);
   const setSections = useStatsSectionsPreference((state) => state.setValue);
-  useEffect(() => {
-    void hydrateSections();
-  }, [hydrateSections]);
+  useHydratedStore(useStatsSectionsPreference);
   const isExpanded = (section: Section) =>
     isSectionExpanded(storedSections, section, {
       isPhone,

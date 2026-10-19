@@ -7,6 +7,7 @@
  *
  * Pure: the Firestore read/write around it lives in `features/share`.
  */
+import { isFiniteNumber } from '../guards';
 import type { AppraisalItem } from './appraisal';
 
 export const APPRAISAL_SNAPSHOT_VERSION = 1;
@@ -66,10 +67,6 @@ export function buildAppraisalSnapshot(input: {
       })),
     },
   };
-}
-
-function isFiniteNumber(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value);
 }
 
 function isPrice(value: unknown): value is number | null {

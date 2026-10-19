@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
@@ -25,13 +26,13 @@ import {
   groupFactoryPins,
   pinRole,
 } from '@/engine/pi/colonyPins';
-import { HOUR_MS, type ColonyCheckRow } from './coloniesModel';
+import type { ColonyCheckRow } from './coloniesModel';
 import { eveClock, hoursLabel, schematicOutputTypeId } from './coloniesFormat';
 import { quickWinLine } from './coloniesText';
 import { Sentence } from '../sentence';
+import { DAY_MS, HOUR_MS } from '@/lib/age';
 
-const MICRO = 'text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
-const DAY_MS = 86_400_000;
+const MICRO = eyebrowClassName;
 
 /** Units a day a reinstall would recover right now, from `engine/pi/extraction`'s own curve. */
 function resetGainPerDay(program: ExtractorYieldProgram, nowMs: number): number {

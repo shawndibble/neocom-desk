@@ -1,4 +1,6 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -127,22 +129,17 @@ export function Calendar() {
 
   const density = useCalendarDensity((state) => state.value);
   const setDensity = useCalendarDensity((state) => state.setValue);
-  const hydrateDensity = useCalendarDensity((state) => state.hydrate);
   const hiddenKinds = useCalendarHiddenKinds((state) => state.value);
   const setHiddenKinds = useCalendarHiddenKinds((state) => state.setValue);
-  const hydrateHiddenKinds = useCalendarHiddenKinds((state) => state.hydrate);
   const skillPlanChoices = useCalendarSkillPlans((state) => state.value);
   const setSkillPlanChoices = useCalendarSkillPlans((state) => state.setValue);
-  const hydrateSkillPlanChoices = useCalendarSkillPlans((state) => state.hydrate);
   const weekStart = useCalendarWeekStart((state) => state.value);
-  const hydrateWeekStart = useCalendarWeekStart((state) => state.hydrate);
-
-  useEffect(() => {
-    void hydrateDensity();
-    void hydrateHiddenKinds();
-    void hydrateSkillPlanChoices();
-    void hydrateWeekStart();
-  }, [hydrateDensity, hydrateHiddenKinds, hydrateSkillPlanChoices, hydrateWeekStart]);
+  useHydratedStore(
+    useCalendarDensity,
+    useCalendarHiddenKinds,
+    useCalendarSkillPlans,
+    useCalendarWeekStart
+  );
 
   // The loader reads the choice from Dexie itself, so the write must land
   // before the reload that reads it.
@@ -442,9 +439,7 @@ export function Calendar() {
             {isNarrow ? (
               <Panel padded className="w-full">
                 <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                    {periodLabel}
-                  </span>
+                  <span className={eyebrowClassName}>{periodLabel}</span>
                   {periodControls}
                 </div>
                 <CalendarDayTicker

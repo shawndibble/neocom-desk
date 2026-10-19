@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { evaluateFitGoal } from '@/engine/fitGoal';
-import { normalizePlanWithBoundaries } from '@/engine/plan';
-import { stepKey, type SkillPlanSchedule, type StepKey } from '@/engine/skillPlanSchedule';
+import { normalizePlanWithBoundaries } from '@/engine/skills/plan';
+import { stepKey, type SkillPlanSchedule, type StepKey } from '@/engine/skills/skillPlanSchedule';
 import {
   milestoneKey,
   milestoneStates,
   nextMilestone,
   type MilestoneStatus,
-} from '@/engine/skillPlanMilestones';
+} from '@/engine/skills/skillPlanMilestones';
 import type { EngineSkill, PlanStep, TrainedSkill } from '@/engine/types';
 import type { SkillPlanRecord } from '@/db';
 import { fitGoalOptions, isFitGoalPickable, type FitGoalOption } from './fitGoalOptions';

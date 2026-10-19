@@ -31,8 +31,9 @@ import { inlineLinkClassName, tappableRowClassName } from '@/components/ui/contr
 import { AlertsWhenClosedSection } from './AlertsWhenClosedSection';
 import { NotificationEventList } from './NotificationEventList';
 import type { EventRowContext } from './eventRowSupport';
-import { useIsDesktop } from './useIsDesktop';
+import { MD_UP_QUERY, useMediaQuery } from '@/lib/useMediaQuery';
 import { db } from '@/db';
+import { useCharacters } from '@/features/character/useCharacters';
 import { NOTIFICATION_EVENT_IDS, eventLabelKey } from './events';
 import {
   useNotificationPreferences,
@@ -69,22 +70,25 @@ import { useUrlParam } from '@/lib/useUrlState';
 import { textParam } from '@/lib/urlState';
 import { androidNotificationSettingsUrl, isPlayStoreApp } from '@/lib/playStoreApp';
 import { assignLocation } from '@/app/navigation';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 /** Module scope so `useUrlParam` sees a stable codec identity across renders. */
 const SEARCH_PARAM = textParam();
 
 export function NotificationsPanel() {
   const { t } = useTranslation();
-  const characters = useLiveQuery(() => db.characters.orderBy('characterId').toArray());
+  const roster = useCharacters();
+  const characters = useMemo(
+    () => [...roster].sort((a, b) => a.characterId - b.characterId),
+    [roster]
+  );
   const tokens = useLiveQuery(() => db.tokens.toArray());
 
   const prefsValue = useNotificationPreferences((state) => state.value);
   // Types the server has seen for each Character (issue #3755): a toggle for
   // one appears the next time Settings opens, so this is read, not awaited.
   const seenEveTypes = useSeenEveTypesStore((state) => state.value);
-  useEffect(() => {
-    void useSeenEveTypesStore.getState().hydrate();
-  }, []);
+  useHydratedStore(useSeenEveTypesStore);
   const extraTypesByCharacter = useMemo(
     () =>
       new Map(
@@ -119,9 +123,7 @@ export function NotificationsPanel() {
   const setPromptState = useNotificationPromptState((state) => state.setValue);
   const pushFailure = usePushFailure((state) => state.value);
   const [retrying, setRetrying] = useState(false);
-  useEffect(() => {
-    void usePushFailure.getState().hydrate();
-  }, []);
+  useHydratedStore(usePushFailure);
 
   // Records the ask here too, so someone who ignored the one-time explainer and
   // came to Settings instead is not offered it again on the next load.
@@ -153,7 +155,7 @@ export function NotificationsPanel() {
 
   const [search, setSearch] = useUrlParam('search', SEARCH_PARAM);
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
-  const isDesktop = useIsDesktop();
+  const isDesktop = useMediaQuery(MD_UP_QUERY);
 
   const scopesByCharacterId = useMemo(() => {
     const map = new Map<number, ReadonlySet<string>>();
@@ -180,7 +182,7 @@ export function NotificationsPanel() {
 
   useEffect(() => {
     let cancelled = false;
-    const ids = (characters ?? []).map((c) => c.characterId);
+    const ids = characters.map((c) => c.characterId);
     if (ids.length === 0) return;
     void (async () => {
       const entries = await Promise.all(
@@ -212,7 +214,7 @@ export function NotificationsPanel() {
   // separate ticks, and rendering Characters before their tokens arrive drew
   // every row scope-less for a frame.
   const characterList = useMemo(
-    () => (characters !== undefined && tokens !== undefined ? characters : []),
+    () => (tokens !== undefined ? characters : []),
     [characters, tokens]
   );
 

@@ -1,3 +1,4 @@
+import { romanLevel } from '@/engine/projection';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Caret, FilterChip, LiveStatus, SearchInput } from '@/components/ui';
@@ -12,6 +13,7 @@ import { cx } from '@/lib/cx';
 import type { SkillType } from '@/sde/types';
 import type { PlanEntry, TrainedSkill } from '@/engine/types';
 import { rankedSearch } from '@/lib/rankedSearch';
+import { useDebouncedValue } from '@/lib/useDebouncedValue';
 import { SkillRequirementsList } from '../SkillRequirementsList';
 import { buildSkillRequirements } from '../skillRequirements';
 import type { SkillCatalog } from '../skillMap';
@@ -31,11 +33,7 @@ function isVerticallyInViewport(el: Element): boolean {
 /** How long the visible confirmation stays up before fading back to sr-only. */
 const ANNOUNCEMENT_VISIBLE_MS = 5000;
 
-const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
 const MAX_RESULTS = 20;
-/** Debounce for the skill search, matching Market.tsx's catalogue search — a fast typist doesn't re-rank ~500 skills on every keystroke. */
-const SEARCH_DEBOUNCE_MS = 250;
-
 interface SkillPickerProps {
   skills: readonly SkillType[];
   catalog: SkillCatalog;
@@ -71,7 +69,7 @@ export function SkillPicker({
   const [query, setQuery] = useState('');
   // Debounced separately from `query`: the input itself stays instantly
   // responsive, only the ~500-skill re-rank below waits out the debounce.
-  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useDebouncedValue(query);
   const [selected, setSelected] = useState<number | null>(null);
   const [activeGroups, setActiveGroups] = useState<Set<string>>(new Set());
   const [announcement, setAnnouncement] = useState('');
@@ -108,11 +106,6 @@ export function SkillPicker({
     setJumpTargetId(isVerticallyInViewport(el) ? null : el.id);
     setPendingJumpElementId(null);
   }, [pendingJumpElementId, planEntries]);
-
-  useEffect(() => {
-    const id = setTimeout(() => setDebouncedQuery(query), SEARCH_DEBOUNCE_MS);
-    return () => clearTimeout(id);
-  }, [query]);
 
   /**
    * Ranked over every skill rather than capped at MAX_RESULTS, so a group
@@ -271,8 +264,8 @@ export function SkillPicker({
               {selected === skill.typeID && (
                 <div className="space-y-2 px-2 pb-2">
                   <div className="flex flex-wrap gap-1">
-                    {ROMAN.map((roman, i) => {
-                      const level = i + 1;
+                    {[1, 2, 3, 4, 5].map((level) => {
+                      const roman = romanLevel(level);
                       const trainedLevel = trainedSkills.get(skill.typeID)?.level ?? 0;
                       // The highest of this skill's rows, not the first one:
                       // a plan holds one entry per level, so `find` reports

@@ -36,8 +36,7 @@ import { toEngineExtraction, type SettlePayment, type SyncExtraction } from './s
 import type { TaxRate } from './rates';
 import type { ObservedMiningEntry, OreLine } from './types';
 import type { DayPrices } from './valuation';
-
-const DAY_MS = 86_400_000;
+import { DAY_MS } from '@/lib/age';
 
 export interface BookViewInput {
   corporationId: number;

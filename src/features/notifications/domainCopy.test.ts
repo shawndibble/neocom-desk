@@ -28,6 +28,7 @@ import {
   priceAlertCopy,
   communityRequestPledgedCopy,
 } from './domainCopy';
+import { DAY_MS, HOUR_MS } from '@/lib/age';
 
 const C = 1;
 const cloneJump = {
@@ -37,8 +38,6 @@ const cloneJump = {
   readyAtMs: 1,
 } as const;
 const PILOT = 'Kestrel';
-const HOUR_MS = 3_600_000;
-const DAY_MS = 86_400_000;
 
 interface Case {
   name: string;

@@ -90,7 +90,7 @@ export interface MarketWideDayRow extends MarketWideResultRow {
 }
 
 /** Every product typeID `marketWideTrees.json` carries a tree for. */
-export function marketWideProductTypeIds(trees: MarketWideTreeMap): number[] {
+function marketWideProductTypeIds(trees: MarketWideTreeMap): number[] {
   return Object.keys(trees).map(Number);
 }
 

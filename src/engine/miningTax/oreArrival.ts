@@ -9,9 +9,7 @@
  * Pure: the caller persists the log and supplies every timestamp.
  */
 import { entryKey } from './types';
-
-const HOUR_MS = 60 * 60 * 1000;
-const DAY_MS = 24 * HOUR_MS;
+import { DAY_MS, HOUR_MS } from '@/lib/age';
 
 /**
  * How long after the last growth an entry may still grow — ESI's longest

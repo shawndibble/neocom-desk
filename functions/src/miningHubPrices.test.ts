@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   MINING_PRICES_MAX_DAYS,
-  SNAPSHOT_HUBS,
-  StationPriceFold,
   expiredMiningMonthKeys,
   groupByMonthObject,
   keepMiningDaysFrom,
@@ -11,6 +9,7 @@ import {
   miningPricesR2Key,
   stationFoldWrites,
 } from './miningHubPrices.js';
+import { SNAPSHOT_HUBS, StationPriceFold } from './marketOpenPrices.js';
 
 const JITA = 60003760;
 const AMARR = 60008494;
@@ -55,6 +54,16 @@ describe('stationFoldWrites', () => {
     const f = new StationPriceFold(SNAPSHOT_HUBS, [34]);
     f.add(JITA, 34, true, 5);
     expect(stationFoldWrites(f, SNAPSHOT_HUBS, '2026-10-17')).toEqual([
+      { hubId: 'jita', date: '2026-10-17', day: { tier: 'saved', prices: { 34: [5, null] } } },
+    ]);
+  });
+
+  it('keeps only the mining types when the fold holds every type (the open-prices fold)', () => {
+    const f = new StationPriceFold(SNAPSHOT_HUBS);
+    f.add(JITA, 34, true, 5);
+    f.add(JITA, 587, true, 9);
+    f.add(AMARR, 587, true, 9);
+    expect(stationFoldWrites(f, SNAPSHOT_HUBS, '2026-10-17', [34])).toEqual([
       { hubId: 'jita', date: '2026-10-17', day: { tier: 'saved', prices: { 34: [5, null] } } },
     ]);
   });

@@ -1,3 +1,4 @@
+import { DAY_MS } from '@/lib/age';
 /**
  * Overdue (D19, D29): an unsettled Statement goes Overdue N days (14 by
  * default) after it is issued; no interest, reminders are manual. A miner's
@@ -12,8 +13,6 @@ export const DEFAULT_OVERDUE_DAYS = 14;
 export const DECLARATION_PAUSE_DAYS = 14;
 /** A rejected declaration leaves at least this long before Overdue. */
 export const REJECTION_GRACE_DAYS = 14;
-
-const DAY_MS = 86_400_000;
 
 export interface Declaration {
   id: string;

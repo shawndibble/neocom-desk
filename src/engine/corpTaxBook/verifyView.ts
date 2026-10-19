@@ -4,6 +4,7 @@
  * names (ore, refinery, corporation) and number formatting stay in the page.
  */
 import type { TaxPriceSource } from '../miningTax/priceBasis';
+import { DAY_MS } from '@/lib/age';
 
 /** What `readCorpTaxBookStatementCallable` returns (functions/src/corpTaxBookStore.ts). */
 export interface VerifyPayload {
@@ -91,8 +92,6 @@ export function verifyRows(lines: readonly VerifyPayloadLine[]): VerifyRow[] {
     reason: line.reason,
   }));
 }
-
-const DAY_MS = 86_400_000;
 
 /** The UTC date a Statement is due: `overdueDays` after it was issued (D19). */
 export function dueDate(issuedAt: string, overdueDays: number): string {

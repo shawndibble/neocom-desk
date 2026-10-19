@@ -11,6 +11,7 @@
  * a mode flag. Sorting is left to `DataTable`'s column sort, same as there —
  * this only narrows the row set.
  */
+import { median } from '../math';
 import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
 
 /** How the seller priced it: a fixed ask, or bids-with-optional-buyout. */
@@ -246,8 +247,5 @@ export function contractOfferPriceSummary(
     .map((row) => offerAskingPrice(row, plexPrice))
     .sort((a, b) => a - b);
   if (prices.length === 0) return { offerCount: rows.length, cheapest: null, median: null };
-  const middle = prices.length >> 1;
-  const median =
-    prices.length % 2 === 1 ? prices[middle] : (prices[middle - 1] + prices[middle]) / 2;
-  return { offerCount: rows.length, cheapest: prices[0], median };
+  return { offerCount: rows.length, cheapest: prices[0], median: median(prices) };
 }

@@ -1,14 +1,13 @@
+import { romanLevel } from '@/engine/projection';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal } from '@/components/ui';
 import type { OptimizeForMeResult, RemapSegment } from '@/engine/optimizer';
-import type { StepKey } from '@/engine/skillPlanSchedule';
+import type { StepKey } from '@/engine/skills/skillPlanSchedule';
 import type { Implants, PlanStep } from '@/engine/types';
 import { formatCountdown } from '@/lib/duration';
 import { yearlyRemapAfterNote } from './optimizeHelpers';
 import type { OptimizeVerdict } from './optimizeVerdict';
 import { remapInstruction } from './remapInstruction';
-
-const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
 
 interface RemapSegmentListProps {
   segments: readonly RemapSegment[];
@@ -186,7 +185,7 @@ export function OptimizeForMeModal({
                 key={`${step.skillTypeID}-${step.level}-${i}`}
                 className="border-b border-line py-1 last:border-b-0"
               >
-                {nameFor(step.skillTypeID)} {ROMAN[step.level - 1]}
+                {nameFor(step.skillTypeID)} {romanLevel(step.level)}
               </li>
             ))}
           </ul>

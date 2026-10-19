@@ -1,3 +1,4 @@
+import { romanLevel } from '@/engine/projection';
 import { useEffect, useMemo, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -130,8 +131,6 @@ const GROUP_SEARCH_PARAM = textParam();
 /** Pause before the match count is announced to a screen reader. */
 const SEARCH_ANNOUNCE_DEBOUNCE_MS = 250;
 
-const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
-
 /** Every SDE skill for the active character, grouped by SDE group, with SP + attributes. */
 export function Skills() {
   const { t } = useTranslation();
@@ -165,7 +164,7 @@ export function Skills() {
   const trainingChip = training && (
     <span className="shrink-0 text-[0.6875rem] whitespace-nowrap text-accent tabular-nums">
       {t('skills.trainingChip', {
-        level: ROMAN[training.targetLevel - 1] ?? training.targetLevel,
+        level: romanLevel(training.targetLevel),
         time: formatCountdown(training.secondsRemaining),
       })}
     </span>
