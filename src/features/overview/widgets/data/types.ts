@@ -6,7 +6,7 @@
  * here knows about React, Dexie or fetch, so the adapters stay testable with
  * plain fixtures.
  */
-import type { DeadlineSeverity } from '@/engine/severity';
+import type { DeadlineSeverity } from '@/engine/character/severity';
 import type { EsiEndpointId } from '@/esi/registry';
 import type { StockBoardData } from '@/features/stockTargets/stockBoard';
 import type { ExtractionPrices } from '@/features/character/useExtractionPrices';
@@ -21,7 +21,7 @@ import type {
   PlanetaryBoardData,
   PriceAlertsBoardData,
   StructuresBoardData,
-} from '../../boardData';
+} from '../../data/boardData';
 import type { IncursionsBoardData } from '../../incursionsBoard';
 import type { BoardDeadline } from '../nextDeadline';
 import type { WidgetStateInput } from '../state';

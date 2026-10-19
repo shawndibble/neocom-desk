@@ -4,7 +4,7 @@
 
 import { db, type CharacterRecord } from '@/db';
 import { purgeCharacterCacheOrSuppress } from '@/esi/cachePurge';
-import { clearPullCursors, ownerHashKey, tombstoneKey, writeTombstones } from './localBookkeeping';
+import { clearPullCursors, ownerHashKey, tombstoneKey } from './localBookkeeping';
 import { EDITABLE_COLLECTIONS } from './syncedCollections';
 
 /**
@@ -16,28 +16,43 @@ export async function handleOwnerHashChange(character: CharacterRecord): Promise
   const key = ownerHashKey(character.characterId);
   const stored = await db.settings.get(key);
   if (stored !== undefined && stored.value !== character.ownerHash) {
-    // Every editable collection, whatever its removal rule: this is the
-    // previous owner's data, not a Character the pilot chose to drop.
-    for (const collection of EDITABLE_COLLECTIONS) {
-      await db.table(collection.table).where('characterId').equals(character.characterId).delete();
-    }
-    for (const collection of EDITABLE_COLLECTIONS) {
-      await writeTombstones(tombstoneKey(collection, character.characterId), []);
-    }
-    // The new owner's docs can carry an `updatedAt` below the previous owner's
-    // high-water mark, so a surviving cursor would hide them entirely.
-    await clearPullCursors(character.characterId);
-    // Feed rows themselves survive a transfer (they are this device's archive
-    // of what it saw, and carry no tombstones), but the new owner's remote
-    // collection has never held any of them — so the claim `syncedAt` makes
-    // is now false for every one of them, and leaving it set would keep them
-    // off the new uid forever.
-    await db.notificationFeed
-      .where('characterId')
-      .equals(character.characterId)
-      .modify((row) => {
-        delete row.syncedAt;
-      });
+    // One transaction: a crash mid-wipe must not leave rows gone but their
+    // tombstones or pull cursors still the previous owner's. Dexie work only —
+    // nothing here awaits Firestore or the network.
+    const tables = [
+      ...EDITABLE_COLLECTIONS.map((collection) => db.table(collection.table)),
+      db.settings,
+      db.notificationFeed,
+    ];
+    await db.transaction('rw', tables, async () => {
+      // Every editable collection, whatever its removal rule: this is the
+      // previous owner's data, not a Character the pilot chose to drop.
+      await Promise.all(
+        EDITABLE_COLLECTIONS.map((collection) =>
+          db.table(collection.table).where('characterId').equals(character.characterId).delete()
+        )
+      );
+      await db.settings.bulkPut(
+        EDITABLE_COLLECTIONS.map((collection) => ({
+          key: tombstoneKey(collection, character.characterId),
+          value: [],
+        }))
+      );
+      // The new owner's docs can carry an `updatedAt` below the previous
+      // owner's high-water mark, so a surviving cursor would hide them entirely.
+      await clearPullCursors(character.characterId);
+      // Feed rows themselves survive a transfer (they are this device's archive
+      // of what it saw, and carry no tombstones), but the new owner's remote
+      // collection has never held any of them — so the claim `syncedAt` makes
+      // is now false for every one of them, and leaving it set would keep them
+      // off the new uid forever.
+      await db.notificationFeed
+        .where('characterId')
+        .equals(character.characterId)
+        .modify((row) => {
+          delete row.syncedAt;
+        });
+    });
     // Cached wallet/mail/assets belong to the previous owner just as much as
     // the plans do. `auth/session` purges on the same signal at login; this
     // covers a transfer noticed between logins. Degrades rather than throws

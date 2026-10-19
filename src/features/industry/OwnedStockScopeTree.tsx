@@ -1,3 +1,5 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { cx } from '@/lib/cx';
 import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Caret, Checkbox } from '@/components/ui';
@@ -142,10 +144,7 @@ export function OwnedStockScopeTree({
     return (
       <li key={key}>
         {heading && (
-          <p
-            id={headingId}
-            className="px-1 pt-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
-          >
+          <p id={headingId} className={cx(eyebrowClassName, 'px-1 pt-1')}>
             {heading}
           </p>
         )}

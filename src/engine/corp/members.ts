@@ -17,8 +17,7 @@
  * Engine-native shapes only (ARCHITECTURE.md): epoch milliseconds in, never
  * ESI's ISO strings — `features/corp/members.ts` adapts at the boundary.
  */
-
-const DAY_MS = 86_400_000;
+import { DAY_MS } from '@/lib/age';
 
 /**
  * Default days without a login after which a member is called dark.

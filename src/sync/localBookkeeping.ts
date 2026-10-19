@@ -41,7 +41,7 @@ export const tombstoneKey = (
  * {@link clearPullCursors} can drop them with a single range scan — which also
  * reaches the Notification Feed's cursor, a collection with no tombstones.
  */
-export const PULL_CURSOR_PREFIX = `${INTERNAL_PREFIX}pullCursor.`;
+const PULL_CURSOR_PREFIX = `${INTERNAL_PREFIX}pullCursor.`;
 export const pullCursorKey = (characterId: number, collectionName: string): string =>
   `${PULL_CURSOR_PREFIX}${characterId}.${collectionName}`;
 
@@ -93,10 +93,6 @@ export async function clearPullCursors(characterId: number): Promise<void> {
 export async function readTombstones(key: string): Promise<LocalTombstone[]> {
   const record = await db.settings.get(key);
   return Array.isArray(record?.value) ? (record.value as LocalTombstone[]) : [];
-}
-
-export async function writeTombstones(key: string, tombstones: LocalTombstone[]): Promise<void> {
-  await db.settings.put({ key, value: tombstones });
 }
 
 /**

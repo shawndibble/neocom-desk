@@ -86,7 +86,8 @@ export interface NavPage {
 }
 
 /** The Corp Capabilities a Corp sub-view is gated on — hidden, not locked, without one. */
-export type CorpViewCapability = 'canReadMembers' | 'canReadWallet' | 'canReadAssets';
+export type CorpViewCapability =
+  'canReadMembers' | 'canReadWallet' | 'canReadAssets' | 'canReadMiningLedger';
 
 export interface NavSubView {
   readonly path: AppRoutePath;
@@ -141,6 +142,7 @@ export const NAV_PAGES = [
       { path: '/corp/members', labelKey: 'corp.membersTab', corpCapability: 'canReadMembers' },
       { path: '/corp/wallet', labelKey: 'corp.walletTab', corpCapability: 'canReadWallet' },
       { path: '/corp/assets', labelKey: 'corp.assetsTab', corpCapability: 'canReadAssets' },
+      { path: '/corp/moons', labelKey: 'corp.moonsTab', corpCapability: 'canReadMiningLedger' },
     ],
   },
   {

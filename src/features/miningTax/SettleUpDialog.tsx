@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -22,12 +23,14 @@ import { formatLocalDate } from '@/lib/localDate';
 import { unmaskNumber } from '@/lib/numberMask';
 import { buildSettleUpReason, formatDateRange } from './groupRows';
 import { settle, type PaymentInput } from './ledgerActions';
+import { systemLabel } from './names';
 import { PayeeOpenInEveButton } from './PayeeOpenInEveButton';
 import { allocateOldestFirst } from './settleAllocation';
 import { useLedgerAction } from './useLedgerAction';
 import { LedgerActionError } from './LedgerActionError';
 import { OreArrivalNotice } from './OreArrivalNotice';
 import type { SettleUpRecheck } from './useSettleUpRecheck';
+import { toggleInSet } from '@/lib/sets';
 
 export interface SettleUpRow {
   assignment: MiningTaxAssignmentRecord;
@@ -63,7 +66,7 @@ function shortEveRange(sortedDates: readonly string[]): string {
   return formatDateRange([sortedDates[0], sortedDates[sortedDates.length - 1]]);
 }
 
-const FIELD_LABEL = 'text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
+const FIELD_LABEL = eyebrowClassName;
 
 /**
  * Settle up (issue #523's lump-sum payment flow), on one screen: the itemized
@@ -127,18 +130,12 @@ export function SettleUpDialog({
   }));
 
   const sortedDates = included.map((r) => r.assignment.date).sort();
-  const systemName = (solarSystemId: number) =>
-    systemNames.get(solarSystemId) ?? `#${String(solarSystemId)}`;
+  const systemName = (solarSystemId: number) => systemLabel(systemNames, solarSystemId);
   const systems = [...new Set(included.map((r) => systemName(r.assignment.solarSystemId)))];
   const reason = buildSettleUpReason(t('miningTax.settleUpReasonPrefix'), systems, sortedDates);
 
   function toggle(id: string) {
-    setExcluded((previous) => {
-      const next = new Set(previous);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+    setExcluded((previous) => toggleInSet(previous, id));
   }
 
   /** Ticks exactly `keep`, out of the entries in `base`. */

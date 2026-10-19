@@ -19,6 +19,7 @@
  * Log scope decision), not full order-level accounting.
  */
 
+import { clamp } from '../math';
 import { brokerFee, salesTax } from '@/engine/industry/fees';
 import type { ResolvedStandings } from '@/engine/market/standings';
 
@@ -116,7 +117,7 @@ export function soldUnitsMargin(inputs: SoldUnitsMarginInputs): SoldUnitsMargin 
 
 function lostUnitsCost(totalCost: number, quantity: number, quantityLost: number): number {
   if (quantity <= 0) return 0;
-  return (totalCost / quantity) * Math.min(Math.max(quantityLost, 0), quantity);
+  return (totalCost / quantity) * clamp(quantityLost, 0, quantity);
 }
 
 export interface RunLossInputs {

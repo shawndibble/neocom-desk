@@ -3673,7 +3673,7 @@
         "caption": "A live order book with jumps from you"
       },
       "skills": {
-        "alt": "The Skills page: the skill in training with its time left, the queue grouped by this week and the next three weeks, and the character\u2019s attributes.",
+        "alt": "The Skills page: the skill in training with its time left, the queue grouped by this week and the next three weeks, and the character’s attributes.",
         "caption": "A training queue you can read at a glance"
       },
       "mail": {
@@ -3796,7 +3796,7 @@
       },
       "token": {
         "name": "Your login stays on this device",
-        "desc": "Your login's refresh token lives in this device's own storage — never on a server, never in a log. Logging in to sync exchanges one short-lived access token and never the refresh token. Remove a character and it goes with it. One opt-in exception: if you turn on Alerts when closed for a character, our server keeps a separate, encrypted token that can read only that character's notifications. Turn it off, or remove the character, and it is deleted."
+        "desc": "Your login's refresh token lives in this device's own storage — never on a server, never in a log. Logging in to sync exchanges one short-lived access token and never the refresh token. Remove a character and it goes with it. One opt-in exception: if you turn on Alerts when closed for a character, our server keeps a separate, encrypted token that can read only that character's notifications. Turn it off, or remove the character, and it is deleted. The other: if a CEO, Director or Accountant turns on Automatic sync for a corporation's Corp Tax Book, our server keeps a separate, encrypted token for that officer's character, limited to the book's reads, until they or the CEO turn it off."
       },
       "offline": {
         "name": "Your data stays when the signal goes",
@@ -3842,7 +3842,7 @@
       },
       "stores": {
         "q": "What does it store, and where?",
-        "a": "What it reads from EVE stays on this device. What you make in the app, such as Skill Plans and Build Plans, syncs between your devices filed under your character's EVE ID, never a name or an email address. The exceptions: alerts you have seen, push and Alerts when closed if you turn them on (your login token stays on this device, apart from Alerts when closed), anything you choose to share with a Community, and Share Links you create (readable by anyone with the link, for 7 days)."
+        "a": "What it reads from EVE stays on this device. What you make in the app, such as Skill Plans and Build Plans, syncs between your devices filed under your character's EVE ID, never a name or an email address. The exceptions: alerts you have seen, push and Alerts when closed if you turn them on (your login token stays on this device, apart from Alerts when closed and a Corp Tax Book's Automatic sync), anything you choose to share with a Community, and Share Links you create (readable by anyone with the link, for 7 days)."
       },
       "delete": {
         "q": "Can I leave and delete my data?",
@@ -5272,13 +5272,13 @@
     }
   },
   "common": {
+    "unknownType": "Type {{id}}",
     "needsConnection": "Needs a connection",
     "opensInNewTab": "(opens in a new tab)",
     "pricesUnavailableOffline": "Prices unavailable offline",
     "pricesUnavailable": "Prices unavailable right now",
     "iskAmountHint": "= {{amount}} ISK",
     "iskInvalid": "Not an ISK amount. Try 1.5b, 500m or 1,000,000.",
-    "unknownType": "Type {{id}}",
     "columnsButton": "Columns",
     "columnsMenuTitle": "Columns",
     "resetColumns": "Reset to default",
@@ -5635,9 +5635,17 @@
       "previewHint": "Approximate: the game's chat font is not monospaced, so the edges line up better there.",
       "border": "Border",
       "borderStyle": "Border style",
-      "borders": { "single": "Single", "double": "Double" },
+      "borders": {
+        "single": "Single",
+        "double": "Double"
+      },
       "ores": "Ores",
-      "oreModes": { "off": "None", "top2": "Top 2", "top3": "Top 3", "all": "All" },
+      "oreModes": {
+        "off": "None",
+        "top2": "Top 2",
+        "top3": "Top 3",
+        "all": "All"
+      },
       "rows": "Rows",
       "eta": "ETA",
       "bar": "Progress bar",
@@ -5919,6 +5927,91 @@
     "payeesSelected_one": "{{count}} payee",
     "payeesSelected_other": "{{count}} payees",
     "payeeOptionWithCharacter": "{{payee}} ({{character}})",
+    "corpBook": {
+      "payeeName": "{{corp}} (Corp Tax Book)",
+      "grouping": {
+        "title": "A corporation wants to group a character of yours",
+        "ask": "{{corp}} grouped {{name}} with {{main}} so one Statement and one payment cover them. Only you can agree, and you can say no.",
+        "confirm": "Confirm {{name}}",
+        "decline": "No, remove it",
+        "failed": "Couldn't save that. Try again."
+      },
+      "state": {
+        "pending": "Pending corp record",
+        "billed": "Billed",
+        "sentWaiting": "Sent, waiting for the corp",
+        "sentWaitingShort": "Sent, waiting",
+        "conflict": "Conflict",
+        "unattributed": "Unattributed",
+        "dismissed": "Dismissed by corp"
+      },
+      "hint": {
+        "pending": "{{corp}} has not closed this day in its book yet. Until it does, your own allocation applies and nothing is owed to the corp.",
+        "billed": "{{corp}}'s Corp Tax Book decides this day.",
+        "sentWaiting": "You sent this to {{corp}}. It shows as paid once the corp's book credits it.",
+        "conflict": "You gave this ore to another Payee, and {{corp}}'s book also recorded it. It is not owed; it resolves to {{corp}} on {{date}} unless you sort it out first.",
+        "unattributed": "No Corp Tax Book claims this ore, so nobody is owed for it.",
+        "dismissed": "{{corp}} dismissed this day: {{reason}}",
+        "paid": "Credited by {{corp}}'s book."
+      },
+      "sync": {
+        "safe": "Safe to pay — {{date}} is closed ({{corp}} synced {{ago}}).",
+        "safeOnce": "Safe to pay once {{corp}} syncs (last synced {{ago}}).",
+        "neverSynced": "Safe to pay once {{corp}} syncs (never synced).",
+        "openDay": "{{date}}: safe to pay once it is closed, after {{time}} UTC on {{closeDate}} and {{corp}}'s next sync.",
+        "inFlight": "{{amount}} ISK sent, waiting for {{corp}} to credit it.",
+        "credit": "{{amount}} ISK credit with {{corp}} goes on your next Statement.",
+        "left": "You left {{corp}}. Its book still shows your lines and what you owe."
+      },
+      "diff": {
+        "open": "Compare with the book…",
+        "title": "{{date}} · you and the book",
+        "you": "You",
+        "book": "Book",
+        "differs": "differs",
+        "quantity": "Quantity ({{ore}})",
+        "priceBasis": "Price basis",
+        "basis": "{{hub}} buy, {{form}}",
+        "rate": "Rate",
+        "tax": "Tax",
+        "explain": "Book rate {{pct}}% is the {{scope}}, effective {{from}}. Once {{date}} is Billable, the book's quantity, price and rate decide what you owe {{corp}}. Raise a difference with an officer."
+      },
+      "disputed": {
+        "rate": "Disputed: you {{you}}%, book {{book}}%",
+        "quantity": "Disputed: you {{you}}, book {{book}}",
+        "both": "Disputed: quantity and rate differ"
+      },
+      "rateScope": {
+        "corp": "corp rate",
+        "guest": "guest rate",
+        "miner": "per-Miner rate",
+        "moon": "per-moon rate",
+        "record": "correction for this day"
+      },
+      "detail": {
+        "bookAndYou": "{{book}} (book) · {{you}} (you)",
+        "priced": "{{hub}} buy · {{form}} ore · {{pct}}% {{scope}} from {{from}}",
+        "onStatement": "It is on {{corp}}'s Statement, which never changes.",
+        "decides": "The book decides this day: it is Billable ({{corp}} synced {{ago}}, after its grace period) and goes on {{corp}}'s next Statement.",
+        "terms": "Terms are locked to the book: {{hub}} buy, {{form}} ore, {{pct}}% {{scope}} from {{from}}.",
+        "disputeHint": "Your own record differs from the book."
+      },
+      "pay": {
+        "title": "Pay {{corp}}",
+        "amount": "Send",
+        "copy": "Copy",
+        "copied": "Copied.",
+        "how": "Send it as a donation from your wallet to {{corp}}, into division {{division}}. The corp's book finds it in its own wallet journal and credits it; nothing is recorded here.",
+        "code": "{{period}} Statement: put this code in the donation's reason to pin it to that Statement.",
+        "noCode": "No code is needed: the donation credits you, oldest day first."
+      },
+      "claim": {
+        "title": "A donation to {{corp}} is not matched to you",
+        "detail": "{{amount}} ISK sent on {{date}} from {{character}}. Claim it to credit it to you; only you and {{corp}}'s officers can see it.",
+        "action": "Claim",
+        "failed": "The claim did not go through. Try again."
+      }
+    },
     "status": {
       "unassigned": "Unassigned",
       "needsReview": "Needs Review",
@@ -5926,7 +6019,7 @@
       "paid": "Paid",
       "dismissed": "Dismissed"
     },
-    "needsReviewHint": "This entry grew after you settled it. Open the row to review the new total.",
+    "needsReviewHint": "More ore showed up for this entry. Open the row to review the new total.",
     "selectRow": "Select {{date}}, {{system}}",
     "selectionCount": "{{count}} selected",
     "selectAllAction": "Select all",
@@ -8535,8 +8628,6 @@
     "wholeContractMarker": "Whole contract",
     "emptyTitle": "No public BPC listings synced yet",
     "emptyHint": "The public contract index refreshes on its own schedule — check back shortly.",
-    "notConfiguredTitle": "Public BPC search isn't available",
-    "notConfiguredHint": "This requires the app's sync backend, which isn't configured here.",
     "noFilterMatches": "No BPC listings match your filters.",
     "noFilterMatchesHint": "Clear the item search or widen the region, ME/TE/runs, price, source and space filters.",
     "suggestionsLabel": "Matching blueprints",
@@ -9466,8 +9557,11 @@
       "StructuresJobsCancelled": "Industry Jobs Cancelled",
       "StructureLowReagentsAlert": "Structure Low on Reagents",
       "StructureNoReagentsAlert": "Structure Out of Reagents",
+      "MoonminingExtractionStarted": "Moon Extraction Started",
       "MoonminingExtractionFinished": "Moon Extraction Ready",
+      "MoonminingLaserFired": "Moon Drill Fired",
       "MoonminingAutomaticFracture": "Moon Chunk Fractured",
+      "MoonminingExtractionCancelled": "Moon Extraction Cancelled",
       "CorpAllBillMsg": "Corporation Bill Issued",
       "BillOutOfMoneyMsg": "Bill Could Not Be Paid",
       "CorpOfficeExpirationMsg": "Corporation Office Expiring",
@@ -9649,6 +9743,19 @@
             "body": "{{character}}: assets at {{structure}} are at risk — the structure is close to being abandoned.",
             "bodyWithDays_one": "{{character}}: assets at {{structure}} are at risk — the structure is abandoned in {{count}} day.",
             "bodyWithDays_other": "{{character}}: assets at {{structure}} are at risk — the structure is abandoned in {{count}} days."
+          },
+          "MoonminingExtractionStarted": {
+            "title": "Moon extraction started",
+            "body": "{{character}}: a moon extraction started at {{structure}}.",
+            "bodyWithReady": "{{character}}: a moon extraction started at {{structure}}; the chunk arrives {{ready}}."
+          },
+          "MoonminingLaserFired": {
+            "title": "Moon drill fired",
+            "body": "{{character}}: the moon drill at {{structure}} was fired and the chunk fractured."
+          },
+          "MoonminingExtractionCancelled": {
+            "title": "Moon extraction cancelled",
+            "body": "{{character}}: the moon extraction at {{structure}} was cancelled."
           },
           "MoonminingExtractionFinished": {
             "title": "Moon extraction ready",
@@ -10305,6 +10412,10 @@
       "seriesBoth": "Buy / Sell",
       "seriesBuy": "Buy",
       "seriesSell": "Sell",
+      "seriesAverage": "Average",
+      "averageNoOrderData": "Average Price (no order data)",
+      "regionAverageNoOrderData": "{{region}} average (no order data)",
+      "noOrderDataTip": "Buy and Sell lines are the best orders at the five Trade Hub stations (Jita 4-4, Amarr VIII, Dodixie IX-20, Rens VI-8, Hek VIII-12); other regions show EVE's daily traded average.",
       "summaryBuyMedian": "Median buy",
       "summarySellMedian": "Median sell",
       "compareRegions": "Compare regions",
@@ -11141,7 +11252,7 @@
     "deviceDeleteUnpurged_one": "The synced data for {{names}} could not be deleted from the sync server (offline, or the login has expired). The server deletes it automatically after 90 days without a sync. Every other character's synced data is already deleted. Finish deleting to erase this device's data.",
     "deviceDeleteUnpurged_other": "The synced data for {{names}} could not be deleted from the sync server (offline, or the logins have expired). The server deletes it automatically after 90 days without a sync. Every other character's synced data is already deleted. Finish deleting to erase this device's data.",
     "faq": {
-      "storeIntro": "We store what you make in the app. What we read from EVE stays on this device. The exceptions are listed below: alerts you have seen, push and Alerts when closed if you turn them on, anything you choose to share with a Community, and Share Links you create.",
+      "storeIntro": "We store what you make in the app. What we read from EVE stays on this device. The exceptions are listed below: alerts you have seen, push and Alerts when closed if you turn them on, a Corp Tax Book's Automatic sync if an officer turns it on, anything you choose to share with a Community, and Share Links you create.",
       "groups": {
         "using": "Using Neocom Desk",
         "data": "Your data"
@@ -11217,7 +11328,7 @@
           "walletHistory": "A year of wallet journal and transactions, longer than the 30 days EVE returns. Not in backups.",
           "jobHistory": "Delivered industry jobs, kept after ESI stops returning them. Removed with the Character.",
           "login": "Your EVE login token.",
-          "loginNote": "It never leaves this device. Alerts when closed is the one opt-in exception: it keeps a separate, encrypted, notifications-only token on our server for each character you turn it on for, deleted when you turn it off or remove the character.",
+          "loginNote": "It never leaves this device. Alerts when closed is the one opt-in exception: it keeps a separate, encrypted, notifications-only token on our server for each character you turn it on for, deleted when you turn it off or remove the character. A Corp Tax Book's Automatic sync is the other: an officer who turns it on leaves a separate, encrypted token with a few corporation reads on our server, deleted when they or the CEO turn it off or they lose the role.",
           "preferences": "Display settings (text size, time format) and the sorts, filters and sections each page remembers.",
           "ansiblex": "Route Safety's Ansiblex jump gate list, and whether Route Safety uses it. Structure access is private alliance information, so it never leaves this device."
         },
@@ -11906,6 +12017,7 @@
       "timersEmpty": "No structure is on a timer.",
       "moons": "Moon chunks",
       "moonsEmpty": "No moon drill is running.",
+      "openMoons": "Open Moons",
       "jobs": "Industry jobs",
       "jobsEmpty": "No job is waiting.",
       "nothingDue": "Nothing due: {{kinds}}",
@@ -11919,6 +12031,12 @@
       "showMore_one": "Show {{count}} more",
       "showMore_other": "Show {{count}} more",
       "showFewer": "Show fewer"
+    },
+    "moonsTab": "Moons",
+    "moons": {
+      "title": "Moons",
+      "noAccessTitle": "Moons need the Accountant role",
+      "noAccessHint": "EVE only opens the refinery ledger to an Accountant, Director or CEO, so the Corp Tax Book is not available to your roles."
     }
   },
   "publicInfo": {
@@ -12029,8 +12147,6 @@
     "clearItem": "Clear item",
     "emptyTitle": "No public contracts synced yet",
     "emptyHint": "The public contract index refreshes on its own schedule — check back shortly.",
-    "notConfiguredTitle": "Contract search isn't available",
-    "notConfiguredHint": "This requires the app's sync backend, which isn't configured here.",
     "noFilterMatches": "No public contracts match your filters.",
     "noFilterMatchesHint": "Clear the item search or widen the region, price and quantity filters.",
     "mobile": {
@@ -12139,9 +12255,8 @@
     "courierNoFilterMatchesUnplacedHint": "Some hauls end at a structure this app cannot place, so they carry no space band and a narrowed Destination space filter leaves them out. Select every band to see them again.",
     "loadingOffers": "Loading public contracts, this may take a moment.",
     "searchFirstTitle": "Search to see contract offers",
-    "searchFirstHint": "Type an item name or set a filter — a region, a price ceiling or a jump range all count. The offers are downloading in the background.",
-    "downloadProgress": "Downloading offers… {{done}} of {{total}}",
-    "downloadStarting": "Downloading offers…",
+    "searchFirstHint": "Type an item name or set a filter — a region, a price ceiling or a jump range all count.",
+    "downloadStarting": "Loading the offer index…",
     "loadingCourier": "Loading courier contracts, this may take a moment.",
     "namingTypes": "Loading item names…",
     "refreshingInBackground": "Refreshing in the background…",
@@ -12250,6 +12365,10 @@
     "unconfirmed": "The connection timed out. Couldn't confirm it opened in EVE — check your client."
   },
   "travel": {
+    "zkillFailure": {
+      "offline": "Couldn't reach zKillboard. Check your connection, then try again.",
+      "rateLimited": "zKillboard is rate-limiting requests. Try again shortly."
+    },
     "incursions": {
       "title": "Incursions near you",
       "show": "Show incursions",
@@ -13186,132 +13305,6 @@
       "dataAgeNote": "Connections come from EVE-Scout's volunteer scouts and are refreshed every 5 minutes."
     }
   },
-  "styleguide": {
-    "interactionGrammar": {
-      "title": "Interaction grammar (§6c)",
-      "intro": "One cue per intent. Each item names its DESIGN.md §6c rule; compare the rendering to the rule to spot drift.",
-      "groups": {
-        "links": "Links",
-        "explain": "Explain and edit",
-        "carets": "Carets and openers",
-        "menusRows": "Menus and rows",
-        "states": "States"
-      },
-      "rules": {
-        "accentText": "Accent text: clickable (entity links)",
-        "inlineLink": "Solid underline at rest: link inside a sentence",
-        "textAction": "Text action: performs an action",
-        "externalLink": "Trailing external icon: leaves Neocom Desk",
-        "hintText": "Dotted underline: has a tooltip (HintText)",
-        "communityMark": "Community icon with a tooltip: another Member shared this Fitting",
-        "infoTooltip": "? circle: explains a term (InfoTooltip)",
-        "chartPoint": "Highlighted column or dot on a chart: hover or tap reads that point (ChartHover)",
-        "addPreview": "Readout under the Add panel list: hover or keyboard-focus a module row to see what adding it changes (never on touch)",
-        "infoButton": "ⓘ IconButton: opens Show Info or an explanation modal",
-        "pencil": "Faint pencil after a value: edit in place",
-        "assumed": "Amber warning mark: a default you have not confirmed",
-        "myOrder": "Person glyph left of a price: an order of yours",
-        "iskAmount": "IskAmount: B/M/K suffix, exact value on hover or tap",
-        "rowCaret": "Trailing CaretRight on a row: goes to another page (RowCaret)",
-        "disclosureCaret": "Leading caret that rotates: expands in place",
-        "pagerCarets": "Paired carets in IconButtons: pages",
-        "dialogOpener": "… ending a label: dialog needing input or confirmation",
-        "rowMenu": "⋮: a row's menu of two or more real actions",
-        "menuOpensDialog": "Menu item that opens a dialog: focus comes back to the menu button",
-        "tabCount": "Round count badge after a tab label: how many things the tab holds",
-        "selectedRow": "Accent 2px left border: selected row",
-        "stateRest": "Rest: variants",
-        "stateHoverPressed": "Hover and pressed",
-        "stateFocus": "Focus-visible",
-        "stateHighlighted": "Highlighted option",
-        "stateDisabled": "Disabled",
-        "offlineStrip": "Slim strip with a cloud-slash glyph: you're offline, saved data below",
-        "needsConnection": "Dimmed login control with a \"Needs a connection\" tooltip",
-        "stateLoading": "Loading (Button loading)",
-        "stateSelected": "Selected / on (aria-pressed)",
-        "stateSelectedSegment": "Selected segment",
-        "fieldCaret": "CaretDown in field chrome (a box sized like a field): opens a list to pick from",
-        "pending": "Hourglass: pending, awaiting an answer"
-      },
-      "notes": {
-        "textAction": "Actions only. Navigation is a link or a row.",
-        "iskAmount": "Hover, focus or tap reveals the exact figure.",
-        "dialogOpener": "Ellipsis on the first. A button that only shows a window has none.",
-        "rowMenu": "Only where the row has two or more actions nothing else reaches. Right-click and touch-and-hold open the same menu.",
-        "menuOpensDialog": "The dialog opens after the menu closes (useOpenAfterMenu). Open it with the keyboard and press Escape.",
-        "tabCount": "Part of the tab's name (Members 12). Never a control, a status or a waiting count.",
-        "selectedRow": "Click a row. Selected never looks like hover.",
-        "states": "Hover, pressed and focus can't be forced on real components. Try them on the samples below.",
-        "hoverPressed": "Hover with a pointer: one step brighter. Press and hold: a step darker.",
-        "highlighted": "Open any menu or picker with the keyboard and press ArrowDown: 2px accent outline inside the option, shown here whenever the last input was the keyboard. A pointer keeps only the fill.",
-        "focus": "Press Tab: 2px accent outline, outset on boxed controls and inline links.",
-        "disabled": "opacity-40. aria-disabled keeps the tooltip reachable.",
-        "offlineStrip": "In flow at the top of the page, never fixed. Polite live region; gone on reconnect.",
-        "needsConnection": "Wrap any control that starts EVE's login in NeedsConnection: offline, the press would strand an installed app.",
-        "selectedToggle": "On takes the accent tint.",
-        "selectedSegment": "Selected takes the accent tint and a 2px accent underline.",
-        "fieldCaret": "The box is a control (§6); the caret says it opens a list."
-      },
-      "samples": {
-        "tabsLabel": "Community",
-        "tabContent": "Blueprints",
-        "tabMembers": "Members",
-        "segmentOn": "Selected",
-        "segmentOff": "Idle",
-        "option": "Option",
-        "character": "Character name",
-        "skill": "Skill name",
-        "sentenceBefore": "A link",
-        "inlineLink": "inside",
-        "sentenceAfter": "a sentence.",
-        "textAction": "Clear filters",
-        "addToCalendar": "Add to Google Calendar",
-        "hintText": "Truncated name",
-        "hintContent": "The full name, in a tooltip.",
-        "communityMark": "Shared in a Community",
-        "communityMarkContent": "Shared by Bob in Pals. Last updated 1 Oct 2026.",
-        "chartLast": "This week",
-        "chartPrev": "Last week",
-        "chartNet": "Net",
-        "term": "Material efficiency",
-        "infoLabel": "About material efficiency",
-        "infoContent": "Percent of materials saved per run.",
-        "showInfo": "Show info",
-        "addPreviewName": "Damage Control II",
-        "editableValue": "Fleet name",
-        "assumedFee": "Assuming NPC station fees",
-        "myOrder": "5.50",
-        "rowLink": "Open the page",
-        "disclosure": "Details",
-        "previous": "Previous month",
-        "next": "Next month",
-        "renameDialog": "Rename…",
-        "showWindow": "Show info",
-        "tableLabel": "Row menu sample",
-        "selectableLabel": "Selected row sample",
-        "nameHeader": "Ship",
-        "menuItem": "Rename",
-        "menuItemDuplicate": "Duplicate",
-        "menuDialogTrigger": "Plan actions",
-        "menuDialogItem": "Delete…",
-        "menuDialogTitle": "Delete plan",
-        "menuDialogBody": "Press Escape: focus returns to the menu button.",
-        "ghost": "Ghost",
-        "primary": "Primary",
-        "danger": "Danger",
-        "boxed": "Boxed control",
-        "disabled": "Disabled",
-        "ariaDisabled": "aria-disabled",
-        "signIn": "Log in with EVE",
-        "signInOffline": "Log in with EVE (offline)",
-        "saving": "Saving",
-        "toggleOn": "Toggle on",
-        "toggleOff": "Toggle off",
-        "region": "Region",
-        "pending": "RSVP pending"
-      }
-    }
-  },
   "stockTargets": {
     "status": {
       "out": "Out",
@@ -13497,6 +13490,885 @@
       "needsCharacter": "Pick a character first: Build Groups belong to one.",
       "groupTitle": "New Build Group",
       "groupConfirm": "Create group"
+    }
+  },
+  "corpTaxBook": {
+    "verify": {
+      "title": "Your Statement",
+      "readOnly": "Read-only · no login needed",
+      "goneTitle": "This link is not valid",
+      "goneHint": "Check that you copied the whole link from the mail. If it still fails, ask the corporation's officers for a fresh Statement.",
+      "failedTitle": "Couldn't load this Statement",
+      "failedHint": "Check your connection and try again.",
+      "theCorp": "the corporation",
+      "refinery": "Refinery {{id}}",
+      "eyebrow": "{{corp}} · Statement {{period}} · issued {{issued}}",
+      "closed": "This account is closed. {{corp}} sent a final Statement and will not mail you again.",
+      "mined": "What you mined",
+      "minedMeta": "{{hub}} buy, {{form}} ore, priced on the day mined",
+      "oreForm": {
+        "compressed": "Compressed",
+        "raw": "raw"
+      },
+      "linesLabel": "Statement lines",
+      "correction": "Correction",
+      "lateOre": "Late ore",
+      "billed": "Billed",
+      "paymentsTitle": "Payments credited",
+      "noPayments": "No payments have been credited to this Statement yet.",
+      "source": {
+        "donation": "Donation to the corporation",
+        "manual": "Recorded by an officer"
+      },
+      "balanceDue": "Balance due",
+      "balanceSum": "Billed {{billed}} − paid {{paid}}.",
+      "dismissed": "{{amount}} was waived by an officer.",
+      "writtenOff": "{{amount}} short of the Statement was written off.",
+      "howToPay": "Donate ISK to {{corp}}; any of your characters counts.",
+      "payCodeLead": "Put the code",
+      "payCodeTail": "in the reason to pin a donation to this Statement.",
+      "settled": "This Statement is settled.",
+      "declaration": "You told {{corp}} on {{date}} that you paid another way.",
+      "declarationPending": "An officer will confirm it.",
+      "termsTitle": "Terms",
+      "term": {
+        "rate": "Rate",
+        "price": "Price",
+        "due": "Due",
+        "minimum": "Minimum Statement",
+        "paying": "Paying"
+      },
+      "rateFrom": "{{pct}}%, effective {{date}}",
+      "rateNoDate": "{{pct}}%",
+      "rateOverride": "Some days carry an officer's logged rate correction.",
+      "priceBasis": "{{hub}} buy, {{form}} ore, on the day mined",
+      "dueValue": "{{date}} ({{days}} days after issue)",
+      "minimumValue": "{{amount}}; smaller balances roll into the next Statement",
+      "payingValue": "Donate to {{corp}}; any of your characters counts",
+      "grouping": {
+        "title": "A character is waiting to join this account",
+        "intro": "{{corp}} grouped a character with this account so one Statement and one payment cover them. Only that character can agree, by logging in with it.",
+        "confirm": "Confirm {{name}}",
+        "signIn": "Log in as {{name}} to confirm",
+        "whySignIn": "This link only proves the mail reached you. Logging in with EVE proves the character is yours.",
+        "decline": "Not mine, remove it",
+        "confirmed": "{{name}} is now part of this account.",
+        "declined": "{{name}} was removed from this account. The corporation can see your answer.",
+        "failed": "Couldn't save that. Try again."
+      },
+      "stop": {
+        "label": "Stop reminders",
+        "hint": "Your monthly Statement still comes. Officers can send you at most one reminder per Statement.",
+        "failed": "Couldn't save that. Try again."
+      }
+    },
+    "mailQueue": {
+      "title": "Statement mail",
+      "minutes_one": "{{count}} minute",
+      "minutes_other": "{{count}} minutes",
+      "chip": {
+        "label": "Statements",
+        "progress": "{{sent}} of {{total}}",
+        "sent": "sent",
+        "aria": "Statement mail: {{percent}}% sent",
+        "ariaDone": "Statement mail: {{percent}}% sent, done",
+        "ariaFailed": "{{count}} failed"
+      },
+      "summary": {
+        "sending": "Sending {{current}} of {{total}}",
+        "done": "Done",
+        "sent": "{{count}} sent",
+        "paused": "{{count}} paused",
+        "waiting": "{{count}} waiting",
+        "failed": "{{count}} failed",
+        "left": "about {{time}} left",
+        "progressLabel": "Statements sent",
+        "runningNote": "One mail every 12–15 seconds, in the background. It keeps going while the app is open in any tab; if you close every tab it waits and picks up where it left off when you next open the app.",
+        "doneNote": "Every mail is logged on its Miner. Retry a failure, or open it in EVE to send it by hand."
+      },
+      "table": {
+        "label": "Send queue",
+        "to": "To",
+        "statement": "Statement",
+        "status": "Status",
+        "reminder": "Reminder"
+      },
+      "status": {
+        "sent": "Sent",
+        "sending": "Sending",
+        "paused": "Paused",
+        "waiting": "Waiting",
+        "failed": "Failed"
+      },
+      "hold": {
+        "rateLimit": "EVE asked us to wait {{seconds}}s (too many mails)",
+        "offline": "Waiting for a connection"
+      },
+      "failure": {
+        "cspa": "{{name}} charges to receive mail. Open it in EVE to send it by hand.",
+        "auth": "EVE refused the mail permission. Log in again, then retry.",
+        "other": "EVE refused: {{detail}}",
+        "otherNoDetail": "EVE refused the mail."
+      },
+      "actions": {
+        "retry": "Retry",
+        "retryLabel": "Retry mail to {{name}}",
+        "openInEve": "Open in EVE",
+        "openInEveLabel": "Open mail to {{name}} in EVE",
+        "clearDone": "Clear sent mail",
+        "close": "Close"
+      },
+      "notice": {
+        "line_one": "EVE lets a character send about 5 mails a minute, so this mail takes about {{minutes}}.",
+        "line_other": "EVE lets a character send about 5 mails a minute, so {{count}} mails take about {{minutes}}.",
+        "detail": "They go out in the background{{from}}. Keep using the app; a chip at the top of every page shows progress. If you close the tab the queue picks up where it left off when you next open the app.",
+        "from": " from {{name}}"
+      },
+      "preview": {
+        "title": "Preview mail",
+        "to": "To",
+        "subject": "Subject",
+        "previous": "Previous Miner",
+        "next": "Next Miner",
+        "position": "{{position}} of {{count}}",
+        "summarised": "This mail is summarised to fit EVE’s 10,000-character limit; the verify link has every line."
+      },
+      "panelTitle": "Statement mail queue"
+    },
+    "moons": {
+      "title": "Moons",
+      "tabs": {
+        "extractions": "Extractions",
+        "miners": "Miners",
+        "statements": "Statements"
+      },
+      "neverSynced": "Never synced",
+      "syncedBy": "Synced {{age}} by {{name}}",
+      "scheduledBy": "Scheduled sync ({{name}})",
+      "syncNow": "Sync now",
+      "viewOnly": "You can view this book. Syncing it needs the Accountant role, and editing needs Director or Accountant.",
+      "syncing": "Syncing…",
+      "failed": "Couldn't load the Corp Tax Book",
+      "declared": "Declared paid, overdue paused",
+      "overdueDays_one": "Overdue {{count}} day",
+      "overdueDays_other": "Overdue {{count}} days",
+      "moreCharacters_one": "+{{count}} character",
+      "moreCharacters_other": "+{{count}} characters",
+      "oreUnknown": "Ore unknown — link a survey",
+      "minedVsLeft": "{{mined}}% mined · {{left}}% left",
+      "startedOn": "started {{date}}",
+      "state": {
+        "extracting": "Extracting",
+        "ready": "Ready",
+        "fractured": "Fractured",
+        "expired": "Expired",
+        "cancelled": "Cancelled"
+      },
+      "standing": {
+        "member": "Member",
+        "guest": "Guest",
+        "left": "Left corp"
+      },
+      "dayStatus": {
+        "paid": "Paid",
+        "on-statement": "On a Statement",
+        "unbilled": "Not on a Statement yet",
+        "not-billable": "Not Billable yet",
+        "dismissed": "Dismissed",
+        "written-off": "Written off"
+      },
+      "periodStatus": {
+        "issued": "Issued",
+        "sent": "Sent",
+        "overdue": "Overdue",
+        "paid": "Paid",
+        "ready": "Ready to send",
+        "open": "Open"
+      },
+      "payment": {
+        "donation": "Donation",
+        "manual": "Recorded by hand",
+        "markNotTax": "Mark not tax…",
+        "markedNotTax": "{{amount}} marked not tax",
+        "oldestFirst": "Oldest debt first"
+      },
+      "cols": {
+        "moon": "Refinery",
+        "state": "State",
+        "when": "When",
+        "ore": "Ore",
+        "estValue": "Est. value",
+        "mined": "Mined vs left",
+        "minedShort": "Mined",
+        "miner": "Miner",
+        "units": "Units",
+        "value": "Value",
+        "tax": "Tax",
+        "fractured": "Fractured",
+        "taxRecorded": "Tax recorded",
+        "miners": "Miners",
+        "inCorp": "In corp",
+        "owed": "Owed",
+        "overdue": "Overdue",
+        "unbilled": "Not on a Statement yet",
+        "credit": "Credit",
+        "lastPaid": "Last paid",
+        "day": "Day",
+        "refinery": "Refinery",
+        "character": "Character",
+        "rate": "Rate",
+        "status": "Status",
+        "from": "From",
+        "amount": "Amount",
+        "creditedTo": "Credited to",
+        "period": "Period",
+        "billed": "Billed",
+        "paid": "Paid",
+        "outstanding": "Outstanding",
+        "issued": "Issued"
+      },
+      "chips": {
+        "inChunks": "Est. value in chunks",
+        "inChunksTip": "Chunks still there to mine; Expired ones are not counted",
+        "owed": "Owed",
+        "overdue": "Overdue",
+        "overdueValue_one": "{{amount}} · {{count}} Miner",
+        "overdueValue_other": "{{amount}} · {{count}} Miners",
+        "unbilled": "Not on a Statement yet",
+        "credit": "Credit held"
+      },
+      "timeline": {
+        "title": "Timeline",
+        "hint": "A row opens the moon's page",
+        "now": "Now",
+        "empty": "No chunk in this window.",
+        "legend": {
+          "extracting": "Extracting",
+          "ready": "Ready",
+          "fractured": "Fractured, minable",
+          "expired": "Expired"
+        }
+      },
+      "moon": {
+        "notFound": "This extraction is not in the book",
+        "thisExtraction": "This extraction",
+        "dismiss": "Dismiss tax for this extraction…",
+        "started": "Started",
+        "arrived": "Chunk arrived",
+        "fractured": "Fractured",
+        "fieldGone": "Field gone",
+        "about": "about {{at}}",
+        "oreFrom": "Ore from",
+        "source": {
+          "notification": "Extraction notification",
+          "survey": "Linked Survey (estimate)",
+          "unknown": "Ore unknown"
+        },
+        "rate": {
+          "measured_one": "Estimated at this refinery's measured {{rate}} m³/h, from {{count}} extraction",
+          "measured_other": "Estimated at this refinery's measured {{rate}} m³/h, from {{count}} extractions",
+          "manual": "Estimated at the book's chunk rate, {{rate}} m³/h",
+          "default": "Estimated at the default {{rate}} m³/h"
+        },
+        "link": {
+          "open": "Link a survey…",
+          "change": "Change survey…",
+          "title": "Link a Survey to this chunk",
+          "intro": "No extraction notification gave this chunk's ore. A Moon Ore Survey scanned before the chunk was mined can stand in for it.",
+          "field": "Survey link or id",
+          "confirm": "Link survey",
+          "notFound": "That Survey could not be opened. Check the link, and that it has not expired.",
+          "effect": "The ore is estimated from the Survey's first scan and the chunk rate in Settings; it is an estimate, not what the structure holds."
+        },
+        "whoMined": "Who mined this chunk",
+        "nobody": "Nobody has mined this chunk yet.",
+        "past": "Past extractions",
+        "pastHint": "Earlier cycles, not this one",
+        "noPast": "No earlier cycle is on record for this moon.",
+        "dismissTitle": "Dismiss this extraction's tax?",
+        "dismissIntro": "{{tax}} of tax recorded against this extraction stays on the record as dismissed and can be reversed."
+      },
+      "miners": {
+        "search": "Search Miners or characters…",
+        "searchLabel": "Search Miners",
+        "members": "Members",
+        "nonMembers": "Non-members",
+        "summary": "{{shown}} of {{total}} Miners",
+        "hidden_one": "{{count}} other Miner owes nothing and has no credit.",
+        "hidden_other": "{{count}} other Miners owe nothing and have no credit."
+      },
+      "needs": {
+        "title_one": "Needs you · {{count}}",
+        "title_other": "Needs you · {{count}}",
+        "declaration": {
+          "title": "{{name}} says they paid · {{amount}}",
+          "body": "Declared “paid by {{kind}}” on {{date}}. Overdue is paused for up to 14 days, then resumes on its own.",
+          "kind": {
+            "contract": "contract",
+            "other-division": "another division",
+            "wrong-corp": "the wrong corporation"
+          },
+          "confirm": "Confirm paid…",
+          "reject": "Reject declaration…"
+        },
+        "overdue": {
+          "title": "{{name}} · overdue {{days}} days · {{amount}}",
+          "body": "Statement {{id}} is unpaid past its due date.",
+          "remind": "Send reminder",
+          "dismiss": "Dismiss…"
+        },
+        "unmatched": {
+          "title": "Unmatched donation · {{amount}} from {{name}}",
+          "body": "{{date}}. Not a character any Miner has; the player can claim it, or you can assign it.",
+          "bodyInMiner": "{{date}}. {{name}} is in a Miner now; the next sync assigns it, or you can assign it.",
+          "assign": "Assign to a Miner…",
+          "notTax": "Not tax…"
+        },
+        "leaver": {
+          "title": "{{name}} left the corp · owes {{amount}}",
+          "body": "Still mailed each month. Write it off once it is clear it will not be paid.",
+          "writeOff": "Write off…"
+        },
+        "reminderQueued": "Reminder to {{name}} is in the send queue.",
+        "reminderRefused": {
+          "stopped": "This Miner stopped reminders and has had their one.",
+          "queued": "A reminder for this Statement is already queued.",
+          "missingLink": "This Statement has no verify link yet, so no mail can go."
+        }
+      },
+      "miner": {
+        "notFound": "This Miner is not in the book",
+        "record": "Record payment…",
+        "remind": "Send reminder",
+        "dismissAll": "Dismiss tax…",
+        "closeAccount": "Close account…",
+        "closedNote": "Account closed on {{date}}. Statement mail has stopped; the final Statement and any earlier ones still go out.",
+        "selectDay": "Select {{date}}",
+        "dismissSelected_one": "Dismiss selected ({{count}})…",
+        "dismissSelected_other": "Dismiss selected ({{count}})…",
+        "days": "Days",
+        "daysHint": "Newest first · Billable through {{date}}",
+        "payments": "Payments",
+        "paymentsHint": "Credited oldest debt first",
+        "sum": "Statements {{billed}} − written off {{written}} − payments and dismissals = {{owed}} owed",
+        "dismissals": "Dismissals",
+        "noDismissals": "Nothing has been dismissed.",
+        "scope": {
+          "record": "A day",
+          "miner": "This Miner",
+          "moon": "A moon",
+          "extraction": "An extraction"
+        },
+        "reversed": "reversed",
+        "reverse": "Reverse",
+        "mail": "Mail",
+        "noMail": "No mail has been queued for this Miner.",
+        "activity": "Activity",
+        "activityHint": "Audit log for this Miner, newest first",
+        "unbilledTip": "Billable days not on a Statement yet. {{pending}} more is not Billable yet.",
+        "writtenOff": "Written off",
+        "writtenOffValue_one": "{{tolerance}} + {{count}} line",
+        "writtenOffValue_other": "{{tolerance}} + {{count}} lines",
+        "writtenOffTip": "What payments within tolerance left over, and lines recorded after a Statement was paid ({{late}}). Paid days are closed for good; both are logged."
+      },
+      "activity": {
+        "button": "Activity",
+        "title": "Activity",
+        "empty": "Nothing has been done in the book yet.",
+        "system": "System",
+        "viaScheduled": "scheduled sync",
+        "officersRevoked_zero": "no other officer had access",
+        "officersRevoked_one": "{{count}} officer must re-verify",
+        "officersRevoked_other": "{{count}} officers must re-verify",
+        "actions": {
+          "scheduledSyncOn": "turned on the scheduled sync",
+          "scheduledSyncOff": "turned off the scheduled sync",
+          "scheduledSyncStopped": "had the scheduled sync stopped",
+          "turnOn": "turned the book on",
+          "reclaim": "reclaimed the book",
+          "sync": "synced the book",
+          "addRate": "added a rate",
+          "setRecordRate": "set the rate for one day",
+          "updateSettings": "changed the settings",
+          "recordPayment": "recorded a payment",
+          "markNotTax": "marked a donation as not tax",
+          "assignPayment": "assigned a donation",
+          "dismiss": "dismissed tax",
+          "reverseDismissal": "reversed a dismissal",
+          "setMiner": "grouped characters into a Miner",
+          "unlink": "unlinked a character",
+          "addAdjustment": "added a correction",
+          "writeOff": "wrote off a balance",
+          "rebill": "rebilled from a date",
+          "issueStatement": "issued a Statement",
+          "settleStatements": "settled Statements",
+          "declare": "declared a payment",
+          "resolveDeclaration": "answered a declaration",
+          "recordReminder": "sent a reminder",
+          "recordMail": "mailed a Statement",
+          "stopReminders": "stopped reminders"
+        }
+      },
+      "health": {
+        "gap": "Gap: {{from}} – {{to}}, {{refinery}} — unrecoverable",
+        "gapDetail": "No officer synced in time and ESI no longer returns these days for this refinery. Whatever was mined is missing from the book and cannot be billed.",
+        "unrated_one": "{{count}} day has no rate yet",
+        "unrated_other": "{{count}} days have no rate yet",
+        "unratedDetail": "Add a corp default rate in Settings; those days are not billed until then.",
+        "never": "Never synced",
+        "neverDetail": "Sync the book to pull the refinery ledger, extractions and donations.",
+        "synced": "Last synced {{age}} by {{name}}",
+        "stale": "Last synced {{age}} by {{name}} — the book is going stale",
+        "billableThrough": "Billable through {{date}} (day end + {{hours}}h grace, then a sync). The book warns here once nobody has synced for about 3 days.",
+        "noBillable": "No day is Billable until an officer syncs.",
+        "failed": "The sync failed: {{message}}",
+        "autoGroupFailed": "The sync worked, but grouping this account's Characters failed: {{message}}",
+        "reassignFailed": "The sync worked, but matching earlier unmatched payments to Miners failed: {{message}}",
+        "scheduledStopped": "Automatic sync stopped: {{reason}}",
+        "scheduledStoppedDetail": "Until someone turns it back on in the book's settings (Automatic sync), the book is only as fresh as the last officer sync.",
+        "skipped": {
+          "missing-mining-scope": "The mining scope is not granted, so nothing was synced.",
+          "no-book": "This corporation has no Corp Tax Book to sync.",
+          "not-an-editor": "Only an Accountant or Director can sync the book.",
+          "needs-reauth": "Log in again to sync the book.",
+          "esi-unavailable": "EVE's servers did not answer, so nothing was synced."
+        }
+      },
+      "run": {
+        "title": "{{period}} Statements",
+        "titleNone": "Statements",
+        "billableThrough": "Billable through {{date}}",
+        "nothing": "Nothing to send: every Billable day is on a Statement, or the period has not closed yet.",
+        "check": "Check",
+        "send": "Send",
+        "doneStep": "Done",
+        "done": "(done)",
+        "statements": "Statements",
+        "toSend_one": "{{count}} to send",
+        "toSend_other": "{{count}} to send",
+        "balances": "Balances due",
+        "balancesTip": "Carried from earlier Statements plus this period's lines, less credit",
+        "belowMinimum": "Below {{amount}}",
+        "rollIn_one": "{{count}} rolls into the next",
+        "rollIn_other": "{{count}} roll into the next",
+        "creditApplied": "Credit applied",
+        "billable": "Every day in the period is Billable and priced ({{hub}} buy, {{form}})",
+        "unmailed_one": "{{count}} earlier Statement was issued but never mailed; it goes with this run",
+        "unmailed_other": "{{count}} earlier Statements were issued but never mailed; they go with this run",
+        "unmatched": "An Unmatched donation is not on anyone's Statement until it is assigned",
+        "previewFor": "Preview mail for",
+        "continue": "Continue to send",
+        "preview": "Preview mail",
+        "loadingCorporation": "Loading corporation name…",
+        "sendIntro_one": "{{count}} mail from {{name}}, one per Miner.",
+        "sendIntro_other": "{{count}} mails from {{name}}, one per Miner.",
+        "sendButton_one": "Send {{count}} Statement",
+        "sendButton_other": "Send {{count}} Statements",
+        "back": "Back",
+        "queued_one": "{{count}} Statement is in the send queue.",
+        "queued_other": "{{count}} Statements are in the send queue.",
+        "skipped_one": "{{count}} was already queued or sent.",
+        "skipped_other": "{{count}} were already queued or sent.",
+        "missingLink_one": "{{count}} has no verify link and was not queued.",
+        "missingLink_other": "{{count}} have no verify link and were not queued.",
+        "chipNote": "Every mail's status is in the progress chip at the top of the page.",
+        "again": "Back to Check"
+      },
+      "periods": {
+        "title": "All periods",
+        "meta": "{{cadence}} · minimum {{minimum}}",
+        "writeOffs": "Written off: {{tolerance}} left over by {{toleranceCount}} payments within tolerance (logged), and {{lateCount}} lines recorded after payment, never billed. Both are on each Miner's page."
+      },
+      "scope": {
+        "title": "Allow the refinery ledger",
+        "hint": "The Corp Tax Book reads who mined at your corporation's refineries. That needs one more permission from EVE, and your corporation role is enough to use it.",
+        "action": "Allow mining ledger access"
+      },
+      "off": {
+        "title": "Start a Corp Tax Book",
+        "intro": "Track moon mining tax for the whole corporation: who mined, what they owe, who has paid. Every officer sees the same book.",
+        "notDirector": "A Director has to turn the book on. Ask one to open this page.",
+        "rate": "Corp default tax rate (%)",
+        "hint": "Mining before the start date is kept as history and owes nothing. You can change the rate later; a new rate never reaches back over days already mined.",
+        "confirm": "Turn the book on"
+      },
+      "autoSync": {
+        "title": "Automatic sync",
+        "hint": "Every 6 hours our server syncs this book for you, so it stays current when no officer visits. It reads the refinery ledger, Extractions and moon notifications, and donations into the selected wallet divisions, and settles Statements that donations now cover. It never issues a Statement and never sends mail.",
+        "state": {
+          "off": "Off. The book updates when an officer syncs it.",
+          "on": "On, held by {{name}}.",
+          "stopped": "Stopped: {{reason}}."
+        },
+        "stopped": {
+          "role-lost": "{{name}} no longer has the Accountant, Director or CEO role",
+          "left-corp": "{{name}} left the corporation",
+          "token-revoked": "{{name}}'s EVE authorization was revoked or expired",
+          "esi-refused": "EVE no longer lets {{name}}'s authorization read the mining ledger",
+          "book-off": "the Corp Tax Book was turned off",
+          "grant-unreadable": "the saved grant can't be read — turn it on again",
+          "unknown": "it could not continue"
+        },
+        "neverRan": "It has not run yet; the first run is within 6 hours.",
+        "lastRan": "Last ran {{age}}: {{rows}} ledger rows, {{donations}} new donations, {{settled}} Statements settled.",
+        "couldNotRead": "It could not read {{sources}} that time.",
+        "missing": {
+          "extractions": "Extractions",
+          "donations": "donations"
+        },
+        "lastSkipped": "Last run {{age}} was skipped: {{reason}}.",
+        "skipped": {
+          "esi-unavailable": "EVE's servers did not answer",
+          "esi-refused": "EVE refused the mining ledger to the authorization (it stops if this repeats next run)",
+          "esi-budget": "EVE asked the app to slow down"
+        },
+        "turnOn": "Turn on for {{name}}",
+        "turnOnAgain": "Turn on for {{name}}…",
+        "turnOff": "Turn off",
+        "revoke": "Revoke {{name}}'s grant",
+        "replaces": "This replaces the current holder; one Character holds it per corporation.",
+        "editorsOnly": "Only a CEO, Director or Accountant can turn this on.",
+        "stores": "Turning it on stores an encrypted token for the Character you authorize on our server, limited to the mining ledger, the corporation wallet, notifications, corporation roles and structure locations. Turning it off, or the Character losing the role, deletes it.",
+        "result": {
+          "on": "Automatic sync is on, held by {{name}}.",
+          "mismatch": "You authorized {{authorized}}, but this book's active Character is {{expected}}. Nothing was turned on.",
+          "cancelled": "Cancelled. Nothing was turned on.",
+          "offFailed": "Couldn't turn it off. Try again.",
+          "failed": {
+            "generic": "Couldn't turn on Automatic sync. Try again.",
+            "not-an-editor": "Only a CEO, Director or Accountant can turn on Automatic sync.",
+            "wrong-corp": "That Character is not in this corporation.",
+            "no-book": "This corporation has no active Corp Tax Book.",
+            "wrong-scopes": "EVE did not grant exactly the permissions Automatic sync needs. Try again and keep every box ticked."
+          }
+        }
+      },
+      "settings": {
+        "open": "Corp Tax Book settings",
+        "title": "Corp Tax Book settings",
+        "rates": "Tax rates",
+        "ratesHint": "The most specific rate wins: moon, then Miner, then Guest default, then the corp default. A rate starts on its date and never reaches back.",
+        "rateScope": {
+          "corp": "Corp default",
+          "guest": "Guest default",
+          "miner": "Miner",
+          "moon": "Moon"
+        },
+        "from": "from {{date}}",
+        "rateFor": "Applies to",
+        "moon": "Moon",
+        "pct": "Rate (%)",
+        "effectiveFrom": "Effective from",
+        "addRate": "Add rate",
+        "pricing": "Pricing",
+        "hub": "Trade hub",
+        "oreForm": "Ore Form",
+        "form": {
+          "compressed": "Compressed",
+          "raw": "Raw"
+        },
+        "billing": "Billing",
+        "startDate": "Start date",
+        "grace": "Grace after day end (hours)",
+        "overdue": "Overdue after (days)",
+        "minimum": "Minimum Statement",
+        "cadenceLabel": "Statements",
+        "cadence": {
+          "monthly": "Monthly",
+          "days": "Every N days"
+        },
+        "cadenceDays": "Days per period",
+        "divisions": "Wallet divisions donations are read from",
+        "division": "Division {{n}}",
+        "extractions": "Extractions",
+        "chunk": "Chunk rate (m³ per hour)",
+        "measured_one": "{{name}}: measured {{rate}} m³/h from {{count}} extraction",
+        "measured_other": "{{name}}: measured {{rate}} m³/h from {{count}} extractions",
+        "notMeasured": "{{name}}: not measured yet, uses {{rate}} m³/h",
+        "chunkHint": "Fallback for a refinery with no measured rate. Each refinery's own rate is learned from its Extraction notifications.",
+        "expiry": "Field lasts after fracture, {{name}} (hours)",
+        "approvals": "Approvals",
+        "approvalLimit": "A dismissal above this needs a Director (ISK)",
+        "approvalHint": "Currently {{limit}}. Leave it empty for no limit.",
+        "approvalHintNone": "No limit is set. Leave it empty to keep it that way.",
+        "approvalDirector": "Only a Director sets the approval limit.",
+        "reclaim": {
+          "title": "Ownership",
+          "hint": "As CEO you can reclaim the book at any time.",
+          "open": "Reclaim the book…",
+          "confirmTitle": "Reclaim the book?",
+          "body": "You become the book's owner. Every other officer loses access until they open Moons again and re-verify.",
+          "confirm": "Reclaim the book",
+          "done_zero": "Book reclaimed; no other officer had access",
+          "done_one": "Book reclaimed; {{count}} officer must re-verify",
+          "done_other": "Book reclaimed; {{count}} officers must re-verify"
+        }
+      },
+      "grouping": {
+        "title": "Characters",
+        "hint": "One payment covers them all; mail goes to the main.",
+        "group": "Group with…",
+        "main": "main",
+        "makeMain": "Make main",
+        "unlink": "Unlink",
+        "pending": "waiting for their confirmation",
+        "confirmed": "confirmed by the player",
+        "declined": "declined to join",
+        "declinedByLink": "declined, from the main's Statement link",
+        "outsideCorp": "not in the corporation",
+        "dialogTitle": "Group characters with {{name}}",
+        "dialogIntro": "Pick the Miners whose characters should be billed together.",
+        "mailMain": "Mail goes to",
+        "confirm_one": "Group {{count}} Miner",
+        "confirm_other": "Group {{count}} Miners",
+        "effect": "Their days, Statements and payments are billed as one Miner from now on.",
+        "pendingEffect": "A character outside the corporation is not linked until that player confirms it."
+      },
+      "corrections": {
+        "title": "Corrections",
+        "hint": "Logged under your name; corrections go on the next Statement.",
+        "none": "No correction lines.",
+        "reason": "Reason (logged, shown on the line)",
+        "rate": {
+          "open": "Change a day's rate…",
+          "title": "Change one day's rate",
+          "intro": "Only for a day not yet on a Statement. The change is logged and the day is repriced at once.",
+          "day": "Day",
+          "pickDay": "Pick a day",
+          "pct": "Rate for that day (%)",
+          "confirm": "Set rate",
+          "effect": "{{from}} becomes {{to}}: about {{tax}} of tax."
+        },
+        "adjust": {
+          "open": "Add a correction line…",
+          "title": "Correct {{name}}'s bill",
+          "intro": "Added to the next Statement as its own labelled line.",
+          "kind": "Direction",
+          "credit": "Credit them",
+          "charge": "Charge them",
+          "amount": "Amount",
+          "date": "Day it corrects",
+          "label": "Label on the line",
+          "confirm": "Add {{amount}}",
+          "effect": "A line dated after the next Statement's last day waits for the one after."
+        },
+        "rebill": {
+          "open": "Rebill from date…",
+          "title": "Rebill {{name}}",
+          "intro": "Bills ore that came in late for days not yet paid, on the next Statement.",
+          "from": "From date",
+          "paid": "A paid Statement covers that day. A paid day is closed for good.",
+          "confirm": "Rebill",
+          "effect": "Never reaches a paid Statement.",
+          "director": "Rebilling a corporation member needs a Director."
+        }
+      },
+      "dialogs": {
+        "logged": "Logged under your name with the reason. Your role is checked again when you confirm.",
+        "reasonShown": "Reason (shown to the Miner)",
+        "dismissConfirm": "Dismiss {{amount}}",
+        "dismissDays": {
+          "title_one": "Dismiss {{count}} day of tax?",
+          "title_other": "Dismiss {{count}} days of tax?",
+          "intro": "{{tax}} of tax. The days stay on the record as dismissed and can be reversed."
+        },
+        "close": {
+          "title": "Close {{name}}'s account?",
+          "confirm": "Close account",
+          "intro": "A final Statement bills everything that is Billable, then Statement mail stops for this guest. Their record stays in the book.",
+          "finalStatement": "Final Statement: {{amount}} through {{through}}.",
+          "noStatement": "Nothing left to bill, so there is no final Statement.",
+          "owedAfter": "Still owed afterwards: {{amount}}.",
+          "pending": "{{amount}} of tax on days that are not Billable yet will never be billed.",
+          "creditLabel": "Credit of {{amount}}",
+          "refund": "Refund",
+          "forfeit": "Forfeit",
+          "refundHint": "Credit is refunded by default. Send the ISK back yourself and record it as a payment.",
+          "basis": "Why forfeit",
+          "consent": "Guest agreed",
+          "noReply": "No reply for {{days}} days",
+          "consentNote": "Where and when the guest agreed",
+          "askedAt": "When you asked where to refund it (at least {{days}} days ago)",
+          "notYet": "Credit can be forfeited only with the guest's recorded consent, or once the refund offer has gone unanswered for {{days}} days.",
+          "reason": "Reason (kept in the activity log)",
+          "sendHint": "The final Statement is mailed from the Statements tab."
+        },
+        "dismissMiner": {
+          "title": "Dismiss {{name}}'s tax?",
+          "intro": "Everything this Miner has mined so far is waived. It stays on the record as dismissed and can be reversed."
+        },
+        "record": {
+          "title": "Record a payment for {{name}}",
+          "confirm": "Record {{amount}}",
+          "intro": "For ISK the wallet journal cannot show: a contract, another division, a handover in person. A donation into the corporation's wallet is found on its own.",
+          "amount": "Amount",
+          "paidBy": "Paid by",
+          "note": "Reason (required, shown to the Miner)",
+          "effect": "Credited oldest debt first. An overpayment is held as credit for {{name}}."
+        },
+        "notTax": {
+          "title": "Mark part of a donation as not tax",
+          "confirm": "Mark {{amount}} not tax",
+          "intro": "Donation from {{name}}, {{at}} EVE time, {{amount}}.",
+          "how": "How much of it is not tax",
+          "all": "All {{amount}}",
+          "part": "Part",
+          "amount": "Amount not tax",
+          "reason": "Reason (required)",
+          "effect": "The debt reopens by {{amount}}. What is left stays credited."
+        },
+        "reject": {
+          "title": "Reject {{name}}'s declaration",
+          "intro": "They said they paid {{amount}} by another route. Overdue has been paused since.",
+          "reason": "Reason (required, shown to the Miner)",
+          "confirm": "Reject declaration",
+          "effect": "They get a fresh 14 days before Overdue counts again. Confirm paid instead if the payment turns up."
+        },
+        "assign": {
+          "title": "Assign a donation to a Miner",
+          "confirm": "Assign {{amount}}",
+          "intro": "{{amount}} from {{name}}, {{date}}, reason “{{reason}}”. No Miner has this character yet.",
+          "miner": "Miner",
+          "pick": "Pick a Miner",
+          "effect": "It is credited to that Miner's oldest debt, or held as credit. The player can still claim it themselves from their own lines."
+        },
+        "writeOff": {
+          "title": "Write off {{name}}'s balance",
+          "intro": "{{amount}} is written off and logged. It does not reopen.",
+          "reason": "Reason (required)",
+          "confirm": "Write off {{amount}}"
+        },
+        "reverse": {
+          "title": "Reverse this dismissal?",
+          "intro": "The tax it waived is owed again.",
+          "reason": "Reason (required)",
+          "confirm": "Reverse"
+        }
+      }
+    }
+  },
+  "interactionGrammar": {
+    "title": "Interaction grammar (§6c)",
+    "intro": "One cue per intent. Each item names its DESIGN.md §6c rule; compare the rendering to the rule to spot drift.",
+    "groups": {
+      "links": "Links",
+      "explain": "Explain and edit",
+      "carets": "Carets and openers",
+      "menusRows": "Menus and rows",
+      "states": "States"
+    },
+    "rules": {
+      "accentText": "Accent text: clickable (entity links)",
+      "inlineLink": "Solid underline at rest: link inside a sentence",
+      "textAction": "Text action: performs an action",
+      "externalLink": "Trailing external icon: leaves Neocom Desk",
+      "hintText": "Dotted underline: has a tooltip (HintText)",
+      "communityMark": "Community icon with a tooltip: another Member shared this Fitting",
+      "infoTooltip": "? circle: explains a term (InfoTooltip)",
+      "chartPoint": "Highlighted column or dot on a chart: hover or tap reads that point (ChartHover)",
+      "addPreview": "Readout under the Add panel list: hover or keyboard-focus a module row to see what adding it changes (never on touch)",
+      "infoButton": "ⓘ IconButton: opens Show Info or an explanation modal",
+      "pencil": "Faint pencil after a value: edit in place",
+      "assumed": "Amber warning mark: a default you have not confirmed",
+      "myOrder": "Person glyph left of a price: an order of yours",
+      "iskAmount": "IskAmount: B/M/K suffix, exact value on hover or tap",
+      "rowCaret": "Trailing CaretRight on a row: goes to another page (RowCaret)",
+      "disclosureCaret": "Leading caret that rotates: expands in place",
+      "pagerCarets": "Paired carets in IconButtons: pages",
+      "dialogOpener": "… ending a label: dialog needing input or confirmation",
+      "rowMenu": "⋮: a row's menu of two or more real actions",
+      "menuOpensDialog": "Menu item that opens a dialog: focus comes back to the menu button",
+      "tabCount": "Round count badge after a tab label: how many things the tab holds",
+      "selectedRow": "Accent 2px left border: selected row",
+      "stateRest": "Rest: variants",
+      "stateHoverPressed": "Hover and pressed",
+      "stateFocus": "Focus-visible",
+      "stateHighlighted": "Highlighted option",
+      "stateDisabled": "Disabled",
+      "offlineStrip": "Slim strip with a cloud-slash glyph: you're offline, saved data below",
+      "needsConnection": "Dimmed login control with a \"Needs a connection\" tooltip",
+      "stateLoading": "Loading (Button loading)",
+      "stateSelected": "Selected / on (aria-pressed)",
+      "stateSelectedSegment": "Selected segment",
+      "fieldCaret": "CaretDown in field chrome (a box sized like a field): opens a list to pick from",
+      "pending": "Hourglass: pending, awaiting an answer"
+    },
+    "notes": {
+      "textAction": "Actions only. Navigation is a link or a row.",
+      "iskAmount": "Hover, focus or tap reveals the exact figure.",
+      "dialogOpener": "Ellipsis on the first. A button that only shows a window has none.",
+      "rowMenu": "Only where the row has two or more actions nothing else reaches. Right-click and touch-and-hold open the same menu.",
+      "menuOpensDialog": "The dialog opens after the menu closes (useOpenAfterMenu). Open it with the keyboard and press Escape.",
+      "tabCount": "Part of the tab's name (Members 12). Never a control, a status or a waiting count.",
+      "selectedRow": "Click a row. Selected never looks like hover.",
+      "states": "Hover, pressed and focus can't be forced on real components. Try them on the samples below.",
+      "hoverPressed": "Hover with a pointer: one step brighter. Press and hold: a step darker.",
+      "highlighted": "Open any menu or picker with the keyboard and press ArrowDown: 2px accent outline inside the option, shown here whenever the last input was the keyboard. A pointer keeps only the fill.",
+      "focus": "Press Tab: 2px accent outline, outset on boxed controls and inline links.",
+      "disabled": "opacity-40. aria-disabled keeps the tooltip reachable.",
+      "offlineStrip": "In flow at the top of the page, never fixed. Polite live region; gone on reconnect.",
+      "needsConnection": "Wrap any control that starts EVE's login in NeedsConnection: offline, the press would strand an installed app.",
+      "selectedToggle": "On takes the accent tint.",
+      "selectedSegment": "Selected takes the accent tint and a 2px accent underline.",
+      "fieldCaret": "The box is a control (§6); the caret says it opens a list."
+    },
+    "samples": {
+      "tabsLabel": "Community",
+      "tabContent": "Blueprints",
+      "tabMembers": "Members",
+      "segmentOn": "Selected",
+      "segmentOff": "Idle",
+      "option": "Option",
+      "character": "Character name",
+      "skill": "Skill name",
+      "sentenceBefore": "A link",
+      "inlineLink": "inside",
+      "sentenceAfter": "a sentence.",
+      "textAction": "Clear filters",
+      "addToCalendar": "Add to Google Calendar",
+      "hintText": "Truncated name",
+      "hintContent": "The full name, in a tooltip.",
+      "communityMark": "Shared in a Community",
+      "communityMarkContent": "Shared by Bob in Pals. Last updated 1 Oct 2026.",
+      "chartLast": "This week",
+      "chartPrev": "Last week",
+      "chartNet": "Net",
+      "term": "Material efficiency",
+      "infoLabel": "About material efficiency",
+      "infoContent": "Percent of materials saved per run.",
+      "showInfo": "Show info",
+      "addPreviewName": "Damage Control II",
+      "editableValue": "Fleet name",
+      "assumedFee": "Assuming NPC station fees",
+      "myOrder": "5.50",
+      "rowLink": "Open the page",
+      "disclosure": "Details",
+      "previous": "Previous month",
+      "next": "Next month",
+      "renameDialog": "Rename…",
+      "showWindow": "Show info",
+      "tableLabel": "Row menu sample",
+      "selectableLabel": "Selected row sample",
+      "nameHeader": "Ship",
+      "menuItem": "Rename",
+      "menuItemDuplicate": "Duplicate",
+      "menuDialogTrigger": "Plan actions",
+      "menuDialogItem": "Delete…",
+      "menuDialogTitle": "Delete plan",
+      "menuDialogBody": "Press Escape: focus returns to the menu button.",
+      "ghost": "Ghost",
+      "primary": "Primary",
+      "danger": "Danger",
+      "boxed": "Boxed control",
+      "disabled": "Disabled",
+      "ariaDisabled": "aria-disabled",
+      "signIn": "Log in with EVE",
+      "signInOffline": "Log in with EVE (offline)",
+      "saving": "Saving",
+      "toggleOn": "Toggle on",
+      "toggleOff": "Toggle off",
+      "region": "Region",
+      "pending": "RSVP pending"
     }
   }
 }

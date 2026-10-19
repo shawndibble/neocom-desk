@@ -47,6 +47,10 @@ const snapshotsMock = vi.hoisted(() => ({
   loadPriceSnapshots: vi.fn(),
 }));
 vi.mock('./priceSnapshots', () => snapshotsMock);
+// The server's hub prices are an R2 read; none published here.
+vi.mock('@/features/market/hubSnapshot', () => ({
+  loadHubSnapshotRange: vi.fn(async () => ({ saved: new Map(), historical: new Map() })),
+}));
 
 import { loadMiningYieldSnapshot } from './yieldSnapshot';
 

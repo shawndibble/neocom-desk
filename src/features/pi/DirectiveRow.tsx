@@ -30,6 +30,8 @@
  * `stopTierSellRaw` / `stopTierSwitchRaw` split in `en.json`, which the old
  * card kept apart in words and this layout has to keep apart in colour.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { cx } from '@/lib/cx';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ProgressBar } from '@/components/ui';
@@ -191,9 +193,7 @@ export function LoadMeter({
   const tight = percent >= 90;
   return (
     <div className="flex items-center gap-1.5">
-      <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-        {label}
-      </span>
+      <span className={eyebrowClassName}>{label}</span>
       <ProgressBar
         label={t('piShared.budgetBarLabel', { axis: label })}
         value={percent}
@@ -209,11 +209,7 @@ export function LoadMeter({
 
 /** A card or modal section's micro-heading. */
 export function SectionLabel({ children }: { children: ReactNode }) {
-  return (
-    <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-      {children}
-    </span>
-  );
+  return <span className={eyebrowClassName}>{children}</span>;
 }
 
 /**
@@ -239,7 +235,12 @@ export function EstimateBadge() {
 export function TierChip({ tier }: { tier: number }) {
   const { t } = useTranslation();
   return (
-    <span className="inline-flex h-[1.125rem] shrink-0 items-center rounded-xs border border-line bg-panel-2 px-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+    <span
+      className={cx(
+        eyebrowClassName,
+        'inline-flex h-[1.125rem] shrink-0 items-center rounded-xs border border-line bg-panel-2 px-1.5'
+      )}
+    >
       {t('piPlan.tierChip', { tier })}
     </span>
   );

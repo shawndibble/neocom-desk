@@ -18,7 +18,7 @@
  * translator, and a group carries its `target` so the view can resolve one.
  */
 import type { NotificationFeedRecord } from '@/db';
-import { compareSeverity, type DeadlineSeverity } from '@/engine/severity';
+import { compareSeverity, type DeadlineSeverity } from '@/engine/character/severity';
 import { entryChannelTarget, type EntryChannelTarget } from './feedSelection';
 import { eveTypeLabel } from './eveTypeLabel';
 import { NOTIFICATION_EVENTS, type NotificationEventId } from './events';
@@ -83,8 +83,11 @@ const EVE_TYPE_SEVERITY: Readonly<Record<string, DeadlineSeverity>> = {
   CorpBecameWarEligible: 'warning',
   // Happened, needs reading, costs nothing to be late on.
   StructureWentHighPower: 'clear',
+  MoonminingExtractionStarted: 'watch',
   MoonminingExtractionFinished: 'watch',
+  MoonminingLaserFired: 'watch',
   MoonminingAutomaticFracture: 'watch',
+  MoonminingExtractionCancelled: 'watch',
   CorpAppNewMsg: 'watch',
 };
 

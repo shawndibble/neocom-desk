@@ -17,6 +17,7 @@
  * reports, not a row with nothing to sort on.
  */
 
+import { romanLevel } from '@/engine/projection';
 import type {
   CalendarEventSummary,
   Contract,
@@ -25,16 +26,13 @@ import type {
   PlanetPin,
   SkillQueueEntry,
 } from '@/esi/endpoints';
-import { isActiveContractStatus } from '@/engine/contractStatus';
-import { courierDeliveryDeadlineMs } from '@/engine/courierDeadline';
+import { isActiveContractStatus } from '@/engine/contracts/contractStatus';
+import { courierDeliveryDeadlineMs } from '@/engine/contracts/courierDeadline';
 import { parseInstant } from '@/engine/esiInstant';
 import type { BoardCalendarEventSource, BoardClockSource } from '@/engine/character/board';
 import type { BoardExtractionSource } from '@/engine/corp/board';
-import { stepKey, type SkillPlanSchedule } from '@/engine/skillPlanSchedule';
-
-const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
-
-const DAY_MS = 86_400_000;
+import { stepKey, type SkillPlanSchedule } from '@/engine/skills/skillPlanSchedule';
+import { DAY_MS } from '@/lib/age';
 
 /** Resolves a type id to its SDE name; supplied by the caller, which owns the catalog. */
 export type TypeNamer = (typeId: number) => string;
@@ -77,7 +75,7 @@ export function toSkillTrainingSources(
   for (const entry of queue) {
     const deadlineMs = parseInstant(entry.finish_date);
     if (deadlineMs === null) continue;
-    const level = ROMAN[entry.finished_level - 1] ?? String(entry.finished_level);
+    const level = romanLevel(entry.finished_level);
     sources.push({
       // `queue_position`, not `skill_id`: one skill appears once per level.
       id: String(entry.queue_position),
@@ -109,7 +107,7 @@ export function toSkillPlanSources(
   for (const step of schedule.scheduled) {
     const id = stepKey(step);
     if (queued.has(id)) continue;
-    const level = ROMAN[step.level - 1] ?? String(step.level);
+    const level = romanLevel(step.level);
     sources.push({
       id,
       subject: `${typeName(step.skillTypeID)} ${level}`,

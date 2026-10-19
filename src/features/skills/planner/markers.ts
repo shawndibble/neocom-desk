@@ -12,7 +12,7 @@
  * so drag interactions are unit-testable without simulating drag events.
  */
 import { arrayMove } from '@dnd-kit/sortable';
-import { normalizePlanWithBoundaries } from '@/engine/plan';
+import { normalizePlanWithBoundaries } from '@/engine/skills/plan';
 import { hasKnownSkill, markerStepIndices, normalizeMarkers } from '@/engine/remapMarkers';
 import type { RemapSegment } from '@/engine/optimizer';
 import type { Attributes, EngineSkill, PlanEntry, TrainedSkill } from '@/engine/types';

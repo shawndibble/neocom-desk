@@ -1,8 +1,8 @@
-import type { CloneInput, QueueEntryInput } from '@/engine/cloneTrainingTime';
+import type { CloneInput, QueueEntryInput } from '@/engine/clone/cloneTrainingTime';
 import { acceleratorBonusOf, baselineAttributes } from '@/engine/attributeBaseline';
 import type { Attributes, EngineSkill } from '@/engine/types';
 import type { JumpClone, SkillQueueEntry } from '@/esi/endpoints';
-import { classifySkillQueue, isQueuePaused } from '@/features/skills/queueStatus';
+import { classifySkillQueue, isQueuePaused } from '@/engine/skills/queueStatus';
 import { loadCharacterAttributes } from '@/features/skills/data';
 import { loadImplantTypeBonuses } from '@/features/skills/typeDetail';
 import { loadSkillCatalog, toAttributeBaseline } from '@/features/skills/skillMap';

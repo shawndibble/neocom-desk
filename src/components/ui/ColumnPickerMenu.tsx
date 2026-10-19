@@ -1,3 +1,5 @@
+import { eyebrowClassName } from './eyebrowClassName';
+import { cx } from '@/lib/cx';
 import type { ComponentProps } from 'react';
 import * as Icon from './icons';
 import { IconButton } from './IconButton';
@@ -67,9 +69,7 @@ export function ColumnPickerMenu<Id extends string, Row>({
         />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-48">
-        <p className="px-2 py-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-          {menuTitle}
-        </p>
+        <p className={cx(eyebrowClassName, 'px-2 py-1.5')}>{menuTitle}</p>
         {available.map((id) => (
           <DropdownMenuCheckboxItem
             key={id}

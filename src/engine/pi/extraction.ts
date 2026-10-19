@@ -20,6 +20,7 @@
  * counterfactual baseline from a running program's own state.
  */
 import type { ExtractorProgram, ExtractorYieldProgram } from './types';
+import { DAY_MS, HOUR_MS } from '@/lib/age';
 
 /** Dogma attribute 1683: how fast output falls away over a program. */
 export const EXTRACTOR_DECAY_FACTOR = 0.012;
@@ -30,8 +31,6 @@ export const EXTRACTOR_NOISE_FACTOR = 0.8;
 const BAR_SECONDS = 900;
 
 /** The window a daily rate is measured over, in both directions. */
-const DAY_MS = 86_400_000;
-const HOUR_MS = 3_600_000;
 
 /** A cycle's width in CCP's 900-second bars — the unit `t` is measured in. */
 function barWidthOf(program: ExtractorYieldProgram): number {
@@ -137,11 +136,6 @@ function completedCycles(program: ExtractorYieldProgram, nowMs: number): number 
 /** Output already delivered at `nowMs` — a cycle banks only once it completes. */
 export function yieldBankedBy(program: ExtractorYieldProgram, nowMs: number): number {
   return sumCycles(program, 0, completedCycles(program, nowMs));
-}
-
-/** Output still to come after `nowMs`; zero once the program has expired. */
-export function yieldRemaining(program: ExtractorYieldProgram, nowMs: number): number {
-  return sumCycles(program, completedCycles(program, nowMs), programCycleCount(program));
 }
 
 /**

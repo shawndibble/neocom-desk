@@ -103,8 +103,8 @@ describe('fetchPilotKillHistory', () => {
       .mockRejectedValueOnce(new Error('offline'))
       .mockResolvedValueOnce(new Response('[]'));
     vi.stubGlobal('fetch', fetchMock);
-    expect(await fetchPilotKillHistory(PILOT)).toEqual({ ok: false });
-    expect(await fetchPilotKillHistory(PILOT)).toEqual({ ok: false });
+    expect(await fetchPilotKillHistory(PILOT)).toEqual({ ok: false, reason: 'rate-limited' });
+    expect(await fetchPilotKillHistory(PILOT)).toEqual({ ok: false, reason: 'offline' });
     expect(await fetchPilotKillHistory(PILOT)).toEqual({ ok: true, kills: [] });
   });
 
@@ -113,7 +113,7 @@ describe('fetchPilotKillHistory', () => {
       'fetch',
       vi.fn(async () => new Response(JSON.stringify([{ killmail_id: 1, zkb: { hash: 'h' } }])))
     );
-    expect(await fetchPilotKillHistory(PILOT)).toEqual({ ok: false });
+    expect(await fetchPilotKillHistory(PILOT)).toEqual({ ok: false, reason: 'parse' });
   });
 
   it('fails when zKillboard answers with an error body instead of a list', async () => {
@@ -121,6 +121,6 @@ describe('fetchPilotKillHistory', () => {
       'fetch',
       vi.fn(async () => new Response(JSON.stringify({ error: 'rate' })))
     );
-    expect(await fetchPilotKillHistory(PILOT)).toEqual({ ok: false });
+    expect(await fetchPilotKillHistory(PILOT)).toEqual({ ok: false, reason: 'parse' });
   });
 });

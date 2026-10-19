@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useEffect, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { IskAmount } from '@/components/ui';
@@ -11,7 +12,7 @@ import { hullsKey } from './lastScan';
 const SHOWN_LINES = 4;
 
 const cardClassName = 'space-y-1 rounded-xs border border-line p-3';
-const captionClassName = 'text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
+const captionClassName = eyebrowClassName;
 
 /**
  * Two read-only cards under the Read-out (issue #3151): what the hulls on the

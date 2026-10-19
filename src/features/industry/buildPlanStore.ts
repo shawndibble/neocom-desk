@@ -22,7 +22,7 @@
 import { db, type BuildPlanRecord } from '@/db';
 import { markBuildPlanDeleted, scheduleSync } from '@/sync';
 import type { MaterialSourcing } from '@/engine/industry/types';
-import { applySourcingPatch } from './sourcingEdits';
+import { applySourcingPatch } from '@/engine/industry/sourcingEdits';
 
 /** Any Build Plan field a patch may change — never its identity or owner. */
 export type BuildPlanFields = Partial<Omit<BuildPlanRecord, 'id' | 'characterId' | 'updatedAt'>>;

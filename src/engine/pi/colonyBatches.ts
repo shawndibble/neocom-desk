@@ -14,7 +14,7 @@
  * Pure: no fetch/DOM/Dexie, and `nowMs` is always a parameter — the same
  * convention `colonyStatus.ts` follows.
  */
-import type { DeadlineSeverity } from '@/engine/severity';
+import type { DeadlineSeverity } from '@/engine/character/severity';
 import { colonyAttention, EXPIRING_SOON_WINDOW_MS } from './colonyStatus';
 import type { ColonyStatus } from './types';
 

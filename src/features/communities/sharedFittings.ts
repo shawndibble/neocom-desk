@@ -24,7 +24,7 @@ import {
   type Firestore,
 } from 'firebase/firestore/lite';
 import { db as localDb } from '@/db';
-import { decodeFittingShare } from '@/engine/fitting/fittingShare';
+import { decodeFittingShare } from '@/engine/fittings/fittingShare';
 import {
   fittingChoiceKey,
   followsSave,

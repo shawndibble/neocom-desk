@@ -6,10 +6,11 @@ import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { useMarketHub } from '@/features/market/hub';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { getHubPricesWithStatus, type HubAggregate } from '@/market/prices';
-import { LARGE_SKILL_INJECTOR_TYPE_ID } from '@/engine/spExtraction';
-import { ALPHA_SP_CAP } from '@/engine/skillInjectors';
+import { LARGE_SKILL_INJECTOR_TYPE_ID } from '@/engine/skills/spExtraction';
+import { ALPHA_SP_CAP } from '@/engine/skills/skillInjectors';
 import type { CloneState } from '@/engine/types';
 import { buildInjectorFacts } from './injectorFacts';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 const LARGE_SKILL_INJECTOR_NAME = 'Large Skill Injector';
 
@@ -34,11 +35,7 @@ export function InjectorFactsPanel({
   const { t } = useTranslation();
   const pricesUnavailableLabel = usePricesUnavailableLabel();
   const hubId = useMarketHub((state) => state.value);
-  const hubHydrated = useMarketHub((state) => state.hydrated);
-  const hydrateHub = useMarketHub((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateHub();
-  }, [hydrateHub]);
+  const hubHydrated = useHydratedStore(useMarketHub);
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
 
   const [aggregate, setAggregate] = useState<HubAggregate | null>(null);

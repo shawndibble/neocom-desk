@@ -491,7 +491,9 @@ describe('Travel › Route Safety', () => {
     expect(uedama.getByText('Smartbombs involved')).toBeInTheDocument();
 
     // A rate-limited system says so on its own row; the rest still fill in.
-    expect(await within(body[1]).findByText('zKillboard unavailable')).toBeInTheDocument();
+    expect(
+      await within(body[1]).findByText('zKillboard is rate-limiting requests. Try again shortly.')
+    ).toBeInTheDocument();
     expect(
       await within(body[0]).findByRole('link', { name: /^0 player kills\s*\(opens/ })
     ).toBeInTheDocument();

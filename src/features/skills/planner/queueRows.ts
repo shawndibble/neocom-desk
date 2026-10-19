@@ -7,7 +7,7 @@
  * buildRows exactly, so bandStarts keeps working unmodified against those).
  */
 import type { PlanEntry, ScheduledStep } from '@/engine/types';
-import type { QueueEndProjection } from '@/features/skills/queueStatus';
+import type { QueueEndProjection } from '@/engine/skills/queueStatus';
 import { entrySlices } from './entrySlices';
 import { buildRows, type PlanRow } from './markers';
 import { entryId } from './reorder';

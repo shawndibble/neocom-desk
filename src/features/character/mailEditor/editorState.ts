@@ -6,7 +6,7 @@ import {
   type FormatRun,
   type FormatState,
   type LinkTarget,
-} from '@/engine/mailFormat';
+} from '@/engine/mail/mailFormat';
 
 function runOf(marks: readonly Mark[]): FormatRun {
   const mark = (name: string) => marks.find((m) => m.type.name === name);

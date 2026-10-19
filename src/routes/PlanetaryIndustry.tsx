@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
 import { usePageItemActions } from '@/features/market/usePageItemActions';
@@ -24,7 +25,7 @@ import { goalsParam, idListParam, seedGoal } from '@/features/pi/goalsParam';
 import { loadPlannableTypeIds } from '@/features/pi/products';
 import type { Goal } from '@/engine/pi/goalTypes';
 import { GrantBanner } from '@/app/GrantNote';
-import { colonyCountUnknown } from '@/features/pi/colonyStripModel';
+import { colonyCountUnknown } from '@/features/pi/colonyFillModel';
 import { PiHeaderStrip } from '@/features/pi/PiHeaderStrip';
 import { ColoniesTab } from '@/features/pi/colonies/ColoniesTab';
 import { loadPiSnapshot } from '@/features/pi/colonies/coloniesSnapshot';
@@ -89,10 +90,7 @@ export function PlanetaryIndustry() {
   // The pilot's own "expiring soon" lead time. Hydrated here, once, for the
   // whole page: the Colonies tab reads the same store, and a hydrate per row
   // would be a Dexie read per colony.
-  const hydrateExpiringWindow = useExpiringWindowHours((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateExpiringWindow();
-  }, [hydrateExpiringWindow]);
+  useHydratedStore(useExpiringWindowHours);
   const [tab, setTab] = usePageTab(PI_TABS);
   const tabsId = useTabsId();
   const [explainerOpen, setExplainerOpen] = useState(false);

@@ -13,7 +13,7 @@
  * The editor's box is plain text; readers get the notes as a small, safe slice
  * of Markdown (`SurveyNotes`), since anyone holding the link reads them.
  */
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Panel, TextArea } from '@/components/ui';
 import { InfoRow } from './InfoRow';
@@ -39,6 +39,7 @@ import {
   type SurveyInfoShare,
   type SurveyTaxShare,
 } from './surveyStore';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 type Location = NonNullable<SurveyInfoShare['location']>;
 
@@ -65,10 +66,7 @@ export function SurveyInfoEditor({
   const [notes, setNotes] = useState(survey?.info?.notes ?? '');
   const [tax, setTax] = useState(() => initialTaxDraft(survey?.published));
   const templates = useSurveyTemplates((state) => state.value);
-  const hydrateTemplates = useSurveyTemplates((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateTemplates();
-  }, [hydrateTemplates]);
+  useHydratedStore(useSurveyTemplates);
   // The template last picked or saved here, for the strip that says so; it is not
   // remembered between visits, since each survey starts from what it stored.
   const [appliedId, setAppliedId] = useState<string | null>(null);

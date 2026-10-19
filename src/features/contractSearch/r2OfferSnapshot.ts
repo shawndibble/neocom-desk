@@ -3,15 +3,14 @@
  * #3746): a small `index.json` that names, per item type, the content-addressed
  * objects holding that type's offers, and the objects themselves. A consumer
  * reads the index, then only the types it uses — instead of the ~40-75 MB the
- * Firestore chunks add up to.
+ * whole snapshot adds up to.
  *
  * Reading the objects the index names is what rules out a half-old, half-new
  * snapshot: an object's name carries its content hash, so it never changes, and
  * a newer publish names different objects.
  *
- * Everything here reports "unavailable" as `null`, never as a throw. The caller
- * then takes the Firestore chunk read (`chunkedSnapshot.ts`), which stays as the
- * fallback until the R2 path has run in production.
+ * Everything here reports "unavailable" as `null`, never as a throw. R2 is the
+ * only store (issue #4270), so the caller shows its "unavailable" state.
  */
 import { loadWithCache, GLOBAL_CACHE_CHARACTER_ID, type CachedResult } from '@/esi/cache';
 import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
@@ -81,8 +80,7 @@ async function fetchIndex(): Promise<R2OfferIndex | null> {
 /**
  * The index, cache-through like the other loaders (global key, 30-minute
  * window, a lapsed copy served while the next read runs). `null` when R2 is
- * unreachable and nothing is cached, or the index is missing or invalid — the
- * Firestore read takes over.
+ * unreachable and nothing is cached, or the index is missing or invalid.
  */
 export async function loadR2OfferIndex(): Promise<CachedResult<R2OfferIndex> | null> {
   try {

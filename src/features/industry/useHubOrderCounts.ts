@@ -2,8 +2,9 @@
  * Open order counts at a Trade Hub for each compared plan's product — one
  * Fuzzwork call per distinct hub, fetched only while a market column is shown.
  */
-import { useEffect, useState } from 'react';
+import { useCallback } from 'react';
 import { fetchOrderCounts, type HubOrderCounts } from '@/market/fuzzwork';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { getTradeHub } from '@/market/hubs';
 
 export interface HubOrderTarget {
@@ -22,6 +23,30 @@ export interface HubOrderCountsState {
 }
 
 const IDLE: HubOrderCountsState = { counts: new Map(), loading: false, failed: false };
+const LOADING: HubOrderCountsState = { counts: new Map(), loading: true, failed: false };
+
+/** One Fuzzwork call per hub in `key`; a hub whose call fails marks the whole result `failed`. */
+async function loadCounts(key: string): Promise<HubOrderCountsState> {
+  const byHub = new Map<string, number[]>();
+  for (const entry of key.split(',')) {
+    const [hubId, typeId] = entry.split(':') as [string, string];
+    byHub.set(hubId, [...(byHub.get(hubId) ?? []), Number(typeId)]);
+  }
+  const results = await Promise.all(
+    [...byHub].map(async ([hubId, typeIds]) => {
+      const hub = getTradeHub(hubId);
+      if (!hub) return { hubId, counts: null };
+      return { hubId, counts: await fetchOrderCounts(hub.stationId, typeIds).catch(() => null) };
+    })
+  );
+  const counts = new Map<string, HubOrderCounts>();
+  let failed = false;
+  for (const { hubId, counts: hubCounts } of results) {
+    if (!hubCounts) failed = true;
+    else for (const [typeId, value] of hubCounts) counts.set(hubOrderKey(hubId, typeId), value);
+  }
+  return { counts, loading: false, failed };
+}
 
 export function useHubOrderCounts(
   targets: readonly HubOrderTarget[],
@@ -33,41 +58,9 @@ export function useHubOrderCounts(
         .sort()
         .join(',')
     : '';
-  const [state, setState] = useState<{ key: string; value: HubOrderCountsState }>({
-    key: '',
-    value: IDLE,
-  });
-
-  useEffect(() => {
-    if (key === '') return;
-    let cancelled = false;
-    const byHub = new Map<string, number[]>();
-    for (const entry of key.split(',')) {
-      const [hubId, typeId] = entry.split(':') as [string, string];
-      byHub.set(hubId, [...(byHub.get(hubId) ?? []), Number(typeId)]);
-    }
-    void Promise.all(
-      [...byHub].map(async ([hubId, typeIds]) => {
-        const hub = getTradeHub(hubId);
-        if (!hub) return { hubId, counts: null };
-        return { hubId, counts: await fetchOrderCounts(hub.stationId, typeIds).catch(() => null) };
-      })
-    ).then((results) => {
-      if (cancelled) return;
-      const counts = new Map<string, HubOrderCounts>();
-      let failed = false;
-      for (const { hubId, counts: hubCounts } of results) {
-        if (!hubCounts) failed = true;
-        else for (const [typeId, value] of hubCounts) counts.set(hubOrderKey(hubId, typeId), value);
-      }
-      setState({ key, value: { counts, loading: false, failed } });
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [key]);
+  const loader = useCallback(() => loadCounts(key), [key]);
+  const { data } = useKeyedLoad(key === '' ? null : key, loader);
 
   if (key === '') return IDLE;
-  if (state.key !== key) return { counts: new Map(), loading: true, failed: false };
-  return state.value;
+  return data ?? LOADING;
 }

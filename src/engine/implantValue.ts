@@ -1,4 +1,5 @@
 /** Pure helpers for the Clones page: what a set of implants is worth, and how far the jump cooldown has run. */
+import { parseInstant } from './esiInstant';
 
 export interface ImplantValue {
   /** ISK of the priced implants. */
@@ -28,8 +29,8 @@ export function cooldownProgress(
   now: Date
 ): number {
   if (!lastCloneJumpDate || cooldownHours <= 0) return 1;
-  const last = Date.parse(lastCloneJumpDate);
-  if (Number.isNaN(last)) return 1;
+  const last = parseInstant(lastCloneJumpDate);
+  if (last === null) return 1;
   const elapsed = (now.getTime() - last) / (cooldownHours * 3_600_000);
   return Math.min(1, Math.max(0, elapsed));
 }

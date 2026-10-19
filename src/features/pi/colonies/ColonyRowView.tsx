@@ -1,4 +1,5 @@
-import type { ReactNode } from 'react';
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { memo, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Trans, useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
@@ -39,7 +40,7 @@ import { formatAge } from '@/lib/age';
 import { PlanetImage } from '../PlanetImage';
 import { StatusWord } from './TodayPanel';
 
-const MICRO = 'text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
+const MICRO = eyebrowClassName;
 
 function Meter({
   fraction,
@@ -319,14 +320,17 @@ export interface ColonyRowViewProps {
   productNames: ReadonlyMap<number, string>;
   schematicNames: ReadonlyMap<number, string>;
   expanded: boolean;
-  onToggle: () => void;
-  onExpand: () => void;
+  /** Called with `row.key`: one stable handler serves every row, so `memo` holds. */
+  onToggle: (key: string) => void;
+  onExpand: (key: string) => void;
   /** The one filled button on the page: the first row, when its action is real. */
   primary: boolean;
   /** The active Character's colony: it has a Plan card to link to. */
   own: boolean;
   /** Another Character's colony: a menu entry that makes them the active Character. */
-  switchTo?: { name: string; onSwitch: () => void };
+  switchTo?: { name: string; characterId: number };
+  /** Stable handler for `switchTo`; called with its `characterId`. */
+  onSwitch?: (characterId: number) => void;
   haulLabel: string;
 }
 
@@ -338,7 +342,8 @@ const BUTTON_VARIANT: Record<CheckStatus, 'danger' | 'accent' | 'ghost'> = {
   healthy: 'accent',
 };
 
-export function ColonyRowView(props: ColonyRowViewProps) {
+/** Memoised: a list of these re-renders only the rows whose props changed. */
+export const ColonyRowView = memo(function ColonyRowView(props: ColonyRowViewProps) {
   const { row, planet, detail, pi, nowMs, planetName, expanded } = props;
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -415,7 +420,7 @@ export function ColonyRowView(props: ColonyRowViewProps) {
       size="md"
       variant={variant}
       className="lg:w-full max-lg:self-start"
-      onClick={props.onExpand}
+      onClick={() => props.onExpand(row.key)}
     >
       {label}
       {exactGain && <span className="sr-only"> {exactGain}</span>}
@@ -432,7 +437,7 @@ export function ColonyRowView(props: ColonyRowViewProps) {
 
   const menu = (
     <>
-      <MenuItem onSelect={props.onToggle}>
+      <MenuItem onSelect={() => props.onToggle(row.key)}>
         {expanded ? t('piColonies.menu.hide') : t('piColonies.menu.show')}
       </MenuItem>
       {props.own && (
@@ -441,7 +446,7 @@ export function ColonyRowView(props: ColonyRowViewProps) {
         </MenuItem>
       )}
       {props.switchTo && (
-        <MenuItem onSelect={props.switchTo.onSwitch}>
+        <MenuItem onSelect={() => props.onSwitch?.(props.switchTo!.characterId)}>
           {t('pi.altColonies.switchTo', { name: props.switchTo.name })}
         </MenuItem>
       )}
@@ -469,7 +474,7 @@ export function ColonyRowView(props: ColonyRowViewProps) {
             const target = event.target as HTMLElement;
             if (target.closest('a, button:not([data-row-toggle]), input, [role="menuitem"]'))
               return;
-            props.onToggle();
+            props.onToggle(row.key);
           }}
           className={`relative grid cursor-pointer gap-x-4 gap-y-2 px-3 py-2 hover:bg-panel-2 lg:py-3 lg:items-start ${ROW_GRID}`}
         >
@@ -619,4 +624,4 @@ export function ColonyRowView(props: ColonyRowViewProps) {
       )}
     </div>
   );
-}
+});

@@ -234,11 +234,6 @@ function autoPart(entry: PledgeEntry): number {
   return entry.manual !== undefined && entry.delivered <= entry.manual ? 0 : entry.delivered;
 }
 
-/** What a line shows: the larger of contracts and the typed amount, never above the Pledge. */
-export function shownDelivered(entry: PledgeEntry): number {
-  return Math.min(entry.quantity, Math.max(autoPart(entry), entry.manual ?? 0));
-}
-
 /**
  * The entry after the Member types a delivered amount (0 clears it): the
  * figure shown is the larger of it and what contracts showed, so it is never

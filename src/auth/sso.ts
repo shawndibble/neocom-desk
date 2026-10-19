@@ -14,7 +14,7 @@ const TOKEN_URL = 'https://login.eveonline.com/v2/oauth/token';
  * itself. Exported (and overridable per-call below) only so tests can drive
  * a hang without waiting out the real value.
  */
-export const SSO_REQUEST_TIMEOUT_MS = 15_000;
+const SSO_REQUEST_TIMEOUT_MS = 15_000;
 
 export interface TokenResponse {
   access_token: string;

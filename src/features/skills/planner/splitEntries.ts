@@ -8,7 +8,7 @@
  * what lets the editor run this on every plan it loads and write only when
  * something actually changed.
  */
-import { normalizePlanWithBoundaries } from '@/engine/plan';
+import { normalizePlanWithBoundaries } from '@/engine/skills/plan';
 import type { EngineSkill, PlanEntry, TrainedSkill } from '@/engine/types';
 import { entrySlices } from './entrySlices';
 

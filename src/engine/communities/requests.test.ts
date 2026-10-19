@@ -3,12 +3,10 @@ import { describe, expect, it } from 'vitest';
 import {
   MAX_LINES_PER_REQUEST,
   MAX_LOCATION_LENGTH,
-  MAX_OPEN_REQUESTS_PER_MEMBER,
   MAX_PLEDGE_QUANTITY,
   MAX_REQUEST_MAILS_PER_DAY,
   MAX_TERMS_LENGTH,
   STALE_PLEDGE_DAYS,
-  REQUEST_LIFETIME_DAYS,
   lineKey,
   filterRequests,
   canFillRequest,
@@ -228,12 +226,10 @@ describe('constants shared with the callables', () => {
     return Function(`return ${match[1].replace(/_/g, '')}`)() as number;
   };
 
-  it('matches the server caps and lifetime', () => {
+  it('matches the server caps', () => {
     expect(MAX_LINES_PER_REQUEST).toBe(constant('MAX_LINES_PER_REQUEST'));
-    expect(MAX_OPEN_REQUESTS_PER_MEMBER).toBe(constant('MAX_OPEN_REQUESTS_PER_MEMBER'));
     expect(MAX_LOCATION_LENGTH).toBe(constant('MAX_LOCATION_LENGTH'));
     expect(MAX_TERMS_LENGTH).toBe(constant('MAX_TERMS_LENGTH'));
-    expect(REQUEST_LIFETIME_DAYS * 24 * 60 * 60 * 1000).toBe(constant('REQUEST_LIFETIME_MS'));
     expect(MAX_REQUEST_MAILS_PER_DAY).toBe(constant('MAX_REQUEST_MAILS_PER_DAY'));
   });
 

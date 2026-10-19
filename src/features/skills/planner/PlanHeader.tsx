@@ -5,7 +5,7 @@ import { focusRingClassName } from '@/components/ui/controlStyles';
 import { formatCountdown } from '@/lib/duration';
 import { formatLocalDate } from '@/lib/localDate';
 import { formatCompactNumber } from '@/lib/compactNumber';
-import type { PlanProgress } from '@/engine/planProgress';
+import type { PlanProgress } from '@/engine/skills/planProgress';
 import { MIN_MEANINGFUL_SAVINGS_SECONDS, type OptimizationBadge } from './planHeaderStats';
 import type { WhatIfVerdict } from './whatIfImplants';
 

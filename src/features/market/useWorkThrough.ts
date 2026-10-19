@@ -136,9 +136,7 @@ export function useWorkThrough({
     return () => {
       cancelled = true;
     };
-    // Keyed on the order, not the row object: rows are rebuilt as deeper
-    // books land, and each rebuild would otherwise re-read the book.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the order, not the row object: rows are rebuilt as deeper books land, and each rebuild would otherwise re-read the book
   }, [currentId]);
 
   const notChangedIds = useMemo(() => {

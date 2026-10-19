@@ -1,3 +1,4 @@
+import { idSetKey } from '@/lib/idSetKey';
 /**
  * The pure half of a materials table's owned-stock handling: which material
  * types detection scans, the `OwnedStockDetection` object every row reads,
@@ -31,7 +32,7 @@ type Translate = Parameters<typeof stockLocationLabel>[2];
 export function materialTypeIdKey(rows: Iterable<{ typeID: number }>): string {
   const ids = new Set<number>();
   for (const row of rows) ids.add(row.typeID);
-  return [...ids].sort((a, b) => a - b).join(',');
+  return idSetKey(ids);
 }
 
 /** @see materialTypeIdKey */

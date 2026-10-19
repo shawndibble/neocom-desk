@@ -15,6 +15,7 @@
  * moment, so the click has feedback; on a phone the sheet covers the page, so
  * it closes and lets the pilot see what they added.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useEffect, useId, useMemo, useRef, useState, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
@@ -37,7 +38,7 @@ import { Widget } from './Widget';
 
 type CategoryFilter = 'all' | KindCategory;
 
-export interface GalleryProps {
+interface GalleryProps {
   open: boolean;
   onClose: () => void;
 }
@@ -279,10 +280,7 @@ function GalleryBody({
           if (group.length === 0) return null;
           return (
             <section key={id} aria-labelledby={`gallery-group-${id}`} className="grid gap-2">
-              <h3
-                id={`gallery-group-${id}`}
-                className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
-              >
+              <h3 id={`gallery-group-${id}`} className={eyebrowClassName}>
                 {t(`overview.gallery.categories.${id}`)}
               </h3>
               <ul className="grid gap-2">{group.map(renderItem)}</ul>

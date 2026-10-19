@@ -54,7 +54,7 @@ export interface LazyRowCache<K, V> {
    * already resolved. General-purpose, not `sticky`-only — used both to
    * re-arm a permanently-gated `sticky` key for one more attempt, and to
    * force an unconditional refetch of a key whose value may be stale for a
-   * reason the key itself doesn't capture (`useOrderBookOrchestration`'s
+   * reason the key itself doesn't capture (`useVariations`'s
    * Variations price cache, paired with `load` on every manual refresh).
    */
   reset: (key: K) => void;

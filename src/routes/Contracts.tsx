@@ -1,4 +1,6 @@
-import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
+import { NO_AFFILIATIONS, NO_NAMES } from '@/lib/emptyCollections';
+import { useCallback, useDeferredValue, useMemo, useState } from 'react';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import type { ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -32,7 +34,7 @@ import {
   CONTRACTS_HISTORY_COLUMN_IDS,
   contractsHistoryColumnsStore,
   type ContractsHistoryColumnId,
-} from './contractsColumns';
+} from '@/features/contracts/contractsColumns';
 import { OpenInEveMenuItem } from '@/features/openInEve/OpenInEveMenuItem';
 import { GrantBanner } from '@/app/GrantNote';
 import { loadContracts } from '@/features/character/contracts';
@@ -75,7 +77,7 @@ import { focusRingClassName } from '@/components/ui/controlStyles';
 import { HintText } from '@/components/ui/HintText';
 import { formatCountdown } from '@/lib/duration';
 import { useTicker } from '@/lib/ticker';
-import { courierDeliveryDeadlineMs } from '@/engine/courierDeadline';
+import { courierDeliveryDeadlineMs } from '@/engine/contracts/courierDeadline';
 import { useTimeZone } from '@/lib/timeFormat';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
@@ -120,10 +122,8 @@ const STATUS_TONE: Record<Contract['status'], string> = {
 };
 
 /** Stable identity, so the fallback doesn't invalidate the column memo every render. */
-const NO_NAMES: ReadonlyMap<number, string> = new Map();
 const NO_CATEGORIES: ReadonlyMap<number, NameCategory> = new Map();
 const NO_STANDING_INDEX: ContactStandingIndex = new Map();
-const NO_AFFILIATIONS: ReadonlyMap<number, CharacterAffiliation> = new Map();
 
 /**
  * Lapsed and unclaimed — still `outstanding` past its accept-by deadline.
@@ -424,12 +424,8 @@ export function Contracts() {
   const [searchStatus, setSearchStatus] = useState<ContractSearchStatus | null>(null);
 
   const rememberedMode = useContractSearchMode((state) => state.value);
-  const rememberedModeHydrated = useContractSearchMode((state) => state.hydrated);
-  const hydrateRememberedMode = useContractSearchMode((state) => state.hydrate);
+  const rememberedModeHydrated = useHydratedStore(useContractSearchMode);
   const setRememberedMode = useContractSearchMode((state) => state.setValue);
-  useEffect(() => {
-    void hydrateRememberedMode();
-  }, [hydrateRememberedMode]);
   /**
    * A bare `/contracts` visit lands on whichever of Item search and Courier
    * was last used (issue #1719), while a link naming a tab — even

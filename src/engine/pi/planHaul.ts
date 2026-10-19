@@ -23,6 +23,7 @@
  * resolved by the caller from the local stargate graph; nothing here routes.
  */
 
+import { sum } from '../math';
 import { securityBand } from '@/engine/securityStatus';
 
 export type ShipClass = 'frigate' | 'industrial' | 'epithal';
@@ -126,7 +127,7 @@ export interface HaulSummary {
 
 function sumKnown(values: readonly (number | null)[]): number | null {
   const known = values.filter((value): value is number => value !== null);
-  return known.length === 0 ? null : known.reduce((sum, value) => sum + value, 0);
+  return known.length === 0 ? null : sum(known);
 }
 
 export function haulSummary(input: {

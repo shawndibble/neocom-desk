@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useState } from 'react';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { OreIcon, OreLink } from './OreIcon';
@@ -190,9 +191,7 @@ export function SplitDialog({
         ) : (
           <div className="flex flex-col gap-3 sm:flex-row">
             <div className="min-w-0 space-y-1 sm:flex-1">
-              <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                {t('miningTax.splitMoveToLabel')}
-              </p>
+              <p className={eyebrowClassName}>{t('miningTax.splitMoveToLabel')}</p>
               <Select
                 value={payeeId ?? undefined}
                 onValueChange={(value) => {
@@ -214,9 +213,7 @@ export function SplitDialog({
               </Select>
             </div>
             <div className="space-y-1 sm:w-16 sm:shrink-0">
-              <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                {t('miningTax.taxPctLabel')}
-              </p>
+              <p className={eyebrowClassName}>{t('miningTax.taxPctLabel')}</p>
               <TextInput
                 type="number"
                 min={0}
@@ -241,9 +238,7 @@ export function SplitDialog({
 
         {rateChips.length > 0 && (
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-              {t('miningTax.splitRatesLabel')}
-            </span>
+            <span className={eyebrowClassName}>{t('miningTax.splitRatesLabel')}</span>
             {rateChips.map((rate) => (
               <FilterChip
                 key={rate}
@@ -261,7 +256,12 @@ export function SplitDialog({
         )}
 
         <div className="rounded-xs border border-line bg-panel-2">
-          <div className="flex items-center justify-between gap-2 border-b border-line px-2 py-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+          <div
+            className={cx(
+              eyebrowClassName,
+              'flex items-center justify-between gap-2 border-b border-line px-2 py-1'
+            )}
+          >
             <span>{t('miningTax.oreColumn')}</span>
             <span className="text-accent">{t('miningTax.splitMovesColumn')}</span>
           </div>
@@ -311,9 +311,7 @@ export function SplitDialog({
 
         {!someoneElseCollects && (
           <fieldset className="space-y-1">
-            <legend className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-              {t('miningTax.splitCollectorLabel')}
-            </legend>
+            <legend className={eyebrowClassName}>{t('miningTax.splitCollectorLabel')}</legend>
             <label
               className={`flex cursor-pointer items-start gap-2 text-xs ${tappableRowClassName}`}
             >
@@ -343,7 +341,7 @@ export function SplitDialog({
 
         <div className="grid grid-cols-2 gap-2 text-xs">
           <div className="space-y-0.5 rounded-xs border border-line p-2">
-            <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+            <p className={eyebrowClassName}>
               {t('miningTax.splitKeepsLabel', { payee: originalPayeeName })}
             </p>
             <p className="tabular-nums">
@@ -357,7 +355,7 @@ export function SplitDialog({
               movedLines.length > 0 ? 'border-accent' : 'border-line'
             )}
           >
-            <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+            <p className={eyebrowClassName}>
               {t('miningTax.splitNewLabel', {
                 payee: newPayeeName || t('miningTax.splitNewSideLabel'),
               })}

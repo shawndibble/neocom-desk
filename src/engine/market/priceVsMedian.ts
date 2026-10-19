@@ -6,7 +6,9 @@
  * never reads as a spike against a region average it was never comparable
  * to. Pure; the caller supplies the region's history and the clock.
  */
-import { medianOf, type MarketHistoryPoint } from './priceHistory';
+import { median } from '../math';
+import type { MarketHistoryPoint } from './priceHistory';
+import { DAY_MS } from '@/lib/age';
 
 export const VS_MEDIAN_WINDOW_DAYS = 90;
 
@@ -27,8 +29,6 @@ export const VS_MEDIAN_MAX_LATEST_AGE_DAYS = 2;
 
 /** At or above this percent over the median, the price is flagged as a spike. */
 export const PRICE_SPIKE_PCT = 20;
-
-const DAY_MS = 86_400_000;
 
 function dayNumber(date: string): number {
   return Math.floor(Date.parse(`${date}T00:00:00Z`) / DAY_MS);
@@ -52,9 +52,9 @@ export function priceVsMedianPct(
   if (window.length < VS_MEDIAN_MIN_TRADED_DAYS) return null;
   const latest = window.reduce((best, p) => (p.date > best.date ? p : best));
   if (today - dayNumber(latest.date) > VS_MEDIAN_MAX_LATEST_AGE_DAYS) return null;
-  const median = medianOf(window.map((p) => p.average));
-  if (!(median > 0)) return null;
-  return (latest.average / median - 1) * 100;
+  const typical = median(window.map((p) => p.average));
+  if (!(typical > 0)) return null;
+  return (latest.average / typical - 1) * 100;
 }
 
 /** Whether a percent flags as a spike, judged on the whole percent shown so "+20%" is never left plain. */
