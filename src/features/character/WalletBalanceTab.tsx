@@ -5,7 +5,7 @@ import * as Icon from '@/components/ui/icons';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { cx } from '@/lib/cx';
 import { GrantBanner } from '@/app/GrantNote';
-import { NetWorthPanel } from '@/features/netWorth/NetWorthPanel';
+import { NetWorthPanel, type NetWorthCharacter } from '@/features/netWorth/NetWorthPanel';
 import { WalletLoyaltyPanel } from '@/features/character/WalletLoyaltyPanel';
 import type { useWalletBalances } from '@/features/character/useWalletBalances';
 import type { useWalletDrill } from '@/features/character/useWalletDrill';
@@ -13,19 +13,14 @@ import type { useWalletLoyalty } from '@/features/character/useWalletLoyalty';
 import type { CachedResult } from '@/esi/cache';
 import type { CharacterLoyaltyPoints } from '@/esi/endpoints';
 
-interface PickedCharacter {
-  characterId: number;
-  name: string;
-}
-
 interface WalletBalanceTabProps {
   activeCharacterId: number;
   /** The Character the net worth view is drilled into, if any. */
-  drilledCharacter: PickedCharacter | undefined;
-  activeCharacter: PickedCharacter | undefined;
+  drilledCharacter: NetWorthCharacter | undefined;
+  activeCharacter: NetWorthCharacter | undefined;
   /** The `?char=` pick reaches beyond the active Character. */
   showingBeyondActive: boolean;
-  pickedCharacters: PickedCharacter[];
+  pickedCharacters: NetWorthCharacter[];
   balances: ReturnType<typeof useWalletBalances>;
   drill: ReturnType<typeof useWalletDrill>;
   loyalty: ReturnType<typeof useWalletLoyalty>;

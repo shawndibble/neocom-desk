@@ -36,13 +36,9 @@ import {
   loadPersonalFills,
   type PersonalFillsSnapshot,
 } from '@/features/character/walletSnapshot';
+import type { NetWorthCharacter } from '@/features/netWorth/NetWorthPanel';
 import type { CachedResult } from '@/esi/cache';
 import type { WalletJournalEntry, WalletTransactionCommon } from '@/esi/endpoints';
-
-interface PickedCharacter {
-  characterId: number;
-  name: string;
-}
 
 interface WalletJournalViewInput {
   /** The Journal tab is open: the item-name fills and the fanned-out journals load only then. */
@@ -51,8 +47,8 @@ interface WalletJournalViewInput {
   /** The `?char=` pick reaches beyond the active Character. */
   showingBeyondActive: boolean;
   /** The Characters that pick resolves to. */
-  pickedCharacters: PickedCharacter[];
-  allCharacters: readonly PickedCharacter[];
+  pickedCharacters: NetWorthCharacter[];
+  allCharacters: readonly NetWorthCharacter[];
   journalResult: CachedResult<WalletJournalEntry[]> | null;
   journalNeedsReauth: boolean;
   journalTruncated: boolean;
