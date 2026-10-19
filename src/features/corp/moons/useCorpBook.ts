@@ -12,7 +12,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { buildBookView, type BookView, type BookViewInput } from '@/engine/corpTaxBook/bookView';
 import { groupObservedEntries } from '@/engine/corpTaxBook/observed';
-import { surveyFractions, estimateChunk } from '@/engine/corpTaxBook/extraction';
+import { surveyFractions, estimateChunk, learnChunkRates } from '@/engine/corpTaxBook/extraction';
+import { measurable } from '@/engine/corpTaxBook/bookView';
 import { toEngineExtraction } from '@/engine/corpTaxBook/sync';
 import { countedScans } from '@/engine/survey/series';
 import { loadCurrentMemberIds } from '../currentMembers';
@@ -198,6 +199,7 @@ export function useCorpBook(sync: CorpTaxBookSync): CorpBook {
       (x) => x.surveyId !== undefined && (x.oreLines ?? []).length === 0
     );
     let cancelled = false;
+    const measured = learnChunkRates(data.state.extractions.map(measurable));
     (async () => {
       const found = new Map<string, { typeId: number; quantity: number }[]>();
       if (wanted.length > 0) {
@@ -217,6 +219,7 @@ export function useCorpBook(sync: CorpTaxBookSync): CorpBook {
             const estimate = estimateChunk(ex, {
               survey: surveyFractions(first.rocks, (ore) => typeIdByName.get(ore)),
               chunkM3PerHour: data.settings.chunkM3PerHour ?? undefined,
+              measured: measured.get(ex.structureId),
             });
             if (estimate.oreLines.length > 0) found.set(ex.id, estimate.oreLines);
           })
@@ -245,6 +248,7 @@ export function useCorpBook(sync: CorpTaxBookSync): CorpBook {
       hubId: s.hubId,
       oreForm: s.oreForm,
       structureExpiryHours: s.structureExpiryHours,
+      chunkM3PerHour: s.chunkM3PerHour ?? undefined,
       lastSyncedAt: s.lastSync ? new Date(s.lastSync.at).toISOString() : undefined,
       rates: s.rates,
       entries: groupObservedEntries(data.observed),

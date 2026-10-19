@@ -75,7 +75,90 @@ export interface ChunkSources {
   notified?: readonly { typeId: number; volumeM3: number }[];
   /** A linked Moon Ore Survey's composition, as fractions of the chunk. */
   survey?: readonly { typeId: number; fraction: number }[];
+  /** The book's manual chunk rate, the fallback behind a measured one. */
   chunkM3PerHour?: number;
+  /** The refinery's learned rate (`learnChunkRates`); preferred over the manual one. */
+  measured?: LearnedChunkRate;
+}
+
+/** The recent cycles a refinery's measured rate is the median of. */
+export const MEASURED_RATE_WINDOW = 5;
+
+export interface LearnedChunkRate {
+  m3PerHour: number;
+  /** How many extractions the median is over. */
+  cycles: number;
+}
+
+/** The rate an estimate used, and where it came from. */
+export interface ChunkRate {
+  m3PerHour: number;
+  basis: 'measured' | 'manual' | 'default';
+  /** Cycles behind a measured rate. */
+  cycles?: number;
+}
+
+/** Measured rate, else the book's manual one, else the default. */
+export function chunkRateFor(
+  measured: LearnedChunkRate | undefined,
+  manual: number | undefined
+): ChunkRate {
+  if (measured)
+    return { m3PerHour: measured.m3PerHour, basis: 'measured', cycles: measured.cycles };
+  if (manual !== undefined) return { m3PerHour: manual, basis: 'manual' };
+  return { m3PerHour: DEFAULT_CHUNK_M3_PER_HOUR, basis: 'default' };
+}
+
+export interface MeasurableExtraction {
+  structureId: number;
+  startedAt: string;
+  chunkArrivalAt: string;
+  /** The ExtractionStarted notification's ore, in units. */
+  oreLines?: readonly { typeId: number; quantity: number }[];
+}
+
+/**
+ * One cycle's real rate: the notified ore (10 m³ a unit) over the hours from
+ * extraction start to chunk arrival. Unknown without a notification or time.
+ */
+export function measureChunkRate(ex: MeasurableExtraction): number | undefined {
+  if (!ex.oreLines?.length) return undefined;
+  const hours = (Date.parse(ex.chunkArrivalAt) - Date.parse(ex.startedAt)) / HOUR_MS;
+  const units = ex.oreLines.reduce((sum, l) => sum + l.quantity, 0);
+  if (!(hours > 0) || units <= 0) return undefined;
+  return (units * MOON_ORE_M3_PER_UNIT) / hours;
+}
+
+/**
+ * Each refinery's measured rate: the median over its last
+ * `MEASURED_RATE_WINDOW` measurable cycles. A median, not the latest, because
+ * one odd cycle (a rig swap mid-cycle, a notification for another chunk) must
+ * not swing every later estimate; five cycles is about a month of weekly
+ * pulls, short enough to follow a rig change within a few cycles.
+ */
+export function learnChunkRates(
+  extractions: readonly MeasurableExtraction[]
+): Map<number, LearnedChunkRate> {
+  const byStructure = new Map<number, { startedAt: string; rate: number }[]>();
+  for (const ex of extractions) {
+    const rate = measureChunkRate(ex);
+    if (rate === undefined) continue;
+    const list = byStructure.get(ex.structureId) ?? [];
+    list.push({ startedAt: ex.startedAt, rate });
+    byStructure.set(ex.structureId, list);
+  }
+  const learned = new Map<number, LearnedChunkRate>();
+  for (const [structureId, list] of byStructure) {
+    const recent = list
+      .sort((a, b) => b.startedAt.localeCompare(a.startedAt))
+      .slice(0, MEASURED_RATE_WINDOW)
+      .map((c) => c.rate)
+      .sort((a, b) => a - b);
+    const mid = recent.length >> 1;
+    const median = recent.length % 2 ? recent[mid] : (recent[mid - 1] + recent[mid]) / 2;
+    learned.set(structureId, { m3PerHour: Math.round(median), cycles: recent.length });
+  }
+  return learned;
 }
 
 /**
@@ -104,6 +187,8 @@ export function surveyFractions(
 export interface ChunkEstimate {
   source: 'notification' | 'survey' | 'unknown';
   oreLines: OreLine[];
+  /** The chunk rate a survey estimate was made at; absent for the other sources. */
+  rate?: ChunkRate;
 }
 
 export function estimateChunk(ex: Extraction, sources: ChunkSources): ChunkEstimate {
@@ -116,8 +201,10 @@ export function estimateChunk(ex: Extraction, sources: ChunkSources): ChunkEstim
   }
   if (sources.survey?.length) {
     const hours = (Date.parse(ex.chunkArrivalAt) - Date.parse(ex.startedAt)) / HOUR_MS;
-    const chunkM3 = hours * (sources.chunkM3PerHour ?? DEFAULT_CHUNK_M3_PER_HOUR);
+    const rate = chunkRateFor(sources.measured, sources.chunkM3PerHour);
+    const chunkM3 = hours * rate.m3PerHour;
     return {
+      rate,
       source: 'survey',
       oreLines: sources.survey.map((o) => ({
         typeId: o.typeId,
