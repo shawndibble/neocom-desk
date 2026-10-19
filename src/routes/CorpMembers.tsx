@@ -17,7 +17,7 @@
  * The `unknown` / `ready` asymmetry and the mount-on-`ready` split are
  * `useCorpRouteGate`'s, shared with `/corp` and `/corp/assets` — see that hook.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useDarkThreshold } from '@/features/corp/darkThreshold';
 import { useTranslation } from 'react-i18next';
@@ -80,10 +80,8 @@ import { useTableExport } from '@/components/ui/useTableExport';
 import { DataGate } from '@/components/DataGate';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { useUrlParams } from '@/lib/useUrlState';
+import { useDebouncedValue } from '@/lib/useDebouncedValue';
 import { boolParam, optionalIdParam, textParam } from '@/lib/urlState';
-
-/** Same debounce shape as `CorpAssets.tsx`/`Assets.tsx`: the input stays responsive, only the filter waits. */
-const SEARCH_DEBOUNCE_MS = 250;
 
 /** The roster's filters, in the URL (ADR 0015); the table's sort is `CorpRosterTable`'s `?sort=`. */
 const FILTER_PARAMS = {
@@ -279,11 +277,7 @@ function CorpMembersView() {
     [rows]
   );
   const darkCount = rows.filter((row) => row.standing.isDark).length;
-  const [debouncedSearch, setDebouncedSearch] = useState(search);
-  useEffect(() => {
-    const id = setTimeout(() => setDebouncedSearch(search), SEARCH_DEBOUNCE_MS);
-    return () => clearTimeout(id);
-  }, [search]);
+  const [debouncedSearch] = useDebouncedValue(search);
   const visibleRows = useMemo(
     () =>
       filterRosterRows(rows, debouncedSearch).filter(

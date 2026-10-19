@@ -31,7 +31,7 @@
  */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { cx } from '@/lib/cx';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useAssetRowVirtualizer } from '@/features/assets/useAssetRowVirtualizer';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useUrlParam } from '@/lib/useUrlState';
@@ -115,8 +115,8 @@ import { loadCorporationBlueprints } from '@/features/corp/blueprints';
 import { loadAssetCopyValues } from '@/features/character/assetCopyValues';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { useFocusHeading } from '@/lib/useFocusHeading';
+import { useDebouncedValue } from '@/lib/useDebouncedValue';
 
-const SEARCH_DEBOUNCE_MS = 250;
 const SEARCH_PARAM = textParam();
 const EMPTY_PRICES: ReadonlyMap<number, number> = new Map();
 const EMPTY_VOLUMES: ReadonlyMap<number, number> = new Map();
@@ -393,11 +393,7 @@ function CorpAssetsView({ canReadBlueprints }: { canReadBlueprints: boolean }) {
   const searchRef = useRef<HTMLInputElement>(null);
   // Query string carried onto every drill-down link, as on the Assets page.
   const { search: query } = useLocation();
-  const [debouncedSearch, setDebouncedSearch] = useState(search);
-  useEffect(() => {
-    const id = setTimeout(() => setDebouncedSearch(search), SEARCH_DEBOUNCE_MS);
-    return () => clearTimeout(id);
-  }, [search]);
+  const [debouncedSearch] = useDebouncedValue(search);
   const searchActive = debouncedSearch.trim().length > 0;
 
   const searchMatches = useMemo(

@@ -27,6 +27,7 @@ import { assetCsvRows, assetsCsvColumns, type AssetCsvRow } from '@/features/cha
 import { withoutAbyssalTypePrices } from '@/engine/market/abyssalValuation';
 import { useAbyssalAssetEstimates } from '@/features/abyssal/useAbyssalAssetEstimates';
 import { parseIskAmount } from '@/lib/isk';
+import { useDebouncedValue } from '@/lib/useDebouncedValue';
 import { assetStackValue } from '@/engine/assetTree';
 import {
   type AssetItemActions,
@@ -41,11 +42,6 @@ import {
   loadCrossCharacterData,
 } from './assetsSnapshot';
 import { locationLabel, matchAssets } from './assetsLogic';
-
-// Matches Market.tsx's/SkillPicker.tsx's own search debounce — the input stays
-// instantly responsive, only the potentially-thousands-of-assets recompute
-// below waits out the debounce.
-const SEARCH_DEBOUNCE_MS = 250;
 
 /**
  * Query-string view state (ADR 0015), beside the drill-down path. The
@@ -94,11 +90,7 @@ export function useAssetsData() {
   // Debounced separately from `search` (issue #415): the input stays
   // instantly responsive, only the matching/grouping memos below — which
   // scan every asset — wait out the debounce.
-  const [debouncedSearch, setDebouncedSearch] = useState(search);
-  useEffect(() => {
-    const id = setTimeout(() => setDebouncedSearch(search), SEARCH_DEBOUNCE_MS);
-    return () => clearTimeout(id);
-  }, [search]);
+  const [debouncedSearch, setDebouncedSearch] = useDebouncedValue(search);
 
   // Permanent "all items across all locations" flat view (issue #414): off by
   // default (unpruned tree browsing, as before), and — like search — flattens

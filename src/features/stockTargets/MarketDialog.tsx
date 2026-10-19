@@ -19,13 +19,13 @@ import { ESI_REGISTRY } from '@/esi/registry';
 import { MIN_STRUCTURE_SEARCH_LENGTH, searchStructures } from '@/features/survey/surveyPlaces';
 import { COMBOBOX_NAV_KEYS, moveHighlight, type ComboboxNavKey } from '@/lib/comboboxNav';
 import { cx } from '@/lib/cx';
+import { LOOKUP_DEBOUNCE_MS } from '@/lib/useDebouncedValue';
 import { rankedSearch } from '@/lib/rankedSearch';
 import { loadNpcStations } from '@/sde/loadMarketSde';
 import type { NpcStationEntry } from '@/sde/marketTypes';
 import { loadListedAtMarket, loadSellLocations, type SellLocation } from './stockTargetsData';
 
 const SEARCH_SCOPE = ESI_REGISTRY.getCharacterSearch.scope;
-const DEBOUNCE_MS = 300;
 const STATION_LIMIT = 20;
 
 interface PlaceOption {
@@ -107,7 +107,7 @@ function MarketPlacePicker({
             ),
           });
         });
-    }, DEBOUNCE_MS);
+    }, LOOKUP_DEBOUNCE_MS);
     return () => {
       clearTimeout(timer);
       controller.abort();
