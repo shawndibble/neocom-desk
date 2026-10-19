@@ -3,6 +3,7 @@ import {
   ACCESS_TTL_MS,
   ROLE_CACHE_MS,
   decideRoles,
+  dismissalNeedsDirector,
   defaultSettings,
   isCacheFresh,
   parseClaimPaymentInput,
@@ -247,5 +248,73 @@ describe('parsers', () => {
       ).toThrow();
       expect(() => parseEditAction(close({ kind: 'keep' }))).toThrow();
     });
+  });
+});
+
+describe('dismissalNeedsDirector (D6, #4194)', () => {
+  it('is never needed without a limit, or for a Director', () => {
+    expect(dismissalNeedsDirector(null, [9e12], false)).toBe(false);
+    expect(dismissalNeedsDirector(100, [9e12], true)).toBe(false);
+  });
+
+  it('checks the limit against the total of a multi-day dismissal, not each day', () => {
+    expect(dismissalNeedsDirector(100, [60, 60], false)).toBe(true);
+    expect(dismissalNeedsDirector(100, [40, 60], false)).toBe(false);
+  });
+
+  it('counts an omitted amount as over the limit', () => {
+    expect(dismissalNeedsDirector(100, [1, undefined], false)).toBe(true);
+  });
+});
+
+describe('dismissRecords', () => {
+  it('parses a bounded batch with a reason', () => {
+    expect(
+      parseEditAction({
+        action: 'dismissRecords',
+        targets: [{ targetId: '1:2:2026-10-01', amountIsk: 5 }],
+        reason: 'r',
+      })
+    ).toEqual({
+      action: 'dismissRecords',
+      targets: [{ targetId: '1:2:2026-10-01', amountIsk: 5 }],
+      reason: 'r',
+    });
+    expect(() => parseEditAction({ action: 'dismissRecords', targets: [], reason: 'r' })).toThrow();
+    expect(() =>
+      parseEditAction({
+        action: 'dismissRecords',
+        targets: [{ targetId: 'a', amountIsk: 1 }],
+        reason: '',
+      })
+    ).toThrow();
+  });
+});
+
+describe('regroupMiner', () => {
+  it('parses a fold of stored Miners into one', () => {
+    expect(
+      parseEditAction({
+        action: 'regroupMiner',
+        minerId: 'solo:1',
+        characterIds: [1, 2, 2],
+        mainCharacterId: 2,
+        absorbMinerIds: ['g1', 'g1'],
+      })
+    ).toEqual({
+      action: 'regroupMiner',
+      minerId: 'solo:1',
+      characterIds: [1, 2],
+      mainCharacterId: 2,
+      absorbMinerIds: ['g1'],
+    });
+  });
+
+  it('refuses a main outside the group and a Miner absorbing itself', () => {
+    const base = { action: 'regroupMiner', minerId: 'g0', absorbMinerIds: [] };
+    expect(() => parseEditAction({ ...base, characterIds: [1], mainCharacterId: 9 })).toThrow();
+    expect(() =>
+      parseEditAction({ ...base, characterIds: [1], mainCharacterId: 1, absorbMinerIds: ['g0'] })
+    ).toThrow();
   });
 });

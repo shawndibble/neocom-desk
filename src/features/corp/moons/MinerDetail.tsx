@@ -24,6 +24,8 @@ import { CloseAccountDialog } from './CloseAccountDialog';
 import { MarkNotTaxDialog, ReasonDialog, RecordPaymentDialog } from './BookDialogs';
 import { isk, shortDate, shortDateTime } from './moonsFormat';
 import { Crumb, StandingWord } from './moonsParts';
+import { MinerCharacters } from './MinerCharacters';
+import { MinerCorrections } from './MinerCorrections';
 import {
   manualRemindersSent,
   mailTarget,
@@ -377,6 +379,7 @@ export function MinerDetail({ id }: { id: string }) {
           stackLayout="dense"
         />
       </Panel>
+      <MinerCorrections miner={row} days={detail.days} statements={detail.statements} />
       <Panel
         title={t('corpTaxBook.moons.miner.payments')}
         meta={
@@ -399,6 +402,7 @@ export function MinerDetail({ id }: { id: string }) {
           })}
         </p>
       </Panel>
+      <MinerCharacters miner={row} />
       <div className="grid gap-4 md:grid-cols-2">
         <Panel title={t('corpTaxBook.moons.miner.dismissals')}>
           {active.length === 0 ? (
@@ -474,15 +478,12 @@ export function MinerDetail({ id }: { id: string }) {
           reasonLabel={t('corpTaxBook.moons.dialogs.reasonShown')}
           confirmLabel={t('corpTaxBook.moons.dialogs.dismissConfirm', { amount: isk(selectedTax) })}
           run={async (reason) => {
-            for (const day of selectedDays) {
-              await edit({
-                action: 'dismiss',
-                scope: 'record',
-                targetId: day.key,
-                reason,
-                amountIsk: day.tax,
-              });
-            }
+            // One act, so the Director-approval limit applies to the total, not each day.
+            await edit({
+              action: 'dismissRecords',
+              targets: selectedDays.map((day) => ({ targetId: day.key, amountIsk: day.tax })),
+              reason,
+            });
           }}
         />
       )}

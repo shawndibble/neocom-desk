@@ -107,6 +107,7 @@ export function uploadSync(characterId: number, upload: SyncUpload): Promise<Syn
  */
 export const LIVE_CHECK_ACTIONS: ReadonlySet<string> = new Set([
   'dismiss',
+  'dismissRecords',
   'reverseDismissal',
   'writeOff',
   'rebill',
@@ -160,6 +161,19 @@ export async function readBookSummary(
     lastSync: (d.lastSync as LastSync | null | undefined) ?? null,
     structureExpiryHours: (d.structureExpiryHours as Record<string, number> | undefined) ?? {},
   };
+}
+
+/** Characters an officer unlinked: automatic grouping leaves them alone (D26). Officer-only. */
+export async function readDeclinedAutoGroup(
+  characterId: number,
+  corporationId: number
+): Promise<Set<number>> {
+  await ensureSignedIn(characterId);
+  const snap = await getDoc(
+    doc(getSyncFirestore(), 'corpTaxBooks', String(corporationId), 'meta', 'declinedAutoGroup')
+  );
+  const ids = snap.data()?.ids;
+  return new Set(Array.isArray(ids) ? (ids as number[]) : []);
 }
 
 /** The book's settings and the collections the sync needs. Officer-only: verify first. */
