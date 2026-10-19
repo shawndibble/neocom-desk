@@ -31,7 +31,7 @@ import type { MaterialSourcing, MaterialSourcingMap } from '@/engine/industry/ty
 import type { SkillGateVerdict } from '@/engine/industry/skillGate';
 import { cx } from '@/lib/cx';
 import { formatIskCompact } from '@/lib/isk';
-import { maskNumber, unmaskCount, unmaskNumber } from '@/lib/numberMask';
+import { unmaskCount, unmaskNumber } from '@/lib/numberMask';
 import { ItemInfoLink } from '@/features/entities';
 import { formatVolume } from './format';
 import { materialRowState } from './materialRow';
@@ -61,17 +61,10 @@ import { useIsPhone } from '@/lib/useIsPhone';
 import { useMediaQuery } from '@/lib/useMediaQuery';
 import { ownedStockBulkText } from './ownedStockBulkText';
 import { SourcingInput } from './SourcingInput';
+import { MaterialsPhoneRow } from './MaterialsPhoneRow';
 import { MakeOrBuyMarker } from './MakeOrBuyMarker';
 import { SwapButton } from './SwapButton';
-import {
-  ERRAND_GLYPH,
-  ERRAND_LABEL_KEY,
-  ERRAND_TONE,
-  LEDGER_VALUE,
-  editPencilClassName,
-  editableValueClassName,
-  linkClassName,
-} from './materialsTableStyle';
+import { ERRAND_GLYPH, ERRAND_LABEL_KEY, ERRAND_TONE, linkClassName } from './materialsTableStyle';
 
 interface MaterialsTableProps {
   /** Engine cost lines — already resolved against the plan's sourcing overrides and hub prices. */
@@ -839,182 +832,6 @@ export function MaterialsTable({
     );
   }
 
-  /**
-   * One phone ledger row, under its section's NEED | HAVE | BUY header: the
-   * name and total; the three numbers in the header's columns, Have a
-   * number with a pencil you tap to edit; then the row's action on the left and its price
-   * (or what a build saves) on the right. No card and no box — rows are told
-   * apart by a zebra tint, so the Materials panel is the only frame. A
-   * Blueprint row has no numbers line, and an owned one says Owned instead of
-   * a total and a price of 0.
-   */
-  function renderPhoneRow(material: MaterialTableRow) {
-    const building = isBuilt(material);
-    const tier = material.acquisitionTier;
-    const ownedBlueprint = tier !== undefined && material.remainingQuantity === 0;
-    const savings = building ? buildSavings(material) : null;
-    const item = (
-      <li
-        key={material.typeID}
-        className={cx(
-          'grid grid-cols-3 gap-x-1.5 gap-y-1 px-3 py-2 even:bg-white/[0.025]',
-          ownedBlueprint && 'opacity-80'
-        )}
-      >
-        <div className="col-span-3 flex items-center justify-between gap-2">
-          <span className="min-w-0 text-sm font-semibold">{renderName(material, false, true)}</span>
-          <span className="flex shrink-0 items-center gap-1 text-sm font-semibold tabular-nums">
-            {ownedBlueprint ? (
-              <span className="text-[0.625rem] leading-5 font-bold tracking-widest text-blueprint-copy uppercase">
-                {t('industry.blueprintAcquisitionOwned')}
-              </span>
-            ) : (
-              renderTotal(material)
-            )}
-          </span>
-        </div>
-        {!tier && (
-          <>
-            <span className={LEDGER_VALUE}>{material.quantity.toLocaleString()}</span>
-            <span className={LEDGER_VALUE}>{renderPhoneHave(material)}</span>
-            <span className={cx(LEDGER_VALUE, 'font-semibold')}>
-              {material.remainingQuantity.toLocaleString()}
-            </span>
-          </>
-        )}
-        {/* What to do about the row on the left — use what's in the hangar,
-            switch build/buy, change the blueprint tier — and on the right its
-            price as "@ price", or what building it saves. */}
-        <div className="col-span-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-          <span className="flex min-w-0 flex-wrap items-center gap-x-3">
-            {renderOwnedHint(material)}
-            {renderAction(material, false)}
-            {tier && (
-              <span className="text-[0.6875rem] text-text-dim">
-                {t('industry.blueprintAcquisitionTier', tier)}
-              </span>
-            )}
-          </span>
-          {building ? (
-            savings !== null ? (
-              <span className="ml-auto text-xs text-success tabular-nums">
-                {t('industry.errands.saves', { amount: formatIskCompact(savings) })}
-              </span>
-            ) : (
-              material.unpriced && renderPrice(material)
-            )
-          ) : (
-            !ownedBlueprint && <span className="ml-auto text-xs">{renderPhonePrice(material)}</span>
-          )}
-        </div>
-      </li>
-    );
-    return item;
-  }
-
-  /**
-   * The ledger's Have: the number with a faint pencil — the price's own
-   * "tap to edit" cue — rather than a field stretched across its column. Blue
-   * when the player set it, faint at 0. A tap swaps in the field, focused;
-   * leaving it swaps the number back. The 44px tap area is an invisible
-   * `::after`, so the row stays one line tall.
-   */
-  function renderPhoneHave(material: MaterialTableRow) {
-    if (editingHave === material.typeID) {
-      return (
-        <span
-          className="w-full"
-          onBlur={(event) => {
-            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-              setEditingHave(null);
-            }
-          }}
-        >
-          {renderHave(material, false, true, true)}
-        </span>
-      );
-    }
-    const owned = sourcing?.[material.typeID]?.ownedQuantity ?? 0;
-    return (
-      <button
-        type="button"
-        onClick={() => setEditingHave(material.typeID)}
-        className={cx(
-          editableValueClassName,
-          'tabular-nums',
-          owned > 0 ? 'text-accent' : 'text-text-dim'
-        )}
-      >
-        <span className="sr-only">
-          {t('industry.errands.haveFor', { material: nameFor(material.typeID) })},{' '}
-        </span>
-        {owned.toLocaleString()}
-        <Icon.Rename size={Icon.ICON_SIZE.sm} aria-hidden="true" className={editPencilClassName} />
-      </button>
-    );
-  }
-
-  /**
-   * The phone card's price: "@ 3,320,000 ISK" as light text, the way the
-   * mockup drew it, which becomes the field when tapped and goes back to text
-   * once focus leaves it. A box on every card made the cards heavy, and gave
-   * a card with nothing else on its last line a 44px line just for that box.
-   * The tap area is still 44px tall — an invisible `::after` around the text —
-   * so it costs no layout height. A row with no price yet stays the field,
-   * since there is no number to show.
-   */
-  function renderPhonePrice(material: MaterialTableRow) {
-    const state = materialRowState(material, sourcing, pricesReady);
-    if (editingPrice === material.typeID || state.unitPrice === null) {
-      return (
-        <span
-          onBlur={(event) => {
-            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-              setEditingPrice(null);
-            }
-          }}
-        >
-          {renderPrice(material, true, editingPrice === material.typeID)}
-        </span>
-      );
-    }
-    const overridden = state.priceSource === 'override';
-    const depth = overridden ? undefined : depthOf(material);
-    return (
-      <>
-        <button
-          type="button"
-          onClick={() => setEditingPrice(material.typeID)}
-          className={cx(
-            editableValueClassName,
-            'text-xs tabular-nums',
-            overridden ? 'text-accent' : 'text-text'
-          )}
-        >
-          <span className="sr-only">
-            {t('industry.priceFor', { material: nameFor(material.typeID) })}:{' '}
-          </span>
-          {t('industry.errands.atPrice', { price: maskNumber(state.unitPrice) })}
-          {overridden && (
-            <span className="ml-1.5 text-[0.6875rem] no-underline">
-              {t('industry.priceSourceOverride')}
-            </span>
-          )}
-          <Icon.Rename
-            size={Icon.ICON_SIZE.sm}
-            aria-hidden="true"
-            className={editPencilClassName}
-          />
-        </button>
-        {depth && (
-          <span className="mt-0.5 block text-right">
-            <DepthPriceLine depth={depth} />
-          </span>
-        )}
-      </>
-    );
-  }
-
   /** Within one section only — a sort never pulls a row out of its errand. */
   function sortForPhone(rows: readonly MaterialTableRow[]): readonly MaterialTableRow[] {
     if (phoneSort === 'plan') return rows;
@@ -1102,7 +919,36 @@ export function MaterialsTable({
                       </span>
                     </div>
                   )}
-                  <ul>{sortForPhone(rows).map((material) => renderPhoneRow(material))}</ul>
+                  <ul>
+                    {sortForPhone(rows).map((material) => (
+                      <MaterialsPhoneRow
+                        key={material.typeID}
+                        material={material}
+                        sourcing={sourcing}
+                        pricesReady={pricesReady}
+                        nameFor={nameFor}
+                        depth={depthOf(material)}
+                        savings={isBuilt(material) ? buildSavings(material) : null}
+                        editingHave={editingHave === material.typeID}
+                        editingPrice={editingPrice === material.typeID}
+                        onEditHave={() => setEditingHave(material.typeID)}
+                        onStopEditingHave={() => setEditingHave(null)}
+                        onEditPrice={() => setEditingPrice(material.typeID)}
+                        onStopEditingPrice={() => setEditingPrice(null)}
+                        name={renderName(material, false, true)}
+                        total={renderTotal(material)}
+                        ownedHint={renderOwnedHint(material)}
+                        action={renderAction(material, false)}
+                        haveField={
+                          editingHave === material.typeID
+                            ? renderHave(material, false, true, true)
+                            : null
+                        }
+                        priceField={(autoFocus) => renderPrice(material, true, autoFocus)}
+                        unpricedField={isBuilt(material) ? renderPrice(material) : null}
+                      />
+                    ))}
+                  </ul>
                 </>
               ) : (
                 <div className="overflow-x-auto">
