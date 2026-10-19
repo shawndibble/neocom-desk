@@ -185,3 +185,13 @@ describe('listedLayers', () => {
     );
   });
 });
+
+describe('dailyWalletFromJournal malformed dates', () => {
+  it('skips an entry whose date does not parse instead of throwing', () => {
+    const m = dailyWalletFromJournal([
+      { date: '2026-10-01T10:00:00Z', balance: 5 },
+      { date: 'garbage', balance: 99 },
+    ]);
+    expect([...m]).toEqual([['2026-10-01', 5]]);
+  });
+});

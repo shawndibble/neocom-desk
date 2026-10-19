@@ -28,6 +28,7 @@
  * generic body it replaces. Nothing in here throws, and nothing in here has a
  * required field.
  */
+import { parseInstant } from './esiInstant';
 
 /** Epoch ms at 1601-01-01T00:00:00Z, the origin EVE's tick counts are measured from. */
 const EVE_EPOCH_OFFSET_MS = 11_644_473_600_000;
@@ -291,8 +292,8 @@ export function reinforcementExitMs(
   payload: EveNotificationPayload
 ): number | undefined {
   if (payload.timeLeftMs === undefined) return undefined;
-  const firedAtMs = Date.parse(notificationTimestamp);
-  if (!Number.isFinite(firedAtMs)) return undefined;
+  const firedAtMs = parseInstant(notificationTimestamp);
+  if (firedAtMs === null) return undefined;
   return firedAtMs + payload.timeLeftMs;
 }
 

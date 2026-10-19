@@ -1,5 +1,6 @@
 import { utcDay } from './netWorth/snapshot';
 import type { JournalRow } from './journalNetting';
+import { parseInstant } from './esiInstant';
 
 /** One EVE (UTC) day of the Journal: ISK in and out, both as non-negative sums. */
 export interface JournalDayFlow {
@@ -65,7 +66,9 @@ export function journalDailyFlow(
   const byDay = new Map<string, JournalDayFlow>();
   for (const entry of rows) {
     if (entry.internal) continue;
-    const day = utcDay(Date.parse(entry.date));
+    const at = parseInstant(entry.date);
+    if (at === null) continue;
+    const day = utcDay(at);
     const amount = entry.amount ?? 0;
     const flow = byDay.get(day) ?? { day, in: 0, out: 0, net: 0 };
     if (amount > 0) flow.in += amount;
