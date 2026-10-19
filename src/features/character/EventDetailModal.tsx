@@ -113,7 +113,10 @@ export function EventDetailModal({
     useCallback(() => loadCalendarEvent(characterId, event.event_id), [characterId, event.event_id])
   );
   // The answer just saved, laid over the loaded copy until the next load.
-  const [savedResponse, setSavedResponse] = useState<CalendarRsvpResponse | null>(null);
+  const [savedResponse, setSavedResponse] = useState<{
+    eventId: number;
+    response: CalendarRsvpResponse;
+  } | null>(null);
   const [saving, setSaving] = useState(false);
   const [rsvpFailed, setRsvpFailed] = useState<Exclude<RsvpResult, 'saved'> | null>(null);
 
@@ -126,7 +129,7 @@ export function EventDetailModal({
         setRsvpFailed(outcome);
         return;
       }
-      setSavedResponse(response);
+      setSavedResponse({ eventId: event.event_id, response });
       onResponded?.(event.event_id, response);
     } finally {
       setSaving(false);
@@ -140,9 +143,10 @@ export function EventDetailModal({
     const { cached } = load.data;
     state = {
       status: 'ready',
-      detail: savedResponse
-        ? { ...cached, data: { ...cached.data, response: savedResponse } }
-        : cached,
+      detail:
+        savedResponse?.eventId === event.event_id
+          ? { ...cached, data: { ...cached.data, response: savedResponse.response } }
+          : cached,
     };
   } else state = { status: load.data.needsReauth ? 'needs-reauth' : 'failed' };
 
