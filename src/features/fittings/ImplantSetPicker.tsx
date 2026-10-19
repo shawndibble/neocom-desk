@@ -14,6 +14,7 @@
  * Fitting — which is what puts the page on it — while opening it alone
  * changes nothing. "Use my clone" drops the set again.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -150,9 +151,7 @@ function SlotList({ heading, typeIds, names, onRemove, onInfo, renderDetail }: S
 
   return (
     <div className="space-y-2">
-      <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-        {heading}
-      </p>
+      <p className={eyebrowClassName}>{heading}</p>
       {typeIds.length === 0 ? (
         <p className="text-sm text-text-dim">{t('fittings.implants.empty')}</p>
       ) : (

@@ -17,6 +17,7 @@
  * `Panel` (its header carries the Compare Hubs toggle) beneath the summary
  * and, when open, the Compare Hubs cards, once something has been appraised.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -382,10 +383,7 @@ export function AppraisalPanel({
             <>
               {share.status === 'manual' && (
                 <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
-                  <label
-                    htmlFor="market-appraisal-share-url"
-                    className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
-                  >
+                  <label htmlFor="market-appraisal-share-url" className={eyebrowClassName}>
                     {t('market.appraisal.shareReady')}
                   </label>
                   <TextInput

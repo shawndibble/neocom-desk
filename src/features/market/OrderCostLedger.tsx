@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { InfoTooltip } from '@/components/ui';
@@ -131,9 +132,7 @@ export function CostLedger({
             {t('market.orders.floorBreakEvenNote')}
           </p>
           <div className="rounded-xs border border-line bg-panel p-2">
-            <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-              {t('market.orders.floorWhyBroker')}
-            </p>
+            <p className={eyebrowClassName}>{t('market.orders.floorWhyBroker')}</p>
             <p className="mt-1 text-xs text-text">
               {t('market.orders.floorWhyBrokerBody', {
                 relist: formatMarketIsk(row.floor.relist),

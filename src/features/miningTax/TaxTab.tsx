@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { TaxDialogsHost } from '@/features/miningTax/TaxDialogsHost';
 import { isSelectableRow, useTaxColumns } from '@/features/miningTax/useTaxColumns';
 import { useTaxDialogs, useTaxDialogSelector } from '@/features/miningTax/useTaxDialogs';
@@ -1217,10 +1218,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
 
                 {historyRows.length > 0 && (
                   <section aria-labelledby="mining-tax-history" className="space-y-2">
-                    <h2
-                      id="mining-tax-history"
-                      className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
-                    >
+                    <h2 id="mining-tax-history" className={eyebrowClassName}>
                       {t('miningTax.sections.history')}
                     </h2>
                     <Panel padded={false}>

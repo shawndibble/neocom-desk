@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Toast } from '@/components/ui';
@@ -30,10 +31,7 @@ export function ReclaimBookSection() {
 
   return (
     <section aria-labelledby="reclaim-book-heading" className="space-y-2">
-      <h3
-        id="reclaim-book-heading"
-        className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
-      >
+      <h3 id="reclaim-book-heading" className={eyebrowClassName}>
         {t('corpTaxBook.moons.settings.reclaim.title')}
       </h3>
       <p className="text-xs text-text-dim">{t('corpTaxBook.moons.settings.reclaim.hint')}</p>

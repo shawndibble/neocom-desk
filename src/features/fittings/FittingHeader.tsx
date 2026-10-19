@@ -1,3 +1,5 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { cx } from '@/lib/cx';
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -139,9 +141,7 @@ function CompactFittingHeader({
               {t('fittings.stats.copy')}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <p className="px-2 pt-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-              {t('fittings.export.button')}
-            </p>
+            <p className={cx(eyebrowClassName, 'px-2 pt-1')}>{t('fittings.export.button')}</p>
             <FittingExportItems actions={exportActions} price={price} share={share?.items} />
             {badges && (
               <>

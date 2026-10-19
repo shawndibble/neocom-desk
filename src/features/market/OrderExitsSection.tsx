@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useTranslation } from 'react-i18next';
 import { Disclosure } from '@/components/ui';
 import { cx } from '@/lib/cx';
@@ -115,9 +116,7 @@ export function OrderExitsSection({
                     than anyone here" needs no cost basis behind it.
                   */}
           <div className="border-t border-line pt-1.5">
-            <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-              {t('market.orders.exitHaulTitle')}
-            </p>
+            <p className={eyebrowClassName}>{t('market.orders.exitHaulTitle')}</p>
             {hubs === undefined ? (
               <p className="mt-1 text-text-dim">
                 {t(

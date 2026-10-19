@@ -20,6 +20,7 @@
  * Mounts under a Router: every item row is a Build Plan context-menu
  * trigger (#931), and so is each line of the detail modal's contents.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useCallback, useDeferredValue, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -906,7 +907,7 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
 
               {suggestions.length > 0 && (
                 <div className="border-b border-line bg-panel-2 px-3 py-2">
-                  <p className="pb-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                  <p className={cx(eyebrowClassName, 'pb-1.5')}>
                     {t('contractSearch.suggestionsHeading')}
                   </p>
                   <ul

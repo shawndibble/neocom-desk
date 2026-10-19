@@ -1,3 +1,5 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { cx } from '@/lib/cx';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Trans, useTranslation } from 'react-i18next';
@@ -89,7 +91,10 @@ function CharacterGroupHeader({
   return (
     <div
       data-character-group-header
-      className="flex items-center justify-between gap-x-2 gap-y-1 border-b max-md:flex-wrap border-line bg-panel-2 px-3 py-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
+      className={cx(
+        eyebrowClassName,
+        'flex items-center justify-between gap-x-2 gap-y-1 border-b max-md:flex-wrap border-line bg-panel-2 px-3 py-1.5'
+      )}
     >
       <div className="flex min-w-0 items-baseline gap-x-2 gap-y-0.5 max-md:flex-wrap">
         <span className="max-w-full truncate">{name}</span>

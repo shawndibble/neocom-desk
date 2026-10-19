@@ -19,6 +19,7 @@
  * is a constraint to check rather than a figure to weigh, and sits in one
  * quiet grid below.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -198,9 +199,7 @@ function EndpointPlace({
 function Figure({ label, value, note }: { label: string; value: ReactNode; note?: string }) {
   return (
     <div className="flex min-w-0 flex-col gap-px">
-      <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-        {label}
-      </span>
+      <span className={eyebrowClassName}>{label}</span>
       <span className="tabular-nums">{value}</span>
       {note !== undefined && <span className="text-[0.6875rem] text-text-dim">{note}</span>}
     </div>
@@ -316,9 +315,7 @@ export function CourierContractDetailModal({
          */}
         <div className="grid grid-cols-2 items-end gap-3">
           <div className="flex flex-col gap-0.5">
-            <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-              {t('contractSearch.rewardColumn')}
-            </span>
+            <span className={eyebrowClassName}>{t('contractSearch.rewardColumn')}</span>
             <span className="text-xl leading-tight font-semibold tabular-nums">
               <IskAmount value={row.reward} />
             </span>
@@ -327,9 +324,7 @@ export function CourierContractDetailModal({
             </span>
           </div>
           <div className="flex flex-col gap-0.5 text-right">
-            <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-              {t('contractSearch.perJumpLabel')}
-            </span>
+            <span className={eyebrowClassName}>{t('contractSearch.perJumpLabel')}</span>
             <span
               // Accent marks the figure the board ranks on, so it is spent
               // only where there is a rate to rank: a free haul's honest zero
@@ -346,9 +341,7 @@ export function CourierContractDetailModal({
 
         <section className="flex flex-col gap-2 rounded-xs border border-line bg-panel-2 p-3">
           <div className="flex flex-col gap-0.5">
-            <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-              {t('contractSearch.pickUpLabel')}
-            </span>
+            <span className={eyebrowClassName}>{t('contractSearch.pickUpLabel')}</span>
             {/* Wraps rather than truncates: the station name and its region
                 are the whole reason this row exists, and the old `truncate`
                 clipped the region off both ends. */}
@@ -412,9 +405,7 @@ export function CourierContractDetailModal({
           )}
 
           <div className="flex flex-col gap-0.5">
-            <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-              {t('contractSearch.dropOffLabel')}
-            </span>
+            <span className={eyebrowClassName}>{t('contractSearch.dropOffLabel')}</span>
             <span className="text-sm">{endpointName(row.destination)}</span>
             {place(row.destination)}
           </div>
@@ -503,9 +494,7 @@ export function CourierContractDetailModal({
           which carries no item lines, or read anyone's intent.
         */}
         <section className="flex flex-col gap-1.5 rounded-xs border border-line bg-panel-2 p-3">
-          <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-            {t('contractSearch.goingRateBenchmarkLabel')}
-          </h3>
+          <h3 className={eyebrowClassName}>{t('contractSearch.goingRateBenchmarkLabel')}</h3>
           <ul className="flex flex-col gap-1.5 text-sm">
             <li>
               {measuring

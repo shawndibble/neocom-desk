@@ -1,4 +1,6 @@
 /** The Appraisal result's summary: totals chips, hold line, notes and the Compare Hubs cards. */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { cx } from '@/lib/cx';
 import { useTranslation } from 'react-i18next';
 import { Spinner } from '@/components/ui';
 import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
@@ -47,9 +49,7 @@ export function AppraisalSummary({
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center gap-2">
         {minusOwnedLabel !== null && (
-          <span className="w-full text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-            {minusOwnedLabel}
-          </span>
+          <span className={cx(eyebrowClassName, 'w-full')}>{minusOwnedLabel}</span>
         )}
         <AppraisalHeaderStats
           totals={totals}

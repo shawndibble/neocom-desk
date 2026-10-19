@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -64,7 +65,7 @@ function shortEveRange(sortedDates: readonly string[]): string {
   return formatDateRange([sortedDates[0], sortedDates[sortedDates.length - 1]]);
 }
 
-const FIELD_LABEL = 'text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
+const FIELD_LABEL = eyebrowClassName;
 
 /**
  * Settle up (issue #523's lump-sum payment flow), on one screen: the itemized

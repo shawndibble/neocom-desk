@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Disclosure, Panel } from '@/components/ui';
@@ -95,9 +96,7 @@ export function PlanToolsPane({ sections, asDisclosure, className }: PlanToolsPa
       >
         {!section.hideTitle && (
           <div className="flex items-center justify-between gap-2">
-            <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-              {section.title}
-            </h3>
+            <h3 className={eyebrowClassName}>{section.title}</h3>
             {section.actions}
           </div>
         )}

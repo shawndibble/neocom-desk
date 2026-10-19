@@ -10,6 +10,7 @@
  * "Show missing" hides what's already trained, in both lists; it sticks.
  * No active Character: names and levels only, nothing to add, no time.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, FilterChip } from '@/components/ui';
@@ -50,7 +51,7 @@ export interface AddedToPlan {
   planName: string;
   entries: readonly PlanEntry[];
 }
-const heading = 'text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
+const heading = eyebrowClassName;
 
 export function SkillsMasteryTab({
   ship,

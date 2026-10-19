@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -442,9 +443,7 @@ export function Calendar() {
             {isNarrow ? (
               <Panel padded className="w-full">
                 <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                    {periodLabel}
-                  </span>
+                  <span className={eyebrowClassName}>{periodLabel}</span>
                   {periodControls}
                 </div>
                 <CalendarDayTicker

@@ -1,3 +1,5 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { cx } from '@/lib/cx';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { db } from '@/db';
@@ -236,7 +238,7 @@ export function SavedComparisonsMenu({
             <h3
               ref={headingRef}
               tabIndex={-1}
-              className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase focus:outline-none"
+              className={cx(eyebrowClassName, 'focus:outline-none')}
             >
               {t('skillCompare.savedTitle')}
             </h3>

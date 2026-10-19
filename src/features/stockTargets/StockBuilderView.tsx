@@ -4,6 +4,7 @@
  * for it, and one action that turns the buildable part into a Build Group
  * sized to cover each.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useEffect, useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
@@ -273,8 +274,7 @@ export function StockBuilderView({
     </Panel>
   );
 
-  const sectionHeadingClassName =
-    'text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
+  const sectionHeadingClassName = eyebrowClassName;
 
   // Build Groups belong to one Character: with none active the action explains itself (§7).
   const addButton = (className: string) => {

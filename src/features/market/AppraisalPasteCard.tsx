@@ -1,4 +1,5 @@
 /** The Appraisal tab's paste card: the list box, Price %, hub, "Minus owned" and the Recent picker. */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -150,10 +151,7 @@ export function AppraisalPasteCard({
         />
 
         <div className="flex items-center gap-2">
-          <label
-            className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
-            htmlFor="market-appraisal-percent"
-          >
+          <label className={eyebrowClassName} htmlFor="market-appraisal-percent">
             {t('market.appraisal.pricePercentLabel')}
           </label>
           <TextInput

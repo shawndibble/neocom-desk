@@ -1,4 +1,5 @@
 /** The pieces of the map panel: detail body, legend, picks strip, what-if line, board. */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { formatList } from '@/lib/listFormat';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -238,7 +239,7 @@ export function PicksStrip({ s }: { s: PlanMapState }) {
       aria-label={t('piMap.picksLabel')}
       className="flex flex-wrap items-center gap-x-3.5 gap-y-1 border-b border-line px-3 py-1.5 text-xs"
     >
-      <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+      <span className={eyebrowClassName}>
         {picks.kind === 'recipes' ? t('piMap.picksRecipes') : t('piMap.picksTitle')}
       </span>
       {picks.kind === 'none' ? (

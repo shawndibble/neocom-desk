@@ -1,3 +1,5 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { cx } from '@/lib/cx';
 import { HintText } from '@/components/ui/HintText';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -843,7 +845,9 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
             )}
             {/* Only once more than one Character's jobs are on screen (`showCharacterColumn`) — same gate as `OpenOrdersPanel`'s `showCharacterStrip`. */}
             {job.owner === 'corporation' && (
-              <span className="shrink-0 rounded-xs bg-panel-2 px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+              <span
+                className={cx(eyebrowClassName, 'shrink-0 rounded-xs bg-panel-2 px-1.5 py-0.5')}
+              >
                 {t('industry.jobsCorpBadge')}
               </span>
             )}
@@ -973,7 +977,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
             {isLoggableHistoryJob(job) &&
               historyStates.get(job.job_id)?.kind !== 'logged' &&
               dismissedJobIds.has(job.job_id) && (
-                <span className="rounded-xs bg-panel-2 px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                <span className={cx(eyebrowClassName, 'rounded-xs bg-panel-2 px-1.5 py-0.5')}>
                   {t('industry.historyDismissed')}
                 </span>
               )}
@@ -1107,7 +1111,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
       }).join(' · ')}
       className="flex items-center gap-1 text-xs tabular-nums"
     >
-      <span className="hidden text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase sm:inline">
+      <span className={cx(eyebrowClassName, 'hidden sm:inline')}>
         {t('industry.jobSlotSummaryLabel')}
       </span>
       {JOB_SLOT_CATEGORIES.map((category, index) => {

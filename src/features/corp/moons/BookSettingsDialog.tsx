@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useMemo, useState, type ReactNode } from 'react';
 import { chunkRateFor } from '@/engine/corpTaxBook/extraction';
 import { useTranslation } from 'react-i18next';
@@ -26,9 +27,7 @@ import { ReclaimBookSection } from './ReclaimBookSection';
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="space-y-2">
-      <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-        {title}
-      </h3>
+      <h3 className={eyebrowClassName}>{title}</h3>
       {children}
     </section>
   );
