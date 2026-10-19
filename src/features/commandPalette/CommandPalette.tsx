@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
@@ -309,7 +310,7 @@ export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
                   <div
                     id={headingId}
                     role="presentation"
-                    className="flex items-center gap-2 px-2 pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
+                    className={cx(eyebrowClassName, 'flex items-center gap-2 px-2 pb-1')}
                   >
                     {t(group.provider.labelKey)}
                     {group.provider.scope && <CharacterScopeReadout {...group.provider.scope} />}

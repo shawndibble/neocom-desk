@@ -95,10 +95,54 @@ function subscribeStatus(listener: () => void): () => void {
   return () => void statusListeners.delete(listener);
 }
 
-/** Test-only: forgets a failure and the retry count a previous test left in the module. */
+/**
+ * The catalogue built once per `loadEpoch` and shared by every hook instance, so
+ * they all hold the same object (the `hullFitService` fingerprint cache keys on
+ * it) and the SDE-wide passes in `buildCatalogue` run once, not once per mount.
+ * A failed load is never kept, so a retry loads again.
+ */
+let cache: {
+  epoch: number;
+  promise: Promise<FittingCatalogue>;
+  value: FittingCatalogue | null;
+} | null = null;
+
+function getCatalogue(): Promise<FittingCatalogue> {
+  if (cache && cache.epoch === loadEpoch) return cache.promise;
+  const entry: NonNullable<typeof cache> = {
+    epoch: loadEpoch,
+    value: null,
+    promise: Promise.all([
+      loadTypes(),
+      loadFittingSlots(),
+      loadMarketTypes(),
+      loadMarketGroups(),
+      loadVariations(),
+    ]).then(([types, rackOf, marketTypes, groups, variations]) => {
+      const built = buildCatalogue(types, rackOf, marketTypes, groups, variations);
+      entry.value = built;
+      return built;
+    }),
+  };
+  cache = entry;
+  entry.promise.then(
+    () => {
+      if (cache === entry) setLoadFailed(false);
+    },
+    () => {
+      if (cache !== entry) return;
+      cache = null;
+      setLoadFailed(true);
+    }
+  );
+  return entry.promise;
+}
+
+/** Test-only: forgets a failure, the retry count and the cached catalogue a previous test left in the module. */
 export function resetFittingCatalogueStatusForTests(): void {
   loadFailed = false;
   loadEpoch = 0;
+  cache = null;
 }
 
 /** Tries the catalogue files again. A no-op unless the last load failed, so several callers retrying together load once. */
@@ -124,7 +168,9 @@ export function useFittingCatalogueFailed(): boolean {
  * retry, and it loads again by itself when the connection returns.
  */
 export function useFittingCatalogue(): FittingCatalogue | null {
-  const [catalogue, setCatalogue] = useState<FittingCatalogue | null>(null);
+  const [catalogue, setCatalogue] = useState<FittingCatalogue | null>(() =>
+    cache?.epoch === loadEpoch ? cache.value : null
+  );
   const epoch = useSyncExternalStore(
     subscribeStatus,
     () => loadEpoch,
@@ -133,23 +179,13 @@ export function useFittingCatalogue(): FittingCatalogue | null {
   const failed = useFittingCatalogueFailed();
   useEffect(() => {
     let cancelled = false;
-    // A new attempt starts clean: an earlier failure is not this one's.
-    setLoadFailed(false);
-    void Promise.all([
-      loadTypes(),
-      loadFittingSlots(),
-      loadMarketTypes(),
-      loadMarketGroups(),
-      loadVariations(),
-    ])
-      .then(([types, rackOf, marketTypes, groups, variations]) => {
-        if (cancelled) return;
-        setCatalogue(buildCatalogue(types, rackOf, marketTypes, groups, variations));
-        setLoadFailed(false);
-      })
-      .catch(() => {
-        if (!cancelled) setLoadFailed(true);
-      });
+    // Failure is reported by `getCatalogue` itself, once per load rather than per mount.
+    getCatalogue().then(
+      (built) => {
+        if (!cancelled) setCatalogue(built);
+      },
+      () => {}
+    );
     return () => {
       cancelled = true;
     };

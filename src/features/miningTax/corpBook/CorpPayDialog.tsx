@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal } from '@/components/ui';
@@ -17,7 +18,7 @@ interface Props {
   statementCodes: readonly { code: string; period: string }[];
 }
 
-const FIELD_LABEL = 'text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
+const FIELD_LABEL = eyebrowClassName;
 
 /**
  * "Settle up" for the corp Payee. Unlike a personal Payee, nothing is recorded

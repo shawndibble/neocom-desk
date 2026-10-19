@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { fittingCompareHref, fittingsRedirect } from '@/features/fittings/fittingRoutes';
 import { ShipsTabBar } from '@/features/fittings/ShipsTabBar';
 import { SHIPS_TABS_ID } from '@/features/fittings/shipsTabs';
@@ -166,12 +167,8 @@ function FittingsPage() {
   useTimedToast(swapped, () => setSwapped(null));
   const openMakeItFit = useCallback(() => setMakeItFitOpen(true), []);
   const storedView = useFittingViewPreference((state) => state.value);
-  const viewHydrated = useFittingViewPreference((state) => state.hydrated);
-  const hydrateView = useFittingViewPreference((state) => state.hydrate);
+  const viewHydrated = useHydratedStore(useFittingViewPreference);
   const setView = useFittingViewPreference((state) => state.setValue);
-  useEffect(() => {
-    void hydrateView();
-  }, [hydrateView]);
   const view = resolveFittingView(storedView, isPhone);
   // Below desktop the Ring, the List and the stats are one set of tabs.
   const [phoneTab, setPhoneTab] = useState<'editor' | 'stats'>('editor');

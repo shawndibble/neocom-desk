@@ -4,7 +4,7 @@
  * (`characterColumns.ts`), applied to a second table so it doesn't grow a
  * second column-picker mechanism.
  */
-import { createLocalSetting } from '@/lib/useLocalSetting';
+import { createColumnVisibilitySetting } from '@/lib/columnVisibility';
 
 /**
  * In table column order — `columns` in `BpcSourcingPanel.tsx` renders exactly
@@ -45,19 +45,12 @@ export const DEFAULT_VISIBLE_BPC_SEARCH_COLUMNS: readonly BpcSearchColumnId[] = 
   'price',
 ];
 
-function isBpcSearchColumnId(raw: unknown): raw is BpcSearchColumnId {
-  return typeof raw === 'string' && (BPC_SEARCH_COLUMN_IDS as readonly string[]).includes(raw);
-}
-
 export const VISIBLE_BPC_SEARCH_COLUMNS_KEY = 'bpcSearchVisibleColumns.v2';
 
-export const useVisibleBpcSearchColumns = createLocalSetting<readonly BpcSearchColumnId[]>({
+// Empty stays valid here: Item/ME/TE/etc. stay put, unlike `characterColumns.ts`.
+export const useVisibleBpcSearchColumns = createColumnVisibilitySetting({
   key: VISIBLE_BPC_SEARCH_COLUMNS_KEY,
-  defaultValue: DEFAULT_VISIBLE_BPC_SEARCH_COLUMNS,
-  // An empty stored array is rejected rather than honoured, same as
-  // `characterColumns.ts` — unlike there, an empty BPC Search column set is
-  // less catastrophic (Item/ME/TE/etc. stay put), but still not a state
-  // worth persisting silently.
-  parse: (raw) =>
-    Array.isArray(raw) && raw.every(isBpcSearchColumnId) ? (raw as BpcSearchColumnId[]) : null,
+  ids: BPC_SEARCH_COLUMN_IDS,
+  defaultVisible: DEFAULT_VISIBLE_BPC_SEARCH_COLUMNS,
+  allowEmpty: true,
 });

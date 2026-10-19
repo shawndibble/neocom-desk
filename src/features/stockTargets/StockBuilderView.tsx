@@ -4,6 +4,7 @@
  * for it, and one action that turns the buildable part into a Build Group
  * sized to cover each.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useEffect, useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
@@ -28,6 +29,7 @@ import { cx } from '@/lib/cx';
 import { formatDuration } from '@/lib/duration';
 import { StockListNameDialog } from './StockListDialogs';
 import { StockStatusPill } from './StockStatus';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 interface BuilderRow extends StockRow {
   blueprint: CharacterBlueprint | null;
@@ -62,16 +64,11 @@ export function StockBuilderView({
   const [busy, setBusy] = useState(false);
   const buildGroups = useBuildGroups((state) => state.value);
   const setBuildGroups = useBuildGroups((state) => state.setValue);
-  const hydrateBuildGroups = useBuildGroups((state) => state.hydrate);
   const assumedMe = useAssumedMe((state) => state.value);
   const assumedTe = useAssumedTe((state) => state.value);
-  const hydrateMe = useAssumedMe((state) => state.hydrate);
-  const hydrateTe = useAssumedTe((state) => state.hydrate);
+  useHydratedStore(useBuildGroups, useAssumedMe, useAssumedTe);
 
   useEffect(() => {
-    void hydrateBuildGroups();
-    void hydrateMe();
-    void hydrateTe();
     let cancelled = false;
     clearCatalogFailure();
     loadBlueprintCatalog().then(
@@ -94,15 +91,7 @@ export function StockBuilderView({
     return () => {
       cancelled = true;
     };
-  }, [
-    activeCharacterId,
-    hydrateBuildGroups,
-    hydrateMe,
-    hydrateTe,
-    catalogAttempt,
-    failCatalog,
-    clearCatalogFailure,
-  ]);
+  }, [activeCharacterId, catalogAttempt, failCatalog, clearCatalogFailure]);
 
   const split = useMemo(() => {
     if (!catalog || !blueprints) return null;
@@ -273,8 +262,7 @@ export function StockBuilderView({
     </Panel>
   );
 
-  const sectionHeadingClassName =
-    'text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
+  const sectionHeadingClassName = eyebrowClassName;
 
   // Build Groups belong to one Character: with none active the action explains itself (§7).
   const addButton = (className: string) => {

@@ -30,11 +30,11 @@ import {
   PRICE_SERIES_CHOICES,
   seriesShows,
   summarizeOpenPrices,
-  type OpenPriceSeries,
   type PriceSeriesChoice,
   type RegionOpenSeries,
 } from '@/engine/market/priceHistoryOpen';
-import { loadMarketOpenPrices } from './marketOpenPrices';
+import { loadMarketOpenPrices, type HubOpenPrices } from './marketOpenPrices';
+import { TRADE_HUBS } from '@/market/hubs';
 import { seriesChoiceLabel } from './priceHistoryLabels';
 import { usePriceHistoryRange } from './priceHistoryRangePref';
 import { usePriceHistorySeries } from './priceHistorySeriesPref';
@@ -42,6 +42,7 @@ import { marketIskDecimals } from '@/lib/isk';
 import type { MarketRegionEntry } from '@/sde/marketTypes';
 import type { ComparedRegionSeries } from './PriceHistoryChart';
 import { CompareRegionsPicker } from './CompareRegionsPicker';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 const MOVING_AVERAGE_WINDOW_DAYS = 7;
 const MOVING_AVERAGE_WINDOW_DAYS_7D_RANGE = 3;
@@ -160,7 +161,7 @@ function useComparedHistories(typeId: number, regionIds: readonly number[]) {
  * simply leaves that region on its average line until the panel is reopened.
  */
 function useOpenSeries(typeId: number, regionIds: readonly number[]) {
-  const [byKey, setByKey] = useState<ReadonlyMap<string, OpenPriceSeries | null>>(new Map());
+  const [byKey, setByKey] = useState<ReadonlyMap<string, HubOpenPrices | null>>(new Map());
   const requested = useRef(new Set<string>());
   useEffect(() => {
     for (const regionId of regionIds) {
@@ -173,7 +174,7 @@ function useOpenSeries(typeId: number, regionIds: readonly number[]) {
     }
   }, [typeId, regionIds]);
   return useMemo(() => {
-    const series = new Map<number, OpenPriceSeries>();
+    const series = new Map<number, HubOpenPrices>();
     const missing = new Set<number>();
     for (const regionId of regionIds) {
       const key = `${regionId}:${typeId}`;
@@ -227,11 +228,8 @@ export function PriceHistoryPanel({
   // series either way and the range only slices it, so no range costs a
   // request the default would not have spent.
   const range = usePriceHistoryRange((state) => state.value);
-  const hydrateRange = usePriceHistoryRange((state) => state.hydrate);
   const setRange = usePriceHistoryRange((state) => state.setValue);
-  useEffect(() => {
-    void hydrateRange();
-  }, [hydrateRange]);
+  useHydratedStore(usePriceHistoryRange);
   // Distinct from "no history": a thrown fetch failure (network/rate-limit/5xx)
   // is not the same fact as ESI genuinely having nothing for this item, and
   // folding the two into one EmptyState would misreport failures as data.
@@ -347,8 +345,8 @@ interface RangedHistoryProps {
   /** Normalized picks, parallel to `comparedHistories`. */
   compareIds: readonly number[];
   comparedHistories: readonly RegionHistoryState[];
-  /** Open buy/sell series by region id, for the regions that have one. */
-  openSeries: ReadonlyMap<number, OpenPriceSeries>;
+  /** Open buy/sell series by region id (its hub station's), for the regions that have one. */
+  openSeries: ReadonlyMap<number, HubOpenPrices>;
   /** Regions whose open read came back with no series at all. */
   openMissing: ReadonlySet<number>;
 }
@@ -369,11 +367,8 @@ function RangedHistory({
 }: RangedHistoryProps) {
   const { t } = useTranslation();
   const series = usePriceHistorySeries((state) => state.value);
-  const hydrateSeries = usePriceHistorySeries((state) => state.hydrate);
   const setSeries = usePriceHistorySeries((state) => state.setValue);
-  useEffect(() => {
-    void hydrateSeries();
-  }, [hydrateSeries]);
+  useHydratedStore(usePriceHistorySeries);
   // Cut to the range like the ESI days; a region with no open day left in it
   // is left out, so it keeps its average line.
   const openPrices = useMemo<RegionOpenSeries[]>(
@@ -381,7 +376,8 @@ function RangedHistory({
       [...openSeries.entries()]
         .map(([regionId, stored]) => ({
           regionId,
-          points: clipOpenPrices(openPricePoints(stored), range, now),
+          station: TRADE_HUBS.find((hub) => hub.stationId === stored.stationId)?.stationLabel,
+          points: clipOpenPrices(openPricePoints(stored.series), range, now),
         }))
         .filter((o) => o.points.length > 0),
     [openSeries, range, now]

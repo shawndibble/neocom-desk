@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -783,7 +784,7 @@ export function Wallet() {
                   headingRef={panelHeadingRef}
                   stats={
                     <div>
-                      <p className="flex items-center gap-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                      <p className={cx(eyebrowClassName, 'flex items-center gap-1')}>
                         {t('wallet.everMarks')}
                         <InfoTooltip
                           label={t('wallet.everMarksTooltipLabel')}

@@ -23,6 +23,7 @@ import type { MapColony } from './PlanMap';
 import { buildMapGraph, type MapGraph } from './mapModel';
 import { whatIfKey, whatIfTypesOf } from '../biggerChainsModel';
 import { useChainEstimates, type ChainEstimateOf } from '../useChainEstimates';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 export type MapAdviceState =
   | { status: 'loading' }
@@ -82,11 +83,7 @@ export function useMapAdvice(
 
   // The Plan tab's Most ISK / Least hauling choice, so both tabs rank alike.
   const preference = usePlanPreference((state) => state.value);
-  const preferenceHydrated = usePlanPreference((state) => state.hydrated);
-  const hydratePreference = usePlanPreference((state) => state.hydrate);
-  useEffect(() => {
-    void hydratePreference();
-  }, [hydratePreference]);
+  const preferenceHydrated = useHydratedStore(usePlanPreference);
   const inputs = usePiAdviceInputs(snapshot, characterId, preference);
   // Wait for the stored choice: ranking by the default first would flash the wrong picks.
   const input =

@@ -36,10 +36,12 @@ no app server. Two kinds of data:
 
 - A daily job (`syncMarketOpenPrices`) folds EVE Ref's last market-order
   snapshot of the previous UTC day into the R2 object `open-prices/<typeId>.json`:
-  per type, every Trade Hub region's highest buy and lowest sell for the day, up
+  per type, every Trade Hub _station_'s highest buy and lowest sell for the day
+  (`{ typeId, dates, stations: { <stationId>: { buy, sell } } }`; objects from
+  before #4279 may still carry region-wide `regions` until the backfill re-run), up
   to 400 days, public static file with no Firebase involved (`functions/src/marketOpenPrices.ts` holds the logic,
-  `marketOrdersArchive.ts` the streaming fetch). The same pass keeps every
-  mining type's best buy and sell at each hub _station_ and merges the day into
+  `marketOrdersArchive.ts` the streaming fetch). The mining types' share of the
+  same station fold is merged into
   `mining-prices/<hubId>/<YYYY-MM>.json` (`functions/src/miningHubPrices.ts`),
   which the mining pricing reads (`features/market/hubSnapshot.ts`); it replaced
   the retired `captureMiningPriceSnapshot` job and its Firestore `marketHistory`.

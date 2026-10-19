@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import type { ReactElement, ReactNode } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import {
@@ -302,9 +303,7 @@ const moonMinerColumns: DataTableColumn<MoonMiner>[] = [
 function Fact({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div>
-      <dt className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-        {label}
-      </dt>
+      <dt className={eyebrowClassName}>{label}</dt>
       <dd className="text-sm">{value}</dd>
     </div>
   );
@@ -839,9 +838,7 @@ function NeedsYouQueue() {
   return (
     <NewComponent name="NeedsYouQueue">
       <div className="space-y-2">
-        <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-          Needs you · 4
-        </p>
+        <p className={eyebrowClassName}>Needs you · 4</p>
         <div className="grid gap-2 md:grid-cols-2">
           <QueueCard
             tone="warning"

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useTranslation } from 'react-i18next';
 import type { PayeeRecord } from '@/db';
 import { useAutoContinueSessions, useDismissedContinuations } from './continueSessionPref';
@@ -37,14 +38,9 @@ export function useContinuations({
   const { t } = useTranslation();
   const autoContinue = useAutoContinueSessions((state) => state.value);
   const setAutoContinue = useAutoContinueSessions((state) => state.setValue);
-  const hydrateAutoContinue = useAutoContinueSessions((state) => state.hydrate);
   const dismissedContinuations = useDismissedContinuations((state) => state.value);
   const setDismissedContinuations = useDismissedContinuations((state) => state.setValue);
-  const hydrateDismissedContinuations = useDismissedContinuations((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateAutoContinue();
-    void hydrateDismissedContinuations();
-  }, [hydrateAutoContinue, hydrateDismissedContinuations]);
+  useHydratedStore(useAutoContinueSessions, useDismissedContinuations);
 
   // Offers on screen when automatic mode was switched on — "next time" means
   // they stay offers rather than being continued the moment the box is ticked.

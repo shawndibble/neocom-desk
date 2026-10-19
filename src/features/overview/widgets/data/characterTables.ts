@@ -323,7 +323,7 @@ export function clonesTable(t: Translate, rows: readonly CloneTableRow[]): Table
 // --- Location ------------------------------------------------------------------------
 
 /** High-sec reads green, low-sec amber, null-sec and below red, by the one-decimal figure the client shows. */
-export function securityTone(security: number): 'good' | 'caution' | 'bad' {
+function securityTone(security: number): 'good' | 'caution' | 'bad' {
   const shown = Math.round(security * 10) / 10;
   return shown >= 0.5 ? 'good' : shown >= 0.1 ? 'caution' : 'bad';
 }

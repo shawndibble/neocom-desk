@@ -6,7 +6,7 @@
  * "Scan".
  */
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
-import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
+import { useCallback, useMemo, useState, type ReactElement } from 'react';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import { useTranslation } from 'react-i18next';
 import { useCharacterNames } from '@/features/character/useCharacters';
@@ -96,6 +96,7 @@ import { vs90dTooltip } from './vs90d';
 import { marketWideOpportunitiesCsvColumns } from './opportunitiesCsv';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 const ORDER_DEPTH_TONE: Record<OrderDepthLevel, StatChipTone> = {
   deep: 'success',
@@ -268,10 +269,7 @@ export function MarketWideOpportunitiesPanel({
   // The share assumption is a remembered default behind its URL key
   // (`salesSharePref.ts`): a link's `marketWide.share` wins, only an edit is stored.
   const rememberedShare = useSalesShare((state) => state.value);
-  const hydrateRememberedShare = useSalesShare((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateRememberedShare();
-  }, [hydrateRememberedShare]);
+  useHydratedStore(useSalesShare);
   const rememberedParams = useMemo(
     () => ({
       values: { [MARKET_WIDE_FILTER.fieldToParam.salesShare]: rememberedShare },

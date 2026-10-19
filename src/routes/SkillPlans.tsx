@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useTranslation } from 'react-i18next';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { db } from '@/db';
@@ -75,10 +76,7 @@ export function SkillPlans() {
   // Shared with every other 30 s clock on screen; paused while the tab is hidden.
   const nowMs = useTicker(TICK_MS);
   const weekStart = useCalendarWeekStart((state) => state.value);
-  const hydrateWeekStart = useCalendarWeekStart((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateWeekStart();
-  }, [hydrateWeekStart]);
+  useHydratedStore(useCalendarWeekStart);
   const queueView = useMemo(
     () => buildQueueView(classifySkillQueue(queueResult?.data ?? [], nowMs), nowMs, weekStart),
     [queueResult, nowMs, weekStart]

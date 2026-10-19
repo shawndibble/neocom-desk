@@ -2,9 +2,8 @@ import { execFileSync } from 'node:child_process';
 import { Readable } from 'node:stream';
 import unbzip2Stream from 'unbzip2-stream';
 import { describe, expect, it } from 'vitest';
-import { OpenPriceFold } from './marketOpenPrices.js';
+import { OpenPriceFold, SNAPSHOT_HUBS, StationPriceFold } from './marketOpenPrices.js';
 import { foldBz2Snapshot, foldOrdersCsv, parseIsBuy } from './marketOrdersArchive.js';
-import { SNAPSHOT_HUBS, StationPriceFold } from './miningHubPrices.js';
 
 const HEADER =
   'duration,is_buy_order,issued,location_id,min_volume,order_id,price,range,system_id,type_id,volume_remain,volume_total,http_last_modified,station_id,region_id,constellation_id';

@@ -43,6 +43,7 @@ import {
   type MarketLocationParam,
 } from '@/engine/market/urlState';
 import type { MarketGroupNode, MarketTypeEntry, MarketRegionEntry } from '@/sde/marketTypes';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 /** Tree search, in the URL (ADR 0015) scoped to the Browser tab. */
 const BROWSER_SEARCH_KEY = 'browser.q';
@@ -143,14 +144,12 @@ export function useMarketBrowser({
   const [searchParams, setSearchParams] = useSearchParams();
 
   const hubId = useMarketBrowserHub((state) => state.value);
-  const hubHydrated = useMarketBrowserHub((state) => state.hydrated);
-  const hydrateHub = useMarketBrowserHub((state) => state.hydrate);
+  const hubHydrated = useHydratedStore(useMarketBrowserHub);
   const setHubId = useMarketBrowserHub((state) => state.setValue);
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
 
   const locationModeValue = useLocationMode((state) => state.value);
-  const locationModeHydrated = useLocationMode((state) => state.hydrated);
-  const hydrateLocationMode = useLocationMode((state) => state.hydrate);
+  const locationModeHydrated = useHydratedStore(useLocationMode);
   const setLocationModeValue = useLocationMode((state) => state.setValue);
 
   // Tree search, in the URL (ADR 0015) scoped to the Browser tab — a reload
@@ -218,13 +217,6 @@ export function useMarketBrowser({
     'browser.compare',
     COMPARE_REGIONS_PARAM
   );
-
-  // Separate from Appraisal's `hydratePricePercent` effect (Market.tsx) —
-  // different concern; two independent mount-effects behave the same as one.
-  useEffect(() => {
-    void hydrateHub();
-    void hydrateLocationMode();
-  }, [hydrateHub, hydrateLocationMode]);
 
   const parsedParams = useMemo(
     () => parseMarketParams((key) => searchParams.get(key)),

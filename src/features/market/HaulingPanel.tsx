@@ -39,7 +39,6 @@ import {
   Toast,
 } from '@/components/ui';
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
-import { cx } from '@/lib/cx';
 import { useIsNarrow } from '@/lib/useIsNarrow';
 import { useElementNarrowerThan } from '@/lib/useElementNarrowerThan';
 import { useIsPhone } from '@/lib/useIsPhone';
@@ -97,7 +96,7 @@ import {
   pickHaulingHub,
 } from './haulingHubs';
 import { rememberHaulingSummary, summarizeHaulingRows } from './haulingSummary';
-import { iskGains, signedIsk } from './signedIsk';
+import { IskDelta } from '@/components/ui/IskDelta';
 import { useHaulingFees, useHaulingScan } from './useHaulingScan';
 import { useHaulingFill, useHaulingFillOffer } from './useHaulingFill';
 import {
@@ -107,6 +106,7 @@ import {
   type HaulingProgress,
   type HaulMode,
 } from './haulingData';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 const DAY_CHOICES = [7, 14, 30, 0] as const;
 
 /**
@@ -183,13 +183,8 @@ function pickRememberedParams(source: RememberedHaulingParams): RememberedHaulin
  */
 function useRememberedHaulingFilter(): RememberedDefaults<ReturnType<typeof haulingUrl>> {
   const filterPref = useHaulingFilterPref((s) => s.value);
-  const hydrateFilterPref = useHaulingFilterPref((s) => s.hydrate);
   const storedBudget = useHaulingBudget((s) => s.value);
-  const hydrateBudget = useHaulingBudget((s) => s.hydrate);
-  useEffect(() => {
-    void hydrateFilterPref();
-    void hydrateBudget();
-  }, [hydrateFilterPref, hydrateBudget]);
+  useHydratedStore(useHaulingFilterPref, useHaulingBudget);
   return useMemo(
     () => ({
       values: pickRememberedParams({
@@ -238,11 +233,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
 
   const defaultHubId = useMarketHub((state) => state.value);
-  const defaultHubHydrated = useMarketHub((state) => state.hydrated);
-  const hydrateDefaultHub = useMarketHub((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateDefaultHub();
-  }, [hydrateDefaultHub]);
+  const defaultHubHydrated = useHydratedStore(useMarketHub);
   const haulingSchema = useMemo(() => haulingUrl(defaultHubId), [defaultHubId]);
 
   const rememberedFilter = useRememberedHaulingFilter();
@@ -298,15 +289,10 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       : (groups?.find((g) => g.id === id)?.name ?? t('market.hauling.categoryFallback', { id }));
 
   const cargo = useHaulingCargo((s) => s.value);
-  const hydrateCargo = useHaulingCargo((s) => s.hydrate);
   const setCargo = useHaulingCargo((s) => s.setValue);
   const introDismissed = useIntroDismissed((s) => s.value);
-  const hydrateIntro = useIntroDismissed((s) => s.hydrate);
   const setIntroDismissed = useIntroDismissed((s) => s.setValue);
-  useEffect(() => {
-    void hydrateCargo();
-    void hydrateIntro();
-  }, [hydrateCargo, hydrateIntro]);
+  useHydratedStore(useHaulingCargo, useIntroDismissed);
   const cargoSet = cargo !== null && cargo.holds.length > 0;
 
   // The pickers never leave Any at both ends (`pickHaulingHub` swaps), but a hand-written link can.
@@ -600,11 +586,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     <div className="flex flex-col gap-2">
       <p className="flex items-baseline gap-2 text-sm tabular-nums">
         {cargoSet && <b>{t('market.hauling.tripBar.free', { m3: formatTripM3(freeM3) })}</b>}
-        <span
-          className={cx('ml-auto font-semibold', iskGains(plan.totals.profit, 0) && 'text-success')}
-        >
-          {signedIsk(plan.totals.profit, 0)}
-        </span>
+        <IskDelta amount={plan.totals.profit} decimals={0} className="ml-auto font-semibold" />
       </p>
       <div className="flex items-center gap-2">
         {copyButton('md', 'flex-1 justify-center')}

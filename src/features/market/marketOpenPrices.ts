@@ -3,8 +3,17 @@
  * `syncMarketOpenPrices` Cloud Function (docs/context/decisions/
  * 20261018-121126-price-history-draws-daily-open-buy-and-sell.md; layout:
  * 20261018-164126-open-prices-one-document-per-type-every-hub.md). One object per
- * type holding every Trade Hub region, a static file in Cloudflare R2 (20261018-201511-moving-the-daily-snapshots-to-r2.md), so — like the contract snapshots — this
+ * type holding every Trade Hub station, a static file in Cloudflare R2 (20261018-201511-moving-the-daily-snapshots-to-r2.md), so — like the contract snapshots — this
  * needs no Firebase session and the read costs no egress.
+ *
+ * Since #4279 the prices are the hub *station*'s (Jita 4-4), keyed by station
+ * id. Objects written before that hold region-wide series keyed by region id
+ * (`regions`), and one the daily job has written into since holds both, on
+ * different dates (each date holds one shape). Both are read: a hub region
+ * gets its station's series; an old object, its region-wide series; a mixed
+ * one, the two spliced by date under the station's name, so the chart neither
+ * loses its history nor stops at the deploy date while the backfill re-run is
+ * pending. Drop the `regions` read once that has run.
  *
  * Never fails the history panel: a missing object (a type the backfill has
  * not reached), a region the object does not hold (any non-hub region) and an
@@ -15,6 +24,7 @@
  */
 import { R2_SNAPSHOT_ORIGIN } from '@/features/contractSearch/r2OfferSnapshot';
 import type { OpenPriceSeries } from '@/engine/market/priceHistoryOpen';
+import { TRADE_HUBS } from '@/market/hubs';
 
 /** Mirrors `openPricesR2Key` on the Functions side (`functions/src/r2DailySnapshots.ts`). */
 export function openPricesUrl(typeId: number): string {
@@ -36,37 +46,75 @@ async function fetchTypeObject(typeId: number): Promise<unknown | null> {
 /** The backend publishes once a day. */
 const CACHE_TTL_MS = 60 * 60_000;
 
-type RegionSeries = ReadonlyMap<number, OpenPriceSeries>;
+/** A type's object as series, by hub station id and (old objects) by region id. */
+export interface StoredOpenPrices {
+  stations: ReadonlyMap<number, OpenPriceSeries>;
+  regions: ReadonlyMap<number, OpenPriceSeries>;
+}
+
+/** What a region draws: its hub station's series, or (`stationId` null) an old region-wide one. */
+export interface HubOpenPrices {
+  series: OpenPriceSeries;
+  stationId: number | null;
+}
 
 function isNumberOrNullArray(value: unknown): value is (number | null)[] {
   return Array.isArray(value) && value.every((v) => v === null || typeof v === 'number');
 }
 
-/**
- * The stored type document as one series per region, or null when it is not
- * shaped like one. Mirrors the writer's layout: a shared ascending `dates`
- * array and `regions.<regionId>.buy|sell` parallel to it. A malformed region
- * is skipped.
- */
-export function parseOpenPricesByType(data: unknown): RegionSeries | null {
-  if (typeof data !== 'object' || data === null) return null;
-  const { dates, regions } = data as Record<string, unknown>;
-  if (!Array.isArray(dates) || !dates.every((d) => typeof d === 'string')) return null;
-  if (dates.length === 0 || typeof regions !== 'object' || regions === null) return null;
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function seriesById(map: unknown, dates: string[]): Map<number, OpenPriceSeries> {
   const out = new Map<number, OpenPriceSeries>();
-  for (const [id, series] of Object.entries(regions)) {
-    const regionId = Number(id);
-    if (!Number.isInteger(regionId) || typeof series !== 'object' || series === null) continue;
-    const { buy, sell } = series as Record<string, unknown>;
+  if (!isObject(map)) return out;
+  for (const [key, series] of Object.entries(map)) {
+    const id = Number(key);
+    if (!Number.isInteger(id) || !isObject(series)) continue;
+    const { buy, sell } = series;
     if (!isNumberOrNullArray(buy) || !isNumberOrNullArray(sell)) continue;
-    out.set(regionId, { dates: dates as string[], buy, sell });
+    out.set(id, { dates, buy, sell });
   }
   return out;
 }
 
-const cache = new Map<number, { at: number; regions: RegionSeries | null }>();
+/**
+ * The stored type object as series, or null when it is not shaped like one.
+ * Mirrors the writer's layout: a shared ascending `dates` array and
+ * `stations.<stationId>.buy|sell` (and, in an old object, `regions.<regionId>`)
+ * parallel to it. A malformed series is skipped.
+ */
+export function parseOpenPricesByType(data: unknown): StoredOpenPrices | null {
+  if (!isObject(data)) return null;
+  const { dates, stations, regions } = data;
+  if (!Array.isArray(dates) || !dates.every((d) => typeof d === 'string')) return null;
+  if (dates.length === 0 || (!isObject(stations) && !isObject(regions))) return null;
+  return { stations: seriesById(stations, dates), regions: seriesById(regions, dates) };
+}
+
+/** Station prices on station days, the old region prices on the region days before them. */
+function splice(station: OpenPriceSeries, region: OpenPriceSeries): OpenPriceSeries {
+  return {
+    dates: station.dates,
+    buy: station.dates.map((_, i) => station.buy[i] ?? region.buy[i] ?? null),
+    sell: station.dates.map((_, i) => station.sell[i] ?? region.sell[i] ?? null),
+  };
+}
+
+/** The region's series to draw out of a type's object, or null when it has none (any non-hub region). */
+export function pickOpenPrices(stored: StoredOpenPrices, regionId: number): HubOpenPrices | null {
+  const stationId = TRADE_HUBS.find((hub) => hub.regionId === regionId)?.stationId;
+  const station = stationId === undefined ? undefined : stored.stations.get(stationId);
+  const region = stored.regions.get(regionId);
+  if (station && stationId !== undefined)
+    return { series: region ? splice(station, region) : station, stationId };
+  return region ? { series: region, stationId: null } : null;
+}
+
+const cache = new Map<number, { at: number; stored: StoredOpenPrices | null }>();
 /** One read per type even when several regions ask at once; resolves undefined on failure. */
-const inflight = new Map<number, Promise<RegionSeries | null | undefined>>();
+const inflight = new Map<number, Promise<StoredOpenPrices | null | undefined>>();
 
 /** For tests: forget every cached document. */
 export function resetMarketOpenPricesCache(): void {
@@ -74,17 +122,17 @@ export function resetMarketOpenPricesCache(): void {
   inflight.clear();
 }
 
-function readType(typeId: number, now: number): Promise<RegionSeries | null | undefined> {
+function readType(typeId: number, now: number): Promise<StoredOpenPrices | null | undefined> {
   let pending = inflight.get(typeId);
   if (!pending) {
     // Started inside the chain, so a synchronous failure is a failed read too,
     // never a rejection.
-    const read: Promise<RegionSeries | null | undefined> = Promise.resolve()
+    const read: Promise<StoredOpenPrices | null | undefined> = Promise.resolve()
       .then(() => fetchTypeObject(typeId))
       .then((body) => {
-        const regions = body === null ? null : parseOpenPricesByType(body);
-        cache.set(typeId, { at: now, regions });
-        return regions;
+        const stored = body === null ? null : parseOpenPricesByType(body);
+        cache.set(typeId, { at: now, stored });
+        return stored;
       })
       .catch(() => undefined)
       .finally(() => {
@@ -96,14 +144,13 @@ function readType(typeId: number, now: number): Promise<RegionSeries | null | un
   return pending;
 }
 
-/** The item's open-price series in the region, or null for "none to draw". Never throws. */
+/** The item's open-price series for the region (its hub station's), or null for "none to draw". Never throws. */
 export async function loadMarketOpenPrices(
   regionId: number,
   typeId: number,
   now: number = Date.now()
-): Promise<OpenPriceSeries | null> {
+): Promise<HubOpenPrices | null> {
   const hit = cache.get(typeId);
-  if (hit && now - hit.at < CACHE_TTL_MS) return hit.regions?.get(regionId) ?? null;
-  const regions = await readType(typeId, now);
-  return regions?.get(regionId) ?? null;
+  const stored = hit && now - hit.at < CACHE_TTL_MS ? hit.stored : await readType(typeId, now);
+  return stored ? pickOpenPrices(stored, regionId) : null;
 }

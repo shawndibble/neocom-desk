@@ -13,6 +13,12 @@ export interface TradeHub {
   /** Short solar-system name (distinct from `name`, the full station name) — for compact UI labels. */
   systemName: string;
   /**
+   * The station as traders say it ("Jita 4-4": planet and moon), naming a
+   * price taken at the station rather than region-wide, e.g. Price History's
+   * "Jita 4-4 buy" line. A proper name, so not translated.
+   */
+  stationLabel: string;
+  /**
    * The hub system's security band, for a Build Plan that names no build
    * system of its own and therefore builds at its hub. Every hub is highsec by
    * construction — an NPC trade hub is not somewhere CONCORD is absent — and
@@ -43,6 +49,7 @@ export const TRADE_HUBS: readonly TradeHub[] = [
     id: 'jita',
     name: 'Jita IV - Moon 4 - Caldari Navy Assembly Plant',
     systemName: 'Jita',
+    stationLabel: 'Jita 4-4',
     security: 'highsec',
     stationId: 60003760,
     systemId: 30000142,
@@ -55,6 +62,7 @@ export const TRADE_HUBS: readonly TradeHub[] = [
     id: 'amarr',
     name: 'Amarr VIII (Oris) - Emperor Family Academy',
     systemName: 'Amarr',
+    stationLabel: 'Amarr VIII',
     security: 'highsec',
     stationId: 60008494,
     systemId: 30002187,
@@ -67,6 +75,7 @@ export const TRADE_HUBS: readonly TradeHub[] = [
     id: 'dodixie',
     name: 'Dodixie IX - Moon 20 - Federation Navy Assembly Plant',
     systemName: 'Dodixie',
+    stationLabel: 'Dodixie IX-20',
     security: 'highsec',
     stationId: 60011866,
     systemId: 30002659,
@@ -79,6 +88,7 @@ export const TRADE_HUBS: readonly TradeHub[] = [
     id: 'rens',
     name: 'Rens VI - Moon 8 - Brutor Tribe Treasury',
     systemName: 'Rens',
+    stationLabel: 'Rens VI-8',
     security: 'highsec',
     stationId: 60004588,
     systemId: 30002510,
@@ -91,6 +101,7 @@ export const TRADE_HUBS: readonly TradeHub[] = [
     id: 'hek',
     name: 'Hek VIII - Moon 12 - Boundless Creation Factory',
     systemName: 'Hek',
+    stationLabel: 'Hek VIII-12',
     security: 'highsec',
     stationId: 60005686,
     systemId: 30002053,

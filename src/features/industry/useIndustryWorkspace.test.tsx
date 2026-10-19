@@ -29,12 +29,19 @@ vi.mock('./reactionFacilityDefaults', () => ({
 vi.mock('./useDetectedOwnedStock', () => ({ useOwnedStockSnapshot: () => ({}) }));
 vi.mock('./corpOwnedStock', () => ({ useCorpOwnedStockSource: () => ({}) }));
 vi.mock('./buildPlanPricingInputs', () => ({ useBuildPlanPricingInputs: () => ({}) }));
+// Selector-callable like a zustand hook, plus the getState/subscribe `useHydratedStore` reads.
+const { settingStub } = vi.hoisted(() => ({
+  settingStub: (state: () => object) =>
+    Object.assign((select: (s: object) => unknown) => select(state()), {
+      getState: state,
+      subscribe: () => () => {},
+    }),
+}));
 vi.mock('./assumedTe', () => ({
-  useAssumedTe: (select: (s: object) => unknown) => select({ value: 0, hydrate }),
+  useAssumedTe: settingStub(() => ({ value: 0, hydrated: true, hydrate })),
 }));
 vi.mock('./buildGroups', () => ({
-  useBuildGroups: (select: (s: object) => unknown) =>
-    select({ value: {}, hydrated: true, hydrate, setValue }),
+  useBuildGroups: settingStub(() => ({ value: {}, hydrated: true, hydrate, setValue })),
 }));
 
 import { useIndustryWorkspace } from './useIndustryWorkspace';

@@ -1,6 +1,6 @@
-import { useEffect } from 'react';
 import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
 import { usePiSettings, type PiBuyTier } from './piSettings';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 export interface SellHub {
   /** The hub PI is priced at: sold to, or the basis of the corp buyback, and bought from. */
@@ -25,11 +25,8 @@ export interface SellHub {
  */
 export function useSellHub(): SellHub {
   const settings = usePiSettings((state) => state.value);
-  const hydrate = usePiSettings((state) => state.hydrate);
   const setSettings = usePiSettings((state) => state.setValue);
-  useEffect(() => {
-    void hydrate();
-  }, [hydrate]);
+  useHydratedStore(usePiSettings);
   return {
     hub: getTradeHub(settings.hub) ?? DEFAULT_TRADE_HUB,
     buybackPct: settings.buybackPct,

@@ -1,4 +1,6 @@
 /** "How to use the map": the steps, the legend, and where to learn PI. */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { cx } from '@/lib/cx';
 import { useTranslation } from 'react-i18next';
 import * as Icon from '@/components/ui/icons';
 import { ExternalLink } from '@/components/ui/ExternalLink';
@@ -6,11 +8,7 @@ import { useTouchContext } from '@/lib/useMediaQuery';
 import { VERDICT_TONE } from './mapText';
 
 function Heading({ children }: { children: React.ReactNode }) {
-  return (
-    <h3 className="mt-4 mb-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase first:mt-0">
-      {children}
-    </h3>
-  );
+  return <h3 className={cx(eyebrowClassName, 'mt-4 mb-1.5 first:mt-0')}>{children}</h3>;
 }
 
 function Sample({ className, children }: { className: string; children?: React.ReactNode }) {

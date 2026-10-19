@@ -31,6 +31,7 @@
  * from the local SDE snapshot only (`loadContractLocationInfo`) — no ESI
  * call per row; a player structure stays unnamed.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { lpRate } from '@/engine/loyalty/marketLpValue';
 import { loadMarketLpValues } from '@/features/loyalty/marketLpValue';
 import {
@@ -104,6 +105,7 @@ import {
 import { loadLpTurnInPricer } from './blueprintPurchaseOffers';
 import { formatPercent } from './format';
 import type { InventionQuoteResult } from './inventionSources';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 export type { AcquisitionOwnedCopy } from './blueprintAcquisitionSources';
 
@@ -116,7 +118,7 @@ const ALL_REGIONS = 'all';
 const HUB_REGION = 'hub';
 type ContractScope = typeof HUB_REGION | typeof ALL_REGIONS;
 
-const HEADING_CLASS = 'text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
+const HEADING_CLASS = eyebrowClassName;
 const SECTION_CLASS = 'flex flex-col gap-2 border-t border-line pt-3';
 
 interface BlueprintAcquisitionModalProps {
@@ -252,10 +254,7 @@ export function BlueprintAcquisitionModal({
   const [contractScope, setContractScope] = useState<ContractScope>(HUB_REGION);
 
   const lpValue = useLpValue((state) => state.value);
-  const hydrateLpValue = useLpValue((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateLpValue();
-  }, [hydrateLpValue]);
+  useHydratedStore(useLpValue);
 
   const contracts = useLoad(async () => {
     const cached = await loadPublicBpcContracts();
