@@ -10,6 +10,7 @@ import {
   FieldValue,
   type DocumentReference,
   type Firestore,
+  type QueryDocumentSnapshot,
   type Transaction,
 } from 'firebase-admin/firestore';
 import { HttpsError, type FunctionsErrorCode } from 'firebase-functions/v2/https';
@@ -34,6 +35,7 @@ import {
   WRITE_OFFS,
   decideRoles,
   needsLiveCheck,
+  dismissalNeedsDirector,
   defaultSettings,
   isCacheFresh,
   parseRecordKey,
@@ -432,6 +434,59 @@ const rateKey = (r: StoredRate): string =>
     ? `record:${r.recordKey}`
     : `${r.scope}:${'minerId' in r ? r.minerId : ''}:${'moonId' in r ? r.moonId : ''}:${r.effectiveFrom}`;
 
+/** The characters an officer unlinked: automatic grouping (D26) leaves them alone. */
+const DECLINED_DOC = 'declinedAutoGroup';
+
+/**
+ * Checks a grouping against the other Miners and the guest rule, reading only.
+ * `ignore` are Miners being dissolved in the same transaction.
+ */
+async function planMiner(
+  c: EditCtx,
+  miners: readonly QueryDocumentSnapshot[],
+  action: { minerId: string; characterIds: number[]; mainCharacterId: number },
+  ignore: ReadonlySet<string>
+): Promise<{ pending: number[]; confirmed: Set<number> }> {
+  const mine = miners.find((d) => d.id === action.minerId)?.data();
+  if (mine?.closedAt != null)
+    fail('failed-precondition', "This Miner's account is closed", 'account-closed');
+  const clash = miners.find(
+    (d) =>
+      d.id !== action.minerId &&
+      !ignore.has(d.id) &&
+      (d.data().characterIds as number[]).some((x) => action.characterIds.includes(x))
+  );
+  if (clash)
+    fail('failed-precondition', 'A character is already in another Miner', 'already-grouped');
+  // Characters outside the corp are not linked until they confirm (D26b).
+  const confirmed = new Set<number>((mine?.confirmedCharacterIds as number[] | undefined) ?? []);
+  const outsiders = new Set<number>();
+  for (const characterId of action.characterIds) {
+    const rows = await c.tx.get(
+      col(c, OBSERVED).where('characterId', '==', characterId).select('recordedCorporationId')
+    );
+    if (rows.docs.some((d) => d.get('recordedCorporationId') !== c.corporationId))
+      outsiders.add(characterId);
+  }
+  return { pending: [...outsiders].filter((x) => !confirmed.has(x)), confirmed };
+}
+
+function writeMiner(
+  c: EditCtx,
+  action: { minerId: string; characterIds: number[]; mainCharacterId: number },
+  { pending, confirmed }: { pending: number[]; confirmed: Set<number> }
+): void {
+  c.tx.set(col(c, MINERS).doc(action.minerId), {
+    id: action.minerId,
+    characterIds: action.characterIds,
+    mainCharacterId: action.mainCharacterId,
+    pendingConfirmation: pending,
+    confirmedCharacterIds: [...confirmed].filter((x) => action.characterIds.includes(x)),
+    // A guest's character stays out of the readable grouping until it confirms (D26b).
+    uids: action.characterIds.filter((x) => !pending.includes(x)).map((x) => `char:${x}`),
+  });
+}
+
 async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
   const { tx, now } = c;
   const iso = new Date(now).toISOString();
@@ -536,12 +591,13 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       return { detail: { paymentId: action.paymentId, minerId: action.minerId } };
     }
     case 'dismiss': {
-      const limit = c.book.dismissApprovalAboveIsk;
       // An omitted amount cannot dodge the gate: with a limit set it counts as over it.
       if (
-        typeof limit === 'number' &&
-        (action.amountIsk ?? Infinity) > limit &&
-        !c.access.isDirector
+        dismissalNeedsDirector(
+          c.book.dismissApprovalAboveIsk as number | null | undefined,
+          [action.amountIsk],
+          c.access.isDirector
+        )
       ) {
         throw new HttpsError(
           'permission-denied',
@@ -578,6 +634,71 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         result: { dismissalId: id },
       };
     }
+    case 'dismissRecords': {
+      // A day an active dismissal already covers is skipped, not dismissed twice. Days already on a
+      // Statement are dismissed as the single `dismiss` does (the Statement is not touched).
+      const wanted = new Map<string, number>();
+      for (const t of action.targets) {
+        wanted.set(t.targetId, (wanted.get(t.targetId) ?? 0) + t.amountIsk);
+      }
+      const already = new Set<string>();
+      const wantedIds = [...wanted.keys()];
+      for (let i = 0; i < wantedIds.length; i += 30) {
+        const snap = await c.tx.get(
+          col(c, DISMISSALS).where('targetId', 'in', wantedIds.slice(i, i + 30))
+        );
+        for (const d of snap.docs) {
+          if (d.get('scope') === 'record' && !d.get('reversed')) already.add(d.get('targetId'));
+        }
+      }
+      const targets = wantedIds
+        .filter((id) => !already.has(id))
+        .map((targetId) => ({ targetId, amountIsk: wanted.get(targetId) as number }));
+      const skipped = wantedIds.filter((id) => already.has(id));
+      if (targets.length === 0) {
+        fail('failed-precondition', 'Those days are already dismissed', 'already-dismissed');
+      }
+      // The limit is on the total actually dismissed in this act, so splitting by day cannot dodge it (#4194).
+      if (
+        dismissalNeedsDirector(
+          c.book.dismissApprovalAboveIsk as number | null | undefined,
+          targets.map((t) => t.amountIsk),
+          c.access.isDirector
+        )
+      ) {
+        throw new HttpsError(
+          'permission-denied',
+          'A Director must approve this size of dismissal',
+          { reason: 'director-approval' }
+        );
+      }
+      const ids: string[] = [];
+      targets.forEach((target, i) => {
+        const id = `d${now}_${i}_${rand(4)}`;
+        const characterId = Number(target.targetId.split(':')[0]);
+        tx.create(col(c, DISMISSALS).doc(id), {
+          id,
+          scope: 'record',
+          targetId: target.targetId,
+          by,
+          at: iso,
+          reason: action.reason,
+          uids: Number.isSafeInteger(characterId) ? [`char:${characterId}`] : [],
+          amountIsk: target.amountIsk,
+        });
+        ids.push(id);
+      });
+      return {
+        detail: {
+          dismissalIds: ids,
+          days: targets.length,
+          skipped,
+          totalIsk: targets.reduce((sum, t) => sum + t.amountIsk, 0),
+          reason: action.reason,
+        },
+        result: { dismissalIds: ids, skipped },
+      };
+    }
     case 'reverseDismissal': {
       const ref = col(c, DISMISSALS).doc(action.dismissalId);
       const dismissal = await mustGet(c, ref, 'Dismissal');
@@ -587,41 +708,49 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
     }
     case 'setMiner': {
       const miners = await tx.get(col(c, MINERS));
-      const mine = miners.docs.find((d) => d.id === action.minerId)?.data();
-      if (mine?.closedAt != null)
-        fail('failed-precondition', "This Miner's account is closed", 'account-closed');
-      const clash = miners.docs.find(
-        (d) =>
-          d.id !== action.minerId &&
-          (d.data().characterIds as number[]).some((x) => action.characterIds.includes(x))
-      );
-      if (clash)
-        fail('failed-precondition', 'A character is already in another Miner', 'already-grouped');
-      // Characters outside the corp are not linked until they confirm (D26b).
-      const confirmed = new Set<number>(
-        (mine?.confirmedCharacterIds as number[] | undefined) ?? []
-      );
-      const outsiders = new Set<number>();
-      for (const characterId of action.characterIds) {
-        const rows = await tx.get(
-          col(c, OBSERVED).where('characterId', '==', characterId).select('recordedCorporationId')
-        );
-        if (rows.docs.some((d) => d.get('recordedCorporationId') !== c.corporationId))
-          outsiders.add(characterId);
-      }
-      const pending = [...outsiders].filter((x) => !confirmed.has(x));
-      tx.set(col(c, MINERS).doc(action.minerId), {
-        id: action.minerId,
-        characterIds: action.characterIds,
-        mainCharacterId: action.mainCharacterId,
-        pendingConfirmation: pending,
-        confirmedCharacterIds: [...confirmed].filter((x) => action.characterIds.includes(x)),
-        // A guest's character stays out of the readable grouping until it confirms (D26b).
-        uids: action.characterIds.filter((x) => !pending.includes(x)).map((x) => `char:${x}`),
-      });
+      const out = await planMiner(c, miners.docs, action, new Set());
+      writeMiner(c, action, out);
       return {
-        detail: { minerId: action.minerId, characterIds: action.characterIds, pending },
-        result: { pendingConfirmation: pending },
+        detail: {
+          minerId: action.minerId,
+          characterIds: action.characterIds,
+          pending: out.pending,
+        },
+        result: { pendingConfirmation: out.pending },
+      };
+    }
+    case 'regroupMiner': {
+      // One transaction for the whole fold: the absorbed groups are dissolved and the target set
+      // together, so a failure leaves every character where it was (#4194).
+      const miners = await tx.get(col(c, MINERS));
+      const absorbed = new Set(action.absorbMinerIds);
+      for (const id of absorbed) {
+        const doc = miners.docs.find((d) => d.id === id);
+        if (!doc) fail('not-found', 'Miner not found', 'not-found');
+        const stray = (doc.data().characterIds as number[]).filter(
+          (x) => !action.characterIds.includes(x)
+        );
+        if (stray.length > 0) {
+          fail('invalid-argument', 'An absorbed Miner keeps a character out', 'regroup-incomplete');
+        }
+      }
+      const out = await planMiner(c, miners.docs, action, absorbed);
+      for (const id of absorbed) tx.delete(col(c, MINERS).doc(id));
+      writeMiner(c, action, out);
+      // A character an officer put in a group on purpose is no longer one to keep out of auto-grouping.
+      tx.set(
+        col(c, META).doc(DECLINED_DOC),
+        { ids: FieldValue.arrayRemove(...action.characterIds) },
+        { merge: true }
+      );
+      return {
+        detail: {
+          minerId: action.minerId,
+          characterIds: action.characterIds,
+          absorbed: action.absorbMinerIds,
+          pending: out.pending,
+        },
+        result: { pendingConfirmation: out.pending },
       };
     }
     case 'unlink': {
@@ -647,6 +776,12 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
           uids: characterIds.map((x) => `char:${x}`),
         });
       }
+      // D26: every officer's sync must leave this character out of an automatic group.
+      tx.set(
+        col(c, META).doc(DECLINED_DOC),
+        { ids: FieldValue.arrayUnion(action.characterId) },
+        { merge: true }
+      );
       return { detail: { minerId: action.minerId, characterId: action.characterId } };
     }
     case 'addAdjustment': {

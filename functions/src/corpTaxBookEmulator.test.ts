@@ -453,6 +453,200 @@ suite('Corp Tax Book callables (emulator)', () => {
       await edit(DIRECTOR, big, true);
     });
 
+    it('dismisses several days at once, skipping days already dismissed', async () => {
+      await turnOn();
+      const day = (d: string) => `50:1000:${d}`;
+      await edit(
+        ACCOUNTANT,
+        { action: 'dismiss', scope: 'record', targetId: day('2026-10-05'), reason: 'event' },
+        true
+      );
+      const out = await edit(
+        ACCOUNTANT,
+        {
+          action: 'dismissRecords',
+          targets: [
+            { targetId: day('2026-10-05'), amountIsk: 10 },
+            { targetId: day('2026-10-06'), amountIsk: 20 },
+          ],
+          reason: 'event',
+        },
+        true
+      );
+      expect(out.skipped).toEqual([day('2026-10-05')]);
+      expect(out.dismissalIds).toHaveLength(1);
+      expect(
+        await reason(
+          edit(
+            ACCOUNTANT,
+            {
+              action: 'dismissRecords',
+              targets: [{ targetId: day('2026-10-06'), amountIsk: 20 }],
+              reason: 'again',
+            },
+            true
+          )
+        )
+      ).toBe('already-dismissed');
+      // A reversed dismissal no longer covers the day.
+      const first = (await book().collection('dismissals').get()).docs.find(
+        (d) => d.get('targetId') === day('2026-10-05')
+      )!;
+      await edit(
+        ACCOUNTANT,
+        { action: 'reverseDismissal', dismissalId: first.id, reason: 'oops' },
+        true
+      );
+      const again = await edit(
+        ACCOUNTANT,
+        {
+          action: 'dismissRecords',
+          targets: [{ targetId: day('2026-10-05'), amountIsk: 10 }],
+          reason: 'back',
+        },
+        true
+      );
+      expect(again.skipped).toEqual([]);
+    });
+
+    it('checks the approval limit on what a multi-day dismissal actually dismisses', async () => {
+      await turnOn();
+      await edit(DIRECTOR, { action: 'updateSettings', patch: { dismissApprovalAboveIsk: 100 } });
+      const day = (d: string) => `50:1000:${d}`;
+      await edit(
+        DIRECTOR,
+        {
+          action: 'dismiss',
+          scope: 'record',
+          targetId: day('2026-10-05'),
+          reason: 'x',
+          amountIsk: 90,
+        },
+        true
+      );
+      // 90 + 60 is over the limit, but the 90 is already dismissed, so only 60 counts.
+      const out = await edit(
+        ACCOUNTANT,
+        {
+          action: 'dismissRecords',
+          targets: [
+            { targetId: day('2026-10-05'), amountIsk: 90 },
+            { targetId: day('2026-10-06'), amountIsk: 60 },
+          ],
+          reason: 'x',
+        },
+        true
+      );
+      expect(out.skipped).toEqual([day('2026-10-05')]);
+      expect(
+        await reason(
+          edit(
+            ACCOUNTANT,
+            {
+              action: 'dismissRecords',
+              targets: [
+                { targetId: day('2026-10-07'), amountIsk: 60 },
+                { targetId: day('2026-10-08'), amountIsk: 60 },
+              ],
+              reason: 'x',
+            },
+            true
+          )
+        )
+      ).toBe('director-approval');
+    });
+
+    it('regroups atomically: absorbed groups dissolve, a refusal changes nothing', async () => {
+      await turnOn();
+      await edit(ACCOUNTANT, {
+        action: 'setMiner',
+        minerId: 'm-b',
+        characterIds: [62, 63],
+        mainCharacterId: 62,
+      });
+      await edit(ACCOUNTANT, {
+        action: 'setMiner',
+        minerId: 'm-c',
+        characterIds: [64, 65],
+        mainCharacterId: 64,
+      });
+      // m-c is not fully inside the new group: nothing may change.
+      expect(
+        await reason(
+          edit(ACCOUNTANT, {
+            action: 'regroupMiner',
+            minerId: 'solo:60',
+            characterIds: [60, 62, 63, 64],
+            mainCharacterId: 60,
+            absorbMinerIds: ['m-b', 'm-c'],
+          })
+        )
+      ).toBe('regroup-incomplete');
+      expect((await book().collection('miners').doc('m-b').get()).exists).toBe(true);
+      expect((await book().collection('miners').doc('solo:60').get()).exists).toBe(false);
+      await edit(ACCOUNTANT, {
+        action: 'regroupMiner',
+        minerId: 'solo:60',
+        characterIds: [60, 62, 63],
+        mainCharacterId: 62,
+        absorbMinerIds: ['m-b'],
+      });
+      expect((await book().collection('miners').doc('m-b').get()).exists).toBe(false);
+      expect((await book().collection('miners').doc('solo:60').get()).data()).toMatchObject({
+        characterIds: [60, 62, 63],
+        mainCharacterId: 62,
+        pendingConfirmation: [],
+      });
+    });
+
+    it('holds a guest added by a regroup until they confirm', async () => {
+      await turnOn();
+      await syncBook(
+        deps(),
+        who(ACCOUNTANT),
+        parseSyncInput(
+          {
+            corporationId: CORP,
+            observed: [
+              row(11, '2026-10-18T10:00:00Z', { characterId: 61, recordedCorporationId: 555 }),
+            ],
+          },
+          now
+        )
+      );
+      const out = await edit(ACCOUNTANT, {
+        action: 'regroupMiner',
+        minerId: 'm-a',
+        characterIds: [60, 61],
+        mainCharacterId: 60,
+        absorbMinerIds: [],
+      });
+      expect(out.pendingConfirmation).toEqual([61]);
+      expect((await book().collection('miners').doc('m-a').get()).get('uids')).toEqual(['char:60']);
+    });
+
+    it('records an unlinked character in the book so every sync leaves it alone', async () => {
+      await turnOn();
+      await edit(ACCOUNTANT, {
+        action: 'setMiner',
+        minerId: 'm-a',
+        characterIds: [60, 61],
+        mainCharacterId: 60,
+      });
+      await edit(ACCOUNTANT, { action: 'unlink', minerId: 'm-a', characterId: 61 });
+      const declined = () => book().collection('meta').doc('declinedAutoGroup').get();
+      expect((await declined()).get('ids')).toEqual([61]);
+      // Grouping it on purpose lifts the mark.
+      await edit(ACCOUNTANT, {
+        action: 'regroupMiner',
+        minerId: 'm-a',
+        characterIds: [60, 61],
+        mainCharacterId: 60,
+        absorbMinerIds: [],
+      });
+      expect((await declined()).get('ids')).toEqual([]);
+    });
+
     it('records manual payments and assigns Unmatched ones', async () => {
       await turnOn();
       await edit(ACCOUNTANT, {
