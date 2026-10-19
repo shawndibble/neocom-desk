@@ -20,6 +20,7 @@ import { cx } from '@/lib/cx';
 import { TRADE_HUBS } from '@/market/hubs';
 import { editErrorMessage, useBook } from './useBook';
 import { isk } from './moonsFormat';
+import { AutomaticSyncSection } from './AutomaticSyncSection';
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -490,6 +491,8 @@ export function BookSettingsDialog({ open, onClose }: { open: boolean; onClose: 
               : t('corpTaxBook.moons.settings.approvalDirector')}
           </p>
         </Section>
+
+        <AutomaticSyncSection />
       </div>
     </Modal>
   );

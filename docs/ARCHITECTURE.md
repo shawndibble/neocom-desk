@@ -511,6 +511,28 @@ nightly when both sources move to a newer build and opens an auto-merging PR.
   pure half is `src/engine/corpTaxBook/sync.ts` (gaps, donation resolution,
   settlement plan). `useCorpTaxBook` exposes last-synced/stale/gaps and syncs
   on visit; `useMiningLedgerAccess` says when to ask for the mining scope.
+  **Scheduled sync** (issue #4068, ADR 0025): `syncCorpTaxBooks`
+  (`onSchedule`, every 6 hours) syncs and settles each opted-in corporation's
+  book with the token of one opted-in book editor. The grant is
+  `corpTaxBookSyncGrants/{corporationId}`: function-only (rules deny every
+  client), one doc per corporation holding the holder's narrow-scope refresh
+  token encrypted under the Alerts Grant's `ALERTS_TOKEN_KEY` with a
+  `corpSyncGrant` purpose in the AAD. What officers read is
+  `corpTaxBooks/{corp}/meta/scheduledSync` (holder, active or stopped and why,
+  last run). Callables: `saveCorpTaxBookSyncGrantCallable` (the holder, proven by
+  the grant's own token) and `revokeCorpTaxBookSyncGrantCallable` (the holder, or
+  the CEO with a live role check). A run refreshes and rotates the token,
+  re-reads the holder's corporation and roles, then calls `syncBookAs` /
+  `editBookAs` (`assignPayment`, `settleStatements` only; never issues or mails).
+  It stops the schedule and deletes the token when the holder lost the role, left
+  the corp, SSO says `invalid_grant`, ESI refuses the token or the book is off.
+  The pure half of the visit's pipeline is mirrored in
+  `functions/src/corpTaxBookSyncEngine.ts`, pinned by
+  `src/engine/corpTaxBook/syncMirror.test.ts`; emulator tests are
+  `functions/src/corpSyncGrantEmulator.test.ts`. The client is
+  `AutomaticSyncSection` (Settings) and `features/corp/taxBook/syncGrant.ts`; the
+  round trip rides the `corpSync` login intent, like Alerts. Not deployed by CI:
+  `firebase deploy --only functions,firestore:rules`.
   **Claiming a donation** (issue #4065): `claimCorpTaxBookPaymentCallable` is
   authorised by the caller's uid, not an officer record. It finds the payment,
   answers "not found" for a missing one and for someone else's alike, refuses

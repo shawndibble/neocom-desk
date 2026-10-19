@@ -80,3 +80,22 @@ describe('rotateStoredToken', () => {
     expect(decryptRefreshToken(next!, 1, key)).toBe('rotated-token');
   });
 });
+
+describe('token purpose', () => {
+  it('binds a blob to its collection: an Alerts blob does not decrypt as a Corp sync grant, nor the reverse', () => {
+    const key = parseAlertsKey(KEY);
+    const alerts = encryptRefreshToken(TOKEN, 7, key);
+    const corp = encryptRefreshToken(TOKEN, 7, key, 'corpSyncGrant');
+    expect(decryptRefreshToken(corp, 7, key, 'corpSyncGrant')).toBe(TOKEN);
+    expect(decryptRefreshToken(alerts, 7, key)).toBe(TOKEN);
+    expect(() => decryptRefreshToken(alerts, 7, key, 'corpSyncGrant')).toThrow();
+    expect(() => decryptRefreshToken(corp, 7, key)).toThrow();
+  });
+  it('rotates under the same purpose', () => {
+    const key = parseAlertsKey(KEY);
+    const blob = encryptRefreshToken(TOKEN, 7, key, 'corpSyncGrant');
+    expect(rotateStoredToken(blob, TOKEN, 7, key, 'corpSyncGrant')).toBeNull();
+    const rotated = rotateStoredToken(blob, 'next', 7, key, 'corpSyncGrant')!;
+    expect(decryptRefreshToken(rotated, 7, key, 'corpSyncGrant')).toBe('next');
+  });
+});

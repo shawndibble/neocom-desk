@@ -1,5 +1,11 @@
 // Kicks off EVE SSO: stash PKCE state, then leave the app for login.eveonline.com.
-import { startAlertsLogin, startLogin, scopesForRetry, takeRetryBudget } from '@/auth/session';
+import {
+  startAlertsLogin,
+  startCorpSyncLogin,
+  startLogin,
+  scopesForRetry,
+  takeRetryBudget,
+} from '@/auth/session';
 import { clearLoginReturnTo, setLoginReturnTo, takeLoginReturnTo } from '@/auth/loginReturnTo';
 import { CORE_GRANT, SCOPES, scopesForGroup } from '@/esi/scopes';
 import type { ScopeGroup } from '@/esi/registry';
@@ -99,6 +105,20 @@ export async function beginEveLogin(options: EveLoginOptions = {}): Promise<void
 export async function beginAlertsLogin(characterId: number): Promise<void> {
   rememberThisPage();
   assignLocation(await startAlertsLogin(characterId));
+}
+
+/**
+ * Turn on the Corp Tax Book's Automatic sync for one book editor (ADR 0025): a
+ * separate SSO round trip for the grant's scopes alone, returning to the page it
+ * was pressed on. The callback never stores its token on this device; see
+ * `features/corp/taxBook/syncGrant.ts`.
+ */
+export async function beginCorpSyncLogin(
+  characterId: number,
+  corporationId: number
+): Promise<void> {
+  rememberThisPage();
+  assignLocation(await startCorpSyncLogin(characterId, corporationId));
 }
 
 /**

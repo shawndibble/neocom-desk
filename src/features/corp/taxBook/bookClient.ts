@@ -31,6 +31,7 @@ import type {
   SyncExtraction,
   SyncGap,
 } from '@/engine/corpTaxBook/sync';
+import { scheduledSyncFrom, type ScheduledSyncStatus } from '@/engine/corpTaxBook/scheduledSync';
 import type { ObservedRow } from '@/engine/corpTaxBook/types';
 import { getSyncFirestore, getSyncFunctions } from '@/sync/firebaseApp';
 import { ensureSignedIn } from '@/sync/syncAuth';
@@ -294,6 +295,8 @@ export interface BookData {
   declarations: Declaration[];
   adjustments: Adjustment[];
   groupingAnswers?: GroupingAnswer[];
+  /** The scheduled sync's public status (ADR 0025); null when it was never turned on or was revoked. */
+  scheduledSync?: ScheduledSyncStatus | null;
 }
 
 export async function readBookData(
@@ -317,6 +320,7 @@ export async function readBookData(
     declarations,
     adjustments,
     answers,
+    scheduled,
   ] = await Promise.all([
     list<Miner>('miners'),
     list<Statement>('statements'),
@@ -330,6 +334,7 @@ export async function readBookData(
     getDoc(
       doc(getSyncFirestore(), 'corpTaxBooks', String(corporationId), 'meta', 'groupingAnswers')
     ),
+    getDoc(doc(getSyncFirestore(), 'corpTaxBooks', String(corporationId), 'meta', 'scheduledSync')),
   ]);
   return {
     settings,
@@ -346,6 +351,7 @@ export async function readBookData(
     declarations,
     adjustments,
     groupingAnswers: groupingAnswersFrom(answers.data()),
+    scheduledSync: scheduledSyncFrom(scheduled.data()),
   };
 }
 
