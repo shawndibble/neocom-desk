@@ -13,7 +13,7 @@ import type { CorpTaxBookSync } from '../taxBook/useCorpTaxBook';
  */
 export function BookHealthStrip({ sync }: { sync: CorpTaxBookSync }) {
   const { t } = useTranslation();
-  const { view, names, canEdit } = useBook();
+  const { view, names, canEdit, data } = useBook();
   const { status } = sync;
   const items: AttentionItem[] = [];
   const syncing = sync.run.phase === 'syncing';
@@ -31,6 +31,21 @@ export function BookHealthStrip({ sync }: { sync: CorpTaxBookSync }) {
         detail: <p>{t('corpTaxBook.moons.health.gapDetail')}</p>,
       });
     }
+  }
+  // ADR 0025: a schedule that stopped is a warning that says why, because the book
+  // quietly goes back to being as fresh as the last officer visit.
+  const scheduled = data.scheduledSync;
+  if (scheduled?.status === 'stopped') {
+    items.push({
+      id: 'scheduledStopped',
+      tone: 'warning',
+      title: t('corpTaxBook.moons.health.scheduledStopped', {
+        reason: t(`corpTaxBook.moons.autoSync.stopped.${scheduled.stoppedReason ?? 'unknown'}`, {
+          name: scheduled.characterName,
+        }),
+      }),
+      detail: <p>{t('corpTaxBook.moons.health.scheduledStoppedDetail')}</p>,
+    });
   }
   if (view.unrated.length > 0) {
     items.push({

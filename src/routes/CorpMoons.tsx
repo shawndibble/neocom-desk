@@ -71,7 +71,11 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
   const { view } = useBook();
   const [tab, selectTab] = usePageTab(MOONS_TABS);
   const tabsId = useTabsId();
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  // Back from EVE's page after the Automatic sync opt-in: show the settings it was pressed in.
+  const { state: routerState } = useLocation();
+  const [settingsOpen, setSettingsOpen] = useState(
+    () => (routerState as { corpSyncGrant?: unknown } | null)?.corpSyncGrant !== undefined
+  );
   const [activityOpen, setActivityOpen] = useState(false);
   const detail = moonsDetail(pathname);
   const status = sync.status;

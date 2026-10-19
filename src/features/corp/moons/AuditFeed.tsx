@@ -28,6 +28,12 @@ export function AuditFeed({ entries, empty }: { entries: readonly AuditEntry[]; 
                 {a.byName || t('corpTaxBook.moons.activity.system')}
               </span>{' '}
               {t(`corpTaxBook.moons.activity.actions.${a.action}`, { defaultValue: a.action })}
+              {a.via === 'scheduled sync' && (
+                <span className="text-text-dim">
+                  {' '}
+                  ({t('corpTaxBook.moons.activity.viaScheduled')})
+                </span>
+              )}
               {why && <span className="text-text-dim"> · {why}</span>}
             </span>
           </li>
