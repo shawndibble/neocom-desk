@@ -13,7 +13,7 @@
  */
 import { useMemo } from 'react';
 import type { GoalPlannerSnapshot } from '../goalPlannerSnapshot';
-import { buildPlanAdvice, type PlanAdvice, type PlanAdviceInput } from '../planAdviceModel';
+import { buildSharedPlanAdvice, type PlanAdvice, type PlanAdviceInput } from '../planAdviceModel';
 import { usePiAdviceInputs } from '../usePiAdviceInputs';
 import { usePiSnapshot } from '../usePiSnapshot';
 
@@ -44,7 +44,7 @@ export function useColoniesAdvice(
   const advice = useMemo(() => {
     if (inputs.status !== 'ready') return null;
     try {
-      return buildPlanAdvice(inputs.input);
+      return buildSharedPlanAdvice(inputs.input);
     } catch {
       return null;
     }

@@ -11,7 +11,7 @@
  * builds and a re-render never repeats one.
  */
 import { useMemo } from 'react';
-import { buildPlanAdvice, type PlanAdvice } from '../planAdviceModel';
+import { buildPlanAdvice, buildSharedPlanAdvice, type PlanAdvice } from '../planAdviceModel';
 import { homeSystemId } from '../sellRoute';
 import { usePlanPreference } from '../planTicksPref';
 import { usePiAdviceInputs } from '../usePiAdviceInputs';
@@ -67,7 +67,7 @@ export function useMapAdvice(
     if (!input) return null;
     let advice: PlanAdvice;
     try {
-      advice = buildPlanAdvice(input);
+      advice = buildSharedPlanAdvice(input);
     } catch {
       return 'error' as const;
     }
