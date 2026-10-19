@@ -24,18 +24,17 @@ import { collection, doc, setDoc } from 'firebase/firestore/lite';
 import { db, type CharacterRecord } from '@/db';
 import { purgeCharacterCacheOrSuppress } from '@/esi/cachePurge';
 import { mapWithConcurrencyLimit } from '@/lib/concurrency';
+import { syncEditableCollection, type SyncContext } from './collectionSync';
+import { syncFeed } from './feedSync';
 import {
   SYNCED_PREFIX,
   isSyncedSettingKey,
   readSettingsMeta,
   readSettingsTombstones,
-  syncEditableCollection,
-  syncFeed,
   syncSettings,
   writeSettingsMeta,
   writeSettingsTombstones,
-  type SyncContext,
-} from './collectionSync';
+} from './settingsSync';
 import { getSyncFirestore } from './firebaseApp';
 import {
   appendTombstones,
