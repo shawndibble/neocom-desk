@@ -5,55 +5,25 @@
  * the global sentinel, same shape as `features/character/stations.ts`.
  */
 import { getUniversePlanet, getUniverseSchematic, type UniversePlanet } from '@/esi/endpoints';
-import {
-  conditionalFetch,
-  loadWithCache,
-  readCached,
-  GLOBAL_CACHE_CHARACTER_ID,
-  STALE_AFTER,
-} from '@/esi/cache';
+import { loadStaticEntity, readCached, GLOBAL_CACHE_CHARACTER_ID } from '@/esi/cache';
 import { loadPi } from '@/sde/loadSde';
 
 // Both are static game data, as this module's name says — a planet does not
 // get renamed and a schematic's output does not change between patches.
-const STATIC = { staleAfterMs: STALE_AFTER.static };
+const PLANET_INFO_PREFIX = 'planet-info';
+const SCHEMATIC_PREFIX = 'schematic';
 
 function planetInfoKey(planetId: number): string {
-  return `planet-info:${planetId}`;
+  return `${PLANET_INFO_PREFIX}:${planetId}`;
 }
 
 async function loadPlanetInfoRow(planetId: number): Promise<UniversePlanet | null> {
-  const { fetchLive, conditional } = conditionalFetch((options) =>
-    getUniversePlanet(planetId, options)
-  );
-  const result = await loadWithCache(
-    GLOBAL_CACHE_CHARACTER_ID,
-    planetInfoKey(planetId),
-    fetchLive,
-    { ...STATIC, conditional }
-  );
+  const result = await loadStaticEntity(PLANET_INFO_PREFIX, planetId, getUniversePlanet);
   return result?.data ?? null;
 }
 
 export async function loadPlanetName(planetId: number): Promise<string | null> {
   return (await loadPlanetInfoRow(planetId))?.name ?? null;
-}
-
-/**
- * A planet's name and its own typeID, which
- * `PiData.planetTypeByTypeId` turns into the same `PlanetType` string an
- * owned colony reports. The Advisor needs both for a planet in the system
- * that the character has *no* colony on, where `/characters/{id}/planets`
- * says nothing at all.
- *
- * Shares the cached row `loadPlanetName` already reads, so a planet whose
- * name is on screen costs no second request to type.
- */
-export async function loadPlanetInfo(
-  planetId: number
-): Promise<{ name: string; typeId: number } | null> {
-  const info = await loadPlanetInfoRow(planetId);
-  return info ? { name: info.name, typeId: info.type_id } : null;
 }
 
 /**
@@ -81,7 +51,7 @@ export async function readCachedPlanetNames(
 }
 
 function schematicKey(schematicId: number): string {
-  return `schematic:${schematicId}`;
+  return `${SCHEMATIC_PREFIX}:${schematicId}`;
 }
 
 /**
@@ -113,15 +83,7 @@ async function localSchematicNames(): Promise<Map<number, string>> {
 export async function loadSchematicName(schematicId: number): Promise<string | null> {
   const local = (await localSchematicNames()).get(schematicId);
   if (local) return local;
-  const { fetchLive, conditional } = conditionalFetch((options) =>
-    getUniverseSchematic(schematicId, options)
-  );
-  const result = await loadWithCache(
-    GLOBAL_CACHE_CHARACTER_ID,
-    schematicKey(schematicId),
-    fetchLive,
-    { ...STATIC, conditional }
-  );
+  const result = await loadStaticEntity(SCHEMATIC_PREFIX, schematicId, getUniverseSchematic);
   return result?.data.schematic_name ?? null;
 }
 

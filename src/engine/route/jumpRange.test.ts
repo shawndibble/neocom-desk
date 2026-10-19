@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  JUMP_RANGES,
   adoptGameBaseline,
   effectiveCurrentSystem,
-  isJumpRange,
   jumpRangeLimit,
   jumpRangeSystems,
   withinJumpRange,
@@ -20,14 +18,6 @@ const JUMPS = new Map([
   [MID, 5],
   [FAR, 11],
 ]);
-
-describe('isJumpRange', () => {
-  it('accepts every listed range and nothing else', () => {
-    for (const range of JUMP_RANGES) expect(isJumpRange(range)).toBe(true);
-    expect(isJumpRange('7')).toBe(false);
-    expect(isJumpRange(null)).toBe(false);
-  });
-});
 
 describe('jumpRangeSystems', () => {
   it('is no restriction at all for any', () => {

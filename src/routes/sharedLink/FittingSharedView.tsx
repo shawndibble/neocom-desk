@@ -1,4 +1,4 @@
-import { parseFittingSharePayload } from '@/engine/fitting/fittingSharePayload';
+import { parseFittingSharePayload } from '@/engine/fittings/fittingSharePayload';
 import type { StoredShare } from '@/features/share/shareStore';
 import { FittingShareView } from '../FittingShared';
 

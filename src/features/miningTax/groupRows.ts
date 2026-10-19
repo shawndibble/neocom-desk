@@ -8,6 +8,7 @@
  */
 import type { MiningTaxAssignmentRecord } from '@/db';
 import type { MiningTaxRowStatus } from '@/engine/miningTax/rowStatus';
+import type { CorpRowInfo } from './corpBook/corpRows';
 import type { MoonMiningTaxRow } from './snapshot';
 
 export interface GroupMember {
@@ -29,6 +30,12 @@ export interface DisplayRow {
    * (`flatten` below).
    */
   groupMembers?: GroupMember[];
+  /**
+   * Set when a Corp Tax Book has a say in this row (#4065): a row the book
+   * decided, owed to the virtual corp Payee and never written to Dexie, or a
+   * personal unassigned row relabelled Pending corp record / Unattributed.
+   */
+  corp?: CorpRowInfo;
 }
 
 /** Every Assignment this display row represents — the lone one for an ordinary row, or the whole group for a joined one. Empty for the unassigned-residual row (no Assignment at all). */

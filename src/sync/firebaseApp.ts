@@ -12,27 +12,49 @@
 // the public `shares` collection — content a pilot chose to share, carrying no
 // uid or Character id (docs/context/decisions/
 // 20261002-125432-stored-short-share-links-in-firestore.md).
-// Fourth: `features/fittings/workbenchFits.ts` reads the public, admin-write-only
-// `workbenchFits` collection (EVE Workbench fits by hull, issue #2484) with no
-// session at all, by document id only (the rules deny listing it).
-// Fifth: `market/mutamarket.ts` calls the `mutamarketEstimate` function for
+// Fourth: `market/mutamarket.ts` calls the `mutamarketEstimate` function for
 // abyssal module estimates (MutaMarket has no CORS), on any Character's session.
 
-import { getAuth, type Auth } from 'firebase/auth';
-import { getFirestore, type Firestore } from 'firebase/firestore/lite';
-import { getFunctions, type Functions } from 'firebase/functions';
-import { getFirebaseApp } from './firebaseCore';
+import { connectAuthEmulator, getAuth, type Auth } from 'firebase/auth';
+import { connectFirestoreEmulator, getFirestore, type Firestore } from 'firebase/firestore/lite';
+import { connectFunctionsEmulator, getFunctions, type Functions } from 'firebase/functions';
+import { emulatorsOn, getFirebaseApp } from './firebaseCore';
 
 export { getFirebaseApp };
 
+// Dev-only: `VITE_FIREBASE_EMULATORS=1` in `.env.local` points the three
+// services at `npm run emulators` (ports in firebase.json). `import.meta.env.DEV`
+// is compile-time false in a production build, so the branch and the emulator
+// hosts below are dead code there. Each connector may be called only once per
+// instance (Firebase throws on a second call after first use), hence the guards.
+const EMULATOR_HOST = '127.0.0.1';
+let authConnected = false;
+let firestoreConnected = false;
+let functionsConnected = false;
+
 export function getSyncAuth(): Auth {
-  return getAuth(getFirebaseApp());
+  const auth = getAuth(getFirebaseApp());
+  if (emulatorsOn() && !authConnected) {
+    authConnected = true;
+    connectAuthEmulator(auth, `http://${EMULATOR_HOST}:9099`, { disableWarnings: true });
+  }
+  return auth;
 }
 
 export function getSyncFirestore(): Firestore {
-  return getFirestore(getFirebaseApp());
+  const firestore = getFirestore(getFirebaseApp());
+  if (emulatorsOn() && !firestoreConnected) {
+    firestoreConnected = true;
+    connectFirestoreEmulator(firestore, EMULATOR_HOST, 8080);
+  }
+  return firestore;
 }
 
 export function getSyncFunctions(): Functions {
-  return getFunctions(getFirebaseApp());
+  const functions = getFunctions(getFirebaseApp());
+  if (emulatorsOn() && !functionsConnected) {
+    functionsConnected = true;
+    connectFunctionsEmulator(functions, EMULATOR_HOST, 5001);
+  }
+  return functions;
 }

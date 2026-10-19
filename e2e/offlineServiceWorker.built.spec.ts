@@ -13,7 +13,7 @@
  *
  * Cutting the network with `context.setOffline` also blocks the preview
  * server itself, so anything that still renders was served by the worker.
- * `/styleguide` is the target page: outside `RequireCharacter`, no ESI.
+ * `/login` is the non-precached target page: outside `RequireCharacter`, no ESI.
  */
 import { test, expect } from './support/testBase';
 import { LAZY_SDE_FILES } from '../src/sde/lazySdeFiles';
@@ -64,8 +64,8 @@ test('boots, deep-links and serves a cached lazy SDE file with no network', asyn
   await expect(page.locator('#root > *').first()).toBeVisible();
 
   // A URL that is not in the precache: NavigationRoute -> /index.html.
-  await page.goto('/styleguide');
-  await expect(page.getByRole('table', { name: 'Wide DataTable sample' })).toBeVisible();
+  await page.goto('/login');
+  await expect(page.getByRole('button', { name: 'Log in with EVE Online' }).first()).toBeVisible();
 
   // The lazy file is served from the `sde-data` runtime cache.
   const offline = await page.evaluate(async (url) => {

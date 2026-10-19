@@ -13,6 +13,6 @@ export const NO_ALERTS: AlertBadge = { count: 0, danger: false };
  * The bell's badge, read once by the app shell (`Layout`, via
  * `useAlertBadge`) and handed down so every `PageHeader`'s bell shares one
  * Dexie live query instead of opening one per route. Outside the shell (tests,
- * the styleguide) it is `NO_ALERTS`: a dim bell with no badge.
+ * Storybook) it is `NO_ALERTS`: a dim bell with no badge.
  */
 export const UnreadAlertsContext = createContext<AlertBadge>(NO_ALERTS);

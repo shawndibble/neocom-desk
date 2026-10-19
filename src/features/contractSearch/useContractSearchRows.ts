@@ -1,38 +1,23 @@
 /**
- * The Items board's row derivation: the filter folded into
- * rows, per-type stats and the cheapest-first display order. Split out of
+ * The Items board's row derivation: the filter folded into the worker query,
+ * per-type stats and the cheapest-first display order. Split out of
  * `ContractSearchPanel`; every input is still owned there.
  */
-import { useMemo } from 'react';
+import { useDeferredValue, useMemo } from 'react';
 import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
-import {
-  contractOfferStats,
-  filterContractOffers,
-  isUnpricedOffer,
-  offerAskingPrice,
-  type ContractOfferFilter,
-  type ContractOfferStats,
-  type ContractSaleKind,
+import type {
+  ContractOfferFilter,
+  ContractOfferStats,
+  ContractSaleKind,
 } from '@/engine/contracts/contractSearch';
-import { withinJumpRange } from '@/engine/route/jumpRange';
+import type { ContractOfferQuery } from '@/engine/contracts/contractSearchQuery';
+import type { withinJumpRange } from '@/engine/route/jumpRange';
 import type { OfferLocation } from '@/features/contractSearch/offerLocations';
 import type { useOfferIndex } from '@/features/contractSearch/useIndexedOffers';
-import { parseNumeric } from '@/features/contractSearch/courierFilterHelpers';
+import { useContractOfferQuery } from '@/features/contractSearch/useContractOfferQuery';
+import { parseNumeric } from '@/lib/isk';
 
-/**
- * `offerAskingPrice`, except an unpriced (barter) row sorts last rather than
- * at its literal 0 (issue #1080) — used only for the fixed, ascending
- * "cheapest first" default view below (`displayRows`), a plain array
- * `.sort()` this `Infinity` sentinel is safe for. `DataTable`'s own
- * reversible column sort must not use this: `sortValueForPriceColumn` in `useItemsColumns`
- * returns `undefined` for that instead, since `Infinity` would sort
- * *first* the moment a pilot clicks the Price header to flip it to
- * descending — the exact bug this fix removes, reintroduced from the
- * other direction.
- */
-function sortablePrice(row: PublicContractOfferRow, plexPrice: number | null): number {
-  return isUnpricedOffer(row, plexPrice) ? Infinity : offerAskingPrice(row, plexPrice);
-}
+const NO_LOCATION_SYSTEMS: ReadonlyMap<number, number | null> = new Map();
 
 /** The filter fields that narrow rows; the panel's `UiFilter` is a superset. */
 interface RowsFilter {
@@ -73,7 +58,7 @@ export function useContractSearchRows({
 }: ContractSearchRowsInput) {
   /**
    * Everything except the item type. Split out so a keystroke in the search
-   * box re-runs only the cheap type narrowing below rather than a fresh pass
+   * box re-runs only the cheap type narrowing rather than a fresh pass
    * over the whole snapshot — and so the suggestion list's counts are
    * computed against the same region/price/kind restrictions the results
    * are, which is what stops a suggestion reading "40 offers" from landing on
@@ -100,9 +85,9 @@ export function useContractSearchRows({
     ]
   );
   /**
-   * Jump Range folded in here rather than into `nonTypeFilter`/the engine:
+   * Jump Range folded in here rather than into `nonTypeFilter`:
    * only this layer resolves an offer's system (`useOfferLocations`), so
-   * `filterContractOffers` cannot see it. A row this app has *placed* and
+   * `filterContractOffers` cannot see it; the query gets the resolved systems. A row this app has *placed* and
    * cannot connect to the origin — a player structure, or a system the
    * stargate graph does not reach — drops out the moment a range is active:
    * "within 5 jumps" is a claim an unknown distance cannot back.
@@ -115,15 +100,41 @@ export function useContractSearchRows({
    * answer excludes" rule Courier's `narrowToOverRate` follows for its own
    * mid-load rows.
    */
-  const nonTypeRows = useMemo(() => {
-    const engineFiltered = filterContractOffers(rows, nonTypeFilter);
-    const allowed = allowedSystems;
-    if (allowed === null) return engineFiltered;
-    return engineFiltered.filter((row) => {
-      const location = offerLocations.get(row.locationId);
-      return location === undefined || withinJumpRange(location.systemId, allowed);
-    });
-  }, [rows, nonTypeFilter, offerLocations, allowedSystems]);
+  const locationSystems = useMemo(
+    () =>
+      allowedSystems === null
+        ? NO_LOCATION_SYSTEMS
+        : new Map([...offerLocations].map(([id, location]) => [id, location.systemId])),
+    [allowedSystems, offerLocations]
+  );
+  /**
+   * Cheapest first, so the rows arrive in the order the table's default
+   * sort shows them rather than the snapshot's own contract-then-type order.
+   * An unpriced (barter) row sorts last regardless of its raw price (issue
+   * #1080). Below market only reads which contracts pass; the offer table is
+   * not shown, so it skips the sort.
+   *
+   * One query answers rows and per-type stats together, in a worker for a
+   * big snapshot (issue #4128).
+   */
+  // Deferred so a price/region edit keeps the inputs responsive while the
+  // ~370k-row filter reruns at low priority.
+  const deferredNonTypeFilter = useDeferredValue(nonTypeFilter);
+  const itemQuery = useMemo<ContractOfferQuery>(
+    () => ({
+      filter: deferredNonTypeFilter,
+      typeIds,
+      allowedSystems,
+      locationSystems,
+      sort: !belowMarket,
+    }),
+    [deferredNonTypeFilter, typeIds, allowedSystems, locationSystems, belowMarket]
+  );
+  const {
+    displayRows,
+    stats: queryStats,
+    awaitingFirst: awaitingQuery,
+  } = useContractOfferQuery(rows, itemQuery);
   const statsByType = useMemo(() => {
     // Before the full rows land, the index's own per-type count and cheapest
     // stand in. They ignore the other filters, which only matters until the
@@ -138,30 +149,12 @@ export function useContractSearchRows({
       // Read through R2 the full rows never arrive, so the types whose rows
       // were read get their real, filter-aware stats; the rest keep the index's.
       if (earlyRows !== null) {
-        for (const [typeId, typeStats] of contractOfferStats(nonTypeRows, plexPrice)) {
-          stats.set(typeId, typeStats);
-        }
+        for (const [typeId, typeStats] of queryStats) stats.set(typeId, typeStats);
       }
       return stats;
     }
-    return contractOfferStats(nonTypeRows, plexPrice);
-  }, [haveFull, offerIndex, earlyRows, nonTypeRows, plexPrice]);
+    return queryStats;
+  }, [haveFull, offerIndex, earlyRows, queryStats]);
 
-  /**
-   * Cheapest first, so the rows arrive in the order the table's default
-   * sort shows them rather than the snapshot's own contract-then-type order.
-   *
-   * An unpriced (barter) row sorts last regardless of its raw price (issue
-   * #1080): its 0 ISK is not a real price, and sorting on it as one would
-   * put the row asking for goods at the very top of the default view — the
-   * harm this fix exists to remove.
-   */
-  const displayRows = useMemo(() => {
-    const filtered = filterContractOffers(nonTypeRows, { typeIds });
-    // Below market only reads which contracts pass; the offer table is not shown.
-    if (belowMarket) return filtered;
-    return filtered.sort((a, b) => sortablePrice(a, plexPrice) - sortablePrice(b, plexPrice));
-  }, [nonTypeRows, typeIds, plexPrice, belowMarket]);
-
-  return { nonTypeFilter, nonTypeRows, statsByType, displayRows };
+  return { nonTypeFilter, statsByType, displayRows, awaitingQuery };
 }

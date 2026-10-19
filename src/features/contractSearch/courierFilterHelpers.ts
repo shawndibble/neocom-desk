@@ -54,13 +54,6 @@ export function narrowsSpace(
   return offered.some((kind) => !selected.includes(kind));
 }
 
-/** A blank or unparseable field is "no restriction", never `NaN` — which would silently exclude every row. */
-export function parseNumeric(value: string): number | null {
-  if (value.trim() === '') return null;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
 export function regionLabel(
   regionId: number | null,
   regionNames: ReadonlyMap<number, string>

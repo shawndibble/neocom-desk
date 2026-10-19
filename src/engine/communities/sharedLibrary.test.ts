@@ -4,7 +4,6 @@ import {
   isLibraryStale,
   libraryHash,
   planPush,
-  selectSharedBlueprints,
   splitSharedBlueprints,
   LIBRARY_CHUNK_SIZE,
   LIBRARY_STALE_MS,
@@ -32,39 +31,6 @@ const byType = (...ids: number[]): BlueprintShare => ({
 const placeIdOf = (b: { location_id: number }) => b.location_id;
 /** Place 3 cannot be named (a structure this Character cannot read). */
 const placeOf = (placeId: number) => (placeId === 3 ? null : place);
-
-describe('selectSharedBlueprints', () => {
-  const owned = [
-    { type_id: 100, material_efficiency: 10, time_efficiency: 20, runs: -1, location_id: 1 },
-    { type_id: 200, material_efficiency: 0, time_efficiency: 0, runs: 5, location_id: 2 },
-    { type_id: 300, material_efficiency: 2, time_efficiency: 4, runs: 1, location_id: 3 },
-  ];
-  const select = (share: BlueprintShare, list = owned) =>
-    selectSharedBlueprints(list, share, placeIdOf, placeOf);
-
-  it('keeps only selected types', () => {
-    expect(select(byType(100))).toEqual([bp()]);
-  });
-
-  it('drops a blueprint whose station or structure is unknown (container, unresolved)', () => {
-    expect(select(byType(300))).toEqual([]);
-  });
-
-  it('shares nothing for an empty selection', () => {
-    expect(select(byType())).toEqual([]);
-  });
-
-  it('is sorted so input order does not change the list', () => {
-    expect(select(byType(100, 200))).toEqual(select(byType(100, 200), [...owned].reverse()));
-  });
-
-  it('carries only type, ME/TE, runs, station and system', () => {
-    const [item] = select(byType(100));
-    expect(Object.keys(item!).sort()).toEqual(
-      ['locationName', 'me', 'runs', 'systemName', 'te', 'typeId'].sort()
-    );
-  });
-});
 
 describe('splitSharedBlueprints', () => {
   const owned = [
@@ -97,6 +63,20 @@ describe('splitSharedBlueprints', () => {
 
   it('counts the copies at a shared location it cannot name as skipped', () => {
     expect(split({ ...byType(), locations: new Set([3]) })).toEqual({ shared: [], skipped: 3 });
+  });
+
+  it('is sorted so input order does not change the list', () => {
+    const share = byType(100, 300);
+    const shared = (list: typeof owned) =>
+      splitSharedBlueprints(list, share, placeIdOf, placeOf).shared;
+    expect(shared(owned)).toEqual(shared([...owned].reverse()));
+  });
+
+  it('carries only type, ME/TE, runs, station and system', () => {
+    const [item] = split(byType(100)).shared;
+    expect(Object.keys(item!).sort()).toEqual(
+      ['locationName', 'me', 'runs', 'systemName', 'te', 'typeId'].sort()
+    );
   });
 
   it('never shares a copy with no known place through a location rule', () => {

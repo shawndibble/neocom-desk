@@ -621,7 +621,7 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
     return ids.map((id) => ({ id, name: regionNames.get(id) ?? `#${id}` }));
   }, [rows, haveFull, offerIndex, regionNames]);
 
-  const { displayRows, statsByType } = useContractSearchRows({
+  const { displayRows, statsByType, awaitingQuery } = useContractSearchRows({
     uiFilter,
     rows,
     haveFull,
@@ -1040,7 +1040,7 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
                       />
                     )}
                   </div>
-                ) : awaitingRows ? (
+                ) : awaitingRows || awaitingQuery ? (
                   <div className="flex flex-col items-center gap-2 py-16">
                     <Spinner label={modeLoadingLabel} />
                     <p aria-hidden="true" className="text-text-dim">

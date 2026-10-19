@@ -194,7 +194,9 @@ export function MovePlanTab({ onClose, characterIds, activeCharacterId }: MovePl
     const out = new Map<number, Map<number, PickerStack[]>>();
     for (const s of loaded?.stacks ?? []) {
       const byPlace = out.get(s.characterId) ?? new Map<number, PickerStack[]>();
-      byPlace.set(s.locationId, [...(byPlace.get(s.locationId) ?? []), s]);
+      const stacks = byPlace.get(s.locationId);
+      if (stacks) stacks.push(s);
+      else byPlace.set(s.locationId, [s]);
       out.set(s.characterId, byPlace);
     }
     if (!loaded) return out;

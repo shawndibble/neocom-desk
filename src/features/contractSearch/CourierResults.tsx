@@ -15,7 +15,6 @@ import {
   UNASKED,
   narrowsSpace,
   offeredSpaceKinds,
-  parseNumeric,
   regionLabel,
   regionOptionsFor,
   type CourierUiFilter,
@@ -76,7 +75,7 @@ import { courierContractsCsvColumns } from './courierContractsCsv';
 import { endpointSystemName } from '@/features/contractSearch/courierEndpointNames';
 import { loadCharacterRegionId } from '@/features/contractSearch/characterRegion';
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
-import { formatIskAuto, formatIskCompact } from '@/lib/isk';
+import { formatIskAuto, formatIskCompact, parseNumeric } from '@/lib/isk';
 import { formatMagnitude } from '@/lib/magnitude';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';

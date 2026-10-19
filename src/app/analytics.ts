@@ -21,9 +21,16 @@ import { whenPageIdle } from './analyticsIdle';
 export interface AnalyticsEnv {
   MODE?: string;
   VITE_FIREBASE_MEASUREMENT_ID?: string;
+  DEV?: boolean;
+  VITE_FIREBASE_EMULATORS?: string;
 }
 
 export function isAnalyticsConfigured(env: AnalyticsEnv = import.meta.env): boolean {
+  // Against the local emulators (`sync/firebaseCore.emulatorsOn`, mirrored here
+  // because that module is Firebase and this one is on the startup path) the
+  // demo project has no GA4 stream: Installations and gtag would hit the real
+  // servers and fail with 403.
+  if (env.DEV && env.VITE_FIREBASE_EMULATORS === '1') return false;
   return env.MODE !== 'test' && Boolean(env.VITE_FIREBASE_MEASUREMENT_ID);
 }
 
