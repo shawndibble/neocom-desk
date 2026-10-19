@@ -437,10 +437,10 @@ describe('HaulingPanel trip rail', () => {
     renderPanel();
     // Damage Control II is a module: it fills the cargo hold, never the ammo hold.
     expect(
-      screen.getByRole('img', { name: 'Cargo hold: 300 of 300 cubic metres used' })
+      screen.getByRole('progressbar', { name: 'Cargo hold: 300 of 300 cubic metres used' })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('img', { name: 'Ammo hold: 0 of 41,000 cubic metres used' })
+      screen.getByRole('progressbar', { name: 'Ammo hold: 0 of 41,000 cubic metres used' })
     ).toBeInTheDocument();
     await userEvent.hover(bringBox());
     expect(await screen.findByRole('tooltip')).toHaveTextContent(

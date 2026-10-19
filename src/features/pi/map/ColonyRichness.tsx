@@ -8,6 +8,8 @@
  * Plan solver score (`richnessOverride.ts`), on Plan, Map and Colonies alike.
  * Optional: with nothing picked, every resource the planet type yields counts.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { cx } from '@/lib/cx';
 import { useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useTranslation } from 'react-i18next';
@@ -72,7 +74,12 @@ export function ColonyRichness({
       <div className="flex items-center gap-2">
         <PlanetImage type={type} size={28} />
         <p className="text-sm text-text-dim">{planetName(t, type)}</p>
-        <span className="ml-auto inline-flex h-[1.125rem] items-center rounded-xs border border-line px-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+        <span
+          className={cx(
+            eyebrowClassName,
+            'ml-auto inline-flex h-[1.125rem] items-center rounded-xs border border-line px-1.5'
+          )}
+        >
           {t('piMap.richness.optional')}
         </span>
       </div>

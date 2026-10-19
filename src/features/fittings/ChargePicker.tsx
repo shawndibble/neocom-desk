@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import * as Icon from '@/components/ui/icons';
 import { Fragment, useMemo, useState, type ReactNode } from 'react';
 import type { TFunction } from 'i18next';
@@ -546,7 +547,7 @@ function TypeList({
       {base.map((g, i) => row(g, i, base.length))}
       {tech2.length > 0 && (
         <>
-          <div className="px-1.5 pt-2.5 pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+          <div className={cx(eyebrowClassName, 'px-1.5 pt-2.5 pb-1')}>
             {t('fittings.chargePicker.tech2')}
           </div>
           {tech2.map((g, i) => row(g, i, tech2.length))}

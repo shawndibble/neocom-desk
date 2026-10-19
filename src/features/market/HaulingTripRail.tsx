@@ -21,13 +21,13 @@ import { formatIsk, formatIskCompactSigned } from '@/lib/isk';
 import { useStickyClearance } from '@/lib/useStickyClearance';
 import { formatTripM3, shownUsedM3 } from './format';
 import { HaulingHoldMeters } from './HaulingHoldMeters';
-import { iskGains, signedIsk } from './signedIsk';
+import { IskDelta } from '@/components/ui/IskDelta';
+import { iskTone, signedIsk } from '@/lib/signedIsk';
 import type { HaulingFillScanState } from './useHaulingFillScan';
 import { useHubJumps } from './useHubJumps';
 
 const isk = (value: number) => formatIsk(value, 0);
 const signed = (value: number) => signedIsk(value, 0);
-const gains = (value: number) => iskGains(value, 0);
 
 /** Literal keys, so the locale split finds them. */
 const BINDING_KEYS = {
@@ -206,9 +206,7 @@ export function HaulingTripSummary({
 
       <dl className="flex flex-col gap-1 border-t border-line pt-3">
         <SummaryRow label={t('market.hauling.rail.profit')}>
-          <span className={`font-semibold ${gains(profit) ? 'text-success' : ''}`}>
-            {signed(profit)}
-          </span>
+          <IskDelta amount={profit} decimals={0} className="font-semibold" />
         </SummaryRow>
         <SummaryRow label={t('market.hauling.rail.spend')}>{isk(cost)}</SummaryRow>
         {knownJumps && (
@@ -324,9 +322,7 @@ function FillRow({
             {item.categoryName && <span className="truncate">· {item.categoryName}</span>}
           </span>
         </span>
-        <span className={`shrink-0 ${gains(item.profit) ? 'text-success' : ''}`}>
-          {signed(item.profit)}
-        </span>
+        <IskDelta amount={item.profit} decimals={0} className="shrink-0" />
       </label>
     </li>
   );
@@ -534,7 +530,7 @@ export function HaulingTripBar({ freeM3, profit, onOpenTrip, copyButton }: Hauli
           {freeM3 !== null && (
             <>{t('market.hauling.tripBar.free', { m3: formatTripM3(freeM3) })} · </>
           )}
-          <span className={gains(profit) ? 'text-success' : undefined}>{profitText}</span>
+          <span className={iskTone(profit, 0)}>{profitText}</span>
         </span>
         <span className="text-xs text-accent">{t('market.hauling.tripBar.details')}</span>
       </button>

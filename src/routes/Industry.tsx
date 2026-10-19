@@ -1,4 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -188,12 +189,8 @@ export function Industry() {
   const itemActions = usePageItemActions({ activeCharacterId });
 
   const expandedGroups = useExpandedGroups((state) => state.value);
-  const expandedGroupsHydrated = useExpandedGroups((state) => state.hydrated);
-  const hydrateExpandedGroups = useExpandedGroups((state) => state.hydrate);
+  const expandedGroupsHydrated = useHydratedStore(useExpandedGroups);
   const setExpandedGroups = useExpandedGroups((state) => state.setValue);
-  useEffect(() => {
-    void hydrateExpandedGroups();
-  }, [hydrateExpandedGroups]);
   // Opening a plan (a row, "Plan", a deep link) leaves for its own
   // page; fetch that page's chunk now so the click doesn't wait on it.
   useEffect(() => {

@@ -6,7 +6,7 @@
  * opens its Ship Info window. The page header and tab bar are the Ships
  * route's.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, EmptyState, SegmentedControl, Spinner } from '@/components/ui';
 import { intParam } from '@/lib/urlState';
@@ -28,6 +28,7 @@ import {
 } from './shipTreeViewPreference';
 import { useFactionTree } from './useFactionTree';
 import { useShipTreeData, type ShipTreeSource } from './useShipTreeData';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import './shipTree.css';
 
 const FACTION_PARAM = intParam(DEFAULT_FACTION_ID, { min: 0 });
@@ -84,11 +85,8 @@ function ShipTree({ source }: { source: ShipTreeSource }) {
 
   const isPhone = useIsPhone();
   const storedView = useShipTreeViewPreference((state) => state.value);
-  const hydrateView = useShipTreeViewPreference((state) => state.hydrate);
   const setView = useShipTreeViewPreference((state) => state.setValue);
-  useEffect(() => {
-    void hydrateView();
-  }, [hydrateView]);
+  useHydratedStore(useShipTreeViewPreference);
   const view = resolveShipTreeView(storedView, isPhone);
 
   const viewSwitch = (

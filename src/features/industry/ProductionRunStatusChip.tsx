@@ -1,11 +1,11 @@
 import { useTranslation } from 'react-i18next';
+import { Pill, type PillTone } from '@/components/ui/Pill';
 import type { ProductionRunStatus } from './productionRunSummary';
 
-/** Same inline-badge shape as `ActiveJobsPanel`'s "Completing soon" tag — bg/text at one tone, no box (static). */
-const TONE_CLASS: Record<ProductionRunStatus, string> = {
-  new: 'bg-panel-2 text-text-dim',
-  open: 'bg-warning/15 text-warning',
-  closed: 'bg-success/15 text-success',
+const TONE: Record<ProductionRunStatus, PillTone> = {
+  new: 'neutral',
+  open: 'warning',
+  closed: 'success',
 };
 
 const LABEL_KEY: Record<ProductionRunStatus, string> = {
@@ -17,11 +17,7 @@ const LABEL_KEY: Record<ProductionRunStatus, string> = {
 /** "N lost" beside the status chip when a run carries Run Loss records (issue #2851). */
 export function ProductionRunLostBadge({ count }: { count: number }) {
   const { t } = useTranslation();
-  return (
-    <span className="inline-flex items-center rounded-xs bg-danger/15 px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest text-danger uppercase">
-      {t('industry.lostBadge', { count })}
-    </span>
-  );
+  return <Pill tone="danger">{t('industry.lostBadge', { count })}</Pill>;
 }
 
 /**
@@ -32,11 +28,5 @@ export function ProductionRunLostBadge({ count }: { count: number }) {
  */
 export function ProductionRunStatusChip({ status }: { status: ProductionRunStatus }) {
   const { t } = useTranslation();
-  return (
-    <span
-      className={`inline-flex items-center rounded-xs px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest uppercase ${TONE_CLASS[status]}`}
-    >
-      {t(LABEL_KEY[status])}
-    </span>
-  );
+  return <Pill tone={TONE[status]}>{t(LABEL_KEY[status])}</Pill>;
 }

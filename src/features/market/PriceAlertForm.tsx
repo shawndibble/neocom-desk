@@ -25,6 +25,7 @@ import { getHubPrices } from '@/market/prices';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { useMarketHub } from './hub';
 import type { QuickbarTarget } from './quickbar';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 export interface PriceAlertFormProps {
   typeId: number;
@@ -53,10 +54,7 @@ export function PriceAlertForm({
   // The hub the alert polls (`priceAlertDomain` → the synced Settings default),
   // not necessarily the one the Market Browser is showing.
   const hubId = useMarketHub((state) => state.value);
-  const hydrateHub = useMarketHub((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateHub();
-  }, [hydrateHub]);
+  useHydratedStore(useMarketHub);
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
 
   const [sellMin, setSellMin] = useState<number | null>(null);

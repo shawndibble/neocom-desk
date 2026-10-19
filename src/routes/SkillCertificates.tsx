@@ -1,3 +1,5 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { cx } from '@/lib/cx';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Navigate } from 'react-router-dom';
@@ -242,7 +244,12 @@ export function SkillCertificates() {
               const total = rows.filter((r) => r.certificate.groupName === name).length;
               return (
                 <section key={name} className="border border-line bg-panel">
-                  <h2 className="flex items-baseline justify-between px-3 pt-3 pb-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                  <h2
+                    className={cx(
+                      eyebrowClassName,
+                      'flex items-baseline justify-between px-3 pt-3 pb-1.5'
+                    )}
+                  >
                     {name}
                     <span className="font-normal tracking-normal normal-case tabular-nums">
                       {t('skills.certificates.groupCount', { shown: inGroup.length, total })}

@@ -18,7 +18,7 @@ export type FittingExportKind = 'permanentLink' | 'eft' | 'multibuy' | 'eveXml';
  * The Fittings tab's own URL with the Fitting in `?f=`, which opens it in the
  * editor.
  */
-export function fittingShareUrl(payload: string): string {
+function fittingShareUrl(payload: string): string {
   const base = import.meta.env.BASE_URL.replace(/\/$/, '');
   const query = new URLSearchParams({ f: payload }).toString();
   return `${window.location.origin}${base}${FITTINGS_PATH}?${query}`;

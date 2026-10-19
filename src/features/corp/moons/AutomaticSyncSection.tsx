@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -85,10 +86,7 @@ export function AutomaticSyncSection() {
 
   return (
     <section aria-labelledby="auto-sync-heading" className="space-y-2">
-      <h3
-        id="auto-sync-heading"
-        className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
-      >
+      <h3 id="auto-sync-heading" className={eyebrowClassName}>
         {t('corpTaxBook.moons.autoSync.title')}
       </h3>
       <p className="text-xs text-text-dim">{t('corpTaxBook.moons.autoSync.hint')}</p>

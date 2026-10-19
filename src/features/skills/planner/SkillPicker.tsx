@@ -13,6 +13,7 @@ import { cx } from '@/lib/cx';
 import type { SkillType } from '@/sde/types';
 import type { PlanEntry, TrainedSkill } from '@/engine/types';
 import { rankedSearch } from '@/lib/rankedSearch';
+import { useDebouncedValue } from '@/lib/useDebouncedValue';
 import { SkillRequirementsList } from '../SkillRequirementsList';
 import { buildSkillRequirements } from '../skillRequirements';
 import type { SkillCatalog } from '../skillMap';
@@ -33,9 +34,6 @@ function isVerticallyInViewport(el: Element): boolean {
 const ANNOUNCEMENT_VISIBLE_MS = 5000;
 
 const MAX_RESULTS = 20;
-/** Debounce for the skill search, matching Market.tsx's catalogue search — a fast typist doesn't re-rank ~500 skills on every keystroke. */
-const SEARCH_DEBOUNCE_MS = 250;
-
 interface SkillPickerProps {
   skills: readonly SkillType[];
   catalog: SkillCatalog;
@@ -71,7 +69,7 @@ export function SkillPicker({
   const [query, setQuery] = useState('');
   // Debounced separately from `query`: the input itself stays instantly
   // responsive, only the ~500-skill re-rank below waits out the debounce.
-  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useDebouncedValue(query);
   const [selected, setSelected] = useState<number | null>(null);
   const [activeGroups, setActiveGroups] = useState<Set<string>>(new Set());
   const [announcement, setAnnouncement] = useState('');
@@ -108,11 +106,6 @@ export function SkillPicker({
     setJumpTargetId(isVerticallyInViewport(el) ? null : el.id);
     setPendingJumpElementId(null);
   }, [pendingJumpElementId, planEntries]);
-
-  useEffect(() => {
-    const id = setTimeout(() => setDebouncedQuery(query), SEARCH_DEBOUNCE_MS);
-    return () => clearTimeout(id);
-  }, [query]);
 
   /**
    * Ranked over every skill rather than capped at MAX_RESULTS, so a group

@@ -13,7 +13,12 @@
 import { gzipSync } from 'node:zlib';
 import type { R2Get, R2Put } from './r2Client.js';
 import type { LpStoreRow } from './lpOffersSnapshot.js';
-import type { TypeDay, TypeDays, TypeOpenPrices } from './marketOpenPrices.js';
+import type {
+  StoredTypeOpenPrices,
+  TypeDay,
+  TypeDays,
+  TypeOpenPrices,
+} from './marketOpenPrices.js';
 
 export const LP_STORE_OFFERS_R2_KEY = 'lp-store-offers/snapshot.json';
 export const OPEN_PRICES_R2_PREFIX = 'open-prices/';
@@ -49,7 +54,7 @@ export async function publishLpStoreOffersToR2(
 export interface MergeFn {
   (
     base: { typeId: number },
-    existing: Pick<TypeOpenPrices, 'dates' | 'regions'> | null,
+    existing: StoredTypeOpenPrices | null,
     days: readonly TypeDay[]
   ): TypeOpenPrices;
 }
@@ -83,7 +88,7 @@ export async function writeOpenPricesToR2(
       const item = step.value;
       const key = openPricesR2Key(item.typeId);
       try {
-        const existing = (await io.get(key)) as Pick<TypeOpenPrices, 'dates' | 'regions'> | null;
+        const existing = (await io.get(key)) as StoredTypeOpenPrices | null;
         const merged = merge(item, existing, item.days);
         await io.put(key, gzipSync(JSON.stringify(merged)), OPEN_PRICES_HEADERS);
         written += 1;

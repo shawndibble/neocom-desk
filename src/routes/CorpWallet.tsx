@@ -1,3 +1,4 @@
+import { NO_NAMES } from '@/lib/emptyCollections';
 /**
  * `/corp/wallet` — the corporation's wallet, one division at a time: its
  * balance, its journal and its market transactions (issues #298, #570).
@@ -22,6 +23,7 @@
  * The journal is the same table `/wallet` draws (`WalletJournalTable.tsx`) —
  * ESI returns the same schema for both.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import {
   focusRingInsetClassName,
   interactiveClassName,
@@ -112,7 +114,6 @@ const VIEW_PARAM = enumParam<WalletTable>(['journal', 'transactions'], 'journal'
 const TRANSACTIONS_SORT = { columnId: 'date', direction: 'desc' } as const;
 
 /** Stable identities, so a missing read doesn't invalidate its dependent memos every render. */
-const NO_NAMES: ReadonlyMap<number, string> = new Map();
 const EMPTY_JOURNAL: readonly WalletJournalEntry[] = [];
 const EMPTY_TRANSACTIONS: readonly CorporationWalletTransaction[] = [];
 
@@ -214,7 +215,7 @@ function CorpDivisionsPanel({
         selectedEntry ? (
           <>
             <p className="flex min-w-0 items-baseline justify-between gap-3">
-              <span className="min-w-0 truncate text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+              <span className={cx(eyebrowClassName, 'min-w-0 truncate')}>
                 {divisionLabel(selectedEntry)}
               </span>
               <span
@@ -261,7 +262,7 @@ function CorpDivisionsPanel({
                   )}
                 >
                   <Tooltip content={divisionLabel(entry)}>
-                    <span className="block truncate text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                    <span className={cx(eyebrowClassName, 'block truncate')}>
                       {divisionLabel(entry)}
                     </span>
                   </Tooltip>

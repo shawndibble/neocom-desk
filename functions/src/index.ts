@@ -168,6 +168,8 @@ import {
 import {
   MARKET_OPEN_PRICES_META_PATH,
   OpenPriceFold,
+  SNAPSHOT_HUBS,
+  StationPriceFold,
   findFinalSnapshot,
   groupByDocument,
   implausibleReason,
@@ -179,7 +181,7 @@ import {
 import { publishLpStoreOffersToR2, writeOpenPricesToR2 } from './r2DailySnapshots.js';
 import { publishMiningPricesToR2 } from './r2MiningPrices.js';
 import { createR2Delete } from './r2Client.js';
-import { SNAPSHOT_HUBS, StationPriceFold, stationFoldWrites } from './miningHubPrices.js';
+import { stationFoldWrites } from './miningHubPrices.js';
 import { MINING_TYPE_IDS } from './data/miningTypeIds.js';
 import { fetchJson as fetchEverefJson, foldSnapshotUrl } from './marketOrdersArchive.js';
 import { runWorkbenchSync } from './workbenchFits.js';
@@ -1392,12 +1394,14 @@ export const syncLpStoreOffers = onSchedule(
  * syncMarketOpenPrices: the price-history chart's Buy and Sell lines (decision
  * 20261018-121126). Once a day, shortly after the previous UTC day's last
  * EVE Ref market-order snapshot (23:45) is published, folds that snapshot into
- * the highest buy and lowest sell per tracked region and type and merges the
- * day into R2's `open-prices/<typeId>.json`, every tracked region in one
- * object (~20,000 objects; layout decision 20261018-164126, storage decision
- * 20261018-201511-moving-the-daily-snapshots-to-r2). Only the small meta doc stays in
- * Firestore, for the shrink guard. The same pass also keeps the best buy and
- * sell of every mining type at each hub *station* and merges that day into
+ * the highest buy and lowest sell per hub *station* and type (only orders
+ * placed at the station; decision 20261019-004148 moved it from region-wide) and
+ * merges the day into R2's `open-prices/<typeId>.json`, every hub station in
+ * one object (~20,000 objects; layout decision 20261018-164126, storage
+ * decision 20261018-201511-moving-the-daily-snapshots-to-r2). The region-wide
+ * fold still runs in the same pass, but only for the plausibility guards; it is
+ * no longer stored. Only the small meta doc stays in Firestore, for the shrink
+ * guard. The mining types' share of the same station fold is merged into
  * `mining-prices/<hubId>/<YYYY-MM>.json` (decision 20261018-233051, which
  * retired `captureMiningPriceSnapshot` and its Firestore `marketHistory`; its
  * days are copied into R2 once, on the first run).
@@ -1415,7 +1419,11 @@ export const syncLpStoreOffers = onSchedule(
  * script can fill it later. 1GiB because the decompress-and-fold peaked at ~300MB RSS
  * in a local measurement and the contracts job has OOM'd before; 540s because
  * the same measurement took ~45s to download and fold, leaving room for the
- * ~20,000 read-merge-write round trips of ~37 KB objects (32 at a time). A
+ * ~20,000 read-merge-write round trips of ~37 KB objects (32 at a time). Folding
+ * every type per station (#4279) adds one map lookup per row and holds ~5 x 15k
+ * station/type pairs, the size of the region fold; it writes no more objects
+ * than the region fold did (a type priced only away from the hub stations gets
+ * no new day), so the same 540s holds. A
  * type that fails to read or write throws the run, so it is retried whole; the
  * merge is idempotent.
  *
@@ -1451,10 +1459,18 @@ export const syncMarketOpenPrices = onSchedule(
     }
     const { url: snapshotUrl, fileTime } = found.snapshot;
     const fold = new OpenPriceFold();
-    // The hub-station mining prices ride the same single pass over the snapshot.
-    const stations = new StationPriceFold(SNAPSHOT_HUBS, MINING_TYPE_IDS);
+    // The hub-station prices (Open Prices for every type, and the mining
+    // prices) ride the same single pass; the region fold only feeds the guards.
+    const stations = new StationPriceFold(SNAPSHOT_HUBS);
     const rows = await foldSnapshotUrl(snapshotUrl, fold, MARKET_HISTORY_USER_AGENT, stations);
-    logInfo('Market open prices fold', { date, fileTime, snapshotUrl, rows, pairs: fold.size });
+    logInfo('Market open prices fold', {
+      date,
+      fileTime,
+      snapshotUrl,
+      rows,
+      pairs: fold.size,
+      stationPairs: stations.size,
+    });
     const reason = implausibleReason(fold);
     if (reason) {
       logError('Market open prices sync skipped publishing', { date, reason });
@@ -1475,7 +1491,7 @@ export const syncMarketOpenPrices = onSchedule(
     const get = createR2Get(r2);
     const put = createR2Put(r2);
     const { written, failed, firstError } = await writeOpenPricesToR2(
-      groupByDocument(new Map([[date, fold]])),
+      groupByDocument(new Map([[date, stations]])),
       mergeDays,
       { get, put }
     );
@@ -1488,7 +1504,7 @@ export const syncMarketOpenPrices = onSchedule(
     // Throws on a failed write, so the run (both halves, both idempotent) retries.
     const mining = await publishMiningPricesToR2(
       date,
-      stationFoldWrites(stations, SNAPSHOT_HUBS, date),
+      stationFoldWrites(stations, SNAPSHOT_HUBS, date, MINING_TYPE_IDS),
       SNAPSHOT_HUBS,
       {
         get,

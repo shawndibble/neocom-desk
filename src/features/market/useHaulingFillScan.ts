@@ -1,3 +1,4 @@
+import { idSetKey } from '@/lib/idSetKey';
 /**
  * The on-demand scan behind "Fill the free space": batch after batch of the
  * same Hauling Opportunities scan as `useHaulingScan`, over every Hauling
@@ -73,7 +74,7 @@ export interface HaulingFillScanInput {
  * string, so it never collides with a category's numeric scope.
  */
 export function haulingFillScope(skipped: Iterable<number>): string {
-  return `fill:${[...new Set(skipped)].sort((a, b) => a - b).join(',')}`;
+  return `fill:${idSetKey(skipped)}`;
 }
 
 /** One press: Find starts afresh; Find more and Try again carry on. */

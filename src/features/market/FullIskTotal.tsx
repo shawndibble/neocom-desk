@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Tooltip } from '@/components/ui';
 import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
 import { writeToClipboard } from '@/lib/clipboard';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
+import { useCopyFeedback } from '@/lib/useCopyFeedback';
 
 /** How long the "copied" bubble stays over the figure. */
 const COPIED_FEEDBACK_MS = 2000;
@@ -26,14 +26,7 @@ const COPIED_FEEDBACK_MS = 2000;
  */
 export function FullIskTotal({ value, compact = false }: { value: number; compact?: boolean }) {
   const { t } = useTranslation();
-  const [copied, setCopied] = useState(false);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(
-    () => () => {
-      if (timer.current !== null) clearTimeout(timer.current);
-    },
-    []
-  );
+  const { copied, flash } = useCopyFeedback(COPIED_FEEDBACK_MS);
 
   const full = formatIsk(value, 0);
   const short = formatIskCompact(value);
@@ -44,9 +37,7 @@ export function FullIskTotal({ value, compact = false }: { value: number; compac
     } catch {
       return;
     }
-    setCopied(true);
-    if (timer.current !== null) clearTimeout(timer.current);
-    timer.current = setTimeout(() => setCopied(false), COPIED_FEEDBACK_MS);
+    flash();
   }
 
   const button = (

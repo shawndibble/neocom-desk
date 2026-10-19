@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal, IskInput, Checkbox, Radio } from '@/components/ui';
@@ -13,6 +14,7 @@ import { rememberPayeeEntity } from './payees';
 import type { LinkSuggestion } from './paymentLinks';
 import { useLedgerAction } from './useLedgerAction';
 import { LedgerActionError } from './LedgerActionError';
+import { toggleInSet } from '@/lib/sets';
 
 interface LinkPaymentDialogProps {
   open: boolean;
@@ -73,12 +75,7 @@ export function LinkPaymentDialog({
   }
 
   function toggle(id: string) {
-    setExcluded((previous) => {
-      const next = new Set(previous);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+    setExcluded((previous) => toggleInSet(previous, id));
   }
 
   const systemName = (solarSystemId: number) => systemLabel(systemNames, solarSystemId);
@@ -195,7 +192,7 @@ export function LinkPaymentDialog({
         {selected && (
           <>
             <div className="space-y-1">
-              <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+              <p className={eyebrowClassName}>
                 {t('miningTax.linkPaymentCoversLabel', { payee: selected.balance.payee.name })}
               </p>
               <ul className="divide-y divide-line rounded-xs border border-line bg-panel-2">
@@ -234,9 +231,7 @@ export function LinkPaymentDialog({
 
             {selected.payment.amount === null && (
               <div className="space-y-1">
-                <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                  {t('miningTax.linkPaymentAmountLabel')}
-                </p>
+                <p className={eyebrowClassName}>{t('miningTax.linkPaymentAmountLabel')}</p>
                 <IskInput
                   value={amountInKind}
                   onChange={setAmountInKind}

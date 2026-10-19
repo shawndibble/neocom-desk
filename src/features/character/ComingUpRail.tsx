@@ -10,6 +10,8 @@
  * Grouping only; the ordering is `engine/character/board.ts`'s and is never
  * re-derived here.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { cx } from '@/lib/cx';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EmptyState, LiveStatus, Panel, textActionClassName } from '@/components/ui';
@@ -67,7 +69,12 @@ export function ComingUpRail({
     <ul aria-label={t('calendar.rail.title')}>
       {groups.map((group) => (
         <li key={group.dayStartMs}>
-          <h3 className="sticky top-0 z-10 border-y border-line bg-panel-2 px-3 py-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+          <h3
+            className={cx(
+              eyebrowClassName,
+              'sticky top-0 z-10 border-y border-line bg-panel-2 px-3 py-1.5'
+            )}
+          >
             {dayHeading(group.dayStartMs)}
             <span className="float-right tabular-nums">{group.items.length}</span>
           </h3>

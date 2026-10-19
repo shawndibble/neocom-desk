@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, InfoTooltip, Modal } from '@/components/ui';
@@ -114,9 +115,7 @@ export function CorpRowDetailModal({
           </div>
 
           <div className="space-y-1 rounded-xs border border-line bg-panel-2 p-2">
-            <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-              {t('miningTax.oreColumn')}
-            </p>
+            <p className={eyebrowClassName}>{t('miningTax.oreColumn')}</p>
             <ul className="divide-y divide-line text-xs">
               {view.oreLines.map((line) => {
                 const you = personal?.find((p) => p.typeId === line.typeId)?.quantity;
@@ -144,9 +143,7 @@ export function CorpRowDetailModal({
           </div>
 
           <div className="space-y-1 rounded-xs border border-line bg-panel-2 p-2">
-            <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-              {t('miningTax.detail.breakdown.title')}
-            </p>
+            <p className={eyebrowClassName}>{t('miningTax.detail.breakdown.title')}</p>
             <p className="text-xs text-text-dim">
               {t('miningTax.corpBook.detail.priced', {
                 hub: hub.name,

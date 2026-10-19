@@ -280,7 +280,7 @@ function undoable(
   return { layout: after, undoLabel, undoTo: snapshotLayout(before) };
 }
 
-export const UNDO_LABELS = {
+const UNDO_LABELS = {
   added: 'overview.customize.undo.added',
   removed: 'overview.customize.undo.removed',
   resized: 'overview.customize.undo.resized',
