@@ -6225,9 +6225,10 @@
         "priceBasisDayRatedHint": "{{percent}}% of {{price}} on {{date}}, not today's price. Raw ore is priced as its compressed form.",
         "priceBasisNowHint": "Today's live {{price}} price, not the price on {{date}}. Raw ore is priced as its compressed form.",
         "priceBasisNowRatedHint": "{{percent}}% of today's live {{price}} price, not the price on {{date}}. Raw ore is priced as its compressed form.",
+        "priceBasisUnpublishedHint": "Until that day's closing price is published, it uses today's live price.",
         "refineBasisHint": "Refining uses {{character}}'s Reprocessing and Reprocessing Efficiency skills at an NPC station's 50% base rate ({{efficiency}}% yield), with no station tax deducted.",
         "refineImplantHint": "Includes the active clone's fitted refining implant, +{{pct}}% to ore and ice yield.",
-        "partialPricingHint": "Some types had no Jita price on this date. Their value is left out of both totals rather than guessed."
+        "partialPricingHint": "Some types have no Jita price on this basis. Their value is left out of both totals rather than guessed."
       }
     },
     "payees": {

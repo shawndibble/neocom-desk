@@ -87,6 +87,7 @@ function renderModal(value = row(), { showRefining = true }: { showRefining?: bo
         showRefining={showRefining}
         basis="sell"
         buybackRate={100}
+        today="2026-10-19"
       />
     </MemoryRouter>
   );
@@ -241,7 +242,7 @@ describe('YieldDetailModal', () => {
         /Reprocessing and Reprocessing Efficiency skills at an NPC station's 50% base rate \(50.0% yield\)/
       )
     ).toBeInTheDocument();
-    expect(screen.getByText(/no Jita price on this date/)).toBeInTheDocument();
+    expect(screen.getByText(/no Jita price on this basis/)).toBeInTheDocument();
   });
 
   describe('refining hidden (issue #1281)', () => {

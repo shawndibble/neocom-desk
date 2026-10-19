@@ -240,8 +240,6 @@ interface RatePanelProps<P> {
   tooltip: (props: TooltipContentProps) => ReactElement;
   /** The `<Bar>`. */
   bars: ReactNode;
-  /** Under the screen-reader table, e.g. the ISK chart's price-source legend. */
-  footer?: ReactNode;
 }
 
 /** The daily-rate card: a bar per day over a screen-reader table of the same rows. */
@@ -255,7 +253,6 @@ function RatePanel<P>({
   tickFormatter,
   tooltip,
   bars,
-  footer,
 }: RatePanelProps<P>) {
   return (
     <Panel padded>
@@ -290,7 +287,6 @@ function RatePanel<P>({
       <div className="sr-only">
         <DataTable columns={columns} responsive="table" rows={rows} rowKey={rowKey} label={title} />
       </div>
-      {footer}
     </Panel>
   );
 }

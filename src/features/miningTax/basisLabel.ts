@@ -1,5 +1,6 @@
 import type { TFunction } from 'i18next';
 import { basisSide, isNowBasis, type PriceBasis } from '@/engine/miningTax/priceBasis';
+import { shiftDate } from '@/engine/miningTax/yieldRange';
 
 /** "Jita buy", "Jita sell", "Now · Jita buy" — the basis as the Value button and summary name it. */
 export function basisLabel(t: TFunction, basis: PriceBasis): string {
@@ -36,21 +37,28 @@ export function basisSummary(t: TFunction, basis: PriceBasis, buybackRate: numbe
 
 /**
  * The row detail's "How this is priced" line: the chosen side and buyback
- * rate, and whether that is the mined day's price or today's.
+ * rate, and whether that is the mined day's price or today's. A mined day of
+ * today or yesterday may not be published yet, so it says it may be live.
  */
 export function basisPriceHint(
   t: TFunction,
   basis: PriceBasis,
   buybackRate: number,
-  date: string
+  date: string,
+  today: string
 ): string {
   const price = t(`miningTax.overview.basis.${basisSide(basis)}`);
-  const kind = isNowBasis(basis) ? 'Now' : 'Day';
-  return buybackRate < 100
-    ? t(`miningTax.overview.detail.priceBasis${kind}RatedHint`, {
-        percent: buybackRate,
-        price,
-        date,
-      })
-    : t(`miningTax.overview.detail.priceBasis${kind}Hint`, { price, date });
+  const percent = buybackRate;
+  const rated = buybackRate < 100;
+  if (isNowBasis(basis)) {
+    return rated
+      ? t('miningTax.overview.detail.priceBasisNowRatedHint', { percent, price, date })
+      : t('miningTax.overview.detail.priceBasisNowHint', { price, date });
+  }
+  const hint = rated
+    ? t('miningTax.overview.detail.priceBasisDayRatedHint', { percent, price, date })
+    : t('miningTax.overview.detail.priceBasisDayHint', { price, date });
+  return date >= shiftDate(today, -1)
+    ? `${hint} ${t('miningTax.overview.detail.priceBasisUnpublishedHint')}`
+    : hint;
 }

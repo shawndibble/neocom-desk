@@ -433,13 +433,13 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
       id: 'pricing',
       header: t('miningTax.overview.pricingColumn'),
       className: 'whitespace-nowrap',
-      render: (row) => (
-        <span
-          className={`text-[0.6875rem] ${row.valuation.pricedAll ? 'text-text-dim' : 'text-warning'}`}
-        >
-          {t(`miningTax.overview.${row.valuation.pricedAll ? 'pricingFull' : 'pricingPartial'}`)}
-        </span>
-      ),
+      render: (row) =>
+        // Only a gap is worth a mark; a fully priced row says nothing.
+        !row.valuation.pricedAll && (
+          <span className="text-[0.6875rem] text-warning">
+            {t('miningTax.overview.pricingPartial')}
+          </span>
+        ),
       sortValue: (row) => (row.valuation.pricedAll ? 1 : 0),
     },
   };
@@ -759,6 +759,7 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
             showRefining={refining}
             basis={basis}
             buybackRate={buybackRate}
+            today={today}
           />
         )}
       </TabPanel>

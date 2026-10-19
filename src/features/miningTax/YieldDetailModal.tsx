@@ -59,6 +59,8 @@ interface YieldDetailModalProps {
   /** The page's Value choice, which "How this is priced" names. */
   basis: PriceBasis;
   buybackRate: number;
+  /** EVE's today, so a not-yet-published day can say it is priced live. */
+  today: string;
 }
 
 const CARD = 'rounded-xs border bg-panel-2 p-2.5';
@@ -99,6 +101,7 @@ export function YieldDetailModal({
   showRefining,
   basis,
   buybackRate,
+  today,
 }: YieldDetailModalProps) {
   const { t } = useTranslation();
   const { valuation, entry } = row;
@@ -495,7 +498,7 @@ export function YieldDetailModal({
                 {t('miningTax.overview.detail.pricingTitle')}
               </p>
               <div className="space-y-1.5 px-2.5 py-2 text-[0.6875rem] leading-relaxed text-text-dim">
-                <p>{basisPriceHint(t, basis, buybackRate, entry.date)}</p>
+                <p>{basisPriceHint(t, basis, buybackRate, entry.date, today)}</p>
                 {showRefining && (
                   <p>
                     {t('miningTax.overview.detail.refineBasisHint', {
