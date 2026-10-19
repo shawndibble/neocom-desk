@@ -106,7 +106,7 @@ import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { rankedSearch } from '@/lib/rankedSearch';
 import { cx } from '@/lib/cx';
 import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
-import { CONTRACT_ISK_CENTS_BELOW, formatIskAuto } from '@/lib/isk';
+import { CONTRACT_ISK_CENTS_BELOW, formatIskAuto, parseNumeric } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
 import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
@@ -200,13 +200,6 @@ const ITEMS_FILTER_PARAMS = {
   'items.belowMarket': boolParam(),
 };
 const ITEMS_SORT = { columnId: 'price', direction: 'asc' } as const;
-
-/** A blank or unparseable field is "no restriction", never `NaN` — which would silently exclude every row. */
-function parseNumeric(value: string): number | null {
-  if (value.trim() === '') return null;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
-}
 
 /**
  * `offerAskingPrice`, except an unpriced (barter) row sorts last rather than
@@ -717,15 +710,18 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
    * answer excludes" rule Courier's `narrowToOverRate` follows for its own
    * mid-load rows.
    */
+  // Deferred so a price/region edit keeps the inputs responsive while the
+  // ~370k-row filter reruns at low priority.
+  const deferredNonTypeFilter = useDeferredValue(nonTypeFilter);
   const nonTypeRows = useMemo(() => {
-    const engineFiltered = filterContractOffers(rows, nonTypeFilter);
+    const engineFiltered = filterContractOffers(rows, deferredNonTypeFilter);
     const allowed = jumpRangeFilter.allowed;
     if (allowed === null) return engineFiltered;
     return engineFiltered.filter((row) => {
       const location = offerLocations.get(row.locationId);
       return location === undefined || withinJumpRange(location.systemId, allowed);
     });
-  }, [rows, nonTypeFilter, offerLocations, jumpRangeFilter.allowed]);
+  }, [rows, deferredNonTypeFilter, offerLocations, jumpRangeFilter.allowed]);
   const statsByType = useMemo(() => {
     // Before the full rows land, the index's own per-type count and cheapest
     // stand in. They ignore the other filters, which only matters until the
@@ -762,7 +758,10 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
     const filtered = filterContractOffers(nonTypeRows, { typeIds });
     // Below market only reads which contracts pass; the offer table is not shown.
     if (belowMarket) return filtered;
-    return filtered.sort((a, b) => sortablePrice(a, plexPrice) - sortablePrice(b, plexPrice));
+    // Sort key computed once per row, not twice per comparison.
+    const keyed = filtered.map((row) => ({ row, key: sortablePrice(row, plexPrice) }));
+    keyed.sort((a, b) => a.key - b.key);
+    return keyed.map((entry) => entry.row);
   }, [nonTypeRows, typeIds, plexPrice, belowMarket]);
 
   const suggestions = useMemo<Suggestion[]>(() => {

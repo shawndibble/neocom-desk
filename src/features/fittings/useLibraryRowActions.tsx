@@ -19,7 +19,7 @@ import {
   type SharedFittingKey,
 } from '@/engine/communities/sharedFittings';
 import type { CommunitySummary } from '@/features/communities/communityStore';
-import { decodeFittingShare, encodeFittingShare } from '@/engine/fitting/fittingShare';
+import { decodeFittingShare, encodeFittingShare } from '@/engine/fittings/fittingShare';
 import { esiFittingToFitting } from '@/engine/fittings/esiFittingMapper';
 import { fittingToShareInput, shareToFitting } from '@/engine/fittings/shareMapper';
 import type { Fitting } from '@/engine/fittings/types';
