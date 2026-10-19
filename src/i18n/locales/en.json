@@ -13914,6 +13914,7 @@
         "noBillable": "No day is Billable until an officer syncs.",
         "failed": "The sync failed: {{message}}",
         "autoGroupFailed": "The sync worked, but grouping this account's Characters failed: {{message}}",
+        "reassignFailed": "The sync worked, but matching earlier unmatched payments to Miners failed: {{message}}",
         "skipped": {
           "missing-mining-scope": "The mining scope is not granted, so nothing was synced.",
           "no-book": "This corporation has no Corp Tax Book to sync.",

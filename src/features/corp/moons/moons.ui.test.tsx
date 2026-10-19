@@ -4,7 +4,13 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
-import { buildBookView, type BookViewInput } from '@/engine/corpTaxBook/bookView';
+import {
+  buildBookView,
+  nextRunPeriod,
+  planStatementRun,
+  statementForLine,
+  type BookViewInput,
+} from '@/engine/corpTaxBook/bookView';
 import type { ObservedMiningEntry } from '@/engine/corpTaxBook/types';
 import { BookProvider } from './BookContext';
 import { MinersTab } from './MinersTab';
@@ -130,6 +136,19 @@ describe('StatementRun', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Next Miner' }));
     expect(screen.getByText('2 of 2')).toBeInTheDocument();
     expect(enqueueStatements).not.toHaveBeenCalled();
+  });
+
+  it('previews the mail of an earlier issued Statement the run will still send', async () => {
+    const first = buildBookView(input());
+    const plan = planStatementRun(first, nextRunPeriod(first)!);
+    const issued = plan.lines.map((l) => statementForLine(first, plan, l));
+    renderBook(<StatementRun />, { statements: issued });
+    expect(screen.getByText('2 to send')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Preview mail' }));
+    expect(await screen.findByText('1 of 2')).toBeInTheDocument();
+    expect(screen.getByText(/moon tax Statement, Aug 2026/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Next Miner' }));
+    expect(screen.getByText('2 of 2')).toBeInTheDocument();
   });
 
   it('checks, then issues each Statement before handing the mails to the queue', async () => {

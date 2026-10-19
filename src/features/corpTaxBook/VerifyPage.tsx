@@ -241,21 +241,32 @@ function VerifyStatement({ token, payload }: { token: string; payload: VerifyPay
               <span className="font-semibold">{isk(statement.amount)}</span>
             </p>
           </Panel>
-          <Panel title={t('corpTaxBook.verify.paymentsTitle')}>
+          <Panel
+            title={t('corpTaxBook.verify.paymentsTitle')}
+            padded={payload.payments.length === 0}
+          >
             {payload.payments.length === 0 ? (
               <p className="text-sm text-text-dim">{t('corpTaxBook.verify.noPayments')}</p>
             ) : (
-              payload.payments.map((p) => (
-                <p key={p.id} className="flex justify-between gap-3 text-sm tabular-nums">
-                  <span>
-                    {shortDate(p.at, locale)}
-                    <span className="block text-xs text-text-dim">
-                      {t(`corpTaxBook.verify.source.${p.source}`)}
+              <ul
+                aria-label={t('corpTaxBook.verify.paymentsTitle')}
+                className="divide-y divide-line"
+              >
+                {payload.payments.map((p) => (
+                  <li
+                    key={p.id}
+                    className="flex justify-between gap-3 px-3 py-2 text-sm tabular-nums"
+                  >
+                    <span>
+                      {shortDate(p.at, locale)}
+                      <span className="block text-xs text-text-dim">
+                        {t(`corpTaxBook.verify.source.${p.source}`)}
+                      </span>
                     </span>
-                  </span>
-                  <span className="text-isk-pos">+{isk(p.amount)}</span>
-                </p>
-              ))
+                    <span className="text-isk-pos">+{isk(p.amount)}</span>
+                  </li>
+                ))}
+              </ul>
             )}
           </Panel>
         </div>
