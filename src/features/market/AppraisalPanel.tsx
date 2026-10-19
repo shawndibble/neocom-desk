@@ -52,7 +52,11 @@ import { GrantNote } from '@/app/GrantNote';
 import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
 import { formatAge } from '@/lib/age';
 import { useIsDesktop } from '@/lib/useIsDesktop';
-import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
+import {
+  focusRingInsetClassName,
+  rowInteractiveClassName,
+  tappableRowClassName,
+} from '@/components/ui/controlStyles';
 import { appraisalNet } from '@/engine/market/appraisal';
 import { countPasteLines, pasteBoxRows } from '@/engine/market/appraisalPaste';
 import { MAX_SNAPSHOT_ITEMS } from '@/engine/market/appraisalSnapshot';
@@ -427,7 +431,7 @@ export function AppraisalPanel({
             <div className="flex flex-col gap-1.5">
               {/* One sentence: "Minus what I own at [Jita]". The picker stays put, disabled, while the box is unticked. */}
               <div className="flex flex-wrap items-center gap-x-2">
-                <label className="flex min-h-9 items-center gap-2 text-xs">
+                <label className={`flex items-center gap-2 text-xs ${tappableRowClassName}`}>
                   <Checkbox
                     checked={minusOwned}
                     disabled={lacksAssets || characterId === null}
