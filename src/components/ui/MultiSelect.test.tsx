@@ -26,7 +26,7 @@ const GROUPS = [
 
 async function openMenu() {
   const user = userEvent.setup();
-  await user.click(screen.getByRole('button', { name: 'Open' }));
+  await user.click(screen.getByRole('button', { name: /Open$/ }));
   return user;
 }
 
@@ -35,7 +35,7 @@ describe('MultiSelect', () => {
     render(
       <MultiSelect
         label="People"
-        trigger={<button>Open</button>}
+        triggerLabel="Open"
         options={OPTIONS}
         selected={new Set([1])}
         onToggle={() => {}}
@@ -53,7 +53,7 @@ describe('MultiSelect', () => {
     render(
       <MultiSelect
         label="People"
-        trigger={<button>Open</button>}
+        triggerLabel="Open"
         options={OPTIONS}
         selected={new Set()}
         onToggle={onToggle}
@@ -70,7 +70,7 @@ describe('MultiSelect', () => {
     render(
       <MultiSelect
         label="People"
-        trigger={<button>Open</button>}
+        triggerLabel="Open"
         options={OPTIONS}
         selected={new Set()}
         onToggle={() => {}}
@@ -89,7 +89,7 @@ describe('MultiSelect', () => {
     render(
       <MultiSelect
         label="People"
-        trigger={<button>Open</button>}
+        triggerLabel="Open"
         options={OPTIONS}
         selected={new Set()}
         onToggle={() => {}}
@@ -110,7 +110,7 @@ describe('MultiSelect', () => {
     render(
       <MultiSelect
         label="People"
-        trigger={<button>Open</button>}
+        triggerLabel="Open"
         options={OPTIONS}
         selected={new Set()}
         onToggle={() => {}}
@@ -127,7 +127,7 @@ describe('MultiSelect', () => {
     render(
       <MultiSelect
         label="People"
-        trigger={<button>Open</button>}
+        triggerLabel="Open"
         groups={GROUPS}
         selected={new Set()}
         onToggle={() => {}}
@@ -148,7 +148,7 @@ describe('MultiSelect', () => {
     render(
       <MultiSelect
         label="People"
-        trigger={<button>Open</button>}
+        triggerLabel="Open"
         options={OPTIONS}
         selected={new Set()}
         onToggle={() => {}}
@@ -165,7 +165,7 @@ describe('MultiSelect', () => {
     render(
       <MultiSelect
         label="People"
-        trigger={<button>Open</button>}
+        triggerLabel="Open"
         options={OPTIONS}
         selected={new Set()}
         onToggle={() => {}}
@@ -183,7 +183,7 @@ describe('MultiSelect', () => {
     render(
       <MultiSelect
         label="People"
-        trigger={<button>Open</button>}
+        triggerLabel="Open"
         options={OPTIONS}
         selected={new Set()}
         onToggle={() => {}}
@@ -201,7 +201,7 @@ describe('MultiSelect', () => {
     render(
       <MultiSelect
         label="People"
-        trigger={<button>Open</button>}
+        triggerLabel="Open"
         options={OPTIONS}
         selected={new Set()}
         onToggle={onToggle}
@@ -232,7 +232,7 @@ describe('MultiSelect', () => {
     render(
       <MultiSelect
         label="People"
-        trigger={<button>Open</button>}
+        triggerLabel="Open"
         options={OPTIONS}
         selected={new Set()}
         onToggle={() => {}}
@@ -253,7 +253,7 @@ describe('MultiSelect', () => {
     render(
       <MultiSelect
         label="People"
-        trigger={<button>Open</button>}
+        triggerLabel="Open"
         options={OPTIONS}
         selected={new Set()}
         onToggle={() => {}}
@@ -278,7 +278,7 @@ describe('MultiSelect', () => {
     render(
       <MultiSelect
         label="People"
-        trigger={<button>Open</button>}
+        triggerLabel="Open"
         options={OPTIONS}
         selected={new Set()}
         onToggle={() => {}}
@@ -295,7 +295,7 @@ describe('MultiSelect', () => {
     render(
       <MultiSelect
         label="People"
-        trigger={<button>Open</button>}
+        triggerLabel="Open"
         options={OPTIONS}
         selected={new Set()}
         onToggle={() => {}}
@@ -310,5 +310,40 @@ describe('MultiSelect', () => {
     const list = screen.getByRole('listbox');
     expect(list.children).toHaveLength(1);
     expect(list.children[0]).toHaveAttribute('aria-hidden', 'true');
+  });
+
+  it('opens from a select-shaped trigger showing the field name and its summary', async () => {
+    render(
+      <MultiSelect
+        label="People"
+        summary="1 / 3"
+        triggerAriaLabel="People, 1 of 3 picked"
+        options={OPTIONS}
+        selected={new Set([1])}
+        onToggle={() => {}}
+        searchPlaceholder="Search"
+        noResultsLabel="No matches"
+      />
+    );
+    const trigger = screen.getByRole('button', { name: 'People, 1 of 3 picked' });
+    expect(trigger).toHaveTextContent('People1 / 3');
+    expect(trigger).toHaveAttribute('aria-haspopup', 'dialog');
+    await userEvent.setup().click(trigger);
+    expect(screen.getByRole('dialog', { name: 'People' })).toBeInTheDocument();
+  });
+
+  it('names a self-named trigger "label: value" when no aria label is given', () => {
+    render(
+      <MultiSelect
+        label="Location"
+        triggerLabel="All locations"
+        options={OPTIONS}
+        selected={new Set()}
+        onToggle={() => {}}
+        searchPlaceholder="Search"
+        noResultsLabel="No matches"
+      />
+    );
+    expect(screen.getByRole('button', { name: 'Location: All locations' })).toBeInTheDocument();
   });
 });

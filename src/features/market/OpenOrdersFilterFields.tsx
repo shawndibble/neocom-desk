@@ -49,6 +49,10 @@ export function OpenOrdersFilterFields({
   showLocationFilter,
 }: OpenOrdersFilterFieldsProps) {
   const { t } = useTranslation();
+  const locationSummary =
+    draft.locationIds.length === 0
+      ? t('market.orders.filter.allLocations')
+      : t('market.orders.filter.selectedLocationsCount', { count: draft.locationIds.length });
   return (
     <>
       <FilterChip
@@ -161,15 +165,8 @@ export function OpenOrdersFilterFields({
       {showLocationFilter && (
         <MultiSelect
           label={t('market.orders.filter.location')}
-          trigger={
-            <Button size="sm">
-              {draft.locationIds.length === 0
-                ? t('market.orders.filter.allLocations')
-                : t('market.orders.filter.selectedLocationsCount', {
-                    count: draft.locationIds.length,
-                  })}
-            </Button>
-          }
+          size="sm"
+          triggerLabel={locationSummary}
           options={locationOptions.map((option) => ({
             id: option.locationId,
             label: option.label,
