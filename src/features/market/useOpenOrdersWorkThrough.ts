@@ -4,7 +4,7 @@ import { db } from '@/db';
 import { requiredScopesForEndpoints } from '@/esi/registry';
 import { OPEN_IN_EVE_ENDPOINTS } from '@/features/openInEve/sendOpenInEve';
 import type { MarketOrder } from '@/esi/endpoints';
-import type { OpenOrderRow } from './openOrdersModel';
+import { ownOrderIdSet, type OpenOrderRow } from './openOrdersModel';
 import type { OpenOrdersPageSnapshot } from './openOrdersPageSnapshot';
 import { workThroughQueue } from './workThrough';
 import { useWorkThrough, useWorkThroughStartParam } from './useWorkThrough';
@@ -48,7 +48,7 @@ export function useOpenOrdersWorkThrough({
   );
   // Every Character's orders, before any narrowing: never undercut an alt.
   const ownOrderIds = useMemo(
-    () => new Set(data?.openOrders.entries.flatMap((e) => e.orders.map((o) => o.order_id)) ?? []),
+    () => (data ? ownOrderIdSet(data.openOrders) : new Set<number>()),
     [data]
   );
   const fetchedAtByCharacter = useMemo(

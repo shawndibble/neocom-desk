@@ -229,7 +229,9 @@ const askChecks: Ask<readonly WorkbenchFit[], ReadonlyMap<string, WorkbenchFitCh
     .then((checks) => checks ?? NO_CHECKS);
 
 const askPopular: Ask<number, PopularFitsResult> = (sources, shipTypeId) =>
-  sources.popularFits(shipTypeId).catch((): PopularFitsResult => ({ ok: false }));
+  sources
+    .popularFits(shipTypeId)
+    .catch((): PopularFitsResult => ({ ok: false, reason: 'offline' }));
 
 const askPrices: Ask<
   { hub: TradeHub; typeIds: readonly number[] },

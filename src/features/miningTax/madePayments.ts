@@ -24,6 +24,7 @@ import { loadWalletJournalWithStatus } from '@/features/character/wallet';
 import { loadContracts } from '@/features/character/contracts';
 import { humanizeRefType } from '@/features/character/format';
 import { resolveNames } from '@/features/character/names';
+import { formatLocalDate } from '@/lib/localDate';
 import type { MadePayment } from './paymentLinks';
 import { PAYMENT_REF_TYPES } from './paymentMatches';
 
@@ -159,4 +160,15 @@ export async function loadMadePaymentsWithStatus(
 /** Just the payments, for callers that don't care why a list is short. */
 export async function loadMadePayments(characterIds: readonly number[]): Promise<MadePayment[]> {
   return (await loadMadePaymentsWithStatus(characterIds)).payments;
+}
+
+/**
+ * A payment's own date as a local calendar date, falling back to today.
+ * A contract carries `date_completed ?? date_issued` straight from ESI, so an
+ * unparseable value would otherwise reach `formatLocalDate` as an Invalid Date
+ * and write nonsense into a synced record.
+ */
+export function paidOnFromIso(isoDate: string): string {
+  const parsed = new Date(isoDate);
+  return formatLocalDate(Number.isNaN(parsed.getTime()) ? new Date() : parsed);
 }

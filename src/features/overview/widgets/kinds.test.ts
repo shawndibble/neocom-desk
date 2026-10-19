@@ -1,13 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ESI_REGISTRY } from '@/esi/registry';
-import {
-  KIND_CATEGORIES,
-  WIDGET_KINDS,
-  getKind,
-  isAddable,
-  isKnownKind,
-  type WidgetKindDef,
-} from './kinds';
+import { KIND_CATEGORIES, WIDGET_KINDS, getKind, isAddable, type WidgetKindDef } from './kinds';
 
 const ALL_IDS = [
   'training',
@@ -166,10 +159,8 @@ describe('widget kind catalogue', () => {
     ]);
   });
 
-  it('looks kinds up and tells known from unknown', () => {
+  it('looks kinds up', () => {
     expect(getKind('orders')?.id).toBe('orders');
     expect(getKind('someFutureKind')).toBeUndefined();
-    expect(isKnownKind('orders')).toBe(true);
-    expect(isKnownKind('someFutureKind')).toBe(false);
   });
 });

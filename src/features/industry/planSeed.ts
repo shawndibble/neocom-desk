@@ -11,6 +11,7 @@
  * as it did before.
  */
 
+import { ME_MAX, TE_MAX } from '@/engine/industry/efficiency';
 import type { MaterialSourcing, MaterialSourcingMap } from '@/engine/industry/types';
 
 /** ME/TE/runs to open a Build Plan at, in place of every default. */
@@ -47,8 +48,8 @@ function parseSeedNumber(raw: string | null, min: number, max: number): number |
 export function parsePlanSeed(params: ParamReader): BuildPlanSeed | null {
   // The game's own bounds, the ones `BuildPlanRecord.me`/`.te` document and
   // the detail pane's inputs enforce.
-  const me = parseSeedNumber(params.get('me'), 0, 10);
-  const te = parseSeedNumber(params.get('te'), 0, 20);
+  const me = parseSeedNumber(params.get('me'), 0, ME_MAX);
+  const te = parseSeedNumber(params.get('te'), 0, TE_MAX);
   // An Offer is always a copy (`is_blueprint_copy`), so runs is at
   // least 1 — an original's ESI runs of -1 never reaches here, and a zero-run
   // plan builds nothing.

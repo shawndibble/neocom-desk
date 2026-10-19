@@ -29,17 +29,16 @@ describe('loadBpcOfferRows', () => {
     loadPublicBpcContracts.mockResolvedValue({
       data: { rows: [row(1)], originals: [row(2)], lastSyncedAt: 5 },
     });
-    expect((await loadBpcOfferRows(7))?.map((r) => r.contractId)).toEqual([1, 2]);
-    expect(loadPublicBpcContracts).toHaveBeenCalledWith(7);
+    expect((await loadBpcOfferRows())?.map((r) => r.contractId)).toEqual([1, 2]);
   });
 
   it('is null when no snapshot is available', async () => {
     loadPublicBpcContracts.mockResolvedValue(null);
-    expect(await loadBpcOfferRows(7)).toBeNull();
+    expect(await loadBpcOfferRows()).toBeNull();
   });
 
   it('is null when the load fails', async () => {
     loadPublicBpcContracts.mockRejectedValue(new Error('offline'));
-    expect(await loadBpcOfferRows(7)).toBeNull();
+    expect(await loadBpcOfferRows()).toBeNull();
   });
 });

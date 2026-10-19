@@ -17,6 +17,11 @@ import {
   type AlertsCallbackState,
   type AlertsGrantOutcome,
 } from '@/features/notifications/alertsGrant';
+import {
+  completeCorpSyncGrant,
+  type CorpSyncCallbackState,
+  type CorpSyncGrantOutcome,
+} from '@/features/corp/taxBook/syncGrant';
 import { beginAddCharacterLogin, retryLastLogin, retryLastLoginOnce } from '@/app/loginFlow';
 import { Button, NeedsConnection, Panel, Spinner } from '@/components/ui';
 import { isOfflineFailure } from '@/esi/client';
@@ -95,6 +100,28 @@ export function Callback() {
       }
       void completeAlertsGrant({ code, state })
         .catch((): AlertsGrantOutcome => ({
+          status: 'failed',
+          characterId: alertsIntent.characterId,
+        }))
+        .then(land);
+      return;
+    }
+
+    // The Corp Tax Book's Automatic sync grant (ADR 0025) is the same kind of
+    // round trip: nothing is stored here, and every outcome goes back to the book.
+    if (alertsIntent?.kind === 'corpSync') {
+      const land = (corpSyncGrant: CorpSyncCallbackState['corpSyncGrant']) => {
+        navigate(takeLoginReturnTo() ?? '/corp/moons', {
+          replace: true,
+          state: { corpSyncGrant } satisfies CorpSyncCallbackState,
+        });
+      };
+      if (ssoError || !code || !state) {
+        land({ status: 'cancelled' });
+        return;
+      }
+      void completeCorpSyncGrant({ code, state })
+        .catch((): CorpSyncGrantOutcome => ({
           status: 'failed',
           characterId: alertsIntent.characterId,
         }))

@@ -6,17 +6,12 @@ import '@/i18n';
 import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { OverviewSubNav } from './OverviewSubNav';
+import { seedGrant as seedGrantFor } from '@/test/seed';
 
 const CHARACTER_ID = 77;
 
 async function seedGrant(scopes: readonly string[]): Promise<void> {
-  await db.tokens.put({
-    characterId: CHARACTER_ID,
-    accessToken: 'access',
-    refreshToken: 'refresh',
-    expiresAt: Date.now() + 60_000,
-    scopes: [...scopes],
-  });
+  await seedGrantFor(CHARACTER_ID, scopes);
   useActiveCharacter.setState({ activeCharacterId: CHARACTER_ID, hydrated: true });
 }
 

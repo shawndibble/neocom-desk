@@ -131,11 +131,6 @@ export function fittingToDna(fitting: Fitting): string {
   return `${fitting.shipTypeId}:${entries.join(':')}::`;
 }
 
-/** What pasted into game chat becomes a clickable fitting link. */
-export function fittingToChatLink(fitting: Fitting): string {
-  return `<url=fitting:${fittingToDna(fitting)}>${headerSafe(fitting.name)}</url>`;
-}
-
 /** How the game's fittings XML names each rack's slots (`hi slot 0`, `med slot 2`…). */
 const XML_RACK: Readonly<Record<FittingSlotKind, string>> = {
   high: 'hi',

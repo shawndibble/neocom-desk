@@ -61,6 +61,7 @@ import type {
 } from './communities/communityAlert';
 import type { StockBelowTargetFire } from './stockTargets/stockAlert';
 import type { IncursionNearbyFire } from './incursions/incursionAlert';
+import { parseInstant } from './esiInstant';
 
 /**
  * Every fire an Occurrence Key can be derived from — the same members as
@@ -275,8 +276,7 @@ export function occurrenceFiredAt(fire: OccurrenceFire, nowMs: number): number {
       return fire.readyAtMs;
     // ESI's own `timestamp` for the notification, as an ISO string.
     case 'eveNotification': {
-      const sentAt = Date.parse(fire.timestamp);
-      return Number.isFinite(sentAt) ? sentAt : nowMs;
+      return parseInstant(fire.timestamp) ?? nowMs;
     }
     // The job's `end_date`, already in the past by the time the diff fires.
     case 'industryJobComplete':

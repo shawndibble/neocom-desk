@@ -3,6 +3,7 @@
 // the client sends only its short-lived access token, which is verified
 // against EVE's published JWKS before any Firebase credential is minted.
 
+import { setTimeout as sleep } from 'node:timers/promises';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { defineSecret } from 'firebase-functions/params';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
@@ -29,7 +30,7 @@ import {
 } from './alertGrant.js';
 import { parseAlertsKey } from './alertGrantCrypto.js';
 import { firestoreAlertGrantStore, firestorePollerStore } from './alertGrantStore.js';
-import { fetchNotifications as fetchEsiNotifications } from './esiNotifications.js';
+import { ESI_USER_AGENT, fetchNotifications as fetchEsiNotifications } from './esiNotifications.js';
 import { pollEveNotifications as pollEveNotificationsRun } from './pollEveNotifications.js';
 import { buildDeviceRegistration, parseRegisterDeviceInput } from './registerDevice.js';
 import { dispatchDueProjections, writeDeviceRegistration } from './projectionStore.js';
@@ -42,10 +43,47 @@ import {
 import {
   LAST_SYNCED_FIELD,
   STALE_ACCOUNT_BATCH_SIZE,
+  STALE_ACCOUNT_READ_PAGE_SIZE,
   STALE_ACCOUNT_MAX_PASSES,
   decideAccountAction,
   lastSyncedAtOf,
 } from './purgeStaleAccounts.js';
+import {
+  parseBookCall,
+  parseClaimPaymentInput,
+  parseConfirmGroupingInput,
+  parseDeclineByTokenInput,
+  parseEditAction,
+  parseStopReminders,
+  parseSyncInput,
+  parseToken,
+  parseTurnOnInput,
+} from './corpTaxBook.js';
+import { esiIdentityReader } from './corpTaxBookEsi.js';
+import {
+  deleteCorpSyncGrantsHeldBy,
+  parseSaveCorpSyncGrantInput,
+  revokeCorpSyncGrant,
+  runScheduledCorpSyncs,
+  saveCorpSyncGrant,
+  type CorpSyncDeps,
+} from './corpSyncGrant.js';
+import { esiSyncReader } from './corpTaxBookSyncEsi.js';
+import {
+  claimPayment,
+  confirmGrouping,
+  declineGrouping,
+  declineGroupingByToken,
+  listPendingGroupings,
+  editBook,
+  readStatementByToken,
+  reclaimBook,
+  setRemindersByToken,
+  syncBook,
+  turnOnBook,
+  verifyOfficer,
+  type BookDeps,
+} from './corpTaxBookStore.js';
 import {
   parseCommunityIdInput,
   parseCreateInput,
@@ -93,19 +131,18 @@ import {
 } from './communityRequestsStore.js';
 import { removePledge, removeRequest, sweepRequests } from './communityRequestsCleanup.js';
 import { LP_CORP_STATION_SYSTEMS } from './data/lpCorpStationSystems.js';
-import {
-  LP_STORE_OFFERS_CHUNK_SIZE,
-  LP_STORE_OFFERS_COLLECTION,
-  LP_STORE_OFFERS_META_DOC,
-  LP_STORE_REQUEST_GAP_MS,
-  fetchLpStoreRows,
-} from './lpOffersSnapshot.js';
+import { LP_STORE_REQUEST_GAP_MS, fetchLpStoreRows } from './lpOffersSnapshot.js';
 import { fetchArchiveFingerprint, streamPublicContractsCsvs } from './publicContractsArchive.js';
 import {
+  createR2Get,
   createR2Put,
+  type R2Config,
   publishContractOffersToR2,
   publishCourierContractsToR2,
+  publicContractsRunVerdict,
+  r2PublishOutcome,
   type CourierR2PublishState,
+  type R2PublishOutcome,
   type R2PublishState,
 } from './r2Publisher.js';
 import { measureContractTypeChanges, type ContractTypeHashes } from './contractTypeChanges.js';
@@ -113,73 +150,44 @@ import {
   INSURGENCY_URL,
   LAWLESS_SYSTEMS_DOC,
   SYSTEM_CONDITIONS_COLLECTION,
+  lawlessWriteNeeded,
   parseLawlessSystemIds,
 } from './lawlessSystems.js';
-import {
-  ADAM4EVE_MIN_REQUEST_GAP_MS,
-  ADAM4EVE_TYPE_CHUNK_SIZE,
-  BACKFILL_HUB,
-  FUZZWORK_TYPE_CHUNK_SIZE,
-  MARKET_HISTORY_COLLECTION,
-  PRICED_TYPE_IDS,
-  SNAPSHOT_HUBS,
-  buildAdam4eveHistoryUrl,
-  buildFuzzworkUrl,
-  chunk,
-  foldHubPriceCapture,
-  isOutsideRetention,
-  missingBackfillDates,
-  parseAdam4eveHistoryResponse,
-  parseFuzzworkAggregates,
-  utcDateString,
-  type MarketHistoryDoc,
-  type SidePrices,
-  type StoredHubDay,
-  type StoredHubPrice,
-} from './marketSnapshot.js';
 import {
   accumulateRequestedSide,
   applyRequestedSide,
   emptyRequestedSide,
-  chunkDocId,
-  buildContractOfferIndex,
-  chunkDocData,
-  chunkRows,
   compactContractOfferRow,
   courierContractFrom,
   eligibleContractFrom,
   isOutstandingCourierContract,
-  sortContractOfferRows,
-  sortCourierContractRows,
-  PUBLIC_CONTRACT_OFFERS_CHUNK_SIZE,
-  PUBLIC_CONTRACT_OFFERS_COLLECTION,
-  PUBLIC_CONTRACT_OFFERS_INDEX_COLLECTION,
-  PUBLIC_CONTRACT_OFFERS_INDEX_DOC,
-  PUBLIC_CONTRACT_OFFERS_META_DOC,
-  PUBLIC_COURIER_CONTRACTS_CHUNK_SIZE,
-  PUBLIC_COURIER_CONTRACTS_COLLECTION,
-  PUBLIC_COURIER_CONTRACTS_META_DOC,
   type EligibleContract,
   type PublicContractOfferRow,
   type PublicCourierContractRow,
 } from './publicContracts.js';
 import {
-  MARKET_OPEN_PRICES_COLLECTION,
   MARKET_OPEN_PRICES_META_PATH,
   OpenPriceFold,
-  dayIndexUrl,
+  findFinalSnapshot,
   groupByDocument,
   implausibleReason,
   mergeDays,
-  pickLastSnapshotUrl,
   previousUtcDate,
   regionCounts,
   shrunkRegion,
 } from './marketOpenPrices.js';
-import { writeOpenPrices } from './marketOpenPricesStore.js';
+import { publishLpStoreOffersToR2, writeOpenPricesToR2 } from './r2DailySnapshots.js';
+import { publishMiningPricesToR2 } from './r2MiningPrices.js';
+import { createR2Delete } from './r2Client.js';
+import { SNAPSHOT_HUBS, StationPriceFold, stationFoldWrites } from './miningHubPrices.js';
+import { MINING_TYPE_IDS } from './data/miningTypeIds.js';
 import { fetchJson as fetchEverefJson, foldSnapshotUrl } from './marketOrdersArchive.js';
 import { runWorkbenchSync } from './workbenchFits.js';
-import { firestoreWorkbenchFitsStore } from './workbenchFitsStore.js';
+import { r2WorkbenchHulls, workbenchFitsStore } from './workbenchFitsStore.js';
+import {
+  firestoreWorkbenchMigration,
+  migrateLegacyWorkbenchFits,
+} from './workbenchFitsMigration.js';
 import {
   MutamarketBusyError,
   MutamarketInputError,
@@ -192,7 +200,11 @@ initializeApp();
 
 // Built at cold start so a missing EVE_CLIENT_ID fails deployment/startup
 // loudly instead of silently accepting any EVE app's tokens per request.
-const verifyOptions = verifyOptionsFromEnv();
+// The Firebase emulator's discovery pass loads this module without the env
+// files (the running functions get them), so only there a missing id is allowed.
+const verifyOptions = verifyOptionsFromEnv({
+  allowMissingClientId: process.env.FUNCTIONS_EMULATOR === 'true',
+});
 
 export const mintFirebaseToken = onCall<{ accessToken?: unknown }>(
   // Hobby-scale abuse cap; also bounds the JWKS fetch fan-out.
@@ -450,9 +462,20 @@ export const purgeStaleAccounts = onSchedule(
     let passes = 0;
     let purged = 0;
 
-    for (const ref of await db.collection('characters').listDocuments()) {
-      const snap = await ref.get();
-      const action = decideAccountAction(lastSyncedAtOf(snap.data()), now);
+    const refs = await db.collection('characters').listDocuments();
+    const snaps = new Map<string, FirebaseFirestore.DocumentSnapshot>();
+    // Heartbeat reads are batched and masked to the one field the decision
+    // needs; the rest of each parent doc is never loaded.
+    for (let i = 0; i < refs.length; i += STALE_ACCOUNT_READ_PAGE_SIZE) {
+      const page = refs.slice(i, i + STALE_ACCOUNT_READ_PAGE_SIZE);
+      for (const snap of await db.getAll(...page, { fieldMask: [LAST_SYNCED_FIELD] })) {
+        snaps.set(snap.ref.path, snap);
+      }
+    }
+
+    for (const ref of refs) {
+      const snap = snaps.get(ref.path);
+      const action = decideAccountAction(lastSyncedAtOf(snap?.data()), now);
       if (action === 'keep') continue;
       if (action === 'seed') {
         await ref.set({ [LAST_SYNCED_FIELD]: now }, { merge: true });
@@ -479,6 +502,20 @@ export const purgeStaleAccounts = onSchedule(
         if (characterId !== undefined) await deleteAlertGrantFor(alertGrantDeps(), characterId);
       } catch (err) {
         logWarn('Stale account purge: Alerts Grant cleanup failed, will retry', {
+          uid: ref.id,
+          error: err instanceof Error ? err.name : 'unknown',
+        });
+        continue;
+      }
+
+      // So does any Corp Tax Book sync grant it holds (ADR 0025).
+      try {
+        const characterId = characterIdForUid(ref.id);
+        if (characterId !== undefined) {
+          await deleteCorpSyncGrantsHeldBy(corpSyncDeps(), characterId);
+        }
+      } catch (err) {
+        logWarn('Stale account purge: Corp sync grant cleanup failed, will retry', {
           uid: ref.id,
           error: err instanceof Error ? err.name : 'unknown',
         });
@@ -717,6 +754,149 @@ export const removeCommunityPledgeCallable = onCall<unknown>(
   }
 );
 
+// Corp Tax Book (issue #4061, ADR 0023). Every write to a corporation's book
+// goes through these callables (corpTaxBookStore.ts) and lands in its audit
+// log; the client only reads, under firestore.rules. The caller sends a
+// short-lived EVE access token for the role check; it is used for ESI reads
+// and dropped, never stored or logged.
+const corpTaxBookDeps = (): BookDeps => ({
+  db: getFirestore(),
+  now: Date.now,
+  verifyToken: (token) => verifyEveAccessToken(token, verifyOptions),
+  readIdentity: esiIdentityReader(),
+});
+
+const CORP_TAX_BOOK_OPTIONS = { maxInstances: 5 };
+
+// Scheduled Corp Tax Book sync (issue #4068, ADR 0025). The second server-held EVE
+// token: an opt-in, narrow-scope grant per corporation, encrypted under the same
+// `ALERTS_TOKEN_KEY` secret (bound to its own purpose, so blobs do not cross
+// collections). Nothing here logs or returns a token; firestore.rules denies the
+// grant collection.
+function corpSyncDeps(): CorpSyncDeps {
+  return {
+    db: getFirestore(),
+    now: Date.now,
+    key: () => parseAlertsKey(ALERTS_TOKEN_KEY.value()),
+    verify: (accessToken) => verifyEveAccessToken(accessToken, verifyOptions),
+    refresh: (clientId, refreshToken) => refreshAtSso(clientId, refreshToken),
+    revoke: (clientId, refreshToken) => revokeAtSso(clientId, refreshToken),
+    readIdentity: esiIdentityReader(),
+    log: (message, data) => logWarn(message, data),
+  };
+}
+
+// Proven by the signed-in Character AND the grant's own access token, which must be
+// for that same Character; the corporation and its roles are read with the grant.
+export const saveCorpTaxBookSyncGrantCallable = onCall<unknown>(
+  { maxInstances: 5, secrets: [ALERTS_TOKEN_KEY] },
+  (request) =>
+    saveCorpSyncGrant(corpSyncDeps(), callerOf(request), parseSaveCorpSyncGrantInput(request.data))
+);
+
+// The holder revokes their own; the CEO revokes anyone's (live role check, so it carries an access token).
+export const revokeCorpTaxBookSyncGrantCallable = onCall<unknown>(
+  { maxInstances: 5, secrets: [ALERTS_TOKEN_KEY] },
+  (request) => revokeCorpSyncGrant(corpSyncDeps(), callerOf(request), parseBookCall(request.data))
+);
+
+/**
+ * syncCorpTaxBooks (issue #4068, ADR 0025): every 6 hours, syncs and settles each
+ * opted-in corporation's Corp Tax Book with its grant holder's token. Never issues
+ * a Statement or sends mail. Deploy is manual:
+ * `firebase deploy --only functions:syncCorpTaxBooks`.
+ */
+export const syncCorpTaxBooks = onSchedule(
+  {
+    schedule: 'every 6 hours',
+    secrets: [ALERTS_TOKEN_KEY],
+    timeoutSeconds: 540,
+    maxInstances: 1,
+  },
+  async () => {
+    const summary = await runScheduledCorpSyncs(corpSyncDeps(), esiSyncReader());
+    logInfo('syncCorpTaxBooks finished', { ...summary });
+  }
+);
+
+export const verifyCorpOfficerCallable = onCall<unknown>(CORP_TAX_BOOK_OPTIONS, (request) =>
+  verifyOfficer(corpTaxBookDeps(), callerOf(request), parseBookCall(request.data))
+);
+
+export const turnOnCorpTaxBookCallable = onCall<unknown>(CORP_TAX_BOOK_OPTIONS, (request) =>
+  turnOnBook(corpTaxBookDeps(), callerOf(request), parseTurnOnInput(request.data))
+);
+
+export const reclaimCorpTaxBookCallable = onCall<unknown>(CORP_TAX_BOOK_OPTIONS, (request) =>
+  reclaimBook(corpTaxBookDeps(), callerOf(request), parseBookCall(request.data))
+);
+
+// A sync is many small transactions (up to 2000 observer rows), so give it room.
+export const syncCorpTaxBookCallable = onCall<unknown>(
+  { ...CORP_TAX_BOOK_OPTIONS, timeoutSeconds: 120 },
+  (request) =>
+    syncBook(corpTaxBookDeps(), callerOf(request), parseSyncInput(request.data, Date.now()))
+);
+
+export const editCorpTaxBookCallable = onCall<unknown>(CORP_TAX_BOOK_OPTIONS, (request) =>
+  editBook(
+    corpTaxBookDeps(),
+    callerOf(request),
+    parseBookCall(request.data),
+    parseEditAction(request.data)
+  )
+);
+
+// A player claims their own Unmatched donation (D5): uid-authorised, no officer role.
+export const claimCorpTaxBookPaymentCallable = onCall<unknown>(CORP_TAX_BOOK_OPTIONS, (request) => {
+  const { corporationId, paymentId } = parseClaimPaymentInput(request.data);
+  return claimPayment(corpTaxBookDeps(), callerOf(request), corporationId, paymentId);
+});
+
+export const confirmCorpTaxBookGroupingCallable = onCall<unknown>(
+  CORP_TAX_BOOK_OPTIONS,
+  (request) => {
+    const { corporationId, minerId } = parseConfirmGroupingInput(request.data);
+    return confirmGrouping(corpTaxBookDeps(), callerOf(request), corporationId, minerId);
+  }
+);
+
+export const declineCorpTaxBookGroupingCallable = onCall<unknown>(
+  CORP_TAX_BOOK_OPTIONS,
+  (request) => {
+    const { corporationId, minerId } = parseConfirmGroupingInput(request.data);
+    return declineGrouping(corpTaxBookDeps(), callerOf(request), corporationId, minerId);
+  }
+);
+
+export const listPendingCorpTaxBookGroupingsCallable = onCall<unknown>(
+  CORP_TAX_BOOK_OPTIONS,
+  (request) => listPendingGroupings(corpTaxBookDeps(), callerOf(request))
+);
+
+// No session on purpose: the verify link is the credential (D27), so a miner
+// without an EVE login can read their Statement and stop reminders.
+export const readCorpTaxBookStatementCallable = onCall<unknown>(CORP_TAX_BOOK_OPTIONS, (request) =>
+  readStatementByToken(corpTaxBookDeps(), parseToken(request.data))
+);
+
+// A decline needs only the link; a confirm never does (it needs the character's own sign-in).
+export const declineCorpTaxBookGroupingByTokenCallable = onCall<unknown>(
+  CORP_TAX_BOOK_OPTIONS,
+  (request) => {
+    const { token, characterId } = parseDeclineByTokenInput(request.data);
+    return declineGroupingByToken(corpTaxBookDeps(), token, characterId);
+  }
+);
+
+export const stopCorpTaxBookRemindersCallable = onCall<unknown>(
+  CORP_TAX_BOOK_OPTIONS,
+  (request) => {
+    const { token, stopped } = parseStopReminders(request.data);
+    return setRemindersByToken(corpTaxBookDeps(), token, stopped);
+  }
+);
+
 /**
  * sweepCommunityRequests (issue #3812, ADR 0021): deletes Requests expired a
  * week ago and Requests closed a week ago, with their Pledges. Bounded to 500
@@ -740,160 +920,13 @@ export const sweepCommunityRequests = onSchedule(
   }
 );
 
-/** Firestore's hard cap on writes in a single `WriteBatch`, with headroom for a shorter final page. */
-const BATCH_WRITE_PAGE_SIZE = 450;
-
-/**
- * Applies more write operations than fit in one `WriteBatch` by paging them
- * across several.
- *
- * `pageSize` exists because the op *count* is not always the binding limit.
- * `commit()` is where the Admin SDK encodes each document — `batch.set()` only
- * stores it — so a page of documents that are individually large costs a
- * transient proportional to the whole page. The public-contract snapshot's
- * ~600KB chunk docs need a much smaller page than the default; small per-doc
- * writers can keep filling batches to Firestore's own limit.
- */
-async function commitInPages(
-  db: Firestore,
-  ops: readonly ((batch: FirebaseFirestore.WriteBatch) => void)[],
-  pageSize: number = BATCH_WRITE_PAGE_SIZE
-): Promise<void> {
-  for (let i = 0; i < ops.length; i += pageSize) {
-    const batch = db.batch();
-    for (const op of ops.slice(i, i + pageSize)) op(batch);
-    await batch.commit();
-  }
-}
-
-/**
- * Chunk docs per `WriteBatch`. Deliberately far below Firestore's 500-op cap:
- * committing every chunk of a snapshot in one batch encodes the whole thing
- * at once, which is what exhausted the 512MiB container even after the parse
- * itself had been made cheap. Five chunks of 3,000 rows keep that transient
- * near 3MB. The total write count is unchanged — this only affects how many
- * are in flight together.
- *
- * Shared by both public-contract snapshots: what a page of chunk docs costs to
- * encode is not what an offers chunk and a courier chunk differ in.
- */
-const PUBLIC_CONTRACT_CHUNK_DOCS_PER_BATCH = 5;
-
-/** Where one chunked snapshot lives, and how coarsely it is written. */
-interface ChunkedSnapshot {
-  collection: string;
-  metaDoc: string;
-  chunkSize: number;
-  chunkDocsPerBatch: number;
-}
-
-/**
- * Replaces a chunked snapshot wholesale: chunk docs 0..N-1 are overwritten,
- * any leftover chunk from a previously-larger run is deleted (`meta`'s stored
- * `chunkCount` is how a shrinking dataset's stale chunks are found — nothing
- * else records how many there used to be), and `meta` itself is updated last
- * so a reader never sees a `chunkCount` ahead of what's actually been written
- * this run.
- *
- * Written against a `ChunkedSnapshot` rather than against this one
- * collection: it was shared with the blueprint-only sync until #907 retired
- * that, and how a snapshot is replaced is not what two such syncs differ in.
- */
-async function writeChunkedSnapshot<Row>(
-  db: Firestore,
-  snapshot: ChunkedSnapshot,
-  rows: readonly Row[]
-): Promise<number> {
-  const collection = db.collection(snapshot.collection);
-  const metaRef = collection.doc(snapshot.metaDoc);
-  const previousChunkCount = ((await metaRef.get()).data()?.chunkCount as number | undefined) ?? 0;
-
-  // Fixed before the first write and stamped on every chunk, then reused as
-  // `meta.lastSyncedAt` and the index's: a reader that finds a chunk from a
-  // different publish than the `meta` it began with knows it read across one.
-  const publishedAt = Date.now();
-  const chunks = chunkRows(rows, snapshot.chunkSize);
-  const ops: ((batch: FirebaseFirestore.WriteBatch) => void)[] = chunks.map((chunk, index) => {
-    const ref = collection.doc(chunkDocId(index));
-    return (batch) => batch.set(ref, chunkDocData(chunk, publishedAt));
-  });
-  for (let i = chunks.length; i < previousChunkCount; i += 1) {
-    const ref = collection.doc(chunkDocId(i));
-    ops.push((batch) => batch.delete(ref));
-  }
-  await commitInPages(db, ops, snapshot.chunkDocsPerBatch);
-
-  await metaRef.set({
-    lastSyncedAt: publishedAt,
-    chunkCount: chunks.length,
-    rowCount: rows.length,
-  });
-  return publishedAt;
-}
-
-const LP_STORE_OFFERS_SNAPSHOT: ChunkedSnapshot = {
-  collection: LP_STORE_OFFERS_COLLECTION,
-  metaDoc: LP_STORE_OFFERS_META_DOC,
-  chunkSize: LP_STORE_OFFERS_CHUNK_SIZE,
-  chunkDocsPerBatch: PUBLIC_CONTRACT_CHUNK_DOCS_PER_BATCH,
-};
-
-const PUBLIC_CONTRACT_OFFERS_SNAPSHOT: ChunkedSnapshot = {
-  collection: PUBLIC_CONTRACT_OFFERS_COLLECTION,
-  metaDoc: PUBLIC_CONTRACT_OFFERS_META_DOC,
-  chunkSize: PUBLIC_CONTRACT_OFFERS_CHUNK_SIZE,
-  chunkDocsPerBatch: PUBLIC_CONTRACT_CHUNK_DOCS_PER_BATCH,
-};
-
-/**
- * The courier half of the same crawl (issue #909). Its own collection because
- * a courier row shares none of an offer row's fields beyond identity — see
- * `PublicCourierContractRow` — and `writeChunkedSnapshot` replaces one
- * snapshot from one row array, so two shapes in one collection is not a thing
- * this writer can express in the first place.
- */
-const PUBLIC_COURIER_CONTRACTS_SNAPSHOT: ChunkedSnapshot = {
-  collection: PUBLIC_COURIER_CONTRACTS_COLLECTION,
-  metaDoc: PUBLIC_COURIER_CONTRACTS_META_DOC,
-  chunkSize: PUBLIC_COURIER_CONTRACTS_CHUNK_SIZE,
-  chunkDocsPerBatch: PUBLIC_CONTRACT_CHUNK_DOCS_PER_BATCH,
-};
-
-async function writePublicContractOffersSnapshot(
-  db: Firestore,
-  rows: readonly PublicContractOfferRow[]
-): Promise<number> {
-  const lastSyncedAt = await writeChunkedSnapshot(db, PUBLIC_CONTRACT_OFFERS_SNAPSHOT, rows);
-  // The index is an optimisation a client can do without (it falls back to
-  // reading every chunk), so a failure to write it is logged, never allowed to
-  // fail a run whose chunks and meta are already published (issue #2921).
-  try {
-    await db
-      .collection(PUBLIC_CONTRACT_OFFERS_INDEX_COLLECTION)
-      .doc(PUBLIC_CONTRACT_OFFERS_INDEX_DOC)
-      .set({
-        lastSyncedAt,
-        ...buildContractOfferIndex(rows, PUBLIC_CONTRACT_OFFERS_CHUNK_SIZE),
-      });
-  } catch (error) {
-    logError('public contract offers index write failed', { error: String(error) });
-  }
-  return lastSyncedAt;
-}
-
-async function writePublicCourierContractsSnapshot(
-  db: Firestore,
-  rows: readonly PublicCourierContractRow[]
-): Promise<void> {
-  await writeChunkedSnapshot(db, PUBLIC_COURIER_CONTRACTS_SNAPSHOT, rows);
-}
-
 /**
  * syncPublicContractOffers: the public contract search's data source
  * (issues #608, #906, ADR 0013). Pulls EVE Ref's public-contracts snapshot
  * (no CORS, so the client can't fetch it directly) and republishes every
  * for-sale line of every public item_exchange/auction contract, any item
- * type, to `publicContractOffers` for signed-in clients to search.
+ * type, to Cloudflare R2 (`contract-offers/`) for clients to search. R2 is the
+ * only store (ADR 0019; issue #4270 removed the Firestore copies).
  *
  * Every 30 minutes, matching EVE Ref's own twice-hourly refresh cadence.
  *
@@ -903,10 +936,10 @@ async function writePublicCourierContractsSnapshot(
  * whole needed ~1.1GB of heap for 37MB of input; the streaming pass peaks far
  * below that against the same live data.
  *
- * It publishes a second snapshot off the same pass: `publicCourierContracts`,
+ * It publishes a second snapshot off the same pass: the courier snapshot,
  * every outstanding public courier contract as a route and a fee (issue #909).
  * Courier contracts have no item lines to join, so they cost one more
- * accumulator and ~2 more writes per run — deliberately not a second scheduled
+ * accumulator and ~2 more R2 puts per run — deliberately not a second scheduled
  * function or a second archive fetch, which is the shape #907 spent a ticket
  * undoing.
  *
@@ -919,7 +952,7 @@ async function writePublicCourierContractsSnapshot(
  * Memory is 2GiB against the retired blueprint-only sync's 1GiB, and the
  * timeout 540s against its 300s. Neither is measured at this volume; both are provisioned for
  * ~3x the rows on the evidence that exists. That evidence is specific: a
- * 512MiB ceiling died at 527MiB *during the write* with ~122k rows, having
+ * 512MiB ceiling died at 527MiB *during the (then Firestore) write* with ~122k rows, having
  * survived the streaming parse — so the ceiling scales with the retained rows
  * and their encoding, which is exactly what triples here. Under-provisioning
  * reproduces a failure this project has already had (every scheduled run
@@ -937,212 +970,24 @@ async function writePublicCourierContractsSnapshot(
  * per billing account ADR 0013 budgeted against, now that the blueprint-only
  * sync it briefly ran beside is gone.
  */
-// Same contact string ESI calls send (src/esi/client.ts's USER_AGENT) —
-// functions/ has no `@/` alias to import it, and Adam4EVE's own docs ask for
-// a User-Agent naming this app rather than a personal contact.
-const MARKET_HISTORY_USER_AGENT = 'Neocom Desk (github.com/shawndibble/neocom-desk)';
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function fetchAdam4eveChunk(
-  typeIds: readonly number[],
-  start: string,
-  end: string
-): Promise<Map<number, Map<string, SidePrices>>> {
-  const url = buildAdam4eveHistoryUrl(typeIds, BACKFILL_HUB.regionId, start, end);
-  const response = await fetch(url, { headers: { 'User-Agent': MARKET_HISTORY_USER_AGENT } });
-  if (!response.ok) {
-    throw new Error(`Adam4EVE market_price_history request failed with status ${response.status}`);
-  }
-  return parseAdam4eveHistoryResponse(await response.json());
-}
-
+// The public data hosts (EVE Ref, EVE Workbench, the LP and insurgency feeds)
+// get the ESI User-Agent naming this app, never a personal contact.
+const MARKET_HISTORY_USER_AGENT = ESI_USER_AGENT;
 /**
- * Fills whatever days in the retention window have no doc at all yet, from
- * Adam4EVE's region-wide history (marketSnapshot.ts's header comment). A
- * no-op once the live capture below has covered every day in the window —
- * this is meant to run itself out of work within
- * `MARKET_HISTORY_RETENTION_DAYS` of first deploying.
- *
- * One request per 20-type chunk of the mining catalog, each covering the
- * whole missing date range in one call (Adam4EVE's `start`/`end` already
- * spans many days), spaced `ADAM4EVE_MIN_REQUEST_GAP_MS` apart — the
- * catalog is ~500 types, so ~25-30 requests, once.
- *
- * A chunk's request failing is logged and skipped rather than thrown
- * (issue #1279 follow-up: live, this 400'd with "Parameter 'typeID'
- * invalid!" for two of ~500 type_ids — 92371, 92374 — that Adam4EVE's own
- * catalog doesn't recognize, likely too new or too obscure for it to have
- * indexed). Those ~20 types simply keep falling to the `average` tier for
- * their missing days, same as before this job existed; the other ~480
- * types' backfill isn't held hostage by the ones Adam4EVE can't answer for.
+ * The retired `captureMiningPriceSnapshot`'s Firestore collection. Read only
+ * by `syncMarketOpenPrices`'s one-time copy into R2; the maintainer deletes it
+ * after the first successful run.
  */
-async function backfillFromAdam4eve(db: Firestore, missingDates: readonly string[]): Promise<void> {
-  if (missingDates.length === 0) return;
-  const missingDateSet = new Set(missingDates);
-  const start = missingDates[0];
-  const end = missingDates[missingDates.length - 1];
-
-  const byDate = new Map<string, StoredHubDay>();
-  const typeChunks = chunk(PRICED_TYPE_IDS, ADAM4EVE_TYPE_CHUNK_SIZE);
-  const stationKey = String(BACKFILL_HUB.stationId);
-  let skippedChunks = 0;
-  for (let i = 0; i < typeChunks.length; i += 1) {
-    if (i > 0) await sleep(ADAM4EVE_MIN_REQUEST_GAP_MS);
-    let byTypeThenDate: Map<number, Map<string, SidePrices>>;
-    try {
-      byTypeThenDate = await fetchAdam4eveChunk(typeChunks[i], start, end);
-    } catch (err) {
-      skippedChunks += 1;
-      logWarn('Adam4EVE backfill chunk failed, skipping', {
-        typeIds: typeChunks[i],
-        error: err instanceof Error ? err.message : String(err),
-      });
-      continue;
-    }
-    for (const [typeId, byDateForType] of byTypeThenDate) {
-      for (const [date, prices] of byDateForType) {
-        // Adam4EVE's own range can include a day this run already captured
-        // live (e.g. a retry landing after midnight UTC) — only the actual
-        // gaps get written from this source.
-        if (!missingDateSet.has(date)) continue;
-        const day = byDate.get(date) ?? {};
-        const stationBucket = day[stationKey] ?? {};
-        stationBucket[String(typeId)] = {
-          buy: prices.buy,
-          sell: prices.sell,
-          buyCount: prices.buy === null ? 0 : 1,
-          sellCount: prices.sell === null ? 0 : 1,
-        };
-        day[stationKey] = stationBucket;
-        byDate.set(date, day);
-      }
-    }
-  }
-
-  const updatedAt = Date.now();
-  await Promise.all(
-    [...byDate].map(([date, hubs]) => {
-      const doc: MarketHistoryDoc = { hubs, source: 'adam4eve', updatedAt };
-      return db.collection(MARKET_HISTORY_COLLECTION).doc(date).set(doc);
-    })
-  );
-  logInfo('market history backfill', {
-    requestedDays: missingDates.length,
-    daysWritten: byDate.size,
-    skippedChunks,
-  });
-}
-
-/**
- * Captures every hub's current live book and folds it into today's running
- * average (marketSnapshot.ts's `foldHubPriceCapture`). Runs every 6 hours;
- * a fetch failure for one hub is logged and skipped rather than failing the
- * whole run — the day's average is simply built from however many captures
- * actually landed.
- */
-async function captureLiveHubPrices(db: Firestore, today: string): Promise<void> {
-  const docRef = db.collection(MARKET_HISTORY_COLLECTION).doc(today);
-  const existing = (await docRef.get()).data() as MarketHistoryDoc | undefined;
-  const hubs: StoredHubDay = existing?.source === 'fuzzwork' ? { ...existing.hubs } : {};
-
-  for (const hub of SNAPSHOT_HUBS) {
-    const captured = new Map<number, SidePrices>();
-    for (const typeIdChunk of chunk(PRICED_TYPE_IDS, FUZZWORK_TYPE_CHUNK_SIZE)) {
-      const url = buildFuzzworkUrl(hub.stationId, typeIdChunk);
-      let response: Response;
-      try {
-        response = await fetch(url);
-      } catch (err) {
-        logWarn('Fuzzwork aggregates request failed', {
-          hub: hub.id,
-          error: err instanceof Error ? err.message : String(err),
-        });
-        continue;
-      }
-      if (!response.ok) {
-        logWarn('Fuzzwork aggregates request failed', { hub: hub.id, status: response.status });
-        continue;
-      }
-      for (const [typeId, prices] of parseFuzzworkAggregates(await response.json(), typeIdChunk)) {
-        captured.set(typeId, prices);
-      }
-    }
-
-    const stationKey = String(hub.stationId);
-    const stationBucket: Record<string, StoredHubPrice> = { ...hubs[stationKey] };
-    for (const [typeId, prices] of captured) {
-      stationBucket[String(typeId)] = foldHubPriceCapture(stationBucket[String(typeId)], prices);
-    }
-    hubs[stationKey] = stationBucket;
-  }
-
-  const doc: MarketHistoryDoc = { hubs, source: 'fuzzwork', updatedAt: Date.now() };
-  await docRef.set(doc);
-  logInfo('market history live capture', { date: today, hubCount: SNAPSHOT_HUBS.length });
-}
-
-/**
- * captureMiningPriceSnapshot: the Mining Yield Overview's server-side price
- * source (issue #1279) — see marketSnapshot.ts's header comment for the full
- * design. Every 6 hours: backfill whatever's missing from Adam4EVE (idle
- * once the window is full), fold a live capture into today's running
- * average, then prune anything that's aged out of the retention window.
- *
- * One collection read up front serves both the backfill-gap check and the
- * prune list, rather than two passes over the same ~90-100 docs.
- *
- * Backfill runs first but is wrapped so it can never block the other two
- * steps: it is a one-time fill of history the app already had a fallback
- * for (ESI's `average`), while live capture is the thing that has to run
- * every single tick to keep today's price building up. A prior deploy hit
- * exactly this — one bad Adam4EVE chunk threw, which killed the whole
- * invocation before live capture or the prune ever ran (see
- * `backfillFromAdam4eve`'s own per-chunk tolerance for the underlying fix;
- * this is the second, outer layer, in case something *else* in that
- * function throws next time).
- *
- * It is the deployment's 4th scheduled job, alongside `dispatchProjections`,
- * `purgeNotificationFeed` and `syncPublicContractOffers` — past the 3 free
- * Cloud Scheduler jobs per billing account `syncPublicContractOffers`'s own
- * comment budgeted against (see the decision doc this ships with).
- */
-export const captureMiningPriceSnapshot = onSchedule(
-  { schedule: 'every 6 hours', timeoutSeconds: 540 },
-  async () => {
-    const db = getFirestore();
-    const today = utcDateString(new Date());
-
-    const snapshot = await db.collection(MARKET_HISTORY_COLLECTION).get();
-    const existingDates = new Set(snapshot.docs.map((doc) => doc.id));
-    const staleDocs = snapshot.docs.filter((doc) => isOutsideRetention(doc.id, today));
-
-    try {
-      await backfillFromAdam4eve(db, missingBackfillDates(existingDates, today));
-    } catch (err) {
-      logError('market history backfill failed, continuing to live capture', {
-        error: err instanceof Error ? err.message : String(err),
-      });
-    }
-    await captureLiveHubPrices(db, today);
-
-    if (staleDocs.length > 0) {
-      const batch = db.batch();
-      for (const doc of staleDocs) batch.delete(doc.ref);
-      await batch.commit();
-      logInfo('market history prune', { deleted: staleDocs.length });
-    }
-  }
-);
+const LEGACY_MARKET_HISTORY_COLLECTION = 'marketHistory';
 
 /**
  * syncLawlessSystems (issue #2870): Route Safety's "lawless" badge. CCP's
  * insurgency feed is CORS-locked to eveonline.com, so this fetches it every
  * 10 minutes (its own cache window) and stores the lawless system ids for the
  * app to read. A failed fetch writes nothing: the doc just ages, and the app
- * hides the badge once `updatedAt` passes its staleness limit.
+ * hides the badge once `updatedAt` passes its staleness limit. An unchanged
+ * list is not rewritten each run (issue #4272): only when it changes or the
+ * `LAWLESS_HEARTBEAT_MS` refresh is due, so `updatedAt` means "last confirmed".
  *
  * Another Cloud Scheduler job past the free three, like the jobs above.
  */
@@ -1165,11 +1010,11 @@ export const syncLawlessSystems = onSchedule({ schedule: 'every 10 minutes' }, a
     return;
   }
   const systemIds = parseLawlessSystemIds(body);
-  await getFirestore()
-    .collection(SYSTEM_CONDITIONS_COLLECTION)
-    .doc(LAWLESS_SYSTEMS_DOC)
-    .set({ systemIds, updatedAt: Date.now() });
-  logInfo('lawless systems sync', { count: systemIds.length });
+  const ref = getFirestore().collection(SYSTEM_CONDITIONS_COLLECTION).doc(LAWLESS_SYSTEMS_DOC);
+  const now = Date.now();
+  const written = lawlessWriteNeeded((await ref.get()).data(), systemIds, now);
+  if (written) await ref.set({ systemIds, updatedAt: now });
+  logInfo('lawless systems sync', { count: systemIds.length, written });
 });
 
 /** Doc under `systemConditions` holding the archive version the last publish was built from. */
@@ -1188,91 +1033,105 @@ const R2_ACCESS_KEY_ID = defineSecret('R2_ACCESS_KEY_ID');
 const R2_SECRET_ACCESS_KEY = defineSecret('R2_SECRET_ACCESS_KEY');
 
 /**
- * Additive to the Firestore snapshot (ADR 0019): never throws, so an R2 outage
- * cannot fail the Firestore publish.
+ * The R2 connection for jobs whose only store is R2 (public contracts, LP
+ * offers, open prices): throws when the config is missing so the run fails
+ * loudly.
+ */
+function r2ConfigOrThrow(): R2Config {
+  const endpoint = process.env.R2_ENDPOINT;
+  const bucket = process.env.R2_BUCKET;
+  if (!endpoint?.startsWith('https://') || !bucket) {
+    throw new Error('R2_ENDPOINT (https) / R2_BUCKET not set');
+  }
+  return {
+    endpoint,
+    bucket,
+    accessKeyId: R2_ACCESS_KEY_ID.value(),
+    secretAccessKey: R2_SECRET_ACCESS_KEY.value(),
+  };
+}
+
+/**
+ * Publishes the offers snapshot to R2 (ADR 0019, issue #4270). Errors reading
+ * the state doc are tolerated (a full re-upload is the worst case); upload and
+ * index failures come back as the outcome, which the run turns into a throw.
  */
 async function publishOffersToR2(
   db: Firestore,
+  config: R2Config,
   rows: readonly PublicContractOfferRow[],
   lastSyncedAt: number
-): Promise<void> {
-  try {
-    const endpoint = process.env.R2_ENDPOINT;
-    const bucket = process.env.R2_BUCKET;
-    if (!endpoint?.startsWith('https://') || !bucket) {
-      logWarn('R2 offers publish skipped: R2_ENDPOINT (https) / R2_BUCKET not set');
-      return;
-    }
-    const stateRef = db.collection(SYSTEM_CONDITIONS_COLLECTION).doc(PUBLIC_CONTRACTS_R2_STATE_DOC);
-    const previous = await stateRef
-      .get()
-      .then((snap) => (snap.exists ? (snap.data() as R2PublishState) : null))
-      .catch(() => null);
-    const result = await publishContractOffersToR2({
-      rows,
-      lastSyncedAt,
-      previous,
-      now: Date.now(),
-      put: createR2Put({
-        endpoint,
-        bucket,
-        accessKeyId: R2_ACCESS_KEY_ID.value(),
-        secretAccessKey: R2_SECRET_ACCESS_KEY.value(),
-      }),
-      onProgress: async (state) => {
-        await stateRef.set(state);
-      },
-    });
-    await stateRef.set(result.state);
-    const { uploaded, skipped, failed, remaining, indexWritten, firstError } = result;
-    (result.failed > 0 || !result.indexWritten ? logWarn : logInfo)(
-      'public contract offers R2 publish',
-      { uploaded, skipped, failed, remaining, indexWritten, firstError }
-    );
-  } catch (error) {
-    logError('public contract offers R2 publish failed', { error: String(error) });
-  }
+): Promise<R2PublishOutcome> {
+  const stateRef = db.collection(SYSTEM_CONDITIONS_COLLECTION).doc(PUBLIC_CONTRACTS_R2_STATE_DOC);
+  const previous = await stateRef
+    .get()
+    .then((snap) => (snap.exists ? (snap.data() as R2PublishState) : null))
+    .catch(() => null);
+  const result = await publishContractOffersToR2({
+    rows,
+    lastSyncedAt,
+    previous,
+    now: Date.now(),
+    put: createR2Put(config),
+    onProgress: async (state) => {
+      await stateRef.set(state);
+    },
+  });
+  await stateRef.set(result.state);
+  const outcome = r2PublishOutcome(result);
+  const { uploaded, skipped, failed, remaining, indexWritten, firstError } = result;
+  (outcome.kind === 'complete' ? logInfo : logWarn)('public contract offers R2 publish', {
+    uploaded,
+    skipped,
+    failed,
+    remaining,
+    indexWritten,
+    firstError,
+  });
+  return outcome;
 }
 
-/** Same contract as `publishOffersToR2`, for the courier snapshot (issue #3748): never throws. */
+/** Same contract as `publishOffersToR2`, for the courier snapshot (issue #3748). */
 async function publishCourierToR2(
   db: Firestore,
+  config: R2Config,
   rows: readonly PublicCourierContractRow[],
   lastSyncedAt: number
-): Promise<void> {
+): Promise<R2PublishOutcome> {
+  const stateRef = db.collection(SYSTEM_CONDITIONS_COLLECTION).doc(PUBLIC_COURIERS_R2_STATE_DOC);
+  const previous = await stateRef
+    .get()
+    .then((snap) => (snap.exists ? (snap.data() as CourierR2PublishState) : null))
+    .catch(() => null);
+  const result = await publishCourierContractsToR2({
+    rows,
+    lastSyncedAt,
+    previous,
+    now: Date.now(),
+    put: createR2Put(config),
+  });
+  await stateRef.set(result.state);
+  const outcome = r2PublishOutcome(result);
+  const { uploaded, indexWritten, firstError } = result;
+  (outcome.kind === 'complete' ? logInfo : logWarn)('public courier contracts R2 publish', {
+    uploaded,
+    indexWritten,
+    firstError,
+  });
+  return outcome;
+}
+
+/**
+ * Runs one R2 publish, folding a thrown error (a state-doc write, say) into a
+ * failed outcome so the other snapshot's publish still runs before the job fails.
+ */
+async function settleR2Publish(
+  publish: () => Promise<R2PublishOutcome>
+): Promise<R2PublishOutcome> {
   try {
-    const endpoint = process.env.R2_ENDPOINT;
-    const bucket = process.env.R2_BUCKET;
-    if (!endpoint?.startsWith('https://') || !bucket) {
-      logWarn('R2 courier publish skipped: R2_ENDPOINT (https) / R2_BUCKET not set');
-      return;
-    }
-    const stateRef = db.collection(SYSTEM_CONDITIONS_COLLECTION).doc(PUBLIC_COURIERS_R2_STATE_DOC);
-    const previous = await stateRef
-      .get()
-      .then((snap) => (snap.exists ? (snap.data() as CourierR2PublishState) : null))
-      .catch(() => null);
-    const result = await publishCourierContractsToR2({
-      rows,
-      lastSyncedAt,
-      previous,
-      now: Date.now(),
-      put: createR2Put({
-        endpoint,
-        bucket,
-        accessKeyId: R2_ACCESS_KEY_ID.value(),
-        secretAccessKey: R2_SECRET_ACCESS_KEY.value(),
-      }),
-    });
-    await stateRef.set(result.state);
-    const { uploaded, indexWritten, firstError } = result;
-    (indexWritten ? logInfo : logWarn)('public courier contracts R2 publish', {
-      uploaded,
-      indexWritten,
-      firstError,
-    });
+    return await publish();
   } catch (error) {
-    logError('public courier contracts R2 publish failed', { error: String(error) });
+    return { kind: 'failed', error: String(error) };
   }
 }
 
@@ -1286,8 +1145,10 @@ export const syncPublicContractOffers = onSchedule(
   async () => {
     // Skip the whole run when EVE Ref has not published a new archive since
     // the last publish. The fingerprint is read before the download and stored
-    // only after the write, so a refresh landing in between is picked up next
-    // run rather than lost. An unreadable fingerprint always syncs.
+    // only after a complete R2 publish, so a refresh landing in between (or a
+    // failed publish) is picked up next run rather than lost. An unreadable fingerprint always syncs.
+    // R2 is the only store, so a missing config fails before the download.
+    const r2Config = r2ConfigOrThrow();
     const db = getFirestore();
     const fingerprintRef = db
       .collection(SYSTEM_CONDITIONS_COLLECTION)
@@ -1357,7 +1218,7 @@ export const syncPublicContractOffers = onSchedule(
     });
 
     // The lookup is dead once the join is done, and it is ~50k objects the
-    // write would otherwise be encoding rows alongside.
+    // publish would otherwise be holding alongside the rows.
     eligibleContracts.clear();
     // Sizes the R2 per-type writer (ADR 0019): how many types change per
     // publish. Telemetry only — a failure here must not fail the publish.
@@ -1379,8 +1240,13 @@ export const syncPublicContractOffers = onSchedule(
     } catch (err) {
       logWarn('public contract type change measurement failed', { error: String(err) });
     }
-    const lastSyncedAt = await writePublicContractOffersSnapshot(db, sortContractOfferRows(rows));
-    await writePublicCourierContractsSnapshot(db, sortCourierContractRows(courierRows));
+    const lastSyncedAt = Date.now();
+    // Courier first: one small object, so a slow offers upload cannot starve it
+    // of the time budget. Both run before either failure is thrown.
+    const courier = await settleR2Publish(() =>
+      publishCourierToR2(db, r2Config, courierRows, lastSyncedAt)
+    );
+    const offers = await settleR2Publish(() => publishOffersToR2(db, r2Config, rows, lastSyncedAt));
     if (typeHashes !== null) {
       await typeHashesRef
         .set({ hashes: typeHashes, updatedAt: Date.now() })
@@ -1388,23 +1254,26 @@ export const syncPublicContractOffers = onSchedule(
           logWarn('public contract type hashes write failed', { error: String(err) })
         );
     }
-    if (fingerprint !== null) await fingerprintRef.set({ fingerprint, updatedAt: Date.now() });
-    // Last, so a slow or failing R2 can never delay or skip the Firestore publish.
-    // Courier first: one small object, so a slow offers upload cannot starve it of the time budget.
-    await publishCourierToR2(db, courierRows, lastSyncedAt);
-    await publishOffersToR2(db, rows, lastSyncedAt);
+    // R2 is the only store (issue #4270): see `publicContractsRunVerdict`.
+    const verdict = publicContractsRunVerdict(courier, offers);
+    if (verdict.error !== null) throw new Error(verdict.error);
+    if (fingerprint !== null && verdict.storeFingerprint) {
+      await fingerprintRef.set({ fingerprint, updatedAt: Date.now() });
+    }
   }
 );
 
 /**
- * syncWorkbenchFits: EVE Workbench's public fits, grouped by hull into
- * `workbenchFits` for the Popular fit panel's EVE Workbench tab (issue
- * #2484). Workbench's list can't be filtered by hull, so this keeps our own
- * copy — see workbenchFits.ts for the pass/checkpoint design, and the
- * decision doc it ships with.
+ * syncWorkbenchFits: EVE Workbench's public fits, grouped by hull into one R2
+ * object per hull (`workbench-fits/<shipTypeId>.json`, issue #4271) for the
+ * Popular fit panel's EVE Workbench tab (issue #2484). Workbench's list
+ * can't be filtered by hull, so this keeps our own copy — see
+ * workbenchFits.ts for the pass/checkpoint design, and the decision doc it
+ * ships with.
  *
- * Every 12 hours (cost: it was every 30 minutes), each run fetching for at most `WORKBENCH_FETCH_BUDGET_MS`
- * then flushing to Firestore. Requests are sequential with a 250ms gap (≤ 4/s
+ * Every 12 hours (cost: it was every 30 minutes), each run fetching for at
+ * most `WORKBENCH_FETCH_BUDGET_MS` then flushing to R2 (only hulls whose fits
+ * changed). Requests are sequential with a 250ms gap (≤ 4/s
  * against a free, unauthenticated API), so a run stores roughly 1,000 fits:
  * the first pass over ~38k fits takes ~40 runs, about 20 days at this cadence, after which a run
  * is one list page plus however many fits were published since.
@@ -1414,8 +1283,10 @@ export const syncPublicContractOffers = onSchedule(
  * pass). A flush that overran the timeout would never save the checkpoint, so
  * every later run would redo the same pages — this margin is what prevents it.
  *
- * 1GiB because a run reads back every hull it touches whole (merge, then
- * re-split), and the most-fitted hulls are a few MB of EFT each.
+ * 1GiB because a run reads back every hull it touches whole (then merges and
+ * gzips it), and the most-fitted hulls are a few MB of EFT each. The one-time
+ * migration run streams the legacy docs 20 at a time, so it holds at most a
+ * page plus the hulls being written.
  *
  * Another Cloud Scheduler job past the free three — the same trade
  * `captureMiningPriceSnapshot` already made.
@@ -1424,10 +1295,28 @@ const WORKBENCH_FETCH_BUDGET_MS = 360_000;
 const WORKBENCH_REQUEST_GAP_MS = 250;
 
 export const syncWorkbenchFits = onSchedule(
-  { schedule: 'every 12 hours', memory: '1GiB', timeoutSeconds: 540 },
+  {
+    schedule: 'every 12 hours',
+    memory: '1GiB',
+    timeoutSeconds: 540,
+    secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY],
+  },
   async () => {
+    const r2 = r2ConfigOrThrow();
+    const db = getFirestore();
+    const hulls = r2WorkbenchHulls({ get: createR2Get(r2), put: createR2Put(r2) });
+    // The first run after the move to R2 only copies the Firestore fits over
+    // (workbenchFitsMigration.ts); every later run skips straight past.
+    const migration = await migrateLegacyWorkbenchFits({
+      ...firestoreWorkbenchMigration(db),
+      hulls,
+    });
+    if (migration.migrated) {
+      logInfo('EVE Workbench fits migrated to R2', { ...migration });
+      return;
+    }
     const result = await runWorkbenchSync({
-      store: firestoreWorkbenchFitsStore(getFirestore()),
+      store: workbenchFitsStore(db, hulls),
       fetchJson: async (url) => {
         const response = await fetch(url, {
           headers: { 'User-Agent': MARKET_HISTORY_USER_AGENT, Accept: 'application/json' },
@@ -1447,8 +1336,11 @@ export const syncWorkbenchFits = onSchedule(
 /**
  * syncLpStoreOffers: the LP Store page's item-first search (issue #2873). Reads
  * every LP corporation's public offers from ESI (~170 requests, paced) and
- * republishes them with each corporation's station systems to `lpStoreOffers`,
- * so the app can search an item across all stores and rank corporations by jumps.
+ * republishes them with each corporation's station systems to R2
+ * (`lp-store-offers/snapshot.json`), so the app can search an item across all
+ * stores and rank corporations by jumps. R2, not Firestore: the whole snapshot is
+ * read by every visitor to the page, and R2 has no egress fee.
+ * Needs the R2 secrets and env like `syncPublicContractOffers`.
  *
  * Once a day: store offers change on patch days, not by the hour. A run that
  * lost more than a tenth of the corporations (ESI down) publishes nothing and
@@ -1460,8 +1352,15 @@ export const syncWorkbenchFits = onSchedule(
 const LP_STORE_MAX_FAILED_SHARE = 0.1;
 
 export const syncLpStoreOffers = onSchedule(
-  { schedule: 'every 24 hours', memory: '512MiB', timeoutSeconds: 540 },
+  {
+    schedule: 'every 24 hours',
+    memory: '512MiB',
+    timeoutSeconds: 540,
+    secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY],
+  },
   async () => {
+    // Before the ~170-request crawl, so a missing R2 config fails fast.
+    const r2 = r2ConfigOrThrow();
     const { rows, failed } = await fetchLpStoreRows({
       corporations: LP_CORP_STATION_SYSTEMS,
       fetchJson: async (url) => {
@@ -1484,7 +1383,8 @@ export const syncLpStoreOffers = onSchedule(
       logError('LP store offers sync skipped publishing', { failed });
       return;
     }
-    await writeChunkedSnapshot(getFirestore(), LP_STORE_OFFERS_SNAPSHOT, rows);
+    await publishLpStoreOffersToR2(rows, Date.now(), createR2Put(r2));
+    logInfo('LP store offers published to R2', { corporations: rows.length });
   }
 );
 
@@ -1493,35 +1393,68 @@ export const syncLpStoreOffers = onSchedule(
  * 20261018-121126). Once a day, shortly after the previous UTC day's last
  * EVE Ref market-order snapshot (23:45) is published, folds that snapshot into
  * the highest buy and lowest sell per tracked region and type and merges the
- * day into `marketOpenPrices/<regionId>_<typeId>` (~70,000 documents).
+ * day into R2's `open-prices/<typeId>.json`, every tracked region in one
+ * object (~20,000 objects; layout decision 20261018-164126, storage decision
+ * 20261018-201511-moving-the-daily-snapshots-to-r2). Only the small meta doc stays in
+ * Firestore, for the shrink guard. The same pass also keeps the best buy and
+ * sell of every mining type at each hub *station* and merges that day into
+ * `mining-prices/<hubId>/<YYYY-MM>.json` (decision 20261018-233051, which
+ * retired `captureMiningPriceSnapshot` and its Firestore `marketHistory`; its
+ * days are copied into R2 once, on the first run).
  *
- * Idempotent (re-running a day replaces its entry). A missing snapshot, a stream
- * that errors or ends truncated, a tracked region implausibly thin, or one
- * under half its size on the previous published day publishes nothing, the same stance as
- * `syncLpStoreOffers`: that day simply has no point, and the backfill script
- * can fill it later. 1GiB because the decompress-and-fold peaked at ~300MB RSS
+ * Idempotent (re-running a day replaces its entry). The day's 23:45 snapshot is
+ * normally listed by ~23:50, but a run that finds only an earlier one (EVE Ref
+ * lagging) or none must not store a price that is not the day's last, so it
+ * throws and Cloud Scheduler retries it (`retryCount`, 15 then 30 minutes
+ * apart); an earlier snapshot is accepted once the next day is listed, since
+ * then the 23:45 slot was skipped for good (`findFinalSnapshot`). A stream that
+ * errors or ends truncated also throws and retries. A tracked region
+ * implausibly thin, or one under half its size on the previous published day,
+ * publishes nothing, the same stance as `syncLpStoreOffers`: retrying the same
+ * file would not change it, that day simply has no point, and the backfill
+ * script can fill it later. 1GiB because the decompress-and-fold peaked at ~300MB RSS
  * in a local measurement and the contracts job has OOM'd before; 540s because
  * the same measurement took ~45s to download and fold, leaving room for the
- * ~140 read-merge-write batches.
+ * ~20,000 read-merge-write round trips of ~37 KB objects (32 at a time). A
+ * type that fails to read or write throws the run, so it is retried whole; the
+ * merge is idempotent.
  *
- * Another Cloud Scheduler job past the free three; the deployment now has eleven
- * scheduled functions.
+ * Another Cloud Scheduler job past the free three; with `captureMiningPriceSnapshot`
+ * folded in here the deployment has ten scheduled functions.
  */
 export const syncMarketOpenPrices = onSchedule(
   // A cron, unlike the other jobs' 'every N' strings, runs in the scheduler's
   // default zone; pinning Etc/UTC keeps it right after the 23:45 UTC snapshot.
-  { schedule: '45 0 * * *', timeZone: 'Etc/UTC', memory: '1GiB', timeoutSeconds: 540 },
+  {
+    schedule: '45 0 * * *',
+    timeZone: 'Etc/UTC',
+    memory: '1GiB',
+    timeoutSeconds: 540,
+    // A thrown run (the final snapshot not listed yet, a broken download) is
+    // retried at ~01:00, ~01:30 and ~02:00 UTC; `previousUtcDate` still names
+    // the same day on every retry.
+    retryCount: 3,
+    minBackoffSeconds: 900,
+    maxBackoffSeconds: 1800,
+    secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY],
+  },
   async () => {
     const date = previousUtcDate(new Date());
-    const listing = await fetchEverefJson(dayIndexUrl(date), MARKET_HISTORY_USER_AGENT);
-    const snapshotUrl = pickLastSnapshotUrl(listing, date);
-    if (!snapshotUrl) {
-      logError('Market open prices sync skipped publishing: no snapshot listed', { date });
-      return;
+    const found = await findFinalSnapshot(date, (url) =>
+      fetchEverefJson(url, MARKET_HISTORY_USER_AGENT)
+    );
+    if (!found.final) {
+      // Thrown, not returned, so the run fails and is retried.
+      throw new Error(
+        `Market open prices: no final snapshot listed for ${date} (last listed: ${found.snapshot?.fileTime ?? 'none'}); retried, and after the last retry the day has no point`
+      );
     }
+    const { url: snapshotUrl, fileTime } = found.snapshot;
     const fold = new OpenPriceFold();
-    const rows = await foldSnapshotUrl(snapshotUrl, fold, MARKET_HISTORY_USER_AGENT);
-    logInfo('Market open prices fold', { date, snapshotUrl, rows, pairs: fold.size });
+    // The hub-station mining prices ride the same single pass over the snapshot.
+    const stations = new StationPriceFold(SNAPSHOT_HUBS, MINING_TYPE_IDS);
+    const rows = await foldSnapshotUrl(snapshotUrl, fold, MARKET_HISTORY_USER_AGENT, stations);
+    logInfo('Market open prices fold', { date, fileTime, snapshotUrl, rows, pairs: fold.size });
     const reason = implausibleReason(fold);
     if (reason) {
       logError('Market open prices sync skipped publishing', { date, reason });
@@ -1538,14 +1471,42 @@ export const syncMarketOpenPrices = onSchedule(
       });
       return;
     }
-    const written = await writeOpenPrices(
-      db,
-      MARKET_OPEN_PRICES_COLLECTION,
+    const r2 = r2ConfigOrThrow();
+    const get = createR2Get(r2);
+    const put = createR2Put(r2);
+    const { written, failed, firstError } = await writeOpenPricesToR2(
       groupByDocument(new Map([[date, fold]])),
-      mergeDays
+      mergeDays,
+      { get, put }
     );
+    if (failed > 0) {
+      // Thrown so the run is retried; meta is only recorded for a complete day.
+      throw new Error(
+        `Market open prices: ${failed} types failed to write to R2 (${written} written); first error: ${firstError}`
+      );
+    }
+    // Throws on a failed write, so the run (both halves, both idempotent) retries.
+    const mining = await publishMiningPricesToR2(
+      date,
+      stationFoldWrites(stations, SNAPSHOT_HUBS, date),
+      SNAPSHOT_HUBS,
+      {
+        get,
+        put,
+        del: createR2Delete(r2),
+        // The retired captureMiningPriceSnapshot's days, copied once (miningHubPrices.ts).
+        loadLegacyDays: async () =>
+          (await db.collection(LEGACY_MARKET_HISTORY_COLLECTION).get()).docs.map((doc) => ({
+            date: doc.id,
+            data: doc.data(),
+          })),
+      }
+    );
+    if (mining.deleteFailed > 0) {
+      logWarn('Mining prices: expired month objects not deleted', { date, ...mining });
+    }
     await meta.set({ date, regions: regionCounts(fold) });
-    logInfo('Market open prices sync', { date, written });
+    logInfo('Market open prices sync', { date, written, mining });
   }
 );
 

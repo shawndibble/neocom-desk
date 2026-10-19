@@ -321,8 +321,8 @@ export async function installEsiMock(page: Page): Promise<void> {
     });
   });
 
-  // R2 contract-offer snapshot (ADR 0019): none published here, so every reader
-  // takes its Firestore fallback, as it did before the R2 read existed.
+  // R2 public snapshots (ADR 0019): none published here, so every reader finds
+  // R2 unavailable and serves only what a spec seeded into its Dexie cache.
   await page.route('https://data.neocomdesk.com/**', async (route) => {
     await route.fulfill({
       status: 404,

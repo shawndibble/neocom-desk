@@ -144,8 +144,9 @@ describe('reconcileAssignments', () => {
     expect((await db.miningTaxAssignments.get('a1'))?.status).toBe('outstanding');
   });
 
-  it('still flags growth on a paid member of a combined entry', async () => {
-    await db.miningTaxAssignments.put(assignment({ groupId: 'g1', status: 'paid', paidAt: 1 }));
+  it('leaves a paid member of a combined entry paid when its day grows', async () => {
+    const member = assignment({ groupId: 'g1', status: 'paid', paidAt: 1 });
+    await db.miningTaxAssignments.put(member);
 
     await reconcileAssignments(CHAR_A, [
       {
@@ -157,11 +158,12 @@ describe('reconcileAssignments', () => {
     ]);
 
     expect(assignmentsMock.planNeedsReviewResolution).not.toHaveBeenCalled();
-    expect((await db.miningTaxAssignments.get('a1'))?.status).toBe('needs-review');
+    expect(await db.miningTaxAssignments.get('a1')).toEqual(member);
   });
 
-  it('flips a paid assignment too, since the debt grew after payment', async () => {
-    await db.miningTaxAssignments.put(assignment({ status: 'paid', paidAt: 5 }));
+  it('leaves a paid assignment exactly as it was when its ore grows (paid stays paid, ADR 0024)', async () => {
+    const paid = assignment({ status: 'paid', paidAt: 5 });
+    await db.miningTaxAssignments.put(paid);
     const fresh: MiningLedgerEntry[] = [
       {
         characterId: CHAR_A,
@@ -173,7 +175,11 @@ describe('reconcileAssignments', () => {
 
     await reconcileAssignments(CHAR_A, fresh);
 
-    expect((await db.miningTaxAssignments.get('a1'))?.status).toBe('needs-review');
+    // Status, ore and tax all stay as paid; the 100 extra units are left
+    // unowned, which the Tax tab shows as a new, separately assignable row.
+    expect(await db.miningTaxAssignments.get('a1')).toEqual(paid);
+    expect(assignmentsMock.planNeedsReviewResolution).not.toHaveBeenCalled();
+    expect(syncMock.scheduleSync).not.toHaveBeenCalled();
   });
 
   it('leaves the assignment alone when its entry has aged out of the fresh read', async () => {
@@ -229,7 +235,9 @@ describe('reconcileAssignments', () => {
   });
 
   it('folds a brand-new ore type into the sole Assignment for that entry (a continuous mining session)', async () => {
-    await db.miningTaxAssignments.put(assignment({ status: 'paid', paidAt: 5 })); // covers only TYPE_A
+    await db.miningTaxAssignments.put(
+      assignment({ status: 'dismissed', payeeId: undefined, taxPct: 0, taxOwed: 0 })
+    ); // covers only TYPE_A
     const fresh: MiningLedgerEntry[] = [
       {
         characterId: CHAR_A,
@@ -277,5 +285,65 @@ describe('reconcileAssignments', () => {
     expect((await db.miningTaxAssignments.get('a1'))?.status).toBe('outstanding');
     expect((await db.miningTaxAssignments.get('a2'))?.status).toBe('outstanding');
     expect(syncMock.scheduleSync).not.toHaveBeenCalled();
+  });
+  it('leaves both sides of a split alone when its paid collector grows', async () => {
+    const kept = assignment({
+      id: 'a1',
+      payeeId: 'p1',
+      status: 'paid',
+      paidAt: 5,
+      collectsGrowth: true,
+    });
+    const moved = assignment({
+      id: 'a2',
+      payeeId: 'p2',
+      oreLines: [{ typeId: TYPE_A, quantity: 40 }],
+    });
+    await db.miningTaxAssignments.bulkPut([kept, moved]);
+
+    await reconcileAssignments(CHAR_A, [
+      {
+        characterId: CHAR_A,
+        date: '2026-09-04',
+        solarSystemId: 1,
+        oreLines: [
+          { typeId: TYPE_A, quantity: 170 },
+          { typeId: TYPE_B, quantity: 10 },
+        ],
+      },
+    ]);
+
+    // The growth is the paid side's, which is frozen, so it stays unassigned
+    // rather than being absorbed by the unpaid side.
+    expect(await db.miningTaxAssignments.get('a1')).toEqual(kept);
+    expect(await db.miningTaxAssignments.get('a2')).toEqual(moved);
+    expect(assignmentsMock.planNeedsReviewResolution).not.toHaveBeenCalled();
+    expect(syncMock.scheduleSync).not.toHaveBeenCalled();
+  });
+
+  it("absorbs growth into the unpaid entry made from a paid day's late ore", async () => {
+    const paid = assignment({ id: 'a1', status: 'paid', paidAt: 5 });
+    const after = assignment({
+      id: 'a2',
+      oreLines: [{ typeId: TYPE_A, quantity: 50 }],
+      collectsGrowth: true,
+    });
+    await db.miningTaxAssignments.bulkPut([paid, after]);
+    const entry: MiningLedgerEntry = {
+      characterId: CHAR_A,
+      date: '2026-09-04',
+      solarSystemId: 1,
+      oreLines: [{ typeId: TYPE_A, quantity: 180 }],
+    };
+
+    await reconcileAssignments(CHAR_A, [entry]);
+
+    expect(assignmentsMock.planNeedsReviewResolution).toHaveBeenCalledTimes(1);
+    expect(assignmentsMock.planNeedsReviewResolution).toHaveBeenCalledWith(
+      after,
+      entry,
+      expect.arrayContaining([paid, after])
+    );
+    expect(await db.miningTaxAssignments.get('a1')).toEqual(paid);
   });
 });

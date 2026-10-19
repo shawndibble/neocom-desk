@@ -13,8 +13,11 @@ import { Readable, pipeline } from 'node:stream';
 import { parse } from 'csv-parse';
 import unbzip2Stream from 'unbzip2-stream';
 import type { OpenPriceFold } from './marketOpenPrices.js';
+import type { StationPriceFold } from './miningHubPrices.js';
 
 const REQUIRED_COLUMNS = ['is_buy_order', 'price', 'type_id', 'region_id'] as const;
+/** Read only when a station fold rides along (the daily job's mining prices). */
+const LOCATION_COLUMN = 'location_id';
 
 /**
  * EVE Ref writes `true` / `false`; any casing of those is accepted. Anything
@@ -28,25 +31,70 @@ export function parseIsBuy(value: string | undefined): boolean {
   throw new Error(`market-order snapshot has an unexpected is_buy_order value: ${String(value)}`);
 }
 
-/** Folds a decompressed snapshot CSV into `fold`; returns the data rows read. Throws when a required column is missing. */
-export async function foldOrdersCsv(csv: Readable, fold: OpenPriceFold): Promise<number> {
+function snapshotCsvParser() {
+  return parse({ skip_empty_lines: true, relax_column_count: true });
+}
+
+/**
+ * Folds a decompressed snapshot CSV into `fold`, and into `stations` too when
+ * given (the same single pass); returns the data rows read. Throws when a
+ * required column is missing.
+ */
+export function foldOrdersCsv(
+  csv: Readable,
+  fold: OpenPriceFold,
+  stations?: StationPriceFold
+): Promise<number> {
   // pipeline, not pipe: an error in the source (a dropped download, a corrupt
-  // bzip2 block) destroys the parser with that error, so the loop below
-  // rejects instead of hanging or ending as if the file were complete.
-  const rows = parse({ skip_empty_lines: true, relax_column_count: true });
+  // bzip2 block) destroys the parser with that error, so the loop rejects
+  // instead of hanging or ending as if the file were complete.
+  const rows = snapshotCsvParser();
   pipeline(csv, rows, () => {});
+  return foldRows(rows, fold, stations);
+}
+
+/**
+ * Decompresses a `.csv.bz2` snapshot stream and folds it into `fold`. One
+ * pipeline through all three streams, not one pipeline into the decompressor
+ * and a second out of it: unbzip2-stream is a legacy `Stream`, and two
+ * pipelines plus their `pipe` calls put 11 `close` listeners on it (Node's
+ * MaxListenersExceededWarning on every run); one pipeline puts 9.
+ */
+export function foldBz2Snapshot(
+  compressed: Readable,
+  fold: OpenPriceFold,
+  stations?: StationPriceFold
+): Promise<number> {
+  const rows = snapshotCsvParser();
+  pipeline(compressed, unbzip2Stream(), rows, () => {});
+  return foldRows(rows, fold, stations);
+}
+
+/** `rows` sits at the end of a pipeline, so destroying it tears the whole pipeline down. */
+async function foldRows(
+  rows: ReturnType<typeof snapshotCsvParser>,
+  fold: OpenPriceFold,
+  stations?: StationPriceFold
+): Promise<number> {
   let columns: Record<(typeof REQUIRED_COLUMNS)[number], number> | null = null;
+  let location = -1;
   let count = 0;
   for await (const row of rows as AsyncIterable<string[]>) {
     if (!columns) {
       const index = (name: string) => row.indexOf(name);
       const found = REQUIRED_COLUMNS.map(index);
       if (found.some((i) => i < 0)) {
-        csv.destroy();
         rows.destroy();
         throw new Error(
           `market-order snapshot is missing a column of ${REQUIRED_COLUMNS.join(', ')}`
         );
+      }
+      if (stations) {
+        location = row.indexOf(LOCATION_COLUMN);
+        if (location < 0) {
+          rows.destroy();
+          throw new Error(`market-order snapshot is missing the ${LOCATION_COLUMN} column`);
+        }
       }
       columns = {
         is_buy_order: found[0],
@@ -57,12 +105,11 @@ export async function foldOrdersCsv(csv: Readable, fold: OpenPriceFold): Promise
       continue;
     }
     count++;
-    fold.add(
-      Number(row[columns.region_id]),
-      Number(row[columns.type_id]),
-      parseIsBuy(row[columns.is_buy_order]),
-      Number(row[columns.price])
-    );
+    const typeId = Number(row[columns.type_id]);
+    const isBuy = parseIsBuy(row[columns.is_buy_order]);
+    const price = Number(row[columns.price]);
+    fold.add(Number(row[columns.region_id]), typeId, isBuy, price);
+    stations?.add(Number(row[location]), typeId, isBuy, price);
   }
   return count;
 }
@@ -73,20 +120,20 @@ export async function fetchJson(url: string, userAgent: string): Promise<unknown
   return response.json().catch(() => null);
 }
 
-/** Downloads one snapshot and folds it. Returns the data rows read. */
+/** Downloads one snapshot and folds it (and `stations`, in the same pass). Returns the data rows read. */
 export async function foldSnapshotUrl(
   url: string,
   fold: OpenPriceFold,
-  userAgent: string
+  userAgent: string,
+  stations?: StationPriceFold
 ): Promise<number> {
   const response = await fetch(url, { headers: { 'User-Agent': userAgent } });
   if (!response.ok || !response.body) {
     throw new Error(`EVE Ref market-orders fetch failed: HTTP ${response.status}`);
   }
-  const compressed = Readable.fromWeb(
-    response.body as import('node:stream/web').ReadableStream<Uint8Array>
+  return foldBz2Snapshot(
+    Readable.fromWeb(response.body as import('node:stream/web').ReadableStream<Uint8Array>),
+    fold,
+    stations
   );
-  const csv = unbzip2Stream();
-  pipeline(compressed, csv, () => {});
-  return foldOrdersCsv(csv, fold);
 }

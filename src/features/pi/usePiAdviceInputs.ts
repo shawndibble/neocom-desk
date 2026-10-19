@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { RebuildPreference } from '@/engine/pi/planAdvice';
 import type { RouteSystem } from '@/engine/pi/planHaul';
-import { routeExposure } from '@/features/route/routeExposure';
+import { localRoutesFromOrigin } from '@/features/route/localRoute';
+import { loadSolarSystemsById } from '@/sde/solarSystems';
 import { useJumpBasis } from '@/features/route/jumpBasis';
 import { useCadence } from './cadencePref';
 import { loadCommandCenterUpgrades } from './colonyBudget';
@@ -122,23 +123,27 @@ export function usePiAdviceInputs(
     if (buybackPct !== null || !basis.hydrated || systemKey === '') return;
     let cancelled = false;
     const ids = systemKey.split(',').map(Number);
-    void Promise.all(
-      ids.map((id) =>
-        routeExposure(id, hub.systemId, basis.rules, basis.network)
-          .then((result): RouteSystem[] | null =>
-            result.kind === 'known'
-              ? result.path.map((system) => ({
-                  systemId: system.systemId,
-                  security: system.security,
+    // One sweep out of the hub answers every colony, not a search per colony.
+    void Promise.all([
+      localRoutesFromOrigin(hub.systemId, ids, basis.rules, basis.network).catch(() => null),
+      loadSolarSystemsById().catch(() => null),
+    ]).then(([swept, systems]) => {
+      if (cancelled) return;
+      const routes = new Map<number, RouteSystem[] | null>(
+        ids.map((id) => {
+          const path = swept?.kind === 'known' ? swept.routes.get(id) : null;
+          return [
+            id,
+            path && systems
+              ? path.map((systemId) => ({
+                  systemId,
+                  security: systems.get(systemId)?.security ?? null,
                 }))
-              : null
-          )
-          .catch(() => null)
-      )
-    ).then((routes) => {
-      if (!cancelled) {
-        setRouted({ key: routesKey, routes: new Map(ids.map((id, i) => [id, routes[i]])) });
-      }
+              : null,
+          ];
+        })
+      );
+      setRouted({ key: routesKey, routes });
     });
     return () => {
       cancelled = true;
@@ -149,6 +154,8 @@ export function usePiAdviceInputs(
   return useMemo((): PiAdviceInputsState => {
     if (!snapshot) return { status: 'loading' };
     const usable = pricesFailed ? null : prices;
+    // Hold until the routes settle: ready-without-routes would run the whole advice model, then run it again with them.
+    if (buybackPct === null && systemKey !== '' && !routes) return { status: 'loading' };
     if (!skills || !richness) {
       return pricesFailed ? { status: 'prices-failed', input: null } : { status: 'loading' };
     }
@@ -183,6 +190,7 @@ export function usePiAdviceInputs(
     buybackPct,
     preference,
     routes,
+    systemKey,
     hub.systemName,
   ]);
 }

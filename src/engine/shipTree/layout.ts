@@ -351,11 +351,13 @@ export function layoutShipTree(input: ShipTreeLayoutInput): ShipTreeLayout {
   // Drops sit under the last industry column once the line is laid out.
   const lastIndustry = industry[industry.length - 1];
   if (lastIndustry) {
+    const nodeById = new Map(nodes.map((p) => [p.def.id, p]));
+    const edgeByChild = new Map(edges.map((ed) => [ed.childId, ed]));
     for (const n of nodes) {
       if (n.def.lane !== 'drop') continue;
       n.x = lastIndustry.x;
-      const parent = nodes.find((p) => p.def.id === n.def.parent);
-      const e = edges.find((ed) => ed.childId === n.def.id);
+      const parent = n.def.parent === null ? undefined : nodeById.get(n.def.parent);
+      const e = edgeByChild.get(n.def.id);
       if (parent && e) e.segs = [M(parent.x + ANCHOR, parent.y + ICON), V(n.y + ANCHOR), H(n.x)];
     }
   }
