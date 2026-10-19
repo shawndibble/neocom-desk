@@ -27,6 +27,7 @@
  * Pure: plan and colonies are parameters.
  */
 
+import { byNumericId } from '../compare';
 import type { GoalPlan, PlannerColony } from './goalTypes';
 import type { PinCounts } from './types';
 
@@ -38,7 +39,7 @@ export type ColonyChange =
   | { verb: 'idle'; planetId: number; from: number[] };
 
 function sortedUnique(ids: readonly number[]): number[] {
-  return [...new Set(ids)].sort((a, b) => a - b);
+  return [...new Set(ids)].sort(byNumericId);
 }
 
 /** One change per assignment, by planet id. */

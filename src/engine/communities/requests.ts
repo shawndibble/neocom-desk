@@ -8,6 +8,7 @@
  * entry also reserves `delivered` and `contractIds` for delivery marking
  * (#3809), which this ticket never writes beyond preserving them.
  */
+import { isRecord } from '../guards';
 import { DAY_MS } from '@/lib/age';
 
 /** Mirrors `functions/src/communityRequests.ts`, which enforces them. */
@@ -386,7 +387,7 @@ export const DEFAULT_NOTIFY: RequestNotify = { app: true, mail: false };
 
 /** A stored `notify`; a missing or malformed flag takes its default. */
 export function readNotify(raw: unknown): RequestNotify {
-  const d = typeof raw === 'object' && raw !== null ? (raw as Record<string, unknown>) : {};
+  const d = isRecord(raw) ? raw : {};
   return {
     app: typeof d.app === 'boolean' ? d.app : DEFAULT_NOTIFY.app,
     mail: typeof d.mail === 'boolean' ? d.mail : DEFAULT_NOTIFY.mail,

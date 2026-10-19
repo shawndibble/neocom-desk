@@ -5,6 +5,7 @@
  * `selectBlueprintTier`'s cheapest-tier pick is the decryptor optimiser.
  * "Expected": luck moves the real cost either way.
  */
+import { sum } from '../math';
 import type { BpcOffer } from './blueprintAcquisition';
 import { estimatedItemValue, jobFee } from './jobCost';
 import type { AdjustedPrices, FacilityPreset, IndustryBlueprint } from './types';
@@ -33,7 +34,7 @@ export function inventionChance(
   skills: InventionSkillLevels,
   probabilityMultiplier = 1
 ): number {
-  const science = skills.science.reduce((sum, level) => sum + level, 0);
+  const science = sum(skills.science);
   const chance =
     baseProbability * (1 + science / 30 + skills.encryption / 40) * probabilityMultiplier;
   return Math.min(1, chance);

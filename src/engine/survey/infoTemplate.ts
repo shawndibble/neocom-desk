@@ -5,6 +5,8 @@
  * save, and applying one leaves the others as they are. Pure.
  */
 
+import { clamp } from '../math';
+
 export interface InfoLocation {
   /** Null for a place typed by hand, which has no waypoint. */
   id: number | null;
@@ -210,6 +212,6 @@ export function insertTemplate(
 ): InfoTemplate[] {
   if (list.some((t) => t.id === template.id)) return [...list];
   const next = [...list];
-  next.splice(Math.min(Math.max(index, 0), next.length), 0, template);
+  next.splice(clamp(index, 0, next.length), 0, template);
   return next.slice(0, TEMPLATE_MAX);
 }

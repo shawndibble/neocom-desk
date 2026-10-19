@@ -1,3 +1,4 @@
+import { sum } from './math';
 import {
   cloneTrainingTimes,
   queueEntrySeconds,
@@ -65,8 +66,6 @@ const ATTRIBUTES: AttributeName[] = [
   'willpower',
   'charisma',
 ];
-
-const sum = (xs: readonly number[]) => xs.reduce((a, b) => a + b, 0);
 
 export function cloneVerdict(input: CloneTrainingInput): CloneVerdictResult {
   const { queue, clones, wornCloneId, baseAttributes, now, cooldownReadyAt } = input;

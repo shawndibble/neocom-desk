@@ -5,6 +5,8 @@
  * no timezone ever shifts a day.
  */
 
+import { shiftUtcDate, utcDay } from '../localDay';
+
 export type MiningYieldRange = '1y' | '90d' | '30d' | '7d' | 'today';
 
 /** Widest first, the order the control lists them. No "All": history is kept a year, so it would always equal "1y". */
@@ -19,14 +21,11 @@ const RANGE_DAYS: Record<MiningYieldRange, number> = {
 };
 
 /** `date` shifted by `days` (negative = earlier), as a bare date string. */
-export function shiftDate(date: string, days: number): string {
-  const [y, m, d] = date.split('-').map(Number);
-  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
-}
+export const shiftDate = shiftUtcDate;
 
 /** Today's EVE/UTC calendar date. */
 export function eveToday(now: Date = new Date()): string {
-  return now.toISOString().slice(0, 10);
+  return utcDay(now.getTime());
 }
 
 export function rangeDays(range: MiningYieldRange): number {

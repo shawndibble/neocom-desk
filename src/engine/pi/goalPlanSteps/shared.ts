@@ -2,6 +2,7 @@
  * Units, tolerances and SDE lookups every goal-planner step shares. See
  * `../goalPlan.ts` for how the steps compose.
  */
+import { byNumericId } from '../../compare';
 import type { PiData, PiFactoryKind, PiRawResource, PiSchematic } from '@/sde/types';
 import { piTier } from '../chain';
 import type { Goal } from '../goalTypes';
@@ -12,9 +13,7 @@ export const HOURS_PER_WEEK = 168;
 /** Below this a remaining rate is float dust, not demand. */
 export const EPSILON = 1e-9;
 
-export function byId(a: number, b: number): number {
-  return a - b;
-}
+export const byId = byNumericId;
 
 /**
  * SDE lookups the planner never expects to miss: every id it asks about came
