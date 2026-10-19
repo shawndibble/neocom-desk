@@ -3,7 +3,7 @@ import { Disclosure, Field, Fields, InfoTooltip, ProgressBar } from '@/component
 import type { RegionCompetition } from './orderCompetition';
 import type { OpenOrderRow } from './openOrdersModel';
 import { computeSellThrough, stationRank } from './orderScopeState';
-import { IskDelta } from './OrderIskDelta';
+import { IskDelta } from '@/components/ui/IskDelta';
 
 /** "The numbers": rank, sell-through, volume, expiry and the net if it sells as listed. */
 export function OrderNumbersSection({

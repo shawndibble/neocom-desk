@@ -39,7 +39,6 @@ import {
   Toast,
 } from '@/components/ui';
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
-import { cx } from '@/lib/cx';
 import { useIsNarrow } from '@/lib/useIsNarrow';
 import { useElementNarrowerThan } from '@/lib/useElementNarrowerThan';
 import { useIsPhone } from '@/lib/useIsPhone';
@@ -97,7 +96,7 @@ import {
   pickHaulingHub,
 } from './haulingHubs';
 import { rememberHaulingSummary, summarizeHaulingRows } from './haulingSummary';
-import { iskGains, signedIsk } from './signedIsk';
+import { IskDelta } from '@/components/ui/IskDelta';
 import { useHaulingFees, useHaulingScan } from './useHaulingScan';
 import { useHaulingFill, useHaulingFillOffer } from './useHaulingFill';
 import {
@@ -600,11 +599,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     <div className="flex flex-col gap-2">
       <p className="flex items-baseline gap-2 text-sm tabular-nums">
         {cargoSet && <b>{t('market.hauling.tripBar.free', { m3: formatTripM3(freeM3) })}</b>}
-        <span
-          className={cx('ml-auto font-semibold', iskGains(plan.totals.profit, 0) && 'text-success')}
-        >
-          {signedIsk(plan.totals.profit, 0)}
-        </span>
+        <IskDelta amount={plan.totals.profit} decimals={0} className="ml-auto font-semibold" />
       </p>
       <div className="flex items-center gap-2">
         {copyButton('md', 'flex-1 justify-center')}

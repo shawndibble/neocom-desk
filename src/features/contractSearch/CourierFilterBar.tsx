@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import {
   Button,
   FilterBar,
+  countActive,
   FilterChip,
   FilterField,
   IskInput,
@@ -263,7 +264,7 @@ export function CourierFilterBar({
   // Counted off the controls, not off the parsed engine filter, for the same
   // reason the item bar does it: a half-typed "1e" parses to `null` there, and
   // the badge should say the field has been touched.
-  const activeCount = [
+  const activeCount = countActive([
     filter.routeQuery,
     filter.originRegionId !== null,
     filter.destinationRegionId !== null,
@@ -274,7 +275,7 @@ export function CourierFilterBar({
     filter.maxCollateral,
     filter.maxVolume,
     filter.minDays,
-  ].filter(Boolean).length;
+  ]);
 
   return (
     <FilterBar

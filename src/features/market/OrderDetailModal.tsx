@@ -37,7 +37,7 @@ import {
   computeSellThrough,
   type LocationState,
 } from './orderScopeState';
-import { IskDelta } from './OrderIskDelta';
+import { IskDelta } from '@/components/ui/IskDelta';
 import { OrderDetailHeader } from './OrderDetailHeader';
 import { OrderWhoCheaperSection } from './OrderWhoCheaperSection';
 import { OrderNumbersSection } from './OrderNumbersSection';

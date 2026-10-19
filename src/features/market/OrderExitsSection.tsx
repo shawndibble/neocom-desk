@@ -16,7 +16,7 @@ import type { OrderDetailView } from './orderDetailView';
 import { orderExits, hubHaulGaps, type OrderExitKind } from './orderExits';
 import { computeSellThrough } from './orderScopeState';
 import { CopyablePrice } from './CopyablePrice';
-import { marketIskTone, signedMarketIsk } from './signedIsk';
+import { marketIskTone, signedMarketIsk } from '@/lib/signedIsk';
 
 /** Short label for an exit's kind in the "Other ways out" disclosure's trailing read — distinct from the exit's own full sentence, which states the price rather than the net. */
 const EXIT_SHORT_KEY: Record<OrderExitKind, string> = {
