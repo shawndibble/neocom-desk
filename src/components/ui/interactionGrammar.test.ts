@@ -169,6 +169,7 @@ describe('interaction grammar source guards (DESIGN.md §6c)', () => {
       'src/features/communities/CommunityMemberList.tsx',
       'src/features/fittings/FittingAddPanel.tsx',
       'src/features/fittings/FittingRackList.tsx',
+      'src/features/fittings/RackListParts.tsx',
       'src/features/fittings/FittingStartScreen.tsx',
       'src/features/fittings/FittingStatsSections.tsx',
       'src/features/industry/BuildPlanList.tsx',
