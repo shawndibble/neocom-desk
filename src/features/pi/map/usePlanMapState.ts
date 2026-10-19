@@ -393,8 +393,13 @@ export function usePlanMapState({
     Promise.resolve()
       .then(() => adviceWithWhatIf(whatIf))
       .then(
-        (advice) => live && setWhatIfBuilt({ types: whatIf, build: adviceWithWhatIf, advice }),
-        () => {}
+        (advice) => {
+          if (live) setWhatIfBuilt({ types: whatIf, build: adviceWithWhatIf, advice });
+        },
+        // A failed build leaves no what-if figures, as a model failure does elsewhere on the board.
+        () => {
+          if (live) setWhatIfBuilt(null);
+        }
       );
     return () => {
       live = false;

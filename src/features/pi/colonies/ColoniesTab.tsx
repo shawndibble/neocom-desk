@@ -436,6 +436,8 @@ export function ColoniesTab({
     void (async () => {
       for (const [characterId, owned] of todo) {
         built.set(characterId, await askOneAltAdvice(input, owned, security));
+        // Without a worker the build ran on the page: give it a frame before the next alt.
+        await new Promise((resolve) => setTimeout(resolve, 0));
         if (!live) return;
       }
       setAltBuilt({ input, byCharacter: new Map(built) });
