@@ -17,7 +17,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { lazyNamed } from '@/app/routeChunks';
+import { lazyNamed } from '@/app/lazyNamed';
 import { useTranslation } from 'react-i18next';
 import { DataAgeBadge, EmptyState, Panel, Spinner, textActionClassName } from '@/components/ui';
 import { canFinishSurvey } from '@/engine/survey/finish';

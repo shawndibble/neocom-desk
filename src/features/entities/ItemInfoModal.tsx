@@ -7,7 +7,7 @@
  */
 import { Suspense, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { lazyNamed } from '@/app/routeChunks';
+import { lazyNamed } from '@/app/lazyNamed';
 import { loadTypeName } from '@/features/character/typeNames';
 import { ItemActionsContext } from '@/features/market/itemActions';
 import { usePageItemActions } from '@/features/market/usePageItemActions';

@@ -5,7 +5,7 @@
  * chunk loads on first open.
  */
 import { Suspense } from 'react';
-import { lazyNamed } from '@/app/routeChunks';
+import { lazyNamed } from '@/app/lazyNamed';
 import { usePlaceInfoModalStore } from '@/stores/placeInfoModal';
 
 const PlaceInfoDialog = lazyNamed(() => import('./PlaceInfoDialog'), 'PlaceInfoDialog');

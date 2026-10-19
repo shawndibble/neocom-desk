@@ -1,8 +1,6 @@
-// @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest';
-import { createElement, Suspense, type ComponentType } from 'react';
-import { render, screen } from '@testing-library/react';
-import { guarded, lazyNamed, named, remembered } from './routeChunks';
+import type { ComponentType } from 'react';
+import { guarded, named, remembered } from './routeChunks';
 
 const Page: ComponentType = () => null;
 
@@ -18,17 +16,6 @@ describe('named', () => {
       'Page'
     );
     await expect(load()).rejects.toThrow(/unavailable/i);
-  });
-});
-
-describe('lazyNamed', () => {
-  it('renders the named export through lazy()', async () => {
-    const Lazy = lazyNamed(
-      () => Promise.resolve({ Page: () => createElement('p', null, 'hi') }),
-      'Page'
-    );
-    render(createElement(Suspense, { fallback: null }, createElement(Lazy)));
-    expect(await screen.findByText('hi')).toBeTruthy();
   });
 });
 
