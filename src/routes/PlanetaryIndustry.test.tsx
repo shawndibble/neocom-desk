@@ -1008,7 +1008,7 @@ describe('PlanetaryIndustry', () => {
     it('says so on Colonies, keeps the status rows, and shows no ISK/day', async () => {
       render(<App />);
       const panel = await colonyPanelFor(/Jita IV/);
-      expect(await screen.findByText(NOTICE, undefined, { timeout: 4000 })).toBeInTheDocument();
+      expect(await screen.findByText(NOTICE)).toBeInTheDocument();
       expect(panel).toHaveAttribute('data-colony-status', 'stopped');
       expect(screen.queryByText(/0\.00 ISK/)).toBeNull();
     });
