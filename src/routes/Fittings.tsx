@@ -62,7 +62,7 @@ import { FittingSaveButton } from '@/features/fittings/FittingSaveButton';
 import { LoadWarnings } from '@/features/fittings/FittingLoadCard';
 import { FittingStartScreen } from '@/features/fittings/FittingStartScreen';
 import { ImportFittingDialog, NewFromHullDialog } from '@/features/fittings/FittingStartDialogs';
-import { SaveToEveDialog } from '@/features/fittings/SaveToEveDialog';
+import { LazySaveToEveDialog } from '@/features/fittings/LazySaveToEveDialog';
 import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
 import { usePageItemActions } from '@/features/market/usePageItemActions';
 import {
@@ -946,9 +946,9 @@ function FittingsPage() {
               </div>
             </form>
           </Modal>
-          {activeCharacterId !== null && (
-            <SaveToEveDialog
-              open={saveToEveOpen}
+          {activeCharacterId !== null && saveToEveOpen && (
+            <LazySaveToEveDialog
+              open
               onClose={() => setSaveToEveOpen(false)}
               characterId={activeCharacterId}
               fitting={fitting}

@@ -32,3 +32,7 @@ export function log(...args) {
 export function printResult(obj) {
   process.stdout.write(JSON.stringify(obj) + '\n');
 }
+
+export function sleepSync(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}

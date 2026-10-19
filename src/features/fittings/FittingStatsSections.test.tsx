@@ -1328,7 +1328,7 @@ describe('FittingStatsSections price', () => {
     await user.unhover(sellFigure);
     await user.click(within(sectionBody('Price')).getByRole('button', { name: 'Appraise' }));
 
-    const dialog = within(screen.getByRole('dialog', { name: 'Price breakdown' }));
+    const dialog = within(await screen.findByRole('dialog', { name: 'Price breakdown' }));
     const priced = within(dialog.getByText('Priced Thing').closest('tr')!);
     expect(priced.getByText('1,500 ISK')).toBeInTheDocument();
     expect(priced.getByText('3,000 ISK')).toBeInTheDocument();

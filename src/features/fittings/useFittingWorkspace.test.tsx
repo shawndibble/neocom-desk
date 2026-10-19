@@ -5,7 +5,7 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { MemoryRouter, useLocation, useNavigate, useNavigationType } from 'react-router-dom';
-import { encodeFittingShare } from '@/engine/fitting/fittingShare';
+import { encodeFittingShare } from '@/engine/fittings/fittingShare';
 import { fittingToShareInput } from '@/engine/fittings/shareMapper';
 import {
   addModule,

@@ -45,11 +45,6 @@ export function concordRate(corp: { id: number; factionId?: number }): ConcordRa
   return null;
 }
 
-/** CONCORD LP an offer's LP cost takes. */
-export function concordLpCost(lpCost: number, rate: number): number {
-  return lpCost / rate;
-}
-
 /** ISK per CONCORD LP; a missing ISK per LP stays missing. */
 export function iskPerConcordLp(iskPerLp: number | null, rate: number): number | null {
   return iskPerLp === null ? null : iskPerLp * rate;

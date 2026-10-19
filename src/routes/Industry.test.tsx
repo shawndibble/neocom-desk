@@ -280,7 +280,9 @@ describe('Industry: tabs are paths (issue #1300)', () => {
 
     await user.click(screen.getByRole('tab', { name: 'Logs' }));
     await waitFor(() => expect(window.location.pathname).toBe('/industry/logs'));
-    expect(screen.getByRole('tab', { name: 'Logs' })).toHaveAttribute('aria-selected', 'true');
+    await waitFor(() =>
+      expect(screen.getByRole('tab', { name: 'Logs' })).toHaveAttribute('aria-selected', 'true')
+    );
   });
 
   it("shows the plan's own runs in the Runs column", async () => {

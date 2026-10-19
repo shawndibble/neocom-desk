@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { encodeFittingShare } from '@/engine/fitting/fittingShare';
+import { encodeFittingShare } from '@/engine/fittings/fittingShare';
 import { fittingToShareInput } from '@/engine/fittings/shareMapper';
 import type { Fitting } from '@/engine/fittings/types';
 import { resolveFittingShareView } from './resolveFittingShareView';

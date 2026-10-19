@@ -5,7 +5,7 @@
  * as its Fitting Share Code. Null when it's too large for one.
  */
 import type { AssetTreeContainerNode, AssetTreeNode } from '@/engine/assetTree';
-import { encodeFittingShare } from '@/engine/fitting/fittingShare';
+import { encodeFittingShare } from '@/engine/fittings/fittingShare';
 import { assetShipToFitting, type ShipAssetItem } from '@/engine/fittings/assetShipMapper';
 import { fittingToShareInput } from '@/engine/fittings/shareMapper';
 import { loadFittingSlots } from '@/sde/loadSde';

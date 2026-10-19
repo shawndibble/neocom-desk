@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import '@/i18n';
 import { BuildPlanContextMenu } from './BuildPlanContextMenu';
 import type { BlueprintMap } from '@/sde/types';
+import { LocationProbe } from '@/test/LocationProbe';
 
 const loadBlueprints = vi.fn();
 const ABYSSAL_NEUT = vi.hoisted(() => 47832);
@@ -27,11 +28,6 @@ const BLUEPRINTS: BlueprintMap = {
     activity: 'manufacturing',
   },
 };
-
-function LocationProbe() {
-  const location = useLocation();
-  return <div data-testid="location">{`${location.pathname}${location.search}`}</div>;
-}
 
 function renderMenu(
   typeId: number,

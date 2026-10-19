@@ -10,6 +10,7 @@ import { useSkillComparisons } from '@/features/skills/comparisons';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { SkillCompareDrawer } from './SkillCompareDrawer';
 import type { SkillType } from '@/sde/types';
+import { deferred } from '@/test/deferred';
 
 const GUNNERY = 1;
 const SPACESHIP_COMMAND = 2;
@@ -148,13 +149,6 @@ function columnNames(table: HTMLElement): string[] {
     .getAllByRole('columnheader')
     .map((header) => header.textContent ?? '')
     .filter((text) => text.startsWith('Pilot'));
-}
-
-/** A promise the test resolves by hand, to hold an ESI response in flight. */
-function deferred(): { promise: Promise<void>; resolve: () => void } {
-  let resolve!: () => void;
-  const promise = new Promise<void>((r) => (resolve = r));
-  return { promise, resolve };
 }
 
 describe('SkillCompareDrawer', () => {

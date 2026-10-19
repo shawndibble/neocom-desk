@@ -297,7 +297,7 @@ describe('loadWithCacheStatus — shell auth-failure signal (issue #1521)', () =
    * Same gate, exercised through the paginated path: a paginated endpoint's
    * per-page esiFetch calls withhold endpointId (esi/paginated.ts), which is
    * exactly the case that let a Core-only Character's /assets sweep leak the
-   * shell notice before esi/endpoints.ts's fetchTransactionCursor and
+   * shell notice before esi/endpoints/'s fetchTransactionCursor and
    * paginated.ts's fetchAllPagesStatus started patching it back in.
    */
   it('does not emit for a paginated endpoint 403 when the stored grant never claimed its scope', async () => {
