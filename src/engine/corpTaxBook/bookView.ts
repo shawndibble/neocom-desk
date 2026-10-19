@@ -707,7 +707,7 @@ export function statementForLine(
 export interface PeriodRow {
   start: string;
   end: string;
-  /** issued: on a Statement but not (all) mailed yet; sent: mailed; overdue: a Miner past due on it; paid: settled. */
+  /** issued: on a Statement but not (all) mailed yet; sent: mailed; overdue: one of its Statements is past due; paid: settled. */
   status: 'issued' | 'sent' | 'overdue' | 'paid' | 'ready' | 'open';
   miners: number;
   billed: number;
@@ -728,13 +728,19 @@ export function periodRows(view: BookView): PeriodRow[] {
     let overdue = false;
     let unmailed = false;
     for (const s of statements) {
-      const settled = view.internals.byMiner
-        .get(s.minerId)
-        ?.allocation.byStatement.get(s.id)?.settled;
-      if (!settled && view.miners.find((m) => m.id === s.minerId)?.overdueDays != null)
+      const settlement = view.internals.byMiner.get(s.minerId)?.allocation.byStatement.get(s.id);
+      if (
+        !settlement?.settled &&
+        overdueStatus({
+          issuedAt: s.issuedAt,
+          settled: false,
+          now: view.input.now,
+          declarations: view.input.declarations.filter((d) => d.statementId === s.id),
+          overdueDays: view.input.overdueDays,
+        }).state === 'overdue'
+      )
         overdue = true;
       if (((s as Statement & { mailsSent?: number }).mailsSent ?? 0) === 0) unmailed = true;
-      const settlement = view.internals.byMiner.get(s.minerId)?.allocation.byStatement.get(s.id);
       paid += settlement?.credited ?? 0;
       outstanding += settlement && !settlement.settled ? settlement.remaining : 0;
     }
