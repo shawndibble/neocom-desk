@@ -417,10 +417,6 @@ export default defineConfig({
           '**/screenshots/**',
           '**/icons/icon-512*.png',
           '**/brand/**',
-          // The /styleguide route chunk (`routes/Styleguide.tsx` and its
-          // single-importer `styleguide/*`): a dev reference page, not worth
-          // precaching for every install. Fetched on demand if opened.
-          '**/assets/Styleguide-*.js',
         ],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
       },

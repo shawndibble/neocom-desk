@@ -73,7 +73,6 @@ const OTHER_ROUTE_TITLE_KEYS: Record<string, readonly string[]> = {
   '/': [],
   '/login': [],
   '/callback': [],
-  '/styleguide': [],
   '/error': ['error.title'],
   '/s/:shareId': ['share.title'],
   '/share/:shareId': ['share.title'],
