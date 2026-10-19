@@ -1,5 +1,6 @@
 import { idSetKey } from '@/lib/idSetKey';
-import { useEffect, useMemo, useState } from 'react';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -356,24 +357,20 @@ export function MyShipsView({
 }: MyShipsViewProps) {
   const { t } = useTranslation();
   const idsKey = idSetKey(characterIds);
-  const [state, setState] = useState<ShipsState>({ status: 'loading' });
+  const loadShips = useCallback(
+    () => loadShipData(idsKey === '' ? [] : idsKey.split(',').map(Number)),
+    [idsKey]
+  );
+  // A manual retry re-keys the load so an all-skipped result blanks to the spinner, as before.
   const [retryTick, setRetryTick] = useState(0);
-  useEffect(() => {
-    let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- a new filter restarts the read
-    setState({ status: 'loading' });
-    void loadShipData(idsKey === '' ? [] : idsKey.split(',').map(Number)).then(
-      (data) => {
-        if (!cancelled) setState({ status: 'ready', data });
-      },
-      () => {
-        if (!cancelled) setState({ status: 'error' });
-      }
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [idsKey, retryTick]);
+  const ships = useKeyedLoad(`${idsKey}#${retryTick}`, loadShips);
+  const state = useMemo<ShipsState>(
+    () =>
+      ships.status === 'ready'
+        ? { status: 'ready', data: ships.data }
+        : { status: ships.status === 'failed' ? 'error' : 'loading' },
+    [ships.status, ships.data]
+  );
 
   const allSkipped =
     state.status === 'ready' && state.data.skipped.length > 0 && state.data.loadedCount === 0;
