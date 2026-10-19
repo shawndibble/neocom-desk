@@ -159,7 +159,7 @@ describe('VerifyPage', () => {
     it('never confirms from the link alone: it asks for that character to sign in', async () => {
       api.read.mockResolvedValue(payload({ pendingCharacterIds: [61] }));
       render(<VerifyPage token="tok" />);
-      const signIn = await screen.findByRole('button', { name: 'Sign in as Quiet Alt to confirm' });
+      const signIn = await screen.findByRole('button', { name: 'Log in as Quiet Alt to confirm' });
       expect(screen.queryByRole('button', { name: /^Confirm/ })).not.toBeInTheDocument();
       await userEvent.click(signIn);
       expect(api.login).toHaveBeenCalledWith([]);

@@ -13670,10 +13670,10 @@
       "payingValue": "Donate to {{corp}}; any of your characters counts",
       "grouping": {
         "title": "A character is waiting to join this account",
-        "intro": "{{corp}} grouped a character with this account so one Statement and one payment cover them. Only that character can agree, by signing in with it.",
+        "intro": "{{corp}} grouped a character with this account so one Statement and one payment cover them. Only that character can agree, by logging in with it.",
         "confirm": "Confirm {{name}}",
-        "signIn": "Sign in as {{name}} to confirm",
-        "whySignIn": "This link only proves the mail reached you. Signing in with EVE proves the character is yours.",
+        "signIn": "Log in as {{name}} to confirm",
+        "whySignIn": "This link only proves the mail reached you. Logging in with EVE proves the character is yours.",
         "decline": "Not mine, remove it",
         "confirmed": "{{name}} is now part of this account.",
         "declined": "{{name}} was removed from this account. The corporation can see your answer.",

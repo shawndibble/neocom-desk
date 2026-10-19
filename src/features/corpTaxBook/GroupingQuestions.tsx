@@ -16,7 +16,7 @@ type Answer = 'confirmed' | 'declined';
  *
  * The link alone proves the mail reached the main, not that the added
  * character is theirs, so it can only decline. Confirming needs that
- * character's own EVE sign-in: the button signs in as it (returning here) and,
+ * character's own EVE sign-in: the button logs in as it (returning here) and,
  * once it is signed in on this device, confirms as it.
  */
 export function GroupingQuestions({
