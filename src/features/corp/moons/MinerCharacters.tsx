@@ -21,6 +21,18 @@ export function MinerCharacters({ miner }: { miner: MinerRow }) {
   const [grouping, setGrouping] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const stored = (data.state.miners as StoredGrouping[]).find((m) => m.id === miner.id);
+  // A character that said no is no longer in the group, so its answer is listed on its own (#4210).
+  const declined = (data.groupingAnswers ?? []).filter(
+    (a) =>
+      a.answer === 'declined' &&
+      a.minerId === miner.id &&
+      !miner.characterIds.includes(a.characterId)
+  );
+  const confirmed = new Set(
+    (data.groupingAnswers ?? [])
+      .filter((a) => a.answer === 'confirmed' && a.minerId === miner.id)
+      .map((a) => a.characterId)
+  );
   const pending = new Set(stored?.pendingConfirmation ?? []);
   const isStored = stored !== undefined;
 
@@ -74,6 +86,12 @@ export function MinerCharacters({ miner }: { miner: MinerRow }) {
                   · {t('corpTaxBook.moons.grouping.pending')}
                 </span>
               )}
+              {confirmed.has(characterId) && !pending.has(characterId) && (
+                <span className="text-xs text-success">
+                  {' '}
+                  · {t('corpTaxBook.moons.grouping.confirmed')}
+                </span>
+              )}
             </span>
             {canEdit && miner.characterIds.length > 1 && (
               <span className="flex gap-3">
@@ -97,6 +115,20 @@ export function MinerCharacters({ miner }: { miner: MinerRow }) {
                 )}
               </span>
             )}
+          </li>
+        ))}
+        {declined.map((a) => (
+          <li key={`declined-${a.characterId}`} className="text-sm">
+            {names.character(a.characterId)}
+            <span className="text-xs text-danger">
+              {' '}
+              ·{' '}
+              {t(
+                a.via === 'verify-link'
+                  ? 'corpTaxBook.moons.grouping.declinedByLink'
+                  : 'corpTaxBook.moons.grouping.declined'
+              )}
+            </span>
           </li>
         ))}
       </ul>

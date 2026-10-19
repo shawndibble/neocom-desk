@@ -5,7 +5,29 @@ import '@/i18n';
 import type { VerifyPayload } from '@/engine/corpTaxBook/verifyView';
 import { VerifyPage } from './VerifyPage';
 
-const api = vi.hoisted(() => ({ read: vi.fn(), stop: vi.fn() }));
+const api = vi.hoisted(() => ({
+  read: vi.fn(),
+  stop: vi.fn(),
+  confirm: vi.fn(),
+  decline: vi.fn(),
+  login: vi.fn(),
+  tracked: [] as number[],
+}));
+vi.mock('./groupingApi', () => ({
+  confirmPendingInCorporation: api.confirm,
+  declineByVerifyLink: api.decline,
+}));
+vi.mock('@/app/loginFlow', () => ({ beginCustomizedAddCharacterLogin: api.login }));
+vi.mock('@/db', () => ({
+  db: {
+    characters: {
+      toArray: () => Promise.resolve(api.tracked.map((characterId) => ({ characterId }))),
+    },
+  },
+}));
+vi.mock('@/features/character/names', () => ({
+  resolveNames: vi.fn().mockResolvedValue(new Map([[61, 'Quiet Alt']])),
+}));
 vi.mock('./verifyApi', () => ({
   readVerifyStatement: api.read,
   setVerifyRemindersStopped: api.stop,
@@ -52,6 +74,7 @@ function payload(over: Partial<VerifyPayload> = {}): VerifyPayload {
     settled: false,
     remindersStopped: false,
     accountClosed: false,
+    pendingCharacterIds: [],
     ...over,
   };
 }
@@ -59,6 +82,10 @@ function payload(over: Partial<VerifyPayload> = {}): VerifyPayload {
 beforeEach(() => {
   api.read.mockReset();
   api.stop.mockReset();
+  api.confirm.mockReset().mockResolvedValue(undefined);
+  api.decline.mockReset().mockResolvedValue(undefined);
+  api.login.mockReset().mockResolvedValue(undefined);
+  api.tracked = [];
 });
 
 describe('VerifyPage', () => {
@@ -119,5 +146,50 @@ describe('VerifyPage', () => {
     await userEvent.click(await screen.findByRole('checkbox', { name: /Stop reminders/ }));
     expect(await screen.findByRole('alert')).toHaveTextContent(/Couldn't save/);
     expect(screen.getByRole('checkbox', { name: /Stop reminders/ })).not.toBeChecked();
+  });
+
+  describe('a hand-made grouping waiting for a character (D26b)', () => {
+    it('shows nothing when no character is waiting', async () => {
+      api.read.mockResolvedValue(payload());
+      render(<VerifyPage token="tok" />);
+      await screen.findByText(/Zeolites × 70,200/);
+      expect(screen.queryByText(/waiting to join/)).not.toBeInTheDocument();
+    });
+
+    it('never confirms from the link alone: it asks for that character to sign in', async () => {
+      api.read.mockResolvedValue(payload({ pendingCharacterIds: [61] }));
+      render(<VerifyPage token="tok" />);
+      const signIn = await screen.findByRole('button', { name: 'Sign in as Quiet Alt to confirm' });
+      expect(screen.queryByRole('button', { name: /^Confirm/ })).not.toBeInTheDocument();
+      await userEvent.click(signIn);
+      expect(api.login).toHaveBeenCalledWith([]);
+      expect(api.confirm).not.toHaveBeenCalled();
+    });
+
+    it('confirms as the character once it is signed in on this device', async () => {
+      api.tracked = [61];
+      api.read.mockResolvedValue(payload({ pendingCharacterIds: [61] }));
+      render(<VerifyPage token="tok" />);
+      await userEvent.click(await screen.findByRole('button', { name: 'Confirm Quiet Alt' }));
+      expect(api.confirm).toHaveBeenCalledWith(61, 98000001);
+      expect(await screen.findByText(/Quiet Alt is now part of this account/)).toBeInTheDocument();
+    });
+
+    it('lets the link decline, naming the character and the token', async () => {
+      api.read.mockResolvedValue(payload({ pendingCharacterIds: [61] }));
+      render(<VerifyPage token="tok" />);
+      await userEvent.click(await screen.findByRole('button', { name: 'Not mine, remove it' }));
+      expect(api.decline).toHaveBeenCalledWith('tok', 61);
+      expect(await screen.findByText(/Quiet Alt was removed/)).toBeInTheDocument();
+    });
+
+    it('says so when saving fails', async () => {
+      api.tracked = [61];
+      api.confirm.mockRejectedValue(new Error('nope'));
+      api.read.mockResolvedValue(payload({ pendingCharacterIds: [61] }));
+      render(<VerifyPage token="tok" />);
+      await userEvent.click(await screen.findByRole('button', { name: 'Confirm Quiet Alt' }));
+      expect(await screen.findByRole('alert')).toHaveTextContent(/Couldn't save that/);
+    });
   });
 });

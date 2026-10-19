@@ -487,10 +487,13 @@ nightly when both sources move to a newer build and opens an auto-merging PR.
   access), `syncCorpTaxBookCallable` (monotonic observer upsert, Extractions,
   donations; Accountant+), `editCorpTaxBookCallable` (rates, settings, payments,
   dismissals, groupings, adjustments, write-offs, rebills, Statements,
-  declarations), `confirmCorpTaxBookGroupingCallable`, the player-facing
-  `claimCorpTaxBookPaymentCallable` (see below), and the two no-login
-  verify-link callables `readCorpTaxBookStatementCallable` and
-  `stopCorpTaxBookRemindersCallable`. `functions/` cannot import `src/`, so the
+  declarations), `confirmCorpTaxBookGroupingCallable` /
+  `declineCorpTaxBookGroupingCallable` / `listPendingCorpTaxBookGroupingsCallable`
+  (a guest answers a hand-made grouping as the added character, never by token;
+  #4210), the player-facing `claimCorpTaxBookPaymentCallable` (see below), and
+  the no-login verify-link callables `readCorpTaxBookStatementCallable`,
+  `stopCorpTaxBookRemindersCallable` and
+  `declineCorpTaxBookGroupingByTokenCallable` (decline only). `functions/` cannot import `src/`, so the
   slice of the pure engine the callables enforce is mirrored in
   `functions/src/corpTaxBookEngine.ts`, pinned to `src/engine/corpTaxBook` by
   `functionsMirror.test.ts`. Callable tests run against the emulator

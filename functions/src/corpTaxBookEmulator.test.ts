@@ -10,7 +10,10 @@ import { ROLES_SCOPE, type CorpIdentity } from './corpTaxBookEsi.js';
 import {
   claimPayment,
   confirmGrouping,
+  declineGrouping,
+  declineGroupingByToken,
   editBook,
+  listPendingGroupings,
   readStatementByToken,
   reclaimBook,
   setRemindersByToken,
@@ -800,6 +803,108 @@ suite('Corp Tax Book callables (emulator)', () => {
       });
       await edit(ACCOUNTANT, { action: 'unlink', minerId: 'm-a', characterId: 61 });
       expect((await book().collection('miners').doc('m-a').get()).exists).toBe(false);
+    });
+
+    describe('a guest answering a hand-made grouping (#4210)', () => {
+      const pendingGuest = async () => {
+        await turnOn();
+        await syncBook(
+          deps(),
+          who(ACCOUNTANT),
+          parseSyncInput(
+            {
+              corporationId: CORP,
+              observed: [
+                row(10, '2026-10-18T10:00:00Z', { characterId: 61, recordedCorporationId: 555 }),
+              ],
+            },
+            now
+          )
+        );
+        await edit(ACCOUNTANT, {
+          action: 'setMiner',
+          minerId: 'm-a',
+          characterIds: [60, 61],
+          mainCharacterId: 60,
+        });
+      };
+      const answers = async () =>
+        (await book().collection('meta').doc('groupingAnswers').get()).get('answers');
+      const miner = () => book().collection('miners').doc('m-a').get();
+
+      it('shows the officers a confirmation after the fact', async () => {
+        await pendingGuest();
+        await confirmGrouping(deps(), who(61), CORP, 'm-a');
+        expect((await answers())['61']).toMatchObject({
+          minerId: 'm-a',
+          answer: 'confirmed',
+          via: 'character',
+        });
+      });
+
+      it('lets the added character decline, which removes it and tells the officers', async () => {
+        await pendingGuest();
+        await declineGrouping(deps(), who(61), CORP, 'm-a');
+        expect((await miner()).exists).toBe(false);
+        expect((await answers())['61']).toMatchObject({ answer: 'declined', via: 'character' });
+        const declined = await book().collection('meta').doc('declinedAutoGroup').get();
+        expect(declined.get('ids')).toEqual([61]);
+        const audit = (await book().collection('audit').get()).docs.map((d) => d.get('action'));
+        expect(audit).toContain('declineGrouping');
+      });
+
+      it('lets the verify link decline but never confirm, and the officer can ask again', async () => {
+        await pendingGuest();
+        await edit(ACCOUNTANT, {
+          action: 'issueStatement',
+          statement: statement('s1', { minerId: 'm-a', characterIds: [60] }),
+        });
+        const token = String(
+          (await book().collection('statementLinks').doc('s1').get()).get('verifyToken')
+        );
+        const view = await readStatementByToken(deps(), token);
+        expect(view.pendingCharacterIds).toEqual([61]);
+        // Another Miner's character cannot be declined with this link.
+        expect(await reason(declineGroupingByToken(deps(), token, 60))).toBe('nothing-pending');
+        await declineGroupingByToken(deps(), token, 61);
+        expect((await miner()).exists).toBe(false);
+        expect((await answers())['61']).toMatchObject({ answer: 'declined', via: 'verify-link' });
+        await edit(ACCOUNTANT, {
+          action: 'setMiner',
+          minerId: 'm-a',
+          characterIds: [60, 61],
+          mainCharacterId: 60,
+        });
+        expect((await answers())['61']).toBeUndefined();
+      });
+
+      it('refuses a confirm or decline from any character but the added one', async () => {
+        await pendingGuest();
+        for (const other of [60, 62, ACCOUNTANT]) {
+          expect(await reason(confirmGrouping(deps(), who(other), CORP, 'm-a'))).toBe(
+            'nothing-pending'
+          );
+          expect(await reason(declineGrouping(deps(), who(other), CORP, 'm-a'))).toBe(
+            'nothing-pending'
+          );
+        }
+        expect(
+          await reason(confirmGrouping(deps(), { uid: 'someone', ownerHash: 'x' }, CORP, 'm-a'))
+        ).toBe('not-signed-in');
+        expect((await miner()).get('pendingConfirmation')).toEqual([61]);
+        expect((await miner()).get('uids')).toEqual(['char:60']);
+        expect(await answers()).toBeUndefined();
+      });
+
+      it('lists the groupings waiting for the signed-in character only', async () => {
+        await pendingGuest();
+        expect(await listPendingGroupings(deps(), who(61))).toEqual([
+          { corporationId: CORP, minerId: 'm-a', mainCharacterId: 60 },
+        ]);
+        expect(await listPendingGroupings(deps(), who(60))).toEqual([]);
+        await confirmGrouping(deps(), who(61), CORP, 'm-a');
+        expect(await listPendingGroupings(deps(), who(61))).toEqual([]);
+      });
     });
 
     it("closes a paid Statement's days for good, and a rebill never reaches them", async () => {

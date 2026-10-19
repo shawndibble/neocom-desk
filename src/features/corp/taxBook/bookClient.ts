@@ -255,6 +255,37 @@ function settingsFrom(d: Record<string, unknown>): BookSettings {
   };
 }
 
+/** A guest's answer to a hand-made grouping (D26b), for the officers to see after the fact. */
+export interface GroupingAnswer {
+  characterId: number;
+  minerId: string;
+  answer: 'confirmed' | 'declined';
+  /** ISO instant. */
+  at: string;
+  /** Whether the character answered itself or the Miner's verify link declined for it. */
+  via: 'character' | 'verify-link';
+}
+
+/** Reads `meta/groupingAnswers`, dropping anything malformed. */
+export function groupingAnswersFrom(d: Record<string, unknown> | undefined): GroupingAnswer[] {
+  const raw = d?.answers;
+  if (typeof raw !== 'object' || raw === null) return [];
+  return Object.entries(raw as Record<string, Record<string, unknown>>).flatMap(([id, a]) => {
+    const characterId = Number(id);
+    if (!Number.isSafeInteger(characterId) || typeof a !== 'object' || a === null) return [];
+    if (a.answer !== 'confirmed' && a.answer !== 'declined') return [];
+    return [
+      {
+        characterId,
+        minerId: String(a.minerId ?? ''),
+        answer: a.answer,
+        at: String(a.at ?? ''),
+        via: a.via === 'verify-link' ? ('verify-link' as const) : ('character' as const),
+      },
+    ];
+  });
+}
+
 /** Everything `/corp/moons` renders from. Officer-only: verify first. */
 export interface BookData {
   settings: BookSettings;
@@ -262,6 +293,7 @@ export interface BookData {
   observed: ObservedRow[];
   declarations: Declaration[];
   adjustments: Adjustment[];
+  groupingAnswers?: GroupingAnswer[];
 }
 
 export async function readBookData(
@@ -284,6 +316,7 @@ export async function readBookData(
     observed,
     declarations,
     adjustments,
+    answers,
   ] = await Promise.all([
     list<Miner>('miners'),
     list<Statement>('statements'),
@@ -294,6 +327,9 @@ export async function readBookData(
     list<ObservedRow>('observed'),
     list<Declaration>('declarations'),
     list<Adjustment>('adjustments'),
+    getDoc(
+      doc(getSyncFirestore(), 'corpTaxBooks', String(corporationId), 'meta', 'groupingAnswers')
+    ),
   ]);
   return {
     settings,
@@ -309,6 +345,7 @@ export async function readBookData(
     observed,
     declarations,
     adjustments,
+    groupingAnswers: groupingAnswersFrom(answers.data()),
   };
 }
 

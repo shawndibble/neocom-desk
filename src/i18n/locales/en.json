@@ -5922,6 +5922,13 @@
     "payeeOptionWithCharacter": "{{payee}} ({{character}})",
     "corpBook": {
       "payeeName": "{{corp}} (Corp Tax Book)",
+      "grouping": {
+        "title": "A corporation wants to group a character of yours",
+        "ask": "{{corp}} grouped {{name}} with {{main}} so one Statement and one payment cover them. Only you can agree, and you can say no.",
+        "confirm": "Confirm {{name}}",
+        "decline": "No, remove it",
+        "failed": "Couldn't save that. Try again."
+      },
       "state": {
         "pending": "Pending corp record",
         "billed": "Billed",
@@ -13661,6 +13668,17 @@
       "dueValue": "{{date}} ({{days}} days after issue)",
       "minimumValue": "{{amount}}; smaller balances roll into the next Statement",
       "payingValue": "Donate to {{corp}}; any of your characters counts",
+      "grouping": {
+        "title": "A character is waiting to join this account",
+        "intro": "{{corp}} grouped a character with this account so one Statement and one payment cover them. Only that character can agree, by signing in with it.",
+        "confirm": "Confirm {{name}}",
+        "signIn": "Sign in as {{name}} to confirm",
+        "whySignIn": "This link only proves the mail reached you. Signing in with EVE proves the character is yours.",
+        "decline": "Not mine, remove it",
+        "confirmed": "{{name}} is now part of this account.",
+        "declined": "{{name}} was removed from this account. The corporation can see your answer.",
+        "failed": "Couldn't save that. Try again."
+      },
       "stop": {
         "label": "Stop reminders",
         "hint": "Your monthly Statement still comes. Officers can send you at most one reminder per Statement.",
@@ -14124,6 +14142,9 @@
         "makeMain": "Make main",
         "unlink": "Unlink",
         "pending": "waiting for their confirmation",
+        "confirmed": "confirmed by the player",
+        "declined": "declined to join",
+        "declinedByLink": "declined, from the main's Statement link",
         "outsideCorp": "not in the corporation",
         "dialogTitle": "Group characters with {{name}}",
         "dialogIntro": "Pick the Miners whose characters should be billed together.",

@@ -8,7 +8,7 @@ import { buildBookView } from '@/engine/corpTaxBook/bookView';
 import type { Miner } from '@/engine/corpTaxBook/charges';
 import { BookProvider } from './BookContext';
 import { MinerCharacters } from './MinerCharacters';
-import type { BookData, BookSettings, OfficerVerdict } from '../taxBook/bookClient';
+import type { BookData, BookSettings, GroupingAnswer, OfficerVerdict } from '../taxBook/bookClient';
 
 const editBook = vi.fn();
 vi.mock('../taxBook/bookClient', () => ({
@@ -37,7 +37,8 @@ const entry = (characterId: number, corp = CORP) => ({
 function renderPanel(
   miners: (Miner & { pendingConfirmation?: number[] })[],
   minerId: string,
-  ui: (row: ReturnType<typeof buildBookView>['miners'][number]) => ReactElement
+  ui: (row: ReturnType<typeof buildBookView>['miners'][number]) => ReactElement,
+  groupingAnswers: GroupingAnswer[] = []
 ) {
   const view = buildBookView({
     corporationId: CORP,
@@ -77,7 +78,7 @@ function renderPanel(
             ore: () => 'Sylvite',
           },
           settings: {} as BookSettings,
-          data: { state: { miners }, adjustments: [] } as unknown as BookData,
+          data: { state: { miners }, adjustments: [], groupingAnswers } as unknown as BookData,
           verdict,
           reload: vi.fn(),
         }}
@@ -99,6 +100,23 @@ describe('MinerCharacters', () => {
     );
     expect(screen.getByText(/waiting for their confirmation/)).toBeInTheDocument();
     expect(screen.getByText(/· main/)).toBeInTheDocument();
+  });
+
+  it('shows the officers a confirmation and a decline after the fact (#4210)', () => {
+    const answer = (
+      characterId: number,
+      a: 'confirmed' | 'declined',
+      via: 'character' | 'verify-link'
+    ) => ({ characterId, minerId: 'g1', answer: a, at: '2026-10-18T10:00:00Z', via }) as const;
+    renderPanel(
+      [{ id: 'g1', characterIds: [1, 3], mainCharacterId: 1, pendingConfirmation: [] }],
+      'g1',
+      (row) => <MinerCharacters miner={row} />,
+      [answer(3, 'confirmed', 'character'), answer(4, 'declined', 'verify-link')]
+    );
+    expect(screen.getByText(/confirmed by the player/)).toBeInTheDocument();
+    expect(screen.getByText('Pilot 4')).toBeInTheDocument();
+    expect(screen.getByText(/declined, from the main's Statement link/)).toBeInTheDocument();
   });
 
   it('unlinks a character and makes another the main', async () => {

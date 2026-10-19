@@ -121,8 +121,25 @@ describe('firestore.indexes.json field overrides', () => {
       'systemConditions',
       // The Community board reads every Pledge in one collection-group query (#3808).
       'pledges',
+      // A guest's pending Miner groupings are found across books (#4210).
+      'miners',
     ]);
     expect(config.fieldOverrides.filter((o) => !groups.has(o.collectionGroup))).toEqual([]);
+  });
+
+  it('indexes pending Miner groupings by character at collection-group scope', () => {
+    // `listPendingGroupings` runs `collectionGroup('miners').where('pendingConfirmation', 'array-contains', id)`.
+    expect(overridesFor('miners')).toEqual([
+      {
+        collectionGroup: 'miners',
+        fieldPath: 'pendingConfirmation',
+        ttl: false,
+        indexes: [
+          { arrayConfig: 'CONTAINS', queryScope: 'COLLECTION' },
+          { arrayConfig: 'CONTAINS', queryScope: 'COLLECTION_GROUP' },
+        ],
+      },
+    ]);
   });
 
   it('indexes pledges by communityId at collection and collection-group scope', () => {
