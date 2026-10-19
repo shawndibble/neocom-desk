@@ -75,7 +75,7 @@ export interface PlanMapProps {
   graph: MapGraph;
   advice: PlanAdvice;
   /** The same advice with these planet types added as what-ifs: priced for them, never for the picks. */
-  adviceWithWhatIf: (types: ReadonlySet<PlanetType>) => PlanAdvice;
+  adviceWithWhatIf: (types: ReadonlySet<PlanetType>) => PlanAdvice | Promise<PlanAdvice>;
   colonies: readonly MapColony[];
   finder: FinderOrigin;
   /** P3/P4 multi-planet chain estimates (`useChainEstimates`); none when left out. */
