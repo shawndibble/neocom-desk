@@ -55,7 +55,7 @@ import type { PlanEntry } from '@/engine/types';
 import { loadSkills } from '@/sde/loadSde';
 import { useDogmaEngine } from './fittingContext';
 import { computeStatsOffThread, skillSourcesOffThread } from './evaluationService';
-import { onReconnect } from '@/stores/network';
+import { useRetryOnReconnect } from '@/lib/useRetryOnReconnect';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 
 /**
@@ -398,7 +398,7 @@ export function useFittingEvaluation({
   const retry = useCallback(() => setAttempt((n) => n + 1), []);
   const engine = useDogmaEngine();
   // A failure while offline mends itself when the connection returns.
-  useEffect(() => (statsError ? onReconnect(retry) : undefined), [statsError, retry]);
+  useRetryOnReconnect(statsError, retry);
   const [price, setPrice] = useState<Appraisal | null>(null);
 
   // A different hull (or none) is a different Fitting: drop the old numbers at
