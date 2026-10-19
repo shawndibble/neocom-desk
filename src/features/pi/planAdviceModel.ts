@@ -44,9 +44,9 @@
 import { orderQuickWins, planTotals, sellBooks, slotNudge } from '@/engine/pi/planAdvice';
 import { haulSummary, type HaulColony } from '@/engine/pi/planHaul';
 import type { BuiltColonyAdvice } from './systemPlanetModel';
-import { cadenceHours } from './cadencePref';
+import { cadenceHours } from './cadenceHours';
 import { goalPlannerInput, plannerColonies, type PlannerColonyRow } from './goalPlannerModel';
-import { planetSlots } from './planetSlots';
+import { planetSlots } from './planetSlotsModel';
 import { analyseColony } from './planAdvice/analyseColony';
 import { factoryRoom } from './planAdvice/factoryRoom';
 import { rankingFor } from './planAdvice/ranking';

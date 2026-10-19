@@ -14,7 +14,7 @@ import {
   type StopTierEntry,
 } from '@/engine/pi/stopTier';
 import type { PinLoad } from '@/engine/pi/types';
-import { colonyBudget } from '../colonyBudget';
+import { colonyBudget } from '../colonyBudgetModel';
 import { highsecCustomsRate } from '../customsRate';
 import { localResourcesFor } from '../systemPlanetModel';
 import { DEFAULT_PLANNER_HEADS, type PlannerColonyRow } from '../goalPlannerModel';

@@ -231,12 +231,15 @@ beforeEach(resetSession);
 
 describe('Industry: data that fails to load', () => {
   it('says the blueprint data could not load instead of spinning, and loads it on Try again', async () => {
-    vi.mocked(loadBlueprints).mockRejectedValueOnce(new Error('offline'));
+    // Several mount-time readers call `loadBlueprints`; a one-shot rejection goes to whichever asks
+    // first, which is load-dependent, so fail every call until Try again.
+    vi.mocked(loadBlueprints).mockRejectedValue(new Error('offline'));
     const user = userEvent.setup();
     render(<App />);
 
     // Once visible, once announced by the always-mounted live region.
     expect((await screen.findAllByText("Blueprint data couldn't load")).length).toBeGreaterThan(0);
+    vi.mocked(loadBlueprints).mockImplementation(async () => BLUEPRINTS);
     await user.click(screen.getByRole('button', { name: 'Try again' }));
     expect(await screen.findByRole('searchbox', { name: 'Add Build Plan' })).toBeInTheDocument();
   });

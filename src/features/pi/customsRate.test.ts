@@ -11,8 +11,8 @@ const {
   customsRateSource,
   defaultCustomsRate,
   highsecCustomsRate,
-  loadCustomsCodeExpertise,
 } = await import('./customsRate');
+const { loadCustomsCodeExpertise } = await import('./customsSkill');
 type ColonySpace = import('./customsRate').ColonySpace;
 
 beforeEach(() => {
