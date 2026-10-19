@@ -136,6 +136,8 @@ export interface LastSync {
   at: number;
   byCharacterId: number;
   byName: string;
+  /** Set when the scheduled server sync made this record, not an officer's visit (ADR 0025). */
+  scheduled?: boolean;
   gaps: SyncGap[];
 }
 

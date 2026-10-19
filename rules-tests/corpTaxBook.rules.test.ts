@@ -72,11 +72,12 @@ beforeEach(async () => {
     await setDoc(doc(db, `${CORP}/audit/e1`), { action: 'sync' });
     await setDoc(doc(db, `${CORP}/extractions/x1`), { moonId: 1 });
     await setDoc(doc(db, `${CORP}/meta/paid`), { ids: ['s1'] });
+    await setDoc(doc(db, `${CORP}/meta/scheduledSync`), { status: 'active', characterId: 1 });
     await setDoc(doc(db, 'corpTaxBookTokens/tok'), { corporationId: 98000001 });
   });
 });
 
-const OFFICER_ONLY = ['audit/e1', 'extractions/x1', 'meta/paid'];
+const OFFICER_ONLY = ['audit/e1', 'extractions/x1', 'meta/paid', 'meta/scheduledSync'];
 const OWN_LINE_PATHS = ['observed/a', 'payments/p1', 'statements/s1', 'dismissals/d1', 'miners/m1'];
 
 describe('corpTaxBooks rules', () => {

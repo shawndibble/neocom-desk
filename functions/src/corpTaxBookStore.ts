@@ -220,13 +220,13 @@ export async function verifyOfficer(
 
 // --- Audit -----------------------------------------------------------------
 
-interface Actor {
+export interface Actor {
   characterId: number | null;
   name: string;
   via?: string;
 }
 
-function appendAudit(
+export function appendAudit(
   tx: Transaction,
   deps: BookDeps,
   corporationId: number,
@@ -246,9 +246,13 @@ function appendAudit(
   });
 }
 
-const actorOf = (access: OfficerAccess): Actor => ({
+/** How the scheduled sync (ADR 0025) appears in the audit log: the holder, `via` the schedule. */
+export const SCHEDULED_VIA = 'scheduled sync';
+
+const actorOf = (access: OfficerAccess, via?: string): Actor => ({
   characterId: access.characterId,
   name: access.characterName,
+  ...(via ? { via } : {}),
 });
 
 // --- Turn on / reclaim -----------------------------------------------------
@@ -317,6 +321,20 @@ const obsId = (r: ObservedRow) => `${r.characterId}_${r.typeId}_${r.date}_${r.st
 
 export async function syncBook(deps: BookDeps, caller: Caller, input: SyncInput) {
   const access = await authorizeOfficer(deps, caller, input, 'edit', { live: false });
+  return syncBookAs(deps, access, input);
+}
+
+/**
+ * The sync once the caller is established. The scheduled sync (ADR 0025) calls
+ * this with the role check it just made with the grant holder's token, and
+ * `scheduled` makes the audit entry and `lastSync` say so.
+ */
+export async function syncBookAs(
+  deps: BookDeps,
+  access: OfficerAccess,
+  input: SyncInput,
+  options: { scheduled?: boolean } = {}
+) {
   const book = bookRef(deps.db, input.corporationId);
   if (!(await book.get()).exists)
     fail('not-found', 'This corporation has no Corp Tax Book', 'no-book');
@@ -385,16 +403,26 @@ export async function syncBook(deps: BookDeps, caller: Caller, input: SyncInput)
       lastSync: {
         at: now,
         byCharacterId: access.characterId,
-        byName: access.characterName,
+        byName: options.scheduled
+          ? `Scheduled sync (${access.characterName})`
+          : access.characterName,
+        ...(options.scheduled ? { scheduled: true } : {}),
         gaps: input.gaps,
       },
     });
-    appendAudit(tx, deps, input.corporationId, actorOf(access), 'sync', {
-      observedChanged,
-      extractions: input.extractions.length,
-      donationsAdded,
-      gaps: input.gaps.length,
-    });
+    appendAudit(
+      tx,
+      deps,
+      input.corporationId,
+      actorOf(access, options.scheduled ? SCHEDULED_VIA : undefined),
+      'sync',
+      {
+        observedChanged,
+        extractions: input.extractions.length,
+        donationsAdded,
+        gaps: input.gaps.length,
+      }
+    );
   });
   return { observedChanged, extractions: input.extractions.length, donationsAdded };
 }
@@ -1202,6 +1230,17 @@ export async function editBook(deps: BookDeps, caller: Caller, call: BookCall, a
   const access = await authorizeOfficer(deps, caller, call, 'edit', {
     live: needsLiveCheck(action),
   });
+  return editBookAs(deps, access, call, action);
+}
+
+/** An edit once the caller is established; the scheduled sync passes `via` (ADR 0025). */
+export async function editBookAs(
+  deps: BookDeps,
+  access: OfficerAccess,
+  call: BookCall,
+  action: EditAction,
+  via?: string
+) {
   const ref = bookRef(deps.db, call.corporationId);
   return deps.db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
@@ -1216,7 +1255,7 @@ export async function editBook(deps: BookDeps, caller: Caller, call: BookCall, a
       now: deps.now(),
     };
     const outcome = await applyEdit(ctx, action);
-    appendAudit(tx, deps, call.corporationId, actorOf(access), action.action, outcome.detail);
+    appendAudit(tx, deps, call.corporationId, actorOf(access, via), action.action, outcome.detail);
     return outcome.result ?? {};
   });
 }
