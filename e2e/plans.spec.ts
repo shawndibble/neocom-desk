@@ -162,11 +162,10 @@ test('a long plan scrolls the page, with the summary strip pinned above it', asy
     .first()
     .locator('xpath=ancestor::section[1]');
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-  await page.waitForTimeout(100);
 
   // Guard against a vacuous pass: if the page cannot actually scroll, the
   // assertions below hold whether or not the strip is sticky at all.
-  expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
 
   await expect(summaryPanel).toBeInViewport();
   const summaryBox = await summaryPanel.boundingBox();
