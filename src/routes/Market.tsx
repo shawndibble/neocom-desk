@@ -400,11 +400,10 @@ export function Market() {
   const isDesktop = useIsDesktop();
   const online = useOnline();
 
+  const catalogue = useMarketCatalogue();
   const {
     groups,
     types,
-    npcStations,
-    solarSystems,
     marketRegions,
     catalogueError,
     catalogueLoading,
@@ -412,13 +411,9 @@ export function Market() {
     groupsById,
     childrenByParent,
     typesByGroup,
-    typesById,
     npcStationMap,
     solarSystemMap,
-    allMarketRegionIds,
-    systemRegions,
-    variationIndex,
-  } = useMarketCatalogue();
+  } = catalogue;
 
   const {
     selectedTypeId,
@@ -567,18 +562,8 @@ export function Market() {
     chosenRegionId,
     hubHydrated,
     locationModeHydrated,
-    catalogueError,
+    catalogue,
     ensureBlueprintCatalog: itemActions.actions.requestBlueprints,
-    npcStations,
-    solarSystems,
-    marketRegions,
-    allMarketRegionIds,
-    systemRegions,
-    typesByGroup,
-    typesById,
-    variationIndex,
-    npcStationMap,
-    solarSystemMap,
     t,
   });
   function filterToStation(locationId: number) {
