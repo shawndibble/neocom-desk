@@ -9,6 +9,7 @@ import {
 } from '@/components/ui';
 import type { Appraisal, AppraisalRow } from '@/engine/market/appraisal';
 import { multibuyText } from '@/engine/market/haulingPlan';
+import { unpricedSellRows } from '@/features/fittings/fittingPrice';
 import { useMarketHub } from '@/features/market/hub';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { writeToClipboard } from '@/lib/clipboard';
@@ -74,6 +75,8 @@ export function FittingAppraisalModal({ open, onClose, price }: Props) {
     },
   ];
 
+  const unpriced = unpricedSellRows(price.rows).length;
+
   async function copyMultibuy() {
     try {
       await writeToClipboard(multibuyText(price.rows));
@@ -103,9 +106,9 @@ export function FittingAppraisalModal({ open, onClose, price }: Props) {
           <span>{t('fittings.appraisal.total')}</span>
           <span className="tabular-nums">{isk(price.totals.sell)}</span>
         </div>
-        {price.totals.unpricedRows > 0 && (
+        {unpriced > 0 && (
           <p className="text-xs text-warning">
-            {t('fittings.stats.priceUnpriced', { count: price.totals.unpricedRows })}
+            {t('fittings.stats.priceUnpriced', { count: unpriced })}
           </p>
         )}
         <div className="flex items-center justify-end gap-2">
