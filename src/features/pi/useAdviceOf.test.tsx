@@ -26,7 +26,9 @@ describe('useAdviceOf without a Worker', () => {
 });
 
 describe('useAdviceOf with a worker', () => {
-  async function withService(ask: (input: PlanAdviceInput) => Promise<unknown>) {
+  async function withService(
+    ask: (input: PlanAdviceInput, signal?: AbortSignal) => Promise<unknown>
+  ) {
     vi.resetModules();
     class Unavailable extends Error {}
     vi.doMock('./planAdviceService', () => ({
@@ -65,6 +67,23 @@ describe('useAdviceOf with a worker', () => {
     );
     const { result } = renderHook(() => useAdviceOf(input));
     await waitFor(() => expect(result.current.status).toBe('ready'));
+  });
+
+  it('withdraws the request when the input changes or the hook unmounts', async () => {
+    const signals: AbortSignal[] = [];
+    const { useAdviceOf } = await withService((_input, signal) => {
+      signals.push(signal as AbortSignal);
+      return new Promise(() => {});
+    });
+    const a = adviceInput('lean');
+    const b = adviceInput('lean');
+    const { rerender, unmount } = renderHook(({ input }) => useAdviceOf(input), {
+      initialProps: { input: a },
+    });
+    rerender({ input: b });
+    expect(signals.map((s) => s.aborted)).toEqual([true, false]);
+    unmount();
+    expect(signals[1].aborted).toBe(true);
   });
 
   it('is an error when the worker says the model threw', async () => {

@@ -9,7 +9,10 @@ export type WirePlanAdviceInput = Omit<PlanAdviceInput, 'snapshot'> & {
 };
 
 export type PlanAdviceRequest =
-  { kind: 'pi'; pi: PiData } | { kind: 'advice'; id: number; input: WirePlanAdviceInput };
+  | { kind: 'pi'; pi: PiData }
+  | { kind: 'advice'; id: number; input: WirePlanAdviceInput }
+  /** Withdraws a queued `advice` request; one already running finishes and is ignored by the page. */
+  | { kind: 'cancel'; id: number };
 
 export type PlanAdviceReply = { id: number; advice: PlanAdvice } | { id: number; error: string };
 

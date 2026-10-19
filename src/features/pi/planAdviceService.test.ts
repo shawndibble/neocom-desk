@@ -14,6 +14,7 @@ class FakeWorker {
   received: PlanAdviceRequest[] = [];
   terminated = false;
   private state = emptyPlanAdviceState();
+  private timers = new Map<number, ReturnType<typeof setTimeout>>();
   constructor() {
     FakeWorker.instances.push(this);
   }
@@ -22,9 +23,13 @@ class FakeWorker {
     const request = structuredClone(message);
     this.received.push(request);
     if (request.kind === 'pi') this.state.pi = request.pi;
+    else if (request.kind === 'cancel') clearTimeout(this.timers.get(request.id));
     else {
       const reply = answerPlanAdvice(this.state, request);
-      setTimeout(() => this.onmessage?.({ data: structuredClone(reply) } as MessageEvent), 0);
+      this.timers.set(
+        request.id,
+        setTimeout(() => this.onmessage?.({ data: structuredClone(reply) } as MessageEvent), 0)
+      );
     }
   }
   terminate() {
@@ -114,6 +119,58 @@ describe('askPlanAdvice', () => {
     } finally {
       FakeWorker.prototype.postMessage = original;
     }
+  });
+
+  describe('abort', () => {
+    it('withdraws a queued request, rejects, and does not remember it', async () => {
+      const { askPlanAdvice, peekPlanAdvice } = await loadService();
+      const input = adviceInput('lean');
+      const abort = new AbortController();
+      const asked = askPlanAdvice(input, abort.signal);
+      abort.abort();
+      await expect(asked).rejects.toMatchObject({ name: 'AbortError' });
+      const [worker] = FakeWorker.instances;
+      expect(worker.received.map((r) => r.kind)).toEqual(['pi', 'advice', 'cancel']);
+      expect(peekPlanAdvice(input)).toBeNull();
+      // The same input can be asked again afterwards.
+      expect(await askPlanAdvice(input)).toEqual(buildPlanAdvice(input));
+    });
+
+    it('keeps the request while another caller still waits on it', async () => {
+      const { askPlanAdvice } = await loadService();
+      const input = adviceInput('lean');
+      const first = new AbortController();
+      const second = new AbortController();
+      const a = askPlanAdvice(input, first.signal);
+      const b = askPlanAdvice(input, second.signal);
+      first.abort();
+      await expect(a).rejects.toMatchObject({ name: 'AbortError' });
+      expect(await b).toEqual(buildPlanAdvice(input));
+      expect(FakeWorker.instances[0].received.some((r) => r.kind === 'cancel')).toBe(false);
+    });
+
+    it('starts a fresh request when the same input is asked again right after an abort', async () => {
+      const { askPlanAdvice } = await loadService();
+      const input = adviceInput('lean');
+      const abort = new AbortController();
+      const first = askPlanAdvice(input, abort.signal);
+      abort.abort();
+      const again = askPlanAdvice(input, new AbortController().signal);
+      await expect(first).rejects.toMatchObject({ name: 'AbortError' });
+      expect(await again).toEqual(buildPlanAdvice(input));
+    });
+
+    it('never posts for a signal that is already aborted', async () => {
+      const { askPlanAdvice } = await loadService();
+      const abort = new AbortController();
+      abort.abort();
+      await expect(askPlanAdvice(adviceInput('lean'), abort.signal)).rejects.toMatchObject({
+        name: 'AbortError',
+      });
+      expect(FakeWorker.instances[0]?.received.filter((r) => r.kind === 'advice') ?? []).toEqual(
+        []
+      );
+    });
   });
 
   it('is unavailable where there is no Worker', async () => {
