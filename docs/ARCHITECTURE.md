@@ -31,10 +31,12 @@ no app server. Two kinds of data:
   public courier contracts as a route and a fee, a sibling collection because
   they carry no item lines. Ingestion only so far — nothing reads it yet.
   A second, separate job (`syncWorkbenchFits`, issue #2484) copies EVE
-  Workbench's public fits into `workbenchFits`, grouped by hull, because
-  Workbench's API can't filter by hull; it is the one collection readable with
-  no Firebase session at all, since the fitter works logged out
-  (`features/fittings/workbenchFits.ts` reads it).
+  Workbench's public fits into R2, one object per hull
+  (`workbench-fits/<shipTypeId>.json`, issue #4271), because Workbench's API
+  can't filter by hull; the client fetches a hull's object by id with no
+  Firebase session, since the fitter works logged out
+  (`features/fittings/workbenchFits.ts`). Only the sync's checkpoint
+  (`workbenchFitsSync`, admin-only) stays in Firestore.
 
 - A daily job (`syncMarketOpenPrices`) folds EVE Ref's last market-order
   snapshot of the previous UTC day into the R2 object `open-prices/<typeId>.json`:
