@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { DEFAULT_CHUNK_M3_PER_HOUR } from '@/engine/corpTaxBook/extraction';
+import { chunkRateFor } from '@/engine/corpTaxBook/extraction';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -445,9 +445,10 @@ export function BookSettingsDialog({ open, onClose }: { open: boolean; onClose: 
                         })
                       : t('corpTaxBook.moons.settings.notMeasured', {
                           name: names.refinery(id),
-                          rate: (
-                            settings.chunkM3PerHour ?? DEFAULT_CHUNK_M3_PER_HOUR
-                          ).toLocaleString('en'),
+                          rate: chunkRateFor(
+                            undefined,
+                            settings.chunkM3PerHour ?? undefined
+                          ).m3PerHour.toLocaleString('en'),
                         })}
                   </li>
                 );
