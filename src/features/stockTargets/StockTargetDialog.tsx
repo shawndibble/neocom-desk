@@ -60,8 +60,7 @@ export function StockTargetDialog({
   useEffect(() => {
     if (!hydrated) return;
     (lists.length > 0 ? quantityRef : openStockRef).current?.focus();
-    // Only the first render after loading decides where focus lands.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only the first render after loading decides where focus lands
   }, [hydrated]);
 
   const quantityValue = quantity ?? (existing !== undefined ? String(existing) : '');

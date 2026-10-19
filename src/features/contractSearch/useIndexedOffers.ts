@@ -92,8 +92,7 @@ export function useEarlyOffers(
       cancelled = true;
       clearTimeout(timer);
     };
-    // `key` encodes index and typeIds; listing the objects would re-run on every identity change of an equal set.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `key` encodes index and typeIds; listing the objects would re-run on every identity change of an equal set
   }, [key]);
 
   // An R2 index listing no type has nothing to read and nothing coming.
