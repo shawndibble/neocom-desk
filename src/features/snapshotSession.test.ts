@@ -10,15 +10,12 @@ import { signInWithCustomToken } from 'firebase/auth';
 import { db } from '@/db';
 import { resetRevalidationState } from '@/esi/cache';
 import { loadHubSnapshotRange } from './market/hubSnapshot';
-import { loadPublicBpcContracts } from './bpcContracts/syncedContracts';
-import { loadChunkedSnapshot } from './contractSearch/chunkedSnapshot';
 
 const getDocs = vi.hoisted(() => vi.fn());
 const fakeAuth = vi.hoisted(() => ({ currentUser: null as { uid: string } | null }));
 
 vi.mock('firebase/firestore/lite', () => ({
   getDocs,
-  // The chunked reader asks `meta` first; an empty one sends it to `getDocs`.
   getDoc: vi.fn(async () => ({ data: () => undefined })),
   doc: (_db: unknown, collectionName: string, id: string) => ({ path: `${collectionName}/${id}` }),
   collection: (_db: unknown, name: string) => ({ name }),
@@ -53,7 +50,7 @@ const ALT_UID = 'char:2';
 beforeEach(async () => {
   await db.esiCache.clear();
   resetRevalidationState();
-  // R2 unreachable: these tests cover the Firestore path (ADR 0019 fallback).
+  // No network in these tests: only the Firestore reads are under test.
   vi.stubGlobal(
     'fetch',
     vi.fn(async () => {
@@ -72,19 +69,6 @@ describe('snapshot readers while an alt sync holds the session', () => {
     [
       'hub market history',
       () => loadHubSnapshotRange(ACTIVE_CHARACTER_ID, '2026-09-24', '2026-09-24'),
-    ],
-    ['public BPC contracts', () => loadPublicBpcContracts(ACTIVE_CHARACTER_ID)],
-    [
-      'chunked snapshot',
-      () =>
-        loadChunkedSnapshot(
-          {
-            collectionName: 'publicCourierContracts',
-            cacheKey: 'publicCourierContracts',
-            staleAfterMs: 60_000,
-          },
-          ACTIVE_CHARACTER_ID
-        ),
     ],
   ])('%s reads under the alt session without changing the current user', async (_name, read) => {
     await read();

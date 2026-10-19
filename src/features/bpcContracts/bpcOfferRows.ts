@@ -19,14 +19,12 @@ export function bpcOfferRows(
 }
 
 /**
- * Every offer row right now, or null when the snapshot is missing (sync off,
- * not landed yet) or the load failed. Callers pick their own fallback for null.
+ * Every offer row right now, or null when the snapshot is missing (R2
+ * unreachable, not landed yet) or the load failed. Callers pick their own fallback for null.
  */
-export async function loadBpcOfferRows(
-  characterId: number
-): Promise<readonly BpcContractRow[] | null> {
+export async function loadBpcOfferRows(): Promise<readonly BpcContractRow[] | null> {
   try {
-    const cached = await loadPublicBpcContracts(characterId);
+    const cached = await loadPublicBpcContracts();
     return cached ? bpcOfferRows(cached.data) : null;
   } catch {
     return null;

@@ -11,7 +11,6 @@ import {
   useCourierFilterPref,
   DEFAULT_COURIER_FILTER,
 } from '@/features/contractSearch/courierFilterPref';
-import { isSyncConfigured } from '@/app/syncStatus';
 import { clearJumpGraphIndex } from '@/sde/jumpGraph';
 import { loadMarketTypes, loadSolarSystemJumps } from '@/sde/loadMarketSde';
 import { clearMarketTypeIndex } from '@/sde/marketTypesById';
@@ -22,18 +21,12 @@ import {
 } from '@/features/contractSearch/ContractSearchPanel';
 import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
 import type { ChunkedSnapshotRead } from '@/features/contractSearch/chunkedSnapshot';
-import { OFFERS_CACHE_KEY, useChunkProgressStore } from '@/features/contractSearch/chunkedSnapshot';
 import type { CachedResult } from '@/esi/cache';
 import type { MarketTypeEntry, NpcStationEntry, SolarSystemEntry } from '@/sde/marketTypes';
 import { clearNpcStationIndex } from '@/sde/npcStations';
 import { clearSolarSystemIndex } from '@/sde/solarSystems';
 import type { PublicCourierContractRow } from '@/engine/contracts/courierSearch';
 import { LocationProbe } from '@/test/LocationProbe';
-
-vi.mock('@/app/syncStatus', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/app/syncStatus')>();
-  return { ...actual, isSyncConfigured: vi.fn(() => true) };
-});
 
 const loadPublicContractOffers = vi.fn();
 vi.mock('@/features/contractSearch/publicContractOffers', () => ({
@@ -367,7 +360,6 @@ beforeEach(async () => {
   // the snapshot reads the previous case's map.
   clearNpcStationIndex();
   clearSolarSystemIndex();
-  vi.mocked(isSyncConfigured).mockReturnValue(true);
 });
 
 async function bodyRows() {
@@ -715,18 +707,7 @@ describe('ContractSearchPanel', () => {
     await waitFor(async () => expect(await bodyRows()).toHaveLength(2));
   });
 
-  it('shows the not-configured state when the app has no sync backend', async () => {
-    vi.mocked(isSyncConfigured).mockReturnValue(false);
-    loadPublicContractOffers.mockResolvedValue(null);
-    renderWithRouter();
-
-    expect(await screen.findByText("Contract search isn't available")).toBeInTheDocument();
-    expect(loadPublicContractOffers).not.toHaveBeenCalled();
-    // No backend is not "unreachable": neither the page nor the live region claims it.
-    expect(screen.queryByText(/Couldn't reach the contract index/)).not.toBeInTheDocument();
-  });
-
-  it('distinguishes a configured-but-empty snapshot from a missing backend', async () => {
+  it('says nothing has synced yet for an empty snapshot', async () => {
     loadPublicContractOffers.mockResolvedValue(cachedSnapshot([]));
     renderWithRouter();
 
@@ -2048,8 +2029,6 @@ describe('ContractSearchPanel — search first (issue #2921)', () => {
     return { promise, settle };
   }
 
-  beforeEach(() => useChunkProgressStore.setState({ byKey: {} }));
-
   it('asks for a search instead of listing offers when nothing is filtered', async () => {
     renderWithRouter(['/']);
 
@@ -2058,15 +2037,13 @@ describe('ContractSearchPanel — search first (issue #2921)', () => {
     expect(screen.getByPlaceholderText('Search item name…')).toBeInTheDocument();
   });
 
-  it('keeps the search box usable while the snapshot downloads, and shows the download', async () => {
+  it('keeps the search box usable while the index loads, and says it is loading', async () => {
     const offers = deferred<ChunkedSnapshotRead<PublicContractOfferRow>>();
     loadPublicContractOffers.mockReturnValue(offers.promise);
-    useChunkProgressStore.getState().set(OFFERS_CACHE_KEY, { done: 40, total: 124 });
     renderWithRouter(['/']);
 
-    expect(await screen.findByRole('progressbar')).toHaveAttribute('aria-valuenow', '40');
-    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuemax', '124');
-    expect(screen.getByText('Downloading offers… 40 of 124')).toBeInTheDocument();
+    expect(await screen.findByRole('progressbar')).not.toHaveAttribute('aria-valuenow');
+    expect(screen.getByText('Downloading offers…')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Search item name…')).toBeEnabled();
 
     offers.settle(cachedSnapshot([TRIT_FORGE]));
@@ -2074,12 +2051,12 @@ describe('ContractSearchPanel — search first (issue #2921)', () => {
     expect(screen.getByText('Search to see contract offers')).toBeInTheDocument();
   });
 
-  describe('with the index published, before the full snapshot lands', () => {
+  describe('with the R2 index published', () => {
     const INDEX = {
       lastSyncedAt: 1,
       types: new Map([
-        [34, { typeId: 34, count: 2, cheapest: 500_000, firstChunk: 0, lastChunk: 0 }],
-        [35, { typeId: 35, count: 1, cheapest: null, firstChunk: 1, lastChunk: 1 }],
+        [34, { typeId: 34, count: 2, cheapest: 500_000 }],
+        [35, { typeId: 35, count: 1, cheapest: null }],
       ]),
       regionIds: [10000002, 10000043],
     };
@@ -2109,12 +2086,13 @@ describe('ContractSearchPanel — search first (issue #2921)', () => {
       renderWithRouter(['/?items.type=34&items.q=Tritanium']);
 
       expect(await bodyRows()).toHaveLength(2);
-      expect(loadOffersForTypes).toHaveBeenCalledWith(INDEX, new Set([34]), CHAR_ID);
+      expect(loadOffersForTypes).toHaveBeenCalledWith(INDEX, new Set([34]));
     });
 
-    it('waits for the full snapshot when the early read cannot answer', async () => {
-      const offers = deferred<ChunkedSnapshotRead<PublicContractOfferRow>>();
-      loadPublicContractOffers.mockReturnValue(offers.promise);
+    it('stops waiting when the type read fails, since no full snapshot is coming (issue #4270)', async () => {
+      loadPublicContractOffers.mockReturnValue(
+        deferred<ChunkedSnapshotRead<PublicContractOfferRow>>().promise
+      );
       loadOfferIndex.mockResolvedValue(INDEX);
       loadOffersForTypes.mockResolvedValue(null);
       renderWithRouter(['/?items.type=34&items.q=Tritanium']);
@@ -2122,9 +2100,11 @@ describe('ContractSearchPanel — search first (issue #2921)', () => {
       expect(
         await screen.findByText('Loading public contracts, this may take a moment.')
       ).toBeInTheDocument();
-
-      offers.settle(cachedSnapshot([TRIT_FORGE, TRIT_DOMAIN, PYERITE_AUCTION]));
-      expect(await bodyRows()).toHaveLength(2);
+      await waitFor(() =>
+        expect(
+          screen.queryByText('Loading public contracts, this may take a moment.')
+        ).not.toBeInTheDocument()
+      );
     });
 
     it('does not call a typed query unmatched while the item names are still unknown', async () => {
@@ -2142,16 +2122,16 @@ describe('ContractSearchPanel — search first (issue #2921)', () => {
       expect(await bodyRows()).toHaveLength(2);
     });
 
-    it('waits for the full snapshot on a search that names no item', async () => {
-      const offers = deferred<ChunkedSnapshotRead<PublicContractOfferRow>>();
-      loadPublicContractOffers.mockReturnValue(offers.promise);
+    it('reads every listed type on a search that names no item', async () => {
+      loadPublicContractOffers.mockReturnValue(
+        deferred<ChunkedSnapshotRead<PublicContractOfferRow>>().promise
+      );
       loadOfferIndex.mockResolvedValue(INDEX);
+      loadOffersForTypes.mockResolvedValue([TRIT_FORGE]);
       renderWithRouter(['/?items.maxPrice=1000000000']);
 
-      expect(
-        await screen.findByText('Loading public contracts, this may take a moment.')
-      ).toBeInTheDocument();
-      expect(loadOffersForTypes).not.toHaveBeenCalled();
+      expect(await bodyRows()).toHaveLength(1);
+      expect(loadOffersForTypes).toHaveBeenCalledWith(INDEX, new Set([34, 35]));
     });
   });
 
