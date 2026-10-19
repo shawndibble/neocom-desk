@@ -31,9 +31,9 @@ import { OpenInEveButton } from '@/features/openInEve/OpenInEveButton';
 import { tabDomId } from '@/components/ui/tabPanel';
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { useRetryFocus } from '@/lib/useRetryFocus';
+import { usePageLeave } from '@/lib/usePageLeave';
 import { guarded } from '@/app/routeChunks';
 import { useTranslation } from 'react-i18next';
-import { useLocation } from 'react-router-dom';
 import {
   Button,
   CharacterAvatar,
@@ -84,8 +84,6 @@ export function PublicInfoModal() {
   const request = usePublicInfoModalStore((state) => state.request);
   const close = usePublicInfoModalStore((state) => state.close);
   const clear = usePublicInfoModalStore((state) => state.clear);
-  const { pathname } = useLocation();
-  const shownPathname = useRef(pathname);
 
   const [activeTab, setActiveTab] = useState<PublicInfoKind | 'employment'>('character');
   const focusAfterCommit = useFocusAfterCommit();
@@ -117,11 +115,9 @@ export function PublicInfoModal() {
 
   // Runs after render, so a caller must not navigate and open in one handler — the
   // open would be closed straight away. None does: every opener stays on its page.
-  useEffect(() => {
-    if (shownPathname.current === pathname) return;
-    shownPathname.current = pathname;
-    clear();
-  }, [pathname, clear]);
+  // A redirect is not a page change (`usePageLeave`): `EntityInfoRoute` keeps
+  // `info` through it, so the modal stays.
+  usePageLeave(clear);
 
   /** The request whose tab was last chosen, so a retry re-runs the lookups without jumping tabs. */
   const tabChosenFor = useRef<typeof request>(null);

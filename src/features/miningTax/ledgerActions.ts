@@ -313,7 +313,13 @@ export function deletePayee(
     async () => {
       let moved: MiningTaxAssignmentRecord[] = [];
       if (moveToPayeeId !== undefined) {
-        const own = await db.miningTaxAssignments.filter((a) => a.payeeId === payee.id).toArray();
+        // Walks the `characterId` index per character (keys only to find them), not every record.
+        const characterIds = await db.miningTaxAssignments.orderBy('characterId').uniqueKeys();
+        const own = await db.miningTaxAssignments
+          .where('characterId')
+          .anyOf(characterIds)
+          .filter((a) => a.payeeId === payee.id)
+          .toArray();
         moved = assignmentsMovedWithPayee(own, payee.id);
         await moveAssignmentsToPayee(moved, moveToPayeeId);
       }

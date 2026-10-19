@@ -12,6 +12,8 @@
  * Pure: the caller need not pre-filter — other types and corp trades are
  * ignored here.
  */
+import { parseInstant } from '../esiInstant';
+
 export interface WalletTrade {
   transactionId: number;
   /** ISO timestamp. */
@@ -66,7 +68,12 @@ export function walletCostBasis(input: WalletCostBasisInput): WalletCostBasisRes
 
   const trades = input.transactions
     .filter((t) => t.isPersonal && t.typeId === typeId && t.quantity > 0)
-    .sort((a, b) => Date.parse(a.date) - Date.parse(b.date) || a.transactionId - b.transactionId);
+    .flatMap((t) => {
+      const at = parseInstant(t.date);
+      return at === null ? [] : [{ t, at }];
+    })
+    .sort((a, b) => a.at - b.at || a.t.transactionId - b.t.transactionId)
+    .map(({ t }) => t);
 
   const lots: Lot[] = [];
   let head = 0;

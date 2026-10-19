@@ -15,7 +15,7 @@
  * changes nothing. "Use my clone" drops the set again.
  */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -39,8 +39,12 @@ import type { Fitting, FittingImplantSet, PilotProfile } from '@/engine/fittings
 import { loadItemNameMap } from '@/features/skills/typeCatalog';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { ItemDetailModal } from '@/features/market/ItemDetailModal';
-import { ImplantFinder } from './ImplantFinder';
 import { loadImplantCatalog } from './useImplantFinder';
+import { guarded } from '@/app/routeChunks';
+
+const ImplantFinder = lazy(() =>
+  guarded(() => import('./ImplantFinder')).then((m) => ({ default: m.ImplantFinder }))
+);
 
 interface ImplantSetPickerProps {
   open: boolean;
@@ -362,14 +366,16 @@ export function ImplantSetPicker({
         />
         <TabPanel tabsId={tabsId} tabId={tab}>
           {tab === 'find' ? (
-            <ImplantFinder
-              open={open}
-              fitting={plannedFitting}
-              profile={finder.profile}
-              basis={finder.basis}
-              implantSet={set}
-              onChange={onChange}
-            />
+            <Suspense fallback={null}>
+              <ImplantFinder
+                open={open}
+                fitting={plannedFitting}
+                profile={finder.profile}
+                basis={finder.basis}
+                implantSet={set}
+                onChange={onChange}
+              />
+            </Suspense>
           ) : (
             setEditor
           )}

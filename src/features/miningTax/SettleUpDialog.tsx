@@ -23,6 +23,7 @@ import { formatLocalDate } from '@/lib/localDate';
 import { unmaskNumber } from '@/lib/numberMask';
 import { buildSettleUpReason, formatDateRange } from './groupRows';
 import { settle, type PaymentInput } from './ledgerActions';
+import { systemLabel } from './names';
 import { PayeeOpenInEveButton } from './PayeeOpenInEveButton';
 import { allocateOldestFirst } from './settleAllocation';
 import { useLedgerAction } from './useLedgerAction';
@@ -128,8 +129,7 @@ export function SettleUpDialog({
   }));
 
   const sortedDates = included.map((r) => r.assignment.date).sort();
-  const systemName = (solarSystemId: number) =>
-    systemNames.get(solarSystemId) ?? `#${String(solarSystemId)}`;
+  const systemName = (solarSystemId: number) => systemLabel(systemNames, solarSystemId);
   const systems = [...new Set(included.map((r) => systemName(r.assignment.solarSystemId)))];
   const reason = buildSettleUpReason(t('miningTax.settleUpReasonPrefix'), systems, sortedDates);
 

@@ -6,9 +6,10 @@ import { selectedRowClassName, tappableRowClassName } from '@/components/ui/cont
 import type { PayeeRecord } from '@/db';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
-import { formatLocalDate } from '@/lib/localDate';
 import { formatDateRange } from './groupRows';
 import { settle } from './ledgerActions';
+import { paidOnFromIso } from './madePayments';
+import { systemLabel } from './names';
 import { rememberPayeeEntity } from './payees';
 import type { LinkSuggestion } from './paymentLinks';
 import { useLedgerAction } from './useLedgerAction';
@@ -22,17 +23,6 @@ interface LinkPaymentDialogProps {
   systemNames: ReadonlyMap<number, string>;
   showCharacter: boolean;
   onLinked: () => void;
-}
-
-/**
- * The payment's own date as a local calendar date, falling back to today.
- * A contract carries `date_completed ?? date_issued` straight from ESI, so an
- * unparseable value would otherwise reach `formatLocalDate` as an Invalid Date
- * and write nonsense into a synced record.
- */
-function paidOnFor(isoDate: string): string {
-  const parsed = new Date(isoDate);
-  return formatLocalDate(Number.isNaN(parsed.getTime()) ? new Date() : parsed);
 }
 
 /**
@@ -92,8 +82,7 @@ export function LinkPaymentDialog({
     });
   }
 
-  const systemName = (solarSystemId: number) =>
-    systemNames.get(solarSystemId) ?? `#${String(solarSystemId)}`;
+  const systemName = (solarSystemId: number) => systemLabel(systemNames, solarSystemId);
 
   /** What goes on the record: the ISK that actually moved, or the pilot's figure for ore handed over. */
   const recordedAmount =
@@ -116,7 +105,7 @@ export function LinkPaymentDialog({
       settle(
         included.map((m) => m.assignment),
         {
-          paidOn: paidOnFor(payment.date),
+          paidOn: paidOnFromIso(payment.date),
           method: payment.method,
           amount: Math.round(recordedAmount),
           ...(payment.kind === 'journal'

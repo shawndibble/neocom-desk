@@ -10,6 +10,7 @@
  * colour alone.
  */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { formatCount } from '@/lib/formatCount';
 import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, FilterChip, IskAmount, Panel, SegmentedControl, TypeIcon } from '@/components/ui';
@@ -362,7 +363,7 @@ function RecipeCard({
         </div>
         <div className="text-[0.6875rem] text-text-dim">
           {t('piPlan.find.perDayVolume', {
-            m3: Math.round(recipe.m3PerDay * DAYS_PER_WEEK).toLocaleString('en'),
+            m3: formatCount(recipe.m3PerDay * DAYS_PER_WEEK),
           })}
         </div>
       </div>

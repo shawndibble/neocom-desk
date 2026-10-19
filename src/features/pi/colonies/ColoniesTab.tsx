@@ -1,6 +1,6 @@
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { cx } from '@/lib/cx';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Trans, useTranslation } from 'react-i18next';
 import {
@@ -227,20 +227,37 @@ export function ColoniesTab({
   const [expandedKeys, setExpandedKeys] = useState<ReadonlySet<string>>(() => new Set());
   const linkedKey = linkedColonyId !== null ? `${characterId}:${linkedColonyId}` : null;
   const isExpanded = (key: string) => expandedKeys.has(key) || key === linkedKey;
-  const setOpen = (key: string, open: boolean) =>
-    setExpandedKeys((current) => {
-      const next = new Set(current);
-      if (open) next.add(key);
-      else next.delete(key);
-      return next;
-    });
-  const toggle = (key: string) => {
-    const open = isExpanded(key);
-    // A `?colony=` link is a way in, not a lock: closing it drops the param.
-    if (key === linkedKey && open) onClearLinkedColony();
-    setOpen(key, !open);
-  };
-  const expand = (key: string) => setOpen(key, true);
+  const setOpen = useCallback(
+    (key: string, open: boolean) =>
+      setExpandedKeys((current) => {
+        const next = new Set(current);
+        if (open) next.add(key);
+        else next.delete(key);
+        return next;
+      }),
+    []
+  );
+  // Read through a ref so `toggle` stays one stable function: a memoised row
+  // would otherwise re-render on every open/close anywhere in the list.
+  const latest = useRef({ isExpanded, linkedKey, onClearLinkedColony });
+  useEffect(() => {
+    latest.current = { isExpanded, linkedKey, onClearLinkedColony };
+  });
+  const toggle = useCallback(
+    (key: string) => {
+      const {
+        isExpanded: expandedNow,
+        linkedKey: linked,
+        onClearLinkedColony: clear,
+      } = latest.current;
+      const open = expandedNow(key);
+      // A `?colony=` link is a way in, not a lock: closing it drops the param.
+      if (key === linked && open) clear();
+      setOpen(key, !open);
+    },
+    [setOpen]
+  );
+  const expand = useCallback((key: string) => setOpen(key, true), [setOpen]);
 
   // Scrolled to and focused once per link, not on every refresh of the data.
   const focusedLink = useRef<string | null>(null);
@@ -468,6 +485,19 @@ export function ColoniesTab({
     });
   }, [roster, pi, planAdvice.snapshot, altAdvice, nowMs, expiringWindowMs, haulHours]);
 
+  // Stable per group, so a memoised alt row skips re-rendering with its siblings.
+  const switchTargets = useMemo(
+    () =>
+      new Map(
+        altGroups.map((g) => [g.characterId, { name: g.characterName, characterId: g.characterId }])
+      ),
+    [altGroups]
+  );
+  const switchCharacter = useCallback(
+    (id: number) => void setActiveCharacter(id),
+    [setActiveCharacter]
+  );
+
   const otherCharacterCount =
     altGroups.length + roster.skipped.length + roster.notLoaded.length + roster.noColonies.length;
   const hasOtherCharacters = otherCharacterCount > 0;
@@ -593,8 +623,8 @@ export function ColoniesTab({
                       productNames={productNames}
                       schematicNames={schematicNames}
                       expanded={isExpanded(row.key)}
-                      onToggle={() => toggle(row.key)}
-                      onExpand={() => expand(row.key)}
+                      onToggle={toggle}
+                      onExpand={expand}
                       primary={index === 0}
                       own
                       haulLabel={haulLabel}
@@ -644,14 +674,12 @@ export function ColoniesTab({
                         productNames={productNames}
                         schematicNames={schematicNames}
                         expanded={isExpanded(row.key)}
-                        onToggle={() => toggle(row.key)}
-                        onExpand={() => expand(row.key)}
+                        onToggle={toggle}
+                        onExpand={expand}
                         primary={false}
                         own={false}
-                        switchTo={{
-                          name: group.characterName,
-                          onSwitch: () => void setActiveCharacter(group.characterId),
-                        }}
+                        switchTo={switchTargets.get(group.characterId)}
+                        onSwitch={switchCharacter}
                         haulLabel={haulLabel}
                       />
                     ))}

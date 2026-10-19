@@ -27,6 +27,11 @@ interface OwedBalancesProps {
   onFilterPayee: (payeeId: string) => void;
   onSettleUp: (balance: PayeeBalance) => void;
   onLinkPayment: (balance: PayeeBalance) => void;
+  /**
+   * A Corp Tax Book's balance credits itself from the corp's wallet journal, so there is no
+   * payment of the member's own to link to it (#4065).
+   */
+  hideLinkPayment?: (balance: PayeeBalance) => boolean;
   onAssignNext: () => void;
   onReviewPayments: () => void;
 }
@@ -48,6 +53,7 @@ export function OwedBalances({
   onFilterPayee,
   onSettleUp,
   onLinkPayment,
+  hideLinkPayment,
   onAssignNext,
   onReviewPayments,
 }: OwedBalancesProps) {
@@ -196,9 +202,11 @@ export function OwedBalances({
                 >
                   {t('miningTax.settleUpAction')}
                 </Button>
-                <Button onClick={() => onLinkPayment(balance)}>
-                  {t('miningTax.owed.linkPayment')}
-                </Button>
+                {!hideLinkPayment?.(balance) && (
+                  <Button onClick={() => onLinkPayment(balance)}>
+                    {t('miningTax.owed.linkPayment')}
+                  </Button>
+                )}
               </div>
             );
             return (

@@ -10,6 +10,8 @@
  * Show info.
  */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { formatCount } from '@/lib/formatCount';
+import { formatList } from '@/lib/listFormat';
 import { OpenInEveButton } from '@/features/openInEve/OpenInEveButton';
 import { interactiveClassName, focusRingClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
@@ -198,7 +200,7 @@ export function ProductDetail(props: ProductDetailProps) {
       {view.money.kind === 'one-planet' && (
         <p className="mt-1 text-xs text-text-dim">
           {t('piMap.detail.haul', {
-            m3: Math.round(view.money.m3PerWeek).toLocaleString('en'),
+            m3: formatCount(view.money.m3PerWeek),
           })}
           {view.money.ccLevel !== null &&
             ` ${t('piMap.detail.ccAssumed', { level: view.money.ccLevel })}`}
@@ -372,8 +374,6 @@ export function ProductDetail(props: ProductDetailProps) {
   );
 }
 
-const listFormat = new Intl.ListFormat('en', { style: 'long', type: 'conjunction' });
-
 export interface AddPlanetDetailProps {
   graph: MapGraph;
   /** The planet types being tried, together, sorted. */
@@ -420,7 +420,7 @@ export function AddPlanetDetail(props: AddPlanetDetailProps) {
           <div className="text-sm font-semibold">
             {types.length === 1
               ? t('piMap.add.title', { aType: withArticle(typeNames[0]) })
-              : t('piMap.add.titleMany', { types: listFormat.format(typeNames) })}
+              : t('piMap.add.titleMany', { types: formatList(typeNames) })}
           </div>
           {props.unlockedIds.length > 0 && (
             <p className="text-xs text-text-dim">

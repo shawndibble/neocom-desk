@@ -156,7 +156,7 @@ describe('PopularFitsPanel', () => {
   });
 
   it('says so, without blocking anything, when zKillboard fails', async () => {
-    renderPanel({ ok: false });
+    renderPanel({ ok: false, reason: 'http' });
     expect((await screen.findByRole('status')).textContent).toMatch(/Couldn't load popular fits/);
   });
 
@@ -523,7 +523,9 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
     });
 
     it('badges nothing, and warns of nothing, when zKillboard is unreachable', async () => {
-      const unreachable = vi.fn(() => Promise.resolve<PopularFitsResult>({ ok: false }));
+      const unreachable = vi.fn(() =>
+        Promise.resolve<PopularFitsResult>({ ok: false, reason: 'http' })
+      );
       openWorkbench(
         { ok: true, fits: [wbFit('a', { eft: '[Vexor, Fit a]\nHeavy Neutron Blaster II' })] },
         vi.fn(),

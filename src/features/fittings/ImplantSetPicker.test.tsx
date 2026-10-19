@@ -137,7 +137,7 @@ describe('ImplantSetPicker — planning from the clone', () => {
         onUseClone={vi.fn()}
       />
     );
-    expect(screen.getByText('Plan: 10228,13283')).toBeInTheDocument();
+    expect(await screen.findByText('Plan: 10228,13283')).toBeInTheDocument();
     expect(screen.getByText('Measured on: 10228,13283')).toBeInTheDocument();
     // Opening it alone saves nothing, and on the clone there is nothing to go back from.
     expect(onChange).not.toHaveBeenCalled();

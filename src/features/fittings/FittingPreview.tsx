@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { Button, Panel, Tooltip } from '@/components/ui';
-import { encodeFittingShare } from '@/engine/fitting/fittingShare';
+import { encodeFittingShare } from '@/engine/fittings/fittingShare';
 import { esiFittingToFitting } from '@/engine/fittings/esiFittingMapper';
 import { fittingToShareInput } from '@/engine/fittings/shareMapper';
 import type { Fitting } from '@/engine/fittings/types';

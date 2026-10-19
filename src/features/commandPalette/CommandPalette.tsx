@@ -12,7 +12,7 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { beginAddCharacterLogin } from '@/app/loginFlow';
 import { listNavDestinations, NAV_LOCK_PATHS } from '@/app/navDestinations';
 import { useLockedRoutes } from '@/app/useGrantedScopes';
-import { useCorpAccess } from '@/features/corp/useCorpAccess';
+import { useCorpViewCapabilities } from '@/features/corp/useCorpViewCapabilities';
 import { useHiddenTabPaths } from '@/app/useHiddenTabPaths';
 import { useCorpNavVisible } from '@/features/corp/useCorpNavVisible';
 import { openPublicInfoModal } from '@/stores/publicInfoModal';
@@ -56,7 +56,7 @@ function useShippedProviders(onShowItem: (item: ShownMarketItem) => void): Palet
   const locked = useLockedRoutes(NAV_LOCK_PATHS);
   const corpVisible = useCorpNavVisible();
   const hiddenTabPaths = useHiddenTabPaths();
-  const { capabilities } = useCorpAccess();
+  const capabilities = useCorpViewCapabilities();
   const characters = useLiveQuery(() => db.characters.toArray(), [], NO_CHARACTERS);
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const setActiveCharacter = useActiveCharacter((state) => state.setActiveCharacter);

@@ -32,3 +32,8 @@ export async function resolveRowNames(
   }
   return { systemNames, systemSecurity, typeNames };
 }
+
+/** A system's resolved name, or `#id` when it failed to resolve. */
+export function systemLabel(systemNames: ReadonlyMap<number, string>, id: number): string {
+  return systemNames.get(id) ?? `#${String(id)}`;
+}

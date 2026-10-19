@@ -213,7 +213,10 @@ export async function loadPilotList(
     .flatMap((row) => (row.characterId === null ? [] : [row.characterId]));
   await mapWithConcurrencyLimit(toLookUp, ZKILL_CONCURRENCY, async (characterId) => {
     if (signal?.aborted) return;
-    const result = await fetchPilotKillHistory(characterId).catch(() => ({ ok: false as const }));
+    const result = await fetchPilotKillHistory(characterId).catch(() => ({
+      ok: false as const,
+      reason: 'offline' as const,
+    }));
     const now = Date.now();
     const wantsRatios = result.ok && needsDangerRatio(result.kills, now);
     const wantsLosses = result.ok && needsLossHistory(result.kills, now);
@@ -225,7 +228,10 @@ export async function loadPilotList(
     });
     // The same slot reads what the verdict still needs, so a pilot never doubles the fan-out.
     if (wantsRatios) {
-      const stats = await fetchPilotStats(characterId).catch(() => ({ kind: 'failed' as const }));
+      const stats = await fetchPilotStats(characterId).catch(() => ({
+        kind: 'failed' as const,
+        reason: 'offline' as const,
+      }));
       update(characterId, {
         extras: {
           kind: 'ready',
@@ -237,6 +243,7 @@ export async function loadPilotList(
     } else if (wantsLosses) {
       const killmails = await fetchPilotKillmails(characterId).catch(() => ({
         ok: false as const,
+        reason: 'offline' as const,
       }));
       update(characterId, {
         extras: {

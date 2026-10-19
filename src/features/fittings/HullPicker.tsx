@@ -5,14 +5,18 @@ import {
   selectedRowClassName,
 } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
-import { useMemo, useState } from 'react';
+import { lazy, Suspense, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, SearchInput, TypeIcon } from '@/components/ui';
 import { buildHullCatalogue, searchHulls, type HullEntry } from '@/engine/fittings/hullCatalogue';
 import type { LoadedFitting } from '@/engine/fittings/load';
 import { CatalogueLoadingNote } from './FittingDataNotices';
-import { PopularFitsPanel } from './PopularFitsPanel';
 import type { FittingCatalogue } from './useFittingCatalogue';
+import { guarded } from '@/app/routeChunks';
+
+const PopularFitsPanel = lazy(() =>
+  guarded(() => import('./PopularFitsPanel')).then((m) => ({ default: m.PopularFitsPanel }))
+);
 
 interface HullPickerProps {
   catalogue: FittingCatalogue | null;
@@ -122,11 +126,13 @@ export function HullPicker({ catalogue, onStart, onOpenPopular }: HullPickerProp
         </Button>
       </div>
       {selected && onOpenPopular && (
-        <PopularFitsPanel
-          shipTypeId={selected.typeId}
-          hullName={selected.name}
-          onOpen={onOpenPopular}
-        />
+        <Suspense fallback={null}>
+          <PopularFitsPanel
+            shipTypeId={selected.typeId}
+            hullName={selected.name}
+            onOpen={onOpenPopular}
+          />
+        </Suspense>
       )}
     </div>
   );

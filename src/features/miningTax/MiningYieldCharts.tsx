@@ -4,8 +4,6 @@
  * `market/PriceHistoryChart.tsx` — this must only ever be reached through a
  * dynamic `import()` from `OverviewTab.tsx`, never imported eagerly.
  */
-import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
-import { cx } from '@/lib/cx';
 import { scalePx } from '@/lib/fontScale';
 import { ChartTooltipShell } from '@/components/ui/ChartTooltipShell';
 import {
@@ -22,7 +20,7 @@ import {
   type TooltipContentProps,
 } from 'recharts';
 import type { PriceSource } from '@/engine/miningTax/priceBasis';
-import { useMemo } from 'react';
+import { useMemo, type ReactElement, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DataTable, Panel, type DataTableColumn } from '@/components/ui';
 import {
@@ -81,25 +79,69 @@ interface MetricComparisonBar extends ValueRanked {
   folded?: ValueRanked[];
 }
 
+type MetricKind = 'volume' | 'count';
+
+/** `formatCompactNumber`, plus an "m³" suffix for the volume metric — count has no unit. */
+function formatMetricCompact(metric: MetricKind, value: number): string {
+  return metric === 'volume' ? `${formatCompactNumber(value)} m³` : formatCompactNumber(value);
+}
+
+/** `toLocaleString`, plus an "m³" suffix for the volume metric — the sr-only tables' full-precision figure. */
+function formatMetricFull(metric: MetricKind, value: number): string {
+  return metric === 'volume' ? `${value.toLocaleString()} m³` : value.toLocaleString();
+}
+
+/** The rate chart's per-metric knobs: where a point's figure lives, and how each surface prints it. */
+interface RateSpec {
+  valueOf: (point: never) => number;
+  /** The figure's line in the tooltip. */
+  tooltip: (value: number) => string;
+  valueLabelKey: string;
+  basisKey: string;
+}
+
+const ISK_RATE_SPEC: RateSpec = {
+  valueOf: (point: DailyRatePoint) => point.iskValue,
+  tooltip: (value) => `${formatIsk(value, 0)} ISK`,
+  valueLabelKey: 'miningTax.overview.iskDay',
+  basisKey: 'miningTax.overview.dayChartBasis',
+};
+
+function metricRateSpec(metric: MetricKind): RateSpec {
+  return {
+    valueOf: (point: DailyMetricPoint) => point.value,
+    tooltip: (value) => formatMetricCompact(metric, value),
+    valueLabelKey:
+      metric === 'volume' ? 'miningTax.overview.m3PerDay' : 'miningTax.overview.countPerDay',
+    basisKey:
+      metric === 'volume'
+        ? 'miningTax.overview.dayChartBasisVolume'
+        : 'miningTax.overview.dayChartBasisCount',
+  };
+}
+
+/** The daily-rate tooltip for every metric: the day, its figure, the basis, and (ISK only) the day's price source. */
 export function RateTooltip({
   active,
   payload,
   label,
-}: TooltipContentProps): React.ReactElement | null {
+  metric = 'isk',
+}: TooltipContentProps & { metric?: ChartMetric }): ReactElement | null {
   const { t } = useTranslation();
   if (!active || !payload || payload.length === 0) return null;
-  const point = payload[0]?.payload as DailyRatePoint | undefined;
+  const point = payload[0]?.payload as (DailyRatePoint & DailyMetricPoint) | undefined;
   if (!point) return null;
+  const spec = metric === 'isk' ? ISK_RATE_SPEC : metricRateSpec(metric);
   return (
     <ChartTooltipShell>
       <p className="font-semibold text-text">
         {typeof label === 'string' ? formatDateTick(label) : ''}
       </p>
       <p>
-        {t('miningTax.overview.iskDay')}: {formatIsk(point.iskValue, 0)} ISK
+        {t(spec.valueLabelKey)}: {spec.tooltip(spec.valueOf(point as never))}
       </p>
-      <p className="text-text-dim">{t('miningTax.overview.dayChartBasis')}</p>
-      {point.source && (
+      <p className="text-text-dim">{t(spec.basisKey)}</p>
+      {metric === 'isk' && point.source && (
         <p>
           {t('miningTax.overview.sourceColumn')}:{' '}
           {t(`miningTax.overview.priceSource.${point.source}`)}
@@ -109,105 +151,78 @@ export function RateTooltip({
   );
 }
 
+/** One series of the ore-type chart, as the tooltip reads it. */
+interface CompareRow {
+  typeId: number;
+  typeName: string;
+  rawValue: number;
+  refineValue: number;
+  value: number;
+  folded?: CompareRow[];
+}
+
+interface CompareSeries {
+  labelKey: string;
+  valueOf: (type: CompareRow) => number;
+  full: (value: number) => string;
+  compact: (value: number) => string;
+}
+
+function compareSeries(metric: ChartMetric, showRefining: boolean): CompareSeries[] {
+  if (metric === 'volume' || metric === 'count') {
+    return [
+      {
+        labelKey:
+          metric === 'volume' ? 'miningTax.overview.volumeTotal' : 'miningTax.overview.countTotal',
+        valueOf: (type) => type.value,
+        full: (value) => formatMetricCompact(metric, value),
+        compact: (value) => formatMetricCompact(metric, value),
+      },
+    ];
+  }
+  const isk = {
+    full: (value: number) => `${formatIsk(value, 0)} ISK`,
+    compact: formatIskCompact,
+  };
+  return [
+    { labelKey: 'miningTax.overview.rawSellValue', valueOf: (type) => type.rawValue, ...isk },
+    ...(showRefining
+      ? [
+          {
+            labelKey: 'miningTax.overview.refineValue',
+            valueOf: (type: CompareRow) => type.refineValue,
+            ...isk,
+          },
+        ]
+      : []),
+  ];
+}
+
+/** The ore-type tooltip for every metric: the type, one line per series, and what an "Other" bar folds. */
 function CompareTooltip({
   active,
   payload,
+  metric,
   showRefining,
-}: TooltipContentProps & { showRefining: boolean }): React.ReactElement | null {
+}: TooltipContentProps & { metric: ChartMetric; showRefining: boolean }): ReactElement | null {
   const { t } = useTranslation();
   if (!active || !payload || payload.length === 0) return null;
-  const point = payload[0]?.payload as ComparisonBar | undefined;
+  const point = payload[0]?.payload as CompareRow | undefined;
   if (!point) return null;
+  const series = compareSeries(metric, showRefining);
   return (
     <ChartTooltipShell>
       <p className="font-semibold text-text">{point.typeName}</p>
-      <p>
-        {t('miningTax.overview.rawSellValue')}: {formatIsk(point.rawValue, 0)} ISK
-      </p>
-      {showRefining && (
-        <p>
-          {t('miningTax.overview.refineValue')}: {formatIsk(point.refineValue, 0)} ISK
+      {series.map((s) => (
+        <p key={s.labelKey}>
+          {t(s.labelKey)}: {s.full(s.valueOf(point))}
         </p>
-      )}
+      ))}
       {point.folded && (
         <ul className="mt-1 border-t border-line pt-1 text-text-dim">
           {point.folded.map((type) => (
             <li key={type.typeId}>
-              {type.typeName}: {formatIskCompact(type.rawValue)}
-              {showRefining && ` / ${formatIskCompact(type.refineValue)}`}
-            </li>
-          ))}
-        </ul>
-      )}
-    </ChartTooltipShell>
-  );
-}
-
-/** `formatCompactNumber`, plus an "m³" suffix for the volume metric — count has no unit. */
-function formatMetricCompact(metric: 'volume' | 'count', value: number): string {
-  return metric === 'volume' ? `${formatCompactNumber(value)} m³` : formatCompactNumber(value);
-}
-
-/** `toLocaleString`, plus an "m³" suffix for the volume metric — the sr-only tables' full-precision figure. */
-function formatMetricFull(metric: 'volume' | 'count', value: number): string {
-  return metric === 'volume' ? `${value.toLocaleString()} m³` : value.toLocaleString();
-}
-
-function MetricRateTooltip({
-  active,
-  payload,
-  label,
-  metric,
-}: TooltipContentProps & { metric: 'volume' | 'count' }): React.ReactElement | null {
-  const { t } = useTranslation();
-  if (!active || !payload || payload.length === 0) return null;
-  const point = payload[0]?.payload as DailyMetricPoint | undefined;
-  if (!point) return null;
-  const valueLabel = t(
-    metric === 'volume' ? 'miningTax.overview.m3PerDay' : 'miningTax.overview.countPerDay'
-  );
-  return (
-    <ChartTooltipShell>
-      <p className="font-semibold text-text">
-        {typeof label === 'string' ? formatDateTick(label) : ''}
-      </p>
-      <p>
-        {valueLabel}: {formatMetricCompact(metric, point.value)}
-      </p>
-      <p className="text-text-dim">
-        {t(
-          metric === 'volume'
-            ? 'miningTax.overview.dayChartBasisVolume'
-            : 'miningTax.overview.dayChartBasisCount'
-        )}
-      </p>
-    </ChartTooltipShell>
-  );
-}
-
-function MetricCompareTooltip({
-  active,
-  payload,
-  metric,
-}: TooltipContentProps & { metric: 'volume' | 'count' }): React.ReactElement | null {
-  const { t } = useTranslation();
-  if (!active || !payload || payload.length === 0) return null;
-  const point = payload[0]?.payload as MetricComparisonBar | undefined;
-  if (!point) return null;
-  const valueLabel = t(
-    metric === 'volume' ? 'miningTax.overview.volumeTotal' : 'miningTax.overview.countTotal'
-  );
-  return (
-    <ChartTooltipShell>
-      <p className="font-semibold text-text">{point.typeName}</p>
-      <p>
-        {valueLabel}: {formatMetricCompact(metric, point.value)}
-      </p>
-      {point.folded && (
-        <ul className="mt-1 border-t border-line pt-1 text-text-dim">
-          {point.folded.map((type) => (
-            <li key={type.typeId}>
-              {type.typeName}: {formatMetricCompact(metric, type.value)}
+              {type.typeName}: {series.map((s) => s.compact(s.valueOf(type))).join(' / ')}
             </li>
           ))}
         </ul>
@@ -221,23 +236,200 @@ function stripCompressedPrefix(name: string, compressed: boolean): string {
   return compressed ? name.replace(/^Compressed /, '') : name;
 }
 
-function IskCharts({
+const TICK_STYLE = { fontSize: '0.6875rem', fill: 'var(--color-text-dim)' } as const;
+const PANEL_TITLE_CLASS =
+  'mb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
+
+interface RatePanelProps<P> {
+  title: string;
+  basis: string;
+  rows: P[];
+  rowKey: (row: P) => string;
+  columns: DataTableColumn<P>[];
+  /** Pixel width of the Y axis' tick column, before font scaling. */
+  axisWidth: number;
+  /** SVG axis text: IskAmount can't render inside the chart (documented exception). */
+  tickFormatter: (value: number) => string;
+  tooltip: (props: TooltipContentProps) => ReactElement;
+  /** The `<Bar>` (and its per-day `<Cell>`s). */
+  bars: ReactNode;
+  /** Under the screen-reader table, e.g. the ISK chart's price-source legend. */
+  footer?: ReactNode;
+}
+
+/** The daily-rate card: a bar per day over a screen-reader table of the same rows. */
+function RatePanel<P>({
+  title,
+  basis,
+  rows,
+  rowKey,
+  columns,
+  axisWidth,
+  tickFormatter,
+  tooltip,
+  bars,
+  footer,
+}: RatePanelProps<P>) {
+  return (
+    <Panel padded>
+      <p className={PANEL_TITLE_CLASS}>{title}</p>
+      <p className="mb-1 text-[0.6875rem] text-text-dim">{basis}</p>
+      <div role="img" aria-label={title} className="h-64 w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart
+            data={rows}
+            margin={{ top: 8, right: 8, left: COMPACT_ISK_Y_AXIS_MARGIN_LEFT, bottom: 0 }}
+          >
+            <CartesianGrid stroke="var(--color-line)" strokeDasharray="3 3" />
+            <XAxis
+              dataKey="date"
+              tickFormatter={formatDateTick}
+              stroke="var(--color-text-dim)"
+              tick={TICK_STYLE}
+            />
+            <YAxis
+              stroke="var(--color-text-dim)"
+              tick={TICK_STYLE}
+              width={scalePx(axisWidth)}
+              tickFormatter={tickFormatter}
+            />
+            <Tooltip content={tooltip} />
+            {bars}
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+      {/* A sibling of the `role="img"` box, never a child — see WalletBalanceChart. */}
+      {/* On a wrapper: a <table> ignores sr-only's clip and still stretches the page. */}
+      <div className="sr-only">
+        <DataTable columns={columns} responsive="table" rows={rows} rowKey={rowKey} label={title} />
+      </div>
+      {footer}
+    </Panel>
+  );
+}
+
+interface ComparePanelProps<B, R> {
+  title: string;
+  /** The drawn bars (top types plus an "Other" roll-up). */
+  bars: B[];
+  /** Every type, for the screen-reader table — the drawn bars fold the tail. */
+  rows: R[];
+  rowKey: (row: R) => number;
+  columns: DataTableColumn<R>[];
+  height: number;
+  marginRight: number;
+  /** SVG axis text: IskAmount can't render inside the chart (documented exception). */
+  tickFormatter: (value: number) => string;
+  tooltip: (props: TooltipContentProps) => ReactElement;
+  series: ReactNode;
+  legend?: boolean;
+  note?: string | null;
+}
+
+/** The ore-type card: horizontal bars, ore names read left of the bar instead of slanted under it. */
+function ComparePanel<B, R>({
+  title,
+  bars,
+  rows,
+  rowKey,
+  columns,
+  height,
+  marginRight,
+  tickFormatter,
+  tooltip,
+  series,
+  legend,
+  note,
+}: ComparePanelProps<B, R>) {
+  const compressed = useMiningTaxCompressedOre((state) => state.value);
+  return (
+    <Panel padded>
+      <p className={PANEL_TITLE_CLASS}>{title}</p>
+      <div role="img" aria-label={title} className="w-full" style={{ height }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart
+            data={bars}
+            layout="vertical"
+            margin={{ top: 8, right: marginRight, left: 0, bottom: 0 }}
+          >
+            <CartesianGrid stroke="var(--color-line)" strokeDasharray="3 3" />
+            <XAxis
+              type="number"
+              stroke="var(--color-text-dim)"
+              tick={TICK_STYLE}
+              tickFormatter={tickFormatter}
+            />
+            <YAxis
+              type="category"
+              dataKey="typeName"
+              stroke="var(--color-text-dim)"
+              tick={TICK_STYLE}
+              interval={0}
+              tickFormatter={(name: string) => stripCompressedPrefix(name, compressed)}
+              width={scalePx(120)}
+            />
+            <Tooltip content={tooltip} />
+            {legend && <Legend wrapperStyle={{ fontSize: '0.6875rem' }} />}
+            {series}
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+      {/* On a wrapper: a <table> ignores sr-only's clip and still stretches the page. */}
+      <div className="sr-only">
+        <DataTable columns={columns} responsive="table" rows={rows} rowKey={rowKey} label={title} />
+      </div>
+      {note && <p className="mt-1 text-[0.6875rem] text-text-dim">{note}</p>}
+    </Panel>
+  );
+}
+
+/**
+ * The two charts for every metric: ISK keeps its per-day price-source colours,
+ * its raw/refined pair and the show-refining switch; volume and count (issue
+ * #2160) are the single-series, raw-only shape — no refined series, no Legend,
+ * whatever the toggle says, since neither has a refined side.
+ */
+function MetricChartPair({
+  metric,
   dailyRate,
+  dailyVolume,
+  dailyCount,
   typeComparison,
-  showRefining,
-}: Pick<MiningYieldChartsProps, 'dailyRate' | 'typeComparison' | 'showRefining'>) {
+  typeVolumeComparison,
+  typeCountComparison,
+  showRefining: showRefiningSetting,
+}: MiningYieldChartsProps) {
   const { t } = useTranslation();
   const compressed = useMiningTaxCompressedOre((state) => state.value);
-  const compareChartTitle = t(
-    showRefining
-      ? 'miningTax.overview.compareChartTitle'
-      : 'miningTax.overview.compareChartTitleRawOnly'
+  const isIsk = metric === 'isk';
+  const showRefining = isIsk && showRefiningSetting;
+  const metricKind: MetricKind = metric === 'volume' ? 'volume' : 'count';
+
+  const rateTitle = t(
+    isIsk
+      ? 'miningTax.overview.dayChartTitle'
+      : metric === 'volume'
+        ? 'miningTax.overview.dayChartTitleVolume'
+        : 'miningTax.overview.dayChartTitleCount'
+  );
+  const compareTitle = t(
+    isIsk
+      ? showRefining
+        ? 'miningTax.overview.compareChartTitle'
+        : 'miningTax.overview.compareChartTitleRawOnly'
+      : metric === 'volume'
+        ? 'miningTax.overview.compareChartTitleVolume'
+        : 'miningTax.overview.compareChartTitleCount'
+  );
+  const rateSpec = isIsk ? ISK_RATE_SPEC : metricRateSpec(metricKind);
+  const totalLabel = t(
+    metric === 'volume' ? 'miningTax.overview.volumeTotal' : 'miningTax.overview.countTotal'
   );
 
   // Screen-reader tables, one per chart: `role="img"` hides the bars, and
   // the ore chart folds its tail into "Other", so the table carries every
   // type rather than the drawn bars.
-  const rateColumns = useMemo<DataTableColumn<DailyRatePoint>[]>(
+  const iskRateColumns = useMemo<DataTableColumn<DailyRatePoint>[]>(
     () => [
       {
         id: 'date',
@@ -258,7 +450,22 @@ function IskCharts({
     ],
     [t]
   );
-  const compareColumns = useMemo<DataTableColumn<TypeComparisonPoint>[]>(
+  const metricRateColumns = useMemo<DataTableColumn<DailyMetricPoint>[]>(
+    () => [
+      {
+        id: 'date',
+        header: t('miningTax.overview.dateColumn'),
+        render: (point) => formatDateTick(point.date),
+      },
+      {
+        id: 'value',
+        header: t(rateSpec.valueLabelKey),
+        render: (point) => formatMetricFull(metricKind, point.value),
+      },
+    ],
+    [t, rateSpec.valueLabelKey, metricKind]
+  );
+  const iskCompareColumns = useMemo<DataTableColumn<TypeComparisonPoint>[]>(
     () => [
       {
         id: 'type',
@@ -282,240 +489,7 @@ function IskCharts({
     ],
     [t, showRefining]
   );
-
-  // Past TOP_TYPE_LIMIT the rest fold into one "Other" bar, so the card
-  // stops growing with the number of types; the table below lists every one.
-  const { top, other } = topTypesWithOther(typeComparison, {
-    limit: TOP_TYPE_LIMIT,
-    by: showRefining ? 'both' : 'raw',
-  });
-  const compareBars: ComparisonBar[] = other
-    ? [
-        ...top,
-        {
-          typeId: -1,
-          typeName: t('miningTax.overview.otherTypes', { count: other.types.length }),
-          rawValue: other.rawValue,
-          refineValue: other.refineValue,
-          folded: other.types,
-        },
-      ]
-    : top;
-
-  // Horizontal bars: ore names read left of the bar instead of slanted under it.
-  // Same row height with refining on or off — the raw and refined bars split
-  // the row — so toggling refining only adds the legend's height.
-  const compareHeight = Math.max(256, compareBars.length * 24 + (showRefining ? 56 : 32));
-
-  // Two cards, same gap as the stat cards above them.
-  return (
-    <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-      <Panel padded>
-        <p className={cx(eyebrowClassName, 'mb-1')}>{t('miningTax.overview.dayChartTitle')}</p>
-        <p className="mb-1 text-[0.6875rem] text-text-dim">
-          {t('miningTax.overview.dayChartBasis')}
-        </p>
-        <div role="img" aria-label={t('miningTax.overview.dayChartTitle')} className="h-64 w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={dailyRate}
-              margin={{ top: 8, right: 8, left: COMPACT_ISK_Y_AXIS_MARGIN_LEFT, bottom: 0 }}
-            >
-              <CartesianGrid stroke="var(--color-line)" strokeDasharray="3 3" />
-              <XAxis
-                dataKey="date"
-                tickFormatter={formatDateTick}
-                stroke="var(--color-text-dim)"
-                tick={{ fontSize: '0.6875rem', fill: 'var(--color-text-dim)' }}
-              />
-              <YAxis
-                stroke="var(--color-text-dim)"
-                tick={{ fontSize: '0.6875rem', fill: 'var(--color-text-dim)' }}
-                width={scalePx(COMPACT_ISK_Y_AXIS_WIDTH)}
-                // SVG axis text: IskAmount can't render inside the chart (documented exception).
-                tickFormatter={(value: number) => formatIskCompact(value)}
-              />
-              <Tooltip content={(props) => <RateTooltip {...props} />} />
-              <Bar
-                isAnimationActive={false}
-                dataKey="iskValue"
-                name={t('miningTax.overview.iskDay')}
-              >
-                {dailyRate.map((point) => (
-                  <Cell key={point.date} fill={SOURCE_FILL[point.source ?? 'saved']} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-        {/* A sibling of the `role="img"` box, never a child — see WalletBalanceChart. */}
-        {/* On a wrapper: a <table> ignores sr-only's clip and still stretches the page. */}
-        <div className="sr-only">
-          <DataTable
-            columns={rateColumns}
-            responsive="table"
-            rows={dailyRate}
-            rowKey={(point) => point.date}
-            label={t('miningTax.overview.dayChartTitle')}
-          />
-        </div>
-        <ul className="mt-1 flex flex-wrap gap-x-3.5 text-[0.6875rem] text-text-dim">
-          {LEGEND_SOURCES.map((source) => (
-            <li key={source} className="flex items-center gap-1">
-              <span
-                aria-hidden="true"
-                className="size-2"
-                style={{ background: SOURCE_FILL[source] }}
-              />
-              {t(`miningTax.overview.priceSource.${source}`)}
-            </li>
-          ))}
-        </ul>
-      </Panel>
-
-      <Panel padded>
-        <p className={cx(eyebrowClassName, 'mb-1')}>{compareChartTitle}</p>
-        <div
-          role="img"
-          aria-label={compareChartTitle}
-          className="w-full"
-          style={{ height: compareHeight }}
-        >
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={compareBars}
-              layout="vertical"
-              margin={{ top: 8, right: showRefining ? 16 : 56, left: 0, bottom: 0 }}
-            >
-              <CartesianGrid stroke="var(--color-line)" strokeDasharray="3 3" />
-              <XAxis
-                type="number"
-                stroke="var(--color-text-dim)"
-                tick={{ fontSize: '0.6875rem', fill: 'var(--color-text-dim)' }}
-                // SVG axis text: IskAmount can't render inside the chart (documented exception).
-                tickFormatter={(value: number) => formatIskCompact(value)}
-              />
-              <YAxis
-                type="category"
-                dataKey="typeName"
-                stroke="var(--color-text-dim)"
-                tick={{ fontSize: '0.6875rem', fill: 'var(--color-text-dim)' }}
-                interval={0}
-                tickFormatter={(name: string) => stripCompressedPrefix(name, compressed)}
-                width={scalePx(120)}
-              />
-              <Tooltip
-                content={(props) => <CompareTooltip {...props} showRefining={showRefining} />}
-              />
-              {showRefining && <Legend wrapperStyle={{ fontSize: '0.6875rem' }} />}
-              <Bar
-                isAnimationActive={false}
-                dataKey="rawValue"
-                fill="var(--color-line-bright)"
-                name={t('miningTax.overview.rawSellValue')}
-              >
-                {!showRefining && (
-                  <LabelList
-                    dataKey="rawValue"
-                    position="right"
-                    // SVG label text: IskAmount can't render inside the chart (documented exception).
-                    formatter={(value: unknown) => formatIskCompact(Number(value))}
-                    style={{ fontSize: '0.6875rem', fill: 'var(--color-text-dim)' }}
-                  />
-                )}
-              </Bar>
-              {showRefining && (
-                <Bar
-                  isAnimationActive={false}
-                  dataKey="refineValue"
-                  fill="var(--color-accent)"
-                  name={t('miningTax.overview.refineValue')}
-                />
-              )}
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-        {/* On a wrapper: a <table> ignores sr-only's clip and still stretches the page. */}
-        <div className="sr-only">
-          <DataTable
-            columns={compareColumns}
-            responsive="table"
-            rows={typeComparison}
-            rowKey={(point) => point.typeId}
-            label={compareChartTitle}
-          />
-        </div>
-        {(!showRefining || compressed) && (
-          <p className="mt-1 text-[0.6875rem] text-text-dim">
-            {t(
-              showRefining
-                ? 'miningTax.overview.assumesCompressedNote'
-                : compressed
-                  ? 'miningTax.overview.refiningHiddenCompressedNote'
-                  : 'miningTax.overview.refiningHiddenNote'
-            )}
-          </p>
-        )}
-      </Panel>
-    </div>
-  );
-}
-
-/**
- * The volume/count render (issue #2160): a single-series rate chart and a
- * single-series ore-type chart, always in "raw only" shape — no refined
- * series, no Legend, regardless of the show-refining toggle, since neither
- * metric has a refined side.
- */
-function MetricCharts({
-  metric,
-  dailyPoints,
-  typeComparison,
-}: {
-  metric: 'volume' | 'count';
-  dailyPoints: DailyMetricPoint[];
-  typeComparison: ValueRanked[];
-}) {
-  const { t } = useTranslation();
-  const compressed = useMiningTaxCompressedOre((state) => state.value);
-  const rateChartTitle = t(
-    metric === 'volume'
-      ? 'miningTax.overview.dayChartTitleVolume'
-      : 'miningTax.overview.dayChartTitleCount'
-  );
-  const rateChartBasis = t(
-    metric === 'volume'
-      ? 'miningTax.overview.dayChartBasisVolume'
-      : 'miningTax.overview.dayChartBasisCount'
-  );
-  const compareChartTitle = t(
-    metric === 'volume'
-      ? 'miningTax.overview.compareChartTitleVolume'
-      : 'miningTax.overview.compareChartTitleCount'
-  );
-  const rateValueLabel = t(
-    metric === 'volume' ? 'miningTax.overview.m3PerDay' : 'miningTax.overview.countPerDay'
-  );
-  const totalValueLabel = t(
-    metric === 'volume' ? 'miningTax.overview.volumeTotal' : 'miningTax.overview.countTotal'
-  );
-
-  const rateColumns = useMemo<DataTableColumn<DailyMetricPoint>[]>(
-    () => [
-      {
-        id: 'date',
-        header: t('miningTax.overview.dateColumn'),
-        render: (point) => formatDateTick(point.date),
-      },
-      {
-        id: 'value',
-        header: rateValueLabel,
-        render: (point) => formatMetricFull(metric, point.value),
-      },
-    ],
-    [t, rateValueLabel, metric]
-  );
-  const compareColumns = useMemo<DataTableColumn<ValueRanked>[]>(
+  const metricCompareColumns = useMemo<DataTableColumn<ValueRanked>[]>(
     () => [
       {
         id: 'type',
@@ -524,159 +498,256 @@ function MetricCharts({
       },
       {
         id: 'value',
-        header: totalValueLabel,
-        render: (point) => formatMetricFull(metric, point.value),
+        header: totalLabel,
+        render: (point) => formatMetricFull(metricKind, point.value),
       },
     ],
-    [t, totalValueLabel, metric]
+    [t, totalLabel, metricKind]
   );
 
-  const { top, other } = topValuesWithOther(typeComparison, { limit: TOP_TYPE_LIMIT });
-  const compareBars: MetricComparisonBar[] = other
+  const tooltip = (props: TooltipContentProps) => (
+    <CompareTooltip {...props} metric={metric} showRefining={showRefining} />
+  );
+  const rateTooltip = (props: TooltipContentProps) => <RateTooltip {...props} metric={metric} />;
+  const otherLabel = (count: number) => t('miningTax.overview.otherTypes', { count });
+
+  return (
+    // Two cards, same gap as the stat cards above them.
+    <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+      {isIsk ? (
+        <RatePanel
+          title={rateTitle}
+          basis={t(rateSpec.basisKey)}
+          rows={dailyRate}
+          rowKey={(point) => point.date}
+          columns={iskRateColumns}
+          axisWidth={COMPACT_ISK_Y_AXIS_WIDTH}
+          tickFormatter={formatIskCompact}
+          tooltip={rateTooltip}
+          bars={
+            <Bar isAnimationActive={false} dataKey="iskValue" name={t(rateSpec.valueLabelKey)}>
+              {dailyRate.map((point) => (
+                <Cell key={point.date} fill={SOURCE_FILL[point.source ?? 'saved']} />
+              ))}
+            </Bar>
+          }
+          footer={
+            <ul className="mt-1 flex flex-wrap gap-x-3.5 text-[0.6875rem] text-text-dim">
+              {LEGEND_SOURCES.map((source) => (
+                <li key={source} className="flex items-center gap-1">
+                  <span
+                    aria-hidden="true"
+                    className="size-2"
+                    style={{ background: SOURCE_FILL[source] }}
+                  />
+                  {t(`miningTax.overview.priceSource.${source}`)}
+                </li>
+              ))}
+            </ul>
+          }
+        />
+      ) : (
+        <RatePanel
+          title={rateTitle}
+          basis={t(rateSpec.basisKey)}
+          rows={metric === 'volume' ? dailyVolume : dailyCount}
+          rowKey={(point) => point.date}
+          columns={metricRateColumns}
+          axisWidth={COMPACT_COUNT_Y_AXIS_WIDTH}
+          tickFormatter={formatCompactNumber}
+          tooltip={rateTooltip}
+          bars={
+            <Bar
+              isAnimationActive={false}
+              dataKey="value"
+              name={t(rateSpec.valueLabelKey)}
+              fill="var(--color-accent)"
+            />
+          }
+        />
+      )}
+
+      {isIsk ? (
+        <IskComparePanel
+          title={compareTitle}
+          typeComparison={typeComparison}
+          showRefining={showRefining}
+          columns={iskCompareColumns}
+          tooltip={tooltip}
+          otherLabel={otherLabel}
+          note={
+            !showRefining || compressed
+              ? t(
+                  showRefining
+                    ? 'miningTax.overview.assumesCompressedNote'
+                    : compressed
+                      ? 'miningTax.overview.refiningHiddenCompressedNote'
+                      : 'miningTax.overview.refiningHiddenNote'
+                )
+              : null
+          }
+        />
+      ) : (
+        <MetricComparePanel
+          title={compareTitle}
+          metric={metricKind}
+          typeComparison={metric === 'volume' ? typeVolumeComparison : typeCountComparison}
+          columns={metricCompareColumns}
+          tooltip={tooltip}
+          otherLabel={otherLabel}
+          totalLabel={totalLabel}
+          note={compressed ? t('miningTax.overview.assumesCompressedNote') : null}
+        />
+      )}
+    </div>
+  );
+}
+
+interface CompareVariantProps<R> {
+  title: string;
+  columns: DataTableColumn<R>[];
+  tooltip: (props: TooltipContentProps) => ReactElement;
+  otherLabel: (count: number) => string;
+  note: string | null;
+}
+
+/** The ISK ore-type card: raw (and, with refining on, refined) value per type. */
+function IskComparePanel({
+  title,
+  typeComparison,
+  showRefining,
+  columns,
+  tooltip,
+  otherLabel,
+  note,
+}: CompareVariantProps<TypeComparisonPoint> & {
+  typeComparison: TypeComparisonPoint[];
+  showRefining: boolean;
+}) {
+  const { t } = useTranslation();
+  // Past TOP_TYPE_LIMIT the rest fold into one "Other" bar, so the card
+  // stops growing with the number of types; the table below lists every one.
+  const { top, other } = topTypesWithOther(typeComparison, {
+    limit: TOP_TYPE_LIMIT,
+    by: showRefining ? 'both' : 'raw',
+  });
+  const bars: ComparisonBar[] = other
     ? [
         ...top,
         {
           typeId: -1,
-          typeName: t('miningTax.overview.otherTypes', { count: other.types.length }),
+          typeName: otherLabel(other.types.length),
+          rawValue: other.rawValue,
+          refineValue: other.refineValue,
+          folded: other.types,
+        },
+      ]
+    : top;
+  return (
+    <ComparePanel
+      title={title}
+      bars={bars}
+      rows={typeComparison}
+      rowKey={(point) => point.typeId}
+      columns={columns}
+      // Same row height with refining on or off — the raw and refined bars split
+      // the row — so toggling refining only adds the legend's height.
+      height={Math.max(256, bars.length * 24 + (showRefining ? 56 : 32))}
+      marginRight={showRefining ? 16 : 56}
+      tickFormatter={formatIskCompact}
+      tooltip={tooltip}
+      legend={showRefining}
+      note={note}
+      series={
+        <>
+          <Bar
+            isAnimationActive={false}
+            dataKey="rawValue"
+            fill="var(--color-line-bright)"
+            name={t('miningTax.overview.rawSellValue')}
+          >
+            {!showRefining && (
+              <LabelList
+                dataKey="rawValue"
+                position="right"
+                // SVG label text: IskAmount can't render inside the chart (documented exception).
+                formatter={(value: unknown) => formatIskCompact(Number(value))}
+                style={TICK_STYLE}
+              />
+            )}
+          </Bar>
+          {showRefining && (
+            <Bar
+              isAnimationActive={false}
+              dataKey="refineValue"
+              fill="var(--color-accent)"
+              name={t('miningTax.overview.refineValue')}
+            />
+          )}
+        </>
+      }
+    />
+  );
+}
+
+/** The volume/count ore-type card: always the "raw only" row height and margin — there is never a second series. */
+function MetricComparePanel({
+  title,
+  metric,
+  typeComparison,
+  columns,
+  tooltip,
+  otherLabel,
+  totalLabel,
+  note,
+}: CompareVariantProps<ValueRanked> & {
+  metric: MetricKind;
+  typeComparison: ValueRanked[];
+  totalLabel: string;
+}) {
+  const { top, other } = topValuesWithOther(typeComparison, { limit: TOP_TYPE_LIMIT });
+  const bars: MetricComparisonBar[] = other
+    ? [
+        ...top,
+        {
+          typeId: -1,
+          typeName: otherLabel(other.types.length),
           value: other.value,
           folded: other.types,
         },
       ]
     : top;
-  // Always the "raw only" row height/margin — there is never a second series here.
-  const compareHeight = Math.max(256, compareBars.length * 24 + 32);
-
   return (
-    <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-      <Panel padded>
-        <p className={cx(eyebrowClassName, 'mb-1')}>{rateChartTitle}</p>
-        <p className="mb-1 text-[0.6875rem] text-text-dim">{rateChartBasis}</p>
-        <div role="img" aria-label={rateChartTitle} className="h-64 w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={dailyPoints}
-              margin={{ top: 8, right: 8, left: COMPACT_ISK_Y_AXIS_MARGIN_LEFT, bottom: 0 }}
-            >
-              <CartesianGrid stroke="var(--color-line)" strokeDasharray="3 3" />
-              <XAxis
-                dataKey="date"
-                tickFormatter={formatDateTick}
-                stroke="var(--color-text-dim)"
-                tick={{ fontSize: '0.6875rem', fill: 'var(--color-text-dim)' }}
-              />
-              <YAxis
-                stroke="var(--color-text-dim)"
-                tick={{ fontSize: '0.6875rem', fill: 'var(--color-text-dim)' }}
-                width={scalePx(COMPACT_COUNT_Y_AXIS_WIDTH)}
-                tickFormatter={(value: number) => formatCompactNumber(value)}
-              />
-              <Tooltip content={(props) => <MetricRateTooltip {...props} metric={metric} />} />
-              <Bar
-                isAnimationActive={false}
-                dataKey="value"
-                name={rateValueLabel}
-                fill="var(--color-accent)"
-              />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-        <div className="sr-only">
-          <DataTable
-            columns={rateColumns}
-            responsive="table"
-            rows={dailyPoints}
-            rowKey={(point) => point.date}
-            label={rateChartTitle}
-          />
-        </div>
-      </Panel>
-
-      <Panel padded>
-        <p className={cx(eyebrowClassName, 'mb-1')}>{compareChartTitle}</p>
-        <div
-          role="img"
-          aria-label={compareChartTitle}
-          className="w-full"
-          style={{ height: compareHeight }}
+    <ComparePanel
+      title={title}
+      bars={bars}
+      rows={typeComparison}
+      rowKey={(point) => point.typeId}
+      columns={columns}
+      height={Math.max(256, bars.length * 24 + 32)}
+      marginRight={56}
+      tickFormatter={formatCompactNumber}
+      tooltip={tooltip}
+      note={note}
+      series={
+        <Bar
+          isAnimationActive={false}
+          dataKey="value"
+          fill="var(--color-line-bright)"
+          name={totalLabel}
         >
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={compareBars}
-              layout="vertical"
-              margin={{ top: 8, right: 56, left: 0, bottom: 0 }}
-            >
-              <CartesianGrid stroke="var(--color-line)" strokeDasharray="3 3" />
-              <XAxis
-                type="number"
-                stroke="var(--color-text-dim)"
-                tick={{ fontSize: '0.6875rem', fill: 'var(--color-text-dim)' }}
-                tickFormatter={(value: number) => formatCompactNumber(value)}
-              />
-              <YAxis
-                type="category"
-                dataKey="typeName"
-                stroke="var(--color-text-dim)"
-                tick={{ fontSize: '0.6875rem', fill: 'var(--color-text-dim)' }}
-                interval={0}
-                tickFormatter={(name: string) => stripCompressedPrefix(name, compressed)}
-                width={scalePx(120)}
-              />
-              <Tooltip content={(props) => <MetricCompareTooltip {...props} metric={metric} />} />
-              <Bar
-                isAnimationActive={false}
-                dataKey="value"
-                fill="var(--color-line-bright)"
-                name={totalValueLabel}
-              >
-                <LabelList
-                  dataKey="value"
-                  position="right"
-                  formatter={(value: unknown) => formatMetricCompact(metric, Number(value))}
-                  style={{ fontSize: '0.6875rem', fill: 'var(--color-text-dim)' }}
-                />
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-        <div className="sr-only">
-          <DataTable
-            columns={compareColumns}
-            responsive="table"
-            rows={typeComparison}
-            rowKey={(point) => point.typeId}
-            label={compareChartTitle}
+          <LabelList
+            dataKey="value"
+            position="right"
+            formatter={(value: unknown) => formatMetricCompact(metric, Number(value))}
+            style={TICK_STYLE}
           />
-        </div>
-        {compressed && (
-          <p className="mt-1 text-[0.6875rem] text-text-dim">
-            {t('miningTax.overview.assumesCompressedNote')}
-          </p>
-        )}
-      </Panel>
-    </div>
+        </Bar>
+      }
+    />
   );
 }
 
-export default function MiningYieldCharts({
-  metric,
-  dailyRate,
-  dailyVolume,
-  dailyCount,
-  typeComparison,
-  typeVolumeComparison,
-  typeCountComparison,
-  showRefining,
-}: MiningYieldChartsProps) {
-  if (metric === 'volume' || metric === 'count') {
-    return (
-      <MetricCharts
-        metric={metric}
-        dailyPoints={metric === 'volume' ? dailyVolume : dailyCount}
-        typeComparison={metric === 'volume' ? typeVolumeComparison : typeCountComparison}
-      />
-    );
-  }
-  return (
-    <IskCharts dailyRate={dailyRate} typeComparison={typeComparison} showRefining={showRefining} />
-  );
+export default function MiningYieldCharts(props: MiningYieldChartsProps) {
+  return <MetricChartPair {...props} />;
 }

@@ -40,7 +40,7 @@ import {
 } from '@/engine/fittings/chargeChoice';
 import type { WeaponChargeGroup } from './useChargeChoices';
 import { ChargeChart } from './ChargeChart';
-import { formatIsk } from './chargeFormat';
+import { formatIskExact } from './chargeFormat';
 import { chargeRowClassName } from './chargeRowStyle';
 import { pickerDistance, type ChargePickerSettings, type ChargeView } from './chargePickerSettings';
 
@@ -229,7 +229,7 @@ function rowLabel(
     price:
       c.price === null
         ? t('fittings.chargePicker.noPrice')
-        : t('fittings.chargePicker.isk', { isk: formatIsk(c.price) }),
+        : t('fittings.chargePicker.isk', { isk: formatIskExact(c.price) }),
   });
   const perMin = iskPerMinute(c);
   const parts = [
@@ -237,7 +237,7 @@ function rowLabel(
     c.cargo > 0
       ? t('fittings.chargePicker.inCargo', { count: formatCompactNumber(c.cargo) })
       : null,
-    perMin === null ? null : t('fittings.chargePicker.perMinute', { isk: formatIsk(perMin) }),
+    perMin === null ? null : t('fittings.chargePicker.perMinute', { isk: formatIskExact(perMin) }),
     extra.pricey ? t('fittings.chargePicker.priceyLabel') : null,
     extra.worse ? t('fittings.chargePicker.worseThan', { name: tierLabel(t, extra.worse) }) : null,
   ].filter(Boolean);
@@ -338,9 +338,11 @@ export function ChargePickerGroup({ group, settings, onLoad, wrapRow, pricesLoad
                       ? t('fittings.chargePicker.km', { km: km(reach(choice)) })
                       : iskPerMinute(choice) !== null
                         ? t('fittings.chargePicker.perMinute', {
-                            isk: formatIsk(iskPerMinute(choice)!),
+                            isk: formatIskExact(iskPerMinute(choice)!),
                           })
-                        : t('fittings.chargePicker.isk', { isk: formatIsk(choice.price ?? 0) })}
+                        : t('fittings.chargePicker.isk', {
+                            isk: formatIskExact(choice.price ?? 0),
+                          })}
                 </span>
               </button>
             ) : null
@@ -520,7 +522,7 @@ function TypeList({
                     ? 'fittings.chargePicker.fromIsk'
                     : 'fittings.chargePicker.isk',
                   {
-                    isk: formatIsk(Math.min(...prices)),
+                    isk: formatIskExact(Math.min(...prices)),
                   }
                 )}
           </span>
@@ -636,9 +638,11 @@ function TypeDetail({
                       ` · ${t('fittings.chargePicker.inCargo', { count: formatCompactNumber(c.cargo) })}`}
                   </span>
                   <span className="text-right">{Math.round(chargeScore(c, distance))}</span>
-                  <span className="text-right">{c.price === null ? '—' : formatIsk(c.price)}</span>
+                  <span className="text-right">
+                    {c.price === null ? '—' : formatIskExact(c.price)}
+                  </span>
                   <span className={cx('text-right', pricey && 'text-warning')}>
-                    {perMin === null ? '—' : formatIsk(perMin)}
+                    {perMin === null ? '—' : formatIskExact(perMin)}
                     {/* Colour is never the only signal (DESIGN.md §7). */}
                     {pricey && (
                       <Icon.PriceHigh
@@ -792,7 +796,7 @@ function FactionList({ choices, group, settings, maxReach, onLoad, wrap }: ListP
                           <RangeBar choice={c} maxReach={maxReach} distance={distance} />
                           <span className="text-right">{Math.round(score)}</span>
                           <span className={cx('text-right', pricey && 'text-warning')}>
-                            {c.price === null ? '—' : formatIsk(c.price)}
+                            {c.price === null ? '—' : formatIskExact(c.price)}
                             {pricey && (
                               <Icon.PriceHigh
                                 size={Icon.ICON_SIZE.sm}

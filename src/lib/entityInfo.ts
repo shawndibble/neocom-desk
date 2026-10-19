@@ -19,7 +19,7 @@ export interface EntityInfoTarget {
   itemId?: number;
 }
 
-export const ENTITY_INFO_PARAM = 'info';
+const ENTITY_INFO_PARAM = 'info';
 
 const INFO_PATTERN = /^(character|corporation|alliance|skill|type|place)-(\d+)(?:-(\d+))?$/;
 

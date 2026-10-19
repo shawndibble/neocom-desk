@@ -28,7 +28,7 @@ import { createLocalSetting } from '@/lib/useLocalSetting';
 /** characterId (as an object key) -> the ids of that Character's open groups. */
 export type ExpandedGroupsValue = Record<number, string[]>;
 
-export const EXPANDED_GROUPS_KEY = 'industryExpandedGroups';
+const EXPANDED_GROUPS_KEY = 'industryExpandedGroups';
 
 /** Exported for its test — the store below is the only other caller. */
 export function parseExpandedGroups(raw: unknown): ExpandedGroupsValue | null {

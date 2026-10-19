@@ -21,6 +21,7 @@ import type { HullCount } from '@/engine/pilotList/dscanWorth';
 import { GrantNote } from '@/app/GrantNote';
 import { useCharacterShipTypeId } from '@/features/character/ship';
 import { cx } from '@/lib/cx';
+import { useTicker } from '@/lib/ticker';
 import { loadGroupCategories, loadTypes } from '@/sde/loadSde';
 import { DangerAnswer, TripwireCard, WatchCard } from './DangerRead';
 import { DscanMeta } from './DscanMeta';
@@ -67,6 +68,8 @@ interface Loaded {
 
 /** How often the scan's age line re-reads the clock. */
 const AGE_TICK_MS = 15_000;
+/** The age line is not shown, so nothing needs a fast clock. */
+const IDLE_TICK_MS = 60 * 60_000;
 
 /**
  * A D-Scan read for danger: an answer to "am I in danger?", the ships to watch,
@@ -115,12 +118,8 @@ export function FleetBoard({
   }, [rowsKey]);
 
   // The age of a live paste, re-read on a slow tick. A Shared D-Scan has none to show.
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    if (!trackHistory) return;
-    const id = setInterval(() => setNow(Date.now()), AGE_TICK_MS);
-    return () => clearInterval(id);
-  }, [trackHistory]);
+  // A hook can't be conditional, so a Shared D-Scan joins the idle hourly clock instead.
+  const now = useTicker(trackHistory ? AGE_TICK_MS : IDLE_TICK_MS);
 
   const hulls = useMemo(() => (loaded === undefined ? [] : shipHulls(loaded.board)), [loaded]);
   const previous = useLastScan(hulls, trackHistory && loaded !== undefined);
