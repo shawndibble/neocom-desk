@@ -22,6 +22,7 @@ import { db } from '@/db';
 import type { ProjectionRow } from '@/engine/projection';
 import { getFirebaseApp, getSyncFunctions } from './firebaseApp';
 import { getDeviceId } from './deviceId';
+import { readLocal, removeLocal, writeLocal } from '@/lib/safeLocalStorage';
 
 interface RegisterDeviceResponse {
   deviceId: string;
@@ -67,9 +68,9 @@ interface LastRegistration {
 }
 
 function readLastRegistration(): LastRegistration | undefined {
+  const raw = readLocal(LAST_REGISTRATION_KEY);
+  if (!raw) return undefined;
   try {
-    const raw = localStorage.getItem(LAST_REGISTRATION_KEY);
-    if (!raw) return undefined;
     const parsed = JSON.parse(raw) as Partial<LastRegistration>;
     return typeof parsed.fingerprint === 'string' && typeof parsed.at === 'number'
       ? { fingerprint: parsed.fingerprint, at: parsed.at }
@@ -80,12 +81,9 @@ function readLastRegistration(): LastRegistration | undefined {
 }
 
 function writeLastRegistration(value: LastRegistration | undefined): void {
-  try {
-    if (value) localStorage.setItem(LAST_REGISTRATION_KEY, JSON.stringify(value));
-    else localStorage.removeItem(LAST_REGISTRATION_KEY);
-  } catch {
-    // Storage blocked (private mode): every poll just re-registers, as before.
-  }
+  // Storage blocked (private mode): every poll just re-registers, as before.
+  if (value) writeLocal(LAST_REGISTRATION_KEY, JSON.stringify(value));
+  else removeLocal(LAST_REGISTRATION_KEY);
 }
 
 /** cyrb53 — a short, stable digest so a 72-hour Projection isn't stored verbatim. */

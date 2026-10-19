@@ -25,9 +25,10 @@
  *    result instead, so a quiet market and a genuinely slow seller are never
  *    confused with a number the UI would otherwise present as gospel.
  */
+import { parseInstant } from '../esiInstant';
+import { DAY_MS } from '@/lib/age';
 
 /** Whole days in milliseconds, used to convert ESI's `duration` (days) to ms. */
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 export interface OrderExpiry {
   /** Epoch ms the order lapses. */
@@ -46,8 +47,8 @@ export interface OrderExpiry {
  * rounds up into a day the order does not actually have left.
  */
 export function orderExpiry(issued: string, durationDays: number, now: number): OrderExpiry | null {
-  const issuedMs = Date.parse(issued);
-  if (Number.isNaN(issuedMs)) return null;
+  const issuedMs = parseInstant(issued);
+  if (issuedMs === null) return null;
   if (!Number.isFinite(durationDays) || durationDays < 0) return null;
 
   const expiresAt = issuedMs + durationDays * DAY_MS;

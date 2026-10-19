@@ -12,9 +12,6 @@ import {
   characterEveTypePrefs,
 } from '../preferences';
 
-export const DAY_MS = 86_400_000;
-export const HOUR_MS = 3_600_000;
-
 /** This Character's current threshold settings (issue #299, synced since #363), re-read every poll — the mechanism AC4's "without a reload" relies on. */
 export async function currentThresholds(characterId: number) {
   await hydrateNotificationPreferences();
@@ -62,3 +59,5 @@ export function optionalDateMs(iso: string | undefined): number | undefined {
   const ms = Date.parse(iso);
   return Number.isFinite(ms) ? ms : undefined;
 }
+
+export { DAY_MS, HOUR_MS } from '@/lib/age';

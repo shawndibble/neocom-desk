@@ -3,6 +3,9 @@
  * figure. Its "What if I add a planet?" part, and the Map's add-planet panel,
  * draw a what-if planet's chains with `WhatIfChainCards`.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { formatCount } from '@/lib/formatCount';
+import { formatList } from '@/lib/listFormat';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -36,8 +39,7 @@ import { Sentence } from './sentence';
 import { planetTypesOf } from './productPlanets';
 import { NO_TYPES, useBiggerChains, useWhatIfChains } from './useBiggerChains';
 
-const listFormat = new Intl.ListFormat('en', { style: 'long', type: 'conjunction' });
-const m3 = (value: number) => Math.round(value).toLocaleString('en');
+const m3 = formatCount;
 
 interface Names {
   of: (planetId: number) => string;
@@ -69,7 +71,7 @@ function ChainSentence({
           planets: (
             <b className="font-semibold">
               {/* A what-if planet reads last: "Gas I, Gas II and a new Lava planet". */}
-              {listFormat.format(
+              {formatList(
                 [...card.planetIds]
                   .sort((a, b) => Number(isWhatIfPlanetId(a)) - Number(isWhatIfPlanetId(b)))
                   .map(names.of)
@@ -250,11 +252,11 @@ function useAssumptions(advice: PlanAdvice, whatIfTypes: readonly PlanetType[]) 
   const added =
     whatIfTypes.length > 0
       ? t('piPlan.chains.assumesWhatIf', {
-          type: listFormat.format(whatIfTypes.map((type) => t(`pi.planetType.${type}`))),
+          type: formatList(whatIfTypes.map((type) => t(`pi.planetType.${type}`))),
           count: whatIfTypes.length,
           level: basis.ccLevel,
           heads: basis.headsPerExtractor,
-          rate: Math.round(basis.ratePerHour).toLocaleString('en'),
+          rate: formatCount(basis.ratePerHour),
         })
       : null;
   return (card: BiggerChainCard) =>
@@ -338,10 +340,7 @@ function WhatIfSection({
   return (
     <section aria-labelledby="pi-chains-whatif" className="border-t border-line">
       <div className={`flex items-center gap-1.5 px-3 pt-2 ${noSlot ? '' : 'pb-1'}`}>
-        <h3
-          id="pi-chains-whatif"
-          className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
-        >
+        <h3 id="pi-chains-whatif" className={eyebrowClassName}>
           {t('piPlan.chains.whatIfTitle')}
         </h3>
         {!noSlot && (

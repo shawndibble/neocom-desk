@@ -59,6 +59,7 @@ import { loadFittingFromText } from './loadFittingFromText';
 import { loadPopularFits, type PopularFitsResult } from './popularFits';
 import { yieldToEventLoop } from './yieldToEventLoop';
 import { loadWorkbenchFits, type WorkbenchFit, type WorkbenchFitsResult } from './workbenchFits';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 /** What the Workbench rows read from outside. */
 export interface WorkbenchHullSources {
@@ -229,7 +230,9 @@ const askChecks: Ask<readonly WorkbenchFit[], ReadonlyMap<string, WorkbenchFitCh
     .then((checks) => checks ?? NO_CHECKS);
 
 const askPopular: Ask<number, PopularFitsResult> = (sources, shipTypeId) =>
-  sources.popularFits(shipTypeId).catch((): PopularFitsResult => ({ ok: false }));
+  sources
+    .popularFits(shipTypeId)
+    .catch((): PopularFitsResult => ({ ok: false, reason: 'offline' }));
 
 const askPrices: Ask<
   { hub: TradeHub; typeIds: readonly number[] },
@@ -293,10 +296,7 @@ export function useWorkbenchHullRows(
   );
 
   const hubId = useMarketHub((state) => state.value);
-  const hydrate = useMarketHub((state) => state.hydrate);
-  useEffect(() => {
-    void hydrate();
-  }, [hydrate]);
+  useHydratedStore(useMarketHub);
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
   const { current, outOfDate } = useMemo(
     () =>

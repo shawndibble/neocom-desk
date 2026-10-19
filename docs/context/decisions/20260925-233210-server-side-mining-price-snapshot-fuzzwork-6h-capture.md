@@ -2,6 +2,9 @@
 
 _Recorded 2026-09-25 · issue #1279._
 
+> Superseded by 20261018-233051-mining-prices-from-the-open-prices-job (issue #4277):
+> the job is retired and mining prices come from `syncMarketOpenPrices`.
+
 - **Added a 4th Cloud Scheduler job, `captureMiningPriceSnapshot`, every 6
   hours.** Mining Yield Overview's daily price previously came from ESI's
   history endpoint, which only has a blended buy+sell _average_ per day —

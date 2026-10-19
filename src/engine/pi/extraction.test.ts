@@ -9,12 +9,10 @@ import {
   programTotalYield,
   sustainedRatePerHour,
   yieldBankedBy,
-  yieldRemaining,
 } from './extraction';
 import type { ExtractorProgram, ExtractorYieldProgram } from './types';
+import { DAY_MS, HOUR_MS } from '@/lib/age';
 
-const DAY_MS = 86_400_000;
-const HOUR_MS = 3_600_000;
 const INSTALL_MS = Date.parse('2026-09-01T00:00:00Z');
 const CYCLE_TIME_MS = 1_800_000; // ESI's cycle_time 1800 s
 const CYCLES_PER_DAY = 48;
@@ -122,7 +120,7 @@ describe('programTotalYield', () => {
   });
 });
 
-describe('yieldBankedBy / yieldRemaining', () => {
+describe('yieldBankedBy', () => {
   it('has banked nothing at install and everything after expiry', () => {
     expect(yieldBankedBy(program, INSTALL_MS)).toBe(0);
     expect(yieldBankedBy(program, INSTALL_MS - DAY_MS)).toBe(0);
@@ -137,23 +135,6 @@ describe('yieldBankedBy / yieldRemaining', () => {
     expect(yieldBankedBy(program, INSTALL_MS + CYCLE_TIME_MS - 1)).toBe(0);
     expect(yieldBankedBy(program, INSTALL_MS + CYCLE_TIME_MS)).toBeCloseTo(yields[0], 6);
     expect(Math.round(yieldBankedBy(program, INSTALL_MS + DAY_MS))).toBe(513_262);
-  });
-
-  it('splits the program total at every point in time', () => {
-    const total = programTotalYield(program);
-    for (const nowMs of [
-      INSTALL_MS - DAY_MS,
-      INSTALL_MS,
-      INSTALL_MS + 3 * DAY_MS,
-      program.expiryTimeMs,
-      program.expiryTimeMs + DAY_MS,
-    ]) {
-      expect(yieldBankedBy(program, nowMs) + yieldRemaining(program, nowMs)).toBeCloseTo(total, 6);
-    }
-  });
-
-  it('has nothing left after expiry', () => {
-    expect(yieldRemaining(program, program.expiryTimeMs)).toBeCloseTo(0, 6);
   });
 });
 

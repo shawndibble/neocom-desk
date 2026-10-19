@@ -15,6 +15,7 @@ import {
   type TheraHub,
   type WormholeShipSize,
 } from './theraConnections';
+import { HOUR_MS } from '@/lib/age';
 
 /** Which hubs' holes a route may use. */
 export type RouteHoleHubs = TheraHub | 'all';
@@ -26,8 +27,6 @@ export interface RouteHoleSettings {
   /** Holes with less life than this left are skipped. */
   minLifeHours: number;
 }
-
-const HOUR_MS = 3_600_000;
 
 /** The connections a route may cross: the chosen hubs, the ship's size, enough life left. */
 export function routeHoles<T extends TheraConnection>(

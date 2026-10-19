@@ -1,7 +1,7 @@
 /**
  * The Order Book filter bar's (Jump Range/Security/Min quantity/NPC stations
  * only/Hide bait sells) device-local remembered default — the URL states the live values
- * (ADR 0015, `useOrderBookOrchestration.ts`'s `BROWSER_FILTER_PARAMS`); this
+ * (ADR 0015, `useBrowserFilters.ts`'s `BROWSER_FILTER_PARAMS`); this
  * is the persisted fallback behind it, like `locationMode.ts`'s Location Mode,
  * so a filter set once survives a reload or a fresh visit with no matching
  * query string, and "use game location" keeps tracking the active

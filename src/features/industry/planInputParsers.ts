@@ -1,3 +1,4 @@
+import { clampPct } from '@/lib/clampPct';
 import { unmaskNumber } from '@/lib/numberMask';
 
 /**
@@ -27,5 +28,5 @@ export function parseOrKeep(
 export function parseTaxPct(current: number, raw: string): number {
   const trimmed = raw.trim();
   const normalized = /^\d*,\d{1,2}$/.test(trimmed) ? trimmed.replace(',', '.') : trimmed;
-  return parseOrKeep(current, normalized, (n) => Math.min(100, Math.max(0, n)));
+  return parseOrKeep(current, normalized, clampPct);
 }

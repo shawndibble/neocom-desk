@@ -37,6 +37,32 @@ function useBoth() {
   return { catalogue: useFittingCatalogue(), failed: useFittingCatalogueFailed() };
 }
 
+describe('useFittingCatalogue sharing', () => {
+  beforeEach(() => {
+    resetFittingCatalogueStatusForTests();
+    loadsFine();
+  });
+  afterEach(() => vi.clearAllMocks());
+
+  it('builds once for two instances and hands both the same object', async () => {
+    const a = renderHook(useFittingCatalogue);
+    const b = renderHook(useFittingCatalogue);
+    await waitFor(() => expect(a.result.current).not.toBeNull());
+    await waitFor(() => expect(b.result.current).not.toBeNull());
+    expect(b.result.current).toBe(a.result.current);
+    expect(sde.loadTypes).toHaveBeenCalledTimes(1);
+    expect(sde.loadMarketTypes).toHaveBeenCalledTimes(1);
+  });
+
+  it('gives a later mount the catalogue on its first render without loading again', async () => {
+    const a = renderHook(useFittingCatalogue);
+    await waitFor(() => expect(a.result.current).not.toBeNull());
+    const late = renderHook(useFittingCatalogue);
+    expect(late.result.current).toBe(a.result.current);
+    expect(sde.loadTypes).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('useFittingCatalogue failure', () => {
   beforeEach(() => {
     resetFittingCatalogueStatusForTests();

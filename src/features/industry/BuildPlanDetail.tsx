@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
 import { tappableRowClassName, touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -99,21 +100,25 @@ import { inventionQuoteFor } from './inventionSources';
 import { buildPlanTypeIds, recipeForLookup } from './recipes';
 import { materialPriceBasisOf } from './priceBasis';
 import { useResolvedPlan } from './useResolvedPlan';
-import { itemMenuProps } from './itemMenuProps';
-import { parseOrKeep, parseTaxPct } from './planInputParsers';
 import { useMarketSnapshot } from './useMarketSnapshot';
 import { priceVsMedianFor, usePriceVsMedian } from './usePriceVsMedian';
 import { formatDuration } from '@/lib/duration';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { writeToClipboard } from '@/lib/clipboard';
+import { parseOrKeep, parseTaxPct } from './planInputParsers';
+import { buildItemMenuProps } from './buildItemMenuProps';
 import { MaterialsTable, SourcingInput, type MaterialsTableHandle } from './MaterialsTable';
 import { BuildRecipeModal } from './BuildRecipeModal';
 import { BlueprintAcquisitionModal } from './BlueprintAcquisitionModal';
 import { buyPricedLine } from './materialRow';
 import { materialsCsvColumns } from './materialsCsv';
 import { GroupOwnedDiffersHint } from './GroupOwnedDiffersHint';
-import { blueprintsLeftOutCount, hasShoppingList, shoppingListText } from './shoppingList';
+import {
+  blueprintsLeftOutCount,
+  hasShoppingList,
+  shoppingListText,
+} from '@/engine/industry/shoppingList';
 import {
   buildRecipe,
   hasSubBuilds,
@@ -143,6 +148,7 @@ import { useNearestLowsecSystem } from './useNearestLowsecSystem';
 import { planReactionLocation } from './planReactionLocation';
 import { PlanScheduleLine } from './PlanScheduleLine';
 import { planJobNodes, usePlanSchedule } from './planJobSlots';
+import { useCopyFeedback } from '@/lib/useCopyFeedback';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import { ProductionRunsPanel } from './ProductionRunsPanel';
 import { BuildSystemInput } from './BuildSystemInput';
@@ -372,7 +378,7 @@ export function BuildPlanDetail({
    * moment. Same beside-the-control confirmation the skill planner's export
    * uses, in the one form a toolbar IconButton has: its own icon and label.
    */
-  const [copyState, setCopyState] = useState<'copied' | 'failed' | null>(null);
+  const { copied: copyState, flash: flashCopy } = useCopyFeedback<'copied' | 'failed'>(2000);
   /** Blueprint Acquisition rows (issue #838) `shoppingListText` just left out of a successful copy. */
   const [blueprintsLeftOut, setBlueprintsLeftOut] = useState(0);
   // Verdict-first layout: the inputs fold behind a chip summary, the ledger
@@ -1075,19 +1081,6 @@ export function BuildPlanDetail({
     return total;
   }, [builtTopLevel, plan.materialSourcing, materialPrices]);
 
-  // The copy confirmation is a flash, not a state the panel keeps. Cleared by
-  // an effect rather than a `setTimeout` inside the handler so unmounting mid-
-  // flash, or clicking again before it fades, cancels the pending timer instead
-  // of setting state on a gone component.
-  useEffect(() => {
-    if (copyState === null) return;
-    const timer = setTimeout(() => {
-      setCopyState(null);
-      setBlueprintsLeftOut(0);
-    }, 2000);
-    return () => clearTimeout(timer);
-  }, [copyState]);
-
   // The Materials table's rows as shown, for its export button and row menus.
   const materialsCsv = useMemo(
     () =>
@@ -1274,7 +1267,7 @@ export function BuildPlanDetail({
     update({ buildHere: [...picked] });
   }
 
-  const { itemMenuFor, itemActionsFor } = itemMenuProps(catalog);
+  const { itemMenuFor, itemActionsFor } = buildItemMenuProps(catalog);
 
   /**
    * Puts the plan's outstanding materials on the clipboard as multibuy text,
@@ -1292,12 +1285,12 @@ export function BuildPlanDetail({
       // produced here is not something to order, and the recipe inputs that
       // replaced it are — however many levels down they sit.
       await writeToClipboard(shoppingListText(shoppingMaterials, (id) => nameForType(catalog, id)));
-      setCopyState('copied');
+      flashCopy('copied');
       // Multibuy can't buy a blueprint (issue #1778) — shoppingListText already
       // dropped it; name the count so the pilot knows to buy it by contract.
       setBlueprintsLeftOut(blueprintsLeftOutCount(shoppingMaterials));
     } catch {
-      setCopyState('failed');
+      flashCopy('failed');
     }
   }
 
@@ -1330,9 +1323,7 @@ export function BuildPlanDetail({
   // a bordered, filled box reads as a button, and nothing here is clickable.
   const setupFact = (label: string, value: string, warn = false) => (
     <div key={label} className="min-w-0">
-      <dt className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-        {label}
-      </dt>
+      <dt className={eyebrowClassName}>{label}</dt>
       <dd className={cx('text-xs tabular-nums', warn ? 'text-warning' : 'text-text')}>
         {warn && <Icon.Warn size={Icon.ICON_SIZE.sm} aria-hidden="true" className="mr-1 inline" />}
         {value}
@@ -1441,7 +1432,7 @@ export function BuildPlanDetail({
         {setupOpen ? (
           <div className="space-y-4">
             <div>
-              <h3 className="border-b border-line pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+              <h3 className={cx(eyebrowClassName, 'border-b border-line pb-1')}>
                 {t('industry.groupBlueprint')}
               </h3>
               {bpcCoverage && (
@@ -1497,7 +1488,12 @@ export function BuildPlanDetail({
             </div>
 
             <div>
-              <h3 className="flex items-center justify-between gap-2 border-b border-line pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+              <h3
+                className={cx(
+                  eyebrowClassName,
+                  'flex items-center justify-between gap-2 border-b border-line pb-1'
+                )}
+              >
                 {t('industry.groupLocationMarket')}
                 <GroupTargetLink
                   plan={plan}

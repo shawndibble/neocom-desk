@@ -1,6 +1,6 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { JumpsAwayResult } from '@/engine/jumpsAway';
+import type { JumpsAwayResult } from '@/engine/clone/jumpsAway';
 import { placeKey } from './classify';
 import { memoryPlaceSource } from './testSource';
 import { usePlaceDetails } from './usePlaceDetails';
@@ -47,6 +47,32 @@ describe('usePlaceDetails', () => {
       security: 0.95,
       jumps: known(3),
     });
+  });
+
+  it('lands every Place of a long list, each with its name and security', async () => {
+    const ids = Array.from({ length: 50 }, (_, i) => 60_000_000 + i);
+    const memory = memoryPlaceSource({
+      stations: Object.fromEntries(ids.map((id) => [id, { name: `S${id}`, systemId: 30000142 }])),
+      systems: { 30000142: { security: 0.95 } },
+    });
+    // Real ESI answers land on separate macrotasks, so React cannot merge them.
+    const tick = () => new Promise<void>((r) => setTimeout(r, 0));
+    const source = {
+      ...memory,
+      stationName: async (id: number) => (await tick(), memory.stationName(id)),
+      stationSystemId: async (id: number) => (await tick(), memory.stationSystemId(id)),
+    } as typeof memory;
+    const refs = ids.map((locationId) => ({
+      locationId,
+      characterId: 1,
+      kind: 'station' as const,
+    }));
+    const { result } = renderHook(() => {
+      return usePlaceDetails(refs, { scopeId: 1, origin: null, basis: null, source });
+    });
+    await waitFor(() => expect(result.current.get(placeKey(refs[49]))?.security).toBe(0.95));
+    expect(result.current.get(placeKey(refs[0]))?.name).toBe('S60000000');
+    expect(result.current.get(placeKey(refs[49]))?.name).toBe('S60000049');
   });
 
   it('reads a Place once however often it rerenders, and a system once for two Places', async () => {

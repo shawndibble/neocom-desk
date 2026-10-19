@@ -4,7 +4,7 @@
  * the engine (not planner/markers.ts, which also carries the drag helpers) so
  * `skillPlanSchedule.ts` can use it and stay pure.
  */
-import { normalizePlan } from '@/engine/plan';
+import { normalizePlan } from '@/engine/skills/plan';
 import type { EngineSkill, PlanEntry, TrainedSkill } from '@/engine/types';
 
 /** Clamp to [0, entryCount], sort ascending, dedupe. */

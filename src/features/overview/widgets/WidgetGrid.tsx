@@ -47,7 +47,7 @@ import { visibleWidgets } from './visibility';
 import { Widget } from './Widget';
 import { WidgetMenu } from './WidgetMenu';
 
-export interface WidgetGridProps {
+interface WidgetGridProps {
   widgets: readonly WidgetModel[];
   editing?: boolean;
   onRemove: (id: string) => void;

@@ -2,13 +2,11 @@ import { describe, expect, it } from 'vitest';
 import {
   backwardBucketSums,
   dailyBalanceSeries,
-  forwardBucketCounts,
   journalCoverageDays,
   withinRange,
 } from './chartSeries';
 
 const DAY = 86_400_000;
-const HOUR = 3_600_000;
 const NOW = Date.parse('2026-10-11T12:00:00Z');
 
 describe('dailyBalanceSeries', () => {
@@ -91,22 +89,5 @@ describe('backwardBucketSums', () => {
       2
     );
     expect(sums).toEqual([0, 0]);
-  });
-});
-
-describe('forwardBucketCounts', () => {
-  it('counts what finishes in each hour, with what is already done in the first', () => {
-    const times = [NOW - 2 * HOUR, NOW + 10 * 60_000, NOW + 90 * 60_000, NOW + 5 * HOUR];
-    expect(forwardBucketCounts(times, NOW, HOUR, 6)).toEqual({
-      counts: [2, 1, 0, 0, 0, 1],
-      later: 0,
-    });
-  });
-
-  it('reports what lands after the last bucket instead of dropping it silently', () => {
-    expect(forwardBucketCounts([NOW + 30 * HOUR], NOW, HOUR, 12)).toEqual({
-      counts: Array<number>(12).fill(0),
-      later: 1,
-    });
   });
 });

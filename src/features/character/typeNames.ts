@@ -50,18 +50,13 @@ import {
   writeCachedMany,
 } from '@/esi/cache';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
+import { chunk } from '@/lib/chunk';
 
 /** ESI's documented cap on ids per /universe/names request (maxItems in the spec). */
 const NAMES_BATCH_LIMIT = 1000;
 
 function cacheKey(typeId: number): string {
   return `type:${typeId}`;
-}
-
-function chunk<T>(items: T[], size: number): T[][] {
-  const out: T[][] = [];
-  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
-  return out;
 }
 
 /**

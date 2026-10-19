@@ -20,7 +20,12 @@ export const MORE_SHEET_ID = 'mobile-more-sheet';
 
 const SHEET_GROUPS = railGroups();
 const NO_LOCKS: ReadonlySet<AppRoutePath> = new Set();
-const ALL_CORP_VIEWS = { canReadMembers: true, canReadWallet: true, canReadAssets: true };
+const ALL_CORP_VIEWS = {
+  canReadMembers: true,
+  canReadWallet: true,
+  canReadAssets: true,
+  canReadMiningLedger: true,
+};
 
 const TILE_GRID = 'grid grid-cols-4 gap-1.5';
 const HEADING = 'text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase';

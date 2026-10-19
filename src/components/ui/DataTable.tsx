@@ -675,7 +675,13 @@ function DataTableRowImpl<T>({
                 footer and group headers sit outside this provider. */}
             <RowTappableContext.Provider value={tapOpensRow}>
               {i === 0 && leadingExpandIcon ? (
-                <span className="flex items-center gap-1.5">
+                <span
+                  className={cx(
+                    'flex items-center gap-1.5',
+                    column.align === 'right' && 'justify-end',
+                    column.align === 'center' && 'justify-center'
+                  )}
+                >
                   <span className="dt-lead-caret inline-flex">
                     <Caret expanded={expanded} />
                   </span>

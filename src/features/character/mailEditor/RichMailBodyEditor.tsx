@@ -24,7 +24,7 @@ import {
   markupToDoc,
   sanitizeMarkup,
   type EditorDoc,
-} from '@/engine/mailEditorDoc';
+} from '@/engine/mail/mailEditorDoc';
 import {
   buildPipeTableLines,
   emptyFormatState,
@@ -34,7 +34,7 @@ import {
   sourceTagPair,
   wrapSourceSelection,
   type SourceTag,
-} from '@/engine/mailFormat';
+} from '@/engine/mail/mailFormat';
 import { EVE_MAIL_SURFACE_FRAME_CLASS } from '../MailBodyView';
 import type { MailBodyEditorProps } from '../MailBodyEditor';
 import type { MailEditorCommands, ToggleMark } from './commands';

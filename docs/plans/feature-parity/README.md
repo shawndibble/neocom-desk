@@ -530,7 +530,7 @@ also feeds the CSV), `routes/Industry.tsx` (industry math) and
   `level_end_sp`, `training_start_sp` — is optional and absent on a paused
   queue. Nothing may dereference them unchecked.
 - **There is no `training_start_date`.** The field is `start_date`.
-  `engine/queueImport.ts` had invented the wrong name; corrected.
+  `engine/skills/queueImport.ts` had invented the wrong name; corrected.
 - **An absent date means "paused, ETA unknown" — never "starts now".**
   EVEMon shipped this bug (`peterhaneve/evemon#40`): it synthesized a start
   time for paused entries and then marked skills falsely complete on

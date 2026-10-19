@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { sortClones, type SortableClone } from './clonesSort';
-import type { JumpsAwayResult } from '@/engine/jumpsAway';
+import type { JumpsAwayResult } from '@/engine/clone/jumpsAway';
 
 const clone = (id: string, over: Partial<SortableClone> = {}): SortableClone => ({
   id,

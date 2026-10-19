@@ -17,7 +17,7 @@
  * in: the four words are the same four words, and a second set of English
  * strings saying "Critical" would be a translation to keep in step for nothing.
  */
-import type { DeadlineSeverity } from '@/engine/severity';
+import type { DeadlineSeverity } from '@/engine/character/severity';
 import * as Icon from './icons';
 
 /** Background fill — flat, per DESIGN.md §6. Dots, bars, swatches. */

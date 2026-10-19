@@ -7,6 +7,7 @@
  * `BASE_ATTRIBUTE_MAX`] — so this is an allocator the user fills to zero
  * remaining, not a form that merely rejects out-of-range numbers.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal, TextInput } from '@/components/ui';
@@ -109,9 +110,7 @@ export function RemapMarkerModal({
         <div className="grid grid-cols-2 gap-3">
           {ATTRIBUTE_NAMES.map((name) => (
             <label key={name} className="flex flex-col gap-1">
-              <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                {t(`skills.attr.${name}`)}
-              </span>
+              <span className={eyebrowClassName}>{t(`skills.attr.${name}`)}</span>
               <TextInput
                 size="sm"
                 type="number"

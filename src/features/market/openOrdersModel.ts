@@ -461,3 +461,12 @@ export function notCheckedCount(rows: readonly OpenOrderRow[]): number {
 export function needsAttentionCount(rows: readonly OpenOrderRow[]): number {
   return rows.filter((row) => row.problem !== 'healthy').length;
 }
+
+/** Every order id across every Character's orders — the "never undercut an alt" set. */
+export function ownOrderIdSet(snapshot: OpenOrdersSnapshot): Set<number> {
+  const ids = new Set<number>();
+  for (const entry of snapshot.entries) {
+    for (const order of entry.orders) ids.add(order.order_id);
+  }
+  return ids;
+}

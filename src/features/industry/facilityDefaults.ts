@@ -49,7 +49,7 @@ import { adoptRefineryDefaultAsReactionLocation } from './adoptRefineryDefault';
 export const FACILITY_DEFAULTS_SETTING_KEY = 'sync.industryFacilityDefaults';
 
 /** What it was stored under before it synced; its value is adopted once. */
-export const LEGACY_FACILITY_DEFAULTS_SETTING_KEY = 'industryFacilityDefaults';
+const LEGACY_FACILITY_DEFAULTS_SETTING_KEY = 'industryFacilityDefaults';
 
 export interface FacilityDefaults extends RememberedLocationFields {
   facility: FacilityKind;

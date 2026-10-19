@@ -13,7 +13,7 @@
  */
 import { ICON_SIZE } from './icons';
 import { SEVERITY_ICON, SEVERITY_TEXT } from './severityTone';
-import type { DeadlineSeverity } from '@/engine/severity';
+import type { DeadlineSeverity } from '@/engine/character/severity';
 
 export interface SeverityIconProps {
   severity: DeadlineSeverity;

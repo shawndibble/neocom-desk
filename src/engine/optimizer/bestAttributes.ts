@@ -11,7 +11,7 @@
  * the wrong optimum for weeks of training (plan §5.5). `placeRemaps` passes a
  * context whenever the character has a Booster enabled.
  */
-import { spBetween, timeToTrain, trainingRate } from '@/engine/sp';
+import { spBetween, timeToTrain, trainingRate } from '@/engine/skills/sp';
 import type {
   AttributeName,
   Attributes,

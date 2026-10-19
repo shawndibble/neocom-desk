@@ -10,6 +10,7 @@
  * row carries a Threat badge beside the name (decision `20261008-181210`); the
  * list never calls a pilot safe or hostile.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -578,10 +579,7 @@ export function DscanShareControl({
       {button}
       {share.status === 'manual' && (
         <div className="flex w-full min-w-72 max-w-full items-center gap-2">
-          <label
-            htmlFor="pilot-dscan-share-url"
-            className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
-          >
+          <label htmlFor="pilot-dscan-share-url" className={eyebrowClassName}>
             {t('travel.pilot.dscan.shareReady')}
           </label>
           <TextInput

@@ -92,7 +92,7 @@ describe('PilotKillActivityView retry focus', () => {
     const onRetry = vi.fn();
     const { rerender } = render(
       <MemoryRouter>
-        <PilotKillActivityView history={{ kind: 'failed' }} onRetry={onRetry} />
+        <PilotKillActivityView history={{ kind: 'failed', reason: 'http' }} onRetry={onRetry} />
       </MemoryRouter>
     );
     const retry = screen.getByRole('button', { name: 'Try again' });

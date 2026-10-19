@@ -10,12 +10,12 @@
  * demand and cached per input, so trying all eight types costs at most eight
  * builds and a re-render never repeats one.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { loadGoalPlannerSnapshot, type GoalPlannerSnapshot } from '../goalPlannerSnapshot';
+import { useMemo } from 'react';
 import { buildPlanAdvice, type PlanAdvice } from '../planAdviceModel';
 import { homeSystemId } from '../sellRoute';
 import { usePlanPreference } from '../planTicksPref';
 import { usePiAdviceInputs } from '../usePiAdviceInputs';
+import { usePiSnapshot } from '../usePiSnapshot';
 import type { PlanetType } from '@/engine/pi/goalTypes';
 import type { PiData } from '@/sde/types';
 import type { FinderOrigin } from './MapDetail';
@@ -23,6 +23,7 @@ import type { MapColony } from './PlanMap';
 import { buildMapGraph, type MapGraph } from './mapModel';
 import { whatIfKey, whatIfTypesOf } from '../biggerChainsModel';
 import { useChainEstimates, type ChainEstimateOf } from '../useChainEstimates';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 export type MapAdviceState =
   | { status: 'loading' }
@@ -47,46 +48,12 @@ export function useMapAdvice(
   characterId: number,
   planetLabel: (planetId: number) => string
 ): MapAdviceState {
-  const [loaded, setLoaded] = useState<{
-    characterId: number;
-    snapshot: GoalPlannerSnapshot;
-  } | null>(null);
-  const [failedFor, setFailedFor] = useState<number | null>(null);
-  const [reloadKey, setReloadKey] = useState(0);
-  const [retrying, setRetrying] = useState(false);
   // Keep the last snapshot while re-reading: the board and the notice stay mounted, so Retry keeps focus.
-  const retry = useCallback(() => {
-    setRetrying(true);
-    setReloadKey((key) => key + 1);
-  }, []);
-  useEffect(() => {
-    let cancelled = false;
-    loadGoalPlannerSnapshot(characterId).then(
-      (snapshot) => {
-        if (cancelled) return;
-        setFailedFor(null);
-        setLoaded({ characterId, snapshot });
-        setRetrying(false);
-      },
-      () => {
-        if (cancelled) return;
-        setFailedFor(characterId);
-        setRetrying(false);
-      }
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [characterId, reloadKey]);
-  const snapshot = loaded?.characterId === characterId ? loaded.snapshot : null;
+  const { snapshot, failed, retrying, retry } = usePiSnapshot(characterId);
 
   // The Plan tab's Most ISK / Least hauling choice, so both tabs rank alike.
   const preference = usePlanPreference((state) => state.value);
-  const preferenceHydrated = usePlanPreference((state) => state.hydrated);
-  const hydratePreference = usePlanPreference((state) => state.hydrate);
-  useEffect(() => {
-    void hydratePreference();
-  }, [hydratePreference]);
+  const preferenceHydrated = useHydratedStore(usePlanPreference);
   const inputs = usePiAdviceInputs(snapshot, characterId, preference);
   // Wait for the stored choice: ranking by the default first would flash the wrong picks.
   const input =
@@ -140,7 +107,7 @@ export function useMapAdvice(
     pi
   );
 
-  if (failedFor === characterId || built === 'error') return { status: 'failed' };
+  if (failed || built === 'error') return { status: 'failed' };
   if (!built || !graph || !pi) return { status: 'loading' };
   const esiFailed = snapshot?.fetchFailed ? { retry, retrying } : null;
   return {

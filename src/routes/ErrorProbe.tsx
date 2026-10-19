@@ -12,7 +12,7 @@ import * as Sentry from '@sentry/react';
  * `ErrorBoundary`'s own — its Reload button will re-throw, so navigate away
  * rather than reloading.
  *
- * Unlinked from every nav, like `/styleguide`. `/error` is also one of the
+ * Unlinked from every nav. `/error` is also one of the
  * most-probed paths on the web and Googlebot runs JavaScript, so the message
  * names itself and the `probe` tag makes a crawler-triggered copy one mute
  * click rather than a diagnosis.

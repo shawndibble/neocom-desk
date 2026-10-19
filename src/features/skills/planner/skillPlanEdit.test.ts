@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { normalizePlanWithBoundaries } from '@/engine/plan';
+import { normalizePlanWithBoundaries } from '@/engine/skills/plan';
 import type { RemapSegment } from '@/engine/optimizer';
 import type {
   AttributeName,

@@ -12,9 +12,9 @@ import {
   industryJobCopy,
   skillQueueCopy,
 } from '@/features/notifications/domainCopy';
+import { HOUR_MS } from '@/lib/age';
 
 const T0 = 1_700_000_000_000;
-const HOUR_MS = 3_600_000;
 
 /**
  * Matches `foregroundPoller.ts`'s own local Romanization of a skill level —

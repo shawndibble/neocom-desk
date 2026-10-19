@@ -134,12 +134,12 @@ describe('every route must declare its scope requirement', () => {
       '/',
       '/callback',
       '/communities/join/:code',
+      '/corp-tax-book/verify/:token',
       '/error',
       '/login',
       '/s/:shareId',
       '/share/:shareId',
       '/share/fitting',
-      '/styleguide',
     ]);
   });
 });

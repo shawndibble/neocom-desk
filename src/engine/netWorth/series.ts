@@ -4,6 +4,8 @@
  * daily balances come in, display-ready numbers go out.
  */
 import { findMissingDays, utcDay, type NetWorthSnapshotRow } from './snapshot';
+import { parseInstant } from '../esiInstant';
+import { DAY_MS } from '@/lib/age';
 
 export const LAYER_IDS = ['isk', 'assets', 'escrow', 'sellOrders'] as const;
 export type LayerId = (typeof LAYER_IDS)[number];
@@ -62,8 +64,6 @@ export interface CharacterSeries {
   gapDays: string[];
 }
 
-const DAY_MS = 86_400_000;
-
 /**
  * One Character's day-by-day series. ISK is the journal's last balance of each
  * day (the backfill) and continues through gaps and pre-snapshot days; the
@@ -95,17 +95,6 @@ export function buildCharacterSeries(input: {
   return { points, firstSnapshotDay, gapDays: findMissingDays(snapDays) };
 }
 
-/** Characters that hold every needed permission count toward totals; the rest are named in the scope readout. */
-export function partitionByCoverage(
-  ids: readonly number[],
-  covered: ReadonlySet<number>
-): { included: number[]; missing: number[] } {
-  return {
-    included: ids.filter((id) => covered.has(id)),
-    missing: ids.filter((id) => !covered.has(id)),
-  };
-}
-
 export function totalsFor(
   latest: ReadonlyMap<number, LayerValues>,
   opts: { included: readonly number[]; hidden: readonly number[]; shown: readonly LayerId[] }
@@ -126,8 +115,12 @@ export function dailyWalletFromJournal(
 ): Map<string, number> {
   const sorted = entries
     .filter((e): e is { date: string; balance: number } => typeof e.balance === 'number')
-    .sort((a, b) => Date.parse(a.date) - Date.parse(b.date));
+    .flatMap((e) => {
+      const at = parseInstant(e.date);
+      return at === null ? [] : [{ at, balance: e.balance }];
+    })
+    .sort((a, b) => a.at - b.at);
   const byDay = new Map<string, number>();
-  for (const e of sorted) byDay.set(utcDay(Date.parse(e.date)), e.balance);
+  for (const e of sorted) byDay.set(utcDay(e.at), e.balance);
   return byDay;
 }

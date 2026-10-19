@@ -1,4 +1,4 @@
-import { remainingSpForLevel, spBetween, trainingRate } from '@/engine/sp';
+import { remainingSpForLevel, spBetween, trainingRate } from '@/engine/skills/sp';
 import type {
   AttributeName,
   Attributes,

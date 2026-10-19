@@ -1,4 +1,4 @@
-import type { FormatState, LinkTarget } from '@/engine/mailFormat';
+import type { FormatState, LinkTarget } from '@/engine/mail/mailFormat';
 
 export type ToggleMark = 'bold' | 'italic' | 'underline';
 

@@ -363,6 +363,123 @@ describe('parseEveNotificationPayload — real payload samples', () => {
 });
 
 /**
+ * The three moon-drill types issue #4058 allow-lists, plus the ore volumes the
+ * moon chunk estimate reads (epic #4055, D13). Their shape is
+ * taken from public samples (aa-moonmining's fixtures), not from CCP, and is
+ * unverified against live data — so every field is optional and the ore
+ * block is read defensively: one bad line costs that line, never the rest.
+ */
+describe('parseEveNotificationPayload — moon drill', () => {
+  const STARTED = [
+    'autoTime: 132052212600000000',
+    'moonID: 40161708',
+    'moonLink: <a href="showinfo:14//40161708">Dital II - Moon 1</a>',
+    'oreVolumeByType:',
+    '  45490: 1288475.0734476',
+    '  46677: 544976.2512398',
+    'readyTime: 132052104600000000',
+    'solarSystemID: 30002640',
+    'startedBy: 92168909',
+    'startedByLink: <a href="showinfo:1383//92168909">Pilot One</a>',
+    'structureID: 1029754054149',
+    'structureLink: <a href="showinfo:35835//1029754054149">Dital - Refinery</a>',
+    'structureName: Dital - Refinery',
+    'structureTypeID: 35835',
+    '',
+  ].join('\n');
+
+  it('reads MoonminingExtractionStarted: moon, times, who started it and the ore volumes', () => {
+    const payload = parseEveNotificationPayload(STARTED);
+    expect(payload.structureId).toBe(1_029_754_054_149);
+    expect(payload.structureName).toBe('Dital - Refinery');
+    expect(payload.moonId).toBe(40_161_708);
+    expect(payload.moonName).toBe('Dital II - Moon 1');
+    expect(payload.startedById).toBe(92_168_909);
+    // 132052104600000000 ticks = 2019-06-17T02:01:00Z; autoTime is 3h later.
+    expect(payload.readyTimeMs).toBe(Date.parse('2019-06-17T02:01:00Z'));
+    expect(payload.autoTimeMs).toBe(Date.parse('2019-06-17T05:01:00Z'));
+    expect(payload.oreVolumes).toEqual([
+      { typeId: 45490, volumeM3: 1288475.0734476 },
+      { typeId: 46677, volumeM3: 544976.2512398 },
+    ]);
+  });
+
+  it('reads MoonminingLaserFired: who fired it', () => {
+    const payload = parseEveNotificationPayload(
+      'firedBy: 92168909\nmoonID: 40161708\noreVolumeByType:\n  45490: 10.5\nstructureID: 1029754054149\n'
+    );
+    expect(payload.firedById).toBe(92_168_909);
+    expect(payload.oreVolumes).toEqual([{ typeId: 45490, volumeM3: 10.5 }]);
+  });
+
+  it('reads MoonminingExtractionCancelled: who cancelled it, and tolerates a null canceller', () => {
+    expect(
+      parseEveNotificationPayload('cancelledBy: 92168909\nstructureID: 1\n').cancelledById
+    ).toBe(92_168_909);
+    expect(
+      parseEveNotificationPayload('cancelledBy: null\nstructureID: 1\n').cancelledById
+    ).toBeUndefined();
+  });
+
+  it('keeps the good ore lines and drops malformed ones', () => {
+    const payload = parseEveNotificationPayload(
+      [
+        'oreVolumeByType:',
+        '  45490: 100.5',
+        '  notATypeId: 12',
+        '  46677: -3',
+        '  46678: .nan',
+        '  46679:',
+        '  0: 50',
+        '  1.5: 50',
+        '    46680: 7',
+        '  46681: 8',
+        'structureID: 1',
+        '  46682: 9',
+      ].join('\n')
+    );
+    // 46680 is a deeper nesting level than the block's own keys; 46682 sits
+    // under a different key. Neither is this block's.
+    expect(payload.oreVolumes).toEqual([
+      { typeId: 45490, volumeM3: 100.5 },
+      { typeId: 46681, volumeM3: 8 },
+    ]);
+    expect(payload.structureId).toBe(1);
+  });
+
+  it('reads a flow-style ore mapping', () => {
+    expect(
+      parseEveNotificationPayload('oreVolumeByType: {45490: 1.5, 46677: 2}\n').oreVolumes
+    ).toEqual([
+      { typeId: 45490, volumeM3: 1.5 },
+      { typeId: 46677, volumeM3: 2 },
+    ]);
+  });
+
+  it('reads an ore block carrying a YAML anchor', () => {
+    expect(
+      parseEveNotificationPayload('oreVolumeByType: &id001\n  45490: 1.5\n').oreVolumes
+    ).toEqual([{ typeId: 45490, volumeM3: 1.5 }]);
+  });
+
+  it('reads CRLF ore lines', () => {
+    expect(parseEveNotificationPayload('oreVolumeByType:\r\n  45490: 1.5\r\n').oreVolumes).toEqual([
+      { typeId: 45490, volumeM3: 1.5 },
+    ]);
+  });
+
+  it.each([
+    ['no ore block', 'structureID: 1\n'],
+    ['an empty ore block', 'oreVolumeByType:\nstructureID: 1\n'],
+    ['an empty flow mapping', 'oreVolumeByType: {}\n'],
+    ['only malformed ore lines', 'oreVolumeByType:\n  x: y\n  1: -1\n'],
+    ['an ore block given as a list', 'oreVolumeByType:\n- 45490\n- 12\n'],
+  ])('leaves oreVolumes undefined for %s', (_label, text) => {
+    expect(parseEveNotificationPayload(text).oreVolumes).toBeUndefined();
+  });
+});
+
+/**
  * Round 36's rule, extracted so `projection.ts` (issue #359) can reuse the
  * identical derivation `eveNotificationText.ts`'s `timerEnd` renders from,
  * rather than a second copy that could drift.

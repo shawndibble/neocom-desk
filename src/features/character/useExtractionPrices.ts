@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import {
   extractionNet,
   LARGE_SKILL_INJECTOR_TYPE_ID,
   SKILL_EXTRACTOR_TYPE_ID,
-} from '@/engine/spExtraction';
+} from '@/engine/skills/spExtraction';
 import { useMarketHub } from '@/features/market/hub';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { getHubPrices } from '@/market/prices';
@@ -19,11 +20,7 @@ export interface ExtractionPrices {
 /** Net ISK per extraction at the saved market hub (sell injector − buy extractor). */
 export function useExtractionPrices(): ExtractionPrices {
   const hubId = useMarketHub((state) => state.value);
-  const hubHydrated = useMarketHub((state) => state.hydrated);
-  const hydrateHub = useMarketHub((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateHub();
-  }, [hydrateHub]);
+  const hubHydrated = useHydratedStore(useMarketHub);
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
 
   const [state, setState] = useState<{ loaded: boolean; net: number | null }>({

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { invalidateFreshness } from '@/esi/cache';
 import type { TrainedSkill } from '@/engine/types';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
-import { idsNeedingFetch } from './compareSkills';
+import { idsNeedingFetch } from '@/engine/skills/compareSkills';
 import { loadCorrectedSkills } from './correctedSkills';
 import { loadSkillCatalog, type SkillCatalog } from './skillMap';
 

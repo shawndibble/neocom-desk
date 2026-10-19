@@ -1,6 +1,6 @@
 # Brief E — Import / Export
 
-Area: `src/engine/import/`, `src/engine/clipboardExport.ts`, `src/engine/queueImport.ts`,
+Area: `src/engine/import/`, `src/engine/clipboardExport.ts`, `src/engine/skills/queueImport.ts`,
 `src/features/skills/planner/ImportClipboardDialog.tsx` + `clipboardImport.ts`,
 `src/features/skills/clipboard.ts`.
 
@@ -23,7 +23,7 @@ investigation; `docs/ARCHITECTURE.md:36` enumerates the full current importer se
 
 - **Return shape convention**: every parser returns a plain result object, never throws for
   malformed _content_ (only throws `TypeError`/`RangeError` for programmer-error inputs like
-  a non-array queue — `src/engine/queueImport.ts:24-27`). Shape is `{ entries: PlanEntry[],
+  a non-array queue — `src/engine/skills/queueImport.ts:24-27`). Shape is `{ entries: PlanEntry[],
 errors: E[] }` (`skillPlanPaste.ts:23-26`) or `{ ...fields, errors: E[] }` for a
   structural parse (`eftFit.ts:34-39`), with a separate `warnings: string[]` layered on top
   at the orchestration level (`clipboardImport.ts:27-36`), not inside the pure parser.

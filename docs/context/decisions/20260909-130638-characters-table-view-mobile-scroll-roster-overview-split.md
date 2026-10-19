@@ -34,7 +34,7 @@ _Recorded 2026-09-09._
   Injectors": a character can never be extracted below 5,000,000 SP, and one
   extractor pulls a fixed 500,000 SP chunk.) A naive `totalSp >= threshold`
   check on the 500k default flags every character within days of creation —
-  caught in review before it shipped. `engine/spExtraction.ts`'s
+  caught in review before it shipped. `engine/skills/spExtraction.ts`'s
   `extractableSp` subtracts the floor first; `isSpExtractionReady` is the
   only entry point that should ever gate this, in the UI column and in the
   poll domain alike.

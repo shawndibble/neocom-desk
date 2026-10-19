@@ -50,7 +50,7 @@ export class EsiError extends Error {
  * Patches `endpointId` onto an `EsiError` a multi-request loader's own catch
  * just caught, when the per-page/per-cursor `esiFetch` call that threw it was
  * built without one (`paginated.ts`'s `fetchAllPagesStatus`,
- * `endpoints.ts`'s `fetchTransactionCursor` — see `EsiError.endpointId`'s
+ * `endpoints/`'s `fetchTransactionCursor` — see `EsiError.endpointId`'s
  * doc comment for why). A no-op for anything else, so callers can run it
  * unconditionally in a catch block before rethrowing.
  */

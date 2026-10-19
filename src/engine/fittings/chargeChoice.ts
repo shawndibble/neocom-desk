@@ -7,6 +7,7 @@
  * Pure: the figures on each `ChargeChoice` come from the dogma engine and
  * the hub's order book, gathered by `features/fittings/useChargeChoices`.
  */
+import { median } from '../math';
 import { turretDamageMultiplier, turretHitChance, type DamageSplit } from './appliedDps';
 import type { CapBoosterFigures } from './capBoosterChoice';
 import type { CrystalFigures } from './mining';
@@ -186,11 +187,8 @@ export function groupByType(choices: readonly ChargeChoice[]): ChargeTypeGroup[]
   );
 }
 
-function median(values: number[]): number | null {
-  if (values.length === 0) return null;
-  const sorted = values.slice().sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 === 1 ? sorted[mid]! : (sorted[mid - 1]! + sorted[mid]!) / 2;
+function medianOrNull(values: number[]): number | null {
+  return values.length === 0 ? null : median(values);
 }
 
 export function groupByFaction(choices: readonly ChargeChoice[]): ChargeFactionGroup[] {
@@ -219,9 +217,9 @@ export function groupByFaction(choices: readonly ChargeChoice[]): ChargeFactionG
       if (base.dps > 0) damage.push(c.dps / base.dps);
       if (base.price && c.price !== null) price.push(c.price / base.price);
     }
-    const gain = median(damage);
+    const gain = medianOrNull(damage);
     group.damageGain = gain === null ? null : gain - 1;
-    group.priceRatio = median(price);
+    group.priceRatio = medianOrNull(price);
   }
   // Tech I, then the factions from the least extra damage to the most (cheapest
   // first at equal damage), then Tech II: the order they climb in price.

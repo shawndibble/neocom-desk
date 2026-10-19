@@ -41,7 +41,7 @@ _Recorded 2026-09-12 · issue #942._
   means a snapshot could not be read (offline first visit — these files sit
   outside the install precache). Collapsing them would let an offline first
   visit report "no gate route exists" for every haul in the game. This is why
-  the jump-count helper does not reuse `engine/jumpsAway.ts`'s
+  the jump-count helper does not reuse `engine/clone/jumpsAway.ts`'s
   `JumpsAwayResult`, whose two reasons are the Assets page's own and cannot
   express `unknown`.
 

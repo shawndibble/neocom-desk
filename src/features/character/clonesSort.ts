@@ -1,4 +1,4 @@
-import type { JumpsAwayResult } from '@/engine/jumpsAway';
+import type { JumpsAwayResult } from '@/engine/clone/jumpsAway';
 import { createLocalSetting } from '@/lib/useLocalSetting';
 
 export type ClonesSort = 'training' | 'nearest' | 'value';

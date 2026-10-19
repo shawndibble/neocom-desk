@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { OreLink } from './OreIcon';
 import { useTranslation } from 'react-i18next';
@@ -43,9 +44,7 @@ export function ContinueSessionCard({
   return (
     <Panel padded={false} className="border-accent-dim">
       <div className="space-y-2 p-3">
-        <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-          {t('miningTax.continue.eyebrow')}
-        </p>
+        <p className={eyebrowClassName}>{t('miningTax.continue.eyebrow')}</p>
         <p className="text-sm font-semibold">
           {next.row.entry.date} ·{' '}
           <SystemLink systemId={next.row.entry.solarSystemId}>{systemName}</SystemLink>

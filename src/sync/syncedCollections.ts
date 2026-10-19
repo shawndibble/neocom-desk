@@ -134,7 +134,7 @@ export interface EditableCollection<
 export interface FeedOrSettingsCollection extends RemoteCollectionBase {
   /**
    * `feed`: the Notification Feed — no tombstones, merged on dismissal
-   * (planSync's syncFeed). `settings`: the synced settings allow-list, one
+   * (feedSync's syncFeed). `settings`: the synced settings allow-list, one
    * global set with its own tombstones (planSync's syncCharacter).
    */
   kind: 'feed' | 'settings';
@@ -345,7 +345,7 @@ export const BUILD_PLANS = defineEditableCollection<BuildPlanRecord, RemoteBuild
 });
 
 /** The Quickbar: one record per Character, never deleted (only emptied), so its tombstone list stays empty in practice — kept because every editable collection syncs through the same tombstone-aware merge. */
-export const QUICKBARS = defineEditableCollection<QuickbarRecord, RemoteQuickbarDoc>({
+const QUICKBARS = defineEditableCollection<QuickbarRecord, RemoteQuickbarDoc>({
   kind: 'editable',
   remoteName: 'quickbars',
   table: 'quickbars',
@@ -701,7 +701,7 @@ export const MINING_TAX_ASSIGNMENTS = defineEditableCollection<
 });
 
 /** One Character's net worth on one UTC day (issue #2865) — numbers only, one document per day. */
-export const NET_WORTH_SNAPSHOTS = defineEditableCollection<
+const NET_WORTH_SNAPSHOTS = defineEditableCollection<
   NetWorthSnapshotRecord,
   RemoteNetWorthSnapshotDoc
 >({

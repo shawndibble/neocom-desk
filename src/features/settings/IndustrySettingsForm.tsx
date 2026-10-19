@@ -3,7 +3,7 @@ import { Field, Fields, Spinner, TextInput } from '@/components/ui';
 import { useAssumedMe, MIN_ASSUMED_ME, MAX_ASSUMED_ME } from '@/features/industry/assumedMe';
 import { useAssumedTe, MIN_ASSUMED_TE, MAX_ASSUMED_TE } from '@/features/industry/assumedTe';
 import { DefaultsSyncHint } from './settingsFields';
-import { useHydratedStore } from './useHydratedStore';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 /**
  * Industry's settings: Settings → Industry, and the Industry page's settings

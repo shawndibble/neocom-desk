@@ -1,8 +1,10 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { cx } from '@/lib/cx';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { Button, Panel, Tooltip } from '@/components/ui';
-import { encodeFittingShare } from '@/engine/fitting/fittingShare';
+import { encodeFittingShare } from '@/engine/fittings/fittingShare';
 import { esiFittingToFitting } from '@/engine/fittings/esiFittingMapper';
 import { fittingToShareInput } from '@/engine/fittings/shareMapper';
 import type { Fitting } from '@/engine/fittings/types';
@@ -38,7 +40,7 @@ interface FittingPreviewProps {
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="border border-line">
-      <h3 className="border-b border-line bg-panel-2 px-3 py-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+      <h3 className={cx(eyebrowClassName, 'border-b border-line bg-panel-2 px-3 py-1.5')}>
         {title}
       </h3>
       <div className="p-3">{children}</div>
