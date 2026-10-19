@@ -34,7 +34,10 @@ import {
   filterProductionRunsByDate,
   type ProductionLogFilter,
 } from './productionLogFilter';
-import { productionProfitHistory, productionProfitTrend } from './productionProfitHistory';
+import {
+  productionProfitHistory,
+  productionProfitTrend,
+} from '@/engine/industry/productionProfitHistory';
 import { summarizeProductionRun, type ProductionRunSummary } from './productionRunSummary';
 import { productionLogItemsCsvColumns, productionLogRunsCsvColumns } from './productionRunsCsv';
 import { TableActionsMenu } from '@/components/ui/TableExport';

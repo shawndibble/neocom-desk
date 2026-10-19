@@ -94,7 +94,7 @@ import { PlanToolsPane, type PlanToolSection } from './PlanToolsPane';
 import { InjectorFactsPanel } from './InjectorFactsPanel';
 import { SkillsToBuyPanel } from './SkillsToBuyPanel';
 import { LiveQueueLead } from './LiveQueueLead';
-import { projectQueueEnd } from '@/features/skills/queueStatus';
+import { projectQueueEnd } from '@/engine/skills/queueStatus';
 import {
   evaluateOptimizationBadge,
   remapSavingsShrank,

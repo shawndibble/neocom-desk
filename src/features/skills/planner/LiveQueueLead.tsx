@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { DataAgeBadge, Disclosure } from '@/components/ui';
 import { SkillLink } from '@/features/entities';
 import { formatLocalDate } from '@/lib/localDate';
-import type { QueueEndProjection } from '@/features/skills/queueStatus';
+import type { QueueEndProjection } from '@/engine/skills/queueStatus';
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V'];
 

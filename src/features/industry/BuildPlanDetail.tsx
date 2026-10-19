@@ -125,7 +125,11 @@ import { BlueprintAcquisitionModal } from './BlueprintAcquisitionModal';
 import { buyPricedLine } from './materialRow';
 import { materialsCsvColumns } from './materialsCsv';
 import { GroupOwnedDiffersHint } from './GroupOwnedDiffersHint';
-import { blueprintsLeftOutCount, hasShoppingList, shoppingListText } from './shoppingList';
+import {
+  blueprintsLeftOutCount,
+  hasShoppingList,
+  shoppingListText,
+} from '@/engine/industry/shoppingList';
 import {
   buildRecipe,
   hasSubBuilds,

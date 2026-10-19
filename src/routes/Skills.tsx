@@ -39,7 +39,7 @@ import {
   classifySkillQueue,
   queuedLevelsBySkill,
   type CompletedLevel,
-} from '@/features/skills/queueStatus';
+} from '@/engine/skills/queueStatus';
 import type { CachedResult } from '@/features/skills/data';
 import { skillCsvColumns, skillCsvRows } from '@/features/skills/skillsCsv';
 import { boardCsvGroups, buildSkillBoard } from '@/features/skills/skillBoard';

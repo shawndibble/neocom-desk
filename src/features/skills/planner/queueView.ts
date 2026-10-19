@@ -1,6 +1,6 @@
 import type { SkillQueueEntry } from '@/esi/endpoints';
 import { addWeeks, startOfWeek, type WeekStart } from '@/lib/calendarGrid';
-import type { ClassifiedQueueEntry } from '../queueStatus';
+import type { ClassifiedQueueEntry } from '@/engine/skills/queueStatus';
 
 /** A queue row plus how long it adds to the queue on its own. */
 export interface QueueRowView extends ClassifiedQueueEntry {
