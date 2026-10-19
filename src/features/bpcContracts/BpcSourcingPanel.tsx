@@ -75,8 +75,6 @@ import { canAskToCopy } from '@/engine/communities/askToCopy';
 import { bpcOfferRows } from '@/features/bpcContracts/bpcOfferRows';
 import {
   bpcMarketLookup,
-  prepareBpcOffers,
-  rankBpcOffers,
   type BlueprintSuggestion,
   type BpcPrepareInput,
   type BpcQuery,
@@ -96,6 +94,7 @@ import {
 } from '@/features/bpcContracts/bpcSearchColumns';
 import { useSpaceFilter } from '@/features/bpcContracts/bpcSpaceFilterPref';
 import { useLpBlueprintOffers } from '@/features/bpcContracts/useLpBlueprintOffers';
+import { useBpcOfferSearch } from '@/features/bpcContracts/useBpcOfferSearch';
 import { useCommunityBlueprintOffers } from '@/features/bpcContracts/useCommunityBlueprintOffers';
 import { useLpValue } from '@/features/loyalty/lpValue';
 import { useBpcSources } from '@/features/bpcContracts/bpcSourcesPref';
@@ -872,41 +871,24 @@ export function BpcSourcingPanel({
   // Deferred so a filter edit doesn't block input while the full snapshot reruns.
   const deferredStableFilter = useDeferredValue(stableFilter);
   const deferredQuery = useDeferredValue(query);
-  const prepared = useMemo(
-    () =>
-      prepareBpcOffers(
-        {
-          contractRows: rows,
-          originals,
-          contractLocations,
-          blueprintNames,
-          ownedBlueprints,
-          communityRows: communityOffers.rows,
-        },
-        {
-          filter: deferredStableFilter,
-          sources: stableSources,
-          spaceKinds: activeSpaceKinds,
-          allowedSystems: jumpFilter.allowed,
-        }
-      ),
-    [
-      rows,
-      originals,
-      contractLocations,
-      blueprintNames,
-      ownedBlueprints,
-      communityOffers.rows,
-      deferredStableFilter,
-      stableSources,
-      activeSpaceKinds,
-      jumpFilter.allowed,
-    ]
+  const prepareInput = useMemo<BpcPrepareInput>(
+    () => ({
+      filter: deferredStableFilter,
+      sources: stableSources,
+      spaceKinds: activeSpaceKinds,
+      allowedSystems: jumpFilter.allowed,
+    }),
+    [deferredStableFilter, stableSources, activeSpaceKinds, jumpFilter.allowed]
   );
-  const { suggestions, filteredRows, bpoSourcesByType, bpoByType, displayRows, summary } = useMemo(
-    () => rankBpcOffers(prepared, sourceData, deferredQuery),
-    [prepared, sourceData, deferredQuery]
-  );
+  const {
+    suggestions,
+    filteredRows,
+    bpoSourcesByType,
+    bpoByType,
+    displayRows,
+    summary,
+    awaiting: awaitingOffers,
+  } = useBpcOfferSearch(sourceData, prepareInput, deferredQuery);
 
   const selectedName =
     selectedTypeId === null ? null : (blueprintNames.get(selectedTypeId) ?? `#${selectedTypeId}`);
@@ -2032,6 +2014,10 @@ export function BpcSourcingPanel({
 
             {sources.size === 0 ? (
               <EmptyState title={t('bpcContracts.noSourceSelected')} className="py-8" />
+            ) : awaitingOffers ? (
+              <div className="flex justify-center py-16">
+                <Spinner label={t('common.loading')} />
+              </div>
             ) : displayRows.length === 0 ? (
               <EmptyState
                 title={t('bpcContracts.noFilterMatches')}
