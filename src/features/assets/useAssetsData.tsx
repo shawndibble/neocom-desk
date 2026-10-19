@@ -1,3 +1,5 @@
+import { NO_NAMES, NO_NUMBERS } from '@/lib/emptyCollections';
+import { idSetKey } from '@/lib/idSetKey';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { industryTabHref } from '@/features/industry/industryTabs';
@@ -61,10 +63,6 @@ const ASSETS_VIEW_PARAMS = {
 };
 
 /** Stable identity, so the fallback doesn't invalidate the grouping memo every render. */
-const NO_NAMES: ReadonlyMap<number, string> = new Map();
-const NO_COPY_VALUES: ReadonlyMap<number, number> = new Map();
-const NO_PRICES: ReadonlyMap<number, number> = new Map();
-const NO_VOLUMES: ReadonlyMap<number, number> = new Map();
 const EMPTY_ITEM_OWNERS: ReadonlyMap<number, number> = new Map();
 const EMPTY_CHARACTER_NAMES: ReadonlyMap<number, string> = new Map();
 export const LOCATION_ENDPOINTS: readonly EsiEndpointId[] = ['getCharacterLocation'];
@@ -184,7 +182,7 @@ export function useAssetsData() {
   const crossCharacterCacheRef = useRef<{ key: string; data: CrossCharacterData } | null>(null);
   useEffect(() => {
     if (otherCharacterIds.length === 0 || activeCharacterId === null) return;
-    const key = [...otherCharacterIds].sort((a, b) => a - b).join(',');
+    const key = idSetKey(otherCharacterIds);
     if (crossCharacterCacheRef.current?.key === key) {
       setCrossCharacterData(crossCharacterCacheRef.current.data);
       return;
@@ -267,9 +265,9 @@ export function useAssetsData() {
   const assetsNeedsReauth = data?.assetsNeedsReauth ?? false;
   const typeNames = data?.typeNames ?? NO_NAMES;
   const locationNames = data?.locationNames ?? NO_NAMES;
-  const typePrices = data?.priceByTypeId ?? NO_PRICES;
-  const ownCopyValues = data?.copyValueByItemId ?? NO_COPY_VALUES;
-  const volumeByTypeId = data?.volumeByTypeId ?? NO_VOLUMES;
+  const typePrices = data?.priceByTypeId ?? NO_NUMBERS;
+  const ownCopyValues = data?.copyValueByItemId ?? NO_NUMBERS;
+  const volumeByTypeId = data?.volumeByTypeId ?? NO_NUMBERS;
 
   // CSV export always stays scoped to the active Character's own assets,
   // regardless of the cross-character toggle — exporting another Character's

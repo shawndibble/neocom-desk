@@ -124,34 +124,6 @@ export function toMemberActivity(rows: readonly CorporationMemberTracking[]): Me
   }));
 }
 
-/** `/universe/names` takes at most this many ids per call. */
-const UNIVERSE_NAMES_BATCH = 1000;
-
-function chunk<T>(items: readonly T[], size: number): T[][] {
-  const chunks: T[][] = [];
-  for (let i = 0; i < items.length; i += size) chunks.push(items.slice(i, i + size));
-  return chunks;
-}
-
-/**
- * `/universe/names` for more ids than one call accepts.
- *
- * Named for entities rather than for members because both halves of the page go
- * through it: `/universe/names` answers for characters and NPC locations alike,
- * and a resolver called `resolveMemberNames` would be lying at its second call
- * site. `resolveNames` is the app's one bulk resolver and is used as it is; the
- * only thing added here is the batch limit, because a corporation can hold more
- * members than one call accepts and an alliance holding corp routinely does.
- */
-async function resolveEntityNames(ids: readonly number[]): Promise<Map<number, string>> {
-  const unique = [...new Set(ids)];
-  const names = new Map<number, string>();
-  for (const batch of chunk(unique, UNIVERSE_NAMES_BATCH)) {
-    for (const [id, name] of await resolveNames(batch)) names.set(id, name);
-  }
-  return names;
-}
-
 /**
  * Location names for the distinct places the roster is standing in.
  *
@@ -181,7 +153,7 @@ async function resolveLocationNames(
   const structureIds = unique.filter((id) => id >= UPWELL_STRUCTURE_ID_FLOOR);
   const bulkIds = unique.filter((id) => id < UPWELL_STRUCTURE_ID_FLOOR);
 
-  const names = await resolveEntityNames(bulkIds);
+  const names = await resolveNames(bulkIds);
   await mapWithConcurrencyLimit(structureIds, ESI_FANOUT_CONCURRENCY, async (id) => {
     const name = await loadStructureName(characterId, id);
     if (name !== null) names.set(id, name);
@@ -222,7 +194,7 @@ export async function loadMemberLabels(
     .filter((id): id is number => id !== null);
 
   const [characters, ships, locations] = await Promise.all([
-    resolveEntityNames([...members.map((member) => member.characterId), ...extraCharacterIds]),
+    resolveNames([...members.map((member) => member.characterId), ...extraCharacterIds]),
     // SDE snapshot first, ESI only for what it misses — `typeNames.ts`.
     loadTypeNames(shipTypeIds),
     resolveLocationNames(characterId, locationIds),

@@ -9,6 +9,7 @@ import { dismiss } from './ledgerActions';
 import { systemLabel } from './names';
 import { useLedgerAction } from './useLedgerAction';
 import { LedgerActionError } from './LedgerActionError';
+import { toggleInSet } from '@/lib/sets';
 
 interface BulkDismissDialogProps {
   open: boolean;
@@ -49,12 +50,7 @@ export function BulkDismissDialog({
   const systemName = (solarSystemId: number) => systemLabel(systemNames, solarSystemId);
 
   function toggle(key: string) {
-    setExcluded((previous) => {
-      const next = new Set(previous);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
+    setExcluded((previous) => toggleInSet(previous, key));
   }
 
   async function commit() {

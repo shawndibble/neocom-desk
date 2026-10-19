@@ -1,3 +1,4 @@
+import { NO_NAMES } from '@/lib/emptyCollections';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { TaxDialogsHost } from '@/features/miningTax/TaxDialogsHost';
@@ -151,7 +152,6 @@ interface Snapshot {
 
 const NO_HUBS: ReadonlySet<TradeHub['id']> = new Set();
 const NO_SECURITY: ReadonlyMap<number, number> = new Map();
-const NO_NAMES: ReadonlyMap<number, string> = new Map();
 const NO_PAYEES_BY_CHARACTER: ReadonlyMap<number, PayeeRecord[]> = new Map();
 
 const EMPTY_DATED_PRICES: DatedUnitPrices = {

@@ -10,7 +10,6 @@
 import {
   Children,
   Fragment,
-  lazy,
   Suspense,
   useEffect,
   useMemo,
@@ -18,6 +17,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { lazyNamed } from '@/app/lazyNamed';
 import { useTranslation } from 'react-i18next';
 import { DataAgeBadge, EmptyState, Panel, Spinner, textActionClassName } from '@/components/ui';
 import { canFinishSurvey } from '@/engine/survey/finish';
@@ -47,9 +47,7 @@ import { useHydratedStore } from '@/lib/useHydratedStore';
 
 const NONE: ReadonlySet<string> = new Set();
 
-const LazySurveyCharts = lazy(() =>
-  import('./SurveyCharts').then((m) => ({ default: m.SurveyCharts }))
-);
+const LazySurveyCharts = lazyNamed(() => import('./SurveyCharts'), 'SurveyCharts');
 
 interface SurveyBoardProps {
   scans: SurveyScan[];

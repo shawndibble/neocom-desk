@@ -1,3 +1,4 @@
+import { idSetKey } from '@/lib/idSetKey';
 /**
  * The Blueprint Acquisition sources automatic tier selection reads beyond
  * public contracts: the cheapest sell order anywhere in the blueprint's
@@ -240,7 +241,7 @@ export function useBlueprintPurchaseOffers(
   blueprintTypeIds: readonly number[]
 ): BlueprintPurchaseOffersState {
   const rate = useLpValue((state) => state.value);
-  const idsKey = [...new Set(blueprintTypeIds)].sort((a, b) => a - b).join(',');
+  const idsKey = idSetKey(blueprintTypeIds);
   const key = `${characterId ?? ''}|${hub.id}|${rate}|${idsKey}`;
   const [loaded, setLoaded] = useState<{
     key: string;

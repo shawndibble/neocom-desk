@@ -1,3 +1,4 @@
+import { NO_AFFILIATIONS, NO_NAMES } from '@/lib/emptyCollections';
 import {
   useDeferredValue,
   useEffect,
@@ -95,6 +96,7 @@ import { boolParam, enumSetParam, textParam } from '@/lib/urlState';
 import { CONTACTS_TABS } from '@/app/pageTabs';
 import { tabBarTabs } from '@/lib/pageTabs';
 import { useContactsStandings } from './ContactsStandings';
+import { toggleInSet } from '@/lib/sets';
 
 interface Snapshot {
   contactsResult: CachedResult<CharacterContact[]> | null;
@@ -123,9 +125,7 @@ function entityName(names: ReadonlyMap<number, string>, id: number): string {
 }
 
 /** Stable identities, so a fallback doesn't invalidate the column memo every render. */
-const NO_NAMES: ReadonlyMap<number, string> = new Map();
 const NO_LABELS: ReadonlyMap<number, string> = new Map();
-const NO_AFFILIATIONS: ReadonlyMap<number, CharacterAffiliation> = new Map();
 const NO_OWN_AFFILIATION: OwnAffiliation = {};
 const NO_LISTS: readonly CharacterContactList[] = [];
 
@@ -323,14 +323,6 @@ const STANDING_FILTER_KEY: Record<StandingCategory, string> = {
   bad: 'contacts.filterBad',
 };
 
-/** Toggling one member of a set-valued criterion, which is how both chip groups edit. */
-function toggled<T>(set: ReadonlySet<T>, member: T): Set<T> {
-  const next = new Set(set);
-  if (next.has(member)) next.delete(member);
-  else next.add(member);
-  return next;
-}
-
 /**
  * `ContactsFilter` plus the Across tab's own criterion, so the sheet's draft
  * (issue #1282) can hold "Only disagreements" the same way it holds every
@@ -408,7 +400,7 @@ function ContactsFilterBar({
                 key={type}
                 label={t(CONTACT_KIND_KEY[type])}
                 selected={draft.types.has(type)}
-                onToggle={() => setDraft({ ...draft, types: toggled(draft.types, type) })}
+                onToggle={() => setDraft({ ...draft, types: toggleInSet(draft.types, type) })}
                 count={counts.type[type]}
               />
             ))}
@@ -424,7 +416,7 @@ function ContactsFilterBar({
                 label={t(STANDING_FILTER_KEY[category])}
                 selected={draft.standings.has(category)}
                 onToggle={() =>
-                  setDraft({ ...draft, standings: toggled(draft.standings, category) })
+                  setDraft({ ...draft, standings: toggleInSet(draft.standings, category) })
                 }
                 count={counts.standing[category]}
               />

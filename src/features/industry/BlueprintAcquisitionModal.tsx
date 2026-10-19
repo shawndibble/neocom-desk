@@ -1,3 +1,4 @@
+import { idSetKey } from '@/lib/idSetKey';
 /**
  * The Blueprint Acquisition modal (issues #839, #1240): opened from an icon on
  * any Blueprint Acquisition row (the top-level plan or any nested sub-build),
@@ -176,7 +177,7 @@ function useNames(
       mounted.current = false;
     };
   }, []);
-  const key = [...new Set(ids)].sort((a, b) => a - b).join(',');
+  const key = idSetKey(ids);
   useEffect(() => {
     for (const id of key === '' ? [] : key.split(',').map(Number)) {
       if (requested.current.has(id)) continue;

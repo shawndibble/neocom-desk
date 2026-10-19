@@ -1,3 +1,4 @@
+import { toggleInSet } from '@/lib/sets';
 import { useMemo, useState } from 'react';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useTranslation } from 'react-i18next';
@@ -38,13 +39,6 @@ const FIND_BEST_PARAMS = {
 interface Props {
   snapshot: GoalPlannerSnapshot;
   characterId: number;
-}
-
-function toggled<T>(set: ReadonlySet<T>, value: T): Set<T> {
-  const next = new Set(set);
-  if (next.has(value)) next.delete(value);
-  else next.add(value);
-  return next;
 }
 
 /**
@@ -150,11 +144,11 @@ export function FindBestPlan({ snapshot, characterId }: Props) {
         chips={best.chips}
         priceSource={priceSource}
         onToggle={(type) => {
-          setOff((current) => toggled(current, type));
+          setOff((current) => toggleInSet(current, type));
           setOpenId(null);
         }}
         onWhatIf={(type) => {
-          setWhatIf((current) => toggled(current, type));
+          setWhatIf((current) => toggleInSet(current, type));
           setOpenId(null);
         }}
       />

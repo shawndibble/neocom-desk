@@ -1,3 +1,4 @@
+import { useCopyFeedback } from '@/lib/useCopyFeedback';
 /**
  * The Travel page's Hauling tab: what is worth
  * buying at one Trade Hub to sell at another, priced at what a hauler can expect to actually get rather than
@@ -468,12 +469,8 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     }
   }
 
-  const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'failed'>('idle');
-  useEffect(() => {
-    if (copyStatus === 'idle') return;
-    const timer = setTimeout(() => setCopyStatus('idle'), 2000);
-    return () => clearTimeout(timer);
-  }, [copyStatus]);
+  const { copied: copyFlash, flash: flashCopy } = useCopyFeedback<'copied' | 'failed'>(2000);
+  const copyStatus = copyFlash ?? 'idle';
   const listText = multibuyText(plan.lines);
   // The list itself stays out of the way until asked for (the trip's
   // menu) — or until the clipboard refuses it, below.
@@ -487,13 +484,13 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
   async function copyMultibuy() {
     try {
       await writeToClipboard(listText);
-      setCopyStatus('copied');
+      flashCopy('copied');
     } catch {
       // Clipboard refused: open the list so it can be copied by hand, and
       // say so rather than leaving the button looking like it did nothing.
       setShowList(true);
       setTripOpen(false);
-      setCopyStatus('failed');
+      flashCopy('failed');
     }
   }
 

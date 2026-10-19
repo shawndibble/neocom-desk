@@ -20,6 +20,7 @@ import { agreedTerms } from './selection';
 import type { MoonMiningTaxRow } from './snapshot';
 import { useLedgerAction } from './useLedgerAction';
 import { LedgerActionError } from './LedgerActionError';
+import { toggleInSet } from '@/lib/sets';
 
 export interface JoinCandidate {
   row: MoonMiningTaxRow;
@@ -132,12 +133,7 @@ export function JoinAssignDialog({
     effectiveTaxPct <= 100;
 
   function toggle(key: string) {
-    setSelectedKeys((previous) => {
-      const next = new Set(previous);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
+    setSelectedKeys((previous) => toggleInSet(previous, key));
   }
 
   function memberInput(candidate: JoinCandidate): JoinMemberInput {

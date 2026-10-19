@@ -1,3 +1,4 @@
+import { idSetKey } from '@/lib/idSetKey';
 /**
  * Bigger chains (Plan) and what-if chains (Plan, the Map), priced off the main
  * render. Mounted only while the pilot hauls between planets, so nothing here
@@ -99,7 +100,7 @@ function useColonyJumps(
   key: string | null;
 } {
   const basis = useJumpBasis();
-  const systemKey = [...new Set(systemOf.values())].sort((a, b) => a - b).join(',');
+  const systemKey = idSetKey(systemOf.values());
   const wanted = `${basis.key}|${systemKey}`;
   const [own, setPairs] = useState(cachedPairs);
   // Another hook on the page may have counted them since this one mounted.

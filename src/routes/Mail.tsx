@@ -1,3 +1,4 @@
+import { NO_AFFILIATIONS, NO_NAMES } from '@/lib/emptyCollections';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import {
   focusRingInsetClassName,
@@ -164,11 +165,9 @@ interface Snapshot {
 }
 
 /** Stable identity for the loading/failed fallback, so it doesn't churn every render. */
-const NO_NAMES: ReadonlyMap<number, string> = new Map();
 const NO_OWNERS: readonly OwnerSnapshot[] = [];
 const NO_MAILING_LISTS: readonly MailingList[] = [];
 const NO_STANDING_INDEX: ContactStandingIndex = new Map();
-const NO_AFFILIATIONS: ReadonlyMap<number, CharacterAffiliation> = new Map();
 const NO_HAS_MORE: ReadonlyMap<number, boolean> = new Map();
 
 /**

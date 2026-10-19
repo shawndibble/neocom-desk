@@ -1,3 +1,4 @@
+import { idSetKey } from '@/lib/idSetKey';
 /**
  * Every NPC Trade Hub's broker-fee standings for one character, resolved
  * once per character (issue #1238) rather than per call site: every page
@@ -58,7 +59,7 @@ export function useTradeHubStandingsByCharacter(
   const [standingsByCharacter, setStandingsByCharacter] = useState<
     ReadonlyMap<number, TradeHubStandingsMap>
   >(new Map());
-  const key = [...characterIds].sort((a, b) => a - b).join(',');
+  const key = idSetKey(characterIds);
 
   useEffect(() => {
     let cancelled = false;

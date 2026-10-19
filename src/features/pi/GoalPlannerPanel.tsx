@@ -1,3 +1,4 @@
+import { idSetKey } from '@/lib/idSetKey';
 /**
  * The Plan tab: a **Goal Plan** over the active Character's colonies — "here
  * are my colonies and the products I want per day; what does each colony do,
@@ -203,10 +204,7 @@ function GoalPlanner({
   // them: until they resolve every leg is unknown (no host is penalised) and
   // the plan is re-made when they land.
   const basis = useJumpBasis();
-  const systemKey = useMemo(
-    () => [...new Set(rows.map((row) => row.systemId))].sort((a, b) => a - b).join(','),
-    [rows]
-  );
+  const systemKey = useMemo(() => idSetKey(rows.map((row) => row.systemId)), [rows]);
   const [jumps, setJumps] = useState<{
     key: string;
     bySystem: Map<number, number | null>;

@@ -1,3 +1,4 @@
+import { toggleInSet } from '@/lib/sets';
 /**
  * Market-Wide Build Opportunities (issue #819): a second panel on the
  * Opportunities tab, ranking manufacturable products market-wide by
@@ -213,14 +214,6 @@ function isKnownRarelySold(unitsPerDay: number | null | undefined): boolean {
 
 function sameMembers<V>(a: ReadonlySet<V>, b: ReadonlySet<V>): boolean {
   return a.size === b.size && [...a].every((member) => b.has(member));
-}
-
-/** `set` with `member` flipped. */
-function toggled<V>(set: ReadonlySet<V>, member: V): ReadonlySet<V> {
-  const next = new Set(set);
-  if (next.has(member)) next.delete(member);
-  else next.add(member);
-  return next;
 }
 
 /**
@@ -661,7 +654,7 @@ export function MarketWideOpportunitiesPanel({
             members={PRODUCT_TIERS}
             selected={draft.tiers}
             labelFor={(tier) => t(`industry.marketOpportunitiesFilters.tiers.${tier}`)}
-            onToggle={(tier) => setDraft({ ...draft, tiers: toggled(draft.tiers, tier) })}
+            onToggle={(tier) => setDraft({ ...draft, tiers: toggleInSet(draft.tiers, tier) })}
           />
           <FilterMultiSelect
             label={t('industry.marketOpportunitiesFilters.category')}
@@ -669,7 +662,7 @@ export function MarketWideOpportunitiesPanel({
             selected={draft.categories}
             labelFor={(category) => t(`industry.marketOpportunitiesFilters.categories.${category}`)}
             onToggle={(category) =>
-              setDraft({ ...draft, categories: toggled(draft.categories, category) })
+              setDraft({ ...draft, categories: toggleInSet(draft.categories, category) })
             }
           />
           <FilterMultiSelect
@@ -677,7 +670,9 @@ export function MarketWideOpportunitiesPanel({
             members={BLUEPRINT_SOURCES}
             selected={draft.sources}
             labelFor={(source) => t(`industry.marketOpportunitiesBlueprintSources.${source}`)}
-            onToggle={(source) => setDraft({ ...draft, sources: toggled(draft.sources, source) })}
+            onToggle={(source) =>
+              setDraft({ ...draft, sources: toggleInSet(draft.sources, source) })
+            }
           />
           <div
             role="group"

@@ -1,3 +1,4 @@
+import { NO_NAMES } from '@/lib/emptyCollections';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { cx } from '@/lib/cx';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -35,7 +36,7 @@ import { buildAltAdvice } from './altAdvice';
 import { loadSystemNameAndSecurity } from '@/features/character/systemSecurity';
 import { AssumedCustomsNote } from '../AssumedCustomsNote';
 import { assumedCustomsNames } from '../colonyCustoms';
-import { EMPTY_ROSTER, NO_DETAILS, NO_NAMES, mergeNames, type Snapshot } from './coloniesSnapshot';
+import { EMPTY_ROSTER, NO_DETAILS, mergeNames, type Snapshot } from './coloniesSnapshot';
 import {
   colonyCheckRow,
   HOUR_MS,
