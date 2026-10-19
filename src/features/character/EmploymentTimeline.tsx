@@ -7,6 +7,9 @@
  * Each stint's date range shows once. On the page at `md` and up it sits in the
  * gutter beside the rail; everywhere else (a phone, and always in the modal,
  * which is too narrow for a gutter) it sits under the name.
+ *
+ * An NPC corporation stint (idle time, or a stop between player corps) draws
+ * as a slim dimmed line instead of a card: no logo, no bar, no stint pills.
  */
 import { useTranslation } from 'react-i18next';
 import { StatChip, StatChips } from '@/components/ui';
@@ -135,53 +138,77 @@ export function EmploymentTimeline({
                 )}
               />
             </div>
-            <div className="mb-2.5 min-w-0 rounded-xs bg-panel-2 px-3 py-2.5">
-              <div className="flex items-center gap-3">
-                <img
-                  src={corporationLogoUrl(row.corporationId, 64)}
-                  crossOrigin="anonymous"
-                  alt=""
-                  width={32}
-                  height={32}
-                  loading="lazy"
-                  className="size-8 max-w-none shrink-0 rounded-xs border border-line"
-                />
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                    <CorporationLink id={row.corporationId} className="min-w-0 truncate text-left">
-                      {name}
-                    </CorporationLink>
-                    {current && (
-                      <span className={cx(PILL, PILL_TONE.success)}>
-                        {t('employmentHistory.current')}
-                      </span>
-                    )}
-                    {row.returned && (
-                      <span className={cx(PILL, PILL_TONE.neutral)}>
-                        {t('employmentHistory.returned')}
-                      </span>
-                    )}
-                    {row.shortStay && (
-                      <span className={cx(PILL, PILL_TONE.warning)}>
-                        {t('employmentHistory.shortStay')}
-                      </span>
-                    )}
-                  </div>
-                  <div className={cx('text-xs text-text-dim', page && 'md:hidden')}>{range}</div>
-                </div>
-                <span className="shrink-0 font-semibold tabular-nums">
+            {row.npc ? (
+              <div className="mb-2.5 flex min-w-0 items-center gap-2 px-3 py-2 text-sm text-text-dim">
+                <span className={cx(PILL, PILL_TONE.neutral)}>{t('employmentHistory.npc')}</span>
+                {current && (
+                  <span className={cx(PILL, PILL_TONE.success)}>
+                    {t('employmentHistory.current')}
+                  </span>
+                )}
+                <CorporationLink id={row.corporationId} className="min-w-0 truncate text-left">
+                  {name}
+                </CorporationLink>
+                <span className={cx('hidden shrink-0 text-xs sm:inline', page && 'md:hidden')}>
+                  {range}
+                </span>
+                <span className="ml-auto shrink-0 tabular-nums">
                   {formatTenure(row.tenureSeconds)}
                 </span>
               </div>
-              <div aria-hidden className="mt-2 h-1 overflow-hidden rounded-xs bg-line">
-                <div
-                  className="h-full rounded-xs bg-line-bright"
-                  style={{
-                    width: `${Math.max(MIN_BAR_PERCENT, Math.round(row.tenureRatio * 100))}%`,
-                  }}
-                />
+            ) : (
+              <div className="mb-2.5 min-w-0 rounded-xs bg-panel-2 px-3 py-2.5">
+                <div className="flex items-center gap-3">
+                  <img
+                    src={corporationLogoUrl(row.corporationId, 64)}
+                    crossOrigin="anonymous"
+                    alt=""
+                    width={32}
+                    height={32}
+                    loading="lazy"
+                    className="size-8 max-w-none shrink-0 rounded-xs border border-line"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <CorporationLink
+                        id={row.corporationId}
+                        className="min-w-0 truncate text-left"
+                      >
+                        {name}
+                      </CorporationLink>
+                      {current && (
+                        <span className={cx(PILL, PILL_TONE.success)}>
+                          {t('employmentHistory.current')}
+                        </span>
+                      )}
+                      {row.returned && (
+                        <span className={cx(PILL, PILL_TONE.neutral)}>
+                          {t('employmentHistory.returned')}
+                        </span>
+                      )}
+                      {row.shortStay && (
+                        <span className={cx(PILL, PILL_TONE.warning)}>
+                          {t('employmentHistory.shortStay')}
+                        </span>
+                      )}
+                    </div>
+                    <div className={cx('text-xs text-text-dim', page && 'md:hidden')}>{range}</div>
+                  </div>
+                  <span className="shrink-0 font-semibold tabular-nums">
+                    {formatTenure(row.tenureSeconds)}
+                  </span>
+                </div>
+                <div aria-hidden className="mt-2 h-1 overflow-hidden rounded-xs bg-line">
+                  <div
+                    data-tenure-bar
+                    className="h-full rounded-xs bg-line-bright"
+                    style={{
+                      width: `${Math.max(MIN_BAR_PERCENT, Math.round(row.tenureRatio * 100))}%`,
+                    }}
+                  />
+                </div>
               </div>
-            </div>
+            )}
           </li>
         );
       })}
