@@ -170,6 +170,26 @@ interface Baselines {
   emptied: Map<string, FittingStats>;
 }
 
+/** Every item's full name with its grade ("… EE-603", "Strong … Booster") and its grade alone. */
+export function implantNames(
+  families: readonly ImplantFamily[]
+): Map<number, { full: string; short: string }> {
+  const map = new Map<number, { full: string; short: string }>();
+  for (const family of families) {
+    for (const grade of family.grades) {
+      map.set(grade.typeId, {
+        full: !grade.code
+          ? family.name
+          : family.kind === 'booster'
+            ? `${grade.code} ${family.name}`
+            : `${family.name} ${grade.code}`,
+        short: grade.code ?? family.name,
+      });
+    }
+  }
+  return map;
+}
+
 /** One slot, kind and number: implant slot 3 and booster slot 3 are different slots. */
 export const slotKey = (kind: string, slot: number) => `${kind}:${slot}`;
 

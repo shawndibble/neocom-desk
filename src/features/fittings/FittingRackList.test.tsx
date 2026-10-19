@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
@@ -8,6 +8,7 @@ import { DroneSection, FittingRackList as EditableRackList } from './FittingRack
 import { FITTING_DRAG_TYPE, useFittingDrag, type FittingDragPayload } from './fittingDrag';
 import { FittingItemActionsProvider, type FittingItemActions } from './fittingItemActions';
 import { fakeItemActions } from './__fixtures__/itemActions';
+import { MakeItFitContext } from './makeItFitContext';
 
 type RackListProps = Parameters<typeof EditableRackList>[0];
 
@@ -62,6 +63,20 @@ describe('FittingRackList', () => {
     rerender(<FittingRackList fitting={fitting} stats={statsWith(112.5)} />);
     expect(screen.getByText('Over by 12.5')).toBeTruthy();
     expect(container.querySelectorAll('.flash-danger')).toHaveLength(1);
+  });
+
+  it('puts Fix CPU beside the overage it fixes, only in the editor', () => {
+    const open = vi.fn();
+    const { rerender } = render(<FittingRackList fitting={fitting} stats={statsWith(112.5)} />);
+    expect(screen.queryByRole('button', { name: 'Fix CPU' })).toBeNull();
+    rerender(
+      <MakeItFitContext.Provider value={open}>
+        <FittingRackList fitting={fitting} stats={statsWith(112.5)} />
+      </MakeItFitContext.Provider>
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Fix CPU' }));
+    expect(open).toHaveBeenCalledWith('cpu');
+    expect(screen.queryByRole('button', { name: 'Fix powergrid' })).toBeNull();
   });
 
   it('does not flash again while it stays over budget, or across a recompute gap', () => {

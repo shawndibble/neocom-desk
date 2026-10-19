@@ -74,6 +74,12 @@ import {
   tacticalModesFor,
 } from '@/engine/fittings/tacticalModes';
 import { guarded } from '@/app/routeChunks';
+import { fitsResourceBudget, resourceOverage } from '@/engine/fittings/skillGaps';
+import { MakeItFitTrigger } from './MakeItFitTrigger';
+import type { FitResource } from './makeItFitContext';
+
+/** An over-budget CPU, powergrid or calibration figure, as the ring and List show theirs. */
+const OVER_BUDGET_TONE = 'font-semibold text-danger';
 
 const FittingAppraisalModal = lazy(() =>
   guarded(() => import('./FittingAppraisalModal')).then((m) => ({
@@ -764,6 +770,25 @@ export function FittingStatsSections({
    */
   const figure = (format: (s: FittingStats) => string, toneClassName?: string) =>
     stats ? <HeatFigure stats={stats} format={format} toneClassName={toneClassName} /> : undefined;
+  /** A CPU/PG/calibration figure: red when over, with its "Fix" link beneath. */
+  const budgetFigure = (
+    resource: FitResource,
+    used: number,
+    total: number,
+    format: (s: FittingStats) => string
+  ) => {
+    const over = resourceOverage(used, total) > 0;
+    return (
+      <>
+        {figure(format, over ? OVER_BUDGET_TONE : undefined)}
+        {over && (
+          <span className="block">
+            <MakeItFitTrigger resource={resource} />
+          </span>
+        )}
+      </>
+    );
+  };
 
   function section(
     id: Section,
@@ -1180,11 +1205,13 @@ export function FittingStatsSections({
     ),
     section(
       'fitting',
-      figure((s) =>
-        t('fittings.stats.fittingMeta', {
-          cpu: pctOf(s.cpuUsed, s.cpuTotal).toFixed(0),
-          pg: pctOf(s.powergridUsed, s.powergridTotal).toFixed(0),
-        })
+      figure(
+        (s) =>
+          t('fittings.stats.fittingMeta', {
+            cpu: pctOf(s.cpuUsed, s.cpuTotal).toFixed(0),
+            pg: pctOf(s.powergridUsed, s.powergridTotal).toFixed(0),
+          }),
+        stats && !fitsResourceBudget(stats) ? OVER_BUDGET_TONE : undefined
       ),
       stats ? (
         <>
@@ -1192,7 +1219,7 @@ export function FittingStatsSections({
             items={[
               {
                 label: t('fittings.stats.fact.cpu'),
-                value: figure((s) =>
+                value: budgetFigure('cpu', stats.cpuUsed, stats.cpuTotal, (s) =>
                   t('fittings.stats.unit.usedOfTotal', {
                     used: s.cpuUsed.toFixed(1),
                     total: s.cpuTotal.toFixed(1),
@@ -1201,7 +1228,7 @@ export function FittingStatsSections({
               },
               {
                 label: t('fittings.stats.fact.powergrid'),
-                value: figure((s) =>
+                value: budgetFigure('powergrid', stats.powergridUsed, stats.powergridTotal, (s) =>
                   t('fittings.stats.unit.usedOfTotal', {
                     used: s.powergridUsed.toFixed(1),
                     total: s.powergridTotal.toFixed(1),
@@ -1210,11 +1237,15 @@ export function FittingStatsSections({
               },
               {
                 label: t('fittings.stats.fact.calibration'),
-                value: figure((s) =>
-                  t('fittings.stats.unit.usedOfTotal', {
-                    used: s.calibrationUsed.toFixed(0),
-                    total: s.calibrationTotal.toFixed(0),
-                  })
+                value: budgetFigure(
+                  'calibration',
+                  stats.calibrationUsed,
+                  stats.calibrationTotal,
+                  (s) =>
+                    t('fittings.stats.unit.usedOfTotal', {
+                      used: s.calibrationUsed.toFixed(0),
+                      total: s.calibrationTotal.toFixed(0),
+                    })
                 ),
               },
               ...resourceFacts(stats),

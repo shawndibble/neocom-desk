@@ -46,7 +46,7 @@ import {
   type FittingSlotKind,
   type FittingStats,
 } from '@/engine/fittings/types';
-import { moduleKey, resourceOverage } from '@/engine/fittings/skillGaps';
+import { moduleKey } from '@/engine/fittings/skillGaps';
 import { showsDrones } from '@/engine/fittings/stats';
 import { useOptionalItemActions } from '@/features/market/itemActions';
 import { useOverBudgetFlash } from './useOverBudgetFlash';
@@ -69,6 +69,7 @@ import type { FittingContext } from './fittingContext';
 import { catalogueTypeName, catalogueVolume, type FittingCatalogue } from './useFittingCatalogue';
 import type { FittingChange } from './useFittingWorkspace';
 import { MakeItFitTrigger } from './MakeItFitTrigger';
+import type { FitResource } from './makeItFitContext';
 import { MODULE_STATE_STYLE } from './moduleStateStyle';
 
 const RACK_LABEL_CLASS =
@@ -78,6 +79,8 @@ interface ResourceBarProps {
   label: string;
   used: number | null;
   total: number | null;
+  /** A budget Make it fit can fix: over budget, it gets its "Fix" link. */
+  resource?: FitResource;
 }
 
 /**
@@ -86,7 +89,7 @@ interface ResourceBarProps {
  * each time the readout goes from within budget to over (a Character switch
  * that re-states it included) — the `null` gap while it recomputes doesn't count.
  */
-function ResourceBar({ label, used, total }: ResourceBarProps) {
+function ResourceBar({ label, used, total, resource }: ResourceBarProps) {
   const { t } = useTranslation();
   const { overage, overBudget, flashKey } = useOverBudgetFlash(used, total);
   const known = used !== null && total !== null;
@@ -118,8 +121,11 @@ function ResourceBar({ label, used, total }: ResourceBarProps) {
         </span>
       </div>
       {overBudget && (
-        <p className="pl-30 text-right text-xs text-danger">
-          {t('fittings.list.overBy', { amount: overage.toFixed(1) })}
+        <p className="flex items-baseline justify-end gap-3 pl-30 text-xs">
+          {resource && <MakeItFitTrigger resource={resource} />}
+          <span className="text-danger">
+            {t('fittings.list.overBy', { amount: overage.toFixed(1) })}
+          </span>
         </p>
       )}
     </div>
@@ -799,10 +805,6 @@ export function FittingRackList({
   const drones = droneGroups(fitting);
   const dronesShown = showsDrones(stats, drones.length);
   const droneVolume = (typeId: number) => catalogueVolume(catalogue, typeId);
-  const overFit =
-    resourceOverage(stats?.cpuUsed ?? null, stats?.cpuTotal ?? null) > 0 ||
-    resourceOverage(stats?.powergridUsed ?? null, stats?.powergridTotal ?? null) > 0 ||
-    resourceOverage(stats?.calibrationUsed ?? null, stats?.calibrationTotal ?? null) > 0;
 
   return (
     <Panel title={t('fittings.list.title')} actions={actions}>
@@ -812,23 +814,20 @@ export function FittingRackList({
             label={t('fittings.list.cpu')}
             used={stats?.cpuUsed ?? null}
             total={stats?.cpuTotal ?? null}
+            resource="cpu"
           />
           <ResourceBar
             label={t('fittings.list.powergrid')}
             used={stats?.powergridUsed ?? null}
             total={stats?.powergridTotal ?? null}
+            resource="powergrid"
           />
           <ResourceBar
             label={t('fittings.list.calibration')}
             used={stats?.calibrationUsed ?? null}
             total={stats?.calibrationTotal ?? null}
+            resource="calibration"
           />
-          {/* CPU, powergrid and calibration can be fixed by swaps (drone bandwidth cannot), and all go through one dialog. */}
-          {overFit && (
-            <div className="flex justify-end">
-              <MakeItFitTrigger />
-            </div>
-          )}
           {dronesShown && (
             <ResourceBar
               label={t('fittings.list.droneBandwidth')}

@@ -453,30 +453,38 @@ function Readout({
   const known = used !== null && total !== null;
   const { overBudget, flashKey } = flash;
   const value = budgetValue(t, budget);
+  // Drone bandwidth has no fix to offer: no swap, skill or implant makes room for a drone.
+  const fixable = gauge === 'cpu' || gauge === 'powergrid' || gauge === 'calibration';
   return (
-    <div
-      role="meter"
-      aria-label={budget.label}
-      aria-valuenow={known ? used : undefined}
-      aria-valuemax={known ? total : undefined}
-      className={`min-w-0 text-xs tabular-nums ${align === 'end' ? 'text-right' : ''}`}
-    >
-      <p
-        className={`flex items-center gap-1.5 ${MICRO_LABEL} ${align === 'end' ? 'flex-row-reverse' : ''}`}
+    <div className={`min-w-0 text-xs tabular-nums ${align === 'end' ? 'text-right' : ''}`}>
+      <div
+        role="meter"
+        aria-label={budget.label}
+        aria-valuenow={known ? used : undefined}
+        aria-valuemax={known ? total : undefined}
       >
-        <GaugeSwatch gauge={gauge} />
-        <span className="truncate">{budget.label}</span>
-      </p>
-      <p
-        key={flashKey}
-        className={`rounded-xs text-sm ${overBudget ? 'font-semibold text-danger' : 'text-text'} ${flashKey > 0 && overBudget ? 'flash-danger' : ''}`}
-      >
-        {value ?? '…'}
-      </p>
-      {overBudget && (
-        <p className="text-danger">
-          {t('fittings.list.overBy', { amount: flash.overage.toFixed(1) })}
+        <p
+          className={`flex items-center gap-1.5 ${MICRO_LABEL} ${align === 'end' ? 'flex-row-reverse' : ''}`}
+        >
+          <GaugeSwatch gauge={gauge} />
+          <span className="truncate">{budget.label}</span>
         </p>
+        <p
+          key={flashKey}
+          className={`rounded-xs text-sm ${overBudget ? 'font-semibold text-danger' : 'text-text'} ${flashKey > 0 && overBudget ? 'flash-danger' : ''}`}
+        >
+          {value ?? '…'}
+        </p>
+        {overBudget && (
+          <p className="text-danger">
+            {t('fittings.list.overBy', { amount: flash.overage.toFixed(1) })}
+          </p>
+        )}
+      </div>
+      {overBudget && fixable && (
+        <div className={`flex ${align === 'end' ? 'justify-end' : ''}`}>
+          <MakeItFitTrigger resource={gauge} />
+        </div>
       )}
     </div>
   );
@@ -1022,9 +1030,6 @@ export function FittingRing({
     ? ['calibration', 'droneBandwidth', 'cpu', 'powergrid']
     : ['calibration', 'cpu', 'powergrid'];
 
-  // One "Make it fit…" for the whole ring: CPU, powergrid and calibration all go through the same dialog.
-  const overFit = [cpuFlash, pgFlash, calFlash].some((flash) => flash.overBudget);
-
   const cantUse = (slot: RingSlot) =>
     slot.module !== undefined && (unusableModuleKeys?.has(moduleKey(slot.module)) ?? false);
   const isSelected = (slot: RingSlot) =>
@@ -1244,11 +1249,6 @@ export function FittingRing({
             )}
             <Readout gauge="powergrid" budget={budgets.powergrid} align="start" />
             <Readout gauge="cpu" budget={budgets.cpu} align="end" />
-            {overFit && (
-              <div className="col-span-2 text-center">
-                <MakeItFitTrigger />
-              </div>
-            )}
             <SustainedTankReadout stats={stats ?? null} className="col-span-2 text-center" />
           </div>
         )}
@@ -1261,11 +1261,6 @@ export function FittingRing({
             {/* Calibration can gate a fit too, but only earns a line on the phone when it is the one over. */}
             {calFlash.overBudget && (
               <Readout gauge="calibration" budget={budgets.calibration} align="start" />
-            )}
-            {overFit && (
-              <div className="col-span-2 text-center">
-                <MakeItFitTrigger />
-              </div>
             )}
           </div>
         )}

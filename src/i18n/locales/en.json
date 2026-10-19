@@ -1199,6 +1199,11 @@
       "filter": "Filter Characters",
       "prerequisite": "(prerequisite)"
     },
+    "skillFixes": {
+      "heading": "Makes it fit",
+      "makesItFit": "Brings the Fitting under budget",
+      "inPlan": "In {{plan}}"
+    },
     "whatToTrain": {
       "noCharacter": "Log in a Character to see which skill to train next for this fit.",
       "overridesOn": "Clear the skill overrides to rank skills: a +1 level builds on the Character's real skills.",
@@ -1268,14 +1273,26 @@
       }
     },
     "makeItFit": {
-      "trigger": "Make it fit…",
+      "fix": {
+        "cpu": "Fix CPU",
+        "powergrid": "Fix powergrid",
+        "calibration": "Fix calibration"
+      },
       "title": "Make it fit",
+      "section": {
+        "train": "Train",
+        "implants": "Implants",
+        "swap": "Swap modules"
+      },
+      "checkingSkills": "Checking skills…",
+      "checkingImplants": "Checking implants… {{done}} of {{total}}",
+      "implantsApplied": "Added {{names}} to the Fitting's implants",
       "searching": "Trying every variant swap…",
       "failed": "Could not work out the swaps for this Fitting.",
       "showing": "Showing the best {{shown}} of {{total}}.",
       "hint": "Smallest changes that bring the Fitting under budget. Click one to apply it.",
       "swap": "{{from}} → {{to}}",
-      "nothingFits": "No swap or pair of swaps brings this Fitting under budget. Try a bigger skill, an implant, or a different module from the List.",
+      "nothingFits": "No module swap or pair of swaps brings this Fitting under budget. Try a different module from the List.",
       "fits": "This Fitting is already within its CPU, powergrid and calibration budget.",
       "noPrice": "Options without a price show no cost.",
       "details": "All changes",
