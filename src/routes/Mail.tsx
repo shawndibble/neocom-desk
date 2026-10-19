@@ -1,5 +1,3 @@
-import { NO_AFFILIATIONS, NO_NAMES } from '@/lib/emptyCollections';
-import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { Navigate } from 'react-router-dom';
@@ -24,45 +22,29 @@ import { ReauthCachedNote } from '@/app/ReauthCachedNote';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useOnline } from '@/stores/network';
 import { useRetryFocus } from '@/lib/useRetryFocus';
-import { CharacterLink } from '@/features/entities';
-import { StandingTag } from '@/features/character/StandingTag';
-import {
-  loadMailHeaders,
-  loadMailBody,
-  loadMoreMailHeaders,
-  markMailReadOnEsi,
-} from '@/features/character/mail';
+import { loadMailBody, markMailReadOnEsi } from '@/features/character/mail';
 import { useMailScopeSwitch } from '@/features/character/useMailScopeSwitch';
 import {
   loadAllMailSnapshot,
   loadMailSnapshot,
-  namePartyIds,
-  resolveSenderAffiliations,
-  NO_HAS_MORE,
   NO_MAILING_LISTS,
   NO_OWNERS,
-  NO_STANDING_INDEX,
-  type Snapshot,
 } from '@/features/character/mailSnapshot';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
 import { CharacterScopeReadout } from '@/features/character/CharacterScopeReadout';
 import type { CharacterFilterValue } from '@/features/character/characterFilterValue';
 import { CharacterAvatar } from '@/components/ui/CharacterAvatar';
-import { MailComposeBox } from '@/features/character/MailComposeBox';
 import { NewMailComposer, type NewMailCloseReason } from '@/features/character/NewMailComposer';
-import { MailBodyView } from '@/features/character/MailBodyView';
-import { MailListRow } from '@/features/character/MailListRow';
-import { MailListEmpty } from '@/features/character/MailListEmpty';
-import { TAB_LABEL_KEY, mailAgeLabel, type MailRow } from '@/features/character/mailDisplay';
-import { characterStanding } from '@/features/character/entityStanding';
+import { MailListPane } from '@/features/character/MailListPane';
+import { MailReaderBody } from '@/features/character/MailReaderBody';
+import { useMailPaging } from '@/features/character/useMailPaging';
+import { TAB_LABEL_KEY, type MailRow } from '@/features/character/mailDisplay';
 import type { CachedResult } from '@/esi/cache';
-import { resolveNames } from '@/features/character/names';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import { useFocusHeading } from '@/lib/useFocusHeading';
 import { stripEveMarkup } from '@/features/skills/typeDisplay';
 import { useMailFolders } from '@/features/character/mailFolderPref';
-import { cx } from '@/lib/cx';
 import { useDebouncedValue } from '@/lib/useDebouncedValue';
 import { useUrlParams } from '@/lib/useUrlState';
 import { boolParam, textParam } from '@/lib/urlState';
@@ -82,7 +64,7 @@ import {
   type ComposeKind,
   type MailTab,
 } from '@/engine/mail/mail';
-import type { CharacterAffiliation, MailBody, MailHeader } from '@/esi/endpoints';
+import type { MailBody, MailHeader } from '@/esi/endpoints';
 
 const SEARCH_PARAM = textParam();
 const HIDE_READ_PARAM = boolParam();
@@ -248,51 +230,6 @@ function MailView({ scope, scopeControl }: MailViewProps) {
   /** Bumped by "Try again" on a body that could not be read, to refetch it. */
   const [bodyAttempt, setBodyAttempt] = useState(0);
   const online = useOnline();
-  /** Why the last "Load more" gave nothing, or `null`. Cleared when the next attempt starts. */
-  const [loadMoreFailure, setLoadMoreFailure] = useState<'offline' | 'error' | null>(null);
-
-  // Headers loaded via "load more" (issue #161) live outside useRouteSnapshot,
-  // which only supports a full reload, not an incremental patch. `null` means
-  // "no load-more yet this snapshot" — fall back to the snapshot's own lists.
-  // Per Character: each mailbox pages by its own `last_mail_id`.
-  const [loadedHeaders, setLoadedHeaders] = useState<ReadonlyMap<number, MailHeader[]> | null>(
-    null
-  );
-  // Names for those headers: the snapshot only resolved the parties in its own
-  // first page, so without this every row past it would read "Unknown".
-  const [loadedNames, setLoadedNames] = useState<ReadonlyMap<number, string> | null>(null);
-  // Same gap, for standing: the snapshot only resolved affiliations for its
-  // own first page of senders, so without this an inherited (corp/alliance)
-  // standing would silently never show past it — a personal contact entry
-  // would still match (the index is id-keyed), which is what makes this easy
-  // to miss in a quick look.
-  const [loadedAffiliations, setLoadedAffiliations] = useState<Map<
-    number,
-    CharacterAffiliation
-  > | null>(null);
-  const [hasMoreByOwner, setHasMoreByOwner] = useState<ReadonlyMap<number, boolean>>(NO_HAS_MORE);
-  const hasMore = [...hasMoreByOwner.values()].some(Boolean);
-  const [loadingMore, setLoadingMore] = useState(false);
-  // Reset for a new snapshot (character switch, manual refresh, or the
-  // initial load) synchronously during render — the same "adjust state while
-  // rendering" pattern useRouteSnapshot itself uses — so `hasMore` is already
-  // correct on the very render that first shows this snapshot's headers,
-  // instead of lagging a render behind through a useEffect.
-  const [snapshotForHeaders, setSnapshotForHeaders] = useState<Snapshot | null>(null);
-  if (data !== snapshotForHeaders) {
-    setSnapshotForHeaders(data);
-    setLoadedHeaders(null);
-    setLoadedNames(null);
-    setLoadedAffiliations(null);
-    setHasMoreByOwner(new Map((data?.owners ?? []).map((o) => [o.characterId, o.hasMore])));
-  }
-  // Latest snapshot, readable from handleLoadMore's async closure after an
-  // await — a stale closure over `data` would never see the character
-  // switch or refresh that superseded the in-flight request.
-  const dataRef = useRef(data);
-  useEffect(() => {
-    dataRef.current = data;
-  });
 
   // The pilot's Local/EVE-time preference, the same way Contracts,
   // Notifications and Clones thread it into their own timestamps.
@@ -303,6 +240,17 @@ function MailView({ scope, scopeControl }: MailViewProps) {
 
   const owners = data?.owners ?? NO_OWNERS;
   const ownerById = useMemo(() => new Map(owners.map((o) => [o.characterId, o])), [owners]);
+
+  const {
+    loadedHeaders,
+    names,
+    senderAffiliations,
+    hasMore,
+    loadingMore,
+    loadMoreFailure,
+    handleLoadMore,
+    refetchOwnerHeaders,
+  } = useMailPaging(data, owners, ownerById);
   // The first mailbox stands in for the whole view in the empty state: with
   // none cached anywhere there is nothing better to say about it.
   const headersResult = owners[0]?.headersResult ?? null;
@@ -313,8 +261,6 @@ function MailView({ scope, scopeControl }: MailViewProps) {
     return at && (oldest === null || at < oldest) ? at : oldest;
   }, null);
   const needsReauth = data?.needsReauth ?? false;
-  const names = loadedNames ?? data?.names ?? NO_NAMES;
-  const senderAffiliations = loadedAffiliations ?? data?.senderAffiliations ?? NO_AFFILIATIONS;
   const unreadByTab = useMemo(() => sumUnreadByTab(owners.map((o) => o.labels)), [owners]);
   const mailingListNames = useMemo(() => {
     const map = new Map<number, string>();
@@ -420,88 +366,10 @@ function MailView({ scope, scopeControl }: MailViewProps) {
     return t('mail.recipientMore', { name: all[0], count: all.length - 1 });
   }
 
-  /** What each mailbox currently shows: its load-more list if it has one, else the snapshot's. */
-  function currentHeadersOf(ownerId: number): MailHeader[] {
-    return loadedHeaders?.get(ownerId) ?? ownerById.get(ownerId)?.headersResult?.data ?? [];
-  }
-
-  /**
-   * Shared by `handleLoadMore` and `handleSent`: resolve names/affiliations
-   * for fresh header lists and apply them, unless a character switch or
-   * refresh already superseded `requestSnapshot` while this was in flight
-   * (`dataRef` tracks the latest one).
-   */
-  async function applyFreshHeaders(
-    requestSnapshot: Snapshot | null,
-    fresh: ReadonlyMap<number, { headers: MailHeader[]; hasMore: boolean }>
-  ) {
-    const all = [...fresh.values()].flatMap((entry) => entry.headers);
-    const [freshNames, freshAffiliations] = await Promise.all([
-      resolveNames(namePartyIds(all)),
-      resolveSenderAffiliations(all),
-    ]);
-    if (dataRef.current !== requestSnapshot) return;
-    setLoadedHeaders(new Map([...fresh].map(([id, entry]) => [id, entry.headers])));
-    setHasMoreByOwner(new Map([...fresh].map(([id, entry]) => [id, entry.hasMore])));
-    setLoadedNames(freshNames);
-    setLoadedAffiliations(freshAffiliations);
-  }
-
-  /** One more page per mailbox that has one — a mailbox with nothing older is left as it is. */
-  async function handleLoadMore() {
-    if (owners.length === 0 || loadingMore) return;
-    const requestSnapshot = data;
-    setLoadingMore(true);
-    setLoadMoreFailure(null);
-    try {
-      const fresh = new Map<number, { headers: MailHeader[]; hasMore: boolean }>();
-      const failures = new Set<'offline' | 'error'>();
-      await Promise.all(
-        owners.map(async (owner) => {
-          const current = currentHeadersOf(owner.characterId);
-          if (!hasMoreByOwner.get(owner.characterId)) {
-            fresh.set(owner.characterId, { headers: current, hasMore: false });
-            return;
-          }
-          const page = await loadMoreMailHeaders(owner.characterId, current);
-          if (page.failure) failures.add(page.failure);
-          fresh.set(owner.characterId, page);
-        })
-      );
-      setLoadMoreFailure(
-        failures.has('offline') ? 'offline' : failures.has('error') ? 'error' : null
-      );
-      await applyFreshHeaders(requestSnapshot, fresh);
-    } finally {
-      setLoadingMore(false);
-    }
-  }
-
-  /**
-   * After a successful Reply/Forward send. `sendMail` already deleted the
-   * cached headers row (mail-reply-and-forward decision: "a targeted
-   * invalidation of one key, not a broader reload") — refetching just the
-   * headers here is what shows the new Sent mail without a manual refresh
-   * while keeping that promise. Not `refresh()`: it calls the cache's global
-   * `invalidateFreshness()`, forcing every other default-tier row (labels,
-   * mailing lists, contacts, affiliations) to refetch too. Only the sending
-   * Character's mailbox is refetched; the others keep what they show.
-   */
-  async function handleSent(ownerId: number) {
+  /** After a successful Reply/Forward/New Mail send: close any compose box, refetch that mailbox's headers. */
+  function handleSent(ownerId: number) {
     setComposeKind(null);
-    const requestSnapshot = data;
-    const result = await loadMailHeaders(ownerId);
-    const fresh = new Map(
-      owners.map((o) => [
-        o.characterId,
-        {
-          headers: currentHeadersOf(o.characterId),
-          hasMore: hasMoreByOwner.get(o.characterId) ?? false,
-        },
-      ])
-    );
-    fresh.set(ownerId, { headers: result.cached?.data ?? [], hasMore: result.hasMore });
-    await applyFreshHeaders(requestSnapshot, fresh);
+    void refetchOwnerHeaders(ownerId);
   }
 
   useEffect(() => {
@@ -575,14 +443,13 @@ function MailView({ scope, scopeControl }: MailViewProps) {
   function handleNewMailSent() {
     setNewMailOpen(false);
     setNotice(t('mail.sentToast'));
-    void handleSent(composeCharacterId);
+    handleSent(composeCharacterId);
   }
 
   // The composer takes the reader's place on a wide screen.
   const newMailInline = newMailOpen && isDesktop;
   const readerVisible = !newMailInline && (isDesktop || selectedKey !== null);
   const showBackControl = !isDesktop && selectedKey !== null;
-  const recipients = selectedHeader?.recipients ?? [];
   const selectedTab = selectedRow?.tab ?? 'inbox';
   const selectedSender =
     (selectedHeader?.from === undefined ? undefined : names.get(selectedHeader.from)) ??
@@ -731,93 +598,29 @@ function MailView({ scope, scopeControl }: MailViewProps) {
           )}
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-[22rem_minmax(0,1fr)] lg:items-start xl:grid-cols-[24rem_minmax(0,1fr)]">
-            <Panel padded={false} className={isDesktop || selectedKey === null ? '' : 'hidden'}>
-              {listState !== 'rows' ? (
-                <MailListEmpty
-                  state={listState}
-                  folderCount={folders.length}
-                  hasMore={hasMore}
-                  offline={offline}
-                  onShowAllFolders={() => void setFolders(MAIL_FOLDERS)}
-                  onClearSearch={clearSearch}
-                  onShowRead={showRead}
-                />
-              ) : (
-                // Flat cap, not viewport-relative: the "load more" button
-                // renders below this list in the same column, so sizing the
-                // list to all remaining viewport height would push it off-screen.
-                // Raised from 32rem alongside the taller two-line row, so about
-                // as many mails stay on screen as before.
-                // Sticky date <h3>s, as in the Coming up rail; `scroll-pt-8`
-                // keeps a focused row out from under one (WCAG 2.4.11).
-                <div className="max-h-[36rem] scroll-pt-8 overflow-y-auto lg:max-h-[44rem]">
-                  {rowSections.map((section) => (
-                    <div key={section.key}>
-                      <h3
-                        className={cx(
-                          eyebrowClassName,
-                          'sticky top-0 z-10 border-y border-line bg-panel-2 px-3 py-1.5'
-                        )}
-                      >
-                        {mailAgeLabel(section.bucket, t)}
-                      </h3>
-                      <ul className="divide-y divide-line">
-                        {section.items.map((row) => {
-                          const { header, tab } = row;
-                          // Not `cond && get(...) ?? fallback`: `??` passes `false`
-                          // straight through, so a header with no sender rendered
-                          // nothing at all instead of the fallback.
-                          const sender =
-                            (header.from === undefined ? undefined : names.get(header.from)) ??
-                            t('mail.unknownSender');
-                          return (
-                            <MailListRow
-                              key={row.key}
-                              row={row}
-                              isAll={isAll}
-                              isRead={header.is_read || locallyReadKeys.has(row.key)}
-                              isSelected={selectedKey === row.key}
-                              // A Sent mail's sender is you, so the whole Sent folder read
-                              // as a column of your own name. Its recipients are already
-                              // resolved for the reading pane, so showing them here costs
-                              // no extra lookup and is what makes Sent legible without
-                              // spending a colour on it.
-                              party={tab === 'sent' ? recipientSummary(header) : sender}
-                              timeZone={timeZone}
-                              onOpen={openRow}
-                            />
-                          );
-                        })}
-                      </ul>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {headersTruncated && (
-                <p className="border-t border-line p-2 text-[0.6875rem] text-text-dim">
-                  {t('mail.capNotice', { count: cappedRows.length })}
-                </p>
-              )}
-              {hasMore && (
-                <div className="border-t border-line p-2">
-                  <Button
-                    size="sm"
-                    className="w-full"
-                    onClick={() => void handleLoadMore()}
-                    disabled={loadingMore}
-                  >
-                    {loadingMore ? t('common.loading') : t('mail.loadMore')}
-                  </Button>
-                  {loadMoreFailure !== null && (
-                    <p role="alert" className="mt-1.5 text-xs text-danger">
-                      {loadMoreFailure === 'offline'
-                        ? t('mail.loadMoreOffline')
-                        : t('mail.loadMoreFailed')}
-                    </p>
-                  )}
-                </div>
-              )}
-            </Panel>
+            <MailListPane
+              visible={isDesktop || selectedKey === null}
+              listState={listState}
+              folderCount={folders.length}
+              hasMore={hasMore}
+              offline={offline}
+              onShowAllFolders={() => void setFolders(MAIL_FOLDERS)}
+              onClearSearch={clearSearch}
+              onShowRead={showRead}
+              rowSections={rowSections}
+              isAll={isAll}
+              names={names}
+              locallyReadKeys={locallyReadKeys}
+              selectedKey={selectedKey}
+              timeZone={timeZone}
+              recipientSummary={recipientSummary}
+              onOpenRow={openRow}
+              headersTruncated={headersTruncated}
+              cappedCount={cappedRows.length}
+              loadingMore={loadingMore}
+              loadMoreFailure={loadMoreFailure}
+              onLoadMore={() => void handleLoadMore()}
+            />
 
             {newMailInline && (
               <Panel className="min-w-0">
@@ -889,137 +692,31 @@ function MailView({ scope, scopeControl }: MailViewProps) {
                 ) : undefined
               }
             >
-              <div ref={bodyRetryRef} tabIndex={-1} className="min-w-0 focus:outline-none">
-                {selectedKey === null ? (
-                  // Only while the pane is on screen: a phone hides it behind
-                  // the list (and floats its own Compose), and the inline
-                  // composer replaces it on a wide screen.
-                  readerVisible && (
-                    <EmptyState
-                      title={t('mail.readerEmptyTitle')}
-                      hint={t('mail.selectHint')}
-                      icon={<Icon.Social size={Icon.ICON_SIZE.lg} />}
-                      className="py-6"
-                      action={
-                        <Button size="sm" onClick={openNewMail}>
-                          <Icon.MailCompose size={Icon.ICON_SIZE.sm} /> {t('mail.compose')}
-                        </Button>
-                      }
-                    />
-                  )
-                ) : body === undefined ? (
-                  <div className="flex justify-center py-4">
-                    <Spinner size="sm" label={t('common.loading')} />
-                  </div>
-                ) : body === null ? (
-                  // Still gets the reader-heading focus target (issue #1485):
-                  // a failed/uncached body is the same "opening this mail
-                  // just changed the pane" transition as the success path
-                  // below, just with nothing to read yet.
-                  <div
-                    ref={(el) => {
-                      readerHeadingRef.current = el;
-                    }}
-                    tabIndex={-1}
-                    className="focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                  >
-                    <EmptyState
-                      title={
-                        online ? t('mail.bodyNotDownloadedOnline') : t('mail.bodyNotDownloaded')
-                      }
-                      className="py-4"
-                      action={
-                        <Button
-                          size="sm"
-                          onClick={() => {
-                            // This button unmounts while the body loads: the wrapper holds focus meanwhile.
-                            holdBodyFocus();
-                            setBodySnapshot(null);
-                            setBodyAttempt((n) => n + 1);
-                          }}
-                        >
-                          {t('common.retry')}
-                        </Button>
-                      }
-                    />
-                  </div>
-                ) : (
-                  <div className="min-w-0 space-y-2 text-xs">
-                    <h3
-                      ref={(el) => {
-                        readerHeadingRef.current = el;
-                      }}
-                      tabIndex={-1}
-                      className="text-base font-semibold break-words text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                    >
-                      {body.data.subject || t('mail.noSubject')}
-                    </h3>
-                    <div className="space-y-0.5 border-b border-line pb-2 text-text-dim">
-                      <p className="flex flex-wrap items-center gap-1.5">
-                        {t('mail.from')}
-                        {selectedHeader?.from !== undefined ? (
-                          <>
-                            <CharacterLink id={selectedHeader.from}>{selectedSender}</CharacterLink>
-                            <StandingTag
-                              standing={characterStanding(
-                                selectedOwner?.standingIndex ?? NO_STANDING_INDEX,
-                                selectedHeader.from,
-                                senderAffiliations
-                              )}
-                            />
-                          </>
-                        ) : (
-                          <span className="text-text">{selectedSender}</span>
-                        )}
-                      </p>
-                      {selectedHeader !== null && recipients.length > 0 && (
-                        <p className="flex flex-wrap items-center gap-x-1">
-                          {t('mail.to')}
-                          {recipients.map((recipient, index) => (
-                            <span key={`${recipient.recipient_type}-${recipient.recipient_id}`}>
-                              {recipient.recipient_type === 'character' ? (
-                                <CharacterLink id={recipient.recipient_id}>
-                                  {resolveRecipientName(recipient)}
-                                </CharacterLink>
-                              ) : (
-                                resolveRecipientName(recipient)
-                              )}
-                              {index < recipients.length - 1 ? ', ' : ''}
-                            </span>
-                          ))}
-                        </p>
-                      )}
-                    </div>
-                    {/* The body renders from the raw markup (`MailBodyView` parses
-                      it to a safe tree: bold, colour, links, tables) on the
-                      reader's fixed dark surface; `bodyText` is only the
-                      flattened text the compose box quotes. `break-words`
-                      inside the view keeps an unbroken URL from pushing the
-                      pane sideways. */}
-                    <MailBodyView text={bodyText} markup={body?.data.body ?? undefined} />
-
-                    {composeKind !== null && selectedRow !== null && (
-                      <MailComposeBox
-                        key={`${selectedRow.key}:${composeKind}`}
-                        characterId={selectedRow.ownerId}
-                        kind={composeKind}
-                        header={selectedRow.header}
-                        bodyText={bodyText}
-                        bodyMarkup={body?.data.body ?? undefined}
-                        senderName={selectedSender}
-                        formattedTimestamp={
-                          selectedRow.header.timestamp
-                            ? formatTimestamp(new Date(selectedRow.header.timestamp), timeZone)
-                            : ''
-                        }
-                        resolveRecipientName={resolveRecipientName}
-                        onClose={() => setComposeKind(null)}
-                        onSent={() => void handleSent(selectedRow.ownerId)}
-                      />
-                    )}
-                  </div>
-                )}
-              </div>
+              <MailReaderBody
+                bodyRetryRef={bodyRetryRef}
+                selectedKey={selectedKey}
+                readerVisible={readerVisible}
+                body={body}
+                bodyText={bodyText}
+                online={online}
+                readerHeadingRef={readerHeadingRef}
+                onCompose={openNewMail}
+                onRetry={() => {
+                  // The retry button unmounts while the body loads: the wrapper holds focus meanwhile.
+                  holdBodyFocus();
+                  setBodySnapshot(null);
+                  setBodyAttempt((n) => n + 1);
+                }}
+                selectedRow={selectedRow}
+                selectedOwner={selectedOwner}
+                selectedSender={selectedSender}
+                senderAffiliations={senderAffiliations}
+                resolveRecipientName={resolveRecipientName}
+                composeKind={composeKind}
+                timeZone={timeZone}
+                onCloseCompose={() => setComposeKind(null)}
+                onSent={handleSent}
+              />
             </Panel>
           </div>
         </>
