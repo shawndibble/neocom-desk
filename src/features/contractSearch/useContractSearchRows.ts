@@ -1,5 +1,5 @@
 /**
- * The Items board's row derivation (issue #4229): the filter folded into
+ * The Items board's row derivation: the filter folded into
  * rows, per-type stats and the cheapest-first display order. Split out of
  * `ContractSearchPanel`; every input is still owned there.
  */

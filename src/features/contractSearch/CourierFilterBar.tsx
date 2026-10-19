@@ -1,6 +1,6 @@
 /**
  * The Courier tab's filter bar and the field controls it is built from. Split
- * out of `CourierResults` (issue #4229); the board still owns every value.
+ * out of `CourierResults`; the board still owns every value.
  */
 import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';

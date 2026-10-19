@@ -1,5 +1,5 @@
 /**
- * The Items table's column set and CSV columns (issue #4229), split out of
+ * The Items table's column set and CSV columns, split out of
  * `ContractSearchPanel`. Also hands back the two cell helpers the panel's
  * detail modal and jumps readout share.
  */

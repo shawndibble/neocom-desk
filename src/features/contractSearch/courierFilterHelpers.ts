@@ -1,6 +1,6 @@
 /**
  * The Courier filter's types and pure helpers, split from `CourierFilterBar`
- * (issue #4229) so that file exports only components.
+ * so that file exports only components.
  */
 import type { CourierRouteRow } from '@/engine/contracts/courierSearch';
 import { SPACE_KINDS, type SpaceKind } from '@/engine/space';
