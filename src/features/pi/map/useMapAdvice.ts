@@ -6,12 +6,14 @@
  * returns `buildPlanAdvice`'s answer. Two tabs reading the same model with the same input show the same
  * figures.
  *
- * What-if advice (a planet type the pilot does not have, added) is built on
- * demand and cached per input, so trying all eight types costs at most eight
- * builds and a re-render never repeats one.
+ * The main advice is built off the main thread (`useAdviceOf`). What-if advice
+ * (a planet type the pilot does not have, added) is built on demand on the page
+ * and cached per input, so trying all eight types costs at most eight builds
+ * and a re-render never repeats one.
  */
 import { useMemo } from 'react';
-import { buildPlanAdvice, buildSharedPlanAdvice, type PlanAdvice } from '../planAdviceModel';
+import { buildPlanAdvice, type PlanAdvice } from '../planAdviceModel';
+import { useAdviceOf } from '../useAdviceOf';
 import { homeSystemId } from '../sellRoute';
 import { usePlanPreference } from '../planTicksPref';
 import { usePiAdviceInputs } from '../usePiAdviceInputs';
@@ -63,14 +65,11 @@ export function useMapAdvice(
   const pi = snapshot?.pi ?? null;
 
   const graph = useMemo(() => (pi ? buildMapGraph(pi) : null), [pi]);
+  const buildResult = useAdviceOf(input);
   const built = useMemo(() => {
-    if (!input) return null;
-    let advice: PlanAdvice;
-    try {
-      advice = buildSharedPlanAdvice(input);
-    } catch {
-      return 'error' as const;
-    }
+    if (buildResult.status === 'pending') return null;
+    if (buildResult.status === 'error' || !input) return 'error' as const;
+    const { advice } = buildResult;
     const cache = new Map<string, PlanAdvice>();
     const adviceWithWhatIf = (types: ReadonlySet<PlanetType>): PlanAdvice => {
       const key = whatIfKey([...types]);
@@ -82,7 +81,7 @@ export function useMapAdvice(
       return hit;
     };
     return { advice, adviceWithWhatIf };
-  }, [input]);
+  }, [buildResult, input]);
 
   const colonies = useMemo<MapColony[]>(
     () =>

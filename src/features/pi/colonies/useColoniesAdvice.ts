@@ -11,9 +11,9 @@
  * (the caller still has the snapshot, and shows status without money), and an
  * unknown skill is `null`, which the model prices conservatively.
  */
-import { useMemo } from 'react';
 import type { GoalPlannerSnapshot } from '../goalPlannerSnapshot';
-import { buildSharedPlanAdvice, type PlanAdvice, type PlanAdviceInput } from '../planAdviceModel';
+import type { PlanAdvice, PlanAdviceInput } from '../planAdviceModel';
+import { useAdviceOf } from '../useAdviceOf';
 import { usePiAdviceInputs } from '../usePiAdviceInputs';
 import { usePiSnapshot } from '../usePiSnapshot';
 
@@ -41,14 +41,8 @@ export function useColoniesAdvice(
   const { snapshot, failed } = usePiSnapshot(characterId, reloadKey);
 
   const inputs = usePiAdviceInputs(snapshot, characterId, 'isk', reloadKey);
-  const advice = useMemo(() => {
-    if (inputs.status !== 'ready') return null;
-    try {
-      return buildSharedPlanAdvice(inputs.input);
-    } catch {
-      return null;
-    }
-  }, [inputs]);
+  const built = useAdviceOf(inputs.status === 'ready' ? inputs.input : null);
+  const advice = built.status === 'ready' ? built.advice : null;
 
   return {
     snapshot,

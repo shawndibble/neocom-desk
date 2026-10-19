@@ -20,7 +20,7 @@ import { loadSystemNameAndSecurity } from '@/features/character/systemSecurity';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { loadAllColonyDetails, loadCharacterPlanets } from './data';
 import { loadPlanetName } from './names';
-import { loadCustomsCodeExpertise } from './customsRate';
+import { loadCustomsCodeExpertise } from './customsSkill';
 import { loadAccountingLevel } from './salesTaxRate';
 import {
   parseCustomsOverrides,

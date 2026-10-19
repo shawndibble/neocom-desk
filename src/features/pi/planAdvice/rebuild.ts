@@ -13,7 +13,7 @@ import type { PinLoad } from '@/engine/pi/types';
 import { pinsLoad } from '@/engine/pi/pinBudget';
 import type { BuiltColonyAdvice } from '../systemPlanetModel';
 import type { PlannerColonyRow } from '../goalPlannerModel';
-import { colonyBudget } from '../colonyBudget';
+import { colonyBudget } from '../colonyBudgetModel';
 import {
   colonyStopTierAdvice,
   currentProductTypeIds,
