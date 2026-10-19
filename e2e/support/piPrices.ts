@@ -34,3 +34,27 @@ export async function mockHubPrices(page: Page): Promise<void> {
     });
   });
 }
+
+/** Every type asked about at one flat quote, whatever it is. */
+export async function mockFlatHubPrices(
+  page: Page,
+  quote: { buy: number; sell: number }
+): Promise<void> {
+  await page.route('https://market.fuzzwork.co.uk/**', async (route) => {
+    const types = new URL(route.request().url()).searchParams.get('types') ?? '';
+    const body = Object.fromEntries(
+      types.split(',').map((raw) => [
+        raw,
+        {
+          buy: { max: String(quote.buy), volume: '900000000', orderCount: '40' },
+          sell: { min: String(quote.sell), volume: '900000000', orderCount: '40' },
+        },
+      ])
+    );
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(body),
+    });
+  });
+}

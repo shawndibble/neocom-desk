@@ -46,6 +46,7 @@
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import type { Page } from '@playwright/test';
+import { stubSyncConfigured } from './support/syncStatus';
 
 const PHONE = { width: 390, height: 844 };
 
@@ -176,24 +177,6 @@ async function seedCourierSnapshot(page: Page, rows: unknown[]): Promise<void> {
     });
     database.close();
   }, rows);
-}
-
-/** The gate described at the top of this file, opened for this page only. */
-async function stubSyncConfigured(page: Page): Promise<void> {
-  await page.route('**/src/app/syncStatus.ts*', async (route) => {
-    await route.fulfill({
-      contentType: 'text/javascript',
-      // Both of the module's runtime exports, so every importer still gets the
-      // module it asked for — only the answer changes.
-      body: [
-        'export function isSyncConfigured() { return true; }',
-        'export function syncDisplayState(status, online) {',
-        "  return online ? status.state : 'offline';",
-        '}',
-        '',
-      ].join('\n'),
-    });
-  });
 }
 
 /**

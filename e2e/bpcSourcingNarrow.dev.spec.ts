@@ -35,6 +35,7 @@
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import type { Page } from '@playwright/test';
+import { stubSyncConfigured } from './support/syncStatus';
 
 const PHONE = { width: 390, height: 844 };
 /**
@@ -121,22 +122,6 @@ async function seedBpcSnapshot(
     },
     { seeded: rows, regionNames: regions }
   );
-}
-
-/** The gate described at the top of this file, opened for this page only. */
-async function stubSyncConfigured(page: Page): Promise<void> {
-  await page.route('**/src/app/syncStatus.ts*', async (route) => {
-    await route.fulfill({
-      contentType: 'text/javascript',
-      body: [
-        'export function isSyncConfigured() { return true; }',
-        'export function syncDisplayState(status, online) {',
-        "  return online ? status.state : 'offline';",
-        '}',
-        '',
-      ].join('\n'),
-    });
-  });
 }
 
 /** Firebase now reads as configured — refused so the snapshot loader falls through to the Dexie row seeded above, same trade `contractSearchCourierNarrow.dev.spec.ts` makes. */

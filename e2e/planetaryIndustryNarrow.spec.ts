@@ -14,23 +14,12 @@ import { signInAndGoto } from './support/authSeed';
 import { SCOPES } from './support/fixtureData';
 import { mockPlannerColonies } from './support/piColonies';
 import { mockHubPrices } from './support/piPrices';
+import { expectNoPageOverflow } from './support/overflow';
 
 const PHONE = { width: 390, height: 844 };
 
 /** Coolant (P2) and Robotics (P3): the second needs a lava or plasma planet the fixture lacks. */
 const GOALS = '9832:200,9848:30';
-
-/**
- * The page itself never scrolls sideways. Measured on the document, as
- * `appraisalSharedNarrow.spec.ts` does.
- */
-async function assertNoOverflow(page: Page): Promise<void> {
-  const doc = await page.evaluate(() => ({
-    scrollWidth: document.documentElement.scrollWidth,
-    clientWidth: document.documentElement.clientWidth,
-  }));
-  expect(doc.scrollWidth).toBeLessThanOrEqual(doc.clientWidth);
-}
 
 test.describe('PI Plan — Goal Planner', () => {
   test('lays the whole plan out at 390px without a sideways scroll', async ({ page }) => {
@@ -51,7 +40,7 @@ test.describe('PI Plan — Goal Planner', () => {
     const goalsBox = (await page.getByRole('heading', { name: 'Goals' }).boundingBox())!;
     const headlineBox = (await page.getByText(/^ISK\/day vs selling/).boundingBox())!;
     expect(goalsBox.y).toBeLessThan(headlineBox.y);
-    await assertNoOverflow(page);
+    await expectNoPageOverflow(page);
   });
 
   test.describe('held-back reason on touch (issue #3681)', () => {
@@ -167,7 +156,7 @@ test.describe('PI Colonies — Switch to an alt (issue #1770)', () => {
     const action = page.getByRole('button', { name: 'Switch to Alt Hauler' });
     await expect(action).toBeVisible();
     expect((await action.boundingBox())!.height).toBeGreaterThanOrEqual(44);
-    await assertNoOverflow(page);
+    await expectNoPageOverflow(page);
 
     await action.click();
     // The alt is now the primary character: it is no longer a "not loaded" row.
@@ -295,6 +284,6 @@ test.describe('PI Colonies — alt group data age (issue #2291)', () => {
     const midline = (box: { y: number; height: number }) => box.y + box.height / 2;
     expect(Math.abs(midline(badgeBox) - midline(nameBox))).toBeLessThan(4);
     expect(Math.abs(midline(switchBox) - midline(nameBox))).toBeLessThan(4);
-    await assertNoOverflow(page);
+    await expectNoPageOverflow(page);
   });
 });
