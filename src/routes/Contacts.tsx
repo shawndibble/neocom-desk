@@ -91,13 +91,6 @@ import {
   loadContactsSnapshot,
 } from '@/features/character/contactsSnapshot';
 
-/**
- * The filter bar, in the URL (ADR 0015) as one group — including the Across
- * tab's own "disagreements only" (issue #1282): two separate `useUrlParams`
- * groups writing in the same tick would each start from the URL as last
- * rendered and the second would drop the first (see `useUrlState.ts`'s own
- * doc comment), so every key `ContactsFilterBar` can change belongs here.
- */
 /** The portrait column both tables lead with: no header, never sorted, never hidden. */
 function portraitColumn<T>(identity: (row: T) => ContactIdentity): DataTableColumn<T> {
   return {
@@ -109,6 +102,13 @@ function portraitColumn<T>(identity: (row: T) => ContactIdentity): DataTableColu
   };
 }
 
+/**
+ * The filter bar, in the URL (ADR 0015) as one group — including the Across
+ * tab's own "disagreements only" (issue #1282): two separate `useUrlParams`
+ * groups writing in the same tick would each start from the URL as last
+ * rendered and the second would drop the first (see `useUrlState.ts`'s own
+ * doc comment), so every key `ContactsFilterBar` can change belongs here.
+ */
 const FILTER_PARAMS = {
   q: textParam(),
   types: enumSetParam(ALL_CONTACT_KINDS),
