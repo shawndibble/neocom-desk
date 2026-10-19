@@ -368,7 +368,7 @@ export interface FeedMergeResult<L extends FeedRow, R extends RemoteFeedDoc> {
  * deleted rather than pulled, on any pass that sees it. That last clause is
  * the honest bound — an aged row's transport stamp has stopped moving, so an
  * incremental pull filters it out and only the periodic full reconcile
- * (`FULL_RECONCILE_INTERVAL_MS` in planSync.ts, itself 30 days) brings it
+ * (`FULL_RECONCILE_INTERVAL_MS` in collectionSync.ts, itself 30 days) brings it
  * back into view. Bounded at roughly 30–60 days, in other words, not
  * expired to the day. Still no tombstone — the doc is
  * hard-deleted with no marker — and nothing resurrects it, because the
