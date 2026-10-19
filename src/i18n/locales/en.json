@@ -13620,13 +13620,6 @@
         "raw": "raw"
       },
       "linesLabel": "Statement lines",
-      "col": {
-        "day": "Day",
-        "ore": "Ore",
-        "price": "Unit price",
-        "rate": "Rate",
-        "tax": "Tax"
-      },
       "correction": "Correction",
       "lateOre": "Late ore",
       "billed": "Billed",

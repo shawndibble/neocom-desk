@@ -120,7 +120,7 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
             onChange={(id) => selectTab(id as typeof tab)}
             tabs={tabBarTabs(MOONS_TABS).map((x) => ({ id: x.id, label: t(x.labelKey) }))}
           />
-          {sync.ledger.state === 'unavailable' && (
+          {sync.ledger.state !== 'ready' && (
             <p className="text-sm text-text-dim" role="note">
               {t('corpTaxBook.moons.viewOnly')}
             </p>
