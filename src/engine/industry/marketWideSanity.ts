@@ -4,6 +4,7 @@
  * regions' daily history.
  */
 import type { MarketHistoryPoint } from '@/engine/market/priceHistory';
+import { DAY_MS } from '@/lib/age';
 
 /**
  * A hub sell price above this multiple of CCP's average traded price is a
@@ -35,8 +36,6 @@ export const SALES_WINDOW_DAYS = 30;
 
 /** Fewer units a day than this, and a product "rarely sells". */
 export const RARELY_SOLD_PER_DAY = 5;
-
-const DAY_MS = 86_400_000;
 
 /**
  * Units traded per day over the last `SALES_WINDOW_DAYS`, summed across

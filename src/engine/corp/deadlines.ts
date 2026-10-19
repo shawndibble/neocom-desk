@@ -15,6 +15,7 @@ import { DEADLINE_SEVERITIES } from '../severity';
 import { localMidnight } from '../localDay';
 import { CORP_BOARD_ITEM_KINDS, type CorpBoardItem, type CorpBoardItemKind } from './board';
 import type { CorpBoardSeverity } from './board';
+import { DAY_MS } from '@/lib/age';
 
 /** How far ahead the Deadline Strip looks on a full-width viewport. */
 export const DEADLINE_STRIP_DAYS = 14;
@@ -27,8 +28,6 @@ export const DEADLINE_STRIP_DAYS = 14;
  * the calendar, not about the severity ladder.
  */
 export const DUE_SOON_WINDOW_MS = 86_400_000;
-
-const DAY_MS = 86_400_000;
 
 /**
  * Severity worst-first, which is also `severityForRemaining`'s own order. Used

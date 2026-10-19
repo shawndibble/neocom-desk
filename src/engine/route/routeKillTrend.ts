@@ -8,13 +8,12 @@
  *
  * Pure, per CLAUDE.md: the caller supplies the kill times (epoch ms).
  */
+import { HOUR_MS } from '@/lib/age';
 
 export const KILL_WINDOW_HOURS = 24;
 
 /** Player kills in 24 hours at which a system reads "busy". */
 export const BUSY_KILLS = 5;
-
-const HOUR_MS = 3_600_000;
 
 export type KillLevel = 'quiet' | 'some' | 'busy';
 

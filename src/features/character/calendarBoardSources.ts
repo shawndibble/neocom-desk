@@ -31,10 +31,9 @@ import { parseInstant } from '@/engine/esiInstant';
 import type { BoardCalendarEventSource, BoardClockSource } from '@/engine/character/board';
 import type { BoardExtractionSource } from '@/engine/corp/board';
 import { stepKey, type SkillPlanSchedule } from '@/engine/skillPlanSchedule';
+import { DAY_MS } from '@/lib/age';
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
-
-const DAY_MS = 86_400_000;
 
 /** Resolves a type id to its SDE name; supplied by the caller, which owns the catalog. */
 export type TypeNamer = (typeId: number) => string;

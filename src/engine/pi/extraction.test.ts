@@ -12,9 +12,8 @@ import {
   yieldRemaining,
 } from './extraction';
 import type { ExtractorProgram, ExtractorYieldProgram } from './types';
+import { DAY_MS, HOUR_MS } from '@/lib/age';
 
-const DAY_MS = 86_400_000;
-const HOUR_MS = 3_600_000;
 const INSTALL_MS = Date.parse('2026-09-01T00:00:00Z');
 const CYCLE_TIME_MS = 1_800_000; // ESI's cycle_time 1800 s
 const CYCLES_PER_DAY = 48;

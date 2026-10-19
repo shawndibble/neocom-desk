@@ -4,6 +4,7 @@
  * daily balances come in, display-ready numbers go out.
  */
 import { findMissingDays, utcDay, type NetWorthSnapshotRow } from './snapshot';
+import { DAY_MS } from '@/lib/age';
 
 export const LAYER_IDS = ['isk', 'assets', 'escrow', 'sellOrders'] as const;
 export type LayerId = (typeof LAYER_IDS)[number];
@@ -61,8 +62,6 @@ export interface CharacterSeries {
   /** Days between the first and last snapshot with no snapshot. */
   gapDays: string[];
 }
-
-const DAY_MS = 86_400_000;
 
 /**
  * One Character's day-by-day series. ISK is the journal's last balance of each

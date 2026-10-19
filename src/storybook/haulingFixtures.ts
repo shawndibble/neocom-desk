@@ -20,6 +20,7 @@ import type { HaulingCargo } from '@/features/market/haulingCargo';
 import { walletFixtureRoutes } from './esiFixtureRoutes';
 import type { FixtureRoute } from './fixtureFetch';
 import { sampleDate } from './sampleData';
+import { DAY_MS, HOUR_MS } from '@/lib/age';
 
 const hub = (id: string) => TRADE_HUBS.find((h) => h.id === id)!;
 const AMARR = hub('amarr');
@@ -164,8 +165,6 @@ interface ItemMarket {
   history: (today: number) => MarketHistoryEntry[];
 }
 
-const HOUR_MS = 3_600_000;
-const DAY_MS = 24 * HOUR_MS;
 const { horizonDays, ownShareOfDemand, historyDays, mostDaysMin, burstsMin, crowdedOrderCount } =
   HAULING_THRESHOLDS;
 

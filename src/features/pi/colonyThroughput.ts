@@ -77,9 +77,7 @@ import type { ExtractorYieldProgram, PiChain, ThroughputCheck } from '@/engine/p
 import { piTier } from '@/engine/pi/chain';
 import { colonyFactoryBalance, colonyOutputPerHour } from './factoryBalanceModel';
 import type { BuiltColonyAdvice } from './systemPlanetModel';
-
-const HOUR_MS = 3_600_000;
-const DAY_MS = 86_400_000;
+import { DAY_MS, HOUR_MS } from '@/lib/age';
 
 /**
  * An extractor's own peak sustained rate: its first day of output, averaged

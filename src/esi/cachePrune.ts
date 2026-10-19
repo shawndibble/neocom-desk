@@ -28,8 +28,7 @@
  * mirrors every delete onto meta.
  */
 import { db, type EsiCacheMetaRecord } from '@/db';
-
-const DAY_MS = 24 * 60 * 60_000;
+import { DAY_MS } from '@/lib/age';
 
 /** Rows `STALE_AFTER.static` (24 h) would already refetch: 30x that. */
 export const STATIC_RETENTION_MS = 30 * DAY_MS;

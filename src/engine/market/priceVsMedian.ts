@@ -7,6 +7,7 @@
  * to. Pure; the caller supplies the region's history and the clock.
  */
 import { medianOf, type MarketHistoryPoint } from './priceHistory';
+import { DAY_MS } from '@/lib/age';
 
 export const VS_MEDIAN_WINDOW_DAYS = 90;
 
@@ -27,8 +28,6 @@ export const VS_MEDIAN_MAX_LATEST_AGE_DAYS = 2;
 
 /** At or above this percent over the median, the price is flagged as a spike. */
 export const PRICE_SPIKE_PCT = 20;
-
-const DAY_MS = 86_400_000;
 
 function dayNumber(date: string): number {
   return Math.floor(Date.parse(`${date}T00:00:00Z`) / DAY_MS);

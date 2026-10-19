@@ -47,8 +47,8 @@ import { builtAdvice } from '../systemPlanetModel';
 import { colonyPlan } from '../colonyPlan';
 import { colonyStorage } from '../colonyThroughput';
 import { fillsBeforeHaul } from '../colonyStripModel';
+import { HOUR_MS } from '@/lib/age';
 
-export const HOUR_MS = 3_600_000;
 /** "Today": the window "expiring today" and one login's worth of work both cover. */
 export const DAY_HOURS = 24;
 /** A colony list older than this reads as stale on its own row. */
@@ -582,3 +582,5 @@ export function todayCheck(rows: readonly ColonyCheckRow[], nowMs: number): Toda
     tripCharacterIds,
   };
 }
+
+export { HOUR_MS } from '@/lib/age';

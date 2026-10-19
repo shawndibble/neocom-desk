@@ -9,6 +9,7 @@
  * can't move a boundary.
  */
 import type { WeekStart } from '@/lib/calendarGrid';
+import { DAY_MS } from '@/lib/age';
 
 /** "Earlier this month" covers the start of this week back to the 1st. */
 export type MailAgeBucket =
@@ -21,8 +22,6 @@ export interface MailAgeSection<T> {
   bucket: MailAgeBucket;
   items: T[];
 }
-
-const DAY_MS = 86_400_000;
 
 const RANK = {
   today: 0,

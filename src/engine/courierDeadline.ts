@@ -16,8 +16,7 @@
  */
 import type { Contract } from '@/esi/endpoints';
 import { parseInstant } from '@/engine/esiInstant';
-
-const DAY_MS = 86_400_000;
+import { DAY_MS } from '@/lib/age';
 
 export function courierDeliveryDeadlineMs(contract: Contract): number | null {
   if (contract.type !== 'courier' || contract.status !== 'in_progress') return null;

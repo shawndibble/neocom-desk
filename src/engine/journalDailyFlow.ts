@@ -1,5 +1,6 @@
 import { utcDay } from './netWorth/snapshot';
 import type { JournalRow } from './journalNetting';
+import { DAY_MS } from '@/lib/age';
 
 /** One EVE (UTC) day of the Journal: ISK in and out, both as non-negative sums. */
 export interface JournalDayFlow {
@@ -10,7 +11,6 @@ export interface JournalDayFlow {
   net: number;
 }
 
-const DAY_MS = 86_400_000;
 /** Days drawn when the Journal has no date range. */
 export const FLOW_DEFAULT_DAYS = 30;
 /** Most days drawn: past this the bars shrink below a pixel. */

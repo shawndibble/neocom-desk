@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { restartCadenceYield } from './restartCadence';
 import type { ExtractorProgram, ExtractorYieldProgram } from './types';
+import { HOUR_MS } from '@/lib/age';
 
-const HOUR_MS = 3_600_000;
 const INSTALL_MS = Date.parse('2026-09-01T00:00:00Z');
 
 /**

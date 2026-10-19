@@ -25,9 +25,9 @@
  *    result instead, so a quiet market and a genuinely slow seller are never
  *    confused with a number the UI would otherwise present as gospel.
  */
+import { DAY_MS } from '@/lib/age';
 
 /** Whole days in milliseconds, used to convert ESI's `duration` (days) to ms. */
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 export interface OrderExpiry {
   /** Epoch ms the order lapses. */

@@ -9,8 +9,8 @@
  */
 import { PLEX_BOUGHT_KEY, PLEX_SOLD_KEY } from './journalNetting';
 import { ARCHIVE_DAYS } from './wallet/archiveCoverage';
+import { DAY_MS } from '@/lib/age';
 
-const DAY_MS = 86_400_000;
 export const OMEGA_PERIOD_DAYS = 30;
 /** CCP's one-month price. */
 export const DEFAULT_PLEX_PER_30_DAYS = 500;

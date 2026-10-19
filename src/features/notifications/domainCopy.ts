@@ -64,6 +64,7 @@ import {
 } from '@/engine/projection';
 import { formatIsk } from '@/lib/isk';
 import { eveNotificationText, type EveNotificationNames } from './eveNotificationText';
+import { DAY_MS, HOUR_MS } from '@/lib/age';
 
 /** A domain's copy as `pollDomains/` consumes it; `push` is passed to its own `project*`. */
 export interface DomainCopy<TFire, TNames> {
@@ -80,8 +81,6 @@ export interface DomainCopy<TFire, TNames> {
 export type NoNames = Record<string, never>;
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
-const HOUR_MS = 3_600_000;
-const DAY_MS = 86_400_000;
 
 function fired(eventId: string, variant: string, vars?: Record<string, unknown>): string {
   return i18n.t(`notifications.fired.${eventId}.${variant}`, vars);

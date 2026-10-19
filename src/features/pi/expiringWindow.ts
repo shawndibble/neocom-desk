@@ -22,6 +22,7 @@
  * not a status colour". This preference governs the Colonies table only.
  */
 import { createSyncedSetting } from '@/lib/useSyncedSetting';
+import { HOUR_MS } from '@/lib/age';
 
 export const PI_EXPIRING_WINDOW_SETTING_KEY = 'sync.piExpiringSoonHours';
 
@@ -58,8 +59,6 @@ export const LEGACY_PI_EXPIRING_WINDOW_SETTING_KEY = 'piExpiringSoonHours';
 export const EXPIRING_WINDOW_HOUR_OPTIONS: readonly number[] = [1, 6, 12, 24];
 
 export const DEFAULT_EXPIRING_WINDOW_HOURS = 24;
-
-const HOUR_MS = 3_600_000;
 
 export const useExpiringWindowHours = createSyncedSetting<number>({
   key: PI_EXPIRING_WINDOW_SETTING_KEY,
