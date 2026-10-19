@@ -4,35 +4,16 @@
  * window's four tabs, and Simulate lands in the Fittings editor with a new
  * Fitting of that hull. Structure only — no stat figure is awaited.
  */
-import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
+import { answerAnyType } from './support/universeTypes';
 
 const MERLIN = 603;
-
-/** The editor resolves the hull's dogma through /universe/types. */
-async function answerAnyType(page: Page) {
-  await page.route(/\/universe\/types\/\d+$/, async (route) => {
-    const typeId = Number(/\/universe\/types\/(\d+)$/.exec(route.request().url())![1]);
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        type_id: typeId,
-        name: `Type ${typeId}`,
-        description: '',
-        group_id: 25,
-        published: true,
-        dogma_attributes: [],
-      }),
-    });
-  });
-}
 
 test.describe('Ship Tree — desktop', () => {
   test('map, hover card, Ship Info tabs, Simulate into the editor', async ({ page }) => {
     await page.setViewportSize({ width: 1600, height: 1000 });
-    await answerAnyType(page);
+    await answerAnyType(page, 25);
     await signInAndGoto(page, './ships/tree');
 
     const map = page.getByRole('region', { name: 'Caldari State ship tree' });

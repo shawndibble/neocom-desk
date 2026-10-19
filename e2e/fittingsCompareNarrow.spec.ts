@@ -11,29 +11,9 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
+import { answerAnyType } from './support/universeTypes';
 
 const PHONE = { width: 390, height: 844 };
-
-/** Skill-gap/stats background compute reads every fitted type's requirements from
- * `/universe/types/{id}` — answered for any id so it doesn't escape as an unmocked request,
- * even though these specs never wait on that compute to finish. */
-async function answerAnyType(page: Page) {
-  await page.route(/\/universe\/types\/\d+$/, async (route) => {
-    const typeId = Number(/\/universe\/types\/(\d+)$/.exec(route.request().url())![1]);
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        type_id: typeId,
-        name: `Type ${typeId}`,
-        description: '',
-        group_id: 46,
-        published: true,
-        dogma_attributes: [],
-      }),
-    });
-  });
-}
 
 // A compare column's header shows the fit's own name — a Fitting Share Code carries it since
 // version 2 (#1718), so the name typed into the EFT header survives the round trip.

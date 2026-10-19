@@ -9,43 +9,8 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
-
-/** Same as `fittingsLoadNarrow.spec.ts`: skill gaps ask ESI for every fitted type. */
-async function answerAnyType(page: Page) {
-  await page.route(/\/universe\/types\/\d+$/, async (route) => {
-    const typeId = Number(/\/universe\/types\/(\d+)$/.exec(route.request().url())![1]);
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        type_id: typeId,
-        name: `Type ${typeId}`,
-        description: '',
-        group_id: 46,
-        published: true,
-        dogma_attributes: [],
-      }),
-    });
-  });
-}
-
-/** Every asked-for type at a flat price — this spec checks the hand-off, not the figures. */
-async function mockHubPrices(page: Page): Promise<void> {
-  await page.route('https://market.fuzzwork.co.uk/**', async (route) => {
-    const types = new URL(route.request().url()).searchParams.get('types') ?? '';
-    const quote = { volume: '900000000', orderCount: '40' };
-    const body = Object.fromEntries(
-      types
-        .split(',')
-        .map((raw) => [raw, { buy: { max: '5', ...quote }, sell: { min: '6', ...quote } }])
-    );
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify(body),
-    });
-  });
-}
+import { answerAnyType } from './support/universeTypes';
+import { mockFlatHubPrices } from './support/piPrices';
 
 /** A real Ctrl+V can't reach the clipboard in headless Chromium; this is the event it raises. */
 async function pasteOnPage(page: Page, text: string): Promise<void> {
@@ -95,7 +60,7 @@ test.describe('Global paste', () => {
 
   test('a pasted item list opens the Appraisal, and prices it', async ({ page }) => {
     await openFittings(page);
-    await mockHubPrices(page);
+    await mockFlatHubPrices(page, { buy: 5, sell: 6 });
 
     await pasteOnPage(page, 'Tritanium\t3,400,000\nPyerite\t1,750,000');
     await expect(page).toHaveURL(/\/market\/appraisal/, { timeout: 15_000 });

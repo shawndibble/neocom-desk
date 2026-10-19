@@ -16,50 +16,12 @@
  */
 import type { Locator, Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
-import {
-  CHARACTER_NAME,
-  CHARACTER_ID,
-  CORPORATION_ID,
-  CORPORATION_NAME,
-  OWNER_HASH,
-  SCOPES,
-} from './support/fixtureData';
+import { CHARACTER_ID, CORPORATION_ID, CORPORATION_NAME, SCOPES } from './support/fixtureData';
 import { signInAndGoto } from './support/authSeed';
 import { scopesForGroup } from '../src/esi/scopes';
+import { makeAccessToken } from './support/mockSso';
 
 const NARROW = { width: 320, height: 720 };
-
-/** Far-future expiry, matching `mockSso.ts`'s own mocked token. */
-const EXP_SECONDS = 4_102_444_800;
-
-function base64url(json: unknown): string {
-  return Buffer.from(JSON.stringify(json), 'utf-8')
-    .toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
-}
-
-/**
- * `mockSso.ts`'s own `makeAccessToken` always grants `SCOPES` — deliberately
- * excluding the `corp` opt-in group (issue #295), so the default mock can
- * never reach `useCorpAccess`'s `ready` state no matter how many roles a
- * character holds. This is that same token shape with the corp group's
- * scopes unioned in, standing in for a Character who has already been
- * through the app's own corp grant flow once before.
- */
-function makeAccessTokenWithCorpScopes(): string {
-  const header = base64url({ alg: 'RS256', typ: 'JWT' });
-  const payload = base64url({
-    sub: `CHARACTER:EVE:${CHARACTER_ID}`,
-    name: CHARACTER_NAME,
-    owner: OWNER_HASH,
-    exp: EXP_SECONDS,
-    scp: [...SCOPES, ...scopesForGroup('corp')],
-    iss: 'login.eveonline.com',
-  });
-  return `${header}.${payload}.fakesig`;
-}
 
 const LONG_NAME = 'Nakugard - Home Sweet Home Fortizar Citadel Deployment Alpha';
 
@@ -87,7 +49,7 @@ async function openCorpBoard(
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
-        access_token: makeAccessTokenWithCorpScopes(),
+        access_token: makeAccessToken([...SCOPES, ...scopesForGroup('corp')]),
         token_type: 'Bearer',
         expires_in: 1199,
         refresh_token: 'fake-refresh',
