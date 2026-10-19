@@ -33,6 +33,7 @@ import {
 import { editBook } from '../taxBook/bookClient';
 import { editErrorMessage, useBook } from './useBook';
 import { isk, periodLabel, shortDate } from './moonsFormat';
+import { TRADE_HUBS } from '@/market/hubs';
 import { mailTarget, mailsSent, useCorporationName } from './statementMailing';
 
 type Step = 'check' | 'send' | 'done';
@@ -143,6 +144,13 @@ export function StatementRun() {
     };
   };
   const previewLine = plan?.lines.find((l) => l.minerId === previewId) ?? plan?.lines[0];
+  /** Previous / Next miner in the run, wrapping round. */
+  const stepPreview = (delta: number) => {
+    const lines = plan?.lines ?? [];
+    if (lines.length === 0 || !previewLine) return;
+    const next = (lines.indexOf(previewLine) + delta + lines.length) % lines.length;
+    setPreviewId(lines[next].minerId);
+  };
 
   const send = async () => {
     setBusy(true);
@@ -274,7 +282,9 @@ export function StatementRun() {
                     aria-hidden
                   />
                   {t('corpTaxBook.moons.run.billable', {
-                    hub: view.input.hubId,
+                    hub:
+                      TRADE_HUBS.find((h) => h.id === view.input.hubId)?.systemName ??
+                      view.input.hubId,
                     form: t(`corpTaxBook.moons.settings.form.${view.input.oreForm}`),
                   })}
                 </li>
@@ -335,6 +345,11 @@ export function StatementRun() {
                 </p>
               )}
               <div className="flex flex-wrap gap-2">
+                {previewLine && (
+                  <Button variant="ghost" onClick={() => setPreviewOpen(true)} disabled={busy}>
+                    {t('corpTaxBook.moons.run.preview')}
+                  </Button>
+                )}
                 <Button variant="primary" onClick={() => void send()} disabled={busy}>
                   {t('corpTaxBook.moons.run.sendButton', { count: total })}
                 </Button>
@@ -368,6 +383,16 @@ export function StatementRun() {
         open={previewOpen}
         onClose={() => setPreviewOpen(false)}
         mail={previewOpen && previewLine ? previewFor(previewLine) : null}
+        {...(plan && plan.lines.length > 1 && previewLine
+          ? {
+              nav: {
+                position: plan.lines.indexOf(previewLine) + 1,
+                count: plan.lines.length,
+                onPrevious: () => stepPreview(-1),
+                onNext: () => stepPreview(1),
+              },
+            }
+          : {})}
       />
     </Panel>
   );

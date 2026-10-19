@@ -122,6 +122,16 @@ describe('MinersTab', () => {
 });
 
 describe('StatementRun', () => {
+  it('previews the mail of each Miner from the Send step, before sending', async () => {
+    renderBook(<StatementRun />);
+    await userEvent.click(screen.getByRole('button', { name: 'Continue to send' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Preview mail' }));
+    expect(await screen.findByText('1 of 2')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Next Miner' }));
+    expect(screen.getByText('2 of 2')).toBeInTheDocument();
+    expect(enqueueStatements).not.toHaveBeenCalled();
+  });
+
   it('checks, then issues each Statement before handing the mails to the queue', async () => {
     const { reload } = renderBook(<StatementRun />);
     expect(screen.getByText('Aug 2026 Statements')).toBeInTheDocument();

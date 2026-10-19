@@ -108,10 +108,16 @@ describe('buildBookView', () => {
     expect(issued.miners[0].overdueDays).toBe(null);
     expect(nextRunPeriod(issued)).toBeUndefined();
     expect(periodRows(issued).find((r) => r.start === '2026-08-01')).toMatchObject({
-      status: 'sent',
+      status: 'issued',
       billed: 100_000,
       outstanding: 100_000,
     });
+
+    const mailed = buildBookView({
+      ...base,
+      statements: [{ ...statement, mailsSent: 1 } as typeof statement],
+    });
+    expect(periodRows(mailed).find((r) => r.start === '2026-08-01')?.status).toBe('sent');
 
     const paid = buildBookView({
       ...base,
@@ -128,6 +134,7 @@ describe('buildBookView', () => {
       ],
     });
     expect(paid.miners[0].owed).toBe(0);
+    expect(periodRows(paid).find((r) => r.start === '2026-08-01')?.status).toBe('paid');
     expect(paid.miners[0].lastPaidAt).toBe('2026-09-02T00:00:00Z');
     expect(minerDetail(paid, 'solo:1')!.days[0].status).toBe('paid');
   });

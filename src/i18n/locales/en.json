@@ -13733,6 +13733,9 @@
         "title": "Preview mail",
         "to": "To",
         "subject": "Subject",
+        "previous": "Previous Miner",
+        "next": "Next Miner",
+        "position": "{{position}} of {{count}}",
         "summarised": "This mail is summarised to fit EVE’s 10,000-character limit; the verify link has every line."
       },
       "panelTitle": "Statement mail queue"
@@ -13779,7 +13782,10 @@
         "written-off": "Written off"
       },
       "periodStatus": {
+        "issued": "Issued",
         "sent": "Sent",
+        "overdue": "Overdue",
+        "paid": "Paid",
         "ready": "Ready to send",
         "open": "Open"
       },
@@ -14116,6 +14122,7 @@
         "approvals": "Approvals",
         "approvalLimit": "A dismissal above this needs a Director (ISK)",
         "approvalHint": "Currently {{limit}}. Leave it empty for no limit.",
+        "approvalHintNone": "No limit is set. Leave it empty to keep it that way.",
         "approvalDirector": "Only a Director sets the approval limit."
       },
       "grouping": {

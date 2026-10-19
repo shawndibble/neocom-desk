@@ -35,10 +35,13 @@ export function StatementMailPreviewDialog({
   open,
   onClose,
   mail,
+  nav,
 }: {
   open: boolean;
   onClose: () => void;
   mail: MailPreviewContent | null;
+  /** With several Miners in the run: which one this is and how to step between them. */
+  nav?: { position: number; count: number; onPrevious: () => void; onNext: () => void };
 }) {
   const { t } = useTranslation();
   return (
@@ -47,7 +50,27 @@ export function StatementMailPreviewDialog({
       onClose={onClose}
       title={t('corpTaxBook.mailQueue.preview.title')}
       placement="wide"
-      footer={<Button onClick={onClose}>{t('corpTaxBook.mailQueue.actions.close')}</Button>}
+      footer={
+        <>
+          {nav && (
+            <span className="mr-auto flex items-center gap-2">
+              <Button variant="ghost" onClick={nav.onPrevious}>
+                {t('corpTaxBook.mailQueue.preview.previous')}
+              </Button>
+              <span className="text-xs text-text-dim">
+                {t('corpTaxBook.mailQueue.preview.position', {
+                  position: nav.position,
+                  count: nav.count,
+                })}
+              </span>
+              <Button variant="ghost" onClick={nav.onNext}>
+                {t('corpTaxBook.mailQueue.preview.next')}
+              </Button>
+            </span>
+          )}
+          <Button onClick={onClose}>{t('corpTaxBook.mailQueue.actions.close')}</Button>
+        </>
+      }
     >
       {mail && <StatementMailPreview {...mail} />}
     </Modal>
