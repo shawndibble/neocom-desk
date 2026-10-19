@@ -108,7 +108,7 @@ export interface BpcSourcingHeaderState {
  * ME/TE/runs are industry vocabulary (and are literally `BuildPlanRecord`'s
  * own fields), and the thing you do after finding one is run a job. It loads
  * its own snapshot rather than joining Industry's, because the two share no
- * data — this one is global and Firestore-backed, Industry's is per-character
+ * data — this one is global and R2-backed, Industry's is per-character
  * and ESI-backed.
  */
 export function BpcSourcingPanel({
@@ -125,7 +125,6 @@ export function BpcSourcingPanel({
     activeCharacterId,
     refreshAll,
     contractsResult,
-    syncConfigured,
     blueprintNames,
     reactionFormulaTypeIds,
     regionNames,
@@ -168,7 +167,7 @@ export function BpcSourcingPanel({
   const [cardRef, , holdRetryFocus] = useRetryFocus(
     loading
       ? 'busy'
-      : error || (syncConfigured && contractsResult === null && ownedBlueprints.length === 0)
+      : error || (contractsResult === null && ownedBlueprints.length === 0)
         ? 'failed'
         : 'ok',
     activeCharacterId
@@ -556,7 +555,6 @@ export function BpcSourcingPanel({
   const showsTable =
     !(loading && !data) &&
     !error &&
-    syncConfigured &&
     !(rows.length === 0 && originals.length === 0 && ownedBlueprints.length === 0);
   const capNote =
     sources.size > 0 && displayRows.length > shownRows.length
@@ -596,12 +594,12 @@ export function BpcSourcingPanel({
         {t('bpcContracts.title')}
       </h2>
       <LiveStatus>
-        {/* What the visible branch below says; nothing for a build with no sync backend. */}
+        {/* What the visible branch below says. */}
         {loading
           ? ''
           : error
             ? t('common.loadFailedTitle')
-            : syncConfigured && contractsResult === null
+            : contractsResult === null
               ? t('common.contractIndexUnreachableTitle')
               : ''}
       </LiveStatus>
@@ -612,11 +610,6 @@ export function BpcSourcingPanel({
           </div>
         ) : error ? (
           <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
-        ) : !syncConfigured ? (
-          <EmptyState
-            title={t('bpcContracts.notConfiguredTitle')}
-            hint={t('bpcContracts.notConfiguredHint')}
-          />
         ) : contractsResult === null && ownedBlueprints.length === 0 ? (
           // The public index was unreachable and nothing is cached, and there are
           // no owned blueprints to search either: not "no listings synced yet".

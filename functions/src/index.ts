@@ -139,7 +139,10 @@ import {
   type R2Config,
   publishContractOffersToR2,
   publishCourierContractsToR2,
+  publicContractsRunVerdict,
+  r2PublishOutcome,
   type CourierR2PublishState,
+  type R2PublishOutcome,
   type R2PublishState,
 } from './r2Publisher.js';
 import { measureContractTypeChanges, type ContractTypeHashes } from './contractTypeChanges.js';
@@ -154,24 +157,10 @@ import {
   accumulateRequestedSide,
   applyRequestedSide,
   emptyRequestedSide,
-  chunkDocId,
-  buildContractOfferIndex,
-  chunkDocData,
-  chunkRows,
   compactContractOfferRow,
   courierContractFrom,
   eligibleContractFrom,
   isOutstandingCourierContract,
-  sortContractOfferRows,
-  sortCourierContractRows,
-  PUBLIC_CONTRACT_OFFERS_CHUNK_SIZE,
-  PUBLIC_CONTRACT_OFFERS_COLLECTION,
-  PUBLIC_CONTRACT_OFFERS_INDEX_COLLECTION,
-  PUBLIC_CONTRACT_OFFERS_INDEX_DOC,
-  PUBLIC_CONTRACT_OFFERS_META_DOC,
-  PUBLIC_COURIER_CONTRACTS_CHUNK_SIZE,
-  PUBLIC_COURIER_CONTRACTS_COLLECTION,
-  PUBLIC_COURIER_CONTRACTS_META_DOC,
   type EligibleContract,
   type PublicContractOfferRow,
   type PublicCourierContractRow,
@@ -931,153 +920,13 @@ export const sweepCommunityRequests = onSchedule(
   }
 );
 
-/** Firestore's hard cap on writes in a single `WriteBatch`, with headroom for a shorter final page. */
-const BATCH_WRITE_PAGE_SIZE = 450;
-
-/**
- * Applies more write operations than fit in one `WriteBatch` by paging them
- * across several.
- *
- * `pageSize` exists because the op *count* is not always the binding limit.
- * `commit()` is where the Admin SDK encodes each document — `batch.set()` only
- * stores it — so a page of documents that are individually large costs a
- * transient proportional to the whole page. The public-contract snapshot's
- * ~600KB chunk docs need a much smaller page than the default; small per-doc
- * writers can keep filling batches to Firestore's own limit.
- */
-async function commitInPages(
-  db: Firestore,
-  ops: readonly ((batch: FirebaseFirestore.WriteBatch) => void)[],
-  pageSize: number = BATCH_WRITE_PAGE_SIZE
-): Promise<void> {
-  for (let i = 0; i < ops.length; i += pageSize) {
-    const batch = db.batch();
-    for (const op of ops.slice(i, i + pageSize)) op(batch);
-    await batch.commit();
-  }
-}
-
-/**
- * Chunk docs per `WriteBatch`. Deliberately far below Firestore's 500-op cap:
- * committing every chunk of a snapshot in one batch encodes the whole thing
- * at once, which is what exhausted the 512MiB container even after the parse
- * itself had been made cheap. Five chunks of 3,000 rows keep that transient
- * near 3MB. The total write count is unchanged — this only affects how many
- * are in flight together.
- *
- * Shared by both public-contract snapshots: what a page of chunk docs costs to
- * encode is not what an offers chunk and a courier chunk differ in.
- */
-const PUBLIC_CONTRACT_CHUNK_DOCS_PER_BATCH = 5;
-
-/** Where one chunked snapshot lives, and how coarsely it is written. */
-interface ChunkedSnapshot {
-  collection: string;
-  metaDoc: string;
-  chunkSize: number;
-  chunkDocsPerBatch: number;
-}
-
-/**
- * Replaces a chunked snapshot wholesale: chunk docs 0..N-1 are overwritten,
- * any leftover chunk from a previously-larger run is deleted (`meta`'s stored
- * `chunkCount` is how a shrinking dataset's stale chunks are found — nothing
- * else records how many there used to be), and `meta` itself is updated last
- * so a reader never sees a `chunkCount` ahead of what's actually been written
- * this run.
- *
- * Written against a `ChunkedSnapshot` rather than against this one
- * collection: it was shared with the blueprint-only sync until #907 retired
- * that, and how a snapshot is replaced is not what two such syncs differ in.
- */
-async function writeChunkedSnapshot<Row>(
-  db: Firestore,
-  snapshot: ChunkedSnapshot,
-  rows: readonly Row[]
-): Promise<number> {
-  const collection = db.collection(snapshot.collection);
-  const metaRef = collection.doc(snapshot.metaDoc);
-  const previousChunkCount = ((await metaRef.get()).data()?.chunkCount as number | undefined) ?? 0;
-
-  // Fixed before the first write and stamped on every chunk, then reused as
-  // `meta.lastSyncedAt` and the index's: a reader that finds a chunk from a
-  // different publish than the `meta` it began with knows it read across one.
-  const publishedAt = Date.now();
-  const chunks = chunkRows(rows, snapshot.chunkSize);
-  const ops: ((batch: FirebaseFirestore.WriteBatch) => void)[] = chunks.map((chunk, index) => {
-    const ref = collection.doc(chunkDocId(index));
-    return (batch) => batch.set(ref, chunkDocData(chunk, publishedAt));
-  });
-  for (let i = chunks.length; i < previousChunkCount; i += 1) {
-    const ref = collection.doc(chunkDocId(i));
-    ops.push((batch) => batch.delete(ref));
-  }
-  await commitInPages(db, ops, snapshot.chunkDocsPerBatch);
-
-  await metaRef.set({
-    lastSyncedAt: publishedAt,
-    chunkCount: chunks.length,
-    rowCount: rows.length,
-  });
-  return publishedAt;
-}
-
-const PUBLIC_CONTRACT_OFFERS_SNAPSHOT: ChunkedSnapshot = {
-  collection: PUBLIC_CONTRACT_OFFERS_COLLECTION,
-  metaDoc: PUBLIC_CONTRACT_OFFERS_META_DOC,
-  chunkSize: PUBLIC_CONTRACT_OFFERS_CHUNK_SIZE,
-  chunkDocsPerBatch: PUBLIC_CONTRACT_CHUNK_DOCS_PER_BATCH,
-};
-
-/**
- * The courier half of the same crawl (issue #909). Its own collection because
- * a courier row shares none of an offer row's fields beyond identity — see
- * `PublicCourierContractRow` — and `writeChunkedSnapshot` replaces one
- * snapshot from one row array, so two shapes in one collection is not a thing
- * this writer can express in the first place.
- */
-const PUBLIC_COURIER_CONTRACTS_SNAPSHOT: ChunkedSnapshot = {
-  collection: PUBLIC_COURIER_CONTRACTS_COLLECTION,
-  metaDoc: PUBLIC_COURIER_CONTRACTS_META_DOC,
-  chunkSize: PUBLIC_COURIER_CONTRACTS_CHUNK_SIZE,
-  chunkDocsPerBatch: PUBLIC_CONTRACT_CHUNK_DOCS_PER_BATCH,
-};
-
-async function writePublicContractOffersSnapshot(
-  db: Firestore,
-  rows: readonly PublicContractOfferRow[]
-): Promise<number> {
-  const lastSyncedAt = await writeChunkedSnapshot(db, PUBLIC_CONTRACT_OFFERS_SNAPSHOT, rows);
-  // The index is an optimisation a client can do without (it falls back to
-  // reading every chunk), so a failure to write it is logged, never allowed to
-  // fail a run whose chunks and meta are already published (issue #2921).
-  try {
-    await db
-      .collection(PUBLIC_CONTRACT_OFFERS_INDEX_COLLECTION)
-      .doc(PUBLIC_CONTRACT_OFFERS_INDEX_DOC)
-      .set({
-        lastSyncedAt,
-        ...buildContractOfferIndex(rows, PUBLIC_CONTRACT_OFFERS_CHUNK_SIZE),
-      });
-  } catch (error) {
-    logError('public contract offers index write failed', { error: String(error) });
-  }
-  return lastSyncedAt;
-}
-
-async function writePublicCourierContractsSnapshot(
-  db: Firestore,
-  rows: readonly PublicCourierContractRow[]
-): Promise<void> {
-  await writeChunkedSnapshot(db, PUBLIC_COURIER_CONTRACTS_SNAPSHOT, rows);
-}
-
 /**
  * syncPublicContractOffers: the public contract search's data source
  * (issues #608, #906, ADR 0013). Pulls EVE Ref's public-contracts snapshot
  * (no CORS, so the client can't fetch it directly) and republishes every
  * for-sale line of every public item_exchange/auction contract, any item
- * type, to `publicContractOffers` for signed-in clients to search.
+ * type, to Cloudflare R2 (`contract-offers/`) for clients to search. R2 is the
+ * only store (ADR 0019; issue #4270 removed the Firestore copies).
  *
  * Every 30 minutes, matching EVE Ref's own twice-hourly refresh cadence.
  *
@@ -1087,10 +936,10 @@ async function writePublicCourierContractsSnapshot(
  * whole needed ~1.1GB of heap for 37MB of input; the streaming pass peaks far
  * below that against the same live data.
  *
- * It publishes a second snapshot off the same pass: `publicCourierContracts`,
+ * It publishes a second snapshot off the same pass: the courier snapshot,
  * every outstanding public courier contract as a route and a fee (issue #909).
  * Courier contracts have no item lines to join, so they cost one more
- * accumulator and ~2 more writes per run — deliberately not a second scheduled
+ * accumulator and ~2 more R2 puts per run — deliberately not a second scheduled
  * function or a second archive fetch, which is the shape #907 spent a ticket
  * undoing.
  *
@@ -1103,7 +952,7 @@ async function writePublicCourierContractsSnapshot(
  * Memory is 2GiB against the retired blueprint-only sync's 1GiB, and the
  * timeout 540s against its 300s. Neither is measured at this volume; both are provisioned for
  * ~3x the rows on the evidence that exists. That evidence is specific: a
- * 512MiB ceiling died at 527MiB *during the write* with ~122k rows, having
+ * 512MiB ceiling died at 527MiB *during the (then Firestore) write* with ~122k rows, having
  * survived the streaming parse — so the ceiling scales with the retained rows
  * and their encoding, which is exactly what triples here. Under-provisioning
  * reproduces a failure this project has already had (every scheduled run
@@ -1184,9 +1033,9 @@ const R2_ACCESS_KEY_ID = defineSecret('R2_ACCESS_KEY_ID');
 const R2_SECRET_ACCESS_KEY = defineSecret('R2_SECRET_ACCESS_KEY');
 
 /**
- * The R2 connection for jobs whose only store is R2 (the LP offers and open
- * prices): unlike the contract publishers, which are additive to Firestore and
- * skip quietly, these throw when the config is missing so the run fails loudly.
+ * The R2 connection for jobs whose only store is R2 (public contracts, LP
+ * offers, open prices): throws when the config is missing so the run fails
+ * loudly.
  */
 function r2ConfigOrThrow(): R2Config {
   const endpoint = process.env.R2_ENDPOINT;
@@ -1203,91 +1052,86 @@ function r2ConfigOrThrow(): R2Config {
 }
 
 /**
- * Additive to the Firestore snapshot (ADR 0019): never throws, so an R2 outage
- * cannot fail the Firestore publish.
+ * Publishes the offers snapshot to R2 (ADR 0019, issue #4270). Errors reading
+ * the state doc are tolerated (a full re-upload is the worst case); upload and
+ * index failures come back as the outcome, which the run turns into a throw.
  */
 async function publishOffersToR2(
   db: Firestore,
+  config: R2Config,
   rows: readonly PublicContractOfferRow[],
   lastSyncedAt: number
-): Promise<void> {
-  try {
-    const endpoint = process.env.R2_ENDPOINT;
-    const bucket = process.env.R2_BUCKET;
-    if (!endpoint?.startsWith('https://') || !bucket) {
-      logWarn('R2 offers publish skipped: R2_ENDPOINT (https) / R2_BUCKET not set');
-      return;
-    }
-    const stateRef = db.collection(SYSTEM_CONDITIONS_COLLECTION).doc(PUBLIC_CONTRACTS_R2_STATE_DOC);
-    const previous = await stateRef
-      .get()
-      .then((snap) => (snap.exists ? (snap.data() as R2PublishState) : null))
-      .catch(() => null);
-    const result = await publishContractOffersToR2({
-      rows,
-      lastSyncedAt,
-      previous,
-      now: Date.now(),
-      put: createR2Put({
-        endpoint,
-        bucket,
-        accessKeyId: R2_ACCESS_KEY_ID.value(),
-        secretAccessKey: R2_SECRET_ACCESS_KEY.value(),
-      }),
-      onProgress: async (state) => {
-        await stateRef.set(state);
-      },
-    });
-    await stateRef.set(result.state);
-    const { uploaded, skipped, failed, remaining, indexWritten, firstError } = result;
-    (result.failed > 0 || !result.indexWritten ? logWarn : logInfo)(
-      'public contract offers R2 publish',
-      { uploaded, skipped, failed, remaining, indexWritten, firstError }
-    );
-  } catch (error) {
-    logError('public contract offers R2 publish failed', { error: String(error) });
-  }
+): Promise<R2PublishOutcome> {
+  const stateRef = db.collection(SYSTEM_CONDITIONS_COLLECTION).doc(PUBLIC_CONTRACTS_R2_STATE_DOC);
+  const previous = await stateRef
+    .get()
+    .then((snap) => (snap.exists ? (snap.data() as R2PublishState) : null))
+    .catch(() => null);
+  const result = await publishContractOffersToR2({
+    rows,
+    lastSyncedAt,
+    previous,
+    now: Date.now(),
+    put: createR2Put(config),
+    onProgress: async (state) => {
+      await stateRef.set(state);
+    },
+  });
+  await stateRef.set(result.state);
+  const outcome = r2PublishOutcome(result);
+  const { uploaded, skipped, failed, remaining, indexWritten, firstError } = result;
+  (outcome.kind === 'complete' ? logInfo : logWarn)('public contract offers R2 publish', {
+    uploaded,
+    skipped,
+    failed,
+    remaining,
+    indexWritten,
+    firstError,
+  });
+  return outcome;
 }
 
-/** Same contract as `publishOffersToR2`, for the courier snapshot (issue #3748): never throws. */
+/** Same contract as `publishOffersToR2`, for the courier snapshot (issue #3748). */
 async function publishCourierToR2(
   db: Firestore,
+  config: R2Config,
   rows: readonly PublicCourierContractRow[],
   lastSyncedAt: number
-): Promise<void> {
+): Promise<R2PublishOutcome> {
+  const stateRef = db.collection(SYSTEM_CONDITIONS_COLLECTION).doc(PUBLIC_COURIERS_R2_STATE_DOC);
+  const previous = await stateRef
+    .get()
+    .then((snap) => (snap.exists ? (snap.data() as CourierR2PublishState) : null))
+    .catch(() => null);
+  const result = await publishCourierContractsToR2({
+    rows,
+    lastSyncedAt,
+    previous,
+    now: Date.now(),
+    put: createR2Put(config),
+  });
+  await stateRef.set(result.state);
+  const outcome = r2PublishOutcome(result);
+  const { uploaded, indexWritten, firstError } = result;
+  (outcome.kind === 'complete' ? logInfo : logWarn)('public courier contracts R2 publish', {
+    uploaded,
+    indexWritten,
+    firstError,
+  });
+  return outcome;
+}
+
+/**
+ * Runs one R2 publish, folding a thrown error (a state-doc write, say) into a
+ * failed outcome so the other snapshot's publish still runs before the job fails.
+ */
+async function settleR2Publish(
+  publish: () => Promise<R2PublishOutcome>
+): Promise<R2PublishOutcome> {
   try {
-    const endpoint = process.env.R2_ENDPOINT;
-    const bucket = process.env.R2_BUCKET;
-    if (!endpoint?.startsWith('https://') || !bucket) {
-      logWarn('R2 courier publish skipped: R2_ENDPOINT (https) / R2_BUCKET not set');
-      return;
-    }
-    const stateRef = db.collection(SYSTEM_CONDITIONS_COLLECTION).doc(PUBLIC_COURIERS_R2_STATE_DOC);
-    const previous = await stateRef
-      .get()
-      .then((snap) => (snap.exists ? (snap.data() as CourierR2PublishState) : null))
-      .catch(() => null);
-    const result = await publishCourierContractsToR2({
-      rows,
-      lastSyncedAt,
-      previous,
-      now: Date.now(),
-      put: createR2Put({
-        endpoint,
-        bucket,
-        accessKeyId: R2_ACCESS_KEY_ID.value(),
-        secretAccessKey: R2_SECRET_ACCESS_KEY.value(),
-      }),
-    });
-    await stateRef.set(result.state);
-    const { uploaded, indexWritten, firstError } = result;
-    (indexWritten ? logInfo : logWarn)('public courier contracts R2 publish', {
-      uploaded,
-      indexWritten,
-      firstError,
-    });
+    return await publish();
   } catch (error) {
-    logError('public courier contracts R2 publish failed', { error: String(error) });
+    return { kind: 'failed', error: String(error) };
   }
 }
 
@@ -1301,8 +1145,10 @@ export const syncPublicContractOffers = onSchedule(
   async () => {
     // Skip the whole run when EVE Ref has not published a new archive since
     // the last publish. The fingerprint is read before the download and stored
-    // only after the write, so a refresh landing in between is picked up next
-    // run rather than lost. An unreadable fingerprint always syncs.
+    // only after a complete R2 publish, so a refresh landing in between (or a
+    // failed publish) is picked up next run rather than lost. An unreadable fingerprint always syncs.
+    // R2 is the only store, so a missing config fails before the download.
+    const r2Config = r2ConfigOrThrow();
     const db = getFirestore();
     const fingerprintRef = db
       .collection(SYSTEM_CONDITIONS_COLLECTION)
@@ -1372,7 +1218,7 @@ export const syncPublicContractOffers = onSchedule(
     });
 
     // The lookup is dead once the join is done, and it is ~50k objects the
-    // write would otherwise be encoding rows alongside.
+    // publish would otherwise be holding alongside the rows.
     eligibleContracts.clear();
     // Sizes the R2 per-type writer (ADR 0019): how many types change per
     // publish. Telemetry only — a failure here must not fail the publish.
@@ -1394,8 +1240,13 @@ export const syncPublicContractOffers = onSchedule(
     } catch (err) {
       logWarn('public contract type change measurement failed', { error: String(err) });
     }
-    const lastSyncedAt = await writePublicContractOffersSnapshot(db, sortContractOfferRows(rows));
-    await writePublicCourierContractsSnapshot(db, sortCourierContractRows(courierRows));
+    const lastSyncedAt = Date.now();
+    // Courier first: one small object, so a slow offers upload cannot starve it
+    // of the time budget. Both run before either failure is thrown.
+    const courier = await settleR2Publish(() =>
+      publishCourierToR2(db, r2Config, courierRows, lastSyncedAt)
+    );
+    const offers = await settleR2Publish(() => publishOffersToR2(db, r2Config, rows, lastSyncedAt));
     if (typeHashes !== null) {
       await typeHashesRef
         .set({ hashes: typeHashes, updatedAt: Date.now() })
@@ -1403,11 +1254,12 @@ export const syncPublicContractOffers = onSchedule(
           logWarn('public contract type hashes write failed', { error: String(err) })
         );
     }
-    if (fingerprint !== null) await fingerprintRef.set({ fingerprint, updatedAt: Date.now() });
-    // Last, so a slow or failing R2 can never delay or skip the Firestore publish.
-    // Courier first: one small object, so a slow offers upload cannot starve it of the time budget.
-    await publishCourierToR2(db, courierRows, lastSyncedAt);
-    await publishOffersToR2(db, rows, lastSyncedAt);
+    // R2 is the only store (issue #4270): see `publicContractsRunVerdict`.
+    const verdict = publicContractsRunVerdict(courier, offers);
+    if (verdict.error !== null) throw new Error(verdict.error);
+    if (fingerprint !== null && verdict.storeFingerprint) {
+      await fingerprintRef.set({ fingerprint, updatedAt: Date.now() });
+    }
   }
 );
 

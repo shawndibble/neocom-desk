@@ -258,7 +258,7 @@ export function BlueprintAcquisitionModal({
   }, [hydrateLpValue]);
 
   const contracts = useLoad(async () => {
-    const cached = await loadPublicBpcContracts(characterId);
+    const cached = await loadPublicBpcContracts();
     return cached ? { copies: cached.data.rows, originals: cached.data.originals ?? [] } : null;
   }, String(characterId));
   // Region mode, not Trade Hub mode: every sell order in the hub's region is

@@ -92,14 +92,13 @@ export function gzipObjectBody(body: string): Buffer {
   return gzipSync(body);
 }
 
-/** Same per-type facts the Firestore index carries, plus the object names. */
+/** The per-type facts of `buildContractOfferIndex`, plus the object names. */
 export function buildContractOfferR2Index(
   rows: readonly PublicContractOfferRow[],
   objects: readonly TypeObject[],
   lastSyncedAt: number
 ): ContractOfferR2Index {
-  // A chunk size no row position reaches: only count, cheapest and regions are used.
-  const base = buildContractOfferIndex(rows, Number.MAX_SAFE_INTEGER);
+  const base = buildContractOfferIndex(rows);
   const types: ContractOfferR2Index['types'] = {};
   for (const object of objects) {
     const [count, cheapest] = base.types[String(object.typeId)];
