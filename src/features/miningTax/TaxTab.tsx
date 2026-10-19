@@ -63,7 +63,6 @@ import { beginGrant } from '@/app/grantAction';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
-import { formatLocalDate } from '@/lib/localDate';
 import { toggleFilterMember } from '@/lib/multiSelectFilter';
 import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
 import { type UrlParamCodec } from '@/lib/urlState';
@@ -82,7 +81,7 @@ import {
   type DisplayRow,
   type GroupMember,
 } from '@/features/miningTax/groupRows';
-import { resolveRowNames } from '@/features/miningTax/names';
+import { resolveRowNames, systemLabel } from '@/features/miningTax/names';
 import {
   loadDatedUnitPricesByHub,
   pricesAtHubOnDate,
@@ -120,6 +119,7 @@ import { BulkDismissDialog } from '@/features/miningTax/BulkDismissDialog';
 import { SelectionToolbar } from '@/features/miningTax/SelectionToolbar';
 import {
   loadMadePaymentsWithStatus,
+  paidOnFromIso,
   type MadePaymentSources,
 } from '@/features/miningTax/madePayments';
 import {
@@ -177,17 +177,6 @@ import {
   isCorpPayeeId,
 } from '@/features/miningTax/corpBook/corpRows';
 import { useCorpBookView } from '@/features/miningTax/corpBook/useCorpBookView';
-
-/**
- * A `MadePayment`'s own timestamp as a local calendar date, falling back to
- * today — the same rule `LinkPaymentDialog`'s `paidOnFor` uses, so a
- * fallback payment created from a manually-linked transaction reads a
- * `paidOn` the same way a Settle-up-recorded one does.
- */
-function paidOnFromMadePaymentDate(isoDate: string): string {
-  const parsed = new Date(isoDate);
-  return formatLocalDate(Number.isNaN(parsed.getTime()) ? new Date() : parsed);
-}
 
 /** A short display line for a linked ref, from the same `MadePayment[]` the Payments-to-link card already loaded — `null` when it's no longer in the cached wallet journal/contracts. */
 function labelForLinkedRef(
@@ -267,6 +256,7 @@ interface Snapshot {
 
 const NO_HUBS: ReadonlySet<TradeHub['id']> = new Set();
 const NO_NAMES: ReadonlyMap<number, string> = new Map();
+const NO_PAYEES_BY_CHARACTER: ReadonlyMap<number, PayeeRecord[]> = new Map();
 
 const EMPTY_DATED_PRICES: DatedUnitPrices = {
   byHubAndDate: new Map(),
@@ -619,6 +609,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     }
     return [...seen.values()].sort((a, b) => a.name.localeCompare(b.name));
   }, [data]);
+  const payeeById = useMemo(() => new Map(allPayees.map((p) => [p.id, p])), [allPayees]);
 
   // The Payees balances and the Payee filter know: the member's own, plus each Corp Tax Book's
   // virtual "<Corp> (Corp Tax Book)" Payee. Never offered to an Assign dialog.
@@ -632,11 +623,11 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
   const pricingGaps = useMemo(() => {
     if (!data) return [];
     return findPricingGaps(personalRows, {
-      hubIdOf: (assignment) => allPayees.find((p) => p.id === assignment?.payeeId)?.hubId,
+      hubIdOf: (assignment) => payeeById.get(assignment?.payeeId ?? '')?.hubId,
       pricesAt: (hubId, date) => pricesAtHubOnDate(data.datedPrices, hubId, date),
       sellFallbackAt: (hubId, date) => sellFallbackAtHubOnDate(data.datedPrices, hubId, date),
     });
-  }, [data, personalRows, allPayees]);
+  }, [data, personalRows, payeeById]);
 
   // `payeeFilter` is URL-held, so a stale or hand-edited link can name Payee
   // ids nobody tracked has — the codec can't validate that itself (it has no
@@ -820,7 +811,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
    * shows what exists), or the write failed (the toast says so).
    */
   async function continueSession(continuation: SessionContinuation): Promise<boolean> {
-    const payee = allPayees.find((p) => p.id === continuation.payeeId);
+    const payee = payeeById.get(continuation.payeeId);
     if (!payee) return false;
     const result = await continueSessionAction(continuation, (date) =>
       pricesFor(payee.hubId, date)
@@ -914,7 +905,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
   }
 
   function entityIdFor(payeeId: string | undefined): { payeeEntityId?: number } {
-    const id = allPayees.find((p) => p.id === payeeId)?.entityId;
+    const id = payeeById.get(payeeId ?? '')?.entityId;
     return id === undefined ? {} : { payeeEntityId: id };
   }
 
@@ -1021,7 +1012,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
 
   function systemName(dr: DisplayRow): string {
     if (dr.row.entry.solarSystemId === 0) return '—';
-    return data?.systemNames.get(dr.row.entry.solarSystemId) ?? `#${dr.row.entry.solarSystemId}`;
+    return systemLabel(data?.systemNames ?? NO_NAMES, dr.row.entry.solarSystemId);
   }
 
   function systemSecurityOf(dr: DisplayRow): number | undefined {
@@ -1200,7 +1191,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
             : { contractId: payment.refId },
           source,
           {
-            paidOn: paidOnFromMadePaymentDate(payment.date),
+            paidOn: paidOnFromIso(payment.date),
             method: payment.method,
             amount: payment.amount === null ? 0 : Math.round(payment.amount),
           }
@@ -1756,7 +1747,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
               {duplicateRows.map((row) => (
                 <li key={`${row.characterId}:${row.entry.date}:${row.entry.solarSystemId}`}>
                   {row.characterName} — {row.entry.date} —{' '}
-                  {data.systemNames.get(row.entry.solarSystemId) ?? `#${row.entry.solarSystemId}`}
+                  {systemLabel(data.systemNames, row.entry.solarSystemId)}
                 </li>
               ))}
             </ul>
@@ -1827,7 +1818,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     }
   }
 
-  const linkWalletPayee = allPayees.find((p) => p.id === linkWalletTarget?.payeeId) ?? null;
+  const linkWalletPayee = payeeById.get(linkWalletTarget?.payeeId ?? '') ?? null;
   const linkWalletOwed = useMemo(
     () =>
       linkWalletTarget?.members ??
@@ -2207,7 +2198,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
             open={payeeManagerCharacterId !== null}
             onClose={() => setPayeeManagerCharacterId(null)}
             characters={characters}
-            payeesByCharacter={data?.payeesByCharacter ?? new Map()}
+            payeesByCharacter={data?.payeesByCharacter ?? NO_PAYEES_BY_CHARACTER}
             initialCharacterId={payeeManagerCharacterId}
             onChanged={refresh}
             owedByPayee={owedByPayee}
