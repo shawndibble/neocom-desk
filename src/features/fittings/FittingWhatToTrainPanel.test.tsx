@@ -484,7 +484,8 @@ describe('FittingWhatToTrainPanel — over budget', () => {
     const user = userEvent.setup();
     renderPanel();
     expect(await screen.findByText('Makes it fit')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Add to plan: Drones IV' }));
+    // Awaited: the heading renders at once, but the fix block's button waits for the target plan to load.
+    await user.click(await screen.findByRole('button', { name: 'Add to plan: Drones IV' }));
     await waitFor(async () => {
       expect(await planEntries()).toEqual([{ skillTypeID: 3436, targetLevel: 4 }]);
     });
