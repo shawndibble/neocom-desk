@@ -12,10 +12,8 @@
  * store's "Change store" link returns to it (`/wallet/lp-store` with no
  * corporation is the landing state).
  */
-import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
 import { useHydratedStore } from '@/lib/useHydratedStore';
-import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { PageSettingsButton } from '@/features/settings/PageSettingsModal';
 import { LpValueSettingsForm } from '@/features/settings/LpValueSettingsForm';
 import {
@@ -32,7 +30,6 @@ import { industryTabHref } from '@/features/industry/industryTabs';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
-  buttonClassName,
   ColumnPickerMenu,
   DataAgeBadge,
   DataTable,
@@ -60,7 +57,6 @@ import {
   type DataTableColumn,
   CachedNotice,
 } from '@/components/ui';
-import * as Icon from '@/components/ui/icons';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { useIsDesktop } from '@/lib/useIsDesktop';
@@ -70,14 +66,9 @@ import {
   loyaltyStoreOffersColumnsStore,
   type LoyaltyStoreOffersColumnId,
 } from '@/features/loyalty/loyaltyStoreColumns';
-import {
-  loyaltyOfferCsvColumns,
-  loyaltyOfferMaterialsCsvColumns,
-} from '@/features/loyalty/loyaltyStoreCsv';
+import { loyaltyOfferCsvColumns } from '@/features/loyalty/loyaltyStoreCsv';
 import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
 import { boolParam, optionalIdParam, textParam } from '@/lib/urlState';
-import { formatIsk } from '@/lib/isk';
-import { iskToneClass } from '@/features/character/format';
 import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
 import { useMarketHub } from '@/features/market/hub';
 import { usePriceBasis, type PriceBasis } from '@/features/loyalty/priceBasis';
@@ -85,16 +76,14 @@ import { useLpBasis, type LpBasis } from '@/features/loyalty/lpBasis';
 import { concordRate, iskPerConcordLp, type ConcordRate } from '@/engine/loyalty/concordExchange';
 import { loadLpCorporations } from '@/sde/loadMarketSde';
 import { DEFAULT_TRADE_HUB, getTradeHub, TRADE_HUBS } from '@/market/hubs';
-import { nameForType } from '@/features/industry/blueprintCatalog';
-import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { useLoyaltyStoreOffers } from '@/features/loyalty/useLoyaltyStoreOffers';
+import { LoyaltyItemName, OfferDetail } from '@/features/loyalty/OfferDetail';
+import { iskPerLpTone, resolveLoyaltyRowItem } from '@/features/loyalty/offerRowDisplay';
 import { LpStoreSearch } from '@/features/loyalty/LpStoreSearch';
 import type { LpSearchCrumbState } from '@/features/loyalty/itemSearch';
 import { WALLET_TABS } from '@/app/pageTabs';
 import { tabPath } from '@/lib/pageTabs';
 import type { LoyaltyOfferRow } from '@/features/loyalty/offerRows';
-import type { BlueprintCatalog } from '@/features/industry/blueprintCatalog';
-import type { ResolvedMaterial } from '@/engine/industry/materialResolution';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
 import { usePageItemActions } from '@/features/market/usePageItemActions';
@@ -102,306 +91,8 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { applyBlueprintPriceSeed } from '@/features/industry/planSeed';
 import { lpBlueprintPickPrice } from '@/features/industry/blueprintPurchaseOffers';
 
-function iskPerLpTone(value: number | null): string {
-  return value === null ? 'text-text-dim' : iskToneClass(value);
-}
-
 /** Module-level so the table's windowing and row memo see one stable function. */
 const offerRowKey = (row: LoyaltyOfferRow) => row.offer.offer_id;
-
-/**
- * Item name: plain text. The row's click selects it for the detail pane, so
- * the name is not a link (DESIGN.md §6c); `OfferDetail`'s View in Market is
- * the Market link. A blueprint row is labelled with the product that button
- * opens; the BP badge beside it still marks the row as a blueprint.
- */
-function LoyaltyItemName({ row }: { row: LoyaltyOfferRow }) {
-  const { typeId, itemName } = resolveLoyaltyRowItem(row);
-  return <span className={entityLinkClassName()}>{typeId === null ? row.itemName : itemName}</span>;
-}
-
-/**
- * A blueprint offer's row is the *blueprint*, but every market/menu action on
- * it targets the manufactured product — shared by `OfferDetail`'s own
- * View in Market/Plan in Industry buttons and the row's context menu, so the
- * two can't drift on which field means "the real item".
- */
-function resolveLoyaltyRowItem(row: LoyaltyOfferRow): { typeId: number | null; itemName: string } {
-  if (!row.isBlueprint) return { typeId: row.offer.type_id, itemName: row.itemName };
-  return { typeId: row.productTypeId, itemName: row.productName ?? row.itemName };
-}
-
-interface OfferDetailProps {
-  row: LoyaltyOfferRow;
-  catalog: BlueprintCatalog | null;
-  hubId: string;
-  hubName: string;
-  priceBasis: PriceBasis;
-  lpBasis: LpBasis;
-  concord: ConcordRate | null;
-  concordPending: boolean;
-  playerLp: number | null;
-  useOwnMaterials: boolean;
-  onToggleUseOwnMaterials: () => void;
-  onPlanInIndustry: (row: LoyaltyOfferRow) => Promise<void>;
-}
-
-const EMPTY_MATERIALS: readonly ResolvedMaterial[] = [];
-
-function OfferDetail({
-  row,
-  catalog,
-  hubId,
-  hubName,
-  priceBasis,
-  lpBasis,
-  concord,
-  concordPending,
-  playerLp,
-  useOwnMaterials,
-  onToggleUseOwnMaterials,
-  onPlanInIndustry,
-}: OfferDetailProps) {
-  const { t } = useTranslation();
-  const { typeId: marketTypeId, itemName: displayName } = resolveLoyaltyRowItem(row);
-  const { profit } = row;
-  const shownIskPerLp =
-    lpBasis === 'concord'
-      ? concord
-        ? iskPerConcordLp(profit.iskPerLp, concord.rate)
-        : null
-      : profit.iskPerLp;
-
-  const materialColumns = useMemo<DataTableColumn<ResolvedMaterial>[]>(
-    () => [
-      {
-        id: 'name',
-        header: t('loyaltyStore.materialColName'),
-        primary: true,
-        sortValue: (material) =>
-          catalog ? nameForType(catalog, material.typeID) : `#${material.typeID}`,
-        render: (material) => (
-          <MarketItemLink typeId={material.typeID} hubId={hubId}>
-            {catalog ? nameForType(catalog, material.typeID) : `#${material.typeID}`}
-          </MarketItemLink>
-        ),
-      },
-      {
-        id: 'needed',
-        header: t('loyaltyStore.materialColNeeded'),
-        align: 'right',
-        className: 'tabular-nums text-text-dim',
-        sortValue: (material) => material.quantity,
-        render: (material) => material.quantity.toLocaleString(),
-      },
-      {
-        id: 'owned',
-        header: t('loyaltyStore.materialColOwned'),
-        align: 'right',
-        className: 'tabular-nums text-text-dim',
-        sortValue: (material) => material.ownedQuantity,
-        render: (material) => material.ownedQuantity.toLocaleString(),
-      },
-      {
-        id: 'buyCost',
-        header: t('loyaltyStore.materialColBuyCost'),
-        align: 'right',
-        className: 'tabular-nums text-text',
-        sortValue: (material) => material.lineCost,
-        render: (material) => <IskAmount value={material.lineCost} decimals={0} />,
-      },
-    ],
-    [t, catalog, hubId]
-  );
-  const materialCsvColumns = useMemo(
-    () =>
-      loyaltyOfferMaterialsCsvColumns(t, (typeId) =>
-        catalog ? nameForType(catalog, typeId) : `#${typeId}`
-      ),
-    [t, catalog]
-  );
-  const materialsExport = useTableExport({
-    surface: 'lp-offer-materials',
-    rows: row.build?.materials ?? EMPTY_MATERIALS,
-    columns: materialCsvColumns,
-    qualifier: displayName,
-  });
-
-  return (
-    <div className="flex flex-col gap-4">
-      <div>
-        <h3 className="text-base font-medium text-text">{displayName}</h3>
-        {row.isBlueprint && <p className="text-xs text-text-dim">{row.itemName}</p>}
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        {marketTypeId !== null && (
-          <MarketItemLink
-            typeId={marketTypeId}
-            hubId={hubId}
-            className={buttonClassName({ variant: 'ghost', size: 'sm' })}
-          >
-            <span className="inline-flex items-center gap-1.5">
-              <Icon.Market size={Icon.ICON_SIZE.sm} aria-hidden="true" />
-              {t('loyaltyStore.viewInMarket')}
-            </span>
-          </MarketItemLink>
-        )}
-        {row.isBlueprint && row.productTypeId !== null && (
-          <Button variant="ghost" size="sm" onClick={() => void onPlanInIndustry(row)}>
-            <span className="inline-flex items-center gap-1.5">
-              <Icon.Industry size={Icon.ICON_SIZE.sm} aria-hidden="true" />
-              {t('loyaltyStore.planInIndustry')}
-            </span>
-          </Button>
-        )}
-      </div>
-
-      <div className="flex flex-wrap gap-6">
-        <div>
-          <div className={eyebrowClassName}>
-            {t(
-              lpBasis === 'concord' ? 'loyaltyStore.colIskPerConcordLp' : 'loyaltyStore.colIskPerLp'
-            )}
-          </div>
-          <div className={`text-3xl font-semibold tabular-nums ${iskPerLpTone(shownIskPerLp)}`}>
-            {lpBasis === 'concord' && !concord && !concordPending
-              ? t('loyaltyStore.noConcordExchange')
-              : shownIskPerLp === null
-                ? '—'
-                : shownIskPerLp.toFixed(1)}
-          </div>
-        </div>
-        <div>
-          <div className={eyebrowClassName}>{t('loyaltyStore.netProfit')}</div>
-          <div className={`text-xl font-semibold tabular-nums ${iskPerLpTone(profit.profit)}`}>
-            {profit.profit === null ? '—' : <IskAmount value={profit.profit} decimals={0} />}
-          </div>
-        </div>
-      </div>
-
-      <dl className="flex flex-col gap-1 text-xs">
-        <div className="flex justify-between gap-4 text-text-dim">
-          <dt>
-            {t(priceBasis === 'buy' ? 'loyaltyStore.buyPriceAt' : 'loyaltyStore.sellPriceAt', {
-              hub: hubName,
-            })}
-          </dt>
-          <dd className="tabular-nums text-text">
-            {profit.revenue === null ? '—' : formatIsk(profit.revenue)}
-          </dd>
-        </div>
-        <div className="flex justify-between gap-4 text-text-dim">
-          <dt>{t('loyaltyStore.storeCost')}</dt>
-          <dd className="tabular-nums text-text">
-            {row.offer.lp_cost.toLocaleString()} LP + {formatIsk(row.offer.isk_cost)} ISK
-          </dd>
-        </div>
-        {row.requiredItems.length > 0 && (
-          <>
-            <div className="flex justify-between gap-4 text-text-dim">
-              <dt>{t('loyaltyStore.requiredItems')}</dt>
-              <dd className="tabular-nums text-text">
-                {row.requiredItemsCost === null ? (
-                  <span className="text-warning">{t('loyaltyStore.requiredItemsNotPriced')}</span>
-                ) : (
-                  formatIsk(row.requiredItemsCost)
-                )}
-              </dd>
-            </div>
-            <div className="flex flex-col gap-0.5 pl-3">
-              {row.requiredItems.map((item) => (
-                <div
-                  key={item.typeId}
-                  className="flex justify-between gap-4 text-[0.6875rem] text-text-dim"
-                >
-                  <dt>
-                    {item.quantity.toLocaleString()} ×{' '}
-                    <MarketItemLink typeId={item.typeId} hubId={hubId}>
-                      {item.name}
-                    </MarketItemLink>
-                  </dt>
-                  <dd className="tabular-nums">
-                    {item.unitPrice === null ? (
-                      <span className="text-warning">
-                        {t('loyaltyStore.requiredItemsNotPriced')}
-                      </span>
-                    ) : (
-                      formatIsk(item.unitPrice * item.quantity)
-                    )}
-                  </dd>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-        {row.isBlueprint && row.build && (
-          <div className="flex justify-between gap-4 text-text-dim">
-            <dt>{t('loyaltyStore.materials')}</dt>
-            <dd className="tabular-nums text-text">
-              {formatIsk(row.build.materialCost + row.build.jobFee.total)}
-            </dd>
-          </div>
-        )}
-        <div className="mt-1 flex justify-between gap-4 border-t border-line pt-1 font-semibold text-text">
-          <dt>{t('loyaltyStore.netProfit')}</dt>
-          <dd className={`tabular-nums ${iskPerLpTone(profit.profit)}`}>
-            {profit.profit === null ? '—' : formatIsk(profit.profit)}
-          </dd>
-        </div>
-      </dl>
-
-      {profit.affordableLp === false && playerLp !== null && (
-        <p className="text-xs text-text-dim">
-          {t('loyaltyStore.needMoreLp', {
-            amount: (row.offer.lp_cost - playerLp).toLocaleString(),
-          })}
-        </p>
-      )}
-      {profit.profit === null && (
-        <p className="text-xs text-warning">
-          {/* A required item with no hub price is a real, distinct cause from
-              a material or the product itself lacking one (row.build's
-              `unpricedMaterials` / a null `profit.revenue`) — naming the
-              wrong one would send the player looking for a Jita order that
-              was never missing. `requiredItemsCost` is the same null the
-              engine already used to null `profit.profit`, so this reads the
-              actual cause rather than re-deriving it. */}
-          {t(
-            row.requiredItemsCost === null
-              ? 'loyaltyStore.unpriceableRequiredItem'
-              : 'loyaltyStore.unpriceable'
-          )}
-        </p>
-      )}
-
-      {row.isBlueprint && row.build && (
-        <div className="flex flex-col gap-2 border-t border-line pt-3">
-          <div className="flex items-center justify-between gap-2">
-            <FilterChip
-              label={t('loyaltyStore.useOwnMaterials')}
-              selected={useOwnMaterials}
-              onToggle={onToggleUseOwnMaterials}
-            />
-            <TableActionsMenu name={t('loyaltyStore.materials')} tableExport={materialsExport} />
-          </div>
-          <p className="text-[0.6875rem] text-text-dim">{t('loyaltyStore.useOwnMaterialsHint')}</p>
-          <div className="overflow-x-auto">
-            <DataTable
-              {...materialsExport.tableProps}
-              label={t('loyaltyStore.materials')}
-              columns={materialColumns}
-              rows={row.build.materials}
-              rowKey={(material) => material.typeID}
-              density="compact"
-              responsive="table"
-            />
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
 
 /**
  * The filter row's three fields, in the URL (ADR 0015, issue #1302): all
