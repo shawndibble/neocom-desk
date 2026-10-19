@@ -8,19 +8,14 @@ import {
   useCharacterIdsWithScopes,
   useEndpointsGranted,
 } from './useGrantedScopes';
+import { seedGrant as seedGrantFor } from '@/test/seed';
 
 const CHARACTER_ID = 42;
 const OTHER_SCOPE = ESI_REGISTRY.getCharacterAssets.scope;
 const IMPLANTS_SCOPE = ESI_REGISTRY.getCharacterImplants.scope;
 
 async function seedGrant(scopes: readonly string[], characterId = CHARACTER_ID): Promise<void> {
-  await db.tokens.put({
-    characterId,
-    accessToken: 'access',
-    refreshToken: 'refresh',
-    expiresAt: Date.now() + 60_000,
-    scopes: [...scopes],
-  });
+  await seedGrantFor(characterId, scopes);
 }
 
 beforeEach(async () => {

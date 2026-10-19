@@ -101,11 +101,6 @@ function basicSchematicFor(p0TypeId: number, pi: PiData): BasicSchematic | null 
   return null;
 }
 
-/** The P1 a P0 refines into: the basic schematic whose single input it is. Null when none does. */
-export function p1ForP0(p0TypeId: number, pi: PiData): number | null {
-  return basicSchematicFor(p0TypeId, pi)?.p1TypeId ?? null;
-}
-
 function addCounts(a: PinCounts, b: PinCounts): PinCounts {
   const out: Partial<Record<PiPinKind, number>> = { ...a };
   for (const [kind, count] of Object.entries(b) as [PiPinKind, number][]) {
@@ -296,18 +291,4 @@ export function extractionOptions(
     if (result.status === 'fits') out.push(result);
   }
   return out;
-}
-
-/** The most ECUs (up to the policy cap) on one P0 that fit on this colony, or null when not even one does. */
-export function bestSingleSlotFit(
-  colony: PlannerColony,
-  p0TypeId: number,
-  pi: PiData,
-  policy: PlannerPolicy
-): FittedExtraction | null {
-  for (let ecus = policy.maxEcusPerColony; ecus >= 1; ecus--) {
-    const result = colonyExtraction(colony, [{ p0TypeId, ecus }], pi, policy);
-    if (result.status === 'fits') return result;
-  }
-  return null;
 }

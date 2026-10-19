@@ -235,7 +235,7 @@ describe('FittingMutationPanel', () => {
     assets.mutationsForItems.mockResolvedValue(new Map([[501, owned]]));
     const { after } = setup(plain, 90000001);
 
-    await user.click(screen.getByRole('button', { name: 'Load rolls from my assets' }));
+    await user.click(await screen.findByRole('button', { name: 'Load rolls from my assets' }));
     expect(assets.loadCharacterAssets).toHaveBeenCalledWith(90000001);
     expect(assets.mutationsForItems.mock.calls[0]![0]).toEqual([{ typeId: ABYSSAL, itemId: 501 }]);
     await user.click(
@@ -253,7 +253,7 @@ describe('FittingMutationPanel', () => {
       needsReauth: false,
     });
     const { show } = setup(plain, 90000001);
-    await user.click(screen.getByRole('button', { name: 'Load rolls from my assets' }));
+    await user.click(await screen.findByRole('button', { name: 'Load rolls from my assets' }));
     expect(await screen.findByText('None of your assets is this module.')).toBeInTheDocument();
     show(plain, 90000002);
     expect(screen.queryByText('None of your assets is this module.')).toBeNull();
@@ -277,7 +277,7 @@ describe('FittingMutationPanel', () => {
     assets.mutationsForItems.mockResolvedValue(new Map([[501, owned]]));
     const unknownBase = { ...plain, typeId: ABYSSAL };
     const { after, show } = setup(unknownBase, 90000001);
-    await user.click(screen.getByRole('button', { name: 'Load rolls from my assets' }));
+    await user.click(await screen.findByRole('button', { name: 'Load rolls from my assets' }));
     await user.click(await screen.findByRole('button', { name: /· Gravid/ }));
     show(after());
     await vi.waitFor(() =>
@@ -292,7 +292,7 @@ describe('FittingMutationPanel', () => {
       needsReauth: false,
     });
     setup(plain, 90000001);
-    await user.click(screen.getByRole('button', { name: 'Load rolls from my assets' }));
+    await user.click(await screen.findByRole('button', { name: 'Load rolls from my assets' }));
     expect(await screen.findByText('None of your assets is this module.')).toBeInTheDocument();
     expect(assets.mutationsForItems).not.toHaveBeenCalled();
   });
@@ -303,16 +303,19 @@ describe('FittingMutationPanel, assets it cannot read', () => {
     const user = userEvent.setup();
     assets.loadCharacterAssets.mockResolvedValue({ cached: null, needsReauth: false });
     setup(plain, 90000001);
-    await user.click(screen.getByRole('button', { name: 'Load rolls from my assets' }));
+    await user.click(await screen.findByRole('button', { name: 'Load rolls from my assets' }));
     expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't read your assets");
     expect(screen.queryByText('None of your assets is this module.')).toBeNull();
     await user.click(screen.getByRole('button', { name: 'Try again' }));
     expect(assets.loadCharacterAssets).toHaveBeenCalledTimes(2);
   });
 
-  it('asks for the Assets Permission instead, when the Character lacks it', () => {
+  it('asks for the Assets Permission instead, when the Character lacks it', async () => {
     scope.lacks = true;
     setup(plain, 90000001);
+    expect(
+      await screen.findByRole('link', { name: 'Grant missing Permissions' })
+    ).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Load rolls from my assets' })).toBeNull();
     expect(screen.getByRole('link', { name: 'Grant missing Permissions' })).toBeInTheDocument();
   });

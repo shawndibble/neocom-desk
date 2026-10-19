@@ -4,16 +4,15 @@ import { resetRevalidationState } from '@/esi/cache';
 import { loadPublicContractOffers } from './publicContractOffers';
 
 const getDoc = vi.hoisted(() => vi.fn());
+const getDocs = vi.hoisted(() => vi.fn());
 
+// R2 is the only store (issue #4270): these spies prove nothing reaches Firestore.
 vi.mock('firebase/firestore/lite', () => ({
   getDoc,
-  getDocs: vi.fn(),
+  getDocs,
   collection: vi.fn(),
-  doc: (_db: unknown, collectionName: string, id: string) => ({ path: `${collectionName}/${id}` }),
+  doc: vi.fn(),
 }));
-vi.mock('@/sync/firebaseApp', () => ({ getSyncFirestore: () => ({}) }));
-vi.mock('@/sync/syncAuth', () => ({ ensureAnySession: vi.fn(async () => undefined) }));
-vi.mock('@/app/syncStatus', () => ({ isSyncConfigured: () => true }));
 
 const INDEX = {
   lastSyncedAt: 400,
@@ -25,6 +24,7 @@ beforeEach(async () => {
   await db.esiCache.clear();
   resetRevalidationState();
   getDoc.mockReset();
+  getDocs.mockReset();
 });
 
 afterEach(() => {
@@ -32,30 +32,25 @@ afterEach(() => {
 });
 
 describe('loadPublicContractOffers', () => {
-  it('reports the R2 index freshness with no rows, and reads no Firestore chunk', async () => {
+  it('reports the R2 index freshness with no rows', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => new Response(JSON.stringify(INDEX), { status: 200 }))
     );
 
-    const read = await loadPublicContractOffers(7);
+    const read = await loadPublicContractOffers();
 
     expect(read.cached?.data).toEqual({ rows: [], lastSyncedAt: 400 });
     expect(getDoc).not.toHaveBeenCalled();
   });
 
-  it('falls back to the Firestore chunks when R2 is blocked', async () => {
+  it('reads as unavailable when R2 is blocked, with no Firestore fallback', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('blocked')));
-    getDoc.mockImplementation(async (ref: { path: string }) => ({
-      data: () =>
-        ref.path === 'publicContractOffers/meta'
-          ? { lastSyncedAt: 90, chunkCount: 1 }
-          : { rows: [{ typeId: 34, contractId: 1 }], publishedAt: 90 },
-    }));
 
-    const read = await loadPublicContractOffers(7);
+    const read = await loadPublicContractOffers();
 
-    expect(read.cached?.data.rows).toEqual([{ typeId: 34, contractId: 1 }]);
-    expect(read.cached?.data.lastSyncedAt).toBe(90);
+    expect(read).toEqual({ cached: null, revalidating: false });
+    expect(getDoc).not.toHaveBeenCalled();
+    expect(getDocs).not.toHaveBeenCalled();
   });
 });

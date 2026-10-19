@@ -8,7 +8,7 @@
  * Drones are not covered: a mutated drone is its own one-drone stack, and
  * the drone rows have no dialog to hold this.
  */
-import { useEffect, useId, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, useId, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -42,10 +42,14 @@ import { useMutaplasmidLookup } from '@/features/abyssal/mutaplasmidData';
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { attributeValueText, formatAttributeNumber } from './attributeValueText';
 import { loadBaseValues } from './loadBaseValues';
-import { MutationFromAssets } from './MutationFromAssets';
 import { useAttributeDictionary } from './useAttributeDictionary';
 import { catalogueTypeName, type FittingCatalogue } from './useFittingCatalogue';
 import type { FittingChange } from './useFittingWorkspace';
+import { guarded } from '@/app/routeChunks';
+
+const MutationFromAssets = lazy(() =>
+  guarded(() => import('./MutationFromAssets')).then((m) => ({ default: m.MutationFromAssets }))
+);
 
 /** Slider positions from worst to best: one arrow-key press is 1%, the step the printed roll shows. */
 const STEPS = 100;
@@ -120,18 +124,20 @@ function MutationEditor({
       ? new Set(lookup.mutaplasmidsForBase(module.typeId).map((m) => m.resultTypeId))
       : new Set([module.typeId]);
   const fromAssets = characterId !== null && (
-    <MutationFromAssets
-      // Another Character or base starts a fresh search: the old one's items aren't these.
-      key={`${characterId}:${[...assetTypes].sort((a, b) => a - b).join(',')}`}
-      characterId={characterId}
-      typeIds={assetTypes}
-      lookup={lookup}
-      nameOf={nameOf}
-      onApply={(owned) => {
-        apply(owned);
-        focusPicker();
-      }}
-    />
+    <Suspense fallback={null}>
+      <MutationFromAssets
+        // Another Character or base starts a fresh search: the old one's items aren't these.
+        key={`${characterId}:${[...assetTypes].sort((a, b) => a - b).join(',')}`}
+        characterId={characterId}
+        typeIds={assetTypes}
+        lookup={lookup}
+        nameOf={nameOf}
+        onApply={(owned) => {
+          apply(owned);
+          focusPicker();
+        }}
+      />
+    </Suspense>
   );
 
   if (status === 'baseUnknown') {

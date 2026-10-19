@@ -223,6 +223,26 @@ describe('EntityInfoRoute', () => {
     expect(probe.pathname).toBe('/mail');
   });
 
+  it('strips info on a tab switch within the page', async () => {
+    renderAt('/market/browser?info=character-1');
+    await screen.findByRole('dialog');
+    act(() => void probe.navigate('/market/orders?info=character-1'));
+    await waitFor(() => expect(probe.search).toBe(''));
+    expect(probe.pathname).toBe('/market/orders');
+  });
+
+  it('keeps info, and the modal, through a redirect: the cold tab landing replaces the path', async () => {
+    // A cold `/market?info=…` lands through TabRoute's `<Navigate replace>`
+    // to the default tab; that is the same visit, not a page change.
+    renderAt('/market?info=character-1');
+    await screen.findByRole('dialog');
+    act(() => void probe.navigate('/market/browser?info=character-1', { replace: true }));
+    await waitFor(() => expect(probe.pathname).toBe('/market/browser'));
+    expect(probe.search).toBe('?info=character-1');
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(usePublicInfoModalStore.getState().request).toEqual({ kind: 'character', id: 1 });
+  });
+
   it('returns focus to the link that opened the modal', async () => {
     renderAt('/contacts');
     const link = screen.getByRole('link', { name: 'Pilot One' });

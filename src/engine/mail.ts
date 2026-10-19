@@ -305,13 +305,6 @@ export function sumUnreadByTab(
   return sums;
 }
 
-/** Names of Characters the All view cannot cover: no mail grant, or nothing cached to show. */
-export function skippedMailCharacters(
-  characters: readonly { name: string; granted: boolean; hasHeaders: boolean }[]
-): string[] {
-  return characters.filter((c) => !c.granted || !c.hasHeaders).map((c) => c.name);
-}
-
 /**
  * Which mail bodies are worth fetching ahead of being opened, so the reader
  * works offline: the `limit` newest headers (unread first, then read, each

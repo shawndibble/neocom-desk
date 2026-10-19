@@ -21,7 +21,7 @@ import type {
   PlanetaryBoardData,
   PriceAlertsBoardData,
   StructuresBoardData,
-} from '../../boardData';
+} from '../../data/boardData';
 import type { IncursionsBoardData } from '../../incursionsBoard';
 import type { BoardDeadline } from '../nextDeadline';
 import type { WidgetStateInput } from '../state';

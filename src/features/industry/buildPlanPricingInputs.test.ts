@@ -134,9 +134,10 @@ describe('useBuildPlanPricingInputs', () => {
   it("loads the Character's standings and BPC Sourcing rows, and reloads both on a Character switch", async () => {
     const rowsFor1 = [row({ typeId: 10, regionId: JITA.regionId })];
     const rowsFor2 = [row({ typeId: 20, regionId: AMARR.regionId })];
-    mockedBpcContracts.mockImplementation((characterId) =>
-      Promise.resolve(snapshotOf(characterId === 1 ? rowsFor1 : rowsFor2))
-    );
+    // One shared public snapshot, re-read on the switch (it may have republished).
+    mockedBpcContracts
+      .mockResolvedValueOnce(snapshotOf(rowsFor1))
+      .mockResolvedValueOnce(snapshotOf(rowsFor2));
 
     const { result, rerender } = renderHook(
       ({ characterId }) => useBuildPlanPricingInputs(characterId),
@@ -144,13 +145,12 @@ describe('useBuildPlanPricingInputs', () => {
     );
     await waitFor(() => expect(result.current.bpcRows).toBe(rowsFor1));
     expect(result.current.standings.get('jita')).toBe(JITA_STANDING);
-    expect(mockedBpcContracts).toHaveBeenCalledWith(1);
 
     rerender({ characterId: 2 });
     await waitFor(() => expect(result.current.bpcRows).toBe(rowsFor2));
     expect(result.current.standings.get('amarr')).toBe(AMARR_STANDING);
     expect(result.current.standings.has('jita')).toBe(false);
-    expect(mockedBpcContracts).toHaveBeenLastCalledWith(2);
+    expect(mockedBpcContracts).toHaveBeenCalledTimes(2);
   });
 
   it('loads no BPC Sourcing rows with no Character', () => {
@@ -234,20 +234,20 @@ describe('loadBpcContractRows', () => {
     mockedBpcContracts.mockResolvedValue({
       data: { rows: copies, originals },
     } as unknown as CachedResult<never>);
-    await expect(loadBpcContractRows(1)).resolves.toEqual([...copies, ...originals]);
+    await expect(loadBpcContractRows()).resolves.toEqual([...copies, ...originals]);
   });
 
   it("returns the snapshot's rows", async () => {
     const rows = [row({ typeId: 10, regionId: JITA.regionId })];
     mockedBpcContracts.mockResolvedValue(snapshotOf(rows));
-    await expect(loadBpcContractRows(1)).resolves.toBe(rows);
+    await expect(loadBpcContractRows()).resolves.toBe(rows);
   });
 
   it('returns null when there is no snapshot or the load fails', async () => {
     mockedBpcContracts.mockResolvedValue(null);
-    await expect(loadBpcContractRows(1)).resolves.toBeNull();
+    await expect(loadBpcContractRows()).resolves.toBeNull();
     mockedBpcContracts.mockRejectedValue(new Error('offline'));
-    await expect(loadBpcContractRows(1)).resolves.toBeNull();
+    await expect(loadBpcContractRows()).resolves.toBeNull();
   });
 });
 

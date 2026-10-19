@@ -1,16 +1,7 @@
-import {
-  useCallback,
-  useDeferredValue,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ReactElement,
-} from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
-  Button,
   ColumnPickerMenu,
   DataAgeBadge,
   DataTable,
@@ -21,15 +12,9 @@ import {
   FilterChip,
   IconButton,
   MenuItem,
-  MultiSelect,
   LiveStatus,
   SearchInput,
   SegmentedControl,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
   Spinner,
   textActionClassName,
   type DataTableSort,
@@ -38,7 +23,7 @@ import {
 import { useColumnVisibility } from '@/lib/columnVisibility';
 import * as Icon from '@/components/ui/icons';
 import { GrantBanner } from '@/app/GrantNote';
-import { useCharacterIdsWithScopes, useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
+import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
 import { useViewedCharacterId } from '@/features/character/viewedCharacter';
@@ -52,13 +37,7 @@ import {
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { useHighlightParam } from '@/lib/useHighlightParam';
 import { useIsPhone } from '@/lib/useIsPhone';
-import {
-  filterFromParamValues,
-  paramsPatchFromFilter,
-  useRememberedUrlParams,
-  type UrlParamValues,
-} from '@/lib/useUrlState';
-import { formatIskCompact } from '@/lib/isk';
+import {} from '@/lib/useUrlState';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { PageHeaderPortals } from './PageHeaderPortals';
 import type { PageHeaderSlots } from './pageHeaderSlots';
@@ -75,17 +54,10 @@ import { sampledProblem } from '@/engine/market/orderProblemHistory';
 import { buildOpenOrderRows, openOrderProblemCounts, type OpenOrderRow } from './openOrdersModel';
 import {
   EMPTY_OPEN_ORDERS_FILTER,
-  FILTERABLE_PROBLEMS,
   locationFilterOptions,
-  OPEN_ORDERS_FIELD_TO_PARAM,
-  OPEN_ORDERS_FILTER_PARAMS,
-  OPEN_ORDERS_SORTS,
   activeFilterChips,
   type OpenOrdersFilter,
-  type OpenOrdersSort,
 } from './openOrdersFilter';
-import { useCharacterFilterPick } from '@/features/character/characterFilterPicks';
-import { useOpenOrdersLocationFilterPref } from './openOrdersLocationFilterPref';
 import { buildOpenOrdersView, shownView } from './openOrdersView';
 import { rowInView, type OpenOrdersView } from './orderUrgency';
 import { doThisPrice, rowFixCall } from './orderDoThis';
@@ -97,35 +69,22 @@ import { useOrderDetail } from './useOrderDetail';
 import { useStructureFees } from './structureFees';
 import { SetWaypointMenuItem } from '@/features/travel/SetWaypointMenuItem';
 import { itemKey } from './orderDetailView';
-import { requiredScopesForEndpoints } from '@/esi/registry';
-import { OPEN_IN_EVE_ENDPOINTS } from '@/features/openInEve/sendOpenInEve';
-import { workThroughQueue } from './workThrough';
-import { useWorkThrough, useWorkThroughStartParam } from './useWorkThrough';
 import { WorkThroughListSlot } from './WorkThroughControls';
-import { WorkThroughContext, type WorkThroughContextValue } from './workThroughContext';
+import { WorkThroughContext } from './workThroughContext';
 import {
   OPEN_ORDER_COLUMN_IDS,
   OPEN_ORDER_DEFAULT_COLUMNS,
   useVisibleOpenOrderColumns,
 } from './openOrdersColumns';
 import { useOpenOrderTableColumns } from './openOrdersTableColumns';
+import { chipLabel } from './openOrdersChipLabel';
+import { OpenOrdersFilterFields } from './OpenOrdersFilterFields';
+import { useOpenOrdersFilterState } from './useOpenOrdersFilterState';
+import { useOpenOrdersWorkThrough } from './useOpenOrdersWorkThrough';
 import { FixListSummary, HealthyFold, ListNotes } from './OpenOrdersFixListParts';
 
 /** A bare visit opens on Needs you, every funnel field clear. */
 const DEFAULT_FILTER: OpenOrdersFilter = EMPTY_OPEN_ORDERS_FILTER;
-
-const SORTS: readonly OpenOrdersSort[] = OPEN_ORDERS_SORTS;
-
-/**
- * Every problem worth a funnel chip. The same set a deep link may name, and
- * deliberately the same constant: the funnel and the URL are two ways to reach
- * one filter, and `healthy` is excluded from both for the reason
- * `FILTERABLE_PROBLEMS` gives.
- */
-const PROBLEM_FILTER_OPTIONS = FILTERABLE_PROBLEMS;
-
-const EXPIRING_WITHIN_DAY_OPTIONS = [3, 7, 14, 30] as const;
-const MIN_ISK_TIED_UP_OPTIONS = [10_000_000, 100_000_000, 1_000_000_000] as const;
 
 const TABLE_LABEL_KEY: Record<OpenOrdersView, string> = {
   act: 'market.orders.fixList.tableAct',
@@ -157,71 +116,7 @@ export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
     { cacheKey: 'market:open-orders' }
   );
 
-  /*
-   * The whole filter lives in the URL (ADR 0015), one `orders.*` key per
-   * field — a deep link (an Overview Orders widget's row, `openOrdersHref`)
-   * narrows it on arrival, and every chip, select, segment and search
-   * keystroke from here on writes straight back to it, so a reload or a
-   * shared link always reopens exactly what was on screen.
-   *
-   * `orders.locations` is the one exception: a bare `/market/orders` visit
-   * (no query string at all — every app relaunch) falls back to the
-   * device-local pick remembered in `openOrdersLocationFilterPref.ts`
-   * (decision `20260922-221531` / ADR 0015), via `useRememberedUrlParams`
-   * rather than the plain `useUrlFilter` every other field still reads
-   * through. The URL always wins when it states the field; the stored value
-   * is never mirrored back into it.
-   */
-  const rememberedLocationIds = useOpenOrdersLocationFilterPref((state) => state.value);
-  const hydrateRememberedLocationIds = useOpenOrdersLocationFilterPref((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateRememberedLocationIds();
-  }, [hydrateRememberedLocationIds]);
-  // `orders.characters` remembers the This character / All characters pick the
-  // same way the other pages do, then the synced Settings default. `'current'`
-  // is `[activeCharacterId]` here, so it keeps following the active Character.
-  const { pick: rememberedCharacterPick, remember: rememberCharacterPick } =
-    useCharacterFilterPick('orders');
-  const rememberedCharacterIds = useMemo<readonly number[]>(
-    () =>
-      rememberedCharacterPick === 'current' && activeCharacterId !== null
-        ? [activeCharacterId]
-        : [],
-    [rememberedCharacterPick, activeCharacterId]
-  );
-  const remembered = useMemo(
-    () => ({
-      values: {
-        'orders.locations': rememberedLocationIds,
-        'orders.characters': rememberedCharacterIds,
-      },
-      remember: (patch: Partial<UrlParamValues<typeof OPEN_ORDERS_FILTER_PARAMS>>) => {
-        if ('orders.locations' in patch) {
-          void useOpenOrdersLocationFilterPref
-            .getState()
-            .setValue(patch['orders.locations'] as readonly number[]);
-        }
-        const characterIds = patch['orders.characters'] as readonly number[] | undefined;
-        if (characterIds) {
-          void rememberCharacterPick(
-            characterIds.length === 1 && characterIds[0] === activeCharacterId ? 'current' : 'all'
-          );
-        }
-      },
-    }),
-    [rememberedLocationIds, rememberedCharacterIds, rememberCharacterPick, activeCharacterId]
-  );
-  const [params, setParams] = useRememberedUrlParams(OPEN_ORDERS_FILTER_PARAMS, remembered);
-  const filter = useMemo(
-    () => filterFromParamValues<OpenOrdersFilter>(params, OPEN_ORDERS_FIELD_TO_PARAM),
-    [params]
-  );
-  // Rows derive from a deferred copy so a keystroke paints the box first
-  // (`useUrlFilter`'s rule); the bar, chips and setter keep the immediate one.
-  const rowsFilter = useDeferredValue(filter);
-  function setFilter(next: OpenOrdersFilter) {
-    setParams(paramsPatchFromFilter(next, OPEN_ORDERS_FIELD_TO_PARAM));
-  }
+  const { filter, rowsFilter, setFilter } = useOpenOrdersFilterState(activeCharacterId);
   /**
    * The order a Notification Event (an undercut, or a fill) sent the reader
    * to, spent once on arrival (`useHighlightParam`'s own doc). Landing on the
@@ -473,63 +368,19 @@ export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
   const detailRow =
     detailOrderId !== null ? (allRows.find((r) => r.orderId === detailOrderId) ?? null) : null;
 
-  const workQueue = useMemo(() => workThroughQueue(sortedRows), [sortedRows]);
-  const openInEveCharacterIds = useCharacterIdsWithScopes(
-    requiredScopesForEndpoints(OPEN_IN_EVE_ENDPOINTS)
-  );
-  const canOpenInEve = useCallback(
-    (characterId: number) => openInEveCharacterIds?.has(characterId) ?? false,
-    [openInEveCharacterIds]
-  );
-  // Every Character's orders, before any narrowing: never undercut an alt.
-  const ownOrderIds = useMemo(
-    () => new Set(data?.openOrders.entries.flatMap((e) => e.orders.map((o) => o.order_id)) ?? []),
-    [data]
-  );
-  const fetchedAtByCharacter = useMemo(
-    () => new Map((snapshot?.openOrders.entries ?? []).map((e) => [e.characterId, e.fetchedAt])),
-    [snapshot]
-  );
-  const workThrough = useWorkThrough({
-    queue: workQueue,
+  const onSeeExits = useCallback((row: OpenOrderRow) => {
+    setDetailAtExits(true);
+    setDetailOrderId(row.orderId);
+  }, []);
+  const { workCurrentId, workCurrent, workThroughContext } = useOpenOrdersWorkThrough({
+    sortedRows,
+    data,
+    snapshot,
+    ordersByOrderId,
     isPhone,
-    ownOrderIds,
-    canOpenInEve,
-    ordersById: ordersByOrderId,
-    fetchedAtByCharacter,
+    rowCount: allRows.length,
+    onSeeExits,
   });
-  const workCurrentId = workThrough.currentId;
-  const workCurrent = workCurrentId === null ? null : workThrough.progress.current;
-  const startRequested = useWorkThroughStartParam();
-  const startedFromLink = useRef(false);
-  const { start: startWorkThrough } = workThrough;
-  useEffect(() => {
-    if (!startRequested || startedFromLink.current || allRows.length === 0) return;
-    startedFromLink.current = true;
-    startWorkThrough();
-  }, [startRequested, allRows.length, startWorkThrough]);
-  useEffect(() => {
-    if (workCurrentId === null) return;
-    document
-      .querySelector(`[data-row-key="${workCurrentId}"]`)
-      ?.scrollIntoView?.({ block: 'nearest' });
-  }, [workCurrentId]);
-  const manyOwners = useMemo(
-    () => new Set(workQueue.map((row) => row.characterId)).size > 1,
-    [workQueue]
-  );
-  const workThroughContext = useMemo<WorkThroughContextValue>(
-    () => ({
-      workThrough,
-      canOpenInEve,
-      manyOwners,
-      onSeeExits: (row) => {
-        setDetailAtExits(true);
-        setDetailOrderId(row.orderId);
-      },
-    }),
-    [workThrough, canOpenInEve, manyOwners]
-  );
 
   /**
    * The segment on screen: the picked one, widened to All while the
@@ -796,191 +647,13 @@ export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
                   }
                 >
                   {(draft, setDraft) => (
-                    <>
-                      <FilterChip
-                        label={t('orders.buy')}
-                        selected={draft.side === 'buy'}
-                        onToggle={() =>
-                          setDraft({ ...draft, side: draft.side === 'buy' ? null : 'buy' })
-                        }
-                      />
-                      <FilterChip
-                        label={t('orders.sell')}
-                        selected={draft.side === 'sell'}
-                        onToggle={() =>
-                          setDraft({ ...draft, side: draft.side === 'sell' ? null : 'sell' })
-                        }
-                      />
-                      {PROBLEM_FILTER_OPTIONS.map((problem) => {
-                        const count = problemCounts[problem];
-                        const selected = draft.problems.includes(problem);
-                        return (
-                          <FilterChip
-                            key={problem}
-                            label={t(`market.orders.group.${problem}`)}
-                            count={count}
-                            selected={selected}
-                            // A zero-count problem still renders, still a real
-                            // focusable button, so the player can see it's clean
-                            // rather than wonder where it went — the `0` itself
-                            // is the cue; no `opacity-50` fade below AA on top of
-                            // it (issue #1491).
-                            onToggle={() =>
-                              setDraft({
-                                ...draft,
-                                problems: selected
-                                  ? draft.problems.filter((p) => p !== problem)
-                                  : [...draft.problems, problem],
-                              })
-                            }
-                          />
-                        );
-                      })}
-                      <FilterChip
-                        label={t('market.orders.filter.costBasisLinked')}
-                        selected={draft.costBasis === 'linked'}
-                        onToggle={() =>
-                          setDraft({
-                            ...draft,
-                            costBasis: draft.costBasis === 'linked' ? null : 'linked',
-                          })
-                        }
-                      />
-                      <FilterChip
-                        label={t('market.orders.filter.costBasisMissing')}
-                        selected={draft.costBasis === 'missing'}
-                        onToggle={() =>
-                          setDraft({
-                            ...draft,
-                            costBasis: draft.costBasis === 'missing' ? null : 'missing',
-                          })
-                        }
-                      />
-                      <Select
-                        value={
-                          draft.expiringWithinDays === null
-                            ? 'any'
-                            : String(draft.expiringWithinDays)
-                        }
-                        onValueChange={(value) =>
-                          setDraft({
-                            ...draft,
-                            expiringWithinDays: value === 'any' ? null : Number(value),
-                          })
-                        }
-                      >
-                        <SelectTrigger
-                          size="sm"
-                          aria-label={t('market.orders.filter.expiringWithin')}
-                          className="w-36"
-                        >
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="any">{t('market.orders.filter.anyExpiry')}</SelectItem>
-                          {EXPIRING_WITHIN_DAY_OPTIONS.map((days) => (
-                            <SelectItem key={days} value={String(days)}>
-                              {t('market.orders.filter.expiringWithinOption', { count: days })}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Select
-                        value={draft.minIskTiedUp === null ? 'any' : String(draft.minIskTiedUp)}
-                        onValueChange={(value) =>
-                          setDraft({
-                            ...draft,
-                            minIskTiedUp: value === 'any' ? null : Number(value),
-                          })
-                        }
-                      >
-                        <SelectTrigger
-                          size="sm"
-                          aria-label={t('market.orders.filter.minIskTiedUp')}
-                          className="w-36"
-                        >
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="any">{t('market.orders.filter.anySize')}</SelectItem>
-                          {MIN_ISK_TIED_UP_OPTIONS.map((amount) => (
-                            <SelectItem key={amount} value={String(amount)}>
-                              {t('market.orders.filter.minIskTiedUpOption', {
-                                amount: formatIskCompact(amount),
-                              })}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {showLocationFilter && (
-                        <MultiSelect
-                          label={t('market.orders.filter.location')}
-                          trigger={
-                            <Button size="sm">
-                              {draft.locationIds.length === 0
-                                ? t('market.orders.filter.allLocations')
-                                : t('market.orders.filter.selectedLocationsCount', {
-                                    count: draft.locationIds.length,
-                                  })}
-                            </Button>
-                          }
-                          options={locationOptions.map((option) => ({
-                            id: option.locationId,
-                            label: option.label,
-                          }))}
-                          selected={new Set(draft.locationIds)}
-                          onToggle={(locationId) =>
-                            setDraft({
-                              ...draft,
-                              locationIds: draft.locationIds.includes(locationId)
-                                ? draft.locationIds.filter((id) => id !== locationId)
-                                : [...draft.locationIds, locationId],
-                            })
-                          }
-                          searchPlaceholder={t('market.orders.filter.locationSearchPlaceholder')}
-                          noResultsLabel={t('market.orders.filter.locationNoResults')}
-                          extraContent={(close) => (
-                            <div className="border-b border-line p-1">
-                              <Button
-                                variant="ghost"
-                                align="start"
-                                size="sm"
-                                className="w-full"
-                                onClick={() => {
-                                  setDraft({ ...draft, locationIds: [] });
-                                  close();
-                                }}
-                              >
-                                {t('market.orders.filter.allLocations')}
-                              </Button>
-                            </div>
-                          )}
-                        />
-                      )}
-                      <Select
-                        value={draft.sort}
-                        onValueChange={(value) =>
-                          setDraft({ ...draft, sort: value as OpenOrdersSort })
-                        }
-                      >
-                        <SelectTrigger
-                          size="sm"
-                          aria-label={t('market.orders.filter.sort')}
-                          className="w-40"
-                        >
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {SORTS.map((sort) => (
-                            <SelectItem key={sort} value={sort}>
-                              {t(
-                                `market.orders.filter.sort${sort[0].toUpperCase()}${sort.slice(1)}`
-                              )}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </>
+                    <OpenOrdersFilterFields
+                      draft={draft}
+                      setDraft={setDraft}
+                      problemCounts={problemCounts}
+                      locationOptions={locationOptions}
+                      showLocationFilter={showLocationFilter}
+                    />
                   )}
                 </FilterBar>
               </div>
@@ -1087,30 +760,4 @@ export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
       </WorkThroughContext.Provider>
     </>
   );
-}
-
-function chipLabel(
-  chip: ReturnType<typeof activeFilterChips>[number],
-  characterNamesById: ReadonlyMap<number, string>,
-  locationNamesById: ReadonlyMap<number, string>,
-  t: (key: string, options?: Record<string, unknown>) => string
-): string {
-  const label = t(chip.labelKey);
-  if (chip.id === 'text') return `${label}: "${chip.value}"`;
-  if (chip.id === 'side')
-    return `${label}: ${t(chip.value === 'buy' ? 'orders.buy' : 'orders.sell')}`;
-  if (chip.id.startsWith('character:')) {
-    const characterId = Number(chip.value);
-    return `${label}: ${characterNamesById.get(characterId) ?? chip.value}`;
-  }
-  if (chip.id.startsWith('location:')) {
-    const locationId = Number(chip.value);
-    return `${label}: ${locationNamesById.get(locationId) ?? chip.value}`;
-  }
-  if (chip.id.startsWith('problem:')) return `${label}: ${t(`market.orders.group.${chip.value}`)}`;
-  if (chip.id === 'costBasis') {
-    return `${label}: ${t(chip.value === 'linked' ? 'market.orders.filter.costBasisLinked' : 'market.orders.filter.costBasisMissing')}`;
-  }
-  if (chip.value !== undefined) return `${label}: ${chip.value}`;
-  return label;
 }

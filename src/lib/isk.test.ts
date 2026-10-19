@@ -8,6 +8,7 @@ import {
   formatMarketIsk,
   marketIskDecimals,
   parseIskAmount,
+  parseNumeric,
 } from './isk';
 
 describe('formatIsk', () => {
@@ -166,5 +167,18 @@ describe('parseIskAmount', () => {
     expect(parseIskAmount('abc')).toBeNull();
     expect(parseIskAmount('10x')).toBeNull();
     expect(parseIskAmount('m10')).toBeNull();
+  });
+});
+
+describe('parseNumeric', () => {
+  it('parses a plain number', () => {
+    expect(parseNumeric('12.5')).toBe(12.5);
+  });
+
+  it('returns null for blank or unparseable input, never NaN', () => {
+    expect(parseNumeric('')).toBeNull();
+    expect(parseNumeric('  ')).toBeNull();
+    expect(parseNumeric('abc')).toBeNull();
+    expect(parseNumeric('Infinity')).toBeNull();
   });
 });

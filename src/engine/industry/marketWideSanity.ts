@@ -4,6 +4,7 @@
  * regions' daily history.
  */
 import type { MarketHistoryPoint } from '@/engine/market/priceHistory';
+import { parseInstant } from '../esiInstant';
 
 /**
  * A hub sell price above this multiple of CCP's average traded price is a
@@ -51,7 +52,7 @@ export function averageDailyVolume(
   let units = 0;
   for (const history of histories) {
     for (const point of history) {
-      if (Date.parse(`${point.date}T00:00:00Z`) >= since) units += point.volume;
+      if ((parseInstant(`${point.date}T00:00:00Z`) ?? -Infinity) >= since) units += point.volume;
     }
   }
   return units / SALES_WINDOW_DAYS;
@@ -66,7 +67,7 @@ export function averageDailyOrders(history: readonly MarketHistoryPoint[], nowMs
   const since = nowMs - SALES_WINDOW_DAYS * DAY_MS;
   let orders = 0;
   for (const point of history) {
-    if (Date.parse(`${point.date}T00:00:00Z`) >= since) orders += point.orderCount;
+    if ((parseInstant(`${point.date}T00:00:00Z`) ?? -Infinity) >= since) orders += point.orderCount;
   }
   return orders / SALES_WINDOW_DAYS;
 }

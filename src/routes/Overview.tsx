@@ -16,10 +16,20 @@
  * Scoped to the active Character; each widget's own menu may widen it to All
  * characters, honoured by the kinds whose reads can sum.
  */
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Spinner } from '@/components/ui';
+import { guarded } from '@/app/routeChunks';
 import { CharacterHeader } from '@/features/character/CharacterHeader';
 import { OverviewSubNav } from '@/features/character/OverviewSubNav';
 import { DangerBanner } from '@/features/notifications/DangerBanner';
@@ -32,23 +42,48 @@ import {
   OverviewNext,
 } from '@/features/overview/OverviewHeader';
 import { useOverviewSummary } from '@/features/overview/useOverviewSummary';
-import { useOverviewCardOrder } from '@/features/overview/cardOrder';
-import { useOverviewHiddenCards } from '@/features/overview/hiddenCards';
 import { OverviewRefreshProvider } from '@/features/overview/widgets/data/OverviewRefreshProvider';
 import { WidgetDataProvider } from '@/features/overview/widgets/data/WidgetDataProvider';
-import { CustomizeBar } from '@/features/overview/widgets/CustomizeBar';
 import { useOverviewEdit } from '@/features/overview/widgets/editContext';
-import { Gallery } from '@/features/overview/widgets/Gallery';
 import { makeWidgetId } from '@/features/overview/widgets/ids';
 import type { OverviewLayout } from '@/features/overview/widgets/layout';
 import { useOverviewLayout } from '@/features/overview/widgets/layoutStore';
-import { isReturningPilot, migrateFromCards } from '@/features/overview/widgets/migrate';
+import {
+  isReturningPilot,
+  migrateFromCards,
+  useOverviewCardOrder,
+  useOverviewHiddenCards,
+} from '@/features/overview/widgets/migrate';
 import { OverviewEditProvider } from '@/features/overview/widgets/OverviewEditProvider';
-import { PhoneCustomizeList } from '@/features/overview/widgets/PhoneCustomizeList';
-import { RoleChooser, RoleChooserDialog } from '@/features/overview/widgets/RoleChooser';
 import { useFirstRunReady } from '@/features/overview/widgets/useFirstRunReady';
 import { distinctKinds, visibleWidgets } from '@/features/overview/widgets/visibility';
 import { WidgetGrid } from '@/features/overview/widgets/WidgetGrid';
+
+const CustomizeBar = lazy(() =>
+  guarded(() => import('@/features/overview/widgets/CustomizeBar')).then((m) => ({
+    default: m.CustomizeBar,
+  }))
+);
+const Gallery = lazy(() =>
+  guarded(() => import('@/features/overview/widgets/Gallery')).then((m) => ({
+    default: m.Gallery,
+  }))
+);
+const PhoneCustomizeList = lazy(() =>
+  guarded(() => import('@/features/overview/widgets/PhoneCustomizeList')).then((m) => ({
+    default: m.PhoneCustomizeList,
+  }))
+);
+const RoleChooser = lazy(() =>
+  guarded(() => import('@/features/overview/widgets/RoleChooser')).then((m) => ({
+    default: m.RoleChooser,
+  }))
+);
+const RoleChooserDialog = lazy(() =>
+  guarded(() => import('@/features/overview/widgets/RoleChooser')).then((m) => ({
+    default: m.RoleChooserDialog,
+  }))
+);
 
 function Centered({ children }: { children: ReactNode }) {
   return <div className="flex justify-center py-16">{children}</div>;
@@ -84,10 +119,14 @@ function Board({ characterId, layout }: BoardProps) {
       <DangerBanner />
       <OverviewCachedNotice summary={summary} />
       {editing && (
-        <CustomizeBar onAdd={() => setGalleryOpen(true)} onRoles={() => setRolesOpen(true)} />
+        <Suspense fallback={null}>
+          <CustomizeBar onAdd={() => setGalleryOpen(true)} onRoles={() => setRolesOpen(true)} />
+        </Suspense>
       )}
       {editing && isPhone && layout.widgets.length > 0 ? (
-        <PhoneCustomizeList />
+        <Suspense fallback={null}>
+          <PhoneCustomizeList />
+        </Suspense>
       ) : (
         <WidgetGrid
           widgets={layout.widgets}
@@ -97,15 +136,19 @@ function Board({ characterId, layout }: BoardProps) {
           onRoles={() => setRolesOpen(true)}
         />
       )}
-      <Gallery open={galleryOpen} onClose={() => setGalleryOpen(false)} />
-      <RoleChooserDialog
-        open={rolesOpen}
-        onClose={() => setRolesOpen(false)}
-        onChoose={(next) => {
-          edit.replace(next);
-          setRolesOpen(false);
-        }}
-      />
+      <Suspense fallback={null}>
+        {galleryOpen && <Gallery open onClose={() => setGalleryOpen(false)} />}
+        {rolesOpen && (
+          <RoleChooserDialog
+            open
+            onClose={() => setRolesOpen(false)}
+            onChoose={(next) => {
+              edit.replace(next);
+              setRolesOpen(false);
+            }}
+          />
+        )}
+      </Suspense>
     </div>
   );
 }
@@ -187,7 +230,15 @@ export function Overview() {
         <CharacterHeader characterId={activeCharacterId} overview />
         <OverviewSubNav />
         <DangerBanner />
-        <RoleChooser firstRun onChoose={onLayoutChange} />
+        <Suspense
+          fallback={
+            <Centered>
+              <Spinner label={t('common.loading')} />
+            </Centered>
+          }
+        >
+          <RoleChooser firstRun onChoose={onLayoutChange} />
+        </Suspense>
       </div>
     );
   }

@@ -193,6 +193,20 @@ describe('verifyOptionsFromEnv', () => {
     await expect(verifyEveAccessToken(token, verifyOptionsFromEnv())).rejects.toThrow();
   });
 
+  it('throws without EVE_CLIENT_ID, unless the emulator discovery pass allows it', async () => {
+    const saved = process.env.EVE_CLIENT_ID;
+    delete process.env.EVE_CLIENT_ID;
+    try {
+      expect(() => verifyOptionsFromEnv()).toThrow(/EVE_CLIENT_ID/);
+      // Allowed, it fails closed: no client id is accepted, so no token verifies.
+      const lenient = verifyOptionsFromEnv({ allowMissingClientId: true });
+      expect(lenient.clientIds).toEqual([]);
+      await expect(verifyEveAccessToken(await makeToken(), lenient)).rejects.toThrow(/client/i);
+    } finally {
+      process.env.EVE_CLIENT_ID = saved;
+    }
+  });
+
   it('rejects tokens minted for another app when using env-derived options', async () => {
     const token = await makeToken({ audience: ['other-apps-client-id', 'EVE Online'] });
     await expect(verifyEveAccessToken(token, verifyOptionsFromEnv())).rejects.toThrow(/client/i);
