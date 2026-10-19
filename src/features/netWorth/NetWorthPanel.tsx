@@ -5,7 +5,8 @@
  * whose rows drill into that Character.
  */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
-import { lazy, Suspense, useEffect, useMemo, type ReactNode, type RefObject } from 'react';
+import { lazy, Suspense, useMemo, type ReactNode, type RefObject } from 'react';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { GrantMissingLink } from '@/app/GrantMissingLink';
 import { useTranslation } from 'react-i18next';
 import { guarded } from '@/app/routeChunks';
@@ -89,14 +90,9 @@ const EMPTY_WALLET: ReadonlyMap<string, number> = new Map();
 function useHidden() {
   const hiddenLayers = useNetWorthHiddenLayers((s) => s.value);
   const setHiddenLayers = useNetWorthHiddenLayers((s) => s.setValue);
-  const hydrateLayers = useNetWorthHiddenLayers((s) => s.hydrate);
   const hiddenCharacters = useNetWorthHiddenCharacters((s) => s.value);
   const setHiddenCharacters = useNetWorthHiddenCharacters((s) => s.setValue);
-  const hydrateCharacters = useNetWorthHiddenCharacters((s) => s.hydrate);
-  useEffect(() => {
-    void hydrateLayers();
-    void hydrateCharacters();
-  }, [hydrateLayers, hydrateCharacters]);
+  useHydratedStore(useNetWorthHiddenLayers, useNetWorthHiddenCharacters);
   return { hiddenLayers, setHiddenLayers, hiddenCharacters, setHiddenCharacters };
 }
 

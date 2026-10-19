@@ -1,4 +1,5 @@
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { TaxDialogsHost } from '@/features/miningTax/TaxDialogsHost';
 import { isSelectableRow, useTaxColumns } from '@/features/miningTax/useTaxColumns';
 import { useTaxDialogs, useTaxDialogSelector } from '@/features/miningTax/useTaxDialogs';
@@ -345,10 +346,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
   // filtered ones: a Character or Payee filter must not hide the target.
   const [searchParams, setSearchParams] = useSearchParams();
   // Read by the Assign dialog when it opens, long after this has hydrated.
-  const hydrateSurveyPayee = useSurveyPayeeId((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateSurveyPayee();
-  }, [hydrateSurveyPayee]);
+  useHydratedStore(useSurveyPayeeId);
   const [initialPaymentRef] = useState(() =>
     parsePaymentRefParam(searchParams.get(PAYMENT_REF_PARAM))
   );

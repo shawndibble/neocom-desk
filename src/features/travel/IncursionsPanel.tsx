@@ -8,7 +8,7 @@
  * never whether a site is worth running. Folded by default and remembered per
  * device; folded, it still names the nearest one.
  */
-import { useEffect } from 'react';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useTranslation } from 'react-i18next';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import { Button, CollapsiblePanel, LiveStatus, Tooltip } from '@/components/ui';
@@ -36,10 +36,7 @@ export function IncursionsPanel({
 }) {
   const { t } = useTranslation();
   const open = useIncursionsPanelOpen((s) => s.value);
-  const hydrateOpen = useIncursionsPanelOpen((s) => s.hydrate);
-  useEffect(() => {
-    void hydrateOpen();
-  }, [hydrateOpen]);
+  useHydratedStore(useIncursionsPanelOpen);
   const systems = useSolarSystemIndex();
   const { feed, rows, constellationNames: names, jumpsStatus, retry } = useIncursions(current);
   // Retry unmounts into "reading…": focus waits on the panel body, never `<body>` (§7).

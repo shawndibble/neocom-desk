@@ -1,4 +1,5 @@
-import { useEffect, useMemo, type ReactElement } from 'react';
+import { useMemo, type ReactElement } from 'react';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useTranslation } from 'react-i18next';
 import { MenuItem, MenuSeparator, type DataTableColumn } from '@/components/ui';
 import { HintText } from '@/components/ui/HintText';
@@ -58,10 +59,7 @@ export function useAppraisalColumns({
           ? DEFAULT_VISIBLE_APPRAISAL_COLUMNS.filter((id) => !COMPACT_OFF_BY_DEFAULT.includes(id))
           : storedColumns;
   const setVisibleColumns = useVisibleAppraisalColumns((state) => state.setValue);
-  const hydrateVisibleColumns = useVisibleAppraisalColumns((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateVisibleColumns();
-  }, [hydrateVisibleColumns]);
+  useHydratedStore(useVisibleAppraisalColumns);
   function toggleColumn(id: AppraisalColumnId) {
     const next = visibleColumns.includes(id)
       ? visibleColumns.filter((existing) => existing !== id)

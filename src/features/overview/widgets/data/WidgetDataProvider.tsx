@@ -13,6 +13,7 @@
  * behind it (`useRouteSnapshot` hands back the retained snapshot).
  */
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import {
   useSpExtractionMonitoringEnabled,
@@ -123,19 +124,11 @@ function IncursionsSource() {
 function SpExtrasSource() {
   const store = useFeedStore();
   const monitoring = useSpExtractionMonitoringEnabled((state) => state.value);
-  const monitoringHydrated = useSpExtractionMonitoringEnabled((state) => state.hydrated);
-  const hydrateMonitoring = useSpExtractionMonitoringEnabled((state) => state.hydrate);
   const thresholdSp = useSpExtractionThresholdSp((state) => state.value);
-  const thresholdHydrated = useSpExtractionThresholdSp((state) => state.hydrated);
-  const hydrateThreshold = useSpExtractionThresholdSp((state) => state.hydrate);
+  const hydrated = useHydratedStore(useSpExtractionMonitoringEnabled, useSpExtractionThresholdSp);
   const price = useExtractionPrices();
-  useEffect(() => {
-    void hydrateMonitoring();
-    void hydrateThreshold();
-  }, [hydrateMonitoring, hydrateThreshold]);
 
   const { hubName, loaded, net } = price;
-  const hydrated = monitoringHydrated && thresholdHydrated;
   const extras = useMemo(
     () => (hydrated ? { monitoring, thresholdSp, price: { hubName, loaded, net } } : null),
     [hydrated, monitoring, thresholdSp, hubName, loaded, net]

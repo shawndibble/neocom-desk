@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { tabPath } from '@/lib/pageTabs';
@@ -96,22 +97,16 @@ export function useAssetsRows(assetsData: AssetsData) {
   const routePreference = assetsRoute.rules.preference;
 
   const stationSortField = useStationSort((state) => state.value);
-  const hydrateStationSort = useStationSort((state) => state.hydrate);
   const setStationSortField = useStationSort((state) => state.setValue);
-  useEffect(() => {
-    void hydrateStationSort();
-  }, [hydrateStationSort]);
+  useHydratedStore(useStationSort);
 
   // The flat (search / All Items) list's own sort, remembered the same way the
   // station list's is. Ungated on `hydrated`: this only reorders a list that is
   // already in memory, so the worst a late hydrate does is re-sort it — there
   // is no request to spend on the default first.
   const sortField = useAssetSort((state) => state.value);
-  const hydrateAssetSort = useAssetSort((state) => state.hydrate);
   const setSortField = useAssetSort((state) => state.setValue);
-  useEffect(() => {
-    void hydrateAssetSort();
-  }, [hydrateAssetSort]);
+  useHydratedStore(useAssetSort);
 
   // Jumps-away distances (issue #87): the active character's current solar
   // system, fetched once per page load (not polled) via ESI's location
@@ -543,10 +538,8 @@ export function useAssetsRows(assetsData: AssetsData) {
     assetsRoute,
     routePreference,
     stationSortField,
-    hydrateStationSort,
     setStationSortField,
     sortField,
-    hydrateAssetSort,
     setSortField,
     placeDetails,
     placeDetailFor,

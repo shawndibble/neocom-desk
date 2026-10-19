@@ -22,6 +22,7 @@
  */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useCallback, useDeferredValue, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -520,10 +521,7 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
   const jumpRangeFilter = useJumpRangeFilter(currentSystem, uiFilter.jumps);
   const visibleItemsColumns = useVisibleContractSearchItemsColumns((state) => state.value);
   const setVisibleItemsColumns = useVisibleContractSearchItemsColumns((state) => state.setValue);
-  const hydrateVisibleItemsColumns = useVisibleContractSearchItemsColumns((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateVisibleItemsColumns();
-  }, [hydrateVisibleItemsColumns]);
+  useHydratedStore(useVisibleContractSearchItemsColumns);
   function toggleItemsColumn(id: ContractSearchItemsColumnId) {
     const next = visibleItemsColumns.includes(id)
       ? visibleItemsColumns.filter((existing) => existing !== id)

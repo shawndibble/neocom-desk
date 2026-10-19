@@ -34,7 +34,7 @@
  */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { cx } from '@/lib/cx';
-import { useEffect } from 'react';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { CharacterLink } from '@/features/entities';
@@ -71,10 +71,7 @@ interface CorpPeopleRailProps {
 export function CorpPeopleRail({ members, highlights, names, diff, nowMs }: CorpPeopleRailProps) {
   const { t } = useTranslation();
   const darkAfterDays = useDarkThreshold((state) => state.value);
-  const hydrateDarkThreshold = useDarkThreshold((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateDarkThreshold();
-  }, [hydrateDarkThreshold]);
+  useHydratedStore(useDarkThreshold);
 
   // `memberStanding` and its threshold, not a count of our own: this figure has
   // to equal the one `CorpRosterStats` prints for the same roster — which is

@@ -106,6 +106,7 @@ import {
   type HaulingProgress,
   type HaulMode,
 } from './haulingData';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 const DAY_CHOICES = [7, 14, 30, 0] as const;
 
 /**
@@ -182,13 +183,8 @@ function pickRememberedParams(source: RememberedHaulingParams): RememberedHaulin
  */
 function useRememberedHaulingFilter(): RememberedDefaults<ReturnType<typeof haulingUrl>> {
   const filterPref = useHaulingFilterPref((s) => s.value);
-  const hydrateFilterPref = useHaulingFilterPref((s) => s.hydrate);
   const storedBudget = useHaulingBudget((s) => s.value);
-  const hydrateBudget = useHaulingBudget((s) => s.hydrate);
-  useEffect(() => {
-    void hydrateFilterPref();
-    void hydrateBudget();
-  }, [hydrateFilterPref, hydrateBudget]);
+  useHydratedStore(useHaulingFilterPref, useHaulingBudget);
   return useMemo(
     () => ({
       values: pickRememberedParams({
@@ -237,11 +233,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
 
   const defaultHubId = useMarketHub((state) => state.value);
-  const defaultHubHydrated = useMarketHub((state) => state.hydrated);
-  const hydrateDefaultHub = useMarketHub((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateDefaultHub();
-  }, [hydrateDefaultHub]);
+  const defaultHubHydrated = useHydratedStore(useMarketHub);
   const haulingSchema = useMemo(() => haulingUrl(defaultHubId), [defaultHubId]);
 
   const rememberedFilter = useRememberedHaulingFilter();
@@ -297,15 +289,10 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       : (groups?.find((g) => g.id === id)?.name ?? t('market.hauling.categoryFallback', { id }));
 
   const cargo = useHaulingCargo((s) => s.value);
-  const hydrateCargo = useHaulingCargo((s) => s.hydrate);
   const setCargo = useHaulingCargo((s) => s.setValue);
   const introDismissed = useIntroDismissed((s) => s.value);
-  const hydrateIntro = useIntroDismissed((s) => s.hydrate);
   const setIntroDismissed = useIntroDismissed((s) => s.setValue);
-  useEffect(() => {
-    void hydrateCargo();
-    void hydrateIntro();
-  }, [hydrateCargo, hydrateIntro]);
+  useHydratedStore(useHaulingCargo, useIntroDismissed);
   const cargoSet = cargo !== null && cargo.holds.length > 0;
 
   // The pickers never leave Any at both ends (`pickHaulingHub` swaps), but a hand-written link can.

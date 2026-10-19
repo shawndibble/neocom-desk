@@ -1,4 +1,5 @@
-import { useDeferredValue, useEffect, useMemo } from 'react';
+import { useDeferredValue, useMemo } from 'react';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import {
   filterFromParamValues,
   paramsPatchFromFilter,
@@ -30,10 +31,7 @@ import {
  */
 export function useOpenOrdersFilterState(activeCharacterId: number | null) {
   const rememberedLocationIds = useOpenOrdersLocationFilterPref((state) => state.value);
-  const hydrateRememberedLocationIds = useOpenOrdersLocationFilterPref((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateRememberedLocationIds();
-  }, [hydrateRememberedLocationIds]);
+  useHydratedStore(useOpenOrdersLocationFilterPref);
   // `orders.characters` remembers the This character / All characters pick the
   // same way the other pages do, then the synced Settings default. `'current'`
   // is `[activeCharacterId]` here, so it keeps following the active Character.

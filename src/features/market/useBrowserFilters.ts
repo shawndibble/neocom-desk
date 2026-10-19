@@ -3,7 +3,8 @@
  * stations only, Hide bait sells — and what each one implies for the book
  * (does the range fan out over regions, do the station-level filters apply).
  */
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useRememberedUrlParams, type RememberedDefaults } from '@/lib/useUrlState';
 import { boolParam, enumParam, enumSetParam, intParam } from '@/lib/urlState';
 import { JUMP_RANGES, DEFAULT_JUMP_RANGE, type JumpRange } from '@/engine/route/jumpRange';
@@ -74,12 +75,8 @@ export interface BrowserFilters {
  */
 export function useBrowserFilters(regionMode: boolean): BrowserFilters {
   const browserFilterSettingValue = useBrowserFilterSetting((state) => state.value);
-  const hydrated = useBrowserFilterSetting((state) => state.hydrated);
-  const hydrateBrowserFilterSetting = useBrowserFilterSetting((state) => state.hydrate);
+  const hydrated = useHydratedStore(useBrowserFilterSetting);
   const setBrowserFilterSettingValue = useBrowserFilterSetting((state) => state.setValue);
-  useEffect(() => {
-    void hydrateBrowserFilterSetting();
-  }, [hydrateBrowserFilterSetting]);
   const rememberedBrowserFilters: RememberedDefaults<typeof BROWSER_FILTER_PARAMS> = useMemo(
     () => ({
       values: {

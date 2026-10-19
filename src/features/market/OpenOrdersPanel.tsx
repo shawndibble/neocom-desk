@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -139,9 +140,7 @@ export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
    */
   const orderDetail = useOrderDetail();
   const structureFees = useStructureFees((state) => state.value);
-  useEffect(() => {
-    void useStructureFees.getState().hydrate();
-  }, []);
+  useHydratedStore(useStructureFees);
 
   const {
     visible: visibleColumnIds,

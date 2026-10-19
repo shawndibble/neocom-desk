@@ -105,6 +105,7 @@ import {
 import { loadLpTurnInPricer } from './blueprintPurchaseOffers';
 import { formatPercent } from './format';
 import type { InventionQuoteResult } from './inventionSources';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 export type { AcquisitionOwnedCopy } from './blueprintAcquisitionSources';
 
@@ -253,10 +254,7 @@ export function BlueprintAcquisitionModal({
   const [contractScope, setContractScope] = useState<ContractScope>(HUB_REGION);
 
   const lpValue = useLpValue((state) => state.value);
-  const hydrateLpValue = useLpValue((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateLpValue();
-  }, [hydrateLpValue]);
+  useHydratedStore(useLpValue);
 
   const contracts = useLoad(async () => {
     const cached = await loadPublicBpcContracts();

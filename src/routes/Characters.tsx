@@ -1,5 +1,6 @@
 import { HintText } from '@/components/ui/HintText';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -524,13 +525,11 @@ export function Characters() {
   const now = useNow();
 
   const groupsValue = useOverviewGroups((state) => state.value);
-  const groupsHydrated = useOverviewGroups((state) => state.hydrated);
-  const hydrateGroups = useOverviewGroups((state) => state.hydrate);
+  const groupsHydrated = useHydratedStore(useOverviewGroups);
   const setGroupsValue = useOverviewGroups((state) => state.setValue);
 
   const starred = useStarredCharacters((state) => state.value);
-  const starredHydrated = useStarredCharacters((state) => state.hydrated);
-  const hydrateStarred = useStarredCharacters((state) => state.hydrate);
+  const starredHydrated = useHydratedStore(useStarredCharacters);
   const setStarred = useStarredCharacters((state) => state.setValue);
 
   const density = useFontScale((state) => state.value);
@@ -538,22 +537,20 @@ export function Characters() {
 
   const viewMode = useCharacterViewMode((state) => state.value);
   const setViewMode = useCharacterViewMode((state) => state.setValue);
-  const hydrateViewMode = useCharacterViewMode((state) => state.hydrate);
+  useHydratedStore(useCharacterViewMode);
 
   const visibleColumns = useVisibleCharacterColumns((state) => state.value);
   const setVisibleColumns = useVisibleCharacterColumns((state) => state.setValue);
-  const hydrateVisibleColumns = useVisibleCharacterColumns((state) => state.hydrate);
-  const visibleColumnsHydrated = useVisibleCharacterColumns((state) => state.hydrated);
+  const visibleColumnsHydrated = useHydratedStore(useVisibleCharacterColumns);
 
   const columnsMigrated = useCharacterColumnsMigrated((state) => state.value);
-  const columnsMigratedHydrated = useCharacterColumnsMigrated((state) => state.hydrated);
-  const hydrateColumnsMigrated = useCharacterColumnsMigrated((state) => state.hydrate);
+  const columnsMigratedHydrated = useHydratedStore(useCharacterColumnsMigrated);
   const setColumnsMigrated = useCharacterColumnsMigrated((state) => state.setValue);
 
   const spExtractionEnabled = useSpExtractionMonitoringEnabled((state) => state.value);
-  const hydrateSpExtractionEnabled = useSpExtractionMonitoringEnabled((state) => state.hydrate);
+  useHydratedStore(useSpExtractionMonitoringEnabled);
   const spExtractionThreshold = useSpExtractionThresholdSp((state) => state.value);
-  const hydrateSpExtractionThreshold = useSpExtractionThresholdSp((state) => state.hydrate);
+  useHydratedStore(useSpExtractionThresholdSp);
 
   const extractionPrices = useExtractionPrices();
   const alertCounts = useAlertCountsByCharacter();
@@ -678,26 +675,6 @@ export function Characters() {
     return true;
   }
 
-  useEffect(() => {
-    void hydrateGroups();
-  }, [hydrateGroups]);
-
-  useEffect(() => {
-    void hydrateStarred();
-  }, [hydrateStarred]);
-
-  useEffect(() => {
-    void hydrateViewMode();
-  }, [hydrateViewMode]);
-
-  useEffect(() => {
-    void hydrateVisibleColumns();
-  }, [hydrateVisibleColumns]);
-
-  useEffect(() => {
-    void hydrateColumnsMigrated();
-  }, [hydrateColumnsMigrated]);
-
   // One-shot migration (issue #2077, decision 20260927-071415): a stored
   // column list from before `group`/`remove` existed is missing both, not
   // because a pilot hid them. Gated on `columnsMigrated` rather than run on
@@ -719,14 +696,6 @@ export function Characters() {
     setVisibleColumns,
     setColumnsMigrated,
   ]);
-
-  useEffect(() => {
-    void hydrateSpExtractionEnabled();
-  }, [hydrateSpExtractionEnabled]);
-
-  useEffect(() => {
-    void hydrateSpExtractionThreshold();
-  }, [hydrateSpExtractionThreshold]);
 
   useEffect(() => {
     // One batched call for the whole roster (issue: /characters page N+1 ESI

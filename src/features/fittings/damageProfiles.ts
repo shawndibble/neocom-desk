@@ -6,7 +6,7 @@
  * The selection is global, not per Fitting: it is the pilot's lens on every
  * fit, and stays out of the `?f=` Fitting Share Code.
  */
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   CUSTOM_DAMAGE_PROFILE_ID_PREFIX,
@@ -19,6 +19,7 @@ import {
   type NamedDamageProfile,
 } from '@/engine/fittings/damageProfile';
 import { createSyncedSetting } from '@/lib/useSyncedSetting';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 const SYNCED_CUSTOM_DAMAGE_PROFILES_KEY = 'sync.fittingDamageProfiles';
 const SYNCED_SELECTED_DAMAGE_PROFILE_KEY = 'sync.fittingDamageProfileId';
@@ -64,17 +65,10 @@ export interface DamageProfiles {
 export function useDamageProfiles(): DamageProfiles {
   const custom = useCustomDamageProfiles((s) => s.value);
   const setCustom = useCustomDamageProfiles((s) => s.setValue);
-  const hydrateCustom = useCustomDamageProfiles((s) => s.hydrate);
-  const customHydrated = useCustomDamageProfiles((s) => s.hydrated);
   const selectedId = useSelectedDamageProfileId((s) => s.value);
   const select = useSelectedDamageProfileId((s) => s.setValue);
-  const hydrateSelected = useSelectedDamageProfileId((s) => s.hydrate);
-  const selectedHydrated = useSelectedDamageProfileId((s) => s.hydrated);
 
-  useEffect(() => {
-    void hydrateCustom();
-    void hydrateSelected();
-  }, [hydrateCustom, hydrateSelected]);
+  const hydrated = useHydratedStore(useCustomDamageProfiles, useSelectedDamageProfileId);
 
   // Memoized: the stats effect depends on it, and a fresh object every render
   // would recalculate the fit on every render.
@@ -107,7 +101,7 @@ export function useDamageProfiles(): DamageProfiles {
   );
 
   return {
-    hydrated: customHydrated && selectedHydrated,
+    hydrated,
     custom,
     selected,
     select: (id) => void select(id),

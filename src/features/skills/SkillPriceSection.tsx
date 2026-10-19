@@ -24,6 +24,7 @@ import { getOrderBook } from '@/features/market/orderBook';
 import { buildMarketParams, marketNearbyParams } from '@/engine/market/urlState';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { skillSellPrices, type SkillSellPrices } from './skillSellPrices';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 const NEARBY_JUMPS = '10';
 
@@ -41,11 +42,7 @@ export function SkillPriceSection({
 }) {
   const { t } = useTranslation();
   const hubId = useMarketHub((state) => state.value);
-  const hubHydrated = useMarketHub((state) => state.hydrated);
-  const hydrateHub = useMarketHub((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateHub();
-  }, [hydrateHub]);
+  const hubHydrated = useHydratedStore(useMarketHub);
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
   // What the currently-rendered prices (if any) were fetched for — a hub or
   // typeID change invalidates them immediately on render, rather than showing

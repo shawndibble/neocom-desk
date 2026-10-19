@@ -42,6 +42,7 @@ import { marketIskDecimals } from '@/lib/isk';
 import type { MarketRegionEntry } from '@/sde/marketTypes';
 import type { ComparedRegionSeries } from './PriceHistoryChart';
 import { CompareRegionsPicker } from './CompareRegionsPicker';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 const MOVING_AVERAGE_WINDOW_DAYS = 7;
 const MOVING_AVERAGE_WINDOW_DAYS_7D_RANGE = 3;
@@ -227,11 +228,8 @@ export function PriceHistoryPanel({
   // series either way and the range only slices it, so no range costs a
   // request the default would not have spent.
   const range = usePriceHistoryRange((state) => state.value);
-  const hydrateRange = usePriceHistoryRange((state) => state.hydrate);
   const setRange = usePriceHistoryRange((state) => state.setValue);
-  useEffect(() => {
-    void hydrateRange();
-  }, [hydrateRange]);
+  useHydratedStore(usePriceHistoryRange);
   // Distinct from "no history": a thrown fetch failure (network/rate-limit/5xx)
   // is not the same fact as ESI genuinely having nothing for this item, and
   // folding the two into one EmptyState would misreport failures as data.
@@ -369,11 +367,8 @@ function RangedHistory({
 }: RangedHistoryProps) {
   const { t } = useTranslation();
   const series = usePriceHistorySeries((state) => state.value);
-  const hydrateSeries = usePriceHistorySeries((state) => state.hydrate);
   const setSeries = usePriceHistorySeries((state) => state.setValue);
-  useEffect(() => {
-    void hydrateSeries();
-  }, [hydrateSeries]);
+  useHydratedStore(usePriceHistorySeries);
   // Cut to the range like the ESI days; a region with no open day left in it
   // is left out, so it keeps its average line.
   const openPrices = useMemo<RegionOpenSeries[]>(
