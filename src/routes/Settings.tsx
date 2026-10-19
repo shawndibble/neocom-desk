@@ -26,7 +26,7 @@ import { PiSettingsForm } from '@/features/settings/PiSettingsForm';
 import { BpcSourcingSettingsForm } from '@/features/settings/BpcSourcingSettingsForm';
 import { MiningTaxSettingsForm } from '@/features/settings/MiningTaxSettingsForm';
 import { ChipRow, DefaultsSyncHint } from '@/features/settings/settingsFields';
-import { useHydratedStore } from '@/features/settings/useHydratedStore';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useDefaultRoutePreference } from '@/features/route/routeRules';
 import { ROUTE_PREFERENCE_LABEL_KEYS } from '@/features/route/routePreferences';
 import { useAvoidedSystems } from '@/features/route/avoidedSystems';

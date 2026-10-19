@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { Checkbox, Field, Fields, Panel, Spinner } from '@/components/ui';
 import { useAnalyticsEnabled } from '@/app/analyticsPref';
-import { useHydratedStore } from './useHydratedStore';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 /** Settings → Data & storage: the device-local switch for Google Analytics page views. */
 export function AnalyticsPanel() {
