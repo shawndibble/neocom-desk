@@ -9,26 +9,21 @@
  * edit here to be run.
  */
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { partitionByWeight } from './lib/e2eShards.mjs';
+import { parseListReporterLog, partitionByWeight } from './lib/e2eShards.mjs';
 
 const WEIGHTS_PATH = 'e2e/shard-weights.json';
 const args = process.argv.slice(2);
 const flag = (name) => args[args.indexOf(name) + 1];
 
 if (args.includes('--weights')) {
-  // Sums the `(1.2s)` durations Playwright's list reporter prints per test.
-  const log = readFileSync(flag('--weights'), 'utf8').replace(/\x1b\[[0-9;]*m/g, '');
-  const weights = {};
-  for (const m of log.matchAll(/ [✓✘] +\d+ \[\w+\] › (e2e\/[^:]+):\S+ › .* \(([\d.]+)(m?s)\)$/gm)) {
-    weights[m[1]] = (weights[m[1]] ?? 0) + Number(m[2]) / (m[3] === 'ms' ? 1000 : 1);
+  const weights = parseListReporterLog(readFileSync(flag('--weights'), 'utf8'));
+  // A log with no test lines must not overwrite the table with `{}`.
+  if (Object.keys(weights).length === 0) {
+    console.error('no Playwright list-reporter test lines found in that log');
+    process.exit(1);
   }
-  const sorted = Object.fromEntries(
-    Object.entries(weights)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([file, s]) => [file, Math.round(s)])
-  );
-  writeFileSync(WEIGHTS_PATH, JSON.stringify(sorted, null, 2) + '\n');
-  console.error(`wrote ${Object.keys(sorted).length} weights to ${WEIGHTS_PATH}`);
+  writeFileSync(WEIGHTS_PATH, JSON.stringify(weights, null, 2) + '\n');
+  console.error(`wrote ${Object.keys(weights).length} weights to ${WEIGHTS_PATH}`);
   process.exit(0);
 }
 
@@ -42,4 +37,7 @@ const files = readdirSync('e2e')
   .filter((name) => name.endsWith('.spec.ts'))
   .map((name) => `e2e/${name}`);
 const weights = JSON.parse(readFileSync(WEIGHTS_PATH, 'utf8'));
-console.log(partitionByWeight(files, weights, total)[current - 1].join('\n'));
+const mine = partitionByWeight(files, weights, total)[current - 1];
+// Nothing at all for an empty shard: a bare newline would reach the caller as
+// one empty filter, which Playwright reads as "run everything".
+if (mine.length > 0) console.log(mine.join('\n'));

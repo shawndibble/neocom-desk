@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { partitionByWeight } from './e2eShards.mjs';
+import { parseListReporterLog, partitionByWeight } from './e2eShards.mjs';
 
 describe('partitionByWeight', () => {
   it('puts every file in exactly one shard', () => {
@@ -40,5 +40,27 @@ describe('partitionByWeight', () => {
 
   it('returns empty shards when there are more shards than files', () => {
     expect(partitionByWeight(['e2e/a.spec.ts'], {}, 3)).toEqual([['e2e/a.spec.ts'], [], []]);
+  });
+});
+
+describe('parseListReporterLog', () => {
+  it('sums seconds per file across tests, in ms, s and m units', () => {
+    const log = [
+      '2026-10-19T20:01:54Z   ✓    1 [chromium] › e2e/a.spec.ts:10:3 › one (3.6s)',
+      '2026-10-19T20:01:55Z   ✓    2 [built] › e2e/a.spec.ts:20:3 › two (400ms)',
+      '2026-10-19T20:01:56Z   ✘    3 [dev] › e2e/b.spec.ts:5:1 › slow (1.5m)',
+    ].join('\n');
+    expect(parseListReporterLog(log)).toEqual({ 'e2e/a.spec.ts': 4, 'e2e/b.spec.ts': 90 });
+  });
+
+  it('counts retry attempts and tolerates CRLF and colour codes', () => {
+    const log =
+      '  \x1b[31m✘\x1b[39m    1 [dev] › e2e/a.spec.ts:1:1 › t (retry #1) (2.0s)\r\n' +
+      '  ✘    2 [dev] › e2e/a.spec.ts:1:1 › t (2.0s) (retry #1)\r\n';
+    expect(parseListReporterLog(log)).toEqual({ 'e2e/a.spec.ts': 4 });
+  });
+
+  it('returns nothing for a log with no test lines', () => {
+    expect(parseListReporterLog('npm ci\nadded 1044 packages')).toEqual({});
   });
 });

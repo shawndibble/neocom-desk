@@ -67,7 +67,7 @@ jobs:
       - run: npm run typecheck
 
   # Builds once for the whole run. The `e2e-shard` jobs download this `dist/`
-  # instead of each rebuilding it (four more builds, each after its own
+  # instead of each rebuilding it (one more build per shard, each after its own
   # `npm ci`). Build-time env must match what the dev-server project gets (see
   # E2E_ENV in playwright.config.ts) — these are baked into the bundle here,
   # not readable from the environment later, and blank Firebase vars are what
@@ -212,7 +212,7 @@ jobs:
 
   # The name the `develop`/`main` ruleset requires. See the `e2e` job below for the full
   # reasoning — a matrix reports as `test-shard (1)`…`(4)`, none of which is
-  # the required context, so this turns the four results back into it.
+  # the required context, so this turns the shard results back into it.
   test:
     if: ${{ !cancelled() && github.event_name == 'pull_request' }}
     needs: [test-shard]
@@ -411,7 +411,7 @@ jobs:
         id: node-modules
         with:
           path: node_modules
-          key: node-modules-${{ runner.os }}-node24-${{ hashFiles('package-lock.json') }}
+          key: node-modules-container-${{ runner.os }}-node24-${{ hashFiles('package-lock.json') }}
       - if: steps.node-modules.outputs.cache-hit != 'true'
         run: npm ci
       - name: Check the image matches @playwright/test
@@ -439,7 +439,7 @@ jobs:
         # The container's default shell is sh, which has no `mapfile`.
         shell: bash
         run: |
-          mapfile -t specs < <(node scripts/e2e-shard.mjs --shard ${{ matrix.shard }}/8)
+          mapfile -t specs < <(node scripts/e2e-shard.mjs --shard ${{ matrix.shard }}/${{ strategy.job-total }})
           if [ "${#specs[@]}" -eq 0 ]; then echo "no specs in this shard"; exit 0; fi
           npx playwright test "${specs[@]}"
         env:
@@ -463,9 +463,9 @@ jobs:
           if-no-files-found: error
 
   # The `main` ruleset requires a status check named exactly `e2e`, and a
-  # matrix job reports as `e2e-shard (1)`, `e2e-shard (2)`, … — four contexts,
+  # matrix job reports as `e2e-shard (1)`, `e2e-shard (2)`, … — one context per shard,
   # none of them the required one. This job keeps that single name and turns
-  # the four shard results back into it. `scripts/next-ticket/drive-ci.mjs`
+  # the shard results back into it. `scripts/next-ticket/drive-ci.mjs`
   # waits on the same context, so the ticket loop needs no change either.
   #
   # `!cancelled()` rather than the default: `fail-fast: false` means a failing

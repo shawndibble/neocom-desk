@@ -37,3 +37,27 @@ export function partitionByWeight(files, weights, shardCount) {
   }
   return shards.map((shard) => shard.files.sort());
 }
+
+/**
+ * Sums per-file seconds out of a Playwright list-reporter log. Lines look like
+ *   `  ✓    1 [chromium] › e2e/foo.spec.ts:10:3 › title (3.6s)`
+ * with `ms`, `s` or `m` units, and a trailing `(retry #1)` on a retried
+ * attempt (counted: it is real worker time).
+ * @param {string} log
+ * @returns {Record<string, number>} whole seconds per file, sorted by name
+ */
+export function parseListReporterLog(log) {
+  const text = log.replace(/\x1b\[[0-9;]*m/g, '').replace(/\r/g, '');
+  const unit = { ms: 0.001, s: 1, m: 60 };
+  const weights = {};
+  for (const m of text.matchAll(
+    /[✓✘] +\d+ \[\w+\] › (e2e\/[^:]+):\S+ › .* \(([\d.]+)(ms|s|m)\)(?: \(retry #\d+\))?$/gm
+  )) {
+    weights[m[1]] = (weights[m[1]] ?? 0) + Number(m[2]) * unit[m[3]];
+  }
+  return Object.fromEntries(
+    Object.entries(weights)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([file, seconds]) => [file, Math.round(seconds)])
+  );
+}
