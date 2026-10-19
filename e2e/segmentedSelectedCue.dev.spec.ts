@@ -6,6 +6,14 @@
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 
+/**
+ * The first assertion after `goto`: on a cold dev server the Travel route's
+ * module graph can take longer than Playwright's default 5s to serve, leaving
+ * `main` on its loading placeholders (seen failing the first test of a CI
+ * shard, and on a fresh local server). Same allowance as bpcSourcingNarrow.
+ */
+const COLD_LOAD = { timeout: 15_000 };
+
 for (const width of [1280, 320]) {
   test(`travel segments: selected has an accent underline, same size (${width}px)`, async ({
     page,
@@ -15,7 +23,7 @@ for (const width of [1280, 320]) {
     // On a phone the rules panel sits behind a toggle.
     if (width < 640) await page.getByRole('button', { name: 'Show route rules' }).click();
     const segs = page.locator('div[role="group"] > button[aria-pressed]');
-    await expect(segs.first()).toBeVisible();
+    await expect(segs.first()).toBeVisible(COLD_LOAD);
     const rows = await segs.evaluateAll((els) =>
       els.map((e) => {
         const r = e.getBoundingClientRect();
