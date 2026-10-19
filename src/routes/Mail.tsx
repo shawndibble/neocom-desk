@@ -1,15 +1,9 @@
 import { NO_AFFILIATIONS, NO_NAMES } from '@/lib/emptyCollections';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
-import {
-  focusRingInsetClassName,
-  interactiveClassName,
-  selectedRowClassName,
-} from '@/components/ui/controlStyles';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import type { TFunction } from 'i18next';
 import {
   Button,
   DataAgeBadge,
@@ -22,7 +16,6 @@ import {
   SearchInput,
   Spinner,
   Toast,
-  Tooltip,
   CachedNotice,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -58,6 +51,9 @@ import { CharacterAvatar } from '@/components/ui/CharacterAvatar';
 import { MailComposeBox } from '@/features/character/MailComposeBox';
 import { NewMailComposer, type NewMailCloseReason } from '@/features/character/NewMailComposer';
 import { MailBodyView } from '@/features/character/MailBodyView';
+import { MailListRow } from '@/features/character/MailListRow';
+import { MailListEmpty } from '@/features/character/MailListEmpty';
+import { TAB_LABEL_KEY, mailAgeLabel, type MailRow } from '@/features/character/mailDisplay';
 import { characterStanding } from '@/features/character/entityStanding';
 import type { CachedResult } from '@/esi/cache';
 import { resolveNames } from '@/features/character/names';
@@ -71,11 +67,10 @@ import { useDebouncedValue } from '@/lib/useDebouncedValue';
 import { useUrlParams } from '@/lib/useUrlState';
 import { boolParam, textParam } from '@/lib/urlState';
 import { useTimeZone } from '@/lib/timeFormat';
-import { formatDateOnly, formatTimestamp } from '@/lib/timestamp';
+import { formatTimestamp } from '@/lib/timestamp';
 import { useCalendarWeekStart } from '@/features/character/calendarWeekStart';
 import { useNow } from '@/lib/useNow';
-import { formatMonthLabel } from '@/lib/calendarGrid';
-import { groupMailByAge, type MailAgeBucket } from '@/engine/mail/mailAge';
+import { groupMailByAge } from '@/engine/mail/mailAge';
 import {
   capHeadersForDisplay,
   mailKey,
@@ -92,46 +87,6 @@ import type { CharacterAffiliation, MailBody, MailHeader } from '@/esi/endpoints
 const SEARCH_PARAM = textParam();
 const HIDE_READ_PARAM = boolParam();
 const MAIL_FILTER_PARAMS = { search: SEARCH_PARAM, hideRead: HIDE_READ_PARAM };
-
-const TAB_LABEL_KEY: Record<MailTab, string> = {
-  inbox: 'mail.tabInbox',
-  sent: 'mail.tabSent',
-  corp: 'mail.tabCorp',
-  alliance: 'mail.tabAlliance',
-};
-
-/**
- * The glyph a row wears instead of the old uppercase text tag.
- *
- * A glyph rather than a per-folder colour on purpose (see
- * `docs/context/decisions/`, "Mail rows go two-line"): Inbox/Sent/Corp/
- * Alliance is a *nominal* set — no order, no severity — and every colour scale
- * in this app is ordinal or semantic (`securityStatusColor`, `STANDING_TONE`,
- * the order-problem severity ladder). Four hues here would encode identity
- * alone, which DESIGN.md §6 calls decoration, and in a palette where cyan is
- * already "interactive" they would read as status and read wrong.
- */
-const FOLDER_ICON: Record<MailTab, typeof Icon.Corporation> = {
-  inbox: Icon.MailInbox,
-  sent: Icon.MailSent,
-  corp: Icon.Corporation,
-  alliance: Icon.MailAlliance,
-};
-
-function mailAgeLabel(bucket: MailAgeBucket, t: TFunction): string {
-  return bucket.kind === 'month'
-    ? formatMonthLabel(new Date(bucket.year, bucket.month - 1, 1))
-    : t(`mail.age.${bucket.kind}`);
-}
-
-/** A list row: one mail, tagged with whose mailbox it sits in. `mail_id` repeats across mailboxes, `key` does not. */
-interface MailRow {
-  key: string;
-  ownerId: number;
-  ownerName: string;
-  header: MailHeader;
-  tab: MailTab;
-}
 
 interface MailViewProps {
   scope: CharacterFilterValue;
@@ -593,6 +548,16 @@ function MailView({ scope, scopeControl }: MailViewProps) {
   function openNewMail() {
     setNewMailOpen(true);
   }
+  function openRow(row: MailRow, button: HTMLButtonElement) {
+    selectMailFromRow({ ownerId: row.ownerId, mailId: row.header.mail_id }, button);
+    markLocalRead(row.key);
+    // Gated on ESI's flag, not the row's `isRead` (which also covers local
+    // state) — a failed write must get another chance on every reopen, not
+    // just the next reload.
+    if (!row.header.is_read) {
+      void markMailReadOnEsi(row.ownerId, row.header.mail_id);
+    }
+  }
   function clearSearch() {
     setSearch('');
     setDebouncedSearch('');
@@ -767,61 +732,15 @@ function MailView({ scope, scopeControl }: MailViewProps) {
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-[22rem_minmax(0,1fr)] lg:items-start xl:grid-cols-[24rem_minmax(0,1fr)]">
             <Panel padded={false} className={isDesktop || selectedKey === null ? '' : 'hidden'}>
-              {listState === 'no-folders' ? (
-                // Deselecting every folder is allowed rather than refused — a
-                // chip that visibly ignores a press is worse than an empty list
-                // that explains itself and hands back the way out. The chip row
-                // above sits outside this branch, so the control that undoes it
-                // never disappears along with the rows.
-                <EmptyState
-                  title={t('mail.noFoldersTitle')}
-                  hint={t('mail.noFoldersHint')}
-                  className="py-6"
-                  action={
-                    <Button size="sm" onClick={() => void setFolders(MAIL_FOLDERS)}>
-                      {t('mail.showAllFolders')}
-                    </Button>
-                  }
-                />
-              ) : listState === 'empty-folder' ? (
-                // No action: no filter here brings mail back. With older pages
-                // unloaded, "none" isn't known yet: point at Load more below.
-                hasMore ? (
-                  <EmptyState
-                    title={t('mail.emptyFolderLoadedTitle', { count: folders.length })}
-                    hint={t('mail.emptyFolderLoadMoreHint')}
-                    className="py-6"
-                  />
-                ) : (
-                  <CachedEmptyState
-                    result={{ fromCache: offline }}
-                    title={t('mail.emptyFolderCachedTitle', { count: folders.length })}
-                    hint={t('mail.emptyFolderCachedHint')}
-                    fetchedTitle={t('mail.emptyFolderTitle', { count: folders.length })}
-                    className="py-6"
-                  />
-                )
-              ) : listState === 'no-search-matches' ? (
-                <EmptyState
-                  title={t('mail.noSearchMatchesTitle')}
-                  hint={t('mail.noSearchMatchesHint')}
-                  className="py-6"
-                  action={
-                    <Button size="sm" onClick={clearSearch}>
-                      {t('mail.clearSearch')}
-                    </Button>
-                  }
-                />
-              ) : listState === 'all-read-hidden' ? (
-                <EmptyState
-                  title={t('mail.allReadHiddenTitle')}
-                  hint={t('mail.allReadHiddenHint')}
-                  className="py-6"
-                  action={
-                    <Button size="sm" onClick={showRead}>
-                      {t('mail.showRead')}
-                    </Button>
-                  }
+              {listState !== 'rows' ? (
+                <MailListEmpty
+                  state={listState}
+                  folderCount={folders.length}
+                  hasMore={hasMore}
+                  offline={offline}
+                  onShowAllFolders={() => void setFolders(MAIL_FOLDERS)}
+                  onClearSearch={clearSearch}
+                  onShowRead={showRead}
                 />
               ) : (
                 // Flat cap, not viewport-relative: the "load more" button
@@ -845,149 +764,28 @@ function MailView({ scope, scopeControl }: MailViewProps) {
                       <ul className="divide-y divide-line">
                         {section.items.map((row) => {
                           const { header, tab } = row;
-                          const FolderIcon = FOLDER_ICON[tab];
-                          const isRead = header.is_read || locallyReadKeys.has(row.key);
-                          const isSelected = selectedKey === row.key;
                           // Not `cond && get(...) ?? fallback`: `??` passes `false`
                           // straight through, so a header with no sender rendered
                           // nothing at all instead of the fallback.
                           const sender =
                             (header.from === undefined ? undefined : names.get(header.from)) ??
                             t('mail.unknownSender');
-                          // A Sent mail's sender is you, so the whole Sent folder read
-                          // as a column of your own name. Its recipients are already
-                          // resolved for the reading pane, so showing them here costs
-                          // no extra lookup and is what makes Sent legible without
-                          // spending a colour on it.
-                          const party = tab === 'sent' ? recipientSummary(header) : sender;
                           return (
-                            <li key={row.key}>
-                              {/* Selection used to be `bg-panel-2` alone � the same fill
-                              hover already paints, so the open mail was invisible
-                              the moment the pointer moved. The accent edge carries
-                              it now, with the fill as the second, non-colour signal;
-                              both sit on the wrapper so they span the twin too. */}
-                              <div
-                                aria-current={isSelected ? 'true' : undefined}
-                                className={cx(
-                                  'flex items-center',
-                                  interactiveClassName,
-                                  isSelected
-                                    ? selectedRowClassName
-                                    : 'border-l-2 border-l-transparent hover:bg-panel-2'
-                                )}
-                              >
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    selectMailFromRow(
-                                      { ownerId: row.ownerId, mailId: header.mail_id },
-                                      e.currentTarget
-                                    );
-                                    markLocalRead(row.key);
-                                    // Gated on ESI's flag, not `isRead` (which also covers
-                                    // local state) — a failed write must get another
-                                    // chance on every reopen, not just the next reload.
-                                    if (!header.is_read) {
-                                      void markMailReadOnEsi(row.ownerId, header.mail_id);
-                                    }
-                                  }}
-                                  // `aria-current={false}` renders the string "false",
-                                  // which is a valid token meaning "not current" — so
-                                  // this is tidiness, not a bug fix: it drops an
-                                  // attribute from every unselected row rather than
-                                  // spelling out the default.
-                                  aria-current={isSelected ? 'true' : undefined}
-                                  className={cx(
-                                    'flex min-w-0 flex-1 items-start gap-2 self-stretch py-1.5 pr-3 pl-2.5 text-left',
-                                    focusRingInsetClassName
-                                  )}
-                                >
-                                  {/* Unread marker, in a fixed-width gutter so read and
-                                unread rows keep one left edge — the empty gutter
-                                is itself the "read" signal. */}
-                                  <span
-                                    aria-hidden="true"
-                                    className="mt-1.5 flex w-1.5 shrink-0 justify-center"
-                                  >
-                                    {!isRead && (
-                                      <span className="size-1.5 rounded-full bg-accent" />
-                                    )}
-                                  </span>
-
-                                  <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                                    {/* The subject wraps rather than truncating: a
-                                  clipped subject was the readability complaint,
-                                  and it is the field that identifies a mail. */}
-                                    <span
-                                      className={cx(
-                                        'line-clamp-2 text-sm break-words',
-                                        isRead
-                                          ? 'font-normal text-text-dim'
-                                          : 'font-semibold text-text'
-                                      )}
-                                    >
-                                      {header.subject || t('mail.noSubject')}
-                                    </span>
-                                    <span className="flex items-center gap-1.5 text-xs text-text-dim">
-                                      {/* Glyph *and* the folder's name, not the glyph
-                                    alone: DESIGN.md §5 blesses a bare decorative
-                                    icon only "beside its own visible text label",
-                                    and dropping the name would have made folder
-                                    identity harder to see than the uppercase tag
-                                    this replaced — the opposite of the point,
-                                    now that several folders share one list by
-                                    default. */}
-                                      <FolderIcon
-                                        aria-hidden="true"
-                                        size={Icon.ICON_SIZE.sm}
-                                        className="shrink-0"
-                                      />
-                                      <span className="shrink-0 tracking-widest uppercase">
-                                        {t(TAB_LABEL_KEY[tab])}
-                                      </span>
-                                      <span aria-hidden="true" className="shrink-0 text-text-faint">
-                                        ·
-                                      </span>
-                                      <span className="min-w-0 truncate">{party}</span>
-                                      {isAll && (
-                                        // Portrait alone: the name beside it repeated down the
-                                        // whole list and crowded the sender. The name stays
-                                        // reachable via the alt/title and the reading pane.
-                                        <Tooltip
-                                          content={t('mail.rowOwner', { name: row.ownerName })}
-                                        >
-                                          <span className="shrink-0">
-                                            <CharacterAvatar
-                                              characterId={row.ownerId}
-                                              size="sm"
-                                              loading="lazy"
-                                              alt={t('mail.rowOwner', { name: row.ownerName })}
-                                              className="rounded-full border-0"
-                                            />
-                                          </span>
-                                        </Tooltip>
-                                      )}
-                                      {header.timestamp && (
-                                        // `text-text-dim`, not the `text-text-faint` this
-                                        // shipped with: DESIGN.md §1 restricts faint to
-                                        // decoration, and a received date is content.
-                                        <span className="ml-auto shrink-0 tabular-nums">
-                                          {formatDateOnly(new Date(header.timestamp), timeZone)}
-                                        </span>
-                                      )}
-                                    </span>
-                                  </span>
-
-                                  {/* The dot and the bold weight say "unread" in
-                                colour and typography only — DESIGN.md §7's
-                                "colour is never the sole signal" wants it in
-                                words too. The folder needs no such gloss: its
-                                name is rendered above. */}
-                                  {!isRead && <span className="sr-only">{t('mail.unread')}</span>}
-                                </button>
-                              </div>
-                            </li>
+                            <MailListRow
+                              key={row.key}
+                              row={row}
+                              isAll={isAll}
+                              isRead={header.is_read || locallyReadKeys.has(row.key)}
+                              isSelected={selectedKey === row.key}
+                              // A Sent mail's sender is you, so the whole Sent folder read
+                              // as a column of your own name. Its recipients are already
+                              // resolved for the reading pane, so showing them here costs
+                              // no extra lookup and is what makes Sent legible without
+                              // spending a colour on it.
+                              party={tab === 'sent' ? recipientSummary(header) : sender}
+                              timeZone={timeZone}
+                              onOpen={openRow}
+                            />
                           );
                         })}
                       </ul>
