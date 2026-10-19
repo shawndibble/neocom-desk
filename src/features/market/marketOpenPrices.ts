@@ -150,7 +150,21 @@ export async function loadMarketOpenPrices(
   typeId: number,
   now: number = Date.now()
 ): Promise<HubOpenPrices | null> {
-  const hit = cache.get(typeId);
-  const stored = hit && now - hit.at < CACHE_TTL_MS ? hit.stored : await readType(typeId, now);
+  const stored = await loadStoredOpenPrices(typeId, now);
   return stored ? pickOpenPrices(stored, regionId) : null;
+}
+
+/**
+ * The type's whole stored object, or null when there is none or the read
+ * failed. Never throws. The mining prices (`hubSnapshot.ts`) read it this way
+ * to tell station days from the old region-wide ones; shares the cache with
+ * `loadMarketOpenPrices`.
+ */
+export async function loadStoredOpenPrices(
+  typeId: number,
+  now: number = Date.now()
+): Promise<StoredOpenPrices | null> {
+  const hit = cache.get(typeId);
+  if (hit && now - hit.at < CACHE_TTL_MS) return hit.stored;
+  return (await readType(typeId, now)) ?? null;
 }

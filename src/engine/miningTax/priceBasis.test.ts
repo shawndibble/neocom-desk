@@ -46,7 +46,7 @@ describe('resolveUnitPrice — mined-day bases', () => {
 
   const historical = { buy: 80, sell: 120 };
 
-  it("uses Adam4EVE's historical buy/sell split ahead of the ESI average when nothing was saved", () => {
+  it('uses the region-wide historical buy/sell split ahead of the ESI average when nothing was saved', () => {
     expect(resolveUnitPrice({ historical, average: 100 }, 'buy', '2026-09-10', TODAY)).toEqual({
       price: 80,
       source: 'historical',

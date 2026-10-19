@@ -198,7 +198,7 @@ function line(
   units: number,
   rate: number,
   status: DayStatus,
-  priceSource = 'Fuzzwork snapshot'
+  priceSource = 'Hub station price'
 ): DayLine {
   const unitPrice = PRICES[ore];
   const value = Math.round(units * unitPrice);
@@ -245,7 +245,7 @@ export const VARRO_DAYS: DayLine[] = [
     70_300,
     10,
     'Not on a Statement yet',
-    'Adam4EVE (Jita)'
+    'Region-wide (Jita)'
   ),
   line(8, '28 Aug', ...EFA7, 'Varro Kestane', 'Cobaltite', 71_300, 10, 'On Aug Statement'),
   line(9, '27 Aug', ...EFA7, 'Varro Kestane', 'Euxenite', 48_900, 10, 'On Aug Statement'),

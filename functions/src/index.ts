@@ -179,10 +179,6 @@ import {
   shrunkRegion,
 } from './marketOpenPrices.js';
 import { publishLpStoreOffersToR2, writeOpenPricesToR2 } from './r2DailySnapshots.js';
-import { publishMiningPricesToR2 } from './r2MiningPrices.js';
-import { createR2Delete } from './r2Client.js';
-import { stationFoldWrites } from './miningHubPrices.js';
-import { MINING_TYPE_IDS } from './data/miningTypeIds.js';
 import { fetchJson as fetchEverefJson, foldSnapshotUrl } from './marketOrdersArchive.js';
 import { runWorkbenchSync } from './workbenchFits.js';
 import { r2WorkbenchHulls, workbenchFitsStore } from './workbenchFitsStore.js';
@@ -975,12 +971,6 @@ export const sweepCommunityRequests = onSchedule(
 // The public data hosts (EVE Ref, EVE Workbench, the LP and insurgency feeds)
 // get the ESI User-Agent naming this app, never a personal contact.
 const MARKET_HISTORY_USER_AGENT = ESI_USER_AGENT;
-/**
- * The retired `captureMiningPriceSnapshot`'s Firestore collection. Read only
- * by `syncMarketOpenPrices`'s one-time copy into R2; the maintainer deletes it
- * after the first successful run.
- */
-const LEGACY_MARKET_HISTORY_COLLECTION = 'marketHistory';
 
 /**
  * syncLawlessSystems (issue #2870): Route Safety's "lawless" badge. CCP's
@@ -1401,10 +1391,8 @@ export const syncLpStoreOffers = onSchedule(
  * decision 20261018-201511-moving-the-daily-snapshots-to-r2). The region-wide
  * fold still runs in the same pass, but only for the plausibility guards; it is
  * no longer stored. Only the small meta doc stays in Firestore, for the shrink
- * guard. The mining types' share of the same station fold is merged into
- * `mining-prices/<hubId>/<YYYY-MM>.json` (decision 20261018-233051, which
- * retired `captureMiningPriceSnapshot` and its Firestore `marketHistory`; its
- * days are copied into R2 once, on the first run).
+ * guard. The mining pages price from these same objects (decision
+ * 20261019-091155, which retired the separate `mining-prices/` month objects).
  *
  * Idempotent (re-running a day replaces its entry). The day's 23:45 snapshot is
  * normally listed by ~23:50, but a run that finds only an earlier one (EVE Ref
@@ -1459,8 +1447,8 @@ export const syncMarketOpenPrices = onSchedule(
     }
     const { url: snapshotUrl, fileTime } = found.snapshot;
     const fold = new OpenPriceFold();
-    // The hub-station prices (Open Prices for every type, and the mining
-    // prices) ride the same single pass; the region fold only feeds the guards.
+    // The hub-station Open Prices ride the same single pass; the region fold
+    // only feeds the guards.
     const stations = new StationPriceFold(SNAPSHOT_HUBS);
     const rows = await foldSnapshotUrl(snapshotUrl, fold, MARKET_HISTORY_USER_AGENT, stations);
     logInfo('Market open prices fold', {
@@ -1501,28 +1489,8 @@ export const syncMarketOpenPrices = onSchedule(
         `Market open prices: ${failed} types failed to write to R2 (${written} written); first error: ${firstError}`
       );
     }
-    // Throws on a failed write, so the run (both halves, both idempotent) retries.
-    const mining = await publishMiningPricesToR2(
-      date,
-      stationFoldWrites(stations, SNAPSHOT_HUBS, date, MINING_TYPE_IDS),
-      SNAPSHOT_HUBS,
-      {
-        get,
-        put,
-        del: createR2Delete(r2),
-        // The retired captureMiningPriceSnapshot's days, copied once (miningHubPrices.ts).
-        loadLegacyDays: async () =>
-          (await db.collection(LEGACY_MARKET_HISTORY_COLLECTION).get()).docs.map((doc) => ({
-            date: doc.id,
-            data: doc.data(),
-          })),
-      }
-    );
-    if (mining.deleteFailed > 0) {
-      logWarn('Mining prices: expired month objects not deleted', { date, ...mining });
-    }
     await meta.set({ date, regions: regionCounts(fold) });
-    logInfo('Market open prices sync', { date, written, mining });
+    logInfo('Market open prices sync', { date, written });
   }
 );
 
