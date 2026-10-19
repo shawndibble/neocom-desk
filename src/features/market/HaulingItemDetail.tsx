@@ -22,7 +22,7 @@ import { formatSignedPct } from './format';
 import { HaulingFlagWord } from './HaulingFlagWord';
 import { ItemMoreActions } from './ItemContextMenu';
 import { MarketItemLink } from './MarketItemLink';
-import { signedMarketIsk } from './signedIsk';
+import { marketIskTone, signedMarketIsk } from '@/lib/signedIsk';
 import type { InstantHaulingScanRow, ListHaulingScanRow } from './haulingData';
 import { formatDaysToSell, type HaulingViewRow } from './haulingView';
 
@@ -157,7 +157,7 @@ function PayAtMost({ row }: { row: HaulingViewRow }) {
         <span
           className={cx(
             'flex flex-wrap gap-x-1.5 pt-1 text-sm font-semibold tabular-nums',
-            row.profitPerUnit >= 0 ? 'text-success' : 'text-danger'
+            marketIskTone(row.profitPerUnit)
           )}
         >
           <span className="whitespace-nowrap">

@@ -65,7 +65,8 @@ import {
 } from '@/engine/industry/characterModifiers';
 import { roundPriceUp } from '@/engine/market/priceTick';
 import { CopyablePrice, CopyPriceButton } from './CopyablePrice';
-import { marketIskTone, signedMarketIsk } from './signedIsk';
+import { IskDelta } from '@/components/ui';
+import { marketIskTone, signedMarketIsk } from '@/lib/signedIsk';
 import { OpenInEveButton } from '@/features/openInEve/OpenInEveButton';
 import { MarketOnly } from '@/features/abyssal/MarketOnly';
 import { MarketItemLink } from './MarketItemLink';
@@ -142,11 +143,6 @@ function tightestRivalScope(
   return [station, system, region].some((s) => s.kind === 'notChecked' || s.kind === 'unavailable')
     ? 'notChecked'
     : 'clear';
-}
-
-/** Money, not status: the ISK delta tokens, with the sign (DESIGN.md §1). */
-function IskDelta({ amount }: { amount: number }) {
-  return <span className={marketIskTone(amount)}>{signedMarketIsk(amount)}</span>;
 }
 
 /** Short label for an exit's kind in the "Other ways out" disclosure's trailing read — distinct from the exit's own full sentence, which states the price rather than the net. */

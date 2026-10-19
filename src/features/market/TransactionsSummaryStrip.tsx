@@ -6,7 +6,7 @@ import { formatDateOnly } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
 import { iskToneClass } from '@/features/character/format';
 import type { WalletTransaction } from '@/esi/endpoints';
-import { signedIsk } from './signedIsk';
+import { signedIsk } from '@/lib/signedIsk';
 import { summarizeTransactions } from './transactionDays';
 import type { TradingSummary } from './tradingSummary';
 

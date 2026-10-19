@@ -28,7 +28,7 @@ import { formatVolume } from './format';
 import type { MarketOrderColumnId } from './marketOrderColumns';
 import { priceClipboardText } from './priceClipboardText';
 import { SetDestinationButton } from './SetDestinationButton';
-import { signedMarketIsk } from './signedIsk';
+import { signedMarketIsk } from '@/lib/signedIsk';
 
 export interface OrderRowDetailProps {
   order: RegionOrder;

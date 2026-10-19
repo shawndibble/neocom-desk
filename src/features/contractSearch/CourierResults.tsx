@@ -19,6 +19,7 @@ import {
   DataTable,
   EmptyState,
   FilterBar,
+  countActive,
   FilterChip,
   FilterField,
   IskInput,
@@ -470,7 +471,7 @@ function CourierFilterBar({
   // Counted off the controls, not off the parsed engine filter, for the same
   // reason the item bar does it: a half-typed "1e" parses to `null` there, and
   // the badge should say the field has been touched.
-  const activeCount = [
+  const activeCount = countActive([
     filter.routeQuery,
     filter.originRegionId !== null,
     filter.destinationRegionId !== null,
@@ -481,7 +482,7 @@ function CourierFilterBar({
     filter.maxCollateral,
     filter.maxVolume,
     filter.minDays,
-  ].filter(Boolean).length;
+  ]);
 
   return (
     <FilterBar

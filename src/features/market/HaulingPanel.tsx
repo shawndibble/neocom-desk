@@ -97,7 +97,7 @@ import {
   pickHaulingHub,
 } from './haulingHubs';
 import { rememberHaulingSummary, summarizeHaulingRows } from './haulingSummary';
-import { iskGains, signedIsk } from './signedIsk';
+import { iskGains, signedIsk } from '@/lib/signedIsk';
 import { useHaulingFees, useHaulingScan } from './useHaulingScan';
 import { useHaulingFill, useHaulingFillOffer } from './useHaulingFill';
 import {
@@ -601,7 +601,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       <p className="flex items-baseline gap-2 text-sm tabular-nums">
         {cargoSet && <b>{t('market.hauling.tripBar.free', { m3: formatTripM3(freeM3) })}</b>}
         <span
-          className={cx('ml-auto font-semibold', iskGains(plan.totals.profit, 0) && 'text-success')}
+          className={cx('ml-auto font-semibold', iskGains(plan.totals.profit, 0) && 'text-isk-pos')}
         >
           {signedIsk(plan.totals.profit, 0)}
         </span>

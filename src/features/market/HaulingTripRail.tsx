@@ -21,7 +21,7 @@ import { formatIsk, formatIskCompactSigned } from '@/lib/isk';
 import { useStickyClearance } from '@/lib/useStickyClearance';
 import { formatTripM3, shownUsedM3 } from './format';
 import { HaulingHoldMeters } from './HaulingHoldMeters';
-import { iskGains, signedIsk } from './signedIsk';
+import { iskGains, signedIsk } from '@/lib/signedIsk';
 import type { HaulingFillScanState } from './useHaulingFillScan';
 import { useHubJumps } from './useHubJumps';
 
@@ -206,7 +206,7 @@ export function HaulingTripSummary({
 
       <dl className="flex flex-col gap-1 border-t border-line pt-3">
         <SummaryRow label={t('market.hauling.rail.profit')}>
-          <span className={`font-semibold ${gains(profit) ? 'text-success' : ''}`}>
+          <span className={`font-semibold ${gains(profit) ? 'text-isk-pos' : ''}`}>
             {signed(profit)}
           </span>
         </SummaryRow>
@@ -324,7 +324,7 @@ function FillRow({
             {item.categoryName && <span className="truncate">· {item.categoryName}</span>}
           </span>
         </span>
-        <span className={`shrink-0 ${gains(item.profit) ? 'text-success' : ''}`}>
+        <span className={`shrink-0 ${gains(item.profit) ? 'text-isk-pos' : ''}`}>
           {signed(item.profit)}
         </span>
       </label>
@@ -534,7 +534,7 @@ export function HaulingTripBar({ freeM3, profit, onOpenTrip, copyButton }: Hauli
           {freeM3 !== null && (
             <>{t('market.hauling.tripBar.free', { m3: formatTripM3(freeM3) })} · </>
           )}
-          <span className={gains(profit) ? 'text-success' : undefined}>{profitText}</span>
+          <span className={gains(profit) ? 'text-isk-pos' : undefined}>{profitText}</span>
         </span>
         <span className="text-xs text-accent">{t('market.hauling.tripBar.details')}</span>
       </button>

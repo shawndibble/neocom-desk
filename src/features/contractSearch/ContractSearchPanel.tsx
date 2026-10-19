@@ -31,6 +31,7 @@ import {
   EmptyState,
   LoadFailedState,
   FilterBar,
+  countActive,
   FilterChip,
   FilterField,
   IskInput,
@@ -221,7 +222,7 @@ function ContractSearchFilterBar({
   // Counted off the controls, not off the parsed engine filter: a half-typed
   // "1e" parses to `null` there, and the badge should say the field has been
   // touched rather than silently drop back to zero mid-keystroke.
-  const activeCount = [
+  const activeCount = countActive([
     filter.typeQuery,
     filter.regionId !== null,
     filter.maxPrice,
@@ -230,7 +231,7 @@ function ContractSearchFilterBar({
     filter.hideAuctions,
     filter.hidePlex,
     filter.jumps !== DEFAULT_JUMP_RANGE,
-  ].filter(Boolean).length;
+  ]);
 
   return (
     <FilterBar

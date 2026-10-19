@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { marketIskTone, signedMarketIsk } from './signedIsk';
+import { marketIskTone, signedMarketIsk } from '@/lib/signedIsk';
 
 describe('signedMarketIsk', () => {
   it('signs a gain, keeps the minus, and leaves a zero unsigned', () => {
