@@ -6,7 +6,7 @@ import { createLocalSetting } from '@/lib/useLocalSetting';
  * Ctrl/Cmd+K are not affected.
  */
 export const SINGLE_KEY_SHORTCUTS_SETTING_KEY = 'singleKeyShortcuts';
-export const DEFAULT_SINGLE_KEY_SHORTCUTS = true;
+const DEFAULT_SINGLE_KEY_SHORTCUTS = true;
 
 export const useSingleKeyShortcuts = createLocalSetting<boolean>({
   key: SINGLE_KEY_SHORTCUTS_SETTING_KEY,

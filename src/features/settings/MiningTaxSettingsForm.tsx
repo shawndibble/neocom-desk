@@ -5,7 +5,7 @@ import { useMiningTaxOreValueMode } from '@/features/miningTax/oreValueMode';
 import { useMiningTaxCompressedOre } from '@/features/miningTax/oreForm';
 import { useAutoContinueSessions } from '@/features/miningTax/continueSessionPref';
 import { DefaultsSyncHint } from './settingsFields';
-import { useHydratedStore } from './useHydratedStore';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 interface MiningTaxSettingsFormProps {
   /**

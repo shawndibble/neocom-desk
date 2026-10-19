@@ -1,3 +1,5 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { cx } from '@/lib/cx';
 import type { ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -248,7 +250,7 @@ export function AssetsList({
           {/* --- level header: breadcrumb when drilled in, sort controls at the root --- */}
           {flatModeActive ? (
             <div className="flex h-11 shrink-0 flex-wrap items-center gap-2 border-b border-line bg-panel-2 px-3 md:h-9">
-              <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+              <span className={eyebrowClassName}>
                 {t('assets.search.resultCount', { count: flatMatches.length })}
               </span>
               {/* CSV export always stays scoped to the active Character's own
@@ -385,7 +387,10 @@ export function AssetsList({
                 <h2
                   ref={levelHeadingRef}
                   tabIndex={-1}
-                  className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                  className={cx(
+                    eyebrowClassName,
+                    'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent'
+                  )}
                 >
                   {t('assets.section.locationCount', { count: sortedTree.length })}
                   {showTotalValueChip && ' · '}

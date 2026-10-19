@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { OpenPriceFold } from '../../functions/src/marketOpenPrices.ts';
+import {
+  OpenPriceFold,
+  SNAPSHOT_HUBS,
+  StationPriceFold,
+} from '../../functions/src/marketOpenPrices.ts';
 import {
   OpenPriceTable,
   checkBucket,
@@ -50,7 +54,10 @@ describe('checkBucket', () => {
   });
 });
 
-// A fold that passes the plausibility guard: every tracked region with a few types.
+const JITA = 60003760;
+const AMARR = 60008494;
+
+// A region fold that passes the plausibility guard: every tracked region with a few types.
 function plausible(price, types = 2000) {
   const fold = new OpenPriceFold();
   for (const region of [10000002, 10000043, 10000032, 10000030, 10000042]) {
@@ -60,59 +67,59 @@ function plausible(price, types = 2000) {
 }
 
 describe('OpenPriceTable', () => {
-  it('regroups the folded days by document, days ascending, nulls kept per side', () => {
-    const a = new OpenPriceFold();
-    a.add(10000002, 34, true, 1);
-    a.add(10000002, 34, false, 2);
-    const b = new OpenPriceFold();
-    b.add(10000002, 34, false, 3);
-    b.add(10000043, 35, true, 4);
+  it('regroups the folded station days by object, days ascending, nulls kept per side', () => {
+    const a = new StationPriceFold(SNAPSHOT_HUBS);
+    a.add(JITA, 34, true, 1);
+    a.add(JITA, 34, false, 2);
+    const b = new StationPriceFold(SNAPSHOT_HUBS);
+    b.add(JITA, 34, false, 3);
+    b.add(AMARR, 35, true, 4);
     const table = new OpenPriceTable();
     table.addDay('2026-10-01', a);
     table.addDay('2026-10-02', b);
     expect(table.size).toBe(2); // types 34 and 35
     expect(table.dates).toEqual(['2026-10-01', '2026-10-02']);
-    // Two Float64Arrays (buy, sell) per day, sized to the region/type pairs known that day.
+    // Two Float64Arrays (buy, sell) per day, sized to the station/type pairs known that day.
     expect(table.bytes).toBe((1 + 2) * 2 * 8);
     expect([...table.documents()]).toEqual([
       {
         typeId: 34,
         days: [
-          { date: '2026-10-01', regions: { 10000002: { buy: 1, sell: 2 } } },
-          { date: '2026-10-02', regions: { 10000002: { buy: null, sell: 3 } } },
+          { date: '2026-10-01', stations: { [JITA]: { buy: 1, sell: 2 } } },
+          { date: '2026-10-02', stations: { [JITA]: { buy: null, sell: 3 } } },
         ],
       },
       {
         typeId: 35,
-        days: [{ date: '2026-10-02', regions: { 10000043: { buy: 4, sell: null } } }],
+        days: [{ date: '2026-10-02', stations: { [AMARR]: { buy: 4, sell: null } } }],
       },
     ]);
   });
-  it('gathers every region of a type into its one document', () => {
-    const a = new OpenPriceFold();
-    a.add(10000002, 34, true, 1);
-    a.add(10000043, 35, true, 2);
-    const b = new OpenPriceFold();
-    b.add(10000043, 34, false, 3);
+  it('gathers every hub station of a type into its one object', () => {
+    const a = new StationPriceFold(SNAPSHOT_HUBS);
+    a.add(JITA, 34, true, 1);
+    a.add(AMARR, 35, true, 2);
+    const b = new StationPriceFold(SNAPSHOT_HUBS);
+    b.add(AMARR, 34, false, 3);
     const table = new OpenPriceTable();
     table.addDay('2026-10-01', a);
     table.addDay('2026-10-02', b);
     expect([...table.documents()][0]).toEqual({
       typeId: 34,
       days: [
-        { date: '2026-10-01', regions: { 10000002: { buy: 1, sell: null } } },
-        { date: '2026-10-02', regions: { 10000043: { buy: null, sell: 3 } } },
+        { date: '2026-10-01', stations: { [JITA]: { buy: 1, sell: null } } },
+        { date: '2026-10-02', stations: { [AMARR]: { buy: null, sell: 3 } } },
       ],
     });
   });
   it('a pair a later day drops gets no entry for that day', () => {
-    const a = new OpenPriceFold();
-    a.add(10000002, 34, true, 1);
+    const a = new StationPriceFold(SNAPSHOT_HUBS);
+    a.add(JITA, 34, true, 1);
     const table = new OpenPriceTable();
     table.addDay('2026-10-01', a);
-    table.addDay('2026-10-02', new OpenPriceFold());
+    table.addDay('2026-10-02', new StationPriceFold(SNAPSHOT_HUBS));
     expect([...table.documents()][0].days).toEqual([
-      { date: '2026-10-01', regions: { 10000002: { buy: 1, sell: null } } },
+      { date: '2026-10-01', stations: { [JITA]: { buy: 1, sell: null } } },
     ]);
   });
 });
@@ -123,9 +130,10 @@ function deps(over = {}) {
     to: '2026-10-03',
     write: true,
     snapshotUrlFor: vi.fn(async (d) => `https://x/${d}`),
-    foldUrl: vi.fn(async (url, fold) => {
+    foldUrl: vi.fn(async (url, fold, stations) => {
       const price = Number(url.slice(-2));
       for (const e of plausible(price).entries()) fold.add(e.regionId, e.typeId, true, e.buy);
+      for (let t = 1; t <= 2000; t++) stations.add(JITA, t, true, price);
       return 10;
     }),
     writeDocuments: vi.fn(async (docs) => [...docs].length),
@@ -142,11 +150,27 @@ describe('foldDays', () => {
     expect(table.dates).toEqual(['2026-10-01', '2026-10-02', '2026-10-03']);
     expect(d.log).toHaveBeenCalledWith(expect.stringContaining('from https://x/2026-10-01'));
   });
+  it('keeps the hub-station prices, not the region-wide ones', async () => {
+    const d = deps({
+      to: '2026-10-01',
+      foldUrl: async (url, fold, stations) => {
+        for (const e of plausible(99).entries()) fold.add(e.regionId, e.typeId, true, e.buy);
+        stations.add(JITA, 34, false, 7);
+        return 1;
+      },
+    });
+    const table = new OpenPriceTable();
+    await foldDays({ ...d, table });
+    expect([...table.documents()]).toEqual([
+      { typeId: 34, days: [{ date: '2026-10-01', stations: { [JITA]: { buy: null, sell: 7 } } }] },
+    ]);
+  });
   it('skips missing and implausible days without keeping them', async () => {
     const d = deps({
       snapshotUrlFor: async (date) => (date === '2026-10-02' ? null : `https://x/${date}`),
-      foldUrl: async (url, fold) => {
+      foldUrl: async (url, fold, stations) => {
         fold.add(10000002, 1, true, 1); // thin: fails the plausibility guard
+        stations.add(JITA, 1, true, 1);
         return 1;
       },
     });
@@ -165,7 +189,7 @@ describe('runBackfill', () => {
     const result = await runBackfill(d);
     expect(d.writeDocuments).toHaveBeenCalledTimes(1);
     const [docs, total] = d.writeDocuments.mock.calls[0];
-    expect(total).toBe(2000); // 2,000 types, each holding 5 regions
+    expect(total).toBe(2000); // 2,000 types priced at Jita
     expect(result).toEqual({ written: 2000, skipped: [] });
     const first = docs[Symbol.iterator]().next().value;
     expect(first.days.map((x) => x.date)).toEqual(['2026-10-01', '2026-10-02', '2026-10-03']);

@@ -32,6 +32,7 @@ import { targetPlanEntries, useTargetPlan } from '@/features/skills/useTargetPla
 import { HeaderBadgeSlot } from './HeaderBadgeSlot';
 import { useRetryFocus } from '@/lib/useRetryFocus';
 import { useMasteries } from './useMasteries';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 const TIERS = [0, 1, 2, 3, 4] as const;
 interface MasteryChipProps {
@@ -88,10 +89,7 @@ export function MasteryChip({
   const { catalog, trainedSkills, attributes, implants } = usePlanEditorData(characterId);
   const target = useTargetPlan(characterId);
   const cloneStates = useCloneStates((state) => state.value);
-  const hydrateCloneStates = useCloneStates((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateCloneStates();
-  }, [hydrateCloneStates]);
+  useHydratedStore(useCloneStates);
   const cloneState = cloneStateFor(cloneStates, characterId);
 
   const tiers = masteries?.[String(hullTypeId)];

@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigationType } from 'react-router-dom';
 import { Button } from '@/components/ui';
@@ -28,12 +29,9 @@ const INSTRUCTION_KEYS = {
 function useCountPageVisits() {
   const { pathname } = useLocation();
   const navigationType = useNavigationType();
-  const { value, hydrated, hydrate, setValue } = useInstallPromptPageVisits();
+  const { value, setValue } = useInstallPromptPageVisits();
+  const hydrated = useHydratedStore(useInstallPromptPageVisits);
   const lastPathname = useRef(pathname);
-
-  useEffect(() => {
-    void hydrate();
-  }, [hydrate]);
 
   // Ref untouched until hydrated, so a move during the first read still counts.
   useEffect(() => {
@@ -60,14 +58,11 @@ function useCountPageVisits() {
  */
 export function InstallPrompt() {
   const { t } = useTranslation();
-  const { value: seen, hydrated, hydrate, setValue } = useInstallPromptSeen();
+  const { value: seen, setValue } = useInstallPromptSeen();
+  const hydrated = useHydratedStore(useInstallPromptSeen);
   const deferredPrompt = useInstallApp((state) => state.deferredPrompt);
   const { pageVisits, hydrated: visitsHydrated } = useCountPageVisits();
   const bannerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    void hydrate();
-  }, [hydrate]);
 
   const variant =
     hydrated && visitsHydrated

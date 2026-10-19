@@ -5,9 +5,8 @@
  */
 import { useTranslation } from 'react-i18next';
 import type { HoldUse } from '@/engine/market/haulingPlan';
+import { ProgressBar } from '@/components/ui/ProgressBar';
 import { formatTripM3 } from './format';
-
-const pct = (hold: HoldUse) => Math.min(100, (hold.usedM3 / hold.capacityM3) * 100);
 
 export function HaulingHoldMeters({ holds }: { holds: readonly HoldUse[] }) {
   const { t } = useTranslation();
@@ -21,13 +20,14 @@ export function HaulingHoldMeters({ holds }: { holds: readonly HoldUse[] }) {
         };
         return (
           <li key={hold.kind} className="flex min-w-0 items-center gap-2">
-            <div
-              role="img"
-              aria-label={t('market.hauling.plan.holdNamedAria', counts)}
-              className="h-1 w-12 shrink-0 bg-line"
-            >
-              <div className="h-full bg-accent" style={{ width: `${pct(hold)}%` }} />
-            </div>
+            <ProgressBar
+              label={t('market.hauling.plan.holdNamedAria', counts)}
+              value={hold.usedM3}
+              max={hold.capacityM3}
+              size="xs"
+              surface="panel-2"
+              className="w-12 shrink-0"
+            />
             <span className="min-w-0 truncate text-[0.6875rem] text-text-dim">
               {t('market.hauling.plan.holdNamed', counts)}
             </span>

@@ -7,14 +7,15 @@
  * Amarr, Dodixie, Rens, Hek) is the order at every width: a hub is always in
  * the same place on the grid.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
-import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Tooltip } from '@/components/ui';
 import { SystemLink } from '@/features/entities';
 import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
 import { writeToClipboard } from '@/lib/clipboard';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
+import { useCopyFeedback } from '@/lib/useCopyFeedback';
 import type { HubComparisonRow } from './appraisalData';
 
 /** How long the "copied" confirmation stays up before the bubble goes back to the figure. */
@@ -81,9 +82,7 @@ function HubFigure({
 }) {
   return (
     <div>
-      <dt className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-        {label}
-      </dt>
+      <dt className={eyebrowClassName}>{label}</dt>
       <dd className="text-base text-text tabular-nums">
         {value === null ? '—' : <CopyableTotal value={value} copied={copied} onCopied={onCopied} />}
       </dd>
@@ -97,16 +96,7 @@ type CopiedKey = `${string}:${'sell' | 'buy'}`;
 export function HubCompareCards({ rows }: { rows: readonly HubComparisonRow[] }) {
   const { t } = useTranslation();
   const pricesUnavailableLabel = usePricesUnavailableLabel();
-  const [copied, setCopied] = useState<CopiedKey | null>(null);
-  const resetTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
-
-  useEffect(() => () => clearTimeout(resetTimer.current), []);
-
-  function announceCopied(key: CopiedKey) {
-    setCopied(key);
-    clearTimeout(resetTimer.current);
-    resetTimer.current = setTimeout(() => setCopied(null), COPIED_FEEDBACK_MS);
-  }
+  const { copied, flash: announceCopied } = useCopyFeedback<CopiedKey>(COPIED_FEEDBACK_MS);
 
   return (
     <>

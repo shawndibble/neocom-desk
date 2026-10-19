@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
+import { useCharacterCount } from '@/features/character/useCharacters';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -44,7 +44,6 @@ import {
   walletTransactionsCsvColumns,
 } from '@/features/character/walletTransactionsCsv';
 import type { WalletJournalEntry, WalletTransaction } from '@/esi/endpoints';
-import { db } from '@/db';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
 import { useRememberedCharacterFilter } from '@/features/character/characterFilterPicks';
 import { characterFilterParam } from '@/features/character/characterFilterUrlParam';
@@ -134,8 +133,7 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
   );
   const characterFilter = characterValues['txn.chars'];
   const resolvedCharacterFilter = useResolvedCharacterFilter(characterFilter, activeCharacterId);
-  const storedCharacters = useLiveQuery(() => db.characters.toArray(), [], []);
-  const characterCount = storedCharacters?.length ?? 0;
+  const characterCount = useCharacterCount();
   const showCharacterFilter = characterCount > 1;
   const allScope = showCharacterFilter && resolvedCharacterFilter === 'all';
   const allFills = useAllCharacterFills(allScope, refreshCount);

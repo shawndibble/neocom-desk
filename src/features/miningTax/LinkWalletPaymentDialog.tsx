@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Checkbox, IskInput, Modal, Radio, SearchInput } from '@/components/ui';
@@ -16,6 +17,7 @@ import { exactAmountMatches, type MadePayment } from './paymentLinks';
 import { allocateOldestFirst } from './settleAllocation';
 import { useLedgerAction } from './useLedgerAction';
 import { LedgerActionError } from './LedgerActionError';
+import { toggleInSet } from '@/lib/sets';
 
 interface LinkWalletPaymentDialogProps {
   open: boolean;
@@ -31,7 +33,7 @@ interface LinkWalletPaymentDialogProps {
   onLinked: () => void;
 }
 
-const FIELD_LABEL = 'text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
+const FIELD_LABEL = eyebrowClassName;
 
 /**
  * "Link a wallet payment": the pilot picks, from their own wallet, the Made
@@ -140,12 +142,7 @@ export function LinkWalletPaymentDialog({
   }
 
   function toggle(id: string) {
-    setTicked((previous) => {
-      const next = new Set(previous);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+    setTicked((previous) => toggleInSet(previous, id));
   }
 
   const systemName = (solarSystemId: number) => systemLabel(systemNames, solarSystemId);

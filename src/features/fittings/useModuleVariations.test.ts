@@ -15,12 +15,6 @@ vi.mock('@/market/prices', () => ({
   getHubPrices: (...args: unknown[]) => getHubPrices(...args),
 }));
 
-// Real macrotask yields by default; a test swaps in a gate it opens by hand.
-const yieldToEventLoop = vi.fn(() => Promise.resolve());
-vi.mock('./yieldToEventLoop', () => ({
-  yieldToEventLoop: () => yieldToEventLoop(),
-}));
-
 function layer(hp: number) {
   return {
     hp,
@@ -125,7 +119,6 @@ const catalogue: FittingCatalogue = {
 describe('useModuleVariations', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    yieldToEventLoop.mockImplementation(() => Promise.resolve());
   });
 
   it('lists same-rack siblings only, excluding the currently fitted type, with delta/fits/canFly/price', async () => {
@@ -231,20 +224,23 @@ describe('useModuleVariations', () => {
       [102, { fitsHull: true, canFly: true }],
     ]);
 
-    /** Each yield waits until the test opens it, so the run can be stepped one variant at a time. */
-    function gatedYields() {
+    /** Each `compare` waits until the test opens it, so the run can be stepped one variant at a time. */
+    function gatedCompare(variants: VariantEvaluator, ehp: number) {
       const gates: (() => void)[] = [];
-      yieldToEventLoop.mockImplementation(
-        () => new Promise<void>((resolve) => gates.push(resolve))
+      variants.compare = vi.fn(
+        () =>
+          new Promise<{ before: FittingStats; after: FittingStats }>((resolve) =>
+            gates.push(() => resolve({ before: baseStats, after: { ...baseStats, ehp } }))
+          )
       );
       return gates;
     }
 
-    it('yields to the event loop before each variant, so the panel never blocks input for all of them', async () => {
-      const gates = gatedYields();
+    it('works out one variant at a time, each with an abort signal', async () => {
       checkCandidates.mockReturnValue(bothFit);
       getHubPrices.mockResolvedValue(new Map());
       const variants = evaluator(() => ({ ...baseStats, ehp: 24000 }));
+      const gates = gatedCompare(variants, 24000);
 
       const { result } = renderHook(() =>
         useModuleVariations({
@@ -257,24 +253,23 @@ describe('useModuleVariations', () => {
       );
 
       await waitFor(() => expect(gates).toHaveLength(1));
-      expect(variants.compare).not.toHaveBeenCalled();
+      expect(variants.compare).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(variants.compare).mock.calls[0][1]).toBeInstanceOf(AbortSignal);
+      expect(result.current.loading).toBe(true);
 
       gates[0]();
       await waitFor(() => expect(gates).toHaveLength(2));
-      expect(variants.compare).toHaveBeenCalledTimes(1);
-      expect(result.current.loading).toBe(true);
-
       gates[1]();
       await waitFor(() => expect(result.current.loading).toBe(false));
       expect(variants.compare).toHaveBeenCalledTimes(2);
       expect(result.current.rows.every((row) => row.delta !== null)).toBe(true);
     });
 
-    it('stops a run the evaluator changed under, without calculating its remaining variants', async () => {
-      const gates = gatedYields();
+    it('stops a run the evaluator changed under, aborting its calculation and skipping its remaining variants', async () => {
       checkCandidates.mockReturnValue(bothFit);
       getHubPrices.mockResolvedValue(new Map());
       const stale = evaluator(() => ({ ...baseStats, ehp: 24000 }));
+      const staleGates = gatedCompare(stale, 24000);
       const current = evaluator(() => ({ ...baseStats, ehp: 26000 }));
 
       const { result, rerender } = renderHook(
@@ -288,14 +283,13 @@ describe('useModuleVariations', () => {
           }),
         { initialProps: stale }
       );
-      await waitFor(() => expect(gates).toHaveLength(1));
-      gates[0]();
-      await waitFor(() => expect(stale.compare).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(staleGates).toHaveLength(1));
+      const signal = vi.mocked(stale.compare).mock.calls[0][1];
 
       // A Character switch mid-run: the old run must not go on to its second variant.
       rerender(current);
-      yieldToEventLoop.mockImplementation(() => Promise.resolve());
-      for (const open of gates.slice(1)) open();
+      expect(signal?.aborted).toBe(true);
+      staleGates[0]();
 
       await waitFor(() => expect(result.current.loading).toBe(false));
       expect(stale.compare).toHaveBeenCalledTimes(1);

@@ -1,3 +1,4 @@
+import { eyebrowClassName } from './eyebrowClassName';
 import {
   useEffect,
   useId,
@@ -64,9 +65,7 @@ export function FilterField({ label, children, stretch = true, className = '' }:
     <div
       className={cx('flex flex-col items-start gap-1', stretch && 'w-full [&>*]:w-full', className)}
     >
-      <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-        {label}
-      </span>
+      <span className={eyebrowClassName}>{label}</span>
       {children}
     </div>
   );

@@ -17,7 +17,8 @@
  * The `unknown` / `ready` asymmetry and the mount-on-`ready` split are
  * `useCorpRouteGate`'s, shared with `/corp` and `/corp/assets` — see that hook.
  */
-import { useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useDarkThreshold } from '@/features/corp/darkThreshold';
 import { useTranslation } from 'react-i18next';
 import {
@@ -225,10 +226,7 @@ function CorpMembersView() {
   // table's tone, the stat strip's count and the dark-only filter all narrow
   // to the same set — the invariant the engine's single constant used to hold.
   const darkAfterDays = useDarkThreshold((state) => state.value);
-  const hydrateDarkThreshold = useDarkThreshold((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateDarkThreshold();
-  }, [hydrateDarkThreshold]);
+  useHydratedStore(useDarkThreshold);
   const snapshot = useRouteSnapshot<MembersSnapshot>(loadMembersSnapshot, undefined, {
     // Keeps the roster on screen during a manual refresh (issue #418).
     staleWhileRevalidate: true,

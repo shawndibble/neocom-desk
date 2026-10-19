@@ -29,6 +29,8 @@
  * plan linking stays explicitly disabled (`blueprintTypeID={null}`), same as
  * before this rework — corp assets still never loads the blueprint catalog.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { cx } from '@/lib/cx';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useAssetRowVirtualizer } from '@/features/assets/useAssetRowVirtualizer';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
@@ -687,7 +689,10 @@ function CorpAssetsView({ canReadBlueprints }: { canReadBlueprints: boolean }) {
                   <h2
                     ref={levelHeadingRef}
                     tabIndex={-1}
-                    className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                    className={cx(
+                      eyebrowClassName,
+                      'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent'
+                    )}
                   >
                     {/* "Groups" on purpose, not "divisions": `groups` here is
                       the seven hangar divisions plus any non-empty flag
@@ -701,7 +706,7 @@ function CorpAssetsView({ canReadBlueprints }: { canReadBlueprints: boolean }) {
               )}
               {searchActive && (
                 <div className="flex h-11 shrink-0 items-center gap-2 border-b border-line bg-panel-2 px-3 md:h-9">
-                  <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                  <span className={eyebrowClassName}>
                     {t('assets.search.resultCount', { count: searchMatches.length })}
                   </span>
                   <IconButton

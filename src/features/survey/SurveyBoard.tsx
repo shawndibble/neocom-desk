@@ -10,7 +10,6 @@
 import {
   Children,
   Fragment,
-  lazy,
   Suspense,
   useEffect,
   useMemo,
@@ -18,6 +17,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { lazyNamed } from '@/app/lazyNamed';
 import { useTranslation } from 'react-i18next';
 import { DataAgeBadge, EmptyState, Panel, Spinner, textActionClassName } from '@/components/ui';
 import { canFinishSurvey } from '@/engine/survey/finish';
@@ -43,12 +43,11 @@ import { SurveyStats } from './SurveyStats';
 import { SurveyViewSelect } from './SurveyViewSelect';
 import { useSurveyChatOptions } from './surveyPref';
 import { useOrePrices } from './useOrePrices';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 const NONE: ReadonlySet<string> = new Set();
 
-const LazySurveyCharts = lazy(() =>
-  import('./SurveyCharts').then((m) => ({ default: m.SurveyCharts }))
-);
+const LazySurveyCharts = lazyNamed(() => import('./SurveyCharts'), 'SurveyCharts');
 
 interface SurveyBoardProps {
   scans: SurveyScan[];
@@ -124,11 +123,8 @@ export function SurveyBoard({
   const [outcome, setOutcome] = useCopyOutcome();
   const now = useNow();
   const chatOptions = useSurveyChatOptions((state) => state.value);
-  const hydrateChatOptions = useSurveyChatOptions((state) => state.hydrate);
   // Copying happens outside the config dialog, so the saved choices load with the board.
-  useEffect(() => {
-    void hydrateChatOptions();
-  }, [hydrateChatOptions]);
+  useHydratedStore(useSurveyChatOptions);
   const [configuring, setConfiguring] = useState(false);
   const [finishing, setFinishing] = useState<'idle' | 'busy' | 'failed'>('idle');
   const [view, setView] = useState<SurveyChartView>('ore');

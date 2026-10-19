@@ -1,8 +1,9 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '@/db';
+import { useCharacters } from '@/features/character/useCharacters';
 import { Modal, SearchInput, Spinner } from '@/components/ui';
 import { activeOptionClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
@@ -40,7 +41,6 @@ import { createLpStoresProvider, NO_BALANCES } from './lpStoresProvider';
 import { GROUP_LIMIT, type PaletteProvider, type PaletteResult } from './types';
 import { usePaletteSearch } from './usePaletteSearch';
 
-const NO_CHARACTERS: readonly { characterId: number; name: string }[] = [];
 const NO_CONTACTS: readonly PaletteContact[] = [];
 const NO_ASSETS: readonly PaletteAsset[] = [];
 
@@ -56,7 +56,7 @@ function useShippedProviders(onShowItem: (item: ShownMarketItem) => void): Palet
   const corpVisible = useCorpNavVisible();
   const hiddenTabPaths = useHiddenTabPaths();
   const capabilities = useCorpViewCapabilities();
-  const characters = useLiveQuery(() => db.characters.toArray(), [], NO_CHARACTERS);
+  const characters = useCharacters();
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const setActiveCharacter = useActiveCharacter((state) => state.setActiveCharacter);
   // Cache-only and live (Dexie re-reads it on a cache or grant change), never
@@ -310,7 +310,7 @@ export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
                   <div
                     id={headingId}
                     role="presentation"
-                    className="flex items-center gap-2 px-2 pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
+                    className={cx(eyebrowClassName, 'flex items-center gap-2 px-2 pb-1')}
                   >
                     {t(group.provider.labelKey)}
                     {group.provider.scope && <CharacterScopeReadout {...group.provider.scope} />}

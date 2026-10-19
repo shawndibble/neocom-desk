@@ -8,6 +8,7 @@
  * (three letters, debounced, and only with the search scope), like the
  * Survey's location box.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGrantedScopes } from '@/app/useGrantedScopes';
@@ -178,7 +179,7 @@ function MarketPlacePicker({
         <li
           role="presentation"
           id={`${listId}-${key}`}
-          className="px-3 pt-2 pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
+          className={cx(eyebrowClassName, 'px-3 pt-2 pb-1')}
         >
           {text}
         </li>

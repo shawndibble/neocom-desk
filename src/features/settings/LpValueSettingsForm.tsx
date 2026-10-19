@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Button, Field, Fields, IskInput, Spinner } from '@/components/ui';
 import { DEFAULT_LP_VALUE, useLpValue } from '@/features/loyalty/lpValue';
 import { DefaultsSyncHint } from './settingsFields';
-import { useHydratedStore } from './useHydratedStore';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 /**
  * The pilot's LP Value as one labelled field: the same store (`useLpValue`)

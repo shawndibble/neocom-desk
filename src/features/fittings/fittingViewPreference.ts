@@ -6,7 +6,7 @@
  */
 import { createLocalSetting } from '@/lib/useLocalSetting';
 
-export const FITTING_VIEW_SETTING_KEY = 'fittingsView';
+const FITTING_VIEW_SETTING_KEY = 'fittingsView';
 
 export type FittingView = 'ring' | 'list';
 

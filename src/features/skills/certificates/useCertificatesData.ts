@@ -10,6 +10,7 @@ import { cloneStateFor, useCloneStates } from '@/features/skills/cloneState';
 import { usePlanEditorData } from '@/features/skills/planner/usePlanEditorData';
 import { loadCertificates } from '@/sde/loadSde';
 import type { Certificate } from '@/sde/types';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 export type CertificatesLoad =
   { status: 'loading' } | { status: 'failed' } | { status: 'ready'; certificates: Certificate[] };
@@ -18,8 +19,6 @@ export function useCertificatesData(characterId: number | null) {
   const [load, setLoad] = useState<CertificatesLoad>({ status: 'loading' });
   const editor = usePlanEditorData(characterId);
   const cloneStates = useCloneStates((state) => state.value);
-  const cloneStatesHydrated = useCloneStates((state) => state.hydrated);
-  const hydrateCloneStates = useCloneStates((state) => state.hydrate);
 
   useEffect(() => {
     let cancelled = false;
@@ -35,9 +34,7 @@ export function useCertificatesData(characterId: number | null) {
       cancelled = true;
     };
   }, []);
-  useEffect(() => {
-    void hydrateCloneStates();
-  }, [hydrateCloneStates]);
+  const cloneStatesHydrated = useHydratedStore(useCloneStates);
 
   const cloneState: CloneState =
     characterId === null ? 'omega' : cloneStateFor(cloneStates, characterId);

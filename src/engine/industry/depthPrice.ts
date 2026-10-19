@@ -16,7 +16,7 @@ import { hubLadders, type HubOrder } from '@/engine/market/haulingMarket';
 import type { HubPrices, MaterialCostLine, MaterialPriceBasis, MaterialSourcingMap } from './types';
 
 /** Need, as a share of the hub's listed units, at which a material's price walks the book. */
-export const DEPTH_WALK_SHARE = 0.01;
+const DEPTH_WALK_SHARE = 0.01;
 
 /** One price level the walk bought from. */
 export interface DepthLevel {

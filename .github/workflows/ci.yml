@@ -137,7 +137,7 @@ jobs:
     # Sharded for the same reason `e2e-shard` is, and with the same shape.
     # Vitest's own summary says where the time goes: of 1250s of worker time,
     # only 40% is test callbacks — the rest is `import` (33%), `environment`
-    # (13%) and `setup` (12%), all paid once per file across 644 files. That
+    # (13%) and `setup` (12%), all paid once per file across every test file. That
     # is work you divide, not work you speed up, and vitest defaults to
     # `cores - 1` = 3 workers on a 4-vCPU runner at 93% utilisation, so there
     # is nothing left to reclaim on one machine.
