@@ -1,10 +1,9 @@
 /**
  * Trade-hub price lookups for the Moon Mining Tax ledger (issue #523), via
  * Fuzzwork for today's live book (ADR 0002), the server's daily hub-station
- * Open Prices in R2 (`hubSnapshot.ts`) for a saved or historical day, and the app's per-browser Dexie
- * snapshot as a further Jita-only fallback (`priceBasis.ts`'s
- * `resolveTaxUnitPrice` — issue #1279 follow-up, "Mining Tax: price at the
- * entry's mined date, not today's live price").
+ * Open Prices in R2 (`hubSnapshot.ts`) for a saved or historical day
+ * (`priceBasis.ts`'s `resolveTaxUnitPrice` — issue #1279 follow-up, "Mining
+ * Tax: price at the entry's mined date, not today's live price").
  *
  * Jita is the default and remains the basis for any Payee that names no hub of
  * its own; a Payee may name another (`PayeeRecord.hubId`) when that is the
@@ -29,14 +28,7 @@ import { loadCompressedOreTypeIds, loadOreAndIceTypeIds, loadTypes } from '@/sde
 import { oreFormTypeId } from '@/engine/miningTax/oreForm';
 import { loadHubSnapshotRange } from '@/features/market/hubSnapshot';
 import { readCompressedOre } from './oreForm';
-import { loadPriceSnapshots } from './priceSnapshots';
-import {
-  mergeSnapshotDay,
-  resolveTaxUnitPrice,
-  type SidePrices,
-  type SnapshotDay,
-  type TaxPriceSource,
-} from '@/engine/miningTax/priceBasis';
+import { resolveTaxUnitPrice, type TaxPriceSource } from '@/engine/miningTax/priceBasis';
 
 export interface UnitPrices {
   /** Per-unit buy price by raw typeId. 0 for anything not priceable that day. */
@@ -79,10 +71,6 @@ interface DatedHubResult {
   byDate: Map<string, UnitPrices>;
 }
 
-function toSidePricesMap(day: SnapshotDay): Map<number, SidePrices> {
-  return new Map(Object.entries(day).map(([typeId, prices]) => [Number(typeId), prices]));
-}
-
 /**
  * Resolves `typeIds`' buy price at `hub` on every date in `dates`, via
  * `resolveTaxUnitPrice`'s saved → historical → live chain. The one place that
@@ -109,27 +97,13 @@ async function resolvePricesForHubAcrossDates(
   const start = sortedDates[0];
   const end = sortedDates[sortedDates.length - 1];
 
-  const [{ saved: serverSaved, historical }, live, dexieSaved] = await Promise.all([
+  const [{ saved, historical }, live] = await Promise.all([
     loadHubSnapshotRange(start, end, pricingTypeIds, hub),
     getHubPricesWithStatus(hub, pricingTypeIds),
-    // Dexie only ever holds Jita — no equivalent for the other 4 hubs.
-    hub.id === DEFAULT_TRADE_HUB.id
-      ? loadPriceSnapshots().catch(() => new Map<string, SnapshotDay>())
-      : Promise.resolve(new Map<string, SnapshotDay>()),
   ]);
 
   for (const date of sortedDates) {
-    // Server wins over the per-browser Dexie snapshot for the same day/type —
-    // the server folds each day's end-of-day book regardless of who's online,
-    // Dexie only when this browser happened to load the page that day.
-    const serverDay = serverSaved.get(date);
-    const dexieDay = dexieSaved.get(date);
-    const mergedSaved =
-      dexieDay || serverDay
-        ? toSidePricesMap(
-            mergeSnapshotDay(dexieDay ?? {}, serverDay ? Object.fromEntries(serverDay) : {})
-          )
-        : undefined;
+    const savedForDate = saved.get(date);
     const historicalForDate = historical.get(date);
 
     const prices = new Map<number, number>();
@@ -139,7 +113,7 @@ async function resolvePricesForHubAcrossDates(
     for (const typeId of unique) {
       const pid = pricedTypeId(typeId);
       const resolved = resolveTaxUnitPrice({
-        saved: mergedSaved?.get(pid),
+        saved: savedForDate?.get(pid),
         historical: historicalForDate?.get(pid),
         live: {
           buy: live.prices.get(pid)?.buyMax ?? null,

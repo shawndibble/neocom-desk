@@ -61,13 +61,11 @@ function row(overrides: Partial<MiningYieldRow> = {}): MiningYieldRow {
       ],
     },
     materialUnitPrices: new Map([[TRITANIUM, 3]]),
-    priceSource: 'saved',
     ...overrides,
   };
   const valued = {
     valuation: base.valuation,
     materialUnitPrices: base.materialUnitPrices,
-    priceSource: base.priceSource,
   };
   return {
     ...base,
@@ -87,6 +85,9 @@ function renderModal(value = row(), { showRefining = true }: { showRefining?: bo
         typeNames={typeNames}
         typeVolumes={typeVolumes}
         showRefining={showRefining}
+        basis="sell"
+        buybackRate={100}
+        today="2026-10-19"
       />
     </MemoryRouter>
   );
@@ -235,13 +236,13 @@ describe('YieldDetailModal', () => {
 
   it('states the mined-date price basis and the refining assumption', () => {
     renderModal();
-    expect(screen.getByText(/Jita average on 2026-09-08/)).toBeInTheDocument();
+    expect(screen.getByText(/Jita sell on 2026-09-08/)).toBeInTheDocument();
     expect(
       screen.getByText(
         /Reprocessing and Reprocessing Efficiency skills at an NPC station's 50% base rate \(50.0% yield\)/
       )
     ).toBeInTheDocument();
-    expect(screen.getByText(/no market history on this date/)).toBeInTheDocument();
+    expect(screen.getByText(/no Jita price on this basis/)).toBeInTheDocument();
   });
 
   describe('refining hidden (issue #1281)', () => {
