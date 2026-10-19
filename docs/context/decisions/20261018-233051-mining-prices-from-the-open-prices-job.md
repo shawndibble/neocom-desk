@@ -3,6 +3,10 @@
 _Recorded 2026-10-18 · issue #4277. Supersedes
 20260925-233210-server-side-mining-price-snapshot-fuzzwork-6h-capture._
 
+> Partly superseded by 20261019-091155-mining-prices-read-the-open-prices:
+> the mining pages read `open-prices/<typeId>.json`; the `mining-prices/` month
+> objects, their migration and their client read are retired.
+
 - **`captureMiningPriceSnapshot` is retired; `syncMarketOpenPrices` produces
   the mining prices.** The open-prices job already streams EVE Ref's final
   daily order snapshot once a day, and that file holds every order for every

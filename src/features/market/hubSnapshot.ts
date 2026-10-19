@@ -62,6 +62,8 @@ export async function loadHubSnapshotRange(
   unique.forEach((typeId, index) => {
     const stored = objects[index];
     if (!stored) return;
+    // Not `pickOpenPrices`: that splices station and region days into one
+    // series, and the tiers need to know which is which.
     const station = stored.stations.get(hub.stationId);
     const region = stored.regions.get(hub.regionId);
     const dates = (station ?? region)?.dates ?? [];

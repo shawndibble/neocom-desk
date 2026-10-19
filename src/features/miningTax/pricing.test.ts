@@ -244,7 +244,7 @@ describe('loadUnitPricesOnDate', () => {
     expect(prices.get(VELDSPAR)).toBe(50);
   });
 
-  it("falls back to Adam4EVE's historical split when nothing was saved for the date", async () => {
+  it('falls back to the region-wide historical split when nothing was saved for the date', async () => {
     hubSnapshotMock.loadHubSnapshotRange.mockResolvedValue({
       saved: new Map(),
       historical: new Map([[DATE, new Map([[VELDSPAR, { buy: 40, sell: 45 }]])]]),
