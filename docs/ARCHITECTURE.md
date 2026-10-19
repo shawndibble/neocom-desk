@@ -526,7 +526,10 @@ nightly when both sources move to a newer build and opens an auto-merging PR.
   the payments credited to it** (`paymentCredits`, from the mirrored
   `allocatePayments`, so a donation that paid two Statements shows its own part
   on each) and never the Miner's other Statements. A token carries a
-  closed-account note when `miners/{id}.closedAt` is set.
+  closed-account note when `miners/{id}.closedAt` is set (the `closeAccount`
+  edit, issue #4184), and applies day, Miner, moon and Extraction dismissals
+  to the allocation, mirrored by `moonOnDay` / `dismissalCredits` in
+  `corpTaxBookEngine.ts`.
   **Local development** runs against the Firebase emulators instead of
   production: `VITE_FIREBASE_EMULATORS=1` in `.env.local` (issue #4190)
   points Auth (9099), Firestore (8080) and Functions (5001) at

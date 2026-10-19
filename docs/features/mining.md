@@ -293,13 +293,12 @@ Already covered above ("Corp Tax Book in the Tax tab"): the tab shows a corp mem
 Every Statement mail carries a link to `/corp-tax-book/verify/:token`. No login and no account: the token is unguessable and maps to one Statement. The page (`VerifyPage`) shows the corporation and period, what was mined (day, ore, unit price, rate, tax; correction and late-ore lines labelled), **Payments credited** to _this_ Statement only (a donation that paid two Statements shows its own part on each), balance due, how to pay (donate to the corporation from any of your characters; the code pins a donation to this Statement), and the **Terms** with dates (rate and effective date, price basis, due date, minimum Statement). Waived and written-off amounts are printed.
 
 - **Stop reminders.** A toggle: the regular Statement still comes, officers may send at most one reminder per Statement.
-- **Closed account.** If the Miner's account is closed the page says so and that no more mail will come. The final-Statement flow that closes an account (credit refunded by default; forfeited only with the guest's consent or after 90 days with no reply) is #4184; the verify page already prints the closed note.
+- **Closed account.** If the Miner's account is closed the page says so and that no more mail will come. An officer closes a guest's account from the Miner's page (**Close account…**, guests only; `closeAccount` edit, `src/engine/corpTaxBook/closeAccount.ts`): one transaction issues the optional final Statement and sets `closedAt`. Credit is refunded by default (the officer sends the ISK in game and records it as a payment; the app cannot move ISK); it is forfeited only with a recorded consent note or an \"asked on\" date 90 or more days back, checked on the server and with a live role re-check. Ore on days that are not Billable at the close is never billed. A closed Miner gets no more Statements (`planStatementRun` skips them, `issueStatement` and `setMiner` refuse them); the final Statement is mailed from the Statements tab like any other (`20261018-182323-*.md`).
 - A bad or revoked link shows "This link is not valid"; a network failure shows a retry message. Analytics and Sentry log the route pattern, never the token.
 
 ### Not built yet
 
 - Server-side scheduled sync (#4068), per-rarity rates (#4069), chunk-volume calibration (#4070).
-- Moon and Extraction dismissals are not applied in the verify page's allocation, only Miner and day scopes (`20261018-171023`).
 - No screen records a declaration ("Paid by contract / other division / wrong corp") yet; the queue, the pause and Confirm / Reject are built.
 
 ## Reconciling with the corp's numbers
