@@ -142,9 +142,9 @@ function MovePlanTabBody({ onClose, characterIds, activeCharacterId }: MovePlanT
   const [working, setWorking] = useState(false);
   const [result, setResult] = useState<PlanState | null>(null);
   const [compareOpen, setCompareOpen] = useState(false);
-  /** Collapsed pickup groups, `characterId:locationId`. */
   /** The pilot's own folding; until they fold something, a long list opens folded. */
-  const [folded, setCollapsed] = useState<ReadonlySet<string> | null>(null);
+  const [folded, setFolded] = useState<ReadonlySet<string> | null>(null);
+  /** Folded pickup groups, `characterId:locationId`. */
   const collapsed = useMemo<ReadonlySet<string>>(
     () =>
       folded ??
@@ -508,7 +508,7 @@ function MovePlanTabBody({ onClose, characterIds, activeCharacterId }: MovePlanT
                 onToggle={toggle}
                 collapsed={collapsed}
                 onToggleCollapsed={(groupKey) =>
-                  setCollapsed(() => {
+                  setFolded(() => {
                     const next = new Set(collapsed);
                     if (next.has(groupKey)) next.delete(groupKey);
                     else next.add(groupKey);
