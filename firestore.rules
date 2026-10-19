@@ -227,22 +227,11 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
-    // LP Store offers of every NPC corporation plus their station systems
-    // (#2873), written daily by syncLpStoreOffers; read by any signed-in client.
-    match /lpStoreOffers/{docId} {
-      allow read: if request.auth != null;
-      allow write: if false;
-    }
-    // Daily open (end-of-UTC-day) best buy and best sell per type, every Trade
-    // Hub region in one doc, doc id `<typeId>` (decisions 20261018-121126 and
-    // 20261018-164126), for the price-history chart. Public market data, so
-    // readable by anyone; written only by syncMarketOpenPrices and the one-off
-    // backfill (admin privileges). marketOpenPricesMeta matches no rule, so it
-    // stays admin-only.
-    match /marketOpenPricesByType/{typeId} {
-      allow read: if true;
-      allow write: if false;
-    }
+    // The LP Store offers and the daily open prices are not in Firestore: both
+    // are static objects in Cloudflare R2 (decision
+    // 20261018-201511-moving-the-daily-snapshots-to-r2). Their rules are gone, so the implicit deny covers any
+    // stale collection left behind.
+
     // Public contract search (issues #608, #906, ADR 0013): one of the two
     // top-level collections that aren't per-Character sync data — the other is
     // publicCourierContracts just below, fed by the same job. Written only

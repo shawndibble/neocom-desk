@@ -2,16 +2,16 @@
  * Daily open prices (docs/context/decisions/20261018-121126-price-history-draws-daily-open-buy-and-sell.md):
  * for each tracked region and type, the highest buy order and the lowest sell
  * order standing at the end of a UTC day, read from EVE Ref's twice-hourly
- * market-order snapshots and stored one document per type, holding every
- * tracked region, in `marketOpenPricesByType` (layout: decision
- * 20261018-164126-open-prices-one-document-per-type-every-hub).
+ * market-order snapshots and stored one object per type, holding every
+ * tracked region, at `open-prices/<typeId>.json` in R2 (layout: decision
+ * 20261018-164126-open-prices-one-document-per-type-every-hub; storage moved
+ * from Firestore to R2 by 20261018-201511-moving-the-daily-snapshots-to-r2).
  *
  * Pure and dependency-free (no Firestore, fetch or relative imports) so the
  * daily function and the one-off backfill script share exactly this code and
  * it runs under plain Node type stripping too.
  */
 
-export const MARKET_OPEN_PRICES_COLLECTION = 'marketOpenPricesByType';
 /** Days kept per document; the oldest entries drop first. */
 export const MARKET_OPEN_PRICES_MAX_DAYS = 400;
 
@@ -46,7 +46,7 @@ export interface RegionOpenPrices {
   sell: Array<number | null>;
 }
 
-/** Document `marketOpenPricesByType/<typeId>`. */
+/** The R2 object name suffix for a type: `open-prices/<typeId>.json`. */
 export interface TypeOpenPrices {
   typeId: number;
   /** Ascending, unique `YYYY-MM-DD`, shared by every region. */

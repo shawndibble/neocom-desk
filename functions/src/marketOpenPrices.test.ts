@@ -9,7 +9,6 @@ import {
   implausibleReason,
   isIsoDate,
   mergeDays,
-  MARKET_OPEN_PRICES_COLLECTION,
   openPriceDocId,
   pairKey,
   findFinalSnapshot,
@@ -183,8 +182,7 @@ describe('OpenPriceFold', () => {
 });
 
 describe('openPriceDocId', () => {
-  it('is one document per type in the by-type collection', () => {
-    expect(MARKET_OPEN_PRICES_COLLECTION).toBe('marketOpenPricesByType');
+  it('is one object per type', () => {
     expect(openPriceDocId(34)).toBe('34');
   });
 });

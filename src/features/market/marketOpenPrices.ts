@@ -2,25 +2,36 @@
  * Daily open buy and sell prices for one item: the read half of the
  * `syncMarketOpenPrices` Cloud Function (docs/context/decisions/
  * 20261018-121126-price-history-draws-daily-open-buy-and-sell.md; layout:
- * 20261018-164126-open-prices-one-document-per-type-every-hub.md). One document per
- * type holding every Trade Hub region, public to read by id and never listed,
- * so — like `workbenchFits.ts` — this needs no Firebase session.
+ * 20261018-164126-open-prices-one-document-per-type-every-hub.md). One object per
+ * type holding every Trade Hub region, a static file in Cloudflare R2 (20261018-201511-moving-the-daily-snapshots-to-r2.md), so — like the contract snapshots — this
+ * needs no Firebase session and the read costs no egress.
  *
- * Never fails the history panel: a missing document (a type the backfill has
- * not reached), a region the document does not hold (any non-hub region), an
- * unconfigured Firebase and an offline client all come back as `null`, and the
- * chart falls back to ESI's average line. Only a good answer (including "no
- * such document") is held, per type, so the panel's primary and compared
- * regions share one read and reopening it costs none; a failure is retried the
- * next time.
+ * Never fails the history panel: a missing object (a type the backfill has
+ * not reached), a region the object does not hold (any non-hub region) and an
+ * offline client all come back as `null`, and the chart falls back to ESI's
+ * average line. Only a good answer (including "no such object") is held, per
+ * type, so the panel's primary and compared regions share one read and
+ * reopening it costs none; a failure is retried the next time.
  */
-import { doc, getDoc } from 'firebase/firestore/lite';
-import { isSyncConfigured } from '@/app/syncStatus';
-import { getSyncFirestore } from '@/sync/firebaseApp';
+import { R2_SNAPSHOT_ORIGIN } from '@/features/contractSearch/r2OfferSnapshot';
 import type { OpenPriceSeries } from '@/engine/market/priceHistoryOpen';
 
-/** Mirrors `MARKET_OPEN_PRICES_COLLECTION` on the Functions side. */
-export const MARKET_OPEN_PRICES_COLLECTION = 'marketOpenPricesByType';
+/** Mirrors `openPricesR2Key` on the Functions side (`functions/src/r2DailySnapshots.ts`). */
+export function openPricesUrl(typeId: number): string {
+  return `${R2_SNAPSHOT_ORIGIN}/open-prices/${typeId}.json`;
+}
+
+const READ_TIMEOUT_MS = 20_000;
+
+/** The type's object, or `null` when R2 has none (404); any other failure throws. */
+async function fetchTypeObject(typeId: number): Promise<unknown | null> {
+  const response = await fetch(openPricesUrl(typeId), {
+    signal: AbortSignal.timeout(READ_TIMEOUT_MS),
+  });
+  if (response.status === 404) return null;
+  if (!response.ok) throw new Error(`open prices ${typeId}: ${response.status}`);
+  return response.json();
+}
 
 /** The backend publishes once a day. */
 const CACHE_TTL_MS = 60 * 60_000;
@@ -66,12 +77,12 @@ export function resetMarketOpenPricesCache(): void {
 function readType(typeId: number, now: number): Promise<RegionSeries | null | undefined> {
   let pending = inflight.get(typeId);
   if (!pending) {
-    // Started inside the chain, so a Firestore that cannot be set up is a
-    // failed read too, never a rejection.
+    // Started inside the chain, so a synchronous failure is a failed read too,
+    // never a rejection.
     const read: Promise<RegionSeries | null | undefined> = Promise.resolve()
-      .then(() => getDoc(doc(getSyncFirestore(), MARKET_OPEN_PRICES_COLLECTION, String(typeId))))
-      .then((snapshot) => {
-        const regions = snapshot.exists() ? parseOpenPricesByType(snapshot.data()) : null;
+      .then(() => fetchTypeObject(typeId))
+      .then((body) => {
+        const regions = body === null ? null : parseOpenPricesByType(body);
         cache.set(typeId, { at: now, regions });
         return regions;
       })
@@ -93,7 +104,6 @@ export async function loadMarketOpenPrices(
 ): Promise<OpenPriceSeries | null> {
   const hit = cache.get(typeId);
   if (hit && now - hit.at < CACHE_TTL_MS) return hit.regions?.get(regionId) ?? null;
-  if (!isSyncConfigured()) return null;
   const regions = await readType(typeId, now);
   return regions?.get(regionId) ?? null;
 }

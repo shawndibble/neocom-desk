@@ -1,6 +1,6 @@
 /**
  * The data behind the LP Store page's item-first search (issue #2873): the
- * `lpStoreOffers` snapshot, names for its items and corporations, the jumps
+ * LP offers snapshot (R2), names for its items and corporations, the jumps
  * from the Current System, and — for the offers the search actually shows —
  * the same profit and ISK/LP numbers a single store computes
  * (`computeLoyaltyOfferRows`), priced at the page's hub and price basis.
@@ -85,9 +85,8 @@ export function useLpStoreSearch(query: string): LpStoreSearchState {
   const [skills, setSkills] = useState<SkillLevels>({});
 
   useEffect(() => {
-    if (activeCharacterId === null) return;
     let cancelled = false;
-    void loadLpStoreSnapshot(activeCharacterId)
+    void loadLpStoreSnapshot()
       .then((read) => {
         if (cancelled) return;
         const data = read.cached?.data ?? null;
@@ -101,7 +100,7 @@ export function useLpStoreSearch(query: string): LpStoreSearchState {
     return () => {
       cancelled = true;
     };
-  }, [activeCharacterId]);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;

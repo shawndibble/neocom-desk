@@ -1,8 +1,8 @@
 // Orchestration of scripts/backfill-market-open-prices.mjs, with the network
-// and Firestore injected so it is unit-tested on fixtures. Deleted together
+// and R2 injected so it is unit-tested on fixtures. Deleted together
 // with the script once the backfill has run.
 //
-// Two phases, so each Firestore document is read and written once:
+// Two phases, so each R2 object is read and written once:
 //   1. foldDays: fold each day's final snapshot and keep only the compact
 //      result (OpenPriceTable) in memory.
 //   2. one writeOpenPrices pass over every document, with all its days.
@@ -14,14 +14,15 @@ import {
   pairKey,
 } from '../../functions/src/marketOpenPrices.ts';
 
-export const USAGE = `Usage: node scripts/backfill-market-open-prices.mjs --from YYYY-MM-DD --to YYYY-MM-DD [--project <id>] [--write [--yes]] [--dry-run]
-Folds every day in memory first, then writes each document once. Nothing is written until every day is folded.
-Dry run unless --write is given. --write needs --project and asks you to type the project id before anything else;
---yes skips that prompt when the GOOGLE_APPLICATION_CREDENTIALS file's project_id matches.`;
+export const USAGE = `Usage: node scripts/backfill-market-open-prices.mjs --from YYYY-MM-DD --to YYYY-MM-DD [--bucket <name>] [--write [--yes]] [--dry-run]
+Folds every day in memory first, then writes each R2 object once. Nothing is written until every day is folded.
+Dry run unless --write is given. --write needs --bucket, which must equal the R2_BUCKET env var, and asks you to
+type the bucket name before anything else; --yes skips that prompt. Reads R2_ENDPOINT, R2_BUCKET,
+R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY from the environment.`;
 
 /** @param {string[]} argv */
 export function parseArgs(argv) {
-  const out = { from: '', to: '', project: '', write: false, yes: false };
+  const out = { from: '', to: '', bucket: '', write: false, yes: false };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     const value = () => {
@@ -31,7 +32,7 @@ export function parseArgs(argv) {
     };
     if (arg === '--from') out.from = value();
     else if (arg === '--to') out.to = value();
-    else if (arg === '--project') out.project = value();
+    else if (arg === '--bucket') out.bucket = value();
     else if (arg === '--write') out.write = true;
     else if (arg === '--yes') out.yes = true;
     else if (arg === '--dry-run') out.write = false;
@@ -40,30 +41,22 @@ export function parseArgs(argv) {
   if (!isIsoDate(out.from) || !isIsoDate(out.to))
     throw new Error('--from and --to must be YYYY-MM-DD dates');
   if (out.from > out.to) throw new Error('--from is after --to');
-  if (out.write && !out.project) throw new Error('--write needs --project <firebase project id>');
+  if (out.write && !out.bucket) throw new Error('--write needs --bucket <R2 bucket name>');
   return out;
 }
 
 /**
- * Whether a write may go ahead. `credentialProject` is the credential file's
- * `project_id`, or null when there is no readable file (application default
- * credentials from elsewhere): then there is nothing to compare, so only the
- * typed confirmation guards the target and --yes is refused.
+ * Whether a write may go ahead: `--bucket` must be the bucket the environment
+ * (`R2_BUCKET`) actually points at, so a typo or a stale shell cannot write to
+ * the wrong one. `--yes` skips the typed confirmation, not the match.
  *
- * @param {{ credentialProject: string | null, project: string, yes: boolean }} input
+ * @param {{ envBucket: string | undefined, bucket: string, yes: boolean }} input
  * @returns {{ refuse: string } | { prompt: boolean }}
  */
-export function checkCredentials({ credentialProject, project, yes }) {
-  if (credentialProject === null) {
-    if (yes)
-      return {
-        refuse:
-          'No readable GOOGLE_APPLICATION_CREDENTIALS file to check the project against, so --yes is refused; run interactively and type the project id.',
-      };
-    return { prompt: true };
-  }
-  if (credentialProject !== project)
-    return { refuse: 'The credentials are for a different project than --project; refusing.' };
+export function checkBucket({ envBucket, bucket, yes }) {
+  if (!envBucket) return { refuse: 'R2_BUCKET is not set; refusing to write.' };
+  if (envBucket !== bucket)
+    return { refuse: 'R2_BUCKET is a different bucket than --bucket; refusing.' };
   return { prompt: !yes };
 }
 
@@ -74,7 +67,7 @@ export function checkCredentials({ credentialProject, project, yes }) {
  * order". The fold only lists a pair with at least one side priced, so both
  * NaN means the day did not list it. 16 bytes per pair per day: 400 days x
  * ~70k pairs is ~450 MB, where the folds' Maps of objects would be several GB.
- * Documents are one per type (`marketOpenPricesByType`), so `documents()`
+ * Objects are one per type (`open-prices/<typeId>.json`), so `documents()`
  * gathers each type's pairs, one per region, into one document.
  */
 export class OpenPriceTable {
