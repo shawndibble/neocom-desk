@@ -74,13 +74,8 @@ import {
   type MoonMiningTaxRow,
   type TrackedCharacter,
 } from '@/features/miningTax/snapshot';
-import {
-  allMembers,
-  flatten,
-  type DisplayRow,
-  type GroupMember,
-} from '@/features/miningTax/groupRows';
-import { resolveRowNames } from '@/features/miningTax/names';
+import { allMembers, type DisplayRow, type GroupMember } from '@/features/miningTax/groupRows';
+import { resolveRowNames, systemLabel } from '@/features/miningTax/names';
 import {
   loadDatedUnitPricesByHub,
   pricesAtHubOnDate,
@@ -112,14 +107,14 @@ import {
 } from '@/features/miningTax/selection';
 import { BulkDismissDialog } from '@/features/miningTax/BulkDismissDialog';
 import { SelectionToolbar } from '@/features/miningTax/SelectionToolbar';
+import { paidOnFromIso } from '@/features/miningTax/madePayments';
 import {
   assignmentsForLinkTarget,
   linkedTransactionsFor,
-  paidOnFor,
   unlinkedPayments,
   type MadePayment,
 } from '@/features/miningTax/paymentLinks';
-import { useMadePayments } from '@/features/miningTax/useMadePayments';
+import { useLinkSuggestions, useMadePayments } from '@/features/miningTax/useMadePayments';
 import { useContinuations } from '@/features/miningTax/useContinuations';
 import {
   dateLabel,
@@ -152,6 +147,22 @@ import { LinkWalletPaymentDialog } from '@/features/miningTax/LinkWalletPaymentD
 import { useLedgerAction } from '@/features/miningTax/useLedgerAction';
 import { splitLedger } from '@/features/miningTax/ledgerSections';
 import { suggestPayeeForSystem, systemsByPayee } from '@/features/miningTax/suggestPayee';
+import { claimCorpTaxBookPayment } from '@/features/miningTax/corpBook/corpBookStore';
+import { CorpBookSyncNote } from '@/features/miningTax/corpBook/CorpBookSyncNote';
+import { CorpPayDialog } from '@/features/miningTax/corpBook/CorpPayDialog';
+import { CorpRowDetailModal } from '@/features/miningTax/corpBook/CorpRowDetailModal';
+import { CorpStatusPill } from '@/features/miningTax/corpBook/CorpStatusPill';
+import {
+  useCorpStateHint,
+  useCorpStateLabel,
+} from '@/features/miningTax/corpBook/useCorpStateText';
+import {
+  buildDisplayRows,
+  corporationOfPayee,
+  isBookRow,
+  isCorpPayeeId,
+} from '@/features/miningTax/corpBook/corpRows';
+import { useCorpBookView } from '@/features/miningTax/corpBook/useCorpBookView';
 
 interface Snapshot {
   entries: MoonMiningTaxRow[];
@@ -174,6 +185,7 @@ interface Snapshot {
 
 const NO_HUBS: ReadonlySet<TradeHub['id']> = new Set();
 const NO_NAMES: ReadonlyMap<number, string> = new Map();
+const NO_PAYEES_BY_CHARACTER: ReadonlyMap<number, PayeeRecord[]> = new Map();
 
 const EMPTY_DATED_PRICES: DatedUnitPrices = {
   byHubAndDate: new Map(),
@@ -327,6 +339,10 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     refresh,
     loading,
   });
+  // The corp pay dialog (Settle up for a Corp Tax Book Payee) and the claim of an Unmatched donation.
+  const [corpPayTarget, setCorpPayTarget] = useState<number | null>(null);
+  const [claiming, setClaiming] = useState<string | null>(null);
+  const [claimError, setClaimError] = useState<string | null>(null);
   // Whose owed entries "Link a wallet payment" is choosing a payment for: a
   // Payee's whole balance, or just the entries ticked or settling.
   const [linkWalletTarget, setLinkWalletTarget] = useState<{
@@ -375,9 +391,37 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
   // refresh (GLOSSARY.md: the point of the feature is not missing an alt's
   // obligation) — a character with nothing mined yet still needs to appear
   // in the Characters filter and in Manage Payees.
-  const characters = data?.characters ?? [];
+  const characters = useMemo(() => data?.characters ?? [], [data]);
 
-  const allDisplayRows = useMemo(() => flatten(data?.entries ?? []), [data]);
+  const { madePayments, paymentSources } = useMadePayments(
+    characters.map((c) => c.characterId).join(',')
+  );
+
+  // The member's Corp Tax Books (D24: only when their corp has an active one; otherwise null and
+  // the tab is exactly what it was).
+  const { view: corpView, reload: reloadCorpBooks } = useCorpBookView({
+    rows: data?.entries,
+    characters,
+    activeCharacterId,
+    madePayments,
+    reloadKey: data?.fetchedAt?.getTime(),
+  });
+  const corpStateLabel = useCorpStateLabel();
+  const corpStateHint = useCorpStateHint();
+  const allDisplayRows = useMemo(
+    () =>
+      buildDisplayRows(
+        data?.entries ?? [],
+        corpView?.overlay ?? null,
+        (id) => characters.find((c) => c.characterId === id)?.characterName ?? `#${id}`
+      ),
+    [data, corpView, characters]
+  );
+  // What the personal ledger writes to: the rows the book decided are display-only.
+  const personalRows = useMemo(
+    () => allDisplayRows.filter((dr) => !isBookRow(dr)),
+    [allDisplayRows]
+  );
 
   // The wallet journal's "Mining tax" link (`paymentDeepLink.ts`): opens the
   // detail of the row that transaction paid. Latched on mount and spent at
@@ -446,9 +490,17 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     }
     return [...seen.values()].sort((a, b) => a.name.localeCompare(b.name));
   }, [data]);
+  const payeeById = useMemo(() => new Map(allPayees.map((p) => [p.id, p])), [allPayees]);
+
+  // The Payees balances and the Payee filter know: the member's own, plus each Corp Tax Book's
+  // virtual "<Corp> (Corp Tax Book)" Payee. Never offered to an Assign dialog.
+  const ledgerPayees = useMemo(
+    () => [...allPayees, ...(corpView?.payees ?? [])],
+    [allPayees, corpView]
+  );
 
   const datedPrices = data?.datedPrices ?? EMPTY_DATED_PRICES;
-  const systemNames = data?.systemNames;
+  const systemNames = data?.systemNames ?? NO_NAMES;
   const systemSecurity = data?.systemSecurity;
 
   /**
@@ -487,19 +539,24 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
 
   const systemName = useCallback(
     (dr: DisplayRow): string =>
-      systemNames?.get(dr.row.entry.solarSystemId) ?? `#${dr.row.entry.solarSystemId}`,
+      dr.row.entry.solarSystemId === 0 ? '—' : systemLabel(systemNames, dr.row.entry.solarSystemId),
     [systemNames]
   );
 
   const payeeName = useCallback(
     (payeeId: string | undefined): string =>
-      allPayees.find((p) => p.id === payeeId)?.name ?? t('miningTax.unknownPayee'),
-    [allPayees, t]
+      ledgerPayees.find((p) => p.id === payeeId)?.name ?? t('miningTax.unknownPayee'),
+    [ledgerPayees, t]
   );
 
   /** The detail modal's Payee display: a resolved name, "No tax owed" for a dismissal, or a dash when unassigned. */
   const payeeDisplayName = useCallback(
     (dr: DisplayRow): string => {
+      // Before the corp's record is final, its name is the hint of whose it will be (D12).
+      if (dr.corp?.kind === 'label' && dr.corp.state === 'pending') {
+        return t('miningTax.corpBook.payeeName', { corp: dr.corp.corpName });
+      }
+      if (dr.corp?.kind === 'row') return payeeName(dr.assignment?.payeeId);
       if (!dr.assignment) return '—';
       if (dr.assignment.status === 'dismissed') return t('miningTax.dismissedLabel');
       return payeeName(dr.assignment.payeeId);
@@ -511,7 +568,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     (members: readonly GroupMember[]): SettleUpRow[] =>
       members.map((m) => {
         const payeeId = m.assignment.payeeId;
-        const entityId = allPayees.find((p) => p.id === payeeId)?.entityId;
+        const entityId = payeeById.get(payeeId ?? '')?.entityId;
         return {
           assignment: m.assignment,
           characterName: m.row.characterName,
@@ -520,19 +577,19 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
           ...(entityId === undefined ? {} : { payeeEntityId: entityId }),
         };
       }),
-    [allPayees, payeeName]
+    [payeeById, payeeName]
   );
 
   // Which entries the pricing banner is about, so it can link to them — the
   // table only shows an entry's total, never per-ore prices.
   const pricingGaps = useMemo(() => {
     if (!data) return [];
-    return findPricingGaps(allDisplayRows, {
-      hubIdOf: (assignment) => allPayees.find((p) => p.id === assignment?.payeeId)?.hubId,
+    return findPricingGaps(personalRows, {
+      hubIdOf: (assignment) => payeeById.get(assignment?.payeeId ?? '')?.hubId,
       pricesAt: (hubId, date) => pricesAtHubOnDate(data.datedPrices, hubId, date),
       sellFallbackAt: (hubId, date) => sellFallbackAtHubOnDate(data.datedPrices, hubId, date),
     });
-  }, [data, allDisplayRows, allPayees]);
+  }, [data, personalRows, payeeById]);
 
   // `payeeFilter` is URL-held, so a stale or hand-edited link can name Payee
   // ids nobody tracked has — the codec can't validate that itself (it has no
@@ -541,10 +598,10 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
   // themselves. Emptying out entirely (every id unknown) reads as no filter.
   const resolvedPayeeFilter = useMemo(() => {
     if (payeeFilter === 'all') return 'all' as const;
-    const known = new Set(allPayees.map((p) => p.id));
+    const known = new Set(ledgerPayees.map((p) => p.id));
     const kept = new Set([...payeeFilter].filter((id) => known.has(id)));
     return kept.size === 0 ? ('all' as const) : kept;
-  }, [payeeFilter, allPayees]);
+  }, [payeeFilter, ledgerPayees]);
 
   // Filtering "by Payee" only makes sense for rows that already have one —
   // an unassigned or dismissed row has no Payee to match, so it drops out as
@@ -564,23 +621,26 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
   // filter (an alt's debts are still debts) but deliberately not the Payee
   // filter — narrowing the ledger to one Payee must not change a balance.
   const balances = useMemo(
-    () => computePayeeBalances(characterFiltered, allPayees),
-    [characterFiltered, allPayees]
+    () => computePayeeBalances(characterFiltered, ledgerPayees),
+    [characterFiltered, ledgerPayees]
   );
+  // A row a Corp Tax Book has labelled (Pending corp record, Unattributed) is not waiting on the
+  // member: it stays out of the "needs assigning" count.
   const unassigned = useMemo(
-    () => summarizeUnassigned(characterFiltered, estimatedValueOf),
+    () =>
+      summarizeUnassigned(
+        characterFiltered.filter((dr) => !dr.corp),
+        estimatedValueOf
+      ),
     [characterFiltered, estimatedValueOf]
   );
 
   const everyAssignment = useMemo(
-    () => allDisplayRows.flatMap((dr) => allMembers(dr).map((m) => m.assignment)),
-    [allDisplayRows]
+    () => personalRows.flatMap((dr) => allMembers(dr).map((m) => m.assignment)),
+    [personalRows]
   );
-  const { madePayments, paymentSources, linkSuggestions } = useMadePayments({
-    trackedCharacterIds: characters.map((c) => c.characterId).join(','),
-    everyAssignment,
-    balances,
-  });
+
+  const linkSuggestions = useLinkSuggestions({ madePayments, everyAssignment, balances });
 
   // Every Payee's systems and owed entries, for the Payee manager's rows.
   const payeeSystems = useMemo(
@@ -604,6 +664,25 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     return out;
   }, [everyAssignment]);
 
+  /** A player claims their own Unmatched donation: audited and uid-authorised server side. */
+  async function handleClaim(
+    characterId: number,
+    corporationId: number,
+    paymentId: string,
+    claimKey: string
+  ) {
+    setClaiming(claimKey);
+    setClaimError(null);
+    try {
+      await claimCorpTaxBookPayment(characterId, corporationId, paymentId);
+      reloadCorpBooks();
+    } catch {
+      setClaimError(claimKey);
+    } finally {
+      setClaiming(null);
+    }
+  }
+
   /** Prefill for a new Assignment's Payee: the one last used in that system, by that pilot. */
   function suggestionFor(row: MoonMiningTaxRow) {
     return suggestPayeeForSystem(
@@ -613,6 +692,11 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     );
   }
 
+  // A Corp Tax Book row is the corp's to continue, not the member's.
+  const continuationRows = useMemo(
+    () => characterFiltered.filter((dr) => !isBookRow(dr)),
+    [characterFiltered]
+  );
   const {
     continuations,
     continuing,
@@ -623,9 +707,9 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     setAutoContinueFromCard,
   } = useContinuations({
     hasData: Boolean(data),
-    rows: characterFiltered,
+    rows: continuationRows,
     allDisplayRows,
-    allPayees,
+    payeeById,
     pricesFor,
     refresh,
     setToast,
@@ -637,7 +721,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
       toggleFilterMember(
         resolvedPayeeFilter,
         payeeId,
-        allPayees.map((p) => p.id)
+        ledgerPayees.map((p) => p.id)
       )
     );
   }
@@ -668,7 +752,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
   /** The "Assign next" shortcut: the newest still-unassigned entry, opened straight into its Assign form. */
   function assignNext() {
     const next = [...characterFiltered]
-      .filter((dr) => dr.status === 'unassigned')
+      .filter((dr) => dr.status === 'unassigned' && !dr.corp)
       .sort((a, b) => b.row.entry.date.localeCompare(a.row.entry.date))[0];
     if (next) setDetailTarget(next);
   }
@@ -747,6 +831,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     return allDisplayRows
       .filter((dr) => dr.key !== primary.key)
       .filter((dr) => !dr.groupMembers)
+      .filter((dr) => !isBookRow(dr))
       .filter((dr) => dr.status === 'unassigned' || dr.status === 'outstanding')
       .filter((dr) => dr.row.characterId === primary.row.characterId)
       .filter((dr) => dr.row.entry.solarSystemId === primary.row.entry.solarSystemId)
@@ -858,7 +943,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
             : { contractId: payment.refId },
           source,
           {
-            paidOn: paidOnFor(payment.date),
+            paidOn: paidOnFromIso(payment.date),
             method: payment.method,
             amount: payment.amount === null ? 0 : Math.round(payment.amount),
           }
@@ -980,7 +1065,8 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
   // dismiss) — an always-blank leading column reads as unexplained
   // whitespace before Date. Both actions share one checkbox column.
   const isSelectableRow = (dr: DisplayRow) =>
-    (dr.status === 'outstanding' && dr.assignment !== null) || dr.status === 'unassigned';
+    !isBookRow(dr) &&
+    ((dr.status === 'outstanding' && dr.assignment !== null) || dr.status === 'unassigned');
   const selectableVisible = openRows.filter(isSelectableRow);
   const showSelectColumn = selectableVisible.length > 0;
 
@@ -1189,15 +1275,17 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
       cardCorner: true,
       // Owed is the figure the page is about; settled history recedes.
       cellClassName: (dr) =>
-        dr.status === 'outstanding' && taxOwedOf(dr) <= 0
+        dr.corp?.kind === 'row' && dr.corp.view.state === 'conflict'
           ? 'text-text-dim'
-          : dr.status === 'outstanding'
-            ? 'text-isk-neg'
-            : dr.status === 'paid' || dr.status === 'dismissed'
-              ? 'text-text-dim font-normal'
-              : undefined,
+          : dr.status === 'outstanding' && taxOwedOf(dr) <= 0
+            ? 'text-text-dim'
+            : dr.status === 'outstanding'
+              ? 'text-isk-neg'
+              : dr.status === 'paid' || dr.status === 'dismissed'
+                ? 'text-text-dim font-normal'
+                : undefined,
       render: (dr) =>
-        dr.assignment
+        dr.assignment && !(dr.corp?.kind === 'row' && dr.corp.view.taxOwed === null)
           ? withDayLines(
               dr,
               `${formatIsk(taxOwedOf(dr))} ISK`,
@@ -1213,14 +1301,17 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
       // Closes the phone card's second line at its right edge, so every
       // status sits in one column under the tax figure above it.
       stackEdge: 'end',
-      render: (dr) => (
-        <StatusPill
-          status={dr.status}
-          label={statusLabel(t, dr.status)}
-          hint={dr.status === 'needs-review' ? t('miningTax.needsReviewHint') : undefined}
-        />
-      ),
-      sortValue: (dr) => statusLabel(t, dr.status),
+      render: (dr) =>
+        dr.corp ? (
+          <CorpStatusPill corp={dr.corp} />
+        ) : (
+          <StatusPill
+            status={dr.status}
+            label={statusLabel(t, dr.status)}
+            hint={dr.status === 'needs-review' ? t('miningTax.needsReviewHint') : undefined}
+          />
+        ),
+      sortValue: (dr) => (dr.corp ? corpStateLabel(dr.corp) : statusLabel(t, dr.status)),
     },
   ];
 
@@ -1293,9 +1384,13 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
         systemName,
         payeeName: (dr) => (dr.assignment ? payeeDisplayName(dr) : null),
         estimatedValue: estimatedValueOf,
-        taxOwed: (dr) => (dr.assignment ? taxOwedOf(dr) : null),
+        taxOwed: (dr) =>
+          dr.assignment && !(dr.corp?.kind === 'row' && dr.corp.view.taxOwed === null)
+            ? taxOwedOf(dr)
+            : null,
+        statusLabel: (dr) => (dr.corp ? corpStateLabel(dr.corp) : undefined),
       }),
-    [t, showCharacterColumn, systemName, payeeDisplayName, estimatedValueOf]
+    [t, showCharacterColumn, systemName, payeeDisplayName, estimatedValueOf, corpStateLabel]
   );
   const taxExport = useTableExport({
     surface: 'mining-tax',
@@ -1311,8 +1406,13 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     characters[0]?.characterId ??
     null;
 
+  // A corp's book is something to owe on its own: a member with no Payee of their own yet still
+  // sees what the book billed.
   const needsFirstPayee =
-    data != null && allPayees.length === 0 && payeeManagerDefaultCharacterId !== null;
+    data != null &&
+    allPayees.length === 0 &&
+    !(corpView && corpView.overlay.rows.length > 0) &&
+    payeeManagerDefaultCharacterId !== null;
 
   const duplicateRows =
     data?.entries.filter((row) => (row.duplicateAssignmentIds?.length ?? 0) > 0) ?? [];
@@ -1395,11 +1495,49 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
               {duplicateRows.map((row) => (
                 <li key={`${row.characterId}:${row.entry.date}:${row.entry.solarSystemId}`}>
                   {row.characterName} — {row.entry.date} —{' '}
-                  {data.systemNames.get(row.entry.solarSystemId) ?? `#${row.entry.solarSystemId}`}
+                  {systemLabel(data.systemNames, row.entry.solarSystemId)}
                 </li>
               ))}
             </ul>
           </>
+        ),
+      });
+    }
+    // A donation to a corp's book that it could not match to anyone: only the donor can claim it.
+    for (const claim of corpView?.claims ?? []) {
+      const claimKey = `${claim.corporationId}:${claim.payment.id}`;
+      attentionItems.push({
+        id: `corp-claim:${claimKey}`,
+        tone: 'info',
+        title: t('miningTax.corpBook.claim.title', { corp: claim.corpName }),
+        detail: (
+          <p>
+            {t('miningTax.corpBook.claim.detail', {
+              amount: formatIsk(claim.payment.amount, 0),
+              date: claim.payment.at.slice(0, 10),
+              character: claim.characterName,
+              corp: claim.corpName,
+            })}
+            {claimError === claimKey && ` ${t('miningTax.corpBook.claim.failed')}`}
+          </p>
+        ),
+        action: (
+          <NeedsConnection>
+            <Button
+              size="sm"
+              disabled={claiming !== null}
+              onClick={() =>
+                void handleClaim(
+                  claim.payment.characterId,
+                  claim.corporationId,
+                  claim.payment.id,
+                  claimKey
+                )
+              }
+            >
+              {t('miningTax.corpBook.claim.action')}
+            </Button>
+          </NeedsConnection>
         ),
       });
     }
@@ -1428,7 +1566,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     }
   }
 
-  const linkWalletPayee = allPayees.find((p) => p.id === linkWalletTarget?.payeeId) ?? null;
+  const linkWalletPayee = payeeById.get(linkWalletTarget?.payeeId ?? '') ?? null;
   const linkWalletOwed = useMemo(
     () =>
       linkWalletTarget?.members ??
@@ -1454,6 +1592,14 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
       : selectedPayeeIds.length > 1
         ? t('miningTax.linkPaymentOnePayeeHint')
         : null;
+
+  /** What a book's rows owe the member right now (Billed and Sent, waiting). */
+  const corpOwedNow = (corporationId: number) =>
+    characterFiltered
+      .filter((dr) => dr.corp?.kind === 'row' && dr.corp.view.corporationId === corporationId)
+      .reduce((sum, dr) => sum + (dr.status === 'outstanding' ? taxOwedOf(dr) : 0), 0);
+
+  const corpDetail = detailTarget?.corp?.kind === 'row' ? detailTarget.corp : null;
 
   const rowClassName = (dr: DisplayRow) =>
     cx(
@@ -1542,11 +1688,24 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
                   }
                   isSoleFilter={isSolePayeeFilter}
                   onFilterPayee={filterToPayee}
-                  onSettleUp={(balance) => settleUpBalance(balance.members)}
+                  onSettleUp={(balance) =>
+                    isCorpPayeeId(balance.payee.id)
+                      ? setCorpPayTarget(corporationOfPayee(balance.payee.id))
+                      : settleUpBalance(balance.members)
+                  }
                   onLinkPayment={(balance) => setLinkWalletTarget({ payeeId: balance.payee.id })}
+                  hideLinkPayment={(balance) => isCorpPayeeId(balance.payee.id)}
                   onAssignNext={assignNext}
                   onReviewPayments={() => setLinkPaymentOpen(true)}
                 />
+
+                {corpView?.books.map((book) => (
+                  <CorpBookSyncNote
+                    key={book.loaded.corporationId}
+                    book={book}
+                    owedNow={corpOwedNow(book.loaded.corporationId)}
+                  />
+                ))}
 
                 {data && continuations.some((c) => !autoContinue || autoSkip.has(c.next.key)) && (
                   <div className="space-y-2">
@@ -1581,7 +1740,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
                       onChange={setCharacterFilter}
                     />
 
-                    {allPayees.length > 0 && (
+                    {ledgerPayees.length > 0 && (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button size="sm">
@@ -1591,7 +1750,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent>
-                          {allPayees.map((p) => (
+                          {ledgerPayees.map((p) => (
                             <DropdownMenuCheckboxItem
                               key={p.id}
                               checked={
@@ -1787,7 +1946,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
             open={payeeManagerCharacterId !== null}
             onClose={() => setPayeeManagerCharacterId(null)}
             characters={characters}
-            payeesByCharacter={data?.payeesByCharacter ?? new Map()}
+            payeesByCharacter={data?.payeesByCharacter ?? NO_PAYEES_BY_CHARACTER}
             initialCharacterId={payeeManagerCharacterId}
             onChanged={refresh}
             owedByPayee={owedByPayee}
@@ -1861,74 +2020,131 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
           />
         )}
 
-        {detailTarget && data && !detailTarget.groupMembers && (
-          <RowDetailModal
-            open={detailTarget !== null}
+        {detailTarget && data && corpDetail && (
+          <CorpRowDetailModal
+            open
             onClose={() => setDetailTarget(null)}
-            row={detailTarget.row}
-            assignment={detailTarget.assignment}
-            status={detailTarget.status}
+            dr={detailTarget}
+            corp={corpDetail}
+            book={corpView?.books.find(
+              (b) => b.loaded.corporationId === corpDetail.view.corporationId
+            )}
             systemName={systemName(detailTarget)}
             systemSecurity={systemSecurityOf(detailTarget)}
-            priceSourcesFor={priceSourcesFor}
             typeNames={data.typeNames}
-            payees={allPayees}
-            suggestion={detailTarget.assignment ? undefined : suggestionFor(detailTarget.row)}
-            pricesFor={pricesFor}
-            unreachableHubs={data.datedPrices.unreachableHubs}
-            busy={busy}
-            // A failed link shows in its own dialog, open on top of this one.
-            saveError={linkTransactionTarget ? null : actionError}
-            onAssigned={handleAssignedFromDetail}
-            onDismiss={handleDismissFromDetail}
-            onMarkPaid={handleMarkPaidFromDetail}
-            onUnmarkPaid={handleUnmarkPaidFromDetail}
-            onResolve={handleResolveFromDetail}
-            onUndo={handleUndoFromDetail}
-            onEdit={() => {
-              setEditTarget(detailTarget);
+            onPay={() => {
+              setCorpPayTarget(corpDetail.view.corporationId);
               setDetailTarget(null);
             }}
-            onSettleUp={
-              detailTarget.status === 'outstanding'
-                ? () => settleUpPayeeOf(detailTarget)
-                : undefined
-            }
-            onLinkWalletPayment={
-              detailTarget.status === 'outstanding' && detailTarget.assignment?.payeeId
-                ? () => {
-                    const payeeId = detailTarget.assignment?.payeeId;
-                    if (payeeId) setLinkWalletTarget({ payeeId });
-                    setDetailTarget(null);
-                  }
-                : undefined
-            }
-            onAddPayee={
-              payeeManagerDefaultCharacterId !== null
-                ? () => setPayeeManagerCharacterId(payeeManagerDefaultCharacterId)
-                : undefined
-            }
-            onJoin={() => {
-              setJoinTarget(detailTarget);
-              setDetailTarget(null);
-            }}
-            onSplit={
-              detailTarget.assignment && !detailTarget.assignment.groupId
-                ? () => {
-                    setSplitTarget(detailTarget);
-                    setDetailTarget(null);
-                  }
-                : undefined
-            }
-            linkedTransactions={detailLinkedTransactions}
-            onLinkTransaction={
-              detailTarget.status === 'paid'
-                ? () => setLinkTransactionTarget(detailTarget)
-                : undefined
-            }
-            onUnlinkTransaction={handleUnlinkTransactionFromDetail}
           />
         )}
+
+        {corpPayTarget !== null &&
+          (() => {
+            const book = corpView?.books.find((b) => b.loaded.corporationId === corpPayTarget);
+            if (!book) return null;
+            const codes = [
+              ...new Set(
+                characterFiltered.flatMap((dr) =>
+                  dr.corp?.kind === 'row' &&
+                  dr.corp.view.corporationId === corpPayTarget &&
+                  dr.corp.view.statementId &&
+                  dr.status === 'outstanding'
+                    ? [dr.corp.view.statementId]
+                    : []
+                )
+              ),
+            ].flatMap((id) => {
+              const statement = book.loaded.statements.find((s) => s.id === id);
+              return statement
+                ? [{ code: statement.code, period: `${statement.periodStart.slice(0, 7)}` }]
+                : [];
+            });
+            return (
+              <CorpPayDialog
+                open
+                onClose={() => setCorpPayTarget(null)}
+                book={book}
+                owed={corpOwedNow(corpPayTarget)}
+                statementCodes={codes}
+              />
+            );
+          })()}
+
+        {detailTarget &&
+          data &&
+          !detailTarget.groupMembers &&
+          detailTarget.corp?.kind !== 'row' && (
+            <RowDetailModal
+              open={detailTarget !== null}
+              onClose={() => setDetailTarget(null)}
+              row={detailTarget.row}
+              assignment={detailTarget.assignment}
+              status={detailTarget.status}
+              systemName={systemName(detailTarget)}
+              systemSecurity={systemSecurityOf(detailTarget)}
+              priceSourcesFor={priceSourcesFor}
+              typeNames={data.typeNames}
+              payees={allPayees}
+              suggestion={detailTarget.assignment ? undefined : suggestionFor(detailTarget.row)}
+              pricesFor={pricesFor}
+              unreachableHubs={data.datedPrices.unreachableHubs}
+              busy={busy}
+              // A failed link shows in its own dialog, open on top of this one.
+              saveError={linkTransactionTarget ? null : actionError}
+              onAssigned={handleAssignedFromDetail}
+              onDismiss={handleDismissFromDetail}
+              onMarkPaid={handleMarkPaidFromDetail}
+              onUnmarkPaid={handleUnmarkPaidFromDetail}
+              onResolve={handleResolveFromDetail}
+              onUndo={handleUndoFromDetail}
+              onEdit={() => {
+                setEditTarget(detailTarget);
+                setDetailTarget(null);
+              }}
+              onSettleUp={
+                detailTarget.status === 'outstanding'
+                  ? () => settleUpPayeeOf(detailTarget)
+                  : undefined
+              }
+              onLinkWalletPayment={
+                detailTarget.status === 'outstanding' && detailTarget.assignment?.payeeId
+                  ? () => {
+                      const payeeId = detailTarget.assignment?.payeeId;
+                      if (payeeId) setLinkWalletTarget({ payeeId });
+                      setDetailTarget(null);
+                    }
+                  : undefined
+              }
+              onAddPayee={
+                payeeManagerDefaultCharacterId !== null
+                  ? () => setPayeeManagerCharacterId(payeeManagerDefaultCharacterId)
+                  : undefined
+              }
+              onJoin={() => {
+                setJoinTarget(detailTarget);
+                setDetailTarget(null);
+              }}
+              onSplit={
+                detailTarget.assignment && !detailTarget.assignment.groupId
+                  ? () => {
+                      setSplitTarget(detailTarget);
+                      setDetailTarget(null);
+                    }
+                  : undefined
+              }
+              linkedTransactions={detailLinkedTransactions}
+              onLinkTransaction={
+                detailTarget.status === 'paid'
+                  ? () => setLinkTransactionTarget(detailTarget)
+                  : undefined
+              }
+              onUnlinkTransaction={handleUnlinkTransactionFromDetail}
+              corpNote={
+                detailTarget.corp?.kind === 'label' ? corpStateHint(detailTarget.corp) : undefined
+              }
+            />
+          )}
 
         {linkTransactionTarget &&
           assignmentsForLinkTarget(linkTransactionTarget, everyAssignment).length > 0 && (

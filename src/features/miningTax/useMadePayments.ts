@@ -11,9 +11,8 @@ import {
   type MadePayment,
 } from './paymentLinks';
 
-interface UseMadePaymentsInput {
-  /** Comma-joined tracked character ids — a string so the effect keys on the roster, never on `data` (see below). */
-  trackedCharacterIds: string;
+interface UseLinkSuggestionsInput {
+  madePayments: readonly MadePayment[];
   everyAssignment: readonly MiningTaxAssignmentRecord[];
   balances: readonly PayeeBalance[];
 }
@@ -27,14 +26,10 @@ interface UseMadePaymentsInput {
  * here"), and blocking here would invert that. The card appears when this
  * resolves.
  *
- * Also silently links recorded payments whose transaction has since shown up,
- * and suggests links for the rest.
+ * @param trackedCharacterIds Comma-joined character ids — a string so the
+ *   effect keys on the roster, never on `data` (see below).
  */
-export function useMadePayments({
-  trackedCharacterIds,
-  everyAssignment,
-  balances,
-}: UseMadePaymentsInput) {
+export function useMadePayments(trackedCharacterIds: string) {
   const [madePayments, setMadePayments] = useState<MadePayment[]>([]);
   const [paymentSources, setPaymentSources] = useState<MadePaymentSources[]>([]);
   /**
@@ -61,6 +56,20 @@ export function useMadePayments({
     };
   }, [trackedCharacterIds]);
 
+  return { madePayments, paymentSources };
+}
+
+/**
+ * Silently links recorded payments whose transaction has since shown up, and
+ * suggests links for the rest. Separate from `useMadePayments` because the
+ * payments feed the Corp Tax Book view, which the ledger rows (and so the
+ * assignments and balances this reads) are built from.
+ */
+export function useLinkSuggestions({
+  madePayments,
+  everyAssignment,
+  balances,
+}: UseLinkSuggestionsInput) {
   // Settle-up payments already recorded (paid-on/method/amount) but never
   // live-linked, because step 2 stopped trying to search the wallet journal
   // at pay time (it always missed — ESI hadn't posted the transaction yet).
@@ -111,5 +120,5 @@ export function useMadePayments({
     );
   }, [everyAssignment, madePayments, balances, recordedMatches]);
 
-  return { madePayments, paymentSources, linkSuggestions };
+  return linkSuggestions;
 }

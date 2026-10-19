@@ -18,12 +18,9 @@ import { scheduleProjectionRebuild } from './projectionRebuildScheduler';
 import {
   isEventEnabledFor,
   toggleEventChannel,
-  toggleAllEventsOnChannel,
   isEveTypeEnabledFor,
   toggleEveTypeChannel,
-  toggleAllEveTypesOnChannel,
   broadcastEventChannelFlags,
-  broadcastAllEventsChannelFlags,
   broadcastEveTypeChannelFlags,
   broadcastAllEveTypesChannelFlags,
   type EventEnabledMap,
@@ -256,22 +253,6 @@ export function withEventChannelToggled(
   };
 }
 
-export function withAllEventsToggledForCharacter(
-  value: NotificationPreferencesValue,
-  characterId: number,
-  eventIds: readonly NotificationEventId[],
-  channel: NotificationChannel
-): NotificationPreferencesValue {
-  const prefs = characterEventPrefs(value, characterId);
-  return {
-    ...value,
-    perCharacter: {
-      ...value.perCharacter,
-      [characterId]: toggleAllEventsOnChannel(eventIds, prefs, channel),
-    },
-  };
-}
-
 export function withEveNotificationTypeToggled(
   value: NotificationPreferencesValue,
   characterId: number,
@@ -288,30 +269,13 @@ export function withEveNotificationTypeToggled(
   };
 }
 
-/** Family header select-all/none for one Character (issue #352). */
-export function withAllEveTypesToggledForCharacter(
-  value: NotificationPreferencesValue,
-  characterId: number,
-  types: readonly string[],
-  channel: NotificationChannel
-): NotificationPreferencesValue {
-  const prefs = characterEveTypePrefs(value, characterId);
-  return {
-    ...value,
-    eveNotificationTypesByCharacter: {
-      ...value.eveNotificationTypesByCharacter,
-      [characterId]: toggleAllEveTypesOnChannel(types, prefs, channel),
-    },
-  };
-}
-
 /**
  * Toggles one event's channel and writes it in one call — `channel` is
  * stated once rather than passed to `withEventChannelToggled` and then again
  * to `updateNotificationPrefs`'s own `channel` argument, which used to let a
  * caller's two copies silently disagree (nothing checked that a browser
  * toggle's builder call and its write call named the same channel). The
- * three toggle pairs below and `updateNotificationPrefs` itself are the only
+ * two toggle pairs below and `updateNotificationPrefs` itself are the only
  * way a caller should apply a channel toggle; a threshold write has no
  * channel and keeps calling `updateNotificationPrefs` directly, since it
  * always syncs.
@@ -329,19 +293,6 @@ export async function toggleEventChannelPref(
   );
 }
 
-export async function toggleAllEventsChannelPref(
-  characterId: number,
-  value: NotificationPreferencesValue,
-  eventIds: readonly NotificationEventId[],
-  channel: NotificationChannel
-): Promise<void> {
-  await updateNotificationPrefs(
-    characterId,
-    withAllEventsToggledForCharacter(value, characterId, eventIds, channel),
-    channel
-  );
-}
-
 export async function toggleEveTypeChannelPref(
   characterId: number,
   value: NotificationPreferencesValue,
@@ -351,19 +302,6 @@ export async function toggleEveTypeChannelPref(
   await updateNotificationPrefs(
     characterId,
     withEveNotificationTypeToggled(value, characterId, type, channel),
-    channel
-  );
-}
-
-export async function toggleAllEveTypesChannelPref(
-  characterId: number,
-  value: NotificationPreferencesValue,
-  types: readonly string[],
-  channel: NotificationChannel
-): Promise<void> {
-  await updateNotificationPrefs(
-    characterId,
-    withAllEveTypesToggledForCharacter(value, characterId, types, channel),
     channel
   );
 }
@@ -438,23 +376,24 @@ export function withCharacterEventThreshold<K extends keyof CharacterEventThresh
 }
 
 /**
- * Writes a batch of already-computed per-Character flags and persists it
- * (issue #738) — the shared shell both broadcast functions below reduce to.
+ * Writes a batch of already-computed per-Character flags into `field` (issue
+ * #738, #745) — the shared shell both broadcast functions below reduce to.
  * `characterIds[0]` drives `updateNotificationPrefs`'s sync scheduling;
  * callers put the active Character first so this is always a signed-in
  * Character with a usable token, not just Dexie's insertion order
  * (`NotificationsPanel.tsx`'s `allCharacterIds`).
  */
 async function writeBroadcastFlags(
+  field: 'perCharacter' | 'eveNotificationTypesByCharacter',
   characterIds: readonly number[],
   value: NotificationPreferencesValue,
-  flags: Record<number, EventEnabledMap>,
+  flags: Record<number, EventEnabledMap> | Record<number, EveTypeEnabledMap>,
   channel: NotificationChannel
 ): Promise<void> {
   if (characterIds.length === 0) return;
   const next: NotificationPreferencesValue = {
     ...value,
-    perCharacter: { ...value.perCharacter, ...flags },
+    [field]: { ...value[field], ...flags },
   };
   await updateNotificationPrefs(characterIds[0], next, channel);
 }
@@ -473,46 +412,12 @@ export async function broadcastEventChannelPref(
   channel: NotificationChannel
 ): Promise<void> {
   await writeBroadcastFlags(
+    'perCharacter',
     characterIds,
     value,
     broadcastEventChannelFlags(characterIds, eventId, value.perCharacter, channel),
     channel
   );
-}
-
-/** Same as `broadcastEventChannelPref`, across every Event at once (no row uses it now). */
-export async function broadcastAllEventsChannelPref(
-  characterIds: readonly number[],
-  value: NotificationPreferencesValue,
-  eventIds: readonly NotificationEventId[],
-  channel: NotificationChannel
-): Promise<void> {
-  await writeBroadcastFlags(
-    characterIds,
-    value,
-    broadcastAllEventsChannelFlags(characterIds, eventIds, value.perCharacter, channel),
-    channel
-  );
-}
-
-/**
- * `writeBroadcastFlags`'s counterpart for `eveNotificationTypesByCharacter`
- * (issue #745) — the per-type map lives in its own top-level field, not
- * `perCharacter`, so it needs its own merge-and-write shell rather than
- * reusing the one above.
- */
-async function writeBroadcastEveTypeFlags(
-  characterIds: readonly number[],
-  value: NotificationPreferencesValue,
-  flags: Record<number, EveTypeEnabledMap>,
-  channel: NotificationChannel
-): Promise<void> {
-  if (characterIds.length === 0) return;
-  const next: NotificationPreferencesValue = {
-    ...value,
-    eveNotificationTypesByCharacter: { ...value.eveNotificationTypesByCharacter, ...flags },
-  };
-  await updateNotificationPrefs(characterIds[0], next, channel);
 }
 
 /**
@@ -527,7 +432,8 @@ export async function broadcastEveTypeChannelPref(
   type: string,
   channel: NotificationChannel
 ): Promise<void> {
-  await writeBroadcastEveTypeFlags(
+  await writeBroadcastFlags(
+    'eveNotificationTypesByCharacter',
     characterIds,
     value,
     broadcastEveTypeChannelFlags(
@@ -547,7 +453,8 @@ export async function broadcastAllEveTypesChannelPref(
   types: readonly string[],
   channel: NotificationChannel
 ): Promise<void> {
-  await writeBroadcastEveTypeFlags(
+  await writeBroadcastFlags(
+    'eveNotificationTypesByCharacter',
     characterIds,
     value,
     broadcastAllEveTypesChannelFlags(

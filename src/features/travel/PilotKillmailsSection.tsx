@@ -9,7 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { Button, Caret, Spinner, TypeIcon } from '@/components/ui';
 import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
-import { encodeFittingShare } from '@/engine/fitting/fittingShare';
+import { encodeFittingShare } from '@/engine/fittings/fittingShare';
 import { fittingToShareInput } from '@/engine/fittings/shareMapper';
 import type { Fitting } from '@/engine/fittings/types';
 import { resolveNames } from '@/features/character/names';

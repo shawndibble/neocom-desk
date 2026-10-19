@@ -16,7 +16,6 @@ import type {
 import type { TFunction } from 'i18next';
 import { DAY_MS } from '@/lib/age';
 import { formatIsk } from '@/lib/isk';
-import { formatLocalDate } from '@/lib/localDate';
 import type { PayeeBalance } from './balances';
 import { allMembers, type DisplayRow, type GroupMember } from './groupRows';
 import type { LinkedTransaction } from './PaymentLinksCard';
@@ -409,17 +408,6 @@ export function suggestLinks(
       (a, b) =>
         rank[a.confidence] - rank[b.confidence] || b.payment.date.localeCompare(a.payment.date)
     );
-}
-
-/**
- * A `MadePayment`'s own timestamp as a local calendar date, falling back to
- * today. A contract carries `date_completed ?? date_issued` straight from ESI,
- * so an unparseable value would otherwise reach `formatLocalDate` as an
- * Invalid Date and write nonsense into a synced record.
- */
-export function paidOnFor(isoDate: string): string {
-  const parsed = new Date(isoDate);
-  return formatLocalDate(Number.isNaN(parsed.getTime()) ? new Date() : parsed);
 }
 
 /** A short display line for a linked ref, from the same `MadePayment[]` the Payments-to-link card already loaded — `null` when it's no longer in the cached wallet journal/contracts. */

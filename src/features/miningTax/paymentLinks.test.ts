@@ -11,7 +11,6 @@ import {
   labelForLinkedRef,
   linkedTransactionsFor,
   normalizePaymentInfo,
-  paidOnFor,
   suggestLink,
   unlinkedPayments,
   unlinkedRecordedPayments,
@@ -490,16 +489,6 @@ describe('exactAmountMatches', () => {
 
 // Echoes the key so the assertions read the branch taken, not a locale string.
 const t = ((key: string) => key) as unknown as TFunction;
-
-describe('paidOnFor', () => {
-  it('reads the timestamp as a local calendar date', () => {
-    expect(paidOnFor('2026-09-06T12:00:00')).toBe('2026-09-06');
-  });
-
-  it('falls back to today for an unparseable timestamp', () => {
-    expect(paidOnFor('not a date')).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-  });
-});
 
 describe('labelForLinkedRef', () => {
   it('is null once the payment has left the cached journal', () => {

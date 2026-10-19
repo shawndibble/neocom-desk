@@ -5,7 +5,7 @@ import type { Fitting } from '@/engine/fittings/types';
 import { useFittingPicker } from './useFittingPicker';
 
 const { encode, load } = vi.hoisted(() => ({ encode: vi.fn(), load: vi.fn() }));
-vi.mock('@/engine/fitting/fittingShare', () => ({ encodeFittingShare: encode }));
+vi.mock('@/engine/fittings/fittingShare', () => ({ encodeFittingShare: encode }));
 vi.mock('@/engine/fittings/shareMapper', () => ({ fittingToShareInput: (f: Fitting) => f }));
 vi.mock('./loadFittingFromText', () => ({ loadFittingFromText: load }));
 

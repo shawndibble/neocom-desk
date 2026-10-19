@@ -7,8 +7,10 @@ import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 import { formatDateRange } from './groupRows';
 import { settle } from './ledgerActions';
+import { paidOnFromIso } from './madePayments';
+import { systemLabel } from './names';
 import { rememberPayeeEntity } from './payees';
-import { paidOnFor, type LinkSuggestion } from './paymentLinks';
+import type { LinkSuggestion } from './paymentLinks';
 import { useLedgerAction } from './useLedgerAction';
 import { LedgerActionError } from './LedgerActionError';
 
@@ -79,8 +81,7 @@ export function LinkPaymentDialog({
     });
   }
 
-  const systemName = (solarSystemId: number) =>
-    systemNames.get(solarSystemId) ?? `#${String(solarSystemId)}`;
+  const systemName = (solarSystemId: number) => systemLabel(systemNames, solarSystemId);
 
   /** What goes on the record: the ISK that actually moved, or the pilot's figure for ore handed over. */
   const recordedAmount =
@@ -103,7 +104,7 @@ export function LinkPaymentDialog({
       settle(
         included.map((m) => m.assignment),
         {
-          paidOn: paidOnFor(payment.date),
+          paidOn: paidOnFromIso(payment.date),
           method: payment.method,
           amount: Math.round(recordedAmount),
           ...(payment.kind === 'journal'

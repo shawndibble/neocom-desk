@@ -14,7 +14,7 @@ interface UseContinuationsInput {
   /** The ledger rows the Character filter lets through. */
   rows: readonly DisplayRow[];
   allDisplayRows: readonly DisplayRow[];
-  allPayees: readonly PayeeRecord[];
+  payeeById: ReadonlyMap<string, PayeeRecord>;
   pricesFor: (hubId: string | undefined, date: string) => ReadonlyMap<number, number>;
   refresh: () => void;
   setToast: (toast: TaxToast) => void;
@@ -29,7 +29,7 @@ export function useContinuations({
   hasData,
   rows,
   allDisplayRows,
-  allPayees,
+  payeeById,
   pricesFor,
   refresh,
   setToast,
@@ -63,7 +63,7 @@ export function useContinuations({
    * shows what exists), or the write failed (the toast says so).
    */
   async function continueSession(continuation: SessionContinuation): Promise<boolean> {
-    const payee = allPayees.find((p) => p.id === continuation.payeeId);
+    const payee = payeeById.get(continuation.payeeId);
     if (!payee) return false;
     const result = await continueSessionAction(continuation, (date) =>
       pricesFor(payee.hubId, date)
@@ -90,7 +90,7 @@ export function useContinuations({
   }
 
   // The automatic-mode effect must not re-run when `continueSession`'s closure
-  // changes (it reads `allPayees`/`pricesFor`/`t`/`refresh`) — only when the
+  // changes (it reads `payeeById`/`pricesFor`/`t`/`refresh`) — only when the
   // offers do. Reading it through a ref keeps it current without that.
   const continueSessionRef = useRef(continueSession);
   useEffect(() => {

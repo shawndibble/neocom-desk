@@ -10,14 +10,12 @@ import {
   withMasterEnabled,
   withEventChannelToggled,
   isEventEnabledFor,
-  withAllEventsToggledForCharacter,
   isBrowserChannelEnabled,
   isFeedChannelEnabled,
   withBrowserEnabled,
   withFeedEnabled,
   characterEveTypePrefs,
   withEveNotificationTypeToggled,
-  withAllEveTypesToggledForCharacter,
   isEveTypeEnabledFor,
   characterEventThresholds,
   withCharacterEventThreshold,
@@ -34,11 +32,8 @@ import {
   DEFAULT_INCURSION_NEARBY_JUMPS,
   updateNotificationPrefs,
   toggleEventChannelPref,
-  toggleAllEventsChannelPref,
   toggleEveTypeChannelPref,
-  toggleAllEveTypesChannelPref,
   broadcastEventChannelPref,
-  broadcastAllEventsChannelPref,
   broadcastEveTypeChannelPref,
   broadcastAllEveTypesChannelPref,
   setDeviceNotificationPrefs,
@@ -186,27 +181,6 @@ describe('withEventChannelToggled', () => {
   });
 });
 
-describe('withAllEventsToggledForCharacter', () => {
-  it('disables one column when it is currently fully enabled', () => {
-    const next = withAllEventsToggledForCharacter(
-      DEFAULT_NOTIFICATION_PREFERENCES,
-      1,
-      [EVENT_A, EVENT_B],
-      'browser'
-    );
-    const prefs = characterEventPrefs(next, 1);
-    expect(isEventEnabledFor(prefs, EVENT_A, 'browser')).toBe(false);
-    expect(isEventEnabledFor(prefs, EVENT_B, 'browser')).toBe(false);
-    expect(isEventEnabledFor(prefs, EVENT_A, 'feed')).toBe(true);
-  });
-
-  it("does not disturb another character's prefs", () => {
-    const value = { masterEnabled: true, perCharacter: { 2: { [EVENT_B]: false } } };
-    const next = withAllEventsToggledForCharacter(value, 1, [EVENT_A], 'feed');
-    expect(characterEventPrefs(next, 2)).toEqual({ [EVENT_B]: false });
-  });
-});
-
 describe('delivery channels', () => {
   it('treats an absent channel flag as enabled, so pre-channel prefs keep working', () => {
     const stored = { masterEnabled: true, perCharacter: {} };
@@ -273,31 +247,6 @@ describe('characterEveTypePrefs / withEveNotificationTypeToggled', () => {
       eveNotificationTypesByCharacter: { 2: { AllWarDeclaredMsg: { feed: false } } },
     };
     const next = withEveNotificationTypeToggled(value, 1, 'BillOutOfMoneyMsg', 'browser');
-    expect(characterEveTypePrefs(next, 2)).toEqual({ AllWarDeclaredMsg: { feed: false } });
-  });
-});
-
-describe('withAllEveTypesToggledForCharacter', () => {
-  it('fills a partial column to fully enabled rather than clearing it', () => {
-    const next = withAllEveTypesToggledForCharacter(
-      DEFAULT_NOTIFICATION_PREFERENCES,
-      1,
-      ['BillOutOfMoneyMsg', 'AllWarDeclaredMsg'],
-      'browser'
-    );
-    const prefs = characterEveTypePrefs(next, 1);
-    expect(isEveTypeEnabledFor(prefs, 'BillOutOfMoneyMsg', 'browser')).toBe(true);
-    expect(isEveTypeEnabledFor(prefs, 'AllWarDeclaredMsg', 'browser')).toBe(true);
-    expect(isEveTypeEnabledFor(prefs, 'BillOutOfMoneyMsg', 'feed')).toBe(true);
-  });
-
-  it("does not disturb another character's type prefs", () => {
-    const value = {
-      masterEnabled: true,
-      perCharacter: {},
-      eveNotificationTypesByCharacter: { 2: { AllWarDeclaredMsg: { feed: false } } },
-    };
-    const next = withAllEveTypesToggledForCharacter(value, 1, ['BillOutOfMoneyMsg'], 'feed');
     expect(characterEveTypePrefs(next, 2)).toEqual({ AllWarDeclaredMsg: { feed: false } });
   });
 });
@@ -425,7 +374,7 @@ describe('characterEventThresholds / withCharacterEventThreshold', () => {
   });
 });
 
-describe('toggleEventChannelPref / toggleAllEventsChannelPref / toggleEveTypeChannelPref / toggleAllEveTypesChannelPref', () => {
+describe('toggleEventChannelPref / toggleEveTypeChannelPref', () => {
   /**
    * These wrap `with*Toggled` + `updateNotificationPrefs` into one call so a
    * caller states `channel` once instead of passing it to both — the two used
@@ -459,26 +408,6 @@ describe('toggleEventChannelPref / toggleAllEventsChannelPref / toggleEveTypeCha
     expect(await db.settings.get(SYNCED_NOTIFICATION_FEED_PREFS_KEY)).toBeDefined();
   });
 
-  it('toggleAllEventsChannelPref: a browser column toggle never touches the synced setting', async () => {
-    await toggleAllEventsChannelPref(
-      1,
-      DEFAULT_NOTIFICATION_PREFERENCES,
-      [EVENT_A, EVENT_B],
-      'browser'
-    );
-    expect(await db.settings.get(SYNCED_NOTIFICATION_FEED_PREFS_KEY)).toBeUndefined();
-  });
-
-  it('toggleAllEventsChannelPref: a feed column toggle pushes the synced setting', async () => {
-    await toggleAllEventsChannelPref(
-      1,
-      DEFAULT_NOTIFICATION_PREFERENCES,
-      [EVENT_A, EVENT_B],
-      'feed'
-    );
-    expect(await db.settings.get(SYNCED_NOTIFICATION_FEED_PREFS_KEY)).toBeDefined();
-  });
-
   it('toggleEveTypeChannelPref: a browser toggle never touches the synced setting', async () => {
     await toggleEveTypeChannelPref(
       1,
@@ -499,26 +428,6 @@ describe('toggleEventChannelPref / toggleAllEventsChannelPref / toggleEveTypeCha
     expect(await db.settings.get(SYNCED_NOTIFICATION_FEED_PREFS_KEY)).toBeDefined();
   });
 
-  it('toggleAllEveTypesChannelPref: a browser column toggle never touches the synced setting', async () => {
-    await toggleAllEveTypesChannelPref(
-      1,
-      DEFAULT_NOTIFICATION_PREFERENCES,
-      ['StructureUnderAttack', 'CorpKicked'],
-      'browser'
-    );
-    expect(await db.settings.get(SYNCED_NOTIFICATION_FEED_PREFS_KEY)).toBeUndefined();
-  });
-
-  it('toggleAllEveTypesChannelPref: a feed column toggle pushes the synced setting', async () => {
-    await toggleAllEveTypesChannelPref(
-      1,
-      DEFAULT_NOTIFICATION_PREFERENCES,
-      ['StructureUnderAttack', 'CorpKicked'],
-      'feed'
-    );
-    expect(await db.settings.get(SYNCED_NOTIFICATION_FEED_PREFS_KEY)).toBeDefined();
-  });
-
   it('a threshold write (no channel argument) still pushes the synced setting', async () => {
     const next = withCharacterEventThreshold(
       DEFAULT_NOTIFICATION_PREFERENCES,
@@ -531,7 +440,7 @@ describe('toggleEventChannelPref / toggleAllEventsChannelPref / toggleEveTypeCha
   });
 });
 
-describe('broadcastEventChannelPref / broadcastAllEventsChannelPref (issue #738)', () => {
+describe('broadcastEventChannelPref (issue #738)', () => {
   it('writes the broadcast value into every known Character at once', async () => {
     await broadcastEventChannelPref([1, 2], DEFAULT_NOTIFICATION_PREFERENCES, EVENT_A, 'browser');
     const value = useNotificationPreferences.getState().value;
@@ -550,21 +459,6 @@ describe('broadcastEventChannelPref / broadcastAllEventsChannelPref (issue #738)
   it('is a no-op with no known Characters', async () => {
     await broadcastEventChannelPref([], DEFAULT_NOTIFICATION_PREFERENCES, EVENT_A, 'browser');
     expect(useNotificationPreferences.getState().value).toEqual(DEFAULT_NOTIFICATION_PREFERENCES);
-  });
-
-  it('broadcastAllEventsChannelPref writes every event to every known Character', async () => {
-    await broadcastAllEventsChannelPref(
-      [1, 2],
-      DEFAULT_NOTIFICATION_PREFERENCES,
-      [EVENT_A, EVENT_B],
-      'browser'
-    );
-    const value = useNotificationPreferences.getState().value;
-    for (const characterId of [1, 2]) {
-      const prefs = characterEventPrefs(value, characterId);
-      expect(isEventEnabledFor(prefs, EVENT_A, 'browser')).toBe(false);
-      expect(isEventEnabledFor(prefs, EVENT_B, 'browser')).toBe(false);
-    }
   });
 });
 
@@ -716,35 +610,23 @@ describe('Projection rebuild scheduling (issue #1259 follow-up)', () => {
     expect(scheduleProjectionRebuild).toHaveBeenCalledTimes(1);
   });
 
-  it('browser select-all, EVE-type and broadcast writes each schedule one rebuild', async () => {
-    await toggleAllEventsChannelPref(1, DEFAULTS, [EVENT_A, EVENT_B], 'browser');
-    await toggleEveTypeChannelPref(
-      1,
-      useNotificationPreferences.getState().value,
-      TYPE_A,
-      'browser'
-    );
-    await toggleAllEveTypesChannelPref(
-      1,
-      useNotificationPreferences.getState().value,
-      [TYPE_A, TYPE_B],
-      'browser'
-    );
+  it('browser EVE-type and broadcast writes each schedule one rebuild', async () => {
+    await toggleEveTypeChannelPref(1, DEFAULTS, TYPE_A, 'browser');
     await broadcastEventChannelPref(
       [1, 2],
       useNotificationPreferences.getState().value,
       EVENT_B,
       'browser'
     );
-    expect(scheduleProjectionRebuild).toHaveBeenCalledTimes(4);
+    expect(scheduleProjectionRebuild).toHaveBeenCalledTimes(2);
   });
 
   it('feed-only EVE-type and broadcast writes do not schedule a rebuild', async () => {
     await toggleEveTypeChannelPref(1, DEFAULTS, TYPE_A, 'feed');
-    await broadcastAllEventsChannelPref(
+    await broadcastEventChannelPref(
       [1, 2],
       useNotificationPreferences.getState().value,
-      [EVENT_A],
+      EVENT_A,
       'feed'
     );
     await broadcastAllEveTypesChannelPref(
