@@ -11,7 +11,7 @@
  * Device-wide, matching the page: the poller runs for every Character, and a
  * badge that hid an alt's alerts would be a badge you learn to distrust.
  */
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import type { NotificationFeedRecord } from '@/db';
 import type { AlertBadge } from '@/components/ui/unreadAlertsContext';
@@ -51,14 +51,22 @@ export function useVisibleAlertEntries(): NotificationFeedRecord[] {
   }, []);
 
   const entries = useLiveQuery(() => readFeed(), [], []);
-  return useMemo(
+  const visible = useMemo(
     () =>
       !prefs.masterEnabled || !isFeedChannelEnabled(prefs)
         ? []
         : withoutSnoozed(visibleFeedEntries(entries, prefs), snoozed, now),
     [entries, prefs, snoozed, now]
   );
+  // The minute tick usually changes nothing; keep the same array so memos downstream hold.
+  const [held, setHeld] = useState(visible);
+  if (held === visible || sameEntries(held, visible)) return held;
+  setHeld(visible);
+  return visible;
 }
+
+const sameEntries = (a: readonly unknown[], b: readonly unknown[]): boolean =>
+  a.length === b.length && a.every((entry, i) => entry === b[i]);
 
 /** The bell's badge: how many alerts wait, and whether one is danger. */
 export function useAlertBadge(): AlertBadge {
