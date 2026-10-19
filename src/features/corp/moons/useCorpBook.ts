@@ -139,7 +139,6 @@ export function useCorpBook(sync: CorpTaxBookSync): CorpBook {
         const loadedOn = utcNow().slice(0, 10);
         dates.add(loadedOn);
         const prices = await loadDatedUnitPricesByHub(
-          characterId,
           [...typeIds],
           [data.settings.hubId],
           [...dates],

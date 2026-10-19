@@ -737,7 +737,6 @@ export async function planNeedsReviewResolution(
       : (await loadPayees(assignment.characterId)).find((p) => p.id === assignment.payeeId);
   const compressed = currentCompressedOre();
   const { prices } = await loadUnitPricesOnDate(
-    assignment.characterId,
     relevantFresh.map((line) => line.typeId),
     hubForPayee(payee?.hubId),
     assignment.date,

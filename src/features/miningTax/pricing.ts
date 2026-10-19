@@ -1,7 +1,7 @@
 /**
  * Trade-hub price lookups for the Moon Mining Tax ledger (issue #523), via
- * Fuzzwork for today's live book (ADR 0002), the server's own hub-price
- * snapshot for a saved or historical day, and the app's per-browser Dexie
+ * Fuzzwork for today's live book (ADR 0002), the server's daily hub-station
+ * mining prices in R2 (`hubSnapshot.ts`) for a saved or historical day, and the app's per-browser Dexie
  * snapshot as a further Jita-only fallback (`priceBasis.ts`'s
  * `resolveTaxUnitPrice` — issue #1279 follow-up, "Mining Tax: price at the
  * entry's mined date, not today's live price").
@@ -91,7 +91,6 @@ function toSidePricesMap(day: SnapshotDay): Map<number, SidePrices> {
  * respectively.
  */
 async function resolvePricesForHubAcrossDates(
-  characterId: number,
   typeIds: readonly number[],
   hub: TradeHub,
   dates: readonly string[],
@@ -111,7 +110,7 @@ async function resolvePricesForHubAcrossDates(
   const end = sortedDates[sortedDates.length - 1];
 
   const [{ saved: serverSaved, historical }, live, dexieSaved] = await Promise.all([
-    loadHubSnapshotRange(characterId, start, end, hub),
+    loadHubSnapshotRange(start, end, hub),
     getHubPricesWithStatus(hub, pricingTypeIds),
     // Dexie only ever holds Jita — no equivalent for the other 4 hubs.
     hub.id === DEFAULT_TRADE_HUB.id
@@ -121,8 +120,8 @@ async function resolvePricesForHubAcrossDates(
 
   for (const date of sortedDates) {
     // Server wins over the per-browser Dexie snapshot for the same day/type —
-    // the server captures 4x/day regardless of who's online, Dexie only when
-    // this browser happened to load the page that day.
+    // the server folds each day's end-of-day book regardless of who's online,
+    // Dexie only when this browser happened to load the page that day.
     const serverDay = serverSaved.get(date);
     const dexieDay = dexieSaved.get(date);
     const mergedSaved =
@@ -174,19 +173,12 @@ async function resolvePricesForHubAcrossDates(
  * does for `TaxTab`.
  */
 export async function loadUnitPricesOnDate(
-  characterId: number,
   typeIds: readonly number[],
   hub: TradeHub,
   date: string,
   compressed = true
 ): Promise<UnitPrices> {
-  const { byDate } = await resolvePricesForHubAcrossDates(
-    characterId,
-    typeIds,
-    hub,
-    [date],
-    compressed
-  );
+  const { byDate } = await resolvePricesForHubAcrossDates(typeIds, hub, [date], compressed);
   return byDate.get(date) ?? { prices: new Map(), unpriced: new Set(), sellFallback: new Set() };
 }
 
@@ -283,7 +275,6 @@ export function sourcesAtHubOnDate(
  * ledger (the common case) still makes exactly one of each.
  */
 export async function loadDatedUnitPricesByHub(
-  characterId: number,
   typeIds: readonly number[],
   hubIds: Iterable<string | undefined>,
   dates: readonly string[],
@@ -298,10 +289,7 @@ export async function loadDatedUnitPricesByHub(
   const loaded = await Promise.all(
     [...hubs.values()].map(
       async (hub) =>
-        [
-          hub.id,
-          await resolvePricesForHubAcrossDates(characterId, typeIds, hub, dates, compressed),
-        ] as const
+        [hub.id, await resolvePricesForHubAcrossDates(typeIds, hub, dates, compressed)] as const
     )
   );
 
