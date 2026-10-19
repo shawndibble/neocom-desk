@@ -13,16 +13,7 @@ import { StartPlanButton } from './StartPlanButton';
 import { MobileOpportunityList } from './MobileOpportunityList';
 import { MobileOwnedBlueprintList } from './MobileOwnedBlueprintList';
 import { MobileMarketWideList } from './MobileMarketWideList';
-
-function deferred() {
-  let resolve!: (navigated: boolean) => void;
-  let reject!: (error: unknown) => void;
-  const promise = new Promise<boolean>((res, rej) => {
-    resolve = res;
-    reject = rej;
-  });
-  return { promise, resolve, reject };
-}
+import { deferred } from '@/test/deferred';
 
 describe('isCardOwnClick', () => {
   function renderCard() {
@@ -60,7 +51,7 @@ describe('isCardOwnClick', () => {
 
 describe('useRowStartPlan', () => {
   it('drops a second click while the first is saving, and keeps the guard once it navigated', async () => {
-    const d = deferred();
+    const d = deferred<boolean>();
     const start = vi.fn(() => d.promise);
     const target = {};
     const { result } = renderHook(() => useRowStartPlan(start));
@@ -87,7 +78,7 @@ describe('useRowStartPlan', () => {
   });
 
   it('shares its guard with Start plan: button then row makes one plan', async () => {
-    const d = deferred();
+    const d = deferred<boolean>();
     const start = vi.fn(() => d.promise);
     const entry = {} as BlueprintCatalogEntry;
     render(<StartPlanButton onStart={() => start()} planKey={entry} />);
@@ -104,7 +95,7 @@ describe('useRowStartPlan', () => {
   });
 
   it('row then button makes one plan too', async () => {
-    const d = deferred();
+    const d = deferred<boolean>();
     const start = vi.fn(() => d.promise);
     const entry = {} as BlueprintCatalogEntry;
     const { result } = renderHook(() =>

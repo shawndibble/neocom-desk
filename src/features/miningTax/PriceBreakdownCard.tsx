@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useTranslation } from 'react-i18next';
 import { formatIsk } from '@/lib/isk';
 import { usePriceBreakdown, type PriceBreakdownInput } from './usePriceBreakdown';
@@ -16,9 +17,7 @@ export function PriceBreakdownCard(props: PriceBreakdownInput) {
 
   return (
     <div className="space-y-1 rounded-xs border border-line bg-panel-2 p-2">
-      <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-        {t('miningTax.detail.breakdown.title')}
-      </p>
+      <p className={eyebrowClassName}>{t('miningTax.detail.breakdown.title')}</p>
       <p className="text-xs text-text-dim">
         {t('miningTax.detail.breakdown.summary', {
           hub: hub.name,

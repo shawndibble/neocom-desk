@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import {
   CORE_GRANT,
   SCOPES,
-  SCOPES_STRING,
   permissionForScope,
   isPermissionGranted,
   revokedScopes,
@@ -92,11 +91,6 @@ describe('SCOPES (Base Grant)', () => {
 
   it('contains no PUBLIC marker from the registry', () => {
     expect(SCOPES).not.toContain(PUBLIC);
-  });
-
-  it('exposes a space-joined string for the SSO scope parameter', () => {
-    expect(SCOPES_STRING).toBe(SCOPES.join(' '));
-    expect(SCOPES_STRING.split(' ')).toHaveLength(SCOPES.length);
   });
 });
 

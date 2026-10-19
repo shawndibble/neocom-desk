@@ -9,7 +9,7 @@ import {
   strictlyWorseThan,
   type ChargeChoice,
 } from '@/engine/fittings/chargeChoice';
-import { formatIsk } from './chargeFormat';
+import { formatIskExact } from './chargeFormat';
 
 const W = 296;
 const H = 250;
@@ -285,7 +285,7 @@ export function ChargeChart({
             {selected.price === null
               ? t('fittings.chargePicker.noPrice')
               : t('fittings.chargePicker.isk', {
-                  isk: formatIsk(selected.price),
+                  isk: formatIskExact(selected.price),
                 })}
             {perMin !== null &&
               ` · ${t('fittings.chargePicker.perMinute', { isk: formatCompactNumber(perMin) })}`}

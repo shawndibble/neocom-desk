@@ -220,10 +220,10 @@ describe('HaulingTripSummary', () => {
       freeM3: 600,
     });
     expect(
-      screen.getByRole('img', { name: 'Cargo hold: 400 of 1,000 cubic metres used' })
+      screen.getByRole('progressbar', { name: 'Cargo hold: 400 of 1,000 cubic metres used' })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('img', { name: 'Ammo hold: 500 of 500 cubic metres used' })
+      screen.getByRole('progressbar', { name: 'Ammo hold: 500 of 500 cubic metres used' })
     ).toBeInTheDocument();
     expect(screen.getByText('600 m³')).toBeInTheDocument();
     expect(screen.getByText('900 of 1,500 m³ used')).toBeInTheDocument();

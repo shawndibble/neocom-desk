@@ -43,6 +43,9 @@ export interface TaxSurvey {
   published: SurveyTaxShare | null;
 }
 
+/** Stable fallback while the live query loads, so `payees` keeps one identity. */
+const NO_PAYEES: Awaited<ReturnType<typeof loadPayees>> = [];
+
 export function MoonTaxRow({
   characterId,
   survey,
@@ -66,7 +69,7 @@ export function MoonTaxRow({
   const [own, setOwn] = useState(() => initialTaxDraft(survey?.published));
   const saved = draft ?? own;
   const setSaved = onDraftChange ?? setOwn;
-  const payees = useLiveQuery(() => loadPayees(characterId), [characterId]) ?? [];
+  const payees = useLiveQuery(() => loadPayees(characterId), [characterId]) ?? NO_PAYEES;
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
   // Focus is inside the name/rate pair: nothing is stored until it leaves.

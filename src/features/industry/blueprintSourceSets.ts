@@ -15,7 +15,6 @@ import {
   type BlueprintSource,
   type BlueprintSourceSets,
 } from '@/engine/industry/blueprintObtainability';
-import { isSyncConfigured } from '@/app/syncStatus';
 import { bpcOfferRows } from '@/features/bpcContracts/bpcOfferRows';
 import { loadPublicBpcContracts } from '@/features/bpcContracts/syncedContracts';
 import { loadCharacterLoyaltyPoints, PARAGON_CORPORATION_ID } from '@/features/character/loyalty';
@@ -76,18 +75,14 @@ async function marketBlueprints(blueprints: readonly BlueprintProduct[]): Promis
 }
 
 /**
- * The snapshot is shared, not per-Character — any Character's Firebase
- * session can read it, so each is tried in turn until one does. A snapshot
- * the backend has never synced lists nothing and counts as unread.
+ * The snapshot is shared, not per-Character, and public in R2 (issue #4270),
+ * so it is read once. A snapshot the backend has never synced lists nothing
+ * and counts as unread.
  */
-async function contractBlueprints(characterIds: readonly number[]): Promise<SourceResult> {
-  if (!isSyncConfigured()) return FAILED;
-  for (const characterId of characterIds) {
-    const snapshot = await loadPublicBpcContracts(characterId).catch(() => null);
-    if (!snapshot || snapshot.data.lastSyncedAt === null) continue;
-    return { ids: new Set(bpcOfferRows(snapshot.data).map((row) => row.typeId)), ok: true };
-  }
-  return FAILED;
+async function contractBlueprints(): Promise<SourceResult> {
+  const snapshot = await loadPublicBpcContracts().catch(() => null);
+  if (!snapshot || snapshot.data.lastSyncedAt === null) return FAILED;
+  return { ids: new Set(bpcOfferRows(snapshot.data).map((row) => row.typeId)), ok: true };
 }
 
 /**
@@ -148,7 +143,7 @@ export async function loadBlueprintSourceSets(
   const [owned, market, contract, lpStore, invention] = await Promise.all([
     owning,
     settle(marketBlueprints(blueprints), FAILED),
-    settle(contractBlueprints(characterIds), FAILED),
+    settle(contractBlueprints(), FAILED),
     settle(lpStoreBlueprints(characterIds), FAILED),
     owning.then((result) => settle(inventionBlueprints(blueprints, result.originals), FAILED)),
   ]);

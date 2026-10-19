@@ -22,7 +22,7 @@
 
 import { mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { ROOT } from './lib/paths.mjs';
 import {
   ASSET_HISTORY_FILE,
   assetsFromServiceWorker,
@@ -30,7 +30,6 @@ import {
   planRetention,
 } from './lib/assetRetention.mjs';
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const DIST = join(ROOT, 'dist');
 const PARALLEL = 8;
 

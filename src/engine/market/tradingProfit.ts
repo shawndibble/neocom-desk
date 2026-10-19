@@ -12,6 +12,7 @@
  * concern) and the margins from `realizedMargins`.
  */
 import type { RealizedMargin } from './realizedMargin';
+import { parseInstant } from '../esiInstant';
 
 export interface SaleFill {
   transactionId: number;
@@ -76,8 +77,8 @@ export function sumBrokerFees(journal: readonly FeeLine[], fromMs: number, toMs:
   let total = 0;
   for (const entry of journal) {
     if (entry.ref_type !== 'brokers_fee' || entry.amount === undefined) continue;
-    const at = Date.parse(entry.date);
-    if (at < fromMs || at > toMs) continue;
+    const at = parseInstant(entry.date);
+    if (at === null || at < fromMs || at > toMs) continue;
     total += Math.abs(entry.amount);
   }
   return total;

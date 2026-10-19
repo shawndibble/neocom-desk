@@ -14,6 +14,8 @@
  * with every service online gets no panel rather than an empty state about a
  * fault it does not have.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { cx } from '@/lib/cx';
 import { useTranslation } from 'react-i18next';
 import { Panel } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -32,7 +34,7 @@ export function CorpOfflineServices({ items }: CorpOfflineServicesProps) {
     <Panel
       title={t('corp.cards.services')}
       meta={
-        <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase tabular-nums">
+        <span className={cx(eyebrowClassName, 'tabular-nums')}>
           {t('corp.cards.servicesCount', { count: items.length })}
         </span>
       }

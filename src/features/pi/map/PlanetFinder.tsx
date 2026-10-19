@@ -5,6 +5,7 @@
  * with no colony has no home, and the finder says so rather than assuming a
  * hub.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Checkbox } from '@/components/ui';
@@ -96,9 +97,7 @@ export function PlanetFinder({
   if (homeSystemId === null) {
     return (
       <section aria-label={heading}>
-        <h4 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-          {heading}
-        </h4>
+        <h4 className={eyebrowClassName}>{heading}</h4>
         <p className="mt-1.5 text-xs text-text-dim">{t('piMap.finder.noHome')}</p>
       </section>
     );
@@ -107,9 +106,7 @@ export function PlanetFinder({
   const current = state?.key === key ? state.loaded : null;
   return (
     <section aria-label={heading}>
-      <h4 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-        {heading}
-      </h4>
+      <h4 className={eyebrowClassName}>{heading}</h4>
       <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2">
         <label className={`inline-flex items-center gap-1.5 text-xs ${tappableRowClassName}`}>
           <Checkbox checked={highsecOnly} onChange={(e) => setHighsecPick(e.target.checked)} />

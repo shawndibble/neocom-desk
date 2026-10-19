@@ -26,6 +26,7 @@ import { getHubPrices } from '@/market/prices';
 import type { ChargeEngineStats } from './dogmaFittingEngine';
 import type { FittingContext } from './fittingContext';
 import type { FittingCatalogue } from './useFittingCatalogue';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 /** The SDE meta groups (public/data/market/variations.json) a charge's tier reads off. */
 const META_GROUP_TECH2 = 2;
@@ -209,10 +210,7 @@ export function useChargeChoices({
   moduleTypeId,
 }: UseChargeChoicesParams): ChargeChoicesResult {
   const hubId = useMarketHub((state) => state.value);
-  const hydrateHub = useMarketHub((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateHub();
-  }, [hydrateHub]);
+  useHydratedStore(useMarketHub);
 
   const figuresByGroup = useMemo(() => {
     if (!fitting || !context || !moduleResults) return null;

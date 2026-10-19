@@ -65,7 +65,7 @@ export function forgetRouteSnapshots(characterId: number): void {
 }
 
 /** Every Character's, for the cache-wide `db.esiCache.clear()` fallback tier. */
-export function forgetAllRouteSnapshots(): void {
+function forgetAllRouteSnapshots(): void {
   byCharacter.clear();
 }
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { SkillQueueEntry } from '@/esi/endpoints';
 import type { WeekStart } from '@/lib/calendarGrid';
-import { classifySkillQueue } from '../queueStatus';
+import { classifySkillQueue } from '@/engine/skills/queueStatus';
 import { buildQueueView, heroProgress, heroSpPerHour } from './queueView';
 
 const NOW = Date.parse('2026-10-14T12:00:00Z');

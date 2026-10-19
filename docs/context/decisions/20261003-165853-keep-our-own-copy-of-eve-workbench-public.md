@@ -1,5 +1,7 @@
 # Scope decisions — Keep our own copy of EVE Workbench public fits, grouped by hull (issue #2484)
 
+_Storage superseded by `20261018-232147-eve-workbench-fits-live-in-r2.md` (issue #4271): the fits are now one R2 object per hull._
+
 _Recorded 2026-10-03 · issue #2484._
 
 - **We keep our own copy of EVE Workbench's public fits, grouped by hull, in

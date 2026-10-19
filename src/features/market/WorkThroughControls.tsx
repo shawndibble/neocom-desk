@@ -3,6 +3,7 @@
  * start action and progress end the headline's quiet line; the current order's
  * controls sit in its row.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useContext, type ReactNode } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
@@ -153,9 +154,7 @@ function ListControls({ row, context }: { row: OpenOrderRow; context: WorkThroug
   return (
     <div className="space-y-2 px-3 pb-3">
       <div>
-        <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-          {t('market.orders.workThrough.newPriceLabel')}
-        </p>
+        <p className={eyebrowClassName}>{t('market.orders.workThrough.newPriceLabel')}</p>
         {price?.kind === 'price' ? (
           <p className="text-2xl font-semibold text-text tabular-nums">
             {formatMarketIsk(price.price)}

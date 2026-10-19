@@ -1,7 +1,7 @@
 /**
  * `Date.parse` of an ESI timestamp, as `null` rather than `NaN`.
  *
- * Shared by both board adapters. A `NaN` deadline sorts unpredictably and
+ * The engine's one timestamp parse. A `NaN` instant sorts unpredictably and
  * compares false against every severity threshold, so it must not reach an
  * engine at all — a rule worth asserting in one place rather than in each
  * adapter that happens to remember it.

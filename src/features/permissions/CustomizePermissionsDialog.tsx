@@ -16,7 +16,8 @@
  * half-made change rather than remembering it (`customizeSelection.ts`).
  */
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useHydratedStore } from '@/lib/useHydratedStore';
+import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal, Checkbox, NeedsConnection } from '@/components/ui';
 import { beginCustomizedAddCharacterLogin } from '@/app/loginFlow';
@@ -40,12 +41,11 @@ export function CustomizePermissionsDialog({
 }: CustomizePermissionsDialogProps) {
   const { t } = useTranslation();
   const stored = useCustomizePermissionsSelection((state) => state.value);
-  const hydrated = useCustomizePermissionsSelection((state) => state.hydrated);
-  const hydrate = useCustomizePermissionsSelection((state) => state.hydrate);
+  const hydrated = useHydratedStore(useCustomizePermissionsSelection);
   const persist = useCustomizePermissionsSelection((state) => state.setValue);
 
   // `null` means "no edit this open" — the draft follows the stored choice,
-  // including once `hydrate()` below lands, the same reasoning
+  // including once hydration lands, the same reasoning
   // `MobileTabsPanel` (Settings.tsx) uses for its own store-backed draft. A
   // reset-on-open effect would need to call `setState` from inside itself,
   // which this avoids entirely: `handleClose` (Escape, backdrop, Cancel, and
@@ -62,10 +62,6 @@ export function CustomizePermissionsDialog({
   const [submitting, setSubmitting] = useState(false);
   const selected = pending ?? new Set(stored);
   const locked = !hydrated || submitting;
-
-  useEffect(() => {
-    void hydrate();
-  }, [hydrate]);
 
   function toggle(group: ScopeGroup) {
     const next = new Set(selected);

@@ -980,14 +980,21 @@ describe('PlanetaryIndustry', () => {
 
   describe('with hub prices unavailable', () => {
     const NOTICE = 'Prices unavailable right now';
+    // Every read fails, not just the first: the colonies snapshot lands twice
+    // (detail-less, then with pins), and each landing re-reads prices. A one-shot
+    // failure let the second read succeed and wipe the notice mid-assertion.
+    const defaultPrices = vi.mocked(loadPlanPrices).getMockImplementation();
     beforeEach(() => {
-      vi.mocked(loadPlanPrices).mockResolvedValueOnce({
+      vi.mocked(loadPlanPrices).mockImplementation(async () => ({
         prices: {},
         buyPrices: {},
         unpriced: [],
         failed: true,
         fetchedAt: new Date(),
-      });
+      }));
+    });
+    afterEach(() => {
+      if (defaultPrices) vi.mocked(loadPlanPrices).mockImplementation(defaultPrices);
     });
 
     it('says so on Plan, with no zero figures', async () => {

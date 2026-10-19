@@ -125,6 +125,7 @@ export async function removeCharacter(characterId: number, syncPush = true): Pro
       db.walletJournalArchive,
       db.walletTransactionArchive,
       db.walletArchiveCoverage,
+      db.corpMailQueue,
       db.notificationFeed,
       db.settings,
     ],
@@ -138,6 +139,8 @@ export async function removeCharacter(characterId: number, syncPush = true): Pro
       await db.mailDrafts.where('characterId').equals(characterId).delete();
       await db.miningLedgerHistory.delete(characterId);
       await db.industryJobHistory.delete(characterId);
+      // Mail queued from this Character can no longer be sent.
+      await db.corpMailQueue.where('senderCharacterId').equals(characterId).delete();
       await clearWalletArchive(characterId);
       // Orphaned feed rows are invisible in the UI (both the bell panel and the
       // other-character counts skip ids with no Character) but `refreshAppBadge`

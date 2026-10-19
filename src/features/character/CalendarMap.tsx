@@ -25,6 +25,7 @@
  * means "nothing new can land here", not "nothing is here" — which is why
  * these cells still draw their count and their dots.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useTranslation } from 'react-i18next';
 import type { DayLoad } from '@/engine/character/deadlines';
 import { localMidnight } from '@/engine/character/deadlines';
@@ -87,7 +88,7 @@ export function CalendarMap({
           <div
             key={label}
             aria-hidden="true"
-            className="border-b border-line px-2 py-1 text-center text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
+            className={cx(eyebrowClassName, 'border-b border-line px-2 py-1 text-center')}
           >
             {label}
           </div>

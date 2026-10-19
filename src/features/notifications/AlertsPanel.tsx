@@ -16,7 +16,7 @@
  * device only and is offered for price alerts alone.
  */
 import { useMemo, useRef, useState } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
+import { useAccountCharacters } from '@/features/character/useCharacters';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 import {
@@ -30,7 +30,7 @@ import {
   textActionClassName,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { db, type NotificationFeedRecord } from '@/db';
+import { type NotificationFeedRecord } from '@/db';
 import { CharacterLink } from '@/features/entities';
 import type { AlertsPanelRenderProps } from '@/components/ui/alertsPanelContext';
 import { SETTINGS_TABS } from '@/app/pageTabs';
@@ -74,11 +74,7 @@ export function AlertsPanel({ variant, onClose }: AlertsPanelRenderProps) {
   const [selectedChip, setSelectedChip] = useState<AlertChip>('all');
   /** Group key → how many of its fires are listed; absent means collapsed. */
   const [opened, setOpened] = useState<ReadonlyMap<string, number>>(new Map());
-  const characters = useLiveQuery(() => db.characters.toArray(), [], []);
-  const nameById = useMemo(
-    () => new Map(characters.map((character) => [character.characterId, character.name])),
-    [characters]
-  );
+  const { characters, namesById: nameById } = useAccountCharacters();
   // One-Character device: the name is the same on every row, so it is dropped.
   const showCharacter = characters.length > 1;
   const focusAfterCommit = useFocusAfterCommit();
