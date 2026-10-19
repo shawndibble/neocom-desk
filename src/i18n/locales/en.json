@@ -8484,9 +8484,10 @@
     "until": "to {{date}}",
     "returned": "Returned",
     "shortStay": "Short stay",
+    "npc": "NPC",
     "summary": {
       "timeInGame": "In game",
-      "corporations": "Corporations",
+      "corporations": "Player corps",
       "currentTenure": "Current tenure",
       "longest": "Longest stay"
     },
