@@ -15,7 +15,7 @@ import { displaySourceValue } from '@/engine/fittings/attributeUnits';
 import { attributeValueText, formatAttributeNumber } from './attributeValueText';
 import { useAttributeDictionary } from './useAttributeDictionary';
 
-function SourceLine({
+function AffectedSourceLine({
   source,
   unitId,
   typeName,
@@ -116,7 +116,12 @@ export function FittingAffectedByPanel({
           </div>
           <ul className="mt-1 space-y-0.5 pl-3">
             {sources.map((source, index) => (
-              <SourceLine key={index} source={source} unitId={entry.unitId} typeName={typeName} />
+              <AffectedSourceLine
+                key={index}
+                source={source}
+                unitId={entry.unitId}
+                typeName={typeName}
+              />
             ))}
           </ul>
         </li>
