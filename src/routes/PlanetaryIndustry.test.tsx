@@ -86,7 +86,8 @@ const JUMP_BASIS = vi.hoisted(() => ({
   podKillsUnavailable: false,
 }));
 vi.mock('@/features/route/jumpBasis', () => ({
-  useJumpBasis: () => JUMP_BASIS,
+  useSharedJumpBasis: () => JUMP_BASIS,
+  JumpBasisProvider: ({ children }: { children: React.ReactNode }) => children,
   jumpsBetween: vi.fn(async () => ({ kind: 'known', jumps: 7 })),
 }));
 

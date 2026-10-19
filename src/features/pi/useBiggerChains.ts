@@ -18,7 +18,7 @@ import { idSetKey } from '@/lib/idSetKey';
 import { useEffect, useMemo, useState } from 'react';
 import type { JumpsFn, PlannerColony, PlanetType } from '@/engine/pi/goalTypes';
 import type { PiData } from '@/sde/types';
-import { jumpsBetween, useJumpBasis } from '@/features/route/jumpBasis';
+import { jumpsBetween, useSharedJumpBasis } from '@/features/route/jumpBasis';
 import {
   biggerChainCandidates,
   estimateOnColonies,
@@ -99,7 +99,7 @@ function useColonyJumps(
   fn: JumpsFn | undefined;
   key: string | null;
 } {
-  const basis = useJumpBasis();
+  const basis = useSharedJumpBasis();
   const systemKey = idSetKey(systemOf.values());
   const wanted = `${basis.key}|${systemKey}`;
   const [own, setPairs] = useState(cachedPairs);
