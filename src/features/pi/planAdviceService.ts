@@ -7,8 +7,10 @@
  * and each answer is remembered per input object like `buildSharedPlanAdvice`,
  * so a tab switch reuses it. Where there is no Worker (jsdom, old browsers), or
  * it has failed, `planAdviceWorkerAvailable` says so and the caller runs the
- * same pure model on the page.
+ * same pure model on the page. A caller that no longer wants an answer aborts
+ * its signal: a request still queued in the worker is withdrawn.
  */
+import { abortError, createWorkerClient, isAbortError } from '@/lib/workerClient';
 import type { PiData } from '@/sde/types';
 import type { PlanAdvice, PlanAdviceInput } from './planAdvice/types';
 import {
@@ -23,109 +25,107 @@ export class PlanAdviceWorkerUnavailable extends Error {}
 
 type Settled = { advice: PlanAdvice } | { error: Error };
 
-let worker: Worker | null = null;
-let workerBroken = false;
-let nextRequest = 0;
-let sentPi: PiData | null = null;
-const pending = new Map<
-  number,
-  { resolve: (advice: PlanAdvice) => void; reject: (reason: Error) => void }
->();
-const settled = new WeakMap<PlanAdviceInput, Settled>();
-const inFlight = new WeakMap<PlanAdviceInput, Promise<PlanAdvice>>();
-
-function failPending(reason: Error) {
-  for (const { reject } of pending.values()) reject(reason);
-  pending.clear();
+interface Running {
+  promise: Promise<PlanAdvice>;
+  /** Callers still waiting; the request is withdrawn only when the last signalled one leaves. */
+  waiters: number;
+  abort: AbortController;
 }
 
-function ensureWorker(): Worker | null {
-  if (workerBroken || typeof Worker === 'undefined') return null;
-  if (worker) return worker;
-  try {
-    worker = new Worker(new URL('./planAdvice.worker.ts', import.meta.url), { type: 'module' });
-  } catch {
-    workerBroken = true;
-    return null;
-  }
-  worker.onmessage = (event: MessageEvent<PlanAdviceReply>) => {
-    const reply = event.data;
-    const waiting = pending.get(reply.id);
-    if (!waiting) return;
-    pending.delete(reply.id);
+let sentPi: PiData | null = null;
+const settled = new WeakMap<PlanAdviceInput, Settled>();
+const inFlight = new WeakMap<PlanAdviceInput, Running>();
+
+const client = createWorkerClient<PlanAdviceReply, PlanAdvice>({
+  spawn: () => new Worker(new URL('./planAdvice.worker.ts', import.meta.url), { type: 'module' }),
+  settle: (reply, waiting) => {
     if ('advice' in reply) waiting.resolve(reply.advice);
     else if (reply.error === PI_NOT_LOADED) {
       // The slice never arrived (a failed clone): the page answers instead.
       sentPi = null;
       waiting.reject(new PlanAdviceWorkerUnavailable(reply.error));
     } else waiting.reject(new Error(reply.error));
-  };
-  const fail = () => {
-    workerBroken = true;
-    worker?.terminate();
-    worker = null;
+  },
+  unavailable: (message) => new PlanAdviceWorkerUnavailable(message),
+  reset: () => {
     sentPi = null;
-    failPending(new PlanAdviceWorkerUnavailable('worker failed'));
-  };
-  worker.onerror = fail;
-  worker.onmessageerror = fail;
-  return worker;
-}
+  },
+  cancel: (id): PlanAdviceRequest => ({ kind: 'cancel', id }),
+});
 
 /** Whether advice can go to the worker; false once it has failed. */
-export function planAdviceWorkerAvailable(): boolean {
-  return !workerBroken && typeof Worker !== 'undefined';
-}
+export const planAdviceWorkerAvailable = client.available;
 
 /** The answer already in hand for this input object, or null. Never starts work. */
 export function peekPlanAdvice(input: PlanAdviceInput): Settled | null {
   return settled.get(input) ?? null;
 }
 
+/** This caller's view of a shared request: it rejects on its own abort, and releases its claim. */
+function waitFor(
+  input: PlanAdviceInput,
+  running: Running,
+  signal: AbortSignal | undefined
+): Promise<PlanAdvice> {
+  if (!signal) return running.promise;
+  return new Promise<PlanAdvice>((resolve, reject) => {
+    const leave = () => {
+      if (--running.waiters === 0) {
+        // Forget it now, not when the rejection lands: a re-ask in this tick must start fresh.
+        if (inFlight.get(input) === running) inFlight.delete(input);
+        running.abort.abort();
+      }
+      reject(abortError());
+    };
+    running.promise.then(resolve, reject);
+    signal.addEventListener('abort', leave, { once: true });
+  });
+}
+
 /**
  * The advice for this input, built once per input object. Rejects with
  * `PlanAdviceWorkerUnavailable` when the worker cannot be used (run the model
- * on the page instead), and with a plain `Error` when the model itself threw.
+ * on the page instead), with a plain `Error` when the model itself threw, and
+ * with an `AbortError` when `signal` fired first.
  */
-export function askPlanAdvice(input: PlanAdviceInput): Promise<PlanAdvice> {
+export function askPlanAdvice(input: PlanAdviceInput, signal?: AbortSignal): Promise<PlanAdvice> {
   const known = settled.get(input);
   if (known) return 'advice' in known ? Promise.resolve(known.advice) : Promise.reject(known.error);
-  const running = inFlight.get(input);
-  if (running) return running;
-  const target = ensureWorker();
-  if (!target) return Promise.reject(new PlanAdviceWorkerUnavailable('no worker'));
-  const id = ++nextRequest;
-  const promise = new Promise<PlanAdvice>((resolve, reject) => {
-    pending.set(id, { resolve, reject });
-    try {
-      if (sentPi !== input.snapshot.pi) {
-        sentPi = input.snapshot.pi;
-        const load: PlanAdviceRequest = { kind: 'pi', pi: input.snapshot.pi };
-        target.postMessage(load);
-      }
-      const request: PlanAdviceRequest = { kind: 'advice', id, input: toWireInput(input) };
-      target.postMessage(request);
-    } catch (error) {
-      // Cloning the snapshot can fail (memory, an unclonable value): the page answers instead.
-      pending.delete(id);
-      sentPi = null;
-      reject(
-        new PlanAdviceWorkerUnavailable(error instanceof Error ? error.message : 'post failed')
+  if (signal?.aborted) return Promise.reject(abortError());
+  let running = inFlight.get(input);
+  if (!running) {
+    const abort = new AbortController();
+    // Only the entry still registered: a withdrawn one may already have been replaced.
+    const release = () => {
+      if (inFlight.get(input) === running) inFlight.delete(input);
+    };
+    const promise = client
+      .send((target, id) => {
+        if (sentPi !== input.snapshot.pi) {
+          sentPi = input.snapshot.pi;
+          const load: PlanAdviceRequest = { kind: 'pi', pi: input.snapshot.pi };
+          target.postMessage(load);
+        }
+        const request: PlanAdviceRequest = { kind: 'advice', id, input: toWireInput(input) };
+        target.postMessage(request);
+      }, abort.signal)
+      .then(
+        (advice) => {
+          settled.set(input, { advice });
+          release();
+          return advice;
+        },
+        (error: Error) => {
+          // A worker failure or a withdrawal is not the input's fault: do not remember it.
+          if (!(error instanceof PlanAdviceWorkerUnavailable) && !isAbortError(error)) {
+            settled.set(input, { error });
+          }
+          release();
+          throw error;
+        }
       );
-    }
-  }).then(
-    (advice) => {
-      settled.set(input, { advice });
-      inFlight.delete(input);
-      return advice;
-    },
-    (error: Error) => {
-      // A worker failure is not the input's fault: do not remember it.
-      if (!(error instanceof PlanAdviceWorkerUnavailable)) settled.set(input, { error });
-      inFlight.delete(input);
-      throw error;
-    }
-  );
-  inFlight.set(input, promise);
-  return promise;
+    inFlight.set(input, (running = { promise, waiters: 0, abort }));
+  }
+  running.waiters++;
+  return waitFor(input, running, signal);
 }

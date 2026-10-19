@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildPlanAdvice } from './planAdviceModel';
 import { adviceInput } from './map/mapFixtures.testutil';
-import { answerPlanAdvice, emptyPlanAdviceState } from './planAdvice.worker';
+import { answerPlanAdvice, createPlanAdviceQueue, emptyPlanAdviceState } from './planAdvice.worker';
 import { toWireInput } from './planAdviceWire';
 
 describe('answerPlanAdvice', () => {
@@ -37,5 +37,36 @@ describe('answerPlanAdvice', () => {
     state.pi = adviceInput('lean').snapshot.pi;
     const reply = answerPlanAdvice(state, { kind: 'advice', id: 3, input: toWireInput(input) });
     expect(reply).toMatchObject({ id: 3, error: expect.any(String) });
+  });
+});
+
+describe('createPlanAdviceQueue', () => {
+  const advice = (id: number) =>
+    ({ kind: 'advice', id, input: toWireInput(adviceInput('lean')) }) as const;
+
+  it('runs messages in order, loading the slice before the requests behind it', () => {
+    const input = adviceInput('lean');
+    const queue = createPlanAdviceQueue(emptyPlanAdviceState());
+    queue.receive({ kind: 'pi', pi: input.snapshot.pi });
+    queue.receive(advice(1));
+    queue.receive(advice(2));
+    expect(queue.runNext()).toBeNull();
+    expect(queue.runNext()).toMatchObject({ id: 1 });
+    expect(queue.runNext()).toMatchObject({ id: 2 });
+    expect(queue.runNext()).toBeNull();
+  });
+
+  it('skips a request cancelled before it started, and ignores a cancel for one that is gone', () => {
+    const input = adviceInput('lean');
+    const queue = createPlanAdviceQueue(emptyPlanAdviceState());
+    queue.receive({ kind: 'pi', pi: input.snapshot.pi });
+    queue.receive(advice(1));
+    queue.receive(advice(2));
+    queue.receive({ kind: 'cancel', id: 1 });
+    queue.receive({ kind: 'cancel', id: 99 });
+    expect(queue.size).toBe(2);
+    queue.runNext();
+    expect(queue.runNext()).toMatchObject({ id: 2 });
+    expect(queue.size).toBe(0);
   });
 });
