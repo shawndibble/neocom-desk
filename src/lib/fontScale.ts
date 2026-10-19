@@ -6,6 +6,7 @@
  * a density control (see the Overview density ticket) must read `useFontScale`
  * rather than define a second one.
  */
+import { writeLocal } from './safeLocalStorage';
 import { createLocalSetting } from './useLocalSetting';
 
 export const FONT_SCALE_KEY = 'fontScale';
@@ -34,12 +35,9 @@ function isFontScale(value: number): value is FontScale {
 
 function applyFontScale(scale: FontScale): void {
   document.documentElement.style.fontSize = `${scale * 100}%`;
-  try {
-    localStorage.setItem(FONT_SCALE_MIRROR_KEY, String(scale));
-  } catch {
-    // Blocked storage: the next cold load just applies the scale a beat
-    // later, from Dexie, as it did before the mirror existed.
-  }
+  // Blocked storage: the next cold load just applies the scale a beat later,
+  // from Dexie, as it did before the mirror existed.
+  writeLocal(FONT_SCALE_MIRROR_KEY, String(scale));
 }
 
 /**
