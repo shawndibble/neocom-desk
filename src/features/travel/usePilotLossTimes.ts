@@ -5,7 +5,8 @@
  * already loads (`fetchPilotKillmails`, one request shared between them), and
  * asked for only when `enabled`.
  */
-import { useEffect, useState } from 'react';
+import { useCallback } from 'react';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { fetchPilotKillmails } from '@/lib/zkillboard';
 import { lossTimesMs } from './pilotLossTimes';
 
@@ -17,28 +18,12 @@ export type PilotLossTimesState =
   | { kind: 'ready'; timesMs: number[] | null };
 
 export function usePilotLossTimes(characterId: number, enabled: boolean): PilotLossTimesState {
-  const [answer, setAnswer] = useState<{
-    characterId: number;
-    state: PilotLossTimesState;
-  } | null>(null);
-
-  useEffect(() => {
-    if (!enabled) return;
-    let cancelled = false;
-    void fetchPilotKillmails(characterId).then((result) => {
-      if (cancelled) return;
-      setAnswer({
-        characterId,
-        state: result.ok
-          ? { kind: 'ready', timesMs: lossTimesMs(result.entries) }
-          : { kind: 'failed' },
-      });
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [characterId, enabled]);
-
-  if (!enabled) return { kind: 'idle' };
-  return answer?.characterId === characterId ? answer.state : { kind: 'loading' };
+  const loader = useCallback(async (): Promise<PilotLossTimesState> => {
+    const result = await fetchPilotKillmails(characterId);
+    return result.ok ? { kind: 'ready', timesMs: lossTimesMs(result.entries) } : { kind: 'failed' };
+  }, [characterId]);
+  const load = useKeyedLoad(enabled ? String(characterId) : null, loader);
+  if (load.status === 'idle') return { kind: 'idle' };
+  if (load.status === 'ready') return load.data;
+  return { kind: load.status === 'failed' ? 'failed' : 'loading' };
 }
