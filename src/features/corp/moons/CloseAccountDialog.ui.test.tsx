@@ -14,6 +14,10 @@ vi.mock('../taxBook/bookClient', () => ({
   readAudit: vi.fn().mockResolvedValue([]),
 }));
 
+vi.mock('@/features/character/useEntityName', () => ({
+  useEntityName: () => 'Ore & Glory',
+}));
+
 const CORP = 98000001;
 const ORE = 45490;
 

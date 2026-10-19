@@ -136,6 +136,9 @@ function build(input: StatementMailInput, detail: MailDetailLevel): StatementMai
  * amount due, code and link are never cut.
  */
 export function composeStatementMail(input: StatementMailInput): StatementMail {
+  if (input.corporationName.trim() === '') {
+    throw new Error('composeStatementMail needs the corporation name; it was empty');
+  }
   for (const detail of ['lines', 'byDay', 'byRefinery'] as const) {
     const mail = build(input, detail);
     if (mail.body.length <= EVE_MARKUP_LIMIT) return mail;

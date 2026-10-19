@@ -74,7 +74,7 @@ export function NeedsYouQueue() {
   const remind = async (item: Extract<NeedsYouItem, { kind: 'overdue' }>) => {
     const miner = minerOf(item.minerId);
     const statement = view.input.statements.find((s) => s.id === item.statementId);
-    if (!statement) return;
+    if (!statement || corporationName === null) return;
     const { enqueueReminder } = await import('@/features/corpTaxBook/mailQueue');
     const result = await enqueueReminder({
       corporationId,
@@ -158,7 +158,11 @@ export function NeedsYouQueue() {
                   actions={
                     canEdit ? (
                       <>
-                        <Button size="sm" onClick={() => void remind(item)}>
+                        <Button
+                          size="sm"
+                          onClick={() => void remind(item)}
+                          disabled={corporationName === null}
+                        >
                           {t('corpTaxBook.moons.needs.overdue.remind')}
                         </Button>
                         <Button

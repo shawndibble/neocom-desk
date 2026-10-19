@@ -101,7 +101,7 @@ export function MinerDetail({ id }: { id: string }) {
   const canSelect = (d: DayRow) => d.status === 'unbilled' || d.status === 'not-billable';
 
   const remind = async () => {
-    if (!openStatement) return;
+    if (!openStatement || corporationName === null) return;
     const { enqueueReminder } = await import('@/features/corpTaxBook/mailQueue');
     const result = await enqueueReminder({
       corporationId,
@@ -293,7 +293,7 @@ export function MinerDetail({ id }: { id: string }) {
                 size="sm"
                 variant="ghost"
                 onClick={() => void remind()}
-                disabled={!openStatement}
+                disabled={!openStatement || corporationName === null}
               >
                 {t('corpTaxBook.moons.miner.remind')}
               </Button>

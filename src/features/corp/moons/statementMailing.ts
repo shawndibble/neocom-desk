@@ -7,10 +7,12 @@
 import type { MinerRow } from '@/engine/corpTaxBook/bookView';
 import type { Statement } from '@/engine/corpTaxBook/statements';
 import { usePublicInfo } from '@/stores/publicInfo';
+import { useEntityName } from '@/features/character/useEntityName';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import type { StatementToMail } from '@/features/corpTaxBook/mailQueue';
 import { addDays, periodLabel } from './moonsFormat';
 import type { BookContextValue } from './bookContextValue';
+import { useBook } from './useBook';
 
 /** Statements the book already mailed are never offered again (`mailsSent` > 0). */
 export function mailsSent(statement: Statement): number {
@@ -44,11 +46,17 @@ export function mailTarget(
   };
 }
 
-/** The corporation's name as already loaded elsewhere; never fetched here. */
-export function useCorporationName(): string {
+/**
+ * The book's corporation name, or null while it is unknown. Prefers the public
+ * info already loaded for the active character when it is for this book's
+ * corporation, else resolves the book's `corporationId` itself, so a mail or a
+ * stored Statement never carries a blank name when no other page loaded it.
+ */
+export function useCorporationName(): string | null {
+  const { corporationId } = useBook();
   const characterId = useActiveCharacter((s) => s.activeCharacterId);
-  return (
-    usePublicInfo((s) => (characterId === null ? null : s.byCharacterId[characterId]))
-      ?.corporationName ?? ''
-  );
+  const info = usePublicInfo((s) => (characterId === null ? null : s.byCharacterId[characterId]));
+  const known = info?.corporationId === corporationId ? info.corporationName : null;
+  const resolved = useEntityName(known ? undefined : corporationId);
+  return known || resolved || null;
 }

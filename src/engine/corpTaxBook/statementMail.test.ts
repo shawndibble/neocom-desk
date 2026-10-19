@@ -36,6 +36,13 @@ function input(patch: Partial<StatementMailInput> = {}): StatementMailInput {
 }
 
 describe('composeStatementMail', () => {
+  it('rejects an empty corporation name instead of mailing a blank one', () => {
+    expect(() => composeStatementMail(input({ corporationName: '' }))).toThrow(/corporation name/);
+    expect(() => composeStatementMail(input({ corporationName: '  ' }))).toThrow(
+      /corporation name/
+    );
+  });
+
   it('lists date, refinery, value and tax per line, then the total', () => {
     const { subject, body, detail } = composeStatementMail(input());
     expect(detail).toBe('lines');
