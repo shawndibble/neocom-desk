@@ -1,6 +1,6 @@
 import { loadCharacterClones } from '@/features/character/clones';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
-import { cloneJumpCooldownHours, INFOMORPH_SYNCHRONIZING_SKILL_ID } from '@/engine/cloneJump';
+import { cloneJumpCooldownHours, INFOMORPH_SYNCHRONIZING_SKILL_ID } from '@/engine/clone/cloneJump';
 import { projectCloneJump } from '@/engine/projection';
 import type {
   CloneJumpEntrySnapshot,

@@ -5,7 +5,7 @@ import {
   bestAttributesForPairs,
   ATTRIBUTE_NAMES,
 } from '@/engine/optimizer/bestAttributes';
-import { timeToTrain, trainingRate } from '@/engine/sp';
+import { timeToTrain, trainingRate } from '@/engine/skills/sp';
 import type { AttributeName, Attributes, EngineSkill, PlanStep } from '@/engine/types';
 
 const skill = (

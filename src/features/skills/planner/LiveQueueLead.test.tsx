@@ -3,7 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { LiveQueueLead } from './LiveQueueLead';
-import type { QueueEndProjection } from '../queueStatus';
+import type { QueueEndProjection } from '@/engine/skills/queueStatus';
 
 const projection: QueueEndProjection = {
   startMs: Date.parse('2026-10-10T00:00:00Z'),

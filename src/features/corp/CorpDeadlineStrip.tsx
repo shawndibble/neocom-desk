@@ -27,7 +27,7 @@
 import { useTranslation } from 'react-i18next';
 import { useIsNarrow } from '@/lib/useIsNarrow';
 import type { DeadlineDay } from '@/engine/corp/deadlines';
-import { DEADLINE_SEVERITIES } from '@/engine/severity';
+import { DEADLINE_SEVERITIES } from '@/engine/character/severity';
 import { Panel } from '@/components/ui';
 import { SeverityIcon } from '@/components/ui/SeverityIcon';
 import { SEVERITY_FILL, SEVERITY_LABEL } from '@/components/ui/severityTone';

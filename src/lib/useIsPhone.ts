@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useMediaQuery } from './useMediaQuery';
 
 /**
  * The `sm` breakpoint, written as a *max*-width for the reason
@@ -22,14 +22,5 @@ export const PHONE_QUERY = '(max-width: 39.999rem)';
  * 700px, where the grid is happily showing two columns of them.
  */
 export function useIsPhone(): boolean {
-  const [isPhone, setIsPhone] = useState(
-    () => typeof window !== 'undefined' && window.matchMedia(PHONE_QUERY).matches
-  );
-  useEffect(() => {
-    const mql = window.matchMedia(PHONE_QUERY);
-    const onChange = (e: MediaQueryListEvent) => setIsPhone(e.matches);
-    mql.addEventListener('change', onChange);
-    return () => mql.removeEventListener('change', onChange);
-  }, []);
-  return isPhone;
+  return useMediaQuery(PHONE_QUERY);
 }

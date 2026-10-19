@@ -17,6 +17,7 @@ import {
 } from '@/engine/route/recentKills';
 import type { SecurityBand } from '@/engine/securityStatus';
 import { mapWithConcurrencyLimit } from '@/lib/concurrency';
+import type { ZkillFailureReason } from '@/lib/zkillboard';
 import { loadSolarSystemsById } from '@/sde/solarSystems';
 import {
   RECENT_KILLS_TTL_MS,
@@ -31,7 +32,7 @@ export const ZKILL_CONCURRENCY = 3;
 
 export type RouteKillsCell =
   | { status: 'loading' }
-  | { status: 'unavailable' }
+  | { status: 'unavailable'; reason?: ZkillFailureReason }
   | { status: 'ready'; summary: RecentKillsSummary };
 
 export interface RouteKillsSystem {
@@ -137,17 +138,20 @@ export function useRouteKills(
         if (cancelled) return;
         // Each row's kills, or null when zKillboard could not answer.
         let killsOf: ((systemId: number) => readonly RecentKill[]) | null;
+        let failure: ZkillFailureReason | undefined;
         if (regionId === null) {
           const result = await loadSystemRecentKills(rows[0].system.systemId);
+          if (!result.ok) failure = result.reason;
           killsOf = result.ok ? () => result.kills : null;
         } else {
           const result = await loadRegionRecentKills(regionId);
+          if (!result.ok) failure = result.reason;
           killsOf = result.ok ? (systemId) => result.bySystem.get(systemId) ?? [] : null;
         }
         for (const row of rows) {
           if (cancelled) return;
           if (killsOf) await fillRow(row, killsOf(row.system.systemId));
-          else set(row.system.systemId, { status: 'unavailable' });
+          else set(row.system.systemId, { status: 'unavailable', reason: failure });
         }
       });
     })();

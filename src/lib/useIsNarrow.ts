@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useMediaQuery } from './useMediaQuery';
 
 /**
  * The `md` breakpoint, written as a *max*-width rather than the `min-width:
@@ -16,14 +16,5 @@ export const NARROW_QUERY = '(max-width: 47.999rem)';
  * more screen than the list it filters (see `FilterBar`).
  */
 export function useIsNarrow(): boolean {
-  const [isNarrow, setIsNarrow] = useState(
-    () => typeof window !== 'undefined' && window.matchMedia(NARROW_QUERY).matches
-  );
-  useEffect(() => {
-    const mql = window.matchMedia(NARROW_QUERY);
-    const onChange = (e: MediaQueryListEvent) => setIsNarrow(e.matches);
-    mql.addEventListener('change', onChange);
-    return () => mql.removeEventListener('change', onChange);
-  }, []);
-  return isNarrow;
+  return useMediaQuery(NARROW_QUERY);
 }

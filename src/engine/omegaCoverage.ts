@@ -9,8 +9,9 @@
  */
 import { PLEX_BOUGHT_KEY, PLEX_SOLD_KEY } from './journalNetting';
 import { ARCHIVE_DAYS } from './wallet/archiveCoverage';
+import { parseInstant } from './esiInstant';
+import { DAY_MS } from '@/lib/age';
 
-const DAY_MS = 86_400_000;
 export const OMEGA_PERIOD_DAYS = 30;
 /** CCP's one-month price. */
 export const DEFAULT_PLEX_PER_30_DAYS = 500;
@@ -112,8 +113,8 @@ export function omegaPeriods(
   });
   const first = periods[0]!.startMs;
   for (const row of rows) {
-    const at = Date.parse(row.date);
-    if (!(at >= first) || at > now) continue;
+    const at = parseInstant(row.date);
+    if (at === null || at < first || at > now) continue;
     const amount = row.amount ?? 0;
     const period = periods[Math.min(count - 1, Math.floor((at - first) / span))]!;
     if (row.refKey === PLEX_BOUGHT_KEY) period.plexSpent += Math.max(0, -amount);

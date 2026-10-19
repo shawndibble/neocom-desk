@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { Button, FieldError, IconButton, Modal, TextInput } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
-import { markupColorToCss } from '@/engine/eveMarkup';
+import { markupColorToCss } from '@/engine/mail/eveMarkup';
 import {
   MAIL_COLOR_SWATCHES,
   MAIL_SIZE_PRESETS,
@@ -18,7 +18,7 @@ import {
   sizePresetOf,
   validateLinkForm,
   type LinkTarget,
-} from '@/engine/mailFormat';
+} from '@/engine/mail/mailFormat';
 import { BASE_SIZE_PX, EVE_MAIL_SURFACE_CLASS } from '../MailBodyView';
 
 interface SheetProps {

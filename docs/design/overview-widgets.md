@@ -1,9 +1,9 @@
 # Overview widget grid — design record
 
 Approved by Shawn after a mockup review (four rounds, a hostile first-time-user
-review, Mobbin research). The interactive mockup is
-`docs/design/mockups/overview-widgets.html` — open it in a browser; it is the
-visual source of truth. This file is the written source of truth, and the
+review, Mobbin research). The interactive mockup was
+`docs/design/mockups/overview-widgets.html`; deleted when its tickets closed
+(in git history). This file is the source of truth, and the
 checklist in §9 is what the implementation is verified against.
 
 ## 1. Intent

@@ -1,5 +1,5 @@
 import { loadContracts as loadCharacterContracts } from '@/features/character/contracts';
-import { courierDeliveryDeadlineMs } from '@/engine/courierDeadline';
+import { courierDeliveryDeadlineMs } from '@/engine/contracts/courierDeadline';
 import { projectContracts } from '@/engine/projection';
 import type { Contract } from '@/esi/endpoints';
 import type {

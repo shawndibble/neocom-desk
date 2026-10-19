@@ -21,6 +21,7 @@ import { brokerFee, brokerFeePct, salesTax, salesTaxPct } from '@/engine/industr
 import type { AppraisalNetFees } from './appraisal';
 import type { MarketHistoryPoint } from './priceHistory';
 import { roundPriceDown, undercutPrice } from './priceTick';
+import { DAY_MS } from '@/lib/age';
 
 export interface HaulingThresholds {
   /** Days of demand a load may lean on: the horizon a quantity and a "clearing price" are read over. */
@@ -95,8 +96,6 @@ export interface DemandSummary {
   latestDay: { date: string; highest: number; lowest: number } | null;
   demand: DemandKind;
 }
-
-const DAY_MS = 86_400_000;
 
 function dayNumber(date: string): number {
   return Math.floor(Date.parse(`${date}T00:00:00Z`) / DAY_MS);

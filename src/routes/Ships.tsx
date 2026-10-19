@@ -1,10 +1,17 @@
+import { lazy, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PageHeader, TabPanel } from '@/components/ui';
 import { ShipsTabBar } from '@/features/fittings/ShipsTabBar';
 import { SHIPS_TABS, SHIPS_TABS_ID } from '@/features/fittings/shipsTabs';
-import { ShipTreeTab } from '@/features/fittings/shipTree/ShipTreeTab';
 import { usePageTab } from '@/lib/usePageTab';
 import { Fittings } from './Fittings';
+import { guarded } from '@/app/routeChunks';
+
+const ShipTreeTab = lazy(() =>
+  guarded(() => import('@/features/fittings/shipTree/ShipTreeTab')).then((m) => ({
+    default: m.ShipTreeTab,
+  }))
+);
 
 /**
  * The Ships section (scope decision `20260926-135538`): the Fittings tab and
@@ -23,7 +30,9 @@ export function Ships() {
       <PageHeader title={t('nav.ships')} />
       <ShipsTabBar />
       <TabPanel tabsId={SHIPS_TABS_ID} tabId={tab}>
-        <ShipTreeTab />
+        <Suspense fallback={null}>
+          <ShipTreeTab />
+        </Suspense>
       </TabPanel>
     </div>
   );

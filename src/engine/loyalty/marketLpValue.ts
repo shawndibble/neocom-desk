@@ -6,6 +6,8 @@
  * absorb a few redemptions of, so one thin, lucky order can't set the rate.
  */
 
+import { upperMedian } from '../math';
+
 /** One store offer as the LP Store page prices it. */
 export interface LpValueCandidate {
   /** Net ISK per LP; null when the offer can't be priced. */
@@ -35,7 +37,7 @@ export function marketLpValue(candidates: readonly LpValueCandidate[]): number |
     .sort((a, b) => b - a)
     .slice(0, TOP_OFFERS);
   if (rates.length < MIN_OFFERS) return null;
-  return rates[Math.floor((rates.length - 1) / 2)]!;
+  return upperMedian(rates);
 }
 
 export interface LpRate {

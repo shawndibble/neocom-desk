@@ -1,5 +1,11 @@
 // Kicks off EVE SSO: stash PKCE state, then leave the app for login.eveonline.com.
-import { startAlertsLogin, startLogin, scopesForRetry, takeRetryBudget } from '@/auth/session';
+import {
+  startAlertsLogin,
+  startCorpSyncLogin,
+  startLogin,
+  scopesForRetry,
+  takeRetryBudget,
+} from '@/auth/session';
 import { clearLoginReturnTo, setLoginReturnTo, takeLoginReturnTo } from '@/auth/loginReturnTo';
 import { CORE_GRANT, SCOPES, scopesForGroup } from '@/esi/scopes';
 import type { ScopeGroup } from '@/esi/registry';
@@ -102,6 +108,20 @@ export async function beginAlertsLogin(characterId: number): Promise<void> {
 }
 
 /**
+ * Turn on the Corp Tax Book's Automatic sync for one book editor (ADR 0025): a
+ * separate SSO round trip for the grant's scopes alone, returning to the page it
+ * was pressed on. The callback never stores its token on this device; see
+ * `features/corp/taxBook/syncGrant.ts`.
+ */
+export async function beginCorpSyncLogin(
+  characterId: number,
+  corporationId: number
+): Promise<void> {
+  rememberThisPage();
+  assignLocation(await startCorpSyncLogin(characterId, corporationId));
+}
+
+/**
  * Stash the current page as the post-login landing. `/callback` is never
  * remembered: its query is the spent code, and its error panel restarts
  * through `retryLastLogin`, which keeps the failed login's own landing. A
@@ -121,9 +141,18 @@ function rememberThisPage(): void {
  * whose Retry fallback restarts the very login that landing belongs to, and
  * `/s` and `/share` (the old spelling), whose "Log in" stashes the shared page
  * before it starts (#3075), and `/communities/join`, whose invite page does the
- * same so a visitor lands back on the invite after EVE's login.
+ * same so a visitor lands back on the invite after EVE's login, and
+ * `/corp-tax-book/verify`, where a guest signs in as the character they are
+ * confirming into a grouping and returns to the Statement (#4210).
  */
-const LANDING_KEEPING_ROUTES = ['/login', '/callback', '/s', '/share', '/communities/join'];
+const LANDING_KEEPING_ROUTES = [
+  '/login',
+  '/callback',
+  '/s',
+  '/share',
+  '/communities/join',
+  '/corp-tax-book/verify',
+];
 
 function forgetStrayLanding(): void {
   const here = currentRouterPath();

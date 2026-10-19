@@ -1,5 +1,5 @@
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
-import type { ComparisonRow } from './compareSkills';
+import type { ComparisonRow } from '@/engine/skills/compareSkills';
 
 /**
  * Export columns for the skill comparison: skill, group, then one level column

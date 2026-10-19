@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal } from '@/components/ui';
@@ -53,9 +54,7 @@ interface CalculationBreakdownProps {
 export function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="space-y-1.5">
-      <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-        {title}
-      </h3>
+      <h3 className={eyebrowClassName}>{title}</h3>
       <div className="space-y-1.5 text-xs leading-relaxed text-text">{children}</div>
     </section>
   );

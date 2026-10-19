@@ -301,7 +301,7 @@ export async function loadMiningYieldSnapshot(
   // before anything reads the snapshots back — so today prices as "saved".
   // `getHubPrices` never throws (a null price per type when Fuzzwork is down);
   // a failed save only costs today's snapshot, never the page.
-  const today = eveToday();
+  const today = eveToday(new Date());
   const hubPrices = await getHubPrices(DEFAULT_TRADE_HUB, historyTypeIds);
   const livePrices = new Map<number, SidePrices>();
   const todaySnapshot: SnapshotDay = {};
@@ -323,19 +323,14 @@ export async function loadMiningYieldSnapshot(
   }
   const savedByDate = await loadPriceSnapshots().catch(() => new Map<string, SnapshotDay>());
 
-  // The server's own hub-price job (`functions/src/marketSnapshot.ts`, issue
-  // #1279) covers every day going forward regardless of whether this browser
-  // ever saved one, and backfills whatever's older — see priceBasis.ts's
-  // header comment for the tier ordering. Its Jita capture (source:
-  // 'fuzzwork') is folded into the same `saved` tier as this browser's own
-  // Dexie snapshot, server winning where both have a value for a day; its
-  // Adam4EVE backfill (source: 'adam4eve') feeds the weaker `historical` tier
-  // instead. `allEntries` is non-empty here (checked above), so there is
-  // always a characterId to sign in as — the read is public, not
-  // character-scoped, so which one doesn't matter.
+  // The server's daily hub-station mining prices (`hubSnapshot.ts`, read from
+  // R2) cover every day regardless of whether this browser ever saved one —
+  // see priceBasis.ts's header comment for the tier ordering. Its `saved` days
+  // fold into the same `saved` tier as this browser's own Dexie snapshot,
+  // server winning where both have a value for a day; the retired job's
+  // Adam4EVE days feed the weaker `historical` tier instead.
   const entryDates = allEntries.map(({ entry }) => entry.date);
   const hubSnapshot = await loadHubSnapshotRange(
-    allEntries[0].characterId,
     entryDates.reduce((min, date) => (date < min ? date : min)),
     entryDates.reduce((max, date) => (date > max ? date : max))
   );

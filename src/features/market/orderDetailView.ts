@@ -4,7 +4,7 @@
  * Pure — the caches live in `useOrderDetail`, the fetches behind them in
  * `orderDetailLoaders`.
  */
-import type { JumpsAwayResult } from '@/engine/jumpsAway';
+import type { JumpsAwayResult } from '@/engine/clone/jumpsAway';
 import { salesTax } from '@/engine/industry/fees';
 import { TRADE_HUBS } from '@/market/hubs';
 import type { ReprocessingType } from '@/sde/types';

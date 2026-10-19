@@ -12,29 +12,11 @@
  */
 import { getUniverseSystem, type UniverseSystem } from '@/esi/endpoints';
 import { lookupSolarSystem } from '@/sde/solarSystems';
-import {
-  conditionalFetch,
-  loadWithCache,
-  readCached,
-  GLOBAL_CACHE_CHARACTER_ID,
-  STALE_AFTER,
-} from '@/esi/cache';
-
-function cacheKey(systemId: number): string {
-  return `system:${systemId}`;
-}
+import { loadStaticEntity } from '@/esi/cache';
 
 async function loadSystem(systemId: number): Promise<UniverseSystem | null> {
-  const { fetchLive, conditional } = conditionalFetch((options) =>
-    getUniverseSystem(systemId, options)
-  );
-  const result = await loadWithCache(
-    GLOBAL_CACHE_CHARACTER_ID,
-    cacheKey(systemId),
-    fetchLive,
-    // A solar system's name and security status are map constants.
-    { staleAfterMs: STALE_AFTER.static, conditional }
-  );
+  // A solar system's name and security status are map constants.
+  const result = await loadStaticEntity('system', systemId, getUniverseSystem);
   return result?.data ?? null;
 }
 
@@ -51,18 +33,6 @@ export async function loadSystemSecurity(systemId: number): Promise<number | nul
   const local = await loadLocalSystem(systemId);
   if (local) return local.security;
   return (await loadSystem(systemId))?.security_status ?? null;
-}
-
-/**
- * A solar system's security status from cache only — never fetches.
- *
- * For a caller that must not spend ESI just because it noticed a system
- * (an alt's colony system, say): `null` here means "unknown", not "offline",
- * and the caller is expected to have a safe fallback for that.
- */
-export async function readCachedSystemSecurity(systemId: number): Promise<number | null> {
-  const cached = await readCached<UniverseSystem>(GLOBAL_CACHE_CHARACTER_ID, cacheKey(systemId));
-  return cached?.security_status ?? null;
 }
 
 /** A solar system's name, or null if unresolvable (offline + uncached). */
@@ -88,21 +58,4 @@ export async function loadSystemNameAndSecurity(systemId: number): Promise<Syste
   if (local) return { name: local.name, security: local.security };
   const system = await loadSystem(systemId);
   return { name: system?.name ?? null, security: system?.security_status ?? null };
-}
-
-/**
- * Every planet in a system, in ESI's own order — which is orbital order, so
- * the Nth entry is the system's Nth planet (Ashab I, II, III...).
- *
- * This is the only way to learn what a system holds when the character has no
- * colony there: `/characters/{id}/planets` covers owned colonies only. Empty
- * when the system has no planets or could not be resolved; the two are the
- * same answer to a caller that just wants a list.
- *
- * No extra request: the same cached `/universe/systems/{id}` row the security
- * badge already reads carries the planet list.
- */
-export async function loadSystemPlanetIds(systemId: number): Promise<number[]> {
-  const system = await loadSystem(systemId);
-  return system?.planets?.map((planet) => planet.planet_id) ?? [];
 }

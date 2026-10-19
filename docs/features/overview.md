@@ -89,12 +89,12 @@ Page ungated; see card table. Missing scope: that card goes warning with a re-lo
 
 ## Formulas and thresholds
 
-- Severity rank critical < warning < watch < clear; `worstSeverity` takes minimum (`src/engine/severity.ts`). `severityForRemaining`: null warning; <= 24 h critical; <= 3 d warning; <= 7 d watch; else clear.
-- SP extraction (`engine/spExtraction.ts`): floor 5,000,000 SP; `extractable = max(0,total-floor)`; extractor = 500,000 SP; ready when extractable >= threshold (default one chunk); off monitoring = clear.
-- Contracts (`engine/contractsBoard.ts`): counts accepted couriers where this Character is acceptor; deadline = courier deliver-by, falls back to offer expiry; overdue = deadline <= now; due soon = within 24 h (`LISTING_WINDOW_MS`); own outstanding non-corp listings count only in their last 24 h; soonest drives strip clock.
+- Severity rank critical < warning < watch < clear; `worstSeverity` takes minimum (`src/engine/character/severity.ts`). `severityForRemaining`: null warning; <= 24 h critical; <= 3 d warning; <= 7 d watch; else clear.
+- SP extraction (`engine/skills/spExtraction.ts`): floor 5,000,000 SP; `extractable = max(0,total-floor)`; extractor = 500,000 SP; ready when extractable >= threshold (default one chunk); off monitoring = clear.
+- Contracts (`engine/contracts/contractsBoard.ts`): counts accepted couriers where this Character is acceptor; deadline = courier deliver-by, falls back to offer expiry; overdue = deadline <= now; due soon = within 24 h (`LISTING_WINDOW_MS`); own outstanding non-corp listings count only in their last 24 h; soonest drives strip clock.
 - Industry: completing soon = remaining in (0, 1 h] (`features/industry/jobs.ts`); next-job clock severity fixed watch.
 - Mining tax warning age `MINING_TAX_WARNING_DAYS = 30`.
-- Coming up: only `accepted`/`tentative` (`engine/calendarDeadline.ts`); watch if within 24 h.
+- Coming up: only `accepted`/`tentative` (`engine/character/calendarDeadline.ts`); watch if within 24 h.
 - Queue: active entry = [start,finish) spans now, else earliest future (BUG #10); depth empty / paused / training (`overviewQueue.ts`).
 
 ## Tests (what they assert)
@@ -103,7 +103,7 @@ Page ungated; see card table. Missing scope: that card goes warning with a re-lo
 - `boardLayout.test.ts`: grid follows pilot order with alerts in its own column; hidden cards drop without moving others; unreadable card omitted; unordered cards go last; phone full slots go to first cards in order regardless of urgency; soonest clock ignores hidden/unreadable cards.
 - `boardSeverity.test.ts`: null until loaded; lapsed grant = warning; mining watch under threshold, warning at it; calendar watch within a day; SP extraction watch at threshold and never when monitoring off; mail watch if unread.
 - `boardSummary.test.ts`: "checking" before load, login prompt instead of zero on lapsed grant, below-floor leads order summary, ISK owed compacted, worst planetary batch named.
-- `cardOrder.test.ts`, `hiddenCards.test.ts`: default order, stored-first ordering, unknown keys kept, alerts never in order, drop-on-self no-op, hide/show toggles without mutation.
+- `widgets/migrate.test.ts` (folds the old `cardOrder`/`hiddenCards` stores): default order, stored-first ordering, unknown keys kept, alerts never in order, drop-on-self no-op, hide/show toggles without mutation.
 - `corpCards.test.ts`: reinforcement/fuel-3-days/offline counts; clocks shorter than cache window skipped; chunk severity.
 - `priceAlertsBoard.test.ts`: only targeted Quickbar items; crossed when last polled price passes target; price withheld after target changed; crossed first.
 - `SummaryStrip.test.tsx`: idle queue warns+links when alert enabled, neutral when muted; cached/older-than-hour note shown, nothing when fresh. `BoardCard.test.tsx`: one help affordance per card; owed ISK as `IskAmount`.
@@ -114,17 +114,17 @@ Page ungated; see card table. Missing scope: that card goes warning with a re-lo
 2. Why does every card always render? A vanishing card looks like a failed load (`Overview.tsx:20-24`).
 3. How is Next deadline chosen? `soonestDeadline` over visible cards plus skill finish (`boardLayout.ts`).
 4. Missing scope? Per-card warning + re-login footer; page ungated (`routeScopes.ts:90-95`).
-5. Why is Alerts a non-reorderable column? Different volume class, device-wide (`Overview.tsx:461-466`, `cardOrder.ts`).
+5. Why is Alerts a non-reorderable column? Different volume class, device-wide (`Overview.tsx:461-466`, `widgets/migrate.ts`).
 6. Phone layout? Two full cards in pilot order, rest folded; no severity reshuffle.
 7. How does Orders stay cheap? Shared snapshot, no deep competition inputs, filter to active Character (`Overview.tsx:324-356`).
-8. Which card is not per-Character? Mining tax (`features/overview/boardData.ts:149`).
+8. Which card is not per-Character? Mining tax (`features/overview/data/boardData.ts:149`).
 9. How is hide/order synced? `createSyncedSetting`; keys above.
 10. Idle-queue warning vs alert? Strip mirrors `characterNotTraining` mute so the two never disagree (#1731).
 11. No active Character? Redirect to `/characters` (`Overview.tsx:399`).
 
 ## Observed gaps
 
-- Mining tax card is all-Character but the header comment lists only alerts/structures/moon as exceptions (`features/overview/boardData.ts:149`, `Overview.tsx:26`).
+- Mining tax card is all-Character but the header comment lists only alerts/structures/moon as exceptions (`features/overview/data/boardData.ts:149`, `Overview.tsx:26`).
 - Rows capped at `ROW_LIMIT = 4` (`cards.tsx:80`) and alerts at 7 groups (`cards.tsx:876`); overflow is only a link.
 - Hidden cards still fetch on load and refresh (`Overview.tsx:752`).
 - SP extraction card has `loading: false` always.

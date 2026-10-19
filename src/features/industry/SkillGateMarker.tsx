@@ -10,7 +10,7 @@
  * takes to train, and an Add to Skill Plan button. The data hooks live in the
  * popover body, so a list of many markers loads nothing until one is opened.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui';
 import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
@@ -27,6 +27,7 @@ import { usePlanEditorData } from '@/features/skills/planner/usePlanEditorData';
 import { scheduleEntries } from '@/features/skills/ships/scheduleEntries';
 import { SkillLink } from '@/features/entities';
 import { targetPlanEntries, useTargetPlan } from '@/features/skills/useTargetPlan';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 type GatedVerdict = Extract<SkillGateVerdict, { gated: true }>;
 
@@ -120,10 +121,7 @@ function SkillGatePopoverBody({
   const { catalog, trainedSkills, attributes, implants } = usePlanEditorData(bestCharacterId);
   const target = useTargetPlan(bestCharacterId);
   const cloneStates = useCloneStates((state) => state.value);
-  const hydrateCloneStates = useCloneStates((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateCloneStates();
-  }, [hydrateCloneStates]);
+  useHydratedStore(useCloneStates);
   const cloneState = cloneStateFor(cloneStates, bestCharacterId);
 
   const entries = useMemo(

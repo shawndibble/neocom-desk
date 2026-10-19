@@ -31,7 +31,7 @@ import {
   mergeMailHeaderPage,
   selectMailBodiesToPrefetch,
   MAIL_HEADERS_PAGE_SIZE,
-} from '@/engine/mail';
+} from '@/engine/mail/mail';
 import { MAIL_BODY_PREFETCH_LIMIT, prefetchMissing } from './detailPrefetch';
 
 export const KEYS = {

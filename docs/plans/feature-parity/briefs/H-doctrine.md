@@ -120,7 +120,7 @@ through push/pull mapping — that is exactly the bug commit `d90e417` fixed.
 
 **Generate must reorder.** VERIFIED gap: `DoctrineRecord.requirements` is
 typeID-sorted; `normalizePlan` preserves user order where prereqs allow
-(`src/engine/plan.ts:38`). A naive `entries = doctrine.requirements` therefore yields a
+(`src/engine/skills/plan.ts:38`). A naive `entries = doctrine.requirements` therefore yields a
 plan whose training order is "ascending typeID" — technically valid, practically
 nonsense (it interleaves attribute pairs and trains cosmetic skills before tackle).
 The generate step must pass the normalized steps through the existing
@@ -235,7 +235,7 @@ doctrine-private one.
 | ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | EFT fit → required skills already exists        | CONFIRMED                                                                                                                                                                                                                    | `src/engine/import/eftFit.ts:47`, `src/engine/import/fitToSkills.ts:53`                                                                                                                                                         |
 | …and is already wired to a paste-preview dialog | CONFIRMED                                                                                                                                                                                                                    | `src/features/skills/planner/clipboardImport.ts:141`, `ImportClipboardDialog.tsx:33`                                                                                                                                            |
-| Training-time math exists and is pure           | CONFIRMED                                                                                                                                                                                                                    | `src/engine/plan.ts:10`, `src/engine/schedule.ts:28`, `src/engine/sp.ts:23-51`                                                                                                                                                  |
+| Training-time math exists and is pure           | CONFIRMED                                                                                                                                                                                                                    | `src/engine/skills/plan.ts:10`, `src/engine/schedule.ts:28`, `src/engine/skills/sp.ts:23-51`                                                                                                                                    |
 | Attribute-grouped reorder exists                | CONFIRMED                                                                                                                                                                                                                    | `src/engine/optimizer/reorderSuggestion.ts`, exported `src/engine/optimizer/index.ts:24`                                                                                                                                        |
 | Sync is per-**user** / account-scoped           | **FALSE** — per character                                                                                                                                                                                                    | `skillPlanSpec.loadLocal`, `handleOwnerHashChange` in `src/sync/planSync.ts`; `uidForCharacter` in `src/sync/uid.ts`; `firestore.rules:22`                                                                                      |
 | Sync runs for all characters                    | **FALSE** — active character only                                                                                                                                                                                            | the `triggerSync` effect, `src/app/App.tsx:91-94`                                                                                                                                                                               |
@@ -257,7 +257,7 @@ doctrine-private one.
 5. `DataTable` is now built (`src/components/ui/DataTable.tsx`); the comparison grid
    just needs to consume it — no primitive gap remains here.
 6. `normalizePlan` **throws** on unknown typeID and on circular prereqs
-   (`src/engine/plan.ts:24,27`). Every other import-path module is never-throw
+   (`src/engine/skills/plan.ts:24,27`). Every other import-path module is never-throw
    (`eftFit.ts:46`, `fitToSkills.ts:50`). A doctrine imported from a fit can carry a
    typeID missing from the SDE snapshot, so the comparison layer must not call
    `normalizePlan` bare.

@@ -3,6 +3,7 @@
  * only. Pure — the fetching, the Dexie write and the once-a-day guard live in
  * `features/netWorth`.
  */
+import { utcDay } from '../localDay';
 import { PLEX_TYPE_ID } from '@/engine/contracts/contractOffers';
 import { assetStackValue } from '@/engine/assetTree';
 
@@ -35,9 +36,7 @@ export function lacksLayer(row: NetWorthSnapshotRow): boolean {
   return row.sellStock === undefined;
 }
 
-export function utcDay(ms: number): string {
-  return new Date(ms).toISOString().slice(0, 10);
-}
+export { utcDay };
 
 export function snapshotId(characterId: number, day: string): string {
   return `${characterId}:${day}`;
@@ -104,21 +103,6 @@ export function buildSnapshotRow(input: SnapshotInputs): NetWorthSnapshotRow | n
     hubId: input.hubId,
     updatedAt: input.now,
   };
-}
-
-/** Union by id; the later `updatedAt` wins a collision (same Character, same day on two devices). */
-export function mergeSnapshotRows(
-  local: readonly NetWorthSnapshotRow[],
-  remote: readonly NetWorthSnapshotRow[]
-): NetWorthSnapshotRow[] {
-  const byId = new Map<string, NetWorthSnapshotRow>();
-  for (const row of [...local, ...remote]) {
-    const held = byId.get(row.id);
-    if (!held || row.updatedAt > held.updatedAt) byId.set(row.id, row);
-  }
-  return [...byId.values()].sort(
-    (a, b) => a.characterId - b.characterId || a.day.localeCompare(b.day)
-  );
 }
 
 /** Days between the first and last with no row. Gaps stay gaps — nothing is interpolated. */

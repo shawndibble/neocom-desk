@@ -20,7 +20,7 @@
  * visible, so a character that needs a different set is one click away.
  */
 import { createLocalSetting } from '@/lib/useLocalSetting';
-import { MAIL_FOLDERS, parseMailFolders, type MailTab } from '@/engine/mail';
+import { MAIL_FOLDERS, parseMailFolders, type MailTab } from '@/engine/mail/mail';
 
 export const MAIL_FOLDERS_SETTING_KEY = 'mailFolders';
 

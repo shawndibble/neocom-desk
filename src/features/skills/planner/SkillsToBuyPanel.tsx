@@ -10,6 +10,7 @@ import { formatIskCompact } from '@/lib/isk';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { getHubPricesWithStatus, getRegionSellPrices } from '@/market/prices';
 import { buildSkillsToBuy, skillsToBuyTypeIds } from './skillsToBuy';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 
 interface SkillsToBuyPanelProps {
   entries: readonly { skillTypeID: number }[];
@@ -39,11 +40,7 @@ export function SkillsToBuyPanel({
   const { t } = useTranslation();
   const pricesUnavailableLabel = usePricesUnavailableLabel();
   const hubId = useMarketHub((state) => state.value);
-  const hubHydrated = useMarketHub((state) => state.hydrated);
-  const hydrateHub = useMarketHub((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateHub();
-  }, [hydrateHub]);
+  const hubHydrated = useHydratedStore(useMarketHub);
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
 
   const typeIds = useMemo(

@@ -8,6 +8,7 @@
  * target that resists nothing — the same numbers it gave then.
  */
 
+import { isRecord } from '../guards';
 import type { PerDamageType } from './types';
 
 /** A target's resist to each damage type, as a share (0–1) of that damage it shrugs off. */
@@ -107,10 +108,6 @@ export function resolveTargetProfile(
     custom.find((p) => p.id === selectedId) ??
     DEFAULT_PROFILE
   );
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
 }
 
 /** Strict parse of the synced custom-profile list — pulled values may come from another build. */

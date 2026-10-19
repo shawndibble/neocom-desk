@@ -15,8 +15,8 @@
  * that needs it.
  */
 import { pairKey } from '@/engine/optimizer/bestAttributes';
-import { priorityRank } from '@/engine/planPriority';
-import { spBetween, timeToTrain, trainingRate } from '@/engine/sp';
+import { priorityRank } from '@/engine/skills/planPriority';
+import { spBetween, timeToTrain, trainingRate } from '@/engine/skills/sp';
 import type {
   Attributes,
   CloneState,

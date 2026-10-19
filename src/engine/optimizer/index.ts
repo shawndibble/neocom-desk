@@ -35,4 +35,4 @@ export type { SortShortestFirstOptions } from '@/engine/optimizer/reorderSuggest
 export { optimizeForMe } from '@/engine/optimizer/optimizeForMe';
 export type { OptimizeForMeResult } from '@/engine/optimizer/optimizeForMe';
 
-export { effectivePriority, higherPriority, priorityRank } from '@/engine/planPriority';
+export { effectivePriority, higherPriority, priorityRank } from '@/engine/skills/planPriority';

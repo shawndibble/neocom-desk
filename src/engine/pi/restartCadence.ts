@@ -45,8 +45,7 @@
  */
 import { hasYieldBaseline, sustainedRatePerHour } from './extraction';
 import type { ExtractorProgram, ExtractorYieldProgram } from './types';
-
-const HOUR_MS = 3_600_000;
+import { HOUR_MS } from '@/lib/age';
 
 /** One candidate restart cadence, priced against the best of the set it was asked alongside. */
 export interface RestartCadenceYield {

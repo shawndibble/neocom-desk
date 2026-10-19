@@ -27,7 +27,7 @@
  * unit-testable without simulating drag events.
  */
 import { arrayMove } from '@dnd-kit/sortable';
-import { normalizePlanWithBoundaries } from '@/engine/plan';
+import { normalizePlanWithBoundaries } from '@/engine/skills/plan';
 import type { EngineSkill, PlanEntry, TrainedSkill } from '@/engine/types';
 import { entrySlices } from './entrySlices';
 import { buildRows, normalizeMarkers, rowsToState, type PlanRow } from './markers';

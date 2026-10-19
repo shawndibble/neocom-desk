@@ -2,7 +2,7 @@
  * "What to train": each +1 skill level that changes the open Fitting, with
  * its whole-Fitting delta (`engine/fittings/skillGains.ts`). The candidates
  * come from one sources pass; each is then worked out on its own, handing
- * the main thread back between them, and the run is keyed on the evaluator
+ * off the main thread, and the run is keyed on the evaluator
  * so a Fitting or Character change mid-way never shows the old fit's rows.
  */
 import { useEffect, useState } from 'react';
@@ -12,7 +12,6 @@ import {
   type SkillGain,
 } from '@/engine/fittings/skillGains';
 import type { SkillGainEvaluator } from './useFittingEvaluation';
-import { yieldToEventLoop } from './yieldToEventLoop';
 
 export interface SkillGainsState {
   /** Null while working out (or with no evaluator); in candidate order — the panel ranks them. */
@@ -31,6 +30,7 @@ export function useSkillGains(evaluator: SkillGainEvaluator | null): SkillGainsS
   useEffect(() => {
     if (!evaluator) return;
     let cancelled = false;
+    const controller = new AbortController();
     void (async () => {
       let sourceIds: number[];
       try {
@@ -40,18 +40,18 @@ export function useSkillGains(evaluator: SkillGainEvaluator | null): SkillGainsS
         return;
       }
       const candidates = skillGainCandidates(sourceIds, evaluator.profile.skillLevels);
-      // One +1 level at a time, as Variations does: each `compare` is a
-      // synchronous engine calculation, and run together they'd land in
-      // one long task and freeze input.
-      const gains = await evaluateSkillGains(candidates, evaluator.compare, {
-        between: yieldToEventLoop,
-        cancelled: () => cancelled,
-      });
+      // One +1 level at a time, as Variations does; each `compare` runs in the worker.
+      const gains = await evaluateSkillGains(
+        candidates,
+        (skillTypeId, level) => evaluator.compare(skillTypeId, level, controller.signal),
+        { cancelled: () => cancelled }
+      );
       if (gains === null || cancelled) return;
       setComputed({ evaluator, gains });
     })();
     return () => {
       cancelled = true;
+      controller.abort();
     };
   }, [evaluator]);
 

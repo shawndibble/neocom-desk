@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Panel } from '@/components/ui';
@@ -26,6 +27,11 @@ interface OwedBalancesProps {
   onFilterPayee: (payeeId: string) => void;
   onSettleUp: (balance: PayeeBalance) => void;
   onLinkPayment: (balance: PayeeBalance) => void;
+  /**
+   * A Corp Tax Book's balance credits itself from the corp's wallet journal, so there is no
+   * payment of the member's own to link to it (#4065).
+   */
+  hideLinkPayment?: (balance: PayeeBalance) => boolean;
   onAssignNext: () => void;
   onReviewPayments: () => void;
 }
@@ -47,6 +53,7 @@ export function OwedBalances({
   onFilterPayee,
   onSettleUp,
   onLinkPayment,
+  hideLinkPayment,
   onAssignNext,
   onReviewPayments,
 }: OwedBalancesProps) {
@@ -164,7 +171,7 @@ export function OwedBalances({
           <span className="text-base font-semibold">
             {t('miningTax.unlinkedPaymentsCardTitle')}
           </span>,
-          <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+          <span className={eyebrowClassName}>
             {t('miningTax.unlinkedPaymentsCount', { count: unlinkedPaymentCount })}
           </span>,
           t('miningTax.unlinkedPaymentsHint'),
@@ -195,9 +202,11 @@ export function OwedBalances({
                 >
                   {t('miningTax.settleUpAction')}
                 </Button>
-                <Button onClick={() => onLinkPayment(balance)}>
-                  {t('miningTax.owed.linkPayment')}
-                </Button>
+                {!hideLinkPayment?.(balance) && (
+                  <Button onClick={() => onLinkPayment(balance)}>
+                    {t('miningTax.owed.linkPayment')}
+                  </Button>
+                )}
               </div>
             );
             return (
@@ -260,7 +269,7 @@ export function OwedBalances({
                   <span className="flex-1 text-base font-semibold">
                     {t('miningTax.unlinkedPaymentsCardTitle')}
                   </span>
-                  <span className="shrink-0 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                  <span className={cx(eyebrowClassName, 'shrink-0')}>
                     {t('miningTax.unlinkedPaymentsCount', { count: unlinkedPaymentCount })}
                   </span>
                 </div>

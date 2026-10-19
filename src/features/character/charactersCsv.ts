@@ -1,6 +1,5 @@
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
-import type { PublicInfoEntry } from '@/stores/publicInfo';
-import { isSpExtractionReady } from '@/engine/spExtraction';
+import { isSpExtractionReady } from '@/engine/skills/spExtraction';
 import { maxJobSlots, type JobSlotCategory, type JobSlotSkills } from '@/engine/industry/jobSlots';
 import type { CharacterSortStats } from './groups';
 import type { QueueInfo } from './rosterView';
@@ -9,7 +8,7 @@ import { isPiExpired, type AttentionEntry } from './rosterAttention';
 /** The slice of a Characters-table row the export reads (the route's `CharacterRow` satisfies it). */
 export interface CharacterCsvRow {
   character: { name: string };
-  info: PublicInfoEntry | undefined;
+  corporationName: string | undefined;
   groupId: string | null;
   stats: CharacterSortStats | undefined;
   queue: QueueInfo | undefined;
@@ -61,7 +60,7 @@ export function charactersCsvColumns(
     { header: t('characters.column.name'), value: (row) => row.character.name },
     {
       header: t('characters.column.corp'),
-      value: (row) => row.info?.corporationName ?? undefined,
+      value: (row) => row.corporationName,
     },
     {
       header: t('characters.column.group'),

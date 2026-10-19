@@ -5,16 +5,16 @@
  * decide what survives a narrow widget. Pure: figures and a translate function
  * in, a `TableModel` out.
  */
-import type { DeadlineSeverity } from '@/engine/severity';
-import { extractableSp, extractorCount } from '@/engine/spExtraction';
+import type { DeadlineSeverity } from '@/engine/character/severity';
+import { extractableSp, extractorCount } from '@/engine/skills/spExtraction';
 import type { SkillQueueEntry } from '@/esi/endpoints';
-import type { ContractTableRow } from '@/engine/contractsBoard';
-import type { UpcomingCalendarEvent } from '@/engine/calendarDeadline';
+import type { ContractTableRow } from '@/engine/contracts/contractsBoard';
+import type { UpcomingCalendarEvent } from '@/engine/character/calendarDeadline';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { DAY_MS } from '@/lib/age';
 import { formatCountdown } from '@/lib/duration';
 import { formatIskCompact } from '@/lib/isk';
-import type { BoardMail } from '../../boardData';
+import type { BoardMail } from '../../data/boardData';
 import { UNKNOWN } from './builderKit';
 import { fractionBar } from './cellKit';
 import { placeHead, shortPlaceName } from './placeName';
@@ -323,7 +323,7 @@ export function clonesTable(t: Translate, rows: readonly CloneTableRow[]): Table
 // --- Location ------------------------------------------------------------------------
 
 /** High-sec reads green, low-sec amber, null-sec and below red, by the one-decimal figure the client shows. */
-export function securityTone(security: number): 'good' | 'caution' | 'bad' {
+function securityTone(security: number): 'good' | 'caution' | 'bad' {
   const shown = Math.round(security * 10) / 10;
   return shown >= 0.5 ? 'good' : shown >= 0.1 ? 'caution' : 'bad';
 }

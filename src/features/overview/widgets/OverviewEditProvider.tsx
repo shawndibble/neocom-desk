@@ -46,7 +46,7 @@ import { visibleWidgets } from './visibility';
 export const FLASH_MS = 1600;
 const ROLES_UNDO_LABEL = 'overview.customize.undo.roles';
 
-export interface OverviewEditProviderProps {
+interface OverviewEditProviderProps {
   layout: OverviewLayout;
   onLayoutChange: (next: OverviewLayout) => void;
   children: ReactNode;

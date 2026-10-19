@@ -8,7 +8,7 @@
  * Heavy (dogma lookups for implants, the SDE skill catalogue), so the
  * Overview reaches it only through `import()`.
  */
-import { cloneJumpCooldown, INFOMORPH_SYNCHRONIZING_SKILL_ID } from '@/engine/cloneJump';
+import { cloneJumpCooldown, INFOMORPH_SYNCHRONIZING_SKILL_ID } from '@/engine/clone/cloneJump';
 import { loadCharacterClones } from '@/features/character/clones';
 import { loadStationName } from '@/features/character/stations';
 import { loadStructureName } from '@/features/character/structures';

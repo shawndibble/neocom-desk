@@ -29,6 +29,7 @@ import {
   rowInteractiveClassName,
 } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
+import { MD_UP_QUERY, useMediaQuery, usePrefersReducedMotion } from '@/lib/useMediaQuery';
 import { AlertCharacterSwitch } from './AlertCharacterSwitch';
 import { AuthFailureNotice } from './AuthFailureNotice';
 import { StandingsScopeNotice } from './StandingsScopeNotice';
@@ -44,6 +45,7 @@ import { useRequestBadgePoll } from '@/features/communities/requestBadge';
 import { useAlertBadge } from '@/features/notifications/useUnreadAlertCount';
 import { barTabs, NAV_LABEL_KEYS, useMobileTabs } from '@/lib/mobileTabs';
 import { CorpGrantPrompt } from '@/features/corp/CorpGrantPrompt';
+import { MailQueueMount } from '@/features/corpTaxBook/MailQueueMount';
 import { InstallPrompt } from './InstallPrompt';
 import { CommandPaletteHost } from '@/features/commandPalette/CommandPaletteHost';
 import { NAV_LOCK_PATHS } from './navDestinations';
@@ -225,11 +227,12 @@ function CharacterFooterLink({
 function useRouteFade(pageKey: string) {
   const ref = useRef<HTMLDivElement>(null);
   const running = useRef<Animation | null>(null);
+  const reduced = usePrefersReducedMotion();
 
   useLayoutEffect(() => {
     const node = ref.current;
     if (node === null || typeof node.animate !== 'function') return;
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (reduced) return;
     // Navigating again mid-fade would otherwise leave two animations driving
     // the same property, and the abandoned one still holds its own opacity.
     running.current?.cancel();
@@ -237,7 +240,7 @@ function useRouteFade(pageKey: string) {
       duration: 140,
       easing: 'ease-out',
     });
-  }, [pageKey]);
+  }, [pageKey, reduced]);
 
   return ref;
 }
@@ -346,18 +349,11 @@ export const Layout = memo(function Layout() {
   // holding the whole app hostage. Unmounting instead lets `Modal`'s cleanup
   // close it and restore focus; `moreOpen` resets so a resize back to mobile
   // doesn't reopen it unasked.
-  const [isDesktop, setIsDesktop] = useState(
-    () => typeof window !== 'undefined' && window.matchMedia('(min-width: 48rem)').matches
-  );
+  const isDesktop = useMediaQuery(MD_UP_QUERY);
   useEffect(() => {
-    const desktop = window.matchMedia('(min-width: 48rem)');
-    const onChange = (e: MediaQueryListEvent) => {
-      setIsDesktop(e.matches);
-      if (e.matches) setMoreOpen(false);
-    };
-    desktop.addEventListener('change', onChange);
-    return () => desktop.removeEventListener('change', onChange);
-  }, []);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset the sheet when the viewport grows past `md`
+    if (isDesktop) setMoreOpen(false);
+  }, [isDesktop]);
 
   return (
     <UnreadAlertsContext.Provider value={alertBadge}>
@@ -404,6 +400,8 @@ export const Layout = memo(function Layout() {
           </aside>
 
           <main className="min-w-0 flex-1 px-2 py-4 pb-[max(calc(5rem_+_env(safe-area-inset-bottom)),var(--compare-drawer-space,0px))] md:px-4 md:pb-[max(1rem,var(--compare-drawer-space,0px))]">
+            {/* Corp Tax Book send queue (D16): only while mail is queued. */}
+            <MailQueueMount />
             <OfflineBanner />
             <AlertCharacterSwitch />
             <AuthFailureNotice />

@@ -10,7 +10,9 @@
  * "Show missing" hides what's already trained, in both lists; it sticks.
  * No active Character: names and levels only, nothing to add, no time.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { useMemo, useState } from 'react';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useTranslation } from 'react-i18next';
 import { Button, FilterChip } from '@/components/ui';
 import {
@@ -50,7 +52,7 @@ export interface AddedToPlan {
   planName: string;
   entries: readonly PlanEntry[];
 }
-const heading = 'text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
+const heading = eyebrowClassName;
 
 export function SkillsMasteryTab({
   ship,
@@ -72,10 +74,7 @@ export function SkillsMasteryTab({
   const [tier, setTier] = useState(() => Math.min(5, mastery + 1));
   const storedShowMissing = useShipInfoShowMissing((state) => state.value);
   const setShowMissing = useShipInfoShowMissing((state) => state.setValue);
-  const hydrateShowMissing = useShipInfoShowMissing((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateShowMissing();
-  }, [hydrateShowMissing]);
+  useHydratedStore(useShipInfoShowMissing);
   // Without a Character nothing is trained, so there is nothing to hide.
   const showMissing = hasCharacter && storedShowMissing;
   const missing = (p: { skillTypeID: number; level: number }) =>

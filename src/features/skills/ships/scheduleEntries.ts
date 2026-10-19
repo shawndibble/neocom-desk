@@ -1,5 +1,5 @@
 /** A one-off schedule for a set of entries, no boosters/markers/remaps — Fit Check and Mastery both just want "how long from here," not a full plan's machinery. */
-import { computeSkillPlanSchedule } from '@/engine/skillPlanSchedule';
+import { computeSkillPlanSchedule } from '@/engine/skills/skillPlanSchedule';
 import type {
   Attributes,
   CloneState,

@@ -1,4 +1,4 @@
-import type { JumpsAwayResult } from '@/engine/jumpsAway';
+import type { JumpsAwayResult } from '@/engine/clone/jumpsAway';
 
 /** What a location id is: a solar system, an NPC station, or an Upwell structure. */
 export type PlaceKind = 'solar_system' | 'station' | 'structure';

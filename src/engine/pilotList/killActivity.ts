@@ -3,6 +3,7 @@
  * Lookup's Local list). Pure: the kill list is fetched in
  * `src/lib/zkillboard.ts`; here it is only counted and dated.
  */
+import { DAY_MS } from '@/lib/age';
 export type KillSpace = 'highsec' | 'lowsec' | 'nullsec' | 'wormhole';
 
 export const KILL_SPACES: readonly KillSpace[] = ['highsec', 'lowsec', 'nullsec', 'wormhole'];
@@ -12,9 +13,6 @@ export const ACTIVITY_WINDOW_DAYS = 30;
 
 /** How many months the modal's chart spans. */
 export const CHART_MONTHS = 6;
-
-const HOUR_MS = 3_600_000;
-const DAY_MS = 24 * HOUR_MS;
 
 /** One kill the pilot took part in. `space` is null when zKillboard didn't say. */
 export interface KillRecord {

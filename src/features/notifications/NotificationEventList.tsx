@@ -4,6 +4,8 @@
  * `AggregateRow`). Corp events keep one "Corp notifications" group with its
  * shared best-effort note, and EVE notifications close the list.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { cx } from '@/lib/cx';
 import { useTranslation } from 'react-i18next';
 import { ChannelColumnHeadings } from './ChannelColumns';
 import { groupNotificationEvents } from './eventGroups';
@@ -27,9 +29,7 @@ export function NotificationEventList({
   // Every corp event rides the one opt-in Corporation Permission, so the group says it once.
   const corpMissing = missingPermissionSummary(layout.corp, context);
   const heading = (text: string) => (
-    <h3 className="border-t border-line bg-panel/40 px-3 py-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-      {text}
-    </h3>
+    <h3 className={cx(eyebrowClassName, 'border-t border-line bg-panel/40 px-3 py-1')}>{text}</h3>
   );
   return (
     <div className="rounded-xs border border-line bg-panel/85 backdrop-blur-sm">

@@ -12,6 +12,8 @@
  * items split on `is_included` into what the issuer hands over ("Included")
  * vs what the acceptor must supply ("Requested").
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { cx } from '@/lib/cx';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -52,7 +54,7 @@ import { contractIssuer, type ContractReceiver } from './contractCounterparty';
 import type { EffectiveStanding } from './contactStandings';
 import { CONTRACT_ISK_CENTS_BELOW, formatIskAuto } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
-import { courierDeliveryDeadlineMs } from '@/engine/courierDeadline';
+import { courierDeliveryDeadlineMs } from '@/engine/contracts/courierDeadline';
 import { useTimeZone } from '@/lib/timeFormat';
 import type { Contract, ContractItem } from '@/esi/endpoints';
 
@@ -501,9 +503,7 @@ function ItemSection({
   return (
     <div>
       <div className="flex items-center justify-between gap-2 border-b border-line pb-1">
-        <h3 className="flex items-center gap-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-          {title}
-        </h3>
+        <h3 className={cx(eyebrowClassName, 'flex items-center gap-1.5')}>{title}</h3>
         <TableActionsMenu name={title} tableExport={tableExport} />
       </div>
       <div className="overflow-x-auto">

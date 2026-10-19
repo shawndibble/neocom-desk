@@ -5,7 +5,7 @@
  */
 import { rankMarkets } from '@/engine/stockTargets/markets';
 import { buildStockRows, summarizeStock, type StockSummary } from '@/engine/stockTargets/stockRows';
-import type { DeadlineSeverity } from '@/engine/severity';
+import type { DeadlineSeverity } from '@/engine/character/severity';
 import { useMarketHub } from '@/features/market/hub';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { getHubPrices } from '@/market/prices';

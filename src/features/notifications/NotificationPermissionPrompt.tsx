@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useLiveQuery } from 'dexie-react-hooks';
 import { Button, NeedsConnection } from '@/components/ui';
-import { db, type CharacterRecord } from '@/db';
+import type { CharacterRecord } from '@/db';
+import { useCharacters } from '@/features/character/useCharacters';
 import {
   useNotificationPromptState,
   useNotificationPermission,
@@ -15,6 +15,7 @@ import { webPushSupport } from '@/sync/webPushSupport';
 import { enableWebPush } from './webPush';
 import { useOnboardingBannerSlot } from '@/app/onboardingBannerSlot';
 import { useHasLeftFirstScreen } from './firstScreen';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useStickyClearance } from '@/lib/useStickyClearance';
 import { beginAlertsLogin } from '@/app/loginFlow';
 
@@ -38,29 +39,25 @@ import { beginAlertsLogin } from '@/app/loginFlow';
  */
 export function NotificationPermissionPrompt() {
   const { t } = useTranslation();
-  const { value, hydrated, hydrate, setValue } = useNotificationPromptState();
+  const { value, setValue } = useNotificationPromptState();
   const { permission, refresh } = useNotificationPermission();
-  const characterCount = useLiveQuery(() => db.characters.count());
-  const newestCharacter = useLiveQuery(async () =>
-    (await db.characters.toArray()).reduce<CharacterRecord | undefined>(
-      (newest, c) => (newest === undefined || c.addedAt > newest.addedAt ? c : newest),
-      undefined
-    )
+  const characters = useCharacters();
+  const characterCount = characters.length;
+  const newestCharacter = useMemo(
+    () =>
+      characters.reduce<CharacterRecord | undefined>(
+        (newest, c) => (newest === undefined || c.addedAt > newest.addedAt ? c : newest),
+        undefined
+      ),
+    [characters]
   );
-  const {
-    value: alertsOfferSeen,
-    hydrated: offerHydrated,
-    hydrate: hydrateOffer,
-    setValue: setAlertsOfferSeen,
-  } = useAlertsOfferSeen();
+  const { value: alertsOfferSeen, setValue: setAlertsOfferSeen } = useAlertsOfferSeen();
   // True only after this banner's own Enable ended in a grant, so the offer
   // never reaches someone who saw the explainer on an earlier visit.
   const [grantedHere, setGrantedHere] = useState(false);
 
-  useEffect(() => {
-    void hydrate();
-    void hydrateOffer();
-  }, [hydrate, hydrateOffer]);
+  const hydrated = useHydratedStore(useNotificationPromptState);
+  const offerHydrated = useHydratedStore(useAlertsOfferSeen);
 
   // iOS delivers Web Push only to an installed PWA — requesting permission
   // here would either do nothing or grant a permission that can never
@@ -74,7 +71,7 @@ export function NotificationPermissionPrompt() {
   const visible = shouldShowPermissionExplainer({
     hydrated,
     seen: value.seen,
-    hasCharacter: (characterCount ?? 0) > 0,
+    hasCharacter: characterCount > 0,
     permission,
     installRequired,
     hasLeftFirstScreen,

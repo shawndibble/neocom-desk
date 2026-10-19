@@ -187,7 +187,7 @@ precedent cutting the other way: `src/features/industry/jobs.ts:36-71` keeps pur
 view helpers (`jobProgress`, `isJobDone`, `isCompletingSoon`) in the _feature_
 module with colocated tests, not in `engine`. **Recommendation: put this in
 `src/engine`** anyway, because unlike `jobProgress` it takes a _skill level_ as
-input — that is EVE domain math (the same category as `engine/sp.ts` or
+input — that is EVE domain math (the same category as `engine/skills/sp.ts` or
 `engine/industry/time.ts`), not view formatting. Flagging the precedent so the
 orchestrator sees it was a choice.
 

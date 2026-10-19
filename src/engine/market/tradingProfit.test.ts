@@ -88,3 +88,13 @@ describe('pooled FIFO', () => {
     expect(realizedMargins([altBuy, mainSale], tax).get(2)?.margin).toBe(500);
   });
 });
+
+describe('sumBrokerFees malformed dates', () => {
+  it('skips a fee line whose date does not parse', () => {
+    const journal = [
+      { ref_type: 'brokers_fee', amount: -100, date: '2026-01-02T00:00:00Z' },
+      { ref_type: 'brokers_fee', amount: -50, date: 'garbage' },
+    ];
+    expect(sumBrokerFees(journal, Date.parse('2026-01-01'), Date.parse('2026-01-31'))).toBe(100);
+  });
+});

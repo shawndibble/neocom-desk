@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Checkbox, IskInput, Modal, Radio, SearchInput } from '@/components/ui';
@@ -6,16 +7,17 @@ import type { PayeeRecord } from '@/db';
 import { GrantNote } from '@/app/GrantNote';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
-import { formatLocalDate } from '@/lib/localDate';
 import type { GroupMember } from './groupRows';
 import { settle } from './ledgerActions';
 import { rememberPayeeEntity } from './payees';
-import { missingPaymentEndpoints, type MadePaymentSources } from './madePayments';
+import { missingPaymentEndpoints, paidOnFromIso, type MadePaymentSources } from './madePayments';
+import { systemLabel } from './names';
 import * as Icon from '@/components/ui/icons';
 import { exactAmountMatches, type MadePayment } from './paymentLinks';
 import { allocateOldestFirst } from './settleAllocation';
 import { useLedgerAction } from './useLedgerAction';
 import { LedgerActionError } from './LedgerActionError';
+import { toggleInSet } from '@/lib/sets';
 
 interface LinkWalletPaymentDialogProps {
   open: boolean;
@@ -31,17 +33,7 @@ interface LinkWalletPaymentDialogProps {
   onLinked: () => void;
 }
 
-/**
- * The payment's own date as a local calendar date, falling back to today —
- * same rule as `LinkPaymentDialog`: an unparseable ESI date must not become an
- * Invalid Date in a synced record.
- */
-function paidOnFor(isoDate: string): string {
-  const parsed = new Date(isoDate);
-  return formatLocalDate(Number.isNaN(parsed.getTime()) ? new Date() : parsed);
-}
-
-const FIELD_LABEL = 'text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
+const FIELD_LABEL = eyebrowClassName;
 
 /**
  * "Link a wallet payment": the pilot picks, from their own wallet, the Made
@@ -150,16 +142,10 @@ export function LinkWalletPaymentDialog({
   }
 
   function toggle(id: string) {
-    setTicked((previous) => {
-      const next = new Set(previous);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+    setTicked((previous) => toggleInSet(previous, id));
   }
 
-  const systemName = (solarSystemId: number) =>
-    systemNames.get(solarSystemId) ?? `#${String(solarSystemId)}`;
+  const systemName = (solarSystemId: number) => systemLabel(systemNames, solarSystemId);
 
   const counterpartyName =
     selected?.counterpartyId === undefined
@@ -173,7 +159,7 @@ export function LinkWalletPaymentDialog({
       settle(
         included.map((m) => m.assignment),
         {
-          paidOn: paidOnFor(selected.date),
+          paidOn: paidOnFromIso(selected.date),
           method: selected.method,
           amount: Math.round(paymentAmount),
           ...(selected.kind === 'journal' ? { journalLinks: link } : { contractLinks: link }),

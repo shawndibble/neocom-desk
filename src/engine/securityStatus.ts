@@ -1,5 +1,7 @@
 export type SecurityBand = 'highsec' | 'lowsec' | 'nullsec';
 
+import { clamp } from './math';
+
 /**
  * EVE's own security-status bands: highsec 0.5+, lowsec 0.1-0.4, nullsec 0.0
  * and below (including negative, which is where J-space sits).
@@ -45,10 +47,6 @@ const LOWSEC_FLOOR = 0.1;
 // 0.1 and a 0.0 cell side by side on the route strip still read apart.
 const LOWSEC_BLEND_TOP = 0.4;
 const LOWSEC_BLEND_BOTTOM = 0.6;
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}
 
 function lerpChannel(a: number, b: number, t: number): number {
   return Math.round(a + (b - a) * t);

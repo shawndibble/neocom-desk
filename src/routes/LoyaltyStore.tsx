@@ -12,7 +12,9 @@
  * store's "Change store" link returns to it (`/wallet/lp-store` with no
  * corporation is the landing state).
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { PageSettingsButton } from '@/features/settings/PageSettingsModal';
 import { LpValueSettingsForm } from '@/features/settings/LpValueSettingsForm';
@@ -67,8 +69,11 @@ import {
   LOYALTY_STORE_OFFERS_COLUMN_IDS,
   loyaltyStoreOffersColumnsStore,
   type LoyaltyStoreOffersColumnId,
-} from './loyaltyStoreColumns';
-import { loyaltyOfferCsvColumns, loyaltyOfferMaterialsCsvColumns } from './loyaltyStoreCsv';
+} from '@/features/loyalty/loyaltyStoreColumns';
+import {
+  loyaltyOfferCsvColumns,
+  loyaltyOfferMaterialsCsvColumns,
+} from '@/features/loyalty/loyaltyStoreCsv';
 import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
 import { boolParam, optionalIdParam, textParam } from '@/lib/urlState';
 import { formatIsk } from '@/lib/isk';
@@ -254,7 +259,7 @@ function OfferDetail({
 
       <div className="flex flex-wrap gap-6">
         <div>
-          <div className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+          <div className={eyebrowClassName}>
             {t(
               lpBasis === 'concord' ? 'loyaltyStore.colIskPerConcordLp' : 'loyaltyStore.colIskPerLp'
             )}
@@ -268,9 +273,7 @@ function OfferDetail({
           </div>
         </div>
         <div>
-          <div className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-            {t('loyaltyStore.netProfit')}
-          </div>
+          <div className={eyebrowClassName}>{t('loyaltyStore.netProfit')}</div>
           <div className={`text-xl font-semibold tabular-nums ${iskPerLpTone(profit.profit)}`}>
             {profit.profit === null ? '—' : <IskAmount value={profit.profit} decimals={0} />}
           </div>
@@ -521,27 +524,14 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
   const isDesktop = useIsDesktop();
   const tabsId = useTabsId();
 
-  const hydrateHub = useMarketHub((s) => s.hydrate);
   const hubId = useMarketHub((s) => s.value);
   const setHubId = useMarketHub((s) => s.setValue);
-  useEffect(() => {
-    void hydrateHub();
-  }, [hydrateHub]);
+  useHydratedStore(useMarketHub, usePriceBasis, useLpBasis);
 
-  const hydratePriceBasis = usePriceBasis((s) => s.hydrate);
   const priceBasis = usePriceBasis((s) => s.value);
   const setPriceBasis = usePriceBasis((s) => s.setValue);
-  useEffect(() => {
-    void hydratePriceBasis();
-  }, [hydratePriceBasis]);
-
-  const hydrateLpBasis = useLpBasis((s) => s.hydrate);
   const lpBasis = useLpBasis((s) => s.value);
   const setLpBasis = useLpBasis((s) => s.setValue);
-  useEffect(() => {
-    void hydrateLpBasis();
-  }, [hydrateLpBasis]);
-
   // The exchange rate is a faction rule keyed off the corporation's faction,
   // which the offers feed does not carry: it comes from the bundled LP corporation list.
   // `undefined` until the list loads (or when it fails), so a corporation that does have an

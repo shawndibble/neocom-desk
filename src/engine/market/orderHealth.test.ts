@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { orderExpiry, sellThrough } from './orderHealth';
+import { DAY_MS } from '@/lib/age';
 
-const DAY_MS = 24 * 60 * 60 * 1000;
 const NOW = Date.parse('2026-09-06T00:00:00Z');
 
 describe('orderExpiry', () => {

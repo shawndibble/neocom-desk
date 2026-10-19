@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import type { JumpsAwayResult } from '@/engine/jumpsAway';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { JumpsAwayResult } from '@/engine/clone/jumpsAway';
 import { jumpsBetween, type JumpBasis } from '@/features/route/jumpBasis';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { placeKey, placeKindOf } from './classify';
@@ -40,6 +40,19 @@ interface Requested {
   systems: Set<string>;
   security: Set<number>;
   jumps: Set<string>;
+}
+
+/** A Store whose maps are private copies, safe to mutate within one flush. */
+interface Draft {
+  systems: Map<string, number | null>;
+  names: Map<string, string | null>;
+  security: Map<number, number | null>;
+  jumps: Map<string, JumpsAwayResult>;
+}
+
+interface PendingWrite {
+  scope: number | null;
+  apply: (draft: Draft) => void;
 }
 
 const emptyStore = (scope: number | null): Store => ({
@@ -97,20 +110,45 @@ export function usePlaceDetails(
   // in `requested` it would never be retried.
   const current = store.scope === scopeId ? store : emptyStore(scopeId);
 
-  function claim(): Requested {
+  const claim = useCallback((): Requested => {
     if (requested.current.scope !== scopeId) requested.current = emptyRequested(scopeId);
     return requested.current;
-  }
-  function write(scope: number | null, update: (base: Store) => Store) {
+  }, [scopeId]);
+
+  // Results land one per resolved Place; applying each as its own state update
+  // would re-render and re-copy every Map per Place. Queue them and apply the
+  // lot in one update on the next microtask (one copy of each Map per flush).
+  const pending = useRef<PendingWrite[]>([]);
+  const write = useCallback((scope: number | null, apply: (draft: Draft) => void) => {
     if (requested.current.scope !== scope) return;
-    setStore((prev) => update(prev.scope === scope ? prev : emptyStore(scope)));
-  }
+    pending.current.push({ scope, apply });
+    if (pending.current.length > 1) return;
+    queueMicrotask(() => {
+      const batch = pending.current;
+      pending.current = [];
+      // Drop writes whose scope was left behind while they waited.
+      const live = batch.filter((w) => w.scope === requested.current.scope);
+      if (live.length === 0) return;
+      const scope = live[0].scope;
+      setStore((prev) => {
+        const base = prev.scope === scope ? prev : emptyStore(scope);
+        const draft: Draft = {
+          systems: new Map(base.systems),
+          names: new Map(base.names),
+          security: new Map(base.security),
+          jumps: new Map(base.jumps),
+        };
+        for (const w of live) w.apply(draft);
+        return { scope, ...draft };
+      });
+    });
+  }, []);
 
   const originId = origin?.systemId ?? null;
   const originResolved = origin?.resolved ?? false;
   const jumpsSuffix = basis ? `${basis.key}:${originId ?? ''}` : '';
   // A count is only valid under the basis and origin it was made for.
-  const jumpsKeyOf = (key: string) => `${key}:${jumpsSuffix}`;
+  const jumpsKeyOf = useCallback((key: string) => `${key}:${jumpsSuffix}`, [jumpsSuffix]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -125,40 +163,35 @@ export function usePlaceDetails(
     void mapWithConcurrencyLimit(missing, ESI_FANOUT_CONCURRENCY, async (r) => {
       const place = await resolvePlace(r, source, { name: wantNames, settle: true });
       const key = placeKey(r);
-      write(scope, (base) => ({
-        ...base,
-        systems: new Map(base.systems).set(key, place.systemId),
-        names: wantNames ? new Map(base.names).set(key, place.name) : base.names,
-      }));
+      write(scope, (draft) => {
+        draft.systems.set(key, place.systemId);
+        if (wantNames) draft.names.set(key, place.name);
+      });
     });
-    // `claim`/`write` are per-render closures over `scopeId` (listed), not deps.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, scopeId, stableRefs, current.systems, source, wantNames]);
+  }, [enabled, scopeId, stableRefs, current.systems, source, wantNames, claim, write]);
 
   useEffect(() => {
     if (!enabled || !basis || !basis.hydrated || !originResolved) return;
     const req = claim();
-    const pending = stableRefs.filter((r) => {
+    const todo = stableRefs.filter((r) => {
       const key = jumpsKeyOf(placeKey(r));
       if (current.jumps.has(key) || req.jumps.has(key)) return false;
       return originId === null || current.systems.has(placeKey(r));
     });
-    if (pending.length === 0) return;
-    for (const r of pending) req.jumps.add(jumpsKeyOf(placeKey(r)));
+    if (todo.length === 0) return;
+    for (const r of todo) req.jumps.add(jumpsKeyOf(placeKey(r)));
     const scope = scopeId;
-    void mapWithConcurrencyLimit(pending, ESI_FANOUT_CONCURRENCY, async (r) => {
+    void mapWithConcurrencyLimit(todo, ESI_FANOUT_CONCURRENCY, async (r) => {
       const key = placeKey(r);
       const systemId = current.systems.get(key) ?? null;
       let result: JumpsAwayResult;
       if (originId === null) result = NO_LOCATION;
       else if (systemId === null) result = NO_ROUTE;
       else result = await jumpsBetween(originId, systemId, basis).catch(() => NO_ROUTE);
-      write(scope, (base) => ({
-        ...base,
-        jumps: new Map(base.jumps).set(jumpsKeyOf(key), result),
-      }));
+      write(scope, (draft) => {
+        draft.jumps.set(jumpsKeyOf(key), result);
+      });
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     enabled,
     scopeId,
@@ -168,7 +201,9 @@ export function usePlaceDetails(
     basis,
     originId,
     originResolved,
-    jumpsSuffix,
+    jumpsKeyOf,
+    claim,
+    write,
   ]);
 
   useEffect(() => {
@@ -186,14 +221,11 @@ export function usePlaceDetails(
     const scope = scopeId;
     void mapWithConcurrencyLimit([...missing], ESI_FANOUT_CONCURRENCY, async (systemId) => {
       const security = await source.systemSecurity(systemId).catch(() => null);
-      write(scope, (base) => ({
-        ...base,
-        security: new Map(base.security).set(systemId, security),
-      }));
+      write(scope, (draft) => {
+        draft.security.set(systemId, security);
+      });
     });
-    // `claim`/`write` are per-render closures over `scopeId` (listed), not deps.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, scopeId, stableRefs, current.systems, current.security, source]);
+  }, [enabled, scopeId, stableRefs, current.systems, current.security, source, claim, write]);
 
   return useMemo(() => {
     const details = new Map<string, PlaceDetail>();
@@ -209,5 +241,5 @@ export function usePlaceDetails(
       });
     }
     return details;
-  }, [stableRefs, current, basis, jumpsSuffix]); // eslint-disable-line react-hooks/exhaustive-deps -- jumpsKeyOf derives from jumpsSuffix
+  }, [stableRefs, current, basis, jumpsKeyOf]);
 }

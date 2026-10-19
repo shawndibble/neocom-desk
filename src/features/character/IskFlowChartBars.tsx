@@ -22,7 +22,7 @@ import { ChartTooltipShell } from '@/components/ui/ChartTooltipShell';
 import { DataTable, type DataTableColumn } from '@/components/ui';
 import type { JournalDayFlow } from '@/engine/journalDailyFlow';
 import { netToneClass } from '@/features/character/format';
-import { signedIsk } from '@/features/market/signedIsk';
+import { signedIsk } from '@/lib/signedIsk';
 import { COMPACT_ISK_Y_AXIS_MARGIN_LEFT, COMPACT_ISK_Y_AXIS_WIDTH } from '@/lib/chartAxis';
 import { formatDateTick, formatDateWithYear } from '@/lib/formatDateTick';
 import { scalePx } from '@/lib/fontScale';

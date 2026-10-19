@@ -30,7 +30,7 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useUrlParam } from '@/lib/useUrlState';
 import { FITTING_EDIT_PATH, FITTINGS_PATH, fittingEditLocation } from './fittingRoutes';
 import { nullableTextParam } from '@/lib/urlState';
-import { decodeFittingShare, encodeFittingShare } from '@/engine/fitting/fittingShare';
+import { decodeFittingShare, encodeFittingShare } from '@/engine/fittings/fittingShare';
 import { withCheckedMutations } from '@/features/abyssal/mutaplasmidData';
 import { loadEveFitXmlEntry, type FittingXmlDocument } from '@/engine/import/eveFitXml';
 import { toLoadOutcome, type LoadedFitting, type LoadOutcome } from '@/engine/fittings/load';

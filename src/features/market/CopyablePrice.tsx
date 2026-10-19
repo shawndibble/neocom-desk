@@ -19,13 +19,14 @@
  * on-screen reading only and is not a legal paste target for EVE's price
  * field.
  */
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Tooltip } from '@/components/ui';
 import { Toast } from '@/components/ui/Toast';
 import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
 import { writeToClipboard } from '@/lib/clipboard';
 import { formatMarketIsk } from '@/lib/isk';
+import { useCopyFeedback } from '@/lib/useCopyFeedback';
 import { priceClipboardText } from './priceClipboardText';
 
 /** How long the "copied" toast stays up — matches `CopyableTotal`'s own feedback window. */
@@ -33,19 +34,14 @@ const COPIED_FEEDBACK_MS = 2000;
 
 /** Plain digits to the clipboard, then the "copied" toast for a couple of seconds. */
 function useCopyPrice(price: number): { copied: boolean; copy: () => Promise<void> } {
-  const [copied, setCopied] = useState(false);
-  const resetTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
-
-  useEffect(() => () => clearTimeout(resetTimer.current), []);
+  const { copied, flash } = useCopyFeedback(COPIED_FEEDBACK_MS);
 
   async function copy() {
     await writeToClipboard(priceClipboardText(price));
-    setCopied(true);
-    clearTimeout(resetTimer.current);
-    resetTimer.current = setTimeout(() => setCopied(false), COPIED_FEEDBACK_MS);
+    flash();
   }
 
-  return { copied, copy };
+  return { copied: copied === true, copy };
 }
 
 export function CopyablePrice({

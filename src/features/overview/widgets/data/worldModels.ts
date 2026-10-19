@@ -6,8 +6,8 @@
  * Number that is a headline plus one fact the headline lacks, and a chart that
  * names what it draws.
  */
-import { DAY_MS } from '@/lib/age';
-import { worstSeverity, type DeadlineSeverity } from '@/engine/severity';
+import { DAY_MS, HOUR_MS } from '@/lib/age';
+import { worstSeverity, type DeadlineSeverity } from '@/engine/character/severity';
 import { filterYieldRange, eveToday, rangeDates, daysCovered } from '@/engine/miningTax/yieldRange';
 import type { MiningYieldRange } from '@/engine/miningTax/yieldRange';
 import type { CorpBoardItem } from '@/engine/corp/board';
@@ -23,13 +23,13 @@ import { routeToHref } from '@/features/route/routeSafetyLink';
 import { formatCountdown } from '@/lib/duration';
 import { formatIskCompact, formatIskCompactSigned } from '@/lib/isk';
 import { formatCompactNumber } from '@/lib/compactNumber';
-import { jobSeverity, industrySeverity, planetarySeverity } from '../../boardSeverity';
+import { jobSeverity, industrySeverity, planetarySeverity } from '../../data/boardSeverity';
 import {
   industrySummary,
   moonChunksSummary,
   planetarySummary,
   structuresSummary,
-} from '../../boardSummary';
+} from '../../data/boardSummary';
 import {
   moonChunkSeverity,
   moonChunksDeadline,
@@ -38,14 +38,14 @@ import {
   structuresDeadline,
   structuresSeverity,
   structuresView,
-} from '../../corpCards';
+} from '../../data/corpCards';
 import { incursionJumpsWhen, incursionsSeverity, incursionsSummary } from '../../incursionsBoard';
 import type { IncursionsBoardData } from '../../incursionsBoard';
 import type {
   IndustryBoardData,
   IndustryCharacterSlots,
   PlanetaryBoardData,
-} from '../../boardData';
+} from '../../data/boardData';
 import {
   aggregateJobSlotSummary,
   JOB_SLOT_CATEGORIES,
@@ -68,7 +68,6 @@ import type {
   Translate,
 } from './types';
 
-const HOUR_MS = 3_600_000;
 const C = 'overview.widgets.chart';
 const D = 'overview.widgets.data';
 
