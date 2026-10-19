@@ -20,7 +20,7 @@ import {
   type DataTableSort,
 } from '@/components/ui';
 import { TableActionsMenu } from '@/components/ui/TableExport';
-import { sortRowsBy } from '@/components/ui/dataTableSort';
+import { sortRows } from '@/components/ui/dataTableSort';
 import type { UseTableExport } from '@/components/ui/useTableExport';
 import { priceComparison } from '@/engine/market/orderBookDepth';
 import type { OrderBookSummary } from '@/engine/market/orderBook';
@@ -300,8 +300,9 @@ export function OrderSideCard({
     direction: side === 'sell' ? 'asc' : 'desc',
   });
   const shownRows = useMemo(() => {
-    const sortValue = columns.find((column) => column.id === sort.columnId)?.sortValue;
-    const sorted = sortValue ? sortRowsBy(rows, sortValue, sort.direction) : rows;
+    // Sorted here, before the cap, so a sort reaches the whole book; the table sorts the slice again (a no-op).
+    const column = columns.find((c) => c.id === sort.columnId);
+    const sorted = column ? sortRows(rows, column, sort.direction) : rows;
     return rowCap === undefined ? sorted : sorted.slice(0, rowCap);
   }, [rows, rowCap, columns, sort]);
   return (

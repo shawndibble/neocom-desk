@@ -620,8 +620,6 @@ export function Market() {
   // and best prices keep the real book (`sortedSell`).
   const sellRowCap = sellShowAll ? undefined : ROW_CAP;
   const buyRowCap = buyShowAll ? undefined : ROW_CAP;
-  const sellRows = sellRowCap === undefined ? shownSell : shownSell.slice(0, sellRowCap);
-  const buyRows = buyRowCap === undefined ? sortedBuy : sortedBuy.slice(0, buyRowCap);
 
   // Every row, not the ROW_CAP the tables mount before "Show all" — hence
   // `source: 'sorted-rows'` (every row, in the order the table is sorted by).
@@ -672,7 +670,7 @@ export function Market() {
     singleStationBook ? ids.filter((id) => id !== 'location') : ids;
   const orderBookWidths = orderBookWidthsRem(
     singleStationBook ? pickedOrderColumns.filter((id) => id !== 'location') : pickedOrderColumns,
-    orderBookFigureChars([...sellRows, ...buyRows], bookBestSell, myOrderIds)
+    orderBookFigureChars([...shownSell, ...sortedBuy], bookBestSell, myOrderIds)
   );
   const [orderBookRef, [orderLocationSqueezed = false, orderBookNarrow = false]] =
     useElementNarrowerThan<HTMLDivElement>([orderBookWidths.roomy, orderBookWidths.cards]);
