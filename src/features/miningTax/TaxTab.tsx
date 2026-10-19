@@ -5,8 +5,17 @@ import { UnpricedOreDetail } from './UnpricedOreDetail';
 import { hasReachableUnpricedHub } from './unpricedHubs';
 import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import type { TFunction } from 'i18next';
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
+import { guarded } from '@/app/routeChunks';
 import { useTranslation } from 'react-i18next';
 import { useStickyClearance } from '@/lib/useStickyClearance';
 import { useSurveyPayeeId } from './surveyPayeePref';
@@ -67,7 +76,7 @@ import { toggleFilterMember } from '@/lib/multiSelectFilter';
 import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
 import { type UrlParamCodec } from '@/lib/urlState';
 import type { TradeHub } from '@/market/hubs';
-import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
+import type { PayeeRecord } from '@/db';
 import { STATUS_LABEL_KEY, type MiningTaxRowStatus } from '@/engine/miningTax/rowStatus';
 import { computeAssignmentValue } from '@/engine/miningTax/valuation';
 import {
@@ -75,12 +84,7 @@ import {
   type MoonMiningTaxRow,
   type TrackedCharacter,
 } from '@/features/miningTax/snapshot';
-import {
-  allMembers,
-  formatDateRange,
-  type DisplayRow,
-  type GroupMember,
-} from '@/features/miningTax/groupRows';
+import { allMembers, type DisplayRow, type GroupMember } from '@/features/miningTax/groupRows';
 import { resolveRowNames, systemLabel } from '@/features/miningTax/names';
 import {
   loadDatedUnitPricesByHub,
@@ -94,16 +98,12 @@ import { SecurityValue } from '@/features/character/assetBrowserRows';
 import {
   acceptNewTotal,
   assignmentsMovedWithPayee,
-  assignmentsSharingPayment,
-  continueSession as continueSessionAction,
   dismiss,
-  linkRecordedPayment,
   linkTransaction,
   settle,
   unsettle,
   unassign,
   uncombine,
-  undoContinue,
   unlinkTransaction,
   type LedgerActionResult,
 } from '@/features/miningTax/ledgerActions';
@@ -117,28 +117,29 @@ import {
 } from '@/features/miningTax/selection';
 import { BulkDismissDialog } from '@/features/miningTax/BulkDismissDialog';
 import { SelectionToolbar } from '@/features/miningTax/SelectionToolbar';
+import { paidOnFromIso } from '@/features/miningTax/madePayments';
 import {
-  loadMadePaymentsWithStatus,
-  paidOnFromIso,
-  type MadePaymentSources,
-} from '@/features/miningTax/madePayments';
-import {
-  autoMatchRecordedPayments,
-  suggestLinks,
+  assignmentsForLinkTarget,
+  linkedTransactionsFor,
   unlinkedPayments,
-  unlinkedRecordedPayments,
   type MadePayment,
 } from '@/features/miningTax/paymentLinks';
-import { LinkPaymentDialog } from '@/features/miningTax/LinkPaymentDialog';
+import { useLinkSuggestions, useMadePayments } from '@/features/miningTax/useMadePayments';
+import { useContinuations } from '@/features/miningTax/useContinuations';
+import {
+  dateLabel,
+  dateRangeOf,
+  oreTypeIdsOf,
+  shortDateLabel,
+  taxOwedOf,
+} from '@/features/miningTax/taxRowFormat';
 import { GroupSummaryModal } from '@/features/miningTax/GroupSummaryModal';
-import { SettleUpDialog, type SettleUpRow } from '@/features/miningTax/SettleUpDialog';
+import type { SettleUpRow } from '@/features/miningTax/SettleUpDialog';
 import { useSettleUpRecheck } from '@/features/miningTax/useSettleUpRecheck';
-import { JoinAssignDialog } from '@/features/miningTax/JoinAssignDialog';
-import { PayeeManagerDialog, type PayeeOwed } from '@/features/miningTax/PayeeManagerDialog';
+import type { PayeeOwed } from '@/features/miningTax/PayeeManagerDialog';
 import { RowDetailModal } from '@/features/miningTax/RowDetailModal';
 import { type LinkedTransaction } from '@/features/miningTax/PaymentLinksCard';
 import { LinkTransactionDialog } from '@/features/miningTax/LinkTransactionDialog';
-import { SplitDialog } from '@/features/miningTax/SplitDialog';
 import { findPricingGaps, type PricingGap } from '@/features/miningTax/pricingGaps';
 import { linesOwnedBy } from '@/engine/miningTax/ownership';
 import { taxCsvColumns } from '@/features/miningTax/taxCsv';
@@ -148,16 +149,6 @@ import { useMediaQuery } from '@/lib/useMediaQuery';
 import { AttentionStrip, type AttentionItem } from '@/features/miningTax/AttentionStrip';
 import { OwedBalances } from '@/features/miningTax/OwedBalances';
 import { ContinueSessionCard } from '@/features/miningTax/ContinueSessionCard';
-import { EntryEditDialog } from '@/features/miningTax/EntryEditDialog';
-import { LinkWalletPaymentDialog } from '@/features/miningTax/LinkWalletPaymentDialog';
-import {
-  useAutoContinueSessions,
-  useDismissedContinuations,
-} from '@/features/miningTax/continueSessionPref';
-import {
-  findSessionContinuations,
-  type SessionContinuation,
-} from '@/features/miningTax/sessionContinuation';
 import { useLedgerAction } from '@/features/miningTax/useLedgerAction';
 import { splitLedger } from '@/features/miningTax/ledgerSections';
 import { suggestPayeeForSystem, systemsByPayee } from '@/features/miningTax/suggestPayee';
@@ -179,62 +170,41 @@ import {
 import { useCorpBookView } from '@/features/miningTax/corpBook/useCorpBookView';
 import { useBookSystems } from '@/features/miningTax/corpBook/useBookSystems';
 
-/** A short display line for a linked ref, from the same `MadePayment[]` the Payments-to-link card already loaded — `null` when it's no longer in the cached wallet journal/contracts. */
-function labelForLinkedRef(
-  madePayments: readonly MadePayment[],
-  t: TFunction,
-  kind: 'journal' | 'contract',
-  refId: number
-): string | null {
-  const mp = madePayments.find((p) => p.key === `${kind}:${refId}`);
-  if (!mp) return null;
-  const amount =
-    mp.amount === null ? t('miningTax.linkPaymentInKind') : `${formatIsk(mp.amount)} ISK`;
-  const label = mp.label || t('miningTax.linkPaymentUntitledContract');
-  return `${amount} · ${mp.date.slice(0, 10)} — ${label}`;
-}
-
-/** The dedup'd `LinkedTransaction[]` across `assignments`' payments — the same shape whether it's one row's shared-payment group or a joined group's members. */
-function linkedTransactionsFor(
-  assignments: readonly MiningTaxAssignmentRecord[],
-  madePayments: readonly MadePayment[],
-  t: TFunction
-): LinkedTransaction[] {
-  const seen = new Set<string>();
-  const out: LinkedTransaction[] = [];
-  for (const a of assignments) {
-    if (!a.payment) continue;
-    for (const kind of ['journal', 'contract'] as const) {
-      for (const l of (kind === 'journal' ? a.payment.journalLinks : a.payment.contractLinks) ??
-        []) {
-        const key = `${kind}:${l.refId}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        out.push({
-          kind,
-          refId: l.refId,
-          source: l.source,
-          label: labelForLinkedRef(madePayments, t, kind, l.refId),
-        });
-      }
-    }
-  }
-  return out;
-}
-
-/**
- * Every Assignment a "Link transaction" action on `dr` should apply to:
- * every member of a joined group at once (issue #540 follow-up — a joined
- * group is billed as one obligation, so a linked transaction covers all of
- * it), or the single row's own shared-`paymentId` group otherwise.
- */
-function assignmentsForLinkTarget(
-  dr: DisplayRow,
-  everyAssignment: readonly MiningTaxAssignmentRecord[]
-): MiningTaxAssignmentRecord[] {
-  if (dr.groupMembers) return allMembers(dr).map((m) => m.assignment);
-  return dr.assignment ? assignmentsSharingPayment(dr.assignment, everyAssignment) : [];
-}
+const LinkPaymentDialog = lazy(() =>
+  guarded(() => import('@/features/miningTax/LinkPaymentDialog')).then((m) => ({
+    default: m.LinkPaymentDialog,
+  }))
+);
+const SettleUpDialog = lazy(() =>
+  guarded(() => import('@/features/miningTax/SettleUpDialog')).then((m) => ({
+    default: m.SettleUpDialog,
+  }))
+);
+const JoinAssignDialog = lazy(() =>
+  guarded(() => import('@/features/miningTax/JoinAssignDialog')).then((m) => ({
+    default: m.JoinAssignDialog,
+  }))
+);
+const PayeeManagerDialog = lazy(() =>
+  guarded(() => import('@/features/miningTax/PayeeManagerDialog')).then((m) => ({
+    default: m.PayeeManagerDialog,
+  }))
+);
+const SplitDialog = lazy(() =>
+  guarded(() => import('@/features/miningTax/SplitDialog')).then((m) => ({
+    default: m.SplitDialog,
+  }))
+);
+const EntryEditDialog = lazy(() =>
+  guarded(() => import('@/features/miningTax/EntryEditDialog')).then((m) => ({
+    default: m.EntryEditDialog,
+  }))
+);
+const LinkWalletPaymentDialog = lazy(() =>
+  guarded(() => import('@/features/miningTax/LinkWalletPaymentDialog')).then((m) => ({
+    default: m.LinkWalletPaymentDialog,
+  }))
+);
 
 interface Snapshot {
   entries: MoonMiningTaxRow[];
@@ -256,8 +226,8 @@ interface Snapshot {
 }
 
 const NO_HUBS: ReadonlySet<TradeHub['id']> = new Set();
-const NO_NAMES: ReadonlyMap<number, string> = new Map();
 const NO_SECURITY: ReadonlyMap<number, number> = new Map();
+const NO_NAMES: ReadonlyMap<number, string> = new Map();
 const NO_PAYEES_BY_CHARACTER: ReadonlyMap<number, PayeeRecord[]> = new Map();
 
 const EMPTY_DATED_PRICES: DatedUnitPrices = {
@@ -389,17 +359,6 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     (next: ReadonlySet<string> | 'all') => setTaxUrlParams({ 'tax.payee': next }),
     [setTaxUrlParams]
   );
-  const autoContinue = useAutoContinueSessions((state) => state.value);
-  const setAutoContinue = useAutoContinueSessions((state) => state.setValue);
-  const hydrateAutoContinue = useAutoContinueSessions((state) => state.hydrate);
-  const dismissedContinuations = useDismissedContinuations((state) => state.value);
-  const setDismissedContinuations = useDismissedContinuations((state) => state.setValue);
-  const hydrateDismissedContinuations = useDismissedContinuations((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateAutoContinue();
-    void hydrateDismissedContinuations();
-  }, [hydrateAutoContinue, hydrateDismissedContinuations]);
-
   const [payeeManagerCharacterId, setPayeeManagerCharacterId] = useState<number | null>(null);
   // Unconditional, deliberately. Hiding this behind "the pilot has at least
   // one tag" reads tidier and reintroduces the shape of the bug it exists to
@@ -433,9 +392,6 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     payeeId: string;
     members?: readonly GroupMember[];
   } | null>(null);
-  // Offers on screen when automatic mode was switched on — "next time" means
-  // they stay offers rather than being continued the moment the box is ticked.
-  const [autoSkip, setAutoSkip] = useState<ReadonlySet<string>>(new Set());
   const [detailTarget, setDetailTarget] = useState<DisplayRow | null>(null);
   // The entry whose edit form is open — single or combined, owed or paid (mockup F1).
   const [editTarget, setEditTarget] = useState<DisplayRow | null>(null);
@@ -454,7 +410,6 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
   // Combined rows the pilot has expanded in place (desktop), to show each day.
   const [expandedCombined, setExpandedCombined] = useState<ReadonlySet<string>>(new Set());
   const [toast, setToast] = useState<{ message: string; onUndo?: () => void } | null>(null);
-  const [continuing, setContinuing] = useState(false);
   // Every row action and the Link-transaction confirm run through this, so a
   // failure reads the same as in every dialog: the modal stays open saying
   // nothing was changed (each action is one transaction, so that is true).
@@ -464,7 +419,6 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     setError: setActionError,
     run: runRowAction,
   } = useLedgerAction();
-  const busy = continuing || acting;
   // Reset whenever the target changes, not keyed on it: after a failure
   // nothing reloads, so reopening the same row hands back the very same object.
   const [errorTargets, setErrorTargets] = useState({ detailTarget, linkTransactionTarget });
@@ -482,41 +436,9 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
   // in the Characters filter and in Manage Payees.
   const characters = useMemo(() => data?.characters ?? [], [data]);
 
-  /**
-   * Payments already made (issue #540), loaded *after* the ledger rather than
-   * as part of its snapshot. Two paginated ESI reads per tracked character —
-   * the wallet journal and contracts — must not sit in front of the table
-   * rendering: `SettleUpDialog` deferred the very same journal fetch out of
-   * its own open path for exactly this reason ("most settle-ups never get
-   * here"), and blocking here would invert that. The card appears when this
-   * resolves, and re-runs on `refresh()` so a just-linked payment drops off.
-   */
-  const [madePayments, setMadePayments] = useState<MadePayment[]>([]);
-  const [paymentSources, setPaymentSources] = useState<MadePaymentSources[]>([]);
-  /**
-   * Keyed on the character roster, never on `data`. `useRouteSnapshot`
-   * re-runs its loader on `onCacheRevalidated`, which is a *global* signal —
-   * an unrelated Jita price row lapsing anywhere in the app hands this route a
-   * brand-new `data` object. Keying the effect on that would refetch the
-   * journal and contracts for every character each time, to learn nothing.
-   *
-   * Nothing is lost by not refetching after a link is confirmed either: the
-   * just-linked payment disappears because `unlinkedPayments` now sees the
-   * Assignment referencing it, not because the payment list was reloaded.
-   */
-  const trackedCharacterIds = (data?.characters ?? []).map((c) => c.characterId).join(',');
-  useEffect(() => {
-    if (trackedCharacterIds === '') return;
-    let cancelled = false;
-    void loadMadePaymentsWithStatus(trackedCharacterIds.split(',').map(Number)).then((result) => {
-      if (cancelled) return;
-      setMadePayments(result.payments);
-      setPaymentSources(result.sources);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [trackedCharacterIds]);
+  const { madePayments, paymentSources } = useMadePayments(
+    characters.map((c) => c.characterId).join(',')
+  );
 
   // The member's Corp Tax Books (D24: only when their corp has an active one; otherwise null and
   // the tab is exactly what it was).
@@ -625,6 +547,87 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     [allPayees, corpView]
   );
 
+  const datedPrices = data?.datedPrices ?? EMPTY_DATED_PRICES;
+  const systemNames = bookSystems.names;
+  const systemSecurity = bookSystems.security;
+
+  /**
+   * The seam every value-computing dialog reads: prices at whichever hub a
+   * Payee bills at, on the date the ore was actually mined (issue #523
+   * follow-up decision doc) — not "now". A lookup rather than one map,
+   * because the dialogs are where the Payee (and so the hub) is chosen —
+   * assigning to a different Payee, or splitting ore over to a second one,
+   * re-values the same ore against a different order book, and this is what
+   * lets that happen without another fetch.
+   */
+  const pricesFor = useCallback(
+    (hubId: string | undefined, date: string): ReadonlyMap<number, number> =>
+      pricesAtHubOnDate(datedPrices, hubId, date),
+    [datedPrices]
+  );
+
+  /** Which price tier produced each of `pricesFor`'s numbers — the row detail's breakdown. */
+  const priceSourcesFor = useCallback(
+    (hubId: string | undefined, date: string) => sourcesAtHubOnDate(datedPrices, hubId, date),
+    [datedPrices]
+  );
+
+  /** Both the table's Value column and the sole Assignment-less rows: an unassigned entry has no `estimatedValue` of its own, so it's priced live from its still-unclaimed ore lines instead. A combined row sums every member's own value — never a blended re-price across dates. */
+  const estimatedValueOf = useCallback(
+    (dr: DisplayRow): number =>
+      dr.assignment
+        ? allMembers(dr).reduce((sum, m) => sum + m.assignment.estimatedValue, 0)
+        : computeAssignmentValue(
+            dr.row.unassignedOreLines,
+            pricesAtHubOnDate(datedPrices, undefined, dr.row.entry.date),
+            0
+          ).estimatedValue,
+    [datedPrices]
+  );
+
+  const systemName = useCallback(
+    (dr: DisplayRow): string =>
+      dr.row.entry.solarSystemId === 0 ? '—' : systemLabel(systemNames, dr.row.entry.solarSystemId),
+    [systemNames]
+  );
+
+  const payeeName = useCallback(
+    (payeeId: string | undefined): string =>
+      ledgerPayees.find((p) => p.id === payeeId)?.name ?? t('miningTax.unknownPayee'),
+    [ledgerPayees, t]
+  );
+
+  /** The detail modal's Payee display: a resolved name, "No tax owed" for a dismissal, or a dash when unassigned. */
+  const payeeDisplayName = useCallback(
+    (dr: DisplayRow): string => {
+      // Before the corp's record is final, its name is the hint of whose it will be (D12).
+      if (dr.corp?.kind === 'label' && dr.corp.state === 'pending') {
+        return t('miningTax.corpBook.payeeName', { corp: dr.corp.corpName });
+      }
+      if (dr.corp?.kind === 'row') return payeeName(dr.assignment?.payeeId);
+      if (!dr.assignment) return '—';
+      if (dr.assignment.status === 'dismissed') return t('miningTax.dismissedLabel');
+      return payeeName(dr.assignment.payeeId);
+    },
+    [payeeName, t]
+  );
+
+  const settleUpRowsFor = useCallback(
+    (members: readonly GroupMember[]): SettleUpRow[] =>
+      members.map((m) => {
+        const payeeId = m.assignment.payeeId;
+        const entityId = payeeById.get(payeeId ?? '')?.entityId;
+        return {
+          assignment: m.assignment,
+          characterName: m.row.characterName,
+          payeeName: payeeName(payeeId),
+          ...(payeeId === undefined ? {} : { payeeId }),
+          ...(entityId === undefined ? {} : { payeeEntityId: entityId }),
+        };
+      }),
+    [payeeById, payeeName]
+  );
+
   // Which entries the pricing banner is about, so it can link to them — the
   // table only shows an entry's total, never per-ore prices.
   const pricingGaps = useMemo(() => {
@@ -677,8 +680,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
         characterFiltered.filter((dr) => !dr.corp),
         estimatedValueOf
       ),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [characterFiltered, data]
+    [characterFiltered, estimatedValueOf]
   );
 
   const everyAssignment = useMemo(
@@ -686,55 +688,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     [personalRows]
   );
 
-  // Settle-up payments already recorded (paid-on/method/amount) but never
-  // live-linked, because step 2 stopped trying to search the wallet journal
-  // at pay time (it always missed — ESI hadn't posted the transaction yet).
-  // An exact amount + recorded-date + paying-character match is unambiguous
-  // enough to attach silently, once the real transaction actually shows up —
-  // see `autoMatchRecordedPayments`'s own doc comment for why this skips the
-  // confirmation dialog `suggestLink` uses.
-  const recordedMatches = useMemo(() => {
-    const candidates = unlinkedPayments(madePayments, everyAssignment);
-    return autoMatchRecordedPayments(candidates, unlinkedRecordedPayments(everyAssignment));
-  }, [everyAssignment, madePayments]);
-
-  // Attempted once per `paymentId`, not on every render this effect's deps
-  // happen to recompute — the write lands in Dexie but nothing here forces a
-  // `refresh()` (that always re-hits ESI); the exclusion below already keeps
-  // the card in sync for this render, and the next real reload picks up the
-  // persisted link like any other Assignment field.
-  const attemptedLinksRef = useRef<Set<string>>(new Set());
-  useEffect(() => {
-    const fresh = recordedMatches.filter(
-      ({ group }) => !attemptedLinksRef.current.has(group.paymentId)
-    );
-    if (fresh.length === 0) return;
-    for (const { group } of fresh) attemptedLinksRef.current.add(group.paymentId);
-    void Promise.all(
-      fresh.map(({ group, payment }) =>
-        linkRecordedPayment(
-          group.assignments,
-          payment.kind === 'journal'
-            ? { journalRefId: payment.refId }
-            : { contractId: payment.refId }
-        )
-      )
-    );
-  }, [recordedMatches]);
-
-  // Payments nothing accounts for, each with the Payee and entries it most
-  // likely settled. Only payments with a plausible target survive
-  // `suggestLinks`, which is what lets the card stay a quiet offer rather than
-  // a standing alert. Excludes whatever `recordedMatches` just claimed
-  // automatically — those never need the confirmation dialog.
-  const linkSuggestions = useMemo(() => {
-    const candidates = unlinkedPayments(madePayments, everyAssignment);
-    const autoLinked = new Set(recordedMatches.map((m) => m.payment.key));
-    return suggestLinks(
-      candidates.filter((p) => !autoLinked.has(p.key)),
-      balances
-    );
-  }, [everyAssignment, madePayments, balances, recordedMatches]);
+  const linkSuggestions = useLinkSuggestions({ madePayments, everyAssignment, balances });
 
   // Every Payee's systems and owed entries, for the Payee manager's rows.
   const payeeSystems = useMemo(
@@ -786,110 +740,29 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     );
   }
 
-  const continuations = useMemo(
-    () =>
-      findSessionContinuations(characterFiltered.filter((dr) => !isBookRow(dr))).filter(
-        (c) => !dismissedContinuations.includes(c.next.key)
-      ),
-    [characterFiltered, dismissedContinuations]
+  // A Corp Tax Book row is the corp's to continue, not the member's.
+  const continuationRows = useMemo(
+    () => characterFiltered.filter((dr) => !isBookRow(dr)),
+    [characterFiltered]
   );
-
-  /**
-   * The seam every value-computing dialog reads: prices at whichever hub a
-   * Payee bills at, on the date the ore was actually mined (issue #523
-   * follow-up decision doc) — not "now". A lookup rather than one map,
-   * because the dialogs are where the Payee (and so the hub) is chosen —
-   * assigning to a different Payee, or splitting ore over to a second one,
-   * re-values the same ore against a different order book, and this is what
-   * lets that happen without another fetch.
-   */
-  function pricesFor(hubId: string | undefined, date: string): ReadonlyMap<number, number> {
-    return pricesAtHubOnDate(data?.datedPrices ?? EMPTY_DATED_PRICES, hubId, date);
-  }
-
-  /** Which price tier produced each of `pricesFor`'s numbers — the row detail's breakdown. */
-  function priceSourcesFor(hubId: string | undefined, date: string) {
-    return sourcesAtHubOnDate(data?.datedPrices ?? EMPTY_DATED_PRICES, hubId, date);
-  }
-
-  /**
-   * Continues one session, offering Undo in a toast. `false` when nothing was
-   * written: its Payee is gone, the day was claimed meanwhile (the refresh
-   * shows what exists), or the write failed (the toast says so).
-   */
-  async function continueSession(continuation: SessionContinuation): Promise<boolean> {
-    const payee = payeeById.get(continuation.payeeId);
-    if (!payee) return false;
-    const result = await continueSessionAction(continuation, (date) =>
-      pricesFor(payee.hubId, date)
-    );
-    refresh();
-    if (!result.ok) {
-      if (result.reason === 'save-failed') setToast({ message: t('miningTax.saveFailed') });
-      return false;
-    }
-    setToast({
-      message: t('miningTax.continue.done', {
-        date: continuation.next.row.entry.date,
-        payee: payee.name,
-      }),
-      onUndo: () => {
-        setToast(null);
-        void undoContinue(result.value).then((undone) => {
-          if (!undone.ok) setToast({ message: t('miningTax.saveFailed') });
-          refresh();
-        });
-      },
-    });
-    return true;
-  }
-
-  async function handleContinue(continuation: SessionContinuation) {
-    setContinuing(true);
-    try {
-      await continueSession(continuation);
-    } finally {
-      setContinuing(false);
-    }
-  }
-
-  // Automatic mode: continue each new offer once, without asking. The ref
-  // keeps a rerender from re-firing a continuation before the refresh lands.
-  const autoContinuedRef = useRef<Set<string>>(new Set());
-  useEffect(() => {
-    if (!autoContinue || !data) return;
-    const fresh = continuations.filter(
-      (c) => !autoContinuedRef.current.has(c.next.key) && !autoSkip.has(c.next.key)
-    );
-    if (fresh.length === 0) return;
-    for (const c of fresh) autoContinuedRef.current.add(c.next.key);
-    void (async () => {
-      for (const c of fresh) {
-        const continued = await continueSession(c);
-        // Not continued: bring the offer back as a card so the pilot can retry
-        // or choose, rather than it vanishing until the next page load.
-        if (!continued) setAutoSkip((previous) => new Set(previous).add(c.next.key));
-      }
-    })();
-    // `continueSession` closes over `allPayees`/`pricesFor`/`t`/`refresh`,
-    // all derived from `data` (or stable) — re-running on those would retry
-    // the same offers for nothing.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoContinue, autoSkip, continuations, data]);
-
-  function setAutoContinueFromCard(next: boolean) {
-    if (next) setAutoSkip(new Set(continuations.map((c) => c.next.key)));
-    void setAutoContinue(next);
-  }
-
-  /** "Keep separate", remembered — pruned to entries still in the ledger so the list can't grow forever. */
-  function keepSeparate(continuation: SessionContinuation) {
-    const present = new Set(allDisplayRows.map((dr) => dr.key));
-    void setDismissedContinuations([
-      ...dismissedContinuations.filter((key) => present.has(key)),
-      continuation.next.key,
-    ]);
-  }
+  const {
+    continuations,
+    continuing,
+    autoContinue,
+    autoSkip,
+    handleContinue,
+    keepSeparate,
+    setAutoContinueFromCard,
+  } = useContinuations({
+    hasData: Boolean(data),
+    rows: continuationRows,
+    allDisplayRows,
+    payeeById,
+    pricesFor,
+    refresh,
+    setToast,
+  });
+  const busy = continuing || acting;
 
   function togglePayee(payeeId: string) {
     setPayeeFilter(
@@ -909,21 +782,6 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
   /** A balance's Payee name doubles as "show me just this Payee's entries" — the filter its own figure came from. */
   function filterToPayee(payeeId: string) {
     setPayeeFilter(isSolePayeeFilter(payeeId) ? 'all' : new Set([payeeId]));
-  }
-
-  function entityIdFor(payeeId: string | undefined): { payeeEntityId?: number } {
-    const id = payeeById.get(payeeId ?? '')?.entityId;
-    return id === undefined ? {} : { payeeEntityId: id };
-  }
-
-  function settleUpRowsFor(members: readonly GroupMember[]): SettleUpRow[] {
-    return members.map((m) => ({
-      assignment: m.assignment,
-      characterName: m.row.characterName,
-      payeeName: payeeName(m.assignment.payeeId),
-      ...(m.assignment.payeeId === undefined ? {} : { payeeId: m.assignment.payeeId }),
-      ...entityIdFor(m.assignment.payeeId),
-    }));
   }
 
   /** "Pay them in one lump sum": every Outstanding Assignment behind one balance, straight into Settle up. */
@@ -961,7 +819,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
   function dismissRow(row: MoonMiningTaxRow) {
     const { estimatedValue } = computeAssignmentValue(
       row.unassignedOreLines,
-      pricesAtHubOnDate(data?.datedPrices ?? EMPTY_DATED_PRICES, undefined, row.entry.date),
+      pricesAtHubOnDate(datedPrices, undefined, row.entry.date),
       0
     );
     return dismiss([
@@ -973,22 +831,6 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
         estimatedValue,
       },
     ]);
-  }
-
-  function payeeName(payeeId: string | undefined): string {
-    return ledgerPayees.find((p) => p.id === payeeId)?.name ?? t('miningTax.unknownPayee');
-  }
-
-  /** The detail modal's Payee display: a resolved name, "No tax owed" for a dismissal, or a dash when unassigned. */
-  function payeeDisplayName(dr: DisplayRow): string {
-    // Before the corp's record is final, its name is the hint of whose it will be (D12).
-    if (dr.corp?.kind === 'label' && dr.corp.state === 'pending') {
-      return t('miningTax.corpBook.payeeName', { corp: dr.corp.corpName });
-    }
-    if (dr.corp?.kind === 'row') return payeeName(dr.assignment?.payeeId);
-    if (!dr.assignment) return '—';
-    if (dr.assignment.status === 'dismissed') return t('miningTax.dismissedLabel');
-    return payeeName(dr.assignment.payeeId);
   }
 
   /** Buttons that open each affected entry, naming the ore at fault — the table itself never shows per-ore prices. */
@@ -1017,57 +859,8 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     );
   }
 
-  function systemName(dr: DisplayRow): string {
-    if (dr.row.entry.solarSystemId === 0) return '—';
-    return systemLabel(bookSystems.names, dr.row.entry.solarSystemId);
-  }
-
   function systemSecurityOf(dr: DisplayRow): number | undefined {
-    return bookSystems.security.get(dr.row.entry.solarSystemId);
-  }
-
-  /** Both the table's Value column and the sole Assignment-less rows: an unassigned entry has no `estimatedValue` of its own, so it's priced live from its still-unclaimed ore lines instead. A combined row sums every member's own value — never a blended re-price across dates. */
-  function estimatedValueOf(dr: DisplayRow): number {
-    return dr.assignment
-      ? allMembers(dr).reduce((sum, m) => sum + m.assignment.estimatedValue, 0)
-      : computeAssignmentValue(
-          dr.row.unassignedOreLines,
-          pricesAtHubOnDate(data?.datedPrices ?? EMPTY_DATED_PRICES, undefined, dr.row.entry.date),
-          0
-        ).estimatedValue;
-  }
-
-  function taxOwedOf(dr: DisplayRow): number {
-    return allMembers(dr).reduce((sum, m) => sum + m.assignment.taxOwed, 0);
-  }
-
-  /** Every date this row covers, earliest first — one entry for an ordinary row, 2+ for a combined one. */
-  function dateRangeOf(dr: DisplayRow): string[] {
-    const members = allMembers(dr);
-    return (members.length > 0 ? members.map((m) => m.row.entry.date) : [dr.row.entry.date]).sort();
-  }
-
-  function dateLabel(dr: DisplayRow): string {
-    return formatDateRange(dateRangeOf(dr));
-  }
-
-  /** The table's own date: a combined range within one year drops the repeated year ("2026-10-03 – 10-04"), the width a long Payee name needs. */
-  function shortDateLabel(dr: DisplayRow): string {
-    const dates = dateRangeOf(dr);
-    const first = dates[0];
-    const last = dates.at(-1);
-    if (!first || !last || first === last) return first ?? dr.row.entry.date;
-    return first.slice(0, 4) === last.slice(0, 4)
-      ? `${first} – ${last.slice(5)}`
-      : formatDateRange(dates);
-  }
-
-  /** The ore types a row covers, for the Ore column's icons. */
-  function oreTypeIdsOf(dr: DisplayRow): number[] {
-    const lines = dr.assignment
-      ? allMembers(dr).flatMap((m) => m.assignment.oreLines)
-      : dr.row.unassignedOreLines;
-    return [...new Set(lines.map((line) => line.typeId))];
+    return systemSecurity?.get(dr.row.entry.solarSystemId);
   }
 
   /**
@@ -1280,9 +1073,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
 
   const selectedSettleUpRows: SettleUpRow[] = useMemo(
     () => settleUpRowsFor(settleUpMembers(selectedRows)),
-    // `settleUpRowsFor` reads only `allPayees`, which follows `data`.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [selectedRows, data]
+    [selectedRows, settleUpRowsFor]
   );
 
   const combine = useMemo(() => combineEligibility(selectedRows), [selectedRows]);
@@ -1632,7 +1423,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
   );
 
   // The table's own cell helpers, so the export reads each row exactly as it
-  // is shown. They close over `data`, `allPayees` and `t` only.
+  // is shown.
   const csvColumns = useMemo(
     () =>
       taxCsvColumns(t, {
@@ -1647,9 +1438,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
             : null,
         statusLabel: (dr) => (dr.corp ? corpStateLabel(dr.corp) : undefined),
       }),
-    // Every helper above reads only `data`/`allPayees`.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [t, showCharacterColumn, data, allPayees]
+    [t, showCharacterColumn, systemName, payeeDisplayName, estimatedValueOf, corpStateLabel]
   );
   const taxExport = useTableExport({
     surface: 'mining-tax',
@@ -1754,7 +1543,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
               {duplicateRows.map((row) => (
                 <li key={`${row.characterId}:${row.entry.date}:${row.entry.solarSystemId}`}>
                   {row.characterName} — {row.entry.date} —{' '}
-                  {systemLabel(bookSystems.names, row.entry.solarSystemId)}
+                  {systemLabel(systemNames, row.entry.solarSystemId)}
                 </li>
               ))}
             </ul>
@@ -2201,17 +1990,19 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
         </PageSettingsModal>
 
         {payeeManagerCharacterId !== null && (
-          <PayeeManagerDialog
-            open={payeeManagerCharacterId !== null}
-            onClose={() => setPayeeManagerCharacterId(null)}
-            characters={characters}
-            payeesByCharacter={data?.payeesByCharacter ?? NO_PAYEES_BY_CHARACTER}
-            initialCharacterId={payeeManagerCharacterId}
-            onChanged={refresh}
-            owedByPayee={owedByPayee}
-            systemsByPayee={payeeSystems}
-            systemNames={bookSystems.names}
-          />
+          <Suspense fallback={null}>
+            <PayeeManagerDialog
+              open={payeeManagerCharacterId !== null}
+              onClose={() => setPayeeManagerCharacterId(null)}
+              characters={characters}
+              payeesByCharacter={data?.payeesByCharacter ?? NO_PAYEES_BY_CHARACTER}
+              initialCharacterId={payeeManagerCharacterId}
+              onChanged={refresh}
+              owedByPayee={owedByPayee}
+              systemsByPayee={payeeSystems}
+              systemNames={systemNames}
+            />
+          </Suspense>
         )}
 
         {detailTarget && data && detailTarget.groupMembers && (
@@ -2262,21 +2053,23 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
         )}
 
         {editTarget && data && (
-          <EntryEditDialog
-            open
-            onClose={() => setEditTarget(null)}
-            members={allMembers(editTarget)}
-            systemName={systemName(editTarget)}
-            systemSecurity={systemSecurityOf(editTarget)}
-            payees={allPayees}
-            assignments={everyAssignment}
-            typeNames={data.typeNames}
-            pricesFor={pricesFor}
-            onSaved={() => {
-              setEditTarget(null);
-              refresh();
-            }}
-          />
+          <Suspense fallback={null}>
+            <EntryEditDialog
+              open
+              onClose={() => setEditTarget(null)}
+              members={allMembers(editTarget)}
+              systemName={systemName(editTarget)}
+              systemSecurity={systemSecurityOf(editTarget)}
+              payees={allPayees}
+              assignments={everyAssignment}
+              typeNames={data.typeNames}
+              pricesFor={pricesFor}
+              onSaved={() => {
+                setEditTarget(null);
+                refresh();
+              }}
+            />
+          </Suspense>
         )}
 
         {detailTarget && data && corpDetail && (
@@ -2419,114 +2212,124 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
           )}
 
         {splitTarget && splitTarget.assignment && data && (
-          <SplitDialog
-            open
-            onClose={() => setSplitTarget(null)}
-            assignment={
-              // A needs-review row splits against what ESI reports now, so the
-              // growth (the ore the pilot usually wants to move) is on offer.
-              splitTarget.assignment.status === 'needs-review'
-                ? {
-                    ...splitTarget.assignment,
-                    oreLines: linesOwnedBy(
-                      splitTarget.row.entry.oreLines,
-                      splitTarget.row.assignments,
-                      splitTarget.assignment.id
-                    ),
-                  }
-                : splitTarget.assignment
-            }
-            row={splitTarget.row}
-            systemName={systemName(splitTarget)}
-            payees={allPayees}
-            assignments={everyAssignment}
-            typeNames={data.typeNames}
-            pricesFor={pricesFor}
-            busy={busy}
-            onSplit={() => {
-              setSplitTarget(null);
-              refresh();
-            }}
-          />
+          <Suspense fallback={null}>
+            <SplitDialog
+              open
+              onClose={() => setSplitTarget(null)}
+              assignment={
+                // A needs-review row splits against what ESI reports now, so the
+                // growth (the ore the pilot usually wants to move) is on offer.
+                splitTarget.assignment.status === 'needs-review'
+                  ? {
+                      ...splitTarget.assignment,
+                      oreLines: linesOwnedBy(
+                        splitTarget.row.entry.oreLines,
+                        splitTarget.row.assignments,
+                        splitTarget.assignment.id
+                      ),
+                    }
+                  : splitTarget.assignment
+              }
+              row={splitTarget.row}
+              systemName={systemName(splitTarget)}
+              payees={allPayees}
+              assignments={everyAssignment}
+              typeNames={data.typeNames}
+              pricesFor={pricesFor}
+              busy={busy}
+              onSplit={() => {
+                setSplitTarget(null);
+                refresh();
+              }}
+            />
+          </Suspense>
         )}
 
         {joinTarget && data && (
-          <JoinAssignDialog
-            open={joinTarget !== null}
-            onClose={() => {
-              setJoinTarget(null);
-              setJoinCandidateOverride(null);
-            }}
-            primary={{ row: joinTarget.row, assignment: joinTarget.assignment }}
-            candidates={
-              joinCandidateOverride
-                ? joinCandidateOverride.map((dr) => ({ row: dr.row, assignment: dr.assignment }))
-                : joinCandidatesFor(joinTarget)
-            }
-            initialSelection={joinCandidateOverride ? 'all' : 'none'}
-            payees={allPayees}
-            typeNames={data.typeNames}
-            pricesFor={pricesFor}
-            busy={busy}
-            onJoined={handleJoined}
-          />
+          <Suspense fallback={null}>
+            <JoinAssignDialog
+              open={joinTarget !== null}
+              onClose={() => {
+                setJoinTarget(null);
+                setJoinCandidateOverride(null);
+              }}
+              primary={{ row: joinTarget.row, assignment: joinTarget.assignment }}
+              candidates={
+                joinCandidateOverride
+                  ? joinCandidateOverride.map((dr) => ({ row: dr.row, assignment: dr.assignment }))
+                  : joinCandidatesFor(joinTarget)
+              }
+              initialSelection={joinCandidateOverride ? 'all' : 'none'}
+              payees={allPayees}
+              typeNames={data.typeNames}
+              pricesFor={pricesFor}
+              busy={busy}
+              onJoined={handleJoined}
+            />
+          </Suspense>
         )}
 
         {settleUpRows && data && (
-          <SettleUpDialog
-            open
-            onClose={() => setSettleUpRows(null)}
-            rows={liveSettleUpRows ?? settleUpRows}
-            systemNames={bookSystems.names}
-            arrivalCheck={settleUpRecheck}
-            onPaid={() => {
-              setSelection(new Set());
-              refresh();
-            }}
-            onPickFromWallet={(() => {
-              const payeeIds = [...new Set(settleUpRows.map((r) => r.assignment.payeeId))];
-              const only = payeeIds.length === 1 ? payeeIds[0] : undefined;
-              if (!only) return undefined;
-              // The entries being settled, not the Payee's whole balance.
-              const members = settleUpRows.flatMap((r) =>
-                allDisplayRows
-                  .flatMap(allMembers)
-                  .filter((m) => m.assignment.id === r.assignment.id)
-              );
-              return () => {
-                setSettleUpRows(null);
-                setLinkWalletTarget({ payeeId: only, members });
-              };
-            })()}
-          />
+          <Suspense fallback={null}>
+            <SettleUpDialog
+              open
+              onClose={() => setSettleUpRows(null)}
+              rows={liveSettleUpRows ?? settleUpRows}
+              systemNames={systemNames}
+              arrivalCheck={settleUpRecheck}
+              onPaid={() => {
+                setSelection(new Set());
+                refresh();
+              }}
+              onPickFromWallet={(() => {
+                const payeeIds = [...new Set(settleUpRows.map((r) => r.assignment.payeeId))];
+                const only = payeeIds.length === 1 ? payeeIds[0] : undefined;
+                if (!only) return undefined;
+                // The entries being settled, not the Payee's whole balance.
+                const members = settleUpRows.flatMap((r) =>
+                  allDisplayRows
+                    .flatMap(allMembers)
+                    .filter((m) => m.assignment.id === r.assignment.id)
+                );
+                return () => {
+                  setSettleUpRows(null);
+                  setLinkWalletTarget({ payeeId: only, members });
+                };
+              })()}
+            />
+          </Suspense>
         )}
 
         {linkWalletPayee && data && (
-          <LinkWalletPaymentDialog
-            key={linkWalletPayee.id}
-            open
-            onClose={() => setLinkWalletTarget(null)}
-            payee={linkWalletPayee}
-            owed={linkWalletOwed}
-            candidates={linkWalletCandidates}
-            paymentSources={paymentSources}
-            systemNames={bookSystems.names}
-            onLinked={() => {
-              setSelection(new Set());
-              refresh();
-            }}
-          />
+          <Suspense fallback={null}>
+            <LinkWalletPaymentDialog
+              key={linkWalletPayee.id}
+              open
+              onClose={() => setLinkWalletTarget(null)}
+              payee={linkWalletPayee}
+              owed={linkWalletOwed}
+              candidates={linkWalletCandidates}
+              paymentSources={paymentSources}
+              systemNames={systemNames}
+              onLinked={() => {
+                setSelection(new Set());
+                refresh();
+              }}
+            />
+          </Suspense>
         )}
 
         {linkPaymentOpen && data && linkSuggestions.length > 0 && (
-          <LinkPaymentDialog
-            open
-            onClose={() => setLinkPaymentOpen(false)}
-            suggestions={linkSuggestions}
-            systemNames={bookSystems.names}
-            showCharacter={characters.length > 1}
-            onLinked={refresh}
-          />
+          <Suspense fallback={null}>
+            <LinkPaymentDialog
+              open
+              onClose={() => setLinkPaymentOpen(false)}
+              suggestions={linkSuggestions}
+              systemNames={systemNames}
+              showCharacter={characters.length > 1}
+              onLinked={refresh}
+            />
+          </Suspense>
         )}
 
         {bulkDismissOpen && data && (
@@ -2534,7 +2337,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
             open
             onClose={() => setBulkDismissOpen(false)}
             rows={dismissTargets}
-            systemNames={bookSystems.names}
+            systemNames={systemNames}
             estimatedValueOf={estimatedValueOf}
             showCharacter={showCharacterColumn}
             onDismissed={() => {

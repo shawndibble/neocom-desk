@@ -92,7 +92,7 @@ describe('Ships', () => {
   it('shows the Tree tab under one Ships header, and its tabs switch back to Fittings', async () => {
     renderAt('/ships/tree');
     expect(screen.getByRole('heading', { level: 1, name: 'Ships' })).toBeInTheDocument();
-    expect(screen.getByText('ship tree')).toBeInTheDocument();
+    expect(await screen.findByText('ship tree')).toBeInTheDocument();
     expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['Fittings', 'Tree']);
 
     await userEvent.click(screen.getByRole('tab', { name: 'Fittings' }));

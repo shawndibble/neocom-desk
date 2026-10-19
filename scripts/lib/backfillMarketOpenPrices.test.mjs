@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { OpenPriceFold } from '../../functions/src/marketOpenPrices.ts';
 import {
   OpenPriceTable,
-  checkCredentials,
+  checkBucket,
   foldDays,
   parseArgs,
   runBackfill,
@@ -14,47 +14,39 @@ describe('parseArgs', () => {
   it('defaults to a dry run', () => {
     expect(parseArgs(base)).toMatchObject({ write: false, yes: false });
   });
-  it('--write needs a project', () => {
-    expect(() => parseArgs([...base, '--write'])).toThrow(/--project/);
-    expect(parseArgs([...base, '--write', '--project', 'p'])).toMatchObject({
+  it('--write needs a bucket', () => {
+    expect(() => parseArgs([...base, '--write'])).toThrow(/--bucket/);
+    expect(parseArgs([...base, '--write', '--bucket', 'b'])).toMatchObject({
       write: true,
-      project: 'p',
+      bucket: 'b',
     });
   });
   it('reads --yes and lets --dry-run turn writing off', () => {
-    expect(parseArgs([...base, '--write', '--project', 'p', '--yes'])).toMatchObject({ yes: true });
-    expect(parseArgs([...base, '--write', '--project', 'p', '--dry-run']).write).toBe(false);
+    expect(parseArgs([...base, '--write', '--bucket', 'b', '--yes'])).toMatchObject({ yes: true });
+    expect(parseArgs([...base, '--write', '--bucket', 'b', '--dry-run']).write).toBe(false);
   });
-  it('rejects bad dates, order and flags, including the retired --chunk-days and cache flags', () => {
+  it('rejects bad dates, order and flags, including the retired --project and --chunk-days', () => {
     expect(() => parseArgs(['--to', '2026-10-03'])).toThrow(/YYYY-MM-DD/);
     expect(() => parseArgs(['--from', '2026-10-04', '--to', '2026-10-03'])).toThrow(/after/);
     expect(() => parseArgs([...base, '--x'])).toThrow(/unknown/);
+    expect(() => parseArgs([...base, '--project', 'p'])).toThrow(/unknown/);
     expect(() => parseArgs([...base, '--chunk-days', '30'])).toThrow(/unknown/);
     expect(() => parseArgs([...base, '--write-only'])).toThrow(/unknown/);
   });
 });
 
-describe('checkCredentials', () => {
-  it('refuses credentials for another project', () => {
-    expect(checkCredentials({ credentialProject: 'other', project: 'p', yes: false })).toEqual({
-      refuse: expect.stringMatching(/different project/),
+describe('checkBucket', () => {
+  it('refuses a missing or different R2_BUCKET', () => {
+    expect(checkBucket({ envBucket: undefined, bucket: 'b', yes: true })).toEqual({
+      refuse: expect.stringMatching(/not set/),
+    });
+    expect(checkBucket({ envBucket: 'other', bucket: 'b', yes: true })).toEqual({
+      refuse: expect.stringMatching(/different bucket/),
     });
   });
-  it('a matching credential file lets --yes skip the prompt', () => {
-    expect(checkCredentials({ credentialProject: 'p', project: 'p', yes: true })).toEqual({
-      prompt: false,
-    });
-    expect(checkCredentials({ credentialProject: 'p', project: 'p', yes: false })).toEqual({
-      prompt: true,
-    });
-  });
-  it('no readable credential file (ADC from elsewhere) relies on the typed confirmation', () => {
-    expect(checkCredentials({ credentialProject: null, project: 'p', yes: false })).toEqual({
-      prompt: true,
-    });
-    expect(checkCredentials({ credentialProject: null, project: 'p', yes: true })).toEqual({
-      refuse: expect.stringMatching(/--yes/),
-    });
+  it('a matching bucket asks for the typed name unless --yes', () => {
+    expect(checkBucket({ envBucket: 'b', bucket: 'b', yes: false })).toEqual({ prompt: true });
+    expect(checkBucket({ envBucket: 'b', bucket: 'b', yes: true })).toEqual({ prompt: false });
   });
 });
 

@@ -37,9 +37,9 @@ no app server. Two kinds of data:
   (`features/fittings/workbenchFits.ts` reads it).
 
 - A daily job (`syncMarketOpenPrices`) folds EVE Ref's last market-order
-  snapshot of the previous UTC day into `marketOpenPricesByType/<typeId>`:
+  snapshot of the previous UTC day into the R2 object `open-prices/<typeId>.json`:
   per type, every Trade Hub region's highest buy and lowest sell for the day, up
-  to 400 days, public read (`functions/src/marketOpenPrices.ts` holds the logic,
+  to 400 days, public static file with no Firebase involved (`functions/src/marketOpenPrices.ts` holds the logic,
   `marketOrdersArchive.ts` the streaming fetch). The deployment now has eleven
   scheduled functions, i.e. eleven Cloud Scheduler jobs.
 
