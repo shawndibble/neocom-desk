@@ -645,7 +645,7 @@ export function FittingStatsSections({
   const shipDataNeedsConnection = useShipDataNeedsConnection();
   const profileName = useDamageProfileName()(damageProfiles.selected);
   const [appraisalOpen, setAppraisalOpen] = useState(false);
-  // A fit with nothing priceable totals 0 on both sides — that's "unknown",
+  // A fit with nothing sell-priced totals 0 — that's "unknown",
   // not a free ship, so the price section shows a dash instead of "0 ISK".
   const nothingPriced = price !== null && price.totals.sell === 0;
   // The price loader names each row by its bare typeId; the section and its
