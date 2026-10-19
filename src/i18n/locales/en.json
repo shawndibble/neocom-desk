@@ -3796,7 +3796,7 @@
       },
       "token": {
         "name": "Your login stays on this device",
-        "desc": "Your login's refresh token lives in this device's own storage — never on a server, never in a log. Logging in to sync exchanges one short-lived access token and never the refresh token. Remove a character and it goes with it. One opt-in exception: if you turn on Alerts when closed for a character, our server keeps a separate, encrypted token that can read only that character's notifications. Turn it off, or remove the character, and it is deleted."
+        "desc": "Your login's refresh token lives in this device's own storage — never on a server, never in a log. Logging in to sync exchanges one short-lived access token and never the refresh token. Remove a character and it goes with it. One opt-in exception: if you turn on Alerts when closed for a character, our server keeps a separate, encrypted token that can read only that character's notifications. Turn it off, or remove the character, and it is deleted. The other: if a CEO, Director or Accountant turns on Automatic sync for a corporation's Corp Tax Book, our server keeps a separate, encrypted token for that officer's character, limited to the book's reads, until they or the CEO turn it off."
       },
       "offline": {
         "name": "Your data stays when the signal goes",
@@ -3842,7 +3842,7 @@
       },
       "stores": {
         "q": "What does it store, and where?",
-        "a": "What it reads from EVE stays on this device. What you make in the app, such as Skill Plans and Build Plans, syncs between your devices filed under your character's EVE ID, never a name or an email address. The exceptions: alerts you have seen, push and Alerts when closed if you turn them on (your login token stays on this device, apart from Alerts when closed), anything you choose to share with a Community, and Share Links you create (readable by anyone with the link, for 7 days)."
+        "a": "What it reads from EVE stays on this device. What you make in the app, such as Skill Plans and Build Plans, syncs between your devices filed under your character's EVE ID, never a name or an email address. The exceptions: alerts you have seen, push and Alerts when closed if you turn them on (your login token stays on this device, apart from Alerts when closed and a Corp Tax Book's Automatic sync), anything you choose to share with a Community, and Share Links you create (readable by anyone with the link, for 7 days)."
       },
       "delete": {
         "q": "Can I leave and delete my data?",
@@ -11254,7 +11254,7 @@
     "deviceDeleteUnpurged_one": "The synced data for {{names}} could not be deleted from the sync server (offline, or the login has expired). The server deletes it automatically after 90 days without a sync. Every other character's synced data is already deleted. Finish deleting to erase this device's data.",
     "deviceDeleteUnpurged_other": "The synced data for {{names}} could not be deleted from the sync server (offline, or the logins have expired). The server deletes it automatically after 90 days without a sync. Every other character's synced data is already deleted. Finish deleting to erase this device's data.",
     "faq": {
-      "storeIntro": "We store what you make in the app. What we read from EVE stays on this device. The exceptions are listed below: alerts you have seen, push and Alerts when closed if you turn them on, anything you choose to share with a Community, and Share Links you create.",
+      "storeIntro": "We store what you make in the app. What we read from EVE stays on this device. The exceptions are listed below: alerts you have seen, push and Alerts when closed if you turn them on, a Corp Tax Book's Automatic sync if an officer turns it on, anything you choose to share with a Community, and Share Links you create.",
       "groups": {
         "using": "Using Neocom Desk",
         "data": "Your data"
@@ -11330,7 +11330,7 @@
           "walletHistory": "A year of wallet journal and transactions, longer than the 30 days EVE returns. Not in backups.",
           "jobHistory": "Delivered industry jobs, kept after ESI stops returning them. Removed with the Character.",
           "login": "Your EVE login token.",
-          "loginNote": "It never leaves this device. Alerts when closed is the one opt-in exception: it keeps a separate, encrypted, notifications-only token on our server for each character you turn it on for, deleted when you turn it off or remove the character.",
+          "loginNote": "It never leaves this device. Alerts when closed is the one opt-in exception: it keeps a separate, encrypted, notifications-only token on our server for each character you turn it on for, deleted when you turn it off or remove the character. A Corp Tax Book's Automatic sync is the other: an officer who turns it on leaves a separate, encrypted token with a few corporation reads on our server, deleted when they or the CEO turn it off or they lose the role.",
           "preferences": "Display settings (text size, time format) and the sorts, filters and sections each page remembers.",
           "ansiblex": "Route Safety's Ansiblex jump gate list, and whether Route Safety uses it. Structure access is private alliance information, so it never leaves this device."
         },
@@ -13649,6 +13649,7 @@
       },
       "neverSynced": "Never synced",
       "syncedBy": "Synced {{age}} by {{name}}",
+      "scheduledBy": "Scheduled sync ({{name}})",
       "syncNow": "Sync now",
       "viewOnly": "You can view this book. Syncing it needs the Accountant role, and editing needs Director or Accountant.",
       "syncing": "Syncing…",
@@ -13880,7 +13881,11 @@
         "title": "Activity",
         "empty": "Nothing has been done in the book yet.",
         "system": "System",
+        "viaScheduled": "scheduled sync",
         "actions": {
+          "scheduledSyncOn": "turned on the scheduled sync",
+          "scheduledSyncOff": "turned off the scheduled sync",
+          "scheduledSyncStopped": "had the scheduled sync stopped",
           "turnOn": "turned the book on",
           "reclaim": "reclaimed the book",
           "sync": "synced the book",
@@ -13921,6 +13926,8 @@
         "failed": "The sync failed: {{message}}",
         "autoGroupFailed": "The sync worked, but grouping this account's Characters failed: {{message}}",
         "reassignFailed": "The sync worked, but matching earlier unmatched payments to Miners failed: {{message}}",
+        "scheduledStopped": "Automatic sync stopped: {{reason}}",
+        "scheduledStoppedDetail": "Until someone turns it back on in the book's settings (Automatic sync), the book is only as fresh as the last officer sync.",
         "skipped": {
           "missing-mining-scope": "The mining scope is not granted, so nothing was synced.",
           "no-book": "This corporation has no Corp Tax Book to sync.",
@@ -13986,6 +13993,57 @@
         "rate": "Corp default tax rate (%)",
         "hint": "Mining before the start date is kept as history and owes nothing. You can change the rate later; a new rate never reaches back over days already mined.",
         "confirm": "Turn the book on"
+      },
+      "autoSync": {
+        "title": "Automatic sync",
+        "hint": "Every 6 hours our server syncs this book for you, so it stays current when no officer visits. It reads the refinery ledger, Extractions and moon notifications, and donations into the selected wallet divisions, and settles Statements that donations now cover. It never issues a Statement and never sends mail.",
+        "state": {
+          "off": "Off. The book updates when an officer syncs it.",
+          "on": "On, held by {{name}}.",
+          "stopped": "Stopped: {{reason}}."
+        },
+        "stopped": {
+          "role-lost": "{{name}} no longer has the Accountant, Director or CEO role",
+          "left-corp": "{{name}} left the corporation",
+          "token-revoked": "{{name}}'s EVE authorization was revoked or expired",
+          "esi-refused": "EVE no longer lets {{name}}'s authorization read the mining ledger",
+          "book-off": "the Corp Tax Book was turned off",
+          "grant-unreadable": "the saved grant can't be read — turn it on again",
+          "unknown": "it could not continue"
+        },
+        "neverRan": "It has not run yet; the first run is within 6 hours.",
+        "lastRan": "Last ran {{age}}: {{rows}} ledger rows, {{donations}} new donations, {{settled}} Statements settled.",
+        "couldNotRead": "It could not read {{sources}} that time.",
+        "missing": {
+          "extractions": "Extractions",
+          "donations": "donations"
+        },
+        "lastSkipped": "Last run {{age}} was skipped: {{reason}}.",
+        "skipped": {
+          "esi-unavailable": "EVE's servers did not answer",
+          "esi-refused": "EVE refused the mining ledger to the authorization (it stops if this repeats next run)",
+          "esi-budget": "EVE asked the app to slow down"
+        },
+        "turnOn": "Turn on for {{name}}",
+        "turnOnAgain": "Turn on for {{name}}…",
+        "turnOff": "Turn off",
+        "revoke": "Revoke {{name}}'s grant",
+        "replaces": "This replaces the current holder; one Character holds it per corporation.",
+        "editorsOnly": "Only a CEO, Director or Accountant can turn this on.",
+        "stores": "Turning it on stores an encrypted token for the Character you authorize on our server, limited to the mining ledger, the corporation wallet, notifications, corporation roles and structure locations. Turning it off, or the Character losing the role, deletes it.",
+        "result": {
+          "on": "Automatic sync is on, held by {{name}}.",
+          "mismatch": "You authorized {{authorized}}, but this book's active Character is {{expected}}. Nothing was turned on.",
+          "cancelled": "Cancelled. Nothing was turned on.",
+          "offFailed": "Couldn't turn it off. Try again.",
+          "failed": {
+            "generic": "Couldn't turn on Automatic sync. Try again.",
+            "not-an-editor": "Only a CEO, Director or Accountant can turn on Automatic sync.",
+            "wrong-corp": "That Character is not in this corporation.",
+            "no-book": "This corporation has no active Corp Tax Book.",
+            "wrong-scopes": "EVE did not grant exactly the permissions Automatic sync needs. Try again and keep every box ticked."
+          }
+        }
       },
       "settings": {
         "open": "Corp Tax Book settings",

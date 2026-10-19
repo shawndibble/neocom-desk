@@ -530,6 +530,16 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Corp Tax Book sync grants (issue #4068, ADR 0025): one doc per corporation
+    // holding the encrypted, narrow-scope refresh token of the officer who opted in
+    // to the scheduled sync. Written and read only by the save/revoke callables and
+    // the scheduled function (admin). No client path, not even the holder's: the
+    // token must never reach a device. What officers may see (holder, status, why
+    // it stopped) is `corpTaxBooks/{corp}/meta/scheduledSync`, covered above.
+    match /corpTaxBookSyncGrants/{corporationId} {
+      allow read, write: if false;
+    }
+
     // Communities (issue #3596, ADR 0018): the first collections gated by
     // membership rather than by uid or public visibility. Members can read a
     // Community, each other and each other's Shared Blueprint library; nobody

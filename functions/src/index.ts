@@ -61,6 +61,15 @@ import {
 } from './corpTaxBook.js';
 import { esiIdentityReader } from './corpTaxBookEsi.js';
 import {
+  deleteCorpSyncGrantsHeldBy,
+  parseSaveCorpSyncGrantInput,
+  revokeCorpSyncGrant,
+  runScheduledCorpSyncs,
+  saveCorpSyncGrant,
+  type CorpSyncDeps,
+} from './corpSyncGrant.js';
+import { esiSyncReader } from './corpTaxBookSyncEsi.js';
+import {
   claimPayment,
   confirmGrouping,
   declineGrouping,
@@ -510,6 +519,20 @@ export const purgeStaleAccounts = onSchedule(
         continue;
       }
 
+      // So does any Corp Tax Book sync grant it holds (ADR 0025).
+      try {
+        const characterId = characterIdForUid(ref.id);
+        if (characterId !== undefined) {
+          await deleteCorpSyncGrantsHeldBy(corpSyncDeps(), characterId);
+        }
+      } catch (err) {
+        logWarn('Stale account purge: Corp sync grant cleanup failed, will retry', {
+          uid: ref.id,
+          error: err instanceof Error ? err.name : 'unknown',
+        });
+        continue;
+      }
+
       for (const sub of await ref.listCollections()) {
         for (;;) {
           if (passes >= STALE_ACCOUNT_MAX_PASSES) {
@@ -755,6 +778,57 @@ const corpTaxBookDeps = (): BookDeps => ({
 });
 
 const CORP_TAX_BOOK_OPTIONS = { maxInstances: 5 };
+
+// Scheduled Corp Tax Book sync (issue #4068, ADR 0025). The second server-held EVE
+// token: an opt-in, narrow-scope grant per corporation, encrypted under the same
+// `ALERTS_TOKEN_KEY` secret (bound to its own purpose, so blobs do not cross
+// collections). Nothing here logs or returns a token; firestore.rules denies the
+// grant collection.
+function corpSyncDeps(): CorpSyncDeps {
+  return {
+    db: getFirestore(),
+    now: Date.now,
+    key: () => parseAlertsKey(ALERTS_TOKEN_KEY.value()),
+    verify: (accessToken) => verifyEveAccessToken(accessToken, verifyOptions),
+    refresh: (clientId, refreshToken) => refreshAtSso(clientId, refreshToken),
+    revoke: (clientId, refreshToken) => revokeAtSso(clientId, refreshToken),
+    readIdentity: esiIdentityReader(),
+    log: (message, data) => logWarn(message, data),
+  };
+}
+
+// Proven by the signed-in Character AND the grant's own access token, which must be
+// for that same Character; the corporation and its roles are read with the grant.
+export const saveCorpTaxBookSyncGrantCallable = onCall<unknown>(
+  { maxInstances: 5, secrets: [ALERTS_TOKEN_KEY] },
+  (request) =>
+    saveCorpSyncGrant(corpSyncDeps(), callerOf(request), parseSaveCorpSyncGrantInput(request.data))
+);
+
+// The holder revokes their own; the CEO revokes anyone's (live role check, so it carries an access token).
+export const revokeCorpTaxBookSyncGrantCallable = onCall<unknown>(
+  { maxInstances: 5, secrets: [ALERTS_TOKEN_KEY] },
+  (request) => revokeCorpSyncGrant(corpSyncDeps(), callerOf(request), parseBookCall(request.data))
+);
+
+/**
+ * syncCorpTaxBooks (issue #4068, ADR 0025): every 6 hours, syncs and settles each
+ * opted-in corporation's Corp Tax Book with its grant holder's token. Never issues
+ * a Statement or sends mail. Deploy is manual:
+ * `firebase deploy --only functions:syncCorpTaxBooks`.
+ */
+export const syncCorpTaxBooks = onSchedule(
+  {
+    schedule: 'every 6 hours',
+    secrets: [ALERTS_TOKEN_KEY],
+    timeoutSeconds: 540,
+    maxInstances: 1,
+  },
+  async () => {
+    const summary = await runScheduledCorpSyncs(corpSyncDeps(), esiSyncReader());
+    logInfo('syncCorpTaxBooks finished', { ...summary });
+  }
+);
 
 export const verifyCorpOfficerCallable = onCall<unknown>(CORP_TAX_BOOK_OPTIONS, (request) =>
   verifyOfficer(corpTaxBookDeps(), callerOf(request), parseBookCall(request.data))

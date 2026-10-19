@@ -19,6 +19,12 @@ import type { ObservedRow } from './types';
 
 /** What ESI is assumed to keep of a refinery's ledger: the character ledger's 30 days; the corp's is unconfirmed. */
 export const ESI_LEDGER_RETENTION_DAYS = 30;
+/** The moon drill notification types the sync reads (the server mirrors the list; a test pins it). */
+export const MOON_NOTIFICATION_TYPES = [
+  'MoonminingExtractionStarted',
+  'MoonminingLaserFired',
+  'MoonminingExtractionCancelled',
+] as const;
 /** After this long without a sync the book warns (D9). */
 export const STALE_AFTER_DAYS = 3;
 /** The server keeps at most this many gaps in a sync. */
@@ -136,6 +142,8 @@ export interface LastSync {
   at: number;
   byCharacterId: number;
   byName: string;
+  /** Set when the scheduled server sync made this record, not an officer's visit (ADR 0025). */
+  scheduled?: boolean;
   gaps: SyncGap[];
 }
 
@@ -147,6 +155,8 @@ export type SyncStatus =
       ageMs: number;
       byCharacterId: number;
       byName: string;
+      /** The scheduled server sync made it (ADR 0025); `byName` is then the grant holder. */
+      scheduled: boolean;
       gaps: SyncGap[];
     };
 
@@ -159,6 +169,7 @@ export function syncStatus(lastSync: LastSync | null | undefined, now: number): 
     ageMs,
     byCharacterId: lastSync.byCharacterId,
     byName: lastSync.byName,
+    scheduled: lastSync.scheduled === true,
     gaps: lastSync.gaps ?? [],
   };
 }
