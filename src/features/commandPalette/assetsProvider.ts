@@ -9,6 +9,7 @@
  * never costs a request, and never trips the re-auth banner for an alt.
  */
 import { db } from '@/db';
+import { characterIdsWithScopes } from '@/app/useGrantedScopes';
 import { readCachedRows } from '@/esi/cache';
 import type { CharacterAsset } from '@/esi/endpoints';
 import { requiredScopesForEndpoints } from '@/esi/registry';
@@ -93,12 +94,11 @@ const ASSETS_SCOPES = requiredScopesForEndpoints(['getCharacterAssets']);
  * so with no grant anywhere the group never shows.
  */
 export async function loadPaletteAssets(): Promise<PaletteAsset[]> {
-  const [characters, tokens] = await Promise.all([db.characters.toArray(), db.tokens.toArray()]);
-  const granted = new Set(
-    tokens
-      .filter((token) => ASSETS_SCOPES.every((scope) => token.scopes.includes(scope)))
-      .map((token) => token.characterId)
-  );
+  const [characters, grantedIds] = await Promise.all([
+    db.characters.toArray(),
+    characterIdsWithScopes(ASSETS_SCOPES),
+  ]);
+  const granted = new Set(grantedIds);
   const holders = characters.filter((character) => granted.has(character.characterId));
   if (holders.length === 0) return [];
   const rows = await readCachedRows<CharacterAsset[]>(
@@ -123,12 +123,11 @@ export interface PaletteAssetsScope {
 
 /** Cache-only, like `loadPaletteAssets`. Who the Assets group leaves out. */
 export async function loadPaletteAssetsScope(): Promise<PaletteAssetsScope> {
-  const [characters, tokens] = await Promise.all([db.characters.toArray(), db.tokens.toArray()]);
-  const granted = new Set(
-    tokens
-      .filter((token) => ASSETS_SCOPES.every((scope) => token.scopes.includes(scope)))
-      .map((token) => token.characterId)
-  );
+  const [characters, grantedIds] = await Promise.all([
+    db.characters.toArray(),
+    characterIdsWithScopes(ASSETS_SCOPES),
+  ]);
+  const granted = new Set(grantedIds);
   const holders = characters.filter((character) => granted.has(character.characterId));
   const rows =
     holders.length === 0

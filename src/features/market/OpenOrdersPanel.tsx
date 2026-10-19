@@ -38,7 +38,7 @@ import {
 import { useColumnVisibility } from '@/lib/columnVisibility';
 import * as Icon from '@/components/ui/icons';
 import { GrantBanner } from '@/app/GrantNote';
-import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
+import { useCharacterIdsWithScopes, useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
 import { useViewedCharacterId } from '@/features/character/viewedCharacter';
@@ -474,16 +474,9 @@ export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
     detailOrderId !== null ? (allRows.find((r) => r.orderId === detailOrderId) ?? null) : null;
 
   const workQueue = useMemo(() => workThroughQueue(sortedRows), [sortedRows]);
-  // Only the answer leaves the query, never a `TokenRecord` (ADR 0001).
-  const openInEveCharacterIds = useLiveQuery(async () => {
-    const required = requiredScopesForEndpoints(OPEN_IN_EVE_ENDPOINTS);
-    const tokens = await db.tokens.toArray();
-    return new Set(
-      tokens
-        .filter((token) => required.every((scope) => token.scopes.includes(scope)))
-        .map((token) => token.characterId)
-    );
-  }, []);
+  const openInEveCharacterIds = useCharacterIdsWithScopes(
+    requiredScopesForEndpoints(OPEN_IN_EVE_ENDPOINTS)
+  );
   const canOpenInEve = useCallback(
     (characterId: number) => openInEveCharacterIds?.has(characterId) ?? false,
     [openInEveCharacterIds]

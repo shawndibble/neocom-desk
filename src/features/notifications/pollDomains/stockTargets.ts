@@ -1,4 +1,4 @@
-import { db } from '@/db';
+import { characterIdsWithScopes } from '@/app/useGrantedScopes';
 import { ESI_REGISTRY } from '@/esi/registry';
 import { useStockLists } from '@/features/stockTargets/stockListsStore';
 import { loadStockAlertEntries } from '@/features/stockTargets/stockTargetsData';
@@ -32,11 +32,7 @@ const isStockAlertEntry = shapeGuard<StockAlertEntry>({
  */
 async function stockAlertOwner(): Promise<number | null> {
   const scope = ESI_REGISTRY.getCharacterOrders.scope;
-  const tokens = await db.tokens.toArray();
-  const ids = tokens
-    .filter((token) => (token.scopes ?? []).includes(scope))
-    .map((token) => token.characterId)
-    .sort((a, b) => a - b);
+  const ids = (await characterIdsWithScopes([scope])).sort((a, b) => a - b);
   return ids[0] ?? null;
 }
 

@@ -3,7 +3,11 @@ import { renderHook, waitFor } from '@testing-library/react';
 import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { ESI_REGISTRY } from '@/esi/registry';
-import { useEndpointsGranted } from './useGrantedScopes';
+import {
+  characterIdsWithScopes,
+  useCharacterIdsWithScopes,
+  useEndpointsGranted,
+} from './useGrantedScopes';
 
 const CHARACTER_ID = 42;
 const OTHER_SCOPE = ESI_REGISTRY.getCharacterAssets.scope;
@@ -46,5 +50,31 @@ describe('useEndpointsGranted', () => {
   it('treats a character with no stored token as granting nothing', async () => {
     const { result } = renderHook(() => useEndpointsGranted(['getCharacterImplants']));
     await waitFor(() => expect(result.current).toBe(false));
+  });
+});
+
+describe('characterIdsWithScopes', () => {
+  it('lists the Characters whose grant covers every scope', async () => {
+    await seedGrant([OTHER_SCOPE, IMPLANTS_SCOPE], 1);
+    await seedGrant([OTHER_SCOPE], 2);
+    await seedGrant([OTHER_SCOPE, IMPLANTS_SCOPE], 3);
+    expect(await characterIdsWithScopes([OTHER_SCOPE, IMPLANTS_SCOPE])).toEqual([1, 3]);
+    expect(await characterIdsWithScopes([OTHER_SCOPE])).toEqual([1, 2, 3]);
+  });
+
+  it('narrows to the given Characters and skips unknown ids', async () => {
+    await seedGrant([OTHER_SCOPE], 1);
+    await seedGrant([OTHER_SCOPE], 2);
+    expect(await characterIdsWithScopes([OTHER_SCOPE], [2, 99])).toEqual([2]);
+  });
+});
+
+describe('useCharacterIdsWithScopes', () => {
+  it('is undefined until read, then the covered ids', async () => {
+    await seedGrant([OTHER_SCOPE], 1);
+    await seedGrant([], 2);
+    const { result } = renderHook(() => useCharacterIdsWithScopes([OTHER_SCOPE]));
+    expect(result.current).toBeUndefined();
+    await waitFor(() => expect([...(result.current ?? [])]).toEqual([1]));
   });
 });

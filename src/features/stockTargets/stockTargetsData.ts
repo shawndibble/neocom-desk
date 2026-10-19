@@ -11,6 +11,7 @@ import type { StockAlertEntry } from '@/engine/stockTargets/stockAlert';
 import { buildStockRows, summarizeStock, type StockRow } from '@/engine/stockTargets/stockRows';
 import type { StockList, StockTarget } from '@/engine/stockTargets/stockLists';
 import { db } from '@/db';
+import { characterIdsWithScopes } from '@/app/useGrantedScopes';
 import type { CharacterAsset, MarketOrder } from '@/esi/endpoints';
 import { readCachedRows } from '@/esi/cache';
 import { ESI_REGISTRY } from '@/esi/registry';
@@ -310,9 +311,7 @@ export async function loadStockAlertEntries(
   // Listed counts come from the order cache. Every Character that can sell must have one:
   // a missing cache would read their listings as gone and fire a false Out.
   const orderScope = ESI_REGISTRY.getCharacterOrders.scope;
-  const sellers = (await db.tokens.toArray())
-    .filter((token) => (token.scopes ?? []).includes(orderScope))
-    .map((token) => token.characterId);
+  const sellers = await characterIdsWithScopes([orderScope]);
   const known = sellers.length > 0 && sellers.every((id) => orders.has(id));
   const detected = detectOwnedStock(
     [...assets].map(([characterId, cached]) => ({ characterId, assets: cached.data })),

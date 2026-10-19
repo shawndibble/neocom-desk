@@ -10,6 +10,7 @@
  * `@/sync`, Firebase or recharts from here.
  */
 import { db } from '@/db';
+import { characterIdsWithScopes } from '@/app/useGrantedScopes';
 import { ESI_REGISTRY, requiredScopesForEndpoints } from '@/esi/registry';
 import { layerValues, type LayerValues } from '@/engine/netWorth/series';
 import type { HistoryCoverage } from '@/engine/omegaCoverage';
@@ -85,13 +86,11 @@ const NET_WORTH_ENDPOINTS = [
  * snapshot recorder, which pulls `@/sync` into whatever imports it.
  */
 export async function loadNetWorthWidget(): Promise<NetWorthWidgetData> {
-  const [rows, tokens] = await Promise.all([db.netWorthSnapshots.toArray(), db.tokens.toArray()]);
-  const required = requiredScopesForEndpoints(NET_WORTH_ENDPOINTS);
-  const covered = new Set(
-    tokens
-      .filter((token) => required.every((scope) => token.scopes.includes(scope)))
-      .map((token) => token.characterId)
-  );
+  const [rows, coveredIds] = await Promise.all([
+    db.netWorthSnapshots.toArray(),
+    characterIdsWithScopes(requiredScopesForEndpoints(NET_WORTH_ENDPOINTS)),
+  ]);
+  const covered = new Set(coveredIds);
   const byCharacter = new Map<number, NetWorthSnapshotRow[]>();
   for (const row of rows) {
     const list = byCharacter.get(row.characterId);
