@@ -3,8 +3,12 @@ import {
   DEFAULT_CHUNK_M3_PER_HOUR,
   DEFAULT_EXPIRY_HOURS,
   MAX_EXPIRY_HOURS,
+  MEASURED_RATE_WINDOW,
+  chunkRateFor,
   estimateChunk,
   extractionStatus,
+  learnChunkRates,
+  measureChunkRate,
   minedVsLeft,
   minedDuringExtraction,
   surveyFractions,
@@ -106,7 +110,23 @@ describe('estimateChunk', () => {
         { typeId: ORE_A, quantity: 216_000 },
         { typeId: ORE_B, quantity: 72_000 },
       ],
+      rate: { m3PerHour: 20_000, basis: 'manual' },
     });
+  });
+
+  it('prefers the refinery measured rate, then the manual one, then the default', () => {
+    const survey = [{ typeId: ORE_A, fraction: 1 }];
+    const total = (sources: Parameters<typeof estimateChunk>[1]) =>
+      estimateChunk(ex, { survey, ...sources });
+    expect(total({ measured: { m3PerHour: 40_000, cycles: 3 }, chunkM3PerHour: 20_000 })).toEqual({
+      source: 'survey',
+      oreLines: [{ typeId: ORE_A, quantity: 576_000 }],
+      rate: { m3PerHour: 40_000, basis: 'measured', cycles: 3 },
+    });
+    expect(total({ chunkM3PerHour: 20_000 }).oreLines[0].quantity).toBe(288_000);
+    const dflt = total({});
+    expect(dflt.oreLines[0].quantity).toBe(432_000);
+    expect(dflt.rate).toEqual({ m3PerHour: DEFAULT_CHUNK_M3_PER_HOUR, basis: 'default' });
   });
 
   it('else says the ore is unknown', () => {
@@ -190,5 +210,80 @@ describe('surveyFractions (D13)', () => {
 
   it('is empty for an empty scan', () => {
     expect(surveyFractions([], typeIdOf)).toEqual([]);
+  });
+});
+
+describe('measured chunk rate', () => {
+  // 6 days = 144h; 4_320_000 m³ is exactly 30,000 m³/h.
+  const cycle = (startedAt: string, hours: number, m3: number, structureId = 1001) => ({
+    structureId,
+    startedAt,
+    chunkArrivalAt: new Date(Date.parse(startedAt) + hours * 3_600_000).toISOString(),
+    oreLines: [
+      { typeId: ORE_A, quantity: (m3 * 0.75) / 10 },
+      { typeId: ORE_B, quantity: (m3 * 0.25) / 10 },
+    ],
+  });
+
+  it('is the notified ore volume over the extraction hours', () => {
+    expect(measureChunkRate(cycle('2026-07-01T00:00:00Z', 144, 4_320_000))).toBe(30_000);
+  });
+
+  it('is unknown without a notification, or with no extraction time', () => {
+    expect(
+      measureChunkRate({ ...cycle('2026-07-01T00:00:00Z', 144, 1), oreLines: [] })
+    ).toBeUndefined();
+    const bare = {
+      structureId: 1001,
+      startedAt: '2026-07-01T00:00:00Z',
+      chunkArrivalAt: '2026-07-07T00:00:00Z',
+    };
+    expect(measureChunkRate(bare)).toBeUndefined();
+    expect(measureChunkRate(cycle('2026-07-01T00:00:00Z', 0, 1_000))).toBeUndefined();
+  });
+
+  it('learns the median of a refinery recent cycles, so an outlier does not swing it', () => {
+    const rates = learnChunkRates([
+      cycle('2026-07-01T00:00:00Z', 100, 3_400_000), // 34,000
+      cycle('2026-07-10T00:00:00Z', 100, 3_500_000), // 35,000
+      cycle('2026-07-20T00:00:00Z', 100, 900_000), // 9,000 outlier
+      cycle('2026-07-01T00:00:00Z', 100, 2_000_000, 2002), // another refinery, 20,000
+    ]);
+    expect(rates.get(1001)).toEqual({ m3PerHour: 34_000, cycles: 3 });
+    expect(rates.get(2002)).toEqual({ m3PerHour: 20_000, cycles: 1 });
+  });
+
+  it('averages the two middle cycles of an even count', () => {
+    const rates = learnChunkRates([
+      cycle('2026-07-01T00:00:00Z', 100, 3_000_000),
+      cycle('2026-07-10T00:00:00Z', 100, 4_000_000),
+    ]);
+    expect(rates.get(1001)).toEqual({ m3PerHour: 35_000, cycles: 2 });
+  });
+
+  it('looks only at the most recent cycles', () => {
+    const old = Array.from({ length: 4 }, (_, i) =>
+      cycle(`2026-01-0${i + 1}T00:00:00Z`, 100, 1_000_000)
+    );
+    const recent = Array.from({ length: MEASURED_RATE_WINDOW }, (_, i) =>
+      cycle(`2026-07-0${i + 1}T00:00:00Z`, 100, 4_000_000)
+    );
+    expect(learnChunkRates([...old, ...recent]).get(1001)).toEqual({
+      m3PerHour: 40_000,
+      cycles: MEASURED_RATE_WINDOW,
+    });
+  });
+
+  it('resolves measured, then manual, then default', () => {
+    expect(chunkRateFor({ m3PerHour: 34_200, cycles: 3 }, 20_000)).toEqual({
+      m3PerHour: 34_200,
+      basis: 'measured',
+      cycles: 3,
+    });
+    expect(chunkRateFor(undefined, 20_000)).toEqual({ m3PerHour: 20_000, basis: 'manual' });
+    expect(chunkRateFor(undefined, undefined)).toEqual({
+      m3PerHour: DEFAULT_CHUNK_M3_PER_HOUR,
+      basis: 'default',
+    });
   });
 });

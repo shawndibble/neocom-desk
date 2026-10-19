@@ -13763,6 +13763,12 @@
           "survey": "Linked Survey (estimate)",
           "unknown": "Ore unknown"
         },
+        "rate": {
+          "measured_one": "Estimated at this refinery's measured {{rate}} m³/h, from {{count}} extraction",
+          "measured_other": "Estimated at this refinery's measured {{rate}} m³/h, from {{count}} extractions",
+          "manual": "Estimated at the book's chunk rate, {{rate}} m³/h",
+          "default": "Estimated at the default {{rate}} m³/h"
+        },
         "link": {
           "open": "Link a survey…",
           "change": "Change survey…",
@@ -14015,6 +14021,10 @@
         "division": "Division {{n}}",
         "extractions": "Extractions",
         "chunk": "Chunk rate (m³ per hour)",
+        "measured_one": "{{name}}: measured {{rate}} m³/h from {{count}} extraction",
+        "measured_other": "{{name}}: measured {{rate}} m³/h from {{count}} extractions",
+        "notMeasured": "{{name}}: not measured yet, uses {{rate}} m³/h",
+        "chunkHint": "Fallback for a refinery with no measured rate. Each refinery's own rate is learned from its Extraction notifications.",
         "expiry": "Field lasts after fracture, {{name}} (hours)",
         "approvals": "Approvals",
         "approvalLimit": "A dismissal above this needs a Director (ISK)",

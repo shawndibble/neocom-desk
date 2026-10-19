@@ -477,15 +477,7 @@ function writeMiner(
   { pending, confirmed }: { pending: number[]; confirmed: Set<number> }
 ): void {
   // An officer asking again starts a fresh question: the old answer no longer stands.
-  if (pending.length > 0) {
-    c.tx.set(
-      col(c, META).doc(ANSWERS_DOC),
-      {
-        answers: Object.fromEntries(pending.map((x) => [String(x), FieldValue.delete()])),
-      },
-      { merge: true }
-    );
-  }
+  clearAnswers(c, pending);
   c.tx.set(col(c, MINERS).doc(action.minerId), {
     id: action.minerId,
     characterIds: action.characterIds,
@@ -830,7 +822,11 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       const out = await planMiner(c, miners.docs, action, absorbed);
       for (const id of absorbed) tx.delete(col(c, MINERS).doc(id));
       writeMiner(c, action, out);
-      clearAnswers(c, action.characterIds);
+      // A confirmation still stands for a character the Miner already held.
+      clearAnswers(
+        c,
+        action.characterIds.filter((x) => !out.confirmed.has(x))
+      );
       keepInGroup(c, action.characterIds);
       return {
         detail: {
@@ -1273,6 +1269,9 @@ async function declinePending(
     if (!miner || !(miner.pendingConfirmation as number[]).includes(characterId)) {
       fail('not-found', 'Nothing to decline', 'nothing-pending');
     }
+    // Removing the last other character deletes the Miner doc, which would erase `closedAt`.
+    if (miner.closedAt != null)
+      fail('failed-precondition', "This Miner's account is closed", 'account-closed');
     removeFromMiner(tx, ref, miner, characterId);
     recordAnswer(tx, deps, corporationId, characterId, {
       minerId,

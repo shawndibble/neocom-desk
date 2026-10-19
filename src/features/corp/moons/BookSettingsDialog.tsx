@@ -1,4 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
+import { chunkRateFor } from '@/engine/corpTaxBook/extraction';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -430,6 +431,29 @@ export function BookSettingsDialog({ open, onClose }: { open: boolean; onClose: 
                 placeholder="30000"
               />
             </Label>
+            <ul className="space-y-0.5 text-xs text-text-dim sm:col-span-2">
+              <li>{t('corpTaxBook.moons.settings.chunkHint')}</li>
+              {structures.map((id) => {
+                const learned = view.chunkRates.get(id);
+                return (
+                  <li key={id}>
+                    {learned
+                      ? t('corpTaxBook.moons.settings.measured', {
+                          name: names.refinery(id),
+                          rate: learned.m3PerHour.toLocaleString('en'),
+                          count: learned.cycles,
+                        })
+                      : t('corpTaxBook.moons.settings.notMeasured', {
+                          name: names.refinery(id),
+                          rate: chunkRateFor(
+                            undefined,
+                            settings.chunkM3PerHour ?? undefined
+                          ).m3PerHour.toLocaleString('en'),
+                        })}
+                  </li>
+                );
+              })}
+            </ul>
             {structures.map((id) => (
               <Label
                 key={id}
