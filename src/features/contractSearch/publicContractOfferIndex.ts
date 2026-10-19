@@ -1,204 +1,50 @@
 /**
- * The index beside the Public Contract Offers chunks (issue #2921): per listed
- * item type, how many offers, the cheapest ask and which chunk docs hold them,
- * plus every region with an offer. Small enough to arrive in one read, which is
- * what lets the Items board suggest item names and fill its region list while
- * the ~124 chunk docs are still coming down — and fetch only the chunks of the
- * item actually being searched.
+ * The Public Contract Offers index (issue #2921), read from R2 (ADR 0019): per
+ * listed item type, how many offers and the cheapest ask, plus every region
+ * with an offer. Small enough to arrive in one read, which is what lets the
+ * Items board suggest item names and fill its region list before any offers
+ * have landed — and fetch only the objects of the item actually being searched.
  *
- * Everything here is an optimisation. An absent or unreadable index (a
- * snapshot published before the writer produced one, rules not yet deployed,
- * offline with nothing cached) reads as `null`, and the board waits for the
- * full snapshot exactly as it did before.
+ * R2 is the only store (issue #4270). An unreachable or invalid index with
+ * nothing cached reads as `null`, and so does a failed object read: the board
+ * then shows its "unavailable" state.
  */
-import { doc, getDoc } from 'firebase/firestore/lite';
-import { getSyncFirestore } from '@/sync/firebaseApp';
-import { ensureAnySession } from '@/sync/syncAuth';
-import { isSyncConfigured } from '@/app/syncStatus';
-import { loadWithCache, GLOBAL_CACHE_CHARACTER_ID } from '@/esi/cache';
 import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
-import { CHUNK_READ_CONCURRENCY, chunkDocId } from './chunkedSnapshot';
-import { loadFirestoreContractOffers } from './publicContractOffers';
-import {
-  loadR2OfferIndex,
-  loadR2TypeRows,
-  r2ObjectsForTypes,
-  type R2OfferIndex,
-} from './r2OfferSnapshot';
-
-const INDEX_COLLECTION = 'publicContractOffersIndex';
-const INDEX_DOC = 'types';
-const OFFERS_COLLECTION = 'publicContractOffers';
-const INDEX_CACHE_KEY = 'publicContractOffersIndex';
-/** Same cadence as the chunks it describes (`publicContractOffers.ts`). */
-const STALE_AFTER_MS = 30 * 60_000;
-
-/** `[count, cheapest, firstChunk, lastChunk]`, as `functions/src/publicContracts.ts` writes it. */
-type RawEntry = [count: number, cheapest: number | null, firstChunk: number, lastChunk: number];
-
-/** What the Dexie cache holds: the doc as written. */
-export interface RawOfferIndex {
-  lastSyncedAt: number;
-  types: Record<string, RawEntry>;
-  regionIds: number[];
-}
+import { loadR2OfferIndex, loadR2TypeRows, type R2OfferIndex } from './r2OfferSnapshot';
 
 export interface OfferIndexType {
   typeId: number;
   count: number;
   cheapest: number | null;
-  /** Firestore chunk range; empty (`lastChunk < firstChunk`) for an index read from R2. */
-  firstChunk: number;
-  lastChunk: number;
 }
 
 export interface OfferIndex {
   lastSyncedAt: number;
   types: ReadonlyMap<number, OfferIndexType>;
   regionIds: readonly number[];
-  /** Set when the index came from R2 (ADR 0019): a type's offers are then read from the objects it names, not from chunk docs. */
-  r2?: R2OfferIndex;
-}
-
-export function parseOfferIndex(raw: RawOfferIndex): OfferIndex {
-  const types = new Map<number, OfferIndexType>();
-  for (const [key, [count, cheapest, firstChunk, lastChunk]] of Object.entries(raw.types)) {
-    const typeId = Number(key);
-    types.set(typeId, { typeId, count, cheapest, firstChunk, lastChunk });
-  }
-  return { lastSyncedAt: raw.lastSyncedAt, types, regionIds: raw.regionIds };
+  /** The R2 index as read: a type's offers are read from the objects it names. */
+  r2: R2OfferIndex;
 }
 
 export function offerIndexFromR2(raw: R2OfferIndex): OfferIndex {
   const types = new Map<number, OfferIndexType>();
   for (const [key, { count, cheapest }] of Object.entries(raw.types)) {
     const typeId = Number(key);
-    types.set(typeId, { typeId, count, cheapest, firstChunk: 0, lastChunk: -1 });
+    types.set(typeId, { typeId, count, cheapest });
   }
   return { lastSyncedAt: raw.lastSyncedAt, types, regionIds: raw.regionIds, r2: raw };
 }
 
-async function fetchIndex(characterId: number): Promise<RawOfferIndex | null> {
-  if (!isSyncConfigured()) return null;
-  await ensureAnySession(characterId);
-  const snap = await getDoc(doc(getSyncFirestore(), INDEX_COLLECTION, INDEX_DOC));
-  const data = snap.data() as Partial<RawOfferIndex> | undefined;
-  if (!data?.types || typeof data.lastSyncedAt !== 'number') return null;
-  return { lastSyncedAt: data.lastSyncedAt, types: data.types, regionIds: data.regionIds ?? [] };
-}
-
-/**
- * `null` when there is no usable index; never throws. R2's index is preferred;
- * the Firestore one answers when R2 is unreachable or its index is missing or
- * invalid.
- */
-export async function loadOfferIndex(characterId: number): Promise<OfferIndex | null> {
+/** `null` when there is no usable index; never throws. */
+export async function loadOfferIndex(): Promise<OfferIndex | null> {
   const r2 = await loadR2OfferIndex();
-  if (r2) return offerIndexFromR2(r2.data);
-  try {
-    const cached = await loadWithCache(
-      GLOBAL_CACHE_CHARACTER_ID,
-      INDEX_CACHE_KEY,
-      () => fetchIndex(characterId),
-      { staleAfterMs: STALE_AFTER_MS, allowStaleServe: true }
-    );
-    return cached ? parseOfferIndex(cached.data) : null;
-  } catch {
-    return null;
-  }
+  return r2 ? offerIndexFromR2(r2.data) : null;
 }
 
-/** Chunk docs already read this publish cycle, keyed by `lastSyncedAt:chunk`, so a second search for a neighbouring type does not re-read them. */
-const chunkMemo = new Map<string, Promise<PublicContractOfferRow[]>>();
-
-function readChunk(index: OfferIndex, chunk: number): Promise<PublicContractOfferRow[]> {
-  const key = `${index.lastSyncedAt}:${chunk}`;
-  let pending = chunkMemo.get(key);
-  if (!pending) {
-    // Chunks of an older publish can never be asked for again; keep the memo
-    // to the current one so a long session does not accumulate them.
-    for (const memoKey of chunkMemo.keys()) {
-      if (!memoKey.startsWith(`${index.lastSyncedAt}:`)) chunkMemo.delete(memoKey);
-    }
-    pending = getDoc(doc(getSyncFirestore(), OFFERS_COLLECTION, chunkDocId(chunk))).then((snap) => {
-      const data = snap.data() as
-        { rows?: PublicContractOfferRow[]; publishedAt?: number } | undefined;
-      // The chunk must belong to the publish the index describes: ranges from
-      // one publish are meaningless against the rows of another. An unstamped
-      // chunk predates the writer that produces an index, so it cannot match.
-      if (data?.publishedAt !== index.lastSyncedAt) {
-        throw new Error('chunk is from another publish');
-      }
-      return data.rows ?? [];
-    });
-    // A failed or mismatched read must not poison the memo for the retry.
-    pending.catch(() => chunkMemo.delete(key));
-    chunkMemo.set(key, pending);
-  }
-  return pending;
-}
-
-/** Test seam: the memo outlives a test's own state. */
-export function resetOfferChunkMemo(): void {
-  chunkMemo.clear();
-}
-
-/**
- * The offers of just these types, read from only the chunk docs the index says
- * hold them. `null` when a chunk is from a different publish than the index
- * describes (its ranges cannot be trusted) or a read failed — the caller then waits for the full snapshot instead.
- */
-export async function loadOffersForTypes(
+/** The offers of just these types, from the R2 objects the index names; `null` when a read failed. */
+export function loadOffersForTypes(
   index: OfferIndex,
-  typeIds: ReadonlySet<number>,
-  characterId: number
+  typeIds: ReadonlySet<number>
 ): Promise<PublicContractOfferRow[] | null> {
-  if (index.r2) {
-    const rows = await loadR2TypeRows(index.r2, typeIds);
-    if (rows) return rows;
-    // R2 stopped answering after its index was read: the whole snapshot from
-    // Firestore, narrowed, rather than a board stuck waiting for rows.
-    const full = await loadFirestoreContractOffers(characterId).catch(() => null);
-    return full?.cached?.data.rows.filter((row) => typeIds.has(row.typeId)) ?? null;
-  }
-  try {
-    await ensureAnySession(characterId);
-    const chunks = new Set<number>();
-    for (const typeId of typeIds) {
-      const entry = index.types.get(typeId);
-      if (!entry) continue;
-      for (let chunk = entry.firstChunk; chunk <= entry.lastChunk; chunk += 1) chunks.add(chunk);
-    }
-    const wanted = [...chunks].sort((a, b) => a - b);
-    const byChunk = new Map<number, PublicContractOfferRow[]>();
-    let next = 0;
-    async function worker(): Promise<void> {
-      while (next < wanted.length) {
-        const chunk = wanted[next];
-        next += 1;
-        byChunk.set(chunk, await readChunk(index, chunk));
-      }
-    }
-    await Promise.all(
-      Array.from({ length: Math.min(CHUNK_READ_CONCURRENCY, wanted.length) }, worker)
-    );
-
-    return wanted.flatMap((chunk) =>
-      (byChunk.get(chunk) ?? []).filter((row) => typeIds.has(row.typeId))
-    );
-  } catch {
-    return null;
-  }
-}
-
-/** How many objects (R2) or chunk docs (Firestore) reading these types takes. */
-export function readSpan(index: OfferIndex, typeIds: ReadonlySet<number>): number {
-  if (index.r2) return r2ObjectsForTypes(index.r2, typeIds).length;
-  const chunks = new Set<number>();
-  for (const typeId of typeIds) {
-    const entry = index.types.get(typeId);
-    if (!entry) continue;
-    for (let chunk = entry.firstChunk; chunk <= entry.lastChunk; chunk += 1) chunks.add(chunk);
-  }
-  return chunks.size;
+  return loadR2TypeRows(index.r2, typeIds);
 }

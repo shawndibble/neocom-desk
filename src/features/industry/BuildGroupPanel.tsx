@@ -49,7 +49,7 @@ import { writeToClipboard } from '@/lib/clipboard';
 import { cx } from '@/lib/cx';
 import { formatDuration } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
-import { unmaskNumber } from '@/lib/numberMask';
+import { unmaskCount } from '@/lib/numberMask';
 import { getTradeHub } from '@/market/hubs';
 import type { PiData } from '@/sde/types';
 import { nameForType, volumeForType, type BlueprintCatalog } from './blueprintCatalog';
@@ -72,7 +72,7 @@ import {
 import { useOwnedStockBulk } from './useOwnedStockBulk';
 import { PlanScheduleLine } from './PlanScheduleLine';
 import { planJobNodes, usePlanSchedule } from './planJobSlots';
-import { hasShoppingList, shoppingListText } from './shoppingList';
+import { hasShoppingList, shoppingListText } from '@/engine/industry/shoppingList';
 import { useComparedBuildResults } from './useComparedBuildResults';
 import { useDetectedOwnedStock } from './useDetectedOwnedStock';
 import { RetargetGroupDialog, type RetargetTarget } from './RetargetGroupDialog';
@@ -83,12 +83,6 @@ import { useTableExport } from '@/components/ui/useTableExport';
 /** A merged materials row still open to buying, plus the buy-list's own
  * netted remainder — see the `buyRows`/`craftedTypeIds` split below. */
 type BuyMaterialRow = MaterialCostLine & { buyToShow: number };
-
-/** Whole-unit input parsing shared by every owned-quantity cell in this panel. */
-function parseOwnedCount(raw: string): number | undefined {
-  const value = unmaskNumber(raw);
-  return value === undefined ? undefined : Math.floor(value);
-}
 
 /** The whole-group copy control's key in `copyState`; no hub can collide with it. */
 const GROUP_COPY = 'group';
@@ -459,7 +453,7 @@ export function BuildGroupPanel({
                 inputMode="numeric"
                 widthClassName="w-20"
                 placeholder="0"
-                parse={parseOwnedCount}
+                parse={unmaskCount}
                 onCommit={(quantity) => setOwnedQuantity(material.typeID, quantity)}
               />
               {offer !== null && (

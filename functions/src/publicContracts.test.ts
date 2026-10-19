@@ -3,8 +3,6 @@ import {
   parseContractsCsv,
   parseContractItemsCsv,
   eligibleContractFrom,
-  chunkRows,
-  chunkDocId,
   compactContractOfferRow,
   accumulateRequestedSide,
   applyRequestedSide,
@@ -13,13 +11,10 @@ import {
   filterAndCompactPublicContractOffers,
   sortContractOfferRows,
   buildContractOfferIndex,
-  chunkDocData,
-  PUBLIC_CONTRACT_OFFERS_CHUNK_SIZE,
   courierContractFrom,
   isOutstandingCourierContract,
   filterAndCompactPublicCourierContracts,
   sortCourierContractRows,
-  PUBLIC_COURIER_CONTRACTS_CHUNK_SIZE,
   type PublicContractOfferRow,
   type PublicCourierContractRow,
 } from './publicContracts.js';
@@ -114,33 +109,6 @@ describe('eligibleContractFrom', () => {
       ])
     );
     expect(eligibleContractFrom(broken, NOW)).toBeNull();
-  });
-});
-
-describe('chunkRows', () => {
-  it('splits rows into fixed-size chunks, in order', () => {
-    const rows = Array.from({ length: 5 }, (_, i) => i);
-    expect(chunkRows(rows, 2)).toEqual([[0, 1], [2, 3], [4]]);
-  });
-
-  it('returns one empty result for no rows', () => {
-    expect(chunkRows([], 2)).toEqual([]);
-  });
-
-  it('returns a single chunk when rows fit within one chunk size', () => {
-    expect(chunkRows([1, 2, 3], 10)).toEqual([[1, 2, 3]]);
-  });
-
-  it('rejects a non-positive chunk size', () => {
-    expect(() => chunkRows([1], 0)).toThrow();
-  });
-});
-
-describe('chunkDocId', () => {
-  it('zero-pads so lexicographic and numeric chunk order agree', () => {
-    expect(chunkDocId(0)).toBe('chunk-0000');
-    expect(chunkDocId(12)).toBe('chunk-0012');
-    expect(chunkDocId(0) < chunkDocId(12)).toBe(true);
   });
 });
 
@@ -517,12 +485,6 @@ describe('sortContractOfferRows', () => {
   });
 });
 
-describe('chunkDocData', () => {
-  it('stamps a chunk with the publish it belongs to, alongside its rows', () => {
-    expect(chunkDocData([{ a: 1 }], 1234)).toEqual({ rows: [{ a: 1 }], publishedAt: 1234 });
-  });
-});
-
 describe('buildContractOfferIndex', () => {
   const offer = (fields: Partial<PublicContractOfferRow>) =>
     ({
@@ -533,129 +495,56 @@ describe('buildContractOfferIndex', () => {
       ...fields,
     }) as PublicContractOfferRow;
 
-  it('says how many offers, the cheapest, and which chunks hold each type', () => {
-    // Already type-sorted, as the writer hands them over; chunks of 2.
+  it('says how many offers and the cheapest for each type, in any row order', () => {
     const rows = [
       offer({ typeId: 34, price: 50 }),
       offer({ typeId: 34, price: 20 }),
       offer({ typeId: 35, price: 70 }),
       offer({ typeId: 36, price: 10 }),
-      offer({ typeId: 36, price: 15 }),
+      offer({ typeId: 34, price: 15 }),
     ];
 
-    const index = buildContractOfferIndex(rows, 2);
+    const index = buildContractOfferIndex(rows);
 
     expect(index.types).toEqual({
-      '34': [2, 20, 0, 0],
-      '35': [1, 70, 1, 1],
-      '36': [2, 10, 1, 2],
+      '34': [3, 15],
+      '35': [1, 70],
+      '36': [1, 10],
     });
   });
 
   it('prices an auction at its buyout, as the client does, not at its starting bid', () => {
-    const index = buildContractOfferIndex(
-      [offer({ typeId: 34, price: 1, isAuction: true, buyout: 2_000_000 })],
-      10
-    );
-    expect(index.types['34']).toEqual([1, 2_000_000, 0, 0]);
+    const index = buildContractOfferIndex([
+      offer({ typeId: 34, price: 1, isAuction: true, buyout: 2_000_000 }),
+    ]);
+    expect(index.types['34']).toEqual([1, 2_000_000]);
   });
 
   it('falls back to the starting bid for an auction with no buyout', () => {
-    const index = buildContractOfferIndex([offer({ typeId: 34, price: 7, isAuction: true })], 10);
-    expect(index.types['34']).toEqual([1, 7, 0, 0]);
+    const index = buildContractOfferIndex([offer({ typeId: 34, price: 7, isAuction: true })]);
+    expect(index.types['34']).toEqual([1, 7]);
   });
 
   it('leaves cheapest null for a type with only unpriced (zero-price) offers', () => {
-    const index = buildContractOfferIndex([offer({ typeId: 34, price: 0 })], 10);
-    expect(index.types['34']).toEqual([1, null, 0, 0]);
+    const index = buildContractOfferIndex([offer({ typeId: 34, price: 0 })]);
+    expect(index.types['34']).toEqual([1, null]);
   });
 
   it('skips a PLEX-asking offer when finding the cheapest, but still counts it', () => {
-    const index = buildContractOfferIndex(
-      [offer({ typeId: 34, price: 5, requestedPlex: 10 }), offer({ typeId: 34, price: 90 })],
-      10
-    );
-    expect(index.types['34']).toEqual([2, 90, 0, 0]);
+    const index = buildContractOfferIndex([
+      offer({ typeId: 34, price: 5, requestedPlex: 10 }),
+      offer({ typeId: 34, price: 90 }),
+    ]);
+    expect(index.types['34']).toEqual([2, 90]);
   });
 
   it('lists each region once, sorted', () => {
-    const index = buildContractOfferIndex(
-      [
-        offer({ typeId: 1, regionId: 10000043 }),
-        offer({ typeId: 2, regionId: 10000002 }),
-        offer({ typeId: 3, regionId: 10000043 }),
-      ],
-      10
-    );
+    const index = buildContractOfferIndex([
+      offer({ typeId: 1, regionId: 10000043 }),
+      offer({ typeId: 2, regionId: 10000002 }),
+      offer({ typeId: 3, regionId: 10000043 }),
+    ]);
     expect(index.regionIds).toEqual([10000002, 10000043]);
-  });
-
-  it('keeps a worst-case index for twice the listed-type count today clear of the 1MiB document limit', () => {
-    const rows = Array.from({ length: 25_000 }, (_, i) =>
-      offer({ typeId: 1_000_000 + i, price: 999999999999.99 })
-    );
-    const bytes = Buffer.byteLength(JSON.stringify(buildContractOfferIndex(rows, 3000)));
-    expect(bytes).toBeLessThan(1_048_576 * 0.9);
-  });
-});
-
-describe('public contract offers snapshot sizing', () => {
-  it('chunks coarsely enough to leave room in the free tier write budget', () => {
-    // The 20,000 writes/day free tier is the project's budget, not this job's:
-    // dispatchProjections runs 288x/day beside it. The row count is #906's
-    // estimate, to be re-grounded once the sync's logged `rowCount` says what
-    // the live volume is; what this pins meanwhile is that the chunk size is
-    // not quietly shrunk back toward the 2,000 the retired blueprint-only
-    // snapshot used, which would spend ~8.9k writes/day here on its own. A
-    // larger chunk trades write count for doc size; the next test is what
-    // holds the doc size honest.
-    const ESTIMATED_ROWS = 370_000;
-    const RUNS_PER_DAY = 48;
-    const writesPerDay =
-      Math.ceil(ESTIMATED_ROWS / PUBLIC_CONTRACT_OFFERS_CHUNK_SIZE) * RUNS_PER_DAY;
-    expect(writesPerDay).toBeLessThan(7_000);
-  });
-
-  it('keeps a chunk of nothing but worst-case rows clear of the 1MiB document limit', () => {
-    // Measured off a real row rather than asserted against a byte constant:
-    // the point of this guard is to fail when a later row-shape change grows
-    // the row — #908 adding a contract title is the obvious one — and a
-    // hardcoded average would sail straight past that. Firestore's own
-    // accounting isn't JSON, but it tracks closely enough to trip well before
-    // a live `set()` does.
-    const widest = compactContractOfferRow(
-      parseContractItemsCsv(
-        itemsCsv([
-          'true,true,1053870035543,10,2100000000,5283227785,300,20,32858,2026-09-01T11:31:43Z,234920481',
-        ])
-      )[0],
-      {
-        contractId: 2349204819,
-        regionId: 10000043,
-        locationId: 1043607688037,
-        price: 999999999999.99,
-        buyout: 999999999999.99,
-        isAuction: true,
-        dateExpired: Date.parse(FUTURE),
-      }
-    );
-    if (widest)
-      applyRequestedSide([widest], {
-        plex: new Map([['2349204819', 2_100_000_000]]),
-        items: new Set(['2349204819']),
-      });
-
-    // Every optional field populated, or it isn't the worst case.
-    expect(widest).toMatchObject({
-      buyout: expect.any(Number),
-      isBlueprintCopy: true,
-      runs: 300,
-      requestedPlex: 2_100_000_000,
-      requestsItems: true,
-    });
-    expect(
-      PUBLIC_CONTRACT_OFFERS_CHUNK_SIZE * Buffer.byteLength(JSON.stringify(widest))
-    ).toBeLessThan(1024 * 1024);
   });
 });
 
@@ -820,61 +709,5 @@ describe('sortCourierContractRows', () => {
 
     expect(sortCourierContractRows(rows)).toBe(rows);
     expect(rows.map((r) => r.contractId)).toEqual([1, 2, 3]);
-  });
-});
-
-describe('public courier contracts snapshot sizing', () => {
-  it('costs a rounding error against the free tier write budget', () => {
-    // ADR 0013's live pull was ~50,300 public contracts, 48,963 of them
-    // item_exchange and 717 auction, so every remaining type together —
-    // courier and loan — is under 620. One row per contract rather than one
-    // per item line, so this snapshot is a single chunk doc plus its meta
-    // doc: ~96 writes/day beside the offers sync's ~6.0k.
-    const ESTIMATED_ROWS = 620;
-    const RUNS_PER_DAY = 48;
-    const chunkAndMetaDocs = Math.ceil(ESTIMATED_ROWS / PUBLIC_COURIER_CONTRACTS_CHUNK_SIZE) + 1;
-    expect(chunkAndMetaDocs * RUNS_PER_DAY).toBeLessThan(200);
-  });
-
-  it('keeps a chunk of nothing but worst-case rows clear of the 1MiB document limit', () => {
-    // Measured off a real row, like the offers snapshot's own guard: a later
-    // field addition should fail here before it fails a live `set()`.
-    const widest = courierContractFrom(
-      parseContractsCsv(
-        contractsCsv([
-          `999999999999.99,2349204819,${FUTURE},2026-08-11T18:10:34Z,30,1043607688037,98745702,2120819548,,999999999999.99,1043607688781,"Widest",courier,1300000.0,2026-09-08T18:08:11Z,10000043,60005668,30002197,20000323,false,`,
-        ])
-      )[0],
-      NOW
-    );
-
-    // Every optional field populated, or it isn't the worst case.
-    expect(widest).toMatchObject({ collateral: expect.any(Number), daysToComplete: 30 });
-    expect(
-      PUBLIC_COURIER_CONTRACTS_CHUNK_SIZE * Buffer.byteLength(JSON.stringify(widest))
-    ).toBeLessThan(1024 * 1024);
-  });
-
-  it('chunks a courier row set at this snapshot chunk size, in order', () => {
-    // One row past a full chunk: the write path in index.ts writes chunk `i`
-    // for every `i < chunks.length` and deletes any leftover past that, so a
-    // set that spills has to spill in order rather than reshuffling.
-    const rows: PublicCourierContractRow[] = Array.from(
-      { length: PUBLIC_COURIER_CONTRACTS_CHUNK_SIZE + 1 },
-      (_, i) => ({
-        contractId: i + 1,
-        regionId: 10000002,
-        originLocationId: 60003760,
-        destinationLocationId: 60008494,
-        reward: 1200000,
-        volume: 12500,
-        dateExpired: Date.parse(FUTURE),
-      })
-    );
-
-    const chunks = chunkRows(sortCourierContractRows(rows), PUBLIC_COURIER_CONTRACTS_CHUNK_SIZE);
-
-    expect(chunks.map((chunk) => chunk.length)).toEqual([PUBLIC_COURIER_CONTRACTS_CHUNK_SIZE, 1]);
-    expect(chunks.flat().map((r) => r.contractId)).toEqual(rows.map((r) => r.contractId));
   });
 });

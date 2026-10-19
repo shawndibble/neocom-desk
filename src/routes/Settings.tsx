@@ -111,7 +111,7 @@ import {
   characterCell,
   dataAgeCsvColumns,
   OUTCOME_LABEL_KEYS,
-} from './activityLogCsv';
+} from '@/features/settings/activityLogCsv';
 
 const FONT_SCALE_LABEL_KEYS = {
   0.875: 'settings.fontScaleSmall',

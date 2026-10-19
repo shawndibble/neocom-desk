@@ -1,7 +1,7 @@
 /**
  * ESI global market prices — fallback price source (ADR 0002), and the
  * source of adjusted_price used for job-cost EIV (estimated item value).
- * Routed through the getMarketsPrices wrapper (src/esi/endpoints.ts) rather
+ * Routed through the getMarketsPrices wrapper (src/esi/endpoints/) rather
  * than esiFetch directly, so the registry stays the one place every ESI call
  * is accounted for.
  */

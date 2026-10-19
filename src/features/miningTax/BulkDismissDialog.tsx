@@ -6,6 +6,7 @@ import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 import type { DisplayRow } from './groupRows';
 import { dismiss } from './ledgerActions';
+import { systemLabel } from './names';
 import { useLedgerAction } from './useLedgerAction';
 import { LedgerActionError } from './LedgerActionError';
 
@@ -45,8 +46,7 @@ export function BulkDismissDialog({
   const included = useMemo(() => rows.filter((dr) => !excluded.has(dr.key)), [rows, excluded]);
   const total = included.reduce((sum, dr) => sum + estimatedValueOf(dr), 0);
 
-  const systemName = (solarSystemId: number) =>
-    systemNames.get(solarSystemId) ?? `#${String(solarSystemId)}`;
+  const systemName = (solarSystemId: number) => systemLabel(systemNames, solarSystemId);
 
   function toggle(key: string) {
     setExcluded((previous) => {

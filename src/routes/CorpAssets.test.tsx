@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import '@/i18n';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import type { CachedResult, StatusResult } from '@/esi/cache';
@@ -17,6 +17,7 @@ import * as corpAssets from '@/features/corp/assets';
 import * as corpWallet from '@/features/corp/wallet';
 import { db } from '@/db';
 import { CorpAssets } from './CorpAssets';
+import { LocationProbe } from '@/test/LocationProbe';
 
 vi.mock('@/features/corp/useCorpAccess', () => ({ useCorpAccess: vi.fn() }));
 vi.mock('@/features/corp/boardData', async (importOriginal) => ({
@@ -107,12 +108,6 @@ function renderAssets(initialEntry = '/corp/assets') {
       <LocationProbe />
     </MemoryRouter>
   );
-}
-
-/** Prints the router's current location, so a test can read what the page wrote. */
-function LocationProbe() {
-  const location = useLocation();
-  return <div data-testid="location">{`${location.pathname}${location.search}`}</div>;
 }
 
 function currentLocation(): string {

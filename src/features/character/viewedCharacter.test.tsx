@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
-import { viewedCharacterHref, viewedCharacterIdFromSearch } from './viewedCharacter';
+import { viewedCharacterIdFromSearch } from './viewedCharacter';
 import { WalletOriginCrumb } from './WalletOriginCrumb';
 
 describe('viewedCharacterIdFromSearch', () => {
@@ -26,10 +26,6 @@ describe('viewedCharacterIdFromSearch', () => {
     ]) {
       expect(viewedCharacterIdFromSearch(search)).toBeNull();
     }
-  });
-
-  it('builds the drill-in href', () => {
-    expect(viewedCharacterHref('/assets', 92)).toBe('/assets?char=92');
   });
 });
 

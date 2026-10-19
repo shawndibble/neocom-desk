@@ -12,7 +12,7 @@ import {
   type ComparisonRow,
   type GroupBand,
   type LevelDelta,
-} from '../compareSkills';
+} from '@/engine/skills/compareSkills';
 
 export interface CompareCharacter {
   characterId: number;

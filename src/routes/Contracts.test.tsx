@@ -15,7 +15,6 @@ import {
   useContractSearchMode,
 } from '@/features/contractSearch/contractSearchModePref';
 import { formatDateOnly, formatTimestamp } from '@/lib/timestamp';
-import { isSyncConfigured } from '@/app/syncStatus';
 import { App } from '@/app/App';
 import { NARROW_QUERY } from '@/lib/useIsNarrow';
 
@@ -51,24 +50,27 @@ vi.mock('@/sync', async (importOriginal) => ({
   scheduleSync: vi.fn(),
 }));
 
-// The Search tab reads a Firestore snapshot. Forced off here so this file
-// stays about the tab strip and the character-contracts table: whether a sync
-// backend is configured otherwise depends on whether a `.env` happens to sit
-// beside the checkout, which would make these tests environment-dependent.
-// `ContractSearchPanel.test.tsx` covers the configured path.
+// Forced off so whether a sync backend is configured does not depend on
+// whether a `.env` happens to sit beside the checkout, which would make these
+// tests environment-dependent. The Search tab reads R2 and is not gated on it
+// (issue #4270).
 vi.mock('@/app/syncStatus', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/app/syncStatus')>();
   return { ...actual, isSyncConfigured: vi.fn(() => false) };
 });
 
-// Only ever reached by the Search-tab header case at the bottom of this file,
-// which turns `isSyncConfigured` back on; everywhere else the mock above keeps
-// the panel out of these loaders entirely.
-const loadPublicContractOffers = vi.fn();
+// The Search tab's loaders: no snapshot by default, so tests about the tab
+// strip and the character-contracts table never touch the network.
+const NO_SNAPSHOT = { cached: null, revalidating: false };
+const loadPublicContractOffers = vi.fn<(...args: unknown[]) => Promise<unknown>>(
+  async () => NO_SNAPSHOT
+);
 vi.mock('@/features/contractSearch/publicContractOffers', () => ({
   loadPublicContractOffers: (...args: unknown[]) => loadPublicContractOffers(...args),
 }));
-const loadPublicCourierContracts = vi.fn();
+const loadPublicCourierContracts = vi.fn<(...args: unknown[]) => Promise<unknown>>(
+  async () => NO_SNAPSHOT
+);
 vi.mock('@/features/contractSearch/publicCourierContracts', () => ({
   loadPublicCourierContracts: (...args: unknown[]) => loadPublicCourierContracts(...args),
 }));
@@ -737,12 +739,13 @@ describe('Contracts row right-click (issue #676)', () => {
 });
 
 describe('Contracts tab strip (issue #908)', () => {
-  const SEARCH_UNAVAILABLE = "Contract search isn't available";
+  // The loaders are mocked to read nothing, so the Search tab says R2 was unreachable.
+  const SEARCH_UNAVAILABLE = "Couldn't reach the contract index — nothing cached yet";
 
   it('lands on Item search with no tab in the URL', async () => {
     window.history.pushState({}, '', '/contracts');
     render(<App />);
-    expect(await screen.findByText(SEARCH_UNAVAILABLE)).toBeInTheDocument();
+    expect(await screen.findAllByText(SEARCH_UNAVAILABLE)).not.toHaveLength(0);
     expect(screen.getByRole('tab', { name: 'Item search' })).toHaveAttribute(
       'aria-selected',
       'true'
@@ -755,7 +758,7 @@ describe('Contracts tab strip (issue #908)', () => {
     useContractSearchMode.setState({ value: 'courier', hydrated: true });
     window.history.pushState({}, '', '/contracts');
     render(<App />);
-    expect(await screen.findByText(SEARCH_UNAVAILABLE)).toBeInTheDocument();
+    expect(await screen.findAllByText(SEARCH_UNAVAILABLE)).not.toHaveLength(0);
     await waitFor(() => expect(window.location.pathname).toBe('/contracts/search/courier'));
   });
 
@@ -766,7 +769,7 @@ describe('Contracts tab strip (issue #908)', () => {
     useContractSearchMode.setState({ value: 'courier', hydrated: true });
     window.history.pushState({}, '', '/contracts/search/items');
     render(<App />);
-    expect(await screen.findByText(SEARCH_UNAVAILABLE)).toBeInTheDocument();
+    expect(await screen.findAllByText(SEARCH_UNAVAILABLE)).not.toHaveLength(0);
     expect(window.location.pathname).toBe('/contracts/search/items');
   });
 
@@ -774,7 +777,7 @@ describe('Contracts tab strip (issue #908)', () => {
     const user = userEvent.setup();
     window.history.pushState({}, '', '/contracts');
     render(<App />);
-    await screen.findByText(SEARCH_UNAVAILABLE);
+    await screen.findAllByText(SEARCH_UNAVAILABLE);
 
     await user.click(screen.getByRole('tab', { name: 'History' }));
 
@@ -791,7 +794,7 @@ describe('Contracts tab strip (issue #908)', () => {
 
     await user.click(screen.getByRole('tab', { name: 'Item search' }));
 
-    expect(await screen.findByText(SEARCH_UNAVAILABLE)).toBeInTheDocument();
+    expect(await screen.findAllByText(SEARCH_UNAVAILABLE)).not.toHaveLength(0);
     expect(window.location.pathname).toBe('/contracts/search/items');
   });
 
@@ -799,7 +802,7 @@ describe('Contracts tab strip (issue #908)', () => {
     window.history.pushState({}, '', '/contracts?tab=search');
     render(<App />);
 
-    expect(await screen.findByText(SEARCH_UNAVAILABLE)).toBeInTheDocument();
+    expect(await screen.findAllByText(SEARCH_UNAVAILABLE)).not.toHaveLength(0);
     expect(screen.getByRole('tab', { name: 'Item search' })).toHaveAttribute(
       'aria-selected',
       'true'
@@ -821,7 +824,7 @@ describe('Contracts tab strip (issue #908)', () => {
 
     await user.click(screen.getByRole('tab', { name: 'Item search' }));
 
-    expect(await screen.findByText(SEARCH_UNAVAILABLE)).toBeInTheDocument();
+    expect(await screen.findAllByText(SEARCH_UNAVAILABLE)).not.toHaveLength(0);
     expect(screen.queryByText(/^no contracts$/i)).not.toBeInTheDocument();
   });
 
@@ -837,7 +840,7 @@ describe('Contracts tab strip (issue #908)', () => {
 
     await user.click(screen.getByRole('tab', { name: 'Item search' }));
 
-    expect(await screen.findByText(SEARCH_UNAVAILABLE)).toBeInTheDocument();
+    expect(await screen.findAllByText(SEARCH_UNAVAILABLE)).not.toHaveLength(0);
     expect(screen.queryByText('Log in again to see your contracts')).not.toBeInTheDocument();
   });
 });
@@ -862,15 +865,13 @@ describe('Contracts Search tab page header', () => {
   };
 
   beforeEach(() => {
-    vi.mocked(isSyncConfigured).mockReturnValue(true);
-    loadPublicContractOffers.mockReset();
     loadPublicContractOffers.mockResolvedValue(EMPTY_SNAPSHOT);
-    loadPublicCourierContracts.mockReset();
     loadPublicCourierContracts.mockResolvedValue(EMPTY_SNAPSHOT);
   });
 
   afterEach(() => {
-    vi.mocked(isSyncConfigured).mockReturnValue(false);
+    loadPublicContractOffers.mockImplementation(async () => NO_SNAPSHOT);
+    loadPublicCourierContracts.mockImplementation(async () => NO_SNAPSHOT);
   });
 
   it("shows the public snapshot's age beside the page title, and an enabled Refresh", async () => {

@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -38,11 +39,16 @@ export function SkillPlanCard({
     async () => db.skillPlans.where('characterId').equals(activeCharacterId).toArray(),
     [activeCharacterId]
   );
-  const stats = usePlanStats(plans, scheduleInputs, activeCharacterId);
-  const current = plans?.reduce<(typeof plans)[number] | undefined>(
-    (best, plan) => (!best || plan.updatedAt > best.updatedAt ? plan : best),
-    undefined
+  const current = useMemo(
+    () =>
+      plans?.reduce<(typeof plans)[number] | undefined>(
+        (best, plan) => (!best || plan.updatedAt > best.updatedAt ? plan : best),
+        undefined
+      ),
+    [plans]
   );
+  // Only the current plan is shown here; the "All plans…" pane costs the rest.
+  const stats = usePlanStats(plans, scheduleInputs, activeCharacterId, current ? [current.id] : []);
   const currentStats = current ? stats?.get(current.id) : undefined;
   const meta = !currentStats
     ? null

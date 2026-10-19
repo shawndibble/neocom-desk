@@ -59,7 +59,6 @@ describe('repriceForOreForm', () => {
     const row = await db.miningTaxAssignments.get('a1');
     expect(row).toMatchObject({ estimatedValue: 500, taxOwed: 50, rawOrePriced: true });
     expect(pricingMock.loadUnitPricesOnDate).toHaveBeenCalledWith(
-      CHAR,
       [TYPE],
       expect.anything(),
       '2026-09-04',

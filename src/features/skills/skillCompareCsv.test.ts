@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { skillCompareCsvColumns } from './skillCompareCsv';
-import type { ComparisonRow } from './compareSkills';
+import type { ComparisonRow } from '@/engine/skills/compareSkills';
 
 const t = (k: string) => k;
 

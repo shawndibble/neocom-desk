@@ -348,7 +348,8 @@ export async function getRegionSellPrices(
       pending.set(typeId, price);
     }
   }
-  for (const [typeId, price] of pending) result.set(typeId, await price);
+  const settled = await Promise.all([...pending.values()]);
+  [...pending.keys()].forEach((typeId, i) => result.set(typeId, settled[i]));
   return result;
 }
 
