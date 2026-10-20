@@ -2061,6 +2061,16 @@ describe('ContractSearchPanel — search first (issue #2921)', () => {
       regionIds: [10000002, 10000043],
     };
 
+    it('asks for a search, with the search box, when R2 returns the index and no rows', async () => {
+      loadPublicContractOffers.mockResolvedValue(cachedSnapshot([]));
+      loadOfferIndex.mockResolvedValue(INDEX);
+      renderWithRouter(['/']);
+
+      expect(await screen.findByText('Search to see contract offers')).toBeInTheDocument();
+      expect(screen.queryByText('No public contracts synced yet')).not.toBeInTheDocument();
+      expect(screen.getByPlaceholderText('Search item name…')).toBeInTheDocument();
+    });
+
     it('suggests item names, with counts, from the index alone', async () => {
       loadPublicContractOffers.mockReturnValue(
         deferred<ChunkedSnapshotRead<PublicContractOfferRow>>().promise
