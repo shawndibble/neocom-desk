@@ -40,11 +40,11 @@ const NOTE: Record<FieldsVariant, string> = {
 };
 
 /**
- * A `form` row whose control is one small toggle: the checkbox leads, the
- * label follows it, and the note sits under the label.
+ * A stacked `form` row whose control is one small toggle keeps it on the
+ * label's line, at the far edge, rather than alone on a line of its own.
  */
-const INLINE_ROW = `grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2 gap-y-0 ${FORM_ROW}`;
-const INLINE_NOTE = 'col-start-2 max-w-2xl text-text-dim';
+const INLINE_ROW = `grid-cols-[minmax(0,1fr)_auto] lg:grid-cols-subgrid ${FORM_ROW}`;
+const INLINE_NOTE = 'col-span-full max-w-2xl text-text-dim lg:col-span-1 lg:col-start-2';
 
 /**
  * Labelled controls as a two-column grid of `Field`s: labels in one column,
@@ -72,7 +72,7 @@ export function Fields({
  * makes the label a real `<label>` for a single control; leave it off for a
  * group (chips, a picker) that names itself. `note` reads dim beneath the
  * control; a `warning` label marks a setting moved off its default. `inline`
- * is for a lone checkbox in a `form` grid: checkbox first, then label and note (see `INLINE_ROW`).
+ * is for a lone checkbox in a `form` grid (see `INLINE_ROW`).
  */
 export function Field({
   label,
@@ -97,7 +97,6 @@ export function Field({
   return (
     <FieldNoteContext.Provider value={hasNote ? noteId : undefined}>
       <div className={cx('col-span-full grid', inlineRow ? INLINE_ROW : ROW[variant])}>
-        {inlineRow && <div className="flex min-w-0 items-center">{children}</div>}
         {htmlFor ? (
           <label htmlFor={htmlFor} className={labelClassName}>
             {label}
@@ -105,7 +104,7 @@ export function Field({
         ) : (
           <span className={labelClassName}>{label}</span>
         )}
-        {!inlineRow && <div className="flex min-w-0 flex-wrap items-center gap-2">{children}</div>}
+        <div className="flex min-w-0 flex-wrap items-center gap-2">{children}</div>
         {hasNote && (
           <p id={noteId} className={inlineRow ? INLINE_NOTE : NOTE[variant]}>
             {note}

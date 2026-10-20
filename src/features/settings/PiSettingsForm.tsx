@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import {
+  Checkbox,
   Field,
   Fields,
   FilterChip,
@@ -19,8 +20,10 @@ import {
   withHaulBetweenPlanets,
   type PiBuyTier,
 } from '@/features/pi/piSettings';
+import { tappableRowClassName } from '@/components/ui/controlStyles';
+import { cx } from '@/lib/cx';
 import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
-import { CheckboxField, ChipRow, SettingsFormLoading } from './settingsFields';
+import { ChipRow, SettingsFormLoading } from './settingsFields';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 
 const BUYBACK = 'buyback';
@@ -159,15 +162,20 @@ export function PiSettingsForm({ showSellAt = false }: { showSellAt?: boolean })
         />
       </Field>
 
-      <CheckboxField
-        id="settings-pi-haul-between-planets"
-        label={t('piPlan.chains.optIn')}
-        hint={t('piPlan.chains.optInHint')}
-        checked={settings.haulBetweenPlanets === true}
-        onChange={() =>
-          void setSettings(withHaulBetweenPlanets(settings, settings.haulBetweenPlanets !== true))
-        }
-      />
+      <Field label={t('piPlan.chains.title')} note={t('piPlan.chains.optInHint')}>
+        <label
+          className={cx(
+            'flex w-fit cursor-pointer items-center gap-2 text-sm text-text',
+            tappableRowClassName
+          )}
+        >
+          <Checkbox
+            checked={settings.haulBetweenPlanets === true}
+            onChange={(e) => void setSettings(withHaulBetweenPlanets(settings, e.target.checked))}
+          />
+          {t('piPlan.chains.optIn')}
+        </label>
+      </Field>
 
       <ChipRow
         label={t('settings.piExpiringLabel')}
