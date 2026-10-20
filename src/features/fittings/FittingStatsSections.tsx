@@ -1,109 +1,37 @@
-import { Fragment, useRef, useState, type ReactNode } from 'react';
-import { useHydratedStore } from '@/lib/useHydratedStore';
+import { useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
 import { useShipDataNeedsConnection } from './useDogmaEngineStatus';
-import { formatSeconds } from '@/lib/duration';
 import type {
   Fitting,
   FittingModuleResult,
   FittingStats,
   StatsErrorReason,
 } from '@/engine/fittings/types';
-import { ResistTable } from './stats/ResistTable';
-import { formatEhp } from './stats/resistFormat';
-import { resistRows } from './stats/resistRows';
-import { fleetBoostsMeta, supportMeta } from './stats/sectionMeta';
-import {
-  DroneFacts,
-  FighterFacts,
-  FittingBudgetFacts,
-  NavigationFacts,
-  TargetingFacts,
-} from './stats/shipFacts';
-import { PriceBody, IskLabel } from './stats/PriceBody';
-import { priceView } from './stats/priceView';
-import { OVER_BUDGET_TONE, makeFigure } from './stats/statFigures';
-import { OffenseRows } from './stats/OffenseRows';
-import { StatSection, YourCharactersSection } from './stats/StatSection';
+import { damageSections, shipSections, tankSections } from './stats/columnSections';
+import { makeFigure } from './stats/statFigures';
+import { YourCharactersSection } from './stats/StatSection';
+import { useSectionBuilder } from './stats/useSectionBuilder';
 import type { Appraisal } from '@/engine/market/appraisal';
 import type { DogmaAssetProgress } from './dogmaFittingEngine';
 import { useDamageProfileName, type DamageProfiles } from './damageProfiles';
-import { DamageProfilePicker } from './DamageProfilePicker';
-import { AppliedDpsPanel } from './AppliedDpsPanel';
-import { StatFields, StatNote } from './StatFacts';
+import { StatNote, StatFields } from './StatFacts';
 import { SkillOverridesControl } from './SkillOverridesControl';
 import { StatsToolbar } from './StatsToolbar';
-import { useIsPhone } from '@/lib/useIsPhone';
-import {
-  isSectionExpanded,
-  useStatsSectionsPreference,
-  withSectionExpanded,
-} from './statsSectionsPreference';
-import { CapacitorFacts, TankFacts } from './FittingTankStats';
-import { capacitorTone, type CapacitorTone } from './capacitorTone';
 import { type GapCharacter } from './useCharacterGaps';
-import { SupportFacts } from './FittingSupportStats';
-import { MiningFacts } from './FittingMiningStats';
-import { FleetBoostFacts } from './FittingFleetBoostStats';
-import { hasFleetSupport } from '@/engine/fittings/fleetSupport';
 import { ProjectedEffectsPanel } from './ProjectedEffectsPanel';
 import { useOverheatAll, useProjectedSources } from './statsConditions';
 import type { TargetProfiles } from './targetProfiles';
 import type { OverlayFitting } from './useOverlayFitting';
-import { kmValue } from './rangeText';
 import { AbyssalRunPlanner, AbyssalWeatherMeta, type WeatherCompare } from './AbyssalRunPlanner';
 import { useAbyssalWeather, useWeatherName } from './abyssalWeatherSelection';
 import { StatsHeadingLabel } from './StatsHeadingLabel';
-import { StatsGroupLabel, StatsScopePanel, StatsScopeTrigger } from './StatsScopePanels';
+import { StatsScopePanel, StatsScopeTrigger } from './StatsScopePanels';
 import {
   defaultTacticalMode,
   tacticalModeKind,
   tacticalModesFor,
 } from '@/engine/fittings/tacticalModes';
-import { fitsResourceBudget, resourceOverage } from '@/engine/fittings/skillGaps';
-
-const CAPACITOR_TONE_CLASS = {
-  success: 'text-success',
-  warning: 'text-warning',
-  danger: 'text-danger',
-} as const satisfies Record<CapacitorTone, string>;
-
-/** Stable ids — the remembered layout (`statsSectionsPreference.ts`) is keyed on them. */
-type Section =
-  | 'assumptions'
-  | 'whatToTrain'
-  | 'yourCharacters'
-  | 'offense'
-  | 'appliedDps'
-  | 'defense'
-  | 'capacitor'
-  | 'support'
-  | 'mining'
-  | 'fleetBoosts'
-  | 'projected'
-  | 'abyssal'
-  | 'targeting'
-  | 'navigation'
-  | 'drones'
-  | 'fighters'
-  | 'fitting'
-  | 'price';
-
-/** Open at first: what a pilot reads on every fit. The rest is a click away, as in the game window. */
-const OPEN_BY_DEFAULT: ReadonlySet<Section> = new Set([
-  'offense',
-  'appliedDps',
-  'defense',
-  'capacitor',
-  // Only there at all when the fit has something to show in it.
-  'support',
-  'mining',
-  'fleetBoosts',
-  'navigation',
-  'drones',
-  'fighters',
-]);
 
 interface FittingStatsSectionsProps {
   stats: FittingStats | null;
@@ -203,25 +131,7 @@ export function FittingStatsSections({
   // The ship data never downloaded and there is no connection to fetch it: say so, not "couldn't load".
   const shipDataNeedsConnection = useShipDataNeedsConnection();
   const profileName = useDamageProfileName()(damageProfiles.selected);
-  const priceInfo = priceView(price, typeName);
-  const { nothingPriced, unpriced } = priceInfo;
-  // A RAH's resists move with the profile (the engine adapts it), so the
-  // armor row does too — label that, and show the RAH's own adapted resists.
-  const adaptedHardeners = (stats?.modules ?? []).flatMap((module) =>
-    module.adaptedResonances ? [module.adaptedResonances] : []
-  );
-  // Which sections are open is the pilot's own layout, kept on this device
-  // (`statsSectionsPreference.ts`); an untouched one opens as OPEN_BY_DEFAULT
-  // says on desktop and starts collapsed on a phone.
-  const isPhone = useIsPhone();
-  const storedSections = useStatsSectionsPreference((state) => state.value);
-  const setSections = useStatsSectionsPreference((state) => state.setValue);
-  useHydratedStore(useStatsSectionsPreference);
-  const isExpanded = (section: Section) =>
-    isSectionExpanded(storedSections, section, {
-      isPhone,
-      openByDefault: OPEN_BY_DEFAULT.has(section),
-    });
+  const { isExpanded, section, group } = useSectionBuilder();
   const projectedShips = useProjectedSources((state) =>
     state.sources.reduce((sum, source) => sum + source.count, 0)
   );
@@ -276,15 +186,6 @@ export function FittingStatsSections({
       )}
     </>
   );
-  const toggle = (section: Section) =>
-    // From the store's current value, never this render's possibly stale copy.
-    void setSections(
-      withSectionExpanded(
-        useStatsSectionsPreference.getState().value,
-        section,
-        !isExpanded(section)
-      )
-    );
 
   const downloadPct =
     statsProgress?.totalBytes && statsProgress.totalBytes > 0
@@ -302,209 +203,18 @@ export function FittingStatsSections({
     </StatNote>
   );
 
-  const pctOf = (used: number, total: number) => (total > 0 ? (used / total) * 100 : 0);
-
   const figure = makeFigure(stats);
-
-  function section(
-    id: Section,
-    meta: ReactNode,
-    body: ReactNode,
-    warning?: string,
-    /** `h3` for a section in a side panel, under the panel's own title. */
-    level: 'h3' | 'h4' = 'h4'
-  ) {
-    return (
-      <StatSection
-        key={id}
-        title={t(`fittings.stats.section.${id}`)}
-        meta={meta}
-        warning={warning}
-        expanded={isExpanded(id)}
-        onToggle={() => toggle(id)}
-        level={level}
-      >
-        {body}
-      </StatSection>
-    );
-  }
-
-  /** A column group: its label over the sections it shows, nothing when it shows none. */
-  function group(id: 'damageTank' | 'ship', sections: ReactNode[]) {
-    const shown = sections.filter(Boolean);
-    if (shown.length === 0) return null;
-    return (
-      <Fragment key={id}>
-        <StatsGroupLabel>{t(`fittings.stats.group.${id}`)}</StatsGroupLabel>
-        {shown}
-      </Fragment>
-    );
-  }
-
-  const damageSections = [
-    section(
-      'offense',
-      stats && stats.offense.weapons.length > 0
-        ? figure((s) => t('fittings.stats.weaponDps', { value: s.offense.dps.toFixed(1) }))
-        : undefined,
-      stats ? (
-        stats.offense.weapons.length > 0 ? (
-          <OffenseRows
-            stats={stats}
-            typeName={typeName}
-            fitting={fitting}
-            moduleResults={moduleResults}
-          />
-        ) : stats.offense.chargelessWeaponCount > 0 ? (
-          <StatNote>
-            {t('fittings.stats.offenseNoCharge', { count: stats.offense.chargelessWeaponCount })}
-          </StatNote>
-        ) : (
-          <StatNote>{t('fittings.stats.offenseNone')}</StatNote>
-        )
-      ) : (
-        placeholder
-      )
-    ),
-    section(
-      'appliedDps',
-      undefined,
-      stats ? (
-        <AppliedDpsPanel
-          applied={stats.applied}
-          unheatedApplied={stats.unheated?.applied ?? null}
-          chargelessWeaponCount={stats.offense.chargelessWeaponCount}
-          targetProfiles={targetProfiles}
-          overlay={overlay}
-        />
-      ) : (
-        placeholder
-      )
-    ),
-    showDrones &&
-      section(
-        'drones',
-        figure((s) => t('fittings.stats.weaponDps', { value: s.droneDps.toFixed(1) })),
-        stats ? <DroneFacts stats={stats} /> : placeholder
-      ),
-    stats &&
-      stats.fighters.tubes.total > 0 &&
-      section(
-        'fighters',
-        figure((s) => t('fittings.stats.weaponDps', { value: s.fighters.dps.toFixed(1) })),
-        <FighterFacts stats={stats} />
-      ),
-  ];
-  const tankSections = [
-    section(
-      'defense',
-      figure((s) => t('fittings.stats.defenseEhp', { value: formatEhp(s.ehp) })),
-      <>
-        <StatFields>
-          <DamageProfilePicker damageProfiles={damageProfiles} field />
-        </StatFields>
-        {stats ? (
-          <>
-            <ResistTable rows={resistRows(stats, adaptedHardeners, profileName, t)} />
-            {adaptedHardeners.length > 0 && (
-              <StatNote>{t('fittings.stats.armorIncludesRah', { profile: profileName })}</StatNote>
-            )}
-            <TankFacts stats={stats} typeName={typeName} />
-          </>
-        ) : (
-          placeholder
-        )}
-      </>
-    ),
-  ];
-  const shipSections = [
-    section(
-      'capacitor',
-      figure(
-        (s) =>
-          s.capacitor.stable
-            ? t('fittings.stats.capacitorStable', {
-                pct: s.capacitor.stablePercentage.toFixed(0),
-              })
-            : t('fittings.stats.capacitorDepletes', {
-                time: formatSeconds(s.capacitor.depletesInSeconds),
-              }),
-        stats ? CAPACITOR_TONE_CLASS[capacitorTone(stats.capacitor)] : undefined
-      ),
-      stats ? <CapacitorFacts stats={stats} /> : placeholder
-    ),
-    section(
-      'navigation',
-      figure((s) =>
-        t('fittings.stats.maxVelocityMeta', { value: s.navigation.maxVelocity.toFixed(0) })
-      ),
-      stats ? <NavigationFacts stats={stats} /> : placeholder
-    ),
-    section(
-      'targeting',
-      figure((s) =>
-        t('fittings.stats.unit.km', {
-          value: kmValue(s.targeting.maxTargetRange),
-        })
-      ),
-      stats ? <TargetingFacts stats={stats} /> : placeholder
-    ),
-    section(
-      'fitting',
-      figure(
-        (s) =>
-          // Calibration earns a place only when it is the one over, or the header would go red with no number to say why.
-          t(
-            resourceOverage(s.calibrationUsed, s.calibrationTotal) > 0
-              ? 'fittings.stats.fittingMetaCalibration'
-              : 'fittings.stats.fittingMeta',
-            {
-              cpu: pctOf(s.cpuUsed, s.cpuTotal).toFixed(0),
-              pg: pctOf(s.powergridUsed, s.powergridTotal).toFixed(0),
-              cal: pctOf(s.calibrationUsed, s.calibrationTotal).toFixed(0),
-            }
-          ),
-        stats && !fitsResourceBudget(stats) ? OVER_BUDGET_TONE : undefined
-      ),
-      stats ? <FittingBudgetFacts stats={stats} typeName={typeName} /> : placeholder,
-      stats && stats.unknownItemTypeIds.length > 0 ? t('fittings.stats.incomplete') : undefined
-    ),
-    stats &&
-      stats.support.rows.length > 0 &&
-      section(
-        'support',
-        figure((s) => supportMeta(s, t)),
-        <SupportFacts stats={stats} typeName={typeName} />
-      ),
-    stats &&
-      stats.mining.rows.length > 0 &&
-      section(
-        'mining',
-        figure((s) =>
-          t('fittings.stats.unit.cubicMetresPerSecond', {
-            value: s.mining.perSecond.toFixed(1),
-          })
-        ),
-        <MiningFacts stats={stats} typeName={typeName} />
-      ),
-    stats &&
-      hasFleetSupport(stats.fleetSupport) &&
-      section(
-        'fleetBoosts',
-        figure((s) => fleetBoostsMeta(s, t)),
-        <FleetBoostFacts stats={stats} typeName={typeName} />
-      ),
-    section(
-      'price',
-      price ? nothingPriced ? '—' : <IskLabel value={price.totals.sell} /> : undefined,
-      priceInfo.named ? (
-        <PriceBody view={{ ...priceInfo, named: priceInfo.named }} />
-      ) : (
-        <StatNote>{t('fittings.stats.priceLoading')}</StatNote>
-      ),
-      unpriced.length > 0 ? t('fittings.stats.incomplete') : undefined
-    ),
-  ];
+  const column = { t, section, figure, stats, placeholder, typeName };
+  const damage = damageSections({
+    ...column,
+    targetProfiles,
+    overlay,
+    showDrones,
+    fitting,
+    moduleResults,
+  });
+  const tank = tankSections({ ...column, damageProfiles, profileName });
+  const ship = shipSections({ ...column, price });
 
   return (
     <div className="rounded-xs border border-line bg-panel/85 backdrop-blur-sm">
@@ -554,8 +264,8 @@ export function FittingStatsSections({
         </p>
       )}
 
-      {group('damageTank', [...damageSections, ...tankSections])}
-      {group('ship', shipSections)}
+      {group('damageTank', [...damage, ...tank])}
+      {group('ship', ship)}
 
       {/* One panel, its content switched by `panel`: swapping two open
         panels would remount it, sending focus back to the first trigger and
