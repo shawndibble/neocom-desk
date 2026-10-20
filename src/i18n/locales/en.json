@@ -11117,7 +11117,7 @@
     },
     "corp": {
       "label": "Corporation",
-      "caption": "Everything on the Corporation pages — wallet, members, structures, assets and moon extractions."
+      "caption": "Unlocks the Corporation pages — wallet, jobs, assets, members, structures and moon extractions — once granted, for a character with the Director, Accountant, Station Manager or Factory Manager role."
     },
     "structureMarkets": {
       "label": "Structure markets",
