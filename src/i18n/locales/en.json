@@ -8648,7 +8648,13 @@
     "priceCheckBpcAbove": "Above the median per run",
     "priceCheckBpcLevel": "Level with the median per run",
     "publicLabel": "Public",
-    "headlineExpiresIn": "Expires in"
+    "headlineExpiresIn": "Expires in",
+    "timelineCancelled": "Cancelled",
+    "timelineDeleted": "Deleted",
+    "timelineRejected": "Rejected",
+    "timelineFailed": "Failed",
+    "timelineReversed": "Reversed",
+    "timelineExpired": "Expired"
   },
   "bpcContracts": {
     "title": "BPC Sourcing",

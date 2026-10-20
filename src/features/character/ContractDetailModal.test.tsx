@@ -626,6 +626,33 @@ describe('ContractDetailModal', () => {
       expect(await within(check).findByText('+7.5%')).toBeInTheDocument();
     });
 
+    it("never prices a blueprint copy at the original's hub price", async () => {
+      // 638 trades at the hub as an original; ESI marks a copy with raw_quantity -2.
+      pricesMock.getHubPrices.mockResolvedValue(
+        new Map([
+          [34, { sellMin: 5.5, buyMax: 5, sellVolume: 0, buyVolume: 0 }],
+          [638, { sellMin: 1_000_000_000, buyMax: 900_000_000, sellVolume: 0, buyVolume: 0 }],
+        ])
+      );
+      serve([
+        {
+          record_id: 1,
+          type_id: 638,
+          quantity: 1,
+          raw_quantity: -2,
+          is_included: true,
+          is_singleton: true,
+        },
+        ...ONE_LINE,
+      ]);
+      open(OUTSTANDING_FOR_4000);
+
+      const check = await screen.findByRole('region', { name: /^Is it fair/ });
+      expect(await within(check).findByText('3,720 ISK')).toBeInTheDocument(); // the Tritanium only
+      expect(within(check).getByText('(1 item unpriced)')).toBeInTheDocument();
+      expect(within(check).queryByText(/900,000,000/)).not.toBeInTheDocument();
+    });
+
     it('counts lines it could not price instead of treating them as free', async () => {
       pricesMock.getHubPrices.mockResolvedValue(
         new Map([
@@ -848,6 +875,46 @@ describe('ContractDetailModal', () => {
       // Finished: no countdown, and the date it finished is in the strip.
       expect(screen.queryByText('Expires in')).not.toBeInTheDocument();
       expect(screen.getAllByText('Completed').length).toBeGreaterThan(0);
+    });
+
+    it('ends a deleted or cancelled contract on its outcome, with no acceptance to wait for', () => {
+      for (const [status, label] of [
+        ['deleted', 'Deleted'],
+        ['cancelled', 'Cancelled'],
+        ['rejected', 'Rejected'],
+      ] as const) {
+        const { unmount } = renderModal({
+          characterId: CHAR_ID,
+          contract: { ...ITEM_EXCHANGE, status, date_completed: undefined, acceptor_id: 0 },
+          issuerName: 'Mero Otichoda',
+          onClose: () => {},
+        });
+        const steps = within(screen.getByRole('list', { name: 'Contract progress' })).getAllByRole(
+          'listitem'
+        );
+        expect(steps.map((li) => li.querySelector('b')?.textContent)).toEqual(['Issued', label]);
+        expect(screen.queryByText('Waiting')).not.toBeInTheDocument();
+        // An expiry means nothing to a contract that can no longer be taken.
+        expect(screen.queryByText('Expires')).not.toBeInTheDocument();
+        expect(screen.queryByText('Expires in')).not.toBeInTheDocument();
+        unmount();
+      }
+    });
+
+    it('calls an outstanding contract past its expiry expired, in the strip and the timeline', () => {
+      renderModal({
+        characterId: CHAR_ID,
+        contract: {
+          ...ITEM_EXCHANGE_OUTSTANDING,
+          date_issued: '2020-01-01T00:00:00Z',
+          date_expired: '2020-01-15T00:00:00Z',
+        },
+        issuerName: 'Mero Otichoda',
+        onClose: () => {},
+      });
+      expect(screen.getAllByText('Expired')).toHaveLength(2); // headline chip and timeline step
+      expect(screen.queryByText('Waiting')).not.toBeInTheDocument();
+      expect(screen.queryByText('Expires in')).not.toBeInTheDocument();
     });
 
     it('keeps the type and availability in one quiet line', () => {

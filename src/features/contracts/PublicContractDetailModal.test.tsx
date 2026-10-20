@@ -291,6 +291,42 @@ describe('PublicContractDetailModal — price check', () => {
     expect(within(check).queryByText('Other items')).not.toBeInTheDocument();
   });
 
+  it("never prices a blueprint copy at the original's hub price, so a copy-only listing has no hub check", async () => {
+    // 40520 has a hub price (1b sell), but only the original trades; a copy never does.
+    showItems([
+      item({
+        record_id: 1,
+        is_blueprint_copy: true,
+        material_efficiency: 10,
+        time_efficiency: 16,
+        runs: 1,
+      }),
+    ]);
+    renderModal(null, { askingIsk: 500_000 });
+
+    await itemRows();
+    expect(screen.queryByRole('region', { name: /^Is it fair/ })).not.toBeInTheDocument();
+    expect(screen.queryByText('1,000,000,000 ISK')).not.toBeInTheDocument();
+  });
+
+  it('leaves a copy out of the figure and counts it unpriced when it sits beside priced items', async () => {
+    showItems([
+      item({
+        record_id: 1,
+        is_blueprint_copy: true,
+        material_efficiency: 10,
+        time_efficiency: 16,
+        runs: 1,
+      }),
+      item({ record_id: 2, type_id: 40519, quantity: 10 }),
+    ]);
+    renderModal(null, { askingIsk: 50_000_000 });
+
+    const check = await screen.findByRole('region', { name: /^Is it fair/ });
+    expect(await within(check).findByText('1,000,000,000 ISK')).toBeInTheDocument(); // 10 x 100m, the item only
+    expect(within(check).getByText('(1 item unpriced)')).toBeInTheDocument();
+  });
+
   it('has no price check for a contract with no ISK ask and nothing requested', async () => {
     showItems([item({ record_id: 1 })]);
     renderModal(null, { askingIsk: null });

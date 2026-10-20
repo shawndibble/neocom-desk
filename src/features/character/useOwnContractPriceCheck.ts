@@ -30,9 +30,13 @@ export function ownContractAskingPrice(contract: Contract): number {
   return (contract.price ?? 0) > 0 ? contract.price! : 0;
 }
 
+/** ESI marks a blueprint copy with `raw_quantity: -2`; a copy never trades, whatever its type's book says. */
+const BLUEPRINT_COPY = -2;
+
 const toLine = (item: ContractItem): PriceCheckLine => ({
   typeId: item.type_id,
   quantity: item.quantity,
+  ...(item.raw_quantity === BLUEPRINT_COPY ? { unpriceable: true as const } : {}),
 });
 
 /** `null` when there is nothing to compare: no items, or no ISK ask and nothing requested. */

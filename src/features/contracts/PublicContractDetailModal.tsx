@@ -211,9 +211,12 @@ export function PublicContractDetailModal({
   );
   const checkLines = useMemo(() => {
     const abyssal = (line: ContractItemLine) => isAbyssalType?.(line.typeId) ?? false;
+    // A copy shares its type with the original, which trades at the hub; the
+    // copy never does, so it is never valued from that book.
     const toLine = (line: ContractItemLine) => ({
       typeId: line.typeId,
       quantity: line.quantity,
+      ...(line.isBlueprintCopy ? { unpriceable: true as const } : {}),
     });
     return {
       included: lines.filter((l) => l.isIncluded && !abyssal(l)).map(toLine),
@@ -227,6 +230,7 @@ export function PublicContractDetailModal({
     identity: String(contractId),
     enabled:
       bpcCheck === undefined &&
+      [...checkLines.included, ...checkLines.requested].some((line) => !line.unpriceable) &&
       included.length > 0 &&
       (requested.length > 0 || (askingIsk ?? 0) > 0),
     included: checkLines.included,

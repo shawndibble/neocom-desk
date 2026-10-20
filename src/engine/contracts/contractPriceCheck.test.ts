@@ -58,6 +58,20 @@ describe('valueLines', () => {
     });
   });
 
+  it('never values a line marked unpriceable, even when its type has a market price', () => {
+    // A blueprint copy shares its type with the original, which trades at the hub;
+    // the copy itself never does, so the original's price must not stand in for it.
+    const copyAndTrit = [
+      { typeId: 691, quantity: 1, unpriceable: true as const },
+      { typeId: 34, quantity: 10 },
+    ];
+    const units = new Map<number, number | null>([
+      [691, 1_135_000_000],
+      [34, 5],
+    ]);
+    expect(valueLines(copyAndTrit, units)).toEqual({ total: 50, pricedLines: 1, unpricedLines: 1 });
+  });
+
   it('treats a type the price map has never heard of, and a zero price, as unpriced', () => {
     const units = new Map<number, number | null>([[28434, 0]]);
     expect(valueLines(lines, units)).toEqual({ total: 0, pricedLines: 0, unpricedLines: 2 });

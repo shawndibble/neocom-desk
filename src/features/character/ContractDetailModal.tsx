@@ -272,6 +272,11 @@ export function ContractDetailModal({
   ].filter((figure): figure is typeof figure & { value: number } => (figure.value ?? 0) > 0);
   const itemForItem = items !== undefined && iskFigures.length === 0 && requested.length > 0;
   const finishedAt = contract.date_completed;
+  // Where the contract's story ends: an expiry still ahead, a lapse, or an
+  // outcome (cancelled, rejected…). The strip shows an expiry only for the first
+  // two; a withdrawn contract has none worth reading.
+  const timeline = contractTimeline(contract, now);
+  const timelineEnd = timeline[timeline.length - 1]!.key;
   const hasItemLines = items !== undefined && items.list.length > 0;
   const volumeText =
     contract.volume !== undefined && contract.volume > 0
@@ -347,14 +352,21 @@ export function ContractDetailModal({
               label={t('contractDetail.timelineCompleted')}
               value={formatTimestamp(new Date(finishedAt), timeZone)}
             />
-          ) : countdown !== null ? (
-            <StatChip label={t('contractDetail.headlineExpiresIn')} value={countdown} />
-          ) : (
+          ) : timelineEnd === 'expires' ? (
+            countdown !== null ? (
+              <StatChip label={t('contractDetail.headlineExpiresIn')} value={countdown} />
+            ) : (
+              <StatChip
+                label={t('contractDetail.timelineExpires')}
+                value={formatTimestamp(new Date(contract.date_expired), timeZone)}
+              />
+            )
+          ) : timelineEnd === 'expired' ? (
             <StatChip
-              label={t('contractDetail.timelineExpires')}
+              label={t('contractDetail.timelineExpired')}
               value={formatTimestamp(new Date(contract.date_expired), timeZone)}
             />
-          )}
+          ) : null}
         </StatChips>
 
         {contract.title && (
@@ -455,7 +467,7 @@ export function ContractDetailModal({
           )}
         </div>
 
-        <ContractTimeline steps={contractTimeline(contract)} />
+        <ContractTimeline steps={timeline} />
 
         <p className="border-t border-line pt-3 text-text-dim">
           {title} · {t(CONTRACT_AVAILABILITY_KEY[contract.availability])}
