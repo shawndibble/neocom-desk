@@ -100,3 +100,72 @@ export async function createFeederInvite(
     ...(offeredOwnerRatePct === undefined ? {} : { offeredOwnerRatePct }),
   });
 }
+
+/** An open invite link; only its id is stored, never the code. */
+export interface OpenInvite {
+  inviteId: string;
+  createdBy: number;
+  createdAt: number;
+  offeredOwnerRatePct?: number;
+}
+
+/** Agree a rate with a moon owner; it wins over the rate they asked for, from today. */
+export async function setFeederRate(
+  characterId: number,
+  corporationId: number,
+  feederCorporationId: number,
+  pct: number
+): Promise<{ ok: true }> {
+  const accessToken = await getValidAccessToken(characterId);
+  return call(characterId, 'setCorpTaxBookFeederRateCallable', {
+    corporationId,
+    accessToken,
+    feederCorporationId,
+    pct,
+  });
+}
+
+/** Settle a moon owner otherwise (or back to normal) from today, with an optional note. */
+export async function setFeederMode(
+  characterId: number,
+  corporationId: number,
+  feederCorporationId: number,
+  mode: 'normal' | 'settled-otherwise',
+  note?: string
+): Promise<{ ok: true }> {
+  const accessToken = await getValidAccessToken(characterId);
+  return call(characterId, 'setCorpTaxBookFeederModeCallable', {
+    corporationId,
+    accessToken,
+    feederCorporationId,
+    mode,
+    ...(note === undefined || note.trim() === '' ? {} : { note }),
+  });
+}
+
+/** Revoke an open invite link. */
+export async function revokeFeederInvite(
+  characterId: number,
+  corporationId: number,
+  inviteId: string
+): Promise<{ revoked: true }> {
+  const accessToken = await getValidAccessToken(characterId);
+  return call(characterId, 'revokeCorpTaxBookFeederInviteCallable', {
+    corporationId,
+    accessToken,
+    inviteId,
+  });
+}
+
+/** The book's open invite links, newest first. Uses the cached officer check: no access token. */
+export async function listFeederInvites(
+  characterId: number,
+  corporationId: number
+): Promise<OpenInvite[]> {
+  const { invites } = await call<{ corporationId: number }, { invites: OpenInvite[] }>(
+    characterId,
+    'listCorpTaxBookFeederInvitesCallable',
+    { corporationId }
+  );
+  return invites;
+}
