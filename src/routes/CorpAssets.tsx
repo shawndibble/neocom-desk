@@ -88,14 +88,10 @@ import {
   selectAll,
   selectionStateForIds,
   toggleSelection,
-} from '@/features/character/assetSelection';
+} from '@/features/assets/assetSelection';
 import { NodeContainerRow, NodeItemRow } from '@/features/assets/AssetBrowseRows';
-import {
-  ItemColumnLabels,
-  LocationRow,
-  SearchResultRow,
-} from '@/features/character/assetBrowserRows';
-import { hasItemRows } from '@/features/character/assetBrowserFormat';
+import { ItemColumnLabels, LocationRow, SearchResultRow } from '@/features/assets/assetBrowserRows';
+import { hasItemRows } from '@/features/assets/assetBrowserFormat';
 import { loadTypeVolumes } from '@/features/character/typeNames';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
@@ -108,10 +104,10 @@ import { useCompareSet } from '@/features/market/compareSet';
 import { writeToClipboard } from '@/lib/clipboard';
 import { TableActionsMenu, TableExportProvider } from '@/components/ui/TableExport';
 import type { TableExport } from '@/components/ui/useTableExport';
-import { assetCsvRows, assetsCsvColumns, type AssetCsvRow } from '@/features/character/assetsCsv';
+import { assetCsvRows, assetsCsvColumns, type AssetCsvRow } from '@/features/assets/assetsCsv';
 import { getAveragePriceByType } from '@/market/prices';
 import { loadCorporationBlueprints } from '@/features/corp/blueprints';
-import { loadAssetCopyValues } from '@/features/character/assetCopyValues';
+import { loadAssetCopyValues } from '@/features/assets/assetCopyValues';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { useFocusHeading } from '@/lib/useFocusHeading';
 import { useDebouncedValue } from '@/lib/useDebouncedValue';

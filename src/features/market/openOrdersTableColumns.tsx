@@ -10,7 +10,7 @@ import { IskAmount, type DataTableColumn } from '@/components/ui';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { DEFAULT_PROBLEM_THRESHOLDS } from '@/engine/market/orderProblems';
 import { formatMarketIsk } from '@/lib/isk';
-import { CharacterBadge } from '@/features/character/assetBrowserRows';
+import { CharacterBadge } from '@/features/assets/assetBrowserRows';
 import type { OpenOrderRow } from './openOrdersModel';
 import { OPEN_ORDER_COLUMN_IDS, type OpenOrderColumnId } from './openOrdersColumns';
 import { OrderProblemBadge } from './OrderProblemBadge';

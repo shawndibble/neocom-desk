@@ -18,7 +18,7 @@ import {
   type SnapshotInputs,
 } from '@/engine/netWorth/snapshot';
 import { lastKnownAbyssalValues } from '@/features/abyssal/abyssalEstimates';
-import { loadCharacterAssets } from '@/features/character/assets';
+import { loadCharacterAssets } from '@/features/assets/assets';
 import { loadOrders } from '@/features/character/orders';
 import { loadWalletBalanceWithStatus } from '@/features/character/wallet';
 import { MARKET_HUB_SETTING_KEY } from '@/features/market/hub';

@@ -13,7 +13,7 @@ import { characterIdsWithScopes } from '@/app/characterIdsWithScopes';
 import { readCachedRows } from '@/esi/cache';
 import type { CharacterAsset } from '@/esi/endpoints';
 import { requiredScopesForEndpoints } from '@/esi/registry';
-import { KEY as ASSETS_KEY } from '@/features/character/assets';
+import { KEY as ASSETS_KEY } from '@/features/assets/assets';
 import { readCachedTypeNames } from '@/features/character/typeNames';
 import { rankedSearch } from '@/lib/rankedSearch';
 import { GROUP_LIMIT, type PaletteProvider, type PaletteResult } from './types';

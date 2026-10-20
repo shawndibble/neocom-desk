@@ -7,7 +7,7 @@ import { tabBarTabs } from '@/lib/pageTabs';
 import { ASSETS_TABS } from '@/app/pageTabs';
 import { cx } from '@/lib/cx';
 import { MovePlanTab } from '@/features/assets/MovePlanTab';
-import { MyShipsView } from '@/features/character/MyShipsView';
+import { MyShipsView } from '@/features/assets/MyShipsView';
 import { assetHref } from '@/features/assets/assetBrowseModel';
 import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
 import { AssetsList } from '@/features/assets/AssetsList';

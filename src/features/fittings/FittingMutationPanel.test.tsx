@@ -70,7 +70,7 @@ const assets = vi.hoisted(() => ({
   loadCharacterAssets: vi.fn(),
   mutationsForItems: vi.fn(),
 }));
-vi.mock('@/features/character/assets', () => ({
+vi.mock('@/features/assets/assets', () => ({
   loadCharacterAssets: assets.loadCharacterAssets,
 }));
 vi.mock('@/features/abyssal/dynamicItems', () => ({

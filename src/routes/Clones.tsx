@@ -21,7 +21,7 @@ import { cloneOwnName, saveCloneNickname } from '@/features/character/cloneNickn
 import { getLastKnownSpSummary } from '@/stores/characterSp';
 import { OverviewSubNav } from '@/features/character/OverviewSubNav';
 import { sumImplantValue } from '@/engine/implantValue';
-import { JumpsAwayText } from '@/features/character/assetBrowserRows';
+import { JumpsAwayText } from '@/features/assets/assetBrowserRows';
 import { useCloneJumpsAway } from '@/features/character/useCloneJumpsAway';
 import { useImplantPrices } from '@/features/character/useImplantPrices';
 import { ClonesSummaryCards } from '@/features/character/ClonesSummaryCards';

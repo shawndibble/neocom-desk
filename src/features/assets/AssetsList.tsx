@@ -35,12 +35,8 @@ import { AbyssalValueNote } from '@/features/abyssal/AbyssalValueNote';
 import { formatIsk } from '@/lib/isk';
 import { collectItemIds, collectStationItemIds, type StationSortField } from '@/engine/assetTree';
 import { assetNodeSegment } from '@/engine/assetPath';
-import { type AssetSortField } from '@/features/character/assetSortPreference';
-import {
-  ItemColumnLabels,
-  JumpsAwayText,
-  SecurityValue,
-} from '@/features/character/assetBrowserRows';
+import { type AssetSortField } from '@/features/assets/assetSortPreference';
+import { ItemColumnLabels, JumpsAwayText, SecurityValue } from '@/features/assets/assetBrowserRows';
 import { BrowseRowView } from '@/features/assets/AssetBrowseRows';
 import {
   AssetItemActionsContext,

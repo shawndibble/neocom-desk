@@ -23,7 +23,7 @@ import type {
 import { readCached } from '@/esi/cache';
 import { inBackgroundLane } from '@/esi/lane';
 import { UPWELL_STRUCTURE_ID_FLOOR } from '@/esi/locationIds';
-import { KEY as ASSETS_KEY } from './assets';
+import { KEY as ASSETS_KEY } from '@/features/assets/assets';
 import { KEY as CONTRACTS_KEY } from './contracts';
 import { KEYS as ORDER_KEYS } from './orders';
 import { KEY as LOYALTY_KEY } from './loyalty';

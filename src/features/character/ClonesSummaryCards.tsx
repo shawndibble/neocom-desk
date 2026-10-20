@@ -11,7 +11,7 @@ import { SecurityStatus } from '@/components/SecurityStatus';
 import { cooldownProgress, type ImplantValue } from '@/engine/implantValue';
 import { cloneJumpCooldownHours, type CloneJumpCooldown } from '@/engine/clone/cloneJump';
 import type { JumpsAwayResult } from '@/engine/clone/jumpsAway';
-import { JumpsAwayText } from '@/features/character/assetBrowserRows';
+import { JumpsAwayText } from '@/features/assets/assetBrowserRows';
 import { TOUCH_LINK } from '@/features/character/CloneCard';
 import { formatDuration } from '@/lib/duration';
 import { formatTimestamp } from '@/lib/timestamp';

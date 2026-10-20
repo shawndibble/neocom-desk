@@ -9,7 +9,7 @@ import { describe, it, expect } from 'vitest';
  */
 const REVIEWED = new Set<string>([
   'src/features/abyssal/AbyssalItemDetail.tsx',
-  'src/features/character/assetBrowserRows.tsx',
+  'src/features/assets/assetBrowserRows.tsx',
   'src/features/character/CloneCard.tsx',
   'src/features/character/ContractDetailModal.tsx',
   'src/features/character/JournalDescriptionCell.tsx',

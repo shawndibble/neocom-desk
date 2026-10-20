@@ -30,7 +30,7 @@ import {
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { CharacterLink, SystemLink } from '@/features/entities';
-import { SecurityValue } from '@/features/character/assetBrowserRows';
+import { SecurityValue } from '@/features/assets/assetBrowserRows';
 import type { OreLineValuation } from '@/engine/miningTax/yieldValuation';
 import type { PriceBasis } from '@/engine/miningTax/priceBasis';
 import type { MiningYieldRow } from './yieldSnapshot';

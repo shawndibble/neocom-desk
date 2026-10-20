@@ -122,7 +122,7 @@ ESI: `GET /corporations/{id}/wallets` (balances), `/divisions` (names), `/wallet
 
 ## 4. Assets (`/corp/assets`, `/corp/assets/*`)
 
-`CorpAssets` -> `CorpAssetsView` (`routes/CorpAssets.tsx`; remounted when `canReadBlueprints` changes). Reuses the character Assets browser components (`features/character/assetBrowserRows.tsx`) and tree engine (`engine/assetTree.ts`) via `engine/corp/assetDivisions.ts`, `assetPath.ts`.
+`CorpAssets` -> `CorpAssetsView` (`routes/CorpAssets.tsx`; remounted when `canReadBlueprints` changes). Reuses the character Assets browser components (`features/assets/assetBrowserRows.tsx`) and tree engine (`engine/assetTree.ts`) via `engine/corp/assetDivisions.ts`, `assetPath.ts`.
 
 ESI: `GET /corporations/{id}/assets` (paginated; capped, `truncated`), `/divisions`, resolved names; Blueprint copy values: `/corporations/{id}/blueprints` only when `canReadBlueprints` (else copy value 0). Prices: ESI global average price per type (`getAveragePriceByType`, best effort, ISK badges drop to 0 on outage); volumes from SDE.
 

@@ -21,15 +21,15 @@ import {
   type AssetTreeStation,
 } from '@/engine/assetTree';
 import { assetNodeSegment, parseAssetPath, resolveAssetPath } from '@/engine/assetPath';
-import { useStationSort } from '@/features/character/stationSortPreference';
-import { useAssetSort } from '@/features/character/assetSortPreference';
+import { useStationSort } from '@/features/assets/stationSortPreference';
+import { useAssetSort } from '@/features/assets/assetSortPreference';
 import {
   namesForSelection,
   quantityLinesForSelection,
   selectAll,
   toggleSelection,
-} from '@/features/character/assetSelection';
-import { hasItemRows } from '@/features/character/assetBrowserFormat';
+} from '@/features/assets/assetSelection';
+import { hasItemRows } from '@/features/assets/assetBrowserFormat';
 import { useAssetRowVirtualizer } from '@/features/assets/useAssetRowVirtualizer';
 import {
   baseRowHeight,
