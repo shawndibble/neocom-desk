@@ -323,7 +323,7 @@ export function NotificationsPanel() {
             className="rounded-xs border border-line bg-panel-2 px-3 py-2 text-xs text-text-dim"
           >
             {t('settings.notifications.installRequiredNotice')}{' '}
-            <Link to={tabPath(SETTINGS_TABS, 'dataAge')} className={inlineLinkClassName}>
+            <Link to={tabPath(SETTINGS_TABS, 'app')} className={inlineLinkClassName}>
               {t('settings.notifications.installRequiredLink')}
             </Link>
           </p>
