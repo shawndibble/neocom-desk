@@ -437,3 +437,107 @@ export function disconnectedCoverage(
   const lastFull = shiftDate(new Date(closedBy).toISOString().slice(0, 10), -1);
   return closePeriod(periods, shiftDate(lastFull, 1));
 }
+
+// --- Feeder accrual and running balance (#4510) -------------------------------
+
+/** Engine `OwnerRateEntry`. */
+export interface OwnerRateEntry {
+  kind: 'requested' | 'agreed';
+  pct: number;
+  effectiveFrom: string;
+  recordedAt: string;
+}
+
+function latestOwnerRate(
+  history: readonly OwnerRateEntry[],
+  kind: OwnerRateEntry['kind'],
+  date: string
+): OwnerRateEntry | undefined {
+  let best: OwnerRateEntry | undefined;
+  for (const entry of history) {
+    if (entry.kind !== kind || entry.effectiveFrom > date) continue;
+    if (
+      !best ||
+      entry.effectiveFrom > best.effectiveFrom ||
+      (entry.effectiveFrom === best.effectiveFrom && entry.recordedAt >= best.recordedAt)
+    )
+      best = entry;
+  }
+  return best;
+}
+
+/** Engine `effectiveOwnerRate`, pct only: the agreed rate on `date` if any, else the requested. */
+export function effectiveOwnerRatePct(
+  history: readonly OwnerRateEntry[],
+  date: string
+): number | undefined {
+  return (latestOwnerRate(history, 'agreed', date) ?? latestOwnerRate(history, 'requested', date))
+    ?.pct;
+}
+
+/** Engine `FeederModeChange`. */
+export interface FeederModeChange {
+  from: string;
+  mode: 'normal' | 'settled-otherwise';
+}
+
+/** Engine `FeederPayout`, the fields the balance reads. */
+export interface FeederPayoutAmount {
+  amount: number;
+  notAPayout: boolean;
+}
+
+function isSettledOn(changes: readonly FeederModeChange[], day: string): boolean {
+  let latest: FeederModeChange | undefined;
+  for (const c of changes) if (c.from <= day && (!latest || c.from >= latest.from)) latest = c;
+  return latest?.mode === 'settled-otherwise';
+}
+
+/** Engine `accrueValuedDays`. */
+export function accrueValuedDays(
+  days: readonly { date: string; value: number }[],
+  rules: {
+    coveragePeriods: readonly CoveragePeriod[];
+    ownerRateHistory: readonly OwnerRateEntry[];
+    modeChanges: readonly FeederModeChange[];
+    isBillable: (day: string) => boolean;
+  }
+): { byDay: { date: string; value: number; pct: number; due: number }[]; accrued: number } {
+  const byDay: { date: string; value: number; pct: number; due: number }[] = [];
+  for (const { date, value } of [...days].sort((x, y) => x.date.localeCompare(y.date))) {
+    if (!isDayCovered(rules.coveragePeriods, date) || !rules.isBillable(date)) continue;
+    if (isSettledOn(rules.modeChanges, date)) continue;
+    const pct = effectiveOwnerRatePct(rules.ownerRateHistory, date);
+    if (pct === undefined) continue;
+    byDay.push({ date, value, pct, due: (value * pct) / 100 });
+  }
+  return { byDay, accrued: byDay.reduce((sum, d) => sum + d.due, 0) };
+}
+
+/** Engine `feederBalance`. */
+export function feederBalance(
+  accrued: number,
+  payouts: readonly FeederPayoutAmount[],
+  settledOtherwise = false
+) {
+  const kindOf = (isk: number, balance: number): 'owed' | 'credit' | 'even' =>
+    isk === 0 ? 'even' : balance > 0 ? 'owed' : 'credit';
+  if (settledOtherwise) return { balance: 0, display: { kind: 'none' as const, isk: 0 } };
+  const paid = payouts.reduce((sum, p) => (p.notAPayout ? sum : sum + p.amount), 0);
+  const balance = accrued - paid;
+  const isk = Math.floor(Math.abs(balance));
+  return { balance, display: { kind: kindOf(isk, balance), isk } };
+}
+
+/** Engine `onPayList`. */
+export function onPayList(balance: { display: { kind: string } }): boolean {
+  return balance.display.kind === 'owed';
+}
+
+/** The `payouts` subcollection document, Engine `FeederPayout`. Written only by callables. */
+export interface FeederPayout extends FeederPayoutAmount {
+  date: string;
+  method: 'donation' | 'other';
+  status: 'recorded' | 'waiting-for-journal' | 'matched';
+  journalRef?: number;
+}
