@@ -6,6 +6,12 @@ import { FORFEIT_NO_REPLY_DAYS, forfeitAllowed } from './closeAccount';
 import type { Dismissal } from './dismissals';
 import { extractionId, type SyncExtraction } from './sync';
 import { closePeriod, isDayCovered, reopenPeriod } from './coverage';
+import {
+  FEEDER_DISCONNECT_DAYS,
+  advanceFeederHealth,
+  disconnectedCoverage,
+  type FeederHealth,
+} from './feederHealth';
 import { DEFAULT_GRACE_HOURS } from './billable';
 import { DEFAULT_OVERDUE_DAYS } from './overdue';
 import { mergeObservedRows, observedRowKey } from './observed';
@@ -332,5 +338,39 @@ describe('feeder coverage mirror', () => {
     expect(mirror.reopenPeriod(closed, '2026-07-20')).toEqual(reopenPeriod(closed, '2026-07-20'));
     expect(() => mirror.reopenPeriod(periods, '2026-08-01')).toThrow();
     expect(() => mirror.reopenPeriod(closed, '2026-07-19')).toThrow();
+  });
+});
+
+describe('feeder health mirror', () => {
+  it('keeps the disconnect window equal', () => {
+    expect(mirror.FEEDER_DISCONNECT_DAYS).toBe(FEEDER_DISCONNECT_DAYS);
+  });
+
+  it('advances health the same', () => {
+    const prevs: FeederHealth[] = [
+      { status: 'active' },
+      { status: 'active', lastReadWellAt: '2026-10-01T00:00:00.000Z' },
+      { status: 'active', staleSince: '2026-09-20T12:00:00.000Z' },
+      { status: 'active', staleSince: '2026-09-21T12:00:01.000Z' },
+      { status: 'disconnected', staleSince: '2026-08-01T00:00:00.000Z' },
+    ];
+    for (const prev of prevs)
+      for (const outcome of ['ok', 'stale', 'none'] as const)
+        expect(mirror.advanceFeederHealth(prev, outcome, '2026-10-20T12:00:00.000Z')).toEqual(
+          advanceFeederHealth(prev, outcome, '2026-10-20T12:00:00.000Z')
+        );
+  });
+
+  it('ends disconnected coverage the same', () => {
+    const periods = [{ from: '2026-01-01', to: '2026-02-01' }, { from: '2026-08-01' }];
+    for (const lastReadWellAt of [
+      undefined,
+      '2026-09-10T08:00:00.000Z',
+      '2026-09-10T05:00:00.000Z',
+    ])
+      for (const grace of [undefined, 6, 12])
+        expect(mirror.disconnectedCoverage(periods, { lastReadWellAt }, grace)).toEqual(
+          disconnectedCoverage(periods, { lastReadWellAt }, grace)
+        );
   });
 });

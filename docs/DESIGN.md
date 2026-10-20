@@ -1097,6 +1097,13 @@ in the URL, so Back returns to the list; a sheet that opens another sheet is
 the one thing to avoid. Beside a row's checkboxes, a phone prints the word
 ("Device", "Alerts") inside the checkbox's label, since it has no column header.
 
+### Settings scope line
+
+Every Settings panel says once where its settings live: `SettingsScopeHint` ("Kept
+across your devices" or "Stays on this device"; `DefaultsSyncHint` is the synced
+form). A field that differs from its panel carries `CheckboxField`'s `scope` note
+instead of prose in its hint. Wording lives in `settings.scope.*`.
+
 ### Origin crumb
 
 A page opened from another surface's drill-in (the Wallet chart, for Assets,

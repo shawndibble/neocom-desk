@@ -89,6 +89,7 @@ export function buildDayCharges(
       date: entry.date,
       minerId,
       moonId: place.moonId,
+      ...(entry.sourceCorporationId !== undefined ? { feederId: entry.sourceCorporationId } : {}),
       recordKey: key,
       isGuest,
     });

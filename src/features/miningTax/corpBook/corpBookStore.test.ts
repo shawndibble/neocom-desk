@@ -37,6 +37,11 @@ describe('readBookSettings', () => {
     });
   });
 
+  it('keeps a per-feeder rate', () => {
+    const feeder = { scope: 'feeder', feederId: 7, pct: 6, effectiveFrom: '2026-10-01' };
+    expect(readBookSettings(1, { ...book, rates: [feeder] })?.rates).toEqual([feeder]);
+  });
+
   it('is null for a missing or switched-off book (D24: then nothing changes)', () => {
     expect(readBookSettings(1, undefined)).toBeNull();
     expect(readBookSettings(1, { ...book, active: false })).toBeNull();

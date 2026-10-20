@@ -401,6 +401,126 @@ describe('overlayCorpBooks', () => {
     expect(paid.rows[0]).toMatchObject({ state: 'paid', taxOwed: 0 });
   });
 
+  describe('mixed-rate days', () => {
+    const billedLine = (
+      over: Partial<Statement['lines'][number]> & { structureId: number }
+    ): Statement['lines'][number] => ({
+      kind: 'mined',
+      date: '2026-10-17',
+      chargeKey: `${ME}:${over.structureId}:2026-10-17`,
+      characterId: ME,
+      oreLines: [{ typeId: ZEO, quantity: 1_000 }],
+      unitPrices: { [ZEO]: 100 },
+      taxPct: 10,
+      estimatedValue: 100_000,
+      tax: 10_000,
+      ...over,
+    });
+    const statementOf = (lines: Statement['lines']): Statement => ({
+      id: 's1',
+      minerId: `solo:${ME}`,
+      code: 'ABC',
+      periodStart: '2026-10-01',
+      periodEnd: '2026-10-31',
+      coversFrom: '2026-10-01',
+      coversThrough: '2026-10-17',
+      issuedAt: '2026-10-18T00:00:00Z',
+      hubId: 'jita',
+      oreForm: 'compressed',
+      amount: lines.reduce((sum, l) => sum + l.tax, 0),
+      lines,
+    });
+    const observed = (structureId: number, quantity: number, sourceCorporationId?: number) => ({
+      characterId: ME,
+      recordedCorporationId: CORP,
+      structureId,
+      date: '2026-10-17',
+      solarSystemId: SYSTEM,
+      oreLines: [{ typeId: ZEO, quantity }],
+      ...(sourceCorporationId !== undefined ? { sourceCorporationId } : {}),
+    });
+    const FEEDER = 98000077;
+    const rates: PersonalBook['rates'] = [
+      { scope: 'corp', pct: 10, effectiveFrom: '2026-10-01' },
+      { scope: 'feeder', feederId: FEEDER, pct: 7, effectiveFrom: '2026-10-01' },
+    ];
+    const pricesAt100 = () => ({
+      prices: new Map([[ZEO, 100]]),
+      sources: new Map([[ZEO, 'saved' as const]]),
+    });
+
+    it('prices each refinery line of a day at its own rate', () => {
+      const out = overlay(
+        [entry({ oreLines: [], freeOreLines: [] })],
+        [
+          book({
+            rates,
+            pricesOn: pricesAt100,
+            observed: [observed(1000, 1_000), observed(2000, 1_000, FEEDER)],
+          }),
+        ]
+      );
+      expect(out.rows.map((r) => r.taxPct)).toEqual([10, 7]);
+      expect(out.rows[0].taxOwed).toBeCloseTo(10_000, 6);
+      expect(out.rows[1].taxOwed).toBeCloseTo(7_000, 6);
+    });
+
+    it('a Statement day gives the same per-line tax as the open day', () => {
+      const lines = [
+        billedLine({ structureId: 1000 }),
+        billedLine({ structureId: 2000, taxPct: 7, tax: 7_000 }),
+      ];
+      const open = overlay(
+        [],
+        [
+          book({
+            rates,
+            pricesOn: pricesAt100,
+            observed: [observed(1000, 1_000), observed(2000, 1_000, FEEDER)],
+          }),
+        ]
+      );
+      const billed = overlay(
+        [],
+        [
+          book({
+            rates,
+            pricesOn: pricesAt100,
+            observed: [observed(1000, 1_000), observed(2000, 1_000, FEEDER)],
+            statements: [statementOf(lines)],
+          }),
+        ]
+      );
+      expect(billed.rows.map((r) => r.taxPct)).toEqual(open.rows.map((r) => r.taxPct));
+      billed.rows.forEach((r, i) => expect(r.taxOwed).toBeCloseTo(open.rows[i].taxOwed ?? 0, 6));
+    });
+
+    it('shows the effective rate when one charge was billed at two rates after a rate fix', () => {
+      const lines = [
+        billedLine({ structureId: 1000 }),
+        billedLine({
+          structureId: 1000,
+          kind: 'late-ore',
+          oreLines: [{ typeId: ZEO, quantity: 1_000 }],
+          taxPct: 20,
+          tax: 20_000,
+        }),
+      ];
+      const out = overlay(
+        [],
+        [
+          book({
+            pricesOn: pricesAt100,
+            observed: [observed(1000, 2_000)],
+            statements: [statementOf(lines)],
+          }),
+        ]
+      );
+      expect(out.rows).toHaveLength(1);
+      expect(out.rows[0]).toMatchObject({ taxOwed: 30_000, estimatedValue: 200_000, taxPct: 15 });
+    });
+  });
+
   it('applies a part payment to the oldest days first', () => {
     const mk = (date: string, tax: number) => ({
       kind: 'mined' as const,
