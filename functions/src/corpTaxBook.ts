@@ -63,6 +63,12 @@ export const FEEDER_OF_COLLECTION = 'corpTaxBookFeederOf';
 export const FEEDER_PREVIOUS_COLLECTION = 'corpTaxBookFeederPrevious';
 /** `corpTaxBooks/{collector}/feederViews/{feederCorp}`: the moon owner's read model (issue #4512). */
 export const FEEDER_VIEWS = 'feederViews';
+/**
+ * `corpTaxBookBilledBy/{char:id}`: which books bill a Character, `books[collectorCorp]`
+ * the epoch ms of the last sync that saw them there. Written by the sync, readable by
+ * that Character only, so a miner in a moon owner's corporation finds the book (#4517).
+ */
+export const BILLED_BY_COLLECTION = 'corpTaxBookBilledBy';
 
 /** Roles are trusted for at most this long without a live check (D7). */
 export const ROLE_CACHE_MS = 10 * 60_000;

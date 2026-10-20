@@ -3,6 +3,7 @@ import {
   coverInFlight,
   inFlightDonations,
   overlayCorpBooks,
+  previewTakeover,
   type PersonalBook,
   type PersonalEntry,
 } from './personal';
@@ -691,6 +692,249 @@ describe('overlayCorpBooks', () => {
       lastSyncedAt: SYNCED,
       closedThrough: '2026-10-17',
     });
+  });
+});
+
+describe('overlayCorpBooks: the miner side of a refinery book', () => {
+  const refinery = (structureId: number, quantity: number, sourceCorporationId?: number) => ({
+    characterId: ME,
+    recordedCorporationId: CORP,
+    structureId,
+    date: '2026-10-17',
+    solarSystemId: SYSTEM,
+    oreLines: [{ typeId: ZEO, quantity }],
+    ...(sourceCorporationId !== undefined ? { sourceCorporationId } : {}),
+  });
+
+  it('matches one personal entry against the SUM of two refineries in the system', () => {
+    const out = overlay(
+      [
+        entry({
+          oreLines: [{ typeId: ZEO, quantity: 30_000 }],
+          freeOreLines: [{ typeId: ZEO, quantity: 30_000 }],
+        }),
+      ],
+      [book({ observed: [refinery(1000, 10_000), refinery(2000, 20_000)] })]
+    );
+    expect(out.rows).toHaveLength(2);
+    expect(out.rows.map((r) => r.structureId).sort()).toEqual([1000, 2000]);
+    expect(out.rows.every((r) => r.dispute === undefined)).toBe(true);
+  });
+
+  it('prices each refinery line at its own per-feeder rate', () => {
+    const out = overlay(
+      [entry({ oreLines: [{ typeId: ZEO, quantity: 30_000 }] })],
+      [
+        book({
+          observed: [refinery(1000, 10_000, 98000077), refinery(2000, 20_000)],
+          rates: [
+            { scope: 'corp', pct: 15, effectiveFrom: '2026-10-01' },
+            { scope: 'feeder', feederId: 98000077, pct: 5, effectiveFrom: '2026-10-01' },
+          ],
+        }),
+      ]
+    );
+    const byStructure = new Map(out.rows.map((r) => [r.structureId, r.taxPct]));
+    expect(byStructure.get(1000)).toBe(5);
+    expect(byStructure.get(2000)).toBe(15);
+  });
+
+  it('flags no overlap when the miner gave the ore to nobody', () => {
+    const out = overlay([entry()], [book()]);
+    expect(out.rows[0].overlap).toBeUndefined();
+  });
+
+  it('flags one overlap on the first line of the day when the miner listed the ore for a Payee', () => {
+    const assigned = entry({
+      freeOreLines: [],
+      oreLines: [{ typeId: ZEO, quantity: 30_000 }],
+      allocations: [
+        {
+          payeeId: 'ashfall',
+          taxPct: 10,
+          oreLines: [{ typeId: ZEO, quantity: 30_000 }],
+          status: 'outstanding',
+        },
+      ],
+    });
+    const out = overlay(
+      [assigned],
+      [book({ observed: [refinery(1000, 10_000), refinery(2000, 20_000)] })]
+    );
+    const flagged = out.rows.filter((r) => r.overlap);
+    expect(flagged).toHaveLength(1);
+    expect(flagged[0].overlap).toEqual({
+      payeeIds: ['ashfall'],
+      ore: [{ typeId: ZEO, quantity: 30_000 }],
+      paid: false,
+    });
+  });
+
+  it('caps the overlap at what the corporation observed', () => {
+    const assigned = entry({
+      freeOreLines: [],
+      oreLines: [{ typeId: ZEO, quantity: 50_000 }],
+      allocations: [
+        {
+          payeeId: 'ashfall',
+          taxPct: 15,
+          oreLines: [{ typeId: ZEO, quantity: 50_000 }],
+          status: 'outstanding',
+        },
+      ],
+    });
+    const out = overlay([assigned], [book()]);
+    expect(out.rows[0].overlap?.ore).toEqual([{ typeId: ZEO, quantity: 43_050 }]);
+  });
+
+  it('marks an overlap paid when the miner marked the entry paid', () => {
+    const assigned = entry({
+      freeOreLines: [],
+      oreLines: [{ typeId: ZEO, quantity: 43_050 }],
+      allocations: [
+        {
+          payeeId: 'ashfall',
+          taxPct: 15,
+          oreLines: [{ typeId: ZEO, quantity: 43_050 }],
+          status: 'paid',
+        },
+      ],
+    });
+    const out = overlay([assigned], [book()]);
+    expect(out.rows.find((r) => r.overlap)?.overlap).toMatchObject({ paid: true });
+  });
+
+  it('shows no overlap before the day is Billable', () => {
+    const assigned = entry({
+      freeOreLines: [],
+      allocations: [
+        {
+          payeeId: 'ashfall',
+          taxPct: 15,
+          oreLines: [{ typeId: ZEO, quantity: 41_200 }],
+          status: 'outstanding',
+        },
+      ],
+    });
+    const out = overlay([assigned], [book({ lastSyncedAt: undefined })]);
+    expect(out.rows).toEqual([]);
+  });
+
+  it('keeps the old number and the new one when the corporation corrected a line', () => {
+    const statement: Statement = {
+      id: 's1',
+      minerId: `solo:${ME}`,
+      code: 'ABC',
+      periodStart: '2026-10-01',
+      periodEnd: '2026-10-31',
+      coversFrom: '2026-10-01',
+      coversThrough: '2026-10-17',
+      issuedAt: '2026-10-18T00:00:00Z',
+      hubId: 'jita',
+      oreForm: 'compressed',
+      amount: 1_000_000,
+      lines: [
+        {
+          kind: 'mined',
+          date: '2026-10-17',
+          chargeKey: `${ME}:1000:2026-10-17`,
+          characterId: ME,
+          structureId: 1000,
+          oreLines: [{ typeId: ZEO, quantity: 43_050 }],
+          unitPrices: { [ZEO]: 140 },
+          taxPct: 15,
+          estimatedValue: 6_000_000,
+          tax: 900_000,
+        },
+        {
+          kind: 'late-ore',
+          date: '2026-10-17',
+          chargeKey: `${ME}:1000:2026-10-17`,
+          characterId: ME,
+          structureId: 1000,
+          oreLines: [{ typeId: ZEO, quantity: 1_000 }],
+          unitPrices: { [ZEO]: 140 },
+          taxPct: 15,
+          estimatedValue: 140_000,
+          tax: 21_000,
+        },
+      ],
+    };
+    const out = overlay([entry()], [book({ statements: [statement] })]);
+    expect(out.rows[0].correction).toEqual({ before: 900_000, after: 921_000 });
+  });
+
+  it('shows no correction on a line billed once', () => {
+    expect(overlay([entry()], [book()]).rows[0].correction).toBeUndefined();
+  });
+});
+
+describe('previewTakeover', () => {
+  it('removes only the overlapping ore from the miner entry and shows before and after', () => {
+    const preview = previewTakeover(
+      [
+        {
+          payeeId: 'ashfall',
+          taxPct: 10,
+          oreLines: [
+            { typeId: ZEO, quantity: 50_000 },
+            { typeId: SYL, quantity: 5_000 },
+          ],
+          status: 'outstanding',
+        },
+      ],
+      [{ typeId: ZEO, quantity: 43_050 }]
+    );
+    expect(preview).toEqual([
+      {
+        index: 0,
+        payeeId: 'ashfall',
+        before: [
+          { typeId: ZEO, quantity: 50_000 },
+          { typeId: SYL, quantity: 5_000 },
+        ],
+        after: [
+          { typeId: ZEO, quantity: 6_950 },
+          { typeId: SYL, quantity: 5_000 },
+        ],
+      },
+    ]);
+  });
+
+  it('empties an allocation the corporation bills in full', () => {
+    const preview = previewTakeover(
+      [
+        {
+          payeeId: 'ashfall',
+          taxPct: 10,
+          oreLines: [{ typeId: ZEO, quantity: 43_050 }],
+          status: 'outstanding',
+        },
+      ],
+      [{ typeId: ZEO, quantity: 43_050 }]
+    );
+    expect(preview[0].after).toEqual([]);
+  });
+
+  it('spreads the overlap across allocations in order', () => {
+    const preview = previewTakeover(
+      [
+        {
+          payeeId: 'a',
+          taxPct: 10,
+          oreLines: [{ typeId: ZEO, quantity: 10 }],
+          status: 'outstanding',
+        },
+        {
+          payeeId: 'b',
+          taxPct: 10,
+          oreLines: [{ typeId: ZEO, quantity: 10 }],
+          status: 'outstanding',
+        },
+      ],
+      [{ typeId: ZEO, quantity: 15 }]
+    );
+    expect(preview.map((p) => p.after)).toEqual([[], [{ typeId: ZEO, quantity: 5 }]]);
   });
 });
 

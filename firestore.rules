@@ -559,6 +559,13 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Which Corp Tax Books bill a Character (issue #4517): written by the sync only,
+    // readable by that Character's own sign-in and nobody else, officers included.
+    match /corpTaxBookBilledBy/{characterUid} {
+      allow get: if request.auth != null && request.auth.uid == characterUid;
+      allow list, write: if false;
+    }
+
     // Corp Tax Book sync grants (issue #4068, ADR 0025): one doc per corporation
     // holding the encrypted, narrow-scope refresh token of the officer who opted in
     // to the scheduled sync. Written and read only by the save/revoke callables and

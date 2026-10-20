@@ -1,4 +1,3 @@
-import { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { StructureFeesList } from '@/features/market/StructureFeesList';
 import {
@@ -34,12 +33,11 @@ export function MarketDefaultsPanel() {
   const setCollateralRatio = useCourierCollateralRatio((state) => state.setValue);
   const collateralHydrated = useHydratedStore(useCourierCollateralRatio);
   const hydrated = hubHydrated && collateralHydrated;
-  const headingRef = useRef<HTMLHeadingElement>(null);
 
-  if (!hydrated) return <SettingsPanelLoading title={t('settings.marketDefaultsTitle')} />;
+  if (!hydrated) return <SettingsPanelLoading />;
 
   return (
-    <Panel title={t('settings.marketDefaultsTitle')} headingRef={headingRef}>
+    <Panel>
       <div className="space-y-4">
         <DefaultsSyncHint />
         <Fields variant="form">
@@ -73,7 +71,7 @@ export function MarketDefaultsPanel() {
 
           <LpValueField id="settings-lp-value" />
         </Fields>
-        <StructureFeesList panelHeading={headingRef} />
+        <StructureFeesList />
       </div>
     </Panel>
   );

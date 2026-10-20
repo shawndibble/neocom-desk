@@ -6012,7 +6012,19 @@
         "onStatement": "It is on {{corp}}'s Statement, which never changes.",
         "decides": "The book decides this day: it is Billable ({{corp}} synced {{ago}}, after its grace period) and goes on {{corp}}'s next Statement.",
         "terms": "Terms are locked to the book: {{hub}} buy, {{form}} ore, {{pct}}% {{scope}} from {{from}}.",
-        "disputeHint": "Your own record differs from the book."
+        "disputeHint": "Your own record differs from the book.",
+        "corrected": "Corrected by the corporation: {{before}} → {{after}}."
+      },
+      "overlap": {
+        "notice": "This ore is also on your list for <strong>{{payee}}</strong>. <strong>{{corp}}</strong> bills it.",
+        "noticePaid": "You marked this paid to {{payee}}. {{corp}} still bills it. If that was the same payment, say so.",
+        "letBill": "Let the corporation bill it",
+        "paidOther": "I paid it another way",
+        "previewTitle": "This is what changes on your list:",
+        "previewLine": "{{payee}}: {{before}} → {{after}}",
+        "nothingLeft": "nothing",
+        "confirm": "Take it off my list",
+        "region": "This ore is also billed by the corporation"
       },
       "pay": {
         "title": "Pay {{corp}}",
@@ -11173,14 +11185,14 @@
       "app": "App & backup",
       "device": "Log out & delete",
       "market": "Market",
-      "miningTax": "Moon Mining Tax",
+      "miningTax": "Moon mining tax",
       "characters": "Characters",
       "corporation": "Corporation",
       "travel": "Travel",
       "notifications": "Notifications",
       "data": "Cached data",
       "offline": "Offline data",
-      "activity": "Activity Log"
+      "activity": "Activity log"
     },
     "groups": {
       "preferences": "Preferences",
@@ -11202,8 +11214,7 @@
       "travel_one": "{{preference}}, {{count}} avoided system",
       "travel_other": "{{preference}}, {{count}} avoided systems"
     },
-    "industryDefaultsTitle": "Industry defaults",
-    "marketDefaultsTitle": "Market defaults",
+    "industryBlueprintTitle": "Blueprint assumptions",
     "lpValueLabel": "Your LP value (ISK per LP)",
     "lpValueHint": "Blank (0) prices each store’s LP at its market rate. Type your own rate to use it for every store.",
     "lpValueUseMarket": "Use market rates",
@@ -11239,15 +11250,12 @@
       "avoidHint": "Avoided systems cost more than any security penalty, but a trip only possible through one still gets a route. Pod kills come from ESI's last-hour kill report and refresh with it.",
       "podKillsUnavailable": "ESI's kill report can't be read right now, so routes aren't avoiding pod-kill systems."
     },
-    "miningTaxDefaultsTitle": "Moon Mining Tax defaults",
     "miningTaxCompressedOreLabel": "Value and show ore as compressed",
     "miningTaxCompressedOreHint": "Prices and names ore as Compressed where a Compressed version exists. Unpaid entries re-price; paid ones keep their ISK.",
     "miningTaxOreValueModeLabel": "Edit ore values individually",
     "miningTaxOreValueModeHint": "Enter each ore's own ISK total when editing an entry, to match a corp's moon-tax tool line by line.",
     "miningTaxAutoContinueLabel": "Continue sessions across midnight UTC automatically",
     "miningTaxAutoContinueHint": "Add the new EVE day to the same session when you mine past midnight UTC, with an Undo.",
-    "characterDefaultsTitle": "Character defaults",
-    "piDefaultsTitle": "Planetary Industry",
     "bpcSourcingDefaultsTitle": "BPC Sourcing",
     "corpUnavailable": "Corporation defaults appear once the active character can see a corporation.",
     "installTitle": "Install this app",
@@ -11260,7 +11268,6 @@
     "analyticsLabel": "Send page views",
     "analyticsHint": "Sends only the name of the page you are on to Google Analytics, never character, corporation or other IDs.",
     "offline": {
-      "title": "Offline data",
       "hint": "Large reference files download the first time a page needs them. Download them all here to use the app with no connection.",
       "packsLabel": "Downloaded on this device",
       "packs": {
@@ -11297,7 +11304,6 @@
       "failed_other": "{{count}} items could not be downloaded.",
       "retry": "Retry"
     },
-    "deviceTitle": "Log out and delete",
     "deviceCharacters_one": "{{count}} character is logged in on this device.",
     "deviceCharacters_other": "{{count}} characters are logged in on this device.",
     "deviceCharactersNone": "No characters are logged in on this device.",
@@ -11496,7 +11502,6 @@
       "skillsPaste": "Bring a plan from elsewhere: Import > From text or file (skill lists, .emp, .xml, EFT fits).",
       "tabShortcuts": "Shortcuts"
     },
-    "displayTitle": "Display",
     "fontScaleLabel": "Text size",
     "singleKeyShortcutsLabel": "Single-key shortcuts",
     "singleKeyShortcutsHint": "G then a letter jumps to a page; ? lists them. Turn off if speech input triggers them.",
@@ -11506,7 +11511,6 @@
     "fontScaleDefault": "Default",
     "fontScaleLarge": "Large",
     "fontScaleExtraLarge": "Extra large",
-    "notificationsTitle": "Notifications",
     "notifications": {
       "hint": "Device raises a pop-up. Alerts adds a row to the Alerts page. Device choices stay on this device; Alerts choices and warn-ahead times sync across your devices.",
       "blockedNotice": "Notifications are blocked — enable them in your device's settings, then return here.",
@@ -11738,7 +11742,6 @@
       "device": "Stays on this device.",
       "deviceField": "This device only."
     },
-    "corpDefaultsTitle": "Corporation",
     "timeFormatLabel": "Time format",
     "timeFormatHint": "EVE runs on UTC, the clock other players quote timers in. Calendar keeps your local days.",
     "timeFormat": {
@@ -11806,7 +11809,6 @@
     "resetViewPrefsHint": "Pages remember sorts, filters and expanded sections as you use them. This puts them all back to their defaults. Your characters, groups, plans and saved comparisons are untouched.",
     "resetViewPrefsConfirm": "View preferences reset.",
     "permissions": {
-      "title": "Permissions",
       "hint": "What this character lets Neocom Desk read from EVE. Grant adds one permission and keeps the rest. Tick several to add them in one login. To take one away, revoke it on <ccp>EVE's own site</ccp>.",
       "selectCharacter": "Select a character to see its permissions.",
       "checking": "Checking…",
@@ -11914,7 +11916,7 @@
     }
   },
   "activityLog": {
-    "title": "Activity Log",
+    "title": "Activity log",
     "hint": "Recent requests this device has made to EVE's servers — useful for your own reference, or for a support conversation. Clears on reload. New entries appear automatically as you use the app.",
     "columnEndpoint": "Endpoint",
     "columnCharacter": "Character",
@@ -11930,7 +11932,7 @@
     "clearedConfirm": "Log cleared."
   },
   "dataAge": {
-    "title": "Data Age",
+    "title": "Data age",
     "hint": "The most recent successful update behind each view, so this stays available on a phone even though the on-screen badge doesn't show there. Session-only, cleared on reload.",
     "columnEndpoint": "Endpoint",
     "columnCharacter": "Character",

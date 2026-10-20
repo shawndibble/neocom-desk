@@ -23,6 +23,7 @@ import {
   DISMISSALS,
   EXTRACTIONS,
   FEEDER_INVITES_COLLECTION,
+  BILLED_BY_COLLECTION,
   FEEDER_OF_COLLECTION,
   MEMBER_SETUP_MS,
   META,
@@ -410,7 +411,33 @@ export async function mergeObservedInto(
       return last.size;
     });
   }
+  await writeBilledByPointers(deps, corporationId, rows);
   return observedChanged;
+}
+
+/**
+ * Points each Character the book observed at the book (`corpTaxBookBilledBy`), so
+ * the miner's client finds it whatever corporation they are in now. Refreshed on
+ * every sync; a failure never fails the sync, the next one writes it again.
+ */
+async function writeBilledByPointers(
+  deps: BookDeps,
+  corporationId: number,
+  rows: readonly ObservedRow[]
+): Promise<void> {
+  const characterIds = [...new Set(rows.map((r) => r.characterId))];
+  const at = Date.now();
+  for (let i = 0; i < characterIds.length; i += CHUNK) {
+    const batch = deps.db.batch();
+    for (const characterId of characterIds.slice(i, i + CHUNK)) {
+      batch.set(
+        deps.db.collection(BILLED_BY_COLLECTION).doc(`char:${characterId}`),
+        { books: { [String(corporationId)]: at } },
+        { merge: true }
+      );
+    }
+    await batch.commit().catch(() => undefined);
+  }
 }
 
 /**

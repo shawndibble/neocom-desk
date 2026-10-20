@@ -40,10 +40,10 @@ export function CharacterDefaultsPanel() {
   // omits that quick-select when this is null).
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
 
-  if (!ready) return <SettingsPanelLoading title={t('settings.characterDefaultsTitle')} />;
+  if (!ready) return <SettingsPanelLoading />;
 
   return (
-    <Panel title={t('settings.characterDefaultsTitle')}>
+    <Panel>
       <div className="space-y-4">
         <DefaultsSyncHint />
         <Fields variant="form">

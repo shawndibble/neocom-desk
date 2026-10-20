@@ -117,7 +117,7 @@ export function Settings() {
         <div className="min-w-0 space-y-4">
           {section === 'display' && (
             <>
-              <Panel title={t('settings.displayTitle')}>
+              <Panel>
                 <div className="space-y-4">
                   <SettingsScopeHint scope="device" />
                   <Fields variant="form">
