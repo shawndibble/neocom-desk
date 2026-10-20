@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { summarizeChannels } from './channelSummary';
+import { applyToAllFlips, summarizeChannels } from './channelSummary';
 
 const on = () => true;
 const off = () => false;
@@ -58,5 +58,23 @@ describe('summarizeChannels', () => {
     const summary = summarizeChannels([7], (_id, channel) => channel === 'feed');
     expect(summary.state).toEqual({ browser: 'unchecked', feed: 'checked' });
     expect(summary.differingIds).toEqual([]);
+  });
+});
+
+describe('applyToAllFlips', () => {
+  it('names only the Characters that differ from the majority, per channel', () => {
+    // character 3 alone has the device channel off
+    const flips = applyToAllFlips([1, 2, 3], (id, channel) => !(id === 3 && channel === 'browser'));
+    expect(flips).toEqual({ browser: [3], feed: [] });
+  });
+
+  it('flips nobody when every Character already agrees', () => {
+    expect(applyToAllFlips([1, 2], on)).toEqual({ browser: [], feed: [] });
+    expect(applyToAllFlips([1, 2], off)).toEqual({ browser: [], feed: [] });
+  });
+
+  it('on an even split turns the Characters that are off on, as the differ marks say', () => {
+    const flips = applyToAllFlips([1, 2, 3, 4], (id, channel) => channel !== 'feed' || id <= 2);
+    expect(flips).toEqual({ browser: [], feed: [3, 4] });
   });
 });

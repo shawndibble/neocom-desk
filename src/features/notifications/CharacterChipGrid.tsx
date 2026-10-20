@@ -31,7 +31,7 @@ interface CharacterChipGridProps {
   differingIds: ReadonlySet<number>;
   availability: (characterId: number) => CharacterAvailability;
   readValue: (characterId: number, channel: NotificationChannel) => boolean;
-  onToggle: (characterId: number, channel: NotificationChannel) => void;
+  onToggle: (characterId: number, channel: NotificationChannel) => void | Promise<void>;
   browserBlocked: boolean;
 }
 

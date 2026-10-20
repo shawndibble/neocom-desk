@@ -9,7 +9,7 @@ import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useTranslation } from 'react-i18next';
 import { SelectionCheckbox } from '@/features/character/SelectionCheckbox';
 import { AggregateRow } from './AggregateRow';
-import { CHANNEL_COLUMNS } from './ChannelColumns';
+import { EVENT_ROW_GRID } from './ChannelColumns';
 import { eveTypeLabel } from './eveTypeLabel';
 import { PermissionNote } from './PermissionNote';
 import {
@@ -74,9 +74,7 @@ export function EveNotificationRow({
       onToggleAll={(ids, channel) =>
         void broadcastEventChannelPref(ids, currentValue(), eventId, channel)
       }
-      onToggleOne={(id, channel) =>
-        void toggleEventChannelPref(id, currentValue(), eventId, channel)
-      }
+      onToggleOne={(id, channel) => toggleEventChannelPref(id, currentValue(), eventId, channel)}
       browserBlocked={context.browserBlocked}
       visibleCharacterIds={context.visibleCharacterIds}
       // Never opened by a search: its list is the longest on the page.
@@ -90,12 +88,18 @@ export function EveNotificationRow({
           const familyLabel = t(`settings.notifications.family.${key}`);
           return (
             <section key={key} aria-label={familyLabel}>
-              <div className="flex items-center justify-between gap-3 border-t border-line/60 px-3 py-1">
-                <span className={eyebrowClassName}>{familyLabel}</span>
-                <div className={CHANNEL_COLUMNS}>
-                  {NOTIFICATION_CHANNELS.map((channel) => (
+              <div
+                className={`flex items-center justify-between gap-3 border-t border-line/60 px-3 py-1 ${EVENT_ROW_GRID}`}
+              >
+                <span className={`${eyebrowClassName} md:col-start-1`}>{familyLabel}</span>
+                {NOTIFICATION_CHANNELS.map((channel, index) => (
+                  <div
+                    key={channel}
+                    className={`md:row-start-1 md:justify-self-center ${
+                      index === 0 ? 'md:col-start-2' : 'md:col-start-3'
+                    }`}
+                  >
                     <SelectionCheckbox
-                      key={channel}
                       state={selectionStateForAllCharactersEveTypes(
                         applicableIds,
                         types,
@@ -118,8 +122,8 @@ export function EveNotificationRow({
                         family: familyLabel,
                       })}
                     />
-                  ))}
-                </div>
+                  </div>
+                ))}
               </div>
               <ul className="divide-y divide-line/60">
                 {types.map((type) => {
@@ -138,7 +142,7 @@ export function EveNotificationRow({
                         void broadcastEveTypeChannelPref(ids, currentValue(), type, channel)
                       }
                       onToggleOne={(id, channel) =>
-                        void toggleEveTypeChannelPref(id, currentValue(), type, channel)
+                        toggleEveTypeChannelPref(id, currentValue(), type, channel)
                       }
                       browserBlocked={context.browserBlocked}
                       visibleCharacterIds={context.visibleCharacterIds}

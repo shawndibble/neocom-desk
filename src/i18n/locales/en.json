@@ -11509,6 +11509,8 @@
       "blockedNotice": "Notifications are blocked — enable them in your device's settings, then return here.",
       "alertsWhenClosed": {
         "title": "Alerts when closed",
+        "manage": "Manage",
+        "manageFor": "Manage Alerts when closed",
         "summary": "{{on}} of {{total}} characters",
         "needsReauthCount_one": "{{count}} needs re-authorizing",
         "needsReauthCount_other": "{{count}} need re-authorizing",
@@ -11635,6 +11637,15 @@
         "browser": "Device",
         "feed": "Alerts"
       },
+      "columnWarnAhead": "Warn ahead",
+      "columnCharacters": "Characters",
+      "topicsLabel": "Topics",
+      "backToTopics": "All topics",
+      "topicState": "Device {{device}} · Alerts {{alerts}} of {{total}}",
+      "topicNeedsCorpPermission": "Needs Corporation permission",
+      "applyToAll": "Apply to all",
+      "applyToAllLabel": "Apply to all characters: {{event}}",
+      "applyToAllHint": "Sets every character to what most of them have.",
       "toggleLabel": {
         "browser": "{{event}}, device notifications",
         "feed": "{{event}}, Alerts list"
@@ -11663,6 +11674,7 @@
         "market": "Market and contracts",
         "mailCalendar": "Mail and calendar",
         "world": "Space and community",
+        "corp": "Corp",
         "eve": "EVE notifications"
       },
       "permissionNote_one": "{{count}} character hasn't granted {{permission}}.",
