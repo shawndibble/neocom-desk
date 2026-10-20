@@ -3,7 +3,7 @@
 /*
  * Opts every same-origin navigation — including the reload that applies a
  * waiting service-worker update at boot (bootUpdate.ts) or from Settings →
- * Update now — into the browser's native cross-document View Transition,
+ * Update app — into the browser's native cross-document View Transition,
  * where supported (Chromium). The browser cross-fades the outgoing and
  * incoming documents itself; the boot screen (BootCoverHost) is already on
  * screen underneath. This rule is a no-op in browsers without support. Gated on

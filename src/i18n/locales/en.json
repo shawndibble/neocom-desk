@@ -17,6 +17,7 @@
       "backup": "Settings › Data & storage exports a password-protected backup of every character on this device.",
       "timeFormat": "Settings › Display switches timers between your local time and EVE time.",
       "textSize": "Settings › Display changes the text size on this device.",
+      "numberFormat": "Settings › Display switches numbers between 1,234.56 and 1.234,56.",
       "selfUpdate": "Neocom Desk updates itself when you open it or reload the page."
     }
   },
@@ -11250,10 +11251,7 @@
     "installHint": "Add Neocom Desk to your device for quicker access. On iPhone and iPad, notifications only work from the installed app.",
     "installMenuSteps": "Open your browser's menu and choose Install app (or Add to Home Screen). If you don't see it, this browser may not support installing.",
     "installInstalled": "Neocom Desk is installed on this device.",
-    "updateTitle": "App updates",
-    "updateHint": "Neocom Desk updates itself when it is opened or the page is reloaded. Update now checks for a new version right away and reloads the app.",
-    "updateAction": "Update now",
-    "updateWorking": "Updating…",
+    "updateAction": "Update app",
     "updateFailed": "Could not check for a new version. Check your connection and try again.",
     "analyticsTitle": "Analytics",
     "analyticsLabel": "Send page views",
@@ -11356,7 +11354,7 @@
       "a": {
         "delete": "Settings › Data & storage › Delete all data deletes every character's synced data from our server, then erases everything on this device. Another device still logged in keeps its own copy and can sync it back. Log out of all characters clears this device only. Delete all data also offers to leave your Communities (ticked by default), which deletes your shared data and your Requests and Pledges there right away; untick it to stay in them. A Community's admin can't leave, so a Community you run is skipped: hand it to someone else, or delete it, which deletes it for every Member. A Character no device has synced in 90 days is removed from its Communities automatically.",
         "install": "<link>Settings › Data & storage › Install this app</link> shows the steps for your browser, or an Install button where your browser offers one. On iPhone and iPad this is also what makes notifications work.",
-        "update": "The app updates itself in the background. To get a new version now, open Settings › Data & storage and press Update now: it checks and reloads.",
+        "update": "The app updates itself in the background. To get a new version now, open Settings and press Update app: it checks and reloads.",
         "pushKinds": "Alerts whose time is known ahead: a skill level finishing, training stopping or a queue ending, an industry job finishing (yours or your corporation's), a courier delivery due, a contract about to expire, market orders about to lapse, a clone jump ready, a PI extraction finishing or an extractor expiring, a calendar event starting, a structure low on fuel, and EVE timers such as a reinforcement ending. Alerts when closed adds EVE's own notifications, such as a structure under attack, for each Character you turn it on for. Everything else, including Community alerts, needs the app open. Turn them on in Settings › Notifications.",
         "permissions": "Plain login asks for everything the pages read from EVE, because EVE grants permissions only at login and a page can't read what you haven't granted. You don't have to accept the lot: <custom>Log in with custom permissions</custom> on the login page lets you pick, and only skills, the skill queue and structure lookup are required. Add more later in Settings › Permissions. To take one away, revoke it on <ccp>EVE's authorized apps page</ccp>. Corporation data, structure markets and jump fatigue are never in the plain login; each is a separate opt-in grant, and Alerts when closed is a further, notifications-only grant per Character.",
         "dataLag": "Neocom Desk reads EVE's ESI, not the game client, and ESI is not live. For a Character's own data it reuses what it fetched in the last 10 minutes (a day for game constants such as item names), or until EVE says the data may change if that is later, so moving between pages doesn't ask again. EVE itself caches some data for minutes and corporation data for about an hour, so a short timer may already have happened. The age badge by a page's title shows how old the data is: amber after an hour, red after a day. It is hidden on a narrow screen, so <data>Settings › Data & storage</data> lists the last update of every source. Where a page has a Refresh button, it asks EVE again straight away.",
@@ -11727,6 +11725,13 @@
     "timeFormat": {
       "local": "My local time",
       "eve": "EVE time (UTC)"
+    },
+    "numberFormatLabel": "Number format",
+    "numberFormatHint": "How numbers are written on this device. Pasted numbers are read in either format, so a list copied from a client set to another language still works.",
+    "numberFormat": {
+      "auto": "Match my browser ({{example}})",
+      "period": "Period decimal ({{example}})",
+      "comma": "Comma decimal ({{example}})"
     },
     "weekStartLabel": "Week starts on",
     "weekStartHint": "Changes the first day of the week in the Calendar's Month and Fortnight grids. EVE's own in-game calendar starts the week on Monday.",
@@ -13740,6 +13745,8 @@
       "oreUnknown": "Ore unknown — link a survey",
       "minedVsLeft": "{{mined}}% mined · {{left}}% left",
       "startedOn": "started {{date}}",
+      "extractionsSummary_one": "{{count}} Extraction",
+      "extractionsSummary_other": "{{count}} Extractions",
       "state": {
         "extracting": "Extracting",
         "ready": "Ready",

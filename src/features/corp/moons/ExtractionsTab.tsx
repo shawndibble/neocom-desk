@@ -107,6 +107,9 @@ export function ExtractionsTab() {
           onRowClick={(row) => navigate(extractionPath(row.id))}
           rowClassName={() => 'group'}
           defaultSort={{ columnId: 'when', direction: 'desc' }}
+          mobileSort
+          stackColumns={2}
+          stackSummary={t('corpTaxBook.moons.extractionsSummary', { count: rows.length })}
         />
       </Panel>
     </div>

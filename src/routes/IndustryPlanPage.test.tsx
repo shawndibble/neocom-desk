@@ -351,25 +351,48 @@ describe('IndustryPlanPage: build plan settings grouping (#120)', () => {
   });
 });
 
+/**
+ * Signs in a Pilot that only the calling test uses (each test passes its own
+ * `characterId`, never one another test has used), with the queue scope granted and
+ * `queue` as its /skillqueue. Not CHAR_ID: an earlier test's background read of
+ * CHAR_ID's queue can land in `esiCache` after `resetSession` cleared it, and
+ * the next test then reads that stale empty queue as fresh instead of fetching
+ * its own (a CI flake). A row keyed to a Character no other test uses can't be poisoned by it.
+ */
+async function signInWithQueue(characterId: number, queue: unknown[]) {
+  await db.characters.put({ characterId, name: 'Pilot Queue', ownerHash: 'ohq', addedAt: 3 });
+  await db.tokens.put({
+    characterId,
+    accessToken: 'access-token-q',
+    refreshToken: 'refresh',
+    expiresAt: Date.now() + 3_600_000,
+    scopes: ['esi-skills.read_skillqueue.v1'],
+  });
+  await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: characterId });
+  const esi = `https://esi.evetech.net/characters/${characterId}`;
+  server.use(
+    http.get(`${esi}/skills`, () => HttpResponse.json(emptySkillsPayload)),
+    http.get(`${esi}/blueprints`, () => HttpResponse.json([])),
+    http.get(`${esi}/industry/jobs`, () => HttpResponse.json([])),
+    http.get(`${esi}/skillqueue`, () => HttpResponse.json(queue))
+  );
+  await db.buildPlans.add(seedPlan({ characterId }));
+}
+
 describe('IndustryPlanPage: /skills is stale until the character logs in', () => {
   it('applies an Industry level the queue finished in the past, which /skills omits', async () => {
     // Base blueprint time is 1200s (20m). Industry V is -4%/level, so a
     // credited level 5 lands at 960s (16m). ESI says past-finish_date queue
     // entries must be applied on top of /skills, which here reports nothing.
-    server.use(
-      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skillqueue`, () =>
-        HttpResponse.json([
-          {
-            skill_id: 3380, // Industry
-            queue_position: 0,
-            finished_level: 5,
-            start_date: '2026-01-01T00:00:00Z',
-            finish_date: '2026-01-05T00:00:00Z',
-          },
-        ])
-      )
-    );
-    await db.buildPlans.add(seedPlan());
+    await signInWithQueue(93, [
+      {
+        skill_id: 3380, // Industry
+        queue_position: 0,
+        finished_level: 5,
+        start_date: '2026-01-01T00:00:00Z',
+        finish_date: '2026-01-05T00:00:00Z',
+      },
+    ]);
     render(<App />);
 
     expect(await screen.findByText('16m')).toBeInTheDocument();
@@ -378,12 +401,7 @@ describe('IndustryPlanPage: /skills is stale until the character logs in', () =>
 
   it('does not credit a paused queue entry, which carries no finish date', async () => {
     // peterhaneve/evemon#40: an absent date is "ETA unknown", never "done".
-    server.use(
-      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skillqueue`, () =>
-        HttpResponse.json([{ skill_id: 3380, queue_position: 0, finished_level: 5 }])
-      )
-    );
-    await db.buildPlans.add(seedPlan());
+    await signInWithQueue(94, [{ skill_id: 3380, queue_position: 0, finished_level: 5 }]);
     render(<App />);
 
     expect(await screen.findByText('20m')).toBeInTheDocument();

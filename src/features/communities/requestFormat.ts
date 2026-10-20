@@ -2,11 +2,12 @@ import { DAY_MS, HOUR_MS, MINUTE_MS } from '@/lib/age';
 import type { RequestStatus } from '@/engine/communities/requests';
 
 type Translate = (key: string, opts?: Record<string, unknown>) => string;
+import { createNumberFormat } from '@/lib/numberLocale';
 
-const quantityFormat = new Intl.NumberFormat('en');
+const quantityFormat = createNumberFormat({});
 
 /** A quantity or count, thousands-separated. */
-export const formatQuantity = (value: number) => quantityFormat.format(value);
+export const formatQuantity = (value: number) => quantityFormat(value);
 
 /** `2h`, `3d`: how long ago, no "ago" (the board column says it in its header). */
 export function formatShortAge(ms: number, t: Translate): string {
