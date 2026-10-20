@@ -1,6 +1,6 @@
 /**
  * Dated tax rates (D3/D31): corp default → Guest default → per-feeder →
- * per-Miner → per-moon → per-record, most specific wins. The per-feeder tier
+ * per-moon → per-Miner → per-record, most specific wins. The per-feeder tier
  * prices every refinery of one feeder corporation. Every rate but a per-record one
  * carries an effective-from date and applies only to days on or after it, so a
  * rate change never reaches back over days already mined. A per-record
@@ -45,7 +45,7 @@ export interface ResolvedRate {
 }
 
 /** Most specific first. */
-const SCOPE_ORDER: readonly RateScope[] = ['record', 'moon', 'miner', 'feeder', 'guest', 'corp'];
+const SCOPE_ORDER: readonly RateScope[] = ['record', 'miner', 'moon', 'feeder', 'guest', 'corp'];
 
 function targets(rate: TaxRate, ctx: RateContext): boolean {
   switch (rate.scope) {
