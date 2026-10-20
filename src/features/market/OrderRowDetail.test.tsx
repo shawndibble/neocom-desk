@@ -133,4 +133,18 @@ describe('OrderRowDetail', () => {
       })
     ).toHaveAttribute('aria-disabled', 'true');
   });
+
+  it('puts an info icon on the fee facts of a hidden column, saying what the sell side assumes', () => {
+    const column = (id: MarketOrderColumnId, header: string) =>
+      ({ id, header, render: () => '1' }) as DataTableColumn<RegionOrder>;
+    renderDetail({
+      hiddenColumns: ['fees', 'finalPrice'],
+      orderColumnsById: {
+        fees: column('fees', 'Tax & fees'),
+        finalPrice: column('finalPrice', 'Final price'),
+      } as Record<MarketOrderColumnId, DataTableColumn<RegionOrder>>,
+    });
+    expect(screen.getByRole('button', { name: /Tax & fees/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Final price/ })).toBeInTheDocument();
+  });
 });

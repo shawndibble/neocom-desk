@@ -45,7 +45,7 @@ export const SELL_ORDER_COLUMN_IDS: readonly MarketOrderColumnId[] = [
 ];
 export const BUY_ORDER_COLUMN_IDS: readonly MarketOrderColumnId[] = MARKET_ORDER_COLUMN_IDS;
 
-/** Columns that need the active Character's Accounting level, so they exist only once it has loaded. */
+/** Columns that need the active Character's Accounting and Broker Relations levels, so they exist only once those have loaded. */
 export const FEE_COLUMN_IDS: readonly MarketOrderColumnId[] = ['fees', 'finalPrice'];
 
 /**

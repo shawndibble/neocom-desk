@@ -15,6 +15,7 @@ import {
   type MarketOrderColumnId,
 } from '@/features/market/marketOrderColumns';
 import { formatVolume } from '@/features/market/format';
+import { feeColumnTooltip } from '@/features/market/feeColumnTooltip';
 import {
   resolveOrderLocation,
   orderExpiry,
@@ -293,17 +294,6 @@ export function useMarketOrderColumns({
   // The two fee columns say what they assume, and it differs by table: a
   // sell order is priced as a listing of your own at that price, a buy order
   // as a sale into it right now (`engine/market/orderFees.ts`).
-  const feeTooltip = useCallback(
-    (id: 'fees' | 'finalPrice', side: 'sell' | 'buy') => {
-      if (id === 'fees') {
-        return side === 'sell' ? t('market.feesTooltip.sell') : t('market.feesTooltip.buy');
-      }
-      return side === 'sell'
-        ? t('market.finalPriceTooltip.sell')
-        : t('market.finalPriceTooltip.buy');
-    },
-    [t]
-  );
   const withFeeTooltips = useCallback(
     (ids: readonly MarketOrderColumnId[], side: 'sell' | 'buy') =>
       ids
@@ -312,11 +302,11 @@ export function useMarketOrderColumns({
           id === 'fees' || id === 'finalPrice'
             ? {
                 ...orderColumnsById[id],
-                headerTooltip: feeTooltip(id, side),
+                headerTooltip: feeColumnTooltip(t, id, side),
               }
             : orderColumnsById[id]
         ),
-    [visibleOrderColumns, orderColumnsById, feeTooltip]
+    [visibleOrderColumns, orderColumnsById, t]
   );
   const baseColumns = useMemo<DataTableColumn<RegionOrder>[]>(
     () => withFeeTooltips(SELL_ORDER_COLUMN_IDS, 'sell'),

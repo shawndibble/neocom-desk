@@ -11,7 +11,7 @@
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useState, type ReactNode } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
-import { Button, IskAmount, ProgressBar } from '@/components/ui';
+import { Button, InfoTooltip, IskAmount, ProgressBar } from '@/components/ui';
 import type { DataTableColumn } from '@/components/ui';
 import {
   orderExpiry,
@@ -25,6 +25,7 @@ import type { RegionOrder } from '@/esi/endpoints';
 import { formatAge } from '@/lib/age';
 import { writeToClipboard } from '@/lib/clipboard';
 import { formatMarketIsk } from '@/lib/isk';
+import { feeColumnTooltip } from './feeColumnTooltip';
 import { formatVolume } from './format';
 import type { MarketOrderColumnId } from './marketOrderColumns';
 import { priceClipboardText } from './priceClipboardText';
@@ -48,10 +49,23 @@ export interface OrderRowDetailProps {
   now?: number;
 }
 
-function Fact({ label, children }: { label: string; children: ReactNode }) {
+function Fact({
+  label,
+  info,
+  children,
+}: {
+  label: string;
+  /** A note on what the figure assumes, as an info icon beside the label. */
+  info?: string;
+  children: ReactNode;
+}) {
+  const { t } = useTranslation();
   return (
     <div className="min-w-0">
-      <div className={eyebrowClassName}>{label}</div>
+      <div className={eyebrowClassName}>
+        {label}
+        {info && <InfoTooltip label={t('common.aboutLabel', { label })} content={info} />}
+      </div>
       <div className="text-text tabular-nums">{children}</div>
     </div>
   );
@@ -152,7 +166,15 @@ export function OrderRowDetail({
         {hiddenColumns.map((id) => {
           const column = orderColumnsById[id];
           return (
-            <Fact key={id} label={column.header}>
+            <Fact
+              key={id}
+              label={column.header}
+              info={
+                id === 'fees' || id === 'finalPrice'
+                  ? feeColumnTooltip(t, id, buy ? 'buy' : 'sell')
+                  : undefined
+              }
+            >
               {column.render(order)}
             </Fact>
           );

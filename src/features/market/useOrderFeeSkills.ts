@@ -10,7 +10,8 @@ export interface OrderFeeSkills {
 /**
  * The Character's trained Accounting and Broker Relations levels, null with
  * nobody active or while their skills are unknown — never a made-up 0, which
- * would show the untrained rate as if it were theirs.
+ * would show the untrained rate as if it were theirs. Once skills have loaded,
+ * a skill they never trained really is level 0.
  */
 export function useOrderFeeSkills(characterId: number | null): OrderFeeSkills | null {
   const [loaded, setLoaded] = useState<{
