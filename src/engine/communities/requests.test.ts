@@ -233,6 +233,13 @@ describe('constants shared with the callables', () => {
     expect(MAX_REQUEST_MAILS_PER_DAY).toBe(constant('MAX_REQUEST_MAILS_PER_DAY'));
   });
 
+  it('pins the open-Request cap and lifetime the app words for Members', () => {
+    // Neither is an app constant any more (a Request carries its own expiresAt); the FAQ and
+    // the Communities copy state them, so a server change must come through here.
+    expect(constant('MAX_OPEN_REQUESTS_PER_MEMBER')).toBe(10);
+    expect(constant('REQUEST_LIFETIME_MS')).toBe(30 * DAY);
+  });
+
   it('matches the server default notification choice', () => {
     const match =
       /export const DEFAULT_NOTIFY: RequestNotify = \{ app: (true|false), mail: (true|false) \};/.exec(
