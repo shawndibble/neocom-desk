@@ -4,7 +4,13 @@
  * summary fields (type, status, issuer, dates, ISK) are already on the
  * `Contract` the caller has in hand, so those render immediately; only the
  * location name(s) and item lines need an ESI round trip, so each gets its
- * own small loading state rather than blocking the whole modal.
+ * own small loading state rather than blocking the whole panel.
+ *
+ * Laid out for the question a reader brings to a contract: what it is (status
+ * pill, headline figure), what is in it (items first), whether the price was
+ * fair (`useOwnContractPriceCheck`), who and where, and how it progressed
+ * (timeline) — in place of a fourteen-row label/value list. Decision
+ * 20261020-005242-contract-detail-price-check.
  *
  * Labeled from ESI's own fields, not the game's "Buyer Will Pay/Get" framing
  * — that flips depending on which side of the trade this character is on.
@@ -19,11 +25,15 @@ import { useTranslation } from 'react-i18next';
 import {
   DataTable,
   EmptyState,
+  Eyebrow,
   SlideOver,
   Spinner,
+  StatChip,
+  StatChips,
   TypeIcon,
   type DataTableColumn,
 } from '@/components/ui';
+import { Pill } from '@/components/ui/Pill';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { DataGate } from '@/components/DataGate';
@@ -31,9 +41,10 @@ import { loadContractItemsDetailed } from './contractItems';
 import { contractItemsCsvColumns } from './contractItemsCsv';
 import { loadContractLocationName } from './contractLocationName';
 import { loadTypeNames } from './typeNames';
-import { loadContractMarketValue, type ContractMarketValue } from './contractMarketValue';
-import { ContractMarketValueRow } from '@/features/contracts/ContractMarketValueRow';
+import { ContractAbyssalValue } from '@/features/contracts/ContractAbyssalValue';
 import { ContractDescriptionLinks } from '@/features/contracts/ContractDescriptionLinks';
+import { ContractPriceCheck } from '@/features/contracts/ContractPriceCheck';
+import { ContractTimeline } from '@/features/contracts/ContractTimeline';
 import { CopyContractIdButton } from '@/features/contracts/CopyContractIdButton';
 import { OpenInEveButton } from '@/features/openInEve/OpenInEveButton';
 import {
@@ -53,8 +64,13 @@ import { StandingTag } from './StandingTag';
 import { ContractReceiverLink } from './ContractReceiverLink';
 import { contractIssuer, type ContractReceiver } from './contractCounterparty';
 import type { EffectiveStanding } from './contactStandings';
-import { CONTRACT_ISK_CENTS_BELOW, formatIskAuto } from '@/lib/isk';
+import { useOwnContractPriceCheck } from './useOwnContractPriceCheck';
+import { formatContractIsk } from '@/lib/isk';
+import { formatDuration } from '@/lib/duration';
 import { formatTimestamp } from '@/lib/timestamp';
+import { useNow } from '@/lib/useNow';
+import { contractStatusTone, isActiveContractStatus } from '@/engine/contracts/contractStatus';
+import { contractTimeline } from '@/engine/contracts/contractTimeline';
 import { courierDeliveryDeadlineMs } from '@/engine/contracts/courierDeadline';
 import { useTimeZone } from '@/lib/timeFormat';
 import type { Contract, ContractItem } from '@/esi/endpoints';
@@ -111,11 +127,6 @@ interface ItemsState {
   typeNames: Map<number, string>;
 }
 
-interface MarketValueState {
-  included: ContractMarketValue | null;
-  requested: ContractMarketValue | null;
-}
-
 const HAS_ITEMS = new Set<Contract['type']>(['item_exchange', 'auction']);
 
 export function ContractDetailModal({
@@ -131,12 +142,13 @@ export function ContractDetailModal({
   const { t } = useTranslation();
   const issuer = contractIssuer(contract);
   const timeZone = useTimeZone();
+  const now = useNow();
   const deliverByMs = courierDeliveryDeadlineMs(contract);
   const hubId = useMarketHub((s) => s.value);
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
   const isAbyssalType = useMutaplasmidLookup()?.isAbyssalType;
   const [location, setLocation] = useState<LocationState | undefined>(undefined);
-  /** `undefined` until resolved; the System rows stay hidden meanwhile rather than spinning. */
+  /** `undefined` until resolved; the system link stays hidden meanwhile rather than spinning. */
   const [systems, setSystems] = useState<SystemsState | undefined>(undefined);
   /** Stays `undefined` forever for a courier/loan contract — `HAS_ITEMS` gates both the fetch and the render, so it's never inspected there. */
   const [items, setItems] = useState<ItemsState | undefined>(undefined);
@@ -147,8 +159,6 @@ export function ContractDetailModal({
    */
   const [itemsFailed, setItemsFailed] = useState(false);
   const [itemsAttempt, setItemsAttempt] = useState(0);
-  /** Only computed for an outstanding contract — see the `Market value` render gate below. */
-  const [marketValue, setMarketValue] = useState<MarketValueState | undefined>(undefined);
 
   useEffect(() => {
     let cancelled = false;
@@ -205,35 +215,14 @@ export function ContractDetailModal({
     };
   }, [characterId, contract.type, contract.contract_id, itemsAttempt]);
 
-  /**
-   * Only for an outstanding contract (issue #717) — a finished/cancelled one
-   * is history, not a decision a market figure could still inform.
-   */
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      if (!HAS_ITEMS.has(contract.type) || contract.status !== 'outstanding' || !items) {
-        setMarketValue(undefined);
-        return;
-      }
-      const includedItems = items.list.filter((item) => item.is_included);
-      const requestedItems = items.list.filter((item) => !item.is_included);
-      // A Character's own contract items carry no item id, so an abyssal module
-      // here can't be identified to MutaMarket: it shows as not priced, and why.
-      const abyssal = isAbyssalType ? { isAbyssalType, characterId: null } : undefined;
-      const [included, requested] = await Promise.all([
-        loadContractMarketValue(hub, includedItems, items.typeNames, { abyssal }),
-        requestedItems.length > 0
-          ? loadContractMarketValue(hub, requestedItems, items.typeNames, { abyssal })
-          : Promise.resolve(null),
-      ]);
-      if (!cancelled) setMarketValue({ included, requested });
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [contract.type, contract.status, items, hub, isAbyssalType]);
+  const priceCheck = useOwnContractPriceCheck({
+    contract,
+    items: HAS_ITEMS.has(contract.type) ? items?.list : undefined,
+    hub,
+    isAbyssalType,
+  });
 
+  const abyssalCount = items?.list.filter((item) => isAbyssalType?.(item.type_id)).length ?? 0;
   const title = t(CONTRACT_TYPE_KEY[contract.type]);
 
   const included = items?.list.filter((item) => item.is_included) ?? [];
@@ -273,151 +262,107 @@ export function ContractDetailModal({
     },
   ];
 
+  // The figures that matter, in the order a reader weighs them. A zero or
+  // absent ISK field is dropped rather than printed as 0.00.
+  const iskFigures = [
+    { key: 'price', label: t('contracts.detailPrice'), value: contract.price },
+    { key: 'reward', label: t('contracts.detailReward'), value: contract.reward },
+    { key: 'collateral', label: t('contracts.detailCollateral'), value: contract.collateral },
+    { key: 'buyout', label: t('contracts.detailBuyout'), value: contract.buyout },
+  ].filter((figure): figure is typeof figure & { value: number } => (figure.value ?? 0) > 0);
+  const itemForItem = items !== undefined && iskFigures.length === 0 && requested.length > 0;
+  const finishedAt = contract.date_completed;
+  const hasItemLines = items !== undefined && items.list.length > 0;
+  const volumeText =
+    contract.volume !== undefined && contract.volume > 0
+      ? `${contract.volume.toLocaleString()} m³`
+      : null;
+  // A contract that can still be taken counts down; one that has lapsed or is
+  // over shows the date instead, since "Expires in 0m" would say nothing.
+  const msLeft = new Date(contract.date_expired).getTime() - now;
+  const countdown =
+    isActiveContractStatus(contract.status) && msLeft > 0 ? formatDuration(msLeft / 1000) : null;
+
   return (
-    <SlideOver open onClose={onClose} title={title} wide>
-      <div className="space-y-4 text-xs">
-        <div>
-          <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
-            <dt className="text-text-dim uppercase">{t('contracts.detailType')}</dt>
-            <dd>{t(CONTRACT_TYPE_KEY[contract.type])}</dd>
+    <SlideOver
+      open
+      onClose={onClose}
+      maxWidthClassName="max-w-[28rem]"
+      title={
+        <span className="flex flex-wrap items-center gap-2">
+          {title}
+          <Pill tone={contractStatusTone(contract.status)}>
+            {t(CONTRACT_STATUS_KEY[contract.status])}
+          </Pill>
+        </span>
+      }
+      subtitle={
+        <span className="flex flex-wrap items-center gap-x-1">
+          <span className="tabular-nums">{contract.contract_id}</span>
+          <CopyContractIdButton contractId={contract.contract_id} />
+          <OpenInEveButton kind="contract" id={contract.contract_id} />
+        </span>
+      }
+    >
+      <div className="space-y-5 text-xs">
+        <StatChips>
+          {iskFigures.map((figure, index) => (
+            <StatChip
+              key={figure.key}
+              emphasis={index === 0}
+              label={figure.label}
+              value={formatContractIsk(figure.value)}
+            />
+          ))}
+          {itemForItem && (
+            <StatChip
+              emphasis
+              label={t('contractDetail.headlineTermsLabel')}
+              value={t('contractDetail.headlineItemForItem')}
+            />
+          )}
+          {hasItemLines && (
+            <StatChip
+              label={t('contractDetail.headlineItemsLabel')}
+              value={`${t('contractDetail.headlineItems', { count: items.list.length })}${volumeText ? ` · ${volumeText}` : ''}`}
+            />
+          )}
+          {!hasItemLines && volumeText && (
+            <StatChip label={t('contracts.detailVolume')} value={volumeText} />
+          )}
+          {contract.days_to_complete !== undefined && contract.days_to_complete > 0 && (
+            <StatChip
+              label={t('contracts.detailDaysToComplete')}
+              value={String(contract.days_to_complete)}
+            />
+          )}
+          {deliverByMs !== null && (
+            <StatChip
+              label={t('contracts.detailDeliverBy')}
+              value={formatTimestamp(new Date(deliverByMs), timeZone)}
+            />
+          )}
+          {finishedAt ? (
+            <StatChip
+              label={t('contractDetail.timelineCompleted')}
+              value={formatTimestamp(new Date(finishedAt), timeZone)}
+            />
+          ) : countdown !== null ? (
+            <StatChip label={t('contractDetail.headlineExpiresIn')} value={countdown} />
+          ) : (
+            <StatChip
+              label={t('contractDetail.timelineExpires')}
+              value={formatTimestamp(new Date(contract.date_expired), timeZone)}
+            />
+          )}
+        </StatChips>
 
-            <dt className="text-text-dim uppercase">{t('contracts.detailStatus')}</dt>
-            <dd>{t(CONTRACT_STATUS_KEY[contract.status])}</dd>
-
-            <dt className="text-text-dim uppercase">{t('contracts.detailIssuedBy')}</dt>
-            <dd className="flex items-center gap-1.5">
-              {issuer.kind === 'corporation' ? (
-                <CorporationLink id={issuer.id}>{issuerName}</CorporationLink>
-              ) : (
-                <CharacterLink id={issuer.id}>{issuerName}</CharacterLink>
-              )}
-              <StandingTag standing={issuerStanding} />
-            </dd>
-
-            {receiver && (
-              <>
-                <dt className="text-text-dim uppercase">{t('contracts.detailReceivedBy')}</dt>
-                <dd>
-                  <ContractReceiverLink
-                    receiver={receiver}
-                    name={receiverName}
-                    standing={receiverStanding}
-                  />
-                </dd>
-              </>
-            )}
-
-            <dt className="text-text-dim uppercase">{t('contracts.detailAvailability')}</dt>
-            <dd>{t(CONTRACT_AVAILABILITY_KEY[contract.availability])}</dd>
-
-            <dt className="text-text-dim uppercase">{t('contractDetail.contractIdLabel')}</dt>
-            <dd className="flex items-center gap-1 tabular-nums">
-              {contract.contract_id}
-              <CopyContractIdButton contractId={contract.contract_id} />
-              <OpenInEveButton kind="contract" id={contract.contract_id} />
-            </dd>
-
-            {contract.title && (
-              <>
-                <dt className="text-text-dim uppercase">{t('contracts.detailDescription')}</dt>
-                <dd className="min-w-0 space-y-1.5">
-                  <p className="break-words">{contract.title}</p>
-                  <ContractDescriptionLinks description={contract.title} />
-                </dd>
-              </>
-            )}
-
-            {contract.start_location_id && (
-              <>
-                <dt className="text-text-dim uppercase">{t('contracts.detailLocation')}</dt>
-                <dd>
-                  {location === undefined ? (
-                    <Spinner size="sm" label={t('common.loading')} />
-                  ) : (
-                    <PlaceName id={contract.start_location_id} name={location.start} />
-                  )}
-                </dd>
-              </>
-            )}
-
-            {systems?.start && <SystemRow system={systems.start} />}
-
-            {contract.end_location_id && (
-              <>
-                <dt className="text-text-dim uppercase">{t('contracts.detailDestination')}</dt>
-                <dd>
-                  {location === undefined ? (
-                    <Spinner size="sm" label={t('common.loading')} />
-                  ) : (
-                    <PlaceName id={contract.end_location_id} name={location.end} />
-                  )}
-                </dd>
-              </>
-            )}
-
-            {systems?.end && <SystemRow system={systems.end} />}
-
-            <dt className="text-text-dim uppercase">{t('contracts.detailDateIssued')}</dt>
-            <dd>{formatTimestamp(new Date(contract.date_issued), timeZone)}</dd>
-
-            <dt className="text-text-dim uppercase">{t('contracts.detailDateExpired')}</dt>
-            <dd>{formatTimestamp(new Date(contract.date_expired), timeZone)}</dd>
-
-            {deliverByMs !== null && (
-              <>
-                <dt className="text-text-dim uppercase">{t('contracts.detailDeliverBy')}</dt>
-                <dd>{formatTimestamp(new Date(deliverByMs), timeZone)}</dd>
-              </>
-            )}
-
-            {contract.date_accepted && (
-              <>
-                <dt className="text-text-dim uppercase">{t('contracts.detailDateAccepted')}</dt>
-                <dd>{formatTimestamp(new Date(contract.date_accepted), timeZone)}</dd>
-              </>
-            )}
-
-            {contract.date_completed && (
-              <>
-                <dt className="text-text-dim uppercase">{t('contracts.detailDateCompleted')}</dt>
-                <dd>{formatTimestamp(new Date(contract.date_completed), timeZone)}</dd>
-              </>
-            )}
-
-            {contract.days_to_complete !== undefined && (
-              <>
-                <dt className="text-text-dim uppercase">{t('contracts.detailDaysToComplete')}</dt>
-                <dd>{contract.days_to_complete}</dd>
-              </>
-            )}
-
-            {contract.volume !== undefined && (
-              <>
-                <dt className="text-text-dim uppercase">{t('contracts.detailVolume')}</dt>
-                <dd>{contract.volume.toLocaleString()} m³</dd>
-              </>
-            )}
-          </dl>
-        </div>
-
-        {(contract.price !== undefined ||
-          contract.reward !== undefined ||
-          contract.collateral !== undefined ||
-          contract.buyout !== undefined) && (
-          <dl className="divide-y divide-line border-y border-line">
-            {contract.price !== undefined && (
-              <IskRow label={t('contracts.detailPrice')} value={contract.price} />
-            )}
-            {contract.reward !== undefined && (
-              <IskRow label={t('contracts.detailReward')} value={contract.reward} />
-            )}
-            {contract.collateral !== undefined && (
-              <IskRow label={t('contracts.detailCollateral')} value={contract.collateral} />
-            )}
-            {contract.buyout !== undefined && (
-              <IskRow label={t('contracts.detailBuyout')} value={contract.buyout} />
-            )}
-          </dl>
+        {contract.title && (
+          <div className="min-w-0 space-y-1.5">
+            <Eyebrow>{t('contracts.detailDescription')}</Eyebrow>
+            <p className="break-words">{contract.title}</p>
+            <ContractDescriptionLinks description={contract.title} />
+          </div>
         )}
 
         {HAS_ITEMS.has(contract.type) && (
@@ -445,10 +390,6 @@ export function ContractDetailModal({
                       columns={itemColumns}
                       items={included}
                       typeNames={items.typeNames}
-                      marketValue={
-                        contract.status === 'outstanding' ? marketValue?.included : undefined
-                      }
-                      hubName={hub.systemName}
                     />
                   )}
                   {itemColumns && (
@@ -458,16 +399,67 @@ export function ContractDetailModal({
                       columns={itemColumns}
                       items={requested}
                       typeNames={items.typeNames}
-                      marketValue={
-                        contract.status === 'outstanding' ? marketValue?.requested : undefined
-                      }
-                      hubName={hub.systemName}
                     />
                   )}
                 </>
               ))}
           </DataGate>
         )}
+
+        {priceCheck && <ContractPriceCheck {...priceCheck} />}
+        {abyssalCount > 0 && (
+          // Own-contract lines carry no item id, so a module cannot be identified
+          // to MutaMarket: it reads as not priced, and why.
+          <ContractAbyssalValue value={{ estimated: 0, priced: 0, unpriced: abyssalCount }} />
+        )}
+
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(10rem,1fr))] gap-3">
+          <div>
+            <Eyebrow>{t('contracts.detailIssuedBy')}</Eyebrow>
+            <p className="flex flex-wrap items-center gap-1.5">
+              {issuer.kind === 'corporation' ? (
+                <CorporationLink id={issuer.id}>{issuerName}</CorporationLink>
+              ) : (
+                <CharacterLink id={issuer.id}>{issuerName}</CharacterLink>
+              )}
+              <StandingTag standing={issuerStanding} />
+            </p>
+          </div>
+          {receiver && (
+            <div>
+              <Eyebrow>{t('contracts.detailReceivedBy')}</Eyebrow>
+              <p>
+                <ContractReceiverLink
+                  receiver={receiver}
+                  name={receiverName}
+                  standing={receiverStanding}
+                />
+              </p>
+            </div>
+          )}
+          {contract.start_location_id && (
+            <PlaceBlock
+              label={t('contracts.detailLocation')}
+              id={contract.start_location_id}
+              name={location === undefined ? undefined : location.start}
+              system={systems?.start ?? null}
+            />
+          )}
+          {contract.end_location_id && (
+            <PlaceBlock
+              label={t('contracts.detailDestination')}
+              id={contract.end_location_id}
+              name={location === undefined ? undefined : location.end}
+              system={systems?.end ?? null}
+            />
+          )}
+        </div>
+
+        <ContractTimeline steps={contractTimeline(contract)} />
+
+        <p className="border-t border-line pt-3 text-text-dim">
+          {title} · {t(CONTRACT_AVAILABILITY_KEY[contract.availability])}
+        </p>
       </div>
     </SlideOver>
   );
@@ -478,10 +470,6 @@ export function ContractDetailModal({
  * columns, differing only in title and rows, so they share a component
  * rather than the block being written out twice — the right-click menu and
  * the narrow-screen wrapper had to stay in step across both.
- *
- * `marketValue` is `undefined` while still loading (or not applicable to this
- * contract's status) and `null` when there is nothing to price — either way,
- * no row renders. Only a resolved `ContractMarketValue` renders one.
  */
 function ItemSection({
   contractId,
@@ -489,16 +477,12 @@ function ItemSection({
   columns,
   items,
   typeNames,
-  marketValue,
-  hubName,
 }: {
   contractId: number;
   title: string;
   columns: DataTableColumn<ContractItem>[];
   items: ContractItem[];
   typeNames: ReadonlyMap<number, string>;
-  marketValue: ContractMarketValue | null | undefined;
-  hubName: string;
 }) {
   const { t } = useTranslation();
   const csvColumns = useMemo(() => contractItemsCsvColumns(t, typeNames), [t, typeNames]);
@@ -536,46 +520,41 @@ function ItemSection({
           )}
         />
       </div>
-      {marketValue && <ContractMarketValueRow value={marketValue} hubName={hubName} />}
     </div>
   );
 }
 
-/** A resolved station/structure name opens its Place Info; an unresolved id stays plain `#id`. */
-function PlaceName({ id, name }: { id: number; name: string | null }) {
-  return name === null ? <>{`#${id}`}</> : <PlaceLink id={id}>{name}</PlaceLink>;
-}
-
 /**
- * The system under a Location/Destination row, linked to Route Safety the way
- * `PublicContractDetailModal`'s System row is.
+ * A place and the system it sits in. The station name opens its Place Info;
+ * an unresolved id stays plain `#id`. The system is linked to Route Safety the
+ * way `PublicContractDetailModal`'s is, and is simply absent until it resolves.
+ * `name` is `undefined` while the lookup is in flight.
  */
-function SystemRow({ system }: { system: SystemRef }) {
+function PlaceBlock({
+  label,
+  id,
+  name,
+  system,
+}: {
+  label: string;
+  id: number;
+  name: string | null | undefined;
+  system: SystemRef | null;
+}) {
   const { t } = useTranslation();
   return (
-    <>
-      <dt className="text-text-dim uppercase">{t('contractDetail.systemLabel')}</dt>
-      <dd>
-        <SystemLink systemId={system.id}>{system.name}</SystemLink>
-      </dd>
-    </>
-  );
-}
-
-/**
- * Neutral color, not `isk-pos`/`isk-neg` — those tokens signal gain/loss
- * *to this character*, but a `Contract` alone doesn't say whether the active
- * character is the issuer or the acceptor, so "Acceptor Pays" could be this
- * character's outflow or the other side's. Coloring it as a gain either way
- * would be a wrong signal, not just a missing one.
- */
-function IskRow({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="flex items-baseline justify-between gap-3 py-1.5">
-      <span className="text-text-dim">{label}</span>
-      <span className="tabular-nums font-semibold">
-        {formatIskAuto(value, CONTRACT_ISK_CENTS_BELOW)}
-      </span>
+    <div className="col-span-full">
+      <Eyebrow>{label}</Eyebrow>
+      {name === undefined ? (
+        <Spinner size="sm" label={t('common.loading')} />
+      ) : (
+        <p>{name === null ? `#${id}` : <PlaceLink id={id}>{name}</PlaceLink>}</p>
+      )}
+      {system && (
+        <p>
+          <SystemLink systemId={system.id}>{system.name}</SystemLink>
+        </p>
+      )}
     </div>
   );
 }

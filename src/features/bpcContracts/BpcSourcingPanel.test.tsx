@@ -629,6 +629,30 @@ describe('BpcSourcingPanel', () => {
     expect(await screen.findByText('1 offer on contract')).toBeInTheDocument();
   });
 
+  it('judges an opened copy against every similar copy listed, however the board is filtered', async () => {
+    // A minimum ME of 10 hides the three similar copies from the board, but
+    // they are still for sale, so they still set the going rate.
+    loadPublicBpcContracts.mockResolvedValue(
+      cachedSnapshot([
+        row({ contractId: 1 }), // 1,000,000 a run
+        row({ contractId: 2, me: 8, price: 4_000_000 }), // 800,000
+        row({ contractId: 3, me: 9, price: 5_500_000 }), // 1,100,000
+        row({ contractId: 4, me: 9, te: 18, price: 6_000_000 }), // 1,200,000
+      ])
+    );
+    window.history.pushState({}, '', '/industry/sourcing?sourcing.type=638&sourcing.minMe=10');
+    const user = userEvent.setup();
+    render(<App />);
+
+    expect(await screen.findByText('1 offer on contract')).toBeInTheDocument();
+    await user.click(within(await screen.findByRole('table')).getByText('Rifter Blueprint'));
+
+    const check = await screen.findByRole('region', {
+      name: 'Is it fair? · 3 similar copies for sale now',
+    });
+    expect(within(check).getByText('1,100,000 ISK')).toBeInTheDocument(); // the median
+  });
+
   it('suggests matching blueprints as you type, with how many offers each has', async () => {
     loadPublicBpcContracts.mockResolvedValue(
       cachedSnapshot([
