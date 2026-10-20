@@ -1258,7 +1258,9 @@ function paymentForAllocation(id: string, p: Data) {
     id,
     amount: p.amount as number,
     at: p.at as string,
-    ...(p.source === 'donation' || p.source === 'manual' ? { source: p.source } : {}),
+    ...(p.source === 'donation' || p.source === 'manual'
+      ? { source: p.source as 'donation' | 'manual' }
+      : {}),
     ...(typeof p.statementId === 'string' ? { statementId: p.statementId } : {}),
     ...(typeof p.notTaxAmount === 'number' ? { notTaxAmount: p.notTaxAmount } : {}),
   };
