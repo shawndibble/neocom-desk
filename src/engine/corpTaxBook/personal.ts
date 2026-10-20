@@ -283,6 +283,7 @@ function prepare(book: PersonalBook, entries: readonly PersonalEntry[], now: str
       statements,
       payments: book.payments.filter((p) => p.minerId === minerId),
       dismissalCredits: credits,
+      startDate: book.startDate,
     });
     credit += allocation.credit;
     for (const s of statements) {

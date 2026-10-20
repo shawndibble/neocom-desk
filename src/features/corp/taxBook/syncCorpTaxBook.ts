@@ -297,6 +297,7 @@ export async function syncCorpTaxBook(
         miners: after.miners,
         alreadyPaid: after.paidStatementIds,
         extractions: after.extractions,
+        startDate: after.book.startDate,
       })
     : [];
   for (const ids of chunks(toSettle, SETTLE_PER_CALL)) {

@@ -7,7 +7,13 @@
  * `charges`, `statements`, `allocation`, `overdue` and `extraction`; this
  * module only joins them per Miner, per day and per Extraction.
  */
-import { allocatePayments, dismissalCredits, type Allocation, type TaxPayment } from './allocation';
+import {
+  allocatePayments,
+  dismissalCredits,
+  isBeforeBook,
+  type Allocation,
+  type TaxPayment,
+} from './allocation';
 import { lastBillableDate } from './billable';
 import { buildDayCharges, type DayCharge, type Miner } from './charges';
 import { activeDismissalFor, type Dismissal } from './dismissals';
@@ -166,6 +172,8 @@ export interface BookView {
   input: BookViewInput;
   charges: DayCharge[];
   beforeBook: ObservedMiningEntry[];
+  /** Donations dated before the start date: counted for officers, never credited or listed. */
+  donationsBeforeBook: number;
   unrated: ObservedMiningEntry[];
   billableThrough: string | undefined;
   miners: MinerRow[];
@@ -278,13 +286,17 @@ export function buildBookView(input: BookViewInput): BookView {
     const characterIds = grouping?.characterIds ?? (solo ? [Number(solo[1])] : []);
     const mainCharacterId = grouping?.mainCharacterId ?? characterIds[0] ?? 0;
     const statements = input.statements.filter((s) => s.minerId === id);
-    const payments = toTaxPayments(input.payments, id);
+    // A donation before the book is neither credited nor shown as a payment.
+    const payments = toTaxPayments(input.payments, id).filter(
+      (p) => p.source !== 'donation' || !isBeforeBook(p.at, input.startDate)
+    );
     const mine = charges.filter((c) => c.minerId === id);
 
     const allocation = allocatePayments({
       statements,
       payments,
       dismissalCredits: dismissalCredits(statements, input.dismissals, mine),
+      startDate: input.startDate,
     });
     const draft = draftStatement({
       minerId: id,
@@ -442,8 +454,10 @@ export function buildBookView(input: BookViewInput): BookView {
       });
     }
   }
+  let donationsBeforeBook = 0;
   for (const p of input.payments) {
-    if (!p.minerId) needsYou.push({ kind: 'unmatched', payment: p });
+    if (p.source === 'donation' && isBeforeBook(p.at, input.startDate)) donationsBeforeBook++;
+    else if (!p.minerId) needsYou.push({ kind: 'unmatched', payment: p });
   }
   // The same ordering the cards read in: declarations, then the oldest debt.
   const rank: Record<NeedsYouItem['kind'], number> = {
@@ -465,6 +479,7 @@ export function buildBookView(input: BookViewInput): BookView {
     input,
     charges,
     beforeBook,
+    donationsBeforeBook,
     unrated,
     billableThrough,
     miners,

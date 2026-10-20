@@ -119,6 +119,7 @@ export interface AllocPayment {
   at: string;
   statementId?: string;
   notTaxAmount?: number;
+  source?: 'donation' | 'manual';
 }
 
 export interface AllocDismissalCredit {
@@ -130,11 +131,24 @@ export function settleTolerance(amount: number): number {
   return Math.max((amount * 0.5) / 100, 100_000);
 }
 
-export function allocatePayments(input: {
+/** Mirror of allocation.ts `isBeforeBook`. */
+export function isBeforeBook(at: string, startDate: string): boolean {
+  return at.slice(0, 10) < startDate;
+}
+
+export function allocatePayments(rawInput: {
   statements: readonly AllocStatement[];
   payments: readonly AllocPayment[];
   dismissalCredits: readonly AllocDismissalCredit[];
+  startDate?: string;
 }) {
+  const { startDate } = rawInput;
+  const input = {
+    ...rawInput,
+    payments: startDate
+      ? rawInput.payments.filter((p) => p.source !== 'donation' || !isBeforeBook(p.at, startDate))
+      : rawInput.payments,
+  };
   const ordered = [...input.statements].sort(
     (a, b) => a.issuedAt.localeCompare(b.issuedAt) || a.id.localeCompare(b.id)
   );

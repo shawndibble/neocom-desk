@@ -330,6 +330,8 @@ export interface SettleInput {
   /** Lets a moon or Extraction dismissal reach the days it covers. */
   extractions?: readonly SyncExtraction[];
   now?: string;
+  /** The book's start date; a donation dated before it credits nothing. */
+  startDate?: string;
 }
 
 /**
@@ -365,6 +367,7 @@ export function planSettlements(input: SettleInput): string[] {
       statements,
       payments,
       dismissalCredits: dismissalCredits(statements, input.dismissals, charges),
+      startDate: input.startDate,
     });
     for (const s of statements) {
       if (allocation.byStatement.get(s.id)?.settled && !input.alreadyPaid.has(s.id)) {
