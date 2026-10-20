@@ -38,7 +38,7 @@ Font `'Segoe UI', Roboto, 'Helvetica Neue', Arial, system-ui, sans-serif`. `trac
 - **InfoTooltip "?":** `16px circle; border 1px line; 10px; text-dim`; hover border line-bright. Bubble: `max-width 224px; bg panel; border line; p 8px; 11px text-dim; shadow`.
 - **Inline link:** `color accent; font-weight 500; text-decoration underline`. Text action ("Transactions →", "Clear"): 11px 600 .1em uppercase accent, underline on hover only, no box.
 - **EmptyState:** centred column, `gap 8px; padding 40px 16px`; title 14px 600 .1em uppercase text-dim; hint 12px text-dim max-width 384px; optional sm Button below (`mt 8px`).
-- **CollapsiblePanel:** Panel whose last header action is a sm ghost IconButton caret; collapsed shows a one-line summary.
+- **CollapsiblePanel:** Panel whose last header action is a row ghost IconButton caret; collapsed shows a one-line summary.
 - **DataTable:** `width 100%; font-size 12px`. Header row `border-bottom 1px line; text-dim; 600 uppercase` (no fill), `padding 8px 12px`. Cells `padding 6px 12px`; rows divided `1px line`; hover bg panel-2. Numbers right-aligned tabular-nums. Compact: `4px 8px`. **Phone (<640px):** header hidden; each row a block `padding 8px 12px`; primary cell first, 600, no label; other cells `padding 2px 0 2px 112px` with label pinned left (`104px wide; 10px; .1em uppercase; text-dim`); everything left-aligned.
 - **TypeIcon:** EVE item icon, source 32/64/128, shown ~20–32px in rows, 64px in headers. No border.
 

@@ -45,11 +45,12 @@ export function TravelSettingsPanel() {
   const { settingsHydrated: hydrated, podKillsUnavailable } = useRouteRules();
   // On a phone the "Also avoid" toggles fold behind a count of the rules on.
   const avoidFold = usePhoneFold();
-  const rulesOn = [
-    useAvoidEdencom((state) => state.value),
-    useAvoidTriglavian((state) => state.value),
-    useAvoidPodKills((state) => state.value),
-  ].filter(Boolean).length;
+  const edencom = useAvoidEdencom((state) => state.value);
+  const triglavian = useAvoidTriglavian((state) => state.value);
+  const podKills = useAvoidPodKills((state) => state.value);
+  // A pod-kill rule with no kill feed is not applied, so it is not "on".
+  const rules = [edencom, triglavian, podKills && !podKillsUnavailable];
+  const rulesOn = rules.filter(Boolean).length;
 
   return (
     <div className="space-y-4">
@@ -96,7 +97,10 @@ export function TravelSettingsPanel() {
               {avoidFold.phone ? (
                 <Disclosure
                   label={t('settings.travel.avoidTitle')}
-                  trailing={t('settings.travel.avoidSummary', { count: rulesOn })}
+                  trailing={t('settings.travel.avoidSummary', {
+                    count: rulesOn,
+                    total: rules.length,
+                  })}
                   expanded={avoidFold.expanded}
                   onToggle={avoidFold.toggle}
                 >

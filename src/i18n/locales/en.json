@@ -11244,7 +11244,7 @@
       "penaltyHint": "0 to 100, as the game's slider. At 50 one unwanted jump outweighs a long detour.",
       "penaltyShorterHint": "Prefer shorter counts jumps only, so the security penalty does not apply.",
       "avoidTitle": "Also avoid",
-      "avoidSummary": "{{count}} of 3 on",
+      "avoidSummary": "{{count}} of {{total}} on",
       "avoidEdencom_one": "EDENCOM systems ({{count}} system)",
       "avoidEdencom_other": "EDENCOM systems ({{count}} systems)",
       "avoidTriglavian_one": "Triglavian minor victory systems ({{count}} system)",

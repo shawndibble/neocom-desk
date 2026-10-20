@@ -46,9 +46,18 @@ for (const section of SECTIONS) {
     // Corporation is hidden for a Character with no Corp access.
     if (section === 'corporation' && (await content.count()) === 0) test.skip();
     await expect(content).toBeVisible();
-    // Let async panels settle before measuring.
-    await page.waitForTimeout(500);
-    const height = await content.evaluate((el) => Math.round(el.getBoundingClientRect().height));
+    const measure = () => content.evaluate((el) => Math.round(el.getBoundingClientRect().height));
+    // Async panels settle: wait for two equal reads in a row.
+    let previous = -1;
+    await expect
+      .poll(async () => {
+        const current = await measure();
+        const settled = current === previous;
+        previous = current;
+        return settled;
+      })
+      .toBe(true);
+    const height = await measure();
     if (section in OVER_BUDGET) return;
     expect(height, `${section} is ${height}px tall`).toBeLessThanOrEqual(LIMIT);
   });

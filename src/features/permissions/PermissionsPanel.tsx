@@ -108,8 +108,10 @@ export function PermissionsPanel() {
   const groups = SCOPE_GROUPS.filter((group) => group !== 'corp' || corp.state !== 'none');
   const missing = groups.filter((group) => statusOf(group) === 'missing');
   // Actionable rows first (stable: catalogue order within each half); a row still checking keeps the Granted half.
-  const grantedRows = groups.filter((group) => statusOf(group) !== 'missing');
-  const rows = [...missing, ...grantedRows];
+  const rows = [...missing, ...groups.filter((group) => statusOf(group) !== 'missing')];
+  // Only a confirmed grant folds on a phone: a row still checking stays in sight.
+  const foldedRows = grantedFold.phone ? rows.filter((group) => statusOf(group) === 'granted') : [];
+  const shownRows = rows.filter((group) => !foldedRows.includes(group));
   // Derived from `missing`, so a row that gets granted (or hidden) drops out of the request.
   const firstFlagged = rows.find((group) => flagged.has(group) && missing.includes(group));
   const chosen = missing.filter((group) => picked.has(group));
@@ -179,6 +181,7 @@ export function PermissionsPanel() {
     );
   }
 
+  // Two columns from `xl`: one full-width list put each status a screen away from its name.
   function renderRows(list: ScopeGroup[]) {
     return <ul className="grid text-xs xl:grid-cols-2 xl:gap-x-8">{list.map(renderRow)}</ul>;
   }
@@ -219,20 +222,15 @@ export function PermissionsPanel() {
                 )}
               </div>
             )}
-            {/* Two columns from `xl`: one full-width list put each status a screen away from its name. */}
-            {grantedFold.phone && grantedRows.length > 0 ? (
-              <>
-                {renderRows(missing)}
-                <Disclosure
-                  label={t('settings.permissions.grantedGroup', { count: grantedRows.length })}
-                  expanded={grantedFold.expanded}
-                  onToggle={grantedFold.toggle}
-                >
-                  {renderRows(grantedRows)}
-                </Disclosure>
-              </>
-            ) : (
-              renderRows(rows)
+            {renderRows(shownRows)}
+            {foldedRows.length > 0 && (
+              <Disclosure
+                label={t('settings.permissions.grantedGroup', { count: foldedRows.length })}
+                expanded={grantedFold.expanded}
+                onToggle={grantedFold.toggle}
+              >
+                {renderRows(foldedRows)}
+              </Disclosure>
             )}
           </>
         )}
