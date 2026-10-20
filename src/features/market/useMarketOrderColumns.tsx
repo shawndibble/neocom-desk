@@ -11,6 +11,7 @@ import {
   BUY_ORDER_COLUMN_IDS,
   useVisibleMarketOrderColumns,
   ORDER_BOOK_LOCATION_CLASS,
+  FEE_COLUMN_IDS,
   type MarketOrderColumnId,
 } from '@/features/market/marketOrderColumns';
 import { formatVolume } from '@/features/market/format';
@@ -29,6 +30,7 @@ import {
 import { renderJumpsCell } from '@/features/route/jumpsCell';
 import type { JumpRangeFilter, JumpsCellValue } from '@/features/route/currentSystem';
 import type { RegionOrder } from '@/esi/endpoints';
+import { orderFees } from '@/engine/market/orderFees';
 import { formatMarketIsk } from '@/lib/isk';
 import { rangeLabel } from '@/features/market/orderBookCsv';
 import { sellOutlierMultiple } from '@/engine/market/orderBookDepth';
@@ -69,6 +71,8 @@ export interface UseMarketOrderColumnsArgs {
    * Location is left off the tables and cards. The stored picks are untouched.
    */
   hideLocation: boolean;
+  /** The active Character's Accounting level; null until it is known, which also keeps the fee columns out. */
+  accountingLevel: number | null;
 }
 
 export interface MarketOrderColumns {
@@ -91,12 +95,17 @@ export function useMarketOrderColumns({
   cards,
   locationSqueezed,
   hideLocation,
+  accountingLevel,
 }: UseMarketOrderColumnsArgs): MarketOrderColumns {
   const pickedOrderColumns = useVisibleMarketOrderColumns((state) => state.value);
   const visibleOrderColumns = useMemo(
     () =>
-      hideLocation ? pickedOrderColumns.filter((id) => id !== 'location') : pickedOrderColumns,
-    [hideLocation, pickedOrderColumns]
+      pickedOrderColumns.filter(
+        (id) =>
+          !(hideLocation && id === 'location') &&
+          !(accountingLevel === null && FEE_COLUMN_IDS.includes(id))
+      ),
+    [hideLocation, accountingLevel, pickedOrderColumns]
   );
   const setVisibleOrderColumns = useVisibleMarketOrderColumns((state) => state.setValue);
   useHydratedStore(useVisibleMarketOrderColumns);
@@ -151,6 +160,30 @@ export function useMarketOrderColumns({
           </>
         ),
         sortValue: (o) => o.price,
+      },
+      fees: {
+        id: 'fees',
+        header: t('market.feesColumn'),
+        align: 'right',
+        className: 'tabular-nums text-text-dim',
+        stackAffix: { before: t('market.feesAffix') },
+        render: (o) =>
+          accountingLevel === null ? '—' : formatMarketIsk(orderFees(o, accountingLevel).fees),
+        sortValue: (o) =>
+          accountingLevel === null ? undefined : orderFees(o, accountingLevel).fees,
+      },
+      finalPrice: {
+        id: 'finalPrice',
+        header: t('market.finalPriceColumn'),
+        align: 'right',
+        className: 'tabular-nums',
+        stackAffix: { before: t('market.finalPriceAffix') },
+        render: (o) =>
+          accountingLevel === null
+            ? '—'
+            : formatMarketIsk(orderFees(o, accountingLevel).finalPrice),
+        sortValue: (o) =>
+          accountingLevel === null ? undefined : orderFees(o, accountingLevel).finalPrice,
       },
       quantity: {
         id: 'quantity',
@@ -263,6 +296,7 @@ export function useMarketOrderColumns({
       cards,
       locationSqueezed,
       visibleOrderColumns,
+      accountingLevel,
     ]
   );
 
@@ -281,15 +315,25 @@ export function useMarketOrderColumns({
     [visibleOrderColumns, orderColumnsById]
   );
   // What each table's row expand (`OrderDetailPanel`) shows that the visible
-  // columns don't — the picker's hidden ids, per table, since Sell and Buy
+  // columns don't — so the unticked fee columns land there by default — the picker's hidden ids, per table, since Sell and Buy
   // don't offer the same columns to begin with.
   const sellHiddenColumns = useMemo(
-    () => SELL_ORDER_COLUMN_IDS.filter((id) => !visibleOrderColumns.includes(id)),
-    [visibleOrderColumns]
+    () =>
+      SELL_ORDER_COLUMN_IDS.filter(
+        (id) =>
+          !visibleOrderColumns.includes(id) &&
+          !(accountingLevel === null && FEE_COLUMN_IDS.includes(id))
+      ),
+    [visibleOrderColumns, accountingLevel]
   );
   const buyHiddenColumns = useMemo(
-    () => BUY_ORDER_COLUMN_IDS.filter((id) => !visibleOrderColumns.includes(id)),
-    [visibleOrderColumns]
+    () =>
+      BUY_ORDER_COLUMN_IDS.filter(
+        (id) =>
+          !visibleOrderColumns.includes(id) &&
+          !(accountingLevel === null && FEE_COLUMN_IDS.includes(id))
+      ),
+    [visibleOrderColumns, accountingLevel]
   );
 
   return {

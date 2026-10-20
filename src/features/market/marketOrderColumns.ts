@@ -18,6 +18,8 @@ import { formatVolume } from './format';
  */
 export const MARKET_ORDER_COLUMN_IDS = [
   'price',
+  'fees',
+  'finalPrice',
   'quantity',
   'jumps',
   'location',
@@ -32,6 +34,8 @@ export type MarketOrderColumnId = (typeof MARKET_ORDER_COLUMN_IDS)[number];
 /** Sell has no `range`/`minVolume` — buy-order-only fields (ESI's `RegionOrder`). */
 export const SELL_ORDER_COLUMN_IDS: readonly MarketOrderColumnId[] = [
   'price',
+  'fees',
+  'finalPrice',
   'quantity',
   'jumps',
   'location',
@@ -40,13 +44,17 @@ export const SELL_ORDER_COLUMN_IDS: readonly MarketOrderColumnId[] = [
 ];
 export const BUY_ORDER_COLUMN_IDS: readonly MarketOrderColumnId[] = MARKET_ORDER_COLUMN_IDS;
 
+/** Columns that need the active Character's Accounting level, so they exist only once it has loaded. */
+export const FEE_COLUMN_IDS: readonly MarketOrderColumnId[] = ['fees', 'finalPrice'];
+
 /**
  * Every column but Min. Volume, which is almost always 1 (the expanded row
  * states it for every buy order) and would cost the book 8rem of width
- * before its rows become cards. A pilot who wants it ticks it.
+ * before its rows become cards, and the two fee columns, which are there to
+ * tick. A pilot who wants one ticks it.
  */
 export const DEFAULT_VISIBLE_MARKET_ORDER_COLUMNS: readonly MarketOrderColumnId[] =
-  MARKET_ORDER_COLUMN_IDS.filter((id) => id !== 'minVolume');
+  MARKET_ORDER_COLUMN_IDS.filter((id) => id !== 'minVolume' && !FEE_COLUMN_IDS.includes(id));
 
 export const VISIBLE_MARKET_ORDER_COLUMNS_KEY = 'marketOrderVisibleColumns';
 
@@ -81,6 +89,8 @@ export const ORDER_BOOK_LOCATION_CLASS = {
  */
 const ORDER_BOOK_COLUMN_REM: Record<Exclude<MarketOrderColumnId, 'location'>, number> = {
   price: 4.75,
+  fees: 5.25,
+  finalPrice: 6.25,
   quantity: 4.125,
   jumps: 5.125,
   security: 4,
