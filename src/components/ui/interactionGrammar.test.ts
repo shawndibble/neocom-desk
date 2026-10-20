@@ -174,7 +174,8 @@ describe('interaction grammar source guards (DESIGN.md §6c)', () => {
       'src/features/fittings/RackListParts.tsx',
       'src/features/fittings/FittingStartScreen.tsx',
       'src/features/fittings/stats/OffenseRows.tsx',
-      'src/features/industry/BuildPlanList.tsx',
+      'src/features/industry/BuildGroupHeader.tsx',
+      'src/features/industry/BuildPlanRow.tsx',
       'src/features/market/ItemContextMenu.tsx',
       // Item Detail's header below md: Open market in EVE and View in Market, the modal's own actions.
       'src/features/market/ItemDetailModal.tsx',
