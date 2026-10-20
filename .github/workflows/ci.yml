@@ -1,69 +1,36 @@
 name: CI
 
 on:
-  # `develop` is where work lands (PRs into it run the full gate); a push to
-  # `main` is a develop→main promotion and is what deploys production.
-  push:
-    branches: [main, develop]
+  # PRs into `develop` and `main` run the full gate. Deploys live in
+  # deploy.yml, so a push never starts a run here whose jobs all skip.
   pull_request:
     branches: [main, develop]
 
-# Superseding a PR's checks is free; superseding a deploy is not. A second
-# merge landing mid-deploy used to cancel the first outright, which is how
-# two main runs ended up `cancelled` rather than deployed.
+# Superseding a PR's checks is free.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: true
 
 jobs:
-  # `validate` used to be one serial chain of checks. They are independent, so
-  # each is its own job and they run side by side; `validate` below is the
-  # aggregate that keeps the context name the `develop`/`main` ruleset requires.
-  check-case:
-    if: github.event_name == 'pull_request'
+  # `validate` below aggregates `static`, `build` and `functions` and keeps the
+  # context name the `develop`/`main` ruleset requires.
+  #
+  # lint, format:check, typecheck and check:case used to be four jobs, each
+  # paying its own checkout and `npm ci`. Run back to back they take about as
+  # long as the slowest test shard, so one runner costs no wall time and
+  # saves three installs and three checks on every PR.
+  static:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      # Needs no dependencies: a script over `git ls-files`.
+          cache: npm
+      - run: npm ci
       - run: npm run check:case
-
-  lint:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
       - run: npm run lint
-
-  format-check:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
       - run: npm run format:check
-
-  typecheck:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
       - run: npm run typecheck
 
   # Builds once for the whole run. The `e2e-shard` jobs download this `dist/`
@@ -75,7 +42,6 @@ jobs:
   # variables change values only, not types or imports, so the same build also
   # answers "does the app build" for `validate`.
   build:
-    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -107,7 +73,6 @@ jobs:
   # reads it, so without this job the Cloud Functions ship unchecked (issue
   # #595). Needs only `functions/` installed, not the root.
   functions:
-    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -123,8 +88,8 @@ jobs:
   # The name the `develop`/`main` ruleset requires. See the `e2e` job below for the full
   # reasoning; this one aggregates the parallel jobs above instead of a matrix.
   validate:
-    if: ${{ !cancelled() && github.event_name == 'pull_request' }}
-    needs: [check-case, lint, format-check, typecheck, build, functions]
+    if: ${{ !cancelled() }}
+    needs: [static, build, functions]
     runs-on: ubuntu-latest
     steps:
       - name: Fail unless every validate job passed
@@ -134,7 +99,6 @@ jobs:
           exit 1
 
   test-shard:
-    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     # Sharded for the same reason `e2e-shard` is, and with the same shape.
     # Vitest's own summary says where the time goes: of 1250s of worker time,
@@ -176,7 +140,6 @@ jobs:
   # which needs a JRE. Kept out of `test-shard` so `npm run test:run` never
   # needs Java. Not yet a required context in the `develop`/`main` ruleset.
   rules:
-    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -214,7 +177,7 @@ jobs:
   # reasoning — a matrix reports as `test-shard (1)`…`(4)`, none of which is
   # the required context, so this turns the shard results back into it.
   test:
-    if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+    if: ${{ !cancelled() }}
     needs: [test-shard]
     runs-on: ubuntu-latest
     steps:
@@ -224,137 +187,7 @@ jobs:
           echo "::error::test shards did not all pass (result: ${{ needs.test-shard.result }})"
           exit 1
 
-  deploy:
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    runs-on: ubuntu-latest
-    # One Pages deploy at a time, queued rather than cancelled — the
-    # environment is a single shared resource and a half-applied deploy is
-    # worse than a slow one.
-    concurrency:
-      group: pages
-      cancel-in-progress: false
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
-      - run: npm run build
-        env:
-          VITE_EVE_CLIENT_ID: ${{ vars.VITE_EVE_CLIENT_ID }}
-          VITE_FIREBASE_API_KEY: ${{ vars.VITE_FIREBASE_API_KEY }}
-          VITE_FIREBASE_AUTH_DOMAIN: ${{ vars.VITE_FIREBASE_AUTH_DOMAIN }}
-          VITE_FIREBASE_PROJECT_ID: ${{ vars.VITE_FIREBASE_PROJECT_ID }}
-          VITE_FIREBASE_STORAGE_BUCKET: ${{ vars.VITE_FIREBASE_STORAGE_BUCKET }}
-          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ vars.VITE_FIREBASE_MESSAGING_SENDER_ID }}
-          VITE_FIREBASE_APP_ID: ${{ vars.VITE_FIREBASE_APP_ID }}
-          VITE_FIREBASE_VAPID_KEY: ${{ vars.VITE_FIREBASE_VAPID_KEY }}
-          VITE_FIREBASE_MEASUREMENT_ID: ${{ vars.VITE_FIREBASE_MEASUREMENT_ID }}
-          VITE_SENTRY_DSN: ${{ vars.VITE_SENTRY_DSN }}
-          # Source-map upload. Absent (on a fork, or before the secret is
-          # added) the Sentry plugin sits out and the build is unchanged.
-          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
-          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-      # A Pages deploy replaces the whole site, so a tab still on the last
-      # build asked for route chunks that now 404. Carries recently retired
-      # `assets/*` over from the live site (scripts/lib/assetRetention.mjs).
-      # After the build, so they are never precached. Never blocks a deploy:
-      # without it the site ships exactly as it did before this step.
-      # The retirement history rides the Actions cache rather than being read
-      # back off the site, whose CDN can serve it 10 minutes stale — longer
-      # than the gap between deploys. Saved only once the deploy lands, so it
-      # never records a build that did not go live.
-      - uses: actions/cache/restore@v4
-        continue-on-error: true
-        with:
-          path: .cache/asset-history.json
-          key: asset-history-${{ github.run_id }}-${{ github.run_attempt }}
-          restore-keys: asset-history-
-      - run: node scripts/keep-old-assets.mjs https://neocomdesk.com .cache/asset-history.json
-        continue-on-error: true
-      - uses: actions/configure-pages@v5
-      # Named per attempt, and deploy-pages told which to read. Artifacts
-      # persist across attempts within a run, so a re-run of this job used to
-      # upload a second `github-pages` alongside the first and deploy-pages
-      # then refused with "Multiple artifacts named github-pages ... count is
-      # 2". That turned any transient failure here — an OIDC token timeout,
-      # say — into one that could not be cleared by re-running, which is the
-      # first thing anyone tries.
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist
-          name: github-pages-${{ github.run_attempt }}
-          # Default excludes dotfiles/dotdirs, silently dropping
-          # dist/.well-known/assetlinks.json (Play Store TWA verification).
-          include-hidden-files: true
-      - uses: actions/deploy-pages@v4
-        id: deployment
-        with:
-          artifact_name: github-pages-${{ github.run_attempt }}
-      - uses: actions/cache/save@v4
-        continue-on-error: true
-        with:
-          path: .cache/asset-history.json
-          key: asset-history-${{ github.run_id }}-${{ github.run_attempt }}
-
-  # dev.neocomdesk.com: every merge to `develop` ships here, so the 5-7 merges
-  # an hour never touch production (`deploy` above runs only for `main`).
-  # Cloudflare Pages by direct upload, because GitHub Pages serves one site
-  # per repo. Uses the `dev` environment's own EVE application (a callback URL
-  # is one per app), and sits out Sentry so dev noise stays out of production.
-  # Needs, in the `dev` environment: secrets CLOUDFLARE_API_TOKEN (Pages: Edit)
-  # and CLOUDFLARE_ACCOUNT_ID; variable VITE_EVE_CLIENT_ID. The custom domain
-  # is attached to the project once, in the Cloudflare dashboard.
-  deploy-dev:
-    if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
-    runs-on: ubuntu-latest
-    # Latest wins: a newer merge makes an in-flight dev upload pointless.
-    concurrency:
-      group: pages-dev
-      cancel-in-progress: true
-    environment:
-      name: dev
-      url: https://dev.neocomdesk.com
-    env:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      PAGES_PROJECT: neocom-desk-dev
-      # The project's production branch: an upload to it is what the custom
-      # domain serves.
-      PAGES_BRANCH: production
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
-      - run: npm run build
-        env:
-          VITE_EVE_CLIENT_ID: ${{ vars.VITE_EVE_CLIENT_ID }}
-          VITE_FIREBASE_API_KEY: ${{ vars.VITE_FIREBASE_API_KEY }}
-          VITE_FIREBASE_AUTH_DOMAIN: ${{ vars.VITE_FIREBASE_AUTH_DOMAIN }}
-          VITE_FIREBASE_PROJECT_ID: ${{ vars.VITE_FIREBASE_PROJECT_ID }}
-          VITE_FIREBASE_STORAGE_BUCKET: ${{ vars.VITE_FIREBASE_STORAGE_BUCKET }}
-          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ vars.VITE_FIREBASE_MESSAGING_SENDER_ID }}
-          VITE_FIREBASE_APP_ID: ${{ vars.VITE_FIREBASE_APP_ID }}
-          VITE_FIREBASE_VAPID_KEY: ${{ vars.VITE_FIREBASE_VAPID_KEY }}
-          VITE_FIREBASE_MEASUREMENT_ID: ${{ vars.VITE_FIREBASE_MEASUREMENT_ID }}
-      # Idempotent: creates the project on the first run, then finds it there.
-      - run: npx --yes wrangler@4 pages project create "$PAGES_PROJECT" --production-branch "$PAGES_BRANCH"
-        continue-on-error: true
-      - run: npx --yes wrangler@4 pages deploy dist --project-name "$PAGES_PROJECT" --branch "$PAGES_BRANCH" --commit-hash "$GITHUB_SHA" --commit-dirty=true
-
   e2e-shard:
-    if: github.event_name == 'pull_request'
     needs: [build]
     runs-on: ubuntu-latest
     # Sharded because one runner could not get under the time budget. The
@@ -473,7 +306,7 @@ jobs:
   # instead of being skipped — a skipped required check never resolves and the
   # PR waits forever.
   e2e:
-    if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+    if: ${{ !cancelled() }}
     needs: [e2e-shard]
     runs-on: ubuntu-latest
     steps:
