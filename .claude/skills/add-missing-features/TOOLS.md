@@ -348,6 +348,12 @@ NARROW — History margin/broker totals, By day, All characters FIFO, Trading
 profit widget. #3987 → #3990 NARROW — invention reopened (SDE kept only
 activities 1/11) as a Blueprint Acquisition tier per decryptor.
 
+**EVE Console 0.9.17 re-read (GPL-3, live):** its earlier gaps all shipped
+since (stock targets, net worth, jump planner); the one unexplored feature was
+Corp Projects (`esi-corporations.read_projects.v1`). #4530 NARROW — Corp Projects
+tab: open projects, pool, reward per contribution, my cap use, build cost vs
+reward on manufacture rows; no alerts, no contributors list, no mining compare.
+
 **Janice open GitHub issues (appraisal sweep):** #4022 NARROW — Appraisal paste
 reads dot/space/apostrophe-grouped quantities and flags unreadable ones instead
 of pricing them as 1 (Janice #34/#28/#22).
@@ -355,6 +361,13 @@ of pricing them as 1 (Janice #34/#28/#22).
 ## Killed / dropped candidates (never filed)
 
 Grouped by the test that killed them; the reason is what stops a re-pitch.
+
+- **Build-cost history series** (EVE Console): realized margin, Production Log and
+  price history already exist; a per-item daily series is gappy per device, and a
+  stored cost is only comparable with the ME/TE/rig/tax inputs stored beside it.
+- **Multi-format sale post** (Slack/Discord/BBCode matrix; EVE Console): Appraisal
+  Copy sell list + share links cover it; only a single Markdown copy option
+  would be defensible. Storefront and webhooks stay out of scope.
 
 - **Janice-issue seeds, Appraisal:** already shipped — remembered hub and Price
   Percent plus `?hub=`/`?percent=` (#33/#24/#48), Price % as the multiplier
