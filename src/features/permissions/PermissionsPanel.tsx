@@ -120,7 +120,7 @@ export function PermissionsPanel() {
   }
 
   return (
-    <Panel title={t('settings.permissions.title')}>
+    <Panel>
       <div className="space-y-2">
         <SettingsHint>
           <Trans

@@ -88,7 +88,6 @@ export function ActivityLogPanel() {
 
   return (
     <Panel
-      title={t('activityLog.title')}
       actions={
         <>
           <Button size="sm" onClick={handleClear} aria-disabled={entries.length === 0}>

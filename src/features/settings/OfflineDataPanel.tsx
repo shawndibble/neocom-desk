@@ -153,7 +153,7 @@ export function OfflineDataPanel() {
   }
 
   return (
-    <Panel title={t('settings.offline.title')}>
+    <Panel>
       <LiveStatus announceKey={announceKey}>{announcement}</LiveStatus>
       <div className="space-y-4">
         <SettingsHint>{t('settings.offline.hint')}</SettingsHint>
