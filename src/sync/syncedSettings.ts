@@ -257,6 +257,12 @@
 // deleteSyncedSetting: removing a list rewrites the array. No `legacyKey`: new.
 // See features/stockTargets/stockListsStore.ts.
 //
+// sync.systemNotes (issue #4452): the pilot's own plain-text note per solar
+// system, as {systemId: {text, updatedAt}} (text capped at 500 characters),
+// written from the Route Safety table. Account-wide, not per Character. Never
+// deleted via deleteSyncedSetting: removing the last note writes {}. No
+// `legacyKey`: new. See features/travel/systemNotes.ts.
+//
 // sync.surveyHistory: the Mining Survey short links the pilot created or opened
 // in the app, as {id, addedAt, name?} entries — the link ids and the pilot's
 // own name for each (capped at 40 characters, so 30 entries stay a few KB), so
@@ -336,6 +342,7 @@ export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.stockLists',
   'sync.surveyHistory',
   'sync.surveyInfoTemplates',
+  'sync.systemNotes',
   'sync.targetSkillPlan',
 ];
 

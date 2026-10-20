@@ -13047,6 +13047,15 @@
         "avoided": "Avoided Systems"
       }
     },
+    "note": {
+      "add": "Note",
+      "addLabel": "Add a note on {{name}}",
+      "openLabel": "Open your note on {{name}}",
+      "label": "Your note on {{name}}",
+      "placeholder": "What you know about this system",
+      "updated": "Updated {{date}}",
+      "count": "{{count}}/{{max}}"
+    },
     "avoid": {
       "action": "Avoid",
       "actionLabel": "Avoid {{name}}",

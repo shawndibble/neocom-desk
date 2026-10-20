@@ -24,7 +24,10 @@
  * an info tip giving the reason, since ESI does not report wormhole space; zKillboard still
  * lists it.
  */
+import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { SystemNote } from './SystemNote';
+import { useSystemNotes } from './systemNotes';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import { HintText } from '@/components/ui/HintText';
 import {
@@ -170,6 +173,7 @@ function useColumns(
       render: (row) => (
         <DataTableDenseCell>
           <span className="font-semibold whitespace-nowrap">{row.name ?? DASH}</span>
+          <SystemNote systemId={row.systemId} name={routeSystemName(row)} face="indicator" />
           {row.chokepoint && (
             <HintText
               content={t('travel.chokepointHint')}
@@ -223,10 +227,19 @@ function useColumns(
       render: (row) => {
         const onAvoid = avoidAction(row);
         const name = routeSystemName(row);
-        return onAvoid === null ? null : (
-          <Button size="sm" onClick={onAvoid} aria-label={t('travel.avoid.actionLabel', { name })}>
-            {t('travel.avoid.action')}
-          </Button>
+        return (
+          <span className="inline-flex items-center gap-2">
+            <SystemNote systemId={row.systemId} name={name} face="add" />
+            {onAvoid !== null && (
+              <Button
+                size="sm"
+                onClick={onAvoid}
+                aria-label={t('travel.avoid.actionLabel', { name })}
+              >
+                {t('travel.avoid.action')}
+              </Button>
+            )}
+          </span>
         );
       },
     },
@@ -272,6 +285,9 @@ export function RouteSystemsTable({
 } & HoleRowProps) {
   const { t } = useTranslation();
   const columns = useColumns(killsOf, avoidAction);
+  useEffect(() => {
+    void useSystemNotes.getState().hydrate();
+  }, []);
   const tableRows = withHoleSteps(rows);
   // Both ends of a hole or bridge jump stay in view beside it.
   const pinned = new Set(
