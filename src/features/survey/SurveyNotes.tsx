@@ -4,8 +4,9 @@
  * the words are never missing.
  */
 import { lazy, Suspense } from 'react';
+import { guarded } from '@/app/routeChunks';
 
-const SurveyNotesMarkdown = lazy(() => import('./SurveyNotesMarkdown'));
+const SurveyNotesMarkdown = lazy(() => guarded(() => import('./SurveyNotesMarkdown')));
 
 export function SurveyNotes({ notes }: { notes: string }) {
   return (
