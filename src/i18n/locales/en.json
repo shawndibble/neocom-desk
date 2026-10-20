@@ -11711,7 +11711,7 @@
     "clearCache": "Clear cached ESI data…",
     "clearCacheTitle": "Clear cached ESI data?",
     "clearCacheBody": "Removes every character's cached game data from this device. Pages fetch it from ESI again when opened.",
-    "clearCacheBodyOffline": "Removes every character's cached game data from this device. You're offline, so it cannot be fetched again until you reconnect.",
+    "clearCacheBodyOffline": "Removes every character's cached game data from this device. You're offline, so nothing can be fetched again until you reconnect: the cached data is the only copy you have.",
     "clearCacheFailed": "Could not clear the cache. Try again.",
     "clearCacheAction": "Clear cache",
     "clearCacheConfirm": "Cache cleared.",
