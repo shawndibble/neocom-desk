@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import {
+  Disclosure,
   Field,
   Fields,
   Panel,
@@ -11,7 +12,13 @@ import {
 } from '@/components/ui';
 import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
 import { ROUTE_PREFERENCE_LABEL_KEYS, ROUTE_PREFERENCES } from '@/features/route/routePreferences';
-import { useDefaultRoutePreference, useRouteRules } from '@/features/route/routeRules';
+import {
+  useAvoidEdencom,
+  useAvoidPodKills,
+  useAvoidTriglavian,
+  useDefaultRoutePreference,
+  useRouteRules,
+} from '@/features/route/routeRules';
 import {
   AvoidRuleToggles,
   SecurityPenaltyInput,
@@ -20,6 +27,7 @@ import {
 import { SavedRouteNetworkFields } from '@/features/travel/SavedRouteNetworkFields';
 import { DefaultsSyncHint, SettingsHint, SettingsPanelLoading } from './settingsFields';
 import { AvoidedSystemsPanel } from './AvoidedSystemsPanel';
+import { usePhoneFold } from './usePhoneFold';
 
 /**
  * Settings → Travel: the in-game autopilot's route options, for planning.
@@ -35,6 +43,14 @@ export function TravelSettingsPanel() {
   const setPreference = useDefaultRoutePreference((state) => state.setValue);
   // The form waits for the settings only: a kill feed still loading must not blank it.
   const { settingsHydrated: hydrated, podKillsUnavailable } = useRouteRules();
+  // On a phone the "Also avoid" toggles fold behind a count of the rules on.
+  const avoidFold = usePhoneFold();
+  const edencom = useAvoidEdencom((state) => state.value);
+  const triglavian = useAvoidTriglavian((state) => state.value);
+  const podKills = useAvoidPodKills((state) => state.value);
+  // A pod-kill rule with no kill feed is not applied, so it is not "on".
+  const rules = [edencom, triglavian, podKills && !podKillsUnavailable];
+  const rulesOn = rules.filter(Boolean).length;
 
   return (
     <div className="space-y-4">
@@ -78,9 +94,29 @@ export function TravelSettingsPanel() {
                 <SecurityPenaltyInput id="settings-security-penalty" preference={preference} />
               </Field>
 
-              <Field label={t('settings.travel.avoidTitle')} note={t('settings.travel.avoidHint')}>
-                <AvoidRuleToggles podKillsUnavailable={podKillsUnavailable} />
-              </Field>
+              {avoidFold.phone ? (
+                <Disclosure
+                  label={t('settings.travel.avoidTitle')}
+                  trailing={t('settings.travel.avoidSummary', {
+                    count: rulesOn,
+                    total: rules.length,
+                  })}
+                  expanded={avoidFold.expanded}
+                  onToggle={avoidFold.toggle}
+                >
+                  <div className="space-y-2 p-2.5">
+                    <SettingsHint>{t('settings.travel.avoidHint')}</SettingsHint>
+                    <AvoidRuleToggles podKillsUnavailable={podKillsUnavailable} />
+                  </div>
+                </Disclosure>
+              ) : (
+                <Field
+                  label={t('settings.travel.avoidTitle')}
+                  note={t('settings.travel.avoidHint')}
+                >
+                  <AvoidRuleToggles podKillsUnavailable={podKillsUnavailable} />
+                </Field>
+              )}
             </Fields>
           </div>
         </Panel>
