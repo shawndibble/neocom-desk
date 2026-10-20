@@ -110,7 +110,7 @@ const ISK_SHORTHAND_MULTIPLIERS: Readonly<Record<string, number>> = {
 };
 
 /** `10.5m`, `10,500,000`, `10.500.000` and `10500000` all parse to 10,500,000. Suffixes: b = billion, m = million, t = thousand. */
-const ISK_AMOUNT_PATTERN = /^([\d.,'\s\u00a0\u2009\u202f]*\d|[.,]\d+)\s*([bmt])?$/i;
+const ISK_AMOUNT_PATTERN = /^([\d.,'\s\u00a0\u2009\u202f]*\d)\s*([bmt])?$/i;
 
 /**
  * Parses a threshold-style ISK amount from free text (issue #wallet-balance-threshold):

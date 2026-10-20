@@ -160,13 +160,9 @@ export function Settings() {
                     selected={numberFormat}
                     onSelect={(format) => void setNumberFormat(format)}
                     labelFor={(format) =>
-                      format === 'auto'
-                        ? t('settings.numberFormat.auto', {
-                            example: numberFormatExample(decimalMarkFor('auto')),
-                          })
-                        : t(`settings.numberFormat.${format}`, {
-                            example: numberFormatExample(format === 'comma' ? ',' : '.'),
-                          })
+                      t(`settings.numberFormat.${format}`, {
+                        example: numberFormatExample(decimalMarkFor(format)),
+                      })
                     }
                   />
                   {weekStartHydrated && (

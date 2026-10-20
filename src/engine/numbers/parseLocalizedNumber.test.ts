@@ -26,25 +26,18 @@ describe('parseLocalizedNumber', () => {
     ['124\u00a0500,25', 124_500.25],
     ['-1.234,56', -1234.56],
     ['  42  ', 42],
+    ['.5', 0.5],
+    [',5', 0.5],
   ])('reads %s as %d', (text, expected) => {
     expect(parseLocalizedNumber(text)).toBe(expected);
   });
 
-  it.each([
-    '',
-    'abc',
-    '1.2.3',
-    '1,23,456',
-    '1.234.56',
-    '1,234,5.5',
-    '12.',
-    '.5',
-    '1e5',
-    '5 m3',
-    '--1',
-  ])('refuses %j', (text) => {
-    expect(parseLocalizedNumber(text)).toBeNull();
-  });
+  it.each(['', 'abc', '1.2.3', '1,23,456', '1.234.56', '1,234,5.5', '12.', '1e5', '5 m3', '--1'])(
+    'refuses %j',
+    (text) => {
+      expect(parseLocalizedNumber(text)).toBeNull();
+    }
+  );
 
   it('lets the typed-text decimal mark settle a single three-digit group', () => {
     expect(parseLocalizedNumber('1.234', '.')).toBe(1.234);

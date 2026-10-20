@@ -25,7 +25,7 @@
 export type DecimalMark = '.' | ',';
 
 const SPACE_AND_APOSTROPHE = /[\s']/g; // \s covers no-break, thin and narrow no-break spaces
-const SHAPE = /^-?\d[\d.,]*$/;
+const SHAPE = /^-?[.,]?\d[\d.,]*$/;
 const FIRST_GROUP = /^\d{1,3}$/;
 const LATER_GROUP = /^\d{3}$/;
 
@@ -37,7 +37,9 @@ export function parseLocalizedNumber(text: string, decimal?: DecimalMark): numbe
   const token = text.trim().replace(SPACE_AND_APOSTROPHE, '');
   if (!SHAPE.test(token)) return null;
   const sign = token.startsWith('-') ? -1 : 1;
-  const body = sign === -1 ? token.slice(1) : token;
+  const unsigned = sign === -1 ? token.slice(1) : token;
+  // A bare ".5" is 0.5.
+  const body = /^[.,]/.test(unsigned) ? `0${unsigned}` : unsigned;
 
   const last = Math.max(body.lastIndexOf('.'), body.lastIndexOf(','));
   if (last === -1) return sign * Number(body);

@@ -28,8 +28,7 @@ export function maskNumber(value: number): string {
  * the way the mask prints it: `1.234` is 1.234 where the mark is a period.
  */
 export function unmaskNumber(raw: string): number | undefined {
-  const text = raw.trim();
-  const value = parseLocalizedNumber(/^[.,]/.test(text) ? `0${text}` : text, getDecimalMark());
+  const value = parseLocalizedNumber(raw, getDecimalMark());
   return value !== null && value >= 0 ? value : undefined;
 }
 

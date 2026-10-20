@@ -29,6 +29,6 @@ export function decimalMarkFor(choice: NumberFormatChoice): DecimalMark {
 export const useNumberFormat = createLocalSetting<NumberFormatChoice>({
   key: NUMBER_FORMAT_SETTING_KEY,
   defaultValue: DEFAULT_NUMBER_FORMAT,
-  parse: (raw) => (raw === 'auto' || raw === 'period' || raw === 'comma' ? raw : null),
+  parse: (raw) => NUMBER_FORMATS.find((format) => format === raw) ?? null,
   onApply: (choice) => setDecimalMark(decimalMarkFor(choice)),
 });
