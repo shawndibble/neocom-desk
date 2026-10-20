@@ -21,7 +21,7 @@ import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ExternalLink } from '@/components/ui/ExternalLink';
 import { Trans, useTranslation } from 'react-i18next';
-import { Button, Checkbox, NeedsConnection, Panel } from '@/components/ui';
+import { Button, Checkbox, Disclosure, NeedsConnection, Panel } from '@/components/ui';
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { beginEveLogin } from '@/app/loginFlow';
 import { useGrantedScopes } from '@/app/useGrantedScopes';
@@ -32,6 +32,7 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useCorpAccess, type CorpAccessState } from '@/features/corp/useCorpAccess';
 import { corpRoleLabel } from '@/features/corp/roles';
 import { SettingsHint } from '@/features/settings/settingsFields';
+import { usePhoneFold } from '@/features/settings/usePhoneFold';
 
 /**
  * `checking` while the answer is still loading — never `missing`, which would
@@ -71,6 +72,8 @@ export function PermissionsPanel() {
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const granted = useGrantedScopes();
   const corp = useCorpAccess();
+  // A phone keeps the rows that need action open and folds the Granted ones.
+  const grantedFold = usePhoneFold();
   // Tagged with its Character so a switch drops the ticks instead of carrying them over.
   const [selection, setSelection] = useState<{
     characterId: number | null;
@@ -105,7 +108,8 @@ export function PermissionsPanel() {
   const groups = SCOPE_GROUPS.filter((group) => group !== 'corp' || corp.state !== 'none');
   const missing = groups.filter((group) => statusOf(group) === 'missing');
   // Actionable rows first (stable: catalogue order within each half); a row still checking keeps the Granted half.
-  const rows = [...missing, ...groups.filter((group) => statusOf(group) !== 'missing')];
+  const grantedRows = groups.filter((group) => statusOf(group) !== 'missing');
+  const rows = [...missing, ...grantedRows];
   // Derived from `missing`, so a row that gets granted (or hidden) drops out of the request.
   const firstFlagged = rows.find((group) => flagged.has(group) && missing.includes(group));
   const chosen = missing.filter((group) => picked.has(group));
@@ -117,6 +121,66 @@ export function PermissionsPanel() {
       else next.add(group);
       return { characterId: activeCharacterId, groups: next };
     });
+  }
+
+  function renderRow(group: ScopeGroup) {
+    const label = t(PERMISSIONS[group].labelKey);
+    const status = statusOf(group);
+    const note = group === 'corp' ? corpNote() : null;
+    return (
+      <li key={group} className="flex items-center justify-between gap-4 border-t border-line py-2">
+        {status === 'missing' ? (
+          <label className={touchCheckboxLabelClassName}>
+            <Checkbox
+              checked={picked.has(group)}
+              onChange={() => toggle(group)}
+              aria-label={t('settings.permissions.selectAria', { permission: label })}
+            />
+          </label>
+        ) : (
+          // Keeps labels aligned with the rows that have a checkbox.
+          missing.length > 0 && <span aria-hidden className="size-4 shrink-0 touch:size-11" />
+        )}
+        <div className="min-w-0 flex-1">
+          <div className="text-text">{label}</div>
+          <div className="text-text-dim">{t(PERMISSIONS[group].captionKey)}</div>
+          {note && <div className="text-text-dim">{note}</div>}
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          {status === 'granted' ? (
+            <span className="text-success">{t('settings.permissions.granted')}</span>
+          ) : status === 'checking' ? (
+            <span className="text-text-dim">{t('settings.permissions.checking')}</span>
+          ) : (
+            <>
+              <span className="text-text-dim">{t('settings.permissions.missing')}</span>
+              {/*
+                `ghost`, not `primary`: /settings already spends its
+                one primary on the notifications panel's Enable
+                (docs/DESIGN.md §6, "One `primary` button per view").
+              */}
+              <NeedsConnection>
+                <Button
+                  size="sm"
+                  ref={group === firstFlagged ? scrollIntoViewOnce : undefined}
+                  className={flagged.has(group) ? 'grant-flash' : undefined}
+                  aria-label={t('settings.permissions.grantAria', {
+                    permission: label,
+                  })}
+                  onClick={() => grant([group])}
+                >
+                  {t('settings.permissions.grant')}
+                </Button>
+              </NeedsConnection>
+            </>
+          )}
+        </div>
+      </li>
+    );
+  }
+
+  function renderRows(list: ScopeGroup[]) {
+    return <ul className="grid text-xs xl:grid-cols-2 xl:gap-x-8">{list.map(renderRow)}</ul>;
   }
 
   return (
@@ -156,68 +220,20 @@ export function PermissionsPanel() {
               </div>
             )}
             {/* Two columns from `xl`: one full-width list put each status a screen away from its name. */}
-            <ul className="grid text-xs xl:grid-cols-2 xl:gap-x-8">
-              {rows.map((group) => {
-                const label = t(PERMISSIONS[group].labelKey);
-                const status = statusOf(group);
-                const note = group === 'corp' ? corpNote() : null;
-                return (
-                  <li
-                    key={group}
-                    className="flex items-center justify-between gap-4 border-t border-line py-2"
-                  >
-                    {status === 'missing' ? (
-                      <label className={touchCheckboxLabelClassName}>
-                        <Checkbox
-                          checked={picked.has(group)}
-                          onChange={() => toggle(group)}
-                          aria-label={t('settings.permissions.selectAria', { permission: label })}
-                        />
-                      </label>
-                    ) : (
-                      // Keeps labels aligned with the rows that have a checkbox.
-                      missing.length > 0 && (
-                        <span aria-hidden className="size-4 shrink-0 touch:size-11" />
-                      )
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <div className="text-text">{label}</div>
-                      <div className="text-text-dim">{t(PERMISSIONS[group].captionKey)}</div>
-                      {note && <div className="text-text-dim">{note}</div>}
-                    </div>
-                    <div className="flex shrink-0 items-center gap-2">
-                      {status === 'granted' ? (
-                        <span className="text-success">{t('settings.permissions.granted')}</span>
-                      ) : status === 'checking' ? (
-                        <span className="text-text-dim">{t('settings.permissions.checking')}</span>
-                      ) : (
-                        <>
-                          <span className="text-text-dim">{t('settings.permissions.missing')}</span>
-                          {/*
-                            `ghost`, not `primary`: /settings already spends its
-                            one primary on the notifications panel's Enable
-                            (docs/DESIGN.md §6, "One `primary` button per view").
-                          */}
-                          <NeedsConnection>
-                            <Button
-                              size="sm"
-                              ref={group === firstFlagged ? scrollIntoViewOnce : undefined}
-                              className={flagged.has(group) ? 'grant-flash' : undefined}
-                              aria-label={t('settings.permissions.grantAria', {
-                                permission: label,
-                              })}
-                              onClick={() => grant([group])}
-                            >
-                              {t('settings.permissions.grant')}
-                            </Button>
-                          </NeedsConnection>
-                        </>
-                      )}
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
+            {grantedFold.phone && grantedRows.length > 0 ? (
+              <>
+                {renderRows(missing)}
+                <Disclosure
+                  label={t('settings.permissions.grantedGroup', { count: grantedRows.length })}
+                  expanded={grantedFold.expanded}
+                  onToggle={grantedFold.toggle}
+                >
+                  {renderRows(grantedRows)}
+                </Disclosure>
+              </>
+            ) : (
+              renderRows(rows)
+            )}
           </>
         )}
       </div>

@@ -114,7 +114,7 @@ export function Settings() {
       <PageHeader title={t('settings.title')} actions={<SettingsBackLink />} />
       <div className="space-y-4 md:grid md:grid-cols-[11rem_minmax(0,1fr)] md:gap-6 md:space-y-0">
         <SettingsNav groups={groups} value={section} />
-        <div className="min-w-0 space-y-4">
+        <div className="min-w-0 space-y-4" data-settings-section={section}>
           {section === 'display' && (
             <>
               <Panel>

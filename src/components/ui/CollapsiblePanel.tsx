@@ -90,7 +90,7 @@ export function CollapsiblePanel({
           {collapsible && (
             <IconButton
               ref={toggleRef}
-              size="sm"
+              size="row"
               icon={<Caret expanded={open} />}
               label={open ? labels.hide : labels.show}
               aria-expanded={open}

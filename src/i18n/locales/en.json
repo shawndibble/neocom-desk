@@ -11225,7 +11225,13 @@
       "addLabel": "Add an avoided system",
       "remove": "Remove {{name}}",
       "empty": "No systems avoided yet.",
-      "enabled": "Keep routes out of these systems"
+      "enabled": "Keep routes out of these systems",
+      "summary_one": "{{count}} system",
+      "summary_other": "{{count}} systems",
+      "summaryOff_one": "{{count}} system, off",
+      "summaryOff_other": "{{count}} systems, off",
+      "show": "Show avoided systems",
+      "hide": "Hide avoided systems"
     },
     "travel": {
       "routeTitle": "Route planning",
@@ -11238,6 +11244,7 @@
       "penaltyHint": "0 to 100, as the game's slider. At 50 one unwanted jump outweighs a long detour.",
       "penaltyShorterHint": "Prefer shorter counts jumps only, so the security penalty does not apply.",
       "avoidTitle": "Also avoid",
+      "avoidSummary": "{{count}} of 3 on",
       "avoidEdencom_one": "EDENCOM systems ({{count}} system)",
       "avoidEdencom_other": "EDENCOM systems ({{count}} systems)",
       "avoidTriglavian_one": "Triglavian minor victory systems ({{count}} system)",
@@ -11813,6 +11820,7 @@
       "selectCharacter": "Select a character to see its permissions.",
       "checking": "Checking…",
       "granted": "Granted",
+      "grantedGroup": "Granted ({{count}})",
       "missing": "Not granted",
       "grant": "Grant",
       "grantAria": "Grant {{permission}}",
