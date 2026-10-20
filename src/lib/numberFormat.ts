@@ -9,7 +9,8 @@
  * client's format. The choice only settles what a pilot types into a field.
  */
 import { createLocalSetting } from '@/lib/useLocalSetting';
-import { browserDecimalMark, setDecimalMark, type DecimalMark } from '@/lib/numberLocale';
+import type { DecimalMark } from '@/engine/numbers/parseLocalizedNumber';
+import { BROWSER_DECIMAL_MARK, setDecimalMark } from '@/lib/numberLocale';
 
 export const NUMBER_FORMAT_SETTING_KEY = 'numberFormat';
 
@@ -23,7 +24,7 @@ export const DEFAULT_NUMBER_FORMAT: NumberFormatChoice = 'auto';
 export function decimalMarkFor(choice: NumberFormatChoice): DecimalMark {
   if (choice === 'period') return '.';
   if (choice === 'comma') return ',';
-  return browserDecimalMark();
+  return BROWSER_DECIMAL_MARK;
 }
 
 export const useNumberFormat = createLocalSetting<NumberFormatChoice>({

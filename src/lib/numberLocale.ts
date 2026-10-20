@@ -12,8 +12,6 @@
  */
 import type { DecimalMark } from '@/engine/numbers/parseLocalizedNumber';
 
-export type { DecimalMark };
-
 /** A locale that groups with the other mark; `de-DE` groups four digits too (`1.234`). */
 const LOCALE_FOR: Record<DecimalMark, string> = { '.': 'en-US', ',': 'de-DE' };
 
@@ -29,19 +27,18 @@ export function detectDecimalMark(locale?: string): DecimalMark {
   }
 }
 
-const browserLocale = (): string | undefined =>
-  typeof navigator === 'undefined' ? undefined : navigator.language;
+/** The mark the `auto` choice stands for: the browser's language, read once. */
+export const BROWSER_DECIMAL_MARK: DecimalMark = detectDecimalMark(
+  typeof navigator === 'undefined' ? undefined : navigator.language
+);
 
-let active: DecimalMark = detectDecimalMark(browserLocale());
+let active: DecimalMark = BROWSER_DECIMAL_MARK;
 
 export const getDecimalMark = (): DecimalMark => active;
 
 export function setDecimalMark(mark: DecimalMark): void {
   active = mark;
 }
-
-/** The mark the `auto` choice stands for on this browser. */
-export const browserDecimalMark = (): DecimalMark => detectDecimalMark(browserLocale());
 
 /**
  * A formatter that follows the active mark. Build it once at module scope like

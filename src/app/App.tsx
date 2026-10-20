@@ -1,4 +1,4 @@
-import { Fragment, lazy, Suspense, useEffect, type ReactElement, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, type ReactElement } from 'react';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { industryTabHref } from '@/features/industry/industryTabs';
@@ -379,18 +379,13 @@ function AppEffects() {
   return null;
 }
 
-/**
- * Formatters read the number format when they run, not through a subscription,
- * so a change would leave what is already on screen in the old format. Keying
- * the tree on the resolved mark remounts it once, when the mark actually
- * changes (switching `auto` to the format it already resolves to does nothing).
- */
-function NumberFormatBoundary({ children }: { children: ReactNode }) {
-  const choice = useNumberFormat((state) => state.value);
-  return <Fragment key={decimalMarkFor(choice)}>{children}</Fragment>;
-}
-
 export function App() {
+  // Formatters read the number format when they run rather than subscribing,
+  // so a change would leave what is on screen in the old format. Keying the
+  // routes on the resolved mark remounts them once, when the mark changes
+  // (switching `auto` to the format it already resolves to does nothing).
+  const numberMark = decimalMarkFor(useNumberFormat((state) => state.value));
+
   return (
     <ErrorBoundary>
       <AppEffects />
@@ -400,68 +395,66 @@ export function App() {
         <LandingShellOffLandingRelease />
         <DocumentTitleTracker />
         <StaleStoresReloader />
-        <NumberFormatBoundary>
-          <Suspense fallback={<RouteFallback />}>
-            <SentryRoutes>
-              <Route path="/" element={<Root />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/callback" element={<Callback />} />
-              {/* Below: a logged-in Character, then the route's own scopes. */}
-              <Route element={<RequireCharacter />}>
-                <Route element={<SignedInShell />}>
-                  {/* A tabbed page (`pageTabs.ts`) mounts once at `<path>/*`, so
+        <Suspense key={numberMark} fallback={<RouteFallback />}>
+          <SentryRoutes>
+            <Route path="/" element={<Root />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/callback" element={<Callback />} />
+            {/* Below: a logged-in Character, then the route's own scopes. */}
+            <Route element={<RequireCharacter />}>
+              <Route element={<SignedInShell />}>
+                {/* A tabbed page (`pageTabs.ts`) mounts once at `<path>/*`, so
                   its tabs are one route instance: switching tab keeps the
                   page mounted, and none of the tables above gain an entry. */}
-                  {FEATURE_ROUTES.map(([path, element]) => {
-                    const tabs = PAGE_TABS[path];
-                    const gated = <ScopeGate path={path}>{element}</ScopeGate>;
-                    return (
-                      <Route
-                        key={path}
-                        path={routePatternFor(path)}
-                        element={
-                          tabs ? (
-                            <TabRoute page={tabs} legacy={PAGE_LEGACY_LOCATIONS[path]}>
-                              {gated}
-                            </TabRoute>
-                          ) : (
-                            gated
-                          )
-                        }
-                      />
-                    );
-                  })}
-                </Route>
+                {FEATURE_ROUTES.map(([path, element]) => {
+                  const tabs = PAGE_TABS[path];
+                  const gated = <ScopeGate path={path}>{element}</ScopeGate>;
+                  return (
+                    <Route
+                      key={path}
+                      path={routePatternFor(path)}
+                      element={
+                        tabs ? (
+                          <TabRoute page={tabs} legacy={PAGE_LEGACY_LOCATIONS[path]}>
+                            {gated}
+                          </TabRoute>
+                        ) : (
+                          gated
+                        )
+                      }
+                    />
+                  );
+                })}
               </Route>
-              {/* A Fitting Share Code opened with no session (#1544) — it must
+            </Route>
+            {/* A Fitting Share Code opened with no session (#1544) — it must
               open with no Character, so it sits outside
               RequireCharacter/ScopeGate. A
               visitor with a Character never sees it: FittingShared redirects
               straight into the editor instead. routeScopes.test.ts asserts
               this exemption is deliberate. */}
-              <Route path="/share/fitting" element={<FittingShared />} />
-              {/* A Share Link (`/s/<id>`), for any share type — same
+            <Route path="/share/fitting" element={<FittingShared />} />
+            {/* A Share Link (`/s/<id>`), for any share type — same
               exemption. `/share/<id>` is the old spelling of the same link
               (ids minted before the short key), kept so links already sent
               still open; the literal `/share/fitting` above outranks it. */}
-              <Route path="/s/:shareId" element={<SharedLink />} />
-              {/* The invite link: a signed-out visitor sees what it is for before logging in. */}
-              <Route path="/communities/join/:code" element={<CommunityJoin />} />
-              <Route path="/share/:shareId" element={<SharedLink />} />
-              {/* A Statement's verify link (#4066): read-only, no login, the token is the credential. */}
-              <Route path="/corp-tax-book/verify/:token" element={<CorpTaxBookVerify />} />
-              {/* Undisclosed Sentry probe — see routes/ErrorProbe.tsx. */}
-              <Route path="/error" element={<ErrorProbe />} />
-              <Route path="*" element={<NotFound />} />
-            </SentryRoutes>
-          </Suspense>
-          <ReloadPrompt />
-          <EntityInfoRoute />
-          <PublicInfoModal />
-          <SkillDetailModal />
-          <ItemInfoModal />
-          <PlaceInfoModal />
-        </NumberFormatBoundary>
+            <Route path="/s/:shareId" element={<SharedLink />} />
+            {/* The invite link: a signed-out visitor sees what it is for before logging in. */}
+            <Route path="/communities/join/:code" element={<CommunityJoin />} />
+            <Route path="/share/:shareId" element={<SharedLink />} />
+            {/* A Statement's verify link (#4066): read-only, no login, the token is the credential. */}
+            <Route path="/corp-tax-book/verify/:token" element={<CorpTaxBookVerify />} />
+            {/* Undisclosed Sentry probe — see routes/ErrorProbe.tsx. */}
+            <Route path="/error" element={<ErrorProbe />} />
+            <Route path="*" element={<NotFound />} />
+          </SentryRoutes>
+        </Suspense>
+        <ReloadPrompt />
+        <EntityInfoRoute />
+        <PublicInfoModal />
+        <SkillDetailModal />
+        <ItemInfoModal />
+        <PlaceInfoModal />
       </BrowserRouter>
     </ErrorBoundary>
   );
