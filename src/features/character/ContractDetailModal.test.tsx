@@ -185,7 +185,7 @@ describe('ContractDetailModal System rows', () => {
     const link = await screen.findByRole('link', { name: 'Jita' });
     expect(link).toHaveAttribute('href', expect.stringContaining('30000142'));
     expect(screen.getAllByRole('link', { name: /^(Jita|Amarr)$/ })).toHaveLength(1);
-    expect(screen.getByRole('link', { name: 'Jita IV - Moon 4' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'IV - Moon 4' })).toHaveAttribute(
       'href',
       expect.stringContaining(`info=place-${JITA_STATION}`)
     );
@@ -211,7 +211,7 @@ describe('ContractDetailModal System rows', () => {
       expect.stringContaining('30002187')
     );
     expect(screen.getAllByRole('link', { name: /^(Jita|Amarr)$/ })).toHaveLength(2);
-    expect(screen.getByRole('link', { name: 'Jita IV - Moon 4' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'IV - Moon 4' })).toHaveAttribute(
       'href',
       expect.stringContaining(`info=place-${JITA_STATION}`)
     );
@@ -219,6 +219,47 @@ describe('ContractDetailModal System rows', () => {
       'href',
       expect.stringContaining(`info=place-${AMARR_STATION}`)
     );
+  });
+
+  it('shows one Location, no Destination, when both ends are the same place', async () => {
+    server.use(
+      stationHandler(JITA_STATION, 'Jita IV - Moon 4', 30000142),
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/contracts/12345/items`, () =>
+        HttpResponse.json([])
+      )
+    );
+    renderModal({
+      characterId: CHAR_ID,
+      contract: {
+        ...ITEM_EXCHANGE,
+        start_location_id: JITA_STATION,
+        end_location_id: JITA_STATION,
+      },
+      issuerName: 'Mero Otichoda',
+      onClose: () => {},
+    });
+    await screen.findByRole('link', { name: 'IV - Moon 4' });
+    expect(screen.getByText('Location')).toBeInTheDocument();
+    expect(screen.queryByText('Destination')).toBeNull();
+    expect(screen.queryByText('→')).toBeNull();
+    expect(screen.getAllByRole('link', { name: 'IV - Moon 4' })).toHaveLength(1);
+  });
+
+  it('shows one Location with an arrow when a courier ends elsewhere', async () => {
+    server.use(
+      stationHandler(JITA_STATION, 'Jita IV - Moon 4', 30000142),
+      stationHandler(AMARR_STATION, 'Amarr VIII (Oris) - Emperor Family Academy', 30002187)
+    );
+    renderModal({
+      characterId: CHAR_ID,
+      contract: { ...COURIER, start_location_id: JITA_STATION, end_location_id: AMARR_STATION },
+      issuerName: 'Mero Otichoda',
+      onClose: () => {},
+    });
+    await screen.findByRole('link', { name: 'Amarr' });
+    expect(screen.getByText('Location')).toBeInTheDocument();
+    expect(screen.getByText('→')).toBeInTheDocument();
+    expect(screen.queryByText('Destination')).toBeNull();
   });
 
   it('hides the System row when the system cannot be resolved', async () => {
