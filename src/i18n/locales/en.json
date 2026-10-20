@@ -8553,7 +8553,7 @@
     "detailReceivedBy": "Received By",
     "detailAvailability": "Availability",
     "detailLocation": "Location",
-    "detailDestination": "Destination",
+    "detailRouteTo": "to",
     "detailDateIssued": "Date Issued",
     "detailDateExpired": "Date Expires",
     "detailDateAccepted": "Date Accepted",
