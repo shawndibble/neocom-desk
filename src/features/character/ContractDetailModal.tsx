@@ -223,6 +223,8 @@ export function ContractDetailModal({
   });
 
   const abyssalCount = items?.list.filter((item) => isAbyssalType?.(item.type_id)).length ?? 0;
+  const isRoute =
+    !!contract.end_location_id && contract.end_location_id !== contract.start_location_id;
   const title = t(CONTRACT_TYPE_KEY[contract.type]);
 
   const included = items?.list.filter((item) => item.is_included) ?? [];
@@ -451,18 +453,21 @@ export function ContractDetailModal({
           )}
           {contract.start_location_id && (
             <PlaceBlock
-              label={t('contracts.detailLocation')}
-              id={contract.start_location_id}
-              name={location === undefined ? undefined : location.start}
-              system={systems?.start ?? null}
-            />
-          )}
-          {contract.end_location_id && (
-            <PlaceBlock
-              label={t('contracts.detailDestination')}
-              id={contract.end_location_id}
-              name={location === undefined ? undefined : location.end}
-              system={systems?.end ?? null}
+              label={t(isRoute ? 'contracts.detailRoute' : 'contracts.detailLocation')}
+              from={{
+                id: contract.start_location_id,
+                name: location === undefined ? undefined : location.start,
+                system: systems?.start ?? null,
+              }}
+              to={
+                isRoute && contract.end_location_id
+                  ? {
+                      id: contract.end_location_id,
+                      name: location === undefined ? undefined : location.end,
+                      system: systems?.end ?? null,
+                    }
+                  : null
+              }
             />
           )}
         </div>
@@ -536,37 +541,81 @@ function ItemSection({
   );
 }
 
-/**
- * A place and the system it sits in. The station name opens its Place Info;
- * an unresolved id stays plain `#id`. The system is linked to Route Safety the
- * way `PublicContractDetailModal`'s is, and is simply absent until it resolves.
- * `name` is `undefined` while the lookup is in flight.
- */
-function PlaceBlock({
-  label,
-  id,
-  name,
-  system,
-}: {
-  label: string;
+interface PlaceEnd {
   id: number;
+  /** `undefined` while the lookup is in flight; `null` when it did not resolve. */
   name: string | null | undefined;
   system: SystemRef | null;
-}) {
+}
+
+/**
+ * Splits a place name that leads with its system: an NPC station reads
+ * "Jita IV - Moon 4", a structure "Badivefi - Tycho Brahe 18 HQ".
+ */
+function leadingSystem(name: string, system: string): { separator: string; rest: string } | null {
+  if (!name.startsWith(system)) return null;
+  const match = /^( - | )(.+)$/.exec(name.slice(system.length));
+  return match ? { separator: match[1], rest: match[2] } : null;
+}
+
+/**
+ * One place: the station name opens its Place Info, an unresolved id stays
+ * plain `#id`. EVE station and structure names lead with their system
+ * ("Badivefi - Tycho Brahe 18 HQ"), so when they do, that prefix is the Route
+ * Safety link rather than a second line repeating the system. A name that does
+ * not lead with it gets the system as a trailing link.
+ */
+function PlaceName({ id, name, system }: PlaceEnd) {
   const { t } = useTranslation();
+  if (name === undefined) return <Spinner size="sm" label={t('common.loading')} />;
+  if (name === null) return <>{`#${id}`}</>;
+  const lead = system ? leadingSystem(name, system.name) : null;
+  if (system && lead) {
+    return (
+      <>
+        <SystemLink systemId={system.id}>{system.name}</SystemLink>
+        {lead.separator}
+        <PlaceLink id={id}>{lead.rest}</PlaceLink>
+      </>
+    );
+  }
+  return (
+    <>
+      <PlaceLink id={id}>{name}</PlaceLink>
+      {system && !name.includes(system.name) && (
+        <>
+          {' · '}
+          <SystemLink systemId={system.id}>{system.name}</SystemLink>
+        </>
+      )}
+    </>
+  );
+}
+
+/**
+ * A contract's place, or its route (`from → to`) when the two ends differ.
+ * Item exchanges and auctions report the same location at both ends, so only
+ * a courier ever shows the arrow, and the row needs no Destination label.
+ */
+function PlaceBlock({ label, from, to }: { label: string; from: PlaceEnd; to: PlaceEnd | null }) {
   return (
     <div className="col-span-full">
       <Eyebrow>{label}</Eyebrow>
-      {name === undefined ? (
-        <Spinner size="sm" label={t('common.loading')} />
-      ) : (
-        <p>{name === null ? `#${id}` : <PlaceLink id={id}>{name}</PlaceLink>}</p>
-      )}
-      {system && (
-        <p>
-          <SystemLink systemId={system.id}>{system.name}</SystemLink>
-        </p>
-      )}
+      <p className="flex flex-wrap items-baseline gap-x-2">
+        <span>
+          <PlaceName {...from} />
+        </span>
+        {to && (
+          <>
+            <span aria-label="to" className="text-text-dim">
+              →
+            </span>
+            <span>
+              <PlaceName {...to} />
+            </span>
+          </>
+        )}
+      </p>
     </div>
   );
 }
