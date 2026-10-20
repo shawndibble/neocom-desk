@@ -23,7 +23,7 @@ import {
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
-import { ChipRow } from './settingsFields';
+import { ChipRow, SettingsFormLoading } from './settingsFields';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 
 const BUYBACK = 'buyback';
