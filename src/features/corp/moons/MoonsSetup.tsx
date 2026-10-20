@@ -13,6 +13,7 @@ import {
 import type { FeederGrantCallbackState } from '../taxBook/feederGrant';
 import { FeederConsent } from './FeederConsent';
 import { MoonOwnerPanel } from './MoonOwnerPanel';
+import { MoonOwnerPrevious } from './MoonOwnerPrevious';
 import { TurnOnBook } from './TurnOnBook';
 
 type Step = 'choices' | 'own' | 'collect' | 'consent';
@@ -165,7 +166,7 @@ export function MoonsSetup({
     );
 
   const canOwn = verdict.isDirector;
-  return (
+  const choices = (
     <div className="mx-auto max-w-4xl space-y-4">
       {left && (
         <p role="status" className="text-center text-sm">
@@ -235,5 +236,11 @@ export function MoonsSetup({
         </p>
       )}
     </div>
+  );
+  // A corporation an accounting corporation handled before sees that history above the choice.
+  return (
+    <MoonOwnerPrevious key={String(left)} characterId={characterId} corporationId={corporationId}>
+      {choices}
+    </MoonOwnerPrevious>
   );
 }

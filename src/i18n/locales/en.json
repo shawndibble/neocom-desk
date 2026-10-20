@@ -14183,6 +14183,79 @@
           "body": "This stops the sync at once and revokes the access. To run your own book instead, turn it on afterwards from this page."
         }
       },
+      "ownerView": {
+        "statement": {
+          "intro": "{{name}} handles the tax on your moons.",
+          "noRate": "No rate is set, so nothing is owed to you yet. Ask for one below.",
+          "owed": "is owed to you for ore mined at your refineries since {{since}}, at your rate of {{pct}}%.",
+          "owedUndated": "is owed to you for ore mined at your refineries, at your rate of {{pct}}%.",
+          "credit": "more than is owed has been paid to you for ore mined at your refineries, at your rate of {{pct}}%.",
+          "even": "Nothing is owed to you right now, at your rate of {{pct}}%.",
+          "paid": "They have paid {{paid}} so far; the last payment was {{amount}} on {{date}}.",
+          "notPaid": "They have not paid you yet.",
+          "unpriced_one": "{{count}} day of mining had ore without a price yet, so it is not counted.",
+          "unpriced_other": "{{count}} days of mining had ore without a price yet, so they are not counted."
+        },
+        "stale": {
+          "title": "We can't read your mining ledger since {{date}}",
+          "hint": "The character who gave access lost the Accountant role or revoked it. Mining since then is not counted until it is reconnected.",
+          "action": "Reconnect"
+        },
+        "settledOtherwise": {
+          "title": "How you are paid",
+          "intro": "You are settled with {{name}} another way.",
+          "nothingOwed": "Nothing is owed in ISK, so no balance builds up."
+        },
+        "previous": {
+          "title": "Previously handled by {{name}}",
+          "owes": "{{name}} owes you",
+          "owesFor": "for mining before {{date}}. It stays here until they pay it; nothing is deleted.",
+          "owesForUndated": "for mining while they handled your moons. It stays here until they pay it; nothing is deleted.",
+          "yours": "Mining from {{date}} is yours to tax.",
+          "settled": "Settled: they paid you everything owed for mining before {{date}}.",
+          "settledUndated": "Settled: they paid you everything owed for the mining they handled.",
+          "dismiss": "Dismiss",
+          "dismissFailed": "Could not dismiss this. Try again."
+        },
+        "rate": {
+          "none": "No rate is set.",
+          "plain": "Your rate is {{pct}}%.",
+          "asked": "You asked for {{pct}}%. Nothing changes until they agree.",
+          "override": "Rate set to {{pct}}% by {{name}} on {{date}}. You asked for {{asked}}%.",
+          "overrideUndated": "Rate set to {{pct}}% by {{name}}. You asked for {{asked}}%.",
+          "ask": "Ask for a different rate…",
+          "dialogTitle": "Ask for a different rate",
+          "field": "Rate you ask for (%)",
+          "hint": "Asking changes nothing until they agree.",
+          "confirm": "Ask for this rate"
+        },
+        "payments": {
+          "none": "No payments yet.",
+          "method": {
+            "donation": "Donation",
+            "other": "Other"
+          },
+          "status": {
+            "recorded": "Recorded",
+            "waiting-for-journal": "Waiting for the wallet journal",
+            "matched": "Matched in the wallet journal"
+          }
+        },
+        "mined": "Mined at your refineries",
+        "minedWhile": "Mined while they handled it",
+        "paymentsAndRate": "Payments and rate",
+        "paymentsToYou": "Payments to you",
+        "minedValue": "Mined at your moons",
+        "minedVolume": "Volume mined",
+        "units": "{{volume}} units",
+        "since": "Since",
+        "cols": {
+          "character": "Character",
+          "refinery": "Refinery",
+          "volume": "Units",
+          "value": "Value"
+        }
+      },
       "autoSync": {
         "title": "Automatic sync",
         "hint": "Every 6 hours our server syncs this book for you, so it stays current when no officer visits. It reads the refinery ledger, Extractions and moon notifications, and donations into the selected wallet divisions, and settles Statements that donations now cover. It never issues a Statement and never sends mail.",

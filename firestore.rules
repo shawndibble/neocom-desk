@@ -500,6 +500,41 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      // Collector books (issue #4512): the moon owner's read model, server-written. A moon owner
+      // reads it through its own access record (`viewers/{uid}`, CEO / Director / Accountant,
+      // live role check, 24h), which is NOT an `officers` doc: it never unlocks the raw book.
+      // It must match the feeder in the path, so one moon owner never reads another's view.
+      // Written out because the officer-only wildcard below is two segments deep and so does
+      // not cover `feederViews/{x}/days/{d}`.
+      function viewerPath(feederCorp) {
+        return /databases/$(database)/documents/corpTaxBooks/$(corporationId)/feederViews/$(feederCorp)/viewers/$(request.auth.uid);
+      }
+      function isMoonOwnerOf(feederCorp) {
+        return isCharacter()
+          && exists(viewerPath(feederCorp))
+          && get(viewerPath(feederCorp)).data.canView == true
+          && get(viewerPath(feederCorp)).data.ownerHash == request.auth.token.ownerHash
+          && get(viewerPath(feederCorp)).data.corporationId == int(feederCorp)
+          && get(viewerPath(feederCorp)).data.expiresAt > request.time.toMillis();
+      }
+
+      match /feederViews/{feederCorp} {
+        allow get: if isMoonOwnerOf(feederCorp);
+        allow list, write: if false;
+      }
+
+      match /feederViews/{feederCorp}/viewers/{viewerUid} {
+        allow get: if isCharacter() && request.auth.uid == viewerUid
+          && resource.data.ownerHash == request.auth.token.ownerHash;
+        allow list, write: if false;
+      }
+
+      match /feederViews/{feederCorp}/{viewCollection}/{viewDoc} {
+        allow get, list: if viewCollection in ['days', 'refineries', 'payouts']
+          && isMoonOwnerOf(feederCorp);
+        allow write: if false;
+      }
+
       match /{officerOnly}/{docId} {
         allow get, list: if officerOnly in ['extractions', 'declarations', 'adjustments', 'writeOffs', 'rebills', 'meta', 'audit', 'feeders']
           && isOfficer();
@@ -517,6 +552,10 @@ service cloud.firestore {
       allow read, write: if false;
     }
     match /corpTaxBookFeederOf/{corporationId} {
+      allow read, write: if false;
+    }
+    // Set when a feeder leaves, so its after-leaving view still finds the Collector (issue #4512).
+    match /corpTaxBookFeederPrevious/{corporationId} {
       allow read, write: if false;
     }
 
