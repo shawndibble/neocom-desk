@@ -16,7 +16,7 @@ const sync = {
   sync: vi.fn(),
 } as unknown as CorpTaxBookSync;
 
-function renderStrip(scheduledSync: ScheduledSyncStatus | null) {
+function renderStrip(scheduledSync: ScheduledSyncStatus | null, strip: CorpTaxBookSync = sync) {
   render(
     <MemoryRouter>
       <BookProvider
@@ -32,11 +32,23 @@ function renderStrip(scheduledSync: ScheduledSyncStatus | null) {
           } as unknown as Omit<BookContextValue, 'edit' | 'canEdit'>
         }
       >
-        <BookHealthStrip sync={sync} />
+        <BookHealthStrip sync={strip} />
       </BookProvider>
     </MemoryRouter>
   );
 }
+
+describe('BookHealthStrip, no readable refineries', () => {
+  it('says so instead of reading as synced', () => {
+    renderStrip(null, {
+      status: { kind: 'fresh', ageMs: 1000, byName: 'Pilot 9', scheduled: false, gaps: [] },
+      run: { phase: 'done', outcome: { kind: 'synced', noRefineries: true } },
+      sync: vi.fn(),
+    } as unknown as CorpTaxBookSync);
+    expect(screen.getByText(/no refineries the book can read/)).toBeInTheDocument();
+    expect(screen.queryByText(/Last synced/)).not.toBeInTheDocument();
+  });
+});
 
 describe('BookHealthStrip, scheduled sync', () => {
   it('shows the last scheduled run as the sync line', () => {

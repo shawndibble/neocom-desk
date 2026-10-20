@@ -70,7 +70,7 @@ export type StopReason = (typeof SCHEDULED_STOP_REASONS)[number];
  * even though the role check passed. One refusal skips the run; the same one on
  * the next run stops the schedule (`runOne`).
  */
-export type SkipReason = 'esi-unavailable' | 'esi-budget' | 'esi-refused';
+export type SkipReason = 'esi-unavailable' | 'esi-budget' | 'esi-refused' | 'no-refineries';
 
 export type BookSyncResult =
   | {
@@ -189,6 +189,8 @@ export async function runBookSync(
   if (observers.kind === 'forbidden') return { kind: 'skipped', reason: 'esi-refused' };
   if (observers.kind === 'backoff') return { kind: 'skipped', reason: 'esi-budget' };
   if (observers.kind !== 'ok') return { kind: 'skipped', reason: 'esi-unavailable' };
+  // An empty list is not a successful sync: say so rather than recording a silent success.
+  if (observers.data.length === 0) return { kind: 'skipped', reason: 'no-refineries' };
 
   const feed: Feed = {
     rows: [],

@@ -141,6 +141,8 @@ export type SyncOutcome =
       settled: string[];
       /** The gaps now on record, earlier ones included. */
       gaps: ReturnType<typeof mergeGaps>;
+      /** The corporation has no refinery this Character can read: donations synced, the ledger is empty. */
+      noRefineries?: true;
       /** Sources this Character could not read this time (the rest still synced). */
       missing: MissingSource[];
       truncated: boolean;
@@ -180,7 +182,7 @@ export async function syncCorpTaxBook(
 
   const missing: MissingSource[] = [];
   const canExtract = capabilities.canReadMoonExtractions && verdict.isStationManager;
-  const [feed, esiExtractions, notifications, donations] = await Promise.all([
+  const [feedRead, esiExtractions, notifications, donations] = await Promise.all([
     deps.loadObserverFeed(characterId, corporationId),
     canExtract ? deps.loadEsiExtractions(characterId, corporationId) : Promise.resolve(null),
     canExtract
@@ -190,9 +192,14 @@ export async function syncCorpTaxBook(
       ? deps.loadDonations(characterId, corporationId, before.book.divisions).catch(() => null)
       : Promise.resolve(null),
   ]);
-  if (feed === 'needs-reauth') return { kind: 'skipped', reason: 'needs-reauth' };
+  if (feedRead === 'needs-reauth') return { kind: 'skipped', reason: 'needs-reauth' };
   // Recording a sync whose ledger never arrived would blame the gap on the officers.
-  if (feed === 'unavailable') return { kind: 'skipped', reason: 'esi-unavailable' };
+  if (feedRead === 'unavailable') return { kind: 'skipped', reason: 'esi-unavailable' };
+  // Donations still sync, but the outcome says the ledger had nothing to read, so the page never calls it "Synced".
+  const noRefineries = feedRead === 'no-refineries';
+  const feed: ObserverFeed = noRefineries
+    ? { rows: [], structureIds: [], oldestEsiDate: {}, truncated: false, systemIds: {} }
+    : feedRead;
   if (canExtract && esiExtractions === null) missing.push('extractions');
   if (!capabilities.canReadWallet || donations === null) missing.push('donations');
 
@@ -305,6 +312,7 @@ export async function syncCorpTaxBook(
     gaps,
     missing,
     truncated: feed.truncated,
+    ...(noRefineries ? { noRefineries: true as const } : {}),
     autoGrouped,
     ...(autoGroupError ? { autoGroupError } : {}),
     ...(reassignError ? { reassignError } : {}),

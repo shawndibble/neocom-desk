@@ -116,6 +116,13 @@ describe('syncCorpTaxBook', () => {
     });
   });
 
+  it('still syncs donations, and says so, when the corporation has no readable refineries', async () => {
+    const d = deps({ loadObserverFeed: async () => 'no-refineries' });
+    const outcome = await run(d);
+    expect(outcome).toMatchObject({ kind: 'synced', observedRows: 0, noRefineries: true });
+    expect(d.uploadSync).toHaveBeenCalled();
+  });
+
   it('uploads the ledger, extractions and donations in one call, with the gaps', async () => {
     const d = deps({
       loadEsiExtractions: async () => [
