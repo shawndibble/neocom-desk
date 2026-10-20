@@ -464,7 +464,7 @@ export async function settleEsiCacheLoads(timeoutMs = 3000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
     const pending = [
-      ...[...pendingLoads].map((entry) => ({ key: entry.key, promise: entry.promise })),
+      ...pendingLoads,
       ...[...inFlightLoads].map(([key, entry]) => ({ key, promise: entry.promise })),
     ];
     if (pending.length === 0) return;

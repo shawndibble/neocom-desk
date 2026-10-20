@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, within, waitFor, fireEvent } from '@testing-library/react';
+import { cleanup, render, screen, within, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -220,7 +220,9 @@ function stubDesktopViewport() {
 }
 
 afterEach(async () => {
-  // Pending ESI cache loads are settled by the global afterEach in vitest.setup.dom.ts.
+  // Unmount before the handlers go; pending ESI cache loads are settled by the
+  // global afterEach in vitest.setup.dom.ts.
+  cleanup();
   server.resetHandlers();
   clearMarketPriceCache();
   clearCostIndexCache();
