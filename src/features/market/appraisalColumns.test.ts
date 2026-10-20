@@ -8,4 +8,11 @@ describe('appraisal columns', () => {
     expect(DEFAULT_VISIBLE_APPRAISAL_COLUMNS).not.toContain('iskPerM3');
     expect(DEFAULT_VISIBLE_APPRAISAL_COLUMNS).toContain('volume');
   });
+
+  it('offers sales tax and the after-tax sell total, off until ticked', () => {
+    const ids = [...APPRAISAL_COLUMN_IDS];
+    expect(ids.indexOf('sellAfterTax')).toBe(ids.indexOf('salesTax') + 1);
+    expect(DEFAULT_VISIBLE_APPRAISAL_COLUMNS).not.toContain('salesTax');
+    expect(DEFAULT_VISIBLE_APPRAISAL_COLUMNS).not.toContain('sellAfterTax');
+  });
 });

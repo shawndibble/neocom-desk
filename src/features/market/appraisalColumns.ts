@@ -17,16 +17,18 @@ export const APPRAISAL_COLUMN_IDS = [
   'lpTotal',
   'volume',
   'iskPerM3',
+  'salesTax',
+  'sellAfterTax',
 ] as const;
 
 export type AppraisalColumnId = (typeof APPRAISAL_COLUMN_IDS)[number];
 
-/**
- * Every column shown before ISK/m³ existed, so adding that one changes nothing
- * on its own: it is there to tick in the picker, not on screen by default.
- */
+/** Columns added after the table shipped: there to tick in the picker, not on screen by default. */
+const OFF_BY_DEFAULT: readonly AppraisalColumnId[] = ['iskPerM3', 'salesTax', 'sellAfterTax'];
+
+/** Every column shown before the opt-in ones existed, so adding one changes nothing on its own. */
 export const DEFAULT_VISIBLE_APPRAISAL_COLUMNS: readonly AppraisalColumnId[] =
-  APPRAISAL_COLUMN_IDS.filter((id) => id !== 'iskPerM3');
+  APPRAISAL_COLUMN_IDS.filter((id) => !OFF_BY_DEFAULT.includes(id));
 
 export const VISIBLE_APPRAISAL_COLUMNS_KEY = 'appraisalVisibleColumns';
 
