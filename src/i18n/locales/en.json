@@ -11338,7 +11338,7 @@
             "fittings": "Fittings: your damage and target profiles, and which ones are active.",
             "pi": "PI and mining tax: customs rate overrides, ore types you tagged, whether ore is valued as compressed ore, and how the Assign form edits ore values. Assets: the refining rate you type for your own structure. Market: the markets you stock, with their stock targets. Mining Survey: the survey links you created or opened, the names you gave them, and your survey info templates.",
             "layout": "Layout: your Overview layout (the widgets you chose, with their sizes, views, order and Omega plan), hidden and reordered Overview cards from before the widget grid, pages hidden from the navigation, and whether you answered the rail question.",
-            "travel": "Travel: route preference, security penalty, avoided systems (and whether the list is on), and avoiding EDENCOM, Triglavian and recent pod-kill systems (with your threshold). Route Safety: whether it routes through Thera / Turnur, your ship size, minimum hole life and which hubs."
+            "travel": "Travel: route preference, security penalty, avoided systems (and whether the list is on), and avoiding EDENCOM, Triglavian and recent pod-kill systems (with your threshold). Route Safety: whether it routes through Thera / Turnur, your ship size, minimum hole life and which hubs. The notes you wrote on solar systems (up to 500 characters each, so don't put anything private in them)."
           }
         },
         "local": {
@@ -13046,6 +13046,15 @@
         "podKills": "≥ {{count}} pod kills",
         "avoided": "Avoided Systems"
       }
+    },
+    "note": {
+      "add": "Note",
+      "addLabel": "Add a note on {{name}}",
+      "openLabel": "Open your note on {{name}}",
+      "label": "Your note on {{name}}",
+      "placeholder": "What you know about this system",
+      "updated": "Updated {{date}}",
+      "count": "{{length}}/{{max}}"
     },
     "avoid": {
       "action": "Avoid",
