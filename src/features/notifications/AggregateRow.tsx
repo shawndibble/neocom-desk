@@ -169,7 +169,9 @@ export function AggregateRow({
             )}
           >
             <Caret expanded={open && isDesktop} />
-            <span className="min-w-0 break-words">{label}</span>
+            <span data-event-name className="min-w-0 break-words">
+              {label}
+            </span>
           </button>
           {labelAccessory !== undefined && <span className="py-3 md:py-2">{labelAccessory}</span>}
         </div>
