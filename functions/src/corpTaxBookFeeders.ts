@@ -57,6 +57,12 @@ export interface FeederRecord {
   payeeChangedAt?: number;
   mode: 'normal' | 'settled-otherwise';
   note?: string;
+  /** The Character (the signed-in player) who handed over the mining grant; the holder may be their alt. */
+  grantedBy?: number;
+  /** The rate the feeder asked for at grant time (0-100); the Collector's agreed rate wins when set. */
+  requestedRatePct?: number;
+  /** The rate the Collector set; absent until one is. */
+  agreedRatePct?: number;
   /** The owner rate the invite offered, if it carried one. */
   offeredOwnerRatePct?: number;
   coveragePeriods: CoveragePeriod[];
@@ -254,7 +260,47 @@ export async function acceptFeederInvite(
   if (!roles.canEdit) {
     fail('permission-denied', 'Only a CEO, Director or Accountant can accept', 'not-an-editor');
   }
-  const feederCorp = identity.corporationId;
+  const accepted = await acceptInviteCore(deps, {
+    code: input.code,
+    characterId,
+    name: claims.name,
+    feederCorp: identity.corporationId,
+  });
+  return {
+    collectorCorporationId: accepted.collectorCorporationId,
+    feederCorporationId: accepted.feederCorporationId,
+    rejoined: accepted.rejoined,
+  };
+}
+
+/** What the mining-only grant path needs to put back if the first ledger read is refused. */
+export interface AcceptUndo {
+  /** The feeder record before the accept; absent when the accept created it. */
+  priorRecord?: FeederRecord;
+  inviteId: string;
+}
+
+export interface AcceptCoreInput {
+  code: string;
+  characterId: number;
+  name: string;
+  feederCorp: number;
+  /** Extra fields stamped on the new or reopened record (the grant path's holder). */
+  recordExtra?: Partial<FeederRecord>;
+}
+
+/**
+ * The accept transaction, after the caller's standing is settled: the roles-scope
+ * path checks the edit role first, the mining-only grant path leaves that to the
+ * ledger read (decision 20261020-141656).
+ */
+export async function acceptInviteCore(
+  deps: BookDeps,
+  input: AcceptCoreInput
+): Promise<AcceptFeederInviteResult & { undo: AcceptUndo }> {
+  const { characterId, feederCorp } = input;
+  const claims = { name: input.name };
+  const extra = input.recordExtra ?? {};
   const inviteId = hashInviteCode(input.code);
   const now = deps.now();
   const today = utcDate(now);
@@ -284,6 +330,7 @@ export async function acceptFeederInvite(
     const held = (await tx.get(feederRef)).data() as FeederRecord | undefined;
 
     let rejoined = false;
+    let priorRecord: FeederRecord | undefined;
     if (!held) {
       const created: FeederRecord = {
         corporationId: feederCorp,
@@ -295,6 +342,7 @@ export async function acceptFeederInvite(
           ? { offeredOwnerRatePct: invite.offeredOwnerRatePct }
           : {}),
         coveragePeriods: [{ from: today }],
+        ...extra,
       };
       tx.create(feederRef, created);
     } else {
@@ -303,6 +351,7 @@ export async function acceptFeederInvite(
         fail('failed-precondition', 'This corporation already feeds this book', 'feeder-active');
       }
       rejoined = true;
+      priorRecord = held;
       const kept: FeederRecord = { ...held };
       delete kept.leftAt;
       // The offered rate belongs to the link, not to the record's history.
@@ -316,6 +365,7 @@ export async function acceptFeederInvite(
           ? { offeredOwnerRatePct: invite.offeredOwnerRatePct }
           : {}),
         coveragePeriods: reopenPeriod(held.coveragePeriods, today),
+        ...extra,
       };
       tx.set(feederRef, reopened);
     }
@@ -334,6 +384,11 @@ export async function acceptFeederInvite(
       rejoined ? 'feederRejoined' : 'feederJoined',
       { feederCorporationId: feederCorp, inviteId }
     );
-    return { collectorCorporationId: collector, feederCorporationId: feederCorp, rejoined };
+    return {
+      collectorCorporationId: collector,
+      feederCorporationId: feederCorp,
+      rejoined,
+      undo: { inviteId, ...(priorRecord ? { priorRecord } : {}) },
+    };
   });
 }

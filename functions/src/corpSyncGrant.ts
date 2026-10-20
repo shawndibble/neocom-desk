@@ -71,6 +71,8 @@ export interface CorpSyncGrantDoc {
    * token (FEEDER_SYNC_SCOPES), keyed by the feeder's corporation id. Absent means 'book'.
    */
   kind?: 'book' | 'feeder';
+  /** Feeder grants: the signed-in Character who handed it over (the holder above may be their alt). */
+  grantedBy?: number;
   /** Feeder grants: the Collector whose book the feeder feeds. */
   collectorCorporationId?: number;
 }
@@ -112,7 +114,7 @@ export interface CorpSyncDeps {
 
 const PURPOSE = 'corpSyncGrant' as const;
 
-const grantRef = (db: Firestore, corporationId: number) =>
+export const grantRef = (db: Firestore, corporationId: number) =>
   db.collection(CORP_SYNC_GRANTS_COLLECTION).doc(String(corporationId));
 const statusRef = (db: Firestore, corporationId: number) =>
   bookRef(db, corporationId).collection(META).doc(SCHEDULED_SYNC_DOC);
@@ -278,7 +280,7 @@ async function verifyGrantToken(deps: CorpSyncDeps, accessToken: string): Promis
 }
 
 /** Decrypt and revoke a stored token at SSO (unless it equals `keepToken`). False if it could not be done. */
-async function revokeStored(
+export async function revokeStored(
   deps: CorpSyncDeps,
   doc: CorpSyncGrantDoc,
   keepToken?: string

@@ -52,7 +52,7 @@ import {
   parseToken,
   parseTurnOnInput,
 } from './corpTaxBook.js';
-import { esiIdentityReader } from './corpTaxBookEsi.js';
+import { esiCorporationLookup, esiIdentityReader } from './corpTaxBookEsi.js';
 import {
   parseSaveCorpSyncGrantInput,
   dropCorpSyncGrant,
@@ -69,6 +69,13 @@ import {
   parseRevokeFeederInviteInput,
   revokeFeederInvite,
 } from './corpTaxBookFeeders.js';
+import {
+  getFeederStatus,
+  leaveFeeder,
+  parseFeederCall,
+  parseSaveFeederGrantInput,
+  saveFeederGrant,
+} from './corpTaxBookFeederGrant.js';
 import { esiSyncReader } from './corpTaxBookSyncEsi.js';
 import {
   claimPayment,
@@ -648,6 +655,28 @@ export const saveCorpTaxBookSyncGrantCallable = onCall<unknown>(
   { maxInstances: 5, secrets: [ALERTS_TOKEN_KEY] },
   (request) =>
     saveCorpSyncGrant(corpSyncDeps(), callerOf(request), parseSaveCorpSyncGrantInput(request.data))
+);
+
+// Collector books (issue #4511): the moon owner's side. The grant is a separate SSO login by
+// the Accountant alt (mining scope only); the first ledger pull is the role check.
+export const saveCorpTaxBookFeederGrantCallable = onCall<unknown>(
+  { maxInstances: 5, secrets: [ALERTS_TOKEN_KEY] },
+  (request) =>
+    saveFeederGrant(
+      { ...corpSyncDeps(), esi: esiSyncReader(), lookupCorporation: esiCorporationLookup() },
+      callerOf(request),
+      parseSaveFeederGrantInput(request.data)
+    )
+);
+
+export const leaveCorpTaxBookFeederCallable = onCall<unknown>(
+  { maxInstances: 5, secrets: [ALERTS_TOKEN_KEY] },
+  (request) => leaveFeeder(corpSyncDeps(), callerOf(request), parseFeederCall(request.data))
+);
+
+export const getCorpTaxBookFeederStatusCallable = onCall<unknown>(
+  { maxInstances: 5, secrets: [ALERTS_TOKEN_KEY] },
+  (request) => getFeederStatus(corpSyncDeps(), callerOf(request), parseFeederCall(request.data))
 );
 
 // The holder revokes their own; the CEO revokes anyone's (live role check, so it carries an access token).

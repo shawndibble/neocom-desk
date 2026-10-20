@@ -13,7 +13,7 @@ const STEPS_KEYS = {
 } as const;
 
 /**
- * Settings → Data & storage → Install this app (phones and tablets only). The later path for the
+ * Settings → App → Install this app (phones and tablets only). The later path for the
  * one-time install banner: ignores `installPrompt.seen`, so a dismissed banner
  * is never the end of it.
  */

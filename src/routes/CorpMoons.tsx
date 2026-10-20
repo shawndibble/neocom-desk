@@ -48,7 +48,7 @@ import { MinersTab } from '@/features/corp/moons/MinersTab';
 import { MoonDetail } from '@/features/corp/moons/MoonDetail';
 import { MOONS_TABS, moonsDetail } from '@/features/corp/moons/moonsPaths';
 import { StatementsTab } from '@/features/corp/moons/StatementsTab';
-import { TurnOnBook } from '@/features/corp/moons/TurnOnBook';
+import { MoonsSetup } from '@/features/corp/moons/MoonsSetup';
 import { useCorpBook } from '@/features/corp/moons/useCorpBook';
 
 function ActivityPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -187,7 +187,7 @@ function CorpMoonsView() {
     return (
       <div className="mx-auto max-w-6xl space-y-4 p-4">
         <PageHeader title={t('corp.moons.title')} subNav={<CorpSubNav flush />} />
-        <TurnOnBook
+        <MoonsSetup
           characterId={book.characterId}
           corporationId={book.corporationId}
           verdict={state.verdict}

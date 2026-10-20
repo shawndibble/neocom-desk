@@ -11,3 +11,6 @@ export const CORP_SYNC_SCOPES = [
   'esi-characters.read_corporation_roles.v1',
   'esi-universe.read_structures.v1',
 ] as const;
+
+/** A moon owner's grant carries this one scope: the observer ledger, nothing else (ADR 0025 amendment). */
+export const FEEDER_SYNC_SCOPES = ['esi-industry.read_corporation_mining.v1'] as const;

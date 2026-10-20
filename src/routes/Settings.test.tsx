@@ -430,7 +430,7 @@ describe('Settings', () => {
   it('Data Age tab shows an empty state when nothing has succeeded yet', async () => {
     const user = userEvent.setup();
     render(<App />);
-    await openTab(user, /^data & storage$/i);
+    await openTab(user, /^cached data$/i);
 
     expect(screen.getByRole('heading', { name: /data age/i })).toBeInTheDocument();
     expect(screen.getByText(/nothing fetched yet/i)).toBeInTheDocument();
@@ -441,7 +441,7 @@ describe('Settings', () => {
   it('Data Age tab lists only the latest successful fetch per endpoint/character, skipping failures (issue #32)', async () => {
     const user = userEvent.setup();
     render(<App />);
-    await openTab(user, /^data & storage$/i);
+    await openTab(user, /^cached data$/i);
 
     act(() => {
       const log = useActivityLog.getState();
@@ -1535,7 +1535,7 @@ describe('Settings defaults', () => {
   });
 
   it('offers the PI expiring-soon window, defaulting to 24 hours', async () => {
-    window.history.pushState({}, '', '/settings/industry');
+    window.history.pushState({}, '', '/settings/pi');
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
@@ -1767,19 +1767,22 @@ describe('Settings — sections rail', () => {
         .map((link) => link.textContent)
     ).toEqual([
       'Display',
-      'Permissions',
+      'Notifications',
       'Industry',
+      'Planetary Industry',
       'Market',
       'Moon Mining Tax',
       'Characters',
       // Corporation is absent: this character has no corp access.
       'Travel',
-      'Notifications',
-      'Data & storage',
+      'Permissions',
+      'App & backup',
+      'Log out & delete',
+      'Cached data',
       'Offline data',
       'Activity Log',
     ]);
-    for (const group of ['App', 'Defaults', 'Alerts', 'Data & device']) {
+    for (const group of ['Preferences', 'Defaults', 'Account & device', 'Data']) {
       expect(within(nav).getByText(group)).toBeInTheDocument();
     }
   });
@@ -1842,12 +1845,12 @@ describe('Settings — phone list', () => {
 
     const nav = await screen.findByRole('navigation', { name: /settings sections/i });
     expect(window.location.pathname).toBe('/settings');
-    for (const group of ['App', 'Defaults', 'Alerts', 'Data & device']) {
+    for (const group of ['Preferences', 'Defaults', 'Account & device', 'Data']) {
       expect(within(nav).getByText(group)).toBeInTheDocument();
     }
     // Corporation is absent: this character has no corp access.
     expect(within(nav).queryByRole('link', { name: /corporation/i })).not.toBeInTheDocument();
-    expect(within(nav).getAllByRole('link')).toHaveLength(11);
+    expect(within(nav).getAllByRole('link')).toHaveLength(14);
     expect(within(nav).getByRole('link', { name: /^display/i })).toHaveTextContent(
       /default text, my local time/i
     );
@@ -1859,8 +1862,8 @@ describe('Settings — phone list', () => {
     expect(within(nav).getByRole('link', { name: /^travel/i })).toHaveTextContent(
       /0 avoided systems/i
     );
-    // Log out lives in Data & storage, not as a row of its own.
-    expect(screen.queryByText(/log out/i)).not.toBeInTheDocument();
+    // Log out lives in its own section, with no summary line.
+    expect(within(nav).getByRole('link', { name: /^log out & delete$/i })).toBeInTheDocument();
   });
 
   it('counts the stored Avoided Systems on the Travel row', async () => {
@@ -1931,7 +1934,7 @@ describe('Settings — This device', () => {
       scopes: [],
     });
     await db.settings.put({ key: ASSUMED_ME_SETTING_KEY, value: 7 });
-    window.history.pushState({}, '', '/settings/dataAge');
+    window.history.pushState({}, '', '/settings/device');
     render(<App />);
 
     expect(
@@ -1953,7 +1956,7 @@ describe('Settings — This device', () => {
 
   it('leaves everything in place when the dialog is cancelled', async () => {
     const user = userEvent.setup();
-    window.history.pushState({}, '', '/settings/dataAge');
+    window.history.pushState({}, '', '/settings/device');
     render(<App />);
 
     // Disabled until the live character count resolves.
@@ -1972,7 +1975,7 @@ describe('Settings — review follow-ups', () => {
   it('keeps the dialog open and says so when logging out fails', async () => {
     const user = userEvent.setup();
     vi.spyOn(db.characters, 'delete').mockRejectedValueOnce(new Error('disk full'));
-    window.history.pushState({}, '', '/settings/dataAge');
+    window.history.pushState({}, '', '/settings/device');
     render(<App />);
 
     // Disabled until the live character count resolves.
@@ -1994,7 +1997,7 @@ describe('Settings — review follow-ups', () => {
     expect(window.location.pathname).toBe('/settings/market');
   });
 
-  it('does not show the CCP data credit on Data & storage', async () => {
+  it('does not show the CCP data credit on Cached data', async () => {
     window.history.pushState({}, '', '/settings/dataAge');
     render(<App />);
 
@@ -2005,11 +2008,10 @@ describe('Settings — review follow-ups', () => {
   });
 
   it('gives both backup password inputs a visible <label for>', async () => {
-    window.history.pushState({}, '', '/settings/dataAge');
+    window.history.pushState({}, '', '/settings/app');
     const { container } = render(<App />);
 
-    await screen.findByRole('button', { name: /clear cached esi data/i });
-    const inputs = screen.getAllByLabelText('Password');
+    const inputs = await screen.findAllByLabelText('Password');
     expect(inputs).toHaveLength(2);
     for (const input of inputs) {
       expect(input.id).not.toBe('');
