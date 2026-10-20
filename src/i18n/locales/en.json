@@ -14014,10 +14014,10 @@
           "no-book": "This corporation has no Corp Tax Book to sync.",
           "not-an-editor": "Only an Accountant or Director can sync the book.",
           "needs-reauth": "Log in again to sync the book.",
-          "esi-unavailable": "EVE's servers did not answer, so nothing was synced.",
-          "no-refineries": "This corporation has no refineries the book can read, so nothing was synced."
+          "esi-unavailable": "EVE's servers did not answer, so nothing was synced."
         },
-        "noRefineriesDetail": "The book needs a corporation that owns refineries, read by an Accountant or Director of it. Nothing is synced until one is readable."
+        "noRefineries": "This corporation has no refineries the book can read",
+        "noRefineriesDetail": "The book needs a corporation that owns refineries, read by an Accountant or Director of it. Donations still sync, but no mining is recorded until one is readable."
       },
       "run": {
         "title": "{{period}} Statements",

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import type { ScheduledSyncStatus } from '@/engine/corpTaxBook/scheduledSync';
@@ -41,13 +41,11 @@ function renderStrip(scheduledSync: ScheduledSyncStatus | null, strip: CorpTaxBo
 describe('BookHealthStrip, no readable refineries', () => {
   it('says so instead of reading as synced', () => {
     renderStrip(null, {
-      status: { kind: 'never' },
-      run: { phase: 'done', outcome: { kind: 'skipped', reason: 'no-refineries' } },
+      status: { kind: 'fresh', ageMs: 1000, byName: 'Pilot 9', scheduled: false, gaps: [] },
+      run: { phase: 'done', outcome: { kind: 'synced', noRefineries: true } },
       sync: vi.fn(),
     } as unknown as CorpTaxBookSync);
-    fireEvent.click(screen.getByRole('button', { name: /need attention/ }));
     expect(screen.getByText(/no refineries the book can read/)).toBeInTheDocument();
-    expect(screen.getByText(/needs a corporation that owns refineries/)).toBeInTheDocument();
     expect(screen.queryByText(/Last synced/)).not.toBeInTheDocument();
   });
 });
