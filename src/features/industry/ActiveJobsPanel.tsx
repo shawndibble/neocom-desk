@@ -1,11 +1,10 @@
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { cx } from '@/lib/cx';
 import { HintText } from '@/components/ui/HintText';
-import { Pill } from '@/components/ui/Pill';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GrantMissingLink } from '@/app/GrantMissingLink';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { captureException } from '@sentry/react';
 import { useHighlightParam } from '@/lib/useHighlightParam';
 import { useTicker } from '@/lib/ticker';
@@ -24,35 +23,28 @@ import {
   EmptyState,
   IconButton,
   Panel,
-  ProgressBar,
   SegmentedControl,
   Spinner,
   Toast,
-  type DataTableColumn,
   CachedNotice,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { GrantBanner } from '@/app/GrantNote';
-import { ItemInfoLink } from '@/features/entities';
 import { db, type BuildPlanRecord } from '@/db';
 import { loadTypes } from '@/sde/loadSde';
 import type { TypeMap } from '@/sde/types';
 import {
   loadCharacterIndustryJobs,
   sortJobsBySoonest,
-  jobProgress,
   isJobDone,
   isCompletingSoon,
-  secondsRemaining,
   summarizeJobs,
-  activityI18nKey,
   canLogProductionFromJob,
-  loadAllCharactersIndustryJobs,
+  JOBS_TICK_MS,
+  activityI18nKey,
   flattenJobsWithCharacter,
   type ActiveJob,
   type JobsLoadResult,
-  type JobsFanOutSnapshot,
 } from './jobs';
 import {
   EMPTY_CORP_JOBS,
@@ -60,7 +52,6 @@ import {
   visibleCorpJobs,
   type CorpJobsSnapshot,
 } from './corpJobs';
-import type { CorporationIndustryJob, IndustryJob } from '@/esi/endpoints';
 import {
   findMatchingBuildPlans,
   createBuildPlanForJob,
@@ -71,43 +62,21 @@ import { countUnloggedDeliveries, isLoggableHistoryJob } from './jobHistory';
 import { useHistoryStates, useJobHistoryData } from './useJobHistory';
 import { setJobDismissed } from './jobHistoryStore';
 import { formatDuration } from '@/lib/duration';
-import { formatEveDateTime } from '@/lib/eveTime';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { jobsCsvColumns } from './jobsCsv';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
-import { mapWithConcurrencyLimit, ESI_FANOUT_CONCURRENCY } from '@/lib/concurrency';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
-import {
-  jobSlotSkillsFromCharacterSkills,
-  toJobSlotJobs,
-} from '@/features/character/jobSlotSkills';
-import {
-  aggregateJobSlotSummary,
-  JOB_SLOT_CATEGORIES,
-  type JobSlotSkills,
-  type JobSlotCharacterInput,
-} from '@/engine/industry/jobSlots';
+import { jobSlotSkillsFromCharacterSkills } from '@/features/character/jobSlotSkills';
+import { JOB_SLOT_CATEGORIES, type JobSlotSkills } from '@/engine/industry/jobSlots';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
-import { CharacterLink } from '@/features/entities';
 import { useResolvedCharacterFilter } from '@/features/character/characterFilterValue';
 import { characterFilterParam } from '@/features/character/characterFilterUrlParam';
 import { useRememberedUrlParams, useUrlParams, useUrlSort } from '@/lib/useUrlState';
 import { enumParam, enumSetParam, idListParam } from '@/lib/urlState';
 import { useRememberedCharacterFilter } from '@/features/character/characterFilterPicks';
-
-/**
- * A row on the table, tagged with its Character even in the single-character
- * view — so `rowKey` and the optional character column need no branch. For a
- * corp job (issue #2302) that Character is the installer, and `characterName`
- * is empty when the installer is a corpmate outside this account (only ever
- * the job an alert pointed at).
- */
-type JobRow = ActiveJob & {
-  characterId: number;
-  characterName: string;
-  owner: 'personal' | 'corporation';
-};
+import { activeJobColumns, historyColumns, toneClass, type JobRow } from './activeJobColumns';
+import { useJobSlotSummary, useJobsFanOut } from './useJobsFanOut';
 
 /** The two derived job states this panel's Status filter offers — not ESI's raw `status` enum, just what the list already highlights. */
 type JobStatusFilter = 'completingSoon' | 'done';
@@ -125,14 +94,6 @@ const JOB_FILTER_PARAMS = {
   'jobs.view': enumParam(['active', 'history'] as const, 'active'),
 };
 const JOBS_DEFAULT_SORT = { columnId: 'endsIn', direction: 'asc' } as const;
-
-/** Picks a job tone's class out of a per-site map, `undefined` for the neutral case — the one place every `cellClassName`/`rowClassName`/fill-color call site turns a tone into a string. */
-function toneClass(
-  tone: 'warning' | 'success' | undefined,
-  classes: { warning: string; success: string }
-): string | undefined {
-  return tone && classes[tone];
-}
 
 /**
  * One grouped multiselect dropdown — Activity and Status are two instances
@@ -191,9 +152,6 @@ interface Snapshot {
   skills: JobSlotSkills | undefined;
 }
 
-/** Countdown recompute cadence; coarse (minutes granularity display) so 30s is plenty fresh. */
-const TICK_MS = 30_000;
-
 async function loadActiveJobsSnapshot(characterId: number): Promise<Snapshot> {
   try {
     const nowMs = Date.now();
@@ -242,50 +200,11 @@ async function loadActiveJobsSnapshot(characterId: number): Promise<Snapshot> {
  * endpoint never returns a corp job, so a pilot who only runs corp jobs
  * otherwise saw an empty panel.
  */
-/** Progress bar that reads the shared clock itself, so its column needn't rebuild per tick. */
-function JobProgressCell({
-  job,
-  label,
-  tone,
-}: {
-  job: Pick<IndustryJob, 'start_date' | 'end_date'>;
-  label: string;
-  tone: 'accent' | 'warning' | 'success';
-}) {
-  const now = useTicker(TICK_MS);
-  const progress = Math.round(jobProgress(job, now) * 100);
-  return (
-    // Fixed track: `flex-1` in a shrink-to-fit cell has no width to
-    // fill and collapses. Nothing may right-align itself below `sm`
-    // either (docs/DESIGN.md §4a) — hence `sm:text-right`.
-    <span className="flex items-center gap-2 max-sm:w-full">
-      <ProgressBar
-        label={label}
-        value={progress}
-        tone={tone}
-        className="w-16 shrink-0 max-sm:w-auto max-sm:flex-1 sm:w-24"
-      />
-      <span className="w-8 shrink-0 tabular-nums text-text-dim sm:text-right">{progress}%</span>
-    </span>
-  );
-}
-
-/** Time-left text that reads the shared clock itself. */
-function JobEndsInCell({
-  job,
-  doneLabel,
-}: {
-  job: Pick<IndustryJob, 'end_date'>;
-  doneLabel: string;
-}) {
-  const now = useTicker(TICK_MS);
-  return isJobDone(job, now) ? doneLabel : formatDuration(secondsRemaining(job, now));
-}
 
 export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
   const { t } = useTranslation();
   // Shared with every other 30 s clock on screen; paused while the tab is hidden.
-  const now = useTicker(TICK_MS);
+  const now = useTicker(JOBS_TICK_MS);
   // URL-backed filters (ADR 0015), empty meaning "every activity"/"every
   // status" — matching how no chip pressed reads as no
   // filter everywhere else in the app. Deliberately not the shared
@@ -348,92 +267,18 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
 
   const { candidates: jobsFilterCandidates, namesById: characterNameById } = useAccountCharacters();
 
-  // Nothing fetched until the picker actually leaves "current". No separate
-  // "loading" state: `jobsFanOut === null` already means "nothing to show
-  // yet" (set once, on the first successful load), and a manual refresh
-  // deliberately leaves the previous snapshot in place while it re-fetches —
-  // same retained-snapshot idiom `useRouteSnapshot`/`useCorpSnapshot` use
-  // elsewhere in this app, and the only way to give the effect below no
-  // synchronous `setState` call of its own (`react-hooks/set-state-in-effect`).
-  const [jobsFanOut, setJobsFanOut] = useState<JobsFanOutSnapshot | null>(null);
-  // The per-Character ESI reads are caught inside `loadAllCharactersIndustryJobs`,
-  // so only its own Dexie reads can reject it — and `jobsFanOut === null` alone
-  // would then mean "still loading" forever, spinner and all. This flag ends the
-  // spinner without inventing an answer: `hasAnswered` stays false, so the panel
-  // lands in the "no data cached" empty state, exactly where
-  // `loadActiveJobsSnapshot`'s own catch puts the single-Character path.
-  const [jobsFanOutFailed, setJobsFanOutFailed] = useState(false);
-  const [jobsFanOutRefreshCount, setJobsFanOutRefreshCount] = useState(0);
-  useEffect(() => {
-    if (!needsJobSlotFanOut) return;
-    let cancelled = false;
-    void loadAllCharactersIndustryJobs()
-      .then((snapshot) => {
-        if (cancelled) return;
-        setJobsFanOut(snapshot);
-        // Cleared here rather than at the top of the effect: a synchronous
-        // `setState` in the effect body is what the retained-snapshot shape
-        // above exists to avoid (`react-hooks/set-state-in-effect`).
-        setJobsFanOutFailed(false);
-      })
-      .catch(() => {
-        if (!cancelled) setJobsFanOutFailed(true);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [needsJobSlotFanOut, jobsFanOutRefreshCount]);
-  const refreshJobsFanOut = useCallback(() => setJobsFanOutRefreshCount((c) => c + 1), []);
-  const jobsFanOutLoading = jobsFanOut === null && !jobsFanOutFailed;
-
-  // Skills for the job-slot header's max-per-category, for every character
-  // the resolved filter names beyond the current one — the single-character
-  // path below reuses `data.skills` (already loaded alongside its jobs) and
-  // never reaches here. No new poll: this fires on the same triggers as the
-  // jobs fan-out above, not its own interval.
-  const [jobsFanOutSkills, setJobsFanOutSkills] = useState<ReadonlyMap<number, JobSlotSkills>>(
-    new Map()
-  );
-  useEffect(() => {
-    if (!needsJobSlotFanOut) return;
-    const ids =
-      resolvedJobsFilter === 'all'
-        ? jobsFilterCandidates.map((c) => c.characterId)
-        : [...resolvedJobsFilter];
-    let cancelled = false;
-    const skillsById = new Map<number, JobSlotSkills>();
-    // No per-character try/catch here (unlike `rosterAttention.ts`'s fan-out,
-    // which wraps each request explicitly): `loadCorrectedSkills` ->
-    // `loadWithCache` already swallows a failed fetch internally and
-    // resolves `null`/no cached result rather than rejecting, so one
-    // character's failure can't sink the others or this `Promise.all` — it
-    // just leaves that character out of `skillsById`, read as "unknown"
-    // below.
-    void mapWithConcurrencyLimit(ids, ESI_FANOUT_CONCURRENCY, async (id) => {
-      const nowMs = Date.now();
-      const corrected = await loadCorrectedSkills(id, nowMs, { skipQueueWithoutScope: true });
-      if (corrected.skillsResult) {
-        skillsById.set(
-          id,
-          jobSlotSkillsFromCharacterSkills(
-            corrected.skillsResult.data.skills,
-            corrected.queueResult?.data ?? [],
-            nowMs
-          )
-        );
-      }
-    })
-      .then(() => {
-        if (!cancelled) setJobsFanOutSkills(skillsById);
-      })
-      // Nothing to record: `jobsFanOutSkills` starts empty and an absent
-      // Character already reads as "unknown" in the job-slot header. This only
-      // stops a Dexie failure here becoming an unhandled rejection.
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [needsJobSlotFanOut, resolvedJobsFilter, jobsFilterCandidates, jobsFanOutRefreshCount]);
+  const {
+    snapshot: jobsFanOut,
+    loading: jobsFanOutLoading,
+    refreshCount: jobsFanOutRefreshCount,
+    refresh: refreshJobsFanOut,
+    skills: jobsFanOutSkills,
+    selectedEntries: jobsFanOutSelectedEntries,
+    skipped: jobsFanOutSkipped,
+    reauth: jobsFanOutReauth,
+    fromCacheAny: jobsFanOutFromCacheAny,
+    oldestFetchedAt: jobsFanOutOldestFetchedAt,
+  } = useJobsFanOut({ needsJobSlotFanOut, resolvedJobsFilter, jobsFilterCandidates });
 
   // Stable `{}` fallback: `nameForBlueprint` closes over `types`, and
   // react-hooks/exhaustive-deps rejects a dependency that is a fresh object
@@ -456,89 +301,16 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
   }, [refresh, needsJobSlotFanOut, refreshJobsFanOut]);
   const corpJobs = data?.corpJobs ?? EMPTY_CORP_JOBS;
 
-  // Every derived note/badge below reads only the Characters the picker
-  // actually selected — narrowing to two of five must not still show a
-  // reauth banner or "hasn't shared" note for one of the other three.
-  const jobsFanOutSelectedEntries = useMemo(
-    () =>
-      (jobsFanOut?.entries ?? []).filter(
-        (entry) => resolvedJobsFilter === 'all' || resolvedJobsFilter.has(entry.characterId)
-      ),
-    [jobsFanOut, resolvedJobsFilter]
-  );
-  // Issue #679's header readout — the single-character branch reuses `data`
-  // (loaded unconditionally above), the multi-character branch reuses the
-  // fan-out state above, gated on the same `needsJobSlotFanOut` that drives
-  // both.
-  // A corp job occupies its installer's slot like a personal one (issue
-  // #2302) — without these, a corp-only pilot's header read every slot open
-  // beside a list full of running jobs.
-  const corpJobsByInstaller = useMemo(() => {
-    const byInstaller = new Map<number, CorporationIndustryJob[]>();
-    const seen = new Set<number>();
-    for (const job of corpJobs.jobs) {
-      if (seen.has(job.job_id)) continue;
-      seen.add(job.job_id);
-      byInstaller.set(job.installer_id, [...(byInstaller.get(job.installer_id) ?? []), job]);
-    }
-    return byInstaller;
-  }, [corpJobs]);
-  const jobSlotCharacterInputs = useMemo<JobSlotCharacterInput[]>(() => {
-    const withCorp = (id: number, personal: readonly ActiveJob[] | undefined) => {
-      if (personal === undefined) return undefined;
-      const ids = new Set(personal.map((job) => job.job_id));
-      const corp = (corpJobsByInstaller.get(id) ?? []).filter((job) => !ids.has(job.job_id));
-      return toJobSlotJobs([...personal, ...corp]);
-    };
-    if (needsJobSlotFanOut) {
-      return jobsFanOutSelectedEntries.map((entry) => ({
-        skills: jobsFanOutSkills.get(entry.characterId),
-        jobs: withCorp(entry.characterId, entry.result.cached?.data),
-      }));
-    }
-    return [
-      {
-        skills: data?.skills,
-        jobs: withCorp(characterId, data?.result.cached?.data),
-      },
-    ];
-  }, [
+  const jobSlotSummary = useJobSlotSummary({
     needsJobSlotFanOut,
-    jobsFanOutSelectedEntries,
-    jobsFanOutSkills,
-    data,
+    fanOutEntries: jobsFanOutSelectedEntries,
+    fanOutSkills: jobsFanOutSkills,
     characterId,
-    corpJobsByInstaller,
-  ]);
-  const jobSlotSummary = useMemo(
-    () => aggregateJobSlotSummary(jobSlotCharacterInputs, now),
-    [jobSlotCharacterInputs, now]
-  );
-  const jobsFanOutSkipped = useMemo(
-    () =>
-      (jobsFanOut?.skipped ?? []).filter(
-        (s) => resolvedJobsFilter === 'all' || resolvedJobsFilter.has(s.characterId)
-      ),
-    [jobsFanOut, resolvedJobsFilter]
-  );
-  // Per-character reauth notes for the multi-character path — the
-  // single-Character path instead blocks the whole panel behind one
-  // `ReauthBanner` below, since there is only one Character's grant to ask
-  // about.
-  const jobsFanOutReauth = useMemo(
-    () => jobsFanOutSelectedEntries.filter((entry) => entry.result.needsReauth),
-    [jobsFanOutSelectedEntries]
-  );
-  const jobsFanOutFromCacheAny = useMemo(
-    () => jobsFanOutSelectedEntries.some((entry) => entry.result.cached?.fromCache),
-    [jobsFanOutSelectedEntries]
-  );
-  const jobsFanOutOldestFetchedAt = useMemo(() => {
-    const times = jobsFanOutSelectedEntries
-      .map((entry) => entry.result.cached?.fetchedAt.getTime())
-      .filter((t): t is number => t !== undefined);
-    return times.length > 0 ? new Date(Math.min(...times)) : null;
-  }, [jobsFanOutSelectedEntries]);
+    singleSkills: data?.skills,
+    singleJobs: data?.result.cached?.data,
+    corpJobs,
+    now,
+  });
   const personalDataAgeDate = needsJobSlotFanOut
     ? jobsFanOutOldestFetchedAt
     : (result?.cached?.fetchedAt ?? null);
@@ -801,130 +573,18 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
     [navigateToPlanWithSeed, setLogJobDialog]
   );
 
-  /**
-   * The countdown and progress cells tick themselves; the warning/done tone
-   * rebuilds the columns only when a job crosses a threshold (`toneSig`).
-   */
-  const columns = useMemo<DataTableColumn<JobRow>[]>(
-    () => [
-      {
-        id: 'blueprint',
-        header: t('industry.jobsColBlueprint'),
-        className: 'font-medium',
-        sortValue: (job) => nameForBlueprint(job.blueprint_type_id),
-        // The row's warning stripe. On a `<tr>` this would be a `box-shadow`,
-        // which Chromium drops under the `border-collapse: collapse` every
-        // table here inherits; a cell border paints. Held behind `sm:` — once
-        // `.dt-stacked` blocks the cell there is no row edge to stripe, and the
-        // card's tint already carries the state.
-        cellClassName: (job) =>
-          toneClass(jobTone(job), {
-            warning: 'sm:border-l sm:border-l-warning',
-            success: 'sm:border-l sm:border-l-success',
-          }),
-        render: (job) => (
-          <span className="flex flex-wrap items-center gap-1.5">
-            <ItemInfoLink typeId={job.product_type_id ?? job.blueprint_type_id}>
-              {nameForBlueprint(job.blueprint_type_id)}
-            </ItemInfoLink>
-            {soon(job) && <Pill tone="warning">{t('industry.jobsCompletingSoon')}</Pill>}
-            {done(job) && <Pill tone="success">{t('industry.jobsDone')}</Pill>}
-            {/* Only once more than one Character's jobs are on screen (`showCharacterColumn`) — same gate as `OpenOrdersPanel`'s `showCharacterStrip`. */}
-            {job.owner === 'corporation' && (
-              <Pill className="shrink-0">{t('industry.jobsCorpBadge')}</Pill>
-            )}
-            {showCharacterColumn && job.characterName !== '' && (
-              <span className="ml-1.5 shrink-0 rounded-xs bg-panel-2 px-1 py-0.5 text-[0.6875rem]">
-                <CharacterLink id={job.characterId}>{job.characterName}</CharacterLink>
-              </span>
-            )}
-          </span>
-        ),
-      },
-      {
-        id: 'activity',
-        header: t('industry.jobsColActivity'),
-        className: 'text-text-dim',
-        sortValue: (job) => t(activityI18nKey(job.activity_id), { id: job.activity_id }),
-        render: (job) => t(activityI18nKey(job.activity_id), { id: job.activity_id }),
-      },
-      {
-        id: 'runs',
-        header: t('industry.jobsColRuns'),
-        align: 'right',
-        className: 'tabular-nums',
-        sortValue: (job) => job.runs,
-        render: (job) => (
-          <>
-            {job.runs.toLocaleString()}
-            {/* The card has no Runs header to say what the bare number is. */}
-            <span className="sm:hidden"> {t('industry.jobsRunsUnit', { count: job.runs })}</span>
-          </>
-        ),
-      },
-      {
-        id: 'progress',
-        header: t('industry.jobsColProgress'),
-        // Sorts on the raw fraction, not the rounded percent the cell prints.
-        sortValue: (job) => jobProgress(job, Date.now()),
-        // A thin line of its own under the meta line, % at its right end.
-        stackEdge: 'below',
-        render: (job) => (
-          <JobProgressCell
-            job={job}
-            label={t('industry.jobsProgress', { name: nameForBlueprint(job.blueprint_type_id) })}
-            tone={jobTone(job) ?? 'accent'}
-          />
-        ),
-      },
-      {
-        id: 'endsIn',
-        header: t('industry.jobsColEndsIn'),
-        align: 'right',
-        cardCorner: true,
-        className: 'tabular-nums whitespace-nowrap',
-        cellClassName: (job) =>
-          toneClass(jobTone(job), {
-            warning: 'font-semibold text-warning',
-            success: 'font-semibold text-success',
-          }),
-        // The timestamp, never the printed duration: "1d 4h" sorts before "9h" as a string.
-        sortValue: (job) => Date.parse(job.end_date),
-        render: (job) => <JobEndsInCell job={job} doneLabel={t('industry.jobsDone')} />,
-      },
-      {
-        id: 'ends',
-        header: t('industry.jobsColEnds'),
-        className: 'whitespace-nowrap text-text-dim',
-        sortValue: (job) => Date.parse(job.end_date),
-        render: (job) => {
-          const endDate = new Date(job.end_date);
-          // Off the phone card: the countdown in its corner already says when.
-          return (
-            <span data-dense-omit>
-              <time dateTime={endDate.toISOString()}>{formatEveDateTime(endDate)}</time>
-            </span>
-          );
-        },
-      },
-      {
-        // The one trailing control: a finished job's primary next step. Rows
-        // that can't be logged (running, corp-owned) render nothing.
-        id: 'logProduction',
-        header: '',
-        align: 'right',
-        // A text button, not the corner icon `cardActions` pins: closes the
-        // phone card's meta line at its right end, 44px tall.
-        stackEdge: 'end',
-        cellClassName: () => 'dt-action-row',
-        render: (job) =>
-          canLog(job) ? (
-            <Button size="sm" onClick={() => void handleLogProduction(job)}>
-              {t('industry.jobsLogProduction')}
-            </Button>
-          ) : null,
-      },
-    ],
+  const columns = useMemo(
+    () =>
+      activeJobColumns({
+        t,
+        nameForBlueprint,
+        soon,
+        done,
+        jobTone,
+        showCharacterColumn,
+        canLog,
+        handleLogProduction,
+      }),
     [t, soon, done, jobTone, nameForBlueprint, showCharacterColumn, canLog, handleLogProduction]
   );
   const planIdSet = useMemo(() => new Set(planIds ?? []), [planIds]);
@@ -938,97 +598,19 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
     },
     [navigate]
   );
-  /** History's columns: what was delivered, when, and whether the Production Log has it. */
-  const historyColumns = useMemo<DataTableColumn<JobRow>[]>(
-    () => [
-      {
-        id: 'blueprint',
-        header: t('industry.jobsColBlueprint'),
-        className: 'font-medium',
-        sortValue: (job) => nameForBlueprint(job.blueprint_type_id),
-        render: (job) => (
-          <span className="flex flex-wrap items-center gap-1.5">
-            <ItemInfoLink typeId={job.product_type_id ?? job.blueprint_type_id}>
-              {nameForBlueprint(job.blueprint_type_id)}
-            </ItemInfoLink>
-            {isLoggableHistoryJob(job) && historyStates.get(job.job_id)?.kind === 'logged' && (
-              <Pill tone="success">{t('industry.historyLogged')}</Pill>
-            )}
-            {isLoggableHistoryJob(job) &&
-              historyStates.get(job.job_id)?.kind !== 'logged' &&
-              dismissedJobIds.has(job.job_id) && <Pill>{t('industry.historyDismissed')}</Pill>}
-            {showHistoryCharacterColumn && job.characterName !== '' && (
-              <span className="ml-1.5 shrink-0 rounded-xs bg-panel-2 px-1 py-0.5 text-[0.6875rem]">
-                <CharacterLink id={job.characterId}>{job.characterName}</CharacterLink>
-              </span>
-            )}
-          </span>
-        ),
-      },
-      {
-        id: 'activity',
-        header: t('industry.jobsColActivity'),
-        className: 'text-text-dim',
-        sortValue: (job) => t(activityI18nKey(job.activity_id), { id: job.activity_id }),
-        render: (job) => t(activityI18nKey(job.activity_id), { id: job.activity_id }),
-      },
-      {
-        id: 'runs',
-        header: t('industry.jobsColRuns'),
-        align: 'right',
-        className: 'tabular-nums',
-        sortValue: (job) => job.runs,
-        render: (job) => job.runs.toLocaleString(),
-      },
-      {
-        id: 'delivered',
-        header: t('industry.historyColDelivered'),
-        className: 'whitespace-nowrap text-text-dim',
-        sortValue: (job) => Date.parse(job.end_date),
-        render: (job) => {
-          const endDate = new Date(job.end_date);
-          return <time dateTime={endDate.toISOString()}>{formatEveDateTime(endDate)}</time>;
-        },
-      },
-      {
-        // An unlogged delivery's next step, or the way to the plan that holds it.
-        id: 'logProduction',
-        header: '',
-        align: 'right',
-        // A text button, not the corner icon `cardActions` pins: its own
-        // full-width row on the phone card, 44px tall.
-        cellClassName: () => 'dt-action-row',
-        render: (job) => {
-          if (!isLoggableHistoryJob(job)) return null;
-          const state = historyStates.get(job.job_id);
-          if (state?.kind === 'logged') {
-            return planIdSet.has(state.buildPlanId) ? (
-              <Link
-                to={`/industry/plans/${state.buildPlanId}`}
-                className={inlineLinkClassName}
-                onClick={(event) => {
-                  event.preventDefault();
-                  void openLoggedPlan(job.characterId, state.buildPlanId);
-                }}
-              >
-                {t('industry.historyViewPlan')}
-              </Link>
-            ) : null;
-          }
-          const dismissed = dismissedJobIds.has(job.job_id);
-          return (
-            <span className="flex flex-wrap justify-end gap-1">
-              <Button size="sm" onClick={() => void handleLogProduction(job)}>
-                {t('industry.jobsLogProduction')}
-              </Button>
-              <Button size="sm" onClick={() => void setDismissed(job, !dismissed)}>
-                {dismissed ? t('industry.historyRestore') : t('industry.historyDismiss')}
-              </Button>
-            </span>
-          );
-        },
-      },
-    ],
+  const historyColumnDefs = useMemo(
+    () =>
+      historyColumns({
+        t,
+        nameForBlueprint,
+        historyStates,
+        dismissedJobIds,
+        setDismissed,
+        showHistoryCharacterColumn,
+        planIdSet,
+        openLoggedPlan,
+        handleLogProduction,
+      }),
     [
       t,
       nameForBlueprint,
@@ -1276,7 +858,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
           ) : (
             <div className="overflow-x-auto">
               <DataTable
-                columns={historyColumns}
+                columns={historyColumnDefs}
                 rows={historyRows}
                 rowKey={(job) => job.job_id}
                 label={t('industry.historyTableLabel')}
