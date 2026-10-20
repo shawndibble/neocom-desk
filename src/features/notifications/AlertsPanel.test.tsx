@@ -264,6 +264,28 @@ describe('AlertsPanel', () => {
       expect(await screen.findByText('Alerts, 2 new')).toBeInTheDocument();
     });
 
+    it.each([
+      [false, ['cal-1', 'cal-2', 'cal-3']],
+      [true, ['cal-1', 'cal-3']],
+    ])(
+      'following one fire link with Dismiss on View %s dismisses only that fire',
+      async (dismissOnView, remaining) => {
+        await db.notificationFeed.bulkPut([cal(1), cal(2), cal(3)]);
+        useNotificationPreferences.setState({
+          value: { ...DEFAULT_NOTIFICATION_PREFERENCES, dismissOnView },
+          hydrated: true,
+        });
+        const { onClose } = renderPanel();
+
+        await userEvent.click(await screen.findByRole('button', { name: '3 alerts' }));
+        const fireRow = screen.getByText('Event 2 body').closest('li') as HTMLElement;
+        await userEvent.click(within(fireRow).getByRole('link', { name: 'Event 2 body' }));
+
+        expect(onClose).toHaveBeenCalled();
+        await waitFor(async () => expect(await liveIds()).toEqual(remaining));
+      }
+    );
+
     it('lists fires newest first and closes the list when one is left', async () => {
       await db.notificationFeed.bulkPut([cal(3), cal(1), cal(2)]);
       renderPanel();
