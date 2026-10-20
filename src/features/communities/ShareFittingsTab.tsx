@@ -5,6 +5,7 @@ import { Button, Checkbox, EmptyState, SearchInput, Spinner } from '@/components
 import { fittingChoiceKey } from '@/engine/communities/sharedFittings';
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { AddSharedItemsDialog } from './AddSharedItemsDialog';
+import { Pill } from '@/components/ui/Pill';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { collectFittingsToShare } from './shareAllFittings';
 import { namedLike, needleOf, ROW_LIMIT } from './shareLists';
@@ -174,11 +175,7 @@ export function ShareFittingsTab({
   const row = (input: SharedFittingInput, action: ReactNode) => (
     <li key={fittingChoiceKey(input)} className="flex items-center gap-2 py-1 text-xs">
       <span className="min-w-0 flex-1 truncate">{input.name}</span>
-      {input.source === 'game' && (
-        <span className="rounded bg-surface-2 px-1.5 py-0.5 text-[0.6875rem] text-text-dim">
-          {t('communities.fittings.inGame')}
-        </span>
-      )}
+      {input.source === 'game' && <Pill>{t('communities.fittings.inGame')}</Pill>}
       {action}
     </li>
   );

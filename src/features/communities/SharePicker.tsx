@@ -74,7 +74,7 @@ function GroupNode({
           type="button"
           aria-expanded={expanded}
           aria-label={t('communities.share.expand', { name: group.name })}
-          className="grid size-7 shrink-0 place-items-center rounded-xs hover:bg-surface-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+          className="grid size-7 shrink-0 place-items-center rounded-xs hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
           onClick={() => setOpen(!open)}
         >
           <Caret expanded={expanded} />

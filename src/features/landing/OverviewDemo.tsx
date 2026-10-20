@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
+import { guarded } from '@/app/routeChunks';
 import {
   Popover,
   PopoverContent,
@@ -43,7 +44,7 @@ import { DEMO_NAME, NEXT_EVENT, READ_AGES } from './demo/demoCast';
  * visitor.
  */
 
-const DemoBoard = lazy(() => import('./demo/DemoBoard'));
+const DemoBoard = lazy(() => guarded(() => import('./demo/DemoBoard')));
 
 /** Only the top of the board shows, fading out below: the full set scrolls off the page. */
 const BOARD_CLIP =

@@ -412,6 +412,8 @@ shape has to be carried into them by hand.
   row and the sibling's own size wasn't itself an oversight.
 - Radius: **minimal**. `rounded-xs` (2px) for panels, buttons, chips, inputs.
   `rounded-full` only for avatars, dots, spinners. Never `rounded-md`+ on rectangles.
+  The one exception: the landing page's phone-capture frames (`QuestionGrid`) keep
+  `rounded-xl shadow-lg`, imitating a phone bezel; lint-disabled inline.
 - Borders: always 1px (`border`), never 2px. The one exception is a **state
   stripe** — the 2px edge that marks an active tab (`tabItemClassName`'s
   `border-b-2`), the work-through's current order (Open Orders) or the
@@ -1166,7 +1168,9 @@ Rows:
 - **A row that navigates** is a real link ending in a trailing `CaretRight`
   (faint at rest, accent on hover).
 - **A row that opens a modal** carries its cue on the primary cell (the
-  accent entity name). The row click is a pointer convenience.
+  accent entity name): one accent cue per row. Secondary cells (system,
+  character) are plain text, however much they look like entities. The row
+  click is a pointer convenience.
 - **A row that selects** for a detail pane shows the selected treatment.
   Where having nothing selected is a valid state (the PI Map's traced
   product), a click on the selected row clears it, the same as a toggle;

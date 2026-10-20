@@ -205,7 +205,9 @@ export function StockManagerTable({
     {
       id: 'fill',
       header: '',
-      headerCellClassName: 'sm:w-28',
+      // Between `sm` and `xl` the table is wider than its panel: the Status pill carries the bar's reading there (the card keeps it below `sm`).
+      headerCellClassName: 'sm:w-28 max-xl:sm:hidden',
+      className: 'max-xl:sm:hidden',
       stackEdge: 'below',
       render: (row) => (
         <StockFillBar

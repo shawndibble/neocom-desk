@@ -22,6 +22,8 @@ import {
   DECLARATIONS,
   DISMISSALS,
   EXTRACTIONS,
+  FEEDER_INVITES_COLLECTION,
+  FEEDER_OF_COLLECTION,
   MEMBER_SETUP_MS,
   META,
   MINERS,
@@ -267,6 +269,12 @@ export async function turnOnBook(deps: BookDeps, caller: Caller, input: TurnOnIn
   await deps.db.runTransaction(async (tx) => {
     if ((await tx.get(ref)).exists)
       fail('already-exists', 'This corporation already has a Corp Tax Book', 'book-exists');
+    // A corporation feeds another book or runs its own, never both (#4507).
+    if (
+      (await tx.get(deps.db.collection(FEEDER_OF_COLLECTION).doc(String(input.corporationId))))
+        .exists
+    )
+      fail('failed-precondition', 'This corporation feeds another book', 'is-a-feeder');
     tx.create(ref, {
       ...defaultSettings(input.startDate, input.startRatePct),
       corporationId: input.corporationId,
@@ -317,6 +325,14 @@ export async function deleteBook(
     .where('corporationId', '==', call.corporationId)
     .get();
   await Promise.all(links.docs.map((d) => d.ref.delete()));
+  // Invite links and feeder pointers live outside the book; the feeder records go with it.
+  for (const name of [FEEDER_INVITES_COLLECTION, FEEDER_OF_COLLECTION]) {
+    const stray = await deps.db
+      .collection(name)
+      .where('collectorCorporationId', '==', call.corporationId)
+      .get();
+    await Promise.all(stray.docs.map((d) => d.ref.delete()));
+  }
   await deps.db.recursiveDelete(ref);
   // A scheduled sync that loaded its grant before it was dropped may still have been writing.
   await deps.db.recursiveDelete(ref);

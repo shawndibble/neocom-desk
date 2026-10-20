@@ -61,6 +61,14 @@ import {
   saveCorpSyncGrant,
   type CorpSyncDeps,
 } from './corpSyncGrant.js';
+import {
+  acceptFeederInvite,
+  createFeederInvite,
+  parseAcceptFeederInviteInput,
+  parseCreateFeederInviteInput,
+  parseRevokeFeederInviteInput,
+  revokeFeederInvite,
+} from './corpTaxBookFeeders.js';
 import { esiSyncReader } from './corpTaxBookSyncEsi.js';
 import {
   claimPayment,
@@ -584,6 +592,37 @@ const corpTaxBookDeps = (): BookDeps => ({
 });
 
 const CORP_TAX_BOOK_OPTIONS = { maxInstances: 5 };
+
+// Collector books (issue #4507): invite links for a feeder corporation. Codes only; the UI maps them later.
+export const createCorpTaxBookFeederInviteCallable = onCall<unknown>(
+  CORP_TAX_BOOK_OPTIONS,
+  (request) =>
+    createFeederInvite(
+      corpTaxBookDeps(),
+      callerOf(request),
+      parseCreateFeederInviteInput(request.data)
+    )
+);
+
+export const revokeCorpTaxBookFeederInviteCallable = onCall<unknown>(
+  CORP_TAX_BOOK_OPTIONS,
+  (request) =>
+    revokeFeederInvite(
+      corpTaxBookDeps(),
+      callerOf(request),
+      parseRevokeFeederInviteInput(request.data)
+    )
+);
+
+export const acceptCorpTaxBookFeederInviteCallable = onCall<unknown>(
+  CORP_TAX_BOOK_OPTIONS,
+  (request) =>
+    acceptFeederInvite(
+      corpTaxBookDeps(),
+      callerOf(request),
+      parseAcceptFeederInviteInput(request.data)
+    )
+);
 
 // Scheduled Corp Tax Book sync (issue #4068, ADR 0025). The second server-held EVE
 // token: an opt-in, narrow-scope grant per corporation, encrypted under the same

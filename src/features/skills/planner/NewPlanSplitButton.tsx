@@ -1,4 +1,4 @@
-import { lazy, Suspense, useRef, useState } from 'react';
+import { Suspense, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { db } from '@/db';
@@ -20,12 +20,12 @@ import { newPlan } from './newPlan';
 import { certifiedPlanRecord, type TrainedLevels } from './certifiedPlan';
 import { CertifiedPlanDialog } from './CertifiedPlanDialog';
 import type { RemapAvailability } from './remapAvailability';
+import { lazyNamed } from '@/app/lazyNamed';
 
 // Firebase stays out of the Skills bundle until a pilot opens the Community browse.
-const CommunityPlansDialog = lazy(() =>
-  import('@/features/communities/CommunityPlansDialog').then((m) => ({
-    default: m.CommunityPlansDialog,
-  }))
+const CommunityPlansDialog = lazyNamed(
+  () => import('@/features/communities/CommunityPlansDialog'),
+  'CommunityPlansDialog'
 );
 
 /**

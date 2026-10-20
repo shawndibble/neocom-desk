@@ -20,7 +20,12 @@ import {
   CachedNotice,
   NeedsConnection,
 } from '@/components/ui';
-import { focusRingClassName, tappableRowClassName } from '@/components/ui/controlStyles';
+import {
+  focusRingClassName,
+  rowInteractiveClassName,
+  selectedRowClassName,
+  tappableRowClassName,
+} from '@/components/ui/controlStyles';
 import { db } from '@/db';
 import { CommunityDetail } from '@/features/communities/CommunityDetail';
 import { communityBadgeClassName } from '@/features/communities/communityBadge';
@@ -234,7 +239,7 @@ export function Communities() {
                 <li key={community.id}>
                   <button
                     type="button"
-                    className={`group flex w-full items-center gap-2.5 px-1 py-1.5 text-left text-xs hover:bg-surface-2 aria-[current=true]:bg-surface-2 ${tappableRowClassName} ${focusRingClassName} focus-visible:-outline-offset-2`}
+                    className={`group flex w-full items-center gap-2.5 px-1 py-1.5 text-left text-xs ${community.id === selected?.id ? selectedRowClassName : rowInteractiveClassName} ${tappableRowClassName} ${focusRingClassName} focus-visible:-outline-offset-2`}
                     aria-current={community.id === selected?.id ? 'true' : undefined}
                     onClick={() => {
                       scrollToDetail.current = community.id !== selected?.id;
@@ -243,7 +248,7 @@ export function Communities() {
                   >
                     <span
                       aria-hidden="true"
-                      className="grid size-8 shrink-0 place-items-center rounded-xs border border-line bg-surface-2 text-[0.6875rem] font-semibold text-text-dim"
+                      className="grid size-8 shrink-0 place-items-center rounded-xs border border-line bg-panel-2 text-[0.6875rem] font-semibold text-text-dim"
                     >
                       {communityInitials(community.name)}
                     </span>
