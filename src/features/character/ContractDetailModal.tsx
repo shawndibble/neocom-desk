@@ -45,7 +45,7 @@ import { BuildPlanContextMenu } from '@/features/industry/BuildPlanContextMenu';
 import { useMarketHub } from '@/features/market/hub';
 import { useMutaplasmidLookup } from '@/features/abyssal/mutaplasmidData';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
-import { CharacterLink, CorporationLink, SystemLink } from '@/features/entities';
+import { CharacterLink, CorporationLink, PlaceLink, SystemLink } from '@/features/entities';
 import { resolvePlaceSystemId } from '@/features/route/placeSystem';
 import { loadSystemName } from './systemSecurity';
 import { StandingTag } from './StandingTag';
@@ -323,7 +323,7 @@ export function ContractDetailModal({
                   {location === undefined ? (
                     <Spinner size="sm" label={t('common.loading')} />
                   ) : (
-                    (location.start ?? `#${contract.start_location_id}`)
+                    <PlaceName id={contract.start_location_id} name={location.start} />
                   )}
                 </dd>
               </>
@@ -338,7 +338,7 @@ export function ContractDetailModal({
                   {location === undefined ? (
                     <Spinner size="sm" label={t('common.loading')} />
                   ) : (
-                    (location.end ?? `#${contract.end_location_id}`)
+                    <PlaceName id={contract.end_location_id} name={location.end} />
                   )}
                 </dd>
               </>
@@ -530,10 +530,14 @@ function ItemSection({
   );
 }
 
+/** A resolved station/structure name opens its Place Info; an unresolved id stays plain `#id`. */
+function PlaceName({ id, name }: { id: number; name: string | null }) {
+  return name === null ? <>{`#${id}`}</> : <PlaceLink id={id}>{name}</PlaceLink>;
+}
+
 /**
  * The system under a Location/Destination row, linked to Route Safety the way
- * `PublicContractDetailModal`'s System row is. The station name above it stays
- * plain: §6c makes a station not clickable.
+ * `PublicContractDetailModal`'s System row is.
  */
 function SystemRow({ system }: { system: SystemRef }) {
   const { t } = useTranslation();

@@ -20,7 +20,7 @@ import {
   type SolarSystemLookup,
 } from '@/engine/market/orderBook';
 import { priceComparison, type DepthAt } from '@/engine/market/orderBookDepth';
-import { SystemLink } from '@/features/entities';
+import { PlaceLink, SystemLink } from '@/features/entities';
 import type { RegionOrder } from '@/esi/endpoints';
 import { formatAge } from '@/lib/age';
 import { writeToClipboard } from '@/lib/clipboard';
@@ -109,7 +109,13 @@ export function OrderRowDetail({
       </div>
 
       <p className="text-text">
-        <span className="font-semibold">{placeName}</span>
+        {location.stationName === null ? (
+          <span className="font-semibold">{placeName}</span>
+        ) : (
+          <PlaceLink id={order.location_id} className="font-semibold">
+            {location.stationName}
+          </PlaceLink>
+        )}
         {location.systemName !== '' && (
           <span className="text-text-dim">
             {' · '}

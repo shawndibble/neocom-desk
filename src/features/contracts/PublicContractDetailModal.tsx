@@ -47,7 +47,7 @@ import {
   loadPublicContractItems,
   type PublicContractItemsOutcome,
 } from '@/features/bpcContracts/publicContractItems';
-import { SystemLink } from '@/features/entities';
+import { PlaceLink, SystemLink } from '@/features/entities';
 import { ItemInfoLink } from '@/features/entities';
 import { loadPlexPrice } from '@/features/market/plexPrice';
 import { PLEX_TYPE_ID } from '@/engine/contracts/contractOffers';
@@ -253,8 +253,10 @@ export function PublicContractDetailModal({
           <dd className="break-words">
             {location === undefined ? (
               <Spinner />
+            ) : location === null ? (
+              t('contractDetail.unknownLocation', { id: locationId })
             ) : (
-              (location ?? t('contractDetail.unknownLocation', { id: locationId }))
+              <PlaceLink id={locationId}>{location}</PlaceLink>
             )}
           </dd>
           <dt className="text-text-dim">{t('contractDetail.expiresLabel')}</dt>

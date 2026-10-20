@@ -97,6 +97,16 @@ describe('CourierContractDetailModal route path', () => {
     expect(link).toHaveAttribute('href', expect.stringContaining('30000142'));
   });
 
+  it('links each endpoint station name to its Place Info', () => {
+    renderModal();
+    for (const name of ['Jita station', 'Amarr station']) {
+      expect(screen.getByRole('link', { name })).toHaveAttribute(
+        'href',
+        expect.stringContaining('info=place-60003760')
+      );
+    }
+  });
+
   it('opens the route system by system, each with its security, from the jump count', async () => {
     routeExposure.mockResolvedValue(KNOWN);
     const user = userEvent.setup();
