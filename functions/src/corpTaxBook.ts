@@ -764,7 +764,7 @@ export function parseSyncInput(data: unknown, nowMs: number): SyncInput {
             sourceCorporationId: int(
               row.sourceCorporationId,
               'sourceCorporationId',
-              0,
+              1,
               CORP_ID_MAX
             ),
           }),
