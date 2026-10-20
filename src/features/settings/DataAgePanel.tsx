@@ -13,6 +13,7 @@ import { ENDPOINT_ROUTES } from '@/esi/endpointRoutes';
 import { useActivityLog, type ActivityLogEntry } from '@/stores/activityLog';
 import { characterCell, dataAgeCsvColumns } from '@/features/settings/activityLogCsv';
 import { CharacterNameCell } from '@/features/settings/CharacterNameCell';
+import { SettingsHint } from '@/features/settings/settingsFields';
 
 /**
  * The most recent *successful* fetch per endpoint/character pair — the
@@ -118,7 +119,7 @@ export function DataAgePanel() {
       }
     >
       <div className="space-y-2">
-        <p className="text-xs text-text-dim">{t('dataAge.hint')}</p>
+        <SettingsHint>{t('dataAge.hint')}</SettingsHint>
         {rows.length === 0 ? (
           <EmptyState title={t('dataAge.emptyTitle')} hint={t('dataAge.emptyHint')} />
         ) : (

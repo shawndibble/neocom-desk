@@ -1087,6 +1087,13 @@ an unboxed micro-label with the same icon and words — "All characters · 4",
 says "All characters · 3 of 4" with a warning icon, and its tooltip names who
 is missing. Never clickable; if the pilot can change the scope, use the filter.
 
+### Settings scope line
+
+Every Settings panel says once where its settings live: `SettingsScopeHint` ("Kept
+across your devices" or "Stays on this device"; `DefaultsSyncHint` is the synced
+form). A field that differs from its panel carries `CheckboxField`'s `scope` note
+instead of prose in its hint. Wording lives in `settings.scope.*`.
+
 ### Origin crumb
 
 A page opened from another surface's drill-in (the Wallet chart, for Assets,

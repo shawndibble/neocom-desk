@@ -4,8 +4,8 @@ import { Button, Panel } from '@/components/ui';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { db } from '@/db';
 import { useOnline } from '@/stores/network';
-import { ActionConfirmation } from '@/features/settings/ActionConfirmation';
 import { ResetViewPreferences } from '@/features/settings/ResetViewPreferences';
+import { ActionResult, SettingsHint } from '@/features/settings/settingsFields';
 
 export function DataPanel() {
   const { t } = useTranslation();
@@ -27,7 +27,7 @@ export function DataPanel() {
   return (
     <Panel title={t('settings.dataTitle')}>
       <div className="space-y-2">
-        <p className="max-w-2xl text-xs text-text-dim">{t('settings.dataHint')}</p>
+        <SettingsHint>{t('settings.dataHint')}</SettingsHint>
         <Button size="sm" onClick={() => setConfirmingClear(true)}>
           {t('settings.clearCache')}
         </Button>
@@ -41,7 +41,9 @@ export function DataPanel() {
           onConfirm={handleClearCache}
           onClose={() => setConfirmingClear(false)}
         />
-        {clearedConfirm && <ActionConfirmation message={t('settings.clearCacheConfirm')} />}
+        {clearedConfirm && (
+          <ActionResult kind="success">{t('settings.clearCacheConfirm')}</ActionResult>
+        )}
         <ResetViewPreferences />
       </div>
     </Panel>

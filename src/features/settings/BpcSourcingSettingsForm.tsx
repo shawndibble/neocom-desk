@@ -1,7 +1,5 @@
-import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { useTranslation } from 'react-i18next';
 import {
-  Checkbox,
   Field,
   Fields,
   Select,
@@ -9,7 +7,6 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-  Spinner,
 } from '@/components/ui';
 import {
   useBpcHideAuctionsDefault,
@@ -17,7 +14,7 @@ import {
 } from '@/features/bpcContracts/sourcingDefaults';
 import { useMarketHub } from '@/features/market/hub';
 import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
-import { DefaultsSyncHint } from './settingsFields';
+import { CheckboxField, DefaultsSyncHint, SettingsFormLoading } from './settingsFields';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 
 /** BPC Sourcing's settings: Settings → Industry, and the BPC Sourcing tab's settings modal. */
@@ -34,7 +31,7 @@ export function BpcSourcingSettingsForm() {
   const hideAuctionsHydrated = useHydratedStore(useBpcHideAuctionsDefault);
   const hidePlexHydrated = useHydratedStore(useBpcHidePlexDefault);
   const hubHydrated = useHydratedStore(useMarketHub);
-  if (!hideAuctionsHydrated || !hidePlexHydrated || !hubHydrated) return <Spinner />;
+  if (!hideAuctionsHydrated || !hidePlexHydrated || !hubHydrated) return <SettingsFormLoading />;
 
   return (
     <div className="space-y-4">
@@ -59,33 +56,19 @@ export function BpcSourcingSettingsForm() {
             </SelectContent>
           </Select>
         </Field>
-        <Field
+        <CheckboxField
+          id="settings-bpc-hide-auctions"
           label={t('settings.bpcHideAuctionsLabel')}
-          htmlFor="settings-bpc-hide-auctions"
-          inline
-        >
-          <label className={touchCheckboxLabelClassName}>
-            <Checkbox
-              id="settings-bpc-hide-auctions"
-              checked={hideAuctions}
-              onChange={() => void setHideAuctions(!hideAuctions)}
-            />
-          </label>
-        </Field>
-        <Field
+          checked={hideAuctions}
+          onChange={() => void setHideAuctions(!hideAuctions)}
+        />
+        <CheckboxField
+          id="settings-bpc-hide-plex"
           label={t('settings.bpcHidePlexLabel')}
-          htmlFor="settings-bpc-hide-plex"
-          inline
-          note={t('settings.bpcHideHint')}
-        >
-          <label className={touchCheckboxLabelClassName}>
-            <Checkbox
-              id="settings-bpc-hide-plex"
-              checked={hidePlex}
-              onChange={() => void setHidePlex(!hidePlex)}
-            />
-          </label>
-        </Field>
+          hint={t('settings.bpcHideHint')}
+          checked={hidePlex}
+          onChange={() => void setHidePlex(!hidePlex)}
+        />
       </Fields>
     </div>
   );

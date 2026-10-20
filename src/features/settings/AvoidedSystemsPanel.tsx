@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Panel } from '@/components/ui';
 import { AvoidedSystemsEditor } from '@/features/route/TravelRuleFields';
+import { SettingsHint, SettingsScopeHint } from '@/features/settings/settingsFields';
 
 /**
  * Settings → Travel: the pilot's Avoided Systems. The editor itself is shared
@@ -11,7 +12,8 @@ export function AvoidedSystemsPanel() {
   return (
     <Panel title={t('settings.avoidedSystems.title')}>
       <div className="space-y-4">
-        <p className="max-w-2xl text-xs text-text-dim">{t('settings.avoidedSystems.hint')}</p>
+        <SettingsScopeHint scope="synced" />
+        <SettingsHint>{t('settings.avoidedSystems.hint')}</SettingsHint>
         <AvoidedSystemsEditor />
       </div>
     </Panel>

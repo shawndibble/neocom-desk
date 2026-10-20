@@ -9,7 +9,6 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-  Spinner,
 } from '@/components/ui';
 import { PI_CADENCE_DAYS, useCadence, type PiCadenceDays } from '@/features/pi/cadencePref';
 import { useExpiringWindowHours, EXPIRING_WINDOW_HOUR_OPTIONS } from '@/features/pi/expiringWindow';
@@ -24,7 +23,7 @@ import {
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
-import { ChipRow } from './settingsFields';
+import { ChipRow, SettingsFormLoading } from './settingsFields';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 
 const BUYBACK = 'buyback';
@@ -48,7 +47,7 @@ export function PiSettingsForm({ showSellAt = false }: { showSellAt?: boolean })
   const settingsHydrated = useHydratedStore(usePiSettings);
   const cadenceHydrated = useHydratedStore(useCadence);
 
-  if (!expiringHydrated || !settingsHydrated || !cadenceHydrated) return <Spinner />;
+  if (!expiringHydrated || !settingsHydrated || !cadenceHydrated) return <SettingsFormLoading />;
 
   const hub = TRADE_HUBS.find((option) => option.id === settings.hub) ?? TRADE_HUBS[0];
   const toggleTier = (tier: PiBuyTier) =>

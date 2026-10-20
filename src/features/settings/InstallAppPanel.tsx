@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { Button, Panel } from '@/components/ui';
 import { promptInstallApp, useInstallApp } from '@/app/installApp';
 import { detectInstallPlatform, selectInstallAppVariant } from '@/app/installPromptRules';
+import { SettingsHint } from '@/features/settings/settingsFields';
 
 const STEPS_KEYS = {
   'ios-safari': 'pwa.installIosSafariCta',
@@ -32,9 +33,9 @@ export function InstallAppPanel() {
   return (
     <Panel title={t('settings.installTitle')} data-testid="install-app-panel">
       <div className="space-y-1.5">
-        <p className="max-w-2xl text-xs text-text-dim">
+        <SettingsHint>
           {variant === 'native' ? t('settings.installHint') : t(STEPS_KEYS[variant])}
-        </p>
+        </SettingsHint>
         {variant === 'native' && (
           <Button size="sm" onClick={() => void promptInstallApp()}>
             {t('pwa.install')}
