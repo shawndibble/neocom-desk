@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { scheduleJobs, type ScheduleNode } from './jobSchedule';
+import { scheduleJobs, scheduleJobsAcrossCharacters, type ScheduleNode } from './jobSchedule';
 import { projectJobFinish, type JobSlotSkills } from './jobSlots';
 
 const NO_SKILLS: JobSlotSkills = {
@@ -178,5 +178,86 @@ describe('scheduleJobs', () => {
     expect(() =>
       scheduleJobs([node('a', 1, ['b']), node('b', 1, ['a'])], { skills: ALL_V, jobs: [] }, NOW)
     ).toThrow();
+  });
+});
+
+describe('scheduleJobsAcrossCharacters', () => {
+  const SKILLS_ONE_SLOT = NO_SKILLS;
+  const alice = { characterId: 1, skills: SKILLS_ONE_SLOT, jobs: [] };
+  const bob = { characterId: 2, skills: SKILLS_ONE_SLOT, jobs: [] };
+
+  it('spreads parallel jobs over Characters with free slots', () => {
+    const s = scheduleJobsAcrossCharacters(
+      [node('root', 10, ['a', 'b']), node('a', 50), node('b', 50)],
+      [alice, bob],
+      NOW
+    );
+    const byId = Object.fromEntries(s.jobs.map((j) => [j.id, j]));
+    expect(byId.a.startMs).toBe(NOW);
+    expect(byId.b.startMs).toBe(NOW);
+    expect(new Set([byId.a.characterId, byId.b.characterId])).toEqual(new Set([1, 2]));
+    expect(s.finishMs).toBe(NOW + 60_000);
+  });
+
+  it("times each job with the assigned Character's own seconds", () => {
+    const s = scheduleJobsAcrossCharacters(
+      [
+        {
+          ...node('a', 100),
+          secondsByCharacter: new Map([
+            [1, 100],
+            [2, 40],
+          ]),
+        },
+      ],
+      [alice, bob],
+      NOW
+    );
+    expect(s.jobs[0]).toMatchObject({ characterId: 2, finishMs: NOW + 40_000 });
+  });
+
+  it('gives a Character without the blueprint none of its jobs', () => {
+    const s = scheduleJobsAcrossCharacters(
+      [
+        { ...node('a', 50), secondsByCharacter: new Map([[1, 50]]) },
+        { ...node('b', 50), secondsByCharacter: new Map([[1, 50]]) },
+      ],
+      [alice, bob],
+      NOW
+    );
+    expect(s.jobs.map((j) => j.characterId)).toEqual([1, 1]);
+    expect(s.finishMs).toBe(NOW + 100_000);
+  });
+
+  it('queues behind a Character whose slot is busy rather than taking a faster busy one', () => {
+    const busy = {
+      characterId: 1,
+      skills: SKILLS_ONE_SLOT,
+      jobs: [{ activityId: 1, endMs: NOW + 500_000 }],
+    };
+    const s = scheduleJobsAcrossCharacters([node('a', 50)], [busy, bob], NOW);
+    expect(s.jobs[0].characterId).toBe(2);
+  });
+
+  it('throws when no listed Character can run a job', () => {
+    expect(() =>
+      scheduleJobsAcrossCharacters(
+        [{ ...node('a', 50), secondsByCharacter: new Map([[9, 50]]) }],
+        [alice],
+        NOW
+      )
+    ).toThrow(/No Character/);
+  });
+
+  it('matches scheduleJobs for one Character, apart from the Character id', () => {
+    const nodes = [node('root', 100, ['a', 'b']), node('a', 50), node('b', 30)];
+    const multi = scheduleJobsAcrossCharacters(nodes, [alice], NOW);
+    const single = scheduleJobs(nodes, alice, NOW);
+    expect(multi.jobs.map((j) => j.id)).toEqual(single.jobs.map((j) => j.id));
+    expect(multi.jobs.map((j) => [j.startMs, j.finishMs, j.stage])).toEqual(
+      single.jobs.map((j) => [j.startMs, j.finishMs, j.stage])
+    );
+    expect(multi.finishMs).toBe(single.finishMs);
+    expect(multi.peakSlots).toBe(single.peakSlots);
   });
 });
