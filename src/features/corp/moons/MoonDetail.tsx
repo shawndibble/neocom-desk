@@ -213,6 +213,7 @@ export function MoonDetail({ id }: { id: string }) {
             rows={detail.past}
             rowKey={(r) => r.id}
             density="compact"
+            stackColumns={2}
           />
         )}
       </Panel>

@@ -93,6 +93,7 @@ export function StatementsTab() {
           rows={rows}
           rowKey={(r) => r.start}
           density="compact"
+          stackColumns={2}
         />
         <p className="border-t border-line px-3 py-2 text-xs text-text-dim">
           {t('corpTaxBook.moons.periods.writeOffs', {

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import type { ExtractionRow } from '@/engine/corpTaxBook/bookView';
@@ -32,5 +32,18 @@ describe('ExtractionTimeline', () => {
     );
     expect(screen.getAllByRole('link')).toHaveLength(3);
     expect(screen.getAllByTestId('timeline-now')).toHaveLength(1);
+  });
+
+  it('keeps the state word outside the truncating name and clamps the label only from sm up', () => {
+    render(
+      <MemoryRouter>
+        <ExtractionTimeline rows={[row('a', 1)]} />
+      </MemoryRouter>
+    );
+    const label = screen.getByText('Refinery 1').parentElement as HTMLElement;
+    expect(label.className).toContain('sm:w-48');
+    expect(label.className).not.toMatch(/(^|\s)w-48/);
+    expect(screen.getByText('Refinery 1').className).toContain('truncate');
+    expect(within(label).getByText('Ready').className).not.toContain('truncate');
   });
 });

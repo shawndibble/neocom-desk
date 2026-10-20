@@ -64,10 +64,10 @@ export function ExtractionTimeline({ rows }: { rows: readonly ExtractionRow[] })
               to={extractionPath(e.id)}
               className="group flex flex-col gap-1 rounded-xs py-0.5 hover:bg-panel-2 sm:flex-row sm:items-center sm:gap-0"
             >
-              <span className="w-48 shrink-0 truncate text-xs">
-                <span className="text-accent group-hover:underline">
+              <span className="flex min-w-0 items-baseline gap-1 text-xs sm:w-48 sm:shrink-0">
+                <span className="truncate text-accent group-hover:underline">
                   {names.refinery(e.structureId)}
-                </span>{' '}
+                </span>
                 <StateWord state={e.state} />
               </span>
               <div className="relative h-4 w-full rounded-xs bg-panel-2 sm:w-auto sm:flex-1">
