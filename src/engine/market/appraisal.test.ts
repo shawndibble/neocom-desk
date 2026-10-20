@@ -3,6 +3,7 @@ import {
   appraisalNet,
   iskPerM3,
   sellSalesTax,
+  sellAfterTax,
   appraisalUndercut,
   compareMargin,
   buildAppraisal,
@@ -732,5 +733,16 @@ describe('sellSalesTax', () => {
 
   it('is null where nothing sells, never a free 0', () => {
     expect(sellSalesTax({ sellTotal: null }, 3)).toBeNull();
+  });
+});
+
+describe('sellAfterTax', () => {
+  it('is the sell total less its sales tax', () => {
+    const tax = sellSalesTax({ sellTotal: 1_000_000 }, 4) as number;
+    expect(sellAfterTax({ sellTotal: 1_000_000 }, 4)).toBeCloseTo(1_000_000 - tax, 6);
+  });
+
+  it('is null where nothing sells', () => {
+    expect(sellAfterTax({ sellTotal: null }, 4)).toBeNull();
   });
 });

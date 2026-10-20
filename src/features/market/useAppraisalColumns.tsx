@@ -7,6 +7,7 @@ import { useTableExport } from '@/components/ui/useTableExport';
 import {
   lpBeatsMarket,
   refineBeatsSellAsIs,
+  sellAfterTax,
   sellSalesTax,
   type AppraisalRow,
 } from '@/engine/market/appraisal';
@@ -134,21 +135,20 @@ export function useAppraisalColumns({
     },
   ];
 
-  // The optional columns' catalog, keyed by `AppraisalColumnId` so the
-  // `ColumnPickerMenu` below and the push loop past it share one definition.
-  // Refine and LP store still only ever enter `availableColumns` when the
-  // data backing them exists — a picker toggle for a column with nothing to
-  // show would just be a lie.
   // Sales tax is the Accounting skill's rate, so with no Character (or skills
   // still loading) there is no honest figure and the columns stay out of the
   // table and the picker, as Refine does without refine data.
   const accountingLevel = result?.accountingLevel ?? null;
   const taxFor = (row: OwnedRow) =>
     accountingLevel === null ? null : sellSalesTax(row, accountingLevel);
-  const afterTaxFor = (row: OwnedRow) => {
-    const tax = taxFor(row);
-    return tax === null || row.sellTotal === null ? null : row.sellTotal - tax;
-  };
+  const afterTaxFor = (row: OwnedRow) =>
+    accountingLevel === null ? null : sellAfterTax(row, accountingLevel);
+
+  // The optional columns' catalog, keyed by `AppraisalColumnId` so the
+  // `ColumnPickerMenu` below and the push loop past it share one definition.
+  // Refine and LP store still only ever enter `availableColumns` when the
+  // data backing them exists — a picker toggle for a column with nothing to
+  // show would just be a lie.
   const optionalColumnsById: Record<AppraisalColumnId, DataTableColumn<OwnedRow>> = {
     buyEach: {
       id: 'buyEach',
