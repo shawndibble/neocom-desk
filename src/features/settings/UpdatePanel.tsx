@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Button, Panel } from '@/components/ui';
+import { Button, LiveStatus, Panel } from '@/components/ui';
 import { useApplyUpdate, useUpdateStatusLine } from './useUpdateState';
 import { ActionResult } from '@/features/settings/settingsFields';
 
@@ -13,14 +13,11 @@ export function UpdatePanel() {
   return (
     <Panel title={t('settings.updateTitle')}>
       <div className="space-y-2">
-        <p
-          role="status"
-          className={available ? 'min-h-5 text-sm text-accent' : 'min-h-5 text-sm text-text-dim'}
-        >
+        <LiveStatus>{line}</LiveStatus>
+        <p className={available ? 'min-h-5 text-sm text-accent' : 'min-h-5 text-sm text-text-dim'}>
           {line}
         </p>
         <Button
-          size="sm"
           variant={available ? 'accent' : 'ghost'}
           className={available ? undefined : 'text-text-dim!'}
           loading={updating}

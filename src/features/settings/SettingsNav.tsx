@@ -11,7 +11,7 @@ import {
   rowInteractiveClassName,
 } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
-import { Button } from '@/components/ui';
+import { Button, LiveStatus } from '@/components/ui';
 import { ActionResult } from './settingsFields';
 import { useApplyUpdate, useUpdateStatusLine } from './useUpdateState';
 import type { SettingsGroup, SettingsSectionId } from './sections';
@@ -115,6 +115,7 @@ export function SettingsIndex({ groups, summaries }: SettingsIndexProps) {
                   key={id}
                   className={highlighted ? 'border-l-2 border-accent bg-accent/10' : undefined}
                 >
+                  {isApp && <LiveStatus>{line}</LiveStatus>}
                   <div className="flex items-center">
                     <Link
                       to={tabPath(SETTINGS_TABS, id)}

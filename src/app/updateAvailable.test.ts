@@ -74,7 +74,36 @@ describe('checkForUpdate', () => {
   });
 });
 
+describe('checkForUpdate overlap', () => {
+  it('shares one check between concurrent callers', async () => {
+    const registration = fakeRegistration();
+    getServiceWorkerRegistration.mockResolvedValue(registration);
+    await Promise.all([checkForUpdate(), checkForUpdate()]);
+    expect(registration.update).toHaveBeenCalledTimes(1);
+  });
+
+  it('never downgrades available', async () => {
+    const registration = fakeRegistration();
+    registration.update.mockImplementation(async () => {
+      useUpdateStatus.setState({ status: 'available' });
+    });
+    getServiceWorkerRegistration.mockResolvedValue(registration);
+    await checkForUpdate();
+    expect(status()).toBe('available');
+  });
+});
+
 describe('watchRegistration', () => {
+  it('watches a worker that is already installing', () => {
+    const installing = Object.assign(new EventTarget(), { state: 'installing' });
+    const registration = fakeRegistration({ installing });
+    watchRegistration(registration as never);
+    installing.state = 'installed';
+    registration.waiting = {} as never;
+    installing.dispatchEvent(new Event('statechange'));
+    expect(status()).toBe('available');
+  });
+
   it('turns available when an installing worker reaches installed', () => {
     const registration = fakeRegistration();
     const installing = Object.assign(new EventTarget(), { state: 'installing' });

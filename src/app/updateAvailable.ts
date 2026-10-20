@@ -14,7 +14,10 @@ const UPDATE_PROBE_CAP_MS = INSTALL_TIMEOUT_MS + 5_000;
 
 export const useUpdateStatus = create<{ status: UpdateStatus }>(() => ({ status: 'unknown' }));
 
+// `available` only clears when the build is applied (a reload): a late or
+// overlapping check must not report "current" or "offline" over a build we saw.
 function setStatus(status: UpdateStatus) {
+  if (useUpdateStatus.getState().status === 'available' && status !== 'available') return;
   useUpdateStatus.setState({ status });
 }
 
@@ -29,12 +32,14 @@ export function watchRegistration(registration: ServiceWorkerRegistration) {
   if (watched.has(registration)) return;
   watched.add(registration);
   if (registration.waiting) setStatus('available');
-  registration.addEventListener('updatefound', () => {
+  const watchInstalling = () => {
     const installing = registration.installing;
     installing?.addEventListener('statechange', () => {
       if (installing.state === 'installed' && registration.waiting) setStatus('available');
     });
-  });
+  };
+  watchInstalling();
+  registration.addEventListener('updatefound', watchInstalling);
 }
 
 async function probe(registration: ServiceWorkerRegistration): Promise<UpdateStatus> {
@@ -48,7 +53,17 @@ async function probe(registration: ServiceWorkerRegistration): Promise<UpdateSta
  * already waiting is `available` with no `checking` state. Run once per
  * Settings mount; never on a timer.
  */
-export async function checkForUpdate(): Promise<void> {
+export function checkForUpdate(): Promise<void> {
+  // A remount (StrictMode, back-and-forth) while a check runs shares it.
+  inflight ??= runCheck().finally(() => {
+    inflight = undefined;
+  });
+  return inflight;
+}
+
+let inflight: Promise<void> | undefined;
+
+async function runCheck(): Promise<void> {
   try {
     const registration = await getServiceWorkerRegistration();
     if (!registration) return setStatus('current');

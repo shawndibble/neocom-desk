@@ -2058,7 +2058,7 @@ describe('Settings — update state', () => {
     const nav = await screen.findByRole('navigation', { name: /settings sections/i });
     const row = await within(nav).findByRole('link', { name: /^app & backup/i });
     expect(row).toHaveTextContent('Update available');
-    expect(screen.queryByText('Checking for updates…')).not.toBeInTheDocument();
+    expect(screen.queryAllByText('Checking for updates…')).toHaveLength(0);
     await userEvent.click(within(nav).getByRole('button', { name: 'Update now' }));
     expect(forceUpdate).toHaveBeenCalledOnce();
     expect(await within(nav).findByRole('alert')).toHaveTextContent(/could not check/i);
@@ -2072,10 +2072,10 @@ describe('Settings — update state', () => {
     serviceWorker(reg);
     render(<App />);
 
-    expect(await screen.findByText('Checking for updates…')).toBeInTheDocument();
+    expect((await screen.findAllByText('Checking for updates…')).length).toBeGreaterThan(0);
     expect(screen.queryByRole('button', { name: 'Update now' })).not.toBeInTheDocument();
     finish();
-    expect(await screen.findByText('No updates at this time')).toBeInTheDocument();
+    expect((await screen.findAllByText('No updates at this time')).length).toBeGreaterThan(0);
   });
 
   it("phone index: says so when the check can't run", async () => {
@@ -2083,7 +2083,7 @@ describe('Settings — update state', () => {
     stubViewport(false);
     serviceWorker(registration({ update: vi.fn().mockRejectedValue(new Error('offline')) }));
     render(<App />);
-    expect(await screen.findByText("Offline, couldn't check")).toBeInTheDocument();
+    expect((await screen.findAllByText("Offline, couldn't check")).length).toBeGreaterThan(0);
   });
 
   it('checks once per visit, from any URL, and not when moving between sections', async () => {
@@ -2097,7 +2097,7 @@ describe('Settings — update state', () => {
 
     await userEvent.click(within(settingsNav()).getByRole('link', { name: /^display/i }));
     await userEvent.click(within(settingsNav()).getByRole('link', { name: /^app & backup/i }));
-    await screen.findByText('No updates at this time');
+    await screen.findAllByText('No updates at this time');
     expect(reg.update).toHaveBeenCalledTimes(1);
   });
 
