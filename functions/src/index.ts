@@ -12,7 +12,9 @@ import { getAuth } from 'firebase-admin/auth';
 import { getMessaging } from 'firebase-admin/messaging';
 import { firestore } from './firestore.js';
 import { runPurgeNotificationFeed, runPurgeStaleAccounts } from './purgeJobs.js';
-import { R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY } from './r2Publish.js';
+import { R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, r2ConfigOrThrow } from './r2Publish.js';
+import { openPricesR2Key } from './r2DailySnapshots.js';
+import { createR2Get } from './r2Publisher.js';
 import { runSyncLawlessSystems, runSyncMarketOpenPrices } from './marketHistoryJob.js';
 import {
   runSyncLpStoreOffers,
@@ -76,6 +78,12 @@ import {
   parseSaveFeederGrantInput,
   saveFeederGrant,
 } from './corpTaxBookFeederGrant.js';
+import {
+  dismissFeederHistory,
+  getFeederViewAccess,
+  parseRequestFeederRateInput,
+  requestFeederRate,
+} from './corpTaxBookFeederViewCalls.js';
 import { esiSyncReader } from './corpTaxBookSyncEsi.js';
 import {
   claimPayment,
@@ -646,9 +654,17 @@ function corpSyncDeps(): CorpSyncDeps {
     refresh: (clientId, refreshToken) => refreshAtSso(clientId, refreshToken),
     revoke: (clientId, refreshToken) => revokeAtSso(clientId, refreshToken),
     readIdentity: esiIdentityReader(),
+    openPrices: r2OpenPrices,
     log: (message, data) => logWarn(message, data),
   };
 }
+
+// The moon owner's view values ore at the book hub's daily open price in R2 (issue #4512).
+// Lazy, so a function without the R2 secrets only fails when it rebuilds a view.
+function r2OpenPrices(typeId: number): Promise<unknown | null> {
+  return createR2Get(r2ConfigOrThrow())(openPricesR2Key(typeId));
+}
+const FEEDER_VIEW_SECRETS = [ALERTS_TOKEN_KEY, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY];
 
 // Proven by the signed-in Character AND the grant's own access token, which must be
 // for that same Character; the corporation and its roles are read with the grant.
@@ -661,7 +677,7 @@ export const saveCorpTaxBookSyncGrantCallable = onCall<unknown>(
 // Collector books (issue #4511): the moon owner's side. The grant is a separate SSO login by
 // the Accountant alt (mining scope only); the first ledger pull is the role check.
 export const saveCorpTaxBookFeederGrantCallable = onCall<unknown>(
-  { maxInstances: 5, secrets: [ALERTS_TOKEN_KEY] },
+  { maxInstances: 5, secrets: FEEDER_VIEW_SECRETS },
   (request) =>
     saveFeederGrant(
       { ...corpSyncDeps(), esi: esiSyncReader(), lookupCorporation: esiCorporationLookup() },
@@ -671,13 +687,32 @@ export const saveCorpTaxBookFeederGrantCallable = onCall<unknown>(
 );
 
 export const leaveCorpTaxBookFeederCallable = onCall<unknown>(
-  { maxInstances: 5, secrets: [ALERTS_TOKEN_KEY] },
+  { maxInstances: 5, secrets: FEEDER_VIEW_SECRETS },
   (request) => leaveFeeder(corpSyncDeps(), callerOf(request), parseFeederCall(request.data))
 );
 
 export const getCorpTaxBookFeederStatusCallable = onCall<unknown>(
   { maxInstances: 5, secrets: [ALERTS_TOKEN_KEY] },
   (request) => getFeederStatus(corpSyncDeps(), callerOf(request), parseFeederCall(request.data))
+);
+
+// The moon owner's view (issue #4512): its officers (CEO, Director, Accountant; live role check)
+// get a 24h access record the rules read, may ask for a rate, and dismiss the after-leaving view.
+export const getCorpTaxBookFeederViewAccessCallable = onCall<unknown>(
+  { maxInstances: 5, secrets: FEEDER_VIEW_SECRETS },
+  (request) => getFeederViewAccess(corpSyncDeps(), callerOf(request), parseFeederCall(request.data))
+);
+
+export const requestCorpTaxBookFeederRateCallable = onCall<unknown>(
+  { maxInstances: 5, secrets: FEEDER_VIEW_SECRETS },
+  (request) =>
+    requestFeederRate(corpSyncDeps(), callerOf(request), parseRequestFeederRateInput(request.data))
+);
+
+export const dismissCorpTaxBookFeederHistoryCallable = onCall<unknown>(
+  { maxInstances: 5, secrets: FEEDER_VIEW_SECRETS },
+  (request) =>
+    dismissFeederHistory(corpSyncDeps(), callerOf(request), parseFeederCall(request.data))
 );
 
 // The holder revokes their own; the CEO revokes anyone's (live role check, so it carries an access token).
@@ -695,7 +730,7 @@ export const revokeCorpTaxBookSyncGrantCallable = onCall<unknown>(
 export const syncCorpTaxBooks = onSchedule(
   {
     schedule: 'every 6 hours',
-    secrets: [ALERTS_TOKEN_KEY],
+    secrets: FEEDER_VIEW_SECRETS,
     timeoutSeconds: 540,
     maxInstances: 1,
   },

@@ -6,6 +6,7 @@ import { FORFEIT_NO_REPLY_DAYS, forfeitAllowed } from './closeAccount';
 import type { Dismissal } from './dismissals';
 import { extractionId, type SyncExtraction } from './sync';
 import { closePeriod, isDayCovered, reopenPeriod } from './coverage';
+import { oreFormTypeId } from '../miningTax/oreForm';
 import {
   FEEDER_DISCONNECT_DAYS,
   advanceFeederHealth,
@@ -13,7 +14,7 @@ import {
   type FeederHealth,
 } from './feederHealth';
 import { accrueValuedDays, feederBalance, onPayList } from './feederAccrual';
-import { DEFAULT_GRACE_HOURS } from './billable';
+import { DEFAULT_GRACE_HOURS, dayClosesAt } from './billable';
 import { DEFAULT_OVERDUE_DAYS } from './overdue';
 import { mergeObservedRows, observedRowKey } from './observed';
 import { canOverrideRecordRate, isRetroactiveRate } from './rates';
@@ -422,5 +423,27 @@ describe('feeder accrual mirror', () => {
     ];
     const r = { ...rules, modeChanges: [], isBillable: () => true, ownerRateHistory: history };
     expect(mirror.accrueValuedDays(days, r)).toEqual(accrueValuedDays(days, r));
+  });
+});
+
+describe('feeder view mirror', () => {
+  it('closes days the same', () => {
+    for (const day of ['2026-06-30', '2026-12-31', '2028-02-28']) {
+      for (const grace of [0, 6, 30]) {
+        expect(mirror.dayClosesAt(day, grace)).toBe(dayClosesAt(day, grace));
+      }
+    }
+    expect(mirror.dayClosesAt('2026-06-01')).toBe(dayClosesAt('2026-06-01'));
+  });
+
+  it('maps Ore Form the same', () => {
+    const map = { '18': 62528, '19': 62572 };
+    for (const raw of [18, 19, 20]) {
+      for (const compressed of [true, false]) {
+        expect(mirror.oreFormTypeId(raw, map, compressed)).toBe(
+          oreFormTypeId(raw, map, compressed)
+        );
+      }
+    }
   });
 });

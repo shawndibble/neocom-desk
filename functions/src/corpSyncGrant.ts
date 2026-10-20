@@ -34,8 +34,10 @@ import {
   type Actor,
   type BookDeps,
   type Caller,
+  type OpenPricesReader,
   mergeObservedInto,
 } from './corpTaxBookStore.js';
+import { tryRebuildFeederView } from './corpTaxBookFeederView.js';
 import {
   FeederStorm,
   READABLE_FEEDER_STATUSES,
@@ -108,6 +110,8 @@ export interface CorpSyncDeps {
   refresh: (clientId: string, refreshToken: string) => Promise<RefreshedTokens>;
   revoke: (clientId: string, refreshToken: string) => Promise<void>;
   readIdentity: IdentityReader;
+  /** Prices the moon owner's view, rebuilt after each ledger read (issue #4512). */
+  openPrices?: OpenPricesReader;
   /** Receives only messages and ids — never a token. */
   log: (message: string, data?: Record<string, unknown>) => void;
 }
@@ -124,6 +128,7 @@ const bookDeps = (deps: CorpSyncDeps): BookDeps => ({
   now: deps.now,
   verifyToken: deps.verify,
   readIdentity: deps.readIdentity,
+  ...(deps.openPrices ? { openPrices: deps.openPrices } : {}),
 });
 
 function fail(
@@ -574,6 +579,9 @@ export async function syncOneFeeder(
       feederCorporationId,
       read
     );
+    if (status !== null) {
+      await tryRebuildFeederView(bookDeps(deps), collectorCorporationId, feederCorporationId);
+    }
     // At 30 days stale the feeder disconnects; its token has no further use.
     if (status === 'disconnected' && grant) await dropFeederGrant(deps, grant);
     return { outcome: read.outcome, status, budget };

@@ -4,6 +4,7 @@
 //   corpTaxBooks/{collector}/feeders/{feederCorp}  the feeder record (officer-readable, function-written)
 //   corpTaxBookFeederInvites/{sha256(code)}        an invite link; only the hash is stored (function-only)
 //   corpTaxBookFeederOf/{feederCorp}               feeder → Collector pointer (function-only)
+//   corpTaxBookFeederPrevious/{feederCorp}         set when a feeder leaves, so its after-leaving view still resolves (function-only)
 //
 // A corporation feeds one book or runs its own, never both. The feeder's
 // mining-only grant (kind 'feeder' in corpTaxBookSyncGrants) arrives with the
@@ -22,7 +23,12 @@ import {
   utcDate,
   type BookCall,
 } from './corpTaxBook.js';
-import { reopenPeriod, type CoveragePeriod } from './corpTaxBookEngine.js';
+import {
+  reopenPeriod,
+  type CoveragePeriod,
+  type FeederModeChange,
+  type OwnerRateEntry,
+} from './corpTaxBookEngine.js';
 import { ROLES_SCOPE } from './corpTaxBookEsi.js';
 import {
   appendAudit,
@@ -66,6 +72,15 @@ export interface FeederRecord {
   /** The owner rate the invite offered, if it carried one. */
   offeredOwnerRatePct?: number;
   coveragePeriods: CoveragePeriod[];
+  /**
+   * The owner rate history (#4512). Absent on records written before it existed: the
+   * feeder view then derives entries from `requestedRatePct` / `agreedRatePct`.
+   */
+  ownerRateHistory?: OwnerRateEntry[];
+  /** Dated mode switches (#4510); absent means derive from `mode`. */
+  modeChanges?: FeederModeChange[];
+  /** When the corporation's officers dismissed the after-leaving view (ms). */
+  viewDismissedAt?: number;
 }
 
 /** `corpTaxBookFeederInvites/{hash}`. */

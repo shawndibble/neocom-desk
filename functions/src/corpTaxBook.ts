@@ -56,6 +56,14 @@ export const FEEDER_INVITES_COLLECTION = 'corpTaxBookFeederInvites';
  */
 export const FEEDER_OF_COLLECTION = 'corpTaxBookFeederOf';
 /**
+ * `corpTaxBookFeederPrevious/{feederCorp}`: `{ collectorCorporationId, leftAt }`, written when a
+ * feeder leaves (the `FEEDER_OF` pointer is deleted then). Function-only; resolves the
+ * Collector for the after-leaving view (issue #4512).
+ */
+export const FEEDER_PREVIOUS_COLLECTION = 'corpTaxBookFeederPrevious';
+/** `corpTaxBooks/{collector}/feederViews/{feederCorp}`: the moon owner's read model (issue #4512). */
+export const FEEDER_VIEWS = 'feederViews';
+/**
  * `corpTaxBookBilledBy/{char:id}`: which books bill a Character, `books[collectorCorp]`
  * the epoch ms of the last sync that saw them there. Written by the sync, readable by
  * that Character only, so a miner in a moon owner's corporation finds the book (#4517).

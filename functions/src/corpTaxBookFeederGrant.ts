@@ -28,12 +28,13 @@ import {
   FEEDERS,
   FEEDER_INVITES_COLLECTION,
   FEEDER_OF_COLLECTION,
+  FEEDER_PREVIOUS_COLLECTION,
   OBSERVED,
   decideRoles,
   utcDate,
 } from './corpTaxBook.js';
 import { FEEDER_SYNC_SCOPES } from './corpSyncScopes.js';
-import { closePeriod, isDayCovered } from './corpTaxBookEngine.js';
+import { closePeriod, isDayCovered, reopenPeriod } from './corpTaxBookEngine.js';
 import { ROLES_SCOPE, type CorporationLookup } from './corpTaxBookEsi.js';
 import {
   acceptInviteCore,
@@ -41,6 +42,11 @@ import {
   type AcceptUndo,
   type FeederRecord,
 } from './corpTaxBookFeeders.js';
+import {
+  appendRequestedRate,
+  feederViewRef,
+  tryRebuildFeederView,
+} from './corpTaxBookFeederView.js';
 import { appendAudit, bookRef, type BookDeps, type Caller } from './corpTaxBookStore.js';
 import type { SyncEsi } from './corpTaxBookSyncEsi.js';
 import { characterIdForUid, type EveTokenClaims } from './verifyEveToken.js';
@@ -58,6 +64,7 @@ const bookDeps = (deps: CorpSyncDeps): BookDeps => ({
   now: deps.now,
   verifyToken: deps.verify,
   readIdentity: deps.readIdentity,
+  ...(deps.openPrices ? { openPrices: deps.openPrices } : {}),
 });
 
 function fail(
@@ -136,6 +143,50 @@ async function verifiedClaims(deps: CorpSyncDeps, accessToken: string): Promise<
   }
 }
 
+/** The code Reconnect sends in place of an invite: rebind the grant of a corporation that already feeds a book. */
+export const RECONNECT_CODE = 'reconnect-existing';
+
+const RECONNECTABLE: readonly FeederRecord['status'][] = [
+  'active',
+  'pending-removal',
+  'disconnected',
+];
+
+async function reconnectCore(
+  deps: BookDeps,
+  feederCorp: number,
+  holder: number,
+  grantedBy: number
+): Promise<AcceptFeederInviteResult & { priorRecord: FeederRecord }> {
+  const pointer = (
+    await deps.db.collection(FEEDER_OF_COLLECTION).doc(String(feederCorp)).get()
+  ).data();
+  const collector = pointer?.collectorCorporationId;
+  if (typeof collector !== 'number') {
+    fail('failed-precondition', 'This corporation is not feeding a book', 'not-your-feeder');
+  }
+  const ref = bookRef(deps.db, collector).collection(FEEDERS).doc(String(feederCorp));
+  const rec = (await ref.get()).data() as FeederRecord | undefined;
+  if (!rec || !RECONNECTABLE.includes(rec.status)) {
+    fail('failed-precondition', 'This corporation is not feeding a book', 'not-your-feeder');
+  }
+  const patch: Record<string, unknown> = { grantHolder: holder, grantedBy };
+  if (rec.status === 'disconnected') {
+    // Back after a disconnect: a new coverage period, the balance and rate history carry on.
+    patch.status = 'active';
+    patch.coveragePeriods = reopenPeriod(rec.coveragePeriods, utcDate(deps.now()));
+    patch.disconnectedAt = FieldValue.delete();
+    patch.staleSince = FieldValue.delete();
+  }
+  await ref.update(patch);
+  return {
+    collectorCorporationId: collector,
+    feederCorporationId: feederCorp,
+    rejoined: false,
+    priorRecord: rec,
+  };
+}
+
 export async function saveFeederGrant(
   deps: FeederGrantDeps,
   caller: Caller,
@@ -169,7 +220,8 @@ export async function saveFeederGrant(
   };
 
   let undo: AcceptUndo | undefined;
-  let accepted: (AcceptFeederInviteResult & { undo: AcceptUndo }) | undefined;
+  let accepted: (AcceptFeederInviteResult & { undo?: AcceptUndo }) | undefined;
+  let reconnectPrior: FeederRecord | undefined;
   try {
     const claims = await verifiedClaims(deps, refreshed.accessToken);
     if (claims.characterId !== supplied.characterId) {
@@ -178,14 +230,18 @@ export async function saveFeederGrant(
     verifyFeederToken(claims);
     const feederCorp = await deps.lookupCorporation(claims.characterId);
 
-    accepted = await acceptInviteCore(bookDeps(deps), {
-      code: input.code,
-      characterId: claims.characterId,
-      name: claims.name,
-      feederCorp,
-      recordExtra: { grantHolder: claims.characterId, grantedBy: callerId },
-    });
+    accepted =
+      input.code === RECONNECT_CODE
+        ? await reconnectCore(bookDeps(deps), feederCorp, claims.characterId, callerId)
+        : await acceptInviteCore(bookDeps(deps), {
+            code: input.code,
+            characterId: claims.characterId,
+            name: claims.name,
+            feederCorp,
+            recordExtra: { grantHolder: claims.characterId, grantedBy: callerId },
+          });
     undo = accepted.undo;
+    if ('priorRecord' in accepted) reconnectPrior = accepted.priorRecord as FeederRecord;
 
     const now = deps.now();
     const doc: CorpSyncGrantDoc = {
@@ -227,6 +283,14 @@ export async function saveFeederGrant(
         }
       );
     }
+    if (reconnectPrior && accepted) {
+      // A refused reconnect puts the record back and drops the grant it just stored.
+      await bookRef(deps.db, accepted.collectorCorporationId)
+        .collection(FEEDERS)
+        .doc(String(accepted.feederCorporationId))
+        .set(reconnectPrior);
+      await grantRef(deps.db, accepted.feederCorporationId).delete();
+    }
     await orphan();
     throw err;
   }
@@ -234,14 +298,25 @@ export async function saveFeederGrant(
   if (input.requestedRatePct !== undefined) {
     // A blank rate is a complete grant, so a rate that fails to save never fails it.
     try {
-      await bookRef(deps.db, accepted.collectorCorporationId)
+      const ref = bookRef(deps.db, accepted.collectorCorporationId)
         .collection(FEEDERS)
-        .doc(String(accepted.feederCorporationId))
-        .update({ requestedRatePct: input.requestedRatePct });
+        .doc(String(accepted.feederCorporationId));
+      const rec = (await ref.get()).data() as FeederRecord | undefined;
+      await ref.update({
+        requestedRatePct: input.requestedRatePct,
+        ...(rec
+          ? { ownerRateHistory: appendRequestedRate(rec, input.requestedRatePct, deps.now()) }
+          : {}),
+      });
     } catch (e) {
       console.error('feeder requested rate not saved', e instanceof Error ? e.message : e);
     }
   }
+  await tryRebuildFeederView(
+    bookDeps(deps),
+    accepted.collectorCorporationId,
+    accepted.feederCorporationId
+  );
   return {
     collectorCorporationId: accepted.collectorCorporationId,
     feederCorporationId: accepted.feederCorporationId,
@@ -281,25 +356,36 @@ async function unwindAccept(
   });
   // The rotated token the sync stored; the caller revokes the originally rotated one.
   if (held && held.kind === 'feeder') await revokeStored(deps, held);
+  // The refused first pull rebuilt the view; put it back, or drop it with the record it described.
+  try {
+    if (undo.priorRecord) await tryRebuildFeederView(bookDeps(deps), collector, feederCorp);
+    else await deps.db.recursiveDelete(feederViewRef(deps.db, collector, feederCorp));
+  } catch (e) {
+    console.error('feeder view not restored', e instanceof Error ? e.message : e);
+  }
 }
 
 // --- Standing --------------------------------------------------------------
 
-interface FeederContext {
+export interface FeederContext {
   callerId: number;
   collectorCorporationId: number;
   record: FeederRecord;
   grant: CorpSyncGrantDoc | undefined;
 }
 
-type Standing = 'leave' | 'read';
+/**
+ * `view` is the moon owner's own page (issue #4512): CEO, Director or Accountant only, and no
+ * holder shortcut, so the role is always live. It also resolves a feeder that has left.
+ */
+type Standing = 'leave' | 'read' | 'view' | 'edit';
 
 /**
  * Who may act on a feeder from the moon owner's side: the grant holder always, else
  * a live roles check in that corporation (CEO or Director to leave; also an
  * Accountant or Junior Accountant to read).
  */
-async function authorizeFeederCaller(
+export async function authorizeFeederCaller(
   deps: CorpSyncDeps,
   caller: Caller,
   input: FeederCall,
@@ -319,7 +405,13 @@ async function authorizeFeederCaller(
   const pointer = (
     await deps.db.collection(FEEDER_OF_COLLECTION).doc(String(input.corporationId)).get()
   ).data();
-  const collector = pointer?.collectorCorporationId;
+  let collector = pointer?.collectorCorporationId;
+  if (typeof collector !== 'number' && standing === 'view') {
+    const previous = (
+      await deps.db.collection(FEEDER_PREVIOUS_COLLECTION).doc(String(input.corporationId)).get()
+    ).data();
+    collector = previous?.collectorCorporationId;
+  }
   if (typeof collector !== 'number') return null;
   const [recordSnap, grantSnap] = await Promise.all([
     bookRef(deps.db, collector).collection(FEEDERS).doc(String(input.corporationId)).get(),
@@ -329,17 +421,20 @@ async function authorizeFeederCaller(
   const grant = grantSnap.data() as CorpSyncGrantDoc | undefined;
   if (!feeder) return null;
   const isHolder =
-    callerId === feeder.grantHolder ||
-    callerId === feeder.grantedBy ||
-    callerId === grant?.characterId ||
-    callerId === grant?.grantedBy;
+    standing !== 'view' &&
+    standing !== 'edit' &&
+    (callerId === feeder.grantHolder ||
+      callerId === feeder.grantedBy ||
+      callerId === grant?.characterId ||
+      callerId === grant?.grantedBy);
   if (!isHolder) {
     const identity = await deps.readIdentity(callerId, input.accessToken);
     if (identity.corporationId !== input.corporationId) {
       fail('permission-denied', 'Not a member of this corporation', 'not-your-feeder');
     }
     const roles = decideRoles(identity.roles, identity.ceoId === callerId);
-    const allowed = standing === 'leave' ? roles.isDirector : roles.canView;
+    const allowed =
+      standing === 'leave' ? roles.isDirector : standing === 'read' ? roles.canView : roles.canEdit;
     if (!allowed) fail('permission-denied', 'Not allowed for this corporation', 'not-your-feeder');
   }
   return { callerId, collectorCorporationId: collector, record: feeder, grant };
@@ -362,6 +457,9 @@ export async function leaveFeeder(
     .collection(FEEDERS)
     .doc(String(input.corporationId));
   const pointerRef = deps.db.collection(FEEDER_OF_COLLECTION).doc(String(input.corporationId));
+  const previousRef = deps.db
+    .collection(FEEDER_PREVIOUS_COLLECTION)
+    .doc(String(input.corporationId));
   const gRef = grantRef(deps.db, input.corporationId);
   const now = deps.now();
 
@@ -382,6 +480,8 @@ export async function leaveFeeder(
       coveragePeriods: closePeriod(rec.coveragePeriods, utcDate(now)),
     });
     tx.delete(pointerRef);
+    // The after-leaving view still finds its Collector through this.
+    tx.set(previousRef, { collectorCorporationId: ctx.collectorCorporationId, leftAt: now });
     if (grant?.kind === 'feeder') tx.delete(gRef);
     appendAudit(
       tx,
@@ -394,6 +494,7 @@ export async function leaveFeeder(
     return grant?.kind === 'feeder' ? grant : undefined;
   });
   if (dropped) await revokeStored(deps, dropped);
+  await tryRebuildFeederView(bookDeps(deps), ctx.collectorCorporationId, input.corporationId);
   // No server-side accrual engine yet (#4510 is client-side): the balance is the client's to show.
   return { left: true, owedIsk: null };
 }

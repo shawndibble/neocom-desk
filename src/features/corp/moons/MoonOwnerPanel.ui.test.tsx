@@ -1,0 +1,103 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import '@/i18n';
+import type { FeederStatus } from '../taxBook/feederClient';
+import { MoonOwnerPanel } from './MoonOwnerPanel';
+import { fixtureView } from './ownerViewFixtures';
+
+const beginFeederGrantLogin = vi.fn();
+vi.mock('@/app/loginFlow', () => ({
+  beginFeederGrantLogin: (...a: unknown[]) => beginFeederGrantLogin(...a),
+}));
+vi.mock('@/features/character/names', () => ({
+  resolveNames: async () => new Map([[1, 'Varro Kestane']]),
+}));
+const loadFeederView = vi.fn();
+const requestFeederRate = vi.fn();
+vi.mock('../taxBook/feederViewClient', async (orig) => ({
+  ...(await orig<typeof import('../taxBook/feederViewClient')>()),
+  loadFeederView: (...a: unknown[]) => loadFeederView(...a),
+  requestFeederRate: (...a: unknown[]) => requestFeederRate(...a),
+}));
+vi.mock('../taxBook/feederClient', async (orig) => ({
+  ...(await orig<typeof import('../taxBook/feederClient')>()),
+  leaveFeeder: vi.fn().mockResolvedValue({ left: true, owedIsk: 1 }),
+}));
+
+const owner: Extract<FeederStatus, { status: 'feeder' }> = {
+  status: 'feeder',
+  collectorCorporationId: 5,
+  collectorName: 'Brass Meridian Logistics',
+  feederStatus: 'active',
+  lastReadWellAt: null,
+  lastSyncResult: null,
+  requestedRatePct: null,
+  effectiveRatePct: null,
+  isHolder: true,
+  refineries: [],
+  owedIsk: 100,
+};
+
+function ready(over = {}) {
+  loadFeederView.mockResolvedValue({
+    access: { collectorCorporationId: 5, expiresAt: 0, canEdit: true },
+    view: fixtureView(over),
+  });
+}
+const mount = () =>
+  render(
+    <MoonOwnerPanel owner={owner} characterId={7} corporationId={98} canLeave onLeft={vi.fn()} />
+  );
+
+beforeEach(() => {
+  loadFeederView.mockReset();
+  requestFeederRate.mockReset().mockResolvedValue({ ok: true });
+  beginFeederGrantLogin.mockReset().mockResolvedValue(undefined);
+});
+
+describe('MoonOwnerPanel', () => {
+  it('renders the owner page from the view and keeps Leave', async () => {
+    ready();
+    mount();
+    expect(await screen.findByText('Varro Kestane')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Leave' })).toBeVisible();
+  });
+
+  it('shows the stale banner and Reconnect starts the grant round trip', async () => {
+    ready({ staleSince: Date.UTC(2026, 9, 11) });
+    mount();
+    await userEvent.click(await screen.findByRole('button', { name: 'Reconnect' }));
+    await waitFor(() =>
+      expect(beginFeederGrantLogin).toHaveBeenCalledWith(7, 'reconnect-existing')
+    );
+  });
+
+  it('sends a requested rate then reloads the view', async () => {
+    ready();
+    mount();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Ask for a different rate…' }));
+    const field = screen.getByLabelText('Rate you ask for (%)');
+    await user.clear(field);
+    await user.type(field, '7');
+    await user.click(screen.getByRole('button', { name: 'Ask for this rate' }));
+    await waitFor(() => expect(requestFeederRate).toHaveBeenCalledWith(7, 98, 7));
+    await waitFor(() => expect(loadFeederView).toHaveBeenCalledTimes(2));
+  });
+
+  it('says it is waiting when the view is not built yet', async () => {
+    loadFeederView.mockResolvedValue({
+      access: { collectorCorporationId: 5, expiresAt: 0, canEdit: true },
+      view: null,
+    });
+    mount();
+    expect(await screen.findByText('Waiting for the first sync.')).toBeVisible();
+  });
+
+  it('offers a retry when the view cannot be loaded', async () => {
+    loadFeederView.mockRejectedValue(new Error('boom'));
+    mount();
+    expect(await screen.findByText('boom')).toBeVisible();
+  });
+});
