@@ -379,6 +379,36 @@ export async function syncBook(deps: BookDeps, caller: Caller, input: SyncInput)
 }
 
 /**
+ * Merge Observed Rows into a book monotonically (a stale row never replaces a
+ * fresher one). Shared by an officer's or the scheduled sync and a feeder's pull,
+ * which must not touch the book's `lastSync` or gaps.
+ */
+export async function mergeObservedInto(
+  deps: BookDeps,
+  corporationId: number,
+  rows: readonly ObservedRow[]
+): Promise<number> {
+  let observedChanged = 0;
+  for (let i = 0; i < rows.length; i += CHUNK) {
+    const chunk = rows.slice(i, i + CHUNK);
+    const col = sub(deps.db, corporationId, OBSERVED);
+    observedChanged += await deps.db.runTransaction(async (tx) => {
+      const unique = [...new Map(chunk.map((r) => [obsId(r), r])).values()];
+      const refs = unique.map((r) => col.doc(obsId(r)));
+      const snaps = refs.length > 0 ? await tx.getAll(...refs) : [];
+      const existing = snaps.filter((s) => s.exists).map((s) => s.data() as ObservedRow);
+      const { changed } = mergeObservedRows(existing, chunk);
+      const last = new Map(changed.map((r) => [observedRowKey(r), r]));
+      for (const row of last.values()) {
+        tx.set(col.doc(obsId(row)), { ...row, uid: `char:${row.characterId}` });
+      }
+      return last.size;
+    });
+  }
+  return observedChanged;
+}
+
+/**
  * The sync once the caller is established. The scheduled sync (ADR 0025) calls
  * this with the role check it just made with the grant holder's token, and
  * `scheduled` makes the audit entry and `lastSync` say so.
@@ -400,23 +430,7 @@ export async function syncBookAs(
     );
   }
 
-  let observedChanged = 0;
-  for (let i = 0; i < input.observed.length; i += CHUNK) {
-    const chunk = input.observed.slice(i, i + CHUNK);
-    const col = sub(deps.db, input.corporationId, OBSERVED);
-    observedChanged += await deps.db.runTransaction(async (tx) => {
-      const unique = [...new Map(chunk.map((r) => [obsId(r), r])).values()];
-      const refs = unique.map((r) => col.doc(obsId(r)));
-      const snaps = refs.length > 0 ? await tx.getAll(...refs) : [];
-      const existing = snaps.filter((s) => s.exists).map((s) => s.data() as ObservedRow);
-      const { changed } = mergeObservedRows(existing, chunk);
-      const last = new Map(changed.map((r) => [observedRowKey(r), r]));
-      for (const row of last.values()) {
-        tx.set(col.doc(obsId(row)), { ...row, uid: `char:${row.characterId}` });
-      }
-      return last.size;
-    });
-  }
+  const observedChanged = await mergeObservedInto(deps, input.corporationId, input.observed);
 
   const extractions = sub(deps.db, input.corporationId, EXTRACTIONS);
   for (const x of input.extractions) {

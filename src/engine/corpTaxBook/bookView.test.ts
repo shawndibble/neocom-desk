@@ -354,3 +354,36 @@ describe('a day on an issued Statement stays frozen (D22)', () => {
     expect(days.find((d) => d.date === '2026-09-10')!.tax).toBe(200_000);
   });
 });
+
+describe('buildBookView with a feeder', () => {
+  const FEEDER = 98000002;
+  const fed = (characterId: number, date: string, quantity: number) => ({
+    ...entry(characterId, date, quantity),
+    sourceCorporationId: FEEDER,
+  });
+
+  it('withholds a feeder day no good read has followed, but not the book’s own days', () => {
+    const view = buildBookView(
+      input({
+        entries: [
+          fed(1, '2026-09-10', 1000),
+          fed(2, '2026-09-17', 1000),
+          entry(3, '2026-09-17', 1000),
+        ],
+        feeders: [{ corporationId: FEEDER, lastReadWellAt: '2026-09-12T00:00:00Z' }],
+      })
+    );
+    const ids = view.miners.map((m) => m.id).sort();
+    expect(ids).toEqual(['solo:1', 'solo:3']);
+  });
+
+  it('bills the feeder day once a read lands after its grace', () => {
+    const view = buildBookView(
+      input({
+        entries: [fed(2, '2026-09-17', 1000)],
+        feeders: [{ corporationId: FEEDER, lastReadWellAt: '2026-09-18T10:00:00Z' }],
+      })
+    );
+    expect(view.miners.map((m) => m.id)).toEqual(['solo:2']);
+  });
+});

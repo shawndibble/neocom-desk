@@ -75,6 +75,9 @@ export function groupObservedEntries(rows: readonly ObservedRow[]): ObservedMini
           date: row.date,
           ...(row.solarSystemId !== undefined ? { solarSystemId: row.solarSystemId } : {}),
           ...(row.moonId !== undefined ? { moonId: row.moonId } : {}),
+          ...(row.sourceCorporationId !== undefined
+            ? { sourceCorporationId: row.sourceCorporationId }
+            : {}),
           oreLines: [],
         },
         lines: new Map(),

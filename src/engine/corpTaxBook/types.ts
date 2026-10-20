@@ -52,6 +52,8 @@ export interface ObservedMiningEntry {
   date: string;
   solarSystemId?: number;
   moonId?: number;
+  /** The feeder corporation whose refinery recorded the ore; absent means the book's own. */
+  sourceCorporationId?: number;
   /** Raw ore types, sorted by typeId ascending. */
   oreLines: OreLine[];
 }

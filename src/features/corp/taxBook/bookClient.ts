@@ -32,6 +32,7 @@ import type {
   SyncGap,
 } from '@/engine/corpTaxBook/sync';
 import { scheduledSyncFrom, type ScheduledSyncStatus } from '@/engine/corpTaxBook/scheduledSync';
+import type { FeederReadClock } from '@/engine/corpTaxBook/feederHealth';
 import type { ObservedRow } from '@/engine/corpTaxBook/types';
 import { getSyncFirestore, getSyncFunctions } from '@/sync/firebaseApp';
 import { ensureSignedIn } from '@/sync/syncAuth';
@@ -300,6 +301,8 @@ export interface BookData {
   observed: ObservedRow[];
   declarations: Declaration[];
   adjustments: Adjustment[];
+  /** Each feeder's last good ledger read (#4509); a feeder's days are Billable only after one. */
+  feeders?: FeederReadClock[];
   groupingAnswers?: GroupingAnswer[];
   /** The scheduled sync's public status (ADR 0025); null when it was never turned on or was revoked. */
   scheduledSync?: ScheduledSyncStatus | null;
@@ -327,6 +330,7 @@ export async function readBookData(
     adjustments,
     answers,
     scheduled,
+    feeders,
   ] = await Promise.all([
     list<Miner>('miners'),
     list<Statement>('statements'),
@@ -341,6 +345,7 @@ export async function readBookData(
       doc(getSyncFirestore(), 'corpTaxBooks', String(corporationId), 'meta', 'groupingAnswers')
     ),
     getDoc(doc(getSyncFirestore(), 'corpTaxBooks', String(corporationId), 'meta', 'scheduledSync')),
+    list<{ corporationId: number; lastReadWellAt?: number }>('feeders'),
   ]);
   return {
     settings,
@@ -356,6 +361,12 @@ export async function readBookData(
     observed,
     declarations,
     adjustments,
+    feeders: feeders.map((f) => ({
+      corporationId: f.corporationId,
+      ...(typeof f.lastReadWellAt === 'number'
+        ? { lastReadWellAt: new Date(f.lastReadWellAt).toISOString() }
+        : {}),
+    })),
     groupingAnswers: groupingAnswersFrom(answers.data()),
     scheduledSync: scheduledSyncFrom(scheduled.data()),
   };
