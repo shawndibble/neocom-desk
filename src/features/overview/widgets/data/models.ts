@@ -76,14 +76,12 @@ import {
 import {
   balanceChange,
   journalTable,
-  ordersListed,
-  ordersStateChart,
   miningTaxTable,
-  ordersTable,
   priceWatchTable,
   stockChart,
   stockTable,
 } from './moneyModels';
+import { ordersListed, ordersStateChart, ordersTable } from './ordersModels';
 import { KIND_DEFS } from './kindModels';
 import { WORLD_DEFS } from './worldModels';
 import type {
