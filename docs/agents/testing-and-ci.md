@@ -62,8 +62,8 @@ Detail moved out of `CLAUDE.md` so it is read on demand. The short rules stay in
      cause (an unawaited assertion, a race on a router or store, a timing
      assumption); never a retry, a longer timeout or a skip.
 - **Cache loads settle between tests.** `vitest.setup.dom.ts` unmounts, then
-  awaits `settleEsiCacheLoads()` after every dom test and fails naming the
-  pending key, so a read still writing to `esiCache` can't leak into the next
+  awaits `settleEsiCacheLoads()` after every dom test and warns naming any
+  key still pending, so a read still writing to `esiCache` can't leak into the next
   test. Don't hand-roll drains (`waitFor(esiInFlight)`, extra ticks).
 - **Tests stay under 10 seconds each.** `testTimeout` is 10000 in
   `vite.config.ts`, and that is a budget to stay under, not a number to raise.
