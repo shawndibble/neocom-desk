@@ -29,19 +29,29 @@ describe('resolveRate', () => {
     expect(resolveRate(rates, { ...ctx, isGuest: true })?.pct).toBe(15);
   });
 
-  it('lets the most specific rate win: record over moon over Miner over Guest over corp', () => {
+  it('lets the most specific rate win: record over Miner over moon over Guest over corp', () => {
     const rates: TaxRate[] = [
       CORP,
       { scope: 'guest', pct: 15, effectiveFrom: '2026-01-01' },
-      { scope: 'miner', minerId: 'm1', pct: 8, effectiveFrom: '2026-01-01' },
       { scope: 'moon', moonId: 40000001, pct: 5, effectiveFrom: '2026-01-01' },
+      { scope: 'miner', minerId: 'm1', pct: 8, effectiveFrom: '2026-01-01' },
       { scope: 'record', recordKey: ctx.recordKey, pct: 2 },
     ];
     const guest = { ...ctx, isGuest: true };
     expect(resolveRate(rates, guest)?.scope).toBe('record');
-    expect(resolveRate(rates.slice(0, 4), guest)?.scope).toBe('moon');
-    expect(resolveRate(rates.slice(0, 3), guest)?.scope).toBe('miner');
+    expect(resolveRate(rates.slice(0, 4), guest)?.scope).toBe('miner');
+    expect(resolveRate(rates.slice(0, 3), guest)?.scope).toBe('moon');
     expect(resolveRate(rates.slice(0, 2), guest)?.scope).toBe('guest');
+  });
+
+  it('prices a miner with a miner rate at the miner rate, even on a moon with a moon rate', () => {
+    const rates: TaxRate[] = [
+      CORP,
+      { scope: 'moon', moonId: 40000001, pct: 5, effectiveFrom: '2026-01-01' },
+      { scope: 'miner', minerId: 'm1', pct: 8, effectiveFrom: '2026-01-01' },
+    ];
+    expect(resolveRate(rates, ctx)).toMatchObject({ scope: 'miner', pct: 8 });
+    expect(resolveRate(rates, { ...ctx, minerId: 'm2' })).toMatchObject({ scope: 'moon', pct: 5 });
   });
 
   it('ignores overrides aimed at another Miner, moon or record', () => {
