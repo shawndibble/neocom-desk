@@ -34,3 +34,23 @@ export async function revokeCorpSyncGrantRemote(
   );
   await revoke(call);
 }
+
+export interface FeederGrantCall {
+  code: string;
+  accessToken: string;
+  refreshToken: string;
+  requestedRatePct?: number;
+}
+
+/** A moon owner's grant (ADR 0025 amendment): the signed-in player is the holder, whichever alt authorised. */
+export async function saveFeederGrantRemote(
+  characterId: number,
+  grant: FeederGrantCall
+): Promise<{ collectorCorporationId: number; feederCorporationId: number; rejoined: boolean }> {
+  await ensureSignedIn(characterId);
+  const save = httpsCallable<
+    FeederGrantCall,
+    { collectorCorporationId: number; feederCorporationId: number; rejoined: boolean }
+  >(getSyncFunctions(), 'saveCorpTaxBookFeederGrantCallable');
+  return (await save(grant)).data;
+}

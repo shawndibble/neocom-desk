@@ -2,6 +2,7 @@
 import {
   startAlertsLogin,
   startCorpSyncLogin,
+  startFeederGrantLogin,
   startLogin,
   scopesForRetry,
   takeRetryBudget,
@@ -119,6 +120,20 @@ export async function beginCorpSyncLogin(
 ): Promise<void> {
   rememberThisPage();
   assignLocation(await startCorpSyncLogin(characterId, corporationId));
+}
+
+/**
+ * Grant a moon owner's ledger to an accounting corporation (ADR 0025 amendment):
+ * a separate SSO round trip where the player picks the Accountant Character on
+ * EVE's login screen, returning to the page it was pressed on.
+ */
+export async function beginFeederGrantLogin(
+  characterId: number,
+  inviteCode: string,
+  requestedRatePct?: number
+): Promise<void> {
+  rememberThisPage();
+  assignLocation(await startFeederGrantLogin(characterId, inviteCode, requestedRatePct));
 }
 
 /**
