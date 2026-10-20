@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect } from 'vitest';
+import { setDecimalMark } from './numberLocale';
 import { maskNumber, unmaskCount, unmaskNumber } from './numberMask';
 
 describe('maskNumber', () => {
@@ -62,5 +63,22 @@ describe('unmaskCount', () => {
   it('returns undefined for blank or garbage', () => {
     expect(unmaskCount('')).toBeUndefined();
     expect(unmaskCount('abc')).toBeUndefined();
+  });
+});
+
+describe('number format', () => {
+  afterEach(() => setDecimalMark('.'));
+
+  it('masks and unmasks with a comma decimal', () => {
+    setDecimalMark(',');
+    expect(maskNumber(6622.35)).toBe('6.622,35');
+    expect(unmaskNumber('6.622,35')).toBe(6622.35);
+    expect(unmaskNumber('1,234')).toBe(1.234);
+    expect(unmaskNumber('1.234')).toBe(1234);
+  });
+
+  it('keeps a typed 1.234 a decimal where the mark is a period', () => {
+    expect(unmaskNumber('1.234')).toBe(1.234);
+    expect(unmaskNumber('1,234')).toBe(1234);
   });
 });

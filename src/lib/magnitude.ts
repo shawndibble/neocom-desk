@@ -6,8 +6,10 @@
  * Distinct from `compactNumber.ts` beside it, which abbreviates the scale
  * ("5.2M"); this keeps the number and trims only the tail.
  */
-const formatter = new Intl.NumberFormat('en', { maximumFractionDigits: 1 });
+import { createNumberFormat } from './numberLocale';
+
+const formatter = createNumberFormat({ maximumFractionDigits: 1 });
 
 export function formatMagnitude(value: number): string {
-  return formatter.format(value);
+  return formatter(value);
 }

@@ -17,6 +17,7 @@
       "backup": "Settings › Data & storage exports a password-protected backup of every character on this device.",
       "timeFormat": "Settings › Display switches timers between your local time and EVE time.",
       "textSize": "Settings › Display changes the text size on this device.",
+      "numberFormat": "Settings › Display switches numbers between 1,234.56 and 1.234,56.",
       "selfUpdate": "Neocom Desk updates itself when you open it or reload the page."
     }
   },
@@ -11724,6 +11725,13 @@
     "timeFormat": {
       "local": "My local time",
       "eve": "EVE time (UTC)"
+    },
+    "numberFormatLabel": "Number format",
+    "numberFormatHint": "How numbers are written on this device. Pasted numbers are read in either format, so a list copied from a client set to another language still works.",
+    "numberFormat": {
+      "auto": "Match my browser ({{example}})",
+      "period": "Period decimal ({{example}})",
+      "comma": "Comma decimal ({{example}})"
     },
     "weekStartLabel": "Week starts on",
     "weekStartHint": "Changes the first day of the week in the Calendar's Month and Fortnight grids. EVE's own in-game calendar starts the week on Monday.",

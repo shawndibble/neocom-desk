@@ -3,6 +3,7 @@ import { VIEW_PREFERENCE_KEYS } from './viewPreferenceKeys';
 import { CALENDAR_VIEW_KEY } from '@/features/character/calendarViewPref';
 import { ASSET_SORT_SETTING_KEY } from '@/features/assets/assetSortPreference';
 import { FONT_SCALE_KEY } from '@/lib/fontScale';
+import { NUMBER_FORMAT_SETTING_KEY } from '@/lib/numberFormat';
 import { TIME_FORMAT_SETTING_KEY } from '@/lib/timeFormat';
 import { MARKET_HUB_SETTING_KEY } from '@/features/market/hub';
 import { ASSUMED_ME_SETTING_KEY } from '@/features/industry/assumedMe';
@@ -56,6 +57,7 @@ describe('VIEW_PREFERENCE_KEYS', () => {
     for (const key of [
       FONT_SCALE_KEY,
       TIME_FORMAT_SETTING_KEY,
+      NUMBER_FORMAT_SETTING_KEY,
       MARKET_HUB_SETTING_KEY,
       ASSUMED_ME_SETTING_KEY,
       ASSUMED_TE_SETTING_KEY,
