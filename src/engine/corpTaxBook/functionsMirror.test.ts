@@ -5,6 +5,7 @@ import { placeOfFactory } from './bookView';
 import { FORFEIT_NO_REPLY_DAYS, forfeitAllowed } from './closeAccount';
 import type { Dismissal } from './dismissals';
 import { extractionId, type SyncExtraction } from './sync';
+import { closePeriod, isDayCovered, reopenPeriod } from './coverage';
 import { DEFAULT_GRACE_HOURS } from './billable';
 import { DEFAULT_OVERDUE_DAYS } from './overdue';
 import { mergeObservedRows, observedRowKey } from './observed';
@@ -301,5 +302,35 @@ describe('functions mirror of the Corp Tax Book engine', () => {
     expect(mirror.BOOK_DEFAULTS.graceHours).toBe(DEFAULT_GRACE_HOURS);
     expect(mirror.BOOK_DEFAULTS.minimumStatement).toBe(DEFAULT_MINIMUM_STATEMENT);
     expect(mirror.BOOK_DEFAULTS.overdueDays).toBe(DEFAULT_OVERDUE_DAYS);
+  });
+});
+
+describe('feeder coverage mirror', () => {
+  const periods = [{ from: '2026-06-01', to: '2026-06-30' }, { from: '2026-07-10' }];
+
+  it('answers isDayCovered the same', () => {
+    for (const day of [
+      '2026-05-31',
+      '2026-06-01',
+      '2026-06-30',
+      '2026-07-01',
+      '2026-07-10',
+      '2027-01-01',
+    ]) {
+      expect(mirror.isDayCovered(periods, day)).toBe(isDayCovered(periods, day));
+    }
+  });
+
+  it('closes periods the same', () => {
+    for (const day of ['2026-07-10', '2026-07-11', '2026-07-01']) {
+      expect(mirror.closePeriod(periods, day)).toEqual(closePeriod(periods, day));
+    }
+  });
+
+  it('reopens periods the same, and refuses the same', () => {
+    const closed = closePeriod(periods, '2026-07-20');
+    expect(mirror.reopenPeriod(closed, '2026-07-20')).toEqual(reopenPeriod(closed, '2026-07-20'));
+    expect(() => mirror.reopenPeriod(periods, '2026-08-01')).toThrow();
+    expect(() => mirror.reopenPeriod(closed, '2026-07-19')).toThrow();
   });
 });

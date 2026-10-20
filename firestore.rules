@@ -495,13 +495,22 @@ service cloud.firestore {
       }
 
       match /{officerOnly}/{docId} {
-        allow get, list: if officerOnly in ['extractions', 'declarations', 'adjustments', 'writeOffs', 'rebills', 'meta', 'audit']
+        allow get, list: if officerOnly in ['extractions', 'declarations', 'adjustments', 'writeOffs', 'rebills', 'meta', 'audit', 'feeders']
           && isOfficer();
         allow write: if false;
       }
     }
 
     match /corpTaxBookTokens/{token} {
+      allow read, write: if false;
+    }
+
+    // Collector books (issue #4507): feeder invite links (keyed by the code's hash)
+    // and the feeder → Collector pointer. Function-only; a client never reads either.
+    match /corpTaxBookFeederInvites/{inviteId} {
+      allow read, write: if false;
+    }
+    match /corpTaxBookFeederOf/{corporationId} {
       allow read, write: if false;
     }
 

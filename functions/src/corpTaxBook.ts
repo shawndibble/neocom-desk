@@ -46,6 +46,15 @@ export const MINERS = 'miners';
 export const META = 'meta';
 export const PAID_DOC = 'paid';
 export const AUDIT = 'audit';
+/** `corpTaxBooks/{collector}/feeders/{feederCorp}`: a feeder's record (issue #4507). */
+export const FEEDERS = 'feeders';
+/** `corpTaxBookFeederInvites/{sha256(code)}`: invite links, function-only. */
+export const FEEDER_INVITES_COLLECTION = 'corpTaxBookFeederInvites';
+/**
+ * `corpTaxBookFeederOf/{feederCorp}`: points a corporation that feeds a book at its
+ * Collector, function-only. Lets "is this corporation a feeder?" be a plain read.
+ */
+export const FEEDER_OF_COLLECTION = 'corpTaxBookFeederOf';
 
 /** Roles are trusted for at most this long without a live check (D7). */
 export const ROLE_CACHE_MS = 10 * 60_000;
