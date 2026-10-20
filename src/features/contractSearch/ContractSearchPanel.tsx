@@ -534,7 +534,15 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
   // screen: the two are published by the same job but cached separately, so a
   // courier read served from Dexie under a live offers read is a real state.
   const activeResult = mode === 'courier' ? courierResult : offersResult;
-  const modeRowCount = mode === 'courier' ? courierRoutes.length : rows.length;
+  // Items rows stay empty until a search names types (R2 is index-only), so the
+  // listed types stand in for them: an index with types is data, not "nothing
+  // synced" — that would hide the filter bar and the search box.
+  const modeRowCount =
+    mode === 'courier'
+      ? courierRoutes.length
+      : haveFull || !offerIndex
+        ? rows.length
+        : offerIndex.types.size;
   const active = mode === 'courier' ? courier : offers;
   /**
    * Per mode, and against that mode's own data: the board on screen spins only
