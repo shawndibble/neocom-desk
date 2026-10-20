@@ -235,6 +235,11 @@ export async function loadCorpBooks(
     for (const corporationId of remembered[c.characterId] ?? []) {
       entry(corporationId).characterIds.add(c.characterId);
     }
+    // The books that bill this Character, whatever corporation they are in (#4517).
+    for (const corporationId of await readBilledBy(c.characterId)) {
+      entry(corporationId).characterIds.add(c.characterId);
+      entry(corporationId).members.add(c.characterId);
+    }
   }
   const books: LoadedCorpBook[] = [];
   for (const [corporationId, { characterIds, members }] of byCorp) {
@@ -248,6 +253,32 @@ export async function loadCorpBooks(
     }
   }
   return books;
+}
+
+/**
+ * The corporations whose books bill a Character, from the pointer the sync writes
+ * (rules: only that Character reads it). A moon owner's miner is billed by a book
+ * that is not their corporation's; nothing else would lead the client to it.
+ */
+export function readBilledByPointer(d: Data | undefined): number[] {
+  const books = d?.books;
+  if (typeof books !== 'object' || books === null) return [];
+  return Object.keys(books)
+    .map(Number)
+    .filter((id) => Number.isInteger(id) && id > 0);
+}
+
+async function readBilledBy(characterId: number): Promise<number[]> {
+  try {
+    return await underFirebaseSession(async () => {
+      const uid = await ensureSignedIn(characterId);
+      const snap = await getDoc(doc(getSyncFirestore(), 'corpTaxBookBilledBy', uid));
+      return readBilledByPointer(snap.data());
+    });
+  } catch {
+    // Offline or signed out: the current and remembered corporations still load.
+    return [];
+  }
 }
 
 const REMEMBERED_KEY = 'corpTaxBookCorps';

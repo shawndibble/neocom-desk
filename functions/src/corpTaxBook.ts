@@ -55,6 +55,12 @@ export const FEEDER_INVITES_COLLECTION = 'corpTaxBookFeederInvites';
  * Collector, function-only. Lets "is this corporation a feeder?" be a plain read.
  */
 export const FEEDER_OF_COLLECTION = 'corpTaxBookFeederOf';
+/**
+ * `corpTaxBookBilledBy/{char:id}`: which books bill a Character, `books[collectorCorp]`
+ * the epoch ms of the last sync that saw them there. Written by the sync, readable by
+ * that Character only, so a miner in a moon owner's corporation finds the book (#4517).
+ */
+export const BILLED_BY_COLLECTION = 'corpTaxBookBilledBy';
 
 /** Roles are trusted for at most this long without a live check (D7). */
 export const ROLE_CACHE_MS = 10 * 60_000;
