@@ -615,7 +615,17 @@ export async function syncOneFeeder(
   // A revoke or replacement that landed during the (slow) reads must not leave this token writing.
   const latest = (await grantRef(deps.db, feederCorporationId).get()).data() as
     CorpSyncGrantDoc | undefined;
-  if (latest?.encryptedRefreshToken !== live.encryptedRefreshToken) {
+  const feederNow = (
+    await bookRef(deps.db, collectorCorporationId)
+      .collection(FEEDERS)
+      .doc(String(feederCorporationId))
+      .get()
+  ).data() as FeederRecord | undefined;
+  if (
+    latest?.encryptedRefreshToken !== live.encryptedRefreshToken ||
+    !feederNow ||
+    !READABLE_FEEDER_STATUSES.includes(feederNow.status)
+  ) {
     return finish({ outcome: 'none', reason: 'esi-unavailable' }, false, live);
   }
   await mergeObservedInto(bookDeps(deps), collectorCorporationId, read.rows);

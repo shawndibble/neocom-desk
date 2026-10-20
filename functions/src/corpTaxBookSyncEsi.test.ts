@@ -80,34 +80,3 @@ describe('esiSyncReader', () => {
     expect(await esi.structureSystem(5, 'tok')).toMatchObject({ kind: 'ok', data: 30000142 });
   });
 });
-
-describe('esiSyncReader If-None-Match', () => {
-  it('sends the ETag back and reads a 304 as the cached body', async () => {
-    const sent: (string | null)[] = [];
-    let call = 0;
-    const fetchImpl = (async (_url: string, init: RequestInit) => {
-      sent.push(new Headers(init.headers).get('If-None-Match'));
-      call += 1;
-      return call === 1
-        ? json([{ observer_id: 7 }], { ETag: '"abc"' })
-        : new Response(null, { status: 304 });
-    }) as unknown as typeof fetch;
-    const esi = esiSyncReader(fetchImpl);
-    expect(await esi.observers(1, 'tok')).toMatchObject({ kind: 'ok', data: [7] });
-    expect(await esi.observers(1, 'tok')).toMatchObject({ kind: 'ok', data: [7] });
-    expect(sent).toEqual([null, '"abc"']);
-  });
-
-  it('still refuses a revoked token even with a cached body', async () => {
-    let call = 0;
-    const fetchImpl = (async () => {
-      call += 1;
-      return call === 1
-        ? json([{ observer_id: 7 }], { ETag: '"abc"' })
-        : new Response(null, { status: 403 });
-    }) as unknown as typeof fetch;
-    const esi = esiSyncReader(fetchImpl);
-    await esi.observers(1, 'tok');
-    expect(await esi.observers(1, 'tok')).toEqual({ kind: 'forbidden' });
-  });
-});

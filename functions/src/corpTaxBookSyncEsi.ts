@@ -55,12 +55,8 @@ export interface SyncEsi {
   budgetLow(): boolean;
 }
 
-/** Bodies kept for `If-None-Match`, per reader (one scheduled run); oldest dropped first. */
-const MAX_ETAGS = 500;
-
 export function esiSyncReader(fetchImpl: typeof fetch = fetch): SyncEsi {
   let low = false;
-  const etags = new Map<string, { etag: string; body: unknown; pages: number }>();
 
   async function get(
     path: string,
@@ -69,11 +65,9 @@ export function esiSyncReader(fetchImpl: typeof fetch = fetch): SyncEsi {
     { kind: 'ok'; body: unknown; pages: number } | { kind: 'fail'; read: EsiRead<never> }
   > {
     let res: Response;
-    const cached = etags.get(path);
     try {
       res = await fetchImpl(`${ESI_BASE}${path}`, {
         headers: {
-          ...(cached ? { 'If-None-Match': cached.etag } : {}),
           Authorization: `Bearer ${accessToken}`,
           'User-Agent': ESI_USER_AGENT,
           'X-User-Agent': ESI_USER_AGENT,
@@ -93,20 +87,11 @@ export function esiSyncReader(fetchImpl: typeof fetch = fetch): SyncEsi {
       low = true;
       return { kind: 'fail', read: { kind: 'backoff' } };
     }
-    // ESI checks the token before it answers 304, so a revoked token never reads a cached body.
-    if (res.status === 304 && cached) return { kind: 'ok', body: cached.body, pages: cached.pages };
     if (!res.ok) return { kind: 'fail', read: { kind: 'unavailable' } };
     const body: unknown = await res.json().catch(() => null);
     if (body === null) return { kind: 'fail', read: { kind: 'unavailable' } };
     const pages = Number(res.headers.get('X-Pages'));
-    const pageCount = Number.isSafeInteger(pages) && pages > 1 ? pages : 1;
-    const etag = res.headers.get('ETag');
-    if (etag) {
-      etags.delete(path);
-      etags.set(path, { etag, body, pages: pageCount });
-      if (etags.size > MAX_ETAGS) etags.delete(etags.keys().next().value as string);
-    }
-    return { kind: 'ok', body, pages: pageCount };
+    return { kind: 'ok', body, pages: Number.isSafeInteger(pages) && pages > 1 ? pages : 1 };
   }
 
   async function paged<T>(path: string, accessToken: string): Promise<EsiRead<T[]>> {
