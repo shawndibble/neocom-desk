@@ -100,4 +100,19 @@ describe('useSurvey polling', () => {
     });
     expect(loadSurvey).toHaveBeenCalledTimes(1);
   });
+
+  it('re-reads when the tab becomes visible again', async () => {
+    loadSurvey.mockResolvedValue(ok([scan(1)]));
+    const { result } = renderHook(() => useSurvey(ID));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    loadSurvey.mockResolvedValue(ok([scan(1), scan(2)]));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(6_000);
+      document.dispatchEvent(new Event('visibilitychange'));
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect((result.current.state as { scans: SurveyScan[] }).scans).toHaveLength(2);
+  });
 });

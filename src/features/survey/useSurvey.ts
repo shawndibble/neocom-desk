@@ -38,7 +38,7 @@ type Loaded = { id: string; result: LoadSurveyResult } | null;
 /**
  * What a poll should leave on screen. A poll that finds nothing new, or that
  * fails for a moment, keeps the very same state, so the page isn't re-rendered
- * (or swapped for an error and back) every minute. Scans only ever get
+ * (or swapped for an error and back) on every poll. Scans only ever get
  * appended, so a matching count and times, and the same ignored set, mean nothing changed.
  */
 function settle(prev: Loaded, id: string, result: LoadSurveyResult): Loaded {
