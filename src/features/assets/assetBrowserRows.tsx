@@ -26,11 +26,11 @@ import { formatUnitVolume } from '@/lib/volume';
 import { securityStatusColor } from '@/engine/securityStatus';
 import { formatBadge } from './assetBrowserFormat';
 import type { JumpsAwayResult } from '@/engine/clone/jumpsAway';
-import type { PinState } from '@/features/character/stationPins';
-import type { SelectionState } from '@/features/character/assetSelection';
+import type { PinState } from '@/features/assets/stationPins';
+import type { SelectionState } from '@/features/assets/assetSelection';
 import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
 import { PlaceJumpsLink } from '@/features/route/JumpsLink';
-import { SelectionCheckbox } from './SelectionCheckbox';
+import { SelectionCheckbox } from '@/features/character/SelectionCheckbox';
 import type { BlueprintKind } from '@/engine/blueprintKind';
 
 export type Translate = (key: string, opts?: Record<string, unknown>) => string;

@@ -45,7 +45,7 @@ import { CharacterFilterControl } from '@/features/character/CharacterFilterCont
 import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
 import { useResolvedCharacterFilter } from '@/features/character/characterFilterValue';
 import { characterFilterParam } from '@/features/character/characterFilterUrlParam';
-import { SecurityValue } from '@/features/character/assetBrowserRows';
+import { SecurityValue } from '@/features/assets/assetBrowserRows';
 import { useUrlParam, useUrlSort } from '@/lib/useUrlState';
 import {
   loadMiningYieldSnapshot,

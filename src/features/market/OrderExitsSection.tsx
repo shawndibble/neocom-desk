@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Disclosure } from '@/components/ui';
 import { cx } from '@/lib/cx';
 import { formatMarketIsk } from '@/lib/isk';
-import { JumpsAwayText } from '@/features/character/assetBrowserRows';
+import { JumpsAwayText } from '@/features/assets/assetBrowserRows';
 import { BASE_STATION_REPROCESSING_RATE } from '@/engine/industry/reprocessing';
 import {
   appliedRefiningImplantPct,

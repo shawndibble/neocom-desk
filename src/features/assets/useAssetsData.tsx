@@ -9,7 +9,7 @@ import type { EsiEndpointId } from '@/esi/registry';
 import { clearStationPin, setAccountStationPin, setCharacterStationPin } from '@/sync';
 import { db, type BuildPlanRecord } from '@/db';
 import { useCharacters } from '@/features/character/useCharacters';
-import { nextPinState, pinStateForStation, type PinState } from '@/features/character/stationPins';
+import { nextPinState, pinStateForStation, type PinState } from '@/features/assets/stationPins';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
 import {
   useResolvedCharacterFilter,
@@ -23,7 +23,7 @@ import { boolParam, textParam } from '@/lib/urlState';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { useBlueprintTypeIds } from '@/features/character/useBlueprintTypeIds';
 import type { TableExport } from '@/components/ui/useTableExport';
-import { assetCsvRows, assetsCsvColumns, type AssetCsvRow } from '@/features/character/assetsCsv';
+import { assetCsvRows, assetsCsvColumns, type AssetCsvRow } from '@/features/assets/assetsCsv';
 import { withoutAbyssalTypePrices } from '@/engine/market/abyssalValuation';
 import { useAbyssalAssetEstimates } from '@/features/abyssal/useAbyssalAssetEstimates';
 import { parseIskAmount } from '@/lib/isk';

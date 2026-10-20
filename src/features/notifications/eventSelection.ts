@@ -22,7 +22,7 @@
  * read rather than migrating on write means a device that downgrades does not
  * lose its settings.
  */
-import type { SelectionState } from '@/features/character/assetSelection';
+import type { SelectionState } from '@/features/assets/assetSelection';
 import { NOTIFICATION_EVENTS, type NotificationEventId } from './events';
 
 export const NOTIFICATION_CHANNELS = ['browser', 'feed'] as const;

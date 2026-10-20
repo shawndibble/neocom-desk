@@ -6,7 +6,7 @@
  * structure (`resolveBlueprintPlacement`), never a container's id.
  */
 import type { CharacterBlueprint } from '@/esi/endpoints';
-import { loadCharacterAssets } from '@/features/character/assets';
+import { loadCharacterAssets } from '@/features/assets/assets';
 import { loadCharacterBlueprints } from '@/features/industry/data';
 import { resolveBlueprintPlacement } from '@/features/industry/ownedBlueprints';
 

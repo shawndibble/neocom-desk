@@ -36,7 +36,7 @@ vi.mock('firebase/firestore/lite', () => ({
 }));
 vi.mock('@/sync/firebaseApp', () => ({ getSyncFirestore: () => ({}) }));
 const loadAllCharactersAssets = vi.hoisted(() => vi.fn());
-vi.mock('@/features/character/assets', () => ({ loadAllCharactersAssets }));
+vi.mock('@/features/assets/assets', () => ({ loadAllCharactersAssets }));
 vi.mock('@/sync/syncAuth', () => ({ ensureAnySession: vi.fn(async () => 'char:7') }));
 
 function controller(overrides: Partial<AppraisalController> = {}): AppraisalController {

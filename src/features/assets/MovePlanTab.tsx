@@ -9,7 +9,7 @@ import { planMove, type MoveHull, type PackHold } from '@/engine/assets/movePlan
 import {
   loadOtherCharactersAssetsDetailed,
   type SkippedCharacterAssets,
-} from '@/features/character/assets';
+} from '@/features/assets/assets';
 import { resolvePlace } from '@/features/places';
 import { loadTypeNames, loadTypePackagedVolumes } from '@/features/character/typeNames';
 import { usePilotProfile } from '@/features/fittings/fittingPilotProfile';

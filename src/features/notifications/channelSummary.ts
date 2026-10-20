@@ -3,7 +3,7 @@
  * shows: a tri-state per delivery channel, and which Characters are the odd
  * ones out. Pure: the caller supplies how to read one Character's value.
  */
-import type { SelectionState } from '@/features/character/assetSelection';
+import type { SelectionState } from '@/features/assets/assetSelection';
 import { NOTIFICATION_CHANNELS, type NotificationChannel } from './eventSelection';
 
 export interface ChannelSummary {

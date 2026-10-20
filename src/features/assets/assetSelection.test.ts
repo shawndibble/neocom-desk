@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseAppraisalPaste } from '../../engine/market/appraisalPaste';
+import { parseAppraisalPaste } from '@/engine/market/appraisalPaste';
 import {
   selectionStateForIds,
   toggleSelection,

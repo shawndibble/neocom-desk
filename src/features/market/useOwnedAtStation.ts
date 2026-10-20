@@ -4,7 +4,7 @@
  */
 import { useEffect, useState } from 'react';
 import { ownedAnywhere, ownedAtStation } from '@/engine/market/appraisalOwned';
-import { loadAllCharactersAssets } from '@/features/character/assets';
+import { loadAllCharactersAssets } from '@/features/assets/assets';
 
 export interface OwnedAtStation {
   /** Null while off, loading, or when nothing could be read. */

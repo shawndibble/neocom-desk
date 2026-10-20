@@ -16,7 +16,7 @@ import {
 } from '@/components/ui';
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import { formatIsk } from '@/lib/isk';
-import { SecurityValue } from '@/features/character/assetBrowserRows';
+import { SecurityValue } from '@/features/assets/assetBrowserRows';
 import * as Icon from '@/components/ui/icons';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { editEntry, type CombinedMemberValues } from './ledgerActions';

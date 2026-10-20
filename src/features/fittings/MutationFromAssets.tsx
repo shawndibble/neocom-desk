@@ -12,7 +12,7 @@ import type { MutaplasmidLookup } from '@/engine/fittings/mutaplasmids';
 import { rollRows, type BaseValue } from '@/engine/fittings/mutationEdit';
 import type { ItemMutation } from '@/engine/fittings/types';
 import { mutationsForItems } from '@/features/abyssal/dynamicItems';
-import { loadCharacterAssets } from '@/features/character/assets';
+import { loadCharacterAssets } from '@/features/assets/assets';
 import { useRetryFocus } from '@/lib/useRetryFocus';
 import { loadBaseValues } from './loadBaseValues';
 

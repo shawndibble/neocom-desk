@@ -14,7 +14,7 @@ import {
   StatChip,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { SecurityValue } from '@/features/character/assetBrowserRows';
+import { SecurityValue } from '@/features/assets/assetBrowserRows';
 import type { MiningTaxAssignmentRecord } from '@/db';
 import { STATUS_LABEL_KEY } from '@/engine/miningTax/rowStatus';
 import { formatIsk } from '@/lib/isk';
