@@ -40,15 +40,10 @@ import {
 } from '@/engine/industry/autoMakeOrBuy';
 import { craftScope } from '@/engine/industry/craftScope';
 import { ownedStockSale, sellableMaterials } from '@/engine/industry/ownedStockSale';
-import type {
-  FacilityKind,
-  MaterialPriceBasis,
-  MaterialSourcing,
-  RigKind,
-} from '@/engine/industry/types';
+import type { FacilityKind, MaterialPriceBasis, RigKind } from '@/engine/industry/types';
 import { rigKindLabelKey } from './rigFitLabels';
 import { RigMatchHelper } from './RigMatchHelper';
-import type { BuildPlanChange, SourcingPatchEntry } from './buildPlanStore';
+import type { BuildPlanChange } from './buildPlanStore';
 import type { BuildGroup, BuildGroupSnapshot } from './buildGroups';
 import { GroupTargetLink } from './GroupTargetLink';
 import {
@@ -58,21 +53,9 @@ import {
 } from './planFacilityContext';
 import { REACTION_FACILITY_PRESETS } from './reactionFacilityDefaults';
 import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
-import {
-  hydrateActivityFacilityDefaults,
-  loadActivityFacilityDefaults,
-  rememberActivityLocations,
-} from './facilityDefaults';
-import { rememberedLocationsFromEdit } from './rememberLocationFromEdit';
+import { hydrateActivityFacilityDefaults } from './facilityDefaults';
 import { applyCostIndexOverride, costIndexSource, parseCostIndexPct } from './costIndexOverride';
-import {
-  facilityMemoryKey,
-  forgetFacility,
-  memoryFromPlan,
-  patchFromMemory,
-  recallFacility,
-  rememberFacility,
-} from './facilityMemory';
+import { facilityMemoryKey, patchFromMemory, recallFacility } from './facilityMemory';
 import { retargetPatch } from './retargetPatch';
 import { DEFAULT_TRADE_HUB, TRADE_HUBS, getTradeHub } from '@/market/hubs';
 import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
@@ -150,6 +133,7 @@ import { BuildLocationPicker } from './BuildLocationPicker';
 import { buildLocationLabel } from './buildLocationLabel';
 import { buildLocationPatch, reactionBuildLocationPatch } from './buildLocationPatch';
 import { useDerivedSecurityBand } from './useDerivedSecurityBand';
+import { usePlanEdits } from './usePlanEdits';
 
 /** The Build Plan fields this panel edits, sent as an `edit` `BuildPlanChange`. */
 export type PlanPatch = Partial<
@@ -301,6 +285,16 @@ export function BuildPlanDetail({
   const entry = catalog.byBlueprintTypeID.get(plan.blueprintTypeID) ?? null;
   const blueprint = useMemo(() => (entry ? toIndustryBlueprint(entry.blueprint) : null), [entry]);
   const activity = blueprint ? industryActivityOf(blueprint) : 'manufacturing';
+  const {
+    latestPlan,
+    latestOnChange,
+    update,
+    movePlan,
+    changeSourcing,
+    changeOneSourcing,
+    toggleBuildHere,
+    toggleIncludeReactions,
+  } = usePlanEdits(plan, activity, onChange);
   const hub = useMemo(() => getTradeHub(plan.hubId) ?? DEFAULT_TRADE_HUB, [plan.hubId]);
   const productTypeID = entry?.productTypeID ?? null;
   const vs90dTargets = useMemo(
@@ -549,12 +543,6 @@ export function BuildPlanDetail({
   // pick: its rigs and tax while it still has none of its own, and the cost
   // index where ESI has none. Once per facility, and not keyed on the override
   // itself — a pilot clearing it must not have it recalled straight back.
-  const latestPlan = useRef(plan);
-  const latestOnChange = useRef(onChange);
-  useEffect(() => {
-    latestPlan.current = plan;
-    latestOnChange.current = onChange;
-  });
   const memoryKey = facilityMemoryKey(plan);
   const recalledFor = useRef<{ rigs: string | null; index: string | null }>({
     rigs: null,
@@ -581,7 +569,7 @@ export function BuildPlanDetail({
       }
       if (Object.keys(patch).length > 0) latestOnChange.current({ kind: 'edit', patch });
     });
-  }, [costIndexMissing, memoryKey]);
+  }, [costIndexMissing, memoryKey, latestPlan, latestOnChange]);
 
   // The Reaction Location's own cost index — a second, independent fetch
   // (issue #698): sharing `snapshot` would charge a reaction job at the
@@ -1008,135 +996,6 @@ export function BuildPlanDetail({
   // the blueprint has no product. Shared by the Results panel and the
   // Production Runs panel's "Log Production" default below.
   const productQuantity = blueprint.products[0] ? blueprint.products[0].quantity * plan.runs : null;
-
-  /** A plan edit that is not the pilot choosing a place — see {@link update}. */
-  function editPlan(patch: PlanPatch) {
-    onChange({ kind: 'edit', patch });
-  }
-
-  /**
-   * Every control's edit. One that moves the plan's location — or its
-   * Reaction Location — also remembers the result as where the pilot's next
-   * plan of that activity starts. Edits that touch no location fields
-   * remember nothing, so this is safe for every control on the page.
-   */
-  function update(patch: PlanPatch, { moved = false }: { moved?: boolean } = {}) {
-    editPlan(patch);
-    if (!moved) rememberFacilityFromEdit(patch);
-    const remembered = rememberedLocationsFromEdit(plan, patch, activity);
-    if (remembered.manufacturing || remembered.reaction) {
-      void rememberActivityLocations(remembered);
-    }
-  }
-
-  /**
-   * Saves what the pilot just set for this facility — rigs, tax and the cost
-   * index they typed (the field only exists where ESI has none) — so any other
-   * plan built there starts with it
-   * (`facilityMemory.ts`). A cleared index is forgotten, so a deliberate clear
-   * is not undone by the recall on the next visit.
-   */
-  function rememberFacilityFromEdit(patch: PlanPatch) {
-    const next = { ...plan, ...patch };
-    if ('costIndexOverridePct' in patch && patch.costIndexOverridePct === undefined) {
-      void forgetFacility(next, 'costIndexPct');
-    }
-    const touched =
-      'rigFit' in patch ||
-      'rigLevel' in patch ||
-      'facilityTaxPct' in patch ||
-      patch.costIndexOverridePct !== undefined;
-    if (!touched) return;
-    const memory = memoryFromPlan(next);
-    if (Object.keys(memory).length > 0) void rememberFacility(next, memory);
-  }
-
-  /**
-   * Moves the plan to another place, then fills in what the pilot already told
-   * the app about it. The override is tied to the system it was read for, so it
-   * is dropped first; the recall may bring one back for the new place. Skips
-   * `rememberFacilityFromEdit`: the plan still carries the old place's rigs for
-   * a moment, and filing those under the new one would poison it.
-   */
-  function movePlan(patch: PlanPatch) {
-    update({ ...patch, costIndexOverridePct: undefined }, { moved: true });
-    const place = { ...plan, ...patch };
-    const key = facilityMemoryKey(place);
-    void recallFacility(place).then((memory) => {
-      // The pilot moved again while this was read: the answer is for a place
-      // they have already left.
-      if (!memory || facilityMemoryKey(latestPlan.current) !== key) return;
-      update(patchFromMemory(memory, place.facility), { moved: true });
-    });
-  }
-
-  function changeSourcing(edits: readonly SourcingPatchEntry[]) {
-    onChange({ kind: 'sourcing', edits });
-  }
-
-  function changeOneSourcing(typeID: number, patch: MaterialSourcing) {
-    changeSourcing([{ typeID, patch }]);
-  }
-
-  /**
-   * Switches one material between being bought and being produced here.
-   *
-   * The whole list is rewritten rather than the single entry toggled in place,
-   * because it is a plain field on the record — unlike `materialSourcing`,
-   * which is a nested map and so needs the read-modify-write path a
-   * `sourcing` change takes.
-   */
-  function toggleBuildHere(typeID: number) {
-    const current = plan.buildHere ?? [];
-    update({
-      buildHere: current.includes(typeID)
-        ? current.filter((id) => id !== typeID)
-        : [...current, typeID],
-    });
-  }
-
-  /**
-   * Include Reactions (issue #698). Turning it on for the first time — no
-   * Reaction Location configured yet — pre-fills the whole Reaction Location
-   * from the remembered reaction default (`reactionFacilityDefaults.ts`), the
-   * place the pilot last set reactions to run. Turning it off only clears the
-   * flag: the Reaction Location itself is left alone, so flipping it back on
-   * doesn't lose whatever the pilot configured.
-   *
-   * Through `editPlan`, not `update`: the pre-fill *is* the remembered
-   * default, so writing it back would only re-stamp it as a fresh choice.
-   * Awaits hydration, so a click that lands before the stored record has
-   * loaded still pre-fills the remembered place, not the built-in default.
-   */
-  function toggleIncludeReactions(next: boolean) {
-    if (next && plan.reactionFacility === undefined) {
-      void loadActivityFacilityDefaults().then(({ reaction: seed }) =>
-        editPlan({
-          includeReactions: true,
-          reactionFacility: seed.facility,
-          reactionRigFit: seed.rigFit,
-          reactionFacilityTaxPct: seed.facilityTaxPct ?? undefined,
-          // Only what the record holds: an absent band already reads as
-          // highsec, and an absent system as the hub's.
-          ...(seed.security !== undefined ? { reactionSecurity: seed.security } : {}),
-          ...(seed.buildSystemId !== undefined && seed.buildSystemName !== undefined
-            ? {
-                reactionBuildSystemId: seed.buildSystemId,
-                reactionBuildSystemName: seed.buildSystemName,
-              }
-            : {}),
-          ...(seed.buildLocationId !== undefined
-            ? { reactionBuildLocationId: seed.buildLocationId }
-            : {}),
-          ...(seed.buildLocationName !== undefined
-            ? { reactionBuildLocationName: seed.buildLocationName }
-            : {}),
-        })
-      );
-    } else {
-      editPlan({ includeReactions: next });
-    }
-  }
 
   /**
    * Auto Build (issue #695): a one-shot bulk write, not a persistent policy
