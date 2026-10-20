@@ -64,4 +64,54 @@ describe('ContractTimeline', () => {
     const accepted = screen.getByText('Accepted').closest('li')!;
     expect(accepted).toHaveTextContent('Waiting');
   });
+
+  it('ends a withdrawn contract on its outcome, with no acceptance to wait for and no date to invent', () => {
+    render(
+      <ContractTimeline
+        steps={[
+          { key: 'issued', done: true, atMs: issued },
+          { key: 'cancelled', done: true, atMs: null },
+        ]}
+      />
+    );
+    const steps = screen.getAllByRole('listitem');
+    expect(steps.map((li) => li.querySelector('b')?.textContent)).toEqual(['Issued', 'Cancelled']);
+    expect(screen.queryByText('Waiting')).not.toBeInTheDocument();
+    // The outcome carries no second line: ESI does not say when.
+    expect(steps[1]!.querySelector('span:not([aria-hidden])')).toBeNull();
+  });
+
+  it('names every way a contract can end without completing', () => {
+    for (const [key, label] of [
+      ['deleted', 'Deleted'],
+      ['rejected', 'Rejected'],
+      ['failed', 'Failed'],
+      ['reversed', 'Reversed'],
+    ] as const) {
+      const { unmount } = render(
+        <ContractTimeline
+          steps={[
+            { key: 'issued', done: true, atMs: issued },
+            { key, done: true, atMs: null },
+          ]}
+        />
+      );
+      expect(screen.getByText(label)).toBeInTheDocument();
+      unmount();
+    }
+  });
+
+  it('dates a lapsed contract as expired, not as expiring', () => {
+    render(
+      <ContractTimeline
+        steps={[
+          { key: 'issued', done: true, atMs: issued },
+          { key: 'expired', done: true, atMs: Date.UTC(2026, 9, 31, 17, 25) },
+        ]}
+      />
+    );
+    expect(screen.getByText('Expired')).toBeInTheDocument();
+    expect(screen.queryByText('Expires')).not.toBeInTheDocument();
+    expect(screen.getByText(/10\/31\/2026/)).toBeInTheDocument();
+  });
 });

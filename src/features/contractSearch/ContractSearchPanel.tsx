@@ -62,7 +62,11 @@ import {
   type ContractSaleKind,
   type ContractTypeOption,
 } from '@/engine/contracts/contractSearch';
-import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
+import {
+  bpcRowsFromContractOffers,
+  type PublicContractOfferRow,
+} from '@/engine/contracts/contractOffers';
+import { bpcPerRunCheck } from '@/engine/contracts/bpcPerRunCheck';
 import {
   resolveCourierRoutes,
   type PublicCourierContractRow,
@@ -524,6 +528,20 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
     void setVisibleItemsColumns(next);
   }
   const [selectedRow, setSelectedRow] = useState<PublicContractOfferRow | null>(null);
+  // A blueprint copy has no market price, so an opened one is held per run
+  // against the other copies of the same blueprint, as BPC Sourcing does.
+  // Absent for anything that is not a copy. The rows are those read for the
+  // search, so a contract that bundles other types looks single-type here: its
+  // price is then divided by one blueprint's runs. That can only raise a rate,
+  // so the cheapest is safe, and the median shrugs off the odd bundle.
+  const selectedBpcCheck = useMemo(() => {
+    if (!selectedRow?.isBlueprintCopy) return undefined;
+    const copies = bpcRowsFromContractOffers(rows);
+    const subject = copies.find(
+      (copy) => copy.contractId === selectedRow.contractId && copy.typeId === selectedRow.typeId
+    );
+    return subject ? bpcPerRunCheck(subject, copies) : null;
+  }, [selectedRow, rows]);
 
   // Freshness and the offline banner both name the snapshot actually on
   // screen: the two are published by the same job but cached separately, so a
@@ -1076,6 +1094,7 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
               : offerAskingPrice(selectedRow, plexPrice)
           }
           searchedTypeIds={typeIds}
+          bpcCheck={selectedBpcCheck}
           onClose={() => setSelectedRow(null)}
         />
       )}

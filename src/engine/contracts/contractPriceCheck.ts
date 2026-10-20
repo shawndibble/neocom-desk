@@ -23,6 +23,12 @@ export function percentDifference(asking: number, reference: number): number | n
 export interface PriceCheckLine {
   typeId: number;
   quantity: number;
+  /**
+   * The hub has no price for this line whatever its type's book says: a
+   * blueprint *copy* shares a type with the original, which trades, but a copy
+   * never does. Counted unpriced, so the original's price never stands in for it.
+   */
+  unpriceable?: true;
 }
 
 export interface LinesValue {
@@ -45,7 +51,7 @@ export function valueLines(
   let total = 0;
   let pricedLines = 0;
   for (const line of lines) {
-    const unit = unitPrices.get(line.typeId);
+    const unit = line.unpriceable ? null : unitPrices.get(line.typeId);
     if (unit == null || !(unit > 0)) continue;
     total += unit * line.quantity;
     pricedLines += 1;

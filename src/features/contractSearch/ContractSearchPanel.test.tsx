@@ -844,6 +844,46 @@ describe('ContractSearchPanel — contract detail modal', () => {
     expect(within(check).getByText('−16.7%')).toBeInTheDocument();
   });
 
+  it("holds a blueprint copy per run against similar copies, never against the original's hub price", async () => {
+    // 638 trades at the hub as an original (a copy never does): its book must not stand in.
+    getHubPricesWithStatus.mockResolvedValue({
+      prices: new Map([[638, { sellMin: 1_135_000_000, buyMax: 1_000_000_000 }]]),
+      unreachable: false,
+    } as never);
+    const copy = (contractId: number, price: number, over = {}) =>
+      row({
+        contractId,
+        typeId: 638,
+        price,
+        quantity: 1,
+        isBlueprintCopy: true,
+        me: 10,
+        te: 20,
+        runs: 5,
+        ...over,
+      });
+    loadPublicContractOffers.mockResolvedValue(
+      cachedSnapshot([
+        copy(21, 4_000_000), // 800,000 a run: the cheapest, so the first row
+        copy(22, 5_000_000), // 1,000,000
+        copy(23, 5_500_000), // 1,100,000
+        copy(24, 6_000_000, { me: 9 }), // 1,200,000
+      ])
+    );
+    const user = userEvent.setup();
+    renderWithRouter(['/?items.type=638']);
+
+    await user.click((await bodyRows())[0]);
+
+    const check = await screen.findByRole('region', {
+      name: 'Is it fair? · 3 similar copies for sale now',
+    });
+    expect(within(check).getByText('800,000 ISK')).toBeInTheDocument(); // this copy
+    expect(within(check).getByText('1,100,000 ISK')).toBeInTheDocument(); // the median of the rest
+    expect(screen.queryByText('1,135,000,000 ISK')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Sell orders' })).not.toBeInTheDocument();
+  });
+
   it('tags the line that was searched for in the detail, and nothing when no search is active', async () => {
     const user = userEvent.setup();
     const first = renderWithRouter(['/?items.type=34&items.q=Tritanium']);
