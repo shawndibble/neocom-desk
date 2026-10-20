@@ -130,7 +130,7 @@ export function BelowMarketResults({
           if (location.systemName === null) return <span className="text-text-dim">—</span>;
           return (
             <>
-              <span className={entityLinkClassName()}>{location.systemName}</span>
+              <span>{location.systemName}</span>
               {location.security !== null && (
                 <>
                   {' '}
