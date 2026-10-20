@@ -14126,7 +14126,7 @@
           "own-book-exists": "This corporation already keeps its own book. Delete it before letting another corporation handle the tax.",
           "already-feeder": "This corporation is already handled by an accounting corporation.",
           "feeder-active": "This corporation is already connected.",
-          "token-mismatch": "That login did not match your signed-in account. Try again."
+          "token-mismatch": "That login did not match your logged-in account. Try again."
         }
       },
       "consent": {
