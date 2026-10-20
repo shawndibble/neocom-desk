@@ -132,8 +132,7 @@ afterAll(() => server.close());
 /**
  * Issue #3525: the own-contract modal is the only place an own contract's
  * place appears, so its system links to Route Safety like the Public and
- * Courier modals' do. The station itself stays plain (§6c: Station is not
- * clickable).
+ * Courier modals' do. The station name links to its Place Info (issue #4455).
  */
 describe('ContractDetailModal System rows', () => {
   const JITA_STATION = 60003760;
@@ -161,8 +160,10 @@ describe('ContractDetailModal System rows', () => {
     const link = await screen.findByRole('link', { name: 'Jita' });
     expect(link).toHaveAttribute('href', expect.stringContaining('30000142'));
     expect(screen.getAllByRole('link', { name: /^(Jita|Amarr)$/ })).toHaveLength(1);
-    expect(screen.queryByRole('link', { name: 'Jita IV - Moon 4' })).toBeNull();
-    expect(screen.getByText('Jita IV - Moon 4')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Jita IV - Moon 4' })).toHaveAttribute(
+      'href',
+      expect.stringContaining(`info=place-${JITA_STATION}`)
+    );
   });
 
   it('links both endpoint systems on a courier contract', async () => {
@@ -185,7 +186,14 @@ describe('ContractDetailModal System rows', () => {
       expect.stringContaining('30002187')
     );
     expect(screen.getAllByRole('link', { name: /^(Jita|Amarr)$/ })).toHaveLength(2);
-    expect(screen.queryByRole('link', { name: /Emperor Family Academy/ })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Jita IV - Moon 4' })).toHaveAttribute(
+      'href',
+      expect.stringContaining(`info=place-${JITA_STATION}`)
+    );
+    expect(screen.getByRole('link', { name: /Emperor Family Academy/ })).toHaveAttribute(
+      'href',
+      expect.stringContaining(`info=place-${AMARR_STATION}`)
+    );
   });
 
   it('hides the System row when the system cannot be resolved', async () => {

@@ -27,7 +27,7 @@ import { IskAmount, Modal, Tooltip } from '@/components/ui';
 import { CopyContractIdButton } from '@/features/contracts/CopyContractIdButton';
 import { OpenInEveButton } from '@/features/openInEve/OpenInEveButton';
 import { Caret } from '@/components/ui/Disclosure';
-import { SystemLink } from '@/features/entities';
+import { PlaceLink, SystemLink } from '@/features/entities';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import { formatIsk, formatIskAuto } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
@@ -142,6 +142,15 @@ function useRouteExposure(
   }, [originSystemId, destinationSystemId, rules, network, routeKey, hydrated]);
 
   return measured?.key === routeKey ? measured.exposure : null;
+}
+
+/** The station name, linked to its Place Info once it resolved; the `#id` fallback stays plain. */
+function endpointPlace(endpoint: CourierEndpoint): ReactNode {
+  return endpoint.name === null ? (
+    endpointName(endpoint)
+  ) : (
+    <PlaceLink id={endpoint.locationId}>{endpoint.name}</PlaceLink>
+  );
 }
 
 /**
@@ -343,7 +352,7 @@ export function CourierContractDetailModal({
             {/* Wraps rather than truncates: the station name and its region
                 are the whole reason this row exists, and the old `truncate`
                 clipped the region off both ends. */}
-            <span className="text-sm">{endpointName(row.origin)}</span>
+            <span className="text-sm">{endpointPlace(row.origin)}</span>
             {place(row.origin)}
           </div>
 
@@ -404,7 +413,7 @@ export function CourierContractDetailModal({
 
           <div className="flex flex-col gap-0.5">
             <span className={eyebrowClassName}>{t('contractSearch.dropOffLabel')}</span>
-            <span className="text-sm">{endpointName(row.destination)}</span>
+            <span className="text-sm">{endpointPlace(row.destination)}</span>
             {place(row.destination)}
           </div>
 

@@ -64,6 +64,17 @@ describe('OrderRowDetail', () => {
     expect(screen.getByText(/87 days left/)).toBeInTheDocument();
   });
 
+  it('links the station name to its Place Info, and leaves an unresolved structure plain', () => {
+    const { unmount } = renderDetail();
+    expect(
+      screen.getByRole('link', { name: 'Jita IV - Moon 4 - Caldari Navy Assembly Plant' })
+    ).toHaveAttribute('href', expect.stringContaining(`info=place-${JITA_44}`));
+    unmount();
+    renderDetail({ order: { ...ORDER, location_id: 1_000_000_000_001 } });
+    expect(screen.queryByRole('link', { name: /Caldari Navy/ })).toBeNull();
+    expect(screen.queryByRole('link', { name: /structure/i })).toBeNull();
+  });
+
   it('totals what taking the book down to this order costs, with the average price', () => {
     renderDetail();
     expect(screen.getByText('Buying down to here:')).toBeInTheDocument();

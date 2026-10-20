@@ -104,6 +104,20 @@ describe('PublicContractDetailModal — contents', () => {
     }
   });
 
+  it('links the location name to its Place Info', async () => {
+    renderModal();
+    expect(
+      await screen.findByRole('link', { name: 'Jita IV - Moon 4 - Caldari Navy Assembly Plant' })
+    ).toHaveAttribute('href', expect.stringContaining('info=place-60003760'));
+  });
+
+  it('shows the unknown-location text without a link when the name did not resolve', async () => {
+    loadContractLocationName.mockResolvedValue(null as unknown as string);
+    renderModal();
+    expect(await screen.findByText(/60003760/)).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /60003760/ })).toBeNull();
+  });
+
   it('gives every line the item icon', async () => {
     showItems([item({ record_id: 1 })]);
     renderModal();

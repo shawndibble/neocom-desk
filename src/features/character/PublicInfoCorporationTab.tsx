@@ -35,7 +35,7 @@ import { corporationAge, corporationTaxPercent } from './corporationInfo';
 import { loadPublicAllianceHistory, type PublicCorporationInfo } from './publicInfoData';
 import { loadStationName } from './stations';
 import { useEntityName } from './useEntityName';
-import { AllianceLink } from '@/features/entities';
+import { AllianceLink, PlaceLink } from '@/features/entities';
 import { PersonLink } from './PublicInfoParts';
 import {
   FACT_COLUMNS,
@@ -195,7 +195,13 @@ export default function PublicInfoCorporationTab({
             {data.home_station_id !== undefined && (
               <>
                 <dt className={termClassName}>{t('publicInfo.homeStation')}</dt>
-                <dd>{stationName ?? `#${data.home_station_id}`}</dd>
+                <dd>
+                  {stationName === null ? (
+                    `#${data.home_station_id}`
+                  ) : (
+                    <PlaceLink id={data.home_station_id}>{stationName}</PlaceLink>
+                  )}
+                </dd>
               </>
             )}
             {data.faction_id !== undefined && (
