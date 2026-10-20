@@ -706,6 +706,7 @@ export interface SyncInput extends BookCall {
     cachedAt: string;
     solarSystemId?: number;
     moonId?: number;
+    sourceCorporationId?: number;
   }[];
   extractions: {
     structureId: number;
@@ -757,6 +758,16 @@ export function parseSyncInput(data: unknown, nowMs: number): SyncInput {
         ? {}
         : { solarSystemId: int(row.solarSystemId, 'solarSystemId', 30_000_000, 32_000_000) }),
       ...(row.moonId === undefined ? {} : { moonId: int(row.moonId, 'moonId') }),
+      ...(row.sourceCorporationId === undefined
+        ? {}
+        : {
+            sourceCorporationId: int(
+              row.sourceCorporationId,
+              'sourceCorporationId',
+              0,
+              CORP_ID_MAX
+            ),
+          }),
     };
   });
   const extractions = list(d.extractions ?? [], 'extractions', MAX_SYNC_EXTRACTIONS).map((r) => {

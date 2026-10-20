@@ -65,6 +65,9 @@ describe('functions mirror of the Corp Tax Book sync engine', () => {
     expect(mirror.observedRowsFromLedger(7, rows, '2026-10-18T00:00:00Z')).toEqual(
       observedRowsFromLedger(7, rows, '2026-10-18T00:00:00Z')
     );
+    expect(mirror.observedRowsFromLedger(7, rows, '2026-10-18T00:00:00Z', 98000002)).toEqual(
+      observedRowsFromLedger(7, rows, '2026-10-18T00:00:00Z', 98000002)
+    );
   });
 
   it('detects and merges gaps the same way', () => {

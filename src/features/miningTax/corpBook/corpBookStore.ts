@@ -116,6 +116,7 @@ export function readObservedRow(d: Data): ObservedRow | null {
   }
   const solarSystemId = num(d.solarSystemId);
   const moonId = num(d.moonId);
+  const sourceCorporationId = num(d.sourceCorporationId);
   return {
     structureId,
     characterId,
@@ -126,6 +127,7 @@ export function readObservedRow(d: Data): ObservedRow | null {
     cachedAt: str(d.cachedAt) ?? '1970-01-01T00:00:00Z',
     ...(solarSystemId !== undefined ? { solarSystemId } : {}),
     ...(moonId !== undefined ? { moonId } : {}),
+    ...(sourceCorporationId !== undefined ? { sourceCorporationId } : {}),
   };
 }
 
