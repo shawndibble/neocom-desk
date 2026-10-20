@@ -14,12 +14,12 @@ import { cx } from '@/lib/cx';
 import { rootFontScale } from '@/lib/fontScale';
 import { useScrollToRowKey } from '@/lib/useScrollToRowKey';
 import { useIsPhone } from '@/lib/useIsPhone';
-import { focusRingInsetClassName, rowInteractiveClassName } from './controlStyles';
 import { groupSortedRows } from './dataTableGroup';
-import * as Icon from './icons';
 import { nextDataTableSort, sortRowsBy } from './dataTableSort';
 import { DataTableRow } from './DataTableRow';
 import { DataTableHeader } from './DataTableHeader';
+import { DataTableGroupHeader } from './DataTableGroupHeader';
+import { DataTableSortBar } from './DataTableSortBar';
 import { stickyStartClass } from './dataTableSticky';
 import { useDataTableVirtualizer } from './useDataTableVirtualizer';
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from './ContextMenu';
@@ -776,23 +776,14 @@ export function DataTable<T>({
     sortableColumns.length > 0 &&
     responsive === 'stack' &&
     stacked !== false && (
-      <div
-        className={cx(
-          'flex min-h-[3.25rem] items-center justify-between gap-3 px-3',
-          stacked === undefined && 'sm:hidden'
-        )}
-      >
-        {stackSummary !== undefined && (
-          <span className="min-w-0 text-[0.6875rem] text-text-dim">{stackSummary}</span>
-        )}
-        <DataTableSortPicker
-          columns={sortableColumns}
-          sort={sort && activeSortId ? sort : undefined}
-          onSortChange={setSort}
-          className="ml-auto"
-        />
-        {stackActions}
-      </div>
+      <DataTableSortBar
+        sortableColumns={sortableColumns}
+        sort={sort && activeSortId ? sort : undefined}
+        onSortChange={setSort}
+        summary={stackSummary}
+        actions={stackActions}
+        stacked={stacked}
+      />
     );
 
   const table = (
@@ -843,37 +834,21 @@ export function DataTable<T>({
               const memberRows = group.rows.map((entry) => entry.row);
               const expanded =
                 groupExpanded[key] ?? groupBy?.defaultExpanded?.(memberRows) ?? false;
-              const Chevron = expanded ? Icon.Expanded : Icon.Descend;
               return (
                 <Fragment key={`dt-group:${key}`}>
-                  <tr role="row" className={cx('dt-group-header', rowInteractiveClassName)}>
-                    <td role="cell" colSpan={columns.length + trailingColumns} className="p-0">
-                      <button
-                        type="button"
-                        aria-expanded={expanded}
-                        // Written from the *effective* state, not the stored
-                        // one: a default-expanded group has no stored entry,
-                        // and negating `undefined` would take two taps.
-                        onClick={() =>
-                          setGroupExpanded((previous) => ({ ...previous, [key]: !expanded }))
-                        }
-                        className={cx(
-                          'flex min-h-12 w-full items-center gap-2 px-3 py-2 text-left',
-                          focusRingInsetClassName,
-                          // Off a phone an all-widths fold sits among table
-                          // rows, so it takes their height, not a card's.
-                          groupBy?.allWidths && 'sm:min-h-0'
-                        )}
-                      >
-                        <span className="min-w-0 flex-1">{groupBy?.renderHeader(memberRows)}</span>
-                        <Chevron
-                          aria-hidden="true"
-                          size={Icon.ICON_SIZE.sm}
-                          className="shrink-0 text-text-dim"
-                        />
-                      </button>
-                    </td>
-                  </tr>
+                  <DataTableGroupHeader
+                    colSpan={columns.length + trailingColumns}
+                    expanded={expanded}
+                    // Written from the *effective* state, not the stored
+                    // one: a default-expanded group has no stored entry,
+                    // and negating `undefined` would take two taps.
+                    onToggle={() =>
+                      setGroupExpanded((previous) => ({ ...previous, [key]: !expanded }))
+                    }
+                    allWidths={groupBy?.allWidths}
+                  >
+                    {groupBy?.renderHeader(memberRows)}
+                  </DataTableGroupHeader>
                   {expanded && group.rows.map((entry) => renderRow(entry.row, entry.index, true))}
                 </Fragment>
               );
