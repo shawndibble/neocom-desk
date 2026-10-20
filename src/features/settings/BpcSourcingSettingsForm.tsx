@@ -59,6 +59,7 @@ export function BpcSourcingSettingsForm() {
         <CheckboxField
           id="settings-bpc-hide-auctions"
           label={t('settings.bpcHideAuctionsLabel')}
+          hint={t('settings.bpcHideAuctionsHint')}
           checked={hideAuctions}
           onChange={() => void setHideAuctions(!hideAuctions)}
         />
