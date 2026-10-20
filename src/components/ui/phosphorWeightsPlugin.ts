@@ -1,5 +1,5 @@
 import type { Plugin } from 'vite';
-import { ALLOWED_ICON_WEIGHTS, PHOSPHOR_WEIGHTS } from './iconWeights';
+import { ALLOWED_ICON_WEIGHTS, PHOSPHOR_WEIGHTS } from './iconWeights.ts';
 
 /**
  * Build-time strip of the Phosphor weights the app never renders.

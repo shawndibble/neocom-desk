@@ -8,7 +8,7 @@ import {
   staticImportClosure,
   type LocalePlan,
   type LocaleTree,
-} from './localeSplit';
+} from './localeSplit.ts';
 
 /**
  * Build-time split of `locales/en.json` (see `localeSplit.ts` for the rule).

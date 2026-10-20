@@ -12,10 +12,10 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
-import { phosphorWeightsPlugin } from './src/components/ui/phosphorWeightsPlugin';
-import { localeSplitPlugin } from './src/i18n/localeSplitPlugin';
-import { deferEntryHtml } from './src/app/deferredEntry';
-import { lazySdeGlobIgnores } from './src/sde/lazySdeFiles';
+import { phosphorWeightsPlugin } from './src/components/ui/phosphorWeightsPlugin.ts';
+import { localeSplitPlugin } from './src/i18n/localeSplitPlugin.ts';
+import { deferEntryHtml } from './src/app/deferredEntry.ts';
+import { lazySdeGlobIgnores } from './src/sde/lazySdeFiles.ts';
 
 const { version, dependencies } = JSON.parse(
   readFileSync(new URL('./package.json', import.meta.url), 'utf-8')

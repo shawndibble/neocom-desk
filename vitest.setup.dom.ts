@@ -132,6 +132,10 @@ if (typeof Element !== 'undefined') {
   if (!Element.prototype.scrollIntoView) {
     Element.prototype.scrollIntoView = () => {};
   }
+  // jsdom defines `window.scrollTo` as a stub that logs "Not implemented" on
+  // every call; swap it for a silent no-op. Tests that assert on scrolling
+  // spy on it, which still works on an own property.
+  window.scrollTo = () => {};
 }
 
 /**
