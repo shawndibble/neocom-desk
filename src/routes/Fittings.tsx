@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { fittingCompareHref, fittingsRedirect } from '@/features/fittings/fittingRoutes';
 import { ShipsTabBar } from '@/features/fittings/ShipsTabBar';
@@ -10,7 +10,6 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useOnline } from '@/stores/network';
 import { useTranslation } from 'react-i18next';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
-import type { FittingLoadState } from '@/lib/shortcuts';
 import {
   Button,
   LiveStatus,
@@ -25,7 +24,6 @@ import {
 } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { AddRow } from '@/components/ui/icons';
-import { SkillsUnknownNote } from '@/features/fittings/FittingPreviewPanels';
 import { useEndpointsGranted } from '@/app/useGrantedScopes';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import { useIsPhone } from '@/lib/useIsPhone';
@@ -71,19 +69,22 @@ import { SaveAsNewDialog } from '@/features/fittings/SaveAsNewDialog';
 import { FittingRackList, RackSlots } from '@/features/fittings/FittingRackList';
 import { FittingRing } from '@/features/fittings/FittingRing';
 import { RING_ROOM_ATTR } from '@/features/fittings/ring/useRingChrome';
-import { FittingStatsSections } from '@/features/fittings/FittingStatsSections';
+import { FittingStatsColumn } from '@/features/fittings/FittingStatsColumn';
+import {
+  THREE_COLUMN_QUERY,
+  addModeFor,
+  editorColumnClass,
+  editorGridClass,
+} from '@/features/fittings/fittingLayout';
+import { useFittingPasteLoad } from '@/features/fittings/useFittingPasteLoad';
+import { useSavedFittingRecord } from '@/features/fittings/useSavedFittingRecord';
 import { FittingFightersPanel } from '@/features/fittings/FittingFightersPanel';
-import { TacticalModePicker } from '@/features/fittings/TacticalModePicker';
-import { tacticalModeKind, tacticalModesFor } from '@/engine/fittings/tacticalModes';
-import { ImplantSetControl } from '@/features/fittings/ImplantSetControl';
-import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
+import { tacticalModeKind } from '@/engine/fittings/tacticalModes';
 import {
   resolveFittingView,
   useFittingViewPreference,
   type FittingView,
 } from '@/features/fittings/fittingViewPreference';
-import { MissingSkillsChip } from '@/features/fittings/MissingSkillsChip';
-import { FittingWhatToTrainPanel } from '@/features/fittings/FittingWhatToTrainPanel';
 import { useFittingAlpha } from '@/features/fittings/useFittingAlpha';
 import { useFittingHardpoints } from '@/features/fittings/useFittingHardpoints';
 import { useFittingSkillGaps } from '@/features/fittings/useFittingSkillGaps';
@@ -95,14 +96,6 @@ import { useModuleVariations } from '@/features/fittings/useModuleVariations';
 import { useOverlayFitting } from '@/features/fittings/useOverlayFitting';
 import { useTargetProfiles } from '@/features/fittings/targetProfiles';
 import { COARSE_POINTER_QUERY, useMediaQuery } from '@/lib/useMediaQuery';
-
-/**
- * Wide enough for browser | Ring | stats side by side: the 12rem nav, a 20rem
- * browser, a Ring column wide enough for a ring of ~36rem (it grows to 48rem when
- * there's more), and
- * 22-26rem of stats, with gaps and page padding.
- */
-const THREE_COLUMN_QUERY = '(min-width: 100rem)';
 
 /**
  * The Fittings section (scope decision `20260924-215855`).
@@ -143,11 +136,7 @@ function FittingsPage() {
   // The HTML5 drag gate follows the input, not just the width: a touch laptop
   // is wide, but a long-press there belongs to the row menu, not a drag.
   const coarsePointer = useMediaQuery(COARSE_POINTER_QUERY);
-  const addMode: 'docked' | 'slideOut' | 'sheet' = threeColumns
-    ? 'docked'
-    : isDesktop
-      ? 'slideOut'
-      : 'sheet';
+  const addMode = addModeFor(threeColumns, isDesktop);
   const [target, setTarget] = useState<AddTarget | null>(null);
   // The slide-out or sheet Add panel is open (the docked one always is).
   // Opened by an empty slot, or by "+ Add module" — which works before the
@@ -161,7 +150,10 @@ function FittingsPage() {
   // What the last applied Make it fit option changed, for its confirmation toast.
   const [fitApplied, setFitApplied] = useState<string | null>(null);
   useTimedToast(fitApplied, () => setFitApplied(null));
-  const openMakeItFit = useCallback((resource: FitResource) => setMakeItFitFor(resource), []);
+  const openMakeItFit = useCallback(
+    (resource: FitResource) => setMakeItFitFor(resource),
+    [setMakeItFitFor]
+  );
   const storedView = useFittingViewPreference((state) => state.value);
   const viewHydrated = useHydratedStore(useFittingViewPreference);
   const setView = useFittingViewPreference((state) => state.setValue);
@@ -201,41 +193,14 @@ function FittingsPage() {
   const [saveToEveOpen, setSaveToEveOpen] = useState(false);
   const [saveAsNewOpen, setSaveAsNewOpen] = useState(false);
   const [saveAsNewName, setSaveAsNewName] = useState('');
-  // The record the open Fitting was saved from, for the "Save as new…"
-  // prefill and to tell Compare there are unsaved edits against it.
-  const savedRecord = useLiveQuery(
-    () => (workspace.savedId === null ? undefined : db.fittings.get(workspace.savedId)),
-    [workspace.savedId]
+  const { savedRecord, currentShareCode, hasUnsavedEdits } = useSavedFittingRecord(
+    workspace.savedId
   );
-  // The app-wide paste router (`app/GlobalPasteRouter.tsx`) lands here with
-  // a pasted EFT fit to open. Keyed on the navigation itself so a re-render
-  // never re-loads it, and the state is cleared once read: unlike appraising,
-  // loading opens the editor, so a remount on this entry (Back from another
-  // section) must not open the fit all over again. The editor replaces this
-  // landing entry rather than pushing past it, so one Back undoes the paste.
-  const handledLoadKey = useRef<string | null>(null);
-  const { loadFromInput } = workspace;
-  useEffect(() => {
-    const text = (location.state as Partial<FittingLoadState> | null)?.fittingLoadText;
-    if (!text || handledLoadKey.current === location.key) return;
-    handledLoadKey.current = location.key;
-    void navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
-    void loadFromInput(text, { replaceEntry: true });
-  }, [location.key, location.state, location.pathname, location.search, navigate, loadFromInput]);
+  useFittingPasteLoad(workspace.loadFromInput);
   const editorShare = useEditorShare(
     activeCharacterId,
     workspace.savedId !== null && savedRecord?.id === workspace.savedId ? savedRecord : null
   );
-  const currentShareCode = new URLSearchParams(location.search).get('f');
-  const hasUnsavedEdits =
-    workspace.savedId !== null &&
-    savedRecord !== undefined &&
-    // Guards the render right after a save/save-as-new, where `savedRecord`
-    // (async, via useLiveQuery) can still be the previous record for a tick
-    // after `workspace.savedId` (synchronous) already points at the new one.
-    savedRecord.id === workspace.savedId &&
-    currentShareCode !== null &&
-    savedRecord.code !== currentShareCode;
   // The page's Item Actions — here only Show info (the Fitting editor's menu
   // has no Add to Quickbar or Build Plan): a List name click or a menu's
   // "Show info" opens the page's Item Detail modal.
@@ -288,22 +253,31 @@ function FittingsPage() {
   });
   // The cargo item whose quantity dialog is open.
   const [cargoQuantityFor, setCargoQuantityFor] = useState<number | null>(null);
-  const selectTarget = useCallback((next: AddTarget | null) => {
-    setTarget(next);
-    setAddOpen(true);
-  }, []);
-  const openVariations = useCallback((slot: FittingSlotKind, slotIndex: number) => {
-    setRackSheet(null);
-    setModuleSlot({ slot, slotIndex });
-    setVariationsOpen(true);
-    setMutationOpen(false);
-  }, []);
-  const openMutation = useCallback((slot: FittingSlotKind, slotIndex: number) => {
-    setRackSheet(null);
-    setModuleSlot({ slot, slotIndex });
-    setVariationsOpen(false);
-    setMutationOpen(true);
-  }, []);
+  const selectTarget = useCallback(
+    (next: AddTarget | null) => {
+      setTarget(next);
+      setAddOpen(true);
+    },
+    [setTarget, setAddOpen]
+  );
+  const openVariations = useCallback(
+    (slot: FittingSlotKind, slotIndex: number) => {
+      setRackSheet(null);
+      setModuleSlot({ slot, slotIndex });
+      setVariationsOpen(true);
+      setMutationOpen(false);
+    },
+    [setRackSheet, setModuleSlot, setVariationsOpen, setMutationOpen]
+  );
+  const openMutation = useCallback(
+    (slot: FittingSlotKind, slotIndex: number) => {
+      setRackSheet(null);
+      setModuleSlot({ slot, slotIndex });
+      setVariationsOpen(false);
+      setMutationOpen(true);
+    },
+    [setRackSheet, setModuleSlot, setVariationsOpen, setMutationOpen]
+  );
   const { itemActions, fitAt, droneBay, noteRecent, defaultCharges } = useEditorItemActions({
     fitting,
     stats,
@@ -586,88 +560,21 @@ function FittingsPage() {
     </div>
   );
 
-  // What the stats column's Pilot and Situation panels hold beyond its own sections.
-  const hasModes = tacticalModesFor(fitting.shipTypeId).length > 0;
-  const showMissingSkills = gaps !== null && gaps.missing.length > 0 && activeCharacterId !== null;
-  const showSkillsUnknown = gaps?.unknown === true && activeCharacterId !== null;
-
-  // Under Make it fit's provider too: the Fitting section's figures carry their "Fix" links.
   const statsSections = (
-    <MakeItFitContext.Provider value={openMakeItFit}>
-      <FittingStatsSections
-        stats={stats}
-        statsProgress={workspace.statsProgress}
-        statsError={workspace.statsError}
-        statsErrorReason={workspace.statsErrorReason}
-        skillsKnown={workspace.skillsKnown}
-        onRetry={workspace.retry}
-        price={workspace.price}
-        typeName={(typeId) => catalogueTypeName(catalogue, typeId)}
-        damageProfiles={workspace.damageProfiles}
-        targetProfiles={targetProfiles}
-        overlay={overlay}
-        showDrones={dronesShown}
-        fitting={fitting}
-        moduleResults={moduleResults}
-        whatToTrain={
-          <FittingWhatToTrainPanel
-            evaluator={workspace.skillGains}
-            characterId={activeCharacterId}
-            fittingName={fitting.name}
-            catalogue={catalogue}
-          />
-        }
-        yourCharacters={yourCharacters.length > 1 ? yourCharacters : undefined}
-        implants={
-          <>
-            <ImplantSetControl
-              basis={workspace.implantBasis}
-              canUseCloneBasis={workspace.canUseCloneBasis}
-              implantSet={fitting.implantSet}
-              onImplantSetChange={workspace.setImplantSet}
-              fitting={fitting}
-              profile={workspace.profile}
-            />
-            {workspace.implantBasis === 'clone' && workspace.canUseCloneBasis && (
-              // Across both columns of the stats column's controls grid.
-              <div className="col-span-2">
-                <ImplantsAssumedNote hint={t('fittings.implants.assumesNoImplantsHint')} />
-              </div>
-            )}
-          </>
-        }
-        abyssal={{
-          hullGroupId: catalogue?.types[String(fitting.shipTypeId)]?.groupID,
-          compare: workspace.compareWeather,
-        }}
-        statsWeatherTypeId={workspace.statsWeatherTypeId}
-        tacticalMode={
-          hasModes ? <TacticalModePicker fitting={fitting} onChange={edit} /> : undefined
-        }
-        pilot={
-          activeCharacterId === null
-            ? undefined
-            : {
-                characterName: characterName ?? null,
-                missingSkills: gaps?.missing.length,
-                skillsUnknown: gaps?.unknown === true,
-                notes:
-                  showMissingSkills || showSkillsUnknown ? (
-                    <>
-                      {showMissingSkills && (
-                        <MissingSkillsChip
-                          entries={gaps.missing}
-                          characterId={activeCharacterId}
-                          fittingName={fitting.name}
-                        />
-                      )}
-                      {showSkillsUnknown && <SkillsUnknownNote />}
-                    </>
-                  ) : undefined,
-              }
-        }
-      />
-    </MakeItFitContext.Provider>
+    <FittingStatsColumn
+      workspace={workspace}
+      catalogue={catalogue}
+      fitting={fitting}
+      moduleResults={moduleResults}
+      dronesShown={dronesShown}
+      gaps={gaps}
+      characterId={activeCharacterId}
+      characterName={characterName}
+      yourCharacters={yourCharacters}
+      targetProfiles={targetProfiles}
+      overlay={overlay}
+      onOpenMakeItFit={openMakeItFit}
+    />
   );
 
   // Under the name: the hull, unless the Fitting is simply named after it,
@@ -809,28 +716,7 @@ function FittingsPage() {
                 </TabPanel>
               </div>
             ) : (
-              <div
-                // Docked: browser | Ring | stats. Otherwise the editor beside the
-                // stats when wide, but stacked while the slide-out has pushed the
-                // page aside, so the editor keeps the width rather than the stats.
-                // The Ring goes beside them from the desktop breakpoint — it is
-                // capped and square, so it fits beside 22rem of stats there (scope
-                // decision `20260925-095734`); the stats hold at 22rem until xl.
-                // The List's rows want the width, so it waits for xl. The Ring's
-                // track stops at 52rem (its 48rem ring and the panel around it);
-                // width past the caps becomes even gutters.
-                className={`grid items-start justify-center gap-3 ${
-                  addMode === 'docked'
-                    ? view === 'ring'
-                      ? 'grid-cols-[20rem_minmax(0,52rem)_minmax(22rem,26rem)]'
-                      : 'grid-cols-[20rem_minmax(0,1fr)_minmax(22rem,26rem)]'
-                    : addOpen
-                      ? 'grid-cols-1'
-                      : view === 'ring'
-                        ? 'grid-cols-1 lg:grid-cols-[minmax(0,52rem)_22rem] xl:grid-cols-[minmax(0,52rem)_minmax(22rem,28rem)]'
-                        : 'grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(22rem,28rem)]'
-                }`}
-              >
+              <div className={editorGridClass(addMode, view, addOpen)}>
                 {addMode === 'docked' && (
                   <Panel
                     title={addTitle}
@@ -840,19 +726,10 @@ function FittingsPage() {
                   </Panel>
                 )}
                 {/* Ring | List as the app's own tabs over the column they switch. */}
-                {/* The Ring stays in view while the tall stats column is read (lg+). The List
-                  needs the width and the stacked layout has nothing beside it. At its max
-                  height the column also clears the page's bottom padding, so at the page's
-                  end, where it rests on the grid's bottom, its top is still on screen. The
-                  Ring sizes itself to that max height (`--ring-room`). */}
                 <div
                   data-testid="fitting-editor-column"
                   {...{ [RING_ROOM_ATTR]: '' }}
-                  className={`min-w-0 space-y-3 ${
-                    view === 'ring' && (addMode === 'docked' || !addOpen)
-                      ? 'lg:sticky lg:top-3 lg:max-h-(--ring-room) lg:overflow-y-auto lg:[--ring-room:calc(100vh-2.5rem)]'
-                      : ''
-                  }`}
+                  className={editorColumnClass(view, addMode, addOpen)}
                 >
                   <Tabs
                     tabsId={viewTabsId}
