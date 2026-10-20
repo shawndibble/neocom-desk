@@ -11505,7 +11505,7 @@
     "fontScaleExtraLarge": "Extra large",
     "notificationsTitle": "Notifications",
     "notifications": {
-      "hint": "Device raises a pop-up. Alerts adds a row to the Alerts page.",
+      "hint": "Device raises a pop-up. Alerts adds a row to the Alerts page. Device choices stay on this device; Alerts choices and warn-ahead times sync across your devices.",
       "blockedNotice": "Notifications are blocked — enable them in your device's settings, then return here.",
       "alertsWhenClosed": {
         "title": "Alerts when closed",
