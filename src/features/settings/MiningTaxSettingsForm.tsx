@@ -1,10 +1,9 @@
-import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { useTranslation } from 'react-i18next';
-import { Checkbox, Field, Fields, Spinner } from '@/components/ui';
+import { Fields, Spinner } from '@/components/ui';
 import { useMiningTaxOreValueMode } from '@/features/miningTax/oreValueMode';
 import { useMiningTaxCompressedOre } from '@/features/miningTax/oreForm';
 import { useAutoContinueSessions } from '@/features/miningTax/continueSessionPref';
-import { DefaultsSyncHint } from './settingsFields';
+import { CheckboxField, DefaultsSyncHint } from './settingsFields';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 
 interface MiningTaxSettingsFormProps {
@@ -51,11 +50,12 @@ export function MiningTaxSettingsForm({ onAutoContinueChange }: MiningTaxSetting
           checked={oreValueMode}
           onChange={() => void setOreValueMode(!oreValueMode)}
         />
-        {/* Device-local (`continueSessionPref.ts`): its hint says so. */}
+        {/* Device-local (`continueSessionPref.ts`), unlike the rest of this panel. */}
         <CheckboxField
           id="settings-mining-tax-auto-continue"
           label={t('settings.miningTaxAutoContinueLabel')}
           hint={t('settings.miningTaxAutoContinueHint')}
+          scope="device"
           checked={autoContinue}
           onChange={() => {
             if (onAutoContinueChange) onAutoContinueChange(!autoContinue);
@@ -64,24 +64,5 @@ export function MiningTaxSettingsForm({ onAutoContinueChange }: MiningTaxSetting
         />
       </Fields>
     </div>
-  );
-}
-
-interface CheckboxFieldProps {
-  id: string;
-  label: string;
-  hint: string;
-  checked: boolean;
-  onChange: () => void;
-}
-
-/** One lone-checkbox row of the Settings form grid, hint as the row's note. */
-function CheckboxField({ id, label, hint, checked, onChange }: CheckboxFieldProps) {
-  return (
-    <Field label={label} htmlFor={id} inline note={hint}>
-      <label className={touchCheckboxLabelClassName}>
-        <Checkbox id={id} checked={checked} onChange={onChange} />
-      </label>
-    </Field>
   );
 }

@@ -4,7 +4,7 @@ import { Button } from '@/components/ui';
 import { markStoresStale } from '@/app/staleStoresReload';
 import { db } from '@/db';
 import { VIEW_PREFERENCE_KEYS } from '@/lib/viewPreferenceKeys';
-import { ActionConfirmation } from '@/features/settings/ActionConfirmation';
+import { ActionResult, SettingsHint } from '@/features/settings/settingsFields';
 
 /**
  * Undoes the preferences pages remember silently — a pinned sort, a filter, a
@@ -35,11 +35,13 @@ export function ResetViewPreferences() {
 
   return (
     <div className="space-y-2 border-t border-line pt-3">
-      <p className="max-w-2xl text-xs text-text-dim">{t('settings.resetViewPrefsHint')}</p>
+      <SettingsHint>{t('settings.resetViewPrefsHint')}</SettingsHint>
       <Button size="sm" onClick={() => void handleReset()}>
         {t('settings.resetViewPrefs')}
       </Button>
-      {confirmed && <ActionConfirmation message={t('settings.resetViewPrefsConfirm')} />}
+      {confirmed && (
+        <ActionResult kind="success">{t('settings.resetViewPrefsConfirm')}</ActionResult>
+      )}
     </div>
   );
 }

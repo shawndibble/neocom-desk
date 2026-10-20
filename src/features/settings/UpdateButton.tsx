@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
 import { forceUpdate } from '@/app/forceUpdate';
 import { isUpdateAvailable } from '@/app/updateAvailable';
+import { ActionResult } from '@/features/settings/settingsFields';
 
 /**
  * Settings nav → "Update app". Checks for a new build as soon as Settings
@@ -46,11 +47,7 @@ export function UpdateButton() {
       >
         {t('settings.updateAction')}
       </Button>
-      {failed && (
-        <span role="alert" className="text-xs text-danger">
-          {t('settings.updateFailed')}
-        </span>
-      )}
+      {failed && <ActionResult kind="error">{t('settings.updateFailed')}</ActionResult>}
     </>
   );
 }

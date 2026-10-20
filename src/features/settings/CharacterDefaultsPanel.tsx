@@ -1,6 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
-import { Checkbox, Field, Fields, Panel, Spinner, TextInput } from '@/components/ui';
+import { Field, Fields, Panel, TextInput } from '@/components/ui';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import {
   useSpExtractionMonitoringEnabled,
@@ -14,7 +13,11 @@ import {
 } from '@/features/character/characterFilterValue';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
 import { useActiveCharacter } from '@/stores/activeCharacter';
-import { DefaultsSyncHint } from '@/features/settings/settingsFields';
+import {
+  CheckboxField,
+  DefaultsSyncHint,
+  SettingsPanelLoading,
+} from '@/features/settings/settingsFields';
 
 export function CharacterDefaultsPanel() {
   const { t } = useTranslation();
@@ -37,13 +40,7 @@ export function CharacterDefaultsPanel() {
   // omits that quick-select when this is null).
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
 
-  if (!ready) {
-    return (
-      <Panel title={t('settings.characterDefaultsTitle')}>
-        <Spinner />
-      </Panel>
-    );
-  }
+  if (!ready) return <SettingsPanelLoading title={t('settings.characterDefaultsTitle')} />;
 
   return (
     <Panel title={t('settings.characterDefaultsTitle')}>
@@ -65,20 +62,13 @@ export function CharacterDefaultsPanel() {
             />
           </Field>
 
-          <Field
+          <CheckboxField
+            id="settings-sp-extraction-enabled"
             label={t('settings.spExtractionEnabledLabel')}
-            htmlFor="settings-sp-extraction-enabled"
-            inline
-            note={t('settings.spExtractionEnabledHint')}
-          >
-            <label className={touchCheckboxLabelClassName}>
-              <Checkbox
-                id="settings-sp-extraction-enabled"
-                checked={spExtractionEnabled}
-                onChange={() => void setSpExtractionEnabled(!spExtractionEnabled)}
-              />
-            </label>
-          </Field>
+            hint={t('settings.spExtractionEnabledHint')}
+            checked={spExtractionEnabled}
+            onChange={() => void setSpExtractionEnabled(!spExtractionEnabled)}
+          />
           {spExtractionEnabled && (
             <Field
               label={t('settings.spExtractionThresholdLabel')}
