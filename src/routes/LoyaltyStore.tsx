@@ -14,8 +14,6 @@
  */
 import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
 import { useHydratedStore } from '@/lib/useHydratedStore';
-import { PageSettingsButton } from '@/features/settings/PageSettingsModal';
-import { LpValueSettingsForm } from '@/features/settings/LpValueSettingsForm';
 import {
   useCallback,
   useDeferredValue,
@@ -24,7 +22,7 @@ import {
   useState,
   type ReactElement,
 } from 'react';
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { CorporationLink } from '@/features/entities/EntityLink';
 import { industryTabHref } from '@/features/industry/industryTabs';
 import { useTranslation } from 'react-i18next';
@@ -51,7 +49,6 @@ import {
   Spinner,
   StatChip,
   StatChips,
-  Tabs,
   TabPanel,
   useTabsId,
   type DataTableColumn,
@@ -79,10 +76,8 @@ import { DEFAULT_TRADE_HUB, getTradeHub, TRADE_HUBS } from '@/market/hubs';
 import { useLoyaltyStoreOffers } from '@/features/loyalty/useLoyaltyStoreOffers';
 import { LoyaltyItemName, OfferDetail } from '@/features/loyalty/OfferDetail';
 import { iskPerLpTone, resolveLoyaltyRowItem } from '@/features/loyalty/offerRowDisplay';
-import { LpStoreSearch } from '@/features/loyalty/LpStoreSearch';
-import type { LpSearchCrumbState } from '@/features/loyalty/itemSearch';
-import { WALLET_TABS } from '@/app/pageTabs';
-import { tabPath } from '@/lib/pageTabs';
+import { LoyaltyStoreLanding } from '@/features/loyalty/LoyaltyStoreLanding';
+import { LpStoreActions, StoreCrumbs, WalletTabBar } from '@/features/loyalty/LpStoreChrome';
 import type { LoyaltyOfferRow } from '@/features/loyalty/offerRows';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
@@ -109,89 +104,6 @@ const FILTER_PARAMS = {
 };
 
 const OFFERS_SORT = { columnId: 'iskPerLp', direction: 'desc' } as const;
-
-/** The header's gear for the one setting this page's numbers lean on, LP Value. */
-function LpStoreActions() {
-  const { t } = useTranslation();
-  return (
-    <>
-      <PageSettingsButton pageName={t('loyaltyStore.title')} section="market">
-        <LpValueSettingsForm />
-      </PageSettingsButton>
-    </>
-  );
-}
-
-/**
- * LP Store is a Wallet tab, but its own route outranks Wallet's, so the page
- * draws Wallet's tab bar itself. Every other tab is a path under `/wallet`;
- * `transactions` is no tab Wallet shows (it redirects to Market).
- */
-function WalletTabBar({ tabsId }: { tabsId: string }) {
-  const { t } = useTranslation();
-  const navigate = useNavigate();
-  return (
-    <Tabs
-      tabsId={tabsId}
-      label={t('wallet.title')}
-      value="lp-store"
-      onChange={(id) =>
-        navigate(tabPath(WALLET_TABS, id as (typeof WALLET_TABS.tabs)[number]['id']))
-      }
-      tabs={WALLET_TABS.tabs
-        .filter((tab) => tab.id !== 'transactions')
-        .map((tab) => ({ id: tab.id, label: t(tab.labelKey) }))}
-    />
-  );
-}
-
-/** `/wallet/lp-store` with no corporation chosen yet: the item-first search. */
-function LoyaltyStoreLanding() {
-  const { t } = useTranslation();
-  const [params, setParams] = useUrlParams(LANDING_PARAMS);
-  const tabsId = useTabsId();
-  return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-3">
-      <PageHeader title={t('loyaltyStore.title')} actions={<LpStoreActions />} />
-      <WalletTabBar tabsId={tabsId} />
-      <TabPanel tabsId={tabsId} tabId="lp-store">
-        <LpStoreSearch query={params.q} onQueryChange={(q) => setParams({ q })} />
-      </TabPanel>
-    </div>
-  );
-}
-
-/** The search box's text, in the URL (ADR 0015) so a search can be linked and Back returns to it. */
-const LANDING_PARAMS = { q: textParam() };
-
-const CRUMB_CLASS =
-  'inline-flex min-h-11 items-center gap-1 rounded-xs px-2 text-xs text-text-dim hover:text-text active:text-text-dim md:min-h-0';
-
-/**
- * The links above an open store: back to the search it was opened from (a
- * result row carries the query in the location state), and "Change store" to
- * the landing search, the way to switch stores.
- */
-function StoreCrumbs() {
-  const { t } = useTranslation();
-  const state = useLocation().state as Partial<LpSearchCrumbState> | null;
-  // An empty query is the landing itself, which "Change store" already links to.
-  const q = state?.from === 'lp-search' && state.q ? state.q : null;
-  return (
-    <div className="flex flex-wrap items-center gap-x-2 self-start">
-      {q !== null && (
-        <Link to={`/wallet/lp-store?q=${encodeURIComponent(q)}`} className={CRUMB_CLASS}>
-          <span aria-hidden="true">‹</span>
-          {t('loyaltyStore.search.crumb')}
-        </Link>
-      )}
-      <Link to="/wallet/lp-store" className={CRUMB_CLASS}>
-        <span aria-hidden="true">‹</span>
-        {t('loyaltyStore.search.changeStore')}
-      </Link>
-    </div>
-  );
-}
 
 /**
  * The route: `/wallet/lp-store` (landing) or `/wallet/lp-store/:corporationId`.
