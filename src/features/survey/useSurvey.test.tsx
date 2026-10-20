@@ -75,4 +75,29 @@ describe('useSurvey polling', () => {
     await tick();
     expect((result.current.state as { ignored: ReadonlySet<string> }).ignored.has('x')).toBe(true);
   });
+
+  it('re-reads at once when the window regains focus after the minimum gap', async () => {
+    loadSurvey.mockResolvedValue(ok([scan(1)]));
+    const { result } = renderHook(() => useSurvey(ID));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    loadSurvey.mockResolvedValue(ok([scan(1), scan(2)]));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(6_000);
+      window.dispatchEvent(new Event('focus'));
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect((result.current.state as { scans: SurveyScan[] }).scans).toHaveLength(2);
+  });
+
+  it('does not re-read on focus right after a read', async () => {
+    loadSurvey.mockResolvedValue(ok([scan(1)]));
+    renderHook(() => useSurvey(ID));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+      window.dispatchEvent(new Event('focus'));
+    });
+    expect(loadSurvey).toHaveBeenCalledTimes(1);
+  });
 });

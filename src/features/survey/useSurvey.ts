@@ -1,7 +1,9 @@
 /**
  * Keeps one shared Survey's scans fresh: loads it, then re-reads every
  * `SURVEY_POLL_MS` while the tab is visible, because other people may be
- * adding scans (the Firestore lite SDK has no live listener).
+ * adding scans (the Firestore lite SDK has no live listener). Coming back to
+ * the tab or window re-reads at once: a hidden tab skips its ticks, and the
+ * page often sits beside the game client.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { SurveyScan } from '@/engine/survey/series';
@@ -12,7 +14,9 @@ import {
   type SurveyTaxShare,
 } from './surveyStore';
 
-export const SURVEY_POLL_MS = 60_000;
+export const SURVEY_POLL_MS = 30_000;
+/** A return to the tab re-reads unless one just did. */
+const RETURN_MIN_GAP_MS = 5_000;
 
 export type SurveyLoadState =
   | { status: 'none' }
@@ -76,7 +80,9 @@ export function useSurvey(id: string | null): {
   useEffect(() => {
     if (id === null) return;
     let cancelled = false;
+    let lastRunAt = 0;
     const run = () => {
+      lastRunAt = Date.now();
       void loadSurvey(id).then((result) => {
         if (!cancelled) setLoaded((prev) => settle(prev, id, result));
       });
@@ -85,9 +91,18 @@ export function useSurvey(id: string | null): {
     const timer = window.setInterval(() => {
       if (document.visibilityState === 'visible') run();
     }, SURVEY_POLL_MS);
+    const onReturn = () => {
+      if (document.visibilityState === 'visible' && Date.now() - lastRunAt >= RETURN_MIN_GAP_MS) {
+        run();
+      }
+    };
+    document.addEventListener('visibilitychange', onReturn);
+    window.addEventListener('focus', onReturn);
     return () => {
       cancelled = true;
       window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', onReturn);
+      window.removeEventListener('focus', onReturn);
     };
   }, [id]);
 
