@@ -77,7 +77,7 @@ describe('NotificationEventList on desktop', () => {
     const user = userEvent.setup();
     render(<Harness />);
 
-    const row = screen.getByRole('button', { name: 'Skill Level Complete' });
+    const row = screen.getByRole('button', { name: 'Skill level complete' });
     expect(row).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByText('Alpha Pilot')).not.toBeInTheDocument();
 
@@ -93,10 +93,10 @@ describe('NotificationEventList on desktop', () => {
     render(<Harness ids={['skillLevelComplete']} />);
     expect(screen.getByText('All 3 alike')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Skill Level Complete' }));
+    await user.click(screen.getByRole('button', { name: 'Skill level complete' }));
     await user.click(
       screen.getByRole('checkbox', {
-        name: 'Skill Level Complete, Beta Pilot, device notifications',
+        name: 'Skill level complete, Beta Pilot, device notifications',
       })
     );
 
@@ -114,7 +114,7 @@ describe('NotificationEventList on desktop', () => {
         over={{ forceExpanded: true, visibleCharacterIds: new Set([2]) }}
       />
     );
-    expect(screen.getByRole('button', { name: 'Skill Level Complete' })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: 'Skill level complete' })).toHaveAttribute(
       'aria-expanded',
       'true'
     );
@@ -138,16 +138,16 @@ describe('NotificationEventList on desktop', () => {
     );
     // Only two can use it: the chip says so rather than claiming all three.
     expect(screen.getByText('2 of 3 can use this')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Skill Level Complete' }));
+    await user.click(screen.getByRole('button', { name: 'Skill level complete' }));
     expect(
       screen.getByRole('checkbox', {
-        name: 'Skill Level Complete, Gamma Pilot, device notifications',
+        name: 'Skill level complete, Gamma Pilot, device notifications',
       })
     ).toHaveAttribute('aria-disabled', 'true');
 
     await user.click(
       screen.getByRole('checkbox', {
-        name: 'Skill Level Complete for every character, device notifications',
+        name: 'Skill level complete for every character, device notifications',
       })
     );
     await waitFor(() => {
@@ -173,7 +173,7 @@ describe('NotificationEventList on desktop', () => {
     expect(screen.getByText('None can use this')).toBeInTheDocument();
     expect(
       screen.getByRole('checkbox', {
-        name: 'Skill Level Complete for every character, device notifications',
+        name: 'Skill level complete for every character, device notifications',
       })
     ).toBeDisabled();
   });
@@ -187,7 +187,7 @@ describe('NotificationEventList on desktop', () => {
     const user = userEvent.setup();
     render(<Harness ids={['eveNotification']} />);
 
-    await user.click(screen.getByRole('button', { name: 'EVE Notifications' }));
+    await user.click(screen.getByRole('button', { name: 'EVE notifications' }));
     await user.click(screen.getByRole('button', { name: 'Structure Under Attack' }));
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -211,7 +211,7 @@ describe('NotificationEventList on desktop', () => {
         over={{ forceExpanded: true, visibleCharacterIds: new Set([2]) }}
       />
     );
-    const row = screen.getByRole('button', { name: 'Skill Level Complete' });
+    const row = screen.getByRole('button', { name: 'Skill level complete' });
     expect(row).toHaveAttribute('aria-expanded', 'true');
 
     await user.click(row);
@@ -222,7 +222,7 @@ describe('NotificationEventList on desktop', () => {
 
   it('never opens the EVE notifications row by itself, even when a search asks for rows to open', () => {
     render(<Harness ids={['eveNotification']} over={{ forceExpanded: true }} />);
-    expect(screen.getByRole('button', { name: 'EVE Notifications' })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: 'EVE notifications' })).toHaveAttribute(
       'aria-expanded',
       'false'
     );
@@ -256,7 +256,7 @@ describe('NotificationEventList on desktop', () => {
     );
     expect(screen.getByText(/1 character hasn't granted/)).toBeInTheDocument();
     expect(screen.getByText(/delivered up to 72 hours ahead/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Planetary Extractor Expiring' })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: 'Planetary extractor expiring' })).toHaveAttribute(
       'aria-expanded',
       'false'
     );
@@ -283,10 +283,10 @@ describe('NotificationEventList on desktop', () => {
   it('marks a differing character with words for a screen reader, not only a colour', async () => {
     const user = userEvent.setup();
     render(<Harness ids={['skillLevelComplete']} />);
-    await user.click(screen.getByRole('button', { name: 'Skill Level Complete' }));
+    await user.click(screen.getByRole('button', { name: 'Skill level complete' }));
     await user.click(
       screen.getByRole('checkbox', {
-        name: 'Skill Level Complete, Beta Pilot, device notifications',
+        name: 'Skill level complete, Beta Pilot, device notifications',
       })
     );
 
@@ -319,13 +319,13 @@ describe('NotificationEventList on desktop', () => {
     // The letters look like the box's label; a click on one that did nothing read as a click that did not register.
     const user = userEvent.setup();
     render(<Harness ids={['skillLevelComplete']} />);
-    await user.click(screen.getByRole('button', { name: 'Skill Level Complete' }));
+    await user.click(screen.getByRole('button', { name: 'Skill level complete' }));
     const chip = screen.getByText('Beta Pilot').closest('li')!;
     const alerts = within(chip).getByRole('checkbox', {
-      name: 'Skill Level Complete, Beta Pilot, Alerts list',
+      name: 'Skill level complete, Beta Pilot, Alerts list',
     });
     const device = within(chip).getByRole('checkbox', {
-      name: 'Skill Level Complete, Beta Pilot, device notifications',
+      name: 'Skill level complete, Beta Pilot, device notifications',
     });
     expect(alerts).toBeChecked();
     expect(device).toBeChecked();
