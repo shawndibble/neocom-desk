@@ -5,12 +5,19 @@ import type { RegionOrder } from '@/esi/endpoints';
 import { useMarketOrderColumns } from './useMarketOrderColumns';
 import { useVisibleMarketOrderColumns } from './marketOrderColumns';
 
+import type { OrderFeeContext } from '@/engine/market/orderFees';
+
+const CTX: OrderFeeContext = {
+  accountingLevel: 5,
+  brokerRelationsLevel: 5,
+  standing: { factionStanding: 0, corpStanding: 0 },
+};
 const t = ((key: string) => key) as unknown as TFunction;
 
 function columnsFor(
   hideLocation: boolean,
   myOrderIds: ReadonlySet<number> = new Set(),
-  accountingLevel: number | null = 5
+  feeContext: OrderFeeContext | null = CTX
 ) {
   return renderHook(() =>
     useMarketOrderColumns({
@@ -28,7 +35,7 @@ function columnsFor(
       cards: false,
       locationSqueezed: false,
       hideLocation,
-      accountingLevel,
+      feeContext,
     })
   ).result.current;
 }
@@ -90,11 +97,26 @@ describe('useMarketOrderColumns fee columns', () => {
     expect(columns.buyHiddenColumns).not.toContain('finalPrice');
   });
 
-  it('prices a buy order net of sales tax and a sell order untaxed', () => {
+  it('prices a buy order net of sales tax and a sell order net of broker fee and tax', () => {
     const { orderColumnsById } = columnsFor(false);
     const base = { price: 1_000, volume_remain: 1 } as RegionOrder;
-    expect(orderColumnsById.finalPrice.sortValue?.({ ...base, is_buy_order: false })).toBe(1_000);
+    const listed = orderColumnsById.finalPrice.sortValue?.({ ...base, is_buy_order: false });
     const net = orderColumnsById.finalPrice.sortValue?.({ ...base, is_buy_order: true });
     expect(net).toBeLessThan(1_000);
+    expect(listed).toBeLessThan(net as number);
+  });
+});
+
+describe('useMarketOrderColumns fee tooltips', () => {
+  it('explains each table’s assumption on both fee headers once ticked', async () => {
+    await useVisibleMarketOrderColumns.getState().setValue(['price', 'fees', 'finalPrice']);
+    const columns = columnsFor(false);
+    const tip = (table: typeof columns.baseColumns, id: string) =>
+      table.find((c) => c.id === id)?.headerTooltip;
+    expect(tip(columns.baseColumns, 'fees')).toBe('market.feesTooltip.sell');
+    expect(tip(columns.baseColumns, 'finalPrice')).toBe('market.finalPriceTooltip.sell');
+    expect(tip(columns.buyColumns, 'fees')).toBe('market.feesTooltip.buy');
+    expect(tip(columns.buyColumns, 'finalPrice')).toBe('market.finalPriceTooltip.buy');
+    await useVisibleMarketOrderColumns.getState().setValue([]);
   });
 });

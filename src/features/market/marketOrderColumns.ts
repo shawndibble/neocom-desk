@@ -6,6 +6,7 @@
  */
 import { sellOutlierMultiple } from '@/engine/market/orderBookDepth';
 import type { RegionOrder } from '@/esi/endpoints';
+import type { OrderFeeContext } from '@/engine/market/orderFees';
 import { createColumnVisibilitySetting } from '@/lib/columnVisibility';
 import { formatMarketIsk } from '@/lib/isk';
 import { formatVolume } from './format';
@@ -50,15 +51,15 @@ export const FEE_COLUMN_IDS: readonly MarketOrderColumnId[] = ['fees', 'finalPri
 /**
  * Whether the book holds a column back right now: Location when one station
  * is already named by the scope bar, the fee columns until the active
- * Character's Accounting level is known. The one rule the picker, the table,
+ * Character's skills are known. The one rule the picker, the table,
  * the row detail and the width budget all follow.
  */
 export function isColumnWithheld(
   id: MarketOrderColumnId,
-  { hideLocation, accountingLevel }: { hideLocation: boolean; accountingLevel: number | null }
+  { hideLocation, feeContext }: { hideLocation: boolean; feeContext: OrderFeeContext | null }
 ): boolean {
   return (
-    (hideLocation && id === 'location') || (accountingLevel === null && FEE_COLUMN_IDS.includes(id))
+    (hideLocation && id === 'location') || (feeContext === null && FEE_COLUMN_IDS.includes(id))
   );
 }
 

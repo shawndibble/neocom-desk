@@ -9920,6 +9920,14 @@
     "range": "Range",
     "minVolume": "Min. Volume",
     "feesColumn": "Tax & fees",
+    "feesTooltip": {
+      "sell": "If you listed your own sell order at this price: the broker fee when you place it plus sales tax when it sells, per unit. Uses your Broker Relations and Accounting skills and your standing with the selected hub's station owner (none for a region or structure). Buying from this order costs a buyer neither. The broker fee has a 100 ISK minimum per order that a single unit does not show.",
+      "buy": "If you sold into this buy order right now: sales tax at your Accounting level, per unit. No broker fee, since you are not placing an order."
+    },
+    "finalPriceTooltip": {
+      "sell": "What you would make per unit by listing at this price and selling it: the price less Tax & fees.",
+      "buy": "What reaches your wallet per unit if you sold into this order right now: the price less sales tax."
+    },
     "finalPriceColumn": "Final price",
     "orderDetail": {
       "structureType": "Structure",

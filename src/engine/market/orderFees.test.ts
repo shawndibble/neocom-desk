@@ -1,24 +1,35 @@
 import { describe, expect, it } from 'vitest';
-import { salesTaxPct } from '@/engine/industry/fees';
-import { orderFees } from './orderFees';
+import { brokerFeePct, salesTaxPct } from '@/engine/industry/fees';
+import { orderFees, type OrderFeeContext } from './orderFees';
+
+const ctx: OrderFeeContext = {
+  accountingLevel: 5,
+  brokerRelationsLevel: 4,
+  standing: { factionStanding: 2, corpStanding: 1 },
+};
+const pct = (p: number) => p / 100;
 
 describe('orderFees', () => {
-  it('charges sales tax when you sell into a buy order, and pays out the rest', () => {
-    const { fees, finalPrice } = orderFees({ price: 1_000, is_buy_order: true }, 5);
-    expect(fees).toBeCloseTo((1_000 * salesTaxPct(5)) / 100, 9);
+  it('charges sales tax only when you sell into a buy order, and pays out the rest', () => {
+    const { fees, finalPrice } = orderFees({ price: 1_000, is_buy_order: true }, ctx);
+    expect(fees).toBeCloseTo(1_000 * pct(salesTaxPct(5)), 9);
     expect(finalPrice).toBeCloseTo(1_000 - fees, 9);
   });
 
-  it('charges nothing when you buy from a sell order outright', () => {
-    expect(orderFees({ price: 1_000, is_buy_order: false }, 0)).toEqual({
-      fees: 0,
-      finalPrice: 1_000,
-    });
+  it('charges the broker fee and sales tax when you list at a sell order’s price', () => {
+    const { fees, finalPrice } = orderFees({ price: 1_000, is_buy_order: false }, ctx);
+    const expected = 1_000 * (pct(salesTaxPct(5)) + pct(brokerFeePct(4, 2, 1)));
+    expect(fees).toBeCloseTo(expected, 9);
+    expect(finalPrice).toBeCloseTo(1_000 - expected, 9);
   });
 
-  it('taxes less at a higher Accounting level', () => {
-    const low = orderFees({ price: 1_000, is_buy_order: true }, 0).fees;
-    const high = orderFees({ price: 1_000, is_buy_order: true }, 5).fees;
-    expect(high).toBeLessThan(low);
+  it('charges less with better Broker Relations and standing', () => {
+    const order = { price: 1_000, is_buy_order: false };
+    const worse = orderFees(order, {
+      ...ctx,
+      brokerRelationsLevel: 0,
+      standing: { factionStanding: 0, corpStanding: 0 },
+    });
+    expect(orderFees(order, ctx).fees).toBeLessThan(worse.fees);
   });
 });
