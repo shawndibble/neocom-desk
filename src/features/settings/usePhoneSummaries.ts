@@ -16,8 +16,8 @@ import { useDefaultCharacterFilter } from '@/features/character/defaultCharacter
 
 /**
  * One line per section for the phone list, from settings already in memory —
- * no network. A section with nothing cheap to say (Permissions, Alerts, Data
- * & storage, Activity Log, FAQ) gets none.
+ * no network. A section with nothing cheap to say (Permissions, Backup, Log out
+ * & delete, Activity Log, FAQ) gets none.
  */
 export function usePhoneSummaries(): Partial<Record<SettingsSectionId, string>> {
   const { t } = useTranslation();

@@ -210,9 +210,9 @@ export function Settings() {
             <>
               <IndustryDefaultsPanel />
               <BpcSourcingDefaultsPanel />
-              <PiDefaultsPanel />
             </>
           )}
+          {section === 'pi' && <PiDefaultsPanel />}
           {section === 'market' && <MarketDefaultsPanel />}
           {section === 'miningTax' && <MiningTaxDefaultsPanel />}
           {section === 'characters' && <CharacterDefaultsPanel />}
@@ -220,23 +220,22 @@ export function Settings() {
           {section === 'travel' && <TravelSettingsPanel />}
           {/* The Overview feed's "Settings" link targets `/settings/notifications` directly. */}
           {section === 'notifications' && <NotificationsPanel />}
-          {/*
-            The four short action panels sit two-up from `xl`: one column of
-            them left most of each card empty. Export beside Import, since
-            they are one round trip; the device's log-out row stays full width.
-            Data Age goes last: its list grows with every endpoint and
-            Character, and it is the least-used block on the page.
-          */}
+          {section === 'backup' && (
+            <>
+              <ExportPanel />
+              <ImportPanel />
+            </>
+          )}
+          {section === 'app' && (
+            <>
+              <InstallAppPanel />
+              <AnalyticsPanel />
+            </>
+          )}
+          {section === 'device' && <DevicePanel />}
           {section === 'dataAge' && (
             <>
-              <div className="grid items-start gap-4 xl:grid-cols-2">
-                <DataPanel />
-                <InstallAppPanel />
-                <ExportPanel />
-                <ImportPanel />
-              </div>
-              <AnalyticsPanel />
-              <DevicePanel />
+              <DataPanel />
               <DataAgePanel />
             </>
           )}

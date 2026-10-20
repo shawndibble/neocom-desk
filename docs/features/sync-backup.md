@@ -1,6 +1,6 @@
 # Sync, backup, delete data
 
-Cross-device sync of Editable Data (Firebase), encrypted device backup, log out, delete all data, and the shell indicators that report sync state. No page of its own: the user surfaces are Settings › Data & storage (`/settings/dataAge`), the rail's status dot, an error note, the Characters page's Remove, and Help › FAQ. Terms per `GLOSSARY.md`: Editable Data, Synced Collection, Character, Tab Leader, Notification Feed, Scheduled Push, Projection.
+Cross-device sync of Editable Data (Firebase), encrypted device backup, log out, delete all data, and the shell indicators that report sync state. No page of its own: the user surfaces are Settings › Backup / App / Log out & delete / Cached data (`/settings/backup`, `/settings/app`, `/settings/device`, `/settings/dataAge`), the rail's status dot, an error note, the Characters page's Remove, and Help › FAQ. Terms per `GLOSSARY.md`: Editable Data, Synced Collection, Character, Tab Leader, Notification Feed, Scheduled Push, Projection.
 
 ## Feature table
 
@@ -29,7 +29,7 @@ Sync is **configured** only when `VITE_FIREBASE_API_KEY` is set and `MODE !== 't
 
 - **Top jobs (ranked):** 1. "Is my work synced?" (rail dot, error note). 2. "Set up a new device with all my Characters" (export and import backup). 3. "Log out, or delete everything" (`20260926-223948`).
 - **Device and cadence:** desktop primary (owner, 2026-10-11); rare. Backup and delete are one-off moments (inferred). Phone parity: the phone shows no sync dot (see gaps).
-- **Above the fold:** n/a. Moment of use: a glance at the dot; in Settings › Data & storage, the action cards.
+- **Above the fold:** n/a. Moment of use: a glance at the dot; in Settings › Backup and Log out & delete, the action cards.
 - **Not for:** how fresh EVE data is (Data Age, and the Characters page's "Last synced", which is ESI age).
 - **Sources:** owner, 2026-10-11 (desktop primary, phone for one-off lookups); ADR 0001, ADR 0014; decisions `20260829-094708-sync-backend`, `20260926-223948`, `20260926-214853`, `20260910-164633`; `settings.md` (backup solves 20+ alt re-login).
 - **Unconfirmed:** that pilots check sync state at all; how often backup is used.
@@ -113,7 +113,7 @@ Refresh tokens: Dexie `tokens` only. Firebase gets one short-lived access token 
 
 Status is per Character in memory (`src/sync/status.ts:22`); the UI subscribes to the **active** Character's stream (plus statuses without a `characterId`) (`src/app/useSyncStatus.ts:20`). Nothing about sync is persisted except bookkeeping keys (ownerHash, tombstones, cursors, heartbeat, settingsMeta) in Dexie `settings`.
 
-## Settings › Data & storage (`/settings/dataAge`, `src/routes/Settings.tsx:1100`)
+## Settings › Backup / App / Log out & delete / Cached data (`/settings/backup`, `/settings/app`, `/settings/device`, `/settings/dataAge`, `src/routes/Settings.tsx:1100`)
 
 Rendered order: a 2-up grid (from `xl`) of Data, Install, Export, Import; then the Log out and delete panel (full width); then Data Age. Phone: single column, section reached from the Settings list.
 
@@ -192,4 +192,4 @@ None of these features need an ESI scope. Sign-in to Firebase requires a refresh
 - Distinct import errors (not a backup file / wrong password / unsupported version) and a skipped-settings count.
 - Server-assigned timestamps (or hybrid logical clocks) for LWW.
 - Optional device-preference section in the backup.
-- Link "Delete your data" (`delete-data.html`) from Settings › Data & storage and add Share Links/analytics lines to the FAQ.
+- Link "Delete your data" (`delete-data.html`) from Settings › Log out & delete and add Share Links/analytics lines to the FAQ.

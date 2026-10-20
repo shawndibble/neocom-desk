@@ -4,7 +4,7 @@ import { Checkbox, Field, Fields, Panel, Spinner } from '@/components/ui';
 import { useAnalyticsEnabled } from '@/app/analyticsPref';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 
-/** Settings → Data & storage: the device-local switch for Google Analytics page views. */
+/** Settings → App: the device-local switch for Google Analytics page views. */
 export function AnalyticsPanel() {
   const { t } = useTranslation();
   const hydrated = useHydratedStore(useAnalyticsEnabled);

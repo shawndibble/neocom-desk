@@ -198,7 +198,7 @@ export function FaqPanel() {
           <Trans
             i18nKey="settings.faq.a.install"
             components={{
-              link: <Link to={tabPath(SETTINGS_TABS, 'dataAge')} className={LINK} />,
+              link: <Link to={tabPath(SETTINGS_TABS, 'app')} className={LINK} />,
             }}
           />
         </p>

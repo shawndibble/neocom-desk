@@ -150,7 +150,7 @@ Phones and tablets only, once per device (key `installPrompt.seen`, `:8`; accept
 
 ### Install later (gap)
 
-Banner is one-shot; the later path is Settings › Data & storage › Install this app (`InstallAppPanel`, `selectInstallAppVariant`, event held by `installApp.ts`), a FAQ entry and a link in the iOS push notice (#2860).
+Banner is one-shot; the later path is Settings › App › Install this app (`InstallAppPanel`, `selectInstallAppVariant`, event held by `installApp.ts`), a FAQ entry and a link in the iOS push notice (#2860).
 
 ## ESI outage, rate limit, offline (what the player sees)
 
@@ -196,7 +196,7 @@ Footer page (not a setting: FAQ and Support left Settings, decision `20261002-14
 
 ## Settings (pointer only)
 
-`/settings`, desktop rail layout / phone grouped list (`src/app/pageTabs.ts:42`, `src/features/settings/sections.ts:18`). Groups and sections: App (Display, Permissions), Defaults (Industry, Market, Moon Mining Tax, Characters, Corporation [hidden unless Corp Access `ready`], Travel), Alerts (Notifications), Data & device (Data & storage, Activity Log). Details: `docs/features/settings.md`; the Data & storage section is documented in `docs/features/sync-backup.md`. Settings section ids are paths (`/settings/dataAge` etc.) so deep links and Back work; old `#shortcuts`-style hashes are carried to `/help/...` (`src/routes/Settings.tsx`, `LEGACY_HASH_TARGETS`).
+`/settings`, desktop rail layout / phone grouped list (`src/app/pageTabs.ts:42`, `src/features/settings/sections.ts:18`). Groups and sections: Preferences (Display, Notifications), Defaults (Industry, Planetary Industry, Market, Moon Mining Tax, Characters, Corporation [hidden unless Corp Access `ready`], Travel), Account & device (Permissions, Backup, App, Log out & delete), Data (Cached data, Offline data, Activity Log). Details: `docs/features/settings.md`; the Backup / Log out & delete sections are documented in `docs/features/sync-backup.md`. Settings section ids are paths (`/settings/dataAge` etc.) so deep links and Back work; old `#shortcuts`-style hashes are carried to `/help/...` (`src/routes/Settings.tsx`, `LEGACY_HASH_TARGETS`).
 
 ## Mobile vs desktop summary
 
@@ -249,7 +249,7 @@ Footer page (not a setting: FAQ and Support left Settings, decision `20261002-14
 - Help › Shortcuts "On a page" rows are hard-coded (`src/features/help/ShortcutsPanel.tsx`), not derived from a registry, so they can drift from the real handlers.
 - No `G` sequence for Skills, Assets, Mail, Calendar, Contacts, Travel, Corporation (`src/lib/shortcuts.ts:152`); only ten keys, two of which (`G` `S`, `?`) are for settings/help.
 - The phone has no indicator for "syncing"/"offline" (see `sync-backup.md`).
-- The Install Prompt banner never shows on Android Chromium unless `beforeinstallprompt` fires; Settings › Data & storage › Install this app gives a generic menu pointer instead.
+- The Install Prompt banner never shows on Android Chromium unless `beforeinstallprompt` fires; Settings › App › Install this app gives a generic menu pointer instead.
 - Updates apply silently with no "update available" indicator; a tab left open can run an old build until it is reopened or reloaded (`src/app/bootUpdate.ts`).
 - Analytics `page_location` carries the full query string (e.g. `?info=`, `?f=`, filters) (`src/app/analytics.ts:71`); the in-app FAQ does not mention analytics (the privacy page does).
 - FAQ "Support" is Discord only; there is no in-app diagnostics or log-copy for bug reports (the Activity Log exists in Settings but is not linked from Support).
