@@ -49,12 +49,18 @@ function context(over: Partial<EventRowContext> = {}): EventRowContext {
   };
 }
 
-function Harness(props: { over?: Partial<EventRowContext>; ids?: typeof NOTIFICATION_EVENT_IDS }) {
+function Harness(props: {
+  over?: Partial<EventRowContext>;
+  ids?: typeof NOTIFICATION_EVENT_IDS;
+  searching?: boolean;
+  path?: string;
+}) {
   // Re-read the store each render so a click's write is visible, like the panel does.
   const value = useNotificationPreferences((state) => state.value);
   return (
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[props.path ?? '/settings/notifications']}>
       <NotificationEventList
+        searching={props.searching}
         eventIds={props.ids ?? NOTIFICATION_EVENT_IDS}
         context={context({ prefsValue: value, ...props.over })}
         extraTypesByCharacter={new Map()}
@@ -336,5 +342,120 @@ describe('NotificationEventList on desktop', () => {
 
     await user.click(within(chip).getByText('D'));
     await waitFor(() => expect(device).not.toBeChecked());
+  });
+});
+
+describe('NotificationEventList Topics', () => {
+  it("shows one topic at a time on desktop, tabs carrying each topic's event count", async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+
+    expect(screen.getByRole('tab', { name: /^Skills\s*5$/ })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+    expect(screen.getByRole('button', { name: 'Skill level complete' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'New mail' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('tab', { name: /^Mail and calendar/ }));
+    expect(screen.getByRole('button', { name: 'New mail' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Skill level complete' })).not.toBeInTheDocument();
+  });
+
+  it('puts the column captions, warn-ahead and characters notes on the desktop table', () => {
+    render(<Harness ids={['skillQueueEnding']} />);
+    expect(screen.getByText('Warn ahead')).toBeInTheDocument();
+    expect(screen.getByText('Characters')).toBeInTheDocument();
+    // Warn-ahead sits on the event's own row, not in a separate list.
+    expect(screen.getByRole('button', { name: /Warn-ahead times \(3 characters\)/ })).toBeVisible();
+  });
+
+  it('lists every matching topic in one stack while searching', () => {
+    render(<Harness ids={['newMail', 'skillLevelComplete']} searching />);
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Skills' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Mail and calendar' })).toBeInTheDocument();
+  });
+
+  it('on a phone lists topics with a one-line state, and drills into one', async () => {
+    const user = userEvent.setup();
+    render(<Harness over={{ isDesktop: false }} />);
+
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
+    const topic = screen.getByRole('button', { name: /Mail and calendar/ });
+    expect(topic).toHaveTextContent('Device 3 · Alerts 3 of 3');
+
+    await user.click(topic);
+    expect(screen.getByRole('button', { name: 'New mail' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'All topics' }));
+    expect(screen.getByRole('button', { name: /Mail and calendar/ })).toBeInTheDocument();
+  });
+
+  it('on a phone says Corp needs the Corporation permission when no character can use it', () => {
+    render(
+      <Harness
+        over={{
+          isDesktop: false,
+          scopesByCharacterId: new Map([
+            [1, NO_SCOPES],
+            [2, NO_SCOPES],
+            [3, NO_SCOPES],
+          ]),
+        }}
+      />
+    );
+    expect(screen.getByRole('button', { name: /^Corp/ })).toHaveTextContent(
+      'Needs Corporation permission'
+    );
+  });
+
+  it('never prints a truncating class on an event name', () => {
+    render(
+      <Harness ids={['skillQueueEnding']} over={{ isDesktop: false }} path="/?topic=skills" />
+    );
+    const name = screen.getByText('Skill queue ending');
+    expect(name.className).not.toMatch(/truncate/);
+  });
+});
+
+describe('NotificationEventList Apply to all', () => {
+  it('fixes the one character that differs, leaving the rest alone, then reads all alike', async () => {
+    const user = userEvent.setup();
+    render(<Harness ids={['skillLevelComplete']} />);
+    await user.click(screen.getByRole('button', { name: 'Skill level complete' }));
+    await user.click(
+      screen.getByRole('checkbox', {
+        name: 'Skill level complete, Beta Pilot, device notifications',
+      })
+    );
+    await waitFor(() => expect(screen.getByText('1 differs')).toBeInTheDocument());
+    expect(
+      within(screen.getByText('Beta Pilot').closest('li')!).getByRole('checkbox', {
+        name: 'Skill level complete, Beta Pilot, device notifications',
+      })
+    ).not.toBeChecked();
+
+    await user.click(
+      screen.getByRole('button', { name: 'Apply to all characters: Skill level complete' })
+    );
+
+    await waitFor(() => expect(screen.getByText('All 3 alike')).toBeInTheDocument());
+    for (const { name } of CHARACTERS) {
+      expect(
+        within(screen.getByText(name).closest('li')!).getByRole('checkbox', {
+          name: `Skill level complete, ${name}, device notifications`,
+        })
+      ).toBeChecked();
+    }
+    expect(
+      screen.queryByRole('button', { name: 'Apply to all characters: Skill level complete' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('offers no Apply to all while every character is alike', async () => {
+    const user = userEvent.setup();
+    render(<Harness ids={['skillLevelComplete']} />);
+    await user.click(screen.getByRole('button', { name: 'Skill level complete' }));
+    expect(screen.queryByRole('button', { name: /Apply to all/ })).not.toBeInTheDocument();
   });
 });

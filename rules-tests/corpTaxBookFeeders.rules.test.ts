@@ -12,6 +12,7 @@ import { characterAuth, createRulesEnv } from './testEnv';
 let env: RulesTestEnvironment;
 const OFFICER = 1;
 const RECORD = 'corpTaxBooks/98000001/feeders/98000002';
+const PAYOUT = `${RECORD}/payouts/p1`;
 const INVITE = 'corpTaxBookFeederInvites/abc';
 const POINTER = 'corpTaxBookFeederOf/98000002';
 
@@ -26,6 +27,7 @@ beforeEach(async () => {
   await env.withSecurityRulesDisabled(async (ctx) => {
     const db = ctx.firestore();
     await setDoc(doc(db, RECORD), { status: 'active' });
+    await setDoc(doc(db, PAYOUT), { amount: 1 });
     await setDoc(doc(db, INVITE), { collectorCorporationId: 98000001 });
     await setDoc(doc(db, POINTER), { collectorCorporationId: 98000001 });
     await setDoc(doc(db, `corpTaxBooks/98000001/officers/char:${OFFICER}`), {
@@ -66,5 +68,18 @@ describe('feeder paths', () => {
     await assertSucceeds(getDoc(doc(characterAuth(env, OFFICER, 'h').firestore(), RECORD)));
     await assertFails(getDoc(doc(characterAuth(env, 2, 'h').firestore(), RECORD)));
     await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), RECORD)));
+  });
+
+  it.each(clients)('denies %s every write to a payout', async (_n, ctx) => {
+    const db = ctx(env);
+    await assertFails(setDoc(doc(db, PAYOUT), { amount: 2 }));
+    await assertFails(setDoc(doc(db, `${RECORD}/payouts/new`), { amount: 2 }));
+    await assertFails(deleteDoc(doc(db, PAYOUT)));
+  });
+
+  it('lets an officer read a payout, and nobody else', async () => {
+    await assertSucceeds(getDoc(doc(characterAuth(env, OFFICER, 'h').firestore(), PAYOUT)));
+    await assertFails(getDoc(doc(characterAuth(env, 2, 'h').firestore(), PAYOUT)));
+    await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), PAYOUT)));
   });
 });

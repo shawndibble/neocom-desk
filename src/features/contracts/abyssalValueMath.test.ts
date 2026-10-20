@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { loadAbyssalContractValue } from './contractAbyssalValue';
+import { loadAbyssalContractValue } from './abyssalValueMath';
 
 const mutamarket = vi.hoisted(() => ({ getAbyssalEstimate: vi.fn() }));
 vi.mock('@/market/mutamarket', () => mutamarket);
