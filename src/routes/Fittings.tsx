@@ -37,15 +37,13 @@ import {
   addModule,
   cargoGroups,
   droneRoom,
-  droneTotals,
   firstFreeSlotIndex,
-  moveModule,
   newFitting,
   setCargoQuantity,
   swapModuleType,
 } from '@/engine/fittings/fittingEdit';
 import { FittingAddPanel } from '@/features/fittings/FittingAddPanel';
-import { MakeItFitContext, type FitResource } from '@/features/fittings/makeItFitContext';
+import { type FitResource } from '@/features/fittings/makeItFitContext';
 import { MakeItFitDialog } from '@/features/fittings/MakeItFitDialog';
 import { CargoQuantityDialog } from '@/features/fittings/CargoQuantityDialog';
 import { FittingItemActionsProvider } from '@/features/fittings/fittingItemActions';
@@ -59,15 +57,14 @@ import type { HullEntry } from '@/engine/fittings/hullCatalogue';
 import { FittingSaveButton } from '@/features/fittings/FittingSaveButton';
 import { LoadWarnings } from '@/features/fittings/FittingLoadCard';
 import { FittingStartScreen } from '@/features/fittings/FittingStartScreen';
-import { ImportFittingDialog, NewFromHullDialog } from '@/features/fittings/FittingStartDialogs';
+import { FittingLibraryDialogs } from '@/features/fittings/FittingLibraryDialogs';
+import { FittingEditorPanes } from '@/features/fittings/FittingEditorPanes';
+import { FittingRackSheet } from '@/features/fittings/FittingRackSheet';
 import { LazySaveToEveDialog } from '@/features/fittings/LazySaveToEveDialog';
 import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
 import { usePageItemActions } from '@/features/market/usePageItemActions';
-import { DroneSection } from '@/features/fittings/FittingDroneSection';
 import { FittingModuleDialog } from '@/features/fittings/FittingModuleDialog';
 import { SaveAsNewDialog } from '@/features/fittings/SaveAsNewDialog';
-import { FittingRackList, RackSlots } from '@/features/fittings/FittingRackList';
-import { FittingRing } from '@/features/fittings/FittingRing';
 import { RING_ROOM_ATTR } from '@/features/fittings/ring/useRingChrome';
 import { FittingStatsColumn } from '@/features/fittings/FittingStatsColumn';
 import {
@@ -78,7 +75,6 @@ import {
 } from '@/features/fittings/fittingLayout';
 import { useFittingPasteLoad } from '@/features/fittings/useFittingPasteLoad';
 import { useSavedFittingRecord } from '@/features/fittings/useSavedFittingRecord';
-import { FittingFightersPanel } from '@/features/fittings/FittingFightersPanel';
 import { tacticalModeKind } from '@/engine/fittings/tacticalModes';
 import {
   resolveFittingView,
@@ -476,88 +472,30 @@ function FittingsPage() {
     fitting !== null &&
     ((fitting.fighters?.length ?? 0) > 0 || (stats?.fighters.tubes?.total ?? 0) > 0);
 
-  const editorBody =
-    view === 'ring' ? (
-      <div className="min-w-0 space-y-3">
-        <FittingRing
-          fitting={fitting}
-          stats={stats}
-          moduleResults={moduleResults}
-          unusableModuleKeys={gaps?.unusableModuleKeys}
-          typeName={typeName}
-          onSlotSelect={selectSlot}
-          // Drag is pointer-only: a touch tablet taps a slot and picks instead.
-          onDropType={isDesktop ? fitAt : undefined}
-          onMoveModule={
-            isDesktop ? (rack, from, to) => edit((f) => moveModule(f, rack, from, to)) : undefined
-          }
-          compact={isPhone}
-          onRackOpen={setRackSheet}
-          hardpointsUsed={hardpoints.used}
-          hardpointKindOf={hardpoints.kindOf}
-          selectedSlot={
-            target?.kind === 'slot' ? { rack: target.slot, index: target.slotIndex } : null
-          }
-          actions={addButton}
-          droneButton={
-            dronesShown ? (
-              <Button
-                size="md"
-                className="w-full justify-between"
-                onClick={() => setRackSheet('drone')}
-              >
-                <span>{t('fittings.list.drones')}</span>
-                <span className="text-xs font-normal text-text-dim tabular-nums">
-                  {t('fittings.ring.droneCount', droneTotals(fitting))}
-                </span>
-              </Button>
-            ) : undefined
-          }
-        />
-        {/* The phone overview has its Drones button among the rack buttons instead. */}
-        {!isPhone && dronesShown && (
-          <Panel title={t('fittings.list.drones')}>
-            <DroneSection
-              fitting={fitting}
-              catalogue={catalogue}
-              stats={stats}
-              edit={edit}
-              target={target}
-              onSelectTarget={selectTarget}
-              variant="panel"
-            />
-          </Panel>
-        )}
-      </div>
-    ) : (
-      <FittingRackList
-        fitting={fitting}
-        stats={stats}
-        moduleResults={moduleResults}
-        catalogue={catalogue}
-        context={context}
-        edit={edit}
-        target={target}
-        onSelectTarget={selectTarget}
-        unusableModuleKeys={gaps?.unusableModuleKeys}
-        actions={addButton}
-      />
-    );
-
   const editor = (
-    <div className="min-w-0 space-y-3">
-      <MakeItFitContext.Provider value={openMakeItFit}>{editorBody}</MakeItFitContext.Provider>
-      {fightersShown && (
-        <Panel title={t('fittings.fighters.title')}>
-          <FittingFightersPanel
-            fitting={fitting}
-            stats={stats}
-            onChange={edit}
-            typeName={(typeId) => catalogueTypeName(catalogue, typeId)}
-          />
-        </Panel>
-      )}
-    </div>
+    <FittingEditorPanes
+      view={view}
+      fitting={fitting}
+      stats={stats}
+      moduleResults={moduleResults}
+      catalogue={catalogue}
+      context={context}
+      edit={edit}
+      target={target}
+      onSelectTarget={selectTarget}
+      unusableModuleKeys={gaps?.unusableModuleKeys}
+      typeName={typeName}
+      onSlotSelect={selectSlot}
+      dragEnabled={isDesktop}
+      onDropType={fitAt}
+      isPhone={isPhone}
+      onRackOpen={setRackSheet}
+      hardpoints={hardpoints}
+      addButton={addButton}
+      dronesShown={dronesShown}
+      fightersShown={fightersShown}
+      onOpenMakeItFit={openMakeItFit}
+    />
   );
 
   const statsSections = (
@@ -823,41 +761,15 @@ function FittingsPage() {
               onSaveToMyFittings={workspace.savedId === null ? workspace.save : undefined}
             />
           )}
-          <Modal
-            open={library === 'open'}
-            onClose={closeLibrary}
-            title={t('fittings.header.libraryTitle')}
-            placement={isPhone ? 'sheet' : 'wide'}
-          >
-            {library === 'open' && (
-              <FittingStartScreen
-                variant="dialog"
-                workspace={workspace}
-                catalogue={catalogue}
-                characterId={activeCharacterId}
-                inGameKey={inGameFittingsKey}
-                onOpened={closeLibrary}
-              />
-            )}
-          </Modal>
-          <NewFromHullDialog
-            open={library === 'new'}
-            onClose={closeLibrary}
-            catalogue={catalogue}
-            onStart={(hull) => {
-              startHull(hull);
-              closeLibrary();
-            }}
-            onOpenPopular={async (loaded) => {
-              await workspace.openLoaded(loaded);
-              closeLibrary();
-            }}
-          />
-          <ImportFittingDialog
-            open={library === 'import'}
+          <FittingLibraryDialogs
+            library={library}
             onClose={closeLibrary}
             workspace={workspace}
-            onOpened={closeLibrary}
+            catalogue={catalogue}
+            characterId={activeCharacterId}
+            inGameKey={inGameFittingsKey}
+            isPhone={isPhone}
+            onStartHull={startHull}
           />
           <FittingModuleDialog
             module={openModule}
@@ -887,43 +799,19 @@ function FittingsPage() {
             characterId={activeCharacterId}
           />
           {isPhone && (
-            <Modal
-              open={rackSheet !== null}
+            <FittingRackSheet
+              rack={rackSheet}
               onClose={() => setRackSheet(null)}
-              title={
-                rackSheet === 'drone'
-                  ? t('fittings.list.drones')
-                  : t(`fittings.list.rack.${rackSheet ?? 'high'}`)
-              }
-              placement="sheet"
-            >
-              {rackSheet === 'drone' && (
-                <DroneSection
-                  fitting={fitting}
-                  catalogue={catalogue}
-                  stats={stats}
-                  edit={edit}
-                  target={target}
-                  onSelectTarget={selectTargetFromSheet}
-                  variant="panel"
-                />
-              )}
-              {rackSheet && rackSheet !== 'drone' && (
-                <RackSlots
-                  rack={rackSheet}
-                  hideLabel
-                  fitting={fitting}
-                  catalogue={catalogue}
-                  context={context}
-                  edit={edit}
-                  stats={stats}
-                  moduleResults={moduleResults}
-                  target={target}
-                  onSelectTarget={selectTargetFromSheet}
-                  unusableModuleKeys={gaps?.unusableModuleKeys}
-                />
-              )}
-            </Modal>
+              fitting={fitting}
+              catalogue={catalogue}
+              context={context}
+              edit={edit}
+              stats={stats}
+              moduleResults={moduleResults}
+              target={target}
+              onSelectTarget={selectTargetFromSheet}
+              unusableModuleKeys={gaps?.unusableModuleKeys}
+            />
           )}
           {addMode === 'sheet' && (
             <Modal open={addOpen} onClose={closeAdd} placement="sheet" title={addTitle}>
