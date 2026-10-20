@@ -18,7 +18,7 @@ describe('LAZY_SDE_FILES', () => {
   });
 
   it('is what vite.config.ts ignores for the precache, and nothing under data/ beyond it', () => {
-    expect(viteConfig).toMatch(/from '\.\/src\/sde\/lazySdeFiles'/);
+    expect(viteConfig).toMatch(/from '\.\/src\/sde\/lazySdeFiles\.ts'/);
     expect(viteConfig).toContain('...lazySdeGlobIgnores()');
     // No second, hand-kept list of data files to drift from this one.
     expect(viteConfig).not.toMatch(/'\*\*\/data\/[^']*'/);

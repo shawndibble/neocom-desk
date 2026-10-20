@@ -12,7 +12,7 @@
  * `vite.config.ts` loads this file at config time.
  * Everything in `public/data` NOT listed here is precached.
  */
-import { TYPE_INFO_SHARD_COUNT } from './typeInfoShard';
+import { TYPE_INFO_SHARD_COUNT } from './typeInfoShard.ts';
 
 export const LAZY_SDE_FILES: readonly string[] = [
   // Item Detail typeInfo shards (issue #3882); every slot has a file (`{}` if
