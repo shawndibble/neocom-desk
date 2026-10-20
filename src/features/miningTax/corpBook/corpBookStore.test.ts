@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  readBilledByPointer,
   readBookSettings,
   readDismissal,
   readMiner,
@@ -149,5 +150,19 @@ describe('the other readers', () => {
       mainCharacterId: 2,
     });
     expect(readMiner('m', { characterIds: [] })).toBeNull();
+  });
+});
+
+describe('readBilledByPointer', () => {
+  it('lists the corporations whose books bill the Character', () => {
+    expect(readBilledByPointer({ books: { '98000001': 1, '98000002': 2 } })).toEqual([
+      98000001, 98000002,
+    ]);
+  });
+
+  it('reads a missing or malformed pointer as no books', () => {
+    expect(readBilledByPointer(undefined)).toEqual([]);
+    expect(readBilledByPointer({ books: 'x' })).toEqual([]);
+    expect(readBilledByPointer({ books: { nope: 1, '-3': 1 } })).toEqual([]);
   });
 });

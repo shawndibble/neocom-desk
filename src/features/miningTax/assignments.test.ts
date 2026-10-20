@@ -12,6 +12,7 @@ import {
   markAssignmentsPaid,
   moveAssignmentsToPayee,
   planNeedsReviewResolution,
+  releaseOreFromAssignment,
   splitAssignment,
   uncombineAssignments,
   unmarkAssignmentsPaid,
@@ -1611,5 +1612,41 @@ describe('moveAssignmentsToPayee', () => {
 
     const stored = await db.miningTaxAssignments.get('d3');
     expect(stored).toMatchObject({ payeeId: 'bureau', taxPct: 5, taxOwed: 50, groupId: 'g1' });
+  });
+});
+
+describe('releaseOreFromAssignment', () => {
+  const base: MiningTaxAssignmentRecord = {
+    id: 'a1',
+    characterId: CHAR_A,
+    date: '2026-09-05',
+    solarSystemId: 1,
+    payeeId: 'payee-1',
+    oreLines: [{ typeId: TYPE_A, quantity: 100 }],
+    taxPct: 10,
+    estimatedValue: 1000,
+    taxOwed: 100,
+    status: 'outstanding',
+    oreLineValues: { [TYPE_A]: 1000 },
+    updatedAt: 1,
+  };
+
+  it('keeps what is left at the same price per unit', async () => {
+    await db.miningTaxAssignments.put(base);
+    const out = await releaseOreFromAssignment(base, [{ typeId: TYPE_A, quantity: 40 }]);
+    expect(out).toMatchObject({ estimatedValue: 400, taxOwed: 40 });
+    expect(out?.oreLineValues).toBeUndefined();
+    expect((await db.miningTaxAssignments.get('a1'))?.oreLines).toEqual([
+      { typeId: TYPE_A, quantity: 40 },
+    ]);
+  });
+
+  it('deletes the Assignment, with a tombstone, when nothing is left', async () => {
+    await db.miningTaxAssignments.put(base);
+    expect(await releaseOreFromAssignment(base, [])).toBeUndefined();
+    expect(await db.miningTaxAssignments.get('a1')).toBeUndefined();
+    expect(await readTombstones(tombstoneKey(MINING_TAX_ASSIGNMENTS, CHAR_A))).toEqual([
+      expect.objectContaining({ id: 'a1' }),
+    ]);
   });
 });
