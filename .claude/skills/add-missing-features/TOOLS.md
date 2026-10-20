@@ -13,7 +13,7 @@ Adam4EVE, Ravworks/Slipway, EVE Tycoon, Janice, EVE Appraisal, Iron Whales
 Appraiser (every piece gated — see Killed), EVE Blue Desk, SolCore Dynamics, EvE
 Blueprint, EVE Courier, Fuzzwork, EVE Ref, EVE Retroindustry, ISK.GG, EVE Miner
 Hub, EQM, EveLens, EVE Horizon, EVE Forge, EVE-Industry-Scanner-Tool, EVE-HUB,
-EVE TradeLooper, EVE Night Trade Tools, IndustrialEVE (PI alerts fully covered —
+EVE TradeLooper, EVE Night Trade Tools, TradeRelay, IndustrialEVE (PI alerts fully covered —
 kill-tests 12 and 17, #956), jEveAssets, EVEAIO, MONW, Mudoteve, Solo Industry
 App, ArmedATLAS V2, PlanetFlow.APP, Cradle of War, EVE Balance, EVE Data Site,
 PIM, EVE PI Manager, Web-based PI Tracker, JitaStocks, Indeve, EVE Fleet Mining
@@ -362,6 +362,7 @@ of pricing them as 1 (Janice #34/#28/#22).
 
 Grouped by the test that killed them; the reason is what stops a re-pitch.
 
+- **Structured WTS/WTB listing board** (TradeRelay, early test, no replies): a cross-player listing book needs a server holding every user's listings — the cross-player aggregation wall in a local-first PWA. Settlement is plain EVE contracts, which the app already reads.
 - **Build-cost history series** (EVE Console): realized margin, Production Log and
   price history already exist; a per-item daily series is gappy per device, and a
   stored cost is only comparable with the ME/TE/rig/tax inputs stored beside it.
