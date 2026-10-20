@@ -46,7 +46,7 @@ Scope gating: `/ships` and `/ships/fittings/compare` are UNGATED (`src/app/route
 - `fittingRoutes.ts`: `fittingsRedirect` sends `/ships/fittings?f=code` to editor; editor with no `f` goes to library.
 - Open Fitting lives in the address bar as `?f=<Fitting Share Code>`; every edit is a history entry, so browser Back is undo (`shortcuts.onPageHint`).
 - Too-large Fitting cannot be carried in a link: warning `fittings.load.tooLargeToShare`, reload loses it; Save to My Fittings and Compare-through-link disabled with tooltip.
-- Router state `fittingLoadText` (`@/lib/shortcuts` `FittingLoadState`) lets `GlobalPasteRouter` (paste of EFT anywhere outside a field) open the Fittings tab and Load it (`src/routes/Fittings.tsx` effect ~line 200).
+- Router state `fittingLoadText` (`@/lib/shortcuts` `FittingLoadState`) lets `GlobalPasteRouter` (paste of EFT anywhere outside a field) open the Fittings tab and Load it (`useFittingPasteLoad`).
 
 ## Start screen (`FittingStartScreen.tsx`)
 
