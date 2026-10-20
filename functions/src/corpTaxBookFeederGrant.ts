@@ -232,10 +232,15 @@ export async function saveFeederGrant(
   }
 
   if (input.requestedRatePct !== undefined) {
-    await bookRef(deps.db, accepted.collectorCorporationId)
-      .collection(FEEDERS)
-      .doc(String(accepted.feederCorporationId))
-      .update({ requestedRatePct: input.requestedRatePct });
+    // A blank rate is a complete grant, so a rate that fails to save never fails it.
+    try {
+      await bookRef(deps.db, accepted.collectorCorporationId)
+        .collection(FEEDERS)
+        .doc(String(accepted.feederCorporationId))
+        .update({ requestedRatePct: input.requestedRatePct });
+    } catch (e) {
+      console.error('feeder requested rate not saved', e instanceof Error ? e.message : e);
+    }
   }
   return {
     collectorCorporationId: accepted.collectorCorporationId,

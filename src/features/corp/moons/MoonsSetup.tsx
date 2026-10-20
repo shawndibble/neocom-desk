@@ -106,7 +106,7 @@ export function MoonsSetup({
   if (
     status.status === 'feeder' &&
     !left &&
-    ['active', 'pending-removal'].includes(status.feederStatus)
+    ['active', 'pending-removal', 'disconnected'].includes(status.feederStatus)
   ) {
     return (
       <>

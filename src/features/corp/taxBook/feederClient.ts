@@ -64,7 +64,18 @@ export async function getFeederStatus(
   corporationId: number
 ): Promise<FeederStatus> {
   const accessToken = await getValidAccessToken(characterId);
-  return call(characterId, 'getCorpTaxBookFeederStatusCallable', { corporationId, accessToken });
+  try {
+    return await call<{ corporationId: number; accessToken: string }, FeederStatus>(
+      characterId,
+      'getCorpTaxBookFeederStatusCallable',
+      { corporationId, accessToken }
+    );
+  } catch (error) {
+    // A member who may not see the corporation's standing sees the ordinary choices.
+    const reason = (error as { details?: { reason?: unknown } } | null)?.details?.reason;
+    if (reason === 'not-your-feeder') return { status: 'none' };
+    throw error;
+  }
 }
 
 /** Leave the accounting corporation: revokes the grant at SSO and deletes it. Immediate. */
