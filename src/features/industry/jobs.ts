@@ -231,3 +231,6 @@ export function summarizeJobs<T extends Pick<IndustryJob, 'end_date'>>(
   }
   return { running, done, next };
 }
+
+/** Countdown recompute cadence for the Active Jobs panel; coarse (minutes granularity display) so 30s is plenty fresh. */
+export const JOBS_TICK_MS = 30_000;

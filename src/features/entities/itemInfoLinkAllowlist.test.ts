@@ -27,7 +27,7 @@ const REVIEWED = new Set<string>([
   'src/features/fittings/RackListParts.tsx',
   'src/features/fittings/ImplantFinder.tsx',
   'src/features/fittings/ImplantSetPicker.tsx',
-  'src/features/industry/ActiveJobsPanel.tsx',
+  'src/features/industry/activeJobColumns.tsx',
   'src/features/industry/MaterialsTable.tsx',
   'src/features/industry/ProductionLogPanel.tsx',
   'src/features/market/HaulingItemDetail.tsx',
