@@ -48,6 +48,13 @@ export interface CorpSyncGrantDoc {
   /** The client_id the token was issued to; SSO revoke needs it. */
   clientId: string;
   enabledAt: number;
+  /**
+   * 'feeder' is the second narrow grant kind: a feeder corporation's mining-only
+   * token (FEEDER_SYNC_SCOPES), keyed by the feeder's corporation id. Absent means 'book'.
+   */
+  kind?: 'book' | 'feeder';
+  /** Feeder grants: the Collector whose book the feeder feeds. */
+  collectorCorporationId?: number;
 }
 
 /** `corpTaxBooks/{corp}/meta/scheduledSync`: officers read this, nobody writes it but the functions. */
@@ -195,6 +202,9 @@ export async function saveCorpSyncGrant(
   const previous = await deps.db.runTransaction(async (tx) => {
     const ref = grantRef(deps.db, input.corporationId);
     const held = (await tx.get(ref)).data() as CorpSyncGrantDoc | undefined;
+    if (held?.kind === 'feeder') {
+      fail('failed-precondition', 'This corporation feeds another book', 'feeder-grant-exists');
+    }
     const status = statusRef(deps.db, input.corporationId);
     const hadSystemIds = (await tx.get(status)).data()?.systemIds as
       Record<string, number> | undefined;
@@ -360,6 +370,13 @@ export async function deleteCorpSyncGrantsHeldBy(
   let count = 0;
   for (const doc of snap.docs) {
     const grant = doc.data() as CorpSyncGrantDoc;
+    if (grant.kind === 'feeder') {
+      // A feeder grant has no book status or audit entry here: drop the token and revoke it.
+      await doc.ref.delete();
+      await revokeStored(deps, grant);
+      count += 1;
+      continue;
+    }
     const removed = await removeGrant(
       deps,
       grant,
@@ -408,6 +425,11 @@ export async function runScheduledCorpSyncs(deps: CorpSyncDeps, esi: SyncEsi): P
       continue;
     }
     const grant = doc.data() as CorpSyncGrantDoc;
+    // A feeder grant is not a book: its own sync arrives with the feeder sync ticket.
+    if (grant.kind === 'feeder') {
+      summary.grants -= 1;
+      continue;
+    }
     try {
       const result = await runOne(deps, esi, grant);
       if (result.kind === 'synced') summary.synced += 1;

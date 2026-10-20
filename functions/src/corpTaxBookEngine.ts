@@ -354,3 +354,35 @@ export function forfeitAllowed(basis: ForfeitBasis, today: string): boolean {
   if (basis.kind === 'consent') return basis.note.trim().length > 0;
   return basis.askedAt <= shiftDate(today, -FORFEIT_NO_REPLY_DAYS);
 }
+
+/** Engine `CoveragePeriod`: a feeder's covered UTC days, both ends inclusive. */
+export interface CoveragePeriod {
+  from: string;
+  to?: string;
+}
+
+/** Engine `isDayCovered`. */
+export function isDayCovered(periods: readonly CoveragePeriod[], day: string): boolean {
+  return periods.some((p) => day >= p.from && (p.to === undefined || day <= p.to));
+}
+
+/** Engine `closePeriod`: ends the open period the day before `effectiveDay`. */
+export function closePeriod(
+  periods: readonly CoveragePeriod[],
+  effectiveDay: string
+): CoveragePeriod[] {
+  const to = shiftDate(effectiveDay, -1);
+  return periods.flatMap((p) => {
+    if (p.to !== undefined) return [p];
+    return to < p.from ? [] : [{ from: p.from, to }];
+  });
+}
+
+/** Engine `reopenPeriod`: a rejoin. Throws if a period is open or would overlap. */
+export function reopenPeriod(periods: readonly CoveragePeriod[], day: string): CoveragePeriod[] {
+  for (const p of periods) {
+    if (p.to === undefined) throw new Error('a coverage period is still open');
+    if (day <= p.to) throw new Error('a new coverage period cannot overlap an earlier one');
+  }
+  return [...periods, { from: day }];
+}

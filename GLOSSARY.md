@@ -36,6 +36,7 @@ here — they go one per file in `docs/context/decisions/`.
   section prices the same pile at all 5 Trade Hubs ("where is it worth the
   most") and is not the **Compare** drawer.
 - **Collector**: A corporation whose **Corp Tax Book** also collects moon mining tax for moons it does not own, billing the miners and accounting to each **Feeder**. Dev term: to a moon owner it is "the accounting corporation".
+- **Coverage period**: A run of UTC days (`from`, optional `to`, both inclusive) during which a **Feeder**'s mined volume counts toward a **Collector**'s book; a rejoin adds a new one on the same record, and rows outside every period owe nothing.
 - **Disconnected**: A **Feeder**'s status after 30 days of a stale grant. Player-facing: "Disconnected".
 - **Feeder**: A moon-owning corporation whose mining ledger a **Collector** reads. Dev term: player-facing, "moon owner".
 - **Feeder view**: What a **Feeder** sees of the **Collector**'s book: its own mined volume, rate, amount due and payouts, never the miner debts, **Miner rate** or margin. Player-facing: the moon owner's page.

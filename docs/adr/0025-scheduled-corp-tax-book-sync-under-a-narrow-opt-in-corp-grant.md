@@ -137,3 +137,10 @@ sync`).
   change with the engine.
 - A new scheduled job, the second server-side SSO refresh path, and a grant
   collection to keep out of every client (`rules-tests/` pins it).
+
+## Addendum (issue #4507): a second grant kind
+
+A Collector book's feeder corporation hands over a mining-only offline grant
+(`kind: 'feeder'`, scope `esi-industry.read_corporation_mining.v1`), held in the
+same collection under the same rules. See
+`docs/context/decisions/20261020-135239-collector-books-feeder-records-coverage-periods-and-the.md`.
