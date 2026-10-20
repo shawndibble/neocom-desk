@@ -52,12 +52,13 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      # sde-check.mjs imports only repo scripts; the install is for the rebake.
+      # sde-check.mjs reads the CCP zip through scripts/lib/ccpStaticData.mjs,
+      # which imports fflate, so the install must precede the check.
+      - name: Install dependencies
+        run: npm ci
       - name: Check for a new game build
         id: check
         run: node scripts/sde-check.mjs | tee -a "$GITHUB_OUTPUT"
-      - if: steps.check.outputs.update == 'true'
-        run: npm ci
       - name: Skip a build already proposed
         id: branch
         if: steps.check.outputs.update == 'true'
