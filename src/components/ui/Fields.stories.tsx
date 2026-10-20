@@ -39,7 +39,7 @@ export const Compact: Story = {};
 /** @summary `form`: stacked on a phone, label column beside the control at `lg`, hairlines between rows. */
 export const Form: Story = { args: { variant: 'form' } };
 
-/** @summary `inline` is for a lone checkbox in a `form` grid: control sits beside its label. */
+/** @summary `inline` is for a lone checkbox in a `form` grid: checkbox first, then the label, note under it. */
 export const InlineCheckbox: Story = {
   args: { variant: 'form' },
   render: (args) => (
