@@ -6,6 +6,7 @@
  */
 import { scalePx } from '@/lib/fontScale';
 import { ChartTooltipShell } from '@/components/ui/ChartTooltipShell';
+import { Eyebrow } from '@/components/ui/Eyebrow';
 import {
   ResponsiveContainer,
   BarChart,
@@ -224,8 +225,6 @@ function stripCompressedPrefix(name: string, compressed: boolean): string {
 }
 
 const TICK_STYLE = { fontSize: '0.6875rem', fill: 'var(--color-text-dim)' } as const;
-const PANEL_TITLE_CLASS =
-  'mb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
 
 interface RatePanelProps<P> {
   title: string;
@@ -256,7 +255,7 @@ function RatePanel<P>({
 }: RatePanelProps<P>) {
   return (
     <Panel padded>
-      <p className={PANEL_TITLE_CLASS}>{title}</p>
+      <Eyebrow className="mb-1">{title}</Eyebrow>
       <p className="mb-1 text-[0.6875rem] text-text-dim">{basis}</p>
       <div role="img" aria-label={title} className="h-64 w-full">
         <ResponsiveContainer width="100%" height="100%">
@@ -327,7 +326,7 @@ function ComparePanel<B, R>({
   const compressed = useMiningTaxCompressedOre((state) => state.value);
   return (
     <Panel padded>
-      <p className={PANEL_TITLE_CLASS}>{title}</p>
+      <Eyebrow className="mb-1">{title}</Eyebrow>
       <div role="img" aria-label={title} className="w-full" style={{ height }}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
