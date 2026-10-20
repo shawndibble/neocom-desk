@@ -51,7 +51,12 @@ export function GroupVerdictBand({ view, plans, catalog, groupVolume }: GroupVer
           'manufacturing')
         : 'manufacturing';
       return planJobNodes(
-        { activity, seconds: member.result.seconds, materials: member.result.materials },
+        {
+          activity,
+          seconds: member.result.seconds,
+          materials: member.result.materials,
+          blueprintTypeID: plan?.blueprintTypeID,
+        },
         catalog,
         `${i}:`
       );

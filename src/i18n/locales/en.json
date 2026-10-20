@@ -3294,6 +3294,7 @@
       "part_other": "{{count}} parts",
       "final_one": "final item",
       "final_other": "{{count}} final items",
+      "lane": "{{name}}: {{stages}}",
       "teNote": "Sub-jobs are timed at TE 0"
     },
     "heroMargin": "{{value}} margin",

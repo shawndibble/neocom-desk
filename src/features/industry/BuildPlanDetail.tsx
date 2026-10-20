@@ -958,11 +958,23 @@ export function BuildPlanDetail({
   const jobNodes = useMemo(
     () =>
       result
-        ? planJobNodes({ activity, seconds: result.seconds, materials: result.materials }, catalog)
+        ? planJobNodes(
+            {
+              activity,
+              seconds: result.seconds,
+              materials: result.materials,
+              blueprintTypeID: plan.blueprintTypeID,
+            },
+            catalog
+          )
         : [],
-    [result, activity, catalog]
+    [result, activity, catalog, plan.blueprintTypeID]
   );
-  const planSchedule = usePlanSchedule(plan.characterId, jobNodes);
+  const planCorpBlueprints = useMemo(
+    () => planOwnedBlueprints({ includeCorpAssets: plan.includeCorpAssets }, [], corpBlueprints),
+    [plan.includeCorpAssets, corpBlueprints]
+  );
+  const planSchedule = usePlanSchedule(plan.characterId, jobNodes, planCorpBlueprints);
   const planSeconds = planSchedule
     ? (planSchedule.schedule.finishMs - planSchedule.nowMs) / 1000
     : undefined;
