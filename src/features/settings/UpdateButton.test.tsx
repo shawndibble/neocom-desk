@@ -20,7 +20,7 @@ describe('UpdateButton', () => {
     forceUpdate.mockResolvedValue('failed');
     render(<UpdateButton />);
     const button = screen.getByRole('button', { name: 'Update app' });
-    expect(button).toHaveClass('text-text-dim');
+    expect(button).toHaveClass('text-text-dim!');
     await userEvent.click(button);
     expect(forceUpdate).toHaveBeenCalledOnce();
     expect(await screen.findByRole('alert')).toBeInTheDocument();
@@ -31,6 +31,6 @@ describe('UpdateButton', () => {
     render(<UpdateButton />);
     const button = screen.getByRole('button', { name: 'Update app' });
     await vi.waitFor(() => expect(button).toHaveClass('text-accent'));
-    expect(button).not.toHaveClass('text-text-dim');
+    expect(button).not.toHaveClass('text-text-dim!');
   });
 });

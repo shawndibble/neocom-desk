@@ -40,7 +40,7 @@ export function UpdateButton() {
       <Button
         size="sm"
         variant={available ? 'accent' : 'ghost'}
-        className={available ? undefined : 'text-text-dim'}
+        className={available ? undefined : 'text-text-dim!'}
         loading={updating}
         onClick={() => void update()}
       >

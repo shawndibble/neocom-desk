@@ -4,19 +4,19 @@
 
 Terms per `GLOSSARY.md`: Permission, Base Grant, Core Grant, Notification Event, Alert, Notification Feed, Trade Hub, Avoided Systems, Corp Access, Corp Capability.
 
-| Group    | Section        | URL                       | Contents                                                                                                   |
-| -------- | -------------- | ------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| App      | Display        | `/settings/display`       | Text size, time format, calendar week start, phone tab bar (phone only)                                    |
-| App      | Permissions    | `/settings/permissions`   | Per-Character Permission grants (re-auth to add)                                                           |
-| Defaults | Industry       | `/settings/industry`      | Assumed ME/TE, blueprint cost, BPC Sourcing defaults, PI defaults                                          |
-| Defaults | Market         | `/settings/market`        | Trade Hub, courier collateral flag, LP value                                                               |
-| Defaults | Mining tax     | `/settings/miningTax`     | Compressed ore, per-ore values, auto-continue sessions                                                     |
-| Defaults | Characters     | `/settings/characters`    | Default Character filter, SP extraction monitoring                                                         |
-| Defaults | Corporation    | `/settings/corporation`   | Dark-member threshold (hidden unless Corp Access `ready`)                                                  |
-| Defaults | Travel         | `/settings/travel`        | Route preference, penalty, avoid rules, wormholes, jump bridges, Avoided Systems                           |
-| Alerts   | Notifications  | `/settings/notifications` | Master switch, channels, per-Character per-event toggles, thresholds                                       |
-| Data     | Data & storage | `/settings/dataAge`       | Clear cache, reset view prefs, app update, export/import backup, log out / delete all data, Data Age table |
-| Data     | Activity Log   | `/settings/activity`      | Session log of ESI calls                                                                                   |
+| Group    | Section        | URL                       | Contents                                                                                       |
+| -------- | -------------- | ------------------------- | ---------------------------------------------------------------------------------------------- |
+| App      | Display        | `/settings/display`       | Text size, time format, calendar week start, phone tab bar (phone only)                        |
+| App      | Permissions    | `/settings/permissions`   | Per-Character Permission grants (re-auth to add)                                               |
+| Defaults | Industry       | `/settings/industry`      | Assumed ME/TE, blueprint cost, BPC Sourcing defaults, PI defaults                              |
+| Defaults | Market         | `/settings/market`        | Trade Hub, courier collateral flag, LP value                                                   |
+| Defaults | Mining tax     | `/settings/miningTax`     | Compressed ore, per-ore values, auto-continue sessions                                         |
+| Defaults | Characters     | `/settings/characters`    | Default Character filter, SP extraction monitoring                                             |
+| Defaults | Corporation    | `/settings/corporation`   | Dark-member threshold (hidden unless Corp Access `ready`)                                      |
+| Defaults | Travel         | `/settings/travel`        | Route preference, penalty, avoid rules, wormholes, jump bridges, Avoided Systems               |
+| Alerts   | Notifications  | `/settings/notifications` | Master switch, channels, per-Character per-event toggles, thresholds                           |
+| Data     | Data & storage | `/settings/dataAge`       | Clear cache, reset view prefs, export/import backup, log out / delete all data, Data Age table |
+| Data     | Activity Log   | `/settings/activity`      | Session log of ESI calls                                                                       |
 
 Section order/grouping: `src/features/settings/sections.ts:15`. A section added to `SETTINGS_TABS` but not `SETTINGS_GROUPS` is routable but has no rail entry (test walks every id).
 
@@ -28,7 +28,7 @@ Section order/grouping: `src/features/settings/sections.ts:15`. A section added 
 | Permissions                                              | See which ESI Permissions this Character granted and add one without re-doing everything | Incremental auth: sign-in asks the Base Grant; extras (corp, structure markets) are opt-in (`20260924-143410`, `20260903-145528`). Grant = SSO re-auth for that Character with the union of stored scopes plus the group (`app/loginFlow.ts:87`; union keeps existing grants because EVE issues a token with exactly what was requested) |
 | Industry/Market/Mining tax/Characters/Corporation/Travel | Set the assumptions pages start from, once, for every device                             | "Defaults answer for the pilot" (`20260907-221425`); each control defaults to what the app did before it was settable so numbers never move silently                                                                                                                                                                                     |
 | Notifications                                            | Choose which events reach which Character through which channel                          | Two independent channels (Device pop-up, in-app Alerts) so one can be off without touching the other                                                                                                                                                                                                                                     |
-| Data & storage                                           | Fix stale data, update, move to a new device, leave                                      | Clear cache is blunt (ESI is re-derivable); backup solves 20+ alt re-login (ADR 0014); delete-all is the only client-side remote delete (`20260926-223948`)                                                                                                                                                                              |
+| Data & storage                                           | Fix stale data, move to a new device, leave                                              | Clear cache is blunt (ESI is re-derivable); backup solves 20+ alt re-login (ADR 0014); delete-all is the only client-side remote delete (`20260926-223948`)                                                                                                                                                                              |
 | Activity Log                                             | See what the app fetched and how it went (support aid)                                   | Session-only so no token, id or body can persist (`stores/activityLog.ts`)                                                                                                                                                                                                                                                               |
 
 - **Top jobs (ranked):** 1. "Set the assumptions my pages start from, once, for every device" (Defaults, `20260907-221425`). 2. "Choose which events reach me, and how" (Notifications). 3. "Fix, move or leave" (clear cache, backup, delete all data).
@@ -212,7 +212,7 @@ Storage: `notificationPreferences` (Dexie, device-local; `masterEnabled`, `brows
 
 ### Data & storage (`/settings/dataAge`)
 
-Layout: 2-up grid from `xl`: Clear cache, App updates, Export, Import; then This device; then Data Age.
+Layout: 2-up grid from `xl`: Clear cache, Install, Export, Import; then This device; then Data Age.
 
 | Control                          | Behavior                                                                                                                                                                                                                                                                                                                                                                                               | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

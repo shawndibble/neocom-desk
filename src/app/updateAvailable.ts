@@ -1,8 +1,9 @@
 import { getServiceWorkerRegistration } from '@/lib/serviceWorker';
-import { timeout, waitForInstall } from './swUpdate';
+import { INSTALL_TIMEOUT_MS, timeout, waitForInstall } from './swUpdate';
 
 // A check that never settles must read as "nothing found", not hang the button's highlight.
-const UPDATE_PROBE_CAP_MS = 15_000;
+// Longer than the install wait, so a slow precache is not cut off first.
+const UPDATE_PROBE_CAP_MS = INSTALL_TIMEOUT_MS + 5_000;
 
 async function probe(): Promise<boolean> {
   const registration = await getServiceWorkerRegistration();
