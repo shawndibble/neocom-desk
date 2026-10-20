@@ -32,9 +32,7 @@ import {
   resolveRigFit,
   setRigSlot,
 } from '@/engine/industry/types';
-import { makeOrBuy, type MakeOrBuy } from '@/engine/industry/makeOrBuy';
 import { groupStockClaims, type GroupClaimMember } from '@/engine/industry/groupStockClaims';
-import { totalVolume } from '@/engine/industry/materialVolume';
 import {
   autoBuildHere,
   maxAutoBuildDepth,
@@ -99,6 +97,7 @@ import { inventionPricingContextFor, planOwnedBlueprints } from './resolveBuildP
 import { inventionQuoteFor } from './inventionSources';
 import { buildPlanTypeIds, recipeForLookup } from './recipes';
 import { materialPriceBasisOf } from './priceBasis';
+import { usePlanMaterials } from './usePlanMaterials';
 import { useResolvedPlan } from './useResolvedPlan';
 import { useMarketSnapshot } from './useMarketSnapshot';
 import { priceVsMedianFor, usePriceVsMedian } from './usePriceVsMedian';
@@ -112,7 +111,6 @@ import { MaterialsTable, type MaterialsTableHandle } from './MaterialsTable';
 import { SourcingInput } from './SourcingInput';
 import { BuildRecipeModal } from './BuildRecipeModal';
 import { BlueprintAcquisitionModal } from './BlueprintAcquisitionModal';
-import { buyPricedLine } from './materialRow';
 import { materialsCsvColumns } from './materialsCsv';
 import { GroupOwnedDiffersHint } from './GroupOwnedDiffersHint';
 import {
@@ -120,13 +118,7 @@ import {
   hasShoppingList,
   shoppingListText,
 } from '@/engine/industry/shoppingList';
-import {
-  buildRecipe,
-  hasSubBuilds,
-  materialTableRows,
-  shoppingListMaterials,
-  subBuildSeconds as computeSubBuildSeconds,
-} from './subBuildPlan';
+import { buildRecipe } from './subBuildPlan';
 import { formatIsk } from '@/lib/isk';
 import { cx } from '@/lib/cx';
 import type { OwnedStockSnapshot } from './ownedStockDetection';
@@ -802,31 +794,26 @@ export function BuildPlanDetail({
     reactionPlanFacilityContext,
   ]);
 
-  /**
-   * The materials table's rows: `result.materials` is already the whole
-   * resolved tree — `buildVsBuy` applies every `buildHere` choice itself, at
-   * whatever depth (src/engine/industry/materialResolution) — so this only
-   * has to flatten it to one row per material. One computation, not two:
-   * before this, a separate expansion priced the table while the Results
-   * panel above priced the plan as written, and the two could disagree the
-   * moment a build was toggled (docs/context/decisions, since superseded).
-   */
-  const visibleMaterials = useMemo(
-    () => (result ? materialTableRows(result.materials) : []),
-    [result]
-  );
-
-  // Same exclusion the volume column itself applies (issue #874): a built
-  // row's quantity is produced here, never hauled at that typeID — its own
-  // inputs already carry that volume as their own rows in this same list.
-  const materialVolume = useMemo(
-    () =>
-      totalVolume(
-        visibleMaterials.filter((material) => material.subBuilds.length === 0),
-        (typeID) => volumeForType(catalog, typeID)
-      ),
-    [visibleMaterials, catalog]
-  );
+  const {
+    visibleMaterials,
+    materialVolume,
+    shoppingMaterials,
+    boughtDepth,
+    anySubBuilds,
+    subBuildTimeSeconds,
+    materialAdvice,
+    builtTopLevel,
+    subBuildTotal,
+    buyInsteadTotal,
+  } = usePlanMaterials({
+    result,
+    catalog,
+    depth,
+    materialSourcing: plan.materialSourcing,
+    materialPrices,
+    makeOrBuyContext,
+    recipeFor,
+  });
 
   // Every material on the table, not just the blueprint's own: a mineral a
   // sub-build introduced is as ownable as anything else, and while this was
@@ -979,29 +966,6 @@ export function BuildPlanDetail({
     return row ? buildRecipe(row) : null;
   }, [visibleMaterials, recipeTypeId]);
 
-  /**
-   * What the plan still has to shop for: every leaf of the resolved tree,
-   * merged by type. Feeds the shopping-list copy — never the table (or its
-   * export), which shows the full tree including what it's building.
-   */
-  const shoppingMaterials = useMemo(
-    () => (result ? shoppingListMaterials(result.materials) : []),
-    [result]
-  );
-  // A dearer walked price can flip a material to built; its walk then explains nothing here.
-  const boughtDepth = useMemo(() => {
-    const bought = new Set(shoppingMaterials.map((m) => m.typeID));
-    return new Map([...depth].filter(([typeID]) => bought.has(typeID)));
-  }, [depth, shoppingMaterials]);
-
-  const anySubBuilds = useMemo(() => (result ? hasSubBuilds(result.materials) : false), [result]);
-
-  /** Job time of every sub-job in the tree, summed (not wall-clock: they run side by side). */
-  const subBuildTimeSeconds = useMemo(
-    () => (result ? computeSubBuildSeconds(result.materials) : 0),
-    [result]
-  );
-
   const jobNodes = useMemo(
     () =>
       result
@@ -1013,74 +977,6 @@ export function BuildPlanDetail({
   const planSeconds = planSchedule
     ? (planSchedule.schedule.finishMs - planSchedule.nowMs) / 1000
     : undefined;
-
-  /**
-   * Make-or-buy verdict per material (GLOSSARY.md round 29), computed once for
-   * the table and the CSV export rather than per row render. Covers every
-   * row regardless of depth: a recipe input a build introduced is exactly as
-   * eligible for advice — and for the build-here control itself — as one of
-   * the plan's own materials.
-   */
-  const materialAdvice = useMemo(() => {
-    const verdicts = new Map<number, MakeOrBuy>();
-    if (!makeOrBuyContext) return verdicts;
-    for (const material of visibleMaterials) {
-      // Priced at what it would cost to buy even while it is being built
-      // (`buyPricedLine`) — the verdict compares against buying, so a built
-      // row's null unit price would silently withdraw the advice exactly
-      // when the player is acting on it.
-      const verdict = makeOrBuy(
-        buyPricedLine(material, plan.materialSourcing, materialPrices),
-        recipeFor(material.typeID),
-        makeOrBuyContext
-      );
-      if (verdict) verdicts.set(material.typeID, verdict);
-    }
-    return verdicts;
-  }, [visibleMaterials, makeOrBuyContext, recipeFor, plan.materialSourcing, materialPrices]);
-
-  /** Top-level materials the player chose to build — what the sub-build footnote summarizes. */
-  const builtTopLevel = useMemo(
-    () => (result ? result.materials.filter((material) => material.subBuild !== undefined) : []),
-    [result]
-  );
-
-  /**
-   * What building the chosen material(s) actually costs — the sum of exactly
-   * the `lineCost`s `result.materialCost` already added for them, so this is
-   * never a second number that could drift from the totals above. Not split
-   * into materials/fees: a nested build's own fee is folded proportionally
-   * into its parent's `lineCost` whenever the job makes more than the parent
-   * needs (EVE sizes jobs in whole runs), so a separately-summed "fees"
-   * figure could disagree with what the split inside `lineCost` actually is.
-   */
-  const subBuildTotal = useMemo(
-    () => builtTopLevel.reduce((sum, material) => sum + material.lineCost, 0),
-    [builtTopLevel]
-  );
-
-  /**
-   * What buying the built material(s) outright would have cost instead, for
-   * the footnote's comparison — priced the same way a plain (unbuilt) row on
-   * this plan is, straight off `materialPrices`/an override, no second
-   * `buildVsBuy` pass. `null` when there is nothing to compare, or when any
-   * of them genuinely isn't sold at this hub, rather than showing a number
-   * that quietly priced the unsold one as free (the bug this replaces).
-   */
-  const buyInsteadTotal = useMemo(() => {
-    if (builtTopLevel.length === 0) return null;
-    let total = 0;
-    for (const material of builtTopLevel) {
-      // Through `buyPricedLine`, the same ladder the make-or-buy advice uses,
-      // rather than a third hand-rolled `override ?? hub`: that one guarded
-      // only `undefined`, so a NaN or negative override reached this figure
-      // and was rendered as ISK. The helper range-checks.
-      const { unitPrice } = buyPricedLine(material, plan.materialSourcing, materialPrices);
-      if (unitPrice === null) return null;
-      total += material.remainingQuantity * unitPrice;
-    }
-    return total;
-  }, [builtTopLevel, plan.materialSourcing, materialPrices]);
 
   // The Materials table's rows as shown, for its export button and row menus.
   const materialsCsv = useMemo(
