@@ -9,6 +9,8 @@ import { SettingsBackLink, SettingsIndex, SettingsNav } from '@/features/setting
 import { AnalyticsPanel } from '@/features/settings/AnalyticsPanel';
 import { DevicePanel } from '@/features/settings/DevicePanel';
 import { OfflineDataPanel } from '@/features/settings/OfflineDataPanel';
+import { UpdatePanel } from '@/features/settings/UpdatePanel';
+import { checkForUpdate } from '@/app/updateAvailable';
 import { InstallAppPanel } from '@/features/settings/InstallAppPanel';
 import { TravelSettingsPanel } from '@/features/settings/TravelSettingsPanel';
 import { CheckboxField, ChipRow, SettingsScopeHint } from '@/features/settings/settingsFields';
@@ -93,6 +95,13 @@ export function Settings() {
     () => visibleSettingsGroups({ corp: corpAccess.state === 'ready' }),
     [corpAccess.state]
   );
+
+  // One bounded check per visit to Settings, whatever the URL, so the index row,
+  // the rail dot and the App & backup line are settled before they are read.
+  // Moving between sections keeps this component mounted and checks nothing.
+  useEffect(() => {
+    void checkForUpdate();
+  }, []);
 
   useEffect(() => {
     // `hasOwn`: a hash like `#constructor` must not resolve to an inherited member.
@@ -217,6 +226,7 @@ export function Settings() {
           {section === 'notifications' && <NotificationsPanel />}
           {section === 'app' && (
             <>
+              <UpdatePanel />
               <InstallAppPanel />
               <ExportPanel />
               <ImportPanel />
