@@ -34,7 +34,7 @@ import {
   utcDate,
 } from './corpTaxBook.js';
 import { FEEDER_SYNC_SCOPES } from './corpSyncScopes.js';
-import { closePeriod, isDayCovered } from './corpTaxBookEngine.js';
+import { closePeriod, isDayCovered, reopenPeriod } from './corpTaxBookEngine.js';
 import { ROLES_SCOPE, type CorporationLookup } from './corpTaxBookEsi.js';
 import {
   acceptInviteCore,
@@ -146,12 +146,18 @@ async function verifiedClaims(deps: CorpSyncDeps, accessToken: string): Promise<
 /** The code Reconnect sends in place of an invite: rebind the grant of a corporation that already feeds a book. */
 export const RECONNECT_CODE = 'reconnect-existing';
 
+const RECONNECTABLE: readonly FeederRecord['status'][] = [
+  'active',
+  'pending-removal',
+  'disconnected',
+];
+
 async function reconnectCore(
   deps: BookDeps,
   feederCorp: number,
   holder: number,
   grantedBy: number
-): Promise<AcceptFeederInviteResult> {
+): Promise<AcceptFeederInviteResult & { priorRecord: FeederRecord }> {
   const pointer = (
     await deps.db.collection(FEEDER_OF_COLLECTION).doc(String(feederCorp)).get()
   ).data();
@@ -161,11 +167,24 @@ async function reconnectCore(
   }
   const ref = bookRef(deps.db, collector).collection(FEEDERS).doc(String(feederCorp));
   const rec = (await ref.get()).data() as FeederRecord | undefined;
-  if (!rec || (rec.status !== 'active' && rec.status !== 'pending-removal')) {
+  if (!rec || !RECONNECTABLE.includes(rec.status)) {
     fail('failed-precondition', 'This corporation is not feeding a book', 'not-your-feeder');
   }
-  await ref.update({ grantHolder: holder, grantedBy });
-  return { collectorCorporationId: collector, feederCorporationId: feederCorp, rejoined: false };
+  const patch: Record<string, unknown> = { grantHolder: holder, grantedBy };
+  if (rec.status === 'disconnected') {
+    // Back after a disconnect: a new coverage period, the balance and rate history carry on.
+    patch.status = 'active';
+    patch.coveragePeriods = reopenPeriod(rec.coveragePeriods, utcDate(deps.now()));
+    patch.disconnectedAt = FieldValue.delete();
+    patch.staleSince = FieldValue.delete();
+  }
+  await ref.update(patch);
+  return {
+    collectorCorporationId: collector,
+    feederCorporationId: feederCorp,
+    rejoined: false,
+    priorRecord: rec,
+  };
 }
 
 export async function saveFeederGrant(
@@ -202,6 +221,7 @@ export async function saveFeederGrant(
 
   let undo: AcceptUndo | undefined;
   let accepted: (AcceptFeederInviteResult & { undo?: AcceptUndo }) | undefined;
+  let reconnectPrior: FeederRecord | undefined;
   try {
     const claims = await verifiedClaims(deps, refreshed.accessToken);
     if (claims.characterId !== supplied.characterId) {
@@ -221,6 +241,7 @@ export async function saveFeederGrant(
             recordExtra: { grantHolder: claims.characterId, grantedBy: callerId },
           });
     undo = accepted.undo;
+    if ('priorRecord' in accepted) reconnectPrior = accepted.priorRecord as FeederRecord;
 
     const now = deps.now();
     const doc: CorpSyncGrantDoc = {
@@ -261,6 +282,14 @@ export async function saveFeederGrant(
           characterId: callerId,
         }
       );
+    }
+    if (reconnectPrior && accepted) {
+      // A refused reconnect puts the record back and drops the grant it just stored.
+      await bookRef(deps.db, accepted.collectorCorporationId)
+        .collection(FEEDERS)
+        .doc(String(accepted.feederCorporationId))
+        .set(reconnectPrior);
+      await grantRef(deps.db, accepted.feederCorporationId).delete();
     }
     await orphan();
     throw err;

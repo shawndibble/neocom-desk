@@ -208,8 +208,12 @@ export function appendRequestedRate(
   pct: number,
   now: number
 ): OwnerRateEntry[] {
+  const history = deriveOwnerRateHistory(record);
+  const lastRequest = [...history].reverse().find((e) => e.kind === 'requested');
+  // Re-sending the standing request adds nothing to the history.
+  if (lastRequest?.pct === pct) return history;
   return [
-    ...deriveOwnerRateHistory(record),
+    ...history,
     { kind: 'requested', pct, effectiveFrom: utcDate(now), recordedAt: iso(now) },
   ];
 }
@@ -360,7 +364,7 @@ export function buildFeederView(input: FeederViewInput): FeederView {
     collectorName: input.collectorName,
     status: record.status,
     mode: record.mode,
-    note: record.note ?? null,
+    note: record.mode === 'settled-otherwise' ? (record.note ?? null) : null,
     builtAt: now,
     coverageFrom: periods[0]?.from ?? null,
     coverageTo: lastPeriod?.to ?? null,
@@ -485,13 +489,13 @@ export async function rebuildFeederView(
     if (!isDayCovered(record.coveragePeriods, r.date)) continue;
     pricedTypes.add(oreFormTypeId(r.typeId, COMPRESSED_ORE_TYPE_IDS, oreForm === 'compressed'));
   }
-  const prices = deps.openPrices
-    ? await loadPrices(
-        deps.openPrices,
-        [...pricedTypes],
-        hubStationId(typeof hubId === 'string' ? hubId : BOOK_DEFAULTS.hubId)
-      )
-    : new Map<string, SidePrices>();
+  // No reader would price every day at 0 and overwrite a good view, so refuse instead.
+  if (!deps.openPrices) throw new Error('rebuildFeederView needs an open-prices reader');
+  const prices = await loadPrices(
+    deps.openPrices,
+    [...pricedTypes],
+    hubStationId(typeof hubId === 'string' ? hubId : BOOK_DEFAULTS.hubId)
+  );
 
   const view = buildFeederView({
     now: deps.now(),

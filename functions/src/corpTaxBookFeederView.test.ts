@@ -358,3 +358,26 @@ describe('buildFeederView', () => {
     expect(v.summary.refineryCount).toBe(2);
   });
 });
+
+describe('review fixes', () => {
+  it('does not grow the history when the standing request is sent again', () => {
+    const once = appendRequestedRate(record({ requestedRatePct: 4 }), 6, NOW);
+    const again = appendRequestedRate(
+      record({ requestedRatePct: 6, ownerRateHistory: once }),
+      6,
+      NOW
+    );
+    expect(again).toEqual(once);
+  });
+
+  it('shows the note only while settled otherwise', () => {
+    const normal = buildFeederView(
+      input({ record: record({ mode: 'normal', note: 'slow payer' }) })
+    );
+    expect(normal.summary.note).toBeNull();
+    const settled = buildFeederView(
+      input({ record: record({ mode: 'settled-otherwise', note: 'fuel' }) })
+    );
+    expect(settled.summary.note).toBe('fuel');
+  });
+});
