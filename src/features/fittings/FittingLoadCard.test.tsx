@@ -3,7 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import type { LoadOutcome } from '@/engine/fittings/load';
-import type { FittingXmlListItem } from './useFittingWorkspace';
+import type { FittingXmlListItem } from './fittingXmlList';
 import { FittingLoadCard, LoadWarnings } from './FittingLoadCard';
 
 const SINGLE_FIT = `<?xml version="1.0"?>
