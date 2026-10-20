@@ -23,7 +23,7 @@ import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { IskAmount, Modal, Tooltip } from '@/components/ui';
+import { IskAmount, SlideOver, Tooltip } from '@/components/ui';
 import { CopyContractIdButton } from '@/features/contracts/CopyContractIdButton';
 import { OpenInEveButton } from '@/features/openInEve/OpenInEveButton';
 import { Caret } from '@/components/ui/Disclosure';
@@ -304,7 +304,7 @@ export function CourierContractDetailModal({
   };
 
   return (
-    <Modal
+    <SlideOver
       open
       onClose={onClose}
       returnFocusFallback={returnFocusFallback}
@@ -630,6 +630,6 @@ export function CourierContractDetailModal({
           />
         </div>
       </div>
-    </Modal>
+    </SlideOver>
   );
 }

@@ -19,7 +19,7 @@ import { useTranslation } from 'react-i18next';
 import {
   DataTable,
   EmptyState,
-  Modal,
+  SlideOver,
   Spinner,
   TypeIcon,
   type DataTableColumn,
@@ -33,6 +33,8 @@ import { loadContractLocationName } from './contractLocationName';
 import { loadTypeNames } from './typeNames';
 import { loadContractMarketValue, type ContractMarketValue } from './contractMarketValue';
 import { ContractMarketValueRow } from '@/features/contracts/ContractMarketValueRow';
+import { ContractDescriptionLinks } from '@/features/contracts/ContractDescriptionLinks';
+import { contractDescriptionLinks } from '@/features/contracts/contractDescriptionLinks';
 import { CopyContractIdButton } from '@/features/contracts/CopyContractIdButton';
 import { OpenInEveButton } from '@/features/openInEve/OpenInEveButton';
 import {
@@ -273,7 +275,7 @@ export function ContractDetailModal({
   ];
 
   return (
-    <Modal open onClose={onClose} title={title}>
+    <SlideOver open onClose={onClose} title={title}>
       <div className="space-y-4 text-xs">
         <div>
           <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
@@ -315,6 +317,15 @@ export function ContractDetailModal({
               <CopyContractIdButton contractId={contract.contract_id} />
               <OpenInEveButton kind="contract" id={contract.contract_id} />
             </dd>
+
+            {contractDescriptionLinks(contract.title).length > 0 && (
+              <>
+                <dt className="text-text-dim uppercase">{t('contracts.detailLink')}</dt>
+                <dd>
+                  <ContractDescriptionLinks description={contract.title} />
+                </dd>
+              </>
+            )}
 
             {contract.start_location_id && (
               <>
@@ -458,7 +469,7 @@ export function ContractDetailModal({
           </DataGate>
         )}
       </div>
-    </Modal>
+    </SlideOver>
   );
 }
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
@@ -168,11 +168,12 @@ describe('CourierContractDetailModal contract ID', () => {
 });
 
 describe('CourierContractDetailModal focus return', () => {
-  it('passes returnFocusFallback through to the modal', () => {
+  it('passes returnFocusFallback through to the panel', async () => {
     routeExposure.mockResolvedValue(KNOWN);
     const fallback = vi.fn(() => null);
     const { unmount } = renderModal({ kind: 'known', count: 2 }, { returnFocusFallback: fallback });
     unmount();
-    expect(fallback).toHaveBeenCalled();
+    // Radix hands focus back on a timer after the panel unmounts.
+    await waitFor(() => expect(fallback).toHaveBeenCalled());
   });
 });

@@ -34,7 +34,7 @@ import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { cx } from '@/lib/cx';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { EmptyState, Modal, Spinner, StatChip, StatChips, TypeIcon } from '@/components/ui';
+import { EmptyState, SlideOver, Spinner, StatChip, StatChips, TypeIcon } from '@/components/ui';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
 import { loadContractLocationName } from '@/features/character/contractLocationName';
@@ -230,7 +230,7 @@ export function PublicContractDetailModal({
       : t('contractDetail.contentsHeading');
 
   return (
-    <Modal open onClose={onClose} title={title}>
+    <SlideOver open onClose={onClose} title={title}>
       <div className="flex flex-col gap-3">
         <StatChips>
           {statChips.map((chip) => (
@@ -311,7 +311,7 @@ export function PublicContractDetailModal({
           />
         )}
       </div>
-    </Modal>
+    </SlideOver>
   );
 }
 
