@@ -8548,7 +8548,7 @@
     "detailType": "Type",
     "detailStatus": "Status",
     "detailIssuedBy": "Issued By",
-    "detailLink": "Link",
+    "detailDescription": "Description",
     "detailReceivedBy": "Received By",
     "detailAvailability": "Availability",
     "detailLocation": "Location",

@@ -34,7 +34,6 @@ import { loadTypeNames } from './typeNames';
 import { loadContractMarketValue, type ContractMarketValue } from './contractMarketValue';
 import { ContractMarketValueRow } from '@/features/contracts/ContractMarketValueRow';
 import { ContractDescriptionLinks } from '@/features/contracts/ContractDescriptionLinks';
-import { contractDescriptionLinks } from '@/features/contracts/contractDescriptionLinks';
 import { CopyContractIdButton } from '@/features/contracts/CopyContractIdButton';
 import { OpenInEveButton } from '@/features/openInEve/OpenInEveButton';
 import {
@@ -235,7 +234,7 @@ export function ContractDetailModal({
     };
   }, [contract.type, contract.status, items, hub, isAbyssalType]);
 
-  const title = contract.title || t(CONTRACT_TYPE_KEY[contract.type]);
+  const title = t(CONTRACT_TYPE_KEY[contract.type]);
 
   const included = items?.list.filter((item) => item.is_included) ?? [];
   const requested = items?.list.filter((item) => !item.is_included) ?? [];
@@ -275,7 +274,7 @@ export function ContractDetailModal({
   ];
 
   return (
-    <SlideOver open onClose={onClose} title={title}>
+    <SlideOver open onClose={onClose} title={title} wide>
       <div className="space-y-4 text-xs">
         <div>
           <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
@@ -318,10 +317,11 @@ export function ContractDetailModal({
               <OpenInEveButton kind="contract" id={contract.contract_id} />
             </dd>
 
-            {contractDescriptionLinks(contract.title).length > 0 && (
+            {contract.title && (
               <>
-                <dt className="text-text-dim uppercase">{t('contracts.detailLink')}</dt>
-                <dd>
+                <dt className="text-text-dim uppercase">{t('contracts.detailDescription')}</dt>
+                <dd className="min-w-0 space-y-1.5">
+                  <p className="break-words">{contract.title}</p>
                   <ContractDescriptionLinks description={contract.title} />
                 </dd>
               </>

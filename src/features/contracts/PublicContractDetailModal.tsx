@@ -230,7 +230,7 @@ export function PublicContractDetailModal({
       : t('contractDetail.contentsHeading');
 
   return (
-    <SlideOver open onClose={onClose} title={title}>
+    <SlideOver open onClose={onClose} title={title} wide>
       <div className="flex flex-col gap-3">
         <StatChips>
           {statChips.map((chip) => (

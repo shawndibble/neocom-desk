@@ -11,3 +11,4 @@ _Recorded 2026-10-19._
   issuer wrote, so the button names the host it leaves for. Only the own
   contract carries a description today: the public and courier snapshots do not
   hand one to the UI.
+- **The panel title is the contract type; the issuer's text is a Description row.** The list row labels itself with the description, but a header has to wrap a long or URL-only one. The rows stay as they were.

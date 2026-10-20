@@ -257,6 +257,8 @@ describe('ContractDetailModal', () => {
       issuerName: 'Mero Otichoda',
       onClose: () => {},
     });
+    expect(screen.getByRole('dialog', { name: 'Item Exchange' })).toBeInTheDocument();
+    expect(screen.getByText('Price list https://example.com/list')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Open example\.com/ }));
     expect(open).toHaveBeenCalledWith('https://example.com/list', '_blank', 'noopener,noreferrer');
     open.mockRestore();
