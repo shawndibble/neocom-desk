@@ -77,7 +77,7 @@ import { loadCharacterRegionId } from '@/features/contractSearch/characterRegion
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { formatIskAuto, formatIskCompact, parseNumeric } from '@/lib/isk';
 import { formatMagnitude } from '@/lib/magnitude';
-import { formatTimestamp } from '@/lib/timestamp';
+import { splitTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
 import { useRememberedUrlParams, useUrlSort, type UrlParamValues } from '@/lib/useUrlState';
 import {
@@ -843,10 +843,24 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
       expires: {
         id: 'expires',
         header: t('contractSearch.expiresColumn'),
-        className: 'whitespace-nowrap text-text-dim',
+        // `sm:px-2` (a variant, so it sorts after the base `px-3`) claws back the last few px a 1024px panel is short once the cell stacks.
+        className: 'whitespace-nowrap text-text-dim sm:px-2',
+        headerClassName: 'sm:px-2',
         sortValue: (row) => row.dateExpired,
         stackAffix: { before: t('contractSearch.courierMobile.expiresAffix') },
-        render: (row) => formatTimestamp(new Date(row.dateExpired), timeZone),
+        // Date over time in the table so the column stays narrow enough for its panel at 1024px;
+        // the stacked phone card (`.dt-stacked`) keeps one line.
+        render: (row) => {
+          const { date, time } = splitTimestamp(new Date(row.dateExpired), timeZone);
+          const body = date.trimEnd();
+          return (
+            <>
+              <span className="block [.dt-stacked_&]:inline">{body}</span>
+              <span className="hidden [.dt-stacked_&]:inline">{date.slice(body.length)}</span>
+              {time && <span className="block [.dt-stacked_&]:inline">{time}</span>}
+            </>
+          );
+        },
       },
     }),
     [t, timeZone, jumps.kind, jumpsByContract, multipleFor, preferenceOverride]
