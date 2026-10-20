@@ -25,7 +25,7 @@ import type { OpenOrderRow } from '@/features/market/openOrdersModel';
 import type { SkillCatalog } from '@/features/skills/skillMap';
 import { blank, statusOf } from '@/features/overview/widgets/data/builderKit';
 import { buildView } from '@/features/overview/widgets/data/models';
-import { ordersStateChart, ordersTable } from '@/features/overview/widgets/data/moneyModels';
+import { ordersStateChart, ordersTable } from '@/features/overview/widgets/data/ordersModels';
 import type { Feeds, FeedState, KindView, Translate } from '@/features/overview/widgets/data/types';
 import type { Widget } from '@/features/overview/widgets/layout';
 import { formatIskCompact } from '@/lib/isk';
