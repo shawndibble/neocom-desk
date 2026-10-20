@@ -9,7 +9,7 @@ import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useTranslation } from 'react-i18next';
 import { SelectionCheckbox } from '@/features/character/SelectionCheckbox';
 import { AggregateRow } from './AggregateRow';
-import { EVENT_ROW_GRID } from './ChannelColumns';
+import { EVENT_ROW_GRID, DEVICE_CELL, ALERTS_CELL } from './ChannelColumns';
 import { eveTypeLabel } from './eveTypeLabel';
 import { PermissionNote } from './PermissionNote';
 import {
@@ -93,12 +93,7 @@ export function EveNotificationRow({
               >
                 <span className={`${eyebrowClassName} md:col-start-1`}>{familyLabel}</span>
                 {NOTIFICATION_CHANNELS.map((channel, index) => (
-                  <div
-                    key={channel}
-                    className={`md:row-start-1 md:justify-self-center ${
-                      index === 0 ? 'md:col-start-2' : 'md:col-start-3'
-                    }`}
-                  >
+                  <div key={channel} className={index === 0 ? DEVICE_CELL : ALERTS_CELL}>
                     <SelectionCheckbox
                       state={selectionStateForAllCharactersEveTypes(
                         applicableIds,

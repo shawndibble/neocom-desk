@@ -22,6 +22,10 @@ import { NOTIFICATION_CHANNELS } from './eventSelection';
 export const EVENT_ROW_GRID =
   'md:grid md:grid-cols-[minmax(0,1fr)_4.25rem_4.25rem_minmax(8rem,12rem)_7rem] md:items-center md:gap-x-3';
 
+/** The Device and Alerts cells of an `EVENT_ROW_GRID` row. */
+export const DEVICE_CELL = 'md:col-start-2 md:row-start-1 md:justify-self-center';
+export const ALERTS_CELL = 'md:col-start-3 md:row-start-1 md:justify-self-center';
+
 /**
  * The caption row that sits directly above a Topic's rows, from `md` up.
  * `pinned` glues it to the top of the viewport while its rows scroll beneath

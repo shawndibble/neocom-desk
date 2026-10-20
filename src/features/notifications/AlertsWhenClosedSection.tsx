@@ -167,7 +167,7 @@ export function AlertsWhenClosedSection({ characters }: { characters: readonly C
             aria-haspopup="dialog"
             aria-label={t('settings.notifications.alertsWhenClosed.manageFor')}
             onClick={() => setExpanded(true)}
-            className={cx(inlineLinkClassName, focusRingInsetClassName)}
+            className={cx(inlineLinkClassName, focusRingInsetClassName, 'touch:min-h-11')}
           >
             {t('settings.notifications.alertsWhenClosed.manage')}
           </button>

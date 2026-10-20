@@ -19,7 +19,7 @@ import { Button, Caret, Modal } from '@/components/ui';
 import { cx } from '@/lib/cx';
 import { focusRingInsetClassName, interactiveClassName } from '@/components/ui/controlStyles';
 import { SelectionCheckbox } from '@/features/character/SelectionCheckbox';
-import { EVENT_ROW_GRID } from './ChannelColumns';
+import { EVENT_ROW_GRID, DEVICE_CELL, ALERTS_CELL } from './ChannelColumns';
 import { applyToAllFlips, summarizeChannels } from './channelSummary';
 import { NOTIFICATION_CHANNELS, type NotificationChannel } from './eventSelection';
 import {
@@ -80,6 +80,8 @@ export function AggregateRow({
   const [chosen, setChosen] = useState<boolean | null>(null);
   const [warnOpen, setWarnOpen] = useState(false);
   const open = chosen ?? (forceExpanded && isDesktop);
+  // The control goes when no Character has the event on; coming back must not reopen it unasked.
+  if (warnAhead === undefined && warnOpen) setWarnOpen(false);
 
   const applicableIds = characters
     .filter((character) => availability(character.characterId).enabled)
@@ -94,6 +96,8 @@ export function AggregateRow({
   async function applyToAll() {
     const flips = applyToAllFlips(applicableIds, readValue);
     for (const channel of NOTIFICATION_CHANNELS) {
+      // The Device boxes are disabled while the browser is blocked; Apply must not write behind them.
+      if (channel === 'browser' && browserBlocked) continue;
       for (const characterId of flips[channel]) await onToggleOne(characterId, channel);
     }
   }
@@ -178,13 +182,7 @@ export function AggregateRow({
         {/* `contents` from `md`: each cell is then its own grid item. */}
         <div className="flex flex-wrap items-center gap-x-5 pl-6 md:contents">
           {NOTIFICATION_CHANNELS.map((channel, index) => (
-            <div
-              key={channel}
-              className={cx(
-                'md:row-start-1 md:justify-self-center',
-                index === 0 ? 'md:col-start-2' : 'md:col-start-3'
-              )}
-            >
+            <div key={channel} className={index === 0 ? DEVICE_CELL : ALERTS_CELL}>
               <SelectionCheckbox
                 state={summary.state[channel]}
                 disabled={applicableIds.length === 0 || (channel === 'browser' && browserBlocked)}

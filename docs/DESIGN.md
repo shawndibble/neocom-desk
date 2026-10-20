@@ -1087,6 +1087,16 @@ an unboxed micro-label with the same icon and words — "All characters · 4",
 says "All characters · 3 of 4" with a warning icon, and its tooltip names who
 is missing. Never clickable; if the pilot can change the scope, use the filter.
 
+### Topic drill-in
+
+A phone list that drills into a section (Settings > Notifications' Topics, its
+Alerts when closed row) is a 44px row: title, one dim line of state under it,
+and a right chevron (`Icon.GoTo`). The whole row is the one control. The
+section opens in the page with a "‹ All topics" button above it and the choice
+in the URL, so Back returns to the list; a sheet that opens another sheet is
+the one thing to avoid. Beside a row's checkboxes, a phone prints the word
+("Device", "Alerts") inside the checkbox's label, since it has no column header.
+
 ### Origin crumb
 
 A page opened from another surface's drill-in (the Wallet chart, for Assets,
