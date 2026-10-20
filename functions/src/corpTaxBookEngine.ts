@@ -386,3 +386,54 @@ export function reopenPeriod(periods: readonly CoveragePeriod[], day: string): C
   }
   return [...periods, { from: day }];
 }
+
+// --- Feeder ledger health (#4509) --------------------------------------------
+
+const DAY_MS = 86_400_000;
+
+/** Engine `FEEDER_DISCONNECT_DAYS`. */
+export const FEEDER_DISCONNECT_DAYS = 30;
+
+/** Engine `FeederHealth`. */
+export interface FeederHealth {
+  status: 'active' | 'disconnected';
+  lastReadWellAt?: string;
+  staleSince?: string;
+}
+
+/** Engine `FeederReadOutcome`. */
+export type FeederReadOutcome = 'ok' | 'stale' | 'none';
+
+/** Engine `advanceFeederHealth`. */
+export function advanceFeederHealth(
+  prev: FeederHealth,
+  outcome: FeederReadOutcome,
+  now: string
+): FeederHealth {
+  if (prev.status === 'disconnected') return prev;
+  if (outcome === 'ok') return { status: 'active', lastReadWellAt: now };
+  const staleSince = outcome === 'stale' ? (prev.staleSince ?? now) : prev.staleSince;
+  const next: FeederHealth = { ...prev, ...(staleSince !== undefined ? { staleSince } : {}) };
+  if (
+    staleSince !== undefined &&
+    Date.parse(now) - Date.parse(staleSince) >= FEEDER_DISCONNECT_DAYS * DAY_MS
+  ) {
+    return { ...next, status: 'disconnected' };
+  }
+  return next;
+}
+
+/** Engine `disconnectedCoverage` (with `lastBillableDate` inlined for a read that is its own clock). */
+export function disconnectedCoverage(
+  periods: readonly CoveragePeriod[],
+  health: Pick<FeederHealth, 'lastReadWellAt'>,
+  graceHours: number = BOOK_DEFAULTS.graceHours
+): CoveragePeriod[] {
+  if (health.lastReadWellAt === undefined) {
+    const open = periods.find((p) => p.to === undefined);
+    return open ? closePeriod(periods, open.from) : [...periods];
+  }
+  const closedBy = Date.parse(health.lastReadWellAt) - graceHours * HOUR_MS;
+  const lastFull = shiftDate(new Date(closedBy).toISOString().slice(0, 10), -1);
+  return closePeriod(periods, shiftDate(lastFull, 1));
+}
