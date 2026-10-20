@@ -2,8 +2,6 @@
 
 _Recorded 2026-10-19._
 
-- **<Decision>.** <Why, and what it rules out.>
-
 - The Market Browser order book's opt-in **Tax & fees** and **Final price**
   columns (per unit, off by default, so they show in the expanded row's hidden
   columns until ticked) price taking that order outright.

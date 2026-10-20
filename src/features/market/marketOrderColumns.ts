@@ -48,6 +48,21 @@ export const BUY_ORDER_COLUMN_IDS: readonly MarketOrderColumnId[] = MARKET_ORDER
 export const FEE_COLUMN_IDS: readonly MarketOrderColumnId[] = ['fees', 'finalPrice'];
 
 /**
+ * Whether the book holds a column back right now: Location when one station
+ * is already named by the scope bar, the fee columns until the active
+ * Character's Accounting level is known. The one rule the picker, the table,
+ * the row detail and the width budget all follow.
+ */
+export function isColumnWithheld(
+  id: MarketOrderColumnId,
+  { hideLocation, accountingLevel }: { hideLocation: boolean; accountingLevel: number | null }
+): boolean {
+  return (
+    (hideLocation && id === 'location') || (accountingLevel === null && FEE_COLUMN_IDS.includes(id))
+  );
+}
+
+/**
  * Every column but Min. Volume, which is almost always 1 (the expanded row
  * states it for every buy order) and would cost the book 8rem of width
  * before its rows become cards, and the two fee columns, which are there to

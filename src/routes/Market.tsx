@@ -104,7 +104,7 @@ import {
   BUY_ORDER_COLUMN_IDS,
   orderBookFigureChars,
   orderBookWidthsRem,
-  FEE_COLUMN_IDS,
+  isColumnWithheld,
   type MarketOrderColumnId,
   useVisibleMarketOrderColumns,
 } from '@/features/market/marketOrderColumns';
@@ -651,19 +651,12 @@ export function Market() {
     !(rangeAcross && browserFilterValue.jumps !== 'any') && effectiveLocation.mode === 'hub';
   const accountingLevel = useAccountingLevel(activeCharacterId);
   const pickedOrderColumns = useVisibleMarketOrderColumns((state) => state.value);
-  // Location can't be ticked while it is held back, so the picker doesn't offer it.
+  const withholding = { hideLocation: singleStationBook, accountingLevel };
+  // A held-back column can't be ticked, so the picker doesn't offer it.
   const pickableColumns = (ids: readonly MarketOrderColumnId[]) =>
-    ids.filter(
-      (id) =>
-        !(singleStationBook && id === 'location') &&
-        !(accountingLevel === null && FEE_COLUMN_IDS.includes(id))
-    );
+    ids.filter((id) => !isColumnWithheld(id, withholding));
   const orderBookWidths = orderBookWidthsRem(
-    pickedOrderColumns.filter(
-      (id) =>
-        !(singleStationBook && id === 'location') &&
-        !(accountingLevel === null && FEE_COLUMN_IDS.includes(id))
-    ),
+    pickedOrderColumns.filter((id) => !isColumnWithheld(id, withholding)),
     orderBookFigureChars([...shownSell, ...sortedBuy], bookBestSell, myOrderIds)
   );
   const [orderBookRef, [orderLocationSqueezed = false, orderBookNarrow = false]] =

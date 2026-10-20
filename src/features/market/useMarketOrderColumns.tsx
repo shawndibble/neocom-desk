@@ -11,7 +11,7 @@ import {
   BUY_ORDER_COLUMN_IDS,
   useVisibleMarketOrderColumns,
   ORDER_BOOK_LOCATION_CLASS,
-  FEE_COLUMN_IDS,
+  isColumnWithheld,
   type MarketOrderColumnId,
 } from '@/features/market/marketOrderColumns';
 import { formatVolume } from '@/features/market/format';
@@ -100,11 +100,7 @@ export function useMarketOrderColumns({
   const pickedOrderColumns = useVisibleMarketOrderColumns((state) => state.value);
   const visibleOrderColumns = useMemo(
     () =>
-      pickedOrderColumns.filter(
-        (id) =>
-          !(hideLocation && id === 'location') &&
-          !(accountingLevel === null && FEE_COLUMN_IDS.includes(id))
-      ),
+      pickedOrderColumns.filter((id) => !isColumnWithheld(id, { hideLocation, accountingLevel })),
     [hideLocation, accountingLevel, pickedOrderColumns]
   );
   const setVisibleOrderColumns = useVisibleMarketOrderColumns((state) => state.setValue);
@@ -315,25 +311,26 @@ export function useMarketOrderColumns({
     [visibleOrderColumns, orderColumnsById]
   );
   // What each table's row expand (`OrderDetailPanel`) shows that the visible
-  // columns don't — so the unticked fee columns land there by default — the picker's hidden ids, per table, since Sell and Buy
-  // don't offer the same columns to begin with.
+  // columns don't — the picker's hidden ids, per table, since Sell and Buy
+  // don't offer the same columns to begin with. The unticked fee columns land
+  // here by default.
   const sellHiddenColumns = useMemo(
     () =>
       SELL_ORDER_COLUMN_IDS.filter(
         (id) =>
           !visibleOrderColumns.includes(id) &&
-          !(accountingLevel === null && FEE_COLUMN_IDS.includes(id))
+          !isColumnWithheld(id, { hideLocation, accountingLevel })
       ),
-    [visibleOrderColumns, accountingLevel]
+    [visibleOrderColumns, hideLocation, accountingLevel]
   );
   const buyHiddenColumns = useMemo(
     () =>
       BUY_ORDER_COLUMN_IDS.filter(
         (id) =>
           !visibleOrderColumns.includes(id) &&
-          !(accountingLevel === null && FEE_COLUMN_IDS.includes(id))
+          !isColumnWithheld(id, { hideLocation, accountingLevel })
       ),
-    [visibleOrderColumns, accountingLevel]
+    [visibleOrderColumns, hideLocation, accountingLevel]
   );
 
   return {
