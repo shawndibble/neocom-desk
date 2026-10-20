@@ -1684,8 +1684,7 @@ describe('Settings — sections rail', () => {
       // Corporation is absent: this character has no corp access.
       'Travel',
       'Permissions',
-      'Backup',
-      'App',
+      'App & backup',
       'Log out & delete',
       'Cached data',
       'Offline data',
@@ -1759,7 +1758,7 @@ describe('Settings — phone list', () => {
     }
     // Corporation is absent: this character has no corp access.
     expect(within(nav).queryByRole('link', { name: /corporation/i })).not.toBeInTheDocument();
-    expect(within(nav).getAllByRole('link')).toHaveLength(15);
+    expect(within(nav).getAllByRole('link')).toHaveLength(14);
     expect(within(nav).getByRole('link', { name: /^display/i })).toHaveTextContent(
       /default text, my local time/i
     );
@@ -1917,7 +1916,7 @@ describe('Settings — review follow-ups', () => {
   });
 
   it('gives both backup password inputs a visible <label for>', async () => {
-    window.history.pushState({}, '', '/settings/backup');
+    window.history.pushState({}, '', '/settings/app');
     const { container } = render(<App />);
 
     const inputs = await screen.findAllByLabelText('Password');

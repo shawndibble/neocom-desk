@@ -29,7 +29,7 @@ export const SETTINGS_GROUPS: readonly SettingsGroup[] = [
   {
     id: 'account',
     labelKey: 'settings.groups.account',
-    sections: ['permissions', 'backup', 'app', 'device'],
+    sections: ['permissions', 'app', 'device'],
   },
   {
     id: 'data',

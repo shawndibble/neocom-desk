@@ -62,7 +62,6 @@ export const SETTINGS_TABS = definePageTabs(
     { id: 'corporation', labelKey: 'settings.tabs.corporation' },
     { id: 'travel', labelKey: 'settings.tabs.travel' },
     { id: 'permissions', labelKey: 'settings.tabs.permissions' },
-    { id: 'backup', labelKey: 'settings.tabs.backup' },
     { id: 'app', labelKey: 'settings.tabs.app' },
     { id: 'device', labelKey: 'settings.tabs.device' },
     { id: 'dataAge', labelKey: 'settings.tabs.data' },

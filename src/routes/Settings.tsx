@@ -215,15 +215,11 @@ export function Settings() {
           {section === 'travel' && <TravelSettingsPanel />}
           {/* The Overview feed's "Settings" link targets `/settings/notifications` directly. */}
           {section === 'notifications' && <NotificationsPanel />}
-          {section === 'backup' && (
-            <>
-              <ExportPanel />
-              <ImportPanel />
-            </>
-          )}
           {section === 'app' && (
             <>
               <InstallAppPanel />
+              <ExportPanel />
+              <ImportPanel />
               <AnalyticsPanel />
             </>
           )}
