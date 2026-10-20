@@ -9919,6 +9919,8 @@
     "expiry": "Expires",
     "range": "Range",
     "minVolume": "Min. Volume",
+    "feesColumn": "Tax & fees",
+    "finalPriceColumn": "Final price",
     "orderDetail": {
       "structureType": "Structure",
       "playerStructure": "Player-owned",
@@ -10888,6 +10890,8 @@
     "jumpsWord_other": "jumps",
     "rangeAffix": "range ",
     "minVolumeAffix": "Min ",
+    "feesAffix": "Fees ",
+    "finalPriceAffix": "Final ",
     "baitHint": "Asks {{times}} times the best sell — likely bait, not a real price.",
     "baitLabel": "Likely bait price",
     "tabVariations": "Variations",

@@ -31,6 +31,7 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { useAccountingLevel } from '@/features/market/useAccountingLevel';
 import { useOnline } from '@/stores/network';
 import { orderBookFailedOffline } from '@/features/market/orderBookView';
 import type { MarketGroupNode, MarketTypeEntry } from '@/sde/marketTypes';
@@ -103,6 +104,7 @@ import {
   BUY_ORDER_COLUMN_IDS,
   orderBookFigureChars,
   orderBookWidthsRem,
+  isColumnWithheld,
   type MarketOrderColumnId,
   useVisibleMarketOrderColumns,
 } from '@/features/market/marketOrderColumns';
@@ -647,12 +649,14 @@ export function Market() {
   // One station, already named by the scope bar: no Location column to repeat it.
   const singleStationBook =
     !(rangeAcross && browserFilterValue.jumps !== 'any') && effectiveLocation.mode === 'hub';
+  const accountingLevel = useAccountingLevel(activeCharacterId);
   const pickedOrderColumns = useVisibleMarketOrderColumns((state) => state.value);
-  // Location can't be ticked while it is held back, so the picker doesn't offer it.
+  const withholding = { hideLocation: singleStationBook, accountingLevel };
+  // A held-back column can't be ticked, so the picker doesn't offer it.
   const pickableColumns = (ids: readonly MarketOrderColumnId[]) =>
-    singleStationBook ? ids.filter((id) => id !== 'location') : ids;
+    ids.filter((id) => !isColumnWithheld(id, withholding));
   const orderBookWidths = orderBookWidthsRem(
-    singleStationBook ? pickedOrderColumns.filter((id) => id !== 'location') : pickedOrderColumns,
+    pickedOrderColumns.filter((id) => !isColumnWithheld(id, withholding)),
     orderBookFigureChars([...shownSell, ...sortedBuy], bookBestSell, myOrderIds)
   );
   const [orderBookRef, [orderLocationSqueezed = false, orderBookNarrow = false]] =
@@ -682,6 +686,7 @@ export function Market() {
     cards: orderCards,
     locationSqueezed: orderLocationSqueezed,
     hideLocation: singleStationBook,
+    accountingLevel,
   });
   // A phone shows one side of the book at a time (`BookSideToggle`).
   const [phoneSide, setPhoneSide] = useState<BookSide>('sell');

@@ -7,7 +7,11 @@ import { useVisibleMarketOrderColumns } from './marketOrderColumns';
 
 const t = ((key: string) => key) as unknown as TFunction;
 
-function columnsFor(hideLocation: boolean, myOrderIds: ReadonlySet<number> = new Set()) {
+function columnsFor(
+  hideLocation: boolean,
+  myOrderIds: ReadonlySet<number> = new Set(),
+  accountingLevel: number | null = 5
+) {
   return renderHook(() =>
     useMarketOrderColumns({
       t,
@@ -24,6 +28,7 @@ function columnsFor(hideLocation: boolean, myOrderIds: ReadonlySet<number> = new
       cards: false,
       locationSqueezed: false,
       hideLocation,
+      accountingLevel,
     })
   ).result.current;
 }
@@ -68,5 +73,28 @@ describe('useMarketOrderColumns own-order mark', () => {
     const { orderColumnsById } = columnsFor(false, new Set([1]));
     render(<div>{orderColumnsById.price.render(order(2))}</div>);
     expect(screen.queryByRole('img')).toBeNull();
+  });
+});
+
+describe('useMarketOrderColumns fee columns', () => {
+  it('leaves them unticked but in the row detail, for both tables', () => {
+    const columns = columnsFor(false);
+    expect(columns.baseColumns.map((c) => c.id)).not.toContain('fees');
+    expect(columns.sellHiddenColumns).toEqual(expect.arrayContaining(['fees', 'finalPrice']));
+    expect(columns.buyHiddenColumns).toEqual(expect.arrayContaining(['fees', 'finalPrice']));
+  });
+
+  it('keeps them out of the row detail while the Accounting level is unknown', () => {
+    const columns = columnsFor(false, new Set(), null);
+    expect(columns.sellHiddenColumns).not.toContain('fees');
+    expect(columns.buyHiddenColumns).not.toContain('finalPrice');
+  });
+
+  it('prices a buy order net of sales tax and a sell order untaxed', () => {
+    const { orderColumnsById } = columnsFor(false);
+    const base = { price: 1_000, volume_remain: 1 } as RegionOrder;
+    expect(orderColumnsById.finalPrice.sortValue?.({ ...base, is_buy_order: false })).toBe(1_000);
+    const net = orderColumnsById.finalPrice.sortValue?.({ ...base, is_buy_order: true });
+    expect(net).toBeLessThan(1_000);
   });
 });

@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { RegionOrder } from '@/esi/endpoints';
 import {
   DEFAULT_VISIBLE_MARKET_ORDER_COLUMNS,
+  SELL_ORDER_COLUMN_IDS,
+  BUY_ORDER_COLUMN_IDS,
   ORDER_BOOK_LOCATION_CLASS,
   ORDER_BOOK_LOCATION_REM,
   orderBookFigureChars,
@@ -120,5 +122,15 @@ describe('orderBookFigureChars', () => {
       baitFlag: false,
       myOrder: false,
     });
+  });
+});
+
+describe('fee columns', () => {
+  it('are offered on both tables but off until ticked', () => {
+    for (const id of ['fees', 'finalPrice'] as const) {
+      expect(SELL_ORDER_COLUMN_IDS).toContain(id);
+      expect(BUY_ORDER_COLUMN_IDS).toContain(id);
+      expect(DEFAULT_VISIBLE_MARKET_ORDER_COLUMNS).not.toContain(id);
+    }
   });
 });
