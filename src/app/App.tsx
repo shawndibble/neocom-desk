@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, type ReactElement } from 'react';
+import { Fragment, lazy, Suspense, useEffect, type ReactElement, type ReactNode } from 'react';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { industryTabHref } from '@/features/industry/industryTabs';
@@ -52,6 +52,7 @@ import { getAccessTokenReportingFailures } from './tokenProvider';
 import type { AppRoutePath } from './routeScopes';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useFontScale } from '@/lib/fontScale';
+import { decimalMarkFor, useNumberFormat } from '@/lib/numberFormat';
 import { useTimeFormat } from '@/lib/timeFormat';
 import { useMobileTabs } from '@/lib/mobileTabs';
 import { useCharacterCountOrLoading } from '@/features/character/useCharacters';
@@ -308,6 +309,9 @@ function AppEffects() {
   // read landed. Once here, before any route mounts, covers them all.
   useHydratedStore(useTimeFormat);
 
+  // The Number format preference, for the same reason: every formatter reads it.
+  useHydratedStore(useNumberFormat);
+
   // And the phone's chosen bottom tabs, for the same reason one level lower:
   // `Layout` is the only reader, but it renders on every route, so hydrating
   // it there would still paint the default bar first on a cold load. Here it
@@ -375,6 +379,17 @@ function AppEffects() {
   return null;
 }
 
+/**
+ * Formatters read the number format when they run, not through a subscription,
+ * so a change would leave what is already on screen in the old format. Keying
+ * the tree on the resolved mark remounts it once, when the mark actually
+ * changes (switching `auto` to the format it already resolves to does nothing).
+ */
+function NumberFormatBoundary({ children }: { children: ReactNode }) {
+  const choice = useNumberFormat((state) => state.value);
+  return <Fragment key={decimalMarkFor(choice)}>{children}</Fragment>;
+}
+
 export function App() {
   return (
     <ErrorBoundary>
@@ -385,66 +400,68 @@ export function App() {
         <LandingShellOffLandingRelease />
         <DocumentTitleTracker />
         <StaleStoresReloader />
-        <Suspense fallback={<RouteFallback />}>
-          <SentryRoutes>
-            <Route path="/" element={<Root />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/callback" element={<Callback />} />
-            {/* Below: a logged-in Character, then the route's own scopes. */}
-            <Route element={<RequireCharacter />}>
-              <Route element={<SignedInShell />}>
-                {/* A tabbed page (`pageTabs.ts`) mounts once at `<path>/*`, so
+        <NumberFormatBoundary>
+          <Suspense fallback={<RouteFallback />}>
+            <SentryRoutes>
+              <Route path="/" element={<Root />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/callback" element={<Callback />} />
+              {/* Below: a logged-in Character, then the route's own scopes. */}
+              <Route element={<RequireCharacter />}>
+                <Route element={<SignedInShell />}>
+                  {/* A tabbed page (`pageTabs.ts`) mounts once at `<path>/*`, so
                   its tabs are one route instance: switching tab keeps the
                   page mounted, and none of the tables above gain an entry. */}
-                {FEATURE_ROUTES.map(([path, element]) => {
-                  const tabs = PAGE_TABS[path];
-                  const gated = <ScopeGate path={path}>{element}</ScopeGate>;
-                  return (
-                    <Route
-                      key={path}
-                      path={routePatternFor(path)}
-                      element={
-                        tabs ? (
-                          <TabRoute page={tabs} legacy={PAGE_LEGACY_LOCATIONS[path]}>
-                            {gated}
-                          </TabRoute>
-                        ) : (
-                          gated
-                        )
-                      }
-                    />
-                  );
-                })}
+                  {FEATURE_ROUTES.map(([path, element]) => {
+                    const tabs = PAGE_TABS[path];
+                    const gated = <ScopeGate path={path}>{element}</ScopeGate>;
+                    return (
+                      <Route
+                        key={path}
+                        path={routePatternFor(path)}
+                        element={
+                          tabs ? (
+                            <TabRoute page={tabs} legacy={PAGE_LEGACY_LOCATIONS[path]}>
+                              {gated}
+                            </TabRoute>
+                          ) : (
+                            gated
+                          )
+                        }
+                      />
+                    );
+                  })}
+                </Route>
               </Route>
-            </Route>
-            {/* A Fitting Share Code opened with no session (#1544) — it must
+              {/* A Fitting Share Code opened with no session (#1544) — it must
               open with no Character, so it sits outside
               RequireCharacter/ScopeGate. A
               visitor with a Character never sees it: FittingShared redirects
               straight into the editor instead. routeScopes.test.ts asserts
               this exemption is deliberate. */}
-            <Route path="/share/fitting" element={<FittingShared />} />
-            {/* A Share Link (`/s/<id>`), for any share type — same
+              <Route path="/share/fitting" element={<FittingShared />} />
+              {/* A Share Link (`/s/<id>`), for any share type — same
               exemption. `/share/<id>` is the old spelling of the same link
               (ids minted before the short key), kept so links already sent
               still open; the literal `/share/fitting` above outranks it. */}
-            <Route path="/s/:shareId" element={<SharedLink />} />
-            {/* The invite link: a signed-out visitor sees what it is for before logging in. */}
-            <Route path="/communities/join/:code" element={<CommunityJoin />} />
-            <Route path="/share/:shareId" element={<SharedLink />} />
-            {/* A Statement's verify link (#4066): read-only, no login, the token is the credential. */}
-            <Route path="/corp-tax-book/verify/:token" element={<CorpTaxBookVerify />} />
-            {/* Undisclosed Sentry probe — see routes/ErrorProbe.tsx. */}
-            <Route path="/error" element={<ErrorProbe />} />
-            <Route path="*" element={<NotFound />} />
-          </SentryRoutes>
-        </Suspense>
-        <ReloadPrompt />
-        <EntityInfoRoute />
-        <PublicInfoModal />
-        <SkillDetailModal />
-        <ItemInfoModal />
-        <PlaceInfoModal />
+              <Route path="/s/:shareId" element={<SharedLink />} />
+              {/* The invite link: a signed-out visitor sees what it is for before logging in. */}
+              <Route path="/communities/join/:code" element={<CommunityJoin />} />
+              <Route path="/share/:shareId" element={<SharedLink />} />
+              {/* A Statement's verify link (#4066): read-only, no login, the token is the credential. */}
+              <Route path="/corp-tax-book/verify/:token" element={<CorpTaxBookVerify />} />
+              {/* Undisclosed Sentry probe — see routes/ErrorProbe.tsx. */}
+              <Route path="/error" element={<ErrorProbe />} />
+              <Route path="*" element={<NotFound />} />
+            </SentryRoutes>
+          </Suspense>
+          <ReloadPrompt />
+          <EntityInfoRoute />
+          <PublicInfoModal />
+          <SkillDetailModal />
+          <ItemInfoModal />
+          <PlaceInfoModal />
+        </NumberFormatBoundary>
       </BrowserRouter>
     </ErrorBoundary>
   );

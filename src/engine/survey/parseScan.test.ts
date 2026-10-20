@@ -117,4 +117,18 @@ describe('isSurveyScanText', () => {
     expect(isSurveyScanText('Tritanium\t1000\nPyerite\t500')).toBe(false);
     expect(isSurveyScanText('Veldspar\t1000 m3')).toBe(false);
   });
+
+  it('reads a scan pasted from a client that swaps the period and the comma', () => {
+    const text = [
+      'Bitumens\t13.812\t138.120 m3\t5.100.000,00 ISK\t112 km',
+      'Bitumens\t964\t9.640 m3\t356.000,00 ISK\t1.178 m',
+      'Sylvite',
+      'Sylvite\t4.718\t47.180 m3\t1.820.000,50 ISK\t1,5 AU',
+    ].join('\n');
+    expect(parseSurveyScan(text)).toEqual([
+      { ore: 'Bitumens', units: 13812, volume: 138_120, isk: 5_100_000, distanceM: 112_000 },
+      { ore: 'Bitumens', units: 964, volume: 9640, isk: 356_000, distanceM: 1178 },
+      { ore: 'Sylvite', units: 4718, volume: 47_180, isk: 1_820_000.5, distanceM: 224_396_806_050 },
+    ]);
+  });
 });

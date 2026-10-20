@@ -33,6 +33,8 @@ import { useHydratedStore } from '@/lib/useHydratedStore';
 import { Checkbox, Field, Fields, FilterChip, PageHeader, Panel } from '@/components/ui';
 import { useFontScale, FONT_SCALE_STEPS } from '@/lib/fontScale';
 import { useSingleKeyShortcuts } from '@/lib/singleKeyShortcuts';
+import { decimalMarkFor, NUMBER_FORMATS, useNumberFormat } from '@/lib/numberFormat';
+import { numberFormatExample } from '@/lib/numberLocale';
 import { useTimeFormat, TIME_FORMATS } from '@/lib/timeFormat';
 import {
   useCalendarWeekStart,
@@ -70,6 +72,8 @@ export function Settings() {
   const timeFormat = useTimeFormat((state) => state.value);
   const isNarrow = useIsNarrow();
   const setTimeFormat = useTimeFormat((state) => state.setValue);
+  const numberFormat = useNumberFormat((state) => state.value);
+  const setNumberFormat = useNumberFormat((state) => state.setValue);
   const weekStart = useCalendarWeekStart((state) => state.value);
   const setWeekStart = useCalendarWeekStart((state) => state.setValue);
   // Unlike `fontScale`/`timeFormat`, `App.tsx` does not hydrate this store for
@@ -148,6 +152,22 @@ export function Settings() {
                     selected={timeFormat}
                     onSelect={(format) => void setTimeFormat(format)}
                     labelFor={(format) => t(`settings.timeFormat.${format}`)}
+                  />
+                  <ChipRow
+                    label={t('settings.numberFormatLabel')}
+                    hint={t('settings.numberFormatHint')}
+                    options={NUMBER_FORMATS}
+                    selected={numberFormat}
+                    onSelect={(format) => void setNumberFormat(format)}
+                    labelFor={(format) =>
+                      format === 'auto'
+                        ? t('settings.numberFormat.auto', {
+                            example: numberFormatExample(decimalMarkFor('auto')),
+                          })
+                        : t(`settings.numberFormat.${format}`, {
+                            example: numberFormatExample(format === 'comma' ? ',' : '.'),
+                          })
+                    }
                   />
                   {weekStartHydrated && (
                     <ChipRow

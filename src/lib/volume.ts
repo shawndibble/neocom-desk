@@ -1,5 +1,7 @@
-const VOLUME_FORMAT = new Intl.NumberFormat('en', { maximumFractionDigits: 2 });
-const TINY_VOLUME_FORMAT = new Intl.NumberFormat('en', { maximumFractionDigits: 4 });
+import { createNumberFormat } from './numberLocale';
+
+const VOLUME_FORMAT = createNumberFormat({ maximumFractionDigits: 2 });
+const TINY_VOLUME_FORMAT = createNumberFormat({ maximumFractionDigits: 4 });
 
 /**
  * A volume in m³, number only (e.g. "0.01", "470,000") — for a cell whose
@@ -9,7 +11,7 @@ const TINY_VOLUME_FORMAT = new Intl.NumberFormat('en', { maximumFractionDigits: 
  */
 export function formatCubicMetres(value: number): string {
   const format = value > 0 && value < 0.01 ? TINY_VOLUME_FORMAT : VOLUME_FORMAT;
-  return format.format(value);
+  return format(value);
 }
 
 /** A per-unit item volume with its unit (e.g. "0.01 m³", "470,000 m³") — `formatCubicMetres` plus the unit. */

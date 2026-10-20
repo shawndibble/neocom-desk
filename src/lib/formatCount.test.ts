@@ -1,10 +1,10 @@
-import i18n from 'i18next';
 import { afterEach, describe, expect, it } from 'vitest';
 import { formatCount } from './formatCount';
+import { setDecimalMark } from './numberLocale';
 
 describe('formatCount', () => {
   afterEach(() => {
-    i18n.language = 'en';
+    setDecimalMark('.');
   });
 
   it('rounds and groups in English', () => {
@@ -12,8 +12,8 @@ describe('formatCount', () => {
     expect(formatCount(0.4)).toBe('0');
   });
 
-  it('follows i18n.language', () => {
-    i18n.language = 'de';
+  it('follows the number format', () => {
+    setDecimalMark(',');
     expect(formatCount(1234567)).toBe('1.234.567');
   });
 });

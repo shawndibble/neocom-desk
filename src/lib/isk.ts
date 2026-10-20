@@ -5,13 +5,15 @@
  * "-0", which reads as a loss that isn't real.
  */
 import { formatCompactNumber } from './compactNumber';
+import { createNumberFormat, getDecimalMark } from './numberLocale';
+import { parseLocalizedNumber } from '@/engine/numbers/parseLocalizedNumber';
 
-const formatters = new Map<number, Intl.NumberFormat>();
+const formatters = new Map<number, (value: number) => string>();
 
-function formatterFor(decimals: number): Intl.NumberFormat {
+function formatterFor(decimals: number): (value: number) => string {
   let formatter = formatters.get(decimals);
   if (!formatter) {
-    formatter = new Intl.NumberFormat('en', {
+    formatter = createNumberFormat({
       minimumFractionDigits: decimals,
       maximumFractionDigits: decimals,
     });
@@ -33,7 +35,7 @@ export function clampIskZero(value: number, decimals: number): number {
 }
 
 export function formatIsk(value: number, decimals = 0): string {
-  return formatterFor(decimals).format(clampIskZero(value, decimals));
+  return formatterFor(decimals)(clampIskZero(value, decimals));
 }
 
 /**
@@ -84,10 +86,10 @@ export function formatMarketIsk(value: number): string {
  * which keeps up to 20 fraction digits for a generic quantity/price field;
  * ISK here is always cents-precision.
  */
-const iskMasker = new Intl.NumberFormat('en', { maximumFractionDigits: 2 });
+const iskMasker = createNumberFormat({ maximumFractionDigits: 2 });
 
 export function maskIsk(value: number): string {
-  return iskMasker.format(value);
+  return iskMasker(value);
 }
 
 /** Abbreviated ISK (`"5.2M"`) for tight spaces — the character card, not Wallet's own precise figures. */
@@ -107,20 +109,24 @@ const ISK_SHORTHAND_MULTIPLIERS: Readonly<Record<string, number>> = {
   t: 1_000,
 };
 
-/** `10.5m`, `10,500,000`, and `10500000` all parse to 10,500,000. Suffixes: b = billion, m = million, t = thousand. */
-const ISK_AMOUNT_PATTERN = /^(\d[\d,]*(?:\.\d+)?|\.\d+)\s*([bmt])?$/i;
+/** `10.5m`, `10,500,000`, `10.500.000` and `10500000` all parse to 10,500,000. Suffixes: b = billion, m = million, t = thousand. */
+const ISK_AMOUNT_PATTERN = /^([\d.,'\s\u00a0\u2009\u202f]*\d|[.,]\d+)\s*([bmt])?$/i;
 
 /**
  * Parses a threshold-style ISK amount from free text (issue #wallet-balance-threshold):
- * comma-separated thousands, a decimal point, and an optional case-insensitive
+ * thousands marks, a decimal mark (either locale), and an optional case-insensitive
  * `b`/`m`/`t` shorthand suffix, in any combination. Returns `null` for anything
  * that doesn't match rather than `NaN`, so a caller can tell "invalid" from "zero".
  */
 export function parseIskAmount(input: string): number | null {
   const match = ISK_AMOUNT_PATTERN.exec(input.trim());
   if (!match) return null;
-  const numeric = Number(match[1].replace(/,/g, ''));
-  if (!Number.isFinite(numeric)) return null;
+  // A typed amount: a lone mark before three digits follows the display format.
+  const numeric = parseLocalizedNumber(
+    /^[.,]/.test(match[1]) ? `0${match[1]}` : match[1],
+    getDecimalMark()
+  );
+  if (numeric === null) return null;
   const suffix = match[2]?.toLowerCase();
   const multiplier = suffix ? ISK_SHORTHAND_MULTIPLIERS[suffix] : 1;
   return numeric * multiplier;
