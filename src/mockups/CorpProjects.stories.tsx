@@ -2,7 +2,6 @@ import { useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import {
   DataTable,
-  EmptyState,
   FilterChip,
   IconButton,
   IskDelta,
@@ -19,7 +18,6 @@ import {
 } from '@/components/ui';
 import { Pill } from '@/components/ui/Pill';
 import * as Icon from '@/components/ui/icons';
-import { GrantBanner } from '@/app/GrantNote';
 import { NewComponent } from './NewComponent';
 
 /**
@@ -34,7 +32,9 @@ import { NewComponent } from './NewComponent';
  * - Jira mobile "All Work": two-line rows, status chip and date on the second line.
  *
  * New components in this mockup: `ProjectsTab` (the whole tab body: summary
- * strip, filter row, table and its empty / missing-permission states). The
+ * strip, filter row and table). The tab is only listed when the Character has
+ * granted the projects permission and the last read returned an open project,
+ * so there is no empty or missing-permission state to draw. The
  * "Projects" entry in the Industry tab strip is the fifth existing `Tabs` item.
  * Everything inside is an existing primitive.
  */
@@ -285,12 +285,10 @@ const COLUMNS: DataTableColumn<Project>[] = [
   },
 ];
 
-type TabState = 'populated' | 'empty' | 'needsPermission';
-
-function ProjectsTab({ state }: { state: TabState }) {
+function ProjectsTab() {
   const tabsId = useTabsId();
   const [query] = useState('');
-  const open = state === 'populated' ? PROJECTS : [];
+  const open = PROJECTS;
   const pool = open.reduce((sum, p) => sum + p.poolRemaining, 0);
   return (
     <div className="mx-auto max-w-7xl space-y-4 px-4 pt-4">
@@ -314,84 +312,53 @@ function ProjectsTab({ state }: { state: TabState }) {
       />
       <NewComponent name="ProjectsTab">
         <div className="space-y-4">
-          {state === 'needsPermission' ? (
-            <GrantBanner
-              characterId={1}
-              characterName="Varro Tam"
-              endpoints={['getCharacterAssets'] as const}
-              title="needs Corporation Projects access"
-              hint="Corporation Projects are read with their own permission. Granting it lets Neocom Desk list the projects your corporation has open."
-              actionLabel="Grant access"
-            />
-          ) : null}
-
           <div className="flex flex-wrap items-center gap-2">
             <NativeSelect
               aria-label="Character"
               className="min-w-0 flex-1 sm:w-64 sm:flex-none"
               defaultValue="varro"
-              disabled={state === 'needsPermission'}
             >
               <option value="varro">Varro Tam · Aurora Foundry</option>
               <option value="tamsin">Tamsin Vale · Aurora Foundry</option>
-              <option value="ilse">Ilse Kor · Quiet Harbour</option>
             </NativeSelect>
             <SearchInput
               aria-label="Search projects"
               placeholder="Search projects"
               className="order-last w-full sm:order-none sm:w-64"
               defaultValue={query}
-              disabled={state !== 'populated'}
             />
             <IconButton icon={<Icon.Refresh />} label="Refresh projects" />
           </div>
 
-          {state === 'populated' ? (
-            <>
-              <StatChips>
-                <StatChip label="Open projects" value={String(open.length)} emphasis />
-                <StatChip label="Pool left" value={isk(pool)} />
-                <StatChip
-                  label="Can still contribute to"
-                  value={`${open.filter((p) => p.mine < p.cap).length} of ${open.length}`}
-                />
-              </StatChips>
-              <div className="flex gap-2 overflow-x-auto">
-                <FilterChip label="Open" selected onToggle={() => {}} count={open.length} />
-                <FilterChip label="Cap not reached" selected={false} onToggle={() => {}} />
-                <FilterChip label="Manufacture" selected={false} onToggle={() => {}} />
-                <FilterChip label="Ending soon" selected={false} onToggle={() => {}} />
-              </div>
-              <Panel title="Open projects" meta="Aurora Foundry">
-                <DataTable
-                  label="Open corporation projects"
-                  columns={COLUMNS}
-                  rows={open}
-                  rowKey={(p) => p.id}
-                  defaultSort={{ columnId: 'expires', direction: 'asc' }}
-                />
-                <p className="mt-3 text-xs text-text-dim">
-                  Reward vs build cost uses your Build Plan pricing for the item. Finished and
-                  expired projects are hidden.
-                </p>
-              </Panel>
-            </>
-          ) : (
-            <Panel title="Open projects">
-              <EmptyState
-                title={
-                  state === 'empty'
-                    ? 'Aurora Foundry has no open projects'
-                    : 'No projects loaded yet'
-                }
-                hint={
-                  state === 'empty'
-                    ? 'New projects show up here when you open this tab.'
-                    : 'Grant Corporation Projects access above to see what your corporation has open.'
-                }
+          <>
+            <StatChips>
+              <StatChip label="Open projects" value={String(open.length)} emphasis />
+              <StatChip label="Pool left" value={isk(pool)} />
+              <StatChip
+                label="Can still contribute to"
+                value={`${open.filter((p) => p.mine < p.cap).length} of ${open.length}`}
               />
+            </StatChips>
+            <div className="flex gap-2 overflow-x-auto">
+              <FilterChip label="Open" selected onToggle={() => {}} count={open.length} />
+              <FilterChip label="Cap not reached" selected={false} onToggle={() => {}} />
+              <FilterChip label="Manufacture" selected={false} onToggle={() => {}} />
+              <FilterChip label="Ending soon" selected={false} onToggle={() => {}} />
+            </div>
+            <Panel title="Open projects" meta="Aurora Foundry">
+              <DataTable
+                label="Open corporation projects"
+                columns={COLUMNS}
+                rows={open}
+                rowKey={(p) => p.id}
+                defaultSort={{ columnId: 'expires', direction: 'asc' }}
+              />
+              <p className="mt-3 text-xs text-text-dim">
+                Reward vs build cost uses your Build Plan pricing for the item. Finished and expired
+                projects are hidden.
+              </p>
             </Panel>
-          )}
+          </>
         </div>
       </NewComponent>
     </div>
@@ -408,22 +375,10 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /** @summary Industry › Projects with seven open projects: summary strip, chips, table. New component: ProjectsTab. */
-export const Populated: Story = { render: () => <ProjectsTab state="populated" /> };
+export const Populated: Story = { render: () => <ProjectsTab /> };
 
 /** @summary The populated tab as stacked cards in the phone shell. */
 export const PopulatedPhone: Story = {
-  render: () => <ProjectsTab state="populated" />,
-  globals: { viewport: { value: 'mobile1', isRotated: false } },
-};
-
-/** @summary A corporation with nothing open: the empty state. */
-export const Empty: Story = { render: () => <ProjectsTab state="empty" /> };
-
-/** @summary The Character has not granted the projects permission: banner above an inert tab. */
-export const NeedsPermission: Story = { render: () => <ProjectsTab state="needsPermission" /> };
-
-/** @summary The missing-permission state on a phone. */
-export const NeedsPermissionPhone: Story = {
-  render: () => <ProjectsTab state="needsPermission" />,
+  render: () => <ProjectsTab />,
   globals: { viewport: { value: 'mobile1', isRotated: false } },
 };
