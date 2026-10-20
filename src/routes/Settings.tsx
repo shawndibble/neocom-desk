@@ -1,4 +1,3 @@
-import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -12,7 +11,7 @@ import { DevicePanel } from '@/features/settings/DevicePanel';
 import { OfflineDataPanel } from '@/features/settings/OfflineDataPanel';
 import { InstallAppPanel } from '@/features/settings/InstallAppPanel';
 import { TravelSettingsPanel } from '@/features/settings/TravelSettingsPanel';
-import { ChipRow } from '@/features/settings/settingsFields';
+import { CheckboxField, ChipRow, SettingsScopeHint } from '@/features/settings/settingsFields';
 import { ActivityLogPanel } from '@/features/settings/ActivityLogPanel';
 import { DataAgePanel } from '@/features/settings/DataAgePanel';
 import { ExportPanel } from '@/features/settings/ExportPanel';
@@ -29,7 +28,7 @@ import { CorpDefaultsPanel } from '@/features/settings/CorpDefaultsPanel';
 import { FONT_SCALE_LABEL_KEYS } from '@/features/settings/fontScaleLabelKeys';
 import { usePhoneSummaries } from '@/features/settings/usePhoneSummaries';
 import { useHydratedStore } from '@/lib/useHydratedStore';
-import { Checkbox, Field, Fields, FilterChip, PageHeader, Panel } from '@/components/ui';
+import { Field, Fields, FilterChip, PageHeader, Panel } from '@/components/ui';
 import { useFontScale, FONT_SCALE_STEPS } from '@/lib/fontScale';
 import { useSingleKeyShortcuts } from '@/lib/singleKeyShortcuts';
 import { decimalMarkFor, NUMBER_FORMATS, useNumberFormat } from '@/lib/numberFormat';
@@ -119,24 +118,26 @@ export function Settings() {
           {section === 'display' && (
             <>
               <Panel title={t('settings.displayTitle')}>
-                <Fields variant="form">
-                  <Field label={t('settings.fontScaleLabel')} note={t('settings.fontScaleHint')}>
-                    <div
-                      role="group"
-                      aria-label={t('settings.fontScaleLabel')}
-                      className="flex flex-wrap gap-2"
-                    >
-                      {FONT_SCALE_STEPS.map((step) => (
-                        <FilterChip
-                          key={step}
-                          label={t(FONT_SCALE_LABEL_KEYS[step])}
-                          selected={scale === step}
-                          onToggle={() => void setScale(step)}
-                        />
-                      ))}
-                    </div>
-                  </Field>
-                  {/*
+                <div className="space-y-4">
+                  <SettingsScopeHint scope="device" />
+                  <Fields variant="form">
+                    <Field label={t('settings.fontScaleLabel')} note={t('settings.fontScaleHint')}>
+                      <div
+                        role="group"
+                        aria-label={t('settings.fontScaleLabel')}
+                        className="flex flex-wrap gap-2"
+                      >
+                        {FONT_SCALE_STEPS.map((step) => (
+                          <FilterChip
+                            key={step}
+                            label={t(FONT_SCALE_LABEL_KEYS[step])}
+                            selected={scale === step}
+                            onToggle={() => void setScale(step)}
+                          />
+                        ))}
+                      </div>
+                    </Field>
+                    {/*
                   EVE runs on UTC and so does every timer other players quote,
                   which is why one column already rendered it before this was
                   settable. The Calendar grids are deliberately excluded — they
@@ -144,57 +145,51 @@ export function Settings() {
                   rendered string would file a late-evening event under the wrong
                   day.
                 */}
-                  <ChipRow
-                    label={t('settings.timeFormatLabel')}
-                    hint={t('settings.timeFormatHint')}
-                    options={TIME_FORMATS}
-                    selected={timeFormat}
-                    onSelect={(format) => void setTimeFormat(format)}
-                    labelFor={(format) => t(`settings.timeFormat.${format}`)}
-                  />
-                  <ChipRow
-                    label={t('settings.numberFormatLabel')}
-                    hint={t('settings.numberFormatHint')}
-                    options={NUMBER_FORMATS}
-                    selected={numberFormat}
-                    onSelect={(format) => void setNumberFormat(format)}
-                    labelFor={(format) =>
-                      t(`settings.numberFormat.${format}`, {
-                        example: numberFormatExample(decimalMarkFor(format)),
-                      })
-                    }
-                  />
-                  {weekStartHydrated && (
                     <ChipRow
-                      label={t('settings.weekStartLabel')}
-                      hint={t('settings.weekStartHint')}
-                      options={CALENDAR_WEEK_START_DAYS}
-                      selected={weekStart}
-                      onSelect={(day) => void setWeekStart(day)}
-                      labelFor={(day) => t(`settings.weekStart.${day}`)}
+                      label={t('settings.timeFormatLabel')}
+                      hint={t('settings.timeFormatHint')}
+                      options={TIME_FORMATS}
+                      selected={timeFormat}
+                      onSelect={(format) => void setTimeFormat(format)}
+                      labelFor={(format) => t(`settings.timeFormat.${format}`)}
                     />
-                  )}
-                  {singleKeyShortcutsHydrated && (
-                    <Field
-                      label={t('settings.singleKeyShortcutsLabel')}
-                      htmlFor="settings-single-key-shortcuts"
-                      inline
-                      note={t(
-                        singleKeyShortcuts
-                          ? 'settings.singleKeyShortcutsHint'
-                          : 'settings.singleKeyShortcutsOffNote'
-                      )}
-                    >
-                      <label className={touchCheckboxLabelClassName}>
-                        <Checkbox
-                          id="settings-single-key-shortcuts"
-                          checked={singleKeyShortcuts}
-                          onChange={() => void setSingleKeyShortcuts(!singleKeyShortcuts)}
-                        />
-                      </label>
-                    </Field>
-                  )}
-                </Fields>
+                    <ChipRow
+                      label={t('settings.numberFormatLabel')}
+                      hint={t('settings.numberFormatHint')}
+                      options={NUMBER_FORMATS}
+                      selected={numberFormat}
+                      onSelect={(format) => void setNumberFormat(format)}
+                      labelFor={(format) =>
+                        t(`settings.numberFormat.${format}`, {
+                          example: numberFormatExample(decimalMarkFor(format)),
+                        })
+                      }
+                    />
+                    {weekStartHydrated && (
+                      <ChipRow
+                        label={t('settings.weekStartLabel')}
+                        hint={t('settings.weekStartHint')}
+                        options={CALENDAR_WEEK_START_DAYS}
+                        selected={weekStart}
+                        onSelect={(day) => void setWeekStart(day)}
+                        labelFor={(day) => t(`settings.weekStart.${day}`)}
+                      />
+                    )}
+                    {singleKeyShortcutsHydrated && (
+                      <CheckboxField
+                        id="settings-single-key-shortcuts"
+                        label={t('settings.singleKeyShortcutsLabel')}
+                        hint={t(
+                          singleKeyShortcuts
+                            ? 'settings.singleKeyShortcutsHint'
+                            : 'settings.singleKeyShortcutsOffNote'
+                        )}
+                        checked={singleKeyShortcuts}
+                        onChange={() => void setSingleKeyShortcuts(!singleKeyShortcuts)}
+                      />
+                    )}
+                  </Fields>
+                </div>
               </Panel>
               {isNarrow && <MobileTabsPanel />}
             </>

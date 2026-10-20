@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, FilterChip, Panel } from '@/components/ui';
+import { SettingsHint, SettingsScopeHint } from '@/features/settings/settingsFields';
 import {
   DEFAULT_MOBILE_TABS,
   MOBILE_TAB_CHOICES,
@@ -62,7 +63,8 @@ export function MobileTabsPanel() {
   return (
     <Panel title={t('settings.mobileTabs.title')}>
       <div className="space-y-2">
-        <p className="max-w-2xl text-xs text-text-dim">{t('settings.mobileTabs.hint')}</p>
+        <SettingsScopeHint scope="device" />
+        <SettingsHint>{t('settings.mobileTabs.hint')}</SettingsHint>
         <div
           role="group"
           aria-label={t('settings.mobileTabs.group')}

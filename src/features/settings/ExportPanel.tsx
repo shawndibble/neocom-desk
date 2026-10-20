@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Field, Fields, Panel, TextInput } from '@/components/ui';
 import { exportBackupToFile } from '@/backup/io';
-import { ActionConfirmation } from '@/features/settings/ActionConfirmation';
+import { ActionResult, SettingsHint } from '@/features/settings/settingsFields';
 
 /**
  * Every Character on this device, encrypted under a password and downloaded
@@ -34,7 +34,7 @@ export function ExportPanel() {
   return (
     <Panel title={t('settings.backup.exportTitle')}>
       <div className="space-y-2">
-        <p className="max-w-2xl text-xs text-text-dim">{t('settings.backup.exportHint')}</p>
+        <SettingsHint>{t('settings.backup.exportHint')}</SettingsHint>
         <p className="max-w-2xl text-xs text-warning">{t('settings.backup.passwordWarning')}</p>
         <Fields variant="form">
           <Field
@@ -58,11 +58,11 @@ export function ExportPanel() {
             </Button>
           </Field>
         </Fields>
-        {status === 'done' && <ActionConfirmation message={t('settings.backup.exportDone')} />}
+        {status === 'done' && (
+          <ActionResult kind="success">{t('settings.backup.exportDone')}</ActionResult>
+        )}
         {status === 'error' && (
-          <p role="alert" className="text-xs text-danger">
-            {t('settings.backup.exportError')}
-          </p>
+          <ActionResult kind="error">{t('settings.backup.exportError')}</ActionResult>
         )}
       </div>
     </Panel>

@@ -1,8 +1,8 @@
 import { useTranslation } from 'react-i18next';
-import { Field, Fields, Spinner, TextInput } from '@/components/ui';
+import { Field, Fields, TextInput } from '@/components/ui';
 import { useAssumedMe, MIN_ASSUMED_ME, MAX_ASSUMED_ME } from '@/features/industry/assumedMe';
 import { useAssumedTe, MIN_ASSUMED_TE, MAX_ASSUMED_TE } from '@/features/industry/assumedTe';
-import { DefaultsSyncHint } from './settingsFields';
+import { DefaultsSyncHint, SettingsFormLoading } from './settingsFields';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 
 /**
@@ -32,7 +32,7 @@ export function IndustrySettingsForm({
   const assumedTeHydrated = useHydratedStore(useAssumedTe);
   const ready = assumedMeHydrated && assumedTeHydrated;
 
-  if (!ready) return <Spinner />;
+  if (!ready) return <SettingsFormLoading />;
 
   return (
     <div className="space-y-4">

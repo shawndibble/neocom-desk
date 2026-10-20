@@ -31,6 +31,7 @@ import { AUTHORIZED_APPS_URL } from '@/lib/links';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useCorpAccess, type CorpAccessState } from '@/features/corp/useCorpAccess';
 import { corpRoleLabel } from '@/features/corp/roles';
+import { SettingsHint } from '@/features/settings/settingsFields';
 
 /**
  * `checking` while the answer is still loading — never `missing`, which would
@@ -121,18 +122,16 @@ export function PermissionsPanel() {
   return (
     <Panel title={t('settings.permissions.title')}>
       <div className="space-y-2">
-        <p className="max-w-2xl text-xs text-text-dim">
+        <SettingsHint>
           <Trans
             i18nKey="settings.permissions.hint"
             components={{
               ccp: <ExternalLink href={AUTHORIZED_APPS_URL} />,
             }}
           />
-        </p>
+        </SettingsHint>
         {activeCharacterId === null ? (
-          <p className="max-w-2xl text-xs text-text-dim">
-            {t('settings.permissions.selectCharacter')}
-          </p>
+          <SettingsHint>{t('settings.permissions.selectCharacter')}</SettingsHint>
         ) : (
           <>
             {missing.length > 0 && (
