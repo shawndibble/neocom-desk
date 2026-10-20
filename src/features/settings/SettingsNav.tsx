@@ -11,6 +11,7 @@ import {
   rowInteractiveClassName,
 } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
+import { UpdateButton } from './UpdateButton';
 import type { SettingsGroup, SettingsSectionId } from './sections';
 
 const LABEL_KEYS = new Map<string, string>(SETTINGS_TABS.tabs.map((tab) => [tab.id, tab.labelKey]));
@@ -67,6 +68,9 @@ export function SettingsNav({ groups, value }: SettingsNavProps) {
           </ul>
         </div>
       ))}
+      <div className="flex flex-col items-start gap-1 px-2 pt-1">
+        <UpdateButton />
+      </div>
     </nav>
   );
 }
@@ -123,6 +127,9 @@ export function SettingsIndex({ groups, summaries }: SettingsIndexProps) {
           </ul>
         </section>
       ))}
+      <div className="flex flex-col items-start gap-1 px-1">
+        <UpdateButton />
+      </div>
     </nav>
   );
 }

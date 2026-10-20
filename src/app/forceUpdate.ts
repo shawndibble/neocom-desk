@@ -14,7 +14,7 @@ async function checkAndActivate() {
 }
 
 /**
- * Settings → "Update now". Checks for a new build immediately, activates it if
+ * Settings → "Update app". Checks for a new build immediately, activates it if
  * one is waiting, then reloads — instead of waiting for the next cold start or
  * browser reload (see bootUpdate.ts). Reloads when already current or when
  * there is no service worker (dev). Resolves `'failed'` without reloading when

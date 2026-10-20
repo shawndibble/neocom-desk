@@ -939,7 +939,7 @@ route ad hoc.
   arrives asynchronously cannot do.
 - The `@view-transition { navigation: auto }` rule in `styles/index.css` is
   unrelated and stays: it covers full **cross-document** reloads (the
-  service-worker update reload at boot or from Settings → Update now), where the browser has both
+  service-worker update reload at boot or from Settings → Update app), where the browser has both
   fully-laid-out documents and the problem above does not arise.
 
 ## 6c. Interaction grammar

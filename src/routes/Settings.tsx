@@ -10,7 +10,6 @@ import { SettingsBackLink, SettingsIndex, SettingsNav } from '@/features/setting
 import { AnalyticsPanel } from '@/features/settings/AnalyticsPanel';
 import { DevicePanel } from '@/features/settings/DevicePanel';
 import { OfflineDataPanel } from '@/features/settings/OfflineDataPanel';
-import { UpdatePanel } from '@/features/settings/UpdatePanel';
 import { InstallAppPanel } from '@/features/settings/InstallAppPanel';
 import { TravelSettingsPanel } from '@/features/settings/TravelSettingsPanel';
 import { ChipRow } from '@/features/settings/settingsFields';
@@ -216,10 +215,7 @@ export function Settings() {
             <>
               <div className="grid items-start gap-4 xl:grid-cols-2">
                 <DataPanel />
-                <div className="space-y-4">
-                  <UpdatePanel />
-                  <InstallAppPanel />
-                </div>
+                <InstallAppPanel />
                 <ExportPanel />
                 <ImportPanel />
               </div>
