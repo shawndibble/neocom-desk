@@ -22,7 +22,7 @@ import type {
   PriceAlertsBoardData,
   StructuresBoardData,
 } from '../../data/boardData';
-import type { IncursionsBoardData } from '../../incursionsBoard';
+import type { IncursionsBoardData } from '../../data/incursionsBoard';
 import type { BoardDeadline } from '../nextDeadline';
 import type { WidgetStateInput } from '../state';
 import type { CalendarEventsChoice, WidgetRange } from '../layout';

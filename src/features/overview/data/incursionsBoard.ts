@@ -10,7 +10,7 @@
 import type { DeadlineSeverity } from '@/engine/character/severity';
 import type { IncursionRow } from '@/engine/incursions/incursionRows';
 import type { JumpDistanceStatus } from '@/features/route/currentSystem';
-import type { Translate } from './data/boardSummary';
+import type { Translate } from './boardSummary';
 
 export interface IncursionsBoardData {
   /** `failed`: the feed could not be read and nothing was cached — not "no incursions". */

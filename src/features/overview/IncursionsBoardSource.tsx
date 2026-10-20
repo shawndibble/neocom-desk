@@ -14,7 +14,7 @@ import { useEffect, useMemo } from 'react';
 import { useCurrentSystem } from '@/features/route/currentSystem';
 import { useSolarSystemIndex } from '@/features/route/useSolarSystems';
 import { useIncursions } from '@/features/travel/useIncursions';
-import type { IncursionsBoardData } from './incursionsBoard';
+import type { IncursionsBoardData } from './data/incursionsBoard';
 
 export function IncursionsBoardSource({
   refreshKey,
