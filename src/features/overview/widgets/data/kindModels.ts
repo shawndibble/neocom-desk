@@ -17,7 +17,15 @@ import { formatIskCompact, formatIskCompactSigned } from '@/lib/isk';
 import type { LayerId } from '@/engine/netWorth/series';
 import { summarizeRouteKills, type KillLevel } from '@/engine/route/routeKillTrend';
 import type { ChartColor, StackPart } from '../charts/types';
-import { blank, count, NEUTRAL_NUMBER, statusOf, UNKNOWN, type Builder } from './builderKit';
+import {
+  blank,
+  count,
+  NEUTRAL_NUMBER,
+  statusOf,
+  UNKNOWN,
+  type Builder,
+  type KindDef,
+} from './builderKit';
 import { omega } from './omegaModel';
 import { tradingProfit } from './tradingProfitModel';
 import { hbarsFromRows } from './chartBuilders';
@@ -33,30 +41,11 @@ import {
 } from './moneyModels';
 import { journalCoverageDays, withinRange } from './chartSeries';
 import { dayTitle, rollingTitles } from './chartTips';
-import type { FeedId, ListRow, NumberModel, TableCell } from './types';
+import type { ListRow, NumberModel, TableCell } from './types';
 
 const D = 'overview.widgets.data';
 const C = 'overview.widgets.chart';
 const W = 'overview.widgets';
-
-/** Kind -> the feeds it reads, for the kinds in this file. */
-export const KIND_FEED_LISTS: Readonly<Record<string, readonly FeedId[]>> = {
-  netWorth: ['netWorth'],
-  profit: ['profit'],
-  miningYield: ['miningYield'],
-  lp: ['lp'],
-  clones: ['clones'],
-  jumpTimers: ['jumpTimers'],
-  walletFlow: ['journal'],
-  location: ['location'],
-  survey: ['survey'],
-  hauling: ['hauling'],
-  belowMarket: ['belowMarket'],
-  routeSafety: ['routeSafety'],
-  kills: ['kills'],
-  omega: ['omega'],
-  tradingProfit: ['tradingProfit'],
-};
 
 /** Where each net worth layer sits in the bar and which series hue it keeps (the Net Worth page's). */
 const NET_WORTH_BAR: readonly { id: LayerId; color: ChartColor }[] = [
@@ -877,18 +866,19 @@ const kills: Builder = (feeds, { t, now, range, scopeAll, activeCharacterId }) =
   };
 };
 
-export const KIND_BUILDERS: Readonly<Record<string, Builder>> = {
-  walletFlow,
-  netWorth,
-  lp,
-  clones,
-  location,
-  survey,
-  hauling,
-  belowMarket,
-  jumpTimers,
-  routeSafety,
-  kills,
-  omega,
-  tradingProfit,
+/** The kinds built in this file, each with the feeds it reads. */
+export const KIND_DEFS: Readonly<Record<string, KindDef>> = {
+  walletFlow: { feeds: ['journal'], build: walletFlow },
+  netWorth: { feeds: ['netWorth'], build: netWorth },
+  lp: { feeds: ['lp'], build: lp },
+  clones: { feeds: ['clones'], build: clones },
+  location: { feeds: ['location'], build: location },
+  survey: { feeds: ['survey'], build: survey },
+  hauling: { feeds: ['hauling'], build: hauling },
+  belowMarket: { feeds: ['belowMarket'], build: belowMarket },
+  jumpTimers: { feeds: ['jumpTimers'], build: jumpTimers },
+  routeSafety: { feeds: ['routeSafety'], build: routeSafety },
+  kills: { feeds: ['kills'], build: kills },
+  omega: { feeds: ['omega'], build: omega },
+  tradingProfit: { feeds: ['tradingProfit'], build: tradingProfit },
 };

@@ -62,6 +62,7 @@ import {
   UNKNOWN,
   ageText,
   type Builder,
+  type KindDef,
 } from './builderKit';
 import { queueSegments, queueStack, walletArea } from './chartBuilders';
 import { dailyBalanceSeries } from './chartSeries';
@@ -83,8 +84,8 @@ import {
   stockChart,
   stockTable,
 } from './moneyModels';
-import { KIND_BUILDERS, KIND_FEED_LISTS } from './kindModels';
-import { WORLD_BUILDERS } from './worldModels';
+import { KIND_DEFS } from './kindModels';
+import { WORLD_DEFS } from './worldModels';
 import type {
   BuildContext,
   FeedId,
@@ -100,26 +101,6 @@ import type {
 export const CONTRACTS_HREF = '/contracts/history';
 
 // --- Which reads a kind needs ------------------------------------------------
-
-/** Kind -> the feeds it reads. A kind absent here reads no feed and draws without data. */
-export const KIND_FEEDS: Readonly<Record<string, readonly FeedId[]>> = {
-  wallet: ['wallet', 'journal'],
-  training: ['skills'],
-  sp: ['skills', 'spExtras'],
-  comingUp: ['calendar'],
-  mail: ['mail'],
-  orders: ['orders', 'skills'],
-  contracts: ['contracts'],
-  industry: ['industry'],
-  planetary: ['planetary'],
-  miningTax: ['mining'],
-  structures: ['structures'],
-  moonChunks: ['moonChunks'],
-  stock: ['stock'],
-  priceWatch: ['priceAlerts'],
-  incursions: ['incursions'],
-  ...KIND_FEED_LISTS,
-};
 
 /** The distinct feeds needed by `kinds`; only these are ever fetched. */
 export function feedsFor(kinds: readonly string[]): FeedId[] {
@@ -770,20 +751,26 @@ const priceWatch: Builder = (feeds, { t }) => {
   };
 };
 
-const BUILDERS: Readonly<Record<string, Builder>> = {
-  wallet,
-  training,
-  sp,
-  comingUp,
-  mail,
-  orders,
-  contracts,
-  miningTax,
-  stock,
-  priceWatch,
-  ...WORLD_BUILDERS,
-  ...KIND_BUILDERS,
+/** Every widget kind: the feeds it reads and the builder that draws it. */
+const KINDS: Readonly<Record<string, KindDef>> = {
+  wallet: { feeds: ['wallet', 'journal'], build: wallet },
+  training: { feeds: ['skills'], build: training },
+  sp: { feeds: ['skills', 'spExtras'], build: sp },
+  comingUp: { feeds: ['calendar'], build: comingUp },
+  mail: { feeds: ['mail'], build: mail },
+  orders: { feeds: ['orders', 'skills'], build: orders },
+  contracts: { feeds: ['contracts'], build: contracts },
+  miningTax: { feeds: ['mining'], build: miningTax },
+  stock: { feeds: ['stock'], build: stock },
+  priceWatch: { feeds: ['priceAlerts'], build: priceWatch },
+  ...WORLD_DEFS,
+  ...KIND_DEFS,
 };
+
+/** Kind -> the feeds it reads. A kind absent here reads no feed and draws without data. */
+export const KIND_FEEDS: Readonly<Record<string, readonly FeedId[]>> = Object.fromEntries(
+  Object.entries(KINDS).map(([kind, def]) => [kind, def.feeds])
+);
 
 /**
  * Kinds still marked coming soon in the catalogue, and kinds a newer build
@@ -806,9 +793,9 @@ function placeholder(kind: string): KindView {
 
 /** One widget kind's view of the feeds; the single seam the shell and the header read. */
 export function buildView(kind: string, feeds: Feeds, ctx: BuildContext): KindView {
-  const builder = BUILDERS[kind];
-  if (!builder) return placeholder(kind);
-  return zeroIsClear(builder(feeds, ctx));
+  const def = KINDS[kind];
+  if (!def) return placeholder(kind);
+  return zeroIsClear(def.build(feeds, ctx));
 }
 
 /**

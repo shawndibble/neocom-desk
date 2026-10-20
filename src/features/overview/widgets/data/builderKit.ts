@@ -5,7 +5,15 @@
  */
 import { formatAge } from '@/lib/age';
 import type { WidgetStateInput } from '../state';
-import type { BuildContext, FeedState, Feeds, KindView, NumberModel, Translate } from './types';
+import type {
+  BuildContext,
+  FeedId,
+  FeedState,
+  Feeds,
+  KindView,
+  NumberModel,
+  Translate,
+} from './types';
 
 /** The Stock page, where the market-stock rows and their per-market summary lead. */
 export const STOCK_PATH = '/market/stock';
@@ -58,3 +66,9 @@ export function ageText(t: Translate, nowMs: number, atMs: number | null): strin
 export const count = (n: number): string => String(n);
 
 export type Builder = (feeds: Feeds, ctx: BuildContext) => KindView;
+
+/** One widget kind: the feeds it reads and the builder that turns them into a view. */
+export interface KindDef {
+  feeds: readonly FeedId[];
+  build: Builder;
+}
