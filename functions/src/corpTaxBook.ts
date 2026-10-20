@@ -23,6 +23,13 @@ import { BOOK_DEFAULTS, type ForfeitBasis } from './corpTaxBookEngine.js';
 
 export const BOOKS_COLLECTION = 'corpTaxBooks';
 export const TOKENS_COLLECTION = 'corpTaxBookTokens';
+
+/**
+ * How long a freshly turned-on book stays out of the members' own Mining Tax
+ * page (no balances, donation notes or notices), so the officers can set the
+ * rates, the sync and the payment matching up before anyone is told anything.
+ */
+export const MEMBER_SETUP_MS = 72 * 60 * 60 * 1000;
 export const OFFICERS = 'officers';
 export const OBSERVED = 'observed';
 export const EXTRACTIONS = 'extractions';

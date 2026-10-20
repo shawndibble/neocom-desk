@@ -336,6 +336,18 @@ async function removeGrant(
   });
 }
 
+/**
+ * The book is being deleted: drop the corporation's grant and its status without
+ * auditing (the audit log goes with the book) and revoke the token at SSO.
+ */
+export async function dropCorpSyncGrant(deps: CorpSyncDeps, corporationId: number): Promise<void> {
+  const grant = (await grantRef(deps.db, corporationId).get()).data() as
+    CorpSyncGrantDoc | undefined;
+  if (!grant) return;
+  await grantRef(deps.db, corporationId).delete();
+  await revokeStored(deps, grant);
+}
+
 /** A Character's grants go with it when the account is purged (ADR 0020's rule, for this grant too). */
 export async function deleteCorpSyncGrantsHeldBy(
   deps: CorpSyncDeps,

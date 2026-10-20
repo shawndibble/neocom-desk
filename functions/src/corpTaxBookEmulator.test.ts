@@ -9,6 +9,7 @@ import { parseBookCall, parseEditAction, parseSyncInput, parseTurnOnInput } from
 import { ROLES_SCOPE, type CorpIdentity } from './corpTaxBookEsi.js';
 import {
   claimPayment,
+  deleteBook,
   confirmGrouping,
   declineGrouping,
   declineGroupingByToken,
@@ -960,6 +961,9 @@ suite('Corp Tax Book callables (emulator)', () => {
 
       it('lists the groupings waiting for the signed-in character only', async () => {
         await pendingGuest();
+        // Not while the book is still in its member setup window.
+        expect(await listPendingGroupings(deps(), who(61))).toEqual([]);
+        now = T0 + 72 * 60 * 60 * 1000;
         expect(await listPendingGroupings(deps(), who(61))).toEqual([
           { corporationId: CORP, minerId: 'm-a', mainCharacterId: 60 },
         ]);
@@ -1080,6 +1084,38 @@ suite('Corp Tax Book callables (emulator)', () => {
       expect(
         await reason(edit(ACCOUNTANT, { action: 'updateSettings', patch: { graceHours: 1 } }))
       ).toBe('not-an-officer');
+    });
+  });
+
+  describe('delete the book', () => {
+    it('turns a new book on with a setup window before members see it', async () => {
+      await turnOn();
+      expect((await book().get()).get('membersSeeFrom')).toBe(T0 + 72 * 60 * 60 * 1000);
+    });
+
+    it('lets only whoever turned it on, or the CEO, delete it, and a re-open starts clean', async () => {
+      await turnOn();
+      await edit(ACCOUNTANT, { action: 'issueStatement', statement: statement('s1') });
+      identities.set(ACCOUNTANT, as(['Director']));
+      expect(await reason(deleteBook(deps(), who(ACCOUNTANT), withToken(ACCOUNTANT)))).toBe(
+        'not-opener'
+      );
+      expect((await book().get()).exists).toBe(true);
+
+      const dropped: number[] = [];
+      await deleteBook(deps(), who(DIRECTOR), withToken(DIRECTOR), async (corp) => {
+        dropped.push(corp);
+      });
+      expect(dropped).toEqual([CORP]);
+      expect((await book().get()).exists).toBe(false);
+      expect((await book().collection('statements').get()).empty).toBe(true);
+      expect(
+        (await db.collection('corpTaxBookTokens').where('corporationId', '==', CORP).get()).empty
+      ).toBe(true);
+      expect(await reason(deleteBook(deps(), who(DIRECTOR), withToken(DIRECTOR)))).toBe('no-book');
+
+      await turnOn();
+      expect((await book().collection('statements').get()).empty).toBe(true);
     });
   });
 

@@ -68,9 +68,12 @@ const num = (v: unknown): number | undefined =>
   typeof v === 'number' && Number.isFinite(v) ? v : undefined;
 const str = (v: unknown): string | undefined => (typeof v === 'string' ? v : undefined);
 
-/** The book's settings doc; `null` when it is not an active book (D24: then nothing changes). */
-export function readBookSettings(corporationId: number, d: Data | undefined) {
+/** The book's settings doc; `null` when it is not an active book, or is still in its setup window (D24: then nothing changes). */
+export function readBookSettings(corporationId: number, d: Data | undefined, now = Date.now()) {
   if (!d || d.active !== true) return null;
+  // A freshly turned-on book is still being set up (rates, sync, payment matching): members see nothing yet.
+  const seeFrom = num(d.membersSeeFrom);
+  if (seeFrom !== undefined && now < seeFrom) return null;
   const startDate = str(d.startDate);
   if (!startDate) return null;
   const rates = (Array.isArray(d.rates) ? d.rates : []).filter((r): r is TaxRate => {

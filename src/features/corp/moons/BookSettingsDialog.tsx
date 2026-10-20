@@ -22,6 +22,7 @@ import { TRADE_HUBS } from '@/market/hubs';
 import { editErrorMessage, useBook } from './useBook';
 import { isk } from './moonsFormat';
 import { AutomaticSyncSection } from './AutomaticSyncSection';
+import { DeleteBookSection } from './DeleteBookSection';
 import { ReclaimBookSection } from './ReclaimBookSection';
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -495,6 +496,8 @@ export function BookSettingsDialog({ open, onClose }: { open: boolean; onClose: 
         <AutomaticSyncSection />
 
         <ReclaimBookSection />
+
+        <DeleteBookSection />
       </div>
     </Modal>
   );

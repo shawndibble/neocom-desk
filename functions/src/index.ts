@@ -55,6 +55,7 @@ import {
 import { esiIdentityReader } from './corpTaxBookEsi.js';
 import {
   parseSaveCorpSyncGrantInput,
+  dropCorpSyncGrant,
   revokeCorpSyncGrant,
   runScheduledCorpSyncs,
   saveCorpSyncGrant,
@@ -69,6 +70,7 @@ import {
   listPendingGroupings,
   editBook,
   readStatementByToken,
+  deleteBook,
   reclaimBook,
   setRemindersByToken,
   syncBook,
@@ -640,6 +642,15 @@ export const verifyCorpOfficerCallable = onCall<unknown>(CORP_TAX_BOOK_OPTIONS, 
 
 export const turnOnCorpTaxBookCallable = onCall<unknown>(CORP_TAX_BOOK_OPTIONS, (request) =>
   turnOnBook(corpTaxBookDeps(), callerOf(request), parseTurnOnInput(request.data))
+);
+
+// Whoever turned the book on (or the CEO) deletes it; the scheduled-sync grant is revoked with it.
+export const deleteCorpTaxBookCallable = onCall<unknown>(
+  { ...CORP_TAX_BOOK_OPTIONS, secrets: [ALERTS_TOKEN_KEY] },
+  (request) =>
+    deleteBook(corpTaxBookDeps(), callerOf(request), parseBookCall(request.data), (corporationId) =>
+      dropCorpSyncGrant(corpSyncDeps(), corporationId)
+    )
 );
 
 export const reclaimCorpTaxBookCallable = onCall<unknown>(CORP_TAX_BOOK_OPTIONS, (request) =>
