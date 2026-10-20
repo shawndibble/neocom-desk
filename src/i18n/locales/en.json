@@ -6013,7 +6013,7 @@
         "decides": "The book decides this day: it is Billable ({{corp}} synced {{ago}}, after its grace period) and goes on {{corp}}'s next Statement.",
         "terms": "Terms are locked to the book: {{hub}} buy, {{form}} ore, {{pct}}% {{scope}} from {{from}}.",
         "disputeHint": "Your own record differs from the book.",
-        "corrected": "Corrected by {{corp}}: {{before}} → {{after}}."
+        "corrected": "Corrected by the corporation: {{before}} → {{after}}."
       },
       "overlap": {
         "notice": "This ore is also on your list for <strong>{{payee}}</strong>. <strong>{{corp}}</strong> bills it.",
@@ -6024,7 +6024,7 @@
         "previewLine": "{{payee}}: {{before}} → {{after}}",
         "nothingLeft": "nothing",
         "confirm": "Take it off my list",
-        "acknowledged": "You said you paid this another way."
+        "region": "This ore is also billed by the corporation"
       },
       "pay": {
         "title": "Pay {{corp}}",

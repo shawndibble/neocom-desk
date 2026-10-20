@@ -197,7 +197,6 @@ export function CorpRowDetailModal({
           {view.correction && (
             <p className="rounded-xs border border-line p-2 text-xs">
               {t('miningTax.corpBook.detail.corrected', {
-                corp: corp.corpName,
                 before: formatIsk(view.correction.before),
                 after: formatIsk(view.correction.after),
               })}

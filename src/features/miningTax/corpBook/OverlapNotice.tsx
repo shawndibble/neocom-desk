@@ -53,7 +53,7 @@ export function OverlapNotice({
   return (
     <div
       role="region"
-      aria-label={t('miningTax.corpBook.overlap.letBill')}
+      aria-label={t('miningTax.corpBook.overlap.region')}
       className="space-y-2 rounded-xs border border-warning/60 bg-warning/10 p-2 text-xs"
     >
       <p>
