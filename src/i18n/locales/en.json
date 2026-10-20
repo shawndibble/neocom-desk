@@ -13740,6 +13740,8 @@
       "oreUnknown": "Ore unknown — link a survey",
       "minedVsLeft": "{{mined}}% mined · {{left}}% left",
       "startedOn": "started {{date}}",
+      "extractionsSummary_one": "{{count}} Extraction",
+      "extractionsSummary_other": "{{count}} Extractions",
       "state": {
         "extracting": "Extracting",
         "ready": "Ready",
