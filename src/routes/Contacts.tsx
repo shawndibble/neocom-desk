@@ -13,27 +13,21 @@ import {
   PageHeader,
   Panel,
   Spinner,
-  StandingIcon,
   Tabs,
   TabPanel,
   useTabsId,
   type DataTableColumn,
   CachedNotice,
 } from '@/components/ui';
-import { HintText } from '@/components/ui/HintText';
 import * as Icon from '@/components/ui/icons';
 import { useColumnVisibility } from '@/lib/columnVisibility';
 import {
   CONTACTS_ACROSS_COLUMN_IDS,
-  CONTACTS_CHARACTER_COLUMN_IDS,
   contactsAcrossColumnsStore,
-  contactsCharacterColumnsStore,
   type ContactsAcrossColumnId,
-  type ContactsCharacterColumnId,
 } from '@/features/character/contactsColumns';
 import { GrantBanner } from '@/app/GrantNote';
 import { ReauthCachedNote } from '@/app/ReauthCachedNote';
-import { contactLabelNames } from '@/features/character/contacts';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { contactsAcrossCsvColumns, contactsCsvColumns } from '@/features/character/contactsCsv';
@@ -45,41 +39,26 @@ import {
   contactCountsByKind,
   contactCountsByStanding,
   contactPublicInfoKind,
-  contactTypeLabelKey,
   filterContacts,
   type ContactsFilter,
 } from '@/features/character/contactsFilter';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
 import { usePublicInfoModal } from '@/stores/publicInfoModal';
 import { type AcrossCharactersRow } from '@/features/character/contactsAcrossCharacters';
-import type { CharacterContact } from '@/esi/endpoints';
-import { buildContactStandingIndex } from '@/features/character/contactStandings';
-import {
-  contactAffiliationRow,
-  type ContactAffiliationRow,
-} from '@/features/character/contactAffiliation';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { usePageTab } from '@/lib/usePageTab';
-import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
+import { useUrlParams } from '@/lib/useUrlState';
 import { boolParam, enumSetParam, textParam } from '@/lib/urlState';
 import { CONTACTS_TABS } from '@/app/pageTabs';
 import { tabBarTabs } from '@/lib/pageTabs';
 import { useContactsStandings } from './ContactsStandings';
-import {
-  AffiliationLine,
-  ContactFlags,
-  ContactNameCell,
-  DenseOmit,
-  EmptyCell,
-} from '@/features/character/ContactCells';
-import { portraitColumn } from '@/features/character/contactsPortraitColumn';
+import { useContactsCharacterColumns } from '@/features/character/useContactsCharacterColumns';
 import { AcrossCharactersPanel } from '@/features/character/ContactsAcrossPanel';
 import { ContactsFilterBar, type ContactCounts } from '@/features/character/ContactsFilterBar';
 import {
   NO_LABELS,
   NO_LISTS,
   NO_OWN_AFFILIATION,
-  entityName,
   loadContactsSnapshot,
 } from '@/features/character/contactsSnapshot';
 
@@ -96,9 +75,6 @@ const FILTER_PARAMS = {
   standing: enumSetParam(STANDING_CATEGORIES),
   'across.disagree': boolParam(),
 };
-const CHARACTER_SORT = { columnId: 'standing', direction: 'desc' } as const;
-
-const CHARACTER_PORTRAIT_COLUMN = portraitColumn<CharacterContact>((contact) => contact);
 
 /** Contacts: standings, blocked/watched state, searchable and filterable by type and standing. */
 export function Contacts() {
@@ -136,10 +112,6 @@ export function Contacts() {
   const [acrossVisibleRows, setAcrossVisibleRows] = useState<readonly AcrossCharactersRow[]>([]);
   const [acrossTruncated, setAcrossTruncated] = useState(false);
 
-  const characterColumnVisibility = useColumnVisibility(
-    contactsCharacterColumnsStore,
-    CONTACTS_CHARACTER_COLUMN_IDS
-  );
   const acrossColumnVisibility = useColumnVisibility(
     contactsAcrossColumnsStore,
     CONTACTS_ACROSS_COLUMN_IDS
@@ -150,14 +122,25 @@ export function Contacts() {
   const contactsTruncated = data?.contactsTruncated ?? false;
   const contactNames = data?.contactNames ?? NO_NAMES;
   const contactLabels = data?.contactLabels ?? NO_LABELS;
-  // A character with no labels sees no Labels column at all — neither in the
-  // table nor in the picker — so the table is exactly what it was.
-  const hasLabels = contactLabels.size > 0;
   const affiliations = data?.affiliations ?? NO_AFFILIATIONS;
   const acrossLists = data?.acrossLists ?? NO_LISTS;
   const ownAffiliation = data?.ownAffiliation ?? NO_OWN_AFFILIATION;
 
   const contacts = useMemo(() => contactsResult?.data ?? [], [contactsResult]);
+  const {
+    affiliationRows,
+    optionalCharacterColumns,
+    availableCharacterColumnIds,
+    columns,
+    characterColumnVisibility,
+    characterSortProps,
+  } = useContactsCharacterColumns({
+    contacts,
+    contactNames,
+    contactLabels,
+    affiliations,
+    ownAffiliation,
+  });
 
   const counts = useMemo(
     () => ({
@@ -187,181 +170,6 @@ export function Contacts() {
     () => filterContacts(contacts, rowsFilter, contactNames),
     [contacts, rowsFilter, contactNames]
   );
-
-  // Once per load rather than per render of a cell: `alsoVia` is a lookup
-  // against an index built from the whole list, and the table re-renders on
-  // every sort click and keystroke in the search box.
-  const affiliationRows = useMemo(() => {
-    const index = buildContactStandingIndex(contacts);
-    return new Map<number, ContactAffiliationRow>(
-      contacts.map((contact) => [
-        contact.contact_id,
-        contactAffiliationRow(contact, affiliations, ownAffiliation, index),
-      ])
-    );
-  }, [contacts, affiliations, ownAffiliation]);
-
-  // The identity column (never hidden) plus the optional columns the picker
-  // controls, in table order — `CONTACTS_CHARACTER_COLUMN_IDS`' own order.
-  const optionalCharacterColumns = useMemo<
-    Record<ContactsCharacterColumnId, DataTableColumn<CharacterContact>>
-  >(
-    () => ({
-      type: {
-        id: 'type',
-        header: t('contacts.type'),
-        className: 'text-text-dim',
-        // A player's "Player" and an NPC's "NPC agent" add nothing to the
-        // phone card — the NPC tag beside the name already tells them apart —
-        // so only a corp, alliance or faction says what it is there.
-        render: (contact) => {
-          const label = t(contactTypeLabelKey(contact));
-          return contact.contact_type === 'character' ? <DenseOmit>{label}</DenseOmit> : label;
-        },
-        // Sorts on what is printed, not on ESI's word for it — otherwise
-        // "Player" would sort under C and "Corp" under C too, by accident.
-        sortValue: (contact) => t(contactTypeLabelKey(contact)),
-      },
-      affiliation: {
-        id: 'affiliation',
-        header: t('contacts.affiliation'),
-        headerTooltip: t('contacts.affiliationHeaderTooltip'),
-        render: (contact) => {
-          const row = affiliationRows.get(contact.contact_id);
-          if (!row || row.corporationId === null) return <EmptyCell />;
-          const alsoVia = row.alsoVia;
-          // Stacked in the table; one line, `·`-joined, on the phone's dense card.
-          return (
-            <span className="inline min-w-0 sm:flex sm:flex-col sm:items-start">
-              <AffiliationLine
-                name={entityName(contactNames, row.corporationId)}
-                own={row.inOwnCorporation}
-                ownLabel={t('contacts.ownCorporation')}
-                alsoVia={alsoVia?.source === 'corporation' ? alsoVia : null}
-              />
-              {row.allianceId !== null && (
-                <span aria-hidden className="sm:hidden">
-                  {' · '}
-                </span>
-              )}
-              {row.allianceId !== null && (
-                <AffiliationLine
-                  name={entityName(contactNames, row.allianceId)}
-                  own={row.inOwnAlliance}
-                  ownLabel={t('contacts.ownAlliance')}
-                  alsoVia={alsoVia?.source === 'alliance' ? alsoVia : null}
-                  dim
-                />
-              )}
-            </span>
-          );
-        },
-        // Corp first, alliance second: a reader sorting this column is
-        // gathering a corp's pilots together, not an alliance's.
-        sortValue: (contact) => {
-          const row = affiliationRows.get(contact.contact_id);
-          return row?.corporationId === null || row === undefined
-            ? undefined
-            : entityName(contactNames, row.corporationId);
-        },
-      },
-      labels: {
-        id: 'labels',
-        header: t('contacts.labels'),
-        // One line however many labels or however long: the full list is the
-        // cell's tooltip, so truncation hides nothing.
-        render: (contact) => {
-          const names = contactLabelNames(contact, contactLabels);
-          if (names.length === 0) return <EmptyCell />;
-          const text = names.join(', ');
-          return (
-            <HintText content={text} className="inline-block max-w-56 truncate align-bottom">
-              {text}
-            </HintText>
-          );
-        },
-        sortValue: (contact) => contactLabelNames(contact, contactLabels)[0],
-      },
-      standing: {
-        id: 'standing',
-        header: t('contacts.standing'),
-        align: 'center',
-        // The phone card's headline: the one thing a contact list is scanned by.
-        cardCorner: true,
-        // The tag replaces the bar *and* the number: the value is in its
-        // accessible name and its tooltip, and the column sorts on the raw
-        // number below, so nothing is lost by not printing it.
-        render: (contact) => <StandingIcon value={contact.standing} />,
-        sortValue: (contact) => contact.standing,
-      },
-      flags: {
-        id: 'flags',
-        header: t('contacts.flags'),
-        align: 'center',
-        // On the phone card the marks ride beside the name instead
-        // (`ContactNameCell`). `!`: the dense card's own cell rule would
-        // otherwise outrank a plain utility.
-        className: 'max-sm:hidden!',
-        render: (contact) =>
-          contact.is_blocked === true || contact.is_watched === true ? (
-            <ContactFlags contact={contact} />
-          ) : (
-            <EmptyCell />
-          ),
-        // Icon-only, but blocked/watched is a real two-level rank (issue
-        // #1282) — blocked outranks watched, and a plain contact has neither
-        // so it sinks (`undefined`) rather than sorting as "0".
-        sortValue: (contact) => {
-          const blocked = contact.is_blocked === true;
-          const watched = contact.is_watched === true;
-          if (!blocked && !watched) return undefined;
-          return (blocked ? 2 : 0) + (watched ? 1 : 0);
-        },
-      },
-    }),
-    [t, contactNames, contactLabels, affiliationRows]
-  );
-  // The ids the table and picker offer: `labels` only when there is something to show.
-  const availableCharacterColumnIds = useMemo(
-    () => CONTACTS_CHARACTER_COLUMN_IDS.filter((id) => id !== 'labels' || hasLabels),
-    [hasLabels]
-  );
-  const flagsVisible = characterColumnVisibility.isVisible('flags');
-  const columns = useMemo<DataTableColumn<CharacterContact>[]>(
-    () => [
-      CHARACTER_PORTRAIT_COLUMN,
-      {
-        id: 'name',
-        header: t('contacts.name'),
-        primary: true,
-        render: (contact) => (
-          <ContactNameCell
-            contact={contact}
-            name={contactNames.get(contact.contact_id) ?? `#${contact.contact_id}`}
-            flags={flagsVisible && <ContactFlags contact={contact} />}
-          />
-        ),
-        sortValue: (contact) => contactNames.get(contact.contact_id) ?? `#${contact.contact_id}`,
-      },
-      ...availableCharacterColumnIds
-        .filter(characterColumnVisibility.isVisible)
-        .map((id) => optionalCharacterColumns[id]),
-    ],
-    [
-      t,
-      flagsVisible,
-      contactNames,
-      optionalCharacterColumns,
-      availableCharacterColumnIds,
-      characterColumnVisibility.isVisible,
-    ]
-  );
-  // The full catalog, not just `columns`' currently-visible ids — see the
-  // Across table's own `sortProps` for why.
-  const characterSortProps = useUrlSort('sort', CHARACTER_SORT, [
-    'name',
-    ...CONTACTS_CHARACTER_COLUMN_IDS,
-  ]);
 
   // `/contacts/across` with a single Character falls back to this Character's
   // view — but only once the snapshot says so: before it loads the list is
