@@ -1,8 +1,9 @@
 import { lazy, Suspense } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
+import { guarded } from '@/app/routeChunks';
 
-const MailQueueHost = lazy(() => import('./MailQueueHost'));
+const MailQueueHost = lazy(() => guarded(() => import('./MailQueueHost')));
 
 /**
  * The shell's hook for the Corp Tax Book send queue (D24: nothing corp-side
