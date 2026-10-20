@@ -92,7 +92,7 @@ export function FitMeters({ stats }: { stats: FittingStats }) {
   );
 }
 
-function Facts({ items }: { items: { label: string; value: string }[] }) {
+function PreviewFacts({ items }: { items: { label: string; value: string }[] }) {
   return (
     <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm tabular-nums sm:grid-cols-[auto_1fr_auto_1fr]">
       {items.map((item) => (
@@ -146,7 +146,7 @@ export function OffensePanel({
   ];
   return (
     <div className="space-y-3">
-      <Facts items={items} />
+      <PreviewFacts items={items} />
       <table className="w-full border-collapse text-xs">
         <thead>
           <tr className="text-left text-[0.6875rem] tracking-widest text-text-dim uppercase">
@@ -201,7 +201,7 @@ export function DefensePanel({ stats }: { stats: FittingStats }) {
   return (
     <div className="space-y-3">
       <ResistTable rows={rows} />
-      <Facts
+      <PreviewFacts
         items={[
           { label: t('fittings.start.preview.ehp'), value: formatCompactNumber(stats.ehp) },
           {
