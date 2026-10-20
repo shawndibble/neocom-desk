@@ -1,8 +1,5 @@
 import { useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { Minus } from '@phosphor-icons/react/dist/csr/Minus';
-import { Plus } from '@phosphor-icons/react/dist/csr/Plus';
-import { X } from '@phosphor-icons/react/dist/csr/X';
 import {
   Button,
   Checkbox,
@@ -24,6 +21,7 @@ import {
   TextArea,
   TextInput,
 } from '@/components/ui';
+import { tappableRowClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import { NewComponent } from './NewComponent';
 
@@ -90,7 +88,7 @@ function FittingsSourcePicker({
               </div>
               <span className="text-xs mr-auto text-text-dim">Hulls</span>
               <IconButton
-                icon={<Minus aria-hidden />}
+                icon={<Icon.Decrease />}
                 label={`Fewer ${f.hull} hulls`}
                 onClick={() => bump(f.id, -1)}
               />
@@ -110,12 +108,12 @@ function FittingsSourcePicker({
                 className="field-no-spinner w-14 text-right"
               />
               <IconButton
-                icon={<Plus aria-hidden />}
+                icon={<Icon.Increase />}
                 label={`More ${f.hull} hulls`}
                 onClick={() => bump(f.id, 1)}
               />
               <IconButton
-                icon={<X aria-hidden />}
+                icon={<Icon.Close />}
                 label={`Remove ${f.name}`}
                 onClick={() => setFits(fits.filter((x) => x.id !== f.id))}
               />
@@ -198,7 +196,7 @@ function Mockup({
               />
             )}
             <div className="flex flex-wrap items-center gap-2">
-              <label className="flex items-center gap-2 text-xs">
+              <label className={`flex items-center gap-2 text-xs ${tappableRowClassName}`}>
                 <Checkbox defaultChecked disabled={!assetsRead} />
                 Minus what I own at
               </label>
