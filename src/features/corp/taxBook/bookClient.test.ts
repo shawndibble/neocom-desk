@@ -36,6 +36,7 @@ describe('bookFeederFrom', () => {
     corporationId: 5,
     status: 'active' as const,
     mode: 'settled-otherwise' as const,
+    invitedBy: 3,
     joinedAt: 1,
     agreedRatePct: 6,
     coveragePeriods: [{ from: '2026-10-01' }],

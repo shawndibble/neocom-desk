@@ -194,7 +194,7 @@ export async function listFeederInvites(
   caller: Caller,
   input: BookCall
 ): Promise<{ invites: OpenFeederInvite[] }> {
-  await authorizeOfficer(deps, caller, input, 'view', { live: false });
+  await authorizeOfficer(deps, caller, input, 'edit', { live: false });
   const snap = await deps.db
     .collection(FEEDER_INVITES_COLLECTION)
     .where('collectorCorporationId', '==', input.corporationId)

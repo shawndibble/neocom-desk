@@ -307,8 +307,18 @@ export interface BookFeeder extends FeederReadClock {
   status: 'active' | 'pending-removal' | 'removed' | 'left' | 'disconnected';
   mode: 'normal' | 'settled-otherwise';
   note?: string;
+  invitedBy: number;
   joinedAt: number;
   leftAt?: number;
+  grantHolder?: number;
+  grantedBy?: number;
+  lastSyncResult?: { at: number; outcome: 'synced' | 'skipped' | 'stale'; reason?: string };
+  /** When ESI first refused the ledger in the current spell (ms). */
+  staleSince?: number;
+  /** When it disconnected after 30 days stale (ms). */
+  disconnectedAt?: number;
+  payeeChangedAt?: number;
+  viewDismissedAt?: number;
   requestedRatePct?: number;
   agreedRatePct?: number;
   offeredOwnerRatePct?: number;
