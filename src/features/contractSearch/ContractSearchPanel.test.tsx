@@ -827,6 +827,38 @@ describe('ContractSearchPanel — contract detail modal', () => {
     expect(loadPublicContractItems).toHaveBeenCalledWith(TRIT_DOMAIN.contractId);
   });
 
+  it('checks the ask against the live hub price, since a listing is something you can still take', async () => {
+    getHubPricesWithStatus.mockResolvedValue({
+      prices: new Map([[34, { sellMin: 6_000, buyMax: 5_000 }]]),
+      unreachable: false,
+    } as never);
+    const user = userEvent.setup();
+    renderWithRouter();
+
+    const rows = await bodyRows();
+    await user.click(rows[0]);
+
+    // 100 Tritanium at 6,000 sell = 600,000 against a 500,000 ask.
+    const check = await screen.findByRole('region', { name: 'Is it fair? · Jita 4-4 right now' });
+    expect(await within(check).findByText('600,000 ISK')).toBeInTheDocument();
+    expect(within(check).getByText('−16.7%')).toBeInTheDocument();
+  });
+
+  it('tags the line that was searched for in the detail, and nothing when no search is active', async () => {
+    const user = userEvent.setup();
+    const first = renderWithRouter(['/?items.type=34&items.q=Tritanium']);
+    await user.click((await bodyRows())[0]);
+    const dialog = await screen.findByRole('dialog');
+    expect(await within(dialog).findByText('Your search')).toBeInTheDocument();
+    first.unmount();
+
+    renderWithRouter();
+    await user.click((await bodyRows())[0]);
+    const plain = await screen.findByRole('dialog');
+    await within(plain).findByText('Everything on this contract');
+    expect(within(plain).queryByText('Your search')).not.toBeInTheDocument();
+  });
+
   it('closes on request, leaving the table underneath untouched', async () => {
     const user = userEvent.setup();
     renderWithRouter();

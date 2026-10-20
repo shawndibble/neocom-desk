@@ -4,6 +4,7 @@ import {
   formatIsk,
   formatIskAuto,
   formatIskCompact,
+  formatContractIsk,
   formatIskCompactSigned,
   formatMarketIsk,
   marketIskDecimals,
@@ -180,5 +181,16 @@ describe('parseNumeric', () => {
     expect(parseNumeric('  ')).toBeNull();
     expect(parseNumeric('abc')).toBeNull();
     expect(parseNumeric('Infinity')).toBeNull();
+  });
+});
+
+describe('formatContractIsk', () => {
+  it('prints whole ISK with the unit for a contract-sized amount', () => {
+    expect(formatContractIsk(476_740_542)).toBe('476,740,542 ISK');
+  });
+
+  it('keeps the cents under the contract threshold, as every contract screen does', () => {
+    expect(formatContractIsk(600)).toBe('600.00 ISK');
+    expect(formatContractIsk(CONTRACT_ISK_CENTS_BELOW + 1)).toBe('1,001 ISK');
   });
 });

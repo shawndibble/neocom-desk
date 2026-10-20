@@ -56,6 +56,7 @@ import {
 import {
   contractOfferPriceSummary,
   listedContractTypeOptions,
+  isUnpricedOffer,
   offerAskingPrice,
   type ContractOfferStats,
   type ContractSaleKind,
@@ -1067,6 +1068,14 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
           regionName={regionNames.get(selectedRow.regionId) ?? `#${selectedRow.regionId}`}
           dateExpired={selectedRow.dateExpired}
           statChips={statChipsForRow(selectedRow)}
+          // The ISK the contract costs, for the price check. A barter, a PLEX ask
+          // with no PLEX price yet, or an ask for items has no honest ISK figure.
+          askingIsk={
+            selectedRow.requestsItems || isUnpricedOffer(selectedRow, plexPrice)
+              ? null
+              : offerAskingPrice(selectedRow, plexPrice)
+          }
+          searchedTypeIds={typeIds}
           onClose={() => setSelectedRow(null)}
         />
       )}

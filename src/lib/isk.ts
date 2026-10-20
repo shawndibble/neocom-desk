@@ -54,6 +54,11 @@ export function formatIskAuto(value: number, centsBelow = 100): string {
 /** The `formatIskAuto` threshold every contract screen shares. */
 export const CONTRACT_ISK_CENTS_BELOW = 1000;
 
+/** An ISK amount as a contract screen words it: `formatIskAuto` at the shared threshold, with the unit. */
+export function formatContractIsk(value: number): string {
+  return `${formatIskAuto(value, CONTRACT_ISK_CENTS_BELOW)} ISK`;
+}
+
 /**
  * Anything that would print as 10,000.00 or more. EVE limits an order price to
  * four significant figures, so from 10,000 up an order's own cents are always

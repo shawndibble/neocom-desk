@@ -74,11 +74,12 @@ function items(list: PublicContractItem[]) {
 
 const CHARACTER_ID = 91;
 
-function renderModal(row: BpcContractRow = ROW) {
+function renderModal(row: BpcContractRow = ROW, comparables: readonly BpcContractRow[] = []) {
   return render(
     <MemoryRouter initialEntries={['/industry/sourcing']}>
       <BpcContractModal
         row={row}
+        comparables={comparables}
         characterId={CHARACTER_ID}
         blueprintName="Rifter Blueprint"
         regionName="The Forge"
@@ -260,5 +261,52 @@ describe('BpcContractModal — Build Plan context menu', () => {
 
     const item = await screen.findByRole('menuitem', { name: 'No blueprint options' });
     expect(item).toHaveAttribute('data-disabled');
+  });
+
+  describe('price check', () => {
+    // ROW is 5,000,000 for 5 runs: 1,000,000 a run, ME 10 / TE 20.
+    const similar = (contractId: number, price: number): BpcContractRow => ({
+      ...ROW,
+      contractId,
+      price,
+    });
+
+    it('holds the copy per run against similar copies, with the median and the cheapest', async () => {
+      renderModal(ROW, [
+        ROW,
+        similar(2, 4_000_000), // 800,000 / run
+        similar(3, 5_500_000), // 1,100,000 / run
+        similar(4, 6_000_000), // 1,200,000 / run
+      ]);
+
+      const check = await screen.findByRole('region', {
+        name: 'Is it fair? · 3 similar copies for sale now',
+      });
+      expect(within(check).getByText('1,000,000 ISK')).toBeInTheDocument(); // this copy
+      expect(within(check).getByText('1,100,000 ISK')).toBeInTheDocument(); // median
+      expect(within(check).getByText('800,000 ISK')).toBeInTheDocument(); // cheapest
+      expect(within(check).getByText('−9.1%')).toBeInTheDocument();
+      expect(within(check).getByText('Below the median per run')).toBeInTheDocument();
+    });
+
+    it('says there are too few similar copies when fewer than three are for sale', async () => {
+      renderModal(ROW, [ROW, similar(2, 4_000_000)]);
+      expect(
+        await screen.findByText('Too few similar copies for sale to compare with.')
+      ).toBeInTheDocument();
+    });
+
+    it('puts the per-run price beside the asking price in the header', async () => {
+      renderModal(ROW, []);
+      expect(await screen.findByText('Per run')).toBeInTheDocument();
+      expect(screen.getAllByText('1,000,000')).not.toHaveLength(0);
+    });
+
+    it('tags the blueprint itself as the line that was searched for', async () => {
+      renderModal(ROW, []);
+      const rows = await screen.findAllByRole('listitem');
+      expect(rows[0]).toHaveTextContent('Your search');
+      expect(rows[1]).not.toHaveTextContent('Your search');
+    });
   });
 });
