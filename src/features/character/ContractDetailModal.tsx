@@ -453,17 +453,17 @@ export function ContractDetailModal({
           )}
           {contract.start_location_id && (
             <PlaceBlock
-              label={t(isRoute ? 'contracts.detailRoute' : 'contracts.detailLocation')}
+              label={t('contracts.detailLocation')}
               from={{
                 id: contract.start_location_id,
-                name: location === undefined ? undefined : location.start,
+                name: location?.start,
                 system: systems?.start ?? null,
               }}
               to={
                 isRoute && contract.end_location_id
                   ? {
                       id: contract.end_location_id,
-                      name: location === undefined ? undefined : location.end,
+                      name: location?.end,
                       system: systems?.end ?? null,
                     }
                   : null
@@ -598,6 +598,7 @@ function PlaceName({ id, name, system }: PlaceEnd) {
  * a courier ever shows the arrow, and the row needs no Destination label.
  */
 function PlaceBlock({ label, from, to }: { label: string; from: PlaceEnd; to: PlaceEnd | null }) {
+  const { t } = useTranslation();
   return (
     <div className="col-span-full">
       <Eyebrow>{label}</Eyebrow>
@@ -607,7 +608,7 @@ function PlaceBlock({ label, from, to }: { label: string; from: PlaceEnd; to: Pl
         </span>
         {to && (
           <>
-            <span aria-label="to" className="text-text-dim">
+            <span aria-label={t('contracts.detailRouteTo')} className="text-text-dim">
               →
             </span>
             <span>

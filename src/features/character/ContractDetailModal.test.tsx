@@ -245,7 +245,7 @@ describe('ContractDetailModal System rows', () => {
     expect(screen.getAllByRole('link', { name: 'IV - Moon 4' })).toHaveLength(1);
   });
 
-  it('shows a Route with an arrow when a courier ends elsewhere', async () => {
+  it('shows one Location with an arrow when a courier ends elsewhere', async () => {
     server.use(
       stationHandler(JITA_STATION, 'Jita IV - Moon 4', 30000142),
       stationHandler(AMARR_STATION, 'Amarr VIII (Oris) - Emperor Family Academy', 30002187)
@@ -257,7 +257,7 @@ describe('ContractDetailModal System rows', () => {
       onClose: () => {},
     });
     await screen.findByRole('link', { name: 'Amarr' });
-    expect(screen.getByText('Route')).toBeInTheDocument();
+    expect(screen.getByText('Location')).toBeInTheDocument();
     expect(screen.getByText('→')).toBeInTheDocument();
     expect(screen.queryByText('Destination')).toBeNull();
   });
