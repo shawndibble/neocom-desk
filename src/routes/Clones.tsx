@@ -1,6 +1,5 @@
 import { NO_NAMES } from '@/lib/emptyCollections';
 import { useMemo } from 'react';
-import { useHydratedStore } from '@/lib/useHydratedStore';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -18,11 +17,7 @@ import { GrantBanner } from '@/app/GrantNote';
 import { ReauthCachedNote } from '@/app/ReauthCachedNote';
 import { CharacterHeader } from '@/features/character/CharacterHeader';
 import { type ImplantDetail } from '@/features/character/clones';
-import {
-  cloneOwnName,
-  saveCloneNickname,
-  useCloneNicknames,
-} from '@/features/character/cloneNicknames';
+import { cloneOwnName, saveCloneNickname } from '@/features/character/cloneNicknames';
 import { getLastKnownSpSummary } from '@/stores/characterSp';
 import { OverviewSubNav } from '@/features/character/OverviewSubNav';
 import { sumImplantValue } from '@/engine/implantValue';
@@ -33,27 +28,14 @@ import { ClonesSummaryCards } from '@/features/character/ClonesSummaryCards';
 import type { JumpClone } from '@/esi/endpoints';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { useTimeZone } from '@/lib/timeFormat';
+import { useClonesView } from '@/features/character/useClonesView';
 import { cloneJumpCooldown } from '@/engine/clone/cloneJump';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { clonesCsvColumns } from '@/features/character/clonesCsv';
-import {
-  CloneVerdictCard,
-  type CloneVerdictCardState,
-} from '@/features/character/CloneVerdictCard';
+import { CloneVerdictCard } from '@/features/character/CloneVerdictCard';
 import { WORN_CLONE_ID } from '@/features/character/cloneTraining';
-import {
-  CLONES_SORTS,
-  sortClones,
-  useClonesSort,
-  type ClonesSort,
-} from '@/features/character/clonesSort';
-import {
-  CLONE_NOTE_KEY,
-  cloneVerdictGate,
-  runCloneVerdict,
-} from '@/features/character/cloneVerdictGate';
-import { cloneStateFor, useCloneStates } from '@/features/skills/cloneState';
+import { CLONES_SORTS, type ClonesSort } from '@/features/character/clonesSort';
 import { loadClonesSnapshot } from '@/features/character/clonesSnapshot';
 import { CloneCard, TOUCH_LINK } from '@/features/character/CloneCard';
 
@@ -131,11 +113,6 @@ export function Clones() {
           { id: homeLocation.location_id }
         ));
 
-  const locationLabel = (clone: JumpClone) =>
-    locationNames.get(clone.location_id) ??
-    t(clone.location_type === 'station' ? 'clones.stationLabel' : 'clones.structureLabel', {
-      id: clone.location_id,
-    });
   const securityOf = (locationId: number | undefined) => {
     const systemId = locationId === undefined ? null : (systemIds.get(locationId) ?? null);
     return systemId === null ? undefined : securities.get(systemId);
@@ -145,95 +122,28 @@ export function Clones() {
   // The summary cards need loaded clones data; every other state lives in the list panel.
   const showSummary = !(loading && !data) && !clonesBlocked && !error && clonesResult !== null;
 
-  // Which clone is best for the active queue (the engine does the numbers).
-  const sort = useClonesSort((state) => state.value);
-  const setSort = useClonesSort((state) => state.setValue);
-  useHydratedStore(useClonesSort);
-  const nicknames = useCloneNicknames((state) => state.value);
-  const nicknamesHydrated = useHydratedStore(useCloneNicknames);
-  const cloneStates = useCloneStates((state) => state.value);
-  const cloneStatesHydrated = useHydratedStore(useCloneStates);
-  const training = data?.training ?? null;
-  const readyAt = cooldown.onCooldown ? cooldown.readyAt : null;
-  const verdictResult = useMemo(() => {
-    if (!cloneStatesHydrated || activeCharacterId === null) return null;
-    return runCloneVerdict(
-      training,
-      cloneStateFor(cloneStates, activeCharacterId),
-      loadedAt,
-      readyAt
-    );
-  }, [training, cloneStates, cloneStatesHydrated, activeCharacterId, loadedAt, readyAt]);
-  const cloneLabel = (clone: JumpClone) => cloneOwnName(clone, nicknames) ?? locationLabel(clone);
-  const verdictCard: CloneVerdictCardState | null = (() => {
-    if (!data) return null;
-    const note = (message: string): CloneVerdictCardState => ({ kind: 'note', message });
-    const gate = cloneVerdictGate(
-      {
-        wornImplantsRead: data.wornImplants !== null,
-        queue: data.queueResult?.data ?? null,
-        training,
-      },
-      verdictResult
-    );
-    if (gate === null) return null;
-    if (gate.kind === 'note') {
-      return note(t(`clones.verdict.note${CLONE_NOTE_KEY[gate.note]}`));
-    }
-    const { verdict } = gate.result;
-    if (verdict.kind === 'stay') {
-      const rival = clones.find((c) => c.jump_clone_id === verdict.closest?.cloneId);
-      return {
-        kind: 'stay',
-        stay: verdict.stay,
-        cooldownReadyAt: readyAt,
-        closest:
-          verdict.closest && rival
-            ? { label: cloneLabel(rival), extraSeconds: verdict.closest.extraSeconds }
-            : null,
-      };
-    }
-    const target = clones.find((c) => c.jump_clone_id === verdict.cloneId);
-    if (!target) return null;
-    const route = jumpsByLocation?.get(target.location_id);
-    if (!route) return note(t('clones.verdict.noteRouting'));
-    if (route.kind === 'unknown') return note(t('clones.verdict.noteRoute'));
-    return {
-      kind: 'jump',
-      label: cloneLabel(target),
-      savedSeconds: verdict.savedSeconds,
-      attributes: verdict.attributes,
-      stay: verdict.stay,
-      best: verdict.best,
-      cooldownReadyAt: verdict.cooldownReadyAt,
-      route: {
-        locationId: target.location_id,
-        placeName: locationLabel(target),
-        jumps: route.jumps,
-      },
-    };
-  })();
-  const showTraining = verdictCard !== null && verdictCard.kind !== 'note';
-  const rowOf = (id: string | number) => verdictResult?.rows.find((r) => r.cloneId === id);
-  const sortedClones = sortClones(
-    clones.map((clone) => {
-      const implantValue = prices ? sumImplantValue(clone.implants, prices) : null;
-      return {
-        clone,
-        id: clone.jump_clone_id,
-        locationId: clone.location_id,
-        deltaSeconds: showTraining ? (rowOf(clone.jump_clone_id)?.deltaSeconds ?? null) : null,
-        value:
-          implantValue &&
-          (implantValue.unpriced < clone.implants.length || clone.implants.length === 0)
-            ? implantValue.total
-            : null,
-      };
-    }),
+  const {
     sort,
-    jumpsByLocation
-  ).map((x) => x.clone);
-  const bestCloneId = showTraining ? (verdictResult?.bestCloneId ?? null) : null;
+    setSort,
+    nicknames,
+    nicknamesHydrated,
+    training,
+    verdictCard,
+    showTraining,
+    rowOf,
+    sortedClones,
+    bestCloneId,
+    locationLabel,
+  } = useClonesView({
+    data,
+    activeCharacterId,
+    loadedAt,
+    cooldown,
+    clones,
+    locationNames,
+    jumpsByLocation,
+    prices,
+  });
   const csvColumns = useMemo(
     () => clonesCsvColumns(t, { locationNames, implantNames, nicknames }),
     [t, locationNames, implantNames, nicknames]
