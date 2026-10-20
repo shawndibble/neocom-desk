@@ -1,5 +1,5 @@
 /**
- * Owner rate (spec #4504): what a feeder is owed, a history of its own that
+ * Owner rate: what a feeder is owed, a history of its own that
  * never enters the miner rate chain. The feeder may request a rate at any time
  * and the Collector may agree one; the agreed rate wins, so a request made
  * after an override is recorded and changes nothing. Dates are bare EVE/UTC

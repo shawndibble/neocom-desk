@@ -1,7 +1,7 @@
 /**
  * Dated tax rates (D3/D31): corp default → Guest default → per-feeder →
  * per-Miner → per-moon → per-record, most specific wins. The per-feeder tier
- * (spec #4504) prices every refinery of one feeder corporation. Every rate but a per-record one
+ * prices every refinery of one feeder corporation. Every rate but a per-record one
  * carries an effective-from date and applies only to days on or after it, so a
  * rate change never reaches back over days already mined. A per-record
  * override is an officer's logged correction to one Observed Mining Entry,
