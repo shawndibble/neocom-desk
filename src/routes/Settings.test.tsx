@@ -554,7 +554,7 @@ describe('Settings — Notifications (issue #170)', () => {
       accessToken: 'a',
       refreshToken: 'r',
       expiresAt: Date.now() + 1000 * 60 * 60,
-      // Every scope except New Mail's — exercises the scope-gated disabled row.
+      // Every scope except New mail's — exercises the scope-gated disabled row.
       scopes: ALL_NOTIFICATION_SCOPES.filter((scope) => scope !== 'esi-mail.read_mail.v1'),
     });
   });
@@ -564,16 +564,16 @@ describe('Settings — Notifications (issue #170)', () => {
     await screen.findByRole('heading', { level: 1, name: /settings/i });
     const panel = within(await notificationsPanel());
 
-    await waitFor(() => expect(rowCheckbox('Skill Level Complete', 'device')).toBeChecked());
+    await waitFor(() => expect(rowCheckbox('Skill level complete', 'device')).toBeChecked());
     // One list, not one accordion per character.
     expect(panel.queryByRole('button', { name: /pilot one/i })).not.toBeInTheDocument();
-    expect(panel.getAllByRole('checkbox', { name: /^Skill Level Complete/ })).toHaveLength(2);
+    expect(panel.getAllByRole('checkbox', { name: /^Skill level complete/ })).toHaveLength(2);
     // marketOrderFilled/walletBalanceChanged default feed-on/browser-off
     // (GLOSSARY.md round 45) — worth a row, not worth an interruption.
-    expect(rowCheckbox('Wallet Balance Changed', 'device')).not.toBeChecked();
-    expect(rowCheckbox('Wallet Balance Changed', 'Alerts')).toBeChecked();
-    expect(rowCheckbox('Sell Order Filled', 'device')).not.toBeChecked();
-    expect(rowCheckbox('Sell Order Filled', 'Alerts')).toBeChecked();
+    expect(rowCheckbox('Wallet balance changed', 'device')).not.toBeChecked();
+    expect(rowCheckbox('Wallet balance changed', 'Alerts')).toBeChecked();
+    expect(rowCheckbox('Sell order filled', 'device')).not.toBeChecked();
+    expect(rowCheckbox('Sell order filled', 'Alerts')).toBeChecked();
     // Two characters, agreeing everywhere to start.
     expect(panel.getAllByText('All 2 alike').length).toBeGreaterThan(0);
   });
@@ -583,10 +583,10 @@ describe('Settings — Notifications (issue #170)', () => {
     render(<App />);
     await notificationsPanel();
 
-    // Pilot Two has no Mail scope, so New Mail applies to Pilot One alone.
-    await waitFor(() => expect(rowCheckbox('New Mail', 'device')).toBeChecked());
-    await user.click(rowCheckbox('New Mail', 'device'));
-    await waitFor(() => expect(rowCheckbox('New Mail', 'device')).not.toBeChecked());
+    // Pilot Two has no Mail scope, so New mail applies to Pilot One alone.
+    await waitFor(() => expect(rowCheckbox('New mail', 'device')).toBeChecked());
+    await user.click(rowCheckbox('New mail', 'device'));
+    await waitFor(() => expect(rowCheckbox('New mail', 'device')).not.toBeChecked());
     expect(
       (await db.settings.get(NOTIFICATION_PREFS_SETTING_KEY))
         ?.value as typeof DEFAULT_NOTIFICATION_PREFERENCES
@@ -595,8 +595,8 @@ describe('Settings — Notifications (issue #170)', () => {
       perCharacter: { [CHAR_ID]: { newMail: { browser: false, feed: true } } },
     });
 
-    await user.click(rowCheckbox('New Mail', 'device'));
-    await waitFor(() => expect(rowCheckbox('New Mail', 'device')).toBeChecked());
+    await user.click(rowCheckbox('New mail', 'device'));
+    await waitFor(() => expect(rowCheckbox('New mail', 'device')).toBeChecked());
   });
 
   it('offers the extractor-expiring event on both channels and discloses the scheduled-push lead time', async () => {
@@ -607,8 +607,8 @@ describe('Settings — Notifications (issue #170)', () => {
     await notificationsPanel();
 
     await waitFor(() => {
-      expect(rowCheckbox('Planetary Extractor Expiring', 'device')).toBeInTheDocument();
-      expect(rowCheckbox('Planetary Extractor Expiring', 'Alerts')).toBeInTheDocument();
+      expect(rowCheckbox('Planetary extractor expiring', 'device')).toBeInTheDocument();
+      expect(rowCheckbox('Planetary extractor expiring', 'Alerts')).toBeInTheDocument();
     });
     // On the row's face, whether or not the row is open.
     expect(screen.getByText(/delivered up to 72 hours ahead/i)).toBeInTheDocument();
@@ -619,7 +619,7 @@ describe('Settings — Notifications (issue #170)', () => {
     const user = userEvent.setup();
     render(<App />);
     await notificationsPanel();
-    await waitFor(() => expect(rowCheckbox('Skill Level Complete', 'device')).toBeChecked());
+    await waitFor(() => expect(rowCheckbox('Skill level complete', 'device')).toBeChecked());
 
     act(() => {
       useNotificationPreferences.setState({
@@ -630,7 +630,7 @@ describe('Settings — Notifications (issue #170)', () => {
         hydrated: true,
       });
     });
-    const device = rowCheckbox('Skill Level Complete', 'device') as HTMLInputElement;
+    const device = rowCheckbox('Skill level complete', 'device') as HTMLInputElement;
     await waitFor(() => expect(device.indeterminate).toBe(true));
     expect(screen.getAllByText('1 differs').length).toBeGreaterThan(0);
 
@@ -672,8 +672,8 @@ describe('Settings — Notifications (issue #170)', () => {
     expect(screen.getByRole('checkbox', { name: 'Enable notifications' })).toBeEnabled();
     expect(screen.getByRole('checkbox', { name: 'Alerts notifications' })).toBeEnabled();
 
-    await waitFor(() => expect(rowCheckbox('New Mail', 'Alerts')).toBeEnabled());
-    expect(rowCheckbox('New Mail', 'device')).toBeDisabled();
+    await waitFor(() => expect(rowCheckbox('New mail', 'Alerts')).toBeEnabled());
+    expect(rowCheckbox('New mail', 'device')).toBeDisabled();
   });
 
   describe('in the Play Store app', () => {
@@ -796,7 +796,7 @@ describe('Settings — Notifications (issue #170)', () => {
     render(<App />);
     await notificationsPanel();
 
-    await waitFor(() => expect(rowCheckbox('New Mail', 'device')).toBeInTheDocument());
+    await waitFor(() => expect(rowCheckbox('New mail', 'device')).toBeInTheDocument());
     expect(screen.queryByText(/notifications are blocked/i)).not.toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: /turn on device notifications/i })
@@ -808,11 +808,11 @@ describe('Settings — Notifications (issue #170)', () => {
     const user = userEvent.setup();
     render(<App />);
     await notificationsPanel();
-    const sheet = await openEvent(user, 'New Mail');
+    const sheet = await openEvent(user, 'New mail');
 
     // Pilot Two stays listed, dimmed and aria-disabled, so the reason can be read.
     const pilotTwoMail = sheet.getByRole('checkbox', {
-      name: 'New Mail, Pilot Two, device notifications',
+      name: 'New mail, Pilot Two, device notifications',
     });
     expect(pilotTwoMail).toHaveAttribute('aria-disabled', 'true');
     // Said on the row's face, so it is visible without opening anything.
@@ -823,14 +823,14 @@ describe('Settings — Notifications (issue #170)', () => {
 
     // Pilot One holds the scope, and other events are untouched for Pilot Two.
     expect(
-      sheet.getByRole('checkbox', { name: 'New Mail, Pilot One, device notifications' })
+      sheet.getByRole('checkbox', { name: 'New mail, Pilot One, device notifications' })
     ).not.toHaveAttribute('aria-disabled');
   });
 
   it('files events under named groups: skills, industry, market (price alert last), mail, corp notifications, then EVE notifications last', async () => {
     render(<App />);
     const panel = await notificationsPanel();
-    await waitFor(() => expect(rowCheckbox('New Mail', 'device')).toBeInTheDocument());
+    await waitFor(() => expect(rowCheckbox('New mail', 'device')).toBeInTheDocument());
     const text = panel.textContent ?? '';
     const at = (label: string) => {
       const index = text.indexOf(label);
@@ -840,11 +840,11 @@ describe('Settings — Notifications (issue #170)', () => {
 
     expect(at('Skills')).toBeLessThan(at('Industry and PI'));
     expect(at('Industry and PI')).toBeLessThan(at('Market and contracts'));
-    expect(at('Wallet Balance Changed')).toBeLessThan(at('Quickbar Price Alert'));
-    expect(at('Quickbar Price Alert')).toBeLessThan(at('Mail and calendar'));
+    expect(at('Wallet balance changed')).toBeLessThan(at('Quickbar price alert'));
+    expect(at('Quickbar price alert')).toBeLessThan(at('Mail and calendar'));
     expect(at('Mail and calendar')).toBeLessThan(at('Corp notifications'));
-    expect(at('Corp notifications')).toBeLessThan(at('Structure Fuel Low'));
-    expect(at('Member Joined')).toBeLessThan(at('EVE notifications'));
+    expect(at('Corp notifications')).toBeLessThan(at('Structure fuel low'));
+    expect(at('Member joined')).toBeLessThan(at('EVE notifications'));
   });
 
   it('says once, on the corp event, that a character has not granted the Corporation permission', async () => {
@@ -863,13 +863,13 @@ describe('Settings — Notifications (issue #170)', () => {
     const user = userEvent.setup();
     render(<App />);
     await notificationsPanel();
-    const sheet = await openEvent(user, 'Member Joined');
+    const sheet = await openEvent(user, 'Member joined');
 
     // Once, on the Corp notifications group, not on each of its five rows.
     expect(screen.getAllByText(/hasn't granted/)).toHaveLength(1);
     // The row is still listed for that character, and still disabled.
     expect(
-      sheet.getByRole('checkbox', { name: 'Member Joined, Pilot Two, device notifications' })
+      sheet.getByRole('checkbox', { name: 'Member joined, Pilot Two, device notifications' })
     ).toHaveAttribute('aria-disabled', 'true');
   });
 
@@ -877,10 +877,10 @@ describe('Settings — Notifications (issue #170)', () => {
     const user = userEvent.setup();
     render(<App />);
     await notificationsPanel();
-    const sheet = await openEvent(user, 'Skill Level Complete');
+    const sheet = await openEvent(user, 'Skill level complete');
 
     await user.click(
-      sheet.getByRole('checkbox', { name: 'Skill Level Complete, Pilot Two, device notifications' })
+      sheet.getByRole('checkbox', { name: 'Skill level complete, Pilot Two, device notifications' })
     );
 
     const stored = (await db.settings.get(NOTIFICATION_PREFS_SETTING_KEY))
@@ -890,7 +890,7 @@ describe('Settings — Notifications (issue #170)', () => {
     // The row now says so, and the odd one out is named by the chip it sits in.
     await waitFor(() =>
       expect(
-        (rowCheckbox('Skill Level Complete', 'device') as HTMLInputElement).indeterminate
+        (rowCheckbox('Skill level complete', 'device') as HTMLInputElement).indeterminate
       ).toBe(true)
     );
   });
@@ -905,11 +905,11 @@ describe('Settings — Notifications (issue #170)', () => {
     await waitFor(() =>
       expect(
         screen.queryByRole('checkbox', {
-          name: 'Skill Level Complete for every character, device notifications',
+          name: 'Skill level complete for every character, device notifications',
         })
       ).not.toBeInTheDocument()
     );
-    expect(rowCheckbox('New Mail', 'device')).toBeInTheDocument();
+    expect(rowCheckbox('New mail', 'device')).toBeInTheDocument();
   });
 
   it('search by character name keeps every event and narrows an opened row to that character', async () => {
@@ -919,14 +919,14 @@ describe('Settings — Notifications (issue #170)', () => {
 
     await user.type(await screen.findByRole('searchbox'), 'Two');
 
-    await waitFor(() => expect(rowCheckbox('Skill Level Complete', 'device')).toBeInTheDocument());
-    const sheet = await openEvent(user, 'Skill Level Complete');
+    await waitFor(() => expect(rowCheckbox('Skill level complete', 'device')).toBeInTheDocument());
+    const sheet = await openEvent(user, 'Skill level complete');
     expect(
-      sheet.getByRole('checkbox', { name: 'Skill Level Complete, Pilot Two, device notifications' })
+      sheet.getByRole('checkbox', { name: 'Skill level complete, Pilot Two, device notifications' })
     ).toBeInTheDocument();
     expect(
       sheet.queryByRole('checkbox', {
-        name: 'Skill Level Complete, Pilot One, device notifications',
+        name: 'Skill level complete, Pilot One, device notifications',
       })
     ).not.toBeInTheDocument();
   });
@@ -936,10 +936,10 @@ describe('Settings — Notifications (issue #170)', () => {
     render(<App />);
     await notificationsPanel();
 
-    await waitFor(() => expect(rowCheckbox('New Mail', 'device')).toBeInTheDocument());
+    await waitFor(() => expect(rowCheckbox('New mail', 'device')).toBeInTheDocument());
     expect(
       screen.queryByRole('checkbox', {
-        name: 'Skill Level Complete for every character, device notifications',
+        name: 'Skill level complete for every character, device notifications',
       })
     ).not.toBeInTheDocument();
   });
@@ -971,7 +971,7 @@ describe('Settings — Notifications (issue #170)', () => {
     render(<App />);
     await notificationsPanel();
 
-    const sheet = await openEvent(user, 'EVE Notifications');
+    const sheet = await openEvent(user, 'EVE notifications');
 
     expect(await sheet.findByText('Structure Under Attack')).toBeInTheDocument();
     expect(sheet.getByText('Corporation Bill Issued')).toBeInTheDocument();
@@ -999,24 +999,31 @@ describe('Settings — Notifications (issue #170)', () => {
     const badgeName = /arrives even with the app closed/i;
     // The label and its badge are siblings inside one wrapper span, so the
     // label's row is exactly the scope to ask about.
-    await panel.findAllByText('Skill Level Complete');
-    const rowFor = (name: string) => within(panel.getByText(name).closest('li')!);
+    await panel.findAllByText('Skill level complete');
+    // "EVE notifications" is both a group heading and an event row: take the row.
+    const rowFor = (name: string) =>
+      within(
+        panel
+          .getAllByText(name)
+          .map((el) => el.closest('li'))
+          .find((li) => li !== null)!
+      );
 
     // Scheduled Push: a knowable future instant the backend can fire on.
     expect(
-      rowFor('Skill Level Complete').getByRole('img', { name: badgeName })
+      rowFor('Skill level complete').getByRole('img', { name: badgeName })
     ).toBeInTheDocument();
     expect(
-      rowFor('Planetary Extractor Expiring').getByRole('img', { name: badgeName })
+      rowFor('Planetary extractor expiring').getByRole('img', { name: badgeName })
     ).toBeInTheDocument();
-    expect(rowFor('Structure Fuel Low').getByRole('img', { name: badgeName })).toBeInTheDocument();
-    expect(rowFor('Clone Jump Ready').getByRole('img', { name: badgeName })).toBeInTheDocument();
+    expect(rowFor('Structure fuel low').getByRole('img', { name: badgeName })).toBeInTheDocument();
+    expect(rowFor('Clone jump ready').getByRole('img', { name: badgeName })).toBeInTheDocument();
 
     // Poll-only: nothing knows when these happen until they have happened.
-    expect(rowFor('New Mail').queryByRole('img', { name: badgeName })).toBeNull();
-    expect(rowFor('Contract Accepted').queryByRole('img', { name: badgeName })).toBeNull();
-    expect(rowFor('Member Joined').queryByRole('img', { name: badgeName })).toBeNull();
-    expect(rowFor('EVE Notifications').queryByRole('img', { name: badgeName })).toBeNull();
+    expect(rowFor('New mail').queryByRole('img', { name: badgeName })).toBeNull();
+    expect(rowFor('Contract accepted').queryByRole('img', { name: badgeName })).toBeNull();
+    expect(rowFor('Member joined').queryByRole('img', { name: badgeName })).toBeNull();
+    expect(rowFor('EVE notifications').queryByRole('img', { name: badgeName })).toBeNull();
   });
 
   it('labels the two delivery columns with what each one does', async () => {
@@ -1040,10 +1047,10 @@ describe('Settings — Notifications (issue #170)', () => {
       render(<App />);
       await notificationsPanel();
 
-      // Pilot Two has every notification scope except New Mail's (outer
-      // beforeEach), so New Mail applies to Pilot One alone.
-      await waitFor(() => expect(rowCheckbox('New Mail', 'device')).toBeChecked());
-      await user.click(rowCheckbox('New Mail', 'device'));
+      // Pilot Two has every notification scope except New mail's (outer
+      // beforeEach), so New mail applies to Pilot One alone.
+      await waitFor(() => expect(rowCheckbox('New mail', 'device')).toBeChecked());
+      await user.click(rowCheckbox('New mail', 'device'));
 
       await waitFor(async () => {
         const stored = (await db.settings.get(NOTIFICATION_PREFS_SETTING_KEY))
@@ -1057,9 +1064,9 @@ describe('Settings — Notifications (issue #170)', () => {
       const user = userEvent.setup();
       render(<App />);
       await notificationsPanel();
-      await waitFor(() => expect(rowCheckbox('Skill Level Complete', 'device')).toBeChecked());
+      await waitFor(() => expect(rowCheckbox('Skill level complete', 'device')).toBeChecked());
 
-      await user.click(rowCheckbox('Skill Level Complete', 'device'));
+      await user.click(rowCheckbox('Skill level complete', 'device'));
 
       await waitFor(async () => {
         const stored = (await db.settings.get(NOTIFICATION_PREFS_SETTING_KEY))
@@ -1076,9 +1083,9 @@ describe('Settings — Notifications (issue #170)', () => {
       render(<App />);
       await notificationsPanel();
 
-      await waitFor(() => expect(rowCheckbox('Skill Level Complete', 'device')).toBeDisabled());
+      await waitFor(() => expect(rowCheckbox('Skill level complete', 'device')).toBeDisabled());
       // The Alerts column is unaffected — only the device column is permission-gated.
-      expect(rowCheckbox('Skill Level Complete', 'Alerts')).not.toBeDisabled();
+      expect(rowCheckbox('Skill level complete', 'Alerts')).not.toBeDisabled();
     });
 
     it('never opens a native confirm dialog for a broadcast', async () => {
@@ -1086,9 +1093,9 @@ describe('Settings — Notifications (issue #170)', () => {
       const confirmSpy = vi.spyOn(window, 'confirm');
       render(<App />);
       await notificationsPanel();
-      await waitFor(() => expect(rowCheckbox('Skill Level Complete', 'device')).toBeChecked());
+      await waitFor(() => expect(rowCheckbox('Skill level complete', 'device')).toBeChecked());
 
-      await user.click(rowCheckbox('Skill Level Complete', 'device'));
+      await user.click(rowCheckbox('Skill level complete', 'device'));
       expect(confirmSpy).not.toHaveBeenCalled();
     });
   });
@@ -1101,7 +1108,7 @@ describe('Settings — Notifications (issue #170)', () => {
     async function renderPanelWithFakeTimers() {
       render(<App />);
       await notificationsPanel();
-      await waitFor(() => expect(rowCheckbox('Skill Level Complete', 'device')).toBeChecked());
+      await waitFor(() => expect(rowCheckbox('Skill level complete', 'device')).toBeChecked());
       // The scheduler is module state: let a rebuild an earlier test's
       // browser click queued (on real timers) land before counting.
       await act(
@@ -1123,12 +1130,12 @@ describe('Settings — Notifications (issue #170)', () => {
     it('turning a browser event on rebuilds once; an Overview-only toggle does not', async () => {
       const user = await renderPanelWithFakeTimers();
 
-      await user.click(rowCheckbox('New Mail', 'Alerts'));
+      await user.click(rowCheckbox('New mail', 'Alerts'));
       await afterQuietPeriod();
       expect(rebuildProjection).not.toHaveBeenCalled();
 
-      // Wallet Balance Changed defaults browser-off (GLOSSARY.md round 45).
-      await user.click(rowCheckbox('Wallet Balance Changed', 'device'));
+      // Wallet balance changed defaults browser-off (GLOSSARY.md round 45).
+      await user.click(rowCheckbox('Wallet balance changed', 'device'));
       await afterQuietPeriod();
       await waitFor(() => expect(rebuildProjection).toHaveBeenCalledTimes(1));
     });
@@ -1136,7 +1143,7 @@ describe('Settings — Notifications (issue #170)', () => {
     it('a row-level browser broadcast rebuilds once', async () => {
       const user = await renderPanelWithFakeTimers();
 
-      await user.click(rowCheckbox('New Mail', 'device'));
+      await user.click(rowCheckbox('New mail', 'device'));
       await afterQuietPeriod();
       await waitFor(() => expect(rebuildProjection).toHaveBeenCalledTimes(1));
     });
@@ -1168,11 +1175,11 @@ describe('Settings — Notifications (issue #170)', () => {
         seenAtRebuild = isEventEnabledFor(stored.perCharacter[CHAR_ID] ?? {}, 'newMail', 'browser');
       });
 
-      const newMail = rowCheckbox('New Mail', 'device');
+      const newMail = rowCheckbox('New mail', 'device');
       await user.click(newMail);
       await user.click(newMail);
       await user.click(newMail);
-      await user.click(rowCheckbox('Skill Level Complete', 'device'));
+      await user.click(rowCheckbox('Skill level complete', 'device'));
       await afterQuietPeriod();
 
       await waitFor(() => expect(rebuildProjection).toHaveBeenCalledTimes(1));
@@ -1207,9 +1214,9 @@ describe('Settings — Notifications with twenty characters', () => {
   it('shows one row per event, not one list per character', async () => {
     render(<App />);
     const panel = within(await notificationsPanel());
-    await waitFor(() => expect(rowCheckbox('Skill Level Complete', 'device')).toBeChecked());
+    await waitFor(() => expect(rowCheckbox('Skill level complete', 'device')).toBeChecked());
 
-    expect(panel.getAllByRole('checkbox', { name: /^Skill Level Complete/ })).toHaveLength(2);
+    expect(panel.getAllByRole('checkbox', { name: /^Skill level complete/ })).toHaveLength(2);
     // The default fixture Character holds no notification scopes, so each row counts the 20 that can use it of the 21.
     expect(panel.getAllByText('20 of 21 can use this').length).toBeGreaterThan(0);
     // Nothing per character is mounted until a row is opened.
@@ -1220,13 +1227,13 @@ describe('Settings — Notifications with twenty characters', () => {
     const user = userEvent.setup();
     render(<App />);
     await notificationsPanel();
-    await waitFor(() => expect(rowCheckbox('Skill Level Complete', 'device')).toBeChecked());
-    const sheet = await openEvent(user, 'Skill Level Complete');
+    await waitFor(() => expect(rowCheckbox('Skill level complete', 'device')).toBeChecked());
+    const sheet = await openEvent(user, 'Skill level complete');
 
     expect(sheet.getAllByRole('listitem').length).toBeGreaterThanOrEqual(ROSTER_SIZE);
     await user.click(
       sheet.getByRole('checkbox', {
-        name: 'Skill Level Complete, Pilot 007, device notifications',
+        name: 'Skill level complete, Pilot 007, device notifications',
       })
     );
     expect(
@@ -1240,9 +1247,9 @@ describe('Settings — Notifications with twenty characters', () => {
     const user = userEvent.setup();
     render(<App />);
     await notificationsPanel();
-    await waitFor(() => expect(rowCheckbox('Skill Level Complete', 'Alerts')).toBeChecked());
+    await waitFor(() => expect(rowCheckbox('Skill level complete', 'Alerts')).toBeChecked());
 
-    await user.click(rowCheckbox('Skill Level Complete', 'Alerts'));
+    await user.click(rowCheckbox('Skill level complete', 'Alerts'));
 
     await waitFor(async () => {
       const stored = (await db.settings.get(NOTIFICATION_PREFS_SETTING_KEY))
@@ -1255,13 +1262,13 @@ describe('Settings — Notifications with twenty characters', () => {
     const user = userEvent.setup();
     render(<App />);
     const panel = within(await notificationsPanel());
-    await waitFor(() => expect(rowCheckbox('Skill Level Complete', 'device')).toBeChecked());
+    await waitFor(() => expect(rowCheckbox('Skill level complete', 'device')).toBeChecked());
 
     await user.type(panel.getByPlaceholderText('Search events or characters'), 'Pilot 007');
-    const sheet = await openEvent(user, 'Skill Level Complete');
+    const sheet = await openEvent(user, 'Skill level complete');
     expect(
       await sheet.findByRole('checkbox', {
-        name: 'Skill Level Complete, Pilot 007, device notifications',
+        name: 'Skill level complete, Pilot 007, device notifications',
       })
     ).toBeInTheDocument();
     expect(sheet.queryByText('Pilot 000')).toBeNull();

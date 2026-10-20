@@ -35,7 +35,7 @@ test('an event row meets the 44px touch floor at 390px and opens a sheet with it
   await gotoNotificationSettings(page);
   await page.setViewportSize(PHONE);
 
-  const toggle = eventToggle(page, 'Skill Queue Ending');
+  const toggle = eventToggle(page, 'Skill queue ending');
   await expect(toggle).toBeVisible();
   const height = await toggle.evaluate((el) => el.getBoundingClientRect().height);
   expect(height).toBeGreaterThanOrEqual(44);
@@ -45,7 +45,7 @@ test('an event row meets the 44px touch floor at 390px and opens a sheet with it
   if (!box) throw new Error('toggle has no bounding box');
   await page.mouse.click(box.x + 40, box.y + 3);
 
-  const sheet = page.getByRole('dialog', { name: 'Skill Queue Ending' });
+  const sheet = page.getByRole('dialog', { name: 'Skill queue ending' });
   await expect(sheet).toBeVisible();
   await expect(sheet.getByText(CHARACTER_NAME)).toBeVisible();
 });
@@ -57,7 +57,7 @@ test('the row-level checkboxes stay independently clickable beside the enlarged 
   await page.setViewportSize(PHONE);
 
   const alerts = page.getByRole('checkbox', {
-    name: 'Skill Queue Ending for every character, Alerts list',
+    name: 'Skill queue ending for every character, Alerts list',
   });
   await expect(alerts).toBeVisible();
   const before = await alerts.isChecked();
@@ -75,7 +75,7 @@ test('an event row stays content-driven at and above md (1280px), and opens inli
   await gotoNotificationSettings(page);
   await page.setViewportSize(DESKTOP);
 
-  const toggle = eventToggle(page, 'Skill Queue Ending');
+  const toggle = eventToggle(page, 'Skill queue ending');
   await expect(toggle).toBeVisible();
   const height = await toggle.evaluate((el) => el.getBoundingClientRect().height);
   // `md:min-h-9` drops the touch floor: 36px, bounded so a regression toward the touch tier shows.
@@ -95,8 +95,8 @@ test('skillQueueEnding warn-ahead select is reachable at 390px (issue #1410)', a
   await gotoNotificationSettings(page);
   await page.setViewportSize(PHONE);
 
-  await eventToggle(page, 'Skill Queue Ending').click();
-  const sheet = page.getByRole('dialog', { name: 'Skill Queue Ending' });
+  await eventToggle(page, 'Skill queue ending').click();
+  const sheet = page.getByRole('dialog', { name: 'Skill queue ending' });
   await sheet.getByRole('button', { name: /^Warn-ahead time/ }).click();
   await expect(
     sheet.getByRole('combobox', { name: 'Warn this far before the skill queue runs dry:' })
