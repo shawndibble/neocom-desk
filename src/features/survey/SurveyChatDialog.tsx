@@ -66,7 +66,7 @@ export function SurveyChatDialog({
           <h3 className="text-xs text-text-dim">{t('survey.chatConfig.preview')}</h3>
           <pre
             data-testid="chat-preview"
-            className="overflow-x-auto rounded-md border border-line bg-panel-2 p-3 font-mono text-xs leading-relaxed"
+            className="overflow-x-auto rounded-xs border border-line bg-panel-2 p-3 font-mono text-xs leading-relaxed"
           >
             {surveyChatMessage(summary, url, labels, now, options, location)}
           </pre>
