@@ -179,6 +179,7 @@ function PhoneShot({ shot, onOpen }: { shot: Screenshot; onOpen: () => void }) {
       onClick={onOpen}
       aria-label={t('login.screenshotEnlarge', { alt })}
       className={cx(
+        // eslint-disable-next-line no-restricted-syntax -- landing phone-capture frame keeps its bezel radius (DESIGN.md §3)
         'group relative block w-full cursor-zoom-in overflow-hidden rounded-xl border border-line bg-panel shadow-lg',
         'motion-safe:transition-transform motion-safe:duration-300 motion-safe:hover:-translate-y-1',
         focusRingInsetClassName

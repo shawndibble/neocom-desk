@@ -14,7 +14,7 @@ export function PricesUnavailable() {
   return (
     <div
       role="status"
-      className="rounded-sm border border-warning/45 bg-warning/10 px-4 py-3 text-sm"
+      className="rounded-xs border border-warning/45 bg-warning/10 px-4 py-3 text-sm"
     >
       <p className="font-semibold text-warning">{pricesUnavailableLabel}</p>
       <p className="mt-1 text-xs text-text-dim">

@@ -19,11 +19,31 @@ const rawInputSyntax = [
   },
 ];
 
+// Rectangles take the house radius `rounded-xs` (DESIGN.md §3). Matches the
+// class words `rounded` and `rounded-{sm..3xl}` in string/template content;
+// `rounded-xs`, `rounded-full`, `rounded-t-*` and friends do not match, and
+// comments and identifiers are never Literals. Pinned by
+// scripts/lib/radiusLint.test.mjs.
+const radiusMessage =
+  'Rectangles use rounded-xs (DESIGN.md §3); rounded-full is only for avatars, dots and spinners.';
+const radiusSyntax = [
+  {
+    selector: 'Literal[value=/(^|\\s)rounded(-(sm|md|lg|xl|2xl|3xl))?(\\s|$)/]',
+    message: radiusMessage,
+  },
+  {
+    selector: 'TemplateElement[value.raw=/(^|\\s)rounded(-(sm|md|lg|xl|2xl|3xl))?(\\s|$)/]',
+    message: radiusMessage,
+  },
+];
+const withoutRadius = (list) => list.filter((r) => !radiusSyntax.includes(r));
+
 // Shared by every non-primitive file. Flat config replaces a rule's options
 // rather than merging them, so a later block that adds selectors for a
 // narrower glob must re-list these.
 const restrictedSyntax = [
   ...rawInputSyntax,
+  ...radiusSyntax,
   {
     selector:
       "JSXOpeningElement[name.name='input'] > JSXAttribute[name.name='type'][value.value='search']",
@@ -172,9 +192,32 @@ export default tseslint.config(
     rules: {
       'no-restricted-syntax': [
         'error',
-        ...restrictedSyntax.filter((r) => !rawInputSyntax.includes(r)),
+        ...withoutRadius(restrictedSyntax).filter((r) => !rawInputSyntax.includes(r)),
         ...sortArrowSyntax,
       ],
+    },
+  },
+  {
+    // Stories are mockups and e2e/tests are fixtures: no house radius to keep.
+    // The Communities files still carry bare `rounded` on their chips; #4539
+    // (surface-2) rewrites those lines and drops them from this list.
+    files: [
+      'src/**/*.stories.tsx',
+      'src/features/communities/CommunityInvites.tsx',
+      'src/features/communities/ShareFittingsTab.tsx',
+      'src/features/communities/SharedBlueprintTable.tsx',
+      'src/features/communities/CommunityLibrary.tsx',
+      'src/features/bpcContracts/CommunityOfferCell.tsx',
+    ],
+    ignores: ['src/components/ui/**'],
+    rules: {
+      'no-restricted-syntax': ['error', ...withoutRadius(restrictedSyntax), ...sortArrowSyntax],
+    },
+  },
+  {
+    files: ['src/**/*.test.ts', 'e2e/**/*.ts'],
+    rules: {
+      'no-restricted-syntax': ['error', ...withoutRadius(restrictedSyntax)],
     },
   },
   {

@@ -43,7 +43,7 @@ export function RigMatchHelper({ facility, security, onApply }: RigMatchHelperPr
               alt={t('industry.rigMatch.imageAlt')}
               width={992}
               height={930}
-              className="w-full rounded border border-line"
+              className="w-full rounded-xs border border-line"
             />
             <p className="text-text-dim">
               {t('industry.rigMatch.using', { security: t(`industry.${security}`) })}
