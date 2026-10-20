@@ -494,6 +494,12 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      // Collector books (issue #4510): what the Collector has paid a feeder. Callable-written.
+      match /feeders/{feederCorp}/payouts/{payoutId} {
+        allow get, list: if isOfficer();
+        allow write: if false;
+      }
+
       match /{officerOnly}/{docId} {
         allow get, list: if officerOnly in ['extractions', 'declarations', 'adjustments', 'writeOffs', 'rebills', 'meta', 'audit', 'feeders']
           && isOfficer();

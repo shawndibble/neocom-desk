@@ -12,6 +12,7 @@ import {
   disconnectedCoverage,
   type FeederHealth,
 } from './feederHealth';
+import { accrueValuedDays, feederBalance, onPayList } from './feederAccrual';
 import { DEFAULT_GRACE_HOURS } from './billable';
 import { DEFAULT_OVERDUE_DAYS } from './overdue';
 import { mergeObservedRows, observedRowKey } from './observed';
@@ -372,5 +373,54 @@ describe('feeder health mirror', () => {
         expect(mirror.disconnectedCoverage(periods, { lastReadWellAt }, grace)).toEqual(
           disconnectedCoverage(periods, { lastReadWellAt }, grace)
         );
+  });
+});
+
+describe('feeder accrual mirror', () => {
+  const rules = {
+    coveragePeriods: [{ from: '2026-06-03', to: '2026-06-20' }],
+    ownerRateHistory: [
+      { kind: 'requested' as const, pct: 8, effectiveFrom: '2026-06-01', recordedAt: 'a' },
+      { kind: 'agreed' as const, pct: 12.5, effectiveFrom: '2026-06-06', recordedAt: 'b' },
+    ],
+    modeChanges: [
+      { from: '2026-06-10', mode: 'settled-otherwise' as const },
+      { from: '2026-06-12', mode: 'normal' as const },
+    ],
+    isBillable: (day: string) => day !== '2026-06-15',
+  };
+  const days = ['02', '04', '07', '10', '11', '12', '15', '19', '21'].map((d, i) => ({
+    date: `2026-06-${d}`,
+    value: 1000.37 * (i + 1),
+  }));
+
+  it('accrues the same', () => {
+    expect(mirror.accrueValuedDays(days, rules)).toEqual(accrueValuedDays(days, rules));
+  });
+
+  it('balances and lists the same', () => {
+    const payouts = [
+      { amount: 700, notAPayout: false },
+      { amount: 5000, notAPayout: true },
+    ];
+    for (const accrued of [0, 0.4, 699.9, 1500.75]) {
+      const b = feederBalance(accrued, payouts);
+      expect(mirror.feederBalance(accrued, payouts)).toEqual(b);
+      expect(mirror.onPayList(b)).toBe(onPayList(b));
+      expect(mirror.feederBalance(accrued, payouts, true)).toEqual(
+        feederBalance(accrued, payouts, true)
+      );
+    }
+  });
+
+  it('resolves same-day ties and agreed-over-requested the same', () => {
+    const history = [
+      { kind: 'agreed' as const, pct: 5, effectiveFrom: '2026-06-04', recordedAt: '1' },
+      { kind: 'agreed' as const, pct: 7, effectiveFrom: '2026-06-04', recordedAt: '2' },
+      { kind: 'requested' as const, pct: 30, effectiveFrom: '2026-06-02', recordedAt: '1' },
+      { kind: 'requested' as const, pct: 40, effectiveFrom: '2026-06-02', recordedAt: '1' },
+    ];
+    const r = { ...rules, modeChanges: [], isBillable: () => true, ownerRateHistory: history };
+    expect(mirror.accrueValuedDays(days, r)).toEqual(accrueValuedDays(days, r));
   });
 });
