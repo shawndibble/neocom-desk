@@ -15,6 +15,7 @@ import {
   type MarketOrderColumnId,
 } from '@/features/market/marketOrderColumns';
 import { formatVolume } from '@/features/market/format';
+import { feeColumnTooltip } from '@/features/market/feeColumnTooltip';
 import {
   resolveOrderLocation,
   orderExpiry,
@@ -30,7 +31,7 @@ import {
 import { renderJumpsCell } from '@/features/route/jumpsCell';
 import type { JumpRangeFilter, JumpsCellValue } from '@/features/route/currentSystem';
 import type { RegionOrder } from '@/esi/endpoints';
-import { orderFees } from '@/engine/market/orderFees';
+import { orderFees, type OrderFeeContext } from '@/engine/market/orderFees';
 import { formatMarketIsk } from '@/lib/isk';
 import { rangeLabel } from '@/features/market/orderBookCsv';
 import { sellOutlierMultiple } from '@/engine/market/orderBookDepth';
@@ -71,8 +72,8 @@ export interface UseMarketOrderColumnsArgs {
    * Location is left off the tables and cards. The stored picks are untouched.
    */
   hideLocation: boolean;
-  /** The active Character's Accounting level; null until it is known, which also keeps the fee columns out. */
-  accountingLevel: number | null;
+  /** What the fee columns price with; null until the active Character's skills are known, which also keeps the columns out. */
+  feeContext: OrderFeeContext | null;
 }
 
 export interface MarketOrderColumns {
@@ -95,13 +96,12 @@ export function useMarketOrderColumns({
   cards,
   locationSqueezed,
   hideLocation,
-  accountingLevel,
+  feeContext,
 }: UseMarketOrderColumnsArgs): MarketOrderColumns {
   const pickedOrderColumns = useVisibleMarketOrderColumns((state) => state.value);
   const visibleOrderColumns = useMemo(
-    () =>
-      pickedOrderColumns.filter((id) => !isColumnWithheld(id, { hideLocation, accountingLevel })),
-    [hideLocation, accountingLevel, pickedOrderColumns]
+    () => pickedOrderColumns.filter((id) => !isColumnWithheld(id, { hideLocation, feeContext })),
+    [hideLocation, feeContext, pickedOrderColumns]
   );
   const setVisibleOrderColumns = useVisibleMarketOrderColumns((state) => state.setValue);
   useHydratedStore(useVisibleMarketOrderColumns);
@@ -163,10 +163,8 @@ export function useMarketOrderColumns({
         align: 'right',
         className: 'tabular-nums text-text-dim',
         stackAffix: { before: t('market.feesAffix') },
-        render: (o) =>
-          accountingLevel === null ? '—' : formatMarketIsk(orderFees(o, accountingLevel).fees),
-        sortValue: (o) =>
-          accountingLevel === null ? undefined : orderFees(o, accountingLevel).fees,
+        render: (o) => (feeContext === null ? '—' : formatMarketIsk(orderFees(o, feeContext).fees)),
+        sortValue: (o) => (feeContext === null ? undefined : orderFees(o, feeContext).fees),
       },
       finalPrice: {
         id: 'finalPrice',
@@ -175,11 +173,8 @@ export function useMarketOrderColumns({
         className: 'tabular-nums',
         stackAffix: { before: t('market.finalPriceAffix') },
         render: (o) =>
-          accountingLevel === null
-            ? '—'
-            : formatMarketIsk(orderFees(o, accountingLevel).finalPrice),
-        sortValue: (o) =>
-          accountingLevel === null ? undefined : orderFees(o, accountingLevel).finalPrice,
+          feeContext === null ? '—' : formatMarketIsk(orderFees(o, feeContext).finalPrice),
+        sortValue: (o) => (feeContext === null ? undefined : orderFees(o, feeContext).finalPrice),
       },
       quantity: {
         id: 'quantity',
@@ -292,23 +287,34 @@ export function useMarketOrderColumns({
       cards,
       locationSqueezed,
       visibleOrderColumns,
-      accountingLevel,
+      feeContext,
     ]
   );
 
+  // The two fee columns say what they assume, and it differs by table: a
+  // sell order is priced as a listing of your own at that price, a buy order
+  // as a sale into it right now (`engine/market/orderFees.ts`).
+  const withFeeTooltips = useCallback(
+    (ids: readonly MarketOrderColumnId[], side: 'sell' | 'buy') =>
+      ids
+        .filter((id) => visibleOrderColumns.includes(id))
+        .map((id) =>
+          id === 'fees' || id === 'finalPrice'
+            ? {
+                ...orderColumnsById[id],
+                headerTooltip: feeColumnTooltip(t, id, side),
+              }
+            : orderColumnsById[id]
+        ),
+    [visibleOrderColumns, orderColumnsById, t]
+  );
   const baseColumns = useMemo<DataTableColumn<RegionOrder>[]>(
-    () =>
-      SELL_ORDER_COLUMN_IDS.filter((id) => visibleOrderColumns.includes(id)).map(
-        (id) => orderColumnsById[id]
-      ),
-    [visibleOrderColumns, orderColumnsById]
+    () => withFeeTooltips(SELL_ORDER_COLUMN_IDS, 'sell'),
+    [withFeeTooltips]
   );
   const buyColumns = useMemo<DataTableColumn<RegionOrder>[]>(
-    () =>
-      BUY_ORDER_COLUMN_IDS.filter((id) => visibleOrderColumns.includes(id)).map(
-        (id) => orderColumnsById[id]
-      ),
-    [visibleOrderColumns, orderColumnsById]
+    () => withFeeTooltips(BUY_ORDER_COLUMN_IDS, 'buy'),
+    [withFeeTooltips]
   );
   // What each table's row expand (`OrderDetailPanel`) shows that the visible
   // columns don't — the picker's hidden ids, per table, since Sell and Buy
@@ -318,19 +324,17 @@ export function useMarketOrderColumns({
     () =>
       SELL_ORDER_COLUMN_IDS.filter(
         (id) =>
-          !visibleOrderColumns.includes(id) &&
-          !isColumnWithheld(id, { hideLocation, accountingLevel })
+          !visibleOrderColumns.includes(id) && !isColumnWithheld(id, { hideLocation, feeContext })
       ),
-    [visibleOrderColumns, hideLocation, accountingLevel]
+    [visibleOrderColumns, hideLocation, feeContext]
   );
   const buyHiddenColumns = useMemo(
     () =>
       BUY_ORDER_COLUMN_IDS.filter(
         (id) =>
-          !visibleOrderColumns.includes(id) &&
-          !isColumnWithheld(id, { hideLocation, accountingLevel })
+          !visibleOrderColumns.includes(id) && !isColumnWithheld(id, { hideLocation, feeContext })
       ),
-    [visibleOrderColumns, hideLocation, accountingLevel]
+    [visibleOrderColumns, hideLocation, feeContext]
   );
 
   return {

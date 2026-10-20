@@ -31,7 +31,9 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { useActiveCharacter } from '@/stores/activeCharacter';
-import { useAccountingLevel } from '@/features/market/useAccountingLevel';
+import { useOrderFeeSkills } from '@/features/market/useOrderFeeSkills';
+import { ZERO_STANDINGS } from '@/engine/market/standings';
+import type { OrderFeeContext } from '@/engine/market/orderFees';
 import { useOnline } from '@/stores/network';
 import { orderBookFailedOffline } from '@/features/market/orderBookView';
 import type { MarketGroupNode, MarketTypeEntry } from '@/sde/marketTypes';
@@ -649,9 +651,19 @@ export function Market() {
   // One station, already named by the scope bar: no Location column to repeat it.
   const singleStationBook =
     !(rangeAcross && browserFilterValue.jumps !== 'any') && effectiveLocation.mode === 'hub';
-  const accountingLevel = useAccountingLevel(activeCharacterId);
+  const feeSkills = useOrderFeeSkills(activeCharacterId);
+  // Broker fee standings come from the selected hub's station owner; a region
+  // or structure book has no single owner, so it prices with none.
+  const hubStanding =
+    effectiveLocation.mode === 'hub'
+      ? tradeHubStanding(tradeHubStandings, effectiveHub.id)
+      : ZERO_STANDINGS;
+  const feeContext = useMemo<OrderFeeContext | null>(
+    () => (feeSkills ? { ...feeSkills, standing: hubStanding } : null),
+    [feeSkills, hubStanding]
+  );
   const pickedOrderColumns = useVisibleMarketOrderColumns((state) => state.value);
-  const withholding = { hideLocation: singleStationBook, accountingLevel };
+  const withholding = { hideLocation: singleStationBook, feeContext };
   // A held-back column can't be ticked, so the picker doesn't offer it.
   const pickableColumns = (ids: readonly MarketOrderColumnId[]) =>
     ids.filter((id) => !isColumnWithheld(id, withholding));
@@ -686,7 +698,7 @@ export function Market() {
     cards: orderCards,
     locationSqueezed: orderLocationSqueezed,
     hideLocation: singleStationBook,
-    accountingLevel,
+    feeContext,
   });
   // A phone shows one side of the book at a time (`BookSideToggle`).
   const [phoneSide, setPhoneSide] = useState<BookSide>('sell');
