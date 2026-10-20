@@ -20,6 +20,7 @@ import {
   revokeFeederInvite,
   type FeederRecord,
 } from './corpTaxBookFeeders.js';
+import { listFeederInvites, setFeederMode, setFeederRate } from './corpTaxBookFeederOwnerCalls.js';
 import { deleteBook, turnOnBook, type BookDeps, type Caller } from './corpTaxBookStore.js';
 import type { SyncEsi } from './corpTaxBookSyncEsi.js';
 
@@ -359,6 +360,113 @@ suite('feeder invites', () => {
       expect(
         (await db.collection(CORP_SYNC_GRANTS_COLLECTION).doc(String(FEEDER)).get()).exists
       ).toBe(false);
+    });
+  });
+
+  describe('owner rate, mode and invite list (#4586)', () => {
+    const asAccountant = {
+      corporationId: COLLECTOR,
+      accessToken: tok(COLLECTOR_ACCOUNTANT),
+      feederCorporationId: FEEDER,
+    };
+    const auditActions = async () =>
+      (await collectorBook().collection('audit').get()).docs.map((d) => d.get('action'));
+
+    beforeEach(async () => {
+      await accept((await invite()).code);
+    });
+
+    it('appends a dated agreed rate and audits it', async () => {
+      await setFeederRate(deps(), who(COLLECTOR_ACCOUNTANT), { ...asAccountant, pct: 6 });
+      const rec = await feederRecord();
+      expect(rec?.agreedRatePct).toBe(6);
+      expect(rec?.ownerRateHistory).toEqual([
+        {
+          kind: 'agreed',
+          pct: 6,
+          effectiveFrom: '2026-10-18',
+          recordedAt: new Date(T0).toISOString(),
+        },
+      ]);
+      expect(await auditActions()).toContain('feederRateAgreed');
+    });
+
+    it('records settled otherwise with a note, then back to normal from the switch day', async () => {
+      await setFeederMode(deps(), who(COLLECTOR_ACCOUNTANT), {
+        ...asAccountant,
+        mode: 'settled-otherwise',
+        note: 'paid by hand',
+      });
+      expect(await feederRecord()).toMatchObject({
+        mode: 'settled-otherwise',
+        note: 'paid by hand',
+        modeChanges: [{ from: '2026-10-18', mode: 'settled-otherwise' }],
+      });
+      now = T0 + 2 * DAY;
+      await setFeederMode(deps(), who(COLLECTOR_ACCOUNTANT), { ...asAccountant, mode: 'normal' });
+      const rec = await feederRecord();
+      expect(rec?.mode).toBe('normal');
+      expect(rec?.note).toBeUndefined();
+      expect(rec?.modeChanges).toEqual([
+        { from: '2026-10-18', mode: 'settled-otherwise' },
+        { from: '2026-10-20', mode: 'normal' },
+      ]);
+      expect(await auditActions()).toContain('feederModeSet');
+    });
+
+    it('refuses non-officers, a stale check and an unknown or departed moon owner', async () => {
+      const junior = { ...asAccountant, accessToken: tok(COLLECTOR_JUNIOR) };
+      expect(
+        await reason(setFeederRate(deps(), who(COLLECTOR_JUNIOR), { ...junior, pct: 5 }))
+      ).toBe('role-required');
+      expect(
+        await reason(
+          setFeederMode(deps(), who(COLLECTOR_JUNIOR), { ...junior, mode: 'settled-otherwise' })
+        )
+      ).toBe('role-required');
+      expect(
+        await reason(
+          setFeederRate(deps(), who(COLLECTOR_ACCOUNTANT), {
+            corporationId: COLLECTOR,
+            feederCorporationId: FEEDER,
+            pct: 5,
+          })
+        )
+      ).toBe('live-check-required');
+      expect(
+        await reason(
+          setFeederRate(deps(), who(COLLECTOR_ACCOUNTANT), {
+            ...asAccountant,
+            feederCorporationId: 98999999,
+            pct: 5,
+          })
+        )
+      ).toBe('no-feeder');
+      await collectorBook().collection('feeders').doc(String(FEEDER)).update({ status: 'left' });
+      expect(
+        await reason(setFeederRate(deps(), who(COLLECTOR_ACCOUNTANT), { ...asAccountant, pct: 5 }))
+      ).toBe('feeder-ended');
+    });
+
+    it('lists open links only, newest first, for officers of that book', async () => {
+      const first = await invite(3);
+      now = T0 + 1000;
+      const second = await invite();
+      const revoked = await invite();
+      await revokeFeederInvite(deps(), who(COLLECTOR_ACCOUNTANT), {
+        corporationId: COLLECTOR,
+        accessToken: tok(COLLECTOR_ACCOUNTANT),
+        inviteId: revoked.inviteId,
+      });
+      const { invites } = await listFeederInvites(deps(), who(COLLECTOR_ACCOUNTANT), {
+        corporationId: COLLECTOR,
+        accessToken: tok(COLLECTOR_ACCOUNTANT),
+      });
+      expect(invites.map((i) => i.inviteId)).toEqual([second.inviteId, first.inviteId]);
+      expect(invites[1]?.offeredOwnerRatePct).toBe(3);
+      expect(
+        await reason(listFeederInvites(deps(), who(FEEDER_DIRECTOR), { corporationId: COLLECTOR }))
+      ).toBe('not-an-officer');
     });
   });
 

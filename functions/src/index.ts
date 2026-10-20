@@ -84,6 +84,13 @@ import {
   parseRequestFeederRateInput,
   requestFeederRate,
 } from './corpTaxBookFeederViewCalls.js';
+import {
+  listFeederInvites,
+  parseSetFeederModeInput,
+  parseSetFeederRateInput,
+  setFeederMode,
+  setFeederRate,
+} from './corpTaxBookFeederOwnerCalls.js';
 import { esiSyncReader } from './corpTaxBookSyncEsi.js';
 import {
   claimPayment,
@@ -712,6 +719,24 @@ export const dismissCorpTaxBookFeederHistoryCallable = onCall<unknown>(
   { maxInstances: 5, secrets: FEEDER_VIEW_SECRETS },
   (request) =>
     dismissFeederHistory(corpSyncDeps(), callerOf(request), parseFeederCall(request.data))
+);
+
+// The accounting corporation's side of a moon owner (issue #4586): officers agree a rate, settle
+// otherwise and list open invite links. The view rebuild prices ore from R2, so these carry its secrets.
+const feederOwnerDeps = (): BookDeps => ({ ...corpTaxBookDeps(), openPrices: r2OpenPrices });
+const FEEDER_OWNER_OPTIONS = { maxInstances: 5, secrets: FEEDER_VIEW_SECRETS };
+
+export const setCorpTaxBookFeederRateCallable = onCall<unknown>(FEEDER_OWNER_OPTIONS, (request) =>
+  setFeederRate(feederOwnerDeps(), callerOf(request), parseSetFeederRateInput(request.data))
+);
+
+export const setCorpTaxBookFeederModeCallable = onCall<unknown>(FEEDER_OWNER_OPTIONS, (request) =>
+  setFeederMode(feederOwnerDeps(), callerOf(request), parseSetFeederModeInput(request.data))
+);
+
+export const listCorpTaxBookFeederInvitesCallable = onCall<unknown>(
+  CORP_TAX_BOOK_OPTIONS,
+  (request) => listFeederInvites(corpTaxBookDeps(), callerOf(request), parseBookCall(request.data))
 );
 
 // The holder revokes their own; the CEO revokes anyone's (live role check, so it carries an access token).

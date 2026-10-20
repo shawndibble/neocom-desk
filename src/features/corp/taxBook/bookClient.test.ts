@@ -10,7 +10,7 @@ vi.mock('@/sync/syncAuth', () => ({ ensureSignedIn: vi.fn().mockResolvedValue(un
 const token = vi.hoisted(() => vi.fn());
 vi.mock('@/auth/session', () => ({ getValidAccessToken: token }));
 
-import { reclaimBook } from './bookClient';
+import { bookFeederFrom, reclaimBook } from './bookClient';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -28,5 +28,36 @@ describe('reclaimBook', () => {
       corporationId: 98000001,
       accessToken: 'access-token',
     });
+  });
+});
+
+describe('bookFeederFrom', () => {
+  const record = {
+    corporationId: 5,
+    status: 'active' as const,
+    mode: 'settled-otherwise' as const,
+    joinedAt: 1,
+    agreedRatePct: 6,
+    coveragePeriods: [{ from: '2026-10-01' }],
+  };
+  const payout = {
+    id: 'p1',
+    date: '2026-10-05',
+    amount: 100,
+    method: 'donation' as const,
+    status: 'recorded' as const,
+    notAPayout: false,
+  };
+
+  it('keeps the whole record, turns the last good read into an ISO string and carries payouts', () => {
+    expect(bookFeederFrom({ ...record, lastReadWellAt: Date.UTC(2026, 9, 5) }, [payout])).toEqual({
+      ...record,
+      lastReadWellAt: '2026-10-05T00:00:00.000Z',
+      payouts: [payout],
+    });
+  });
+
+  it('leaves the clock absent when no read has landed', () => {
+    expect(bookFeederFrom(record, [])).not.toHaveProperty('lastReadWellAt');
   });
 });
