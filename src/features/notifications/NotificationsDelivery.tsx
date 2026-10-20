@@ -176,7 +176,7 @@ export function NotificationsDelivery({
   return (
     <div className="space-y-2">
       {isDesktop && <div className="space-y-2 empty:hidden">{notices}</div>}
-      <div className="flex flex-col md:flex-row md:flex-wrap md:items-center md:gap-x-5 md:gap-y-0.5">
+      <div className="flex flex-col md:flex-row md:flex-wrap md:items-center md:gap-x-4 md:gap-y-0.5">
         <label className={cx(rowClassName, 'font-medium')}>
           <Checkbox
             checked={prefsValue.masterEnabled}

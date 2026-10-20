@@ -143,8 +143,8 @@ test('the first screen at 390px shows Delivery and the first topics', async ({ p
   await page.setViewportSize(PHONE);
 
   for (const locator of [
-    page.getByRole('checkbox', { name: 'Enable notifications' }),
-    page.getByRole('checkbox', { name: 'Dismiss on View' }),
+    page.getByRole('checkbox', { name: 'Enable notifications', exact: true }),
+    page.getByRole('checkbox', { name: 'Dismiss on View', exact: true }),
     page.getByRole('button', { name: /^Skills/ }),
     page.getByRole('button', { name: /^Industry and PI/ }),
   ]) {
@@ -157,10 +157,10 @@ test('Delivery fits one line at 1080px', async ({ page }) => {
   await page.setViewportSize({ width: 1080, height: 800 });
 
   const items = [
-    page.getByRole('checkbox', { name: 'Enable notifications' }),
-    page.getByRole('checkbox', { name: 'Device notifications' }),
-    page.getByRole('checkbox', { name: 'Alerts notifications' }),
-    page.getByRole('checkbox', { name: 'Dismiss on View' }),
+    page.getByRole('checkbox', { name: 'Enable notifications', exact: true }),
+    page.getByRole('checkbox', { name: 'Device pop-ups', exact: true }),
+    page.getByRole('checkbox', { name: 'Alerts list', exact: true }),
+    page.getByRole('checkbox', { name: 'Dismiss on View', exact: true }),
   ];
   const tops = [];
   for (const item of items) {

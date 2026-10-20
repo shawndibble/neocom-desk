@@ -525,6 +525,21 @@ function rowCheckbox(event: string, channel: 'device' | 'Alerts') {
 }
 
 /**
+ * Drills into a Topic. The test DOM reports a phone viewport, so Notifications
+ * is a Topics list; a Topic opens on tap (the `topic` URL param) and shows only
+ * its own rows, with an "All topics" button back. Returns to the list first when
+ * another Topic is already open.
+ */
+async function openTopic(user: ReturnType<typeof userEvent.setup>, name: string) {
+  const back = screen.queryByRole('button', { name: 'All topics' });
+  if (back) await user.click(back);
+  // Scoped to the list: the phone tab bar has its own "Skills" button.
+  const list = await screen.findByRole('list', { name: 'Topics' });
+  await user.click(within(list).getByRole('button', { name: new RegExp(`^${name}`) }));
+  await screen.findByRole('button', { name: 'All topics' });
+}
+
+/**
  * Opens an event's row. The test DOM reports a phone viewport (no media query
  * matches), so a row opens as a bottom sheet; the inline desktop panel has its
  * own tests in `NotificationEventList.test.tsx`.
@@ -560,28 +575,32 @@ describe('Settings — Notifications (issue #170)', () => {
   });
 
   it('lists every event once, each speaking for all characters, with the feed-only exceptions off for device', async () => {
+    const user = userEvent.setup();
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
     const panel = within(await notificationsPanel());
+    await openTopic(user, 'Skills');
 
     await waitFor(() => expect(rowCheckbox('Skill Level Complete', 'device')).toBeChecked());
     // One list, not one accordion per character.
     expect(panel.queryByRole('button', { name: /pilot one/i })).not.toBeInTheDocument();
     expect(panel.getAllByRole('checkbox', { name: /^Skill Level Complete/ })).toHaveLength(2);
+    // Two characters, agreeing everywhere to start.
+    expect(panel.getAllByText('All 2 alike').length).toBeGreaterThan(0);
     // marketOrderFilled/walletBalanceChanged default feed-on/browser-off
     // (GLOSSARY.md round 45) — worth a row, not worth an interruption.
+    await openTopic(user, 'Market and contracts');
     expect(rowCheckbox('Wallet Balance Changed', 'device')).not.toBeChecked();
     expect(rowCheckbox('Wallet Balance Changed', 'Alerts')).toBeChecked();
     expect(rowCheckbox('Sell Order Filled', 'device')).not.toBeChecked();
     expect(rowCheckbox('Sell Order Filled', 'Alerts')).toBeChecked();
-    // Two characters, agreeing everywhere to start.
-    expect(panel.getAllByText('All 2 alike').length).toBeGreaterThan(0);
   });
 
   it('flips an event off for every character it applies to, then back on, persisting to Dexie', async () => {
     const user = userEvent.setup();
     render(<App />);
     await notificationsPanel();
+    await openTopic(user, 'Mail and calendar');
 
     // Pilot Two has no Mail scope, so New Mail applies to Pilot One alone.
     await waitFor(() => expect(rowCheckbox('New Mail', 'device')).toBeChecked());
@@ -600,11 +619,13 @@ describe('Settings — Notifications (issue #170)', () => {
   });
 
   it('offers the extractor-expiring event on both channels and discloses the scheduled-push lead time', async () => {
+    const user = userEvent.setup();
     // Issue #358: extractor-expiring moved from an app-open poll to a
     // scheduled push delivered up to 72 hours ahead; the disclosure text
     // must reflect that, not the old 5-minute poll wording.
     render(<App />);
     await notificationsPanel();
+    await openTopic(user, 'Industry and PI');
 
     await waitFor(() => {
       expect(rowCheckbox('Planetary Extractor Expiring', 'device')).toBeInTheDocument();
@@ -619,6 +640,7 @@ describe('Settings — Notifications (issue #170)', () => {
     const user = userEvent.setup();
     render(<App />);
     await notificationsPanel();
+    await openTopic(user, 'Skills');
     await waitFor(() => expect(rowCheckbox('Skill Level Complete', 'device')).toBeChecked());
 
     act(() => {
@@ -654,8 +676,10 @@ describe('Settings — Notifications (issue #170)', () => {
 
   it('shows a blocked notice and disables only the browser controls while permission is denied', async () => {
     stubNotification('denied');
+    const user = userEvent.setup();
     render(<App />);
     await notificationsPanel();
+    await openTopic(user, 'Mail and calendar');
 
     expect(await screen.findByText(/notifications are blocked/i)).toBeInTheDocument();
     // Android settings exist only behind the Play Store app's shell.
@@ -666,11 +690,11 @@ describe('Settings — Notifications (issue #170)', () => {
     expect(
       screen.queryByRole('button', { name: /turn on device notifications/i })
     ).not.toBeInTheDocument();
-    expect(screen.getByRole('checkbox', { name: 'Device notifications' })).toBeDisabled();
+    expect(screen.getByRole('checkbox', { name: 'Device pop-ups' })).toBeDisabled();
 
     // ...but the Overview feed works with no grant at all, so its controls stay live.
     expect(screen.getByRole('checkbox', { name: 'Enable notifications' })).toBeEnabled();
-    expect(screen.getByRole('checkbox', { name: 'Alerts notifications' })).toBeEnabled();
+    expect(screen.getByRole('checkbox', { name: 'Alerts list' })).toBeEnabled();
 
     await waitFor(() => expect(rowCheckbox('New Mail', 'Alerts')).toBeEnabled());
     expect(rowCheckbox('New Mail', 'device')).toBeDisabled();
@@ -709,7 +733,7 @@ describe('Settings — Notifications (issue #170)', () => {
       await notificationsPanel();
 
       await waitFor(() =>
-        expect(screen.getByRole('checkbox', { name: 'Device notifications' })).toBeEnabled()
+        expect(screen.getByRole('checkbox', { name: 'Device pop-ups' })).toBeEnabled()
       );
       expect(
         screen.queryByRole('button', { name: /open notification settings/i })
@@ -732,7 +756,7 @@ describe('Settings — Notifications (issue #170)', () => {
       await waitFor(() =>
         expect(screen.queryByText(/notifications are off for this app/i)).not.toBeInTheDocument()
       );
-      expect(screen.getByRole('checkbox', { name: 'Device notifications' })).toBeEnabled();
+      expect(screen.getByRole('checkbox', { name: 'Device pop-ups' })).toBeEnabled();
     });
   });
 
@@ -772,7 +796,7 @@ describe('Settings — Notifications (issue #170)', () => {
     await notificationsPanel();
 
     expect(await screen.findByText(/couldn't reach the server/i)).toBeInTheDocument();
-    expect(screen.getByRole('checkbox', { name: 'Device notifications' })).toBeEnabled();
+    expect(screen.getByRole('checkbox', { name: 'Device pop-ups' })).toBeEnabled();
 
     await user.click(screen.getByRole('button', { name: 'Retry' }));
     expect(enableWebPush).toHaveBeenCalledTimes(1);
@@ -786,15 +810,17 @@ describe('Settings — Notifications (issue #170)', () => {
     render(<App />);
     await notificationsPanel();
     await waitFor(() =>
-      expect(screen.getByRole('checkbox', { name: 'Device notifications' })).toBeEnabled()
+      expect(screen.getByRole('checkbox', { name: 'Device pop-ups' })).toBeEnabled()
     );
     expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
   });
 
   it('never requests permission on its own when the grant is already settled', async () => {
     const requestPermission = stubNotification('granted');
+    const user = userEvent.setup();
     render(<App />);
     await notificationsPanel();
+    await openTopic(user, 'Mail and calendar');
 
     await waitFor(() => expect(rowCheckbox('New Mail', 'device')).toBeInTheDocument());
     expect(screen.queryByText(/notifications are blocked/i)).not.toBeInTheDocument();
@@ -808,6 +834,7 @@ describe('Settings — Notifications (issue #170)', () => {
     const user = userEvent.setup();
     render(<App />);
     await notificationsPanel();
+    await openTopic(user, 'Mail and calendar');
     const sheet = await openEvent(user, 'New Mail');
 
     // Pilot Two stays listed, dimmed and aria-disabled, so the reason can be read.
@@ -827,24 +854,32 @@ describe('Settings — Notifications (issue #170)', () => {
     ).not.toHaveAttribute('aria-disabled');
   });
 
-  it('files events under named groups: skills, industry, market (price alert last), mail, corp notifications, then EVE notifications last', async () => {
+  it('files events under named topics: skills, industry, market (price alert last), mail, corp, then EVE notifications last', async () => {
+    const user = userEvent.setup();
     render(<App />);
-    const panel = await notificationsPanel();
-    await waitFor(() => expect(rowCheckbox('New Mail', 'device')).toBeInTheDocument());
-    const text = panel.textContent ?? '';
-    const at = (label: string) => {
+    const panel = within(await notificationsPanel());
+    const topics = (await panel.findByRole('list', { name: 'Topics' })).textContent ?? '';
+    const at = (text: string, label: string) => {
       const index = text.indexOf(label);
       expect(index, label).toBeGreaterThanOrEqual(0);
       return index;
     };
 
-    expect(at('Skills')).toBeLessThan(at('Industry and PI'));
-    expect(at('Industry and PI')).toBeLessThan(at('Market and contracts'));
-    expect(at('Wallet Balance Changed')).toBeLessThan(at('Quickbar Price Alert'));
-    expect(at('Quickbar Price Alert')).toBeLessThan(at('Mail and calendar'));
-    expect(at('Mail and calendar')).toBeLessThan(at('Corp notifications'));
-    expect(at('Corp notifications')).toBeLessThan(at('Structure Fuel Low'));
-    expect(at('Member Joined')).toBeLessThan(at('EVE notifications'));
+    expect(at(topics, 'Skills')).toBeLessThan(at(topics, 'Industry and PI'));
+    expect(at(topics, 'Industry and PI')).toBeLessThan(at(topics, 'Market and contracts'));
+    expect(at(topics, 'Market and contracts')).toBeLessThan(at(topics, 'Mail and calendar'));
+    expect(at(topics, 'Mail and calendar')).toBeLessThan(at(topics, 'Corp'));
+    expect(at(topics, 'Corp')).toBeLessThan(at(topics, 'EVE notifications'));
+
+    await openTopic(user, 'Market and contracts');
+    const market = (await panel.findByRole('heading', { name: 'Market and contracts' }))
+      .parentElement!.textContent!;
+    expect(at(market, 'Wallet Balance Changed')).toBeLessThan(at(market, 'Quickbar Price Alert'));
+
+    await openTopic(user, 'Corp');
+    const corp = (await panel.findByRole('heading', { name: 'Corp' })).parentElement!.textContent!;
+    expect(at(corp, 'Best-effort')).toBeLessThan(at(corp, 'Structure Fuel Low'));
+    expect(at(corp, 'Structure Fuel Low')).toBeLessThan(at(corp, 'Member Joined'));
   });
 
   it('says once, on the corp event, that a character has not granted the Corporation permission', async () => {
@@ -863,9 +898,10 @@ describe('Settings — Notifications (issue #170)', () => {
     const user = userEvent.setup();
     render(<App />);
     await notificationsPanel();
+    await openTopic(user, 'Corp');
     const sheet = await openEvent(user, 'Member Joined');
 
-    // Once, on the Corp notifications group, not on each of its five rows.
+    // Once, on the Corp topic, not on each of its five rows.
     expect(screen.getAllByText(/hasn't granted/)).toHaveLength(1);
     // The row is still listed for that character, and still disabled.
     expect(
@@ -877,6 +913,7 @@ describe('Settings — Notifications (issue #170)', () => {
     const user = userEvent.setup();
     render(<App />);
     await notificationsPanel();
+    await openTopic(user, 'Skills');
     const sheet = await openEvent(user, 'Skill Level Complete');
 
     await user.click(
@@ -970,6 +1007,7 @@ describe('Settings — Notifications (issue #170)', () => {
     const user = userEvent.setup();
     render(<App />);
     await notificationsPanel();
+    await openTopic(user, 'EVE notifications');
 
     const sheet = await openEvent(user, 'EVE Notifications');
 
@@ -993,35 +1031,60 @@ describe('Settings — Notifications (issue #170)', () => {
    * — which is what breaks if someone later drops the filter.
    */
   it('marks only the events that really arrive with the app closed', async () => {
+    const user = userEvent.setup();
     render(<App />);
     const panel = within(await notificationsPanel());
 
     const badgeName = /arrives even with the app closed/i;
     // The label and its badge are siblings inside one wrapper span, so the
-    // label's row is exactly the scope to ask about.
-    await panel.findAllByText('Skill Level Complete');
-    const rowFor = (name: string) => within(panel.getByText(name).closest('li')!);
+    // label's row is exactly the scope to ask about. Rows only render for the
+    // open topic, so each is looked up after opening its own.
+    const rowIn = async (topic: string, name: string) => {
+      await openTopic(user, topic);
+      await panel.findAllByText(name);
+      return within(panel.getByText(name).closest('li')!);
+    };
 
     // Scheduled Push: a knowable future instant the backend can fire on.
     expect(
-      rowFor('Skill Level Complete').getByRole('img', { name: badgeName })
+      (await rowIn('Skills', 'Skill Level Complete')).getByRole('img', { name: badgeName })
     ).toBeInTheDocument();
     expect(
-      rowFor('Planetary Extractor Expiring').getByRole('img', { name: badgeName })
+      (await rowIn('Skills', 'Clone Jump Ready')).getByRole('img', { name: badgeName })
     ).toBeInTheDocument();
-    expect(rowFor('Structure Fuel Low').getByRole('img', { name: badgeName })).toBeInTheDocument();
-    expect(rowFor('Clone Jump Ready').getByRole('img', { name: badgeName })).toBeInTheDocument();
+    expect(
+      (await rowIn('Industry and PI', 'Planetary Extractor Expiring')).getByRole('img', {
+        name: badgeName,
+      })
+    ).toBeInTheDocument();
+    expect(
+      (await rowIn('Corp', 'Structure Fuel Low')).getByRole('img', { name: badgeName })
+    ).toBeInTheDocument();
 
     // Poll-only: nothing knows when these happen until they have happened.
-    expect(rowFor('New Mail').queryByRole('img', { name: badgeName })).toBeNull();
-    expect(rowFor('Contract Accepted').queryByRole('img', { name: badgeName })).toBeNull();
-    expect(rowFor('Member Joined').queryByRole('img', { name: badgeName })).toBeNull();
-    expect(rowFor('EVE Notifications').queryByRole('img', { name: badgeName })).toBeNull();
+    expect(
+      (await rowIn('Mail and calendar', 'New Mail')).queryByRole('img', { name: badgeName })
+    ).toBeNull();
+    expect(
+      (await rowIn('Market and contracts', 'Contract Accepted')).queryByRole('img', {
+        name: badgeName,
+      })
+    ).toBeNull();
+    expect(
+      (await rowIn('Corp', 'Member Joined')).queryByRole('img', { name: badgeName })
+    ).toBeNull();
+    expect(
+      (await rowIn('EVE notifications', 'EVE Notifications')).queryByRole('img', {
+        name: badgeName,
+      })
+    ).toBeNull();
   });
 
   it('labels the two delivery columns with what each one does', async () => {
+    const user = userEvent.setup();
     render(<App />);
     const panel = within(await notificationsPanel());
+    await openTopic(user, 'Skills');
 
     // "App" and "List" named neither the pop-up nor the page it lands on.
     // Scoped to the panel: the app's own nav has an "Overview" link, which
@@ -1029,6 +1092,13 @@ describe('Settings — Notifications (issue #170)', () => {
     // "Browser" was wrong in the Play Store app, which has no browser in sight.
     expect((await panel.findAllByText(/^Device$/)).length).toBeGreaterThan(0);
     expect(panel.getAllByText(/^Alerts$/).length).toBeGreaterThan(0);
+    // The header captions (md up) and the row's own captions (phone) agree.
+    expect(panel.getByText('Warn ahead')).toBeInTheDocument();
+    expect(panel.getByText('Characters')).toBeInTheDocument();
+    const rowDevice = rowCheckbox('Skill Level Complete', 'device').closest('label')!;
+    expect(within(rowDevice).getByText('Device')).toBeInTheDocument();
+    const rowAlerts = rowCheckbox('Skill Level Complete', 'Alerts').closest('label')!;
+    expect(within(rowAlerts).getByText('Alerts')).toBeInTheDocument();
     expect(panel.queryByText(/^Browser$/)).not.toBeInTheDocument();
     expect(panel.queryByText(/^App$/)).not.toBeInTheDocument();
     expect(panel.queryByText(/^List$/)).not.toBeInTheDocument();
@@ -1039,6 +1109,7 @@ describe('Settings — Notifications (issue #170)', () => {
       const user = userEvent.setup();
       render(<App />);
       await notificationsPanel();
+      await openTopic(user, 'Mail and calendar');
 
       // Pilot Two has every notification scope except New Mail's (outer
       // beforeEach), so New Mail applies to Pilot One alone.
@@ -1057,6 +1128,7 @@ describe('Settings — Notifications (issue #170)', () => {
       const user = userEvent.setup();
       render(<App />);
       await notificationsPanel();
+      await openTopic(user, 'Skills');
       await waitFor(() => expect(rowCheckbox('Skill Level Complete', 'device')).toBeChecked());
 
       await user.click(rowCheckbox('Skill Level Complete', 'device'));
@@ -1073,8 +1145,10 @@ describe('Settings — Notifications (issue #170)', () => {
 
     it("disables the device column when the browser permission is denied, matching a Character's own row", async () => {
       stubNotification('denied');
+      const user = userEvent.setup();
       render(<App />);
       await notificationsPanel();
+      await openTopic(user, 'Skills');
 
       await waitFor(() => expect(rowCheckbox('Skill Level Complete', 'device')).toBeDisabled());
       // The Alerts column is unaffected — only the device column is permission-gated.
@@ -1086,6 +1160,7 @@ describe('Settings — Notifications (issue #170)', () => {
       const confirmSpy = vi.spyOn(window, 'confirm');
       render(<App />);
       await notificationsPanel();
+      await openTopic(user, 'Skills');
       await waitFor(() => expect(rowCheckbox('Skill Level Complete', 'device')).toBeChecked());
 
       await user.click(rowCheckbox('Skill Level Complete', 'device'));
@@ -1101,6 +1176,7 @@ describe('Settings — Notifications (issue #170)', () => {
     async function renderPanelWithFakeTimers() {
       render(<App />);
       await notificationsPanel();
+      await openTopic(userEvent.setup(), 'Skills');
       await waitFor(() => expect(rowCheckbox('Skill Level Complete', 'device')).toBeChecked());
       // The scheduler is module state: let a rebuild an earlier test's
       // browser click queued (on real timers) land before counting.
@@ -1123,11 +1199,13 @@ describe('Settings — Notifications (issue #170)', () => {
     it('turning a browser event on rebuilds once; an Overview-only toggle does not', async () => {
       const user = await renderPanelWithFakeTimers();
 
+      await openTopic(user, 'Mail and calendar');
       await user.click(rowCheckbox('New Mail', 'Alerts'));
       await afterQuietPeriod();
       expect(rebuildProjection).not.toHaveBeenCalled();
 
       // Wallet Balance Changed defaults browser-off (GLOSSARY.md round 45).
+      await openTopic(user, 'Market and contracts');
       await user.click(rowCheckbox('Wallet Balance Changed', 'device'));
       await afterQuietPeriod();
       await waitFor(() => expect(rebuildProjection).toHaveBeenCalledTimes(1));
@@ -1136,6 +1214,7 @@ describe('Settings — Notifications (issue #170)', () => {
     it('a row-level browser broadcast rebuilds once', async () => {
       const user = await renderPanelWithFakeTimers();
 
+      await openTopic(user, 'Mail and calendar');
       await user.click(rowCheckbox('New Mail', 'device'));
       await afterQuietPeriod();
       await waitFor(() => expect(rebuildProjection).toHaveBeenCalledTimes(1));
@@ -1144,11 +1223,11 @@ describe('Settings — Notifications (issue #170)', () => {
     it('the master switch and browser gate each rebuild once; the Overview gate does not', async () => {
       const user = await renderPanelWithFakeTimers();
 
-      await user.click(screen.getByRole('checkbox', { name: 'Alerts notifications' }));
+      await user.click(screen.getByRole('checkbox', { name: 'Alerts list' }));
       await afterQuietPeriod();
       expect(rebuildProjection).not.toHaveBeenCalled();
 
-      await user.click(screen.getByRole('checkbox', { name: 'Device notifications' }));
+      await user.click(screen.getByRole('checkbox', { name: 'Device pop-ups' }));
       await afterQuietPeriod();
       await waitFor(() => expect(rebuildProjection).toHaveBeenCalledTimes(1));
 
@@ -1168,10 +1247,12 @@ describe('Settings — Notifications (issue #170)', () => {
         seenAtRebuild = isEventEnabledFor(stored.perCharacter[CHAR_ID] ?? {}, 'newMail', 'browser');
       });
 
+      await openTopic(user, 'Mail and calendar');
       const newMail = rowCheckbox('New Mail', 'device');
       await user.click(newMail);
       await user.click(newMail);
       await user.click(newMail);
+      await openTopic(user, 'Skills');
       await user.click(rowCheckbox('Skill Level Complete', 'device'));
       await afterQuietPeriod();
 
@@ -1205,8 +1286,10 @@ describe('Settings — Notifications with twenty characters', () => {
   });
 
   it('shows one row per event, not one list per character', async () => {
+    const user = userEvent.setup();
     render(<App />);
     const panel = within(await notificationsPanel());
+    await openTopic(user, 'Skills');
     await waitFor(() => expect(rowCheckbox('Skill Level Complete', 'device')).toBeChecked());
 
     expect(panel.getAllByRole('checkbox', { name: /^Skill Level Complete/ })).toHaveLength(2);
@@ -1220,6 +1303,7 @@ describe('Settings — Notifications with twenty characters', () => {
     const user = userEvent.setup();
     render(<App />);
     await notificationsPanel();
+    await openTopic(user, 'Skills');
     await waitFor(() => expect(rowCheckbox('Skill Level Complete', 'device')).toBeChecked());
     const sheet = await openEvent(user, 'Skill Level Complete');
 
@@ -1240,6 +1324,7 @@ describe('Settings — Notifications with twenty characters', () => {
     const user = userEvent.setup();
     render(<App />);
     await notificationsPanel();
+    await openTopic(user, 'Skills');
     await waitFor(() => expect(rowCheckbox('Skill Level Complete', 'Alerts')).toBeChecked());
 
     await user.click(rowCheckbox('Skill Level Complete', 'Alerts'));
@@ -1255,6 +1340,7 @@ describe('Settings — Notifications with twenty characters', () => {
     const user = userEvent.setup();
     render(<App />);
     const panel = within(await notificationsPanel());
+    await openTopic(user, 'Skills');
     await waitFor(() => expect(rowCheckbox('Skill Level Complete', 'device')).toBeChecked());
 
     await user.type(panel.getByPlaceholderText('Search events or characters'), 'Pilot 007');
