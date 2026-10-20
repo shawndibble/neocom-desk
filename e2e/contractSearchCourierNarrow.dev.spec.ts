@@ -311,3 +311,52 @@ test.describe('courier board — 390px width', () => {
     await expect(page.getByText('= 500,000,000 ISK')).toBeVisible();
   });
 });
+
+/**
+ * Between 1024px and about 1099px, with the left rail open, the table was wider
+ * than its panel: the Expires cell was one nowrap timestamp, so its text ran past
+ * the panel border and the viewport edge (issue #4499). The cell now stacks the
+ * date over the time of day.
+ */
+for (const width of [1024, 1440]) {
+  test.describe(`courier board — ${width}px width`, () => {
+    test.use({ viewport: { width, height: 768 } });
+
+    test('the table fits its panel and Expires shows date and time', async ({ page }) => {
+      await signInAndGoto(page);
+      await seedCourierSnapshot(page, courierSnapshotRows());
+
+      await page.goto('./contracts');
+      await page.getByRole('main').getByRole('tab', { name: 'Courier' }).click();
+
+      const table = page.getByRole('table', { name: 'Courier Contract Search' });
+      const lastCell = table.locator('tbody tr').first().locator('td').last();
+      await expect(lastCell).toBeVisible();
+
+      // The panel is the nearest ancestor drawing a border around the table.
+      const panelRight = await table.evaluate((element) => {
+        let node = element.parentElement;
+        while (node && parseFloat(getComputedStyle(node).borderLeftWidth) === 0) {
+          node = node.parentElement;
+        }
+        return (node ?? document.documentElement).getBoundingClientRect().right;
+      });
+      const cellBox = await lastCell.boundingBox();
+      const tableBox = await table.boundingBox();
+      expect(cellBox!.x + cellBox!.width).toBeLessThanOrEqual(panelRight + ALIGNMENT_TOLERANCE_PX);
+      expect(tableBox!.x + tableBox!.width).toBeLessThanOrEqual(
+        panelRight + ALIGNMENT_TOLERANCE_PX
+      );
+
+      // Date over time: both are present, on separate lines.
+      const parts = lastCell.locator('span:visible');
+      await expect(parts).toHaveCount(2);
+      const [dateBox, timeBox] = await Promise.all([
+        parts.nth(0).boundingBox(),
+        parts.nth(1).boundingBox(),
+      ]);
+      expect(timeBox!.y).toBeGreaterThan(dateBox!.y);
+      await expect(parts.nth(1)).toHaveText(/\d{1,2}:\d{2}/);
+    });
+  });
+}
