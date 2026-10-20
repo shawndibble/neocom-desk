@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { cleanup, render, screen, within, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, within, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -11,7 +11,6 @@ import { useAuthFailure } from '@/stores/authFailure';
 import { App } from '@/app/App';
 import * as routeChunks from '@/app/routeChunks';
 import { resetRevalidationState } from '@/esi/cache';
-import { esiInFlight } from '@/esi/budget';
 import { clearMarketPriceCache } from '@/market/prices';
 import { clearCostIndexCache } from '@/features/industry/marketData';
 import { useBuildGroups } from '@/features/industry/buildGroups';
@@ -221,17 +220,7 @@ function stubDesktopViewport() {
 }
 
 afterEach(async () => {
-  // A read still in flight when its test ends writes its response into
-  // `esiCache` after the next `resetSession` has cleared it, and the next
-  // test then reads that stale row as fresh instead of fetching its own
-  // handler's payload. Unmount so nothing new starts, then wait for the
-  // requests on the wire. This narrows the window rather than closing it:
-  // `esiInFlight()` drops when the response arrives, a little before the body
-  // is parsed and the row is written, which the one-tick settle only mostly
-  // covers.
-  cleanup();
-  await waitFor(() => expect(esiInFlight()).toBe(0));
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  // Pending ESI cache loads are settled by the global afterEach in vitest.setup.dom.ts.
   server.resetHandlers();
   clearMarketPriceCache();
   clearCostIndexCache();
