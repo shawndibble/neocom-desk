@@ -34,6 +34,11 @@ export interface ObservedRow {
   solarSystemId?: number;
   /** The moon the refinery was drilling that day, when known — for per-moon rates. */
   moonId?: number;
+  /**
+   * The feeder corporation whose refinery recorded the row. Absent means the
+   * book's own corporation, so every existing book reads as before.
+   */
+  sourceCorporationId?: number;
 }
 
 /**

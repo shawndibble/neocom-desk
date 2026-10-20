@@ -205,7 +205,7 @@ export async function runBookSync(
     if (ledger.kind === 'backoff') return { kind: 'skipped', reason: 'esi-budget' };
     // A refinery that did not answer is a missing read, not an empty ledger: abandon the run.
     if (ledger.kind !== 'ok') return { kind: 'skipped', reason: 'esi-unavailable' };
-    const rows = observedRowsFromLedger(structureId, ledger.data, ledger.fetchedAt);
+    const rows = observedRowsFromLedger(structureId, ledger.data, ledger.fetchedAt, corporationId);
     feed.rows.push(...rows);
     feed.truncated ||= ledger.truncated;
     feed.oldestEsiDate[structureId] = rows.map((r) => r.date).sort()[0];

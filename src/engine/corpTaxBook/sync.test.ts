@@ -99,6 +99,24 @@ describe('observedRowsFromLedger', () => {
     ]);
   });
 
+  it('stamps the source corporation on every row when given one', () => {
+    const rows = observedRowsFromLedger(
+      1001,
+      [
+        {
+          character_id: 7,
+          recorded_corporation_id: 9,
+          type_id: 45490,
+          quantity: 12,
+          last_updated: '2026-07-12',
+        },
+      ],
+      '2026-07-12T10:00:00.000Z',
+      98000002
+    );
+    expect(rows[0].sourceCorporationId).toBe(98000002);
+  });
+
   it('drops rows the server would reject: no quantity, a bad date or a non-integer', () => {
     const base = {
       character_id: 7,
