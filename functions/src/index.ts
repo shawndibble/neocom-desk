@@ -216,6 +216,7 @@ export const registerDevice = onCall<unknown>({ maxInstances: 5 }, async (reques
     characterIds: registration.characterIds,
     projections,
     eveTypesByCharacter,
+    quietHours: input.quietHours,
   });
 
   // The types the server has seen for each Character (alertGrants, ADR 0020),

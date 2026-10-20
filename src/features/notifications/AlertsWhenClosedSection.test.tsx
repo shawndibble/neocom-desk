@@ -14,6 +14,7 @@ vi.mock('@/sync/alertsGrantApi', () => ({
 }));
 
 import { AlertsWhenClosedSection } from './AlertsWhenClosedSection';
+import { DEFAULT_NOTIFICATION_PREFERENCES, useNotificationPreferences } from './preferences';
 import { markAlertsNeedReauth, readAlertsGrants } from './alertsGrant';
 import { queueAlertsForAll } from './alertsGrant';
 
@@ -45,6 +46,7 @@ async function turnOn(characterId: number) {
 beforeEach(async () => {
   vi.clearAllMocks();
   sessionStorage.clear();
+  useNotificationPreferences.setState({ value: DEFAULT_NOTIFICATION_PREFERENCES });
   await db.settings.clear();
   login.begin.mockResolvedValue(undefined);
   remote.del.mockResolvedValue(undefined);
@@ -190,5 +192,30 @@ describe('AlertsWhenClosedSection', () => {
     unmount();
     await renderSection({ alertsGrant: { status: 'failed', characterId: 2 } });
     expect(await screen.findByRole('status')).toHaveTextContent(/Could not turn on .* Beta/);
+  });
+});
+
+describe('Quiet time (issue #4566)', () => {
+  it('shows the switch and its help; the times appear only when on', async () => {
+    await renderSection();
+    const quiet = screen.getByTestId('quiet-time');
+    expect(within(quiet).getByText(/No pop-ups from the closed app/)).toBeInTheDocument();
+    expect(within(quiet).queryByLabelText('From')).not.toBeInTheDocument();
+
+    await userEvent.click(within(quiet).getByRole('checkbox', { name: 'Quiet time' }));
+
+    expect(await within(quiet).findByLabelText('From')).toHaveValue('22:00');
+    expect(within(quiet).getByLabelText('To')).toHaveValue('07:00');
+    expect(within(quiet).getByRole('checkbox', { name: 'Let attacks through' })).not.toBeChecked();
+  });
+
+  it('turning it off hides the times again', async () => {
+    await renderSection();
+    const quiet = screen.getByTestId('quiet-time');
+    const toggle = within(quiet).getByRole('checkbox', { name: 'Quiet time' });
+    await userEvent.click(toggle);
+    await within(quiet).findByLabelText('From');
+    await userEvent.click(toggle);
+    await waitFor(() => expect(within(quiet).queryByLabelText('From')).not.toBeInTheDocument());
   });
 });

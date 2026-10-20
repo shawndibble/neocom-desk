@@ -17,6 +17,7 @@ import {
   type EventEnabledMap,
   type EveTypeEnabledMap,
 } from './eventSelection';
+import { isQuietTimePrefs, type QuietTimePrefs } from './quietTime';
 import { isCharacterEventThresholds, type CharacterEventThresholds } from './eventThresholdFields';
 import {
   SYNCED_NOTIFICATION_FEED_PREFS_KEY,
@@ -43,6 +44,11 @@ export interface NotificationPreferencesValue {
   feedEnabled?: boolean;
   /** The Alerts popover's View button also dismisses the alert. Absent means off. */
   dismissOnView?: boolean;
+  /**
+   * Quiet time (issue #4566): this device's daily window with no pushes from
+   * the closed app. Device-local, never synced. Absent means off.
+   */
+  quietTime?: QuietTimePrefs;
   perCharacter: Record<number, EventEnabledMap>;
   /**
    * Per-`type` opt-out underneath the single `eveNotification` event (issue
@@ -125,6 +131,7 @@ function isNotificationPreferencesValue(raw: unknown): raw is NotificationPrefer
     isOptionalBoolean(r.browserEnabled) &&
     isOptionalBoolean(r.feedEnabled) &&
     isOptionalBoolean(r.dismissOnView) &&
+    (r.quietTime === undefined || isQuietTimePrefs(r.quietTime)) &&
     isPerCharacterMap(r.perCharacter) &&
     (r.eveNotificationTypesByCharacter === undefined ||
       isEveNotificationTypesByCharacter(r.eveNotificationTypesByCharacter)) &&

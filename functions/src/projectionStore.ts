@@ -27,6 +27,7 @@ import {
   type StoredProjectionRow,
 } from './dispatchProjections.js';
 import type { CharacterProjection } from './registerDevice.js';
+import { suppressPush, type QuietHours } from './quietHours.js';
 
 export const PROJECTIONS_COLLECTION = 'projections';
 export const DEVICE_REGISTRATIONS_COLLECTION = 'deviceRegistrations';
@@ -64,6 +65,11 @@ export interface DeviceRegistrationWrite {
    * `set` replaces only this device's lists.
    */
   eveTypesByCharacter: Record<number, string[]>;
+  /**
+   * This device's quiet time (issue #4566). `undefined` (an older client)
+   * keeps what the registration already stores; `null` clears it.
+   */
+  quietHours?: QuietHours | null;
 }
 
 type Doc = QueryDocumentSnapshot;
@@ -106,6 +112,10 @@ export async function writeDeviceRegistration(
     typeof previous?.eveTypesByCharacter === 'object' && previous.eveTypesByCharacter !== null
       ? (previous.eveTypesByCharacter as Record<string, string[]>)
       : {};
+  // An upload without a window keeps the stored one; `null` drops it (`set`
+  // below rebuilds the doc, so an omitted field is a deleted one).
+  const quietHours =
+    write.quietHours === undefined ? readQuietHours(previous?.quietHours) : write.quietHours;
   const droppedIds = previousIds.filter((id) => !write.characterIds.includes(id));
   // Once per Character per device: on the device's first per-device upload,
   // and again for any Character it adds later, which may still carry another
@@ -147,6 +157,7 @@ export async function writeDeviceRegistration(
         write.eveTypesByCharacter[id] ?? previousEveTypes[String(id)] ?? [],
       ])
     ),
+    ...(quietHours ? { quietHours } : {}),
     updatedAt: FieldValue.serverTimestamp(),
   });
 
@@ -192,6 +203,17 @@ interface Registration {
   id: string;
   fcmToken: string;
   characterIds: number[];
+  quietHours?: QuietHours;
+}
+
+/** A stored window, or undefined when absent or not the shape `parseQuietHours` writes. */
+export function readQuietHours(raw: unknown): QuietHours | undefined {
+  if (typeof raw !== 'object' || raw === null) return undefined;
+  const { start, end, timeZone, allowAttacks } = raw as Record<string, unknown>;
+  if (typeof start !== 'string' || typeof end !== 'string' || typeof timeZone !== 'string') {
+    return undefined;
+  }
+  return { start, end, timeZone, allowAttacks: allowAttacks === true };
 }
 
 /**
@@ -229,6 +251,7 @@ export async function dispatchDueProjections(
       id: doc.id,
       fcmToken: data.fcmToken as string,
       characterIds: Array.isArray(data.characterIds) ? (data.characterIds as number[]) : [],
+      quietHours: readQuietHours(data.quietHours),
     };
   };
 
@@ -291,8 +314,17 @@ export async function dispatchDueProjections(
         targets = [device];
       }
 
+      // Quiet time (issue #4566): a device inside its window is skipped, not
+      // queued. The row is marked fired below, so it is never pushed late and
+      // still reaches the Alerts list through the feed sync.
+      const awake = targets.filter((device) => !suppressPush(now, device.quietHours, row.eveType));
+      if (awake.length === 0) {
+        await doc.ref.update({ fired: true, firedAt: now });
+        return;
+      }
+
       const data = buildPushData(row);
-      const sent = await Promise.all(targets.map((device) => sendTo(device, data)));
+      const sent = await Promise.all(awake.map((device) => sendTo(device, data)));
 
       // Only mark fired once a device actually received it — every send
       // failing on a transient error leaves the row unfired so the next

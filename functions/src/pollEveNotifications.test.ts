@@ -42,6 +42,7 @@ function setup(opts: {
   refresh?: (id: number) => Promise<RefreshOutcome | void>;
   esi?: (id: number) => NotificationsResult;
   send?: (token: string, m: PushMessage) => Promise<void>;
+  now?: () => number;
 }) {
   const grants = opts.grants ?? { 1: grant() };
   const store = {
@@ -66,6 +67,7 @@ function setup(opts: {
       sent.push({ token, m });
     }),
     log: vi.fn(),
+    ...(opts.now ? { now: opts.now } : {}),
   };
   return { store, deps, sent };
 }
@@ -236,5 +238,74 @@ describe('pollEveNotifications', () => {
     const summary = await pollEveNotifications(deps);
     expect(summary).toMatchObject({ polled: 1, skipped: 1 });
     expect(store.patch).toHaveBeenCalledWith(2, 'blob', expect.anything());
+  });
+});
+
+describe('quiet time (issue #4566)', () => {
+  // 13:00Z; AFTER is 13:00Z too.
+  const NOW = Date.parse('2026-10-14T13:30:00Z');
+  const window = (over: Partial<NonNullable<PollDevice['quietHours']>> = {}) => ({
+    start: '13:00',
+    end: '14:00',
+    timeZone: 'UTC',
+    allowAttacks: false,
+    ...over,
+  });
+  const attackDevice = (quietHours: PollDevice['quietHours']): PollDevice => ({
+    ...phone,
+    eveTypes: ['WarDeclared', 'StructureUnderAttack'],
+    quietHours,
+  });
+  const feed = () => ({
+    kind: 'ok' as const,
+    etag: '"new"',
+    budgetLow: false,
+    notifications: [note(11), note(12, 'StructureUnderAttack')],
+  });
+
+  it('sends nothing inside the window, yet still advances the high-water mark', async () => {
+    const { deps, sent, store } = setup({
+      devices: [attackDevice(window())],
+      esi: feed,
+      now: () => NOW,
+    });
+    await pollEveNotifications(deps);
+    expect(sent).toEqual([]);
+    expect(store.patch).toHaveBeenCalledWith(
+      1,
+      'blob',
+      expect.objectContaining({ highWaterId: 12 })
+    );
+  });
+
+  it('sends outside the window', async () => {
+    const { deps, sent } = setup({
+      devices: [attackDevice(window({ start: '20:00', end: '21:00' }))],
+      esi: feed,
+      now: () => NOW,
+    });
+    await pollEveNotifications(deps);
+    expect(sent.map((s) => s.m.data.notificationId)).toEqual(['11', '12']);
+  });
+
+  it('lets only attacks through when the checkbox is ticked', async () => {
+    const { deps, sent } = setup({
+      devices: [attackDevice(window({ allowAttacks: true }))],
+      esi: feed,
+      now: () => NOW,
+    });
+    await pollEveNotifications(deps);
+    expect(sent.map((s) => s.m.data.notificationId)).toEqual(['12']);
+  });
+
+  it('only silences the device whose window it is', async () => {
+    const other: PollDevice = { ...phone, deviceId: 'tablet', fcmToken: 'fcm-tablet' };
+    const { deps, sent } = setup({
+      devices: [attackDevice(window()), other],
+      esi: feed,
+      now: () => NOW,
+    });
+    await pollEveNotifications(deps);
+    expect(sent.map((s) => s.token)).toEqual(['fcm-tablet']);
   });
 });

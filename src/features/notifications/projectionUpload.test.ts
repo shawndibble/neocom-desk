@@ -56,7 +56,7 @@ describe('uploadProjectionRows', () => {
       expect.any(String),
       readyRegistration,
       rows,
-      { skipIfUnchanged: true, eveTypesByCharacter: TYPES }
+      { skipIfUnchanged: true, eveTypesByCharacter: TYPES, quietHours: null }
     );
   });
 

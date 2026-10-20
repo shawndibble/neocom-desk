@@ -538,3 +538,62 @@ describe('dispatchDueProjections query boundaries', () => {
     }
   );
 });
+
+describe('quiet time (issue #4566)', () => {
+  const due = row('industryJobComplete', NOW - 60_000);
+  const hour = new Date(NOW).getUTCHours();
+  const hh = (h: number) => `${String((h + 24) % 24).padStart(2, '0')}:00`;
+  const insideNow = (over: Record<string, unknown> = {}) => ({
+    start: hh(hour - 1),
+    end: hh(hour + 1),
+    timeZone: 'UTC',
+    allowAttacks: false,
+    ...over,
+  });
+  const upWith = async (
+    db: FakeFirestore,
+    quietHours: Parameters<typeof writeDeviceRegistration>[1]['quietHours']
+  ) =>
+    writeDeviceRegistration(asFirestore(db), {
+      deviceId: 'A',
+      fcmToken: 'token-A',
+      characterIds: [CHAR],
+      projections: [{ characterId: CHAR, rows: [due] }],
+      eveTypesByCharacter: {},
+      quietHours,
+    });
+
+  it('stores the window, keeps it when an upload omits it, and drops it on null', async () => {
+    const db = new FakeFirestore();
+    await upWith(db, insideNow());
+    expect(db.get('deviceRegistrations', 'A')?.quietHours).toEqual(insideNow());
+    await upWith(db, undefined);
+    expect(db.get('deviceRegistrations', 'A')?.quietHours).toEqual(insideNow());
+    await upWith(db, null);
+    expect(db.get('deviceRegistrations', 'A')?.quietHours).toBeUndefined();
+  });
+
+  it('does not push inside the window, and marks the row fired so it is not sent late', async () => {
+    const db = new FakeFirestore();
+    const messaging = new FakeMessaging();
+    await upWith(db, insideNow());
+
+    await dispatchDueProjections(asFirestore(db), messaging, NOW);
+
+    expect(messaging.sent).toEqual([]);
+    expect(db.get('projections', projectionDocId('A', due.occurrenceKey))).toMatchObject({
+      fired: true,
+      firedAt: NOW,
+    });
+  });
+
+  it('pushes outside the window', async () => {
+    const db = new FakeFirestore();
+    const messaging = new FakeMessaging();
+    await upWith(db, insideNow({ start: hh(hour + 2), end: hh(hour + 3) }));
+
+    await dispatchDueProjections(asFirestore(db), messaging, NOW);
+
+    expect(messaging.sent.map((m) => m.token)).toEqual(['token-A']);
+  });
+});
