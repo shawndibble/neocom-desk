@@ -11,7 +11,7 @@ import { useTranslation } from 'react-i18next';
 import { ExternalLink } from '@/components/ui/ExternalLink';
 import { MUTAMARKET_SITE_URL } from '@/market/mutamarket';
 import { CONTRACT_ISK_CENTS_BELOW, formatIskAuto } from '@/lib/isk';
-import type { AbyssalContractValue } from './contractAbyssalValue';
+import type { AbyssalContractValue } from './abyssalValueMath';
 
 export function ContractAbyssalValue({ value }: { value: AbyssalContractValue }) {
   const { t } = useTranslation();

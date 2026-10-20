@@ -40,3 +40,21 @@ export function summarizeChannels(
   const differingIds = characterIds.filter((id) => differing.has(id));
   return { state, differingIds, alike: differingIds.length === 0 };
 }
+
+/**
+ * What "Apply to all" changes: per channel, the Characters whose value is not
+ * the majority's. A tie goes to on, so it fixes exactly the Characters
+ * `summarizeChannels` marks as differing.
+ */
+export function applyToAllFlips(
+  characterIds: readonly number[],
+  read: (characterId: number, channel: NotificationChannel) => boolean
+): Record<NotificationChannel, number[]> {
+  const flips = {} as Record<NotificationChannel, number[]>;
+  for (const channel of NOTIFICATION_CHANNELS) {
+    const onIds = characterIds.filter((id) => read(id, channel));
+    const offIds = characterIds.filter((id) => !read(id, channel));
+    flips[channel] = onIds.length >= offIds.length ? offIds : onIds;
+  }
+  return flips;
+}

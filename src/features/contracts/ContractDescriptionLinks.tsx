@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
 import { ExternalMark } from '@/components/ui/ExternalLink';
-import { contractDescriptionLinks } from './contractDescriptionLinks';
+import { contractDescriptionLinks } from './descriptionLinkParts';
 
 function hostOf(href: string): string {
   try {

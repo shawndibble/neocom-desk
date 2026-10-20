@@ -61,7 +61,7 @@ import { useMutaplasmidLookup } from '@/features/abyssal/mutaplasmidData';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { BuildPlanContextMenu } from '@/features/industry/BuildPlanContextMenu';
 import { ContractAbyssalValue } from './ContractAbyssalValue';
-import { loadAbyssalContractValue, type AbyssalContractValue } from './contractAbyssalValue';
+import { loadAbyssalContractValue, type AbyssalContractValue } from './abyssalValueMath';
 import { ContractPriceCheck, type PriceCheckRowModel } from './ContractPriceCheck';
 import { CopyContractIdButton } from './CopyContractIdButton';
 import { OpenInEveButton } from '@/features/openInEve/OpenInEveButton';

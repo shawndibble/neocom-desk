@@ -1,6 +1,10 @@
 /**
  * Settings → Notifications → "Alerts when closed" (ADR 0020): one row per
- * Character for the opt-in server-side alerts. Off by default. Turning one on
+ * Character for the opt-in server-side alerts, on a screen of its own (a
+ * dialog) opened from Delivery's one-line summary. The component stays
+ * mounted while that screen is closed: the EVE round trip hands its outcome
+ * back here, and a "Turn on for all" walk carries on from here, so neither
+ * may wait for someone to open the screen. Off by default. Turning one on
  * sends the user to EVE to authorize that Character for notifications only;
  * the token goes to our server and never to this device.
  *
@@ -12,9 +16,15 @@ import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useTranslation } from 'react-i18next';
-import { Button, Caret, NeedsConnection } from '@/components/ui';
+import { Button, Modal, NeedsConnection } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
-import { focusRingInsetClassName, interactiveClassName } from '@/components/ui/controlStyles';
+import {
+  focusRingInsetClassName,
+  inlineLinkClassName,
+  interactiveClassName,
+} from '@/components/ui/controlStyles';
+import { MD_UP_QUERY, useMediaQuery } from '@/lib/useMediaQuery';
 import { beginAlertsLogin } from '@/app/loginFlow';
 import {
   alertsRowState,
@@ -31,9 +41,6 @@ interface CharacterRef {
   characterId: number;
   name: string;
 }
-
-/** Names listed on the closed section's face before "+N more". */
-const SHOWN_NAMES = 5;
 
 type Notice = { tone: 'info' | 'warning'; text: string } | null;
 
@@ -70,8 +77,10 @@ export function AlertsWhenClosedSection({ characters }: { characters: readonly C
     }
   });
   const [busyId, setBusyId] = useState<number | null>(null);
-  // Closed to start: with many Characters the list pushed every event below the fold.
-  const [expanded, setExpanded] = useState(false);
+  const isDesktop = useMediaQuery(MD_UP_QUERY);
+  // Closed to start, so the list never pushes the Topics below the fold; open on
+  // arrival from EVE, where it holds the outcome of the round trip.
+  const [expanded, setExpanded] = useState(returned !== undefined);
 
   // Side effects only: drop the state so a reload does not replay it, and
   // carry on a "Turn on for all" walk after a success. Guarded, because
@@ -131,143 +140,150 @@ export function AlertsWhenClosedSection({ characters }: { characters: readonly C
     (character) => alertsRowState(grants[character.characterId]) === 'needs-reauth'
   );
 
+  const summary = t('settings.notifications.alertsWhenClosed.summary', {
+    on: enabled.length,
+    total: characters.length,
+  });
+  const reauthNote =
+    needsReauth.length > 0
+      ? t('settings.notifications.alertsWhenClosed.needsReauthCount', { count: needsReauth.length })
+      : null;
+  const title = t('settings.notifications.alertsWhenClosed.title');
+
   return (
-    <section aria-labelledby="alerts-when-closed-heading" className="space-y-2">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 id="alerts-when-closed-heading" className="text-xs font-medium text-text">
+    <section aria-label={title} className="md:ml-auto">
+      {isDesktop ? (
+        <p className="flex flex-wrap items-center gap-x-1.5 text-xs text-text">
+          <span>{title}:</span>
+          <span className="font-mono text-[0.6875rem] text-text-dim">{summary}</span>
+          {reauthNote !== null && (
+            <span className="font-mono text-[0.6875rem] text-warning">{reauthNote}</span>
+          )}
+          <span aria-hidden="true" className="text-text-dim">
+            ·
+          </span>
           <button
             type="button"
-            aria-expanded={expanded}
-            onClick={() => setExpanded((value) => !value)}
-            className={cx(
-              'flex min-h-11 items-center gap-1.5 text-left md:min-h-0',
-              interactiveClassName,
-              focusRingInsetClassName
-            )}
+            aria-haspopup="dialog"
+            aria-label={t('settings.notifications.alertsWhenClosed.manageFor')}
+            onClick={() => setExpanded(true)}
+            className={cx(inlineLinkClassName, focusRingInsetClassName, 'touch:min-h-11')}
           >
-            <Caret expanded={expanded} />
-            {t('settings.notifications.alertsWhenClosed.title')}
+            {t('settings.notifications.alertsWhenClosed.manage')}
           </button>
-        </h3>
-        <span className="font-mono text-[0.6875rem] text-text-dim">
-          {t('settings.notifications.alertsWhenClosed.summary', {
-            on: enabled.length,
-            total: characters.length,
-          })}
-          {needsReauth.length > 0 && (
-            <span className="ml-2 text-warning">
-              {t('settings.notifications.alertsWhenClosed.needsReauthCount', {
-                count: needsReauth.length,
-              })}
-            </span>
-          )}
-        </span>
-        {expanded && toAuthorize.length > 1 && (
-          <NeedsConnection>
-            <Button size="sm" onClick={turnOnAll} disabled={busyId !== null}>
-              {t('settings.notifications.alertsWhenClosed.turnOnAll')}
-            </Button>
-          </NeedsConnection>
-        )}
-      </div>
-      {!expanded && enabled.length > 0 && (
-        <ul className="flex flex-wrap gap-1.5">
-          {enabled.slice(0, SHOWN_NAMES).map((character) => (
-            <li
-              key={character.characterId}
-              className="rounded-xs border border-accent/60 px-1.5 py-0.5 text-[0.6875rem] text-accent"
-            >
-              {character.name}
-            </li>
-          ))}
-          {enabled.length > SHOWN_NAMES && (
-            <li className="rounded-xs border border-line px-1.5 py-0.5 text-[0.6875rem] text-text-dim">
-              {t('settings.notifications.alertsWhenClosed.more', {
-                count: enabled.length - SHOWN_NAMES,
-              })}
-            </li>
-          )}
-        </ul>
-      )}
-      {expanded && (
-        <p className="text-[0.6875rem] text-text-dim">
-          {t('settings.notifications.alertsWhenClosed.hint')}
         </p>
-      )}
-      {notice && (
-        <p
-          role="status"
-          className={
-            notice.tone === 'warning'
-              ? 'rounded-xs border border-warning/60 bg-warning/10 px-3 py-2 text-xs text-warning'
-              : 'rounded-xs border border-line bg-panel-2 px-3 py-2 text-xs text-text'
-          }
+      ) : (
+        <button
+          type="button"
+          aria-haspopup="dialog"
+          onClick={() => setExpanded(true)}
+          className={cx(
+            'flex min-h-11 w-full items-center gap-3 text-left text-xs',
+            interactiveClassName,
+            focusRingInsetClassName
+          )}
         >
-          {notice.text}
-        </p>
+          <span className="min-w-0 flex-1">
+            <span className="block text-text">{title}</span>
+            <span className="block text-[0.6875rem] text-text-dim">
+              {summary}
+              {reauthNote !== null && <span className="text-warning"> · {reauthNote}</span>}
+            </span>
+          </span>
+          <Icon.GoTo size={Icon.ICON_SIZE.sm} aria-hidden="true" className="text-text-dim" />
+        </button>
       )}
-      {expanded && (
-        <ul className="divide-y divide-line rounded-xs border border-line">
-          {characters.map((character) => {
-            const state = alertsRowState(grants[character.characterId]);
-            const busy = busyId === character.characterId;
-            return (
-              <li
-                key={character.characterId}
-                className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-xs"
-              >
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-text">{character.name}</span>
-                  <span className="block text-[0.6875rem] text-text-dim">
-                    {t('settings.notifications.alertsWhenClosed.stores')}
-                  </span>
-                </span>
-                <span
-                  className={state === 'needs-reauth' ? 'text-warning' : 'text-text-dim'}
-                  data-testid={`alerts-state-${character.characterId}`}
+      <Modal
+        open={expanded}
+        onClose={() => setExpanded(false)}
+        title={title}
+        placement={isDesktop ? 'center' : 'sheet-full'}
+      >
+        <div className="space-y-3">
+          <p className="text-[0.6875rem] text-text-dim">
+            {t('settings.notifications.alertsWhenClosed.hint')}
+          </p>
+          {toAuthorize.length > 1 && (
+            <NeedsConnection>
+              <Button size="sm" onClick={turnOnAll} disabled={busyId !== null}>
+                {t('settings.notifications.alertsWhenClosed.turnOnAll')}
+              </Button>
+            </NeedsConnection>
+          )}
+          {notice && (
+            <p
+              role="status"
+              className={
+                notice.tone === 'warning'
+                  ? 'rounded-xs border border-warning/60 bg-warning/10 px-3 py-2 text-xs text-warning'
+                  : 'rounded-xs border border-line bg-panel-2 px-3 py-2 text-xs text-text'
+              }
+            >
+              {notice.text}
+            </p>
+          )}
+          <ul className="divide-y divide-line rounded-xs border border-line">
+            {characters.map((character) => {
+              const state = alertsRowState(grants[character.characterId]);
+              const busy = busyId === character.characterId;
+              return (
+                <li
+                  key={character.characterId}
+                  className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-xs"
                 >
-                  {t(`settings.notifications.alertsWhenClosed.state.${state}`)}
-                </span>
-                {state === 'on' ? (
-                  <Button
-                    size="sm"
-                    loading={busy}
-                    disabled={busyId !== null}
-                    aria-label={t('settings.notifications.alertsWhenClosed.turnOffFor', {
-                      name: character.name,
-                    })}
-                    onClick={() => void turnOff(character.characterId)}
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-text">{character.name}</span>
+                    <span className="block text-[0.6875rem] text-text-dim">
+                      {t('settings.notifications.alertsWhenClosed.stores')}
+                    </span>
+                  </span>
+                  <span
+                    className={state === 'needs-reauth' ? 'text-warning' : 'text-text-dim'}
+                    data-testid={`alerts-state-${character.characterId}`}
                   >
-                    {t('settings.notifications.alertsWhenClosed.turnOff')}
-                  </Button>
-                ) : (
-                  <NeedsConnection>
+                    {t(`settings.notifications.alertsWhenClosed.state.${state}`)}
+                  </span>
+                  {state === 'on' ? (
                     <Button
                       size="sm"
-                      variant={state === 'needs-reauth' ? 'primary' : 'ghost'}
                       loading={busy}
                       disabled={busyId !== null}
-                      aria-label={t(
-                        state === 'needs-reauth'
-                          ? 'settings.notifications.alertsWhenClosed.reauthorizeFor'
-                          : 'settings.notifications.alertsWhenClosed.turnOnFor',
-                        { name: character.name }
-                      )}
-                      onClick={() => turnOn(character.characterId)}
+                      aria-label={t('settings.notifications.alertsWhenClosed.turnOffFor', {
+                        name: character.name,
+                      })}
+                      onClick={() => void turnOff(character.characterId)}
                     >
-                      {t(
-                        state === 'needs-reauth'
-                          ? 'settings.notifications.alertsWhenClosed.reauthorize'
-                          : 'settings.notifications.alertsWhenClosed.turnOn'
-                      )}
+                      {t('settings.notifications.alertsWhenClosed.turnOff')}
                     </Button>
-                  </NeedsConnection>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      )}
+                  ) : (
+                    <NeedsConnection>
+                      <Button
+                        size="sm"
+                        variant={state === 'needs-reauth' ? 'primary' : 'ghost'}
+                        loading={busy}
+                        disabled={busyId !== null}
+                        aria-label={t(
+                          state === 'needs-reauth'
+                            ? 'settings.notifications.alertsWhenClosed.reauthorizeFor'
+                            : 'settings.notifications.alertsWhenClosed.turnOnFor',
+                          { name: character.name }
+                        )}
+                        onClick={() => turnOn(character.characterId)}
+                      >
+                        {t(
+                          state === 'needs-reauth'
+                            ? 'settings.notifications.alertsWhenClosed.reauthorize'
+                            : 'settings.notifications.alertsWhenClosed.turnOn'
+                        )}
+                      </Button>
+                    </NeedsConnection>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      </Modal>
     </section>
   );
 }

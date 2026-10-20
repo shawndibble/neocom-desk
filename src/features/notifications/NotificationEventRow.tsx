@@ -30,9 +30,12 @@ import type { CharacterRef } from './CharacterChipGrid';
 export function NotificationEventRow({
   eventId,
   context,
+  omitUnavailableNote = false,
 }: {
   eventId: NotificationEventId;
   context: EventRowContext;
+  /** The Topic already says nobody can use its events. */
+  omitUnavailableNote?: boolean;
 }) {
   const { t } = useTranslation();
   const entry = eventEntry(eventId);
@@ -59,6 +62,14 @@ export function NotificationEventRow({
         isEventEnabledFor(characterEventPrefs(prefsValue, character.characterId), eventId, 'feed'))
   );
 
+  // What the row's Warn ahead button says; none when no Character has the event on.
+  const warnAheadLabel =
+    entry.thresholds === null || thresholdCharacters.length === 0
+      ? null
+      : entry.thresholds.headingKey === undefined
+        ? t('settings.notifications.warnAheadTimes', { count: thresholdCharacters.length })
+        : t(entry.thresholds.headingKey);
+
   return (
     <AggregateRow
       label={t(eventLabelKey(eventId))}
@@ -71,9 +82,8 @@ export function NotificationEventRow({
       onToggleAll={(ids, channel) =>
         void broadcastEventChannelPref(ids, currentValue(), eventId, channel)
       }
-      onToggleOne={(id, channel) =>
-        void toggleEventChannelPref(id, currentValue(), eventId, channel)
-      }
+      onToggleOne={(id, channel) => toggleEventChannelPref(id, currentValue(), eventId, channel)}
+      omitUnavailableNote={omitUnavailableNote}
       browserBlocked={context.browserBlocked}
       visibleCharacterIds={context.visibleCharacterIds}
       forceExpanded={context.forceExpanded}
@@ -88,14 +98,20 @@ export function NotificationEventRow({
           </>
         ) : undefined
       }
-    >
-      {entry.thresholds !== null && (
-        <EventThresholdsList
-          thresholds={entry.thresholds}
-          characters={thresholdCharacters}
-          prefsValue={prefsValue}
-        />
-      )}
-    </AggregateRow>
+      warnAhead={
+        entry.thresholds !== null && warnAheadLabel !== null
+          ? {
+              label: warnAheadLabel,
+              body: (
+                <EventThresholdsList
+                  thresholds={entry.thresholds}
+                  characters={thresholdCharacters}
+                  prefsValue={prefsValue}
+                />
+              ),
+            }
+          : undefined
+      }
+    />
   );
 }

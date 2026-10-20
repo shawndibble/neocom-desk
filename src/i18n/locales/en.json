@@ -11512,6 +11512,8 @@
       "blockedNotice": "Notifications are blocked — enable them in your device's settings, then return here.",
       "alertsWhenClosed": {
         "title": "Alerts when closed",
+        "manage": "Manage",
+        "manageFor": "Manage Alerts when closed",
         "summary": "{{on}} of {{total}} characters",
         "needsReauthCount_one": "{{count}} needs re-authorizing",
         "needsReauthCount_other": "{{count}} need re-authorizing",
@@ -11628,9 +11630,9 @@
       "walletBalanceChangedThresholdHint": "Accepts shorthand: 10.5m, 10,500,000, or 10500000 (b = billion, m = million, t = thousand).",
       "channelsLegend": "Delivery channels",
       "channelInfoLabel": "About {{channel}}",
-      "browserChannelLabel": "Device notifications",
+      "browserChannelLabel": "Device pop-ups",
       "browserChannelHint": "Pop-ups from your operating system. Needs permission. Events with a known future time can arrive up to 72 hours ahead even with the app closed, once installed on iPhone and iPad; the rest need the app open.",
-      "feedChannelLabel": "Alerts notifications",
+      "feedChannelLabel": "Alerts list",
       "dismissOnViewLabel": "Dismiss on View",
       "dismissOnViewHint": "When clicking the view button, dismiss it from the alerts.",
       "feedChannelHint": "A dismissible list on the Alerts page. Works on every device.",
@@ -11638,6 +11640,15 @@
         "browser": "Device",
         "feed": "Alerts"
       },
+      "columnWarnAhead": "Warn ahead",
+      "columnCharacters": "Characters",
+      "topicsLabel": "Topics",
+      "backToTopics": "All topics",
+      "topicState": "Device {{device}} · Alerts {{alerts}} of {{total}}",
+      "topicNeedsCorpPermission": "Needs Corporation permission",
+      "applyToAll": "Apply to all",
+      "applyToAllLabel": "Apply to all characters: {{event}}",
+      "applyToAllHint": "Sets every character to what most of them have.",
       "toggleLabel": {
         "browser": "{{event}}, device notifications",
         "feed": "{{event}}, Alerts list"
@@ -11666,6 +11677,7 @@
         "market": "Market and contracts",
         "mailCalendar": "Mail and calendar",
         "world": "Space and community",
+        "corp": "Corp",
         "eve": "EVE notifications"
       },
       "permissionNote_one": "{{count}} character hasn't granted {{permission}}.",

@@ -399,7 +399,7 @@ export const Layout = memo(function Layout() {
             <CharacterFooterLink activeCharacter={activeCharacter} />
           </aside>
 
-          <main className="min-w-0 flex-1 px-2 py-4 pb-[max(calc(5rem_+_env(safe-area-inset-bottom)),var(--compare-drawer-space,0px))] md:px-4 md:pb-[max(1rem,var(--compare-drawer-space,0px))]">
+          <main className="min-w-0 flex-1 px-2 py-4 pb-[max(calc(5rem_+_env(safe-area-inset-bottom)),var(--compare-drawer-space,0px),calc(var(--sticky-clearance)_+_var(--bottom-nav-clearance)_+_1rem))] md:px-4 md:pb-[max(1rem,var(--compare-drawer-space,0px),calc(var(--sticky-clearance)_+_1rem))]">
             {/* Corp Tax Book send queue (D16): only while mail is queued. */}
             <MailQueueMount />
             <OfflineBanner />
