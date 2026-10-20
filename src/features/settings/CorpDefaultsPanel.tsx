@@ -26,15 +26,15 @@ export function CorpDefaultsPanel() {
   // Reachable by URL even when the rail hides it, so say why it is empty.
   if (access.state !== 'ready') {
     return (
-      <Panel title={t('settings.corpDefaultsTitle')}>
+      <Panel>
         <SettingsHint>{t('settings.corpUnavailable')}</SettingsHint>
       </Panel>
     );
   }
-  if (!hydrated) return <SettingsPanelLoading title={t('settings.corpDefaultsTitle')} />;
+  if (!hydrated) return <SettingsPanelLoading />;
 
   return (
-    <Panel title={t('settings.corpDefaultsTitle')}>
+    <Panel>
       <div className="space-y-4">
         <DefaultsSyncHint />
         <Fields variant="form">

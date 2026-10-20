@@ -20,6 +20,7 @@
 import {
   db,
   type MiningTaxAssignmentRecord,
+  type MiningTaxOreLine,
   type MiningTaxPaymentLinkSource,
   type PayeeRecord,
 } from '@/db';
@@ -35,6 +36,7 @@ import {
   markAssignmentsPaid,
   moveAssignmentsToPayee,
   planNeedsReviewResolution,
+  releaseOreFromAssignment,
   splitAssignment,
   uncombineAssignments,
   unmarkAssignmentsPaid,
@@ -264,6 +266,15 @@ export function unsettle(
   assignments: readonly MiningTaxAssignmentRecord[]
 ): Promise<LedgerActionResult> {
   return commit(charactersOf(assignments), () => unmarkAssignmentsPaid(assignments));
+}
+
+/** Takes ore off the miner's own Assignments because the corporation bills it (#4517). */
+export function releaseOre(
+  releases: readonly { assignment: MiningTaxAssignmentRecord; after: MiningTaxOreLine[] }[]
+): Promise<LedgerActionResult> {
+  return commit(charactersOf(releases.map((r) => r.assignment)), async () => {
+    for (const r of releases) await releaseOreFromAssignment(r.assignment, r.after);
+  });
 }
 
 /** Splits part of one assigned day over to a second Payee. */

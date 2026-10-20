@@ -10,6 +10,7 @@ import { AVOIDED_SYSTEMS_KEY, useAvoidedSystems } from '@/features/route/avoided
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { useFontScale, FONT_SCALE_KEY, DEFAULT_FONT_SCALE } from '@/lib/fontScale';
 import { useActivityLog } from '@/stores/activityLog';
+import en from '@/i18n/locales/en.json';
 import { NOTIFICATION_EVENTS } from '@/features/notifications/events';
 import {
   useNotificationPreferences,
@@ -263,7 +264,6 @@ describe('Settings', () => {
     render(<App />);
     await openTab(user, /activity log/i);
 
-    expect(screen.getByRole('heading', { name: /activity log/i })).toBeInTheDocument();
     expect(screen.getByText(/no activity yet/i)).toBeInTheDocument();
   });
 
@@ -511,8 +511,8 @@ async function notificationsPanel(): Promise<HTMLElement> {
   await screen.findByRole('heading', { level: 1, name: /settings/i });
   const link = within(settingsNav()).getByRole('link', { name: /^notifications$/i });
   if (link.getAttribute('aria-current') !== 'page') fireEvent.click(link);
-  const heading = await screen.findByRole('heading', { name: /^notifications$/i });
-  const section = heading.closest('section');
+  const hint = await screen.findByText(en.settings.notifications.hint);
+  const section = hint.closest('section');
   if (!section) throw new Error('Notifications panel has no section wrapper');
   return section as HTMLElement;
 }
@@ -1000,7 +1000,7 @@ describe('Settings — Notifications (issue #170)', () => {
     expect(
       await within(settingsNav()).findByRole('link', { name: /^notifications$/i })
     ).toHaveAttribute('aria-current', 'page');
-    expect(await screen.findByRole('heading', { name: /^notifications$/i })).toBeInTheDocument();
+    expect(await screen.findByText(en.settings.notifications.hint)).toBeInTheDocument();
   });
 
   it("names EVE's own notification types in words, not in ESI's CamelCase", async () => {
@@ -1512,7 +1512,7 @@ describe('Settings defaults', () => {
     expect(
       await within(settingsNav()).findByRole('link', { name: /offline data/i })
     ).toHaveAttribute('aria-current', 'page');
-    expect(await screen.findByRole('heading', { name: 'Offline data' })).toBeInTheDocument();
+    expect(await screen.findByText(en.settings.offline.hint)).toBeInTheDocument();
     expect(
       await screen.findByRole('button', { name: 'Download everything for offline' })
     ).toBeInTheDocument();
@@ -1771,7 +1771,7 @@ describe('Settings — sections rail', () => {
       'Industry',
       'Planetary Industry',
       'Market',
-      'Moon Mining Tax',
+      'Moon mining tax',
       'Characters',
       // Corporation is absent: this character has no corp access.
       'Travel',
@@ -1780,7 +1780,7 @@ describe('Settings — sections rail', () => {
       'Log out & delete',
       'Cached data',
       'Offline data',
-      'Activity Log',
+      'Activity log',
     ]);
     for (const group of ['Preferences', 'Defaults', 'Account & device', 'Data']) {
       expect(within(nav).getByText(group)).toBeInTheDocument();

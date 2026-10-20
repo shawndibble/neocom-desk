@@ -20,7 +20,7 @@ import { IndustrySettingsForm } from '@/features/settings/IndustrySettingsForm';
 export function IndustryDefaultsPanel() {
   const { t } = useTranslation();
   return (
-    <Panel title={t('settings.industryDefaultsTitle')}>
+    <Panel title={t('settings.industryBlueprintTitle')}>
       <IndustrySettingsForm />
     </Panel>
   );

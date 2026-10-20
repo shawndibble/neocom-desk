@@ -268,6 +268,16 @@ suite('Corp Tax Book callables (emulator)', () => {
       expect((await book().get()).get('lastSync')).toMatchObject({ byCharacterId: ACCOUNTANT });
     });
 
+    it('points each observed Character at the book, refreshed on every sync', async () => {
+      await turnOn();
+      await sync(ACCOUNTANT, { observed: [row(100, '2026-10-18T10:00:00Z')] });
+      const pointer = db.collection('corpTaxBookBilledBy').doc('char:50');
+      const first = (await pointer.get()).get(`books.${CORP}`);
+      expect(first).toEqual(expect.any(Number));
+      await sync(ACCOUNTANT, { observed: [row(100, '2026-10-18T10:00:00Z')] });
+      expect((await pointer.get()).get(`books.${CORP}`)).toBeGreaterThanOrEqual(first);
+    });
+
     it('needs an editor, and Station_Manager for extractions', async () => {
       await turnOn();
       expect(await reason(sync(JUNIOR, { observed: [row(1, '2026-10-18T10:00:00Z')] }))).toBe(

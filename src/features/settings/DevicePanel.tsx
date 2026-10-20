@@ -104,7 +104,7 @@ export function DevicePanel() {
   const administered = (communities ?? []).filter((entry) => entry.administered);
 
   return (
-    <Panel title={t('settings.deviceTitle')}>
+    <Panel>
       <div className="space-y-4">
         <SettingsHint>
           {loggedIn > 0

@@ -75,6 +75,24 @@ export interface PersonalBook {
   pricesOn: (date: string) => Pick<DayPrices, 'prices' | 'sources'>;
   /** Donations the member has sent the corp that the book has not credited yet. */
   inFlight: { amount: number; at: string }[];
+  /** Refinery names by structure id, where ESI let the app read them. */
+  structureNames?: Record<number, string>;
+}
+
+/** The miner's own listing of ore the corporation also bills (issue #4517). */
+export interface BookOverlap {
+  /** The Payees the miner gave that ore to. */
+  payeeIds: string[];
+  /** The ore both sides claim: what "Let the corporation bill it" would take off the miner's entry. */
+  ore: OreLine[];
+  /** Every allocation involved is marked paid. */
+  paid: boolean;
+}
+
+/** The corporation changed a number it had billed: the old one stays visible next to the new. */
+export interface BookCorrection {
+  before: number;
+  after: number;
 }
 
 export interface BookDispute {
@@ -117,6 +135,13 @@ export interface BookRowView {
   /** A conflict: when it resolves to the corp. */
   resolvesAt?: string;
   dispute?: BookDispute;
+  /** The refinery that recorded the line. */
+  structureId?: number;
+  /** The refinery's name, when known; callers fall back to the system. */
+  refineryLabel?: string;
+  /** Set on the first line of a day the miner's own entry overlaps. */
+  overlap?: BookOverlap;
+  correction?: BookCorrection;
   hubId: string;
   oreForm: 'compressed' | 'raw';
 }
@@ -308,6 +333,7 @@ function dayValue(p: PreparedCharge): {
   rateEffectiveFrom?: string;
   estimatedValue: number;
   tax: number;
+  correction?: BookCorrection;
 } {
   const { charge, statement } = p;
   if (!statement) {
@@ -353,13 +379,75 @@ function dayValue(p: PreparedCharge): {
     ...(rateEffectiveFrom !== undefined ? { rateEffectiveFrom } : {}),
     estimatedValue,
     tax,
+    ...(statement.lines.length > 1 && first.tax !== tax
+      ? { correction: { before: first.tax, after: tax } }
+      : {}),
   };
+}
+
+/** The ore both the miner's allocations and the corporation's bill claim, capped at what it observed. */
+function overlapOf(
+  allocations: readonly PersonalAllocation[],
+  observed: readonly OreLine[]
+): BookOverlap | undefined {
+  const left = new Map(observed.map((l) => [l.typeId, l.quantity]));
+  const taken: OreLine[] = [];
+  const touching: PersonalAllocation[] = [];
+  for (const allocation of allocations) {
+    let touched = false;
+    for (const line of allocation.oreLines) {
+      const take = Math.min(line.quantity, left.get(line.typeId) ?? 0);
+      if (take <= 0) continue;
+      left.set(line.typeId, (left.get(line.typeId) ?? 0) - take);
+      taken.push({ typeId: line.typeId, quantity: take });
+      touched = true;
+    }
+    if (touched) touching.push(allocation);
+  }
+  if (touching.length === 0) return undefined;
+  return {
+    payeeIds: [...new Set(touching.map((a) => a.payeeId))],
+    ore: sumLines(taken),
+    paid: touching.every((a) => a.status === 'paid'),
+  };
+}
+
+/**
+ * "Let the corporation bill it": each unpaid allocation of the miner's entry
+ * before and after the overlapping ore comes off it, in order (`index` is its place in `allocations`). Only the
+ * overlap goes; anything else the miner listed stays.
+ */
+export function previewTakeover(
+  allocations: readonly PersonalAllocation[],
+  overlap: readonly OreLine[]
+): { index: number; payeeId: string; before: OreLine[]; after: OreLine[] }[] {
+  let left = sumLines(overlap);
+  const out: { index: number; payeeId: string; before: OreLine[]; after: OreLine[] }[] = [];
+  for (const [index, allocation] of allocations.entries()) {
+    if (allocation.status === 'paid') continue;
+    const take = allocation.oreLines
+      .map((l) => ({
+        typeId: l.typeId,
+        quantity: Math.min(l.quantity, left.find((x) => x.typeId === l.typeId)?.quantity ?? 0),
+      }))
+      .filter((l) => l.quantity > 0);
+    if (take.length === 0) continue;
+    left = minusLines(left, take);
+    out.push({
+      index,
+      payeeId: allocation.payeeId,
+      before: [...allocation.oreLines],
+      after: minusLines(allocation.oreLines, take),
+    });
+  }
+  return out;
 }
 
 function disputeOf(
   entry: PersonalEntry | undefined,
   bookLines: readonly OreLine[],
-  bookPct: number
+  bookPct: number,
+  sameRate = true
 ): BookDispute | undefined {
   if (!entry) return undefined;
   const types = new Set(bookLines.map((l) => l.typeId));
@@ -368,7 +456,7 @@ function disputeOf(
   const pcts = new Set(entry.allocations.map((a) => a.taxPct));
   const personalPct = pcts.size === 1 ? [...pcts][0] : undefined;
   const quantity = personalQuantity !== bookQuantity;
-  const rate = personalPct !== undefined && personalPct !== bookPct;
+  const rate = sameRate && personalPct !== undefined && personalPct !== bookPct;
   if (!quantity && !rate) return undefined;
   return {
     quantity,
@@ -425,7 +513,8 @@ export function overlayCorpBooks(input: {
     charge: PreparedCharge,
     lines: readonly OreLine[],
     conflict: { lines: OreLine[]; resolvesAt: string } | undefined,
-    soleBook = true
+    soleBook = true,
+    day?: { lines: OreLine[]; sameRate: boolean }
   ) => {
     const { book } = p;
     const value = dayValue(charge);
@@ -445,11 +534,18 @@ export function overlayCorpBooks(input: {
         ? { rateEffectiveFrom: value.rateEffectiveFrom }
         : {}),
       ...(charge.entry ? { personalOreLines: charge.entry.oreLines } : {}),
+      structureId: charge.observed.structureId,
+      ...(book.structureNames?.[charge.observed.structureId] !== undefined
+        ? { refineryLabel: book.structureNames[charge.observed.structureId] }
+        : {}),
+      ...(value.correction ? { correction: value.correction } : {}),
       hubId: book.hubId,
       oreForm: book.oreForm,
     };
     // With several books the member's entry is split among them: one book's share is not a dispute.
-    const dispute = soleBook ? disputeOf(charge.entry, lines, value.taxPct) : undefined;
+    const dispute = soleBook
+      ? disputeOf(charge.entry, day?.lines ?? lines, value.taxPct, day?.sameRate ?? true)
+      : undefined;
     if (conflict) {
       const worth = computeAssignmentValue(
         conflict.lines,
@@ -528,6 +624,11 @@ export function overlayCorpBooks(input: {
           ? undefined
           : { lines: resolved.conflict, resolvesAt: resolved.conflictResolvesAt ?? '' };
       let remaining = contested?.lines ?? [];
+      const firstRow = rows.length;
+      const day = {
+        lines: sumLines(...here.map((c) => c.oreLines)),
+        sameRate: new Set(here.map((c) => dayValue(c).taxPct)).size <= 1,
+      };
       for (const charge of here) {
         // Hand the contested ore to the first charges that observed it.
         const mine = sumLines(...[charge.oreLines]);
@@ -545,9 +646,12 @@ export function overlayCorpBooks(input: {
           contested && take.length > 0
             ? { lines: take, resolvesAt: contested.resolvesAt }
             : undefined,
-          claiming.length === 1
+          claiming.length === 1,
+          day
         );
       }
+      const overlap = overlapOf(entry.allocations, day.lines);
+      if (overlap && rows[firstRow]) rows[firstRow].overlap = overlap;
     }
     free.set(key, left);
   }

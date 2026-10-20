@@ -213,7 +213,7 @@ export function NotificationsPanel() {
   };
 
   return (
-    <Panel title={t('settings.notificationsTitle')}>
+    <Panel>
       <div className="space-y-3">
         <p className="text-xs text-text-dim">{t('settings.notifications.hint')}</p>
         <NotificationsDelivery

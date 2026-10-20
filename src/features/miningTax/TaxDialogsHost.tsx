@@ -7,6 +7,7 @@ import { linesOwnedBy } from '@/engine/miningTax/ownership';
 import { computeAssignmentValue } from '@/engine/miningTax/valuation';
 import type { PayeeBalance } from '@/features/miningTax/balances';
 import { BulkDismissDialog } from '@/features/miningTax/BulkDismissDialog';
+import { CorpOverlapNotice } from '@/features/miningTax/corpBook/CorpOverlapNotice';
 import { CorpPayDialog } from '@/features/miningTax/corpBook/CorpPayDialog';
 import { CorpRowDetailModal } from '@/features/miningTax/corpBook/CorpRowDetailModal';
 import { isBookRow } from '@/features/miningTax/corpBook/corpRows';
@@ -545,6 +546,18 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
           systemSecurity={systemSecurityOf(detailTarget)}
           typeNames={typeNames}
           onPay={() => actions.corpPayFromDetail(corpDetail.view.corporationId)}
+          notice={
+            corpDetail.view.overlap && (
+              <CorpOverlapNotice
+                view={corpDetail.view}
+                corpName={corpDetail.corpName}
+                everyAssignment={everyAssignment}
+                payeeById={payeeById}
+                typeNames={typeNames}
+                onChanged={refresh}
+              />
+            )
+          }
         />
       )}
 
