@@ -52,30 +52,11 @@ describe('loadHubSnapshotRange', () => {
     expect(result.saved.has('2026-09-23')).toBe(false);
   });
 
-  it("reads an old object's region-wide days as historical, where the station has none", async () => {
-    serve({
-      34: {
-        typeId: 34,
-        dates: ['2026-08-01', '2026-10-01'],
-        regions: { [amarr.regionId]: { buy: [4, 4.5], sell: [5, 5.5] } },
-        stations: { [amarr.stationId]: { buy: [null, 6], sell: [null, 7] } },
-      },
-    });
-
-    const result = await loadHubSnapshotRange('2026-08-01', '2026-10-01', [34], amarr);
-
-    expect(result.historical.get('2026-08-01')?.get(34)).toEqual({ buy: 4, sell: 5 });
-    expect(result.saved.get('2026-10-01')?.get(34)).toEqual({ buy: 6, sell: 7 });
-    expect(result.historical.has('2026-10-01')).toBe(false);
-    expect(result.saved.has('2026-08-01')).toBe(false);
-  });
-
   it('treats a missing, failed or malformed object as no days and retries a failure next time', async () => {
     serve({ 35: { dates: 'nope' } }, [34]);
 
     const first = await loadHubSnapshotRange('2026-10-01', '2026-10-01', [34, 35, 36]);
     expect(first.saved.size).toBe(0);
-    expect(first.historical.size).toBe(0);
 
     serve({
       34: { dates: ['2026-10-01'], stations: { [jita.stationId]: { buy: [1], sell: [2] } } },
@@ -92,7 +73,7 @@ describe('loadHubSnapshotRange', () => {
   });
 
   it('is empty without fetching when the range is backwards or there are no types', async () => {
-    const empty = { saved: new Map(), historical: new Map() };
+    const empty = { saved: new Map() };
     expect(await loadHubSnapshotRange('2026-09-24', '2026-09-01', [34])).toEqual(empty);
     expect(await loadHubSnapshotRange('2026-09-01', '2026-09-24', [])).toEqual(empty);
     expect(fetchMock).not.toHaveBeenCalled();

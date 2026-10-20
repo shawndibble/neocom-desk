@@ -6,16 +6,9 @@
  * type holding every Trade Hub station, a static file in Cloudflare R2 (20261018-201511-moving-the-daily-snapshots-to-r2.md), so — like the contract snapshots — this
  * needs no Firebase session and the read costs no egress.
  *
- * Since #4279 the prices are the hub *station*'s (Jita 4-4), keyed by station
- * id. Objects written before that hold region-wide series keyed by region id
- * (`regions`), and one the daily job has written into since holds both, on
- * different dates (each date holds one shape). Both are read: a hub region
- * gets its station's series; an old object, its region-wide series; a mixed
- * one, the two spliced by date under the station's name, so the chart neither
- * loses its history nor stops at the deploy date while the backfill re-run is
- * pending. Drop the `regions` read once that has run.
+ * The prices are the hub *station*'s (Jita 4-4), keyed by station id.
  *
- * Never fails the history panel: a missing object (a type the backfill has
+ * Never fails the history panel: a missing object (a type the daily job has
  * not reached), a region the object does not hold (any non-hub region) and an
  * offline client all come back as `null`, and the chart falls back to ESI's
  * average line. Only a good answer (including "no such object") is held, per
@@ -46,16 +39,15 @@ async function fetchTypeObject(typeId: number): Promise<unknown | null> {
 /** The backend publishes once a day. */
 const CACHE_TTL_MS = 60 * 60_000;
 
-/** A type's object as series, by hub station id and (old objects) by region id. */
+/** A type's object as series, by hub station id. */
 export interface StoredOpenPrices {
   stations: ReadonlyMap<number, OpenPriceSeries>;
-  regions: ReadonlyMap<number, OpenPriceSeries>;
 }
 
-/** What a region draws: its hub station's series, or (`stationId` null) an old region-wide one. */
+/** What a region draws: its hub station's series. */
 export interface HubOpenPrices {
   series: OpenPriceSeries;
-  stationId: number | null;
+  stationId: number;
 }
 
 function isNumberOrNullArray(value: unknown): value is (number | null)[] {
@@ -82,34 +74,21 @@ function seriesById(map: unknown, dates: string[]): Map<number, OpenPriceSeries>
 /**
  * The stored type object as series, or null when it is not shaped like one.
  * Mirrors the writer's layout: a shared ascending `dates` array and
- * `stations.<stationId>.buy|sell` (and, in an old object, `regions.<regionId>`)
- * parallel to it. A malformed series is skipped.
+ * `stations.<stationId>.buy|sell` parallel to it. A malformed series is skipped.
  */
 export function parseOpenPricesByType(data: unknown): StoredOpenPrices | null {
   if (!isObject(data)) return null;
-  const { dates, stations, regions } = data;
+  const { dates, stations } = data;
   if (!Array.isArray(dates) || !dates.every((d) => typeof d === 'string')) return null;
-  if (dates.length === 0 || (!isObject(stations) && !isObject(regions))) return null;
-  return { stations: seriesById(stations, dates), regions: seriesById(regions, dates) };
-}
-
-/** Station prices on station days, the old region prices on the region days before them. */
-function splice(station: OpenPriceSeries, region: OpenPriceSeries): OpenPriceSeries {
-  return {
-    dates: station.dates,
-    buy: station.dates.map((_, i) => station.buy[i] ?? region.buy[i] ?? null),
-    sell: station.dates.map((_, i) => station.sell[i] ?? region.sell[i] ?? null),
-  };
+  if (dates.length === 0 || !isObject(stations)) return null;
+  return { stations: seriesById(stations, dates) };
 }
 
 /** The region's series to draw out of a type's object, or null when it has none (any non-hub region). */
 export function pickOpenPrices(stored: StoredOpenPrices, regionId: number): HubOpenPrices | null {
   const stationId = TRADE_HUBS.find((hub) => hub.regionId === regionId)?.stationId;
-  const station = stationId === undefined ? undefined : stored.stations.get(stationId);
-  const region = stored.regions.get(regionId);
-  if (station && stationId !== undefined)
-    return { series: region ? splice(station, region) : station, stationId };
-  return region ? { series: region, stationId: null } : null;
+  const series = stationId === undefined ? undefined : stored.stations.get(stationId);
+  return series && stationId !== undefined ? { series, stationId } : null;
 }
 
 const cache = new Map<number, { at: number; stored: StoredOpenPrices | null }>();
@@ -156,9 +135,8 @@ export async function loadMarketOpenPrices(
 
 /**
  * The type's whole stored object, or null when there is none or the read
- * failed. Never throws. The mining prices (`hubSnapshot.ts`) read it this way
- * to tell station days from the old region-wide ones; shares the cache with
- * `loadMarketOpenPrices`.
+ * failed. Never throws. The mining prices (`hubSnapshot.ts`) read it this way;
+ * shares the cache with `loadMarketOpenPrices`.
  */
 export async function loadStoredOpenPrices(
   typeId: number,

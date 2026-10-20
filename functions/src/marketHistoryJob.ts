@@ -28,14 +28,14 @@ import { writeOpenPricesToR2 } from './r2DailySnapshots.js';
 
 // The public data hosts (EVE Ref, EVE Workbench, the LP and insurgency feeds)
 // get the ESI User-Agent naming this app, never a personal contact.
-export const MARKET_HISTORY_USER_AGENT = ESI_USER_AGENT;
+export const PUBLIC_HOST_USER_AGENT = ESI_USER_AGENT;
 
 /** Body of syncLawlessSystems (see its doc in index.ts). */
 export async function runSyncLawlessSystems(): Promise<void> {
   const response = await fetch(INSURGENCY_URL, {
     headers: {
-      'User-Agent': MARKET_HISTORY_USER_AGENT,
-      'X-User-Agent': MARKET_HISTORY_USER_AGENT,
+      'User-Agent': PUBLIC_HOST_USER_AGENT,
+      'X-User-Agent': PUBLIC_HOST_USER_AGENT,
       Accept: 'application/json',
     },
   });
@@ -61,7 +61,7 @@ export async function runSyncLawlessSystems(): Promise<void> {
 export async function runSyncMarketOpenPrices(): Promise<void> {
   const date = previousUtcDate(new Date());
   const found = await findFinalSnapshot(date, (url) =>
-    fetchEverefJson(url, MARKET_HISTORY_USER_AGENT)
+    fetchEverefJson(url, PUBLIC_HOST_USER_AGENT)
   );
   if (!found.final) {
     // Thrown, not returned, so the run fails and is retried.
@@ -74,7 +74,7 @@ export async function runSyncMarketOpenPrices(): Promise<void> {
   // The hub-station Open Prices ride the same single pass; the region fold
   // only feeds the guards.
   const stations = new StationPriceFold(SNAPSHOT_HUBS);
-  const rows = await foldSnapshotUrl(snapshotUrl, fold, MARKET_HISTORY_USER_AGENT, stations);
+  const rows = await foldSnapshotUrl(snapshotUrl, fold, PUBLIC_HOST_USER_AGENT, stations);
   logInfo('Market open prices fold', {
     date,
     fileTime,

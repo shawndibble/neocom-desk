@@ -11,7 +11,6 @@ import {
   implausibleReason,
   isIsoDate,
   mergeDays,
-  rewriteDays,
   openPriceDocId,
   pairKey,
   findFinalSnapshot,
@@ -317,62 +316,6 @@ describe('mergeDays', () => {
       typeId: 34,
       dates: ['2026-10-02'],
       stations: { [JITA]: { buy: [1], sell: [2] } },
-    });
-  });
-
-  describe('an object still in the old, region-wide shape', () => {
-    const old = {
-      typeId: 34,
-      dates: ['2026-10-15', '2026-10-16'],
-      regions: {
-        [FORGE]: { buy: [1, 3], sell: [2, 4] },
-        [DOMAIN]: { buy: [null, 5], sell: [null, 6] },
-      },
-    };
-
-    it('keeps its region days and adds the new station day beside them', () => {
-      const merged = mergeDays(base, old, [day('2026-10-17', { [JITA]: { buy: 7, sell: 8 } })]);
-      expect(merged).toEqual({
-        typeId: 34,
-        dates: ['2026-10-15', '2026-10-16', '2026-10-17'],
-        stations: { [JITA]: { buy: [null, null, 7], sell: [null, null, 8] } },
-        regions: {
-          [FORGE]: { buy: [1, 3, null], sell: [2, 4, null] },
-          [DOMAIN]: { buy: [null, 5, null], sell: [null, 6, null] },
-        },
-      });
-    });
-    it('replaces a region day with the station day for the same date (the backfill re-run)', () => {
-      const merged = mergeDays(base, old, [day('2026-10-16', { [JITA]: { buy: 9, sell: 10 } })]);
-      expect(merged.dates).toEqual(['2026-10-15', '2026-10-16']);
-      expect(merged.stations).toEqual({ [JITA]: { buy: [null, 9], sell: [null, 10] } });
-      expect(merged.regions).toEqual({ [FORGE]: { buy: [1, null], sell: [2, null] } });
-    });
-    it('drops the region series entirely once every region day is replaced', () => {
-      const merged = mergeDays(base, old, [
-        day('2026-10-15', { [JITA]: { buy: 1, sell: 2 } }),
-        day('2026-10-16', { [JITA]: { buy: 3, sell: 4 } }),
-      ]);
-      expect(merged).toEqual({
-        typeId: 34,
-        dates: ['2026-10-15', '2026-10-16'],
-        stations: { [JITA]: { buy: [1, 3], sell: [2, 4] } },
-      });
-      expect('regions' in merged).toBe(false);
-    });
-    it('rewriteDays (the backfill re-run) drops every stored region day, covered or not', () => {
-      const mixed = mergeDays(base, old, [day('2026-10-17', { [JITA]: { buy: 7, sell: 8 } })]);
-      expect(
-        rewriteDays(base, mixed, [day('2026-10-15', { [JITA]: { buy: 1, sell: 2 } })])
-      ).toEqual({
-        typeId: 34,
-        dates: ['2026-10-15', '2026-10-17'],
-        stations: { [JITA]: { buy: [1, 7], sell: [2, 8] } },
-      });
-    });
-    it('carries a mixed object forward unchanged when the merge adds nothing', () => {
-      const mixed = mergeDays(base, old, [day('2026-10-17', { [JITA]: { buy: 7, sell: 8 } })]);
-      expect(mergeDays(base, mixed, [])).toEqual(mixed);
     });
   });
 

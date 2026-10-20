@@ -300,13 +300,10 @@ export async function loadMiningYieldSnapshot(
     )
   );
 
-  // A station day where there is one; else a region-wide day from an object
-  // the station backfill (#4279) has not rewritten yet.
   const priceOn = (typeId: number, date: string, basis: PriceBasis) =>
     resolveUnitPrice(
       {
-        day:
-          hubSnapshot.saved.get(date)?.get(typeId) ?? hubSnapshot.historical.get(date)?.get(typeId),
+        day: hubSnapshot.saved.get(date)?.get(typeId),
         live: livePrices.get(typeId),
       },
       basis,

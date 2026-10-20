@@ -1,7 +1,7 @@
 /**
  * Trade-hub price lookups for the Moon Mining Tax ledger (issue #523), via
  * Fuzzwork for today's live book (ADR 0002), the server's daily hub-station
- * Open Prices in R2 (`hubSnapshot.ts`) for a saved or historical day
+ * Open Prices in R2 (`hubSnapshot.ts`) for a saved day
  * (`priceBasis.ts`'s `resolveTaxUnitPrice` — issue #1279 follow-up, "Mining
  * Tax: price at the entry's mined date, not today's live price").
  *
@@ -73,7 +73,7 @@ interface DatedHubResult {
 
 /**
  * Resolves `typeIds`' buy price at `hub` on every date in `dates`, via
- * `resolveTaxUnitPrice`'s saved → historical → live chain. The one place that
+ * `resolveTaxUnitPrice`'s saved → live chain. The one place that
  * actually fetches: `loadDatedUnitPricesByHub` and `loadUnitPricesOnDate`
  * both call this, for a whole ledger's dates or a single Assignment's date
  * respectively.
@@ -97,14 +97,13 @@ async function resolvePricesForHubAcrossDates(
   const start = sortedDates[0];
   const end = sortedDates[sortedDates.length - 1];
 
-  const [{ saved, historical }, live] = await Promise.all([
+  const [{ saved }, live] = await Promise.all([
     loadHubSnapshotRange(start, end, pricingTypeIds, hub),
     getHubPricesWithStatus(hub, pricingTypeIds),
   ]);
 
   for (const date of sortedDates) {
     const savedForDate = saved.get(date);
-    const historicalForDate = historical.get(date);
 
     const prices = new Map<number, number>();
     const unpriced = new Set<number>();
@@ -114,7 +113,6 @@ async function resolvePricesForHubAcrossDates(
       const pid = pricedTypeId(typeId);
       const resolved = resolveTaxUnitPrice({
         saved: savedForDate?.get(pid),
-        historical: historicalForDate?.get(pid),
         live: {
           buy: live.prices.get(pid)?.buyMax ?? null,
           sell: live.prices.get(pid)?.sellMin ?? null,

@@ -34,7 +34,7 @@ vi.mock('@/sde/loadSde', () => sdeMock);
 const hubSnapshotMock = vi.hoisted(() => ({ loadHubSnapshotRange: vi.fn() }));
 vi.mock('@/features/market/hubSnapshot', () => hubSnapshotMock);
 
-const EMPTY_HUB_SNAPSHOT = { saved: new Map(), historical: new Map() };
+const EMPTY_HUB_SNAPSHOT = { saved: new Map() };
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -223,7 +223,6 @@ describe('loadUnitPricesOnDate', () => {
   it("prefers the server's saved snapshot for the date over today's live price", async () => {
     hubSnapshotMock.loadHubSnapshotRange.mockResolvedValue({
       saved: new Map([[DATE, new Map([[VELDSPAR, { buy: 50, sell: 60 }]])]]),
-      historical: new Map(),
     });
     pricesMock.getHubPrices.mockResolvedValue(
       new Map([[VELDSPAR, { sellMin: 10, buyMax: 999, sellVolume: 0, buyVolume: 0 }]])
@@ -236,24 +235,6 @@ describe('loadUnitPricesOnDate', () => {
     );
 
     expect(prices.get(VELDSPAR)).toBe(50);
-  });
-
-  it('falls back to the region-wide historical split when nothing was saved for the date', async () => {
-    hubSnapshotMock.loadHubSnapshotRange.mockResolvedValue({
-      saved: new Map(),
-      historical: new Map([[DATE, new Map([[VELDSPAR, { buy: 40, sell: 45 }]])]]),
-    });
-    pricesMock.getHubPrices.mockResolvedValue(
-      new Map([[VELDSPAR, { sellMin: 10, buyMax: 999, sellVolume: 0, buyVolume: 0 }]])
-    );
-
-    const { prices } = await loadUnitPricesOnDate(
-      [VELDSPAR],
-      getTradeHub('jita') as TradeHub,
-      DATE
-    );
-
-    expect(prices.get(VELDSPAR)).toBe(40);
   });
 
   it('flags the live lookup as unreachable on an unpriced type, so the UI can say why', async () => {
@@ -401,7 +382,6 @@ describe('loadDatedUnitPricesByHub', () => {
         [DATE, new Map([[COMPRESSED_ZEOLITES, { buy: 100, sell: 110 }]])],
         [OTHER_DATE, new Map([[COMPRESSED_ZEOLITES, { buy: 200, sell: 210 }]])],
       ]),
-      historical: new Map(),
     });
     pricesMock.getHubPrices.mockResolvedValue(new Map());
 

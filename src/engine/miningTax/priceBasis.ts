@@ -63,7 +63,7 @@ export type TaxPriceSource = 'saved' | 'historical' | 'live' | 'live-sell' | 'no
 export interface TaxUnitPriceInputs {
   /** The hub station's end-of-day prices for the day. */
   saved?: SidePrices;
-  /** Region-wide end-of-day prices, from an Open Prices object not yet re-backfilled (#4279). */
+  /** Region-wide end-of-day prices. Nothing feeds this since #4293; the tier is kept for the engine's callers. */
   historical?: SidePrices;
   /** Today's live book. */
   live?: SidePrices;
