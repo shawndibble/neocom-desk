@@ -222,6 +222,8 @@ export interface BookSettings extends BookSummary {
   /** Above this a dismissal needs a Director (D6); null when there is no limit. */
   dismissApprovalAboveIsk: number | null;
   ownerCharacterId: number | null;
+  /** Who turned the book on; the owner changes when the CEO reclaims it. */
+  createdBy: number | null;
   /** Epoch ms: until then members' own Mining Tax pages ignore the book (setup window). */
   membersSeeFrom?: number;
 }
@@ -255,6 +257,7 @@ function settingsFrom(d: Record<string, unknown>): BookSettings {
     dismissApprovalAboveIsk:
       typeof d.dismissApprovalAboveIsk === 'number' ? d.dismissApprovalAboveIsk : null,
     ownerCharacterId: typeof d.ownerCharacterId === 'number' ? d.ownerCharacterId : null,
+    createdBy: typeof d.createdBy === 'number' ? d.createdBy : null,
     ...(typeof d.membersSeeFrom === 'number' ? { membersSeeFrom: d.membersSeeFrom } : {}),
   };
 }

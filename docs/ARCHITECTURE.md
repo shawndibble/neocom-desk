@@ -487,7 +487,7 @@ nightly when both sources move to a newer build and opens an auto-merging PR.
   verified `char:{id}` uid) in any corp's book, including after leaving it; the
   settings doc is `get`-able by any signed-in Character (the terms are on every
   mail). Callables: `verifyCorpOfficerCallable`, `turnOnCorpTaxBookCallable`
-  (Director), `reclaimCorpTaxBookCallable` (the CEO; revokes other officers'
+  (Director), `deleteCorpTaxBookCallable` (the opener or the CEO; wipes the book), `reclaimCorpTaxBookCallable` (the CEO; revokes other officers'
   access), `syncCorpTaxBookCallable` (monotonic observer upsert, Extractions,
   donations; Accountant+), `editCorpTaxBookCallable` (rates, settings, payments,
   dismissals, groupings, adjustments, write-offs, rebills, Statements,

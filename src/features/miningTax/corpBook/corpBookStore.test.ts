@@ -40,6 +40,7 @@ describe('readBookSettings', () => {
   it('is null for a missing or switched-off book (D24: then nothing changes)', () => {
     expect(readBookSettings(1, undefined)).toBeNull();
     expect(readBookSettings(1, { ...book, active: false })).toBeNull();
+    expect(readBookSettings(1, { active: true })).toBeNull();
   });
 
   it('hides a book from members until its setup window ends', () => {
@@ -48,7 +49,6 @@ describe('readBookSettings', () => {
     expect(readBookSettings(1, setUp, seeFrom - 1)).toBeNull();
     expect(readBookSettings(1, setUp, seeFrom)).not.toBeNull();
     expect(readBookSettings(1, book, 0)).not.toBeNull();
-    expect(readBookSettings(1, { active: true })).toBeNull();
   });
 
   it('defaults to the book defaults when a field is absent', () => {

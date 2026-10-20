@@ -961,6 +961,9 @@ suite('Corp Tax Book callables (emulator)', () => {
 
       it('lists the groupings waiting for the signed-in character only', async () => {
         await pendingGuest();
+        // Not while the book is still in its member setup window.
+        expect(await listPendingGroupings(deps(), who(61))).toEqual([]);
+        now = T0 + 72 * 60 * 60 * 1000;
         expect(await listPendingGroupings(deps(), who(61))).toEqual([
           { corporationId: CORP, minerId: 'm-a', mainCharacterId: 60 },
         ]);

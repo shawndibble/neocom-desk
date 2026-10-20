@@ -16,7 +16,8 @@ export function DeleteBookSection() {
   const { t } = useTranslation();
   const { characterId, corporationId, verdict, settings, reload } = useBook();
   const [confirming, setConfirming] = useState(false);
-  const opener = verdict.isDirector && settings.ownerCharacterId === characterId;
+  const opener =
+    verdict.isDirector && [settings.createdBy, settings.ownerCharacterId].includes(characterId);
   if (!verdict.isCeo && !opener) return null;
 
   const remove = async () => {

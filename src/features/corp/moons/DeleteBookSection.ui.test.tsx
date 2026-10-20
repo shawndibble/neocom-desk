@@ -27,7 +27,7 @@ function renderSection(verdict: Partial<OfficerVerdict>, ownerCharacterId: numbe
             characterId: ME,
             corporationId: CORP,
             verdict: { isCeo: false, isDirector: false, canEdit: true, ...verdict },
-            settings: { ownerCharacterId },
+            settings: { ownerCharacterId, createdBy: ownerCharacterId },
             reload,
           } as unknown as Omit<BookContextValue, 'edit' | 'canEdit'>
         }

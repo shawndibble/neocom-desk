@@ -318,6 +318,8 @@ export async function deleteBook(
     .get();
   await Promise.all(links.docs.map((d) => d.ref.delete()));
   await deps.db.recursiveDelete(ref);
+  // A scheduled sync that loaded its grant before it was dropped may still have been writing.
+  await deps.db.recursiveDelete(ref);
   return { deleted: true };
 }
 
@@ -1397,11 +1399,24 @@ export async function listPendingGroupings(deps: BookDeps, caller: Caller) {
     .collectionGroup(MINERS)
     .where('pendingConfirmation', 'array-contains', characterId)
     .get();
-  return snap.docs.flatMap((d) => {
+  const now = deps.now();
+  const found = snap.docs.flatMap((d) => {
     const corporationId = Number(d.ref.parent.parent?.id);
     if (d.ref.parent.parent?.parent.id !== BOOKS_COLLECTION || !Number.isFinite(corporationId))
       return [];
     return [{ corporationId, minerId: d.id, mainCharacterId: d.get('mainCharacterId') as number }];
+  });
+  // A book still in its setup window is not shown to members yet, grouping questions included.
+  const books = new Map(
+    await Promise.all(
+      [...new Set(found.map((f) => f.corporationId))].map(
+        async (id) => [id, (await bookRef(deps.db, id).get()).get('membersSeeFrom')] as const
+      )
+    )
+  );
+  return found.filter((f) => {
+    const seeFrom = books.get(f.corporationId);
+    return typeof seeFrom !== 'number' || now >= seeFrom;
   });
 }
 
