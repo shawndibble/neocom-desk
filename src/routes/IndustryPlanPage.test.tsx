@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, within, waitFor, fireEvent } from '@testing-library/react';
+import { cleanup, render, screen, within, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -10,6 +10,8 @@ import { usePublicInfo } from '@/stores/publicInfo';
 import { useAuthFailure } from '@/stores/authFailure';
 import { App } from '@/app/App';
 import * as routeChunks from '@/app/routeChunks';
+import { resetRevalidationState } from '@/esi/cache';
+import { esiInFlight } from '@/esi/budget';
 import { clearMarketPriceCache } from '@/market/prices';
 import { clearCostIndexCache } from '@/features/industry/marketData';
 import { useBuildGroups } from '@/features/industry/buildGroups';
@@ -218,7 +220,15 @@ function stubDesktopViewport() {
     }) as unknown as MediaQueryList;
 }
 
-afterEach(() => {
+afterEach(async () => {
+  // A read still in flight when its test ends writes its response into
+  // `esiCache` after the next `resetSession` has cleared it, and the next
+  // test then reads that stale row as fresh instead of fetching its own
+  // handler's payload. Unmount so nothing new starts, let what is running
+  // land, then reset.
+  cleanup();
+  await waitFor(() => expect(esiInFlight()).toBe(0));
+  await new Promise((resolve) => setTimeout(resolve, 0));
   server.resetHandlers();
   clearMarketPriceCache();
   clearCostIndexCache();
@@ -227,6 +237,7 @@ afterEach(() => {
 /** A signed-in Pilot One on `/industry/plans/bp-1`, with nothing left over from the last test. */
 async function resetSession() {
   stubDesktopViewport();
+  resetRevalidationState();
   await db.characters.clear();
   await db.tokens.clear();
   await db.settings.clear();
