@@ -125,6 +125,18 @@ export function iskPerM3(row: Pick<AppraisalRow, 'sellTotal' | 'volume'>): numbe
   return row.sellTotal / row.volume;
 }
 
+/**
+ * Sales tax in ISK on selling the row's sell total, at the Accounting level's
+ * rate. Null where nothing sells: no price is not a free 0.
+ */
+export function sellSalesTax(
+  row: Pick<AppraisalRow, 'sellTotal'>,
+  accountingLevel: number
+): number | null {
+  if (row.sellTotal === null) return null;
+  return salesTax(row.sellTotal, accountingLevel);
+}
+
 export interface AppraisalTotals {
   /** Summed over rows with a buy price. */
   buy: number;

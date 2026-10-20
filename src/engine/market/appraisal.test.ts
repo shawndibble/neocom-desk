@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   appraisalNet,
   iskPerM3,
+  sellSalesTax,
   appraisalUndercut,
   compareMargin,
   buildAppraisal,
@@ -12,6 +13,7 @@ import {
   type AppraisalItem,
   type AppraisalRow,
 } from '@/engine/market/appraisal';
+import { salesTaxPct } from '@/engine/industry/fees';
 import { BASE_STATION_REPROCESSING_RATE } from '@/engine/industry/reprocessing';
 import { NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
 import { ZERO_STANDINGS } from '@/engine/market/standings';
@@ -718,5 +720,17 @@ describe('iskPerM3', () => {
 
   it('is null when nobody sells it, rather than a free cargo', () => {
     expect(iskPerM3({ ...base, sellTotal: null })).toBeNull();
+  });
+});
+
+describe('sellSalesTax', () => {
+  it('charges the Accounting-reduced rate on the row sell total', () => {
+    const tax = sellSalesTax({ sellTotal: 1_000_000 }, 5);
+    expect(tax).toBeCloseTo((1_000_000 * salesTaxPct(5)) / 100, 6);
+    expect(sellSalesTax({ sellTotal: 1_000_000 }, 0)).toBeGreaterThan(tax as number);
+  });
+
+  it('is null where nothing sells, never a free 0', () => {
+    expect(sellSalesTax({ sellTotal: null }, 3)).toBeNull();
   });
 });

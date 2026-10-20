@@ -10323,6 +10323,8 @@
       "columnLpTotal": "LP store",
       "columnVolume": "Volume (m³)",
       "columnIskPerM3": "ISK/m³",
+      "columnSalesTax": "Sales tax",
+      "columnSellAfterTax": "Sell after tax",
       "removeRow": "Remove",
       "minusOwnedEverywhere": "any location",
       "minusOwnedChipEverywhere": "Minus owned · all locations",

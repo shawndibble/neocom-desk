@@ -4,7 +4,12 @@ import { useTranslation } from 'react-i18next';
 import { MenuItem, MenuSeparator, type DataTableColumn } from '@/components/ui';
 import { HintText } from '@/components/ui/HintText';
 import { useTableExport } from '@/components/ui/useTableExport';
-import { lpBeatsMarket, refineBeatsSellAsIs, type AppraisalRow } from '@/engine/market/appraisal';
+import {
+  lpBeatsMarket,
+  refineBeatsSellAsIs,
+  sellSalesTax,
+  type AppraisalRow,
+} from '@/engine/market/appraisal';
 import { looksLikeEftFit } from '@/engine/import/eftFit';
 import { subtractOwned, type WithOwned } from '@/engine/market/appraisalOwned';
 import { removeItemFromPaste } from '@/engine/market/appraisalPaste';
@@ -134,6 +139,16 @@ export function useAppraisalColumns({
   // Refine and LP store still only ever enter `availableColumns` when the
   // data backing them exists — a picker toggle for a column with nothing to
   // show would just be a lie.
+  // Sales tax is the Accounting skill's rate, so with no Character (or skills
+  // still loading) there is no honest figure and the columns stay out of the
+  // table and the picker, as Refine does without refine data.
+  const accountingLevel = result?.accountingLevel ?? null;
+  const taxFor = (row: OwnedRow) =>
+    accountingLevel === null ? null : sellSalesTax(row, accountingLevel);
+  const afterTaxFor = (row: OwnedRow) => {
+    const tax = taxFor(row);
+    return tax === null || row.sellTotal === null ? null : row.sellTotal - tax;
+  };
   const optionalColumnsById: Record<AppraisalColumnId, DataTableColumn<OwnedRow>> = {
     buyEach: {
       id: 'buyEach',
@@ -242,9 +257,28 @@ export function useAppraisalColumns({
     },
     volume: appraisalVolumeColumn(t),
     iskPerM3: appraisalIskPerM3Column(t),
+    salesTax: {
+      id: 'salesTax',
+      header: t('market.appraisal.columnSalesTax'),
+      align: 'right',
+      className: 'whitespace-nowrap tabular-nums text-text-dim',
+      render: (row) => totalCell(taxFor(row)),
+      sortValue: (row) => taxFor(row) ?? undefined,
+    },
+    sellAfterTax: {
+      id: 'sellAfterTax',
+      header: t('market.appraisal.columnSellAfterTax'),
+      align: 'right',
+      className: 'whitespace-nowrap tabular-nums',
+      render: (row) => totalCell(afterTaxFor(row)),
+      sortValue: (row) => afterTaxFor(row) ?? undefined,
+    },
   };
   const availableColumns = APPRAISAL_COLUMN_IDS.filter(
-    (id) => (id !== 'refineTotal' || hasRefine) && (id !== 'lpTotal' || hasLpOption)
+    (id) =>
+      (id !== 'refineTotal' || hasRefine) &&
+      (id !== 'lpTotal' || hasLpOption) &&
+      (accountingLevel !== null || (id !== 'salesTax' && id !== 'sellAfterTax'))
   );
   for (const id of availableColumns) {
     if (visibleColumns.includes(id)) columns.push(optionalColumnsById[id]);
