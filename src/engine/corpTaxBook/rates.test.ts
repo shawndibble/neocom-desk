@@ -77,6 +77,49 @@ describe('resolveRate', () => {
   });
 });
 
+describe('per-feeder tier', () => {
+  const FEEDER = 98000077;
+  const feeder: TaxRate = {
+    scope: 'feeder',
+    feederId: FEEDER,
+    pct: 7,
+    effectiveFrom: '2026-01-01',
+  };
+  const at = { ...ctx, feederId: FEEDER };
+
+  it('beats the Guest and corp defaults for a feeder refinery', () => {
+    const rates: TaxRate[] = [
+      CORP,
+      { scope: 'guest', pct: 15, effectiveFrom: '2026-01-01' },
+      feeder,
+    ];
+    expect(resolveRate(rates, { ...at, isGuest: true })).toEqual({
+      pct: 7,
+      scope: 'feeder',
+      effectiveFrom: '2026-01-01',
+    });
+  });
+
+  it('loses to a per-miner and a per-moon rate', () => {
+    const miner: TaxRate = { scope: 'miner', minerId: 'm1', pct: 8, effectiveFrom: '2026-01-01' };
+    const moon: TaxRate = { scope: 'moon', moonId: 40000001, pct: 5, effectiveFrom: '2026-01-01' };
+    expect(resolveRate([CORP, feeder, miner], at)?.scope).toBe('miner');
+    expect(resolveRate([CORP, feeder, moon], at)?.scope).toBe('moon');
+  });
+
+  it('ignores another feeder and a refinery with no feeder', () => {
+    expect(resolveRate([CORP, feeder], { ...at, feederId: 98000078 })?.scope).toBe('corp');
+    expect(resolveRate([CORP, feeder], ctx)?.scope).toBe('corp');
+  });
+
+  it('is effective-dated: earlier days keep the old rate, a future rate falls back', () => {
+    const rates: TaxRate[] = [CORP, feeder, { ...feeder, pct: 9, effectiveFrom: '2026-07-13' }];
+    expect(resolveRate(rates, at)?.pct).toBe(7);
+    expect(resolveRate(rates, { ...at, date: '2026-07-13' })?.pct).toBe(9);
+    expect(resolveRate(rates, { ...at, date: '2025-12-31' })).toBeUndefined();
+  });
+});
+
 describe('isRetroactiveRate', () => {
   it('flags a new rate dated before today', () => {
     expect(isRetroactiveRate('2026-07-11', '2026-07-12')).toBe(true);

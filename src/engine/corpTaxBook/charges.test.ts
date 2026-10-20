@@ -95,3 +95,20 @@ describe('buildDayCharges', () => {
     expect(unrated).toHaveLength(1);
   });
 });
+
+describe('buildDayCharges per-feeder tier', () => {
+  it('prices each refinery at its own feeder rate on one day', () => {
+    const feederRates: TaxRate[] = [
+      ...rates,
+      { scope: 'feeder', feederId: 98000077, pct: 7, effectiveFrom: '2026-01-01' },
+    ];
+    const { charges } = buildDayCharges(
+      [entry({ structureId: 1001 }), entry({ structureId: 1002, sourceCorporationId: 98000077 })],
+      { ...book, rates: feederRates }
+    );
+    expect(charges.map((c) => [c.structureId, c.taxPct, c.rateScope])).toEqual([
+      [1001, 10, 'corp'],
+      [1002, 7, 'feeder'],
+    ]);
+  });
+});

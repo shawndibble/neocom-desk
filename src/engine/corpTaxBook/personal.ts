@@ -331,18 +331,28 @@ function dayValue(p: PreparedCharge): {
   // What the Statement billed, frozen: every line of this day (late ore adds lines).
   const lines = sumLines(...statement.lines.map((l) => l.oreLines));
   const first = statement.lines[0];
+  const estimatedValue = statement.lines.reduce((sum, l) => sum + l.estimatedValue, 0);
+  const tax = statement.lines.reduce((sum, l) => sum + l.tax, 0);
+  // Each line was billed at its own rate (a rate fix lands on later lines only), so
+  // the day shows one rate only when its lines share it, else the rate they came to.
+  const pcts = new Set(statement.lines.map((l) => l.taxPct ?? charge.taxPct));
+  const mixed = pcts.size > 1;
+  const taxPct = mixed
+    ? estimatedValue > 0
+      ? Math.round((tax / estimatedValue) * 100 * 1e4) / 1e4
+      : charge.taxPct
+    : (first.taxPct ?? charge.taxPct);
+  const rateEffectiveFrom = mixed
+    ? undefined
+    : (first.rateEffectiveFrom ?? charge.rateEffectiveFrom);
   return {
     lines,
     unitPrices: first.unitPrices ?? charge.unitPrices,
     priceSources: (first.priceSources as Record<number, string> | undefined) ?? charge.priceSources,
-    taxPct: first.taxPct ?? charge.taxPct,
-    ...(first.rateEffectiveFrom !== undefined
-      ? { rateEffectiveFrom: first.rateEffectiveFrom }
-      : charge.rateEffectiveFrom !== undefined
-        ? { rateEffectiveFrom: charge.rateEffectiveFrom }
-        : {}),
-    estimatedValue: statement.lines.reduce((sum, l) => sum + l.estimatedValue, 0),
-    tax: statement.lines.reduce((sum, l) => sum + l.tax, 0),
+    taxPct,
+    ...(rateEffectiveFrom !== undefined ? { rateEffectiveFrom } : {}),
+    estimatedValue,
+    tax,
   };
 }
 
