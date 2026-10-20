@@ -46,7 +46,7 @@ declare let self: ServiceWorkerGlobalScope;
 
 // registerType: 'prompt' (vite.config.ts) — the worker must stay in
 // `waiting` until a boot-time swap triggers it (cold start or browser reload,
-// behind the boot screen, never mid-session) or Settings → "Update now", via
+// behind the boot screen, never mid-session) or Settings → "Update app", via
 // workbox-window's `messageSkipWaiting()`, which sends exactly this message.
 self.addEventListener('message', (event) => {
   if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();

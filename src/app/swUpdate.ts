@@ -1,6 +1,6 @@
 /**
  * Service-worker update steps shared by the boot-time swap (`bootUpdate.ts`)
- * and Settings → "Update now" (`forceUpdate.ts`). Every await is bounded: a
+ * and Settings → "Update app" (`forceUpdate.ts`). Every await is bounded: a
  * promise that never settles is not a rejection, and either caller would hang.
  */
 
