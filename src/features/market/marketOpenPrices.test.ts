@@ -20,16 +20,6 @@ const DOC = {
     [AMARR]: { buy: [1, 2], sell: [3, 4] },
   },
 };
-/** An object written before #4279: series keyed by region id. */
-const OLD_DOC = {
-  typeId: 34,
-  dates: ['2026-10-01', '2026-10-02'],
-  regions: {
-    [FORGE]: { buy: [15, null], sell: [16, 17] },
-    [DOMAIN]: { buy: [11, 12], sell: [13, 14] },
-  },
-};
-
 const fetchMock = vi.fn();
 
 /** Serves `data` for any type; `undefined` is an object R2 does not have (404). */
@@ -62,13 +52,6 @@ describe('parseOpenPricesByType', () => {
     const parsed = parseOpenPricesByType(DOC);
     expect(parsed?.stations.get(JITA)).toEqual({ dates: DOC.dates, buy: [5, null], sell: [6, 7] });
     expect(parsed?.stations.get(AMARR)?.buy).toEqual([1, 2]);
-    expect(parsed?.regions.size).toBe(0);
-  });
-
-  it('reads an old region-shaped object too', () => {
-    const parsed = parseOpenPricesByType(OLD_DOC);
-    expect(parsed?.regions.get(FORGE)?.sell).toEqual([16, 17]);
-    expect(parsed?.stations.size).toBe(0);
   });
 
   it('skips a malformed series and rejects anything not shaped like a type object', () => {
@@ -99,32 +82,6 @@ describe('loadMarketOpenPrices', () => {
     // A compared non-hub region simply has no open series.
     expect(other).toBeNull();
     expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([openPricesUrl(34)]);
-  });
-
-  it('serves an old region-shaped object as region-wide (no station) until the backfill rewrites it', async () => {
-    serve(OLD_DOC);
-    expect(await loadMarketOpenPrices(FORGE, 34)).toEqual({
-      stationId: null,
-      series: { dates: OLD_DOC.dates, buy: [15, null], sell: [16, 17] },
-    });
-  });
-
-  it('splices an object holding both (old days region-wide, new days at the station) under the station', async () => {
-    // The daily job wrote station days into an object the old backfill wrote.
-    serve({
-      typeId: 34,
-      dates: ['2026-10-01', '2026-10-02', '2026-10-03'],
-      regions: { [FORGE]: { buy: [1, 2, null], sell: [1, null, null] } },
-      stations: { [JITA]: { buy: [null, null, 3], sell: [null, null, null] } },
-    });
-    expect(await loadMarketOpenPrices(FORGE, 34)).toEqual({
-      stationId: JITA,
-      series: {
-        dates: ['2026-10-01', '2026-10-02', '2026-10-03'],
-        buy: [1, 2, 3],
-        sell: [1, null, null],
-      },
-    });
   });
 
   it('holds the answer, a missing object included, so a reopen reads nothing', async () => {

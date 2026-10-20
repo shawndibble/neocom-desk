@@ -32,9 +32,8 @@ interface RowsFilter {
 interface ContractSearchRowsInput {
   uiFilter: RowsFilter;
   rows: readonly PublicContractOfferRow[];
-  haveFull: boolean;
   offerIndex: ReturnType<typeof useOfferIndex>;
-  /** Rows read through R2 before the full snapshot lands; `null` when none were. */
+  /** Rows read through R2 for the search's types; `null` when none were. */
   earlyRows: readonly PublicContractOfferRow[] | null;
   plexPrice: number | null;
   offerLocations: ReadonlyMap<number, OfferLocation>;
@@ -47,7 +46,6 @@ interface ContractSearchRowsInput {
 export function useContractSearchRows({
   uiFilter,
   rows,
-  haveFull,
   offerIndex,
   earlyRows,
   plexPrice,
@@ -136,25 +134,22 @@ export function useContractSearchRows({
     awaitingFirst: awaitingQuery,
   } = useContractOfferQuery(rows, itemQuery);
   const statsByType = useMemo(() => {
-    // Before the full rows land, the index's own per-type count and cheapest
-    // stand in. They ignore the other filters, which only matters until the
-    // snapshot arrives and the stats are computed as before.
-    if (!haveFull && offerIndex) {
+    // The index's own per-type count and cheapest stand in. They ignore the
+    // other filters, so the types whose rows were read get their real stats.
+    if (offerIndex) {
       const stats = new Map<number, ContractOfferStats>(
         [...offerIndex.types.values()].map((entry) => [
           entry.typeId,
           { offerCount: entry.count, cheapest: entry.cheapest },
         ])
       );
-      // Read through R2 the full rows never arrive, so the types whose rows
-      // were read get their real, filter-aware stats; the rest keep the index's.
       if (earlyRows !== null) {
         for (const [typeId, typeStats] of queryStats) stats.set(typeId, typeStats);
       }
       return stats;
     }
     return queryStats;
-  }, [haveFull, offerIndex, earlyRows, queryStats]);
+  }, [offerIndex, earlyRows, queryStats]);
 
   return { nonTypeFilter, statsByType, displayRows, awaitingQuery };
 }

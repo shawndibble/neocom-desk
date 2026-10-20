@@ -20,22 +20,10 @@
  * gutter-comparison technique: it is the literal property this fix flips,
  * and the acceptance criteria for this ticket are phrased in exactly these
  * terms.
- *
- * ## Why this spec stubs one module
- *
- * Same trade `contractSearchCourierNarrow.dev.spec.ts` documents: BPC Sourcing's
- * contract rows come from a shared, sync-gated Public Contract Offers
- * snapshot (`syncedContracts.ts`), gated on `isSyncConfigured()` — shut for
- * every E2E spec since Firebase env vars are blanked on purpose (see
- * `playwright.config.ts`). The dev server's own `@/app/syncStatus` module is
- * served back as a two-line stub to open that gate, and Firebase's real
- * hosts are refused so the snapshot loader falls through to the Dexie copy
- * seeded below, rather than reaching the real cloud.
  */
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import type { Page } from '@playwright/test';
-import { stubSyncConfigured } from './support/syncStatus';
 
 const PHONE = { width: 390, height: 844 };
 /**
@@ -124,19 +112,6 @@ async function seedBpcSnapshot(
   );
 }
 
-/** Firebase now reads as configured — refused so the snapshot loader falls through to the Dexie row seeded above, same trade `contractSearchCourierNarrow.dev.spec.ts` makes. */
-async function refuseSyncBackend(page: Page): Promise<void> {
-  const SYNC_HOSTS = [
-    'https://*.googleapis.com/**',
-    'https://*.cloudfunctions.net/**',
-    'https://*.firebaseio.com/**',
-    'https://*.gstatic.com/**',
-  ];
-  for (const pattern of SYNC_HOSTS) {
-    await page.route(pattern, (route) => route.abort('failed'));
-  }
-}
-
 async function priceWrapperAlignItems(page: Page): Promise<string> {
   const table = page.getByRole('table', { name: 'BPC Sourcing' });
   const priceCell = table.locator('tbody tr').first().locator('td[data-label="Price"]');
@@ -150,8 +125,6 @@ async function priceWrapperAlignItems(page: Page): Promise<string> {
 
 test.describe('BPC Sourcing — multi-type price cell alignment', () => {
   test('hugs the right of the dense card’s title line below sm', async ({ page }) => {
-    await stubSyncConfigured(page);
-    await refuseSyncBackend(page);
     await page.setViewportSize(PHONE);
 
     await signInAndGoto(page);
@@ -163,8 +136,6 @@ test.describe('BPC Sourcing — multi-type price cell alignment', () => {
   });
 
   test('stays right-aligned at and above sm', async ({ page }) => {
-    await stubSyncConfigured(page);
-    await refuseSyncBackend(page);
     await page.setViewportSize(DESKTOP);
 
     await signInAndGoto(page);
@@ -176,8 +147,6 @@ test.describe('BPC Sourcing — multi-type price cell alignment', () => {
   });
 
   test('a non-multi-type row never renders the wrapper, at any width', async ({ page }) => {
-    await stubSyncConfigured(page);
-    await refuseSyncBackend(page);
     await page.setViewportSize(PHONE);
 
     await signInAndGoto(page);
@@ -204,8 +173,6 @@ test.describe('BPC Sourcing — cheapest-per-run chip (issue #1782)', () => {
   test('shows ISK/run beside total price, wrapping like the other summary chips at phone width', async ({
     page,
   }) => {
-    await stubSyncConfigured(page);
-    await refuseSyncBackend(page);
     // The selected blueprint also triggers a region market-BPO lookup
     // (issue #1241's `bpoSourcesByType`) — irrelevant to this chip, but the
     // shared network guard fails any unmocked ESI request, so it needs an
@@ -241,8 +208,6 @@ test.describe('BPC Sourcing — cheapest-per-run chip (issue #1782)', () => {
 
 test.describe('BPC Sourcing — cheapest by region on a phone', () => {
   test('shows only the pricing baseline, inside the page width', async ({ page }) => {
-    await stubSyncConfigured(page);
-    await refuseSyncBackend(page);
     await page.route(/\/markets\/\d+\/orders/, async (route) => {
       await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
     });

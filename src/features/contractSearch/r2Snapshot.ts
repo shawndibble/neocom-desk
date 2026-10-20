@@ -1,10 +1,6 @@
 /**
  * The cache-through read shared by the R2-served public snapshots: the courier
- * snapshot here (issue #910) and the LP Store snapshot (`loyalty/`). The name
- * is historical — it was the read half of a chunked Firestore collection until
- * issue #4270 made R2 the only store (ADR 0019) — but the shapes it exports
- * (`ChunkedSnapshot`, `ChunkedSnapshotRead`) are still what those readers and
- * their views speak.
+ * snapshot here (issue #910) and the LP Store snapshot (`loyalty/`).
  *
  * Neither snapshot is per-character data, so both go through `esi/cache.ts`'s
  * `GLOBAL_CACHE_CHARACTER_ID` sentinel — the same trade every other
@@ -16,14 +12,14 @@
  */
 import { loadWithCache, GLOBAL_CACHE_CHARACTER_ID, type CachedResult } from '@/esi/cache';
 
-export interface ChunkedSnapshot<TRow> {
+export interface R2Snapshot<TRow> {
   rows: TRow[];
   /** When the backend last pulled EVE Ref's archive — the freshness that actually matters here, distinct from when this browser last read it. Null when nothing has synced yet. */
   lastSyncedAt: number | null;
 }
 
 /** Which snapshot to read, how, and under what key to cache it. */
-export interface ChunkedSnapshotSource<TRow> {
+export interface R2SnapshotSource<TRow> {
   /** Distinct per payload shape, never per consumer: two shapes under one key is a corrupt cache. */
   cacheKey: string;
   /**
@@ -39,7 +35,7 @@ export interface ChunkedSnapshotSource<TRow> {
    */
   staleAfterMs: number;
   /** The live read from R2. `null` means unavailable: there is no other source. */
-  read: () => Promise<ChunkedSnapshot<TRow> | null>;
+  read: () => Promise<R2Snapshot<TRow> | null>;
 }
 
 /** How many R2 objects are in flight at once: enough to hide round-trip latency, few enough not to starve the page's other requests. */
@@ -60,14 +56,14 @@ export const CHUNK_READ_CONCURRENCY = 6;
  * the cached result, which is the more alarming news and the one the view
  * should say instead.
  */
-export interface ChunkedSnapshotRead<TRow> {
-  cached: CachedResult<ChunkedSnapshot<TRow>> | null;
+export interface R2SnapshotRead<TRow> {
+  cached: CachedResult<R2Snapshot<TRow>> | null;
   revalidating: boolean;
 }
 
-export async function loadChunkedSnapshot<TRow>(
-  source: ChunkedSnapshotSource<TRow>
-): Promise<ChunkedSnapshotRead<TRow>> {
+export async function loadR2Snapshot<TRow>(
+  source: R2SnapshotSource<TRow>
+): Promise<R2SnapshotRead<TRow>> {
   const cached = await loadWithCache(GLOBAL_CACHE_CHARACTER_ID, source.cacheKey, source.read, {
     // A long window here is a publish cadence, not a claim that the payload is
     // a constant, so the lapsed row is the right thing to render while the

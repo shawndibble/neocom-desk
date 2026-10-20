@@ -27,11 +27,7 @@ import {
 import { publishLpStoreOffersToR2 } from './r2DailySnapshots.js';
 import { runWorkbenchSync } from './workbenchFits.js';
 import { r2WorkbenchHulls, workbenchFitsStore } from './workbenchFitsStore.js';
-import {
-  firestoreWorkbenchMigration,
-  migrateLegacyWorkbenchFits,
-} from './workbenchFitsMigration.js';
-import { MARKET_HISTORY_USER_AGENT } from './marketHistoryJob.js';
+import { PUBLIC_HOST_USER_AGENT } from './marketHistoryJob.js';
 
 /** Doc under `systemConditions` holding the archive version the last publish was built from. */
 const PUBLIC_CONTRACTS_ARCHIVE_FINGERPRINT_DOC = 'publicContractsArchiveFingerprint';
@@ -168,21 +164,11 @@ export async function runSyncWorkbenchFits(): Promise<void> {
   const r2 = r2ConfigOrThrow();
   const db = firestore();
   const hulls = r2WorkbenchHulls({ get: createR2Get(r2), put: createR2Put(r2) });
-  // The first run after the move to R2 only copies the Firestore fits over
-  // (workbenchFitsMigration.ts); every later run skips straight past.
-  const migration = await migrateLegacyWorkbenchFits({
-    ...firestoreWorkbenchMigration(db),
-    hulls,
-  });
-  if (migration.migrated) {
-    logInfo('EVE Workbench fits migrated to R2', { ...migration });
-    return;
-  }
   const result = await runWorkbenchSync({
     store: workbenchFitsStore(db, hulls),
     fetchJson: async (url) => {
       const response = await fetch(url, {
-        headers: { 'User-Agent': MARKET_HISTORY_USER_AGENT, Accept: 'application/json' },
+        headers: { 'User-Agent': PUBLIC_HOST_USER_AGENT, Accept: 'application/json' },
       });
       const body: unknown = response.ok ? await response.json().catch(() => null) : null;
       return { status: response.status, retryAfter: response.headers.get('Retry-After'), body };
@@ -206,8 +192,8 @@ export async function runSyncLpStoreOffers(): Promise<void> {
     fetchJson: async (url) => {
       const response = await fetch(url, {
         headers: {
-          'User-Agent': MARKET_HISTORY_USER_AGENT,
-          'X-User-Agent': MARKET_HISTORY_USER_AGENT,
+          'User-Agent': PUBLIC_HOST_USER_AGENT,
+          'X-User-Agent': PUBLIC_HOST_USER_AGENT,
           'X-Compatibility-Date': '2026-08-01',
           Accept: 'application/json',
         },

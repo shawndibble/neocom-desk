@@ -9,8 +9,7 @@
  * The sync checkpoint stays an admin-only Firestore doc,
  * `workbenchFitsSync/state` (no client rule reaches it): it is one small doc
  * read and written once a run, and keeping it out of the public bucket keeps
- * it off the public domain. The one-time copy of the old Firestore fits is
- * `workbenchFitsMigration.ts`.
+ * it off the public domain.
  */
 import { gzipSync } from 'node:zlib';
 import type { Firestore } from 'firebase-admin/firestore';

@@ -5,9 +5,7 @@
  *
  * Nothing is buffered: rows are parsed as arrays (not one object per row) and
  * folded one at a time, so only the fold's per-type map stays resident. Shared
- * by the daily function and scripts/backfill-market-open-prices.mjs, which
- * runs it under Node's type stripping, so: relative imports are type-only and
- * there are no enums or parameter properties here.
+ * by the daily function.
  */
 import { Readable, pipeline } from 'node:stream';
 import { parse } from 'csv-parse';

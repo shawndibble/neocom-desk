@@ -41,7 +41,7 @@ separately, folded into the open-prices job._
   reading Firestore. The legacy docs are streamed 20 at a time in `shipTypeId`
   order, so the run holds a page and the hulls in flight, not all ~38k fits. A
   failed write throws before the flag is set, so the next run retries; the merge
-  makes that safe. The module and the flag go once the collection is deleted.
+  makes that safe. The module and the flag go once the collection is deleted. (Since removed, #4293.)
 - **Deploy before the client ships.** CI deploys only the app; functions are
   deployed by hand. The client reads R2 the moment the app deploys and reads a
   missing hull object as no fits, so until the function is deployed and its

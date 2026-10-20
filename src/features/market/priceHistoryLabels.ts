@@ -10,12 +10,12 @@ import type { OpenPriceSide, PriceSeriesChoice } from '@/engine/market/priceHist
 
 export type Translate = (key: string, options?: Record<string, unknown>) => string;
 
-/** Table and CSV header: "Domain buy" once regions are compared; plain "Buy" otherwise. */
-export function openSideLabel(t: Translate, side: OpenPriceSide, region?: string): string {
-  if (region) {
+/** Table and CSV header: "Domain buy" once places are compared; plain "Buy" otherwise. */
+export function openSideLabel(t: Translate, side: OpenPriceSide, place?: string): string {
+  if (place) {
     return side === 'buy'
-      ? t('market.priceHistory.regionBuy', { region })
-      : t('market.priceHistory.regionSell', { region });
+      ? t('market.priceHistory.regionBuy', { region: place })
+      : t('market.priceHistory.regionSell', { region: place });
   }
   return side === 'buy' ? t('market.priceHistory.openBuy') : t('market.priceHistory.openSell');
 }
@@ -24,11 +24,11 @@ export function openSideLabel(t: Translate, side: OpenPriceSide, region?: string
  * Chart legend and tooltip: "Jita 4-4 buy at close" with a station or region;
  * "Best buy at close" otherwise.
  */
-export function chartOpenSideLabel(t: Translate, side: OpenPriceSide, region?: string): string {
-  if (region) {
+export function chartOpenSideLabel(t: Translate, side: OpenPriceSide, place?: string): string {
+  if (place) {
     return side === 'buy'
-      ? t('market.priceHistory.regionBuyAtClose', { region })
-      : t('market.priceHistory.regionSellAtClose', { region });
+      ? t('market.priceHistory.regionBuyAtClose', { region: place })
+      : t('market.priceHistory.regionSellAtClose', { region: place });
   }
   return side === 'buy'
     ? t('market.priceHistory.openBuyAtClose')

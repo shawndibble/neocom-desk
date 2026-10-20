@@ -11,7 +11,7 @@
  * it; only the tiny index is re-read.
  */
 import type { PublicCourierContractRow } from '@/engine/contracts/courierSearch';
-import type { ChunkedSnapshot } from './chunkedSnapshot';
+import type { R2Snapshot } from './r2Snapshot';
 import { R2_SNAPSHOT_ORIGIN, fetchJson } from './r2OfferSnapshot';
 
 const INDEX_URL = `${R2_SNAPSHOT_ORIGIN}/courier-contracts/index.json`;
@@ -42,7 +42,7 @@ function isCourierRow(value: unknown): value is PublicCourierContractRow {
   return typeof (value as Record<string, unknown>).contractId === 'number';
 }
 
-export async function readR2CourierSnapshot(): Promise<ChunkedSnapshot<PublicCourierContractRow> | null> {
+export async function readR2CourierSnapshot(): Promise<R2Snapshot<PublicCourierContractRow> | null> {
   try {
     const index = parseR2CourierIndex(await fetchJson(INDEX_URL));
     if (!index) return null;

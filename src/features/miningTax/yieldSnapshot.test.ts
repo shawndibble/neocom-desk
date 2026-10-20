@@ -44,7 +44,7 @@ vi.mock('@/features/market/hubSnapshot', () => hubSnapshotMock);
 
 /** The hub snapshot with one station day priced for `TRADABLE`. */
 function stationDay(date: string, prices: { buy: number | null; sell: number | null }) {
-  return { saved: new Map([[date, new Map([[TRADABLE, prices]])]]), historical: new Map() };
+  return { saved: new Map([[date, new Map([[TRADABLE, prices]])]]) };
 }
 
 import { loadMiningYieldSnapshot } from './yieldSnapshot';
@@ -56,7 +56,6 @@ beforeEach(() => {
   hubSnapshotMock.loadHubSnapshotRange.mockImplementation(
     async (_start: string, _end: string, typeIds: number[]) => ({
       saved: new Map([['2026-09-01', new Map(typeIds.map((id) => [id, { buy: 10, sell: 12 }]))]]),
-      historical: new Map(),
     })
   );
   sdeMock.loadCompressedOreTypeIds.mockResolvedValue({});
@@ -280,17 +279,6 @@ describe('loadMiningYieldSnapshot', () => {
       expect(row.valuation).toBe(row.byBasis.buy.valuation);
     });
 
-    it('uses a region-wide day where the station has none', async () => {
-      hubSnapshotMock.loadHubSnapshotRange.mockResolvedValue({
-        saved: new Map(),
-        historical: new Map([['2026-09-01', new Map([[TRADABLE, { buy: 7, sell: 13 }]])]]),
-      });
-
-      const [row] = (await loadMiningYieldSnapshot()).rows;
-
-      expect(valueOn(row, 'buy')).toBe(700);
-    });
-
     it("values every day at today's live price on a now basis", async () => {
       const [row] = (await loadMiningYieldSnapshot()).rows;
 
@@ -302,7 +290,6 @@ describe('loadMiningYieldSnapshot', () => {
       vi.setSystemTime(new Date('2026-09-02T12:00:00Z'));
       hubSnapshotMock.loadHubSnapshotRange.mockResolvedValue({
         saved: new Map(),
-        historical: new Map(),
       });
 
       const [row] = (await loadMiningYieldSnapshot()).rows;
@@ -313,7 +300,6 @@ describe('loadMiningYieldSnapshot', () => {
     it('leaves an older unpublished day unpriced rather than using the live price', async () => {
       hubSnapshotMock.loadHubSnapshotRange.mockResolvedValue({
         saved: new Map(),
-        historical: new Map(),
       });
 
       const [row] = (await loadMiningYieldSnapshot()).rows;

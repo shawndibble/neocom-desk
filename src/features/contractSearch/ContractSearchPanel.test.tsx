@@ -20,7 +20,7 @@ import {
   type ContractSearchStatus,
 } from '@/features/contractSearch/ContractSearchPanel';
 import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
-import type { ChunkedSnapshotRead } from '@/features/contractSearch/chunkedSnapshot';
+import type { R2SnapshotRead } from '@/features/contractSearch/r2Snapshot';
 import type { CachedResult } from '@/esi/cache';
 import type { MarketTypeEntry, NpcStationEntry, SolarSystemEntry } from '@/sde/marketTypes';
 import { clearNpcStationIndex } from '@/sde/npcStations';
@@ -33,9 +33,8 @@ vi.mock('@/features/contractSearch/publicContractOffers', () => ({
   loadPublicContractOffers: (...args: unknown[]) => loadPublicContractOffers(...args),
 }));
 
-// The early-read index (issue #2921) defaults to "none published", which is
-// the snapshot as the rest of this suite was written against; the search-first
-// suite below publishes one.
+// The offer index and its per-type reads (issue #4270): `cachedSnapshot`
+// publishes the rows it is given through these; the default is "none published".
 const loadOfferIndex = vi.fn();
 const loadOffersForTypes = vi.fn();
 vi.mock('@/features/contractSearch/publicContractOfferIndex', async (importOriginal) => ({
@@ -277,9 +276,9 @@ const AMARR_TO_STRUCTURE = courierRow({
 });
 
 /**
- * What `loadChunkedSnapshot` hands back: the cached rows, plus whether a newer
+ * What `loadR2Snapshot` hands back: the cached rows, plus whether a newer
  * read is running behind them (#963). `revalidating` is false here — the
- * stale-serve path has its own coverage in `chunkedSnapshot.test.ts`.
+ * stale-serve path has its own coverage in `r2Snapshot.test.ts`.
  */
 function snapshotRead<TRow>(rows: TRow[], overrides: Partial<CachedResult<never>> = {}) {
   return {
@@ -296,15 +295,37 @@ function snapshotRead<TRow>(rows: TRow[], overrides: Partial<CachedResult<never>
 
 function cachedCourierSnapshot(
   rows: PublicCourierContractRow[]
-): ChunkedSnapshotRead<PublicCourierContractRow> {
+): R2SnapshotRead<PublicCourierContractRow> {
   return snapshotRead(rows);
 }
 
+/**
+ * Publishes `rows` the way R2 does (issue #4270): the index lists their types
+ * and regions, and a search reads their rows per type. The offers read itself
+ * carries only freshness, never rows.
+ */
 function cachedSnapshot(
   rows: PublicContractOfferRow[],
   overrides: Partial<CachedResult<never>> = {}
-): ChunkedSnapshotRead<PublicContractOfferRow> {
-  return snapshotRead(rows, overrides);
+): R2SnapshotRead<PublicContractOfferRow> {
+  const types = new Map<number, { typeId: number; count: number; cheapest: number | null }>();
+  for (const row of rows) {
+    const entry = types.get(row.typeId) ?? { typeId: row.typeId, count: 0, cheapest: null };
+    entry.count += 1;
+    if (row.price > 0 && (entry.cheapest === null || row.price < entry.cheapest))
+      entry.cheapest = row.price;
+    types.set(row.typeId, entry);
+  }
+  loadOfferIndex.mockResolvedValue({
+    lastSyncedAt: Date.parse('2026-09-12T18:30:00Z'),
+    types,
+    regionIds: [...new Set(rows.map((row) => row.regionId))],
+    r2: {},
+  });
+  loadOffersForTypes.mockImplementation(async (_index: unknown, ids: ReadonlySet<number>) =>
+    rows.filter((row) => ids.has(row.typeId))
+  );
+  return snapshotRead([], overrides);
 }
 
 beforeEach(async () => {
@@ -716,6 +737,7 @@ describe('ContractSearchPanel', () => {
 
   it('says the index could not be reached, not "synced yet", when the read returned nothing', async () => {
     loadPublicContractOffers.mockResolvedValue({ cached: null, revalidating: false });
+    loadOfferIndex.mockResolvedValue(null);
     renderWithRouter();
 
     expect(
@@ -2038,7 +2060,7 @@ describe('ContractSearchPanel — search first (issue #2921)', () => {
   });
 
   it('keeps the search box usable while the index loads, and says it is loading', async () => {
-    const offers = deferred<ChunkedSnapshotRead<PublicContractOfferRow>>();
+    const offers = deferred<R2SnapshotRead<PublicContractOfferRow>>();
     loadPublicContractOffers.mockReturnValue(offers.promise);
     renderWithRouter(['/']);
 
@@ -2073,7 +2095,7 @@ describe('ContractSearchPanel — search first (issue #2921)', () => {
 
     it('suggests item names, with counts, from the index alone', async () => {
       loadPublicContractOffers.mockReturnValue(
-        deferred<ChunkedSnapshotRead<PublicContractOfferRow>>().promise
+        deferred<R2SnapshotRead<PublicContractOfferRow>>().promise
       );
       loadOfferIndex.mockResolvedValue(INDEX);
       const user = userEvent.setup();
@@ -2089,7 +2111,7 @@ describe('ContractSearchPanel — search first (issue #2921)', () => {
 
     it('shows a pinned item from just its chunks while the full snapshot is still downloading', async () => {
       loadPublicContractOffers.mockReturnValue(
-        deferred<ChunkedSnapshotRead<PublicContractOfferRow>>().promise
+        deferred<R2SnapshotRead<PublicContractOfferRow>>().promise
       );
       loadOfferIndex.mockResolvedValue(INDEX);
       loadOffersForTypes.mockResolvedValue([TRIT_FORGE, TRIT_DOMAIN]);
@@ -2101,7 +2123,7 @@ describe('ContractSearchPanel — search first (issue #2921)', () => {
 
     it('stops waiting when the type read fails, since no full snapshot is coming (issue #4270)', async () => {
       loadPublicContractOffers.mockReturnValue(
-        deferred<ChunkedSnapshotRead<PublicContractOfferRow>>().promise
+        deferred<R2SnapshotRead<PublicContractOfferRow>>().promise
       );
       loadOfferIndex.mockResolvedValue(INDEX);
       loadOffersForTypes.mockResolvedValue(null);
@@ -2118,24 +2140,9 @@ describe('ContractSearchPanel — search first (issue #2921)', () => {
       ).not.toBeInTheDocument();
     });
 
-    it('does not call a typed query unmatched while the item names are still unknown', async () => {
-      const offers = deferred<ChunkedSnapshotRead<PublicContractOfferRow>>();
-      loadPublicContractOffers.mockReturnValue(offers.promise);
-      loadOfferIndex.mockResolvedValue(null);
-      renderWithRouter(['/?items.q=trit']);
-
-      expect(
-        await screen.findByText('Loading public contracts, this may take a moment.')
-      ).toBeInTheDocument();
-      expect(screen.queryByText('No public contracts match your filters.')).not.toBeInTheDocument();
-
-      offers.settle(cachedSnapshot([TRIT_FORGE, TRIT_DOMAIN, PYERITE_AUCTION]));
-      expect(await bodyRows()).toHaveLength(2);
-    });
-
     it('reads every listed type on a search that names no item', async () => {
       loadPublicContractOffers.mockReturnValue(
-        deferred<ChunkedSnapshotRead<PublicContractOfferRow>>().promise
+        deferred<R2SnapshotRead<PublicContractOfferRow>>().promise
       );
       loadOfferIndex.mockResolvedValue(INDEX);
       loadOffersForTypes.mockResolvedValue([TRIT_FORGE]);
@@ -2154,7 +2161,7 @@ describe('ContractSearchPanel — search first (issue #2921)', () => {
   });
 
   it('waits behind a spinner, filter bar intact, when a search arrives before the snapshot', async () => {
-    const offers = deferred<ChunkedSnapshotRead<PublicContractOfferRow>>();
+    const offers = deferred<R2SnapshotRead<PublicContractOfferRow>>();
     loadPublicContractOffers.mockReturnValue(offers.promise);
     renderWithRouter(['/?items.maxPrice=1000000000']);
 
@@ -2179,7 +2186,7 @@ describe('ContractSearchPanel — progressive loading', () => {
   }
 
   it('renders the courier board while the offers snapshot is still in flight', async () => {
-    const offers = deferred<ChunkedSnapshotRead<PublicContractOfferRow>>();
+    const offers = deferred<R2SnapshotRead<PublicContractOfferRow>>();
     loadPublicContractOffers.mockReturnValue(offers.promise);
     const user = userEvent.setup();
     renderWithRouter();
@@ -2194,7 +2201,7 @@ describe('ContractSearchPanel — progressive loading', () => {
   });
 
   it('renders the item board while the courier snapshot is still in flight', async () => {
-    const courier = deferred<ChunkedSnapshotRead<PublicCourierContractRow>>();
+    const courier = deferred<R2SnapshotRead<PublicCourierContractRow>>();
     loadPublicCourierContracts.mockReturnValue(courier.promise);
     renderWithRouter();
 
@@ -2203,7 +2210,7 @@ describe('ContractSearchPanel — progressive loading', () => {
   });
 
   it('says which corpus it is loading rather than showing a bare spinner', async () => {
-    const offers = deferred<ChunkedSnapshotRead<PublicContractOfferRow>>();
+    const offers = deferred<R2SnapshotRead<PublicContractOfferRow>>();
     loadPublicContractOffers.mockReturnValue(offers.promise);
     renderWithRouter();
 
@@ -2218,8 +2225,9 @@ describe('ContractSearchPanel — progressive loading', () => {
   it('never claims an empty corpus while that corpus is still loading', async () => {
     // The whole point: "no contracts have synced" and "they have not arrived
     // yet" are different answers, and the second must not be given as the first.
-    const offers = deferred<ChunkedSnapshotRead<PublicContractOfferRow>>();
+    const offers = deferred<R2SnapshotRead<PublicContractOfferRow>>();
     loadPublicContractOffers.mockReturnValue(offers.promise);
+    loadOfferIndex.mockResolvedValue(null);
     renderWithRouter();
 
     await screen.findByRole('status', {
