@@ -280,7 +280,8 @@ describe('Contracts', () => {
     const user = userEvent.setup();
     render(<App />);
     await user.click(await screen.findByRole('button', { name: 'Rifter fit' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Rifter fit' });
+    const dialog = await screen.findByRole('dialog', { name: 'Item Exchange' });
+    expect(within(dialog).getByText('Rifter fit')).toBeInTheDocument();
     // The row menu's "Copy contract ID" moved here: the modal is where the ID is read.
     expect(within(dialog).getByRole('button', { name: 'Copy contract ID' })).toBeInTheDocument();
   });
@@ -587,7 +588,7 @@ describe('Contact standing cross-reference', () => {
     const user = userEvent.setup();
     render(<App />);
     await user.click(await screen.findByRole('button', { name: 'Rifter fit' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Rifter fit' });
+    const dialog = await screen.findByRole('dialog', { name: 'Item Exchange' });
     expect(
       within(dialog).getByRole('img', { name: 'Your contact: Terrible standing (-10)' })
     ).toBeInTheDocument();

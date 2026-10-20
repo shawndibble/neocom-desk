@@ -243,6 +243,27 @@ describe('ContractDetailModal', () => {
     expect(screen.getByText('18,205,203')).toBeInTheDocument();
   });
 
+  it('opens a link from the description in a new tab, from a button', () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/stations/60003760`, () => new Promise(() => {})),
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/contracts/12345/items`, () =>
+        HttpResponse.json([])
+      )
+    );
+    const open = vi.spyOn(window, 'open').mockReturnValue(null);
+    renderModal({
+      characterId: CHAR_ID,
+      contract: { ...ITEM_EXCHANGE, title: 'Price list https://example.com/list' },
+      issuerName: 'Mero Otichoda',
+      onClose: () => {},
+    });
+    expect(screen.getByRole('dialog', { name: 'Item Exchange' })).toBeInTheDocument();
+    expect(screen.getByText('Price list https://example.com/list')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Open example\.com/ }));
+    expect(open).toHaveBeenCalledWith('https://example.com/list', '_blank', 'noopener,noreferrer');
+    open.mockRestore();
+  });
+
   it('resolves the location name once the station lookup returns', async () => {
     server.use(
       http.get(`${ESI_BASE_URL}/universe/stations/60003760`, () =>

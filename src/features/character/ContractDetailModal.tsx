@@ -19,7 +19,7 @@ import { useTranslation } from 'react-i18next';
 import {
   DataTable,
   EmptyState,
-  Modal,
+  SlideOver,
   Spinner,
   TypeIcon,
   type DataTableColumn,
@@ -33,6 +33,7 @@ import { loadContractLocationName } from './contractLocationName';
 import { loadTypeNames } from './typeNames';
 import { loadContractMarketValue, type ContractMarketValue } from './contractMarketValue';
 import { ContractMarketValueRow } from '@/features/contracts/ContractMarketValueRow';
+import { ContractDescriptionLinks } from '@/features/contracts/ContractDescriptionLinks';
 import { CopyContractIdButton } from '@/features/contracts/CopyContractIdButton';
 import { OpenInEveButton } from '@/features/openInEve/OpenInEveButton';
 import {
@@ -233,7 +234,7 @@ export function ContractDetailModal({
     };
   }, [contract.type, contract.status, items, hub, isAbyssalType]);
 
-  const title = contract.title || t(CONTRACT_TYPE_KEY[contract.type]);
+  const title = t(CONTRACT_TYPE_KEY[contract.type]);
 
   const included = items?.list.filter((item) => item.is_included) ?? [];
   const requested = items?.list.filter((item) => !item.is_included) ?? [];
@@ -273,7 +274,7 @@ export function ContractDetailModal({
   ];
 
   return (
-    <Modal open onClose={onClose} title={title}>
+    <SlideOver open onClose={onClose} title={title} wide>
       <div className="space-y-4 text-xs">
         <div>
           <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
@@ -315,6 +316,16 @@ export function ContractDetailModal({
               <CopyContractIdButton contractId={contract.contract_id} />
               <OpenInEveButton kind="contract" id={contract.contract_id} />
             </dd>
+
+            {contract.title && (
+              <>
+                <dt className="text-text-dim uppercase">{t('contracts.detailDescription')}</dt>
+                <dd className="min-w-0 space-y-1.5">
+                  <p className="break-words">{contract.title}</p>
+                  <ContractDescriptionLinks description={contract.title} />
+                </dd>
+              </>
+            )}
 
             {contract.start_location_id && (
               <>
@@ -458,7 +469,7 @@ export function ContractDetailModal({
           </DataGate>
         )}
       </div>
-    </Modal>
+    </SlideOver>
   );
 }
 
