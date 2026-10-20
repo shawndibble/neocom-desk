@@ -1168,7 +1168,9 @@ Rows:
 - **A row that navigates** is a real link ending in a trailing `CaretRight`
   (faint at rest, accent on hover).
 - **A row that opens a modal** carries its cue on the primary cell (the
-  accent entity name). The row click is a pointer convenience.
+  accent entity name): one accent cue per row. Secondary cells (system,
+  character) are plain text, however much they look like entities. The row
+  click is a pointer convenience.
 - **A row that selects** for a detail pane shows the selected treatment.
   Where having nothing selected is a valid state (the PI Map's traced
   product), a click on the selected row clears it, the same as a toggle;
