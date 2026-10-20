@@ -170,9 +170,18 @@ describe('buildBookView', () => {
       payments: [
         { id: 'j1', characterId: 99, amount: 7, at: '2026-07-31T23:59:59Z', source: 'donation' },
         { id: 'j2', characterId: 99, amount: 7, at: '2026-08-01T00:00:00Z', source: 'donation' },
+        {
+          id: 'j3',
+          minerId: 'solo:1',
+          characterId: 1,
+          amount: 7,
+          at: '2026-07-20T00:00:00Z',
+          source: 'donation',
+        },
       ],
     });
-    expect(view.donationsBeforeBook).toBe(1);
+    expect(view.donationsBeforeBook).toBe(2);
+    expect(view.miners.find((m) => m.id === 'solo:1')?.lastPaidAt).toBeNull();
     expect(view.needsYou.map((n) => (n.kind === 'unmatched' ? n.payment.id : n.kind))).toEqual([
       'j2',
     ]);

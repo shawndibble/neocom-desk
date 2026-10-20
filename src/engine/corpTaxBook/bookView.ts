@@ -286,7 +286,10 @@ export function buildBookView(input: BookViewInput): BookView {
     const characterIds = grouping?.characterIds ?? (solo ? [Number(solo[1])] : []);
     const mainCharacterId = grouping?.mainCharacterId ?? characterIds[0] ?? 0;
     const statements = input.statements.filter((s) => s.minerId === id);
-    const payments = toTaxPayments(input.payments, id);
+    // A donation before the book is neither credited nor shown as a payment.
+    const payments = toTaxPayments(input.payments, id).filter(
+      (p) => p.source !== 'donation' || !isBeforeBook(p.at, input.startDate)
+    );
     const mine = charges.filter((c) => c.minerId === id);
 
     const allocation = allocatePayments({
