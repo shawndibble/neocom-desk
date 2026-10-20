@@ -62,7 +62,7 @@ function NoteEditor({ systemId, name }: { systemId: number; name: string }) {
         <span>
           {note ? t('travel.note.updated', { date: formatDateOnly(new Date(note.updatedAt)) }) : ''}
         </span>
-        <span>{t('travel.note.count', { count: draft.length, max: SYSTEM_NOTE_MAX_LENGTH })}</span>
+        <span>{t('travel.note.count', { length: draft.length, max: SYSTEM_NOTE_MAX_LENGTH })}</span>
       </p>
     </div>
   );
