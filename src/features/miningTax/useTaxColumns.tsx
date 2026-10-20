@@ -9,7 +9,6 @@ import {
   type DataTableColumn,
 } from '@/components/ui';
 import { HintText } from '@/components/ui/HintText';
-import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import {
   focusRingClassName,
   interactiveClassName,
@@ -205,9 +204,7 @@ export function useTaxColumns({
               headerCellClassName: 'sm:w-28',
               header: t('miningTax.characterColumn'),
               // Plain: the row opens the detail modal, which links the pilot (§6c).
-              render: (dr: DisplayRow) => (
-                <span className={entityLinkClassName()}>{dr.row.characterName}</span>
-              ),
+              render: (dr: DisplayRow) => <span>{dr.row.characterName}</span>,
               sortValue: (dr: DisplayRow) => dr.row.characterName,
             } satisfies DataTableColumn<DisplayRow>,
           ]
@@ -259,7 +256,7 @@ export function useTaxColumns({
         header: t('miningTax.systemColumn'),
         render: (dr) => (
           <DataTableDenseCell>
-            <span className={entityLinkClassName()}>{systemName(dr)}</span>
+            <span>{systemName(dr)}</span>
             <SecurityValue security={systemSecurityOf(dr)} />
           </DataTableDenseCell>
         ),

@@ -2,7 +2,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { EmptyState, RowCaret, SearchInput, Spinner } from '@/components/ui';
-import { focusRingClassName, tappableRowClassName } from '@/components/ui/controlStyles';
+import {
+  focusRingClassName,
+  rowInteractiveClassName,
+  tappableRowClassName,
+} from '@/components/ui/controlStyles';
 import type { SharedFitting } from '@/engine/communities/sharedFittings';
 import { fittingEditLocation } from '@/features/fittings/fittingRoutes';
 import { uidForCharacter } from '@/sync/uid';
@@ -114,7 +118,7 @@ export function CommunitySharedFittings({
             <li key={fitting.id}>
               <Link
                 to={fittingEditLocation(fitting.code)}
-                className={`group flex w-full items-center gap-2 px-1 py-1.5 text-xs hover:bg-surface-2 ${tappableRowClassName} ${focusRingClassName} focus-visible:-outline-offset-2`}
+                className={`group flex w-full items-center gap-2 px-1 py-1.5 text-xs ${rowInteractiveClassName} ${tappableRowClassName} ${focusRingClassName} focus-visible:-outline-offset-2`}
               >
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-medium text-accent">{fitting.name}</span>

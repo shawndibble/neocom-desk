@@ -46,7 +46,7 @@ export function SurveyHowTo() {
                 alt={t(`survey.howTo.${image.alt}`)}
                 width={image.width}
                 height={image.height}
-                className="w-full rounded border border-line"
+                className="w-full rounded-xs border border-line"
               />
             )}
             <div className="flex items-start gap-2.5">

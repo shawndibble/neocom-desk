@@ -176,7 +176,7 @@ export function useItemsColumns({
           return (
             <>
               {/* Plain: the row opens the contract modal, which carries the system link. */}
-              <span className={entityLinkClassName()}>{location.systemName}</span>
+              <span>{location.systemName}</span>
               {location.security !== null && (
                 <>
                   {' '}

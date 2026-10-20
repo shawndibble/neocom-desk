@@ -437,6 +437,55 @@ async function withDedupe<R>(
   }
 }
 
+/**
+ * Every public loader call, from entry to the end of its return. `inFlightLoads`
+ * covers the live work (through `esiCache.put`, even when a grace-window caller
+ * has already gone home with the stale row); this covers the cache read ahead
+ * of it. Together they are what `settleEsiCacheLoads` waits on.
+ */
+const pendingLoads = new Set<{ key: string; promise: Promise<unknown> }>();
+
+function trackLoad<R>(characterId: number, key: string, run: () => Promise<R>): Promise<R> {
+  const promise = run();
+  const entry = { key: dedupeKey(characterId, key), promise };
+  pendingLoads.add(entry);
+  return promise.finally(() => pendingLoads.delete(entry));
+}
+
+/**
+ * Tests only: resolves once no cache load is running or still writing its row.
+ * Unlike `esiInFlight()` (which drops when the HTTP response arrives, before the
+ * body is parsed and `esiCache.put` runs), this waits for the write itself, so a
+ * read that outlives its test can't land in the next test's freshly cleared
+ * cache. Throws, naming the keys still pending, rather than letting the next
+ * test read a poisoned cache.
+ */
+export async function settleEsiCacheLoads(timeoutMs = 3000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const pending = [
+      ...pendingLoads,
+      ...[...inFlightLoads].map(([key, entry]) => ({ key, promise: entry.promise })),
+    ];
+    if (pending.length === 0) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timedOut = new Promise<'timeout'>((resolve) => {
+      timer = setTimeout(() => resolve('timeout'), Math.max(deadline - Date.now(), 0));
+    });
+    const settled = Promise.allSettled(pending.map((entry) => entry.promise)).then(
+      () => 'settled' as const
+    );
+    const outcome = await Promise.race([settled, timedOut]);
+    clearTimeout(timer);
+    if (outcome === 'timeout') {
+      const keys = [...new Set(pending.map((entry) => entry.key))].join(', ');
+      throw new Error(`ESI cache load still pending after ${timeoutMs}ms: ${keys}`);
+    }
+    // Let the `finally` blocks that deregister the loads run before re-checking.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Stale-while-revalidate
 // ---------------------------------------------------------------------------
@@ -779,16 +828,18 @@ export async function loadWithCacheStatus<T>(
   fetchLive: () => Promise<T | null>,
   options: LoadSingleWithCacheOptions = {}
 ): Promise<StatusResult<T>> {
-  // Before the first await, while a background caller's lane is still ambient.
-  const lane = laneForLoad();
-  const staleAfterMs = options.staleAfterMs ?? STALE_AFTER.default;
-  const fresh = await readFreshRow<T>(characterId, key, staleAfterMs);
-  if (!isMiss(fresh)) return { cached: fresh, needsReauth: false };
+  return trackLoad(characterId, key, async () => {
+    // Before the first await, while a background caller's lane is still ambient.
+    const lane = laneForLoad();
+    const staleAfterMs = options.staleAfterMs ?? STALE_AFTER.default;
+    const fresh = await readFreshRow<T>(characterId, key, staleAfterMs);
+    if (!isMiss(fresh)) return { cached: fresh, needsReauth: false };
 
-  const read = rowReader(characterId, key);
-  return loadPastWindow<T>(characterId, key, staleAfterMs, options, read, lane, fresh, () =>
-    loadWithCacheStatusLive(characterId, key, fetchLive, options, read, lane)
-  );
+    const read = rowReader(characterId, key);
+    return loadPastWindow<T>(characterId, key, staleAfterMs, options, read, lane, fresh, () =>
+      loadWithCacheStatusLive(characterId, key, fetchLive, options, read, lane)
+    );
+  });
 }
 
 /**
@@ -1120,16 +1171,18 @@ export async function loadPaginatedWithCacheStatus<T>(
   fetchLive: () => Promise<TruncatableResult<T>>,
   options: LoadPaginatedWithCacheOptions<T> = {}
 ): Promise<StatusResult<T[]>> {
-  // Before the first await, while a background caller's lane is still ambient.
-  const lane = laneForLoad();
-  const staleAfterMs = options.staleAfterMs ?? STALE_AFTER.default;
-  const fresh = await readFreshRow<T[]>(characterId, key, staleAfterMs);
-  if (!isMiss(fresh)) return { cached: fresh, needsReauth: false };
+  return trackLoad(characterId, key, async () => {
+    // Before the first await, while a background caller's lane is still ambient.
+    const lane = laneForLoad();
+    const staleAfterMs = options.staleAfterMs ?? STALE_AFTER.default;
+    const fresh = await readFreshRow<T[]>(characterId, key, staleAfterMs);
+    if (!isMiss(fresh)) return { cached: fresh, needsReauth: false };
 
-  const read = rowReader(characterId, key);
-  return loadPastWindow<T[]>(characterId, key, staleAfterMs, options, read, lane, fresh, () =>
-    loadPaginatedWithCacheStatusLive(characterId, key, fetchLive, options, read, lane)
-  );
+    const read = rowReader(characterId, key);
+    return loadPastWindow<T[]>(characterId, key, staleAfterMs, options, read, lane, fresh, () =>
+      loadPaginatedWithCacheStatusLive(characterId, key, fetchLive, options, read, lane)
+    );
+  });
 }
 
 async function loadPaginatedWithCacheStatusLive<T>(

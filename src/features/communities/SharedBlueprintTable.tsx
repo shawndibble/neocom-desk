@@ -10,6 +10,7 @@ import {
   RowActionsMenu,
   type DataTableColumn,
 } from '@/components/ui';
+import { Pill } from '@/components/ui/Pill';
 import { bpcSourcingHref } from '@/features/bpcContracts/bpcSourcingUrl';
 import { ItemInfoLink } from '@/features/entities/EntityLink';
 import { BuildPlanMenuItem } from '@/features/industry/BuildPlanContextMenu';
@@ -146,11 +147,7 @@ export function SharedBlueprintTable({
       render: (row) => (
         <>
           {row.memberName}
-          {row.stale && (
-            <span className="ml-1 rounded bg-surface-2 px-1.5 py-0.5 text-[0.6875rem] text-text-dim">
-              {t('communities.staleBadge')}
-            </span>
-          )}
+          {row.stale && <Pill className="ml-1">{t('communities.staleBadge')}</Pill>}
         </>
       ),
       sortValue: (row) => row.memberName,

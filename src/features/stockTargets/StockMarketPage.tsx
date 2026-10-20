@@ -521,7 +521,10 @@ export function StockMarketPage({
 function BarLegend() {
   const { t } = useTranslation();
   return (
-    <p aria-hidden="true" className="flex flex-wrap items-center gap-4 text-xs text-text-dim">
+    <p
+      aria-hidden="true"
+      className="flex flex-wrap items-center gap-4 text-xs text-text-dim max-xl:sm:hidden"
+    >
       <span className="flex items-center gap-1.5">
         <span className="inline-block h-1.5 w-4 rounded-xs bg-text-dim" />
         {t('stockTargets.table.legendListed')}

@@ -18,7 +18,7 @@ export function EsiDidntAnswer({
   return (
     <div
       role="alert"
-      className="flex flex-col gap-3 rounded-sm border border-warning/45 bg-warning/10 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between"
+      className="flex flex-col gap-3 rounded-xs border border-warning/45 bg-warning/10 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between"
     >
       <div>
         <p className="font-semibold text-warning">{t('piPlan.esiFailedTitle')}</p>
