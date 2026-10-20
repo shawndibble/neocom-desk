@@ -115,8 +115,6 @@ vi.mock('@/sde/loadMarketSde', () => ({
 }));
 
 const CHAR_ID = 91;
-/** The Pilot `signInWithQueue` signs in: one per test that depends on its own /skillqueue. */
-const QUEUE_ID = 93;
 const emptySkillsPayload = { skills: [], total_sp: 0, unallocated_sp: 0 };
 
 function fuzzworkHandler() {
@@ -354,11 +352,12 @@ describe('IndustryPlanPage: build plan settings grouping (#120)', () => {
 });
 
 /**
- * Signs in a Pilot that only this test uses, with the queue scope granted and
+ * Signs in a Pilot that only the calling test uses (each test passes its own
+ * `characterId`, never one another test has used), with the queue scope granted and
  * `queue` as its /skillqueue. Not CHAR_ID: an earlier test's background read of
  * CHAR_ID's queue can land in `esiCache` after `resetSession` cleared it, and
  * the next test then reads that stale empty queue as fresh instead of fetching
- * its own (a CI flake). A row keyed to another Character can't be poisoned by it.
+ * its own (a CI flake). A row keyed to a Character no other test uses can't be poisoned by it.
  */
 async function signInWithQueue(characterId: number, queue: unknown[]) {
   await db.characters.put({ characterId, name: 'Pilot Queue', ownerHash: 'ohq', addedAt: 3 });
@@ -385,7 +384,7 @@ describe('IndustryPlanPage: /skills is stale until the character logs in', () =>
     // Base blueprint time is 1200s (20m). Industry V is -4%/level, so a
     // credited level 5 lands at 960s (16m). ESI says past-finish_date queue
     // entries must be applied on top of /skills, which here reports nothing.
-    await signInWithQueue(QUEUE_ID, [
+    await signInWithQueue(93, [
       {
         skill_id: 3380, // Industry
         queue_position: 0,
@@ -402,7 +401,7 @@ describe('IndustryPlanPage: /skills is stale until the character logs in', () =>
 
   it('does not credit a paused queue entry, which carries no finish date', async () => {
     // peterhaneve/evemon#40: an absent date is "ETA unknown", never "done".
-    await signInWithQueue(QUEUE_ID, [{ skill_id: 3380, queue_position: 0, finished_level: 5 }]);
+    await signInWithQueue(94, [{ skill_id: 3380, queue_position: 0, finished_level: 5 }]);
     render(<App />);
 
     expect(await screen.findByText('20m')).toBeInTheDocument();
