@@ -5,11 +5,8 @@ import { Button, entityLinkClassName, Panel, TextArea } from '@/components/ui';
 import type { LoadedFitting, LoadOutcome } from '@/engine/fittings/load';
 import type { FittingXmlDocument } from '@/engine/import/eveFitXml';
 import { parseFittingXmlFile, type FittingXmlDocumentErrorCode } from './fittingXmlDocument';
-import {
-  resolveFittingXmlOpenAction,
-  type FittingXmlListItem,
-  type ShareDecodeError,
-} from './useFittingWorkspace';
+import { resolveFittingXmlOpenAction, type FittingXmlListItem } from './fittingXmlList';
+import type { ShareDecodeError } from './useFittingWorkspace';
 
 interface FittingLoadCardProps {
   onLoad: (text: string) => Promise<void>;
