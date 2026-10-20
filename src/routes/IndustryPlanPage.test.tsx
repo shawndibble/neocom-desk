@@ -10,6 +10,7 @@ import { usePublicInfo } from '@/stores/publicInfo';
 import { useAuthFailure } from '@/stores/authFailure';
 import { App } from '@/app/App';
 import * as routeChunks from '@/app/routeChunks';
+import { resetRevalidationState, settleInFlightLoads } from '@/esi/cache';
 import { clearMarketPriceCache } from '@/market/prices';
 import { clearCostIndexCache } from '@/features/industry/marketData';
 import { useBuildGroups } from '@/features/industry/buildGroups';
@@ -218,7 +219,9 @@ function stubDesktopViewport() {
     }) as unknown as MediaQueryList;
 }
 
-afterEach(() => {
+afterEach(async () => {
+  // Before the handlers reset, so a straggling read still sees this test's mocks.
+  await settleInFlightLoads();
   server.resetHandlers();
   clearMarketPriceCache();
   clearCostIndexCache();
@@ -227,6 +230,9 @@ afterEach(() => {
 /** A signed-in Pilot One on `/industry/plans/bp-1`, with nothing left over from the last test. */
 async function resetSession() {
   stubDesktopViewport();
+  // A failed revalidation in the last test (an unmocked read) backs off the next
+  // test's /skillqueue read for the same character, which then never fires.
+  resetRevalidationState();
   await db.characters.clear();
   await db.tokens.clear();
   await db.settings.clear();

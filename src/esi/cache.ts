@@ -748,6 +748,15 @@ export function resetRevalidationState(): void {
 }
 
 /**
+ * Test seam: resolves once every load now in flight has settled. A read the
+ * last test left running is joined by the next test's identical read
+ * (`withDedupe`), which then gets the old test's answer instead of its own.
+ */
+export async function settleInFlightLoads(): Promise<void> {
+  await Promise.allSettled([...inFlightLoads.values()].map((entry) => entry.promise));
+}
+
+/**
  * Forgets the held revalidation failures that were network failures, so the
  * next read of each key goes to the network again instead of being answered
  * from the stored row. Called when the connection returns
