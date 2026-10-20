@@ -60,6 +60,11 @@ export function SettingsPanelLoading({ title }: { title?: string }) {
   );
 }
 
+/** Loading state of a form that renders inside its parent panel. */
+export function SettingsFormLoading() {
+  return <Spinner />;
+}
+
 /** One lone-checkbox row of the Settings form grid, hint as the row's note. */
 export function CheckboxField({
   id,

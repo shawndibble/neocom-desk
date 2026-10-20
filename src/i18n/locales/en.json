@@ -11721,7 +11721,6 @@
     "scope": {
       "synced": "Kept across your devices — set these once, on whichever one you have to hand.",
       "device": "Stays on this device.",
-      "syncedField": "Kept across your devices.",
       "deviceField": "This device only."
     },
     "corpDefaultsTitle": "Corporation",

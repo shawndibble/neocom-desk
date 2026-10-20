@@ -18,7 +18,7 @@ _Recorded 2026-09-07._
   was decided device-local the same week with its own reasoning
   (`20260907-102126`). The rule this batch draws: a preference that describes
   _the pilot's play_ syncs, one that describes _the machine they are looking
-  at_ does not. `settings.defaultsSyncHint` says so on the page, and
+  at_ does not. `settings.scope.synced` says so on the page, and
   `settings.fontScaleHint` already said the opposite for its own control.
 
 - **One `sync.` key per preference, not one blob for all five.** The two synced

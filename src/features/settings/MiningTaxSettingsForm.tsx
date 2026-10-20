@@ -1,9 +1,9 @@
 import { useTranslation } from 'react-i18next';
-import { Fields, Spinner } from '@/components/ui';
+import { Fields } from '@/components/ui';
 import { useMiningTaxOreValueMode } from '@/features/miningTax/oreValueMode';
 import { useMiningTaxCompressedOre } from '@/features/miningTax/oreForm';
 import { useAutoContinueSessions } from '@/features/miningTax/continueSessionPref';
-import { CheckboxField, DefaultsSyncHint } from './settingsFields';
+import { CheckboxField, DefaultsSyncHint, SettingsFormLoading } from './settingsFields';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 
 interface MiningTaxSettingsFormProps {
@@ -30,7 +30,8 @@ export function MiningTaxSettingsForm({ onAutoContinueChange }: MiningTaxSetting
   const oreValueModeHydrated = useHydratedStore(useMiningTaxOreValueMode);
   const compressedOreHydrated = useHydratedStore(useMiningTaxCompressedOre);
   const autoContinueHydrated = useHydratedStore(useAutoContinueSessions);
-  if (!oreValueModeHydrated || !compressedOreHydrated || !autoContinueHydrated) return <Spinner />;
+  if (!oreValueModeHydrated || !compressedOreHydrated || !autoContinueHydrated)
+    return <SettingsFormLoading />;
 
   return (
     <div className="space-y-4">

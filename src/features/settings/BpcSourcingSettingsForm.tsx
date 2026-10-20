@@ -7,7 +7,6 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-  Spinner,
 } from '@/components/ui';
 import {
   useBpcHideAuctionsDefault,
@@ -15,7 +14,7 @@ import {
 } from '@/features/bpcContracts/sourcingDefaults';
 import { useMarketHub } from '@/features/market/hub';
 import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
-import { CheckboxField, DefaultsSyncHint } from './settingsFields';
+import { CheckboxField, DefaultsSyncHint, SettingsFormLoading } from './settingsFields';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 
 /** BPC Sourcing's settings: Settings → Industry, and the BPC Sourcing tab's settings modal. */
@@ -32,7 +31,7 @@ export function BpcSourcingSettingsForm() {
   const hideAuctionsHydrated = useHydratedStore(useBpcHideAuctionsDefault);
   const hidePlexHydrated = useHydratedStore(useBpcHidePlexDefault);
   const hubHydrated = useHydratedStore(useMarketHub);
-  if (!hideAuctionsHydrated || !hidePlexHydrated || !hubHydrated) return <Spinner />;
+  if (!hideAuctionsHydrated || !hidePlexHydrated || !hubHydrated) return <SettingsFormLoading />;
 
   return (
     <div className="space-y-4">
