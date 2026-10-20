@@ -13,7 +13,7 @@ import {
 } from '@/esi/cachePurge';
 import { revokedScopes } from '@/esi/scopes';
 import { ALERTS_SCOPE } from './alertsScope';
-import { CORP_SYNC_SCOPES } from './corpSyncScopes';
+import { CORP_SYNC_SCOPES, FEEDER_SYNC_SCOPES } from './corpSyncScopes';
 
 export interface SsoConfig {
   clientId?: string;
@@ -108,7 +108,8 @@ interface PendingLogin {
  */
 export type LoginIntent =
   | { kind: 'alerts'; characterId: number }
-  | { kind: 'corpSync'; characterId: number; corporationId: number };
+  | { kind: 'corpSync'; characterId: number; corporationId: number }
+  | { kind: 'feederGrant'; characterId: number; inviteCode: string; requestedRatePct?: number };
 
 /**
  * Which way a login failed. The callback route recovers from these rather
@@ -170,6 +171,27 @@ export function startCorpSyncLogin(
     kind: 'corpSync',
     characterId,
     corporationId,
+  });
+}
+
+/**
+ * A moon owner's grant round trip (ADR 0025 amendment): the observer ledger
+ * scope alone, picked on EVE's login screen by an Accountant Character that need
+ * not be on this account. `characterId` is the signed-in Character that holds the
+ * grant; the invite code and the optional requested rate ride along so they
+ * survive the redirect. Like `startCorpSyncLogin`, it leaves `INTENT_KEY` alone.
+ */
+export function startFeederGrantLogin(
+  characterId: number,
+  inviteCode: string,
+  requestedRatePct?: number,
+  config?: SsoConfig
+): Promise<string> {
+  return beginLogin([...FEEDER_SYNC_SCOPES], config, {
+    kind: 'feederGrant',
+    characterId,
+    inviteCode,
+    ...(requestedRatePct === undefined ? {} : { requestedRatePct }),
   });
 }
 
@@ -477,7 +499,20 @@ function readPendingLogin(key: string, allowExpired = false): PendingLogin | und
               corporationId: intent.corporationId,
             } satisfies LoginIntent,
           }
-        : {}),
+        : intent?.kind === 'feederGrant' &&
+            typeof intent.characterId === 'number' &&
+            typeof intent.inviteCode === 'string'
+          ? {
+              intent: {
+                kind: 'feederGrant',
+                characterId: intent.characterId,
+                inviteCode: intent.inviteCode,
+                ...(typeof intent.requestedRatePct === 'number'
+                  ? { requestedRatePct: intent.requestedRatePct }
+                  : {}),
+              } satisfies LoginIntent,
+            }
+          : {}),
   };
 }
 
@@ -668,6 +703,22 @@ export async function completeCorpSyncLogin(
 ): Promise<CorpSyncLoginResult> {
   const { intent, ...result } = await completeIntentLogin(params, 'corpSync', config);
   return { ...result, corporationId: (intent as { corporationId: number }).corporationId };
+}
+
+/** What a moon owner's grant round trip came back with. Nothing here has been stored. */
+export interface FeederGrantLoginResult extends AlertsLoginResult {
+  inviteCode: string;
+  requestedRatePct?: number;
+}
+
+/** Handle the callback of a moon owner's grant round trip: like `completeCorpSyncLogin`, storing nothing. */
+export async function completeFeederGrantLogin(
+  params: { code: string; state: string },
+  config?: SsoConfig
+): Promise<FeederGrantLoginResult> {
+  const { intent, ...result } = await completeIntentLogin(params, 'feederGrant', config);
+  const { inviteCode, requestedRatePct } = intent as Extract<LoginIntent, { kind: 'feederGrant' }>;
+  return { ...result, inviteCode, ...(requestedRatePct === undefined ? {} : { requestedRatePct }) };
 }
 
 async function completeIntentLogin(

@@ -14096,6 +14096,80 @@
         "hint": "Mining before the start date is kept as history and owes nothing. You can change the rate later; a new rate never reaches back over days already mined.",
         "confirm": "Turn the book on"
       },
+      "setup": {
+        "back": "Back",
+        "paste": "Paste an invite link or code",
+        "granted": "Connected through {{name}}.",
+        "left": "You have left. Nothing already collected was deleted. You can turn on your own book or pick another option.",
+        "own": {
+          "title": "Run our own book",
+          "hint": "Track the moon mining tax for our own refineries in this app.",
+          "action": "Turn on our own book"
+        },
+        "handled": {
+          "title": "Let an accounting corporation handle it",
+          "hint": "Another corporation keeps the book and bills the miners. You only share who mined at your refineries.",
+          "action": "Continue"
+        },
+        "collect": {
+          "title": "Collect tax for other corporations",
+          "hint": "Run the book for moons other corporations own. You get an invite link to send them. No refineries needed.",
+          "action": "Start collecting",
+          "noRefineries": "This book needs no refineries of its own. The moon owners you invite share their mining ledgers with it.",
+          "ready": "Your book is on. Send this link to a moon owner.",
+          "linkHint": "Anyone with this link can connect as a moon owner, so send it only to the corporation you mean. You can make more links later.",
+          "done": "Open the book"
+        },
+        "failed": {
+          "generic": "Could not connect. Try again, or ask for a new invite link.",
+          "not-an-accountant": "That Character is not an Accountant. In EVE's login, pick a Character that holds the Accountant role in the corporation that owns the moons.",
+          "invite-invalid": "That invite link or code is not valid.",
+          "invite-revoked": "That invite link was cancelled. Ask for a new one.",
+          "invite-used": "That invite link was already used. Ask for a new one.",
+          "own-book-exists": "This corporation already keeps its own book. Delete it before letting another corporation handle the tax.",
+          "already-feeder": "This corporation is already handled by an accounting corporation.",
+          "feeder-active": "This corporation is already connected.",
+          "token-mismatch": "That login did not match your logged-in account. Try again."
+        }
+      },
+      "consent": {
+        "title": "Share your mining ledger",
+        "sees": {
+          "title": "They will see",
+          "body": "Who mined at your refineries, how much and what, and when."
+        },
+        "cannot": {
+          "title": "They cannot",
+          "body": "Read your wallet, mail, assets or skills, or move any ISK."
+        },
+        "stop": {
+          "title": "To stop",
+          "body": "Leave any time. Nothing already collected is deleted. It re-syncs about every 6 hours."
+        },
+        "moonNames": "If the Character you pick is also a Station Manager, moon names come free. Otherwise add a Station Manager to see which moon.",
+        "rate": "Rate you ask for (%, optional)",
+        "accountant": "Next, EVE asks you to log in. Pick a Character that is an Accountant in your corporation.",
+        "continue": "Continue to EVE"
+      },
+      "owner": {
+        "title": "{{name}} handles the tax on your moons",
+        "waiting": "Waiting for the first sync.",
+        "synced": "Last synced {{date}}.",
+        "noRate": "No rate set.",
+        "rate": "Your rate is {{pct}}%.",
+        "noMining": "Nobody has mined at your refineries yet.",
+        "anonymous": "The accounting corporation",
+        "volume": "{{volume}} units mined",
+        "leave": {
+          "open": "Leave",
+          "title": "Leave this accounting corporation?",
+          "confirm": "Leave",
+          "owed": "{{name}} keeps {{isk}} ISK for you until it is settled. Nothing is deleted.",
+          "owedUnknown": "{{name}} keeps whatever it owes you until it is settled. Nothing is deleted.",
+          "nothingOwed": "{{name}} owes you nothing right now. Nothing is deleted.",
+          "body": "This stops the sync at once and revokes the access. To run your own book instead, turn it on afterwards from this page."
+        }
+      },
       "autoSync": {
         "title": "Automatic sync",
         "hint": "Every 6 hours our server syncs this book for you, so it stays current when no officer visits. It reads the refinery ledger, Extractions and moon notifications, and donations into the selected wallet divisions, and settles Statements that donations now cover. It never issues a Statement and never sends mail.",

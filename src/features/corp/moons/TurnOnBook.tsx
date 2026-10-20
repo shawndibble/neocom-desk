@@ -3,18 +3,25 @@ import { useTranslation } from 'react-i18next';
 import { Button, EmptyState, TextInput } from '@/components/ui';
 import { editErrorMessage } from './useBook';
 import { turnOnBook, type OfficerVerdict } from '../taxBook/bookClient';
+import { createFeederInvite, inviteLink } from '../taxBook/feederClient';
 
-/** D10: a Director picks the start date (and the corp's default rate) to turn the book on. */
+/**
+ * D10: a Director picks the start date (and the corp's default rate) to turn the book on.
+ * With `collect`, the book is for collecting tax for other corporations: it needs no
+ * refineries, and an invite link is made and shown before moving on.
+ */
 export function TurnOnBook({
   characterId,
   corporationId,
   verdict,
   onDone,
+  collect = false,
 }: {
   characterId: number;
   corporationId: number;
   verdict: OfficerVerdict;
   onDone: () => void;
+  collect?: boolean;
 }) {
   const { t } = useTranslation();
   const today = new Date().toISOString().slice(0, 10);
@@ -22,6 +29,7 @@ export function TurnOnBook({
   const [rate, setRate] = useState('10');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [link, setLink] = useState<string | null>(null);
   if (!verdict.isDirector) {
     return (
       <EmptyState
@@ -37,13 +45,28 @@ export function TurnOnBook({
     setError(null);
     try {
       await turnOnBook(characterId, corporationId, startDate, pct);
-      onDone();
+      if (collect) {
+        const { code } = await createFeederInvite(characterId, corporationId);
+        setLink(inviteLink(window.location.origin, code));
+      } else onDone();
     } catch (e) {
       setError(editErrorMessage(e));
     } finally {
       setBusy(false);
     }
   };
+  if (link !== null) {
+    return (
+      <div className="mx-auto max-w-md space-y-3 rounded-xs border border-line bg-panel p-4 text-sm">
+        <h2 className="text-base font-semibold">{t('corpTaxBook.moons.setup.collect.ready')}</h2>
+        <p className="text-text-dim">{t('corpTaxBook.moons.setup.collect.linkHint')}</p>
+        <TextInput readOnly value={link} onFocus={(e) => e.currentTarget.select()} />
+        <Button variant="primary" onClick={onDone}>
+          {t('corpTaxBook.moons.setup.collect.done')}
+        </Button>
+      </div>
+    );
+  }
   return (
     <div className="mx-auto max-w-md space-y-3 rounded-xs border border-line bg-panel p-4 text-sm">
       <h2 className="text-base font-semibold">{t('corpTaxBook.moons.off.title')}</h2>
@@ -62,7 +85,13 @@ export function TurnOnBook({
         <TextInput inputMode="decimal" value={rate} onChange={(e) => setRate(e.target.value)} />
       </label>
       <p className="text-xs text-text-dim">{t('corpTaxBook.moons.off.hint')}</p>
-      <p className="text-xs text-text-dim">{t('corpTaxBook.moons.off.needsRefineries')}</p>
+      <p className="text-xs text-text-dim">
+        {t(
+          collect
+            ? 'corpTaxBook.moons.setup.collect.noRefineries'
+            : 'corpTaxBook.moons.off.needsRefineries'
+        )}
+      </p>
       {error && (
         <p role="alert" className="text-danger">
           {error}

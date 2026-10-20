@@ -73,3 +73,17 @@ export function esiIdentityReader(fetchImpl: typeof fetch = fetch): IdentityRead
     };
   };
 }
+
+/** The public lookup of which corporation a Character is in: no token, no scope. */
+export type CorporationLookup = (characterId: number) => Promise<number>;
+
+export function esiCorporationLookup(fetchImpl: typeof fetch = fetch): CorporationLookup {
+  return async (characterId) => {
+    const character = await getJson(`${ESI_BASE}/characters/${characterId}/`, null, fetchImpl);
+    const corporationId = (character as { corporation_id?: unknown } | null)?.corporation_id;
+    if (typeof corporationId !== 'number') {
+      throw new HttpsError('unavailable', 'ESI sent no corporation', { reason: 'esi-error' });
+    }
+    return corporationId;
+  };
+}
