@@ -52,6 +52,7 @@ import { getAccessTokenReportingFailures } from './tokenProvider';
 import type { AppRoutePath } from './routeScopes';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useFontScale } from '@/lib/fontScale';
+import { decimalMarkFor, useNumberFormat } from '@/lib/numberFormat';
 import { useTimeFormat } from '@/lib/timeFormat';
 import { useMobileTabs } from '@/lib/mobileTabs';
 import { useCharacterCountOrLoading } from '@/features/character/useCharacters';
@@ -308,6 +309,9 @@ function AppEffects() {
   // read landed. Once here, before any route mounts, covers them all.
   useHydratedStore(useTimeFormat);
 
+  // The Number format preference, for the same reason: every formatter reads it.
+  useHydratedStore(useNumberFormat);
+
   // And the phone's chosen bottom tabs, for the same reason one level lower:
   // `Layout` is the only reader, but it renders on every route, so hydrating
   // it there would still paint the default bar first on a cold load. Here it
@@ -376,6 +380,12 @@ function AppEffects() {
 }
 
 export function App() {
+  // Formatters read the number format when they run rather than subscribing,
+  // so a change would leave what is on screen in the old format. Keying the
+  // routes on the resolved mark remounts them once, when the mark changes
+  // (switching `auto` to the format it already resolves to does nothing).
+  const numberMark = decimalMarkFor(useNumberFormat((state) => state.value));
+
   return (
     <ErrorBoundary>
       <AppEffects />
@@ -385,7 +395,7 @@ export function App() {
         <LandingShellOffLandingRelease />
         <DocumentTitleTracker />
         <StaleStoresReloader />
-        <Suspense fallback={<RouteFallback />}>
+        <Suspense key={numberMark} fallback={<RouteFallback />}>
           <SentryRoutes>
             <Route path="/" element={<Root />} />
             <Route path="/login" element={<Login />} />

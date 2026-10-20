@@ -3,9 +3,10 @@
  * one row per rock, `ore  units  volume m3  value ISK  distance`, separated
  * by tabs (or runs of spaces after a round trip through a chat or a browser).
  *
- * Numbers are read with a comma as the thousands separator, the way an
- * English client prints them.
+ * Numbers are read in either locale: "5,100,000.00" and "5.100.000,00" are
+ * the same figure. See `parseLocalizedNumber`.
  */
+import { parseLocalizedNumber } from '../numbers/parseLocalizedNumber';
 import type { SurveyRock } from './series';
 
 const METRES_PER: Record<string, number> = { m: 1, km: 1000, au: 149_597_870_700 };
@@ -15,8 +16,6 @@ const ROW = new RegExp(
   `^(.+?)\\s+(${NUMBER})\\s+(${NUMBER})\\s*m(?:3|³)\\s+(?:(${NUMBER})\\s*ISK\\s+)?(${NUMBER})\\s*(km|m|AU)$`,
   'i'
 );
-
-const num = (text: string): number => Number(text.replace(/,/g, ''));
 
 /** "Scordite II-Grade" and "Scordite III-Grade" are grades of one ore. */
 const GRADE = /\s(?:I|II|III|IV|V)-Grade$/;
@@ -57,12 +56,17 @@ export function parseSurveyScan(text: string): SurveyRock[] | null {
       if (bare && (nextRowIsSameOre || emptyGroup)) continue;
       return null;
     }
+    const units = parseLocalizedNumber(match[2]);
+    const volume = parseLocalizedNumber(match[3]);
+    const isk = match[4] === undefined ? undefined : parseLocalizedNumber(match[4]);
+    const distance = parseLocalizedNumber(match[5]);
+    if (units === null || volume === null || isk === null || distance === null) return null;
     rocks.push({
       ore: match[1],
-      units: num(match[2]),
-      volume: num(match[3]),
-      ...(match[4] === undefined ? {} : { isk: num(match[4]) }),
-      distanceM: num(match[5]) * METRES_PER[match[6].toLowerCase()],
+      units,
+      volume,
+      ...(isk === undefined ? {} : { isk }),
+      distanceM: distance * METRES_PER[match[6].toLowerCase()],
     });
   }
   if (rocks.length === 0) return null;

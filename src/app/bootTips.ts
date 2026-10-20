@@ -14,6 +14,7 @@ export const BOOT_TIP_KEYS = [
   'boot.tips.backup',
   'boot.tips.timeFormat',
   'boot.tips.textSize',
+  'boot.tips.numberFormat',
   'boot.tips.selfUpdate',
 ] as const;
 

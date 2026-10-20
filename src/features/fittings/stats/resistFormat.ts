@@ -24,10 +24,11 @@ export const RESONANCE_KEY = {
   kinetic: 'kineticResonance',
   explosive: 'explosiveResonance',
 } as const satisfies Record<DamageType, keyof Resonances>;
+import { createNumberFormat } from '@/lib/numberLocale';
 
-const EHP_FORMAT = new Intl.NumberFormat('en', { maximumFractionDigits: 0 });
+const EHP_FORMAT = createNumberFormat({ maximumFractionDigits: 0 });
 
 /** Whole hit points, grouped: "64,745". */
 export function formatEhp(ehp: number): string {
-  return EHP_FORMAT.format(ehp);
+  return EHP_FORMAT(ehp);
 }

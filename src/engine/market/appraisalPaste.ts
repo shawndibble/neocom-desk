@@ -37,6 +37,7 @@
  */
 
 import { looksLikeEftFit, parseEftFit } from '@/engine/import/eftFit';
+import { parseLocalizedNumber } from '@/engine/numbers/parseLocalizedNumber';
 
 export interface AppraisalPasteEntry {
   /** As written, in the first spelling seen. Matching is the caller's job. */
@@ -58,26 +59,13 @@ const X_SUFFIX = /^(.*\S)\s+x\s*(\d[\d.,']*)$/i;
 const TRAILING_QUANTITY = /^(.*\S)\s+(\d[\d.,']*)$/;
 
 /**
- * Digits grouped in threes by one repeated mark: a dot, an apostrophe, a space,
- * a no-break space, a thin space or a narrow no-break space — what a non-English client or
- * OS writes where English writes a comma. Every group after the first must be
- * exactly three digits, so `124.500` is 124500 while `12.5` is not a grouping.
- */
-const GROUPED_QUANTITY = /^\d{1,3}([.' \u00a0\u2009\u202f])\d{3}(?:\1\d{3})*$/;
-
-/**
  * `124,500` -> 124500, and so are `124.500`, `124 500` and `124'500`. Answers
  * null for anything that is not a positive whole number, so the caller decides
  * whether that is "one of these" or a line to report.
  */
 function parseQuantity(raw: string): number | null {
-  const token = raw.trim();
-  let digits: string;
-  if (/^[\d,]+$/.test(token)) digits = token.replace(/,/g, '');
-  else if (GROUPED_QUANTITY.test(token)) digits = token.replace(/\D/g, '');
-  else return null;
-  const value = Number(digits);
-  return Number.isSafeInteger(value) && value > 0 ? value : null;
+  const value = parseLocalizedNumber(raw);
+  return value !== null && Number.isSafeInteger(value) && value > 0 ? value : null;
 }
 
 /**
@@ -90,7 +78,7 @@ function parseQuantity(raw: string): number | null {
  */
 function isUnreadableQuantity(raw: string): boolean {
   const token = raw.trim();
-  return /^\d/.test(token) && !/^[\d,]+$/.test(token);
+  return /^\d/.test(token) && !/^\d+$|^\d{1,3}(,\d{3})+$/.test(token);
 }
 
 /** A line whose stated quantity could not be read; it is reported, not priced. */

@@ -6,6 +6,7 @@
  * pastes the pilot never aimed at a field: every line must look like a pilot
  * name (or every line like a D-Scan row), so prose and URLs stay a no-op.
  */
+import { parseLocalizedNumber } from '@/engine/numbers/parseLocalizedNumber';
 
 /** Names looked up per paste; the rest are counted, never silently dropped. */
 export const MAX_LIST_PILOTS = 40;
@@ -28,12 +29,12 @@ export interface DscanRow {
 
 const KM_PER_AU = 149_597_870.7;
 
-/** `1,234 km`, `3,500 m` or `2 AU` as km; `-`, blank or anything else as null. */
+/** `1,234 km` (or `1.234 km`), `3,500 m` or `2 AU` as km; `-`, blank or anything else as null. */
 export function parseDscanDistance(text: string | undefined): number | null {
-  const match = /^([\d,]+(?:\.\d+)?)\s*(km|m|AU)$/i.exec((text ?? '').trim());
+  const match = /^(\d[\d.,'\s\u00a0\u2009\u202f]*?)\s*(km|m|AU)$/i.exec((text ?? '').trim());
   if (match === null) return null;
-  const value = Number(match[1].replaceAll(',', ''));
-  if (!Number.isFinite(value)) return null;
+  const value = parseLocalizedNumber(match[1]);
+  if (value === null) return null;
   const unit = match[2].toLowerCase();
   return unit === 'au' ? value * KM_PER_AU : unit === 'm' ? value / 1000 : value;
 }

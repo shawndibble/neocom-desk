@@ -13,21 +13,23 @@
  * nothing and never a NaN.
  */
 
+import { parseLocalizedNumber } from '@/engine/numbers/parseLocalizedNumber';
+import { createNumberFormat, getDecimalMark } from './numberLocale';
+
 /** `maximumFractionDigits` is capped at 20, which is also as far as a double carries. */
-const masker = new Intl.NumberFormat('en', { maximumFractionDigits: 20 });
+const masker = createNumberFormat({ maximumFractionDigits: 20 });
 
 export function maskNumber(value: number): string {
-  return masker.format(value);
+  return masker(value);
 }
 
-/** Group separators and the spaces some exports use in their place. */
-const SEPARATORS = /[,\s]/g;
-
+/**
+ * Typed text in the display format, so a lone mark before three digits is read
+ * the way the mask prints it: `1.234` is 1.234 where the mark is a period.
+ */
 export function unmaskNumber(raw: string): number | undefined {
-  const bare = raw.replace(SEPARATORS, '');
-  if (bare === '') return undefined;
-  const value = Number(bare);
-  return Number.isFinite(value) && value >= 0 ? value : undefined;
+  const value = parseLocalizedNumber(raw, getDecimalMark());
+  return value !== null && value >= 0 ? value : undefined;
 }
 
 /**

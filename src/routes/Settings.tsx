@@ -10,7 +10,6 @@ import { SettingsBackLink, SettingsIndex, SettingsNav } from '@/features/setting
 import { AnalyticsPanel } from '@/features/settings/AnalyticsPanel';
 import { DevicePanel } from '@/features/settings/DevicePanel';
 import { OfflineDataPanel } from '@/features/settings/OfflineDataPanel';
-import { UpdatePanel } from '@/features/settings/UpdatePanel';
 import { InstallAppPanel } from '@/features/settings/InstallAppPanel';
 import { TravelSettingsPanel } from '@/features/settings/TravelSettingsPanel';
 import { ChipRow } from '@/features/settings/settingsFields';
@@ -33,6 +32,8 @@ import { useHydratedStore } from '@/lib/useHydratedStore';
 import { Checkbox, Field, Fields, FilterChip, PageHeader, Panel } from '@/components/ui';
 import { useFontScale, FONT_SCALE_STEPS } from '@/lib/fontScale';
 import { useSingleKeyShortcuts } from '@/lib/singleKeyShortcuts';
+import { decimalMarkFor, NUMBER_FORMATS, useNumberFormat } from '@/lib/numberFormat';
+import { numberFormatExample } from '@/lib/numberLocale';
 import { useTimeFormat, TIME_FORMATS } from '@/lib/timeFormat';
 import {
   useCalendarWeekStart,
@@ -70,6 +71,8 @@ export function Settings() {
   const timeFormat = useTimeFormat((state) => state.value);
   const isNarrow = useIsNarrow();
   const setTimeFormat = useTimeFormat((state) => state.setValue);
+  const numberFormat = useNumberFormat((state) => state.value);
+  const setNumberFormat = useNumberFormat((state) => state.setValue);
   const weekStart = useCalendarWeekStart((state) => state.value);
   const setWeekStart = useCalendarWeekStart((state) => state.setValue);
   // Unlike `fontScale`/`timeFormat`, `App.tsx` does not hydrate this store for
@@ -149,6 +152,18 @@ export function Settings() {
                     onSelect={(format) => void setTimeFormat(format)}
                     labelFor={(format) => t(`settings.timeFormat.${format}`)}
                   />
+                  <ChipRow
+                    label={t('settings.numberFormatLabel')}
+                    hint={t('settings.numberFormatHint')}
+                    options={NUMBER_FORMATS}
+                    selected={numberFormat}
+                    onSelect={(format) => void setNumberFormat(format)}
+                    labelFor={(format) =>
+                      t(`settings.numberFormat.${format}`, {
+                        example: numberFormatExample(decimalMarkFor(format)),
+                      })
+                    }
+                  />
                   {weekStartHydrated && (
                     <ChipRow
                       label={t('settings.weekStartLabel')}
@@ -216,10 +231,7 @@ export function Settings() {
             <>
               <div className="grid items-start gap-4 xl:grid-cols-2">
                 <DataPanel />
-                <div className="space-y-4">
-                  <UpdatePanel />
-                  <InstallAppPanel />
-                </div>
+                <InstallAppPanel />
                 <ExportPanel />
                 <ImportPanel />
               </div>

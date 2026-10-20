@@ -9,6 +9,7 @@
  * (#3809), which this ticket never writes beyond preserving them.
  */
 import { isRecord } from '../guards';
+import { parseLocalizedNumber } from '../numbers/parseLocalizedNumber';
 import { DAY_MS } from '@/lib/age';
 
 /** Mirrors `functions/src/communityRequests.ts`, which enforces them. */
@@ -249,12 +250,10 @@ export function mergeLines(
   return { lines, dropped };
 }
 
-/** A quantity typed into a field: a positive whole number, thousands separators allowed. */
+/** A quantity typed into a field: a positive whole number, thousands separators allowed in either locale. */
 export function parseQuantity(text: string): number | null {
-  const digits = text.replace(/,/g, '').trim();
-  if (!/^\d+$/.test(digits)) return null;
-  const value = Number(digits);
-  return Number.isSafeInteger(value) && value > 0 ? value : null;
+  const value = parseLocalizedNumber(text);
+  return value !== null && Number.isSafeInteger(value) && value > 0 ? value : null;
 }
 
 /** A blueprint type's name ends "... Blueprint": those lines can ask for a copy or an original. */

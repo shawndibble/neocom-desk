@@ -67,6 +67,13 @@ describe('parseDscanDistance', () => {
     expect(parseDscanDistance('77 km')).toBe(77);
   });
 
+  it('reads the same distances from a client that swaps the period and the comma', () => {
+    expect(parseDscanDistance('1.234 km')).toBe(1234);
+    expect(parseDscanDistance('3.500 m')).toBe(3.5);
+    expect(parseDscanDistance('1,5 AU')).toBeCloseTo(224_396_806.05, 1);
+    expect(parseDscanDistance('1.234,5 km')).toBe(1234.5);
+  });
+
   it('reads a dash, blank or anything else as unknown', () => {
     expect(parseDscanDistance('-')).toBeNull();
     expect(parseDscanDistance('')).toBeNull();
