@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import type { SelectionState } from './assetSelection';
+import type { SelectionState } from '@/features/assets/assetSelection';
 import { Checkbox } from '@/components/ui';
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 

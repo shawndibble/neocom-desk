@@ -20,9 +20,9 @@ import {
   SearchResultRow,
   SectionHeading,
   type Translate,
-} from '@/features/character/assetBrowserRows';
-import { selectionStateForIds } from '@/features/character/assetSelection';
-import type { PinState } from '@/features/character/stationPins';
+} from '@/features/assets/assetBrowserRows';
+import { selectionStateForIds } from '@/features/assets/assetSelection';
+import type { PinState } from '@/features/assets/stationPins';
 import { planTargetForItem } from '@/features/industry/blueprintCatalog';
 import { useItemActions } from '@/features/market/itemActions';
 import {

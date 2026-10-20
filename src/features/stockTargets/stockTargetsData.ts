@@ -15,7 +15,7 @@ import { characterIdsWithScopes } from '@/app/characterIdsWithScopes';
 import type { CharacterAsset, MarketOrder } from '@/esi/endpoints';
 import { readCachedRows } from '@/esi/cache';
 import { ESI_REGISTRY } from '@/esi/registry';
-import { KEY as ASSETS_KEY, loadAllCharactersAssets } from '@/features/character/assets';
+import { KEY as ASSETS_KEY, loadAllCharactersAssets } from '@/features/assets/assets';
 import { KEYS as ORDER_KEYS } from '@/features/character/orders';
 import { loadStationSummary } from '@/features/character/stations';
 import { loadStructureSummary } from '@/features/character/structures';

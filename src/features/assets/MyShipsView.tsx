@@ -34,7 +34,7 @@ import type { JumpsAwayResult } from '@/engine/clone/jumpsAway';
 import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
 import { loadGroupCategories, loadTypes } from '@/sde/loadSde';
 import { loadOtherCharactersAssetsDetailed, type SkippedCharacterAssets } from './assets';
-import { loadCharacterSolarSystemId } from './location';
+import { loadCharacterSolarSystemId } from '@/features/character/location';
 import { placeKey, usePlaceDetails } from '@/features/places';
 import { loadGroupNames } from '@/features/market/groupNames';
 import { JumpsAwayText, SecurityValue } from './assetBrowserRows';

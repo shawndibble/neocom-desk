@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { db } from '@/db';
 import type { BlueprintCopy } from '@/engine/communities/shareMode';
 import { loadBlueprintLocation } from '@/features/bpcContracts/blueprintLocation';
-import { KEY as ASSETS_KEY } from '@/features/character/assets';
+import { KEY as ASSETS_KEY } from '@/features/assets/assets';
 import { KEY as BLUEPRINTS_KEY } from '@/features/industry/data';
 import { lookupSolarSystem } from '@/sde/solarSystems';
 import { loadPlacedBlueprints } from './blueprintPlacement';

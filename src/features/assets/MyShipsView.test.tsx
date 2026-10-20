@@ -21,7 +21,7 @@ vi.mock('@/sde/loadSde', () => ({
   loadTypes: async () => ({}),
   loadGroupCategories: async () => ({}),
 }));
-vi.mock('./location', () => ({ loadCharacterSolarSystemId: async () => null }));
+vi.mock('@/features/character/location', () => ({ loadCharacterSolarSystemId: async () => null }));
 vi.mock('@/features/places', () => ({
   placeKey: () => '',
   usePlaceDetails: () => new Map(),

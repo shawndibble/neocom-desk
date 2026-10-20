@@ -18,7 +18,7 @@ import {
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 import { STATUS_LABEL_KEY, type MiningTaxRowStatus } from '@/engine/miningTax/rowStatus';
-import { SecurityValue } from '@/features/character/assetBrowserRows';
+import { SecurityValue } from '@/features/assets/assetBrowserRows';
 import { allMembers, type DisplayRow, type GroupMember } from '@/features/miningTax/groupRows';
 import {
   dateLabel,

@@ -12,7 +12,7 @@ import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { useTranslation } from 'react-i18next';
 import { IskAmount, TypeIcon, sortRows } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { BlueprintBadge } from '@/features/character/assetBrowserRows';
+import { BlueprintBadge } from '@/features/assets/assetBrowserRows';
 import { iskToneClass } from '@/features/character/format';
 import { ME_MAX, TE_MAX } from '@/engine/industry/efficiency';
 import { cx } from '@/lib/cx';

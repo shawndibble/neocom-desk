@@ -5,7 +5,7 @@ const assets = vi.hoisted(() => ({ current: null as unknown }));
 vi.mock('@/features/industry/data', () => ({
   loadCharacterBlueprints: async () => ({ cached: blueprints.current, needsReauth: false }),
 }));
-vi.mock('@/features/character/assets', () => ({
+vi.mock('@/features/assets/assets', () => ({
   loadCharacterAssets: async () => ({ cached: assets.current, needsReauth: false }),
 }));
 

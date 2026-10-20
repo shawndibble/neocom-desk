@@ -47,7 +47,7 @@ vi.mock('@/sde/loadSde', async (importOriginal) => ({
   })),
 }));
 // Copy valuation reaches Firestore; these tests only need a copy's badge.
-vi.mock('@/features/character/assetCopyValues', () => ({
+vi.mock('@/features/assets/assetCopyValues', () => ({
   loadAssetCopyValues: vi.fn(async () => new Map()),
 }));
 vi.mock('@/features/corp/wallet', async (importOriginal) => ({

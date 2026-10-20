@@ -162,9 +162,9 @@ describe('interaction grammar source guards (DESIGN.md §6c)', () => {
     // entries as menus are removed. (`DataTable`'s `rowMoreActions` column lives
     // in src/components/ui and is not scanned.)
     const audited = [
-      'src/features/character/assetBrowserRows.tsx',
+      'src/features/assets/assetBrowserRows.tsx',
       // My ships rows: Show info, Show fitting, Plan route, Open location assets; the row click holds only Show info.
-      'src/features/character/MyShipsView.tsx',
+      'src/features/assets/MyShipsView.tsx',
       // Admin's Member rows: Make admin… and Remove…, reachable nowhere else.
       'src/features/communities/CommunityMemberList.tsx',
       'src/features/fittings/AddCargoTab.tsx',

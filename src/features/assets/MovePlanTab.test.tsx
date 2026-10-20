@@ -29,7 +29,7 @@ const skippedCharacters = vi.hoisted(() => ({
   list: [] as { characterId: number; name: string }[],
   noEntries: false,
 }));
-vi.mock('@/features/character/assets', () => ({
+vi.mock('@/features/assets/assets', () => ({
   loadOtherCharactersAssetsDetailed: () =>
     Promise.resolve({
       entries: skippedCharacters.noEntries
