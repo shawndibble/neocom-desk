@@ -32,8 +32,8 @@ import { FITTING_EDIT_PATH, FITTINGS_PATH, fittingEditLocation } from './fitting
 import { nullableTextParam } from '@/lib/urlState';
 import { decodeFittingShare, encodeFittingShare } from '@/engine/fittings/fittingShare';
 import { withCheckedMutations } from '@/features/abyssal/mutaplasmidData';
-import { loadEveFitXmlEntry, type FittingXmlDocument } from '@/engine/import/eveFitXml';
-import { toLoadOutcome, type LoadedFitting, type LoadOutcome } from '@/engine/fittings/load';
+import type { FittingXmlDocument } from '@/engine/import/eveFitXml';
+import type { LoadedFitting, LoadOutcome } from '@/engine/fittings/load';
 import { fittingToShareInput, shareToFitting } from '@/engine/fittings/shareMapper';
 import { launchDrones, launchLimitsFrom } from '@/engine/fittings/fittingEdit';
 import { loadFittingFromText } from './loadFittingFromText';
@@ -45,49 +45,12 @@ import type {
   PilotProfile,
   StatsErrorReason,
 } from '@/engine/fittings/types';
-import { loadItemNameMap } from '@/features/skills/typeCatalog';
-import { loadTypes, typeName } from '@/sde/loadSde';
+import { typeName } from '@/sde/loadSde';
+import { resolveFittingXmlDocument, type FittingXmlListItem } from './fittingXmlList';
 import { usePilotProfile } from './fittingPilotProfile';
 import { useFittingEvaluation, type FittingEvaluation } from './useFittingEvaluation';
 
 export type ShareDecodeError = 'invalid' | 'unsupported-version';
-
-/** One `<fitting>` entry from a Loaded EVE fittings-XML file, resolved but not yet opened. */
-export interface FittingXmlListItem {
-  name: string;
-  hullName: string | null;
-  /** What opening it would Load; a `failed` one (its hull didn't resolve) can't be opened. */
-  load: LoadOutcome;
-}
-
-export type FittingXmlOpenAction = { kind: 'open'; loaded: LoadedFitting } | { kind: 'list' };
-
-/** A single-fit export opens directly; anything else — a multi-fit file, or a single entry whose hull didn't resolve — needs the picker list instead. */
-export function resolveFittingXmlOpenAction(items: FittingXmlListItem[]): FittingXmlOpenAction {
-  const only = items.length === 1 ? items[0]!.load : null;
-  return only?.kind === 'fitting' ? { kind: 'open', loaded: only } : { kind: 'list' };
-}
-
-/**
- * Resolves a Loaded fittings-XML document's `<fitting>` entries against the
- * type catalog — display data for the picker list, nothing opened yet. A
- * hull that doesn't resolve becomes a `failed` row rather than
- * dropping the entry, so a malformed fit in a multi-fit file surfaces its
- * own reason without taking the rest of the file down with it.
- */
-export async function resolveFittingXmlDocument(
-  document: FittingXmlDocument
-): Promise<FittingXmlListItem[]> {
-  const [typeByName, types] = await Promise.all([loadItemNameMap(), loadTypes()]);
-  return document.entries.map((entry) => {
-    const result = loadEveFitXmlEntry(entry, typeByName);
-    const hullTypeId = result.hullTypeId;
-    const resolvedHullName =
-      hullTypeId === null ? null : (types[String(hullTypeId)]?.name ?? `Type ${hullTypeId}`);
-    const name = entry.name.trim() !== '' ? entry.name : (resolvedHullName ?? entry.shipTypeName);
-    return { name, hullName: resolvedHullName, load: toLoadOutcome(result, name, 'file') };
-  });
-}
 
 const COALESCE_MS = 1000;
 
