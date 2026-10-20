@@ -236,7 +236,7 @@ export function GoalResults({
                     {fix.sources.map((source, k) => (
                       <li key={fix.typeIds[k]} className="text-xs text-text-dim">
                         <span className="text-text">{nameOf(fix.typeIds[k]!)}:</span>{' '}
-                        <SourceLine source={source} />
+                        <ImplantSourceLine source={source} />
                       </li>
                     ))}
                   </ul>
@@ -300,7 +300,7 @@ export function GoalResults({
 /** How a source line names a Trade Hub and a turn-in — resolved once for the whole window. */
 
 /** Where one item comes from, in a line: a hub's sell orders, or an LP Store offer and what it takes. */
-function SourceLine({ source }: { source: Source }) {
+function ImplantSourceLine({ source }: { source: Source }) {
   const { t } = useTranslation();
   const { hubName, itemName } = useContext(SourceNames);
 
@@ -436,7 +436,7 @@ function GradeRow({
         {sources === null ? (
           <span className="text-text-dim">{t('fittings.implantFinder.findingSources')}</span>
         ) : shown ? (
-          <SourceLine source={shown} />
+          <ImplantSourceLine source={shown} />
         ) : (
           <span className="text-text-dim">{t('fittings.implantFinder.noSource')}</span>
         )}
@@ -445,7 +445,7 @@ function GradeRow({
             {alt.cheaperIfYouCould
               ? t('fittings.implantFinder.cheaperIfYouCould')
               : t('fittings.implantFinder.or')}{' '}
-            <SourceLine source={alt.source} />
+            <ImplantSourceLine source={alt.source} />
           </span>
         )}
         {replacesName && !row.inSet && (
