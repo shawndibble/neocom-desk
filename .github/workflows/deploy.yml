@@ -8,17 +8,13 @@ on:
   push:
     branches: [main, develop]
 
-# Deploys must not be cancelled by a later merge: a second merge landing
-# mid-deploy used to cancel the first outright, which is how two main runs
-# ended up `cancelled` rather than deployed. Each job below has its own
-# concurrency group for the shared resource.
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: false
+# No workflow-level concurrency: each job has its own group for the resource
+# it deploys to (`pages` queues, `pages-dev` lets the latest win), and a
+# workflow-level group would serialise runs ahead of them and defeat that.
 
 jobs:
   deploy:
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     # One Pages deploy at a time, queued rather than cancelled — the
     # environment is a single shared resource and a half-applied deploy is
@@ -107,7 +103,7 @@ jobs:
   # and CLOUDFLARE_ACCOUNT_ID; variable VITE_EVE_CLIENT_ID. The custom domain
   # is attached to the project once, in the Cloudflare dashboard.
   deploy-dev:
-    if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
+    if: github.ref == 'refs/heads/develop'
     runs-on: ubuntu-latest
     # Latest wins: a newer merge makes an in-flight dev upload pointless.
     concurrency:
