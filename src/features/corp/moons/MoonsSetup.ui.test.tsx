@@ -6,6 +6,7 @@ import '@/i18n';
 import type { OfficerVerdict } from '../taxBook/bookClient';
 import type { FeederStatus } from '../taxBook/feederClient';
 import { MoonsSetup } from './MoonsSetup';
+import { fixtureView } from './ownerViewFixtures';
 
 const beginFeederGrantLogin = vi.fn();
 vi.mock('@/app/loginFlow', () => ({
@@ -17,6 +18,15 @@ vi.mock('../taxBook/feederClient', async (orig) => ({
   ...(await orig<typeof import('../taxBook/feederClient')>()),
   getFeederStatus: (...a: unknown[]) => getFeederStatus(...a),
   leaveFeeder: (...a: unknown[]) => leaveFeeder(...a),
+}));
+
+vi.mock('@/features/character/names', () => ({
+  resolveNames: async () => new Map<number, string>(),
+}));
+const loadFeederView = vi.fn();
+vi.mock('../taxBook/feederViewClient', async (orig) => ({
+  ...(await orig<typeof import('../taxBook/feederViewClient')>()),
+  loadFeederView: (...a: unknown[]) => loadFeederView(...a),
 }));
 
 const verdict = {
@@ -52,6 +62,7 @@ function renderSetup(state?: unknown, search = '', v = verdict) {
 beforeEach(() => {
   beginFeederGrantLogin.mockReset().mockResolvedValue(undefined);
   getFeederStatus.mockReset().mockResolvedValue({ status: 'none' });
+  loadFeederView.mockReset().mockRejectedValue(new Error('not-your-feeder'));
   leaveFeeder.mockReset().mockResolvedValue({ left: true, owedIsk: null });
 });
 
@@ -94,13 +105,38 @@ describe('MoonsSetup', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/not an Accountant/);
   });
 
-  it('shows what is mined, the sync state and "no rate set" once granted', async () => {
+  it('shows the owner page from the view once granted', async () => {
     getFeederStatus.mockResolvedValue(owner);
+    loadFeederView.mockResolvedValue({
+      access: { collectorCorporationId: 5, expiresAt: 0, canEdit: true },
+      view: fixtureView(),
+    });
     renderSetup();
-    expect(await screen.findByText('Efa Refinery')).toBeInTheDocument();
-    expect(screen.getByText('Waiting for the first sync.')).toBeInTheDocument();
-    expect(screen.getByText('No rate set.')).toBeInTheDocument();
+    expect(await screen.findByText(/handles the tax on your moons/)).toBeInTheDocument();
     expect(screen.queryByText('Run our own book')).not.toBeInTheDocument();
+  });
+
+  it('after leaving: previously handled above the choices, history below', async () => {
+    loadFeederView.mockResolvedValue({
+      access: { collectorCorporationId: 5, expiresAt: 0, canEdit: true },
+      view: fixtureView({ status: 'left', leftAt: Date.UTC(2026, 9, 12) }),
+    });
+    renderSetup();
+    expect(
+      await screen.findByText('Previously handled by Brass Meridian Logistics')
+    ).toBeInTheDocument();
+    expect(screen.getByText('Run our own book')).toBeInTheDocument();
+    expect(screen.getByText('Mined while they handled it')).toBeInTheDocument();
+  });
+
+  it('a dismissed after-leaving section is gone; the choices stay', async () => {
+    loadFeederView.mockResolvedValue({
+      access: { collectorCorporationId: 5, expiresAt: 0, canEdit: true },
+      view: fixtureView({ status: 'left', dismissedAt: 1 }),
+    });
+    renderSetup();
+    expect(await screen.findByText('Run our own book')).toBeInTheDocument();
+    expect(screen.queryByText(/Previously handled/)).not.toBeInTheDocument();
   });
 
   it('Leave says what is owed, leaves, then offers the choices again', async () => {

@@ -541,3 +541,21 @@ export interface FeederPayout extends FeederPayoutAmount {
   status: 'recorded' | 'waiting-for-journal' | 'matched';
   journalRef?: number;
 }
+
+// --- Feeder view (#4512) -------------------------------------------------------
+
+/** Engine `dayClosesAt`: the instant `date` stops taking late ore (end of the UTC day plus the grace). */
+export function dayClosesAt(date: string, graceHours: number = BOOK_DEFAULTS.graceHours): string {
+  return new Date(
+    Date.parse(`${shiftDate(date, 1)}T00:00:00Z`) + graceHours * HOUR_MS
+  ).toISOString();
+}
+
+/** Engine `oreFormTypeId`: the type a mined ore is valued as. */
+export function oreFormTypeId(
+  rawTypeId: number,
+  compressedByRaw: Readonly<Record<string, number>>,
+  compressed: boolean
+): number {
+  return compressed ? (compressedByRaw[String(rawTypeId)] ?? rawTypeId) : rawTypeId;
+}
