@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Field, Fields, Panel, TextInput } from '@/components/ui';
 import { importBackup, type ImportSummary } from '@/backup/io';
+import { ActionResult, SettingsHint } from '@/features/settings/settingsFields';
 
 /**
  * The counterpart to {@link ExportPanel}. Conflict policy (issue #789, not
@@ -43,7 +44,7 @@ export function ImportPanel() {
   return (
     <Panel title={t('settings.backup.importTitle')}>
       <div className="space-y-2">
-        <p className="max-w-2xl text-xs text-text-dim">{t('settings.backup.importHint')}</p>
+        <SettingsHint>{t('settings.backup.importHint')}</SettingsHint>
         <input
           ref={fileInputRef}
           type="file"
@@ -83,19 +84,17 @@ export function ImportPanel() {
           </Field>
         </Fields>
         {status === 'error' && (
-          <p role="alert" className="text-xs text-danger">
-            {t('settings.backup.importError')}
-          </p>
+          <ActionResult kind="error">{t('settings.backup.importError')}</ActionResult>
         )}
         {summary && (
-          <p role="status" aria-live="polite" className="text-xs text-success">
+          <ActionResult kind="success">
             {t('settings.backup.importSummary', {
               added: summary.addedCharacterIds.length,
               skipped: summary.skippedCharacterIds.length,
             })}
             {(summary.addedCharacterIds.length > 0 || summary.addedSettingKeys.length > 0) &&
               ` ${t('settings.backup.importReloading')}`}
-          </p>
+          </ActionResult>
         )}
       </div>
     </Panel>

@@ -8,7 +8,6 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-  Spinner,
 } from '@/components/ui';
 import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
 import { ROUTE_PREFERENCE_LABEL_KEYS, ROUTE_PREFERENCES } from '@/features/route/routePreferences';
@@ -19,6 +18,7 @@ import {
   SecurityPenaltyNote,
 } from '@/features/route/TravelRuleFields';
 import { SavedRouteNetworkFields } from '@/features/travel/SavedRouteNetworkFields';
+import { DefaultsSyncHint, SettingsHint, SettingsPanelLoading } from './settingsFields';
 import { AvoidedSystemsPanel } from './AvoidedSystemsPanel';
 
 /**
@@ -38,10 +38,11 @@ export function TravelSettingsPanel() {
 
   return (
     <div className="space-y-4">
-      <Panel title={t('settings.travel.routeTitle')}>
-        {hydrated ? (
+      {hydrated ? (
+        <Panel title={t('settings.travel.routeTitle')}>
           <div className="space-y-4">
-            <p className="max-w-2xl text-xs text-text-dim">{t('settings.travel.hint')}</p>
+            <DefaultsSyncHint />
+            <SettingsHint>{t('settings.travel.hint')}</SettingsHint>
 
             <Fields variant="form">
               <Field
@@ -82,13 +83,13 @@ export function TravelSettingsPanel() {
               </Field>
             </Fields>
           </div>
-        ) : (
-          <Spinner />
-        )}
-      </Panel>
+        </Panel>
+      ) : (
+        <SettingsPanelLoading title={t('settings.travel.routeTitle')} />
+      )}
       <Panel title={t('settings.travel.networkTitle')}>
         <div className="space-y-4">
-          <p className="max-w-2xl text-xs text-text-dim">{t('settings.travel.networkHint')}</p>
+          <SettingsHint>{t('settings.travel.networkHint')}</SettingsHint>
           <SavedRouteNetworkFields />
         </div>
       </Panel>

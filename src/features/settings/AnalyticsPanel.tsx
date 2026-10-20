@@ -1,8 +1,8 @@
 import { useTranslation } from 'react-i18next';
-import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
-import { Checkbox, Field, Fields, Panel, Spinner } from '@/components/ui';
+import { Fields, Panel } from '@/components/ui';
 import { useAnalyticsEnabled } from '@/app/analyticsPref';
 import { useHydratedStore } from '@/lib/useHydratedStore';
+import { CheckboxField, SettingsPanelLoading, SettingsScopeHint } from './settingsFields';
 
 /** Settings → Data & storage: the device-local switch for Google Analytics page views. */
 export function AnalyticsPanel() {
@@ -11,28 +11,22 @@ export function AnalyticsPanel() {
   const enabled = useAnalyticsEnabled((state) => state.value);
   const setEnabled = useAnalyticsEnabled((state) => state.setValue);
 
+  if (!hydrated) return <SettingsPanelLoading title={t('settings.analyticsTitle')} />;
+
   return (
     <Panel title={t('settings.analyticsTitle')}>
-      {hydrated ? (
+      <div className="space-y-4">
+        <SettingsScopeHint scope="device" />
         <Fields variant="form">
-          <Field
+          <CheckboxField
+            id="analytics-enabled"
             label={t('settings.analyticsLabel')}
-            htmlFor="analytics-enabled"
-            inline
-            note={t('settings.analyticsHint')}
-          >
-            <label className={touchCheckboxLabelClassName}>
-              <Checkbox
-                id="analytics-enabled"
-                checked={enabled}
-                onChange={() => void setEnabled(!enabled)}
-              />
-            </label>
-          </Field>
+            hint={t('settings.analyticsHint')}
+            checked={enabled}
+            onChange={() => void setEnabled(!enabled)}
+          />
         </Fields>
-      ) : (
-        <Spinner />
-      )}
+      </div>
     </Panel>
   );
 }

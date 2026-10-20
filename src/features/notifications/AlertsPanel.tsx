@@ -296,7 +296,10 @@ export function AlertsPanel({ variant, onClose }: AlertsPanelRenderProps) {
                         characterName={nameById.get(fire.characterId) ?? String(fire.characterId)}
                         showCharacter={showCharacter}
                         buttonSize={buttonSize}
-                        onNavigate={onClose}
+                        onNavigate={() => {
+                          if (dismissOnView) void dismissFeedEntriesAndSync([fire]);
+                          onClose();
+                        }}
                         onDismiss={() => dismissFire(group, fireIndex)}
                       />
                     ))}

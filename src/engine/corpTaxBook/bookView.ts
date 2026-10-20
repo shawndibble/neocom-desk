@@ -15,6 +15,7 @@ import {
   type TaxPayment,
 } from './allocation';
 import { lastBillableDate } from './billable';
+import { withholdUnreadFeederDays, type FeederReadClock } from './feederHealth';
 import { buildDayCharges, type DayCharge, type Miner } from './charges';
 import { activeDismissalFor, type Dismissal } from './dismissals';
 import {
@@ -68,6 +69,11 @@ export interface BookViewInput {
   dismissals: readonly Dismissal[];
   declarations: readonly Declaration[];
   adjustments: readonly Adjustment[];
+  /**
+   * Feeders' last good ledger reads. A feeder's refinery days are withheld until
+   * one lands after the day's grace (#4509); absent means no feeders.
+   */
+  feeders?: readonly FeederReadClock[];
   extractions: readonly SyncExtraction[];
   paidStatementIds: ReadonlySet<string>;
   /** The day's prices at the book's hub and Ore Form, by raw type id. */
@@ -247,7 +253,13 @@ function frozenDay(lines: readonly StatementLine[]) {
 
 export function buildBookView(input: BookViewInput): BookView {
   const placeOf = placeOfFactory(input.extractions, input.structureExpiryHours);
-  const { charges, beforeBook, unrated } = buildDayCharges(input.entries, {
+  const entries = withholdUnreadFeederDays(input.entries, {
+    now: input.now,
+    graceHours: input.graceHours,
+    bookCorporationId: input.corporationId,
+    feeders: input.feeders ?? [],
+  });
+  const { charges, beforeBook, unrated } = buildDayCharges(entries, {
     corporationId: input.corporationId,
     startDate: input.startDate,
     miners: input.miners,

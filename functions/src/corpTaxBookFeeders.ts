@@ -45,7 +45,13 @@ export interface FeederRecord {
   leftAt?: number;
   /** The Character holding the feeder's mining grant; set by the grant ticket. */
   grantHolder?: number;
-  lastSyncResult?: { at: number; outcome: 'synced' | 'skipped'; reason?: string };
+  lastSyncResult?: { at: number; outcome: 'synced' | 'skipped' | 'stale'; reason?: string };
+  /** Last ledger read that landed (ms); a feeder's days are Billable only after one past their grace. */
+  lastReadWellAt?: number;
+  /** When ESI first refused the ledger in the current spell (ms); absent when the ledger reads fine. */
+  staleSince?: number;
+  /** When it disconnected after 30 days stale (ms). */
+  disconnectedAt?: number;
   /** One payee: a corporation or a player. */
   payee?: { kind: 'corporation' | 'character'; id: number };
   payeeChangedAt?: number;

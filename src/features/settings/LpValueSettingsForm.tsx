@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Field, Fields, IskInput, Spinner } from '@/components/ui';
+import { Button, Field, Fields, IskInput } from '@/components/ui';
 import { DEFAULT_LP_VALUE, useLpValue } from '@/features/loyalty/lpValue';
-import { DefaultsSyncHint } from './settingsFields';
+import { DefaultsSyncHint, SettingsFormLoading } from './settingsFields';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 
 /**
@@ -76,7 +76,7 @@ export function LpValueField({ id }: { id: string }) {
 /** LP Value on its own: Settings → Market, and the LP Store's settings modal. */
 export function LpValueSettingsForm() {
   const hydrated = useHydratedStore(useLpValue);
-  if (!hydrated) return <Spinner />;
+  if (!hydrated) return <SettingsFormLoading />;
   return (
     <div className="space-y-4">
       <DefaultsSyncHint />

@@ -11206,7 +11206,7 @@
     "lpValueUseMarket": "Use market rates",
     "avoidedSystems": {
       "title": "Avoided systems",
-      "hint": "Systems you keep off your routes. Every jump count and route in the app goes around them where it can. The game doesn't share its own autopilot avoidance list, so enter yours here. Kept across your devices.",
+      "hint": "Systems you keep off your routes. Every jump count and route in the app goes around them where it can. The game doesn't share its own autopilot avoidance list, so enter yours here.",
       "add": "Add",
       "addLabel": "Add an avoided system",
       "remove": "Remove {{name}}",
@@ -11217,7 +11217,7 @@
       "routeTitle": "Route planning",
       "networkTitle": "Wormholes and jump bridges",
       "networkHint": "Whether routes may fly through Thera / Turnur wormholes and Ansiblex jump bridges. Like the rules above, every jump count in the app follows them, so a number always matches the route Route Safety draws.",
-      "hint": "The in-game autopilot's route settings, for planning. Every jump count and route in the app follows them; a page with its own route picker starts from the preference here. Kept across your devices.",
+      "hint": "The in-game autopilot's route settings, for planning. Every jump count and route in the app follows them; a page with its own route picker starts from the preference here.",
       "preferenceLabel": "Default route preference",
       "preferenceHint": "Which trip to plan, as the game's autopilot offers it.",
       "penaltyLabel": "Security penalty",
@@ -11242,7 +11242,7 @@
     "miningTaxOreValueModeLabel": "Edit ore values individually",
     "miningTaxOreValueModeHint": "When editing an entry, enter each ore's own total ISK value instead of one value per day — useful for matching a corp's moon-tax tool line by line. Estimated Value and Tax Owed are calculated from them.",
     "miningTaxAutoContinueLabel": "Continue sessions across midnight UTC automatically",
-    "miningTaxAutoContinueHint": "When you keep mining past midnight UTC, add the new EVE day to the same session without asking, with an Undo. Set on this device only, unlike the rest of this section.",
+    "miningTaxAutoContinueHint": "When you keep mining past midnight UTC, add the new EVE day to the same session without asking, with an Undo.",
     "characterDefaultsTitle": "Character defaults",
     "piDefaultsTitle": "Planetary Industry",
     "bpcSourcingDefaultsTitle": "BPC Sourcing",
@@ -11255,7 +11255,7 @@
     "updateFailed": "Could not check for a new version. Check your connection and try again.",
     "analyticsTitle": "Analytics",
     "analyticsLabel": "Send page views",
-    "analyticsHint": "Sends only the name of the page you are on to Google Analytics, never character, corporation or other IDs. Stored on this device only.",
+    "analyticsHint": "Sends only the name of the page you are on to Google Analytics, never character, corporation or other IDs.",
     "offline": {
       "title": "Offline data",
       "hint": "Large reference files download the first time a page needs them. Download them all here to use the app with no connection.",
@@ -11496,9 +11496,9 @@
     "displayTitle": "Display",
     "fontScaleLabel": "Text size",
     "singleKeyShortcutsLabel": "Single-key shortcuts",
-    "singleKeyShortcutsHint": "G then a letter jumps between pages, and ? lists them, anywhere outside a text field. Turn them off if you set them off by accident, for example with speech input. Stays on this device.",
-    "singleKeyShortcutsOffNote": "Single-key shortcuts are off. Esc still closes an open dialog, and the command palette still opens from its key. Stays on this device.",
-    "fontScaleHint": "Scales text and controls together. Applies immediately and stays on this device.",
+    "singleKeyShortcutsHint": "G then a letter jumps between pages, and ? lists them, anywhere outside a text field. Turn them off if you set them off by accident, for example with speech input.",
+    "singleKeyShortcutsOffNote": "Single-key shortcuts are off. Esc still closes an open dialog, and the command palette still opens from its key.",
+    "fontScaleHint": "Scales text and controls together. Applies immediately.",
     "fontScaleSmall": "Small",
     "fontScaleDefault": "Default",
     "fontScaleLarge": "Large",
@@ -11718,7 +11718,11 @@
       "importSummary": "Added {{added}} character(s); skipped {{skipped}} already on this device.",
       "importReloading": "Reloading to pick up the imported data…"
     },
-    "defaultsSyncHint": "Kept across your devices — set these once, on whichever one you have to hand.",
+    "scope": {
+      "synced": "Kept across your devices — set these once, on whichever one you have to hand.",
+      "device": "Stays on this device.",
+      "deviceField": "This device only."
+    },
     "corpDefaultsTitle": "Corporation",
     "timeFormatLabel": "Time format",
     "timeFormatHint": "EVE runs on UTC — the clock other players quote timers in. Calendar keeps your local days either way.",
@@ -11727,7 +11731,7 @@
       "eve": "EVE time (UTC)"
     },
     "numberFormatLabel": "Number format",
-    "numberFormatHint": "How numbers are written on this device. Pasted numbers are read in either format, so a list copied from a client set to another language still works.",
+    "numberFormatHint": "How numbers are written. Pasted numbers are read in either format, so a list copied from a client set to another language still works.",
     "numberFormat": {
       "auto": "Match my browser ({{example}})",
       "period": "Period decimal ({{example}})",
@@ -11741,7 +11745,7 @@
     },
     "mobileTabs": {
       "title": "Phone tab bar",
-      "hint": "Pick the four links the bottom bar shows on a phone. The More menu lists every page. Stays on this device.",
+      "hint": "Pick the four links the bottom bar shows on a phone. The More menu lists every page.",
       "group": "Phone tab bar links",
       "chosen": "{{count}} of {{total}} picked",
       "full": "Unpick one first — the bar holds four.",
