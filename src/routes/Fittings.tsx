@@ -1,30 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useHydratedStore } from '@/lib/useHydratedStore';
-import { fittingCompareHref, fittingsRedirect } from '@/features/fittings/fittingRoutes';
+import { fittingsRedirect } from '@/features/fittings/fittingRoutes';
 import { ShipsTabBar } from '@/features/fittings/ShipsTabBar';
 import { SHIPS_TABS_ID } from '@/features/fittings/shipsTabs';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
 import { useCharacters } from '@/features/character/useCharacters';
 import { useActiveCharacter } from '@/stores/activeCharacter';
-import { useOnline } from '@/stores/network';
 import { useTranslation } from 'react-i18next';
-import { Navigate, useLocation, useNavigate } from 'react-router-dom';
-import {
-  Button,
-  LiveStatus,
-  Modal,
-  Panel,
-  SlideOver,
-  Tabs,
-  TabPanel,
-  useTabsId,
-  Toast,
-  useTimedToast,
-} from '@/components/ui';
+import { Navigate, useLocation } from 'react-router-dom';
+import { Button, LiveStatus } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { AddRow } from '@/components/ui/icons';
-import { useEndpointsGranted } from '@/app/useGrantedScopes';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { moduleKey } from '@/engine/fittings/skillGaps';
@@ -43,43 +30,33 @@ import {
   swapModuleType,
 } from '@/engine/fittings/fittingEdit';
 import { FittingAddPanel } from '@/features/fittings/FittingAddPanel';
-import { type FitResource } from '@/features/fittings/makeItFitContext';
-import { MakeItFitDialog } from '@/features/fittings/MakeItFitDialog';
 import { CargoQuantityDialog } from '@/features/fittings/CargoQuantityDialog';
 import { FittingItemActionsProvider } from '@/features/fittings/fittingItemActions';
 import { useChargeLoading } from '@/features/fittings/useChargeLoading';
 import { useEditorItemActions } from '@/features/fittings/useEditorItemActions';
 import { targetRack, type AddTarget } from '@/features/fittings/addTarget';
-import { writeCompareCodes } from '@/features/fittings/compareUrl';
 import { useEditorShare } from '@/features/fittings/useEditorShare';
-import { FittingHeader, type LibraryAction } from '@/features/fittings/FittingHeader';
 import type { HullEntry } from '@/engine/fittings/hullCatalogue';
-import { FittingSaveButton } from '@/features/fittings/FittingSaveButton';
 import { LoadWarnings } from '@/features/fittings/FittingLoadCard';
+import { FittingEditorHeader } from '@/features/fittings/FittingEditorHeader';
+import { FittingEditorLayout } from '@/features/fittings/FittingEditorLayout';
+import { useMakeItFitDialog } from '@/features/fittings/useMakeItFitDialog';
+import type { LibraryAction } from '@/features/fittings/FittingHeader';
 import { FittingStartScreen } from '@/features/fittings/FittingStartScreen';
 import { FittingLibraryDialogs } from '@/features/fittings/FittingLibraryDialogs';
 import { FittingEditorPanes } from '@/features/fittings/FittingEditorPanes';
 import { FittingRackSheet } from '@/features/fittings/FittingRackSheet';
-import { LazySaveToEveDialog } from '@/features/fittings/LazySaveToEveDialog';
 import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
 import { usePageItemActions } from '@/features/market/usePageItemActions';
 import { FittingModuleDialog } from '@/features/fittings/FittingModuleDialog';
-import { SaveAsNewDialog } from '@/features/fittings/SaveAsNewDialog';
-import { RING_ROOM_ATTR } from '@/features/fittings/ring/useRingChrome';
 import { FittingStatsColumn } from '@/features/fittings/FittingStatsColumn';
-import {
-  THREE_COLUMN_QUERY,
-  addModeFor,
-  editorColumnClass,
-  editorGridClass,
-} from '@/features/fittings/fittingLayout';
+import { THREE_COLUMN_QUERY, addModeFor } from '@/features/fittings/fittingLayout';
 import { useFittingPasteLoad } from '@/features/fittings/useFittingPasteLoad';
 import { useSavedFittingRecord } from '@/features/fittings/useSavedFittingRecord';
 import { tacticalModeKind } from '@/engine/fittings/tacticalModes';
 import {
   resolveFittingView,
   useFittingViewPreference,
-  type FittingView,
 } from '@/features/fittings/fittingViewPreference';
 import { useFittingAlpha } from '@/features/fittings/useFittingAlpha';
 import { useFittingHardpoints } from '@/features/fittings/useFittingHardpoints';
@@ -121,8 +98,6 @@ function FittingsPage() {
       .then(({ warmFittingAssets }) => warmFittingAssets())
       .catch(() => {});
   }, []);
-  const navigate = useNavigate();
-  const location = useLocation();
   const workspace = useFittingWorkspace();
   const catalogue = useFittingCatalogue();
   const context = useFittingContext(workspace.profile, catalogue);
@@ -141,23 +116,10 @@ function FittingsPage() {
   // What the last add did, read out by the sr-only status (the browser stays open beside the Ring).
   const [added, setAdded] = useState({ message: '', n: 0 });
   const setAddedMessage = (message: string) => setAdded((a) => ({ message, n: a.n + 1 }));
-  // Which budget's "Fix" link opened Make it fit; null while it is closed.
-  const [makeItFitFor, setMakeItFitFor] = useState<FitResource | null>(null);
-  // What the last applied Make it fit option changed, for its confirmation toast.
-  const [fitApplied, setFitApplied] = useState<string | null>(null);
-  useTimedToast(fitApplied, () => setFitApplied(null));
-  const openMakeItFit = useCallback(
-    (resource: FitResource) => setMakeItFitFor(resource),
-    [setMakeItFitFor]
-  );
   const storedView = useFittingViewPreference((state) => state.value);
   const viewHydrated = useHydratedStore(useFittingViewPreference);
   const setView = useFittingViewPreference((state) => state.setValue);
   const view = resolveFittingView(storedView, isPhone);
-  // Below desktop the Ring, the List and the stats are one set of tabs.
-  const [phoneTab, setPhoneTab] = useState<'editor' | 'stats'>('editor');
-  // One tab bar renders at a time (phone sheet or docked/wide), so one id base serves both.
-  const viewTabsId = useTabsId();
   // Phone Ring: the rack whose slots sheet is open (scope decision `20260924-205720`).
   const [rackSheet, setRackSheet] = useState<FittingSlotKind | 'drone' | null>(null);
   // The module dialog's variations start folded: a tap on a module is
@@ -186,12 +148,8 @@ function FittingsPage() {
   const gaps = useFittingSkillGaps(workspace.fitting, activeCharacterId);
   const alpha = useFittingAlpha(workspace.fitting);
   const hardpoints = useFittingHardpoints(workspace.fitting);
-  const [saveToEveOpen, setSaveToEveOpen] = useState(false);
-  const [saveAsNewOpen, setSaveAsNewOpen] = useState(false);
-  const [saveAsNewName, setSaveAsNewName] = useState('');
-  const { savedRecord, currentShareCode, hasUnsavedEdits } = useSavedFittingRecord(
-    workspace.savedId
-  );
+  const saved = useSavedFittingRecord(workspace.savedId);
+  const { savedRecord } = saved;
   useFittingPasteLoad(workspace.loadFromInput);
   const editorShare = useEditorShare(
     activeCharacterId,
@@ -204,10 +162,18 @@ function FittingsPage() {
   // Bumped on a successful Save to EVE so In-game Fittings remounts and
   // refetches, picking up the fitting that just landed (or the overwrite).
   const [inGameFittingsKey, setInGameFittingsKey] = useState(0);
-  const canSaveToEve = useEndpointsGranted(['postCharacterFitting']);
-  const online = useOnline();
 
   const { fitting, stats, edit } = workspace;
+  const makeItFit = useMakeItFitDialog({
+    workspace,
+    fitting,
+    catalogue,
+    characterId: activeCharacterId,
+    isPhone,
+    view,
+    setView,
+    edit,
+  });
   // Warm the module browser's hull check in the background once the ship data,
   // pilot and catalogue are in, so opening Add (or changing hull) needn't wait.
   // The panel's own call finds the memoized results.
@@ -494,7 +460,7 @@ function FittingsPage() {
       addButton={addButton}
       dronesShown={dronesShown}
       fightersShown={fightersShown}
-      onOpenMakeItFit={openMakeItFit}
+      onOpenMakeItFit={makeItFit.open}
     />
   );
 
@@ -511,7 +477,7 @@ function FittingsPage() {
       yourCharacters={yourCharacters}
       targetProfiles={targetProfiles}
       overlay={overlay}
-      onOpenMakeItFit={openMakeItFit}
+      onOpenMakeItFit={makeItFit.open}
     />
   );
 
@@ -538,75 +504,19 @@ function FittingsPage() {
         <div
           className={`mx-auto max-w-[120rem] space-y-3 ${addOpen && addMode === 'slideOut' ? 'pl-[26rem]' : ''}`}
         >
-          <FittingHeader
+          <FittingEditorHeader
+            workspace={workspace}
             fitting={fitting}
-            subtitle={subtitle}
-            onRename={workspace.rename}
-            onLibrary={openLibrary}
-            onCompare={() => {
-              // Unsaved edits against a saved Fitting: Compare opens saved vs.
-              // current rather than just the one code already in the URL.
-              if (hasUnsavedEdits && savedRecord && currentShareCode) {
-                const params = writeCompareCodes(new URLSearchParams(), [
-                  savedRecord.code,
-                  currentShareCode,
-                ]);
-                navigate(fittingCompareHref(params.toString()));
-                return;
-              }
-              navigate(fittingCompareHref(location.search));
-            }}
-            price={workspace.price}
-            cloneImplants={workspace.profile?.implantTypeIds}
-            compact={headerCompact}
             stats={stats}
+            characterId={activeCharacterId}
+            subtitle={subtitle}
+            hullName={hullName}
+            compact={headerCompact}
+            alpha={alpha}
             share={editorShare}
-            badges={{
-              alpha: { blockers: alpha.blockers, skillName: alpha.skillName },
-              mastery:
-                activeCharacterId !== null
-                  ? {
-                      hullTypeId: fitting.shipTypeId,
-                      hullName,
-                      characterId: activeCharacterId,
-                    }
-                  : null,
-            }}
-            save={
-              <FittingSaveButton
-                compact={headerCompact}
-                onSave={() => void workspace.save()}
-                canSave={workspace.canSave}
-                saveBlockedReason={
-                  activeCharacterId === null
-                    ? t('fittings.myFittings.needCharacter')
-                    : workspace.tooLargeToShare
-                      ? t('fittings.myFittings.tooLarge')
-                      : undefined
-                }
-                updating={workspace.savedId !== null}
-                onSaveAsNew={() => {
-                  setSaveAsNewName(
-                    t('fittings.myFittings.saveAsNewDefaultName', {
-                      name: savedRecord?.name ?? fitting.name,
-                    })
-                  );
-                  setSaveAsNewOpen(true);
-                }}
-                onSaveToEve={() => setSaveToEveOpen(true)}
-                canSaveToEve={activeCharacterId !== null && canSaveToEve === true && online}
-                saveToEveBlockedReason={
-                  activeCharacterId === null
-                    ? t('fittings.saveToEve.needCharacter')
-                    : !online
-                      ? t('fittings.saveToEve.needsConnection')
-                      : undefined
-                }
-                saveToEveMissingGroups={
-                  activeCharacterId !== null && canSaveToEve === false ? ['fittings'] : undefined
-                }
-              />
-            }
+            saved={saved}
+            onLibrary={openLibrary}
+            onSavedToEve={() => setInGameFittingsKey((key) => key + 1)}
           />
           {workspace.tooLargeToShare && (
             <p role="alert" className="text-xs text-warning">
@@ -624,143 +534,19 @@ function FittingsPage() {
             {charges.message}
           </p>
 
-          {viewHydrated &&
-            (addMode === 'sheet' ? (
-              <div className="space-y-3">
-                <Tabs
-                  tabsId={viewTabsId}
-                  tabs={[
-                    { id: 'ring', label: t('fittings.view.ring') },
-                    { id: 'list', label: t('fittings.view.list') },
-                    { id: 'stats', label: t('fittings.phoneTabs.stats') },
-                  ]}
-                  value={phoneTab === 'stats' ? 'stats' : view}
-                  onChange={(id) => {
-                    if (id === 'stats') {
-                      setPhoneTab('stats');
-                      return;
-                    }
-                    setPhoneTab('editor');
-                    void setView(id as FittingView);
-                  }}
-                  label={t('fittings.phoneTabs.label')}
-                />
-                <TabPanel
-                  tabsId={viewTabsId}
-                  tabId={phoneTab === 'stats' ? 'stats' : view}
-                  className="space-y-3"
-                >
-                  {phoneTab === 'stats' ? statsSections : editor}
-                </TabPanel>
-              </div>
-            ) : (
-              <div className={editorGridClass(addMode, view, addOpen)}>
-                {addMode === 'docked' && (
-                  <Panel
-                    title={addTitle}
-                    className="sticky top-3 max-h-[calc(100vh-1.5rem)] overflow-y-auto"
-                  >
-                    {addPanel}
-                  </Panel>
-                )}
-                {/* Ring | List as the app's own tabs over the column they switch. */}
-                <div
-                  data-testid="fitting-editor-column"
-                  {...{ [RING_ROOM_ATTR]: '' }}
-                  className={editorColumnClass(view, addMode, addOpen)}
-                >
-                  <Tabs
-                    tabsId={viewTabsId}
-                    tabs={[
-                      { id: 'ring', label: t('fittings.view.ring') },
-                      { id: 'list', label: t('fittings.view.list') },
-                    ]}
-                    value={view}
-                    onChange={(id) => void setView(id as FittingView)}
-                    label={t('fittings.view.label')}
-                  />
-                  <TabPanel tabsId={viewTabsId} tabId={view} className="space-y-3">
-                    {editor}
-                  </TabPanel>
-                </div>
-                {statsSections}
-              </div>
-            ))}
-
-          <MakeItFitDialog
-            open={makeItFitFor !== null}
-            resource={makeItFitFor}
-            onClose={() => setMakeItFitFor(null)}
-            variants={workspace.variants}
-            skillGains={workspace.skillGains}
-            characterId={activeCharacterId}
-            fittingName={fitting.name}
-            implants={
-              workspace.profile
-                ? {
-                    fitting,
-                    profile: workspace.profile,
-                    basis: workspace.implantBasis,
-                    onChange: workspace.setImplantSet,
-                  }
-                : null
-            }
-            onImplantsApplied={(names) => {
-              setMakeItFitFor(null);
-              setFitApplied(t('fittings.makeItFit.implantsApplied', { names }));
-            }}
-            catalogue={catalogue}
-            placement={isPhone ? 'sheet' : 'center'}
-            onOpenList={
-              view === 'list'
-                ? undefined
-                : () => {
-                    void setView('list');
-                    setMakeItFitFor(null);
-                  }
-            }
-            onApply={(option) => {
-              edit((f) =>
-                option.swaps.reduce(
-                  (acc, swap) => swapModuleType(acc, swap.slot, swap.slotIndex, swap.toTypeId),
-                  f
-                )
-              );
-              setMakeItFitFor(null);
-              setFitApplied(
-                t('fittings.makeItFit.applied', {
-                  swap: option.swaps
-                    .map((swap) =>
-                      t('fittings.makeItFit.swap', {
-                        from: catalogueTypeName(catalogue, swap.fromTypeId),
-                        to: catalogueTypeName(catalogue, swap.toTypeId),
-                      })
-                    )
-                    .join('; '),
-                })
-              );
-            }}
+          <FittingEditorLayout
+            addMode={addMode}
+            addOpen={addOpen}
+            addTitle={addTitle}
+            addPanel={addPanel}
+            onCloseAdd={closeAdd}
+            viewHydrated={viewHydrated}
+            view={view}
+            onViewChange={(next) => void setView(next)}
+            editor={editor}
+            statsSections={statsSections}
           />
-          {/* No Undo here: the editor has no in-app undo, only the browser's Back (one swap is one history entry). */}
-          {fitApplied !== null && <Toast message={fitApplied} />}
-          <SaveAsNewDialog
-            open={saveAsNewOpen}
-            onClose={() => setSaveAsNewOpen(false)}
-            name={saveAsNewName}
-            onNameChange={setSaveAsNewName}
-            onConfirm={(name) => void workspace.saveAsNew(name)}
-          />
-          {activeCharacterId !== null && saveToEveOpen && (
-            <LazySaveToEveDialog
-              open
-              onClose={() => setSaveToEveOpen(false)}
-              characterId={activeCharacterId}
-              fitting={fitting}
-              description={savedRecord?.notes ?? ''}
-              onSaved={() => setInGameFittingsKey((key) => key + 1)}
-              onSaveToMyFittings={workspace.savedId === null ? workspace.save : undefined}
-            />
-          )}
+          {makeItFit.dialog}
           <FittingLibraryDialogs
             library={library}
             onClose={closeLibrary}
@@ -812,23 +598,6 @@ function FittingsPage() {
               onSelectTarget={selectTargetFromSheet}
               unusableModuleKeys={gaps?.unusableModuleKeys}
             />
-          )}
-          {addMode === 'sheet' && (
-            <Modal open={addOpen} onClose={closeAdd} placement="sheet" title={addTitle}>
-              {addPanel}
-            </Modal>
-          )}
-          {addMode === 'slideOut' && (
-            <SlideOver
-              side="left"
-              // Clears the app's 12rem nav, so it slides out where the docked column sits.
-              className="md:left-48"
-              open={addOpen}
-              onClose={closeAdd}
-              title={addTitle}
-            >
-              {addPanel}
-            </SlideOver>
           )}
           {cargoQuantityFor !== null && (
             <CargoQuantityDialog
