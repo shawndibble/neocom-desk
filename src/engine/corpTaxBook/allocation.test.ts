@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   allocatePayments,
   dismissalCredits,
+  isBeforeBook,
   matchDonation,
   settleTolerance,
   type TaxPayment,
@@ -297,5 +298,47 @@ describe('matchDonation', () => {
         { miners, statements: [JUNE], knownCharacterIds: new Set() }
       )
     ).toEqual({ kind: 'unmatched' });
+  });
+});
+
+describe('donations before the book (#4505)', () => {
+  const run = (at: string, extra: Partial<TaxPayment> = {}) =>
+    allocatePayments({
+      statements: [JUNE],
+      payments: [payment('p1', 12_000_000, at, extra)],
+      dismissalCredits: [],
+      startDate: '2026-06-01',
+    });
+
+  it('credits nothing for a donation dated the day before the start date', () => {
+    const result = run('2026-05-31T23:59:59Z');
+    expect(result.byStatement.get('s1')).toMatchObject({ credited: 0, settled: false });
+    expect(result.paymentCredits).toEqual([]);
+    expect(result.credit).toBe(0);
+  });
+
+  it('counts a donation on the start date', () => {
+    expect(run('2026-06-01T00:00:00Z').byStatement.get('s1')?.settled).toBe(true);
+  });
+
+  it('keeps crediting a manual payment dated before the start date', () => {
+    expect(run('2026-05-01T00:00:00Z', { source: 'manual' }).byStatement.get('s1')?.settled).toBe(
+      true
+    );
+  });
+
+  it('re-evaluates when the start date moves later', () => {
+    const input = {
+      statements: [JUNE],
+      payments: [payment('p1', 12_000_000, '2026-06-10T00:00:00Z')],
+      dismissalCredits: [],
+    };
+    expect(allocatePayments({ ...input, startDate: '2026-06-01' }).credit).toBe(2_000_000);
+    expect(allocatePayments({ ...input, startDate: '2026-06-11' }).credit).toBe(0);
+  });
+
+  it('isBeforeBook compares the UTC day', () => {
+    expect(isBeforeBook('2026-05-31T23:59:59Z', '2026-06-01')).toBe(true);
+    expect(isBeforeBook('2026-06-01T00:00:00Z', '2026-06-01')).toBe(false);
   });
 });

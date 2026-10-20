@@ -142,6 +142,11 @@ export function MinersTab() {
         <StatChip label={t('corpTaxBook.moons.chips.credit')} value={isk(view.totals.credit)} />
       </StatChips>
       <NeedsYouQueue />
+      {view.donationsBeforeBook > 0 && (
+        <p className="text-xs text-text-dim">
+          {t('corpTaxBook.moons.beforeBook.donations', { count: view.donationsBeforeBook })}
+        </p>
+      )}
       <Panel padded={false}>
         <div className="flex flex-wrap items-center gap-2 p-3">
           <SearchInput

@@ -164,6 +164,20 @@ describe('buildBookView', () => {
     expect(rows.find((r) => r.start === '2026-09-01')?.status).toBe('issued');
   });
 
+  it('counts a donation before the start date and lists it nowhere (#4505)', () => {
+    const view = buildBookView({
+      ...input({ entries: [entry(1, '2026-08-10', 1000)] }),
+      payments: [
+        { id: 'j1', characterId: 99, amount: 7, at: '2026-07-31T23:59:59Z', source: 'donation' },
+        { id: 'j2', characterId: 99, amount: 7, at: '2026-08-01T00:00:00Z', source: 'donation' },
+      ],
+    });
+    expect(view.donationsBeforeBook).toBe(1);
+    expect(view.needsYou.map((n) => (n.kind === 'unmatched' ? n.payment.id : n.kind))).toEqual([
+      'j2',
+    ]);
+  });
+
   it('flags an overdue Statement, a declaration to answer and an Unmatched donation', () => {
     const base = input({ entries: [entry(1, '2026-08-10', 1000)], now: '2026-09-30T00:00:00Z' });
     const plan0 = planStatementRun(buildBookView(base), { start: '2026-08-01', end: '2026-08-31' });

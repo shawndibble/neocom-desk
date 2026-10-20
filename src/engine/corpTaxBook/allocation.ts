@@ -100,15 +100,29 @@ export interface Allocation {
   balance: number;
 }
 
+/** Whether a donation's UTC timestamp falls before the book's start date (a donation on the start date counts). */
+export function isBeforeBook(at: string, startDate: string): boolean {
+  return at.slice(0, 10) < startDate;
+}
+
 export interface AllocationInput {
   /** One Miner's issued Statements. */
   statements: readonly Statement[];
   /** That Miner's Tax Payments. */
   payments: readonly TaxPayment[];
   dismissalCredits: readonly DismissalCredit[];
+  /** The book's start date: a donation dated before it credits nothing. Hand-recorded payments always count. */
+  startDate?: string;
 }
 
-export function allocatePayments(input: AllocationInput): Allocation {
+export function allocatePayments(rawInput: AllocationInput): Allocation {
+  const { startDate } = rawInput;
+  const input = {
+    ...rawInput,
+    payments: startDate
+      ? rawInput.payments.filter((p) => p.source !== 'donation' || !isBeforeBook(p.at, startDate))
+      : rawInput.payments,
+  };
   const ordered = [...input.statements].sort(
     (a, b) => a.issuedAt.localeCompare(b.issuedAt) || a.id.localeCompare(b.id)
   );

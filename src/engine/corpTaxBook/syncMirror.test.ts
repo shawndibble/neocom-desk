@@ -387,4 +387,36 @@ describe('functions mirror of the Corp Tax Book sync engine', () => {
       expect(theirs.length).toBeGreaterThan(0);
     }
   });
+  it('planSettlements ignores a donation before the start date in both copies (#4505)', () => {
+    const statements = [
+      {
+        id: 's1',
+        minerId: 'solo:50',
+        amount: 10_000_000,
+        issuedAt: '2026-10-01T00:00:00Z',
+        lines: [],
+      },
+    ];
+    for (const at of ['2026-05-31T23:59:59Z', '2026-06-01T00:00:00Z']) {
+      const payments = [{ id: 'p1', minerId: 'solo:50', amount: 10_000_000, at }];
+      const ours = planSettlements({
+        statements: statements as unknown as Statement[],
+        payments: payments.map((p) => ({ ...p, characterId: 1, source: 'donation' as const })),
+        dismissals: [],
+        miners: [],
+        alreadyPaid: new Set(),
+        startDate: '2026-06-01',
+      });
+      const theirs = mirror.planSettlements({
+        statements,
+        payments: payments.map((p) => ({ ...p, source: 'donation' as const })),
+        dismissals: [],
+        alreadyPaid: new Set(),
+        extractions: [],
+        startDate: '2026-06-01',
+      });
+      expect(theirs).toEqual(ours);
+      expect(ours.length).toBe(at.startsWith('2026-06') ? 1 : 0);
+    }
+  });
 });

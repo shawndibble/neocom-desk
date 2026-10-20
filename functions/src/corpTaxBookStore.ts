@@ -1205,6 +1205,7 @@ async function closeAccount(
       extractions: extractions.docs.map((d) => d.data() as MirrorExtraction),
       expiryHours: (c.book.structureExpiryHours as Record<string, number> | undefined) ?? {},
     }),
+    startDate: c.book.startDate as string | undefined,
   });
   const credit = Math.max(0, allocation.credit);
   const owed = [...allocation.byStatement.values()]
@@ -1257,6 +1258,7 @@ function paymentForAllocation(id: string, p: Data) {
     id,
     amount: p.amount as number,
     at: p.at as string,
+    ...(p.source === 'donation' || p.source === 'manual' ? { source: p.source } : {}),
     ...(typeof p.statementId === 'string' ? { statementId: p.statementId } : {}),
     ...(typeof p.notTaxAmount === 'number' ? { notTaxAmount: p.notTaxAmount } : {}),
   };
@@ -1542,6 +1544,7 @@ export async function readStatementByToken(deps: BookDeps, token: string) {
       extractions: extractions.docs.map((d) => d.data() as MirrorExtraction),
       expiryHours: (b.structureExpiryHours as Record<string, number> | undefined) ?? {},
     }),
+    startDate: b.startDate as string | undefined,
   });
   const here = allocation.paymentCredits.filter((c) => c.statementId === statementId);
   const bySource = new Map(payments.docs.map((d) => [d.id, d.data()]));

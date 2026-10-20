@@ -340,6 +340,7 @@ export async function runBookSync(
         dismissals: after.dismissals,
         alreadyPaid: after.paidStatementIds,
         extractions: after.extractions,
+        startDate: after.startDate,
       })
     : [];
   for (const ids of chunks(toSettle, SETTLE_PER_CALL)) {

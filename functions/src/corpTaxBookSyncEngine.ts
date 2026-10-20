@@ -514,6 +514,7 @@ export interface SettlePayment {
   at: string;
   statementId?: string;
   notTaxAmount?: number;
+  source?: 'donation' | 'manual';
 }
 
 /** Engine `planSettlements`: the Statements now settled that the book does not yet hold as paid. */
@@ -523,6 +524,7 @@ export function planSettlements(input: {
   dismissals: readonly MirrorDismissal[];
   alreadyPaid: ReadonlySet<string>;
   extractions: readonly MirrorExtraction[];
+  startDate?: string;
 }): string[] {
   const settled: string[] = [];
   const minerIds = [...new Set(input.statements.map((s) => s.minerId))];
@@ -539,6 +541,7 @@ export function planSettlements(input: {
         extractions: input.extractions,
         expiryHours: {},
       }),
+      startDate: input.startDate,
     });
     for (const s of statements) {
       if (allocation.byStatement.get(s.id)?.settled && !input.alreadyPaid.has(s.id)) {

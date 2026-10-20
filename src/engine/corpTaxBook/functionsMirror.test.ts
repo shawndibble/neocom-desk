@@ -124,6 +124,33 @@ describe('functions mirror of the Corp Tax Book engine', () => {
     expect(theirs.balance).toBe(ours.balance);
   });
 
+  it('allocatePayments drops a donation before the start date the same way (#4505)', () => {
+    const statements = [{ id: 's1', amount: 10_000_000, issuedAt: '2026-07-01T00:00:00Z' }];
+    for (const at of ['2026-05-31T23:59:59Z', '2026-06-01T00:00:00Z']) {
+      const payments = [{ id: 'p1', amount: 12_000_000, at }];
+      const theirs = mirror.allocatePayments({
+        statements,
+        payments: payments.map((p) => ({ ...p, source: 'donation' as const })),
+        dismissalCredits: [],
+        startDate: '2026-06-01',
+      });
+      const ours = allocatePayments({
+        statements: statements.map((s) => ({ ...s, minerId: 'm', code: '', lines: [] }) as never),
+        payments: payments.map((p) => ({
+          ...p,
+          minerId: 'm',
+          characterId: 1,
+          source: 'donation' as const,
+        })),
+        dismissalCredits: [],
+        startDate: '2026-06-01',
+      });
+      expect(theirs.paymentCredits).toEqual(ours.paymentCredits);
+      expect(theirs.credit).toBe(ours.credit);
+      expect(ours.credit).toBe(at.startsWith('2026-06') ? 2_000_000 : 0);
+    }
+  });
+
   describe('dismissals (#4184)', () => {
     // Fractured 17 Oct 03:00, expires 19 Oct 03:00; a second moon ran later at the same refinery.
     const extractions: SyncExtraction[] = [

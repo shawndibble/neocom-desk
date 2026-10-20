@@ -13817,6 +13817,10 @@
         "outstanding": "Outstanding",
         "issued": "Issued"
       },
+      "beforeBook": {
+        "donations_one": "{{count}} donation dated before the start date is not counted",
+        "donations_other": "{{count}} donations dated before the start date are not counted"
+      },
       "chips": {
         "inChunks": "Est. value in chunks",
         "inChunksTip": "Chunks still there to mine; Expired ones are not counted",
