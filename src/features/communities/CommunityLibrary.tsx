@@ -17,6 +17,7 @@ import {
   Tooltip,
   CachedNotice,
 } from '@/components/ui';
+import { Pill } from '@/components/ui/Pill';
 import {
   buildLibraryRows,
   filterLibraryRows,
@@ -64,7 +65,7 @@ function MemberDot({ member, stale }: { member: CommunityMember; stale: boolean 
   return (
     <span
       aria-hidden="true"
-      className={`grid size-6 shrink-0 place-items-center rounded-full border border-line bg-surface-2 text-[0.6875rem] font-semibold ${stale ? 'opacity-60' : ''}`}
+      className={`grid size-6 shrink-0 place-items-center rounded-full border border-line bg-panel-2 text-[0.6875rem] font-semibold ${stale ? 'opacity-60' : ''}`}
     >
       {member.characterName.charAt(0).toUpperCase()}
     </span>
@@ -94,7 +95,7 @@ function LibraryGroup({
       <button
         type="button"
         aria-expanded={expanded}
-        className="flex min-h-9 w-full items-center gap-1 text-left text-xs font-medium hover:bg-surface-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+        className="flex min-h-9 w-full items-center gap-1 text-left text-xs font-medium hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
         style={{ paddingLeft: depth * 16 }}
         onClick={() => setOpen(!open)}
       >
@@ -390,9 +391,7 @@ export function CommunityLibrary({
               ? ` · ${t('communities.library.sharesNothing')}`
               : ` · ${t('communities.asOf', { age: formatAge(now - member.libraryAsOf, t) })}`}
             {staleUids.has(member.uid) && (
-              <span className="ml-1 rounded bg-surface-2 px-1.5 py-0.5 text-[0.6875rem]">
-                {t('communities.staleBadge')}
-              </span>
+              <Pill className="ml-1">{t('communities.staleBadge')}</Pill>
             )}
           </li>
         ))}

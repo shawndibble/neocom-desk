@@ -76,6 +76,17 @@ const restrictedSyntax = [
     message:
       'A typed "−", "+" or "Aa" is not an icon — use IconButton with an Icon.* glyph (e.g. Icon.Decrease / Icon.Increase).',
   },
+  {
+    // The theme defines no `surface-*` colour, so such a class renders nothing.
+    selector: 'Literal[value=/(bg|text|border|ring|from|to)-surface-/]',
+    message:
+      'There is no `surface-*` colour in the theme — use a token from src/styles/index.css (panel, panel-2, line …).',
+  },
+  {
+    selector: 'TemplateElement[value.raw=/(bg|text|border|ring|from|to)-surface-/]',
+    message:
+      'There is no `surface-*` colour in the theme — use a token from src/styles/index.css (panel, panel-2, line …).',
+  },
 ];
 
 // Sort direction is always Icon.Sort / Icon.Ascending / Icon.Descending
