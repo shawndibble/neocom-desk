@@ -299,6 +299,8 @@ export async function acceptFeederInvite(
       rejoined = true;
       const kept: FeederRecord = { ...held };
       delete kept.leftAt;
+      // The offered rate belongs to the link, not to the record's history.
+      delete kept.offeredOwnerRatePct;
       const reopened: FeederRecord = {
         ...kept,
         status: 'active',
