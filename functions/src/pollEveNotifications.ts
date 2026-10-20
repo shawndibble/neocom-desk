@@ -9,6 +9,7 @@ import { shouldDeleteDeviceToken } from './dispatchProjections.js';
 import type { NotificationsResult } from './esiNotifications.js';
 import { buildPushes, type PushMessage } from './eveNotificationPush.js';
 import { selectPushable } from './eveNotificationSelection.js';
+import { suppressPush, type QuietHours } from './quietHours.js';
 
 export const POLL_CONCURRENCY = 5;
 
@@ -17,6 +18,8 @@ export interface PollDevice {
   fcmToken: string;
   /** ESI types this device enabled for the browser channel for the Character. */
   eveTypes: string[];
+  /** Quiet time (issue #4566): no pushes inside the window. */
+  quietHours?: QuietHours;
 }
 
 export type RefreshOutcome =
@@ -57,6 +60,8 @@ export interface PollDeps {
   /** Receives only messages and ids — never a token. */
   log: (message: string, data?: Record<string, unknown>) => void;
   concurrency?: number;
+  /** Clock, injectable for tests. */
+  now?: () => number;
 }
 
 export interface PollSummary {
@@ -165,8 +170,13 @@ async function pollOne(deps: PollDeps, summary: PollSummary, characterId: number
   // push (the client dedupes on Occurrence Key) instead of losing one.
   let transientFailure = false;
   for (const device of devices) {
-    const pushable = selection.byDevice.get(device.deviceId);
-    if (!pushable) continue;
+    // Quiet time: skipped, not queued. The high-water mark still advances below,
+    // and the Alerts list gets the notification through the feed sync.
+    const nowMs = (deps.now ?? Date.now)();
+    const pushable = selection.byDevice
+      .get(device.deviceId)
+      ?.filter((n) => !suppressPush(nowMs, device.quietHours, n.type));
+    if (!pushable || pushable.length === 0) continue;
     for (const message of buildPushes(characterId, pushable)) {
       try {
         await deps.send(device.fcmToken, message);

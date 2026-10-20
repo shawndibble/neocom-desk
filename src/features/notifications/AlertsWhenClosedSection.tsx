@@ -36,6 +36,7 @@ import {
   turnOffAlerts,
   type AlertsGrantRecord,
 } from './alertsGrant';
+import { QuietTimeRows } from './QuietTimeRows';
 
 interface CharacterRef {
   characterId: number;
@@ -203,6 +204,7 @@ export function AlertsWhenClosedSection({ characters }: { characters: readonly C
           <p className="text-[0.6875rem] text-text-dim">
             {t('settings.notifications.alertsWhenClosed.hint')}
           </p>
+          <QuietTimeRows />
           {toAuthorize.length > 1 && (
             <NeedsConnection>
               <Button size="sm" onClick={turnOnAll} disabled={busyId !== null}>

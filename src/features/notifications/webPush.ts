@@ -14,6 +14,8 @@
 import { requestNotificationPermission, type NotificationPermissionState } from './permission';
 import { recordPushFailure, settlePushRegistration } from './pushFailure';
 import { recordSeenEveTypes } from './seenEveTypes';
+import { useNotificationPreferences } from './preferencesStore';
+import { quietHoursPayload } from './quietTime';
 import { webPushSupport, type WebPushSupport } from '@/sync/webPushSupport';
 
 export interface EnableWebPushResult {
@@ -50,6 +52,7 @@ export async function enableWebPush(): Promise<EnableWebPushResult> {
       ]);
       const result = await registerDeviceForWebPush(vapidKey, registration, new Map(), {
         eveTypesByCharacter: await enabledEveTypesByCharacter(liveDependencies()),
+        quietHours: quietHoursPayload(useNotificationPreferences.getState().value),
       });
       settlePushRegistration(result);
       await recordSeenEveTypes(result?.seenTypes);

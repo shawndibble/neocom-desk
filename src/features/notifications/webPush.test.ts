@@ -55,7 +55,7 @@ describe('enableWebPush', () => {
       expect.any(String),
       readyRegistration,
       new Map(),
-      { eveTypesByCharacter: new Map([[1, ['StructureDestroyed']]]) }
+      { eveTypesByCharacter: new Map([[1, ['StructureDestroyed']]]), quietHours: null }
     );
   });
 
