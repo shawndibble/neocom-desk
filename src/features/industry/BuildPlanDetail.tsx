@@ -46,7 +46,7 @@ import type {
   MaterialSourcing,
   RigKind,
 } from '@/engine/industry/types';
-import { rigKindLabelKey, rigFitSummaryLabel } from './rigFitLabels';
+import { rigKindLabelKey } from './rigFitLabels';
 import { RigMatchHelper } from './RigMatchHelper';
 import type { BuildPlanChange, SourcingPatchEntry } from './buildPlanStore';
 import type { BuildGroup, BuildGroupSnapshot } from './buildGroups';
@@ -137,6 +137,7 @@ import { OwnedStockScopeControl } from './OwnedStockScopeControl';
 import { BuildPlanAutoBuildControl } from './BuildPlanAutoBuildControl';
 import { ResultsSummary } from './ResultsSummary';
 import { BpcCoverageWarning, PlanVerdictHero } from './PlanVerdictHero';
+import { PlanSetupFacts } from './PlanSetupFacts';
 import { useNearestLowsecSystem } from './useNearestLowsecSystem';
 import { planReactionLocation } from './planReactionLocation';
 import { PlanScheduleLine } from './PlanScheduleLine';
@@ -1216,65 +1217,9 @@ export function BuildPlanDetail({
     })),
   };
 
-  // Read-only summary of the setup: plain label-over-value pairs, not chips —
-  // a bordered, filled box reads as a button, and nothing here is clickable.
-  const setupFact = (label: string, value: string, warn = false) => (
-    <div key={label} className="min-w-0">
-      <dt className={eyebrowClassName}>{label}</dt>
-      <dd className={cx('text-xs tabular-nums', warn ? 'text-warning' : 'text-text')}>
-        {warn && <Icon.Warn size={Icon.ICON_SIZE.sm} aria-hidden="true" className="mr-1 inline" />}
-        {value}
-      </dd>
-    </div>
-  );
-  // ME/TE belong to the materials table's blueprint row, whose tier picker
-  // sets them. An owned BPO gets no such row (nothing to buy), so only then
-  // does the summary carry them — and not before the plan resolves, or they
-  // would flash in and out on every plan that does have the row.
   const lacksBlueprintRow =
     result !== null &&
     !result.materials.some((m) => m.typeID === plan.blueprintTypeID && m.acquisitionTier);
-  const setupFacts = [
-    setupFact(t('industry.runs'), plan.runs.toLocaleString()),
-    ...(activity === 'manufacturing' && lacksBlueprintRow
-      ? [
-          setupFact(t('industry.setupChipMe'), `${resolvedMe}%`),
-          setupFact(t('industry.setupChipTe'), `${resolvedTe}%`),
-        ]
-      : []),
-    // The place the pilot picked, by the name they picked it under; the
-    // facility · system · band triple only when no place was picked.
-    setupFact(
-      t('industry.buildLocation'),
-      buildLocationName ??
-        `${facilityPreset.name} · ${buildSystem?.name ?? hub.systemName} · ${t(`industry.${plan.security}`)}`
-    ),
-    ...(facilityPreset.structure
-      ? [
-          setupFact(t('industry.setupChipRig'), rigFitSummaryLabel(resolveRigFit(plan), t)),
-          setupFact(t('industry.setupChipTax'), `${plan.facilityTaxPct ?? 0}%`),
-        ]
-      : []),
-    ...(includeReactions && activity !== 'reaction'
-      ? [
-          setupFact(
-            t('industry.reactionLocation'),
-            reactionBuildSystem === null
-              ? t('industry.reactionLocationEntryNotSet')
-              : (reactionBuildLocationName ??
-                  `${FACILITY_PRESETS[plan.reactionFacility ?? 'athanor'].name} · ${reactionBuildSystem.name} · ${t(`industry.${plan.reactionSecurity ?? 'highsec'}`)}`),
-            reactionsInHighsec
-          ),
-        ]
-      : []),
-    setupFact(t('industry.tradeHub'), hub.systemName),
-    setupFact(
-      t('industry.materialPriceBasis'),
-      materialPriceBasisOf(plan.materialPriceBasis) === 'buy'
-        ? t('industry.materialPriceBasisBuy')
-        : t('industry.materialPriceBasisSell')
-    ),
-  ];
 
   return (
     <div className="space-y-4">
@@ -1801,7 +1746,21 @@ export function BuildPlanDetail({
             </div>
           </div>
         ) : (
-          <dl className="flex flex-wrap gap-x-6 gap-y-2">{setupFacts}</dl>
+          <PlanSetupFacts
+            plan={plan}
+            activity={activity}
+            hub={hub}
+            facilityPreset={facilityPreset}
+            buildSystemName={buildSystem?.name ?? null}
+            buildLocationName={buildLocationName}
+            includeReactions={includeReactions}
+            reactionBuildSystemName={reactionBuildSystem?.name ?? null}
+            reactionBuildLocationName={reactionBuildLocationName}
+            reactionsInHighsec={reactionsInHighsec}
+            resolvedMe={resolvedMe}
+            resolvedTe={resolvedTe}
+            lacksBlueprintRow={lacksBlueprintRow}
+          />
         )}
       </Panel>
 
