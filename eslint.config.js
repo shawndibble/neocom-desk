@@ -179,7 +179,11 @@ export default tseslint.config(
   },
   {
     files: ['src/components/ui/**/*.tsx'],
-    ignores: ['src/components/ui/DataTable.tsx', 'src/components/ui/DataTable.test.tsx'],
+    ignores: [
+      'src/components/ui/DataTable.tsx',
+      'src/components/ui/DataTableSortPicker.tsx',
+      'src/components/ui/DataTable.test.tsx',
+    ],
     rules: {
       'no-restricted-syntax': ['error', ...sortArrowSyntax],
     },
