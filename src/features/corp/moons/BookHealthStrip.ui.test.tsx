@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import type { ScheduledSyncStatus } from '@/engine/corpTaxBook/scheduledSync';
@@ -16,7 +16,7 @@ const sync = {
   sync: vi.fn(),
 } as unknown as CorpTaxBookSync;
 
-function renderStrip(scheduledSync: ScheduledSyncStatus | null) {
+function renderStrip(scheduledSync: ScheduledSyncStatus | null, strip: CorpTaxBookSync = sync) {
   render(
     <MemoryRouter>
       <BookProvider
@@ -32,11 +32,25 @@ function renderStrip(scheduledSync: ScheduledSyncStatus | null) {
           } as unknown as Omit<BookContextValue, 'edit' | 'canEdit'>
         }
       >
-        <BookHealthStrip sync={sync} />
+        <BookHealthStrip sync={strip} />
       </BookProvider>
     </MemoryRouter>
   );
 }
+
+describe('BookHealthStrip, no readable refineries', () => {
+  it('says so instead of reading as synced', () => {
+    renderStrip(null, {
+      status: { kind: 'never' },
+      run: { phase: 'done', outcome: { kind: 'skipped', reason: 'no-refineries' } },
+      sync: vi.fn(),
+    } as unknown as CorpTaxBookSync);
+    fireEvent.click(screen.getByRole('button', { name: /need attention/ }));
+    expect(screen.getByText(/no refineries the book can read/)).toBeInTheDocument();
+    expect(screen.getByText(/needs a corporation that owns refineries/)).toBeInTheDocument();
+    expect(screen.queryByText(/Last synced/)).not.toBeInTheDocument();
+  });
+});
 
 describe('BookHealthStrip, scheduled sync', () => {
   it('shows the last scheduled run as the sync line', () => {

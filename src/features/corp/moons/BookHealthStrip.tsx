@@ -126,8 +126,11 @@ export function BookHealthStrip({ sync }: { sync: CorpTaxBookSync }) {
   if (sync.run.phase === 'done' && sync.run.outcome.kind === 'skipped') {
     items.push({
       id: 'skipped',
-      tone: 'info',
+      tone: sync.run.outcome.reason === 'no-refineries' ? 'warning' : 'info',
       title: t(`corpTaxBook.moons.health.skipped.${sync.run.outcome.reason}`),
+      ...(sync.run.outcome.reason === 'no-refineries'
+        ? { detail: <p>{t('corpTaxBook.moons.health.noRefineriesDetail')}</p> }
+        : {}),
     });
   }
   return <AttentionStrip items={items} />;

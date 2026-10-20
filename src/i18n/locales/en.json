@@ -14014,8 +14014,10 @@
           "no-book": "This corporation has no Corp Tax Book to sync.",
           "not-an-editor": "Only an Accountant or Director can sync the book.",
           "needs-reauth": "Log in again to sync the book.",
-          "esi-unavailable": "EVE's servers did not answer, so nothing was synced."
-        }
+          "esi-unavailable": "EVE's servers did not answer, so nothing was synced.",
+          "no-refineries": "This corporation has no refineries the book can read, so nothing was synced."
+        },
+        "noRefineriesDetail": "The book needs a corporation that owns refineries, read by an Accountant or Director of it. Nothing is synced until one is readable."
       },
       "run": {
         "title": "{{period}} Statements",
@@ -14070,6 +14072,7 @@
       "off": {
         "title": "Start a Corp Tax Book",
         "intro": "Track moon mining tax for the whole corporation: who mined, what they owe, who has paid. Every officer sees the same book.",
+        "needsRefineries": "The book is fed by the corporation's refineries, so it only works for a corporation that owns some and lets an Accountant or Director read them.",
         "notDirector": "A Director has to turn the book on. Ask one to open this page.",
         "rate": "Corp default tax rate (%)",
         "hint": "Mining before the start date is kept as history and owes nothing. You can change the rate later; a new rate never reaches back over days already mined.",
@@ -14102,6 +14105,7 @@
         "lastSkipped": "Last run {{age}} was skipped: {{reason}}.",
         "skipped": {
           "esi-unavailable": "EVE's servers did not answer",
+          "no-refineries": "the corporation has no refineries the book can read",
           "esi-refused": "EVE refused the mining ledger to the authorization (it stops if this repeats next run)",
           "esi-budget": "EVE asked the app to slow down"
         },

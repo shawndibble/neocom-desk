@@ -62,6 +62,7 @@ export function TurnOnBook({
         <TextInput inputMode="decimal" value={rate} onChange={(e) => setRate(e.target.value)} />
       </label>
       <p className="text-xs text-text-dim">{t('corpTaxBook.moons.off.hint')}</p>
+      <p className="text-xs text-text-dim">{t('corpTaxBook.moons.off.needsRefineries')}</p>
       {error && (
         <p role="alert" className="text-danger">
           {error}

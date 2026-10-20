@@ -130,7 +130,12 @@ export type SyncOutcome =
   | {
       kind: 'skipped';
       reason:
-        'missing-mining-scope' | 'no-book' | 'not-an-editor' | 'needs-reauth' | 'esi-unavailable';
+        | 'missing-mining-scope'
+        | 'no-book'
+        | 'not-an-editor'
+        | 'needs-reauth'
+        | 'esi-unavailable'
+        | 'no-refineries';
     }
   | {
       kind: 'synced';
@@ -193,6 +198,8 @@ export async function syncCorpTaxBook(
   if (feed === 'needs-reauth') return { kind: 'skipped', reason: 'needs-reauth' };
   // Recording a sync whose ledger never arrived would blame the gap on the officers.
   if (feed === 'unavailable') return { kind: 'skipped', reason: 'esi-unavailable' };
+  // No refinery to read is not "Synced": recording a visit would make an empty book look current.
+  if (feed === 'no-refineries') return { kind: 'skipped', reason: 'no-refineries' };
   if (canExtract && esiExtractions === null) missing.push('extractions');
   if (!capabilities.canReadWallet || donations === null) missing.push('donations');
 

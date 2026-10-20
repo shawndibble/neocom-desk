@@ -24,6 +24,7 @@ import { loadStructureSystemId } from '@/features/character/structures';
 import { loadCharacterNotifications } from '@/features/character/notifications';
 import { loadCorporationMiningExtractions } from '../boardData';
 import { loadCorpPaginatedWithCacheStatus } from '../corpRead';
+import { isCorpRoleGate } from '../corpAuthFailure';
 import { loadCorporationWalletJournal } from '../wallet';
 
 export interface ObserverFeed {
@@ -38,8 +39,12 @@ export interface ObserverFeed {
   systemIds: Record<number, number>;
 }
 
-/** Why a feed could not be read: sign in again, or ESI did not answer. */
-export type FeedFailure = 'needs-reauth' | 'unavailable';
+/**
+ * Why a feed could not be read: sign in again, ESI did not answer, or the
+ * corporation has no refinery this Character can read (an empty list, or the
+ * role gate's 403 on it) — an answer, not an outage.
+ */
+export type FeedFailure = 'needs-reauth' | 'unavailable' | 'no-refineries';
 
 export async function loadObserverFeed(
   characterId: number,
@@ -48,16 +53,22 @@ export async function loadObserverFeed(
   const listing = conditionalPagedFetch((o) =>
     getCorporationMiningObservers(characterId, corporationId, o)
   );
+  let refused = false;
   const list = await loadCorpPaginatedWithCacheStatus(
     characterId,
     corporationId,
     'miningObservers',
-    listing.fetchLive,
+    () =>
+      listing.fetchLive().catch((err: unknown) => {
+        refused ||= isCorpRoleGate(err);
+        throw err;
+      }),
     { conditional: listing.conditional }
   );
   if (list.needsReauth) return 'needs-reauth';
-  if (!list.cached) return 'unavailable';
+  if (!list.cached) return refused ? 'no-refineries' : 'unavailable';
   const observers: CorporationMiningObserver[] = list.cached.data;
+  if (observers.length === 0) return 'no-refineries';
   const feed: ObserverFeed = {
     rows: [],
     structureIds: observers.map((o) => o.observer_id),
