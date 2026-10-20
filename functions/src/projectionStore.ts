@@ -318,7 +318,7 @@ export async function dispatchDueProjections(
       // queued. The row is marked fired below, so it is never pushed late and
       // still reaches the Alerts list through the feed sync.
       const awake = targets.filter((device) => !suppressPush(now, device.quietHours, row.eveType));
-      if (awake.length === 0) {
+      if (targets.length > 0 && awake.length === 0) {
         await doc.ref.update({ fired: true, firedAt: now });
         return;
       }

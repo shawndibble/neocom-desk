@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { Checkbox, TextInput } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
+import { SettingsHint } from '@/features/settings/settingsFields';
 import { setDeviceNotificationPrefs, useNotificationPreferences } from './preferences';
 import { quietTimeView, withQuietTime } from './quietTime';
 
@@ -30,9 +31,11 @@ export function QuietTimeRows() {
         />
         {t('settings.notifications.quietTime.label')}
       </label>
-      <p id="quiet-time-hint" className="text-[0.6875rem] text-text-dim">
-        {t('settings.notifications.quietTime.hint')}
-      </p>
+      <div id="quiet-time-hint">
+        <SettingsHint>
+          {t('settings.notifications.quietTime.hint')} {t('settings.scope.deviceField')}
+        </SettingsHint>
+      </div>
       {quiet.enabled && (
         <div className="space-y-1 pl-6">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text">

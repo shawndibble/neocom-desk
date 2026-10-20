@@ -587,6 +587,26 @@ describe('quiet time (issue #4566)', () => {
     });
   });
 
+  it('leaves a legacy row with no holder unfired so a later tick retries it', async () => {
+    const db = new FakeFirestore();
+    const messaging = new FakeMessaging();
+    db.seed('projections', 'legacy', {
+      characterId: CHAR,
+      eventId: 'x',
+      occurrenceKey: 'legacy',
+      fireAt: NOW - 60_000,
+      title: 't',
+      body: 'b',
+      fired: false,
+      firedAt: null,
+    });
+
+    await dispatchDueProjections(asFirestore(db), messaging, NOW);
+
+    expect(messaging.sent).toEqual([]);
+    expect(db.get('projections', 'legacy')).toMatchObject({ fired: false });
+  });
+
   it('pushes outside the window', async () => {
     const db = new FakeFirestore();
     const messaging = new FakeMessaging();
