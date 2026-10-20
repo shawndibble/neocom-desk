@@ -57,7 +57,7 @@ import {
 } from '@/engine/industry/jobSlots';
 import { ganttAxis } from '../charts/geometry';
 import type { ChartModel } from '../charts/types';
-import { blank, count, statusOf, UNKNOWN, type Builder } from './builderKit';
+import { blank, count, statusOf, UNKNOWN, type Builder, type KindDef } from './builderKit';
 import { fractionBar, signedCell } from './cellKit';
 import { hbarsFromRows, severityColor } from './chartBuilders';
 import { backwardBucketSums } from './chartSeries';
@@ -1180,12 +1180,13 @@ export const miningYield: Builder = (feeds, { t, now, range, scopeAll, activeCha
   };
 };
 
-export const WORLD_BUILDERS: Readonly<Record<string, Builder>> = {
-  industry,
-  planetary,
-  structures,
-  moonChunks,
-  incursions,
-  profit,
-  miningYield,
+/** The kinds built in this file, each with the feeds it reads. */
+export const WORLD_DEFS: Readonly<Record<string, KindDef>> = {
+  industry: { feeds: ['industry'], build: industry },
+  planetary: { feeds: ['planetary'], build: planetary },
+  structures: { feeds: ['structures'], build: structures },
+  moonChunks: { feeds: ['moonChunks'], build: moonChunks },
+  incursions: { feeds: ['incursions'], build: incursions },
+  profit: { feeds: ['profit'], build: profit },
+  miningYield: { feeds: ['miningYield'], build: miningYield },
 };
