@@ -54,6 +54,9 @@ import { useDarkThreshold } from '@/features/corp/darkThreshold';
 import { useDefaultCharacterFilter } from '@/features/character/defaultCharacterFilter';
 import { VIEW_PREFERENCE_KEYS } from '@/lib/viewPreferenceKeys';
 import { NARROW_QUERY } from '@/lib/useIsNarrow';
+import { forceUpdate } from '@/app/forceUpdate';
+import { useUpdateStatus } from '@/app/updateAvailable';
+import { getServiceWorkerRegistration } from '@/lib/serviceWorker';
 import { DEFAULT_MOBILE_TABS, MOBILE_TABS_KEY, useMobileTabs } from '@/lib/mobileTabs';
 
 vi.mock('virtual:pwa-register/react', () => ({
@@ -65,6 +68,10 @@ vi.mock('virtual:pwa-register/react', () => ({
 }));
 
 vi.mock('@/app/navigation', () => ({ assignLocation: vi.fn() }));
+vi.mock('@/app/forceUpdate', () => ({ forceUpdate: vi.fn() }));
+vi.mock('@/lib/serviceWorker', () => ({
+  getServiceWorkerRegistration: vi.fn().mockResolvedValue(undefined),
+}));
 
 vi.mock('@/sde/loadSde', () => ({
   loadSkills: vi.fn(async () => []),
@@ -2017,5 +2024,96 @@ describe('Settings — review follow-ups', () => {
       expect(input.id).not.toBe('');
       expect(container.querySelector(`label[for="${input.id}"]`)).toBeInTheDocument();
     }
+  });
+});
+
+describe('Settings — update state', () => {
+  function registration(over: Record<string, unknown> = {}) {
+    return Object.assign(new EventTarget(), {
+      waiting: null,
+      installing: null,
+      update: vi.fn().mockResolvedValue(undefined),
+      ...over,
+    });
+  }
+  function serviceWorker(reg: ReturnType<typeof registration>) {
+    vi.mocked(getServiceWorkerRegistration).mockResolvedValue(reg as never);
+  }
+
+  beforeEach(() => {
+    useUpdateStatus.setState({ status: 'unknown' });
+    vi.mocked(forceUpdate).mockReset();
+  });
+  afterEach(() => {
+    vi.mocked(getServiceWorkerRegistration).mockResolvedValue(undefined);
+  });
+
+  it('phone index: a waiting build highlights the row and Update now applies it', async () => {
+    window.history.pushState({}, '', '/settings');
+    stubViewport(false);
+    serviceWorker(registration({ waiting: {} }));
+    vi.mocked(forceUpdate).mockResolvedValue('failed');
+    render(<App />);
+
+    const nav = await screen.findByRole('navigation', { name: /settings sections/i });
+    const row = await within(nav).findByRole('link', { name: /^app & backup/i });
+    expect(row).toHaveTextContent('Update available');
+    expect(screen.queryAllByText('Checking for updates…')).toHaveLength(0);
+    await userEvent.click(within(nav).getByRole('button', { name: 'Update now' }));
+    expect(forceUpdate).toHaveBeenCalledOnce();
+    expect(await within(nav).findByRole('alert')).toHaveTextContent(/could not check/i);
+  });
+
+  it('phone index: checking, then no updates', async () => {
+    window.history.pushState({}, '', '/settings');
+    stubViewport(false);
+    let finish!: () => void;
+    const reg = registration({ update: vi.fn(() => new Promise<void>((r) => (finish = r))) });
+    serviceWorker(reg);
+    render(<App />);
+
+    expect((await screen.findAllByText('Checking for updates…')).length).toBeGreaterThan(0);
+    expect(screen.queryByRole('button', { name: 'Update now' })).not.toBeInTheDocument();
+    finish();
+    expect((await screen.findAllByText('No updates at this time')).length).toBeGreaterThan(0);
+  });
+
+  it("phone index: says so when the check can't run", async () => {
+    window.history.pushState({}, '', '/settings');
+    stubViewport(false);
+    serviceWorker(registration({ update: vi.fn().mockRejectedValue(new Error('offline')) }));
+    render(<App />);
+    expect((await screen.findAllByText("Offline, couldn't check")).length).toBeGreaterThan(0);
+  });
+
+  it('checks once per visit, from any URL, and not when moving between sections', async () => {
+    window.history.pushState({}, '', '/settings/industry');
+    const reg = registration();
+    serviceWorker(reg);
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
+    await waitFor(() => expect(useUpdateStatus.getState().status).toBe('current'));
+    expect(reg.update).toHaveBeenCalledTimes(1);
+
+    await userEvent.click(within(settingsNav()).getByRole('link', { name: /^display/i }));
+    await userEvent.click(within(settingsNav()).getByRole('link', { name: /^app & backup/i }));
+    await screen.findAllByText('No updates at this time');
+    expect(reg.update).toHaveBeenCalledTimes(1);
+  });
+
+  it('rail dot and the App & backup line follow the state', async () => {
+    window.history.pushState({}, '', '/settings/app');
+    serviceWorker(registration({ waiting: {} }));
+    render(<App />);
+
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
+    const nav = settingsNav();
+    expect(await within(nav).findByRole('img', { name: 'Update available' })).toBeInTheDocument();
+    const panel = screen.getByText('Update available', { selector: 'p' });
+    expect(screen.getByRole('button', { name: 'Update now' })).toBeInTheDocument();
+
+    act(() => useUpdateStatus.setState({ status: 'current' }));
+    expect(within(nav).queryByRole('img', { name: 'Update available' })).not.toBeInTheDocument();
+    expect(panel).toHaveTextContent('No updates at this time');
   });
 });
