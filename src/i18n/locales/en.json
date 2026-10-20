@@ -14185,6 +14185,14 @@
           "done_zero": "Book reclaimed; no other officer had access",
           "done_one": "Book reclaimed; {{count}} officer must re-verify",
           "done_other": "Book reclaimed; {{count}} officers must re-verify"
+        },
+        "delete": {
+          "title": "Delete the book",
+          "hint": "Removes the book for good and starts the corporation over. Turning it on again leaves members' Mining Tax pages untouched for 3 days, so you can set it up first.",
+          "open": "Delete the book…",
+          "confirmTitle": "Delete the book?",
+          "body": "Every mining entry, payment, Statement and the activity log is erased, the automatic sync stops, and Statement verify links stop working. Members' Mining Tax pages stop showing this corporation's book. This cannot be undone.",
+          "confirm": "Delete the book"
         }
       },
       "grouping": {
