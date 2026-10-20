@@ -32,7 +32,9 @@ import type {
   SyncGap,
 } from '@/engine/corpTaxBook/sync';
 import { scheduledSyncFrom, type ScheduledSyncStatus } from '@/engine/corpTaxBook/scheduledSync';
+import type { FeederModeChange, FeederPayout } from '@/engine/corpTaxBook/feederAccrual';
 import type { FeederReadClock } from '@/engine/corpTaxBook/feederHealth';
+import type { OwnerRateEntry } from '@/engine/corpTaxBook/ownerRate';
 import type { ObservedRow } from '@/engine/corpTaxBook/types';
 import { getSyncFirestore, getSyncFunctions } from '@/sync/firebaseApp';
 import { ensureSignedIn } from '@/sync/syncAuth';
@@ -294,6 +296,55 @@ export function groupingAnswersFrom(d: Record<string, unknown> | undefined): Gro
   });
 }
 
+/** A payout row with its document id. */
+export type FeederPayoutRow = FeederPayout & { id: string };
+
+/**
+ * One feeder's record as the officers read it (`corpTaxBooks/{book}/feeders/{corp}`), with its
+ * `payouts`. `lastReadWellAt` is an ISO string, as `FeederReadClock` carries it.
+ */
+export interface BookFeeder extends FeederReadClock {
+  status: 'active' | 'pending-removal' | 'removed' | 'left' | 'disconnected';
+  mode: 'normal' | 'settled-otherwise';
+  note?: string;
+  invitedBy: number;
+  joinedAt: number;
+  leftAt?: number;
+  grantHolder?: number;
+  grantedBy?: number;
+  lastSyncResult?: { at: number; outcome: 'synced' | 'skipped' | 'stale'; reason?: string };
+  /** When ESI first refused the ledger in the current spell (ms). */
+  staleSince?: number;
+  /** When it disconnected after 30 days stale (ms). */
+  disconnectedAt?: number;
+  payeeChangedAt?: number;
+  viewDismissedAt?: number;
+  requestedRatePct?: number;
+  agreedRatePct?: number;
+  offeredOwnerRatePct?: number;
+  payee?: { kind: 'corporation' | 'character'; id: number };
+  coveragePeriods: { from: string; to?: string }[];
+  /** Absent on records written before the history existed. */
+  ownerRateHistory?: OwnerRateEntry[];
+  /** Absent means derive from `mode`. */
+  modeChanges?: FeederModeChange[];
+  payouts: FeederPayoutRow[];
+}
+
+type FeederDoc = Omit<BookFeeder, 'lastReadWellAt' | 'payouts'> & { lastReadWellAt?: number };
+
+/** A stored feeder record and its payouts as a `BookFeeder`. */
+export function bookFeederFrom(record: FeederDoc, payouts: FeederPayoutRow[]): BookFeeder {
+  const { lastReadWellAt, ...rest } = record;
+  return {
+    ...rest,
+    ...(typeof lastReadWellAt === 'number'
+      ? { lastReadWellAt: new Date(lastReadWellAt).toISOString() }
+      : {}),
+    payouts,
+  };
+}
+
 /** Everything `/corp/moons` renders from. Officer-only: verify first. */
 export interface BookData {
   settings: BookSettings;
@@ -302,11 +353,21 @@ export interface BookData {
   declarations: Declaration[];
   adjustments: Adjustment[];
   /** Each feeder's last good ledger read (#4509); a feeder's days are Billable only after one. */
-  feeders?: FeederReadClock[];
+  feeders?: BookFeeder[];
   groupingAnswers?: GroupingAnswer[];
   /** The scheduled sync's public status (ADR 0025); null when it was never turned on or was revoked. */
   scheduledSync?: ScheduledSyncStatus | null;
 }
+
+const feederPayouts = (book: number, feeder: number) =>
+  collection(
+    getSyncFirestore(),
+    'corpTaxBooks',
+    String(book),
+    'feeders',
+    String(feeder),
+    'payouts'
+  );
 
 export async function readBookData(
   characterId: number,
@@ -345,8 +406,18 @@ export async function readBookData(
       doc(getSyncFirestore(), 'corpTaxBooks', String(corporationId), 'meta', 'groupingAnswers')
     ),
     getDoc(doc(getSyncFirestore(), 'corpTaxBooks', String(corporationId), 'meta', 'scheduledSync')),
-    list<{ corporationId: number; lastReadWellAt?: number }>('feeders'),
+    list<FeederDoc>('feeders'),
   ]);
+  const feederRows = await Promise.all(
+    feeders.map(async (f) =>
+      bookFeederFrom(
+        f,
+        (await getDocs(feederPayouts(corporationId, f.corporationId))).docs.map(
+          (d) => ({ ...d.data(), id: d.id }) as FeederPayoutRow
+        )
+      )
+    )
+  );
   return {
     settings,
     state: {
@@ -361,12 +432,7 @@ export async function readBookData(
     observed,
     declarations,
     adjustments,
-    feeders: feeders.map((f) => ({
-      corporationId: f.corporationId,
-      ...(typeof f.lastReadWellAt === 'number'
-        ? { lastReadWellAt: new Date(f.lastReadWellAt).toISOString() }
-        : {}),
-    })),
+    feeders: feederRows,
     groupingAnswers: groupingAnswersFrom(answers.data()),
     scheduledSync: scheduledSyncFrom(scheduled.data()),
   };
