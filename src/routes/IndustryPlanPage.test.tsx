@@ -224,8 +224,11 @@ afterEach(async () => {
   // A read still in flight when its test ends writes its response into
   // `esiCache` after the next `resetSession` has cleared it, and the next
   // test then reads that stale row as fresh instead of fetching its own
-  // handler's payload. Unmount so nothing new starts, let what is running
-  // land, then reset.
+  // handler's payload. Unmount so nothing new starts, then wait for the
+  // requests on the wire. This narrows the window rather than closing it:
+  // `esiInFlight()` drops when the response arrives, a little before the body
+  // is parsed and the row is written, which the one-tick settle only mostly
+  // covers.
   cleanup();
   await waitFor(() => expect(esiInFlight()).toBe(0));
   await new Promise((resolve) => setTimeout(resolve, 0));
