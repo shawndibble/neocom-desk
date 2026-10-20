@@ -21,7 +21,7 @@ import { formatCountdown } from '@/lib/duration';
 import { formatIskCompact, formatIskCompactSigned } from '@/lib/isk';
 import type { RefTypeBreakdownRow } from '@/features/character/walletJournalFilter';
 import type { StockBoardMarket } from '@/features/stockTargets/stockBoard';
-import type { PayeeOwed } from '../../miningTaxPayees';
+import type { PayeeOwed } from '../../data/miningTaxPayees';
 import type {
   BarsChartModel,
   StackChartModel,

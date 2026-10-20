@@ -32,7 +32,7 @@ import {
   loadStructuresBoard,
 } from '../../data/boardData';
 import { IncursionsBoardSource } from '../../IncursionsBoardSource';
-import type { IncursionsBoardData } from '../../incursionsBoard';
+import type { IncursionsBoardData } from '../../data/incursionsBoard';
 import { createFeedStore } from './feedStore';
 import { FeedStoreContext, useFeedStore } from './feedStoreContext';
 import {

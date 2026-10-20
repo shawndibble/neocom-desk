@@ -39,8 +39,12 @@ import {
   structuresSeverity,
   structuresView,
 } from '../../data/corpCards';
-import { incursionJumpsWhen, incursionsSeverity, incursionsSummary } from '../../incursionsBoard';
-import type { IncursionsBoardData } from '../../incursionsBoard';
+import {
+  incursionJumpsWhen,
+  incursionsSeverity,
+  incursionsSummary,
+} from '../../data/incursionsBoard';
+import type { IncursionsBoardData } from '../../data/incursionsBoard';
 import type {
   IndustryBoardData,
   IndustryCharacterSlots,
