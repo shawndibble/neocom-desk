@@ -18,30 +18,6 @@
  * Every haul the fixture seeds runs one lane, Jita → Amarr, so the first
  * thing in the table is that lane's collapsed header; both tests open it
  * before touching a haul.
- *
- * ## Why this spec stubs one module
- *
- * `ContractSearchPanel` is gated twice on `isSyncConfigured()`: without it the
- * whole Search tab renders a "needs the sync backend" empty state, and
- * `loadCourier` returns a constant rather than reading anything. E2E blanks
- * `VITE_FIREBASE_API_KEY` on purpose (see `playwright.config.ts`) so the app
- * never reaches the real cloud — which means that gate is shut for every spec
- * and this board is unreachable from a signed-in session as things stand.
- * Setting the key instead would turn sync on for the whole suite, which is the
- * thing that config comment exists to prevent.
- *
- * So the dev server's own module for `@/app/syncStatus` is served back as a
- * two-line stub. It is the same trade `mockEsi.ts` makes one layer out — the
- * backend is replaced, the app under test is not — and it is deliberately the
- * smallest module that opens the gate: the panel, the table, the cell and the
- * CSS under test are all the real ones. Firebase's own hosts are then refused
- * below, because "configured" now means the snapshot loaders will try; that
- * refusal is what sends them to their Dexie copy, which is the row seeded
- * here.
- *
- * If the stub ever stops matching (a moved module, a renamed export) the gate
- * shuts again, the Courier chip never appears, and this fails at its first
- * `expect` rather than quietly asserting nothing.
  */
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
@@ -178,47 +154,6 @@ async function seedCourierSnapshot(page: Page, rows: unknown[]): Promise<void> {
   }, rows);
 }
 
-/** The gate described at the top of this file, opened for this page only. */
-async function stubSyncConfigured(page: Page): Promise<void> {
-  await page.route('**/src/app/syncStatus.ts*', async (route) => {
-    await route.fulfill({
-      contentType: 'text/javascript',
-      // Both of the module's runtime exports, so every importer still gets the
-      // module it asked for — only the answer changes.
-      body: [
-        'export function isSyncConfigured() { return true; }',
-        'export function syncDisplayState(status, online) {',
-        "  return online ? status.state : 'offline';",
-        '}',
-        '',
-      ].join('\n'),
-    });
-  });
-}
-
-/**
- * Firebase now reads as configured, so the sync triggers and both snapshot
- * loaders will try to reach it. Refused here rather than left to `testBase`'s
- * network guard: the guard records an escape before aborting and fails the run
- * at teardown, where an unreachable backend is precisely the state this spec
- * wants — it is what sends the Courier loader to the Dexie row seeded above.
- * Four host patterns rather than one catch-all handler that defers: every other
- * request must keep reaching the fixture's own routes, and the last of those
- * is the guard that fails the run on a real network escape. Nothing this spec
- * registers should be able to stand between a stray request and that guard.
- */
-async function refuseSyncBackend(page: Page): Promise<void> {
-  const SYNC_HOSTS = [
-    'https://*.googleapis.com/**',
-    'https://*.cloudfunctions.net/**',
-    'https://*.firebaseio.com/**',
-    'https://*.gstatic.com/**',
-  ];
-  for (const pattern of SYNC_HOSTS) {
-    await page.route(pattern, (route) => route.abort('failed'));
-  }
-}
-
 interface CardEdges {
   cornerRight: number;
   badgeRight: number;
@@ -242,9 +177,6 @@ test.describe('courier board — 390px width', () => {
   test.use({ viewport: PHONE });
 
   test('the ISK/jump figure heads the dense card at its right edge', async ({ page }) => {
-    await stubSyncConfigured(page);
-    await refuseSyncBackend(page);
-
     await signInAndGoto(page);
     await seedCourierSnapshot(page, courierSnapshotRows());
 
@@ -337,9 +269,6 @@ test.describe('courier board — 390px width', () => {
   });
 
   test('the reverse-lane link meets the touch tier (issue #1150)', async ({ page }) => {
-    await stubSyncConfigured(page);
-    await refuseSyncBackend(page);
-
     await signInAndGoto(page);
     await seedCourierSnapshot(page, courierSnapshotRowsWithReverseLane());
 
@@ -369,9 +298,6 @@ test.describe('courier board — 390px width', () => {
   test('the ISK filters take shorthand and echo the parsed figure (issue #1722)', async ({
     page,
   }) => {
-    await stubSyncConfigured(page);
-    await refuseSyncBackend(page);
-
     await signInAndGoto(page);
     await seedCourierSnapshot(page, courierSnapshotRows());
 

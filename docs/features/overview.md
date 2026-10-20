@@ -105,7 +105,7 @@ Page ungated; see card table. Missing scope: that card goes warning with a re-lo
 - `boardSummary.test.ts`: "checking" before load, login prompt instead of zero on lapsed grant, below-floor leads order summary, ISK owed compacted, worst planetary batch named.
 - `widgets/migrate.test.ts` (folds the old `cardOrder`/`hiddenCards` stores): default order, stored-first ordering, unknown keys kept, alerts never in order, drop-on-self no-op, hide/show toggles without mutation.
 - `corpCards.test.ts`: reinforcement/fuel-3-days/offline counts; clocks shorter than cache window skipped; chunk severity.
-- `priceAlertsBoard.test.ts`: only targeted Quickbar items; crossed when last polled price passes target; price withheld after target changed; crossed first.
+- `data/priceAlertsBoard.test.ts`: only targeted Quickbar items; crossed when last polled price passes target; price withheld after target changed; crossed first.
 - `SummaryStrip.test.tsx`: idle queue warns+links when alert enabled, neutral when muted; cached/older-than-hour note shown, nothing when fresh. `BoardCard.test.tsx`: one help affordance per card; owed ISK as `IskAmount`.
 
 ## Interview Q&A

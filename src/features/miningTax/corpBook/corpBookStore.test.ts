@@ -43,6 +43,14 @@ describe('readBookSettings', () => {
     expect(readBookSettings(1, { active: true })).toBeNull();
   });
 
+  it('hides a book from members until its setup window ends', () => {
+    const seeFrom = Date.parse('2026-10-21T12:00:00Z');
+    const setUp = { ...book, membersSeeFrom: seeFrom };
+    expect(readBookSettings(1, setUp, seeFrom - 1)).toBeNull();
+    expect(readBookSettings(1, setUp, seeFrom)).not.toBeNull();
+    expect(readBookSettings(1, book, 0)).not.toBeNull();
+  });
+
   it('defaults to the book defaults when a field is absent', () => {
     expect(readBookSettings(1, { active: true, startDate: '2026-10-01' })).toMatchObject({
       graceHours: 6,

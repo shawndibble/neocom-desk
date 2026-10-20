@@ -2,7 +2,7 @@
  * Reads the lawless (insurgency) systems list (issue #2870) the
  * `syncLawlessSystems` function keeps in Firestore: CCP's endpoint blocks
  * browser origins, so the app never calls it directly. Public data, so any
- * signed-in session reads it (`ensureAnySession`, as `syncedContracts.ts` does).
+ * signed-in session reads it (`ensureAnySession`).
  *
  * Never rejects: a failed read, no sync configured, or a stale or missing
  * snapshot all come back as "none lawless" — the badge hides quietly.

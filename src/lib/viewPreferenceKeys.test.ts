@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { VIEW_PREFERENCE_KEYS } from './viewPreferenceKeys';
 import { CALENDAR_VIEW_KEY } from '@/features/character/calendarViewPref';
-import { ASSET_SORT_SETTING_KEY } from '@/features/character/assetSortPreference';
+import { ASSET_SORT_SETTING_KEY } from '@/features/assets/assetSortPreference';
 import { FONT_SCALE_KEY } from '@/lib/fontScale';
 import { TIME_FORMAT_SETTING_KEY } from '@/lib/timeFormat';
 import { MARKET_HUB_SETTING_KEY } from '@/features/market/hub';

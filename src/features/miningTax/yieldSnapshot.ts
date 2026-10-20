@@ -22,8 +22,6 @@ import {
 } from '@/engine/miningTax/yieldValuation';
 import { NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
 import { loadCharacterModifiers } from '@/features/character/characterModifiers';
-import { loadPriceHistory, type PriceHistoryResult } from '@/features/market/priceHistory';
-import { EsiError } from '@/esi/errors';
 import { loadCompressedOreTypeIds, loadReprocessing, loadTypes } from '@/sde/loadSde';
 import type { ReprocessingMap } from '@/sde/types';
 import { loadTypeNames } from '@/features/character/typeNames';
@@ -42,16 +40,11 @@ import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurren
 import { getHubPrices } from '@/market/prices';
 import {
   PRICE_BASES,
-  mergeSnapshotDay,
   resolveUnitPrice,
-  weakestSource,
   type PriceBasis,
-  type PriceSource,
   type SidePrices,
-  type SnapshotDay,
 } from '@/engine/miningTax/priceBasis';
 import { eveToday } from '@/engine/miningTax/yieldRange';
-import { loadPriceSnapshots, saveTodayPriceSnapshot } from './priceSnapshots';
 import { loadHubSnapshotRange } from '@/features/market/hubSnapshot';
 
 export interface TrackedCharacter {
@@ -69,8 +62,6 @@ export interface BasisValuation {
    * a material with no price on this basis is simply absent.
    */
   materialUnitPrices: ReadonlyMap<number, number>;
-  /** Where the row's ore prices came from — the weakest across its lines (`weakestSource`). */
-  priceSource: PriceSource;
 }
 
 export interface MiningYieldRow extends BasisValuation {
@@ -79,7 +70,7 @@ export interface MiningYieldRow extends BasisValuation {
   entry: MiningYieldEntry;
   /**
    * The row valued on every basis, so switching basis on the page never
-   * refetches. The row's own `valuation`/`materialUnitPrices`/`priceSource`
+   * refetches. The row's own `valuation`/`materialUnitPrices`
    * are the default `buy` basis; the page swaps in the chosen one.
    */
   byBasis: Record<PriceBasis, BasisValuation>;
@@ -178,7 +169,7 @@ async function fetchVolumesFromEsi(typeIds: number[]): Promise<Map<number, numbe
 /**
  * `showRefining` false (issue #1281's page switch, default on) skips
  * everything only refining needs — the reprocessing recipe bake, material
- * price history/snapshots, and character skills/implants — for a pilot who
+ * prices, and character skills/implants — for a pilot who
  * never refines. `valueMiningYield`'s `includeRefining` flag keeps the
  * resulting rows from reading as "Partial" for refine data that was never
  * fetched on purpose.
@@ -269,81 +260,31 @@ export async function loadMiningYieldSnapshot(
     ),
   ];
   const pricingTypeIds = [...new Set(rawTypeIds.map(pricingTypeId))];
-  const historyTypeIds = [...new Set([...pricingTypeIds, ...materialTypeIds])];
+  const priceTypeIds = [...new Set([...pricingTypeIds, ...materialTypeIds])];
 
-  // Some type_ids in this union (e.g. non-tradable ore/ice variants like
-  // Banidine/Augumene) 400 from ESI's /markets/{region}/history — a real,
-  // honest "not tradable" answer (esiFetch has already retried anything
-  // transient before this catch ever sees it, same reasoning as
-  // typeNames.ts's 404-only narrowing). Only that specific, expected
-  // rejection is tolerated per id — the same "missing = 0 contribution, not
-  // thrown" convention `valueMiningYield` already uses. Anything else (a
-  // budget refusal, a 5xx, a timeout) is never priced as "not tradable":
-  // `loadPriceHistory` answers it from its cached history when it has one
-  // (past days' averages don't change), and otherwise fails the whole
-  // snapshot.
-  const historyAttempts = await Promise.allSettled(
-    historyTypeIds.map(
-      async (typeId) =>
-        [typeId, await loadPriceHistory(DEFAULT_TRADE_HUB.regionId, typeId)] as const
-    )
-  );
-  const histories: (readonly [number, PriceHistoryResult])[] = [];
-  for (const attempt of historyAttempts) {
-    if (attempt.status === 'fulfilled') {
-      histories.push(attempt.value);
-      continue;
-    }
-    if (attempt.reason instanceof EsiError && attempt.reason.status === 400) continue;
-    throw attempt.reason;
-  }
-  // Today's live Jita book for every priced type, saved as today's snapshot
-  // before anything reads the snapshots back — so today prices as "saved".
-  // `getHubPrices` never throws (a null price per type when Fuzzwork is down);
-  // a failed save only costs today's snapshot, never the page.
+  // Each mined day's hub prices (`hubSnapshot.ts`, read from R2) and today's
+  // live book, for today and yesterday before the day is published and for
+  // the now bases. Neither read throws: `getHubPrices` returns a null price
+  // per type when its source is down.
+  const entryDates = allEntries.map(({ entry }) => entry.date);
   const today = eveToday(new Date());
-  const hubPrices = await getHubPrices(DEFAULT_TRADE_HUB, historyTypeIds);
+  const [hubSnapshot, hubPrices] = await Promise.all([
+    loadHubSnapshotRange(
+      entryDates.reduce((min, date) => (date < min ? date : min)),
+      entryDates.reduce((max, date) => (date > max ? date : max)),
+      priceTypeIds
+    ),
+    getHubPrices(DEFAULT_TRADE_HUB, priceTypeIds),
+  ]);
   const livePrices = new Map<number, SidePrices>();
-  const todaySnapshot: SnapshotDay = {};
-  for (const typeId of historyTypeIds) {
+  for (const typeId of priceTypeIds) {
     const aggregate = hubPrices.get(typeId);
     const buy = aggregate?.buyMax ?? null;
     const sell = aggregate?.sellMin ?? null;
-    const prices: SidePrices = {
+    livePrices.set(typeId, {
       buy: buy && buy > 0 ? buy : null,
       sell: sell && sell > 0 ? sell : null,
-    };
-    livePrices.set(typeId, prices);
-    if (prices.buy !== null || prices.sell !== null) todaySnapshot[typeId] = prices;
-  }
-  try {
-    await saveTodayPriceSnapshot(today, todaySnapshot);
-  } catch {
-    // Storage full or blocked: the page still prices from what it has.
-  }
-  const savedByDate = await loadPriceSnapshots().catch(() => new Map<string, SnapshotDay>());
-
-  // The server's daily hub-station mining prices (`hubSnapshot.ts`, read from
-  // R2) cover every day regardless of whether this browser ever saved one —
-  // see priceBasis.ts's header comment for the tier ordering. Its `saved` days
-  // fold into the same `saved` tier as this browser's own Dexie snapshot,
-  // server winning where both have a value for a day; the retired job's
-  // Adam4EVE days feed the weaker `historical` tier instead.
-  const entryDates = allEntries.map(({ entry }) => entry.date);
-  const hubSnapshot = await loadHubSnapshotRange(
-    entryDates.reduce((min, date) => (date < min ? date : min)),
-    entryDates.reduce((max, date) => (date > max ? date : max))
-  );
-  for (const [date, byType] of hubSnapshot.saved) {
-    const fresh: SnapshotDay = Object.fromEntries(byType);
-    savedByDate.set(date, mergeSnapshotDay(savedByDate.get(date) ?? {}, fresh));
-  }
-
-  const priceByTypeAndDate = new Map<number, Map<string, number>>();
-  for (const [typeId, result] of histories) {
-    const byDate = new Map<string, number>();
-    for (const point of result.points) byDate.set(point.date, point.average);
-    priceByTypeAndDate.set(typeId, byDate);
+    });
   }
 
   const characterIds = [...new Set(allEntries.map(({ characterId }) => characterId))];
@@ -362,9 +303,7 @@ export async function loadMiningYieldSnapshot(
   const priceOn = (typeId: number, date: string, basis: PriceBasis) =>
     resolveUnitPrice(
       {
-        saved: savedByDate.get(date)?.[typeId],
-        historical: hubSnapshot.historical.get(date)?.get(typeId),
-        average: priceByTypeAndDate.get(typeId)?.get(date),
+        day: hubSnapshot.saved.get(date)?.get(typeId),
         live: livePrices.get(typeId),
       },
       basis,
@@ -377,14 +316,12 @@ export async function loadMiningYieldSnapshot(
     const valueOn = (basis: PriceBasis): BasisValuation => {
       const rawUnitPrices = new Map<number, number>();
       const materialPrices: Record<number, number> = {};
-      const sources: PriceSource[] = [];
       for (const line of entry.oreLines) {
         const raw = priceOn(pricingTypeId(line.typeId), entry.date, basis);
-        sources.push(raw.source);
-        if (raw.price !== undefined) rawUnitPrices.set(line.typeId, raw.price);
+        if (raw !== undefined) rawUnitPrices.set(line.typeId, raw);
         const reprocessing = reprocessingByTypeId.get(line.typeId);
         for (const material of reprocessing?.materials ?? []) {
-          const materialPrice = priceOn(material.typeId, entry.date, basis).price;
+          const materialPrice = priceOn(material.typeId, entry.date, basis);
           if (materialPrice !== undefined) materialPrices[material.typeId] = materialPrice;
         }
       }
@@ -400,7 +337,6 @@ export async function loadMiningYieldSnapshot(
         materialUnitPrices: new Map(
           Object.entries(materialPrices).map(([typeId, price]) => [Number(typeId), price])
         ),
-        priceSource: weakestSource(sources),
       };
     };
     const byBasis = Object.fromEntries(

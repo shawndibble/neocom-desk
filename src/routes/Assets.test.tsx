@@ -10,7 +10,7 @@ import { STALE_FETCHED_AT } from '@/esi/cacheFixtures';
 import { clearMarketPriceCache } from '@/market/prices';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
-import { DEFAULT_ASSET_SORT, useAssetSort } from '@/features/character/assetSortPreference';
+import { DEFAULT_ASSET_SORT, useAssetSort } from '@/features/assets/assetSortPreference';
 import { useDefaultCharacterFilter } from '@/features/character/defaultCharacterFilter';
 import { useCharacterFilterPicks } from '@/features/character/characterFilterPicks';
 import { configureClipboard } from '@/lib/clipboard';

@@ -19,7 +19,7 @@
  * `/route/` treats Avoided Systems as a wall where the graph weighs them as a
  * cost, so asking it gave Assets a different number than the route it links to.
  */
-import { useMemo } from 'react';
+import { createContext, createElement, useContext, useMemo, type ReactNode } from 'react';
 import type { JumpsAwayResult } from '@/engine/clone/jumpsAway';
 import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
 import { routeSafetyNetwork } from '@/engine/route/routeSafetyTrip';
@@ -84,6 +84,30 @@ export function useJumpBasis(preferenceOverride?: RoutePreferenceKind | null): J
     () => ({ rules, network, key, hydrated, podKillsUnavailable }),
     [rules, network, key, hydrated, podKillsUnavailable]
   );
+}
+
+const SharedJumpBasis = createContext<JumpBasis | null>(null);
+
+/**
+ * Works the jump basis out once for a subtree. A page whose panels all count
+ * jumps under the saved basis (Planetary Industry) mounts this once, so the
+ * hole ticker and the Ansiblex live query run once instead of once per panel.
+ */
+export function JumpBasisProvider({ children }: { children: ReactNode }) {
+  const basis = useJumpBasis();
+  return createElement(SharedJumpBasis.Provider, { value: basis }, children);
+}
+
+/**
+ * The saved-settings jump basis (no preference override): the enclosing
+ * `JumpBasisProvider`'s when there is one, else worked out here. Whether a
+ * provider exists never changes over a component's lifetime, so the hook order
+ * is stable.
+ */
+export function useSharedJumpBasis(): JumpBasis {
+  const shared = useContext(SharedJumpBasis);
+  // eslint-disable-next-line react-hooks/rules-of-hooks -- provider presence is fixed for a mount
+  return shared ?? useJumpBasis();
 }
 
 function networkFromKeys(holesKey: string, bridgesKey: string): RouteGraphExtras {

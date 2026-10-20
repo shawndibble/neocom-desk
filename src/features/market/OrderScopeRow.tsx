@@ -3,7 +3,7 @@ import { cx } from '@/lib/cx';
 import { formatMarketIsk } from '@/lib/isk';
 import type { JumpsAwayResult } from '@/engine/clone/jumpsAway';
 import type { UndercutScope } from '@/engine/market/undercut';
-import { JumpsAwayText } from '@/features/character/assetBrowserRows';
+import { JumpsAwayText } from '@/features/assets/assetBrowserRows';
 import { CELL, scopeLabelText, type ScopeState } from './orderScopeState';
 
 /** Scope pill colours: the same station/system/region ladder the row badges use. */

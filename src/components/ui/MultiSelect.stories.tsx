@@ -2,8 +2,6 @@ import { useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, userEvent, within } from 'storybook/test';
 import { MultiSelect, type MultiSelectProps } from './MultiSelect';
-import * as Icon from './icons';
-import { Button } from './Button';
 
 const OPTIONS = [
   { id: 'jita', label: 'Jita' },
@@ -45,12 +43,8 @@ const meta = {
   component: MultiSelect<Id>,
   tags: ['autodocs'],
   args: {
-    trigger: (
-      <Button size="sm">
-        Hubs
-        <Icon.Expanded aria-hidden="true" />
-      </Button>
-    ),
+    summary: '1 / 4',
+    triggerAriaLabel: 'Hubs, 1 of 4 picked',
     options: OPTIONS,
     selected: new Set(['jita']),
     onToggle: () => {},
@@ -64,11 +58,22 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** @summary Closed: just the trigger the caller supplies. */
+/** @summary Closed: the standard select-shaped trigger, the field name and a dim count of the picks, with `SelectTrigger`'s border, height, text case and chevron. */
 export const Closed: Story = {};
 
 /** @summary Open with one option ticked; the ticked options carry a check, not colour alone (§6c States, Selected). */
 export const Open: Story = { play: openPopover };
+
+/** @summary `sm` trigger whose visible text names itself ("All hubs"), for a dense filter row. */
+export const SmallSelfNamedTrigger: Story = {
+  args: {
+    size: 'sm',
+    triggerLabel: 'All hubs',
+    summary: undefined,
+    triggerAriaLabel: undefined,
+    selected: new Set(),
+  },
+};
 
 /** @summary Grouped options under non-selectable group headings. */
 export const Grouped: Story = {

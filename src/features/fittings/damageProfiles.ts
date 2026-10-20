@@ -6,7 +6,6 @@
  * The selection is global, not per Fitting: it is the pilot's lens on every
  * fit, and stays out of the `?f=` Fitting Share Code.
  */
-import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   CUSTOM_DAMAGE_PROFILE_ID_PREFIX,
@@ -18,11 +17,12 @@ import {
   type CustomDamageProfile,
   type NamedDamageProfile,
 } from '@/engine/fittings/damageProfile';
+import {
+  SYNCED_CUSTOM_DAMAGE_PROFILES_KEY,
+  SYNCED_SELECTED_DAMAGE_PROFILE_KEY,
+} from '@/sync/syncedSettings';
 import { createSyncedSetting } from '@/lib/useSyncedSetting';
-import { useHydratedStore } from '@/lib/useHydratedStore';
-
-const SYNCED_CUSTOM_DAMAGE_PROFILES_KEY = 'sync.fittingDamageProfiles';
-const SYNCED_SELECTED_DAMAGE_PROFILE_KEY = 'sync.fittingDamageProfileId';
+import { useCustomProfiles, type CustomProfiles } from './useCustomProfiles';
 
 export const useCustomDamageProfiles = createSyncedSetting<CustomDamageProfile[]>({
   key: SYNCED_CUSTOM_DAMAGE_PROFILES_KEY,
@@ -50,62 +50,13 @@ export function newCustomDamageProfileId(): string {
   return `${CUSTOM_DAMAGE_PROFILE_ID_PREFIX}${crypto.randomUUID()}`;
 }
 
-export interface DamageProfiles {
-  /** Both stores have been read, so `selected` is the stored choice rather than the pre-read default. */
-  hydrated: boolean;
-  custom: CustomDamageProfile[];
-  /** The profile stats are measured against — uniform when the stored id names nothing. */
-  selected: NamedDamageProfile;
-  select: (id: string) => void;
-  /** Adds a new custom profile, or replaces the one with the same id. */
-  saveCustom: (profile: CustomDamageProfile) => void;
-  deleteCustom: (id: string) => void;
-}
+export type DamageProfiles = CustomProfiles<CustomDamageProfile, NamedDamageProfile>;
 
 export function useDamageProfiles(): DamageProfiles {
-  const custom = useCustomDamageProfiles((s) => s.value);
-  const setCustom = useCustomDamageProfiles((s) => s.setValue);
-  const selectedId = useSelectedDamageProfileId((s) => s.value);
-  const select = useSelectedDamageProfileId((s) => s.setValue);
-
-  const hydrated = useHydratedStore(useCustomDamageProfiles, useSelectedDamageProfileId);
-
-  // Memoized: the stats effect depends on it, and a fresh object every render
-  // would recalculate the fit on every render.
-  const selected = useMemo(() => resolveDamageProfile(selectedId, custom), [selectedId, custom]);
-
-  // Both writes rewrite the whole list, so they read the store's current
-  // value at write time rather than this render's — never a stale or
-  // not-yet-hydrated `[]` that would wipe every other profile on every device.
-  const saveCustom = useCallback(
-    (profile: CustomDamageProfile) => {
-      const current = useCustomDamageProfiles.getState().value;
-      const exists = current.some((p) => p.id === profile.id);
-      void setCustom(
-        exists ? current.map((p) => (p.id === profile.id ? profile : p)) : [...current, profile]
-      );
-    },
-    [setCustom]
-  );
-
-  const deleteCustom = useCallback(
-    (id: string) => {
-      void setCustom(useCustomDamageProfiles.getState().value.filter((p) => p.id !== id));
-      // A deleted selection already resolves to uniform; say so in storage
-      // too, so another device doesn't keep a dangling id.
-      if (useSelectedDamageProfileId.getState().value === id) {
-        void select(UNIFORM_DAMAGE_PROFILE_ID);
-      }
-    },
-    [setCustom, select]
-  );
-
-  return {
-    hydrated,
-    custom,
-    selected,
-    select: (id) => void select(id),
-    saveCustom,
-    deleteCustom,
-  };
+  return useCustomProfiles({
+    useCustom: useCustomDamageProfiles,
+    useSelectedId: useSelectedDamageProfileId,
+    defaultId: UNIFORM_DAMAGE_PROFILE_ID,
+    resolve: resolveDamageProfile,
+  });
 }

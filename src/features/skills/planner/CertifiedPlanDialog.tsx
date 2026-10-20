@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -12,6 +12,7 @@ import {
 } from '@/components/ui';
 import { rowInteractiveClassName, selectedRowClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
+import { useAsyncLoad } from '@/lib/useAsyncLoad';
 import { loadCertifiedPlans, loadSkills } from '@/sde/loadSde';
 import type { CertifiedPlan } from '@/sde/types';
 import {
@@ -36,10 +37,15 @@ interface CertifiedPlanDialogProps {
   onClose: () => void;
 }
 
-type LoadState =
-  | { status: 'loading' }
-  | { status: 'failed' }
-  | { status: 'ready'; plans: CertifiedPlan[]; skillNames: ReadonlyMap<number, string> };
+interface PlanData {
+  plans: CertifiedPlan[];
+  skillNames: ReadonlyMap<number, string>;
+}
+
+async function loadPlanData(): Promise<PlanData> {
+  const [plans, skills] = await Promise.all([loadCertifiedPlans(), loadSkills()]);
+  return { plans, skillNames: new Map(skills.map((s) => [s.typeID, s.name])) };
+}
 
 /**
  * "New certified plan" (issue #2392): pick one of CCP's career plans, grouped
@@ -53,42 +59,12 @@ export function CertifiedPlanDialog({ characterId, onPick, onClose }: CertifiedP
   const tabsId = useTabsId();
   const { loaded, trainedSkills, trainedSkillsKnown } = usePlanEditorData(characterId);
   const trained = trainedSkillsKnown ? trainedSkills : null;
-  const [state, setState] = useState<LoadState>({ status: 'loading' });
+  const state = useAsyncLoad(loadPlanData);
   const [careerPathId, setCareerPathId] = useState<number | null>(null);
   const [pickedId, setPickedId] = useState<number | null>(null);
 
-  // Bumped by Try again; each attempt is one load.
-  const [attempt, setAttempt] = useState(0);
-
-  useEffect(() => {
-    let cancelled = false;
-    Promise.all([loadCertifiedPlans(), loadSkills()]).then(
-      ([plans, skills]) => {
-        if (cancelled) return;
-        setState({
-          status: 'ready',
-          plans,
-          skillNames: new Map(skills.map((s) => [s.typeID, s.name])),
-        });
-      },
-      () => {
-        if (!cancelled) setState({ status: 'failed' });
-      }
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [attempt]);
-
-  function retry() {
-    setState({ status: 'loading' });
-    setAttempt((n) => n + 1);
-  }
-
-  const groups = useMemo(
-    () => (state.status === 'ready' ? groupByCareerPath(state.plans) : []),
-    [state]
-  );
+  const plans = state.data?.plans;
+  const groups = useMemo(() => (plans ? groupByCareerPath(plans) : []), [plans]);
   const activePathId =
     groups.find((g) => g.careerPathId === careerPathId)?.careerPathId ??
     groups[0]?.careerPathId ??
@@ -112,7 +88,7 @@ export function CertifiedPlanDialog({ characterId, onPick, onClose }: CertifiedP
 
   function create() {
     if (!picked || state.status !== 'ready') return;
-    const names = state.skillNames;
+    const names = state.data.skillNames;
     onPick(picked, (id) => names.get(id) ?? t('common.unknownType', { id }), trained);
   }
 
@@ -132,7 +108,7 @@ export function CertifiedPlanDialog({ characterId, onPick, onClose }: CertifiedP
             <p role="alert" className="text-danger">
               {t('plans.certified.loadFailed')}
             </p>
-            <Button size="sm" onClick={retry}>
+            <Button size="sm" onClick={state.retry}>
               {t('common.retry')}
             </Button>
           </div>

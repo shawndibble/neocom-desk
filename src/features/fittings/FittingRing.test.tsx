@@ -134,10 +134,10 @@ describe('FittingRing', () => {
     expect(screen.getByRole('meter', { name: 'CPU' })).toBeTruthy();
     expect(screen.getByRole('meter', { name: 'Powergrid' })).toBeTruthy();
     expect(screen.queryByRole('meter', { name: 'Calibration' })).toBeNull();
-    expect(screen.queryByRole('button', { name: /make it fit/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Fix / })).toBeNull();
   });
 
-  it('offers one Make it fit on the phone overview when CPU is over, and none under budget', () => {
+  it('offers Fix CPU on the phone overview when CPU is over, and none under budget', () => {
     const open = vi.fn();
     const ring = (cpuUsed: number) => (
       <MakeItFitContext.Provider value={open}>
@@ -146,14 +146,14 @@ describe('FittingRing', () => {
     );
     const { rerender } = render(ring(112.5));
     expect(screen.getByText('Over by 12.5')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: /make it fit/i }));
-    expect(open).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole('button', { name: 'Fix CPU' }));
+    expect(open).toHaveBeenCalledWith('cpu');
     rerender(ring(90));
     expect(screen.queryByText(/Over by/)).toBeNull();
-    expect(screen.queryByRole('button', { name: /make it fit/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Fix / })).toBeNull();
   });
 
-  it('offers a single Make it fit when CPU and powergrid are both over', () => {
+  it('puts a Fix link under each budget that is over', () => {
     render(
       <MakeItFitContext.Provider value={vi.fn()}>
         <FittingRing
@@ -162,7 +162,10 @@ describe('FittingRing', () => {
         />
       </MakeItFitContext.Provider>
     );
-    expect(screen.getAllByRole('button', { name: /make it fit/i })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: /^Fix / }).map((b) => b.textContent)).toEqual([
+      'Fix powergrid',
+      'Fix CPU',
+    ]);
   });
 
   it('names the four module-state colours in a legend', () => {

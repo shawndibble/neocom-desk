@@ -43,7 +43,7 @@
 //                                                                 yet within the grace period;
 //                                                                 wait and retry
 
-import { ghJson, tryRun, printResult, log, sleepSync } from './lib.mjs';
+import { ghJson, tryRun, printResult, log, sleepSync, INTEGRATION_BRANCH } from './lib.mjs';
 
 const [, , prArg] = process.argv;
 if (!prArg) {
@@ -60,13 +60,13 @@ const REQUIRED_CONTEXT_POLL_INTERVAL_MS = 15_000;
 
 // Fallback only — used if the ruleset API call below fails (permissions,
 // API shape change, etc.). The real source of truth is the "Merging"
-// branch ruleset covering `main` in this repo; keep this in sync with it
+// branch ruleset covering `develop` (and `main`) in this repo; keep this in sync with it
 // if that ruleset's required contexts ever change.
 const FALLBACK_REQUIRED_CONTEXTS = ['validate', 'test', 'e2e'];
 
 function getRequiredContexts() {
   try {
-    const rules = ghJson(['api', 'repos/{owner}/{repo}/rules/branches/main']);
+    const rules = ghJson(['api', `repos/{owner}/{repo}/rules/branches/${INTEGRATION_BRANCH}`]);
     const contexts = rules
       .filter((r) => r.type === 'required_status_checks')
       .flatMap((r) => r.parameters?.required_status_checks ?? [])

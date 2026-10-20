@@ -9,7 +9,7 @@ You are running one iteration of the autonomous ticket loop for **Neocom Desk**
 
 **This run is safe to execute concurrently with other `/next-ticket` runs on the
 same machine.** It never touches the checkout it's invoked from — it fetches
-`main`, then does all its work in its own `git worktree`. Ticket selection and
+`develop`, then does all its work in its own `git worktree`. Ticket selection and
 claiming are serialized through a local lock so two concurrent runs can't grab
 the same ticket.
 
@@ -98,18 +98,18 @@ STOP, or continue to pick a different ticket, as stated).
 ## Resilience: merge conflicts
 
 Merge conflicts are expected, not exceptional — concurrent `/next-ticket`
-runs (or a human) can land on `main` while this one is still working. This
+runs (or a human) can land on `develop` while this one is still working. This
 should not kill the run; the procedure below is bounded, so if the bound is
 exceeded the run abandons cleanly per the procedure above instead of looping
 unboundedly.
 
 ### Sync-with-main / conflict resolution procedure
 
-Referenced by steps 6, 7a, and 8 whenever the branch is behind `main` or a PR
+Referenced by steps 6, 7a, and 8 whenever the branch is behind `develop` or a PR
 reports `mergeStateStatus: CONFLICTING`/`DIRTY`. Up to **3 attempts**:
 
 1. `node scripts/next-ticket/sync-main.mjs` — fetches and merges
-   `origin/main`. Prints `{"status":"already-up-to-date"}`,
+   `origin/develop`. Prints `{"status":"already-up-to-date"}`,
    `{"status":"merged"}`, or `{"status":"conflict","files":[...]}`.
 2. On `already-up-to-date`: nothing changed — this procedure is done; return
    to whichever step called it.
@@ -122,8 +122,8 @@ reports `mergeStateStatus: CONFLICTING`/`DIRTY`. Up to **3 attempts**:
    below). If the hook rejects it, fix the reported issue and re-commit —
    never `git commit --no-verify`, and still never `git merge --abort`.
 
-If a 3rd attempt still leaves conflicts (main moving faster than this run can
-converge — very unlikely), abandon and report that `main` would not settle.
+If a 3rd attempt still leaves conflicts (develop moving faster than this run can
+converge — very unlikely), abandon and report that `develop` would not settle.
 
 ### Pre-commit hook, then CI
 
@@ -167,11 +167,11 @@ retry.
 ## 1. Prepare
 
 - `gh auth status` must succeed. If not, stop and report.
-- `git fetch origin main:main` — updates the local `main` ref to match
-  `origin/main` (fast-forward only) without touching the checked-out branch.
-  Git refuses this when `main` is checked out in the main repo directory (the
-  normal setup); then fall back to a plain `git fetch origin main` — step 6's
-  `sync-main.mjs` merges `origin/main` anyway.
+- `git fetch origin develop:develop` — updates the local `develop` ref to match
+  `origin/develop` (fast-forward only) without touching the checked-out branch.
+  Git refuses this when `develop` is checked out in the main repo directory (the
+  normal setup); then fall back to a plain `git fetch origin develop` — step 6's
+  `sync-main.mjs` merges `origin/develop` anyway.
 - `git worktree prune` — clears references to worktrees whose directories were
   already deleted (e.g. by a crashed prior run).
 
@@ -210,7 +210,7 @@ It prints one line of JSON on stdout:
 `node scripts/next-ticket/setup-worktree.mjs <n> <slug>` does the rest of
 this step in one call: removes a stale worktree dir at the target path if one
 exists, `git worktree add`s a new one on branch `claude/<n>-<slug>` off
-`main`, copies `.env` from the checkout this session started in (gitignored,
+`develop`, copies `.env` from the checkout this session started in (gitignored,
 per-directory — the worktree won't have it otherwise) if that file exists
 there, and runs `npm ci` inside the new worktree.
 
@@ -259,7 +259,7 @@ run them inline.
 
 ## 6. Sync with main
 
-`main` may have moved since step 3 (another `/next-ticket` run or a human
+`develop` may have moved since step 3 (another `/next-ticket` run or a human
 merge) — catch that now rather than at PR-merge time. Run the sync-with-main
 procedure above once, unconditionally. If it produces a commit (`merged`, or
 a conflict was resolved), that commit already ran through the pre-commit
@@ -283,7 +283,7 @@ that one spec: `npx playwright test e2e/plans.spec.ts -g "<test name>"`.
   any deviations from the ticket, and a "Review notes" section for
   unaddressed judgement-call findings from `/code-review`).
 - `node scripts/next-ticket/open-pr.mjs "<type>: <summary> (#<n>)" <body-file>`
-  — pushes the branch (`-u origin HEAD`), creates the PR against `main`, and
+  — pushes the branch (`-u origin HEAD`), creates the PR against `develop`, and
   arms auto-merge (`gh pr merge --merge --auto --delete-branch`) so GitHub
   merges it itself the instant it's mergeable and green — no need to
   win a manual race in step 9, and a check-watch hiccup in step 8 can't
@@ -299,7 +299,7 @@ that one spec: `npx playwright test e2e/plans.spec.ts -g "<test name>"`.
 ## 7a. Immediate conflict check
 
 Right after `open-pr.mjs` succeeds, before waiting on any CI run: check
-locally whether `main` moved in the gap between step 6's sync and this push
+locally whether `develop` moved in the gap between step 6's sync and this push
 (a race, not the common case — but worth a cheap local check before
 spending a full CI run on a PR that couldn't have merged anyway). Run the
 sync-with-main / conflict resolution procedure above once, unconditionally.
@@ -391,12 +391,12 @@ the worktree. Prints `{"status":"merged","issueClosed":true|false}` or
 `{"status":"merge-failed","message":"..."}`.
 
 - On `merge-failed`: this can be a last-second race (something merged to
-  `main` between step 8's check and now) — re-run
+  `develop` between step 8's check and now) — re-run
   `node scripts/next-ticket/drive-ci.mjs <pr>` once more; if it now reports
   `conflict`, handle it per step 8 and retry `finish.mjs`. If it still won't
   merge, abandon per the procedure above.
-- Note in your final report: merging to `main` triggered the `deploy` job
-  (GitHub Pages).
+- Note in your final report: merging to `develop` deploys the dev site (`dev.neocomdesk.com`) but never production (that ships on a develop → main promotion, which triggers the `deploy` job
+  (GitHub Pages)).
 
 ## 10. Report
 

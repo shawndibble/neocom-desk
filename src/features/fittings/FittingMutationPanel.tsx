@@ -172,21 +172,34 @@ function MutationEditor({
           {t('fittings.mutation.baseIs', { name: nameOf(mutation.baseTypeId) })}
         </p>
       )}
-      <MutaplasmidSelect
-        triggerId={pickerId}
-        options={options}
-        value={mutation?.mutaplasmidTypeId ?? null}
-        nameOf={nameOf}
-        disabled={baseValue === null}
-        onChange={(mutaplasmidTypeId) => {
-          if (baseTypeId === null || baseValue === null) return;
-          apply({
-            baseTypeId,
-            mutaplasmidTypeId,
-            attributes: startingRolls(mutaplasmidTypeId, baseValue, lookup),
-          });
-        }}
-      />
+      <div className="flex items-center gap-2">
+        <MutaplasmidSelect
+          triggerId={pickerId}
+          options={options}
+          value={mutation?.mutaplasmidTypeId ?? null}
+          nameOf={nameOf}
+          disabled={baseValue === null}
+          onChange={(mutaplasmidTypeId) => {
+            if (baseTypeId === null || baseValue === null) return;
+            apply({
+              baseTypeId,
+              mutaplasmidTypeId,
+              attributes: startingRolls(mutaplasmidTypeId, baseValue, lookup),
+            });
+          }}
+        />
+        {mutation && (
+          <Button
+            size="sm"
+            onClick={() => {
+              apply(null);
+              focusPicker();
+            }}
+          >
+            {t('fittings.mutation.remove')}
+          </Button>
+        )}
+      </div>
       {baseFailed && <WarnNote>{t('fittings.mutation.baseValuesFailed')}</WarnNote>}
       {status === 'rollsUnknown' && <WarnNote>{t('fittings.mutation.rollsUnknownNote')}</WarnNote>}
       {mutation &&
@@ -220,20 +233,7 @@ function MutationEditor({
             ))}
           </ul>
         ))}
-      <div className="flex flex-wrap items-start gap-2">
-        {fromAssets}
-        {mutation && (
-          <Button
-            size="sm"
-            onClick={() => {
-              apply(null);
-              focusPicker();
-            }}
-          >
-            {t('fittings.mutation.remove')}
-          </Button>
-        )}
-      </div>
+      {fromAssets}
     </div>
   );
 }

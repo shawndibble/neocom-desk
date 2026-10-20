@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { Contract } from '@/esi/endpoints';
-import { isActiveContractStatus, withAcceptedCourierInProgress } from './contractStatus';
+import {
+  isActiveContractStatus,
+  withAcceptedCourierInProgress,
+  contractStatusTone,
+} from './contractStatus';
 
 function contract(over: Partial<Contract>): Contract {
   return {
@@ -43,5 +47,26 @@ describe('isActiveContractStatus', () => {
   it('counts outstanding and in progress as live', () => {
     expect(isActiveContractStatus('in_progress')).toBe(true);
     expect(isActiveContractStatus('finished')).toBe(false);
+  });
+});
+
+describe('contractStatusTone', () => {
+  it('reads every finished state as success', () => {
+    for (const status of ['finished', 'finished_issuer', 'finished_contractor'] as const) {
+      expect(contractStatusTone(status)).toBe('success');
+    }
+  });
+
+  it('reads a contract that is still live as warning', () => {
+    expect(contractStatusTone('outstanding')).toBe('warning');
+    expect(contractStatusTone('in_progress')).toBe('warning');
+  });
+
+  it('reads a failure as danger, and a withdrawal as neutral', () => {
+    for (const status of ['failed', 'rejected', 'reversed'] as const) {
+      expect(contractStatusTone(status)).toBe('danger');
+    }
+    expect(contractStatusTone('cancelled')).toBe('neutral');
+    expect(contractStatusTone('deleted')).toBe('neutral');
   });
 });

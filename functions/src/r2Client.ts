@@ -48,16 +48,3 @@ export function createR2Get(config: R2Config): R2Get {
     return response.json();
   };
 }
-
-/** Deletes one object; a missing one is not an error. */
-export type R2Delete = (key: string) => Promise<void>;
-
-export function createR2Delete(config: R2Config): R2Delete {
-  const { client, base } = connect(config);
-  return async (key) => {
-    const response = await client.fetch(`${base}/${key}`, { method: 'DELETE' });
-    if (!response.ok && response.status !== 404) {
-      throw new Error(`R2 DELETE ${key} failed: ${response.status}`);
-    }
-  };
-}

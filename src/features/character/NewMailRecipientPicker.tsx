@@ -4,7 +4,15 @@
  * picks (Forward's contacts) and ESI search hits for characters,
  * corporations and alliances.
  */
-import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { GrantNote } from '@/app/GrantNote';
 import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
@@ -13,6 +21,7 @@ import { activeOptionClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import { isOfflineFailure } from '@/esi/client';
 import { cx } from '@/lib/cx';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { LOOKUP_DEBOUNCE_MS } from '@/lib/useDebouncedValue';
 import { moveHighlight } from '@/lib/comboboxNav';
 import { useOnline } from '@/stores/network';
@@ -28,6 +37,8 @@ import { MIN_RECIPIENT_SEARCH_LENGTH, searchTypedMailRecipients } from './mailRe
 
 const MAX_QUICK_PICKS = 8;
 const SEARCH_ENDPOINTS = ['getCharacterSearch'] as const;
+
+const NO_LISTS: [] = [];
 
 type ListsState =
   | { status: 'loading'; lists: [] }
@@ -66,7 +77,6 @@ export function NewMailRecipientPicker({
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [highlight, setHighlight] = useState<number | null>(null);
-  const [listsState, setListsState] = useState<ListsState>({ status: 'loading', lists: [] });
   const [hits, setHits] = useState<ComposeRecipient[]>([]);
   const [failure, setFailure] = useState<'offline' | 'error' | null>(null);
   const listboxId = `${useId()}-recipients`;
@@ -81,24 +91,16 @@ export function NewMailRecipientPicker({
     inputRef.current?.focus();
   }, [autoFocus]);
 
-  useEffect(() => {
-    let cancelled = false;
-    loadMailingLists(characterId)
-      .then((result) => {
-        if (cancelled) return;
-        setListsState(
-          result.cached === null
-            ? { status: 'failed', lists: [] }
-            : { status: 'ready', lists: result.cached.data }
-        );
-      })
-      .catch(() => {
-        if (!cancelled) setListsState({ status: 'failed', lists: [] });
-      });
-    return () => {
-      cancelled = true;
-    };
+  const loadLists = useCallback(async () => {
+    const result = await loadMailingLists(characterId);
+    if (result.cached === null) throw new Error('mailing lists unavailable');
+    return result.cached.data;
   }, [characterId]);
+  const listsLoad = useKeyedLoad(String(characterId), loadLists);
+  const listsState: ListsState =
+    listsLoad.status === 'ready'
+      ? { status: 'ready', lists: listsLoad.data }
+      : { status: listsLoad.status === 'failed' ? 'failed' : 'loading', lists: NO_LISTS };
 
   const trimmed = query.trim();
   const searchable = trimmed.length >= MIN_RECIPIENT_SEARCH_LENGTH && !lacksSearch;

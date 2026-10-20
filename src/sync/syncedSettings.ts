@@ -257,6 +257,12 @@
 // deleteSyncedSetting: removing a list rewrites the array. No `legacyKey`: new.
 // See features/stockTargets/stockListsStore.ts.
 //
+// sync.systemNotes (issue #4452): the pilot's own plain-text note per solar
+// system, as {systemId: {text, updatedAt}} (text capped at 500 characters),
+// written from the Route Safety table. Account-wide, not per Character. Never
+// deleted via deleteSyncedSetting: removing the last note writes {}. No
+// `legacyKey`: new. See features/travel/systemNotes.ts.
+//
 // sync.surveyHistory: the Mining Survey short links the pilot created or opened
 // in the app, as {id, addedAt, name?} entries — the link ids and the pilot's
 // own name for each (capped at 40 characters, so 30 entries stay a few KB), so
@@ -279,6 +285,12 @@
 // beside but deliberately not part of the Travel Settings: sync.routeHoles
 // (route through the open Thera / Turnur holes), sync.routeHoleShipSize,
 // sync.routeHoleMinLife and sync.routeHoleHubs. Also set, never unset.
+/** The Fittings damage / target profile settings (read by features/fittings). */
+export const SYNCED_CUSTOM_DAMAGE_PROFILES_KEY = 'sync.fittingDamageProfiles';
+export const SYNCED_SELECTED_DAMAGE_PROFILE_KEY = 'sync.fittingDamageProfileId';
+export const SYNCED_CUSTOM_TARGET_PROFILES_KEY = 'sync.fittingTargetProfiles';
+export const SYNCED_SELECTED_TARGET_PROFILE_KEY = 'sync.fittingTargetProfileId';
+
 export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.avoidEdencom',
   'sync.avoidPodKills',
@@ -291,10 +303,10 @@ export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.corpDarkAfterDays',
   'sync.courierHighCollateralRatio',
   'sync.defaultCharacterFilter',
-  'sync.fittingDamageProfileId',
-  'sync.fittingDamageProfiles',
-  'sync.fittingTargetProfileId',
-  'sync.fittingTargetProfiles',
+  SYNCED_SELECTED_DAMAGE_PROFILE_KEY,
+  SYNCED_CUSTOM_DAMAGE_PROFILES_KEY,
+  SYNCED_SELECTED_TARGET_PROFILE_KEY,
+  SYNCED_CUSTOM_TARGET_PROFILES_KEY,
   'sync.industryAssumedMe',
   'sync.industryAssumedTe',
   'sync.industryBuildGroups',
@@ -330,6 +342,7 @@ export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.stockLists',
   'sync.surveyHistory',
   'sync.surveyInfoTemplates',
+  'sync.systemNotes',
   'sync.targetSkillPlan',
 ];
 

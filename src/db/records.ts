@@ -14,7 +14,6 @@ import type { TradeHub } from '@/market/hubs';
 import type { OrderProblemSample } from '@/engine/market/orderProblemHistory';
 import type { MiningLedgerRow } from '@/engine/miningTax/types';
 import type { IndustryJob, WalletJournalEntry, WalletTransaction } from '@/esi/endpoints';
-import type { SnapshotDay } from '@/engine/miningTax/priceBasis';
 
 export interface CharacterRecord {
   characterId: number;
@@ -1073,18 +1072,6 @@ export interface WalletArchiveCoverageRecord {
   windows: Array<[number, number]>;
   /** `fetchedAt` of the newest result archived; an unchanged cached result is not re-written. */
   archivedAt?: number;
-}
-
-/**
- * One day's Jita buy/sell snapshot for every type the Mining Overview prices
- * (issue #1279) — the ore's pricing type (its Compressed form where one
- * exists) and each reprocessing material. ESI history only has a daily
- * average; this is the app's own record of the book's two sides. Keyed by
- * EVE/UTC date, a year kept. Character-independent and device-local.
- */
-export interface JitaPriceSnapshotRecord {
-  date: string;
-  prices: SnapshotDay;
 }
 
 /**

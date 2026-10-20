@@ -60,7 +60,20 @@ export function BookHealthStrip({ sync }: { sync: CorpTaxBookSync }) {
       {syncing ? t('corpTaxBook.moons.syncing') : t('corpTaxBook.moons.syncNow')}
     </Button>
   ) : undefined;
-  if (status.kind === 'never') {
+  // A visit that found no refinery to read is not "Synced": say what the book needs instead.
+  const noRefineries =
+    sync.run.phase === 'done' &&
+    sync.run.outcome.kind === 'synced' &&
+    sync.run.outcome.noRefineries;
+  if (noRefineries) {
+    items.push({
+      id: 'sync',
+      tone: 'warning',
+      title: t('corpTaxBook.moons.health.noRefineries'),
+      detail: <p>{t('corpTaxBook.moons.health.noRefineriesDetail')}</p>,
+      action: syncAction,
+    });
+  } else if (status.kind === 'never') {
     items.push({
       id: 'sync',
       tone: 'warning',

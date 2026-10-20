@@ -14,7 +14,7 @@ import { isSyncConfigured } from '@/app/syncStatus';
 import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
 import type { EsiEndpointId } from '@/esi/registry';
 import { ownedAtStation } from '@/engine/market/appraisalOwned';
-import { loadAllCharactersAssets } from '@/features/character/assets';
+import { loadAllCharactersAssets } from '@/features/assets/assets';
 import { useAppraisalOwnedPref } from '@/features/market/appraisalOwnedPref';
 import { useMarketHub } from '@/features/market/hub';
 import { TRADE_HUBS, getTradeHub } from '@/market/hubs';

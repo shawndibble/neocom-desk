@@ -37,6 +37,32 @@ describe('EmploymentTimeline', () => {
     expect(first).not.toHaveTextContent('employmentHistory.returned');
   });
 
+  it('draws an NPC stint as a slim tagged line with no bar', () => {
+    const npcRows = deriveEmploymentHistoryRows(
+      [
+        { record_id: 1, corporation_id: 100, start_date: '2024-01-15T00:00:00Z' },
+        { record_id: 2, corporation_id: 1_000_125, start_date: '2025-02-10T00:00:00Z' },
+        { record_id: 3, corporation_id: 200, start_date: '2025-02-12T00:00:00Z' },
+      ],
+      NOW
+    );
+    const { container } = render(
+      <EmploymentTimeline
+        rows={npcRows}
+        names={new Map([...names, [1_000_125, 'Perkone']])}
+        label="History"
+      />
+    );
+
+    const [, npc] = within(screen.getByRole('list', { name: 'History' })).getAllByRole('listitem');
+    expect(npc).toHaveTextContent('Perkone');
+    expect(npc).toHaveTextContent('employmentHistory.npc');
+    expect(npc).not.toHaveTextContent('employmentHistory.shortStay');
+    expect(npc.querySelector('img')).toBeNull();
+    expect(within(npc).getByText(/ – /)).toBeInTheDocument();
+    expect(container.querySelectorAll('[data-tenure-bar]')).toHaveLength(2);
+  });
+
   it('keeps the ongoing row plain when the character record names another corp', () => {
     render(
       <EmploymentTimeline rows={rows} names={names} label="History" currentCorporationId={999} />

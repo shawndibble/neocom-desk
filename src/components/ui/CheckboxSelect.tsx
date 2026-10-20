@@ -6,9 +6,9 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from './DropdownMenu';
-import { fieldBaseClassName, fieldSizeClassName } from './controlStyles';
+import { selectTriggerClassName } from './controlStyles';
 import { useFilterSurface } from './filterSurface';
-import * as Icon from './icons';
+import { SelectChevron } from './SelectChevron';
 
 export interface CheckboxSelectOption<V> {
   value: V;
@@ -63,21 +63,12 @@ export function CheckboxSelect<V extends string | number>({
     <DropdownMenu>
       <DropdownMenuTrigger
         aria-label={t('common.checkboxSelect.labelled', { label, value: summary })}
-        className={cx(
-          fieldBaseClassName,
-          fieldSizeClassName.sm,
-          'flex items-center justify-between gap-2 overflow-hidden whitespace-nowrap',
-          className
-        )}
+        className={cx(selectTriggerClassName('sm'), className)}
       >
-        <span className="min-w-0 truncate">
+        <span>
           {inline ? t('common.checkboxSelect.labelled', { label, value: summary }) : summary}
         </span>
-        <Icon.Expanded
-          aria-hidden="true"
-          size={Icon.ICON_SIZE.sm}
-          className="shrink-0 text-text-dim"
-        />
+        <SelectChevron size="sm" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start">
         {options.map((option) => (

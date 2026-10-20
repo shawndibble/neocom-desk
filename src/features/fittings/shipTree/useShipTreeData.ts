@@ -9,7 +9,7 @@
  * one, no status is computed until its skills have been read — until then
  * the tree renders dim rather than guessing from an empty skill sheet.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { hullStatuses } from '@/engine/shipTree/status';
 import type { ShipTreeHullStatus } from '@/engine/shipTree/types';
 import type { Attributes, CloneState, Implants, TrainedSkill } from '@/engine/types';
@@ -17,15 +17,21 @@ import { cloneStateFor, useCloneStates } from '@/features/skills/cloneState';
 import { usePlanEditorData } from '@/features/skills/planner/usePlanEditorData';
 import type { SkillCatalog } from '@/features/skills/skillMap';
 import { loadShipTree } from '@/sde/loadSde';
-import { onReconnect } from '@/stores/network';
 import { useMasteries } from '../useMasteries';
 import type { MasteryMap, ShipTreeData } from '@/sde/types';
 import { shipTreeSkillCatalog } from './shipTreeCatalogs';
+import { useAsyncLoad } from '@/lib/useAsyncLoad';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 
 const NO_TRAINED: ReadonlyMap<number, TrainedSkill> = new Map();
 const NO_STATUSES: ReadonlyMap<number, ShipTreeHullStatus> = new Map();
 const NO_MASTERIES: MasteryMap = {};
+
+const loadTreeAndCatalog = () =>
+  Promise.all([loadShipTree(), shipTreeSkillCatalog()]).then(([tree, skills]) => ({
+    tree,
+    skills,
+  }));
 
 export interface ShipTreeSource {
   data: ShipTreeData;
@@ -57,37 +63,19 @@ export function useShipTreeData(characterId: number | null): {
   source: ShipTreeSource | null | 'failed';
   retry: () => void;
 } {
-  const [data, setData] = useState<ShipTreeData | null>(null);
-  const [failed, setFailed] = useState(false);
-  const [attempt, setAttempt] = useState(0);
-  const retry = useCallback(() => setAttempt((n) => n + 1), []);
+  const loaded = useAsyncLoad(loadTreeAndCatalog);
+  const { retry } = loaded;
+  const data = loaded.data?.tree ?? null;
+  const catalog = loaded.data?.skills ?? null;
+  const failed = loaded.status === 'failed';
   const masteriesState = useMasteries();
   const masteries = masteriesState.status === 'loaded' ? masteriesState.masteries : NO_MASTERIES;
   const masteriesStatus = masteriesState.status;
   const retryMasteries = masteriesState.retry;
-  const [catalog, setCatalog] = useState<SkillCatalog | null>(null);
   const editor = usePlanEditorData(characterId);
   const cloneStates = useCloneStates((state) => state.value);
   const [now] = useState(() => new Date());
 
-  useEffect(() => {
-    let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset for a retry, not a render-time derivation
-    setFailed(false);
-    Promise.all([loadShipTree(), shipTreeSkillCatalog()])
-      .then(([tree, skills]) => {
-        if (cancelled) return;
-        setData(tree);
-        setCatalog(skills);
-      })
-      .catch(() => {
-        if (!cancelled) setFailed(true);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [attempt]);
-  useEffect(() => (failed ? onReconnect(retry) : undefined), [failed, retry]);
   useHydratedStore(useCloneStates);
 
   const trainedSkills = characterId === null ? NO_TRAINED : editor.trainedSkills;

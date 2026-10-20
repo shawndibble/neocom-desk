@@ -41,6 +41,28 @@ const pricesMock = vi.hoisted(() => {
 });
 vi.mock('@/market/prices', () => pricesMock);
 
+// PLEX trades only on its own market, so no hub lists it.
+vi.mock('@/features/market/plexPrice', () => ({ usePlexPrice: () => 5_000_000 }));
+
+vi.mock('@/features/abyssal/mutaplasmidData', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/features/abyssal/mutaplasmidData')>()),
+  useMutaplasmidLookup: () => ({ isAbyssalType: (typeId: number) => typeId === 47832 }),
+}));
+
+const snapshotMock = vi.hoisted(() => ({ loadHubSnapshotRange: vi.fn() }));
+vi.mock('@/features/market/hubSnapshot', () => snapshotMock);
+
+/** The hub station's Open Price for one UTC day, by type id. */
+function openPricesOn(
+  date: string,
+  prices: Record<number, { buy: number | null; sell: number | null }>
+) {
+  snapshotMock.loadHubSnapshotRange.mockResolvedValue({
+    saved: new Map([[date, new Map(Object.entries(prices).map(([id, p]) => [Number(id), p]))]]),
+    historical: new Map(),
+  });
+}
+
 const CHAR_ID = 91;
 
 const ITEM_EXCHANGE: Contract = {
@@ -122,6 +144,9 @@ beforeEach(async () => {
   await db.esiCache.clear();
   usePublicInfoModalStore.setState({ request: null });
   pricesMock.getHubPrices.mockReset().mockResolvedValue(new Map());
+  snapshotMock.loadHubSnapshotRange
+    .mockReset()
+    .mockResolvedValue({ saved: new Map(), historical: new Map() });
 });
 afterEach(() => {
   server.resetHandlers();
@@ -132,8 +157,7 @@ afterAll(() => server.close());
 /**
  * Issue #3525: the own-contract modal is the only place an own contract's
  * place appears, so its system links to Route Safety like the Public and
- * Courier modals' do. The station itself stays plain (§6c: Station is not
- * clickable).
+ * Courier modals' do. The station name links to its Place Info (issue #4455).
  */
 describe('ContractDetailModal System rows', () => {
   const JITA_STATION = 60003760;
@@ -161,8 +185,10 @@ describe('ContractDetailModal System rows', () => {
     const link = await screen.findByRole('link', { name: 'Jita' });
     expect(link).toHaveAttribute('href', expect.stringContaining('30000142'));
     expect(screen.getAllByRole('link', { name: /^(Jita|Amarr)$/ })).toHaveLength(1);
-    expect(screen.queryByRole('link', { name: 'Jita IV - Moon 4' })).toBeNull();
-    expect(screen.getByText('Jita IV - Moon 4')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'IV - Moon 4' })).toHaveAttribute(
+      'href',
+      expect.stringContaining(`info=place-${JITA_STATION}`)
+    );
   });
 
   it('links both endpoint systems on a courier contract', async () => {
@@ -185,7 +211,55 @@ describe('ContractDetailModal System rows', () => {
       expect.stringContaining('30002187')
     );
     expect(screen.getAllByRole('link', { name: /^(Jita|Amarr)$/ })).toHaveLength(2);
-    expect(screen.queryByRole('link', { name: /Emperor Family Academy/ })).toBeNull();
+    expect(screen.getByRole('link', { name: 'IV - Moon 4' })).toHaveAttribute(
+      'href',
+      expect.stringContaining(`info=place-${JITA_STATION}`)
+    );
+    expect(screen.getByRole('link', { name: /Emperor Family Academy/ })).toHaveAttribute(
+      'href',
+      expect.stringContaining(`info=place-${AMARR_STATION}`)
+    );
+  });
+
+  it('shows one Location, no Destination, when both ends are the same place', async () => {
+    server.use(
+      stationHandler(JITA_STATION, 'Jita IV - Moon 4', 30000142),
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/contracts/12345/items`, () =>
+        HttpResponse.json([])
+      )
+    );
+    renderModal({
+      characterId: CHAR_ID,
+      contract: {
+        ...ITEM_EXCHANGE,
+        start_location_id: JITA_STATION,
+        end_location_id: JITA_STATION,
+      },
+      issuerName: 'Mero Otichoda',
+      onClose: () => {},
+    });
+    await screen.findByRole('link', { name: 'IV - Moon 4' });
+    expect(screen.getByText('Location')).toBeInTheDocument();
+    expect(screen.queryByText('Destination')).toBeNull();
+    expect(screen.queryByText('→')).toBeNull();
+    expect(screen.getAllByRole('link', { name: 'IV - Moon 4' })).toHaveLength(1);
+  });
+
+  it('shows one Location with an arrow when a courier ends elsewhere', async () => {
+    server.use(
+      stationHandler(JITA_STATION, 'Jita IV - Moon 4', 30000142),
+      stationHandler(AMARR_STATION, 'Amarr VIII (Oris) - Emperor Family Academy', 30002187)
+    );
+    renderModal({
+      characterId: CHAR_ID,
+      contract: { ...COURIER, start_location_id: JITA_STATION, end_location_id: AMARR_STATION },
+      issuerName: 'Mero Otichoda',
+      onClose: () => {},
+    });
+    await screen.findByRole('link', { name: 'Amarr' });
+    expect(screen.getByText('Location')).toBeInTheDocument();
+    expect(screen.getByText('→')).toBeInTheDocument();
+    expect(screen.queryByText('Destination')).toBeNull();
   });
 
   it('hides the System row when the system cannot be resolved', async () => {
@@ -229,10 +303,31 @@ describe('ContractDetailModal', () => {
       issuerName: 'Mero Otichoda',
       onClose: () => {},
     });
-    expect(screen.getByRole('dialog', { name: 'Item Exchange' })).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: /Item Exchange/ })).toBeInTheDocument();
     expect(screen.getByText('Finished (Contractor)')).toBeInTheDocument();
     expect(screen.getByText('Mero Otichoda')).toBeInTheDocument();
-    expect(screen.getByText('18,205,203')).toBeInTheDocument();
+    expect(screen.getByText('18,205,203 ISK')).toBeInTheDocument();
+  });
+
+  it('opens a link from the description in a new tab, from a button', () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/stations/60003760`, () => new Promise(() => {})),
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/contracts/12345/items`, () =>
+        HttpResponse.json([])
+      )
+    );
+    const open = vi.spyOn(window, 'open').mockReturnValue(null);
+    renderModal({
+      characterId: CHAR_ID,
+      contract: { ...ITEM_EXCHANGE, title: 'Price list https://example.com/list' },
+      issuerName: 'Mero Otichoda',
+      onClose: () => {},
+    });
+    expect(screen.getByRole('dialog', { name: /Item Exchange/ })).toBeInTheDocument();
+    expect(screen.getByText('Price list https://example.com/list')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Open example\.com/ }));
+    expect(open).toHaveBeenCalledWith('https://example.com/list', '_blank', 'noopener,noreferrer');
+    open.mockRestore();
   });
 
   it('resolves the location name once the station lookup returns', async () => {
@@ -367,8 +462,8 @@ describe('ContractDetailModal', () => {
       issuerName: 'Mero Otichoda',
       onClose: () => {},
     });
-    expect(screen.getByText('500,000')).toBeInTheDocument();
-    expect(screen.getByText('1,000,000')).toBeInTheDocument();
+    expect(screen.getByText('500,000 ISK')).toBeInTheDocument();
+    expect(screen.getByText('1,000,000 ISK')).toBeInTheDocument();
     expect(screen.getByText('3')).toBeInTheDocument();
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
   });
@@ -481,113 +576,297 @@ describe('ContractDetailModal', () => {
     );
   });
 
-  describe('Market value (issue #717)', () => {
-    it('shows a neutral market-value total for an outstanding contract, naming the hub', async () => {
-      pricesMock.getHubPrices.mockResolvedValue(
-        new Map([[34, { sellMin: 5.5, buyMax: 5, sellVolume: 0, buyVolume: 0 }]])
-      );
+  describe('Price check', () => {
+    const ONE_LINE = [
+      { record_id: 1, type_id: 34, quantity: 744, is_included: true, is_singleton: false },
+    ];
+    const FINISHED_FOR_4000: Contract = { ...ITEM_EXCHANGE, price: 4_000 };
+    const OUTSTANDING_FOR_4000: Contract = { ...ITEM_EXCHANGE_OUTSTANDING, price: 4_000 };
+
+    function serve(items: unknown[]) {
       server.use(
         http.get(`${ESI_BASE_URL}/universe/stations/60003760`, () => new Promise(() => {})),
         http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/contracts/12345/items`, () =>
-          HttpResponse.json([
-            { record_id: 1, type_id: 34, quantity: 744, is_included: true, is_singleton: false },
-          ])
+          HttpResponse.json(items)
         )
       );
-      renderModal({
+    }
+    function open(contract: Contract) {
+      return renderModal({
         characterId: CHAR_ID,
-        contract: ITEM_EXCHANGE_OUTSTANDING,
+        contract,
         issuerName: 'Mero Otichoda',
         onClose: () => {},
       });
+    }
 
-      expect(await screen.findByText('Market value at Jita (sell orders)')).toBeInTheDocument();
-      expect(screen.getByText('4,092')).toBeInTheDocument(); // 744 * 5.5
-      expect(screen.queryByText(/unpriced/)).not.toBeInTheDocument();
+    it('checks a finished contract at the hub station Open Price of the day it was issued', async () => {
+      openPricesOn('2026-08-25', { 34: { buy: 5, sell: 5.5 } });
+      serve(ONE_LINE);
+      open(FINISHED_FOR_4000);
+
+      const check = await screen.findByRole('region', {
+        name: 'Price check · Jita 4-4 at close of Aug 25',
+      });
+      expect(snapshotMock.loadHubSnapshotRange).toHaveBeenCalledWith(
+        '2026-08-25',
+        '2026-08-25',
+        [34],
+        expect.objectContaining({ id: 'jita' })
+      );
+      expect(await within(check).findByText('4,000 ISK')).toBeInTheDocument(); // asking
+      expect(within(check).getByText('3,720 ISK')).toBeInTheDocument(); // 744 * 5, buy
+      expect(within(check).getByText('+7.5%')).toBeInTheDocument();
+      expect(within(check).getByText('Asking is above buy orders')).toBeInTheDocument();
+      expect(pricesMock.getHubPrices).not.toHaveBeenCalled();
     });
 
-    it('also shows a market-value total for an outstanding auction contract', async () => {
+    it('flips to sell orders when the side label is pressed, and every figure follows', async () => {
+      openPricesOn('2026-08-25', { 34: { buy: 5, sell: 5.5 } });
+      serve(ONE_LINE);
+      open(FINISHED_FOR_4000);
+
+      const check = await screen.findByRole('region', { name: /^Price check/ });
+      await within(check).findByText('3,720 ISK');
+      fireEvent.click(within(check).getByRole('button', { name: 'Buy orders' }));
+      expect(within(check).getByRole('button', { name: 'Sell orders' })).toBeInTheDocument();
+      expect(within(check).getByText('4,092 ISK')).toBeInTheDocument(); // 744 * 5.5
+      expect(within(check).getByText('−2.2%')).toBeInTheDocument();
+      expect(within(check).getByText('Asking is below sell orders')).toBeInTheDocument();
+    });
+
+    it('says there is no Open Price for that day, never 0', async () => {
+      serve(ONE_LINE);
+      open(FINISHED_FOR_4000);
+
+      const check = await screen.findByRole('region', { name: /^Price check/ });
+      expect(await within(check).findByText('No Open Price for Aug 25')).toBeInTheDocument();
+      expect(within(check).queryByText(/ISK/)).not.toBeInTheDocument();
+    });
+
+    it('checks an outstanding contract against the live book instead', async () => {
       pricesMock.getHubPrices.mockResolvedValue(
         new Map([[34, { sellMin: 5.5, buyMax: 5, sellVolume: 0, buyVolume: 0 }]])
       );
-      server.use(
-        http.get(`${ESI_BASE_URL}/universe/stations/60003760`, () => new Promise(() => {})),
-        http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/contracts/12345/items`, () =>
-          HttpResponse.json([
-            { record_id: 1, type_id: 34, quantity: 744, is_included: true, is_singleton: false },
-          ])
-        )
-      );
-      renderModal({
-        characterId: CHAR_ID,
-        contract: AUCTION_OUTSTANDING,
-        issuerName: 'Mero Otichoda',
-        onClose: () => {},
-      });
+      serve(ONE_LINE);
+      open(OUTSTANDING_FOR_4000);
 
-      expect(await screen.findByText('Market value at Jita (sell orders)')).toBeInTheDocument();
-      expect(screen.getByText('4,092')).toBeInTheDocument(); // 744 * 5.5
+      const check = await screen.findByRole('region', { name: 'Is it fair? · Jita 4-4 right now' });
+      expect(await within(check).findByText('3,720 ISK')).toBeInTheDocument();
+      expect(snapshotMock.loadHubSnapshotRange).not.toHaveBeenCalled();
     });
 
-    it('flags unpriced lines instead of treating them as free, and leaves them out of the total', async () => {
+    it('also checks an outstanding auction, against its buyout', async () => {
+      pricesMock.getHubPrices.mockResolvedValue(
+        new Map([[34, { sellMin: 5.5, buyMax: 5, sellVolume: 0, buyVolume: 0 }]])
+      );
+      serve(ONE_LINE);
+      open({ ...AUCTION_OUTSTANDING, buyout: 4_000 });
+
+      const check = await screen.findByRole('region', { name: /^Is it fair/ });
+      expect(await within(check).findByText('+7.5%')).toBeInTheDocument();
+    });
+
+    it("never prices a blueprint copy at the original's hub price", async () => {
+      // 638 trades at the hub as an original; ESI marks a copy with raw_quantity -2.
+      pricesMock.getHubPrices.mockResolvedValue(
+        new Map([
+          [34, { sellMin: 5.5, buyMax: 5, sellVolume: 0, buyVolume: 0 }],
+          [638, { sellMin: 1_000_000_000, buyMax: 900_000_000, sellVolume: 0, buyVolume: 0 }],
+        ])
+      );
+      serve([
+        {
+          record_id: 1,
+          type_id: 638,
+          quantity: 1,
+          raw_quantity: -2,
+          is_included: true,
+          is_singleton: true,
+        },
+        ...ONE_LINE,
+      ]);
+      open(OUTSTANDING_FOR_4000);
+
+      const check = await screen.findByRole('region', { name: /^Is it fair/ });
+      expect(await within(check).findByText('3,720 ISK')).toBeInTheDocument(); // the Tritanium only
+      expect(within(check).getByText('(1 item unpriced)')).toBeInTheDocument();
+      expect(within(check).queryByText(/900,000,000/)).not.toBeInTheDocument();
+    });
+
+    it('counts lines it could not price instead of treating them as free', async () => {
+      pricesMock.getHubPrices.mockResolvedValue(
+        new Map([
+          [34, { sellMin: 5.5, buyMax: 5, sellVolume: 0, buyVolume: 0 }],
+          [35, { sellMin: null, buyMax: null, sellVolume: 0, buyVolume: 0 }],
+        ])
+      );
+      serve([
+        ...ONE_LINE,
+        { record_id: 2, type_id: 35, quantity: 10, is_included: true, is_singleton: false },
+      ]);
+      open(OUTSTANDING_FOR_4000);
+
+      const check = await screen.findByRole('region', { name: /^Is it fair/ });
+      expect(await within(check).findByText('(1 item unpriced)')).toBeInTheDocument();
+      expect(within(check).getByText('3,720 ISK')).toBeInTheDocument();
+    });
+
+    it('says nothing is priced when no line has a price, never a value of 0', async () => {
       pricesMock.getHubPrices.mockResolvedValue(
         new Map([[34, { sellMin: null, buyMax: null, sellVolume: 0, buyVolume: 0 }]])
       );
-      server.use(
-        http.get(`${ESI_BASE_URL}/universe/stations/60003760`, () => new Promise(() => {})),
-        http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/contracts/12345/items`, () =>
-          HttpResponse.json([
-            { record_id: 1, type_id: 34, quantity: 744, is_included: true, is_singleton: false },
-          ])
-        )
+      serve(ONE_LINE);
+      open(OUTSTANDING_FOR_4000);
+
+      const check = await screen.findByRole('region', { name: /^Is it fair/ });
+      expect(await within(check).findByText('Not priced at Jita 4-4')).toBeInTheDocument();
+    });
+
+    it('does not read an unreachable price source as an empty market', async () => {
+      pricesMock.getHubPricesWithStatus.mockResolvedValueOnce({
+        prices: new Map(),
+        unreachable: true,
+      });
+      serve(ONE_LINE);
+      open(OUTSTANDING_FOR_4000);
+
+      const check = await screen.findByRole('region', { name: /^Is it fair/ });
+      expect(await within(check).findByText(/unavailable/i)).toBeInTheDocument();
+      expect(within(check).queryByText('Not priced at Jita 4-4')).not.toBeInTheDocument();
+    });
+
+    it('prices PLEX from its own market on a live check, since no hub lists it', async () => {
+      serve([
+        { record_id: 1, type_id: 44992, quantity: 2, is_included: true, is_singleton: false },
+      ]);
+      open({ ...OUTSTANDING_FOR_4000, price: 12_000_000 });
+
+      const check = await screen.findByRole('region', { name: /^Is it fair/ });
+      // PLEX has no buy orders: flip to sell, where its market price applies.
+      fireEvent.click(await within(check).findByRole('button', { name: 'Buy orders' }));
+      expect(await within(check).findByText('10,000,000 ISK')).toBeInTheDocument(); // 2 x 5M
+      expect(within(check).getByText('+20.0%')).toBeInTheDocument();
+    });
+
+    it('judges an auction on its buyout, not its starting bid', async () => {
+      pricesMock.getHubPrices.mockResolvedValue(
+        new Map([[34, { sellMin: 5.5, buyMax: 5, sellVolume: 0, buyVolume: 0 }]])
       );
-      renderModal({
+      serve(ONE_LINE);
+      open({ ...AUCTION_OUTSTANDING, price: 1_000, buyout: 4_000 });
+
+      const check = await screen.findByRole('region', { name: /^Is it fair/ });
+      expect(await within(check).findByText('+7.5%')).toBeInTheDocument(); // 4,000 against 3,720
+      expect(within(check).queryByText('1,000 ISK')).not.toBeInTheDocument();
+    });
+
+    it('compares Included to Requested for an item-for-item contract', async () => {
+      openPricesOn('2026-08-25', { 34: { buy: 5, sell: 5.5 }, 35: { buy: 6, sell: 7 } });
+      serve([
+        ...ONE_LINE,
+        { record_id: 2, type_id: 35, quantity: 100, is_included: false, is_singleton: false },
+      ]);
+      open({ ...ITEM_EXCHANGE, price: undefined });
+
+      const check = await screen.findByRole('region', { name: /^Price check/ });
+      expect(await within(check).findByText('3,720 ISK')).toBeInTheDocument(); // included, buy
+      expect(within(check).getByText('600.00 ISK')).toBeInTheDocument(); // requested, buy
+      expect(within(check).getByText('+520.0%')).toBeInTheDocument();
+      expect(within(check).getByText('Included is above Requested')).toBeInTheDocument();
+    });
+
+    it('shows no price check where there is nothing to compare: a courier, or a contract with no ask', async () => {
+      const { unmount } = renderModal({
         characterId: CHAR_ID,
-        contract: ITEM_EXCHANGE_OUTSTANDING,
+        contract: COURIER,
         issuerName: 'Mero Otichoda',
         onClose: () => {},
       });
+      expect(
+        screen.queryByRole('region', { name: /Price check|Is it fair/ })
+      ).not.toBeInTheDocument();
+      unmount();
 
-      expect(await screen.findByText('(1 item unpriced)')).toBeInTheDocument();
-      expect(screen.getByText('0.00')).toBeInTheDocument();
+      serve(ONE_LINE);
+      open({ ...ITEM_EXCHANGE, price: 0 });
+      await screen.findByRole('table', { name: 'Included' });
+      expect(
+        screen.queryByRole('region', { name: /Price check|Is it fair/ })
+      ).not.toBeInTheDocument();
+      expect(snapshotMock.loadHubSnapshotRange).not.toHaveBeenCalled();
+      expect(pricesMock.getHubPrices).not.toHaveBeenCalled();
     });
 
-    it('shows no market-value figure for a finished contract', async () => {
-      server.use(
-        http.get(`${ESI_BASE_URL}/universe/stations/60003760`, () => new Promise(() => {})),
-        http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/contracts/12345/items`, () =>
-          HttpResponse.json([
-            { record_id: 1, type_id: 34, quantity: 744, is_included: true, is_singleton: false },
-          ])
-        )
-      );
+    it('keeps an abyssal module out of the figure and says it is not priced, and why', async () => {
+      // Own-contract lines carry no item id, so a module cannot be identified to MutaMarket.
+      openPricesOn('2026-08-25', { 34: { buy: 5, sell: 5.5 } });
+      serve([
+        ...ONE_LINE,
+        { record_id: 2, type_id: 47832, quantity: 1, is_included: true, is_singleton: true },
+      ]);
+      open(FINISHED_FOR_4000);
+
+      const check = await screen.findByRole('region', { name: /^Price check/ });
+      expect(await within(check).findByText('3,720 ISK')).toBeInTheDocument(); // the Tritanium only
+      expect(screen.getByText('Abyssal modules (MutaMarket estimate)')).toBeInTheDocument();
+      expect(screen.getByText('Not priced')).toBeInTheDocument();
+      expect(screen.getByText(/worth its own rolls/)).toBeInTheDocument();
+    });
+  });
+
+  describe('Layout', () => {
+    it('shows the status as a pill beside the title, and the id with copy and Open in EVE under it', () => {
       renderModal({
         characterId: CHAR_ID,
         contract: ITEM_EXCHANGE,
         issuerName: 'Mero Otichoda',
         onClose: () => {},
       });
-
-      await screen.findByRole('table', { name: 'Included' });
-      expect(screen.queryByText(/Market value at/)).not.toBeInTheDocument();
-      expect(pricesMock.getHubPrices).not.toHaveBeenCalled();
+      const dialog = screen.getByRole('dialog', { name: /Item Exchange/ });
+      expect(within(dialog).getByText('Finished (Contractor)')).toBeInTheDocument();
+      expect(within(dialog).getByText('12345')).toBeInTheDocument();
+      expect(within(dialog).getByRole('button', { name: 'Copy contract ID' })).toBeInTheDocument();
+      expect(
+        within(dialog).getByRole('button', { name: /Open contract in EVE/ })
+      ).toBeInTheDocument();
     });
 
-    it('shows no market-value figure for a courier contract', () => {
+    it('drops ISK rows that are zero instead of printing 0.00', () => {
       renderModal({
         characterId: CHAR_ID,
-        contract: COURIER,
+        contract: { ...ITEM_EXCHANGE, price: 4_000, reward: 0, collateral: 0 },
         issuerName: 'Mero Otichoda',
         onClose: () => {},
       });
-      expect(screen.queryByText(/Market value at/)).not.toBeInTheDocument();
-      expect(pricesMock.getHubPrices).not.toHaveBeenCalled();
+      expect(screen.getByText('4,000 ISK')).toBeInTheDocument();
+      expect(screen.queryByText('Acceptor Receives')).not.toBeInTheDocument();
+      expect(screen.queryByText('Collateral')).not.toBeInTheDocument();
+      expect(screen.queryByText('0.00')).not.toBeInTheDocument();
     });
 
-    it('does not show a Requested market-value row when Requested has no items', async () => {
-      pricesMock.getHubPrices.mockResolvedValue(
-        new Map([[34, { sellMin: 5, buyMax: 4, sellVolume: 0, buyVolume: 0 }]])
+    it('shows the contract as a timeline, with no separate date rows or days-to-complete', () => {
+      renderModal({
+        characterId: CHAR_ID,
+        contract: {
+          ...ITEM_EXCHANGE,
+          date_accepted: '2026-08-25T23:06:10Z',
+          date_completed: '2026-08-25T23:06:40Z',
+          days_to_complete: 0,
+        },
+        issuerName: 'Mero Otichoda',
+        onClose: () => {},
+      });
+      const steps = within(screen.getByRole('list', { name: 'Contract progress' })).getAllByRole(
+        'listitem'
       );
+      expect(steps).toHaveLength(3);
+      expect(screen.getByText('Same minute')).toBeInTheDocument();
+      expect(screen.queryByText('Date Issued')).not.toBeInTheDocument();
+      expect(screen.queryByText('Days To Complete')).not.toBeInTheDocument();
+    });
+
+    it('folds the volume into the Items figure instead of a chip of its own', async () => {
       server.use(
         http.get(`${ESI_BASE_URL}/universe/stations/60003760`, () => new Promise(() => {})),
         http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/contracts/12345/items`, () =>
@@ -598,14 +877,95 @@ describe('ContractDetailModal', () => {
       );
       renderModal({
         characterId: CHAR_ID,
-        contract: ITEM_EXCHANGE_OUTSTANDING,
+        contract: { ...ITEM_EXCHANGE, price: 4_000, volume: 92_300.4 },
         issuerName: 'Mero Otichoda',
         onClose: () => {},
       });
+      expect(await screen.findByText('1 line · 92,300.4 m³')).toBeInTheDocument();
+      expect(screen.queryByText('Volume')).not.toBeInTheDocument();
+    });
 
-      await screen.findByText('Market value at Jita (sell orders)');
-      expect(screen.queryByRole('table', { name: 'Requested' })).not.toBeInTheDocument();
-      expect(screen.getAllByText('Market value at Jita (sell orders)')).toHaveLength(1);
+    it('keeps the volume as its own figure where there are no item lines, as on a courier', () => {
+      renderModal({
+        characterId: CHAR_ID,
+        contract: COURIER,
+        issuerName: 'Mero Otichoda',
+        onClose: () => {},
+      });
+      expect(screen.getByText('Volume')).toBeInTheDocument();
+      expect(screen.getByText('4,400 m³')).toBeInTheDocument();
+    });
+
+    it('counts down to the expiry of a contract that can still be taken, and dates a finished one', () => {
+      const { unmount } = renderModal({
+        characterId: CHAR_ID,
+        contract: { ...COURIER, date_expired: '2099-01-01T00:00:00Z' },
+        issuerName: 'Mero Otichoda',
+        onClose: () => {},
+      });
+      expect(screen.getByText('Expires in')).toBeInTheDocument();
+      expect(screen.getByText(/^\d+d \d+h \d+m$/)).toBeInTheDocument();
+      unmount();
+
+      renderModal({
+        characterId: CHAR_ID,
+        contract: ITEM_EXCHANGE,
+        issuerName: 'Mero Otichoda',
+        onClose: () => {},
+      });
+      // Finished: no countdown, and the date it finished is in the strip.
+      expect(screen.queryByText('Expires in')).not.toBeInTheDocument();
+      expect(screen.getAllByText('Completed').length).toBeGreaterThan(0);
+    });
+
+    it('ends a deleted or cancelled contract on its outcome, with no acceptance to wait for', () => {
+      for (const [status, label] of [
+        ['deleted', 'Deleted'],
+        ['cancelled', 'Cancelled'],
+        ['rejected', 'Rejected'],
+      ] as const) {
+        const { unmount } = renderModal({
+          characterId: CHAR_ID,
+          contract: { ...ITEM_EXCHANGE, status, date_completed: undefined, acceptor_id: 0 },
+          issuerName: 'Mero Otichoda',
+          onClose: () => {},
+        });
+        const steps = within(screen.getByRole('list', { name: 'Contract progress' })).getAllByRole(
+          'listitem'
+        );
+        expect(steps.map((li) => li.querySelector('b')?.textContent)).toEqual(['Issued', label]);
+        expect(screen.queryByText('Waiting')).not.toBeInTheDocument();
+        // An expiry means nothing to a contract that can no longer be taken.
+        expect(screen.queryByText('Expires')).not.toBeInTheDocument();
+        expect(screen.queryByText('Expires in')).not.toBeInTheDocument();
+        unmount();
+      }
+    });
+
+    it('calls an outstanding contract past its expiry expired, in the strip and the timeline', () => {
+      renderModal({
+        characterId: CHAR_ID,
+        contract: {
+          ...ITEM_EXCHANGE_OUTSTANDING,
+          date_issued: '2020-01-01T00:00:00Z',
+          date_expired: '2020-01-15T00:00:00Z',
+        },
+        issuerName: 'Mero Otichoda',
+        onClose: () => {},
+      });
+      expect(screen.getAllByText('Expired')).toHaveLength(2); // headline chip and timeline step
+      expect(screen.queryByText('Waiting')).not.toBeInTheDocument();
+      expect(screen.queryByText('Expires in')).not.toBeInTheDocument();
+    });
+
+    it('keeps the type and availability in one quiet line', () => {
+      renderModal({
+        characterId: CHAR_ID,
+        contract: ITEM_EXCHANGE,
+        issuerName: 'Mero Otichoda',
+        onClose: () => {},
+      });
+      expect(screen.getByText(/Item Exchange · Private/)).toBeInTheDocument();
     });
   });
 });

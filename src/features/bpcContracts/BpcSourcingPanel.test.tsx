@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, waitFor, within, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useMarketHub } from '@/features/market/hub';
@@ -358,6 +358,9 @@ beforeAll(async () => {
 }, 30_000);
 
 beforeEach(resetSession);
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 /** Every `FilterBar` keeps its controls behind the funnel, so open it first. */
 async function openFilters(user: ReturnType<typeof userEvent.setup>) {
@@ -624,6 +627,30 @@ describe('BpcSourcingPanel', () => {
     render(<App />);
 
     expect(await screen.findByText('1 offer on contract')).toBeInTheDocument();
+  });
+
+  it('judges an opened copy against every similar copy listed, however the board is filtered', async () => {
+    // A minimum ME of 10 hides the three similar copies from the board, but
+    // they are still for sale, so they still set the going rate.
+    loadPublicBpcContracts.mockResolvedValue(
+      cachedSnapshot([
+        row({ contractId: 1 }), // 1,000,000 a run
+        row({ contractId: 2, me: 8, price: 4_000_000 }), // 800,000
+        row({ contractId: 3, me: 9, price: 5_500_000 }), // 1,100,000
+        row({ contractId: 4, me: 9, te: 18, price: 6_000_000 }), // 1,200,000
+      ])
+    );
+    window.history.pushState({}, '', '/industry/sourcing?sourcing.type=638&sourcing.minMe=10');
+    const user = userEvent.setup();
+    render(<App />);
+
+    expect(await screen.findByText('1 offer on contract')).toBeInTheDocument();
+    await user.click(within(await screen.findByRole('table')).getByText('Rifter Blueprint'));
+
+    const check = await screen.findByRole('region', {
+      name: 'Is it fair? · 3 similar copies for sale now',
+    });
+    expect(within(check).getByText('1,100,000 ISK')).toBeInTheDocument(); // the median
   });
 
   it('suggests matching blueprints as you type, with how many offers each has', async () => {
@@ -1603,11 +1630,12 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
 
   describe('BPO availability (issue #1241)', () => {
     it('checks no market Order Book while the search is empty', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
       loadPublicBpcContracts.mockResolvedValue(cachedSnapshot([row({ contractId: 1 })]));
       render(<App />);
       await screen.findByRole('table', { name: 'BPC Sourcing' });
       // Past the lookup debounce, so a pending fan-out would have started.
-      await new Promise((resolve) => setTimeout(resolve, 400));
+      await vi.advanceTimersByTimeAsync(400);
       expect(getOrderBook).not.toHaveBeenCalled();
     });
 

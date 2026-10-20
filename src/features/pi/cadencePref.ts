@@ -75,20 +75,7 @@ export interface PiCadence {
  */
 export const DEFAULT_PI_CADENCE: PiCadence = { restartDays: 1, haulDays: 1 };
 
-const HOURS_PER_DAY = 24;
-
-export interface CadenceHours {
-  restartHours: number;
-  haulHours: number;
-}
-
-/** The pair in the unit `checkThroughput` and the extraction curve both speak. */
-export function cadenceHours(cadence: PiCadence): CadenceHours {
-  return {
-    restartHours: cadence.restartDays * HOURS_PER_DAY,
-    haulHours: cadence.haulDays * HOURS_PER_DAY,
-  };
-}
+export { cadenceHours, type CadenceHours } from './cadenceHours';
 
 function isOfferedDays(value: unknown): value is PiCadenceDays {
   return (

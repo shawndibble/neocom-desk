@@ -6,12 +6,15 @@
  * returns `buildPlanAdvice`'s answer. Two tabs reading the same model with the same input show the same
  * figures.
  *
- * What-if advice (a planet type the pilot does not have, added) is built on
- * demand and cached per input, so trying all eight types costs at most eight
- * builds and a re-render never repeats one.
+ * The main advice is built off the main thread (`useAdviceOf`). What-if advice
+ * (a planet type the pilot does not have, added) is built on demand the same
+ * way and cached per input, so trying all eight types costs at most eight builds
+ * and a re-render never repeats one.
  */
 import { useMemo } from 'react';
-import { buildPlanAdvice, type PlanAdvice } from '../planAdviceModel';
+import type { PlanAdvice, PlanAdviceInput } from '../planAdviceModel';
+import { askAdvice } from '../planAdviceAsync';
+import { useAdviceOf } from '../useAdviceOf';
 import { homeSystemId } from '../sellRoute';
 import { usePlanPreference } from '../planTicksPref';
 import { usePiAdviceInputs } from '../usePiAdviceInputs';
@@ -32,7 +35,7 @@ export type MapAdviceState =
       status: 'ready';
       graph: MapGraph;
       advice: PlanAdvice;
-      adviceWithWhatIf: (types: ReadonlySet<PlanetType>) => PlanAdvice;
+      adviceWithWhatIf: (types: ReadonlySet<PlanetType>) => PlanAdvice | Promise<PlanAdvice>;
       colonies: MapColony[];
       finder: FinderOrigin;
       /** The colony read failed: the board runs as for a pilot with no colonies, plus this notice. */
@@ -63,26 +66,24 @@ export function useMapAdvice(
   const pi = snapshot?.pi ?? null;
 
   const graph = useMemo(() => (pi ? buildMapGraph(pi) : null), [pi]);
+  const buildResult = useAdviceOf(input);
   const built = useMemo(() => {
-    if (!input) return null;
-    let advice: PlanAdvice;
-    try {
-      advice = buildPlanAdvice(input);
-    } catch {
-      return 'error' as const;
-    }
-    const cache = new Map<string, PlanAdvice>();
-    const adviceWithWhatIf = (types: ReadonlySet<PlanetType>): PlanAdvice => {
+    if (buildResult.status === 'pending') return null;
+    if (buildResult.status === 'error' || !input) return 'error' as const;
+    const { advice } = buildResult;
+    // One input object per type set, so the worker service remembers each answer.
+    const cache = new Map<string, PlanAdviceInput>();
+    const adviceWithWhatIf = (types: ReadonlySet<PlanetType>): Promise<PlanAdvice> => {
       const key = whatIfKey([...types]);
-      let hit = cache.get(key);
-      if (!hit) {
-        hit = buildPlanAdvice({ ...input, whatIfTypes: whatIfTypesOf(key) });
-        cache.set(key, hit);
+      let variant = cache.get(key);
+      if (!variant) {
+        variant = { ...input, whatIfTypes: whatIfTypesOf(key) };
+        cache.set(key, variant);
       }
-      return hit;
+      return askAdvice(variant);
     };
     return { advice, adviceWithWhatIf };
-  }, [input]);
+  }, [buildResult, input]);
 
   const colonies = useMemo<MapColony[]>(
     () =>

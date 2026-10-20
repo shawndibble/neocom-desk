@@ -9,10 +9,7 @@
  * `null` for "unavailable" so the page shows its unavailable state.
  */
 import { loadWithCache, GLOBAL_CACHE_CHARACTER_ID } from '@/esi/cache';
-import type {
-  ChunkedSnapshot,
-  ChunkedSnapshotRead,
-} from '@/features/contractSearch/chunkedSnapshot';
+import type { R2Snapshot, R2SnapshotRead } from '@/features/contractSearch/r2Snapshot';
 import { R2_SNAPSHOT_ORIGIN, fetchJson } from '@/features/contractSearch/r2OfferSnapshot';
 import type { LpSnapshotStore } from './itemSearch';
 
@@ -33,7 +30,7 @@ function isStoreRow(value: unknown): value is LpSnapshotStore {
 }
 
 /** The object as `functions/src/r2DailySnapshots.ts` writes it, or `null` when it is not that shape. */
-export function parseLpStoreSnapshot(raw: unknown): ChunkedSnapshot<LpSnapshotStore> | null {
+export function parseLpStoreSnapshot(raw: unknown): R2Snapshot<LpSnapshotStore> | null {
   if (typeof raw !== 'object' || raw === null) return null;
   const { lastSyncedAt, rows } = raw as Record<string, unknown>;
   if (typeof lastSyncedAt !== 'number' || !(lastSyncedAt > 0)) return null;
@@ -41,7 +38,7 @@ export function parseLpStoreSnapshot(raw: unknown): ChunkedSnapshot<LpSnapshotSt
   return { rows, lastSyncedAt };
 }
 
-async function fetchSnapshot(): Promise<ChunkedSnapshot<LpSnapshotStore> | null> {
+async function fetchSnapshot(): Promise<R2Snapshot<LpSnapshotStore> | null> {
   try {
     return parseLpStoreSnapshot(await fetchJson(SNAPSHOT_URL));
   } catch {
@@ -49,7 +46,7 @@ async function fetchSnapshot(): Promise<ChunkedSnapshot<LpSnapshotStore> | null>
   }
 }
 
-export async function loadLpStoreSnapshot(): Promise<ChunkedSnapshotRead<LpSnapshotStore>> {
+export async function loadLpStoreSnapshot(): Promise<R2SnapshotRead<LpSnapshotStore>> {
   const cached = await loadWithCache(GLOBAL_CACHE_CHARACTER_ID, CACHE_KEY, fetchSnapshot, {
     staleAfterMs: STALE_AFTER_MS,
     allowStaleServe: true,

@@ -5,10 +5,11 @@
  * resolver the detail modal uses. Until both resolve (or if either can't) the
  * generic type label stands, as before; collateral rides on a meta line.
  */
-import { useEffect, useState } from 'react';
+import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { loadContractLocationName } from './contractLocationName';
 import { CONTRACT_TYPE_KEY } from './contractLabels';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { CONTRACT_ISK_CENTS_BELOW, formatIskAuto } from '@/lib/isk';
 import type { Contract } from '@/esi/endpoints';
 
@@ -26,21 +27,18 @@ export function ContractIdentity({
   const { t } = useTranslation();
   const untitledCourier = isUntitledCourier(contract);
   const { start_location_id: startId, end_location_id: endId } = contract;
-  const [route, setRoute] = useState<{ start: string | null; end: string | null } | undefined>();
-
-  useEffect(() => {
-    if (!untitledCourier || characterId === null || !startId || !endId) return;
-    let cancelled = false;
-    void Promise.all([
-      loadContractLocationName(characterId, startId),
-      loadContractLocationName(characterId, endId),
-    ]).then(([start, end]) => {
-      if (!cancelled) setRoute({ start, end });
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [untitledCourier, characterId, startId, endId]);
+  const eligible = untitledCourier && characterId !== null && !!startId && !!endId;
+  const loadRoute = useCallback(async () => {
+    const [start, end] = await Promise.all([
+      loadContractLocationName(characterId ?? 0, startId ?? 0),
+      loadContractLocationName(characterId ?? 0, endId ?? 0),
+    ]);
+    return { start, end };
+  }, [characterId, startId, endId]);
+  const route = useKeyedLoad(
+    eligible ? `${characterId}:${startId}:${endId}` : null,
+    loadRoute
+  ).data;
 
   if (!untitledCourier) return <>{contract.title || t(CONTRACT_TYPE_KEY[contract.type])}</>;
 

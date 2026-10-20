@@ -1,128 +1,81 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getTradeHub } from '@/market/hubs';
-import {
-  loadHubSnapshotRange,
-  miningPricesUrl,
-  parseMiningPricesMonth,
-  resetHubSnapshotCache,
-} from './hubSnapshot';
+import { loadHubSnapshotRange } from './hubSnapshot';
+import { openPricesUrl, resetMarketOpenPricesCache } from './marketOpenPrices';
 
 const fetchMock = vi.fn();
 
-function serve(objects: Record<string, unknown>, failing: string[] = []) {
+function serve(objects: Record<number, unknown>, failing: number[] = []) {
   fetchMock.mockImplementation(async (url: string) => {
-    if (failing.includes(url)) return new Response('boom', { status: 500 });
-    if (!(url in objects)) return new Response('', { status: 404 });
-    return new Response(JSON.stringify(objects[url]), { status: 200 });
+    const typeId = Number(url.match(/open-prices\/(\d+)\.json$/)?.[1]);
+    if (failing.includes(typeId)) return new Response('boom', { status: 500 });
+    if (!(typeId in objects)) return new Response('', { status: 404 });
+    return new Response(JSON.stringify(objects[typeId]), { status: 200 });
   });
 }
 
 const jita = getTradeHub('jita')!;
 const amarr = getTradeHub('amarr')!;
-const url = (hub = jita, month: string) => miningPricesUrl(hub, month);
 
 beforeEach(() => {
-  resetHubSnapshotCache();
+  resetMarketOpenPricesCache();
   fetchMock.mockReset();
   vi.stubGlobal('fetch', fetchMock);
 });
 afterEach(() => vi.unstubAllGlobals());
 
 describe('loadHubSnapshotRange', () => {
-  it('splits days by tier and reads only the days in range', async () => {
+  it("reads the hub station's open prices as saved days, only the days in range", async () => {
     serve({
-      [url(jita, '2026-09')]: {
-        hub: 'jita',
-        month: '2026-09',
-        days: {
-          '2026-09-23': { tier: 'saved', prices: { 34: [9, 9] } }, // before the range
-          '2026-09-24': { tier: 'saved', prices: { 34: [3.6, 3.8], 35: [null, 7] } },
-          '2026-09-25': { tier: 'historical', prices: { 34: [1, 2] } },
+      34: {
+        typeId: 34,
+        dates: ['2026-09-23', '2026-09-24', '2026-09-25'],
+        stations: {
+          [jita.stationId]: { buy: [9, 3.6, null], sell: [9, 3.8, null] },
+          [amarr.stationId]: { buy: [1, 1, 1], sell: [1, 1, 1] },
         },
+      },
+      35: {
+        typeId: 35,
+        dates: ['2026-09-24'],
+        stations: { [jita.stationId]: { buy: [null], sell: [7] } },
       },
     });
 
-    const result = await loadHubSnapshotRange('2026-09-24', '2026-09-25');
+    const result = await loadHubSnapshotRange('2026-09-24', '2026-09-25', [34, 35]);
 
+    expect(fetchMock.mock.calls.map(([u]) => u)).toEqual([openPricesUrl(34), openPricesUrl(35)]);
     expect(result.saved.get('2026-09-24')?.get(34)).toEqual({ buy: 3.6, sell: 3.8 });
     expect(result.saved.get('2026-09-24')?.get(35)).toEqual({ buy: null, sell: 7 });
-    expect(result.historical.get('2026-09-25')?.get(34)).toEqual({ buy: 1, sell: 2 });
+    // Neither side priced at the station that day: no day at all.
+    expect(result.saved.has('2026-09-25')).toBe(false);
     expect(result.saved.has('2026-09-23')).toBe(false);
   });
 
-  it('reads every month object a range spans, and a missing month is just empty', async () => {
-    serve({
-      [url(amarr, '2026-08')]: {
-        days: { '2026-08-31': { tier: 'saved', prices: { 34: [1, 2] } } },
-      },
-      [url(amarr, '2026-10')]: {
-        days: { '2026-10-01': { tier: 'saved', prices: { 34: [5, 6] } } },
-      },
-    });
+  it('treats a missing, failed or malformed object as no days and retries a failure next time', async () => {
+    serve({ 35: { dates: 'nope' } }, [34]);
 
-    const result = await loadHubSnapshotRange('2026-08-31', '2026-10-01', amarr);
-
-    expect(fetchMock.mock.calls.map(([u]) => u)).toEqual([
-      url(amarr, '2026-08'),
-      url(amarr, '2026-09'),
-      url(amarr, '2026-10'),
-    ]);
-    expect([...result.saved.keys()]).toEqual(['2026-08-31', '2026-10-01']);
-  });
-
-  it('crosses a year boundary', async () => {
-    serve({});
-    await loadHubSnapshotRange('2026-12-31', '2027-01-01');
-    expect(fetchMock.mock.calls.map(([u]) => u)).toEqual([
-      url(jita, '2026-12'),
-      url(jita, '2027-01'),
-    ]);
-  });
-
-  it('treats a failed or malformed month as empty and retries a failure next time', async () => {
-    serve({ [url(jita, '2026-09')]: { days: 'nope' } }, [url(jita, '2026-10')]);
-
-    const first = await loadHubSnapshotRange('2026-09-30', '2026-10-01');
+    const first = await loadHubSnapshotRange('2026-10-01', '2026-10-01', [34, 35, 36]);
     expect(first.saved.size).toBe(0);
 
     serve({
-      [url(jita, '2026-10')]: {
-        days: { '2026-10-01': { tier: 'saved', prices: { 34: [1, 2] } } },
-      },
+      34: { dates: ['2026-10-01'], stations: { [jita.stationId]: { buy: [1], sell: [2] } } },
     });
-    const second = await loadHubSnapshotRange('2026-10-01', '2026-10-01');
+    const second = await loadHubSnapshotRange('2026-10-01', '2026-10-01', [34]);
     expect(second.saved.get('2026-10-01')?.get(34)).toEqual({ buy: 1, sell: 2 });
   });
 
-  it('holds a good month so a second read costs no fetch', async () => {
-    serve({ [url(jita, '2026-10')]: { days: {} } });
-    await loadHubSnapshotRange('2026-10-01', '2026-10-02');
-    await loadHubSnapshotRange('2026-10-03', '2026-10-04');
+  it('holds a good object so a second read costs no fetch, and reads each type once', async () => {
+    serve({ 34: { dates: ['2026-10-01'], stations: {} } });
+    await loadHubSnapshotRange('2026-10-01', '2026-10-02', [34, 34]);
+    await loadHubSnapshotRange('2026-10-03', '2026-10-04', [34], amarr);
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it('is empty without fetching when the range is backwards', async () => {
-    const result = await loadHubSnapshotRange('2026-09-24', '2026-09-01');
-    expect(result).toEqual({ saved: new Map(), historical: new Map() });
+  it('is empty without fetching when the range is backwards or there are no types', async () => {
+    const empty = { saved: new Map() };
+    expect(await loadHubSnapshotRange('2026-09-24', '2026-09-01', [34])).toEqual(empty);
+    expect(await loadHubSnapshotRange('2026-09-01', '2026-09-24', [])).toEqual(empty);
     expect(fetchMock).not.toHaveBeenCalled();
-  });
-});
-
-describe('parseMiningPricesMonth', () => {
-  it('skips malformed days and prices', () => {
-    const parsed = parseMiningPricesMonth({
-      days: {
-        '2026-10-01': { tier: 'saved', prices: { 34: [1, 2], 35: ['x', 2], abc: [1, 1] } },
-        '2026-10-02': { tier: 'other', prices: {} },
-        nope: { tier: 'saved', prices: {} },
-      },
-    });
-    expect([...parsed.keys()]).toEqual(['2026-10-01']);
-    expect([...parsed.get('2026-10-01')!.prices.keys()]).toEqual([34]);
-  });
-
-  it('is empty for something that is not a month object', () => {
-    expect(parseMiningPricesMonth(null).size).toBe(0);
-    expect(parseMiningPricesMonth([]).size).toBe(0);
   });
 });

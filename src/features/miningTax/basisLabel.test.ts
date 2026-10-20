@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import '@/i18n';
 import i18n from '@/i18n';
-import { basisSummary, basisUsage, valueButtonLabel } from './basisLabel';
+import { basisPriceHint, basisSummary, valueButtonLabel } from './basisLabel';
 
 describe('valueButtonLabel', () => {
   it('is just the basis at the default 100% rate', () => {
@@ -35,34 +35,34 @@ describe('basisSummary', () => {
   });
 });
 
-describe('basisUsage', () => {
-  const counts = { total: 6, saved: 6, historical: 0, average: 0, live: 0, none: 0 };
+describe('basisPriceHint', () => {
+  const TODAY = '2026-09-20';
 
-  it('counts saved days when nothing fell back', () => {
-    expect(basisUsage(i18n.t, 'buy', counts)).toBe('6 of 6 days use saved prices');
+  it('says today or yesterday may be live until the day is published', () => {
+    expect(basisPriceHint(i18n.t, 'buy', 100, '2026-09-19', TODAY)).toBe(
+      "Jita buy on 2026-09-19, not today's price. Raw ore is priced as its compressed form. Until that day's closing price is published, it uses today's live price."
+    );
+    expect(basisPriceHint(i18n.t, 'now-buy', 100, TODAY, TODAY)).not.toContain('Until');
   });
 
-  it('singular for one day', () => {
-    expect(basisUsage(i18n.t, 'buy', { ...counts, total: 1, saved: 1 })).toBe(
-      '1 of 1 day uses saved prices'
+  it('names the chosen side on the day mined', () => {
+    expect(basisPriceHint(i18n.t, 'sell', 100, '2026-09-08', TODAY)).toBe(
+      "Jita sell on 2026-09-08, not today's price. Raw ore is priced as its compressed form."
     );
   });
 
-  it('names each fallback source', () => {
-    expect(
-      basisUsage(i18n.t, 'sell', {
-        total: 9,
-        saved: 4,
-        historical: 1,
-        average: 2,
-        live: 1,
-        none: 1,
-      })
-    ).toBe('4 of 9 days use saved prices, 1 historical, 2 daily avg, 1 live, 1 unpriced');
+  it('folds the rate in below 100%', () => {
+    expect(basisPriceHint(i18n.t, 'buy', 90, '2026-09-08', TODAY)).toBe(
+      "90% of Jita buy on 2026-09-08, not today's price. Raw ore is priced as its compressed form."
+    );
   });
 
-  it('is empty under a now basis or with no days', () => {
-    expect(basisUsage(i18n.t, 'now-buy', counts)).toBe('');
-    expect(basisUsage(i18n.t, 'buy', { ...counts, total: 0, saved: 0 })).toBe('');
+  it("says a now basis uses today's live price, not the mined day's", () => {
+    expect(basisPriceHint(i18n.t, 'now-buy', 100, '2026-09-08', TODAY)).toBe(
+      "Today's live Jita buy price, not the price on 2026-09-08. Raw ore is priced as its compressed form."
+    );
+    expect(basisPriceHint(i18n.t, 'now-sell', 90, '2026-09-08', TODAY)).toBe(
+      "90% of today's live Jita sell price, not the price on 2026-09-08. Raw ore is priced as its compressed form."
+    );
   });
 });

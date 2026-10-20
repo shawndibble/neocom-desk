@@ -215,7 +215,6 @@ export const RETENTION_GROUPS: readonly RetentionGroup[] = [
       'moonTax',
       'ledger',
       'wallet',
-      'prices',
       'netWorth',
       'jobs',
       'alerts',

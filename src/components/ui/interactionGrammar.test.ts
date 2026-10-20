@@ -162,16 +162,20 @@ describe('interaction grammar source guards (DESIGN.md §6c)', () => {
     // entries as menus are removed. (`DataTable`'s `rowMoreActions` column lives
     // in src/components/ui and is not scanned.)
     const audited = [
-      'src/features/character/assetBrowserRows.tsx',
+      'src/features/assets/assetBrowserRows.tsx',
       // My ships rows: Show info, Show fitting, Plan route, Open location assets; the row click holds only Show info.
-      'src/features/character/MyShipsView.tsx',
+      'src/features/assets/MyShipsView.tsx',
       // Admin's Member rows: Make admin… and Remove…, reachable nowhere else.
       'src/features/communities/CommunityMemberList.tsx',
+      'src/features/fittings/AddCargoTab.tsx',
+      'src/features/fittings/AddChargesTab.tsx',
       'src/features/fittings/FittingAddPanel.tsx',
       'src/features/fittings/FittingRackList.tsx',
+      'src/features/fittings/RackListParts.tsx',
       'src/features/fittings/FittingStartScreen.tsx',
-      'src/features/fittings/FittingStatsSections.tsx',
-      'src/features/industry/BuildPlanList.tsx',
+      'src/features/fittings/stats/OffenseRows.tsx',
+      'src/features/industry/BuildGroupHeader.tsx',
+      'src/features/industry/BuildPlanRow.tsx',
       'src/features/market/ItemContextMenu.tsx',
       // Item Detail's header below md: Open market in EVE and View in Market, the modal's own actions.
       'src/features/market/ItemDetailModal.tsx',

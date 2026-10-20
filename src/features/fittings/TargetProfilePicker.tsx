@@ -9,8 +9,6 @@ import { useTranslation } from 'react-i18next';
 import {
   Button,
   FieldError,
-  IconButton,
-  Modal,
   Select,
   SelectContent,
   SelectGroup,
@@ -21,7 +19,6 @@ import {
   SelectValue,
   TextInput,
 } from '@/components/ui';
-import * as Icon from '@/components/ui/icons';
 import {
   BUILT_IN_TARGET_PROFILES,
   isValidTargetProfile,
@@ -45,6 +42,7 @@ import {
   useTargetProfileName,
   type TargetProfiles,
 } from './targetProfiles';
+import { ManageCustomProfilesModal } from './ManageCustomProfilesModal';
 import { StatField } from './StatFacts';
 import { STAT_FIELD_WIDTH } from './statKit';
 
@@ -222,73 +220,35 @@ function ManageProfilesModal({
   targetProfiles: TargetProfiles;
 }) {
   const { t } = useTranslation();
-  const [draft, setDraft] = useState<Draft | null>(null);
   const { custom, saveCustom, deleteCustom } = targetProfiles;
-
-  function close() {
-    setDraft(null);
-    onClose();
-  }
-
   return (
-    <Modal open={open} onClose={close} title={t('fittings.targetProfile.manageTitle')}>
-      <div className="space-y-3">
-        {custom.length === 0 ? (
-          <p className="text-sm text-text-dim">{t('fittings.targetProfile.empty')}</p>
-        ) : (
-          <ul className="space-y-1">
-            {custom.map((profile) => (
-              <li key={profile.id} className="flex items-center gap-2 rounded-xs bg-panel-2 p-1.5">
-                <span className="min-w-0 flex-1 truncate text-sm">{profile.name}</span>
-                <span className="shrink-0 text-xs text-text-dim">
-                  {t('fittings.targetProfile.summary', {
-                    signature: profile.signatureRadius,
-                    velocity: profile.velocity,
-                  })}
-                  {profile.resists &&
-                    t('fittings.targetProfile.resistSummary', {
-                      resists: resistSummary(profile.resists),
-                    })}
-                </span>
-                <IconButton
-                  variant="plain"
-                  size="sm"
-                  icon={<Icon.Rename />}
-                  label={t('fittings.targetProfile.edit', { name: profile.name })}
-                  onClick={() => setDraft(draftOf(profile))}
-                />
-                <IconButton
-                  variant="plain"
-                  size="sm"
-                  tone="danger"
-                  icon={<Icon.Close />}
-                  label={t('fittings.targetProfile.delete', { name: profile.name })}
-                  onClick={() => {
-                    deleteCustom(profile.id);
-                    if (draft?.id === profile.id) setDraft(null);
-                  }}
-                />
-              </li>
-            ))}
-          </ul>
-        )}
-        {draft ? (
-          <ProfileForm
-            key={draft.id ?? 'new'}
-            draft={draft}
-            onCancel={() => setDraft(null)}
-            onSave={(profile) => {
-              saveCustom(profile);
-              setDraft(null);
-            }}
-          />
-        ) : (
-          <Button size="sm" onClick={() => setDraft(EMPTY_DRAFT)}>
-            {t('fittings.targetProfile.add')}
-          </Button>
-        )}
-      </div>
-    </Modal>
+    <ManageCustomProfilesModal
+      open={open}
+      onClose={onClose}
+      title={t('fittings.targetProfile.manageTitle')}
+      emptyLabel={t('fittings.targetProfile.empty')}
+      addLabel={t('fittings.targetProfile.add')}
+      editLabel={(name) => t('fittings.targetProfile.edit', { name })}
+      deleteLabel={(name) => t('fittings.targetProfile.delete', { name })}
+      custom={custom}
+      saveCustom={saveCustom}
+      deleteCustom={deleteCustom}
+      summary={(profile) => (
+        <>
+          {t('fittings.targetProfile.summary', {
+            signature: profile.signatureRadius,
+            velocity: profile.velocity,
+          })}
+          {profile.resists &&
+            t('fittings.targetProfile.resistSummary', {
+              resists: resistSummary(profile.resists),
+            })}
+        </>
+      )}
+      draftOf={draftOf}
+      emptyDraft={EMPTY_DRAFT}
+      renderForm={(props) => <ProfileForm {...props} />}
+    />
   );
 }
 

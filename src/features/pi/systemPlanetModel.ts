@@ -33,7 +33,7 @@ import type { PiData, PiRawResource } from '@/sde/types';
 import { extractorState } from '@/engine/pi/colonyStatus';
 import { hasYieldBaseline, sustainedRatePerHour } from '@/engine/pi/extraction';
 import type { PinLoad } from '@/engine/pi/types';
-import { colonyBudget } from './colonyBudget';
+import { colonyBudget } from './colonyBudgetModel';
 import {
   colonyPinLoad,
   extractorExpiryMs,

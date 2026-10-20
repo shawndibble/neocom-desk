@@ -9,8 +9,7 @@
  * station rather than region-wide since 20261019-004148-open-prices-at-the-hub-station-not-region).
  *
  * Pure and dependency-free (no Firestore, fetch or relative imports) so the
- * daily function and the one-off backfill script share exactly this code and
- * it runs under plain Node type stripping too.
+ * code stays trivially testable.
  */
 
 /** Days kept per document; the oldest entries drop first. */
@@ -41,7 +40,7 @@ export interface OpenPrice {
   sell: number | null;
 }
 
-/** One station's (or, in an old object, one region's) prices in a type object, parallel to its `dates`; `null` where that side had no order that day. */
+/** One station's prices in a type object, parallel to its `dates`; `null` where that side had no order that day. */
 export interface OpenPriceSeries {
   buy: Array<number | null>;
   sell: Array<number | null>;
@@ -54,12 +53,6 @@ export interface TypeOpenPrices {
   dates: string[];
   /** Keyed by hub station id; a station with no price in any kept day is absent. */
   stations: Record<string, OpenPriceSeries>;
-  /**
-   * Transitional (#4279): the region-wide days an object written before the
-   * station change still holds, keyed by region id and null on every station
-   * day. Absent once the backfill re-run has rewritten them.
-   */
-  regions?: Record<string, OpenPriceSeries>;
 }
 
 export function openPriceDocId(typeId: number): string {
@@ -352,8 +345,8 @@ export interface TypeDays {
   days: TypeDay[];
 }
 
-/** What `mergeDays` accepts as the stored object: either shape, or both mid-transition, or junk. */
-export type StoredTypeOpenPrices = Partial<Pick<TypeOpenPrices, 'dates' | 'stations' | 'regions'>>;
+/** What `mergeDays` accepts as the stored object: possibly junk, so every field is optional. */
+export type StoredTypeOpenPrices = Partial<Pick<TypeOpenPrices, 'dates' | 'stations'>>;
 
 function priceAt(values: unknown, i: number): number | null {
   if (!Array.isArray(values)) return null;
@@ -361,7 +354,7 @@ function priceAt(values: unknown, i: number): number | null {
   return typeof v === 'number' && Number.isFinite(v) ? v : null;
 }
 
-/** The prices stored at index `i` of a `stations` or `regions` map, keyed as stored. */
+/** The prices stored at index `i` of a `stations` map, keyed as stored. */
 function pricesAt(stored: unknown, i: number): Map<string, OpenPrice> {
   const out = new Map<string, OpenPrice>();
   if (typeof stored !== 'object' || stored === null) return out;
@@ -375,27 +368,17 @@ function pricesAt(stored: unknown, i: number): Map<string, OpenPrice> {
   return out;
 }
 
-type StoredDay = { shape: 'stations' | 'regions'; prices: Map<string, OpenPrice> };
-
 function seriesOf(
   dates: readonly string[],
-  byDate: ReadonlyMap<string, StoredDay>,
-  shape: StoredDay['shape']
+  byDate: ReadonlyMap<string, Map<string, OpenPrice>>
 ): Record<string, OpenPriceSeries> {
   const ids = new Set<string>();
-  for (const date of dates) {
-    const day = byDate.get(date)!;
-    if (day.shape === shape) for (const id of day.prices.keys()) ids.add(id);
-  }
-  const at = (date: string, id: string): OpenPrice | undefined => {
-    const day = byDate.get(date)!;
-    return day.shape === shape ? day.prices.get(id) : undefined;
-  };
+  for (const date of dates) for (const id of byDate.get(date)!.keys()) ids.add(id);
   const out: Record<string, OpenPriceSeries> = {};
   for (const id of [...ids].sort()) {
     out[id] = {
-      buy: dates.map((d) => at(d, id)?.buy ?? null),
-      sell: dates.map((d) => at(d, id)?.sell ?? null),
+      buy: dates.map((d) => byDate.get(d)!.get(id)?.buy ?? null),
+      sell: dates.map((d) => byDate.get(d)!.get(id)?.sell ?? null),
     };
   }
   return out;
@@ -409,62 +392,24 @@ function seriesOf(
  * entry (no invented gaps); a `null` means that station had no order on that
  * side that day. A stored array that falls short reads as null, and a station
  * left with no price at all is dropped.
- *
- * The region-wide transition (#4279): each date holds one shape. A stored
- * date with region prices (and no station prices) is kept as a region day
- * under `regions`, so the daily job writing into an object the old backfill
- * wrote loses no history; a station day for that date replaces it, so the
- * backfill re-run rewrites every region day, and `regions` is left out once
- * none remains (or the 400-day cap ages them out).
  */
 export function mergeDays(
   base: { typeId: number },
   existing: StoredTypeOpenPrices | null,
   days: readonly TypeDay[],
-  maxDays = MARKET_OPEN_PRICES_MAX_DAYS,
-  keepRegions = true
+  maxDays = MARKET_OPEN_PRICES_MAX_DAYS
 ): TypeOpenPrices {
-  const byDate = new Map<string, StoredDay>();
+  const byDate = new Map<string, Map<string, OpenPrice>>();
   if (existing && Array.isArray(existing.dates)) {
     existing.dates.forEach((date, i) => {
       if (typeof date !== 'string') return;
       const stations = pricesAt(existing.stations, i);
-      if (stations.size > 0) {
-        byDate.set(date, { shape: 'stations', prices: stations });
-        return;
-      }
-      const regions = keepRegions ? pricesAt(existing.regions, i) : new Map<string, OpenPrice>();
-      if (regions.size > 0) byDate.set(date, { shape: 'regions', prices: regions });
+      if (stations.size > 0) byDate.set(date, stations);
     });
   }
-  for (const day of days) {
-    byDate.set(day.date, { shape: 'stations', prices: new Map(Object.entries(day.stations)) });
-  }
+  for (const day of days) byDate.set(day.date, new Map(Object.entries(day.stations)));
   const dates = [...byDate.keys()].sort().slice(-maxDays);
-  const out: TypeOpenPrices = {
-    typeId: base.typeId,
-    dates,
-    stations: seriesOf(dates, byDate, 'stations'),
-  };
-  const regions = seriesOf(dates, byDate, 'regions');
-  if (Object.keys(regions).length > 0) out.regions = regions;
-  return out;
-}
-
-/**
- * `mergeDays` for the backfill re-run: every stored region-wide day is
- * dropped, inside the run's dates or not, so each object it writes leaves in
- * the station shape. A day with no order at the station has no point, rather
- * than keeping a region-wide one. An object for a type with no station price
- * in the whole run is not written and keeps its region days; the client stops
- * reading those once the old-shape read is removed.
- */
-export function rewriteDays(
-  base: { typeId: number },
-  existing: StoredTypeOpenPrices | null,
-  days: readonly TypeDay[]
-): TypeOpenPrices {
-  return mergeDays(base, existing, days, MARKET_OPEN_PRICES_MAX_DAYS, false);
+  return { typeId: base.typeId, dates, stations: seriesOf(dates, byDate) };
 }
 
 /** Regroups per-day station folds by type object, days ascending. Folds may be passed in any order. */

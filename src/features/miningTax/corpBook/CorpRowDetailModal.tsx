@@ -2,7 +2,7 @@ import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, InfoTooltip, Modal } from '@/components/ui';
-import { SecurityValue } from '@/features/character/assetBrowserRows';
+import { SecurityValue } from '@/features/assets/assetBrowserRows';
 import { CharacterLink, SystemLink } from '@/features/entities';
 import { formatAge } from '@/lib/age';
 import { cx } from '@/lib/cx';

@@ -6,6 +6,7 @@
  */
 import { scalePx } from '@/lib/fontScale';
 import { ChartTooltipShell } from '@/components/ui/ChartTooltipShell';
+import { Eyebrow } from '@/components/ui/Eyebrow';
 import {
   ResponsiveContainer,
   BarChart,
@@ -15,11 +16,9 @@ import {
   Tooltip,
   Legend,
   Bar,
-  Cell,
   LabelList,
   type TooltipContentProps,
 } from 'recharts';
-import type { PriceSource } from '@/engine/miningTax/priceBasis';
 import { useMemo, type ReactElement, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DataTable, Panel, type DataTableColumn } from '@/components/ui';
@@ -37,7 +36,6 @@ import {
   type ValueRanked,
 } from './topTypes';
 import type { DailyMetricPoint } from './chartAggregation';
-import { SOURCE_FILL } from './priceSourceTone';
 import { useMiningTaxCompressedOre } from './oreForm';
 import type { ChartMetric } from './chartMetricPref';
 import { formatDateTick } from '@/lib/formatDateTick';
@@ -45,11 +43,7 @@ import { formatDateTick } from '@/lib/formatDateTick';
 export interface DailyRatePoint {
   date: string;
   iskValue: number;
-  /** The day's weakest price source (issue #1279); null on a day with no mining. */
-  source: PriceSource | null;
 }
-
-const LEGEND_SOURCES: PriceSource[] = ['saved', 'historical', 'average', 'live'];
 
 export type TypeComparisonPoint = RankedType;
 
@@ -120,7 +114,7 @@ function metricRateSpec(metric: MetricKind): RateSpec {
   };
 }
 
-/** The daily-rate tooltip for every metric: the day, its figure, the basis, and (ISK only) the day's price source. */
+/** The daily-rate tooltip for every metric: the day, its figure and the basis. */
 export function RateTooltip({
   active,
   payload,
@@ -141,12 +135,6 @@ export function RateTooltip({
         {t(spec.valueLabelKey)}: {spec.tooltip(spec.valueOf(point as never))}
       </p>
       <p className="text-text-dim">{t(spec.basisKey)}</p>
-      {metric === 'isk' && point.source && (
-        <p>
-          {t('miningTax.overview.sourceColumn')}:{' '}
-          {t(`miningTax.overview.priceSource.${point.source}`)}
-        </p>
-      )}
     </ChartTooltipShell>
   );
 }
@@ -237,8 +225,6 @@ function stripCompressedPrefix(name: string, compressed: boolean): string {
 }
 
 const TICK_STYLE = { fontSize: '0.6875rem', fill: 'var(--color-text-dim)' } as const;
-const PANEL_TITLE_CLASS =
-  'mb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
 
 interface RatePanelProps<P> {
   title: string;
@@ -251,10 +237,8 @@ interface RatePanelProps<P> {
   /** SVG axis text: IskAmount can't render inside the chart (documented exception). */
   tickFormatter: (value: number) => string;
   tooltip: (props: TooltipContentProps) => ReactElement;
-  /** The `<Bar>` (and its per-day `<Cell>`s). */
+  /** The `<Bar>`. */
   bars: ReactNode;
-  /** Under the screen-reader table, e.g. the ISK chart's price-source legend. */
-  footer?: ReactNode;
 }
 
 /** The daily-rate card: a bar per day over a screen-reader table of the same rows. */
@@ -268,11 +252,10 @@ function RatePanel<P>({
   tickFormatter,
   tooltip,
   bars,
-  footer,
 }: RatePanelProps<P>) {
   return (
     <Panel padded>
-      <p className={PANEL_TITLE_CLASS}>{title}</p>
+      <Eyebrow className="mb-1">{title}</Eyebrow>
       <p className="mb-1 text-[0.6875rem] text-text-dim">{basis}</p>
       <div role="img" aria-label={title} className="h-64 w-full">
         <ResponsiveContainer width="100%" height="100%">
@@ -303,7 +286,6 @@ function RatePanel<P>({
       <div className="sr-only">
         <DataTable columns={columns} responsive="table" rows={rows} rowKey={rowKey} label={title} />
       </div>
-      {footer}
     </Panel>
   );
 }
@@ -344,7 +326,7 @@ function ComparePanel<B, R>({
   const compressed = useMiningTaxCompressedOre((state) => state.value);
   return (
     <Panel padded>
-      <p className={PANEL_TITLE_CLASS}>{title}</p>
+      <Eyebrow className="mb-1">{title}</Eyebrow>
       <div role="img" aria-label={title} className="w-full" style={{ height }}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
@@ -441,12 +423,6 @@ function MetricChartPair({
         header: t('miningTax.overview.iskDay'),
         render: (point) => `${formatIsk(point.iskValue, 0)} ISK`,
       },
-      {
-        id: 'source',
-        header: t('miningTax.overview.sourceColumn'),
-        render: (point) =>
-          point.source ? t(`miningTax.overview.priceSource.${point.source}`) : '',
-      },
     ],
     [t]
   );
@@ -525,25 +501,12 @@ function MetricChartPair({
           tickFormatter={formatIskCompact}
           tooltip={rateTooltip}
           bars={
-            <Bar isAnimationActive={false} dataKey="iskValue" name={t(rateSpec.valueLabelKey)}>
-              {dailyRate.map((point) => (
-                <Cell key={point.date} fill={SOURCE_FILL[point.source ?? 'saved']} />
-              ))}
-            </Bar>
-          }
-          footer={
-            <ul className="mt-1 flex flex-wrap gap-x-3.5 text-[0.6875rem] text-text-dim">
-              {LEGEND_SOURCES.map((source) => (
-                <li key={source} className="flex items-center gap-1">
-                  <span
-                    aria-hidden="true"
-                    className="size-2"
-                    style={{ background: SOURCE_FILL[source] }}
-                  />
-                  {t(`miningTax.overview.priceSource.${source}`)}
-                </li>
-              ))}
-            </ul>
+            <Bar
+              isAnimationActive={false}
+              dataKey="iskValue"
+              name={t(rateSpec.valueLabelKey)}
+              fill="var(--color-accent)"
+            />
           }
         />
       ) : (

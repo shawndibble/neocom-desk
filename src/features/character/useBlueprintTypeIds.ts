@@ -8,8 +8,9 @@
  * session, so the Assets page's lazily loaded Build Plan catalog reuses the
  * same fetch rather than repeating it.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { mayBeBlueprintName } from '@/engine/blueprintKind';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { loadBlueprints } from '@/sde/loadSde';
 import type { BlueprintMap } from '@/sde/types';
 
@@ -22,6 +23,8 @@ function blueprintTypeIdSet(source: BlueprintMap): ReadonlySet<number> {
   return built.ids;
 }
 
+const loadBlueprintTypeIds = () => loadBlueprints().then(blueprintTypeIdSet);
+
 /**
  * The set once loaded; null while still loading, on a failed load (a missing
  * BPO badge is not worth an error), or when no name in `typeNames` — the
@@ -32,20 +35,6 @@ export function useBlueprintTypeIds(
   typeNames: ReadonlyMap<number, string>
 ): ReadonlySet<number> | null {
   const enabled = useMemo(() => [...typeNames.values()].some(mayBeBlueprintName), [typeNames]);
-  const [ids, setIds] = useState<ReadonlySet<number> | null>(null);
-
-  useEffect(() => {
-    if (!enabled || ids !== null) return;
-    let cancelled = false;
-    loadBlueprints()
-      .then((source) => {
-        if (!cancelled) setIds(blueprintTypeIdSet(source));
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [enabled, ids]);
-
-  return enabled ? ids : null;
+  const { data } = useKeyedLoad(enabled ? 'blueprints' : null, loadBlueprintTypeIds);
+  return data ?? null;
 }

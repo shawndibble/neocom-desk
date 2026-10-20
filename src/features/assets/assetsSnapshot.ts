@@ -3,7 +3,7 @@ import {
   loadOtherCharactersAssetsDetailed,
   type SkippedCharacterAssets,
   type OtherCharacterAssets,
-} from '@/features/character/assets';
+} from '@/features/assets/assets';
 import type { CachedResult } from '@/esi/cache';
 import { loadStationName } from '@/features/character/stations';
 import { loadStructureName } from '@/features/character/structures';
@@ -12,7 +12,7 @@ import { loadTypeNames, loadTypeVolumes } from '@/features/character/typeNames';
 import { type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import type { CharacterAsset } from '@/esi/endpoints';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
-import { loadAssetCopyValues } from '@/features/character/assetCopyValues';
+import { loadAssetCopyValues } from '@/features/assets/assetCopyValues';
 import { loadCharacterBlueprints } from '@/features/industry/data';
 import { getAveragePriceByType } from '@/market/prices';
 

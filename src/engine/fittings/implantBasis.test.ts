@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyImplantBasis, defaultImplantBasis } from './implantBasis';
+import { applyImplantBasis, cloneSeedSet, defaultImplantBasis } from './implantBasis';
 import type { Fitting, PilotProfile } from './types';
 
 function fitting(overrides: Partial<Fitting> = {}): Fitting {
@@ -62,5 +62,18 @@ describe('applyImplantBasis — booster side effects', () => {
       'fitting'
     );
     expect(result.boosterSideEffects).toEqual([2737]);
+  });
+});
+
+describe('cloneSeedSet', () => {
+  it('starts a plan from the clone on "My clone" with no set of the Fitting’s own', () => {
+    expect(cloneSeedSet('clone', undefined, [1, 2])).toEqual({ implants: [1, 2], boosters: [] });
+  });
+
+  it('has no seed once the Fitting carries a set, off the clone, or with an empty clone', () => {
+    const set = { implants: [3], boosters: [] };
+    expect(cloneSeedSet('clone', set, [1])).toBeUndefined();
+    expect(cloneSeedSet('fitting', undefined, [1])).toBeUndefined();
+    expect(cloneSeedSet('clone', undefined, [])).toBeUndefined();
   });
 });

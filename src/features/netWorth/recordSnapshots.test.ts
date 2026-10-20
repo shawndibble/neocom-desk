@@ -20,7 +20,7 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock('@/features/abyssal/abyssalEstimates', () => ({ lastKnownAbyssalValues: mocks.abyssal }));
 vi.mock('@/features/character/wallet', () => ({ loadWalletBalanceWithStatus: mocks.wallet }));
-vi.mock('@/features/character/assets', () => ({ loadCharacterAssets: mocks.assets }));
+vi.mock('@/features/assets/assets', () => ({ loadCharacterAssets: mocks.assets }));
 vi.mock('@/features/character/orders', () => ({ loadOrders: mocks.orders }));
 vi.mock('@/market/prices', () => ({
   getHubPrices: mocks.hubPrices,

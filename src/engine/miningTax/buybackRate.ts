@@ -3,7 +3,7 @@
  * percentage of Jita price rather than the full book, commonly around 90%.
  * One page-wide rate, not per character — 100 is off (full market price).
  *
- * A pure multiplier on price, unrelated to `PriceSource`/`pricedAll`: it says
+ * A pure multiplier on price, unrelated to `pricedAll`: it says
  * nothing about where a price came from, only what fraction of it is paid.
  */
 import type { EntryValuation } from './yieldValuation';

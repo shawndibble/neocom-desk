@@ -13,7 +13,7 @@
  * region had dozens.
  */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useCallback, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { InfoTooltip, IskAmount } from '@/components/ui';
@@ -25,6 +25,7 @@ import { buildMarketParams, marketNearbyParams } from '@/engine/market/urlState'
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { skillSellPrices, type SkillSellPrices } from './skillSellPrices';
 import { useHydratedStore } from '@/lib/useHydratedStore';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 
 const NEARBY_JUMPS = '10';
 
@@ -50,28 +51,20 @@ export function SkillPriceSection({
   // resolves.
   const priceKey = `${hub.id}:${typeID}`;
 
-  const [priceResult, setPriceResult] = useState<{
-    key: string;
-    prices: SkillSellPrices | 'failed';
-  } | null>(null);
-  useEffect(() => {
-    if (!hubHydrated) return;
-    let cancelled = false;
-    getOrderBook(hub.regionId, typeID).then(
-      (book) => {
-        if (!cancelled)
-          setPriceResult({ key: priceKey, prices: skillSellPrices(book.orders, hub.stationId) });
-      },
-      () => {
-        if (!cancelled) setPriceResult({ key: priceKey, prices: 'failed' });
-      }
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [hub, hubHydrated, typeID, priceKey]);
-
-  const prices = priceResult?.key === priceKey ? priceResult.prices : undefined;
+  const loadPrices = useCallback(
+    () =>
+      getOrderBook(hub.regionId, typeID).then((book) =>
+        skillSellPrices(book.orders, hub.stationId)
+      ),
+    [hub.regionId, hub.stationId, typeID]
+  );
+  const priceLoad = useKeyedLoad(priceKey, loadPrices, !hubHydrated);
+  const prices: SkillSellPrices | 'failed' | undefined =
+    priceLoad.status === 'ready'
+      ? priceLoad.data
+      : priceLoad.status === 'failed'
+        ? 'failed'
+        : undefined;
 
   function marketPrice(pick: (p: SkillSellPrices) => number | null): ReactNode {
     if (prices === undefined) return <span className="text-text-dim">{t('common.loading')}</span>;

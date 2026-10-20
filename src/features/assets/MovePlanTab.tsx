@@ -1,5 +1,6 @@
 import { idSetKey } from '@/lib/idSetKey';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useAsyncLoad } from '@/lib/useAsyncLoad';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, FilterChip, LiveStatus, Spinner } from '@/components/ui';
 import { buildHullCatalogue } from '@/engine/fittings/hullCatalogue';
@@ -8,7 +9,7 @@ import { planMove, type MoveHull, type PackHold } from '@/engine/assets/movePlan
 import {
   loadOtherCharactersAssetsDetailed,
   type SkippedCharacterAssets,
-} from '@/features/character/assets';
+} from '@/features/assets/assets';
 import { resolvePlace } from '@/features/places';
 import { loadTypeNames, loadTypePackagedVolumes } from '@/features/character/typeNames';
 import { usePilotProfile } from '@/features/fittings/fittingPilotProfile';
@@ -124,18 +125,36 @@ interface MovePlanTabProps {
  * Volumes and trips are an estimate from hull class; the Route Safety link
  * answers the safety question.
  */
-export function MovePlanTab({ onClose, characterIds, activeCharacterId }: MovePlanTabProps) {
+export function MovePlanTab(props: MovePlanTabProps) {
+  return <MovePlanTabBody key={idSetKey(props.characterIds)} {...props} />;
+}
+
+function MovePlanTabBody({ onClose, characterIds, activeCharacterId }: MovePlanTabProps) {
   const { t } = useTranslation();
-  const [loaded, setLoaded] = useState<Loaded | null>(null);
-  const [failed, setFailed] = useState(false);
+  // Frozen for this mount: a different Character set remounts the tab (`key` below).
+  const [ids] = useState(characterIds);
+  const loadIds = useCallback(() => load(ids), [ids]);
+  const { status, data: loaded = null } = useAsyncLoad(loadIds);
+  const failed = status === 'failed';
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [destSystem, setDestSystem] = useState<number | null>(null);
   const [destStation, setDestStation] = useState<number | null>(null);
   const [working, setWorking] = useState(false);
   const [result, setResult] = useState<PlanState | null>(null);
   const [compareOpen, setCompareOpen] = useState(false);
-  /** Collapsed pickup groups, `characterId:locationId`. */
-  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
+  /** The pilot's own folding; until they fold something, a long list opens folded. */
+  const [folded, setFolded] = useState<ReadonlySet<string> | null>(null);
+  /** Folded pickup groups, `characterId:locationId`. */
+  const collapsed = useMemo<ReadonlySet<string>>(
+    () =>
+      folded ??
+      new Set(
+        loaded && loaded.stacks.length > COLLAPSE_ABOVE
+          ? loaded.stacks.map((st) => `${st.characterId}:${st.locationId}`)
+          : []
+      ),
+    [folded, loaded]
+  );
   const [planFailed, setPlanFailed] = useState(false);
   /** Ships (itemID) the plan hauls packaged instead of flying. */
   const [packed, setPacked] = useState<ReadonlySet<number>>(new Set());
@@ -151,45 +170,17 @@ export function MovePlanTab({ onClose, characterIds, activeCharacterId }: MovePl
     skillsKnown: true,
   });
   const hullHolds = useRef(new Map<number, PackHold[]>());
-  const idsKey = idSetKey(characterIds);
   const focusAfterCommit = useFocusAfterCommit();
   const planHeadingRef = useRef<HTMLHeadingElement>(null);
   const deliverHeadingRef = useRef<HTMLHeadingElement>(null);
 
-  useEffect(() => {
-    let live = true;
-    /* eslint-disable react-hooks/set-state-in-effect -- reset for a new Character set */
-    setLoaded(null);
-    setFailed(false);
-    setSelected(new Set());
-    setResult(null);
-    setDestSystem(null);
-    setDestStation(null);
-    setCompareOpen(false);
-    setCollapsed(new Set());
-    setPlanFailed(false);
-    setPacked(new Set());
-    setWorking(false);
-    session.current += 1;
-    /* eslint-enable react-hooks/set-state-in-effect */
-    load(characterIds).then(
-      (data) => {
-        if (!live) return;
-        // A long list opens folded: the group headers are the overview.
-        if (data.stacks.length > COLLAPSE_ABOVE) {
-          setCollapsed(new Set(data.stacks.map((st) => `${st.characterId}:${st.locationId}`)));
-        }
-        setLoaded(data);
-      },
-      () => {
-        if (live) setFailed(true);
-      }
-    );
-    return () => {
-      live = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- idsKey stands for characterIds
-  }, [idsKey]);
+  // A new plan's work is dropped when this tab goes away.
+  useEffect(
+    () => () => {
+      session.current += 1;
+    },
+    []
+  );
 
   const grouped = useMemo(() => {
     const out = new Map<number, Map<number, PickerStack[]>>();
@@ -517,8 +508,8 @@ export function MovePlanTab({ onClose, characterIds, activeCharacterId }: MovePl
                 onToggle={toggle}
                 collapsed={collapsed}
                 onToggleCollapsed={(groupKey) =>
-                  setCollapsed((prev) => {
-                    const next = new Set(prev);
+                  setFolded(() => {
+                    const next = new Set(collapsed);
                     if (next.has(groupKey)) next.delete(groupKey);
                     else next.add(groupKey);
                     return next;

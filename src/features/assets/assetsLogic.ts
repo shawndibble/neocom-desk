@@ -1,4 +1,4 @@
-import { type PinState } from '@/features/character/stationPins';
+import { type PinState } from '@/features/assets/stationPins';
 import type { CharacterAsset } from '@/esi/endpoints';
 import type { JumpsAwayResult } from '@/engine/clone/jumpsAway';
 import {
@@ -7,7 +7,7 @@ import {
   type AssetTreeStation,
   type StationSortField,
 } from '@/engine/assetTree';
-import { type AssetSortField } from '@/features/character/assetSortPreference';
+import { type AssetSortField } from '@/features/assets/assetSortPreference';
 import { type AssetMatch } from '@/features/assets/assetBrowseModel';
 
 export type Translate = (key: string, opts?: Record<string, unknown>) => string;

@@ -1,6 +1,6 @@
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { cx } from '@/lib/cx';
-import { useEffect, useState } from 'react';
+import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -21,18 +21,13 @@ import { securityStatusColor, shownSecurity } from '@/engine/securityStatus';
 import { routeExposure } from '@/features/route/routeExposure';
 import { loadCharacterSolarSystemId } from '@/features/character/location';
 import { loadSystemNameAndSecurity } from '@/features/character/systemSecurity';
-import { useJumpBasis } from '@/features/route/jumpBasis';
+import { useSharedJumpBasis } from '@/features/route/jumpBasis';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { useNow } from '@/lib/useNow';
 import { getTradeHub, TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import { eveClock } from './colonies/coloniesFormat';
 import { EstimateBadge } from './DirectiveRow';
-import {
-  homeSystemId,
-  nearestHub,
-  routeFigures,
-  type NearestHub,
-  type RouteFigures,
-} from './sellRoute';
+import { homeSystemId, nearestHub, routeFigures, type RouteFigures } from './sellRoute';
 import { DEFAULT_BUYBACK_PCT, PI_BUYBACK_PCT_OPTIONS } from './piSettings';
 import { useSellHub } from './sellHub';
 
@@ -62,12 +57,6 @@ function EveTimeChip() {
   return <StatChip label={t('piPlan.strip.eveTime')} value={eveClock(now)} />;
 }
 
-interface Home {
-  systemId: number;
-  name: string | null;
-  security: number | null;
-}
-
 /**
  * The strip under the PI tabs, shared by all three: one slim row with the sell
  * market, the nearest-hub nudge, an Est. chip and an "i" popover holding where
@@ -85,28 +74,21 @@ export function PiHeaderStrip({
 }: Props) {
   const { t } = useTranslation();
   const { hub, buybackPct, hubChosen, setHub, setBuyback, keepHub } = useSellHub();
-  const basis = useJumpBasis();
+  const basis = useSharedJumpBasis();
   const colonyHome = homeSystemId(colonySystemIds);
-  const [located, setLocated] = useState<{
-    characterId: number;
-    systemId: number | null;
-  } | null>(null);
-  useEffect(() => {
-    if (colonyHome !== null || locationCharacterId === null) return;
-    let cancelled = false;
-    void loadCharacterSolarSystemId(locationCharacterId)
-      .catch(() => null)
-      .then((systemId) => {
-        if (!cancelled) setLocated({ characterId: locationCharacterId, systemId });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [colonyHome, locationCharacterId]);
-  const locationId =
-    colonyHome === null && located !== null && located.characterId === locationCharacterId
-      ? located.systemId
-      : null;
+  const locateLoader = useCallback(
+    () =>
+      locationCharacterId === null
+        ? Promise.resolve(null)
+        : loadCharacterSolarSystemId(locationCharacterId).catch(() => null),
+    [locationCharacterId]
+  );
+  const located = useKeyedLoad(
+    locationCharacterId === null ? null : `located:${locationCharacterId}`,
+    locateLoader,
+    colonyHome !== null
+  );
+  const locationId = colonyHome === null ? (located.data ?? null) : null;
   // Where the route and the nearest-hub nudge start: the colonies, else the pilot.
   const homeId = colonyHome ?? locationId;
   // With no colony, the chips say where the figures start: here, not home.
@@ -114,56 +96,45 @@ export function PiHeaderStrip({
     colonyHome === null && homeId !== null
       ? { home: 'location', route: 'routeFromHere', dropOff: 'dropOffHere' }
       : { home: 'home', route: 'route', dropOff: 'dropOff' };
-  const [home, setHome] = useState<Home | null>(null);
-  const [route, setRoute] = useState<{ key: string; figures: RouteFigures | null } | null>(null);
+  const homeLoader = useCallback(
+    () =>
+      homeId === null
+        ? Promise.resolve({ name: null, security: null })
+        : loadSystemNameAndSecurity(homeId).catch(() => ({ name: null, security: null })),
+    [homeId]
+  );
+  const home = useKeyedLoad(homeId === null ? null : String(homeId), homeLoader);
 
-  useEffect(() => {
-    if (homeId === null) return;
-    let cancelled = false;
-    void loadSystemNameAndSecurity(homeId)
-      .catch(() => ({ name: null, security: null }))
-      .then((found) => {
-        if (!cancelled) setHome({ systemId: homeId, ...found });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [homeId]);
-
-  const routeKey = `${basis.key}|${homeId}|${hub.systemId}`;
-  useEffect(() => {
-    if (homeId === null || !basis.hydrated || buybackPct !== null) return;
-    let cancelled = false;
-    void hubRouteFigures(homeId, hub.systemId, basis).then((found) => {
-      if (!cancelled) setRoute({ key: routeKey, figures: found });
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [homeId, hub.systemId, basis, routeKey, buybackPct]);
+  const routeLoader = useCallback(
+    () => (homeId === null ? Promise.resolve(null) : hubRouteFigures(homeId, hub.systemId, basis)),
+    [homeId, hub.systemId, basis]
+  );
+  const route = useKeyedLoad(
+    `${basis.key}|${homeId}|${hub.systemId}`,
+    routeLoader,
+    homeId === null || !basis.hydrated || buybackPct !== null
+  );
 
   // Until the pilot picks a hub, find the nearest one by gate route (#2705).
-  const suggestKey = `${basis.key}|${homeId}`;
-  const [suggest, setSuggest] = useState<{ key: string; nearest: NearestHub | null } | null>(null);
-  useEffect(() => {
-    if (homeId === null || !basis.hydrated || hubChosen) return;
-    let cancelled = false;
-    void Promise.all(
+  const suggestLoader = useCallback(async () => {
+    if (homeId === null) return null;
+    const routes = await Promise.all(
       TRADE_HUBS.map((h) =>
         hubRouteFigures(homeId, h.systemId, basis).then((figures) => ({ hub: h.id, figures }))
       )
-    ).then((routes) => {
-      if (!cancelled) setSuggest({ key: suggestKey, nearest: nearestHub(routes, hub.id) });
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [homeId, basis, suggestKey, hubChosen, hub.id]);
-  const nearest = !hubChosen && suggest?.key === suggestKey ? suggest.nearest : null;
+    );
+    return nearestHub(routes, hub.id);
+  }, [homeId, basis, hub.id]);
+  const suggest = useKeyedLoad(
+    `${basis.key}|${homeId}`,
+    suggestLoader,
+    homeId === null || !basis.hydrated || hubChosen
+  );
+  const nearest = suggest.data ?? null;
   const nearestOption = nearest && nearest.hub !== hub.id ? getTradeHub(nearest.hub) : null;
 
-  const shownHome = home?.systemId === homeId ? home : null;
-  const figures = buybackPct === null && route?.key === routeKey ? route.figures : null;
+  const shownHome = home.data ?? null;
+  const figures = route.data ?? null;
 
   const homeChip = homeId !== null && shownHome?.name && (
     <StatChip
@@ -340,7 +311,7 @@ export function PiHeaderStrip({
 async function hubRouteFigures(
   homeId: number,
   hubSystemId: number,
-  basis: ReturnType<typeof useJumpBasis>
+  basis: ReturnType<typeof useSharedJumpBasis>
 ): Promise<RouteFigures | null> {
   const result = await routeExposure(homeId, hubSystemId, basis.rules, basis.network).catch(() => ({
     kind: 'unknown' as const,

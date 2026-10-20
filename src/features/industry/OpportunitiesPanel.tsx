@@ -11,7 +11,7 @@
  * account-level alt-linking, just this feature's own scoped selector.
  */
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
-import { useEffect, useMemo, useState, type ReactElement } from 'react';
+import { useMemo, useState, type ReactElement } from 'react';
 import { useCharacterModifiersByCharacter } from '@/features/character/characterModifiers';
 import { useTradeHubStandingsByCharacter } from '@/features/market/useTradeHubStandings';
 import { useTranslation } from 'react-i18next';
@@ -32,12 +32,6 @@ import {
   type DataTableColumn,
   Checkbox,
   ColumnPickerMenu,
-  SegmentedControl,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
   STAT_CHIP_TONE_TEXT_CLASS,
   MenuItem,
   CachedNotice,
@@ -48,41 +42,31 @@ import { formatDuration } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
 import { iskToneClass } from '@/features/character/format';
 import { useIsDesktop } from '@/lib/useIsDesktop';
-import type { CharacterBlueprint } from '@/esi/endpoints';
 import { evaluateSkillGate, type SkillGateVerdict } from '@/engine/industry/skillGate';
 import type { PiData } from '@/sde/types';
 import { useRowStartPlan } from './rowStartPlan';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { PriceHistoryPanel } from '@/features/market/PriceHistoryPanel';
-import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
-import {
-  useResolvedCharacterFilter,
-  type CharacterFilterValue,
-} from '@/features/character/characterFilterValue';
+import { type CharacterFilterValue } from '@/features/character/characterFilterValue';
 import { useAccountSkillLevels } from '@/features/skills/useAccountSkillLevels';
 import { nameForType, type BlueprintCatalog, type BlueprintCatalogEntry } from './blueprintCatalog';
-import { loadCharacterBlueprints } from './data';
 import type { ActivityFacilityDefaults } from './facilityDefaults';
 import { formatPercent, numericCell } from './format';
 import { MobileOpportunityList } from './MobileOpportunityList';
 import { OPPORTUNITIES_DEFAULT_SORT, OPPORTUNITIES_SORT_KEY } from './opportunitiesUrl';
 import {
   matchesStockFilter,
-  MOSTLY_COVERED_PCT,
   ORDER_DEPTH_RANK,
   ORDER_DEPTH_TONE,
   stockCoverage,
   unitMargin,
 } from './opportunityMetrics';
 import type { OwnedStockSnapshot } from './ownedStockDetection';
-import {
-  AUTO_RECALCULATE_MAX,
-  buildOpportunityCandidates,
-  hubForCharacter,
-  type OpportunityRow,
-} from './opportunities';
+import { AUTO_RECALCULATE_MAX, hubForCharacter, type OpportunityRow } from './opportunities';
 import { SkillGateMarker } from './SkillGateMarker';
 import { useOpportunities } from './useOpportunities';
+import { useOpportunityCandidates } from './useOpportunityCandidates';
+import { OpportunitiesFilterBar, OpportunitiesViewPicker } from './OpportunitiesToolbars';
 import { priceVsMedianFor, usePriceVsMedian } from './usePriceVsMedian';
 import { Vs90dFigure } from './Vs90dFigure';
 import { vs90dTooltip } from './vs90d';
@@ -192,123 +176,24 @@ export function OpportunitiesPanel({
   const characterFilter = characterParams['opps.chars'];
   const setCharacterFilter = (next: CharacterFilterValue) =>
     setCharacterParams({ 'opps.chars': next });
-  // `useResolvedCharacterFilter`, not the raw `resolveCharacterFilter`: this
-  // panel's resolved filter feeds `characterIds` and through it the
-  // blueprint-loading effect's dep array below, and the raw function
-  // allocates a fresh `Set` per call for `'current'` — routing that
-  // unmemoized identity into an effect dep array is exactly what caused an
-  // infinite render loop here before (issue #675, React error #185).
-  const resolvedCharacterIds = useResolvedCharacterFilter(characterFilter, activeCharacterId);
-  const nextCharacterIds =
-    resolvedCharacterIds === 'all'
-      ? characterCandidates.map((c) => c.characterId)
-      : [...resolvedCharacterIds];
-  // Stabilizes the array's *identity* across renders where its *values*
-  // haven't changed — memoizing on the ids themselves (via a joined string,
-  // a plain primitive) rather than on `characterCandidates`'s own identity,
-  // which still allocates a fresh array whenever `allCharacters`'s
-  // `useLiveQuery` result changes, even to an equal roster. The
-  // blueprint-loading effect below keys off this array by reference, so a
-  // churning identity re-fires it every such commit — the "one redundant
-  // load... when useLiveQuery swaps its default [] for the real roster" the
-  // render-loop-settling test above already flags as bounded but
-  // unaddressed; this closes it so the effect only ever re-fires when the
-  // actual selected characters change.
-  const characterIdsKey = nextCharacterIds.join(',');
-  const characterIds = useMemo(
-    () => (characterIdsKey === '' ? [] : characterIdsKey.split(',').map(Number)),
-    [characterIdsKey]
-  );
-
-  // One state object rather than two separate `useState` calls: every branch
-  // below is then exactly one `setState` call, matching this codebase's
-  // `react-hooks/set-state-in-effect` rule.
-  const [blueprintsState, setBlueprintsState] = useState<{
-    ownedByCharacter: Map<number, CharacterBlueprint[]>;
-    loading: boolean;
-    /** Oldest fetch across every fetched Character — reported up through `onDataAgeChange`. */
-    oldestFetchedAt: Date | null;
-    /** Selected Characters whose blueprint read came back with nothing (offline, ESI down, nothing cached). */
-    failedCount: number;
-    /** When the oldest cached-copy blueprint list was read (ms); null when every list is a fresh read. */
-    cachedAt: number | null;
-  }>({
-    ownedByCharacter: new Map(),
-    loading: true,
-    oldestFetchedAt: null,
-    failedCount: 0,
-    cachedAt: null,
-  });
-  const [retryTick, setRetryTick] = useState(0);
-
-  useEffect(() => {
-    if (characterIds.length === 0) {
-      // A plain reset, not a derived sync worth restructuring around: no
-      // Character is selected, so there is nothing to fetch and the panel's
-      // empty state should say so immediately.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setBlueprintsState({
-        ownedByCharacter: new Map(),
-        loading: false,
-        oldestFetchedAt: null,
-        failedCount: 0,
-        cachedAt: null,
-      });
-      return;
-    }
-    let cancelled = false;
-    setBlueprintsState((prev) => ({ ...prev, loading: true }));
-    void Promise.all(characterIds.map((id) => loadCharacterBlueprints(id))).then((results) => {
-      if (cancelled) return;
-      const map = new Map<number, CharacterBlueprint[]>();
-      let oldestFetchedAt: Date | null = null;
-      let failedCount = 0;
-      let cachedAt: number | null = null;
-      results.forEach((result, index) => {
-        map.set(characterIds[index]!, result.cached?.data ?? []);
-        // `null` is "nothing came back", which is not the same as a Character
-        // who owns no blueprints (`[]`).
-        if (result.cached === null) failedCount += 1;
-        else if (result.cached.fromCache) {
-          const at = result.cached.fetchedAt.getTime();
-          if (cachedAt === null || at < cachedAt) cachedAt = at;
-        }
-        const fetchedAt = result.cached?.fetchedAt;
-        if (fetchedAt && (!oldestFetchedAt || fetchedAt < oldestFetchedAt))
-          oldestFetchedAt = fetchedAt;
-      });
-      setBlueprintsState({
-        ownedByCharacter: map,
-        loading: false,
-        oldestFetchedAt,
-        failedCount,
-        cachedAt,
-      });
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [characterIds, retryTick]);
   const {
+    characterIds,
+    characterIdsKey,
+    candidates,
     ownedByCharacter,
-    loading: blueprintsLoading,
-    oldestFetchedAt,
+    blueprintsLoading,
     failedCount,
     cachedAt,
-  } = blueprintsState;
-  /** Every selected Character came back with nothing: "no blueprints" would be a guess. */
-  const allBlueprintsFailed = characterIds.length > 0 && failedCount === characterIds.length;
-
-  const oldestFetchedMs = oldestFetchedAt?.getTime() ?? null;
-  useEffect(() => {
-    onDataAgeChange?.(oldestFetchedMs === null ? null : new Date(oldestFetchedMs));
-    return () => onDataAgeChange?.(null);
-  }, [oldestFetchedMs, onDataAgeChange]);
-
-  const candidates = useMemo(
-    () => buildOpportunityCandidates(ownedByCharacter, characterNames, catalog),
-    [ownedByCharacter, characterNames, catalog]
-  );
+    allBlueprintsFailed,
+    retry,
+  } = useOpportunityCandidates({
+    catalog,
+    activeCharacterId,
+    characterFilter,
+    characterCandidates,
+    characterNames,
+    onDataAgeChange,
+  });
 
   // Every candidate's own Build Plan, for `hubForCharacter` below (issue
   // #2055): the same Trade Hub a fresh plan for that Character would default
@@ -674,103 +559,21 @@ export function OpportunitiesPanel({
     columns.map((column) => column.id)
   );
 
-  const characterFilterControl = showCharacterFilter && (
-    <CharacterFilterControl
-      activeCharacterId={activeCharacterId}
-      value={characterFilter}
-      onChange={setCharacterFilter}
-    />
-  );
-  // The segmented control on desktop gets one-word labels so the three fit on
-  // the title's line at 1280; the phone select has the room for the full ones.
-  const stockOptions = [
-    { value: 'any' as const, label: t('industry.opportunitiesStockAny') },
-    {
-      value: 'mostly' as const,
-      label: isDesktop
-        ? t('industry.opportunitiesStockMostlyShort', { pct: MOSTLY_COVERED_PCT })
-        : t('industry.opportunitiesStockMostly', { pct: MOSTLY_COVERED_PCT }),
-    },
-    {
-      value: 'full' as const,
-      label: isDesktop
-        ? t('industry.opportunitiesStockFullShort')
-        : t('industry.opportunitiesStockFull'),
-    },
-  ];
-  const stockFilterControl = isDesktop ? (
-    <SegmentedControl
-      label={t('industry.opportunitiesUseMyStock')}
-      size="sm"
-      value={stockFilter}
-      onChange={setStockFilter}
-      options={stockOptions}
-    />
-  ) : (
-    <Select
-      value={stockFilter}
-      onValueChange={(next) => setStockFilter(next as typeof stockFilter)}
-    >
-      <SelectTrigger
-        size="sm"
-        aria-label={t('industry.opportunitiesUseMyStock')}
-        className="min-w-0 flex-1"
-      >
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        {stockOptions.map((o) => (
-          <SelectItem key={o.value} value={o.value}>
-            {o.label}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  );
-  // Below `lg` the view picker *is* the panel's title: a bordered select
-  // reading "Ranked builds" / "Owned blueprints", so the title, the view, the
-  // Character filter and the actions all fit one line on a phone. The
-  // segmented control and the plain title stay on desktop, where they fit.
+  // `undefined` on desktop, not an empty element: `Panel` pads its header by `leading`'s truthiness.
   const viewPicker = isDesktop ? undefined : (
-    <span className="flex min-w-0 items-center pl-2">
-      <h2 className="sr-only">{t('industry.opportunitiesTitle')}</h2>
-      <Select value={view} onValueChange={(next) => setView(next as typeof view)}>
-        <SelectTrigger
-          size="sm"
-          aria-label={t('industry.opportunitiesView')}
-          className="min-w-0 text-[0.6875rem] font-semibold tracking-widest uppercase"
-        >
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="ranked">{t('industry.opportunitiesViewRankedTitle')}</SelectItem>
-          <SelectItem value="owned">{t('industry.opportunitiesViewOwnedTitle')}</SelectItem>
-        </SelectContent>
-      </Select>
-    </span>
+    <OpportunitiesViewPicker view={view} onViewChange={setView} />
   );
-  const meta = isDesktop ? (
-    <span className="flex flex-wrap items-center gap-2">
-      <SegmentedControl
-        label={t('industry.opportunitiesView')}
-        size="sm"
-        value={view}
-        onChange={setView}
-        options={[
-          { value: 'ranked', label: t('industry.opportunitiesViewRanked') },
-          { value: 'owned', label: t('industry.opportunitiesViewOwned') },
-        ]}
-      />
-      {characterFilterControl}
-      {view === 'ranked' && stockFilterControl}
-    </span>
-  ) : (
-    // A second header row on a phone, so the stock select gets the full width
-    // instead of colliding with the view picker and Refresh.
-    <span className="flex items-center gap-2 max-md:basis-full">
-      {characterFilterControl}
-      {view === 'ranked' && stockFilterControl}
-    </span>
+  const meta = (
+    <OpportunitiesFilterBar
+      view={view}
+      onViewChange={setView}
+      showCharacterFilter={showCharacterFilter}
+      activeCharacterId={activeCharacterId}
+      characterFilter={characterFilter}
+      onCharacterFilterChange={setCharacterFilter}
+      stockFilter={stockFilter}
+      onStockFilterChange={setStockFilter}
+    />
   );
   const title = isDesktop ? t('industry.opportunitiesTitle') : undefined;
 
@@ -859,7 +662,7 @@ export function OpportunitiesPanel({
         }
         title={t('common.couldntLoad')}
         hint={t('industry.opportunitiesLoadFailedHint')}
-        onRetry={() => setRetryTick((n) => n + 1)}
+        onRetry={retry}
         resetKey={characterIdsKey}
         busy={
           <div className="flex justify-center py-8">

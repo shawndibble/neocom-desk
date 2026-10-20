@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { act, render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import '@/i18n';
@@ -76,6 +76,10 @@ const SNAPSHOT: OwnedStockSnapshot = {
   incompleteCharacters: [],
 };
 
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 beforeEach(async () => {
   loop.count = 0;
   stub.rows = [];
@@ -123,11 +127,16 @@ describe('OpportunitiesPanel', () => {
     );
 
     await waitFor(() => expect(loadCharacterBlueprints).toHaveBeenCalled());
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(100);
+    });
     expect(loop.count).toBeLessThan(loop.limit);
 
     const settled = loadCharacterBlueprints.mock.calls.length;
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(100);
+    });
     expect(loadCharacterBlueprints.mock.calls.length).toBe(settled);
   });
 

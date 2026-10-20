@@ -78,6 +78,69 @@ describe('employment row flags', () => {
   });
 });
 
+// 1_000_125 sits in CCP's NPC corporation id block; 100/200/300 stand in for player corps.
+const NPC = 1_000_125;
+
+describe('NPC corporation stints', () => {
+  it('flags NPC stints and never calls them returned or short', () => {
+    const rows = deriveEmploymentHistoryRows(
+      [
+        ENTRY(1, NPC, daysAgo(900)),
+        ENTRY(2, 100, daysAgo(800)),
+        ENTRY(3, NPC, daysAgo(500)),
+        ENTRY(4, 200, daysAgo(497)),
+      ],
+      NOW
+    );
+
+    expect(rows.map((r) => r.npc)).toEqual([false, true, false, true]);
+    expect(rows.map((r) => r.returned)).toEqual([false, false, false, false]);
+    expect(rows.map((r) => r.shortStay)).toEqual([false, false, false, false]);
+  });
+
+  it('scales bars to the longest player stint, capping a longer NPC stint at full', () => {
+    const rows = deriveEmploymentHistoryRows(
+      [ENTRY(1, 100, daysAgo(1000)), ENTRY(2, NPC, daysAgo(900)), ENTRY(3, 200, daysAgo(50))],
+      NOW
+    );
+
+    // 200: 50d, NPC: 850d, 100: 100d.
+    expect(rows.map((r) => r.tenureRatio)).toEqual([0.5, 1, 1]);
+  });
+
+  it('scales against every stint when the pilot has only ever been in NPC corps', () => {
+    const rows = deriveEmploymentHistoryRows(
+      [ENTRY(1, NPC, daysAgo(300)), ENTRY(2, 1_000_166, daysAgo(100))],
+      NOW
+    );
+
+    expect(rows.map((r) => r.tenureRatio)).toEqual([0.5, 1]);
+  });
+
+  it('leaves NPC stints out of the corporation count and the longest stay', () => {
+    const rows = deriveEmploymentHistoryRows(
+      [ENTRY(1, 100, daysAgo(1000)), ENTRY(2, NPC, daysAgo(900)), ENTRY(3, 200, daysAgo(50))],
+      NOW
+    );
+
+    expect(deriveEmploymentSummary(rows, NOW)).toEqual({
+      timeInGameSeconds: 1000 * 86_400,
+      corporationCount: 2,
+      currentTenureSeconds: 50 * 86_400,
+      longest: { corporationId: 100, seconds: 100 * 86_400 },
+    });
+  });
+
+  it('has no longest stay when every stint was in an NPC corp', () => {
+    const rows = deriveEmploymentHistoryRows([ENTRY(1, NPC, daysAgo(300))], NOW);
+
+    expect(deriveEmploymentSummary(rows, NOW)).toMatchObject({
+      corporationCount: 0,
+      longest: null,
+    });
+  });
+});
+
 describe('deriveEmploymentSummary', () => {
   it('returns zeros and no longest for an empty history', () => {
     expect(deriveEmploymentSummary([], NOW)).toEqual({

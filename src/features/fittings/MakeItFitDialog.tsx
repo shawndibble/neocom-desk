@@ -1,7 +1,11 @@
 /**
- * "Make it fit…": the smallest swaps that bring an over-budget Fitting back
- * under CPU/PG/calibration, each with what it changes and what it costs.
- * A row click applies it as one ordinary edit, so Back undoes it.
+ * Make it fit, opened from a budget's "Fix CPU" (or powergrid, calibration)
+ * link: every kind of way back under CPU/PG/calibration, those that cost the
+ * fit nothing first — skills to train (Add to plan), then implants (a row
+ * click puts them in the set), then the smallest module swaps, each with what
+ * it changes and what it costs (a row click applies it as one ordinary edit,
+ * so Back undoes it). Scope decision for #2828's follow-up: skills and
+ * implants are offered here too, not only in What to train and the Implant Finder.
  */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -13,6 +17,11 @@ import type { FittingCatalogue } from './useFittingCatalogue';
 import { catalogueTypeName } from './useFittingCatalogue';
 import type { VariantEvaluator } from './useFittingEvaluation';
 import { useMakeItFit } from './useMakeItFit';
+import type { FitResource } from './makeItFitContext';
+import { MakeItFitImplants, type MakeItFitImplantsInput } from './MakeItFitImplants';
+import { MakeItFitSection } from './MakeItFitSection';
+import { MakeItFitTraining } from './MakeItFitTraining';
+import type { SkillGainEvaluator } from './useFittingEvaluation';
 import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 
@@ -55,8 +64,18 @@ function tradeOffSummary(changes: StatChange[], t: Translate): string {
 
 interface Props {
   open: boolean;
+  /** The budget whose "Fix" link opened it, which names it; every budget over is fixed together. */
+  resource: FitResource | null;
   onClose: () => void;
   variants: VariantEvaluator | null;
+  /** What to train's evaluator, for the skills that make it fit. */
+  skillGains: SkillGainEvaluator | null;
+  /** The active Character; null offers no training. */
+  characterId: number | null;
+  fittingName: string;
+  /** Null until the pilot loads; offers no implants. */
+  implants: MakeItFitImplantsInput | null;
+  onImplantsApplied: (names: string) => void;
   catalogue: FittingCatalogue | null;
   onApply: (option: FitOption) => void;
   /** Leaves the dialog for the module List, where a swap can be picked by hand; absent when the List is already showing. */
@@ -66,8 +85,14 @@ interface Props {
 
 export function MakeItFitDialog({
   open,
+  resource,
   onClose,
   variants,
+  skillGains,
+  characterId,
+  fittingName,
+  implants,
+  onImplantsApplied,
   catalogue,
   onApply,
   onOpenList,
@@ -80,6 +105,8 @@ export function MakeItFitDialog({
   const swapLabel = (swap: FitOption['swaps'][number]) =>
     t('fittings.makeItFit.swap', { from: name(swap.fromTypeId), to: name(swap.toTypeId) });
   const shown = result?.options.slice(0, OPTION_LIMIT) ?? [];
+  // Within budget already: nothing to train, buy or swap.
+  const fits = result !== null && result.options.length === 0 && !result.nothingFits;
   // Two rows that read the same (two Gyrostabilizers) are told apart by their slot.
   const labelCounts = new Map<string, number>();
   for (const option of shown)
@@ -90,109 +117,129 @@ export function MakeItFitDialog({
     <Modal
       open={open}
       onClose={onClose}
-      title={t('fittings.makeItFit.title')}
+      title={resource ? t(`fittings.makeItFit.fix.${resource}`) : t('fittings.makeItFit.title')}
       placement={placement}
     >
-      {failed ? (
-        <p className="text-danger text-sm">{t('fittings.makeItFit.failed')}</p>
-      ) : result === null || before === null ? (
-        <p className="text-text-dim flex items-center gap-2 text-sm">
-          <Spinner /> {t('fittings.makeItFit.searching')}
-        </p>
-      ) : result.options.length === 0 ? (
-        <div className="space-y-2">
-          <p className="text-text-dim text-sm">
-            {result.nothingFits
-              ? t('fittings.makeItFit.nothingFits')
-              : t('fittings.makeItFit.fits')}
-          </p>
-          {result.nothingFits && onOpenList && (
-            <Button size="sm" onClick={onOpenList}>
-              {t('fittings.makeItFit.openList')}
-            </Button>
-          )}
-        </div>
+      {fits ? (
+        <p className="text-text-dim text-sm">{t('fittings.makeItFit.fits')}</p>
       ) : (
-        <div className="space-y-2">
-          <p className="text-text-dim text-xs">
-            {t('fittings.makeItFit.hint')}
-            {result.options.length > OPTION_LIMIT &&
-              ` ${t('fittings.makeItFit.showing', { shown: OPTION_LIMIT, total: result.options.length })}`}
-          </p>
-          {shown.some((option) => option.iskDelta === null) && (
-            <p className="text-text-dim text-xs">{t('fittings.makeItFit.noPrice')}</p>
+        <div className="space-y-4">
+          <MakeItFitTraining
+            open={open}
+            evaluator={skillGains}
+            characterId={characterId}
+            fittingName={fittingName}
+          />
+          {implants && (
+            <MakeItFitImplants
+              open={open}
+              resource={resource}
+              implants={implants}
+              onApplied={onImplantsApplied}
+            />
           )}
-          <ul className="space-y-1">
-            {shown.map((option) => {
-              const delta = diffFittingStats(before, option.after);
-              const key = optionKey(option);
-              return (
-                <li key={key} className="border-line rounded-xs border">
-                  <button
-                    type="button"
-                    className={cx(
-                      'w-full rounded-xs p-2 text-left text-sm',
-                      rowInteractiveClassName,
-                      focusRingInsetClassName
-                    )}
-                    onClick={() => onApply(option)}
-                  >
-                    {option.swaps.map((swap) => {
-                      const label = swapLabel(swap);
-                      return (
-                        <p key={`${swap.slot}${swap.slotIndex}`} className="font-medium">
-                          {label}
-                          {(labelCounts.get(label) ?? 0) > 1 && (
-                            <span className="text-text-dim font-normal">
-                              {' · '}
-                              {t(`fittings.makeItFit.slot.${swap.slot}`, {
-                                index: swap.slotIndex + 1,
-                              })}
-                            </span>
+          <MakeItFitSection heading={t('fittings.makeItFit.section.swap')}>
+            {failed ? (
+              <p className="text-danger text-sm">{t('fittings.makeItFit.failed')}</p>
+            ) : result === null || before === null ? (
+              <p className="text-text-dim flex items-center gap-2 text-sm">
+                <Spinner /> {t('fittings.makeItFit.searching')}
+              </p>
+            ) : result.options.length === 0 ? (
+              <div className="space-y-2">
+                <p className="text-text-dim text-sm">{t('fittings.makeItFit.nothingFits')}</p>
+                {result.nothingFits && onOpenList && (
+                  <Button size="sm" onClick={onOpenList}>
+                    {t('fittings.makeItFit.openList')}
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-text-dim text-xs">
+                  {t('fittings.makeItFit.hint')}
+                  {result.options.length > OPTION_LIMIT &&
+                    ` ${t('fittings.makeItFit.showing', { shown: OPTION_LIMIT, total: result.options.length })}`}
+                </p>
+                {shown.some((option) => option.iskDelta === null) && (
+                  <p className="text-text-dim text-xs">{t('fittings.makeItFit.noPrice')}</p>
+                )}
+                <ul className="space-y-1">
+                  {shown.map((option) => {
+                    const delta = diffFittingStats(before, option.after);
+                    const key = optionKey(option);
+                    return (
+                      <li key={key} className="border-line rounded-xs border">
+                        <button
+                          type="button"
+                          className={cx(
+                            'w-full rounded-xs p-2 text-left text-sm',
+                            rowInteractiveClassName,
+                            focusRingInsetClassName
                           )}
-                        </p>
-                      );
-                    })}
-                    <p className="text-text-dim mt-0.5 text-xs">
-                      {tradeOffSummary(delta.changes, t)}
-                    </p>
-                    {option.iskDelta !== null && (
-                      <p className="mt-0.5 text-xs">
-                        {option.iskDelta < 0 ? (
-                          <span className="text-success">
-                            {t('fittings.makeItFit.saves')} <IskAmount value={-option.iskDelta} />
-                          </span>
-                        ) : (
-                          <span>
-                            {t('fittings.makeItFit.costs')} <IskAmount value={option.iskDelta} />
-                          </span>
+                          onClick={() => onApply(option)}
+                        >
+                          {option.swaps.map((swap) => {
+                            const label = swapLabel(swap);
+                            return (
+                              <p key={`${swap.slot}${swap.slotIndex}`} className="font-medium">
+                                {label}
+                                {(labelCounts.get(label) ?? 0) > 1 && (
+                                  <span className="text-text-dim font-normal">
+                                    {' · '}
+                                    {t(`fittings.makeItFit.slot.${swap.slot}`, {
+                                      index: swap.slotIndex + 1,
+                                    })}
+                                  </span>
+                                )}
+                              </p>
+                            );
+                          })}
+                          <p className="text-text-dim mt-0.5 text-xs">
+                            {tradeOffSummary(delta.changes, t)}
+                          </p>
+                          {option.iskDelta !== null && (
+                            <p className="mt-0.5 text-xs">
+                              {option.iskDelta < 0 ? (
+                                <span className="text-success">
+                                  {t('fittings.makeItFit.saves')}{' '}
+                                  <IskAmount value={-option.iskDelta} />
+                                </span>
+                              ) : (
+                                <span>
+                                  {t('fittings.makeItFit.costs')}{' '}
+                                  <IskAmount value={option.iskDelta} />
+                                </span>
+                              )}
+                            </p>
+                          )}
+                        </button>
+                        {delta.changes.length > 0 && (
+                          <Disclosure
+                            label={t('fittings.makeItFit.details')}
+                            expanded={expanded.has(key)}
+                            onToggle={() =>
+                              setExpanded((current) => {
+                                const next = new Set(current);
+                                if (!next.delete(key)) next.add(key);
+                                return next;
+                              })
+                            }
+                          >
+                            <p className="text-text-dim flex flex-wrap gap-x-2 px-2 pb-2 text-xs">
+                              {delta.changes.map((change) => (
+                                <span key={change.key}>{changeLabel(change, t)}</span>
+                              ))}
+                            </p>
+                          </Disclosure>
                         )}
-                      </p>
-                    )}
-                  </button>
-                  {delta.changes.length > 0 && (
-                    <Disclosure
-                      label={t('fittings.makeItFit.details')}
-                      expanded={expanded.has(key)}
-                      onToggle={() =>
-                        setExpanded((current) => {
-                          const next = new Set(current);
-                          if (!next.delete(key)) next.add(key);
-                          return next;
-                        })
-                      }
-                    >
-                      <p className="text-text-dim flex flex-wrap gap-x-2 px-2 pb-2 text-xs">
-                        {delta.changes.map((change) => (
-                          <span key={change.key}>{changeLabel(change, t)}</span>
-                        ))}
-                      </p>
-                    </Disclosure>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+          </MakeItFitSection>
         </div>
       )}
     </Modal>

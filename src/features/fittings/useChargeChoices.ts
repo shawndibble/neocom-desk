@@ -12,7 +12,7 @@
  * rest of the Fitting, so loading one of the group's own charges doesn't
  * recalculate the list.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import { factionName, type ChargeChoice, type ChargeTier } from '@/engine/fittings/chargeChoice';
 import type {
   Fitting,
@@ -26,6 +26,7 @@ import { getHubPrices } from '@/market/prices';
 import type { ChargeEngineStats } from './dogmaFittingEngine';
 import type { FittingContext } from './fittingContext';
 import type { FittingCatalogue } from './useFittingCatalogue';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 
 /** The SDE meta groups (public/data/market/variations.json) a charge's tier reads off. */
@@ -226,32 +227,23 @@ export function useChargeChoices({
       ),
     [figuresByGroup]
   );
-  const priceKey = `${hubId}|${priceIds.join(',')}`;
-  const [prices, setPrices] = useState<{ key: string; map: Map<number, number | null> } | null>(
-    null
+  const hub = getTradeHub(hubId);
+  const loadPrices = useCallback(async () => {
+    const map = new Map<number, number | null>();
+    if (!hub) return map;
+    try {
+      const aggregates = await getHubPrices(hub, priceIds);
+      for (const id of priceIds) map.set(id, aggregates.get(id)?.sellMin ?? null);
+    } catch {
+      map.clear();
+    }
+    return map;
+  }, [hub, priceIds]);
+  const prices = useKeyedLoad(
+    hub && priceIds.length > 0 ? `${hubId}|${priceIds.join(',')}` : null,
+    loadPrices
   );
-  useEffect(() => {
-    const hub = getTradeHub(hubId);
-    if (!hub || priceIds.length === 0) return;
-    let cancelled = false;
-    void getHubPrices(hub, priceIds)
-      .then((aggregates) => {
-        if (cancelled) return;
-        const map = new Map<number, number | null>();
-        for (const id of priceIds) map.set(id, aggregates.get(id)?.sellMin ?? null);
-        setPrices({ key: priceKey, map });
-      })
-      .catch(() => {
-        if (!cancelled) setPrices({ key: priceKey, map: new Map() });
-      });
-    return () => {
-      cancelled = true;
-    };
-    // priceKey carries hubId and priceIds.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [priceKey]);
-
-  const priceMap = prices?.key === priceKey ? prices.map : null;
+  const priceMap = prices.status === 'ready' ? prices.data : null;
 
   const groups = useMemo(() => {
     if (!figuresByGroup || !context || !fitting) return null;

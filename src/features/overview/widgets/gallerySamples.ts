@@ -15,6 +15,7 @@
 import type { TFunction } from 'i18next';
 import type { ChartModel } from './charts/types';
 import type { KindView, ListRow } from './data/types';
+import { swing } from '@/features/overview/samplePilot';
 
 type Row = readonly [title: string, detail: string, value: string];
 
@@ -33,7 +34,7 @@ function series(count: number, from: number, to: number, wobble = 0.06): number[
   return Array.from({ length: count }, (_, i) => {
     const t = count === 1 ? 1 : i / (count - 1);
     const base = from + (to - from) * t;
-    return Math.round(base * (1 + wobble * Math.sin(i * 2.3 + from)) * 100) / 100;
+    return Math.round(base * (1 + wobble * swing(i, 2.3, from)) * 100) / 100;
   });
 }
 

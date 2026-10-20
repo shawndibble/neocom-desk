@@ -33,3 +33,29 @@ export function withAcceptedCourierInProgress(contract: Contract): Contract {
   }
   return contract;
 }
+
+export type ContractStatusTone = 'neutral' | 'success' | 'warning' | 'danger';
+
+/**
+ * The tint of a contract's status pill: done well, still live, failed, or
+ * simply withdrawn. A cancelled or deleted contract is not a failure, so it
+ * stays neutral rather than red.
+ */
+export function contractStatusTone(status: Contract['status']): ContractStatusTone {
+  switch (status) {
+    case 'finished':
+    case 'finished_issuer':
+    case 'finished_contractor':
+      return 'success';
+    case 'outstanding':
+    case 'in_progress':
+      return 'warning';
+    case 'failed':
+    case 'rejected':
+    case 'reversed':
+      return 'danger';
+    case 'cancelled':
+    case 'deleted':
+      return 'neutral';
+  }
+}

@@ -11,7 +11,7 @@ const routes = vi.hoisted(() => ({ jumps: {} as Record<number, number> }));
 // One object for every render, as the real hook's memoised basis is: a fresh one
 // each call re-ran the strip's route effects on every render, endlessly.
 const basis = vi.hoisted(() => ({ rules: {}, network: {}, key: 'k', hydrated: true }));
-vi.mock('@/features/route/jumpBasis', () => ({ useJumpBasis: () => basis }));
+vi.mock('@/features/route/jumpBasis', () => ({ useSharedJumpBasis: () => basis }));
 vi.mock('@/features/route/routeExposure', () => ({
   routeExposure: vi.fn(async (_from: number, to: number) => {
     const n = routes.jumps[to];

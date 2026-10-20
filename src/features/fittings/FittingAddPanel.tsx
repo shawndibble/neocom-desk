@@ -1,4 +1,4 @@
-import { useId, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Caret,
@@ -9,7 +9,6 @@ import {
   SearchInput,
   TabPanel,
   Tabs,
-  TextInput,
   TypeIcon,
   useTabsId,
 } from '@/components/ui';
@@ -20,12 +19,9 @@ import {
   rowInteractiveClassName,
 } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
-import { chargeRowClassName } from './chargeRowStyle';
 import { Close, Warn } from '@/components/ui/icons';
 import {
-  browserTree,
   type BrowserNode,
-  CANDIDATE_LIMIT,
   type CandidateEntry,
   type CandidateRack,
 } from '@/engine/fittings/candidates';
@@ -35,20 +31,21 @@ import type { VariantEvaluator } from './useFittingEvaluation';
 import { useModuleAddPreview } from './useModuleAddPreview';
 import { AddPreviewReadout } from './AddPreviewReadout';
 import type { CandidateCheck } from './dogmaFittingEngine';
-import { CapBoosterGuide } from './CapBoosterGuide';
-import { MiningCrystalGuide } from './MiningCrystalGuide';
-import { ChargePickerControls, ChargePickerGroup } from './ChargePicker';
-import { DEFAULT_PICKER_SETTINGS, type ChargePickerSettings } from './chargePickerSettings';
-import { useChargeChoices } from './useChargeChoices';
-import { AddCargoMenuItems, AddItemMenuItems, FittingItemMenu } from './FittingItemMenu';
+import { AddItemMenuItems, FittingItemMenu } from './FittingItemMenu';
 import { endFittingDrag, startFittingDrag } from './fittingDrag';
 import { useFittingItemActions } from './fittingItemActions';
 import type { FittingContext } from './fittingContext';
 import { useHullFit } from './useHullFit';
 import { CatalogueLoadingNote, ShipDataWaitingNote } from './FittingDataNotices';
 import type { FittingCatalogue } from './useFittingCatalogue';
-
-type BrowserTab = 'modules' | 'charges' | 'drones' | 'cargo';
+import { ChargesTab } from './AddChargesTab';
+import { CargoTab } from './AddCargoTab';
+import {
+  FIT_FILTER_KINDS,
+  useAddPanelResults,
+  type BrowserTab,
+  type FitFilterKind,
+} from './useAddPanelResults';
 
 interface FittingAddPanelProps {
   fitting: Fitting;
@@ -94,10 +91,6 @@ const RACK_LABEL_KEY: Record<CandidateRack, string> = {
   drone: 'fittings.add.rack.drone',
 };
 
-/** The in-game Fitting window's three icon toggles, in their on-screen order. */
-type FitFilterKind = 'hull' | 'resources' | 'skills';
-const FIT_FILTER_KINDS: readonly FitFilterKind[] = ['hull', 'resources', 'skills'];
-
 /**
  * The icon and i18n keys for each toggle — CCP's own in-game art (scope
  * decision `20260927-104252`), copied from the EVE University wiki into
@@ -139,44 +132,6 @@ const SLOT_ICONS: Partial<Record<FittingSlotKind, string>> = {
   low: '/images/fitting/slot-low.png',
   rig: '/images/fitting/slot-rig.png',
 };
-
-interface BrowseFilterOptions {
-  tab: BrowserTab;
-  /** Only this rack — the chosen slot's, with "fits this slot" on. */
-  slotRack: CandidateRack | null;
-  metaGroupId: number | null;
-  /** Null until the hull check is done; then only what fits it. */
-  hullFit: ReadonlyMap<number, CandidateCheck> | null;
-  /** Which of the three icon filters are currently on. */
-  fitFilters: ReadonlySet<FitFilterKind>;
-}
-
-/** Whether a market item belongs in the browser under the current tab, slot and filters. */
-function browseFilter(
-  catalogue: FittingCatalogue,
-  { tab, slotRack, metaGroupId, hullFit, fitFilters }: BrowseFilterOptions
-): (entry: CandidateEntry) => boolean {
-  return (entry) => {
-    const rack = catalogue.rackOf[String(entry.typeId)];
-    if (rack === undefined) return false;
-    if (tab === 'drones' ? rack !== 'drone' : rack === 'drone') return false;
-    if (slotRack !== null && rack !== slotRack) return false;
-    if (
-      metaGroupId !== null &&
-      (catalogue.variations.types[entry.typeId]?.metaGroupId ?? null) !== metaGroupId
-    )
-      return false;
-    if (hullFit !== null) {
-      const check = hullFit.get(entry.typeId);
-      // Each icon toggle hides on its own rule: the hull's rack rules, its
-      // bare CPU/powergrid/calibration, or the pilot's skills.
-      if (fitFilters.has('hull') && !check?.fitsHull) return false;
-      if (fitFilters.has('resources') && !check?.fitsResources) return false;
-      if (fitFilters.has('skills') && !check?.canFly) return false;
-    }
-    return true;
-  };
-}
 
 interface ItemRowProps {
   entry: CandidateEntry;
@@ -346,44 +301,17 @@ export function FittingAddPanel({
   const toggleFitsSlot = () => setFitsSlot((on) => !on);
 
   const trimmed = query.trim().toLowerCase();
-  const results = useMemo(() => {
-    // Once the ship data is in, a search waits for the hull check as browsing
-    // does, rather than briefly offering structure modules and the like.
-    if (catalogue === null || trimmed === '' || (context !== null && hullFit === null)) return [];
-    const include = browseFilter(catalogue, { tab, slotRack, metaGroupId, hullFit, fitFilters });
-    return catalogue.marketTypes
-      .filter((entry) => include(entry) && entry.name.toLowerCase().includes(trimmed))
-      .sort((a, b) => a.name.localeCompare(b.name))
-      .slice(0, CANDIDATE_LIMIT);
-  }, [catalogue, trimmed, context, tab, slotRack, metaGroupId, hullFit, fitFilters]);
-  // Browsing needs the hull check: without it the tree would be every
-  // fittable item in the game, structure modules and all.
-  const tree = useMemo(() => {
-    if (catalogue === null || hullFit === null || trimmed !== '') return [];
-    const include = browseFilter(catalogue, { tab, slotRack, metaGroupId, hullFit, fitFilters });
-    return browserTree(catalogue.marketTypes, include, catalogue.groupsById);
-  }, [catalogue, trimmed, tab, slotRack, metaGroupId, hullFit, fitFilters]);
-  // What Resources and Skills are hiding for this search/browse: the items
-  // that pass Hull (as it currently stands) and every other filter but not
-  // one of those two. Hull stays fixed here — the market is mostly things
-  // that don't fit this hull at all, so counting past it would name numbers
-  // in the thousands and the note would stop being useful.
-  const relaxed = useMemo(() => {
-    const next = new Set(fitFilters);
-    next.delete('resources');
-    next.delete('skills');
-    return next;
-  }, [fitFilters]);
+  const { results, tree, relaxed, hiddenByFilters, metaGroups } = useAddPanelResults({
+    catalogue,
+    trimmed,
+    context,
+    tab,
+    slotRack,
+    metaGroupId,
+    hullFit,
+    fitFilters,
+  });
   const searchRef = useRef<HTMLInputElement>(null);
-  const hiddenByFilters = useMemo(() => {
-    if (catalogue === null || hullFit === null || relaxed.size === fitFilters.size) return 0;
-    const base = { tab, slotRack, metaGroupId, hullFit };
-    const shown = browseFilter(catalogue, { ...base, fitFilters });
-    const all = browseFilter(catalogue, { ...base, fitFilters: relaxed });
-    return catalogue.marketTypes.filter(
-      (entry) => all(entry) && !shown(entry) && entry.name.toLowerCase().includes(trimmed)
-    ).length;
-  }, [catalogue, trimmed, tab, slotRack, metaGroupId, hullFit, fitFilters, relaxed]);
   const hiddenNote =
     hiddenByFilters > 0 ? (
       <button
@@ -445,16 +373,6 @@ export function FittingAddPanel({
       </li>
     );
   }
-
-  const metaGroups = useMemo(
-    () =>
-      catalogue === null
-        ? []
-        : Object.entries(catalogue.variations.metaGroups)
-            .map(([id, name]) => ({ id: Number(id), name }))
-            .sort((a, b) => a.id - b.id),
-    [catalogue]
-  );
 
   function row(entry: CandidateEntry) {
     const rack = catalogue!.rackOf[String(entry.typeId)];
@@ -642,309 +560,6 @@ export function FittingAddPanel({
           </>
         )}
       </TabPanel>
-    </div>
-  );
-}
-
-interface ChargesTabProps {
-  fitting: Fitting;
-  catalogue: FittingCatalogue | null;
-  context: FittingContext | null;
-  moduleResults: FittingModuleResult[] | null;
-  onLoadCharge?: (chargeTypeId: number) => void;
-  /** A charge drags onto the modules that take it. */
-  dragToFit: boolean;
-}
-
-/**
- * Per fitted module type that takes charges: for a weapon, the Charge
- * Picker (grouped by type or faction, with this Fitting's damage, range and
- * the hub's price); for a cap booster, its guide (how the capacitor fares on
- * each charge, GJ/s, ISK per GJ); for a mining laser, its crystal guide
- * (what A, B and C are for, each ore family's crystals side by side); for
- * anything else (scripts, paste), the
- * plain list of what it takes. Each module's section collapses under its
- * header, which then names the charge loaded in it.
- */
-function ChargesTab({
-  fitting,
-  catalogue,
-  context,
-  moduleResults,
-  onLoadCharge,
-  dragToFit,
-}: ChargesTabProps) {
-  const { t } = useTranslation();
-  const actions = useFittingItemActions();
-  const [settings, setSettings] = useState<ChargePickerSettings>(DEFAULT_PICKER_SETTINGS);
-  const [collapsed, setCollapsed] = useState<ReadonlySet<number>>(() => new Set());
-  const sectionId = useId();
-  const toggleSection = (moduleTypeId: number) =>
-    setCollapsed((prev) => {
-      const next = new Set(prev);
-      if (!next.delete(moduleTypeId)) next.add(moduleTypeId);
-      return next;
-    });
-  const { groups, pricesLoading } = useChargeChoices({ fitting, context, moduleResults });
-
-  const name = (typeId: number) => catalogue?.types[String(typeId)]?.name ?? `#${typeId}`;
-
-  /** The Add panel's own row behaviour around any loadable charge: drag onto the modules that take it, right-click menu. */
-  const wrapRow = (chargeTypeId: number, row: ReactNode) => {
-    const draggable = dragToFit && actions !== null;
-    const inner = (
-      <div
-        className="flex items-center"
-        draggable={draggable}
-        onDragStart={
-          draggable
-            ? (event) =>
-                startFittingDrag(event, {
-                  kind: 'charge',
-                  typeId: chargeTypeId,
-                  fromCargo: false,
-                  targets: actions.charges.targetsFor(chargeTypeId),
-                })
-            : undefined
-        }
-        onDragEnd={draggable ? endFittingDrag : undefined}
-      >
-        <div className="min-w-0 flex-1">{row}</div>
-        {actions && <RowMoreActions />}
-      </div>
-    );
-    return actions ? (
-      <FittingItemMenu name={name(chargeTypeId)} items={<AddItemMenuItems typeId={chargeTypeId} />}>
-        {inner}
-      </FittingItemMenu>
-    ) : (
-      inner
-    );
-  };
-
-  if (groups === null) {
-    return <ShipDataWaitingNote />;
-  }
-  if (groups.length === 0) {
-    return <p className="text-xs text-text-dim">{t('fittings.add.noChargeTakers')}</p>;
-  }
-  const weaponChoices = groups.filter((g) => g.isWeapon).flatMap((g) => g.choices);
-  // The shared View/Sort/distance controls go with the weapon sections they drive.
-  const anyWeaponOpen = groups.some((g) => g.isWeapon && !collapsed.has(g.moduleTypeId));
-  const maxKm = Math.ceil(
-    (Math.max(0, ...weaponChoices.map((c) => c.optimal + c.falloff)) / 1000) * 1.2
-  );
-  return (
-    <div className="space-y-3">
-      {weaponChoices.length > 0 && anyWeaponOpen && (
-        <ChargePickerControls settings={settings} onChange={setSettings} maxKm={maxKm} />
-      )}
-      {groups.map((group) => {
-        const open = !collapsed.has(group.moduleTypeId);
-        const bodyId = `${sectionId}-${group.moduleTypeId}`;
-        const loadedNames = [...group.loaded].map(name).join(', ');
-        return (
-          <section key={group.moduleTypeId} className="space-y-1">
-            <h3 className="text-xs font-semibold">
-              <button
-                type="button"
-                aria-expanded={open}
-                aria-controls={bodyId}
-                onClick={() => toggleSection(group.moduleTypeId)}
-                className={cx(
-                  'flex min-h-11 w-full items-center gap-2 px-2 text-left md:min-h-9',
-                  rowInteractiveClassName,
-                  focusRingInsetClassName
-                )}
-              >
-                <Caret expanded={open} />
-                <TypeIcon typeId={group.moduleTypeId} size={32} width={20} height={20} />
-                <span className="min-w-0 flex-1 truncate">
-                  {t('fittings.add.chargeTaker', {
-                    count: group.count,
-                    name: name(group.moduleTypeId),
-                  })}
-                </span>
-                {/* The name always carries what's loaded, so it reads the same open or shut. */}
-                {loadedNames !== '' && (
-                  <span className="sr-only">
-                    {t('fittings.add.chargeTakerLoaded', { names: loadedNames })}
-                  </span>
-                )}
-                {!open && loadedNames !== '' && (
-                  <span
-                    aria-hidden="true"
-                    className="max-w-40 shrink-0 truncate font-normal text-text-dim"
-                  >
-                    {loadedNames}
-                  </span>
-                )}
-              </button>
-            </h3>
-            {/* Hidden rather than unmounted, so a type opened inside stays open. */}
-            <div id={bodyId} hidden={!open}>
-              {group.isMiner ? (
-                <MiningCrystalGuide
-                  group={group}
-                  onLoad={onLoadCharge}
-                  wrapRow={wrapRow}
-                  pricesLoading={pricesLoading}
-                />
-              ) : group.isCapBooster ? (
-                <CapBoosterGuide
-                  group={group}
-                  onLoad={onLoadCharge}
-                  wrapRow={wrapRow}
-                  pricesLoading={pricesLoading}
-                />
-              ) : group.isWeapon ? (
-                <ChargePickerGroup
-                  group={group}
-                  settings={settings}
-                  onLoad={onLoadCharge}
-                  wrapRow={wrapRow}
-                  pricesLoading={pricesLoading}
-                />
-              ) : (
-                <ul>
-                  {group.choices.map((choice) => {
-                    const loaded = group.loaded.has(choice.typeId);
-                    return (
-                      <li key={choice.typeId}>
-                        {wrapRow(
-                          choice.typeId,
-                          <button
-                            type="button"
-                            aria-pressed={loaded}
-                            disabled={!onLoadCharge}
-                            onClick={() => onLoadCharge?.(choice.typeId)}
-                            className={chargeRowClassName(
-                              loaded,
-                              'flex min-h-11 w-full items-center gap-2 px-2 text-left text-xs md:min-h-9'
-                            )}
-                          >
-                            <TypeIcon typeId={choice.typeId} size={32} width={20} height={20} />
-                            <span className="min-w-0 flex-1 truncate">{choice.name}</span>
-                            {loaded && (
-                              <span className="shrink-0 text-[0.6875rem]">
-                                {t('fittings.add.loaded')}
-                              </span>
-                            )}
-                          </button>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </div>
-          </section>
-        );
-      })}
-    </div>
-  );
-}
-
-/**
- * Add cargo: any market item, found by name, in the quantity asked — the
- * hold takes what the ring has no slot for (ammo, paste, filaments, a depot).
- */
-function CargoTab({
-  catalogue,
-  cargo,
-  onAddCargo,
-}: {
-  catalogue: FittingCatalogue | null;
-  /** What the hold already carries: those results get the List cargo row's menu. */
-  cargo: Fitting['cargo'];
-  onAddCargo: (typeId: number, quantity: number) => void;
-}) {
-  const { t } = useTranslation();
-  const actions = useFittingItemActions();
-  const inHold = useMemo(() => new Set(cargo.map((item) => item.typeId)), [cargo]);
-  const [query, setQuery] = useState('');
-  const [quantity, setQuantity] = useState('1');
-  const trimmed = query.trim().toLowerCase();
-  const results = useMemo(() => {
-    if (catalogue === null || trimmed === '') return [];
-    return catalogue.marketTypes
-      .filter((entry) => entry.name.toLowerCase().includes(trimmed))
-      .sort((a, b) => a.name.localeCompare(b.name))
-      .slice(0, CANDIDATE_LIMIT);
-  }, [catalogue, trimmed]);
-  const count = Math.floor(Number(quantity));
-  const valid = Number.isFinite(count) && count >= 1;
-  return (
-    <div className="space-y-2">
-      <SearchInput
-        aria-label={t('fittings.add.cargoSearchLabel')}
-        placeholder={t('fittings.add.cargoSearchPlaceholder')}
-        value={query}
-        onChange={(event) => setQuery(event.target.value)}
-      />
-      <label className="flex items-center gap-2 text-xs text-text-dim">
-        {t('fittings.edit.quantity')}
-        <TextInput
-          type="number"
-          min={1}
-          size="sm"
-          className="w-24"
-          value={quantity}
-          onChange={(event) => setQuantity(event.target.value)}
-        />
-      </label>
-      {catalogue === null ? (
-        <CatalogueLoadingNote />
-      ) : trimmed === '' ? (
-        <p className="text-xs text-text-dim">{t('fittings.add.cargoHint')}</p>
-      ) : results.length === 0 ? (
-        <p className="text-xs text-text-dim">{t('fittings.add.noResults')}</p>
-      ) : (
-        <ul>
-          {results.map((entry) => {
-            const row = (
-              <li key={entry.typeId} className="flex items-center">
-                <button
-                  type="button"
-                  disabled={!valid}
-                  onClick={() => onAddCargo(entry.typeId, count)}
-                  className={cx(
-                    'flex min-h-11 w-full items-center gap-2 px-2 text-left text-xs md:min-h-9',
-                    rowInteractiveClassName,
-                    focusRingInsetClassName,
-                    disabledClassName
-                  )}
-                >
-                  <TypeIcon typeId={entry.typeId} size={32} width={24} height={24} />
-                  <span className="min-w-0 flex-1 truncate">{entry.name}</span>
-                  <span className="shrink-0 text-text-dim tabular-nums">
-                    {t('fittings.add.cargoAddCount', { count: valid ? count : 0 })}
-                  </span>
-                </button>
-                {actions && <RowMoreActions />}
-              </li>
-            );
-            return actions ? (
-              <FittingItemMenu
-                key={entry.typeId}
-                name={entry.name}
-                items={
-                  <AddCargoMenuItems
-                    typeId={entry.typeId}
-                    count={valid ? count : 0}
-                    inHold={inHold.has(entry.typeId)}
-                    onAddCargo={onAddCargo}
-                  />
-                }
-              >
-                {row}
-              </FittingItemMenu>
-            ) : (
-              row
-            );
-          })}
-        </ul>
-      )}
     </div>
   );
 }

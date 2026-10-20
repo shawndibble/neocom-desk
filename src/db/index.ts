@@ -13,7 +13,6 @@ import type {
   FittingRecord,
   HullFitCacheRecord,
   IndustryJobHistoryRecord,
-  JitaPriceSnapshotRecord,
   MailDraftRecord,
   MiningLedgerHistoryRecord,
   MiningTaxAssignmentRecord,
@@ -66,7 +65,6 @@ export const db = new Dexie('neocom') as Dexie & {
   walletArchiveCoverage: Dexie.Table<WalletArchiveCoverageRecord, [number, ArchiveKind]>;
   industryJobHistory: EntityTable<IndustryJobHistoryRecord, 'characterId'>;
   netWorthSnapshots: EntityTable<NetWorthSnapshotRecord, 'id'>;
-  jitaPriceSnapshots: EntityTable<JitaPriceSnapshotRecord, 'date'>;
   hullFitCache: EntityTable<HullFitCacheRecord, 'key'>;
   ansiblexGates: EntityTable<AnsiblexGateRecord, 'id'>;
   dynamicItems: EntityTable<DynamicItemRecord, 'itemId'>;
@@ -277,4 +275,11 @@ db.version(25).stores({
 // kept so the queue survives closing the tab.
 db.version(26).stores({
   corpMailQueue: 'id, corporationId, batchId, senderCharacterId',
+});
+
+// Drops `jitaPriceSnapshots`, the Mining Overview's per-browser daily Jita
+// prices: the mining pages price every day from the server's Open Prices now
+// (decision 20261019-091155). Device-local only, so nothing to clean up in sync.
+db.version(27).stores({
+  jitaPriceSnapshots: null,
 });

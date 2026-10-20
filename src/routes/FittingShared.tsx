@@ -14,6 +14,7 @@ import {
 } from '@/components/ui';
 import { ShareShell } from '@/features/share/ShareShell';
 import { writeToClipboard } from '@/lib/clipboard';
+import { typeNameOr } from '@/lib/typeNameOr';
 import { useRetryFocus } from '@/lib/useRetryFocus';
 import { fittingEditLocation } from '@/features/fittings/fittingRoutes';
 import { resolveFittingShareView } from '@/features/fittings/resolveFittingShareView';
@@ -159,10 +160,7 @@ export function FittingShareView({
       const types = await loadTypes();
       if (!cancelled) {
         setShipGroupId(types[String(readyFitting.shipTypeId)]?.groupID);
-        setTypeName(
-          () => (typeId: number) =>
-            types[String(typeId)]?.name ?? t('common.unknownType', { id: typeId })
-        );
+        setTypeName(() => (typeId: number) => typeNameOr(t, types[String(typeId)]?.name, typeId));
       }
     })();
     return () => {

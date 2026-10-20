@@ -1,0 +1,642 @@
+/**
+ * Row components for the Assets drill-down (issue #148 follow-up).
+ *
+ * Every row here obeys one layout rule, which is the whole point of the
+ * rework: below `md`, nothing is laid out in fixed-width columns that a 390px
+ * screen cannot honour (the one md+ exception is an item row's figure cells,
+ * see `ItemRow`). A row is a name that truncates and one wrapping metadata
+ * line beneath it — item count, ISK value, security, jumps — rendered once
+ * (no `sm:hidden`/`hidden sm:flex` duplicate pair), so the page never
+ * scrolls sideways and never puts the same text in the DOM twice at any
+ * width. Below `md` the numbers that used to be fixed-width columns
+ * (`w-14`/`w-16`/`w-20`) wrap with everything else.
+ */
+
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { type ReactElement, type ReactNode } from 'react';
+import { Link } from 'react-router-dom';
+import { IconButton, IskAmount, RowMoreActions, Tooltip } from '@/components/ui';
+import { HintText } from '@/components/ui/HintText';
+import * as Icon from '@/components/ui/icons';
+import { cx } from '@/lib/cx';
+import { focusRingInsetClassName, tappableRowClassName } from '@/components/ui/controlStyles';
+import { useLiftAfterHoldGuard } from '@/components/ui/liftAfterHold';
+import { ItemInfoLink } from '@/features/entities';
+import { formatUnitVolume } from '@/lib/volume';
+import { securityStatusColor } from '@/engine/securityStatus';
+import { formatBadge } from './assetBrowserFormat';
+import type { JumpsAwayResult } from '@/engine/clone/jumpsAway';
+import type { PinState } from '@/features/assets/stationPins';
+import type { SelectionState } from '@/features/assets/assetSelection';
+import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
+import { PlaceJumpsLink } from '@/features/route/JumpsLink';
+import { SelectionCheckbox } from '@/features/character/SelectionCheckbox';
+import type { BlueprintKind } from '@/engine/blueprintKind';
+
+export type Translate = (key: string, opts?: Record<string, unknown>) => string;
+
+/* ------------------------------------------------------------------ badges */
+
+/** A navigating row's trailing caret (§6c): faint at rest, accent while the row's link is hovered or focused. */
+const rowCaretClassName =
+  'shrink-0 text-text-faint group-hover:text-accent group-focus-visible:text-accent';
+
+interface SecurityValueProps {
+  /** Undefined while still resolving, null when unresolvable — renders nothing either way. */
+  security: number | null | undefined;
+}
+
+/**
+ * A solar system's security status on the game's own scale
+ * (`securityStatusColor`). The number is always spelled out rather than
+ * reduced to a coloured dot — DESIGN.md §7, colour is never the only signal.
+ */
+export function SecurityValue({ security }: SecurityValueProps) {
+  if (security === null || security === undefined) return null;
+  const value = security.toFixed(1);
+  return (
+    <span
+      className="shrink-0 text-[0.6875rem] font-semibold tabular-nums"
+      style={{ color: securityStatusColor(security) }}
+    >
+      {value}
+    </span>
+  );
+}
+
+interface JumpsAwayTextProps {
+  result: JumpsAwayResult | undefined;
+  t: Translate;
+  /** The place counted to; when given, a known count opens the route to it. Leave out inside a link — a button can't nest in one. */
+  locationId?: number;
+  /** The page's own route picker, carried into the route the count opens. */
+  preference?: RoutePreferenceKind | null;
+  /** Extra classes for the route link, e.g. a touch-target box. */
+  linkClassName?: string;
+}
+
+/** Renders nothing until its route call settles — a progressive enhancement, never load-blocking. */
+export function JumpsAwayText({
+  result,
+  t,
+  locationId,
+  preference,
+  linkClassName,
+}: JumpsAwayTextProps) {
+  if (!result) return null;
+  if (result.kind === 'known') {
+    const text = t('assets.jumpsAway.value', { count: result.jumps });
+    return locationId === undefined ? (
+      <span className="tabular-nums">{text}</span>
+    ) : (
+      <PlaceJumpsLink
+        locationId={locationId}
+        preference={preference}
+        className={cx('tabular-nums', linkClassName)}
+      >
+        {text}
+      </PlaceJumpsLink>
+    );
+  }
+  return (
+    // Plain Tooltip, not HintText: this sits inside a row link, where a focusable,
+    // tap-to-toggle trigger would fight the navigation.
+    <Tooltip content={t(`assets.jumpsAway.unknownReason.${result.reason}`)}>
+      <span className="relative z-10 tabular-nums">
+        <span aria-hidden="true">{t('assets.jumpsAway.unknown')}</span>
+        <span className="sr-only">{t(`assets.jumpsAway.unknownReason.${result.reason}`)}</span>
+      </span>
+    </Tooltip>
+  );
+}
+
+interface CharacterBadgeProps {
+  characterName: string;
+}
+
+/** Marks a row as belonging to a Character other than the active one. */
+export function CharacterBadge({ characterName }: CharacterBadgeProps) {
+  return (
+    <span className="ml-1.5 shrink-0 rounded-xs bg-panel-2 px-1 py-0.5 text-[0.6875rem] text-text-dim">
+      {characterName}
+    </span>
+  );
+}
+
+interface BlueprintBadgeProps {
+  kind: BlueprintKind;
+  t: Translate;
+}
+
+/** Per kind: the visible abbreviation, the full name a screen reader hears, and its hue (DESIGN.md §1 "Blueprints"). */
+const BLUEPRINT_BADGE: Record<BlueprintKind, { label: string; name: string; className: string }> = {
+  original: {
+    label: 'assets.blueprintBadge.original.label',
+    name: 'assets.blueprintBadge.original.name',
+    className: 'text-accent',
+  },
+  copy: {
+    label: 'assets.blueprintBadge.copy.label',
+    name: 'assets.blueprintBadge.copy.name',
+    className: 'text-blueprint-copy',
+  },
+};
+
+/**
+ * Marks a blueprint stack as a **BPO** or a **BPC** (GLOSSARY.md) — the one
+ * distinction the item name can't carry, since a copy shares its original's
+ * typeID and name. The written label, not the colour, is the signal
+ * (DESIGN.md §7); a screen reader hears the full name instead of the letters.
+ */
+export function BlueprintBadge({ kind, t }: BlueprintBadgeProps) {
+  const badge = BLUEPRINT_BADGE[kind];
+  return (
+    <span
+      className={cx(
+        'ml-1.5 shrink-0 rounded-xs bg-panel-2 px-1 py-0.5 text-[0.6875rem] font-semibold',
+        badge.className
+      )}
+    >
+      <span aria-hidden="true">{t(badge.label)}</span>
+      <span className="sr-only">{t(badge.name)}</span>
+    </span>
+  );
+}
+
+/* ------------------------------------------------------------- location row */
+
+interface LocationRowProps {
+  href: string;
+  label: string;
+  security: number | null | undefined;
+  jumpsAway: JumpsAwayResult | undefined;
+  itemCount: number;
+  estimatedValue: number;
+  pinState: PinState;
+  onTogglePin: () => void;
+  /** Set when this "location" is really an orphan group — an asset whose parent wasn't in the fetch. */
+  unresolvedParent?: boolean;
+  /** Corp assets has no pinning concept (no device-local "current owner" to pin per) — hides the pin control entirely rather than rendering one nothing can toggle meaningfully. */
+  showPin?: boolean;
+  selectMode: boolean;
+  selectionState: SelectionState;
+  onToggleSelection: () => void;
+  t: Translate;
+}
+
+/**
+ * One location in the root list. The whole row is the link into it — a 64px
+ * target rather than a chevron a thumb has to find — with the pin as the one
+ * independently-focusable control beside it.
+ */
+export function LocationRow({
+  href,
+  label,
+  security,
+  jumpsAway,
+  itemCount,
+  estimatedValue,
+  pinState,
+  onTogglePin,
+  unresolvedParent = false,
+  showPin = true,
+  selectMode,
+  selectionState,
+  onToggleSelection,
+  t,
+}: LocationRowProps) {
+  const pinLabel = t('assets.pin.ariaLabel', {
+    station: label,
+    state: t(`assets.pin.${pinState}`),
+  });
+  return (
+    <div className="flex items-center gap-2 border-b border-line pr-2 pl-3 hover:bg-panel-2">
+      {selectMode && (
+        <SelectionCheckbox
+          state={selectionState}
+          onToggle={onToggleSelection}
+          label={t('assets.select.stationAriaLabel', { station: label })}
+        />
+      )}
+      <Link
+        to={href}
+        className={cx(
+          'group flex min-h-16 min-w-0 flex-1 items-center gap-2.5 py-2',
+          focusRingInsetClassName
+        )}
+      >
+        <span className="flex w-7 shrink-0 justify-end">
+          {unresolvedParent ? (
+            <Icon.Container size={Icon.ICON_SIZE.md} className="text-text-faint" />
+          ) : (
+            <SecurityValue security={security} />
+          )}
+        </span>
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="truncate text-sm font-medium">{label}</span>
+          <span className="flex flex-wrap items-center gap-x-1.5 text-[0.6875rem] text-text-dim">
+            {unresolvedParent ? (
+              <span className="text-warning">{t('assets.unresolved.rowHint')}</span>
+            ) : (
+              <JumpsAwayText result={jumpsAway} t={t} />
+            )}
+            <span aria-hidden="true">·</span>
+            <span className="tabular-nums">{t('assets.itemCount', { count: itemCount })}</span>
+            <span aria-hidden="true">·</span>
+            <span className="tabular-nums text-isk-pos">
+              <IskAmount value={estimatedValue} decimals={0} />
+            </span>
+          </span>
+        </span>
+        <Icon.Descend size={Icon.ICON_SIZE.md} className={rowCaretClassName} />
+      </Link>
+      {!unresolvedParent && showPin && (
+        <IconButton
+          icon={
+            <Icon.Pin
+              size={Icon.ICON_SIZE.md}
+              weight={pinState === 'unpinned' ? 'light' : 'fill'}
+            />
+          }
+          label={pinLabel}
+          pressed={pinState !== 'unpinned'}
+          onClick={onTogglePin}
+          variant="plain"
+          size="sm"
+          className={pinState === 'unpinned' ? '' : 'text-accent'}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ----------------------------------------------------------- container row */
+
+interface ContainerRowProps {
+  href: string;
+  label: string;
+  itemCount: number;
+  estimatedValue: number;
+  characterBadge: string | null;
+  /** A bay (Cargo Hold/Drone Bay/Fitting) has no asset of its own — plain text, not a heading, same as a station's `h2`/an item's plain name. A ship or container names a real, ownable entity and gets an `h3`, same distinction the tree view made. */
+  named: boolean;
+  selectMode: boolean;
+  selectionState: SelectionState;
+  onToggleSelection: () => void;
+  t: Translate;
+}
+
+/** A ship, bay or container inside the current level — descends one more step. */
+export function ContainerRow({
+  href,
+  label,
+  itemCount,
+  estimatedValue,
+  characterBadge,
+  named,
+  selectMode,
+  selectionState,
+  onToggleSelection,
+  t,
+}: ContainerRowProps) {
+  return (
+    <div className="flex items-center gap-2 border-b border-line pl-3 hover:bg-panel-2">
+      {selectMode && (
+        <SelectionCheckbox
+          state={selectionState}
+          onToggle={onToggleSelection}
+          label={t('assets.select.branchAriaLabel', { name: label })}
+        />
+      )}
+      <Link
+        to={href}
+        className={cx(
+          'group flex min-h-12 min-w-0 flex-1 items-center gap-2.5 py-1.5 pr-3',
+          focusRingInsetClassName
+        )}
+      >
+        <Icon.Container size={Icon.ICON_SIZE.sm} className="shrink-0 text-text-faint" />
+        <span className="flex min-w-0 flex-1 items-center">
+          {named ? (
+            <h3 className="truncate text-sm font-medium">{label}</h3>
+          ) : (
+            <span className="truncate text-sm text-text-dim">{label}</span>
+          )}
+          {characterBadge && <CharacterBadge characterName={characterBadge} />}
+        </span>
+        <span className="shrink-0 text-[0.6875rem] text-text-dim tabular-nums">
+          {formatBadge({ itemCount, estimatedValue }, t)}
+        </span>
+        <Icon.Descend size={Icon.ICON_SIZE.sm} className={rowCaretClassName} />
+      </Link>
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------- item row */
+
+/*
+ * md+ column geometry for an item row. The label strip
+ * (`ItemColumnLabels`) reads the same constants, so the labels sit over the
+ * cells by construction rather than by two hand-matched sets of widths.
+ * Below `md` none of these apply and the figures wrap as before.
+ */
+/**
+ * The name cell: capped at 24rem so the figures sit beside it instead of a
+ * screen away at the panel's far edge, but free to shrink when the panel is
+ * narrower. The rest of the row stays blank to the right of the menu slot.
+ */
+const ITEM_NAME_CELL = 'md:flex-[0_1_24rem]';
+const ITEM_CELL = 'md:shrink-0 md:truncate md:text-right';
+const ITEM_QUANTITY_CELL = cx(ITEM_CELL, 'md:w-24');
+const ITEM_VOLUME_CELL = cx(ITEM_CELL, 'md:w-28');
+const ITEM_VALUE_CELL = cx(ITEM_CELL, 'md:w-24');
+/** The row menu button's md+ box (`IconButton` size `row`, `md:size-7`), reserved even when the row has no menu. */
+const ITEM_MENU_SLOT = 'md:flex md:w-7 md:shrink-0 md:justify-end';
+const ITEM_MENU_SPACER = 'md:w-7 md:shrink-0';
+
+interface ItemColumnLabelsProps {
+  t: Translate;
+}
+
+/**
+ * The label strip above a level's item rows, md+ only. Right-aligned to the
+ * same cells `ItemRow` lays out; container rows in the same level keep their
+ * own shape and simply have no figures under it.
+ */
+export function ItemColumnLabels({ t }: ItemColumnLabelsProps) {
+  return (
+    <div
+      aria-hidden="true"
+      data-testid="item-column-labels"
+      className={cx(
+        eyebrowClassName,
+        'sticky top-0 z-10 hidden shrink-0 items-center gap-2.5 border-b border-line bg-panel-2 py-1 pr-3 pl-3 md:flex'
+      )}
+    >
+      <span className={cx('min-w-0 truncate', ITEM_NAME_CELL)}>{t('assets.sort.name')}</span>
+      <span className={ITEM_QUANTITY_CELL}>{t('assets.columns.quantity')}</span>
+      <span className={ITEM_VOLUME_CELL}>{t('assets.columns.volume')}</span>
+      <span className={ITEM_VALUE_CELL}>{t('assets.sort.value')}</span>
+      <span className={ITEM_MENU_SPACER} />
+    </div>
+  );
+}
+
+interface ItemRowProps {
+  name: string;
+  quantity: number;
+  unitVolume: number | undefined;
+  estimatedValue: number;
+  /** Tooltip note on the value. */
+  valueHint?: string;
+  characterBadge: string | null;
+  /** Set on a blueprint stack: a BPO or BPC badge beside the name. */
+  blueprintKind?: BlueprintKind | null;
+  /** Makes the name a Market link (§6c); Show info stays in the row menu. */
+  typeId?: number;
+  /** Set for a Mutated module only: Show info opens on its own Rolls. */
+  itemId?: number;
+  /** Wraps the row in the shared item context menu — supplied by the route. */
+  wrap: (children: ReactElement) => ReactNode;
+  selectMode: boolean;
+  selectionState: SelectionState;
+  onToggleSelection: () => void;
+  t: Translate;
+}
+
+/**
+ * An item's estimated value. Exactly 0 means "no estimate" (an unpriced type or
+ * a blueprint copy without a valuation), so it reads as a dim dash with a
+ * screen-reader "No estimate" rather than a green "0". `hint` (an abyssal
+ * module's estimate note, or why it has none) joins the figure's own tooltip,
+ * or gives the dash one; `inLink` keeps that dash tooltip reachable inside a
+ * whole-row link (see JumpsAwayText).
+ */
+function ValueFigure({
+  value,
+  hint,
+  inLink = false,
+  t,
+}: {
+  value: number;
+  hint?: string;
+  inLink?: boolean;
+  t: Translate;
+}) {
+  if (value !== 0) return <IskAmount value={value} decimals={0} note={hint} />;
+  const dash = (
+    <>
+      <span aria-hidden="true">{t('assets.unknownValue')}</span>
+      <span className="sr-only">{hint ?? t('assets.noEstimate')}</span>
+    </>
+  );
+  if (hint === undefined) return dash;
+  if (!inLink) return <HintText content={hint}>{dash}</HintText>;
+  return (
+    <Tooltip content={hint}>
+      <span className="relative z-10">{dash}</span>
+    </Tooltip>
+  );
+}
+
+/**
+ * A leaf asset: name, then quantity/volume/value on one wrapping metadata
+ * line. The fixed-width three-column layout this replaces (`Assets.tsx`'s
+ * old `w-14`/`w-16`/`w-20` trio) is exactly what made the row unreadable
+ * below ~500px — this reflows instead of clipping or scrolling sideways.
+ *
+ * Full item detail (icon, volume, location, jumps-away) lives behind the
+ * row's menu's "Show info" action — right-click, or the More actions button
+ * the menu publishes into the row — not on the row itself. With `typeId`
+ * the name links to the item's Market listing; a link inside the menu's
+ * trigger, so right-click and long-press still reach the menu from it.
+ */
+export function ItemRow({
+  name,
+  quantity,
+  unitVolume,
+  estimatedValue,
+  valueHint,
+  characterBadge,
+  blueprintKind = null,
+  typeId,
+  itemId,
+  wrap,
+  selectMode,
+  selectionState,
+  onToggleSelection,
+  t,
+}: ItemRowProps) {
+  // A touch long-press opens the row menu; the lift that ends it must not
+  // also follow the name link.
+  const guard = useLiftAfterHoldGuard();
+  const volumeText =
+    unitVolume === undefined ? t('assets.unknownValue') : formatUnitVolume(unitVolume);
+  return (
+    <div className="flex items-center gap-2 border-b border-line pl-3 hover:bg-panel-2">
+      {selectMode && (
+        <SelectionCheckbox
+          state={selectionState}
+          onToggle={onToggleSelection}
+          label={t('assets.select.itemAriaLabel', { name })}
+        />
+      )}
+      {wrap(
+        <div className="flex min-h-12 w-full min-w-0 items-center gap-2.5 py-1.5 pr-3">
+          {/* `md:contents` dissolves both wrappers at md+, so the name and the
+              three figures become direct cells of this flex row — one DOM,
+              two layouts (a stacked name + wrapping line below, a table row
+              above). */}
+          <span className="flex min-w-0 flex-1 flex-col gap-0.5 md:contents">
+            <span className={cx('flex min-w-0 items-center', ITEM_NAME_CELL)}>
+              {typeId === undefined ? (
+                <Tooltip content={name}>
+                  <span className="truncate text-sm">{name}</span>
+                </Tooltip>
+              ) : (
+                <ItemInfoLink
+                  typeId={typeId}
+                  itemId={itemId}
+                  className={cx('flex min-w-0 items-center text-sm', tappableRowClassName)}
+                  {...guard.handlers}
+                  onClick={(e) => {
+                    if (guard.swallowClick(e)) e.preventDefault();
+                  }}
+                >
+                  <Tooltip content={name}>
+                    <span className="truncate">{name}</span>
+                  </Tooltip>
+                </ItemInfoLink>
+              )}
+              {blueprintKind && <BlueprintBadge kind={blueprintKind} t={t} />}
+              {characterBadge && <CharacterBadge characterName={characterBadge} />}
+            </span>
+            <span className="flex flex-wrap items-center gap-x-1.5 text-[0.6875rem] text-text-dim tabular-nums md:contents md:text-xs">
+              <span className={ITEM_QUANTITY_CELL}>×{quantity.toLocaleString()}</span>
+              <span aria-hidden="true" className="md:hidden">
+                ·
+              </span>
+              <span className={ITEM_VOLUME_CELL}>{volumeText}</span>
+              <span aria-hidden="true" className="md:hidden">
+                ·
+              </span>
+              <span
+                className={cx(
+                  estimatedValue === 0 ? 'text-text-faint' : 'text-isk-pos',
+                  ITEM_VALUE_CELL
+                )}
+              >
+                <ValueFigure value={estimatedValue} hint={valueHint} t={t} />
+              </span>
+            </span>
+          </span>
+          <span className={ITEM_MENU_SLOT}>
+            <RowMoreActions />
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* -------------------------------------------------------- search result row */
+
+interface SearchResultRowProps {
+  name: string;
+  quantity: number;
+  estimatedValue: number;
+  /** Where this item lives, outermost first — the drill-down path it would take to reach it. */
+  trail: readonly string[];
+  security: number | null | undefined;
+  href: string;
+  characterBadge: string | null;
+  /** Set on a blueprint stack: a BPO or BPC badge beside the name. */
+  blueprintKind?: BlueprintKind | null;
+  /** Tooltip note on the value. */
+  valueHint?: string;
+  t: Translate;
+}
+
+/**
+ * A search hit. Search deliberately leaves the drill-down and reports across
+ * every location at once — filtering only the level you happen to be standing
+ * in would make "Search all characters" meaningless — so each hit has to say
+ * where it lives, and links straight to that place. The whole row is that
+ * link, so its name stays plain text — a Show info button there would nest
+ * one control inside another; the hit's own place has it one tap away.
+ */
+export function SearchResultRow({
+  name,
+  quantity,
+  estimatedValue,
+  trail,
+  security,
+  href,
+  characterBadge,
+  blueprintKind = null,
+  valueHint,
+  t,
+}: SearchResultRowProps) {
+  return (
+    <div className="border-b border-line hover:bg-panel-2">
+      <Link
+        to={href}
+        className={cx(
+          'group flex min-h-16 items-center gap-2.5 px-3 py-2',
+          focusRingInsetClassName
+        )}
+      >
+        <span className="flex min-w-0 flex-1 flex-col gap-1">
+          <span className="flex min-w-0 items-baseline gap-2">
+            <span className="flex min-w-0 flex-1 items-center">
+              <span className="truncate text-sm font-medium">{name}</span>
+              {blueprintKind && <BlueprintBadge kind={blueprintKind} t={t} />}
+              {characterBadge && <CharacterBadge characterName={characterBadge} />}
+            </span>
+            <span className="shrink-0 text-sm tabular-nums">×{quantity.toLocaleString()}</span>
+          </span>
+          <span className="flex min-w-0 items-baseline gap-2">
+            <span className="flex min-w-0 flex-1 items-baseline gap-1.5">
+              <SecurityValue security={security} />
+              <span className="truncate text-[0.6875rem] text-text-dim">{trail.join(' › ')}</span>
+            </span>
+            <span
+              className={cx(
+                'shrink-0 text-[0.6875rem] tabular-nums',
+                estimatedValue === 0 ? 'text-text-faint' : 'text-isk-pos'
+              )}
+            >
+              <ValueFigure value={estimatedValue} hint={valueHint} inLink t={t} />
+            </span>
+          </span>
+        </span>
+        <Icon.Descend size={Icon.ICON_SIZE.sm} className={rowCaretClassName} />
+      </Link>
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------- section */
+
+interface SectionHeadingProps {
+  children: ReactNode;
+  tone?: 'default' | 'warning';
+}
+
+/** Splits a list into named runs — "Pinned", "All locations", "Location unresolved". */
+export function SectionHeading({ children, tone = 'default' }: SectionHeadingProps) {
+  return (
+    <div
+      role="heading"
+      aria-level={3}
+      className={cx(
+        'flex items-center gap-1.5 border-y border-line px-3 py-1.5 text-[0.6875rem] font-semibold tracking-widest uppercase',
+        tone === 'warning' ? 'bg-panel-2 text-warning' : 'bg-panel-2 text-text-dim'
+      )}
+    >
+      {tone === 'warning' && <Icon.Warn size={Icon.ICON_SIZE.sm} />}
+      {children}
+    </div>
+  );
+}

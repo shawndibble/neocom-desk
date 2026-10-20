@@ -10,11 +10,12 @@
  * Each note's wrapper stays mounted through Retry and takes focus at the
  * click (`useRetryFocus`'s `hold`), so focus is never left on `<body>`.
  */
-import { useEffect, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
 import { useRetryFocus } from '@/lib/useRetryFocus';
-import { onReconnect, useOnline } from '@/stores/network';
+import { useRetryOnReconnect } from '@/lib/useRetryOnReconnect';
+import { useOnline } from '@/stores/network';
 import { warmDogmaEngine } from './dogmaFittingEngine';
 import { useDogmaEngineStatus } from './useDogmaEngineStatus';
 import { retryFittingCatalogue, useFittingCatalogueFailed } from './useFittingCatalogue';
@@ -90,7 +91,7 @@ export function ShipDataWaitingNote() {
   const status = useDogmaEngineStatus();
   const online = useOnline();
   const failed = status === 'failed';
-  useEffect(() => (failed ? onReconnect(warmDogmaEngine) : undefined), [failed]);
+  useRetryOnReconnect(failed, warmDogmaEngine);
   if (status !== 'loading' && !failed) return null;
   return (
     <FailedNote

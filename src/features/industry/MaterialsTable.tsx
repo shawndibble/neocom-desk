@@ -18,24 +18,21 @@ import {
   IconButton,
   IskAmount,
   NativeSelect,
-  TextInput,
   Toast,
-  Tooltip,
   textActionClassName,
-  type DataTableColumn,
 } from '@/components/ui';
 import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import type { UseTableExport } from '@/components/ui/useTableExport';
-import type { MakeMethod, MakeOrBuy } from '@/engine/industry/makeOrBuy';
-import { rowVolume } from '@/engine/industry/materialVolume';
+import type { MakeOrBuy } from '@/engine/industry/makeOrBuy';
 import type { MaterialSourcing, MaterialSourcingMap } from '@/engine/industry/types';
 import type { SkillGateVerdict } from '@/engine/industry/skillGate';
 import { cx } from '@/lib/cx';
-import { formatIsk, formatIskCompact } from '@/lib/isk';
-import { maskNumber, unmaskCount, unmaskNumber } from '@/lib/numberMask';
+import { formatIskCompact } from '@/lib/isk';
+import { unmaskCount, unmaskNumber } from '@/lib/numberMask';
 import { ItemInfoLink } from '@/features/entities';
-import { formatVolume } from './format';
+import { buildMaterialsColumns } from './MaterialsColumns';
+import { NotApplicable } from './NotApplicable';
 import { materialRowState } from './materialRow';
 import { DepthPriceLine } from './DepthPriceLine';
 import type { DepthPrice } from '@/engine/industry/depthPrice';
@@ -62,6 +59,11 @@ import {
 import { useIsPhone } from '@/lib/useIsPhone';
 import { useMediaQuery } from '@/lib/useMediaQuery';
 import { ownedStockBulkText } from './ownedStockBulkText';
+import { SourcingInput } from './SourcingInput';
+import { MaterialsPhoneRow } from './MaterialsPhoneRow';
+import { MakeOrBuyMarker } from './MakeOrBuyMarker';
+import { SwapButton } from './SwapButton';
+import { ERRAND_GLYPH, ERRAND_LABEL_KEY, ERRAND_TONE, linkClassName } from './materialsTableStyle';
 
 interface MaterialsTableProps {
   /** Engine cost lines — already resolved against the plan's sourcing overrides and hub prices. */
@@ -137,332 +139,6 @@ export interface MaterialsTableHandle {
 
 const parsePrice = unmaskNumber;
 
-interface SourcingInputProps {
-  value: number | undefined;
-  /** Accessible name — the column alone cannot name it, a `<th>` does not label a form control. */
-  label: string;
-  /** Which keypad a phone raises: `numeric` for a whole count, `decimal` where a fraction is legal. */
-  inputMode: 'numeric' | 'decimal';
-  widthClassName: string;
-  /**
-   * Shown while the field is empty. Only right where empty means a known
-   * default — "0" on a quantity nobody has claimed to own. The price field
-   * passes none: empty there means the market has no number for this
-   * material, which the tag beside it spells out, and a ghost 0 would read as
-   * a price of nothing.
-   */
-  placeholder?: string;
-  /**
-   * Pairs with an external `<label htmlFor>` for callers that don't wrap the
-   * input in a `<label>`. Only for click-to-focus — `aria-label` above (set
-   * from `label`) always wins the accessible name over an id/for
-   * association, so this id changes nothing a screen reader announces.
-   */
-  id?: string;
-  /** Marks the field invalid and ties it to `describedBy`'s error text (issue #1488). */
-  invalid?: boolean;
-  describedBy?: string;
-  /** The player's own number (a typed price, a claimed owned count): shown in the accent, the app's "you set this" cue. */
-  mine?: boolean;
-  /** Takes focus on mount — a field the player has just asked to edit. */
-  autoFocus?: boolean;
-  parse: (raw: string) => number | undefined;
-  onCommit: (value: number | undefined) => void;
-}
-
-/**
- * One always-editable numeric cell. Commits on blur (and on Enter, which blurs)
- * rather than per keystroke: every commit writes the whole plan record and
- * schedules a sync, and clearing the box to retype would briefly drop the entry
- * and flip the row's state labels mid-edit. While focused the raw string is
- * held locally so a half-typed value survives; the moment the edit ends the
- * prop is the source of truth again.
- *
- * It masks at rest and unmasks to edit: a column of prices is unreadable as
- * `338600` beside `6622`, and a box you are typing into is unusable if a
- * formatter rewrites the digits under the caret. So the grouped number shows
- * while the field sits, focus swaps in the plain one, and blur puts the mask
- * back. That costs `type="number"` — an input holding "338,600" is invalid to
- * the browser and reads back as empty — so this is a text field with the
- * numeric keypad asked for explicitly. Nothing is lost: the spin buttons were
- * already suppressed on a phone, Enter still commits, and `unmaskNumber`
- * accepts the separators a pasted number brings with it.
- */
-export function SourcingInput({
-  value,
-  label,
-  inputMode,
-  widthClassName,
-  placeholder,
-  id,
-  invalid,
-  describedBy,
-  mine = false,
-  autoFocus,
-  parse,
-  onCommit,
-}: SourcingInputProps) {
-  const [draft, setDraft] = useState<string | null>(null);
-  const [editing, setEditing] = useState(false);
-  // Leaving the page mid-edit (Back, a shortcut, a row scrolled out of a
-  // virtualized list) unmounts the field without a blur, which would drop the
-  // edit. The ref mirrors the uncommitted draft synchronously — cleared in the
-  // same handler that commits on blur, so an unmount right after a blur never
-  // commits twice — and the latest props, read only at unmount.
-  const pendingRef = useRef<string | null>(null);
-  const latestRef = useRef({ value, parse, onCommit });
-  useEffect(() => {
-    latestRef.current = { value, parse, onCommit };
-  });
-  useEffect(
-    () => () => {
-      const pending = pendingRef.current;
-      if (pending === null) return;
-      const { value: current, parse: parseLatest, onCommit: commit } = latestRef.current;
-      const next = parseLatest(pending);
-      // Only a real number: an emptied or unparseable box on the way out is
-      // more likely abandoned than a deliberate clear.
-      if (next !== undefined && next !== current) commit(next);
-    },
-    []
-  );
-  return (
-    <TextInput
-      id={id}
-      aria-invalid={invalid}
-      aria-describedby={describedBy}
-      size="sm"
-      type="text"
-      inputMode={inputMode}
-      aria-label={label}
-      placeholder={placeholder}
-      // Digits sit right in the table, where they line up with the numeric
-      // columns around them; in the stacked card there is no column to line
-      // up with, and right-aligned digits would float a width away from the
-      // label that names them.
-      // `!`: the field's base class sets `text-text`, and two colour utilities
-      // on one element resolve by stylesheet order, not by class order.
-      className={cx(widthClassName, 'text-left tabular-nums sm:text-right', mine && 'text-accent!')}
-      autoFocus={autoFocus}
-      // Three states, and the order matters. A typed draft wins, verbatim — a
-      // half-finished "6622." has to survive a keystroke a formatter would
-      // eat. Otherwise the prop is shown: plain while focused, masked at rest.
-      //
-      // Deliberately not "unmask into the draft on focus": that would freeze
-      // the number as it stood when the field was entered, and a market
-      // refresh landing mid-edit would then be committed on blur as an
-      // override of the stale price. Until a key is pressed the prop stays the
-      // source of truth, exactly as it was before the mask existed.
-      value={draft ?? (value === undefined ? '' : editing ? String(value) : maskNumber(value))}
-      onFocus={() => setEditing(true)}
-      onChange={(event) => {
-        pendingRef.current = event.target.value;
-        setDraft(event.target.value);
-      }}
-      onBlur={(event) => {
-        const next = parse(event.target.value);
-        pendingRef.current = null;
-        setDraft(null);
-        setEditing(false);
-        // Tabbing through an untouched field must not rewrite the record.
-        // This is also what keeps the price field's market default a default:
-        // its `value` is the hub price when nothing is stored, so a field
-        // blurred as it was found commits nothing and the row keeps tracking
-        // the market.
-        if (next !== value) onCommit(next);
-      }}
-      onKeyDown={(event) => {
-        if (event.key === 'Enter') event.currentTarget.blur();
-      }}
-    />
-  );
-}
-
-/** Structural, not i18next's TFunction, so this stays easy to pass around without fighting its generics. */
-type Translate = (key: string, opts?: Record<string, unknown>) => string;
-
-/** The "build" glyph per method — a fourth method needs an entry here, never another ternary branch at a call site. */
-const BUILD_GLYPH: Record<MakeMethod, typeof Icon.Build> = {
-  manufacturing: Icon.Build,
-  planetary: Icon.Planetary,
-  reaction: Icon.Reaction,
-};
-
-/**
- * The prose behind a make-or-buy verdict: both unit prices, at ME, and — when
- * there is a remainder left to spend the difference on — what it's worth.
- * Shared by the advice-only marker below and the build-here toggle in the
- * materials column, so a row's tooltip and its control never say something
- * different about the same number.
- */
-function makeOrBuyVerdict(advice: MakeOrBuy, t: Translate): string {
-  return t('industry.makeOrBuy.suggestion', {
-    verdict: t(`industry.makeOrBuy.${advice.verdict === 'build' ? 'actionBuild' : 'actionBuy'}`),
-  });
-}
-
-/**
- * The reasoning under the verdict: the two unit prices the call turns on, and
- * what the gap is worth. Deliberately terse fragments rather than sentences —
- * this is read at a glance off a hover, where a paragraph is worse than a
- * comparison. One string per method, not one per method-and-verdict: the
- * verdict is the heading now, so the numbers no longer have to restate it.
- */
-function makeOrBuyReason(advice: MakeOrBuy, remaining: number, t: Translate): string {
-  const method =
-    advice.method === 'manufacturing'
-      ? 'Manufacturing'
-      : advice.method === 'reaction'
-        ? 'Reaction'
-        : 'Planetary';
-  const parts = [
-    // Two decimals on the unit prices, unlike the whole-ISK columns beside
-    // them: the verdict turns on the gap between these two numbers, and
-    // rounding a 5.4-vs-5.6 call to "5 against 5" would make it unreadable.
-    t(`industry.makeOrBuy.reason${method}`, {
-      make: formatIsk(advice.makeUnitPrice, 2),
-      buy: formatIsk(advice.buyUnitPrice, 2),
-      me: advice.me,
-    }),
-  ];
-  // Already inside the build price above — named so a "buy" verdict on a
-  // cheap recipe reads as the blueprint's doing, not a pricing error.
-  if (advice.blueprintCost > 0) {
-    parts.push(t('industry.makeOrBuy.blueprintCost', { amount: formatIsk(advice.blueprintCost) }));
-  }
-  // Nothing is riding on a fully owned row: there is no remainder to spend
-  // the difference on either way.
-  if (remaining > 0 && advice.savings > 0) {
-    parts.push(
-      t('industry.makeOrBuy.savings', {
-        amount: formatIsk(advice.savings),
-        quantity: remaining.toLocaleString(),
-      })
-    );
-  }
-  return parts.join(' ');
-}
-
-/** Plain text for an accessible name, which cannot take a node. */
-function makeOrBuyLabel(advice: MakeOrBuy, remaining: number, t: Translate): string {
-  return `${makeOrBuyVerdict(advice, t)}. ${makeOrBuyReason(advice, remaining, t)}`;
-}
-
-/**
- * The advice as a tooltip bubble: the suggestion on its own line, bold, the
- * reasoning under it, and — where the trigger is the toggle rather than the
- * advisory glyph — what clicking will do.
- *
- * The suggestion leads because it is the only part a player needs every time
- * — "which of these two should I be doing" — and it used to be inferable only
- * from which of six phrasings the sentence happened to start with. Bold and
- * on its own line, it survives a glance; the prices below it are there for
- * when the answer is close enough to want checking.
- *
- * `action` is the row's *current* state inverted, never the suggestion: a row
- * already being built is clicked to go back to buying, whatever the advice
- * says. Keeping the two apart is the whole point of spelling the click out —
- * "Suggestion: Build It" over "Click to Buy" is a row that is already right,
- * which is exactly the case a single line of text used to render as a
- * contradiction.
- */
-function MakeOrBuyTooltip({
-  advice,
-  remaining,
-  action,
-}: {
-  /** Omitted where there is no verdict — an unpriced recipe input, or nothing that produces this. */
-  advice?: MakeOrBuy;
-  remaining: number;
-  /** What a click does. Omitted on the advice-only marker, which has nothing to click. */
-  action?: 'build' | 'buy';
-}) {
-  const { t } = useTranslation();
-  return (
-    <span className="flex flex-col gap-1">
-      {advice && (
-        <>
-          <span className="font-semibold">{makeOrBuyVerdict(advice, t)}</span>
-          <span>{makeOrBuyReason(advice, remaining, t)}</span>
-        </>
-      )}
-      {action && (
-        <span>{t(`industry.makeOrBuy.${action === 'build' ? 'clickBuild' : 'clickBuy'}`)}</span>
-      )}
-    </span>
-  );
-}
-
-/**
- * The row's make-or-buy verdict (GLOSSARY.md round 29). Distinct glyphs
- * rather than one glyph in several tones: the verdict has to survive greyscale
- * and a screen reader (docs/DESIGN.md §7), so the shape carries it and the
- * label spells it out with both prices. Deliberately not a control — it has
- * nothing to click, so it takes no tab stop from the sourcing inputs on the
- * same row. (A material something here can build gets the interactive
- * version of this same glyph instead — see the materials column below.)
- *
- * The house `Tooltip` reads that same label on hover or touch-and-hold —
- * never a bare `title`, which every other pointer-revealed hint in the app
- * already avoids (docs/DESIGN.md's component table). `Tooltip`'s trigger
- * only needs `asChild`, not focusability: Radix reveals it on pointer
- * movement regardless of tab order, and only wires up its `onFocus` handler,
- * which never fires without a `tabIndex` to focus onto. So wrapping the span
- * costs nothing of the "no tab stop" rule above — there's a test pinning it.
- */
-function MakeOrBuyMarker({
-  advice,
-  remaining,
-  badge = false,
-}: {
-  advice: MakeOrBuy;
-  remaining: number;
-  /**
-   * A short word in a pill ("PI", "Buy") instead of the glyph — the phone
-   * card's form, where there is no hover to explain a bare planet or cart.
-   */
-  badge?: boolean;
-}) {
-  const { t } = useTranslation();
-  const building = advice.verdict === 'build';
-  const label = makeOrBuyLabel(advice, remaining, t);
-  // Four glyphs, not two: "build" covers three different errands. A hammer
-  // sends the player to an industry slot, a planet to a colony, a flask to a
-  // refinery, and none of the three are interchangeable — nothing about the
-  // manufacturing icon told a player which one a "build" row meant. The
-  // tooltip already said so; the marker now says it at a glance. Planetary
-  // keeps its own tone (`text-accent`, the app's blue) rather than sharing
-  // manufacturing's green, so that one split reads without hovering; reaction
-  // shares manufacturing's green — both are "run an industry job", and the
-  // flask glyph alone (not a third colour) is what tells them apart, which is
-  // the shape-carries-meaning half of docs/DESIGN.md §7, not the colour half.
-  const planetary = building && advice.method === 'planetary';
-  const Glyph = building ? BUILD_GLYPH[advice.method] : Icon.Buy;
-  const tone = planetary ? 'text-accent' : building ? 'text-isk-pos' : 'text-text-dim';
-  return (
-    <Tooltip content={<MakeOrBuyTooltip advice={advice} remaining={remaining} />} openOnTap>
-      <span
-        role="img"
-        aria-label={label}
-        className={cx(
-          'shrink-0',
-          tone,
-          badge &&
-            'rounded-xs border border-current px-1 text-[0.5625rem] leading-4 font-bold tracking-widest uppercase'
-        )}
-      >
-        {badge ? (
-          t(
-            `industry.errands.badge.${building ? (advice.method === 'manufacturing' ? 'build' : advice.method) : 'buy'}`
-          )
-        ) : (
-          <Glyph size={Icon.ICON_SIZE.sm} />
-        )}
-      </span>
-    </Tooltip>
-  );
-}
-
 /** `xl` (78.125rem, src/styles/index.css) up to `2xl`: where BuildPlanDetail puts Costs & revenue beside Materials. */
 const BESIDE_COSTS_QUERY = '(min-width: 78.125rem) and (max-width: 95.999rem)';
 
@@ -473,149 +149,6 @@ const PHONE_SORTS: readonly PhoneSort[] = ['plan', 'total', 'toBuy', 'name'];
 /** A material being built here rather than bought. */
 function isBuilt(material: MaterialTableRow): boolean {
   return material.subBuilds.length > 0;
-}
-
-/** A number in the phone ledger, right-aligned under its section's column header. */
-const LEDGER_VALUE = 'flex min-w-0 justify-end text-sm tabular-nums';
-
-/**
- * Each section's colour, carried by its heading. Never the only cue
- * (docs/DESIGN.md §7): every heading also names its section in words and,
- * where one exists, carries the errand's own glyph.
- */
-const ERRAND_TONE: Record<MaterialErrand, string> = {
-  toBuy: 'text-text',
-  building: 'text-success',
-  blueprint: 'text-blueprint-copy',
-  have: 'text-text-dim',
-};
-
-const ERRAND_GLYPH: Record<MaterialErrand, typeof Icon.Build | null> = {
-  toBuy: Icon.Buy,
-  building: Icon.Build,
-  blueprint: Icon.Blueprint,
-  have: null,
-};
-
-const ERRAND_LABEL_KEY: Record<MaterialErrand, string> = {
-  toBuy: 'industry.errands.toBuy',
-  building: 'industry.errands.building',
-  blueprint: 'industry.errands.blueprint',
-  have: 'industry.errands.have',
-};
-
-/** Editable-in-place value (§6c): faint pencil at rest, field box on hover/focus. 44px tap area is an invisible ::after. */
-const editableValueClassName = cx(
-  'relative inline-flex items-center gap-1 rounded-xs border border-transparent px-1 hover:border-line-bright hover:bg-panel-2 after:absolute after:-inset-x-2 after:-inset-y-3 after:content-[""]',
-  interactiveClassName,
-  focusRingClassName
-);
-const editPencilClassName = 'text-text-faint';
-
-type LinkTone = 'accent' | 'build' | 'blueprint' | 'quiet';
-
-/**
- * A row's text action — Recipe, Build instead, Buy instead, Change tier. Text
- * rather than a bare glyph: the hammer/cart button this replaces said what a
- * click did only on hover, and needed a reserved slot beside every name to
- * line the names up, which read as an indent on every row without one.
- */
-function linkClassName(tone: LinkTone): string {
-  return cx(
-    'inline-flex min-h-11 items-center gap-1 rounded-xs text-[0.6875rem] font-semibold whitespace-nowrap underline underline-offset-2 md:min-h-0',
-    interactiveClassName,
-    focusRingClassName,
-    tone === 'accent' && 'text-accent decoration-accent-dim',
-    tone === 'build' && 'text-success decoration-success/50',
-    tone === 'blueprint' && 'text-blueprint-copy decoration-blueprint-copy/50',
-    tone === 'quiet' && 'text-text-dim decoration-line-bright hover:text-text'
-  );
-}
-
-/**
- * Switches one material between buying and building it here. Shown on every
- * material something here can produce, the way the hammer was: green, with
- * what it saves, when the make-or-buy advice says building is cheaper; quiet
- * otherwise, so it never reads as a recommendation it isn't.
- *
- * The savings sit beside the button rather than inside it, so the button's
- * visible text stays a prefix of its accessible name (WCAG 2.5.3).
- */
-function SwapButton({
-  material,
-  name,
-  kind,
-  advice,
-  skillGate,
-  nameForCharacter,
-  nameForSkill,
-  onClick,
-}: {
-  material: MaterialTableRow;
-  name: string;
-  /** What a click does: start building it, or go back to buying it. */
-  kind: 'build' | 'buy';
-  advice: MakeOrBuy | undefined;
-  /** When gated, a lock-only marker follows a Build instead button: no skill text. */
-  skillGate?: SkillGateVerdict;
-  nameForCharacter?: (characterId: number) => string;
-  nameForSkill?: (typeID: number) => string;
-  onClick: () => void;
-}) {
-  const { t } = useTranslation();
-  const savings =
-    kind === 'build' &&
-    advice?.verdict === 'build' &&
-    advice.savings > 0 &&
-    material.remainingQuantity > 0
-      ? advice.savings
-      : null;
-  const Glyph = kind === 'build' ? BUILD_GLYPH[advice?.method ?? 'manufacturing'] : Icon.Buy;
-  return (
-    <span className="inline-flex flex-wrap items-center gap-x-1.5">
-      <Tooltip
-        content={
-          <MakeOrBuyTooltip advice={advice} remaining={material.remainingQuantity} action={kind} />
-        }
-      >
-        <button
-          type="button"
-          data-swap-for={material.typeID}
-          data-swap-kind={kind}
-          aria-label={t(kind === 'build' ? 'industry.buildHereFor' : 'industry.buyInsteadFor', {
-            material: name,
-          })}
-          className={linkClassName(savings !== null ? 'build' : 'quiet')}
-          onClick={onClick}
-        >
-          <Glyph size={Icon.ICON_SIZE.sm} aria-hidden="true" />
-          {t(kind === 'build' ? 'industry.errands.buildInstead' : 'industry.errands.buyInstead')}
-        </button>
-      </Tooltip>
-      {savings !== null && (
-        <span className="text-[0.6875rem] text-success tabular-nums">
-          {t('industry.errands.saves', { amount: formatIskCompact(savings) })}
-        </span>
-      )}
-      {kind === 'build' && skillGate?.gated && nameForCharacter && nameForSkill && (
-        <SkillGateMarker
-          lockOnly
-          verdict={skillGate}
-          nameForSkill={nameForSkill}
-          nameForCharacter={nameForCharacter}
-        />
-      )}
-    </span>
-  );
-}
-
-/** A plain "—" for a cell with nothing to say on this kind of row. */
-function NotApplicable() {
-  return (
-    <span className="text-text-faint" aria-hidden="true">
-      —
-    </span>
-  );
 }
 
 /**
@@ -1117,83 +650,18 @@ export function MaterialsTable({
   // hold and toggle machinery above, and a stale closure there would commit
   // an edit through an outdated sourcing map.
   const anyDepth = materials.some((m) => depthOf(m) !== undefined);
-  const columns: DataTableColumn<MaterialTableRow>[] = [
-    {
-      id: 'material',
-      header: t('industry.material'),
-      sortValue: (material) => nameFor(material.typeID),
-      render: (material) => renderName(material, true),
-    },
-    {
-      id: 'quantity',
-      header: t('industry.errands.need'),
-      align: 'right',
-      className: 'tabular-nums',
-      headerCellClassName: 'w-20',
-      sortValue: (material) => material.quantity,
-      render: (material) => <span>{material.quantity.toLocaleString()}</span>,
-    },
-    {
-      id: 'owned',
-      header: t('industry.errands.haveColumn'),
-      align: 'right',
-      // The field's own width plus the compact cell padding, and no more.
-      headerCellClassName: 'w-24',
-      render: renderHave,
-    },
-    {
-      id: 'toBuy',
-      header: t('industry.errands.toBuyColumn'),
-      align: 'right',
-      className: 'tabular-nums',
-      headerCellClassName: 'w-20',
-      // A built row is not bought at all, so it sinks rather than sorting as zero.
-      sortValue: (material) =>
-        material.subBuilds.length > 0 ? undefined : material.remainingQuantity,
-      render: (material) =>
-        material.subBuilds.length > 0 ? (
-          <NotApplicable />
-        ) : (
-          <span>{material.remainingQuantity.toLocaleString()}</span>
-        ),
-    },
-    {
-      id: 'price',
-      header: t('industry.price'),
-      align: 'right',
-      // Wider only while a row carries a Depth Price's second line.
-      headerCellClassName: anyDepth ? 'w-44' : 'w-28',
-      render: renderPrice,
-    },
-    {
-      id: 'volume',
-      header: t('industry.volume'),
-      align: 'right',
-      className: 'tabular-nums',
-      headerCellClassName: 'w-24',
-      sortValue: (material) =>
-        material.subBuilds.length > 0 ? undefined : (rowVolume(material, volumeFor) ?? undefined),
-      render: (material) => {
-        // A built row's own volume is never hauled at this typeID — its
-        // inputs carry it in their own rows.
-        if (material.subBuilds.length > 0) return <NotApplicable />;
-        const volume = rowVolume(material, volumeFor);
-        return <span>{volume === null ? t('common.unknown') : formatVolume(volume)}</span>;
-      },
-    },
-    {
-      id: 'lineTotal',
-      header: t('industry.errands.total'),
-      align: 'right',
-      className: 'tabular-nums',
-      headerCellClassName: 'w-24',
-      sortValue: (material) =>
-        material.subBuilds.length > 0
-          ? undefined
-          : (materialRowState(material, sourcing, pricesReady).lineCost ?? undefined),
-      render: renderTotal,
-    },
-  ];
+  const columns = buildMaterialsColumns({
+    t,
+    nameFor,
+    volumeFor,
+    sourcing,
+    pricesReady,
+    anyDepth,
+    renderName,
+    renderHave,
+    renderPrice,
+    renderTotal,
+  });
 
   // Dropped only where Materials shares its row with Costs & revenue (`xl`
   // up to `2xl`): that panel already totals the plan's volume, and the
@@ -1289,182 +757,6 @@ export function MaterialsTable({
     );
   }
 
-  /**
-   * One phone ledger row, under its section's NEED | HAVE | BUY header: the
-   * name and total; the three numbers in the header's columns, Have a
-   * number with a pencil you tap to edit; then the row's action on the left and its price
-   * (or what a build saves) on the right. No card and no box — rows are told
-   * apart by a zebra tint, so the Materials panel is the only frame. A
-   * Blueprint row has no numbers line, and an owned one says Owned instead of
-   * a total and a price of 0.
-   */
-  function renderPhoneRow(material: MaterialTableRow) {
-    const building = isBuilt(material);
-    const tier = material.acquisitionTier;
-    const ownedBlueprint = tier !== undefined && material.remainingQuantity === 0;
-    const savings = building ? buildSavings(material) : null;
-    const item = (
-      <li
-        key={material.typeID}
-        className={cx(
-          'grid grid-cols-3 gap-x-1.5 gap-y-1 px-3 py-2 even:bg-white/[0.025]',
-          ownedBlueprint && 'opacity-80'
-        )}
-      >
-        <div className="col-span-3 flex items-center justify-between gap-2">
-          <span className="min-w-0 text-sm font-semibold">{renderName(material, false, true)}</span>
-          <span className="flex shrink-0 items-center gap-1 text-sm font-semibold tabular-nums">
-            {ownedBlueprint ? (
-              <span className="text-[0.625rem] leading-5 font-bold tracking-widest text-blueprint-copy uppercase">
-                {t('industry.blueprintAcquisitionOwned')}
-              </span>
-            ) : (
-              renderTotal(material)
-            )}
-          </span>
-        </div>
-        {!tier && (
-          <>
-            <span className={LEDGER_VALUE}>{material.quantity.toLocaleString()}</span>
-            <span className={LEDGER_VALUE}>{renderPhoneHave(material)}</span>
-            <span className={cx(LEDGER_VALUE, 'font-semibold')}>
-              {material.remainingQuantity.toLocaleString()}
-            </span>
-          </>
-        )}
-        {/* What to do about the row on the left — use what's in the hangar,
-            switch build/buy, change the blueprint tier — and on the right its
-            price as "@ price", or what building it saves. */}
-        <div className="col-span-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-          <span className="flex min-w-0 flex-wrap items-center gap-x-3">
-            {renderOwnedHint(material)}
-            {renderAction(material, false)}
-            {tier && (
-              <span className="text-[0.6875rem] text-text-dim">
-                {t('industry.blueprintAcquisitionTier', tier)}
-              </span>
-            )}
-          </span>
-          {building ? (
-            savings !== null ? (
-              <span className="ml-auto text-xs text-success tabular-nums">
-                {t('industry.errands.saves', { amount: formatIskCompact(savings) })}
-              </span>
-            ) : (
-              material.unpriced && renderPrice(material)
-            )
-          ) : (
-            !ownedBlueprint && <span className="ml-auto text-xs">{renderPhonePrice(material)}</span>
-          )}
-        </div>
-      </li>
-    );
-    return item;
-  }
-
-  /**
-   * The ledger's Have: the number with a faint pencil — the price's own
-   * "tap to edit" cue — rather than a field stretched across its column. Blue
-   * when the player set it, faint at 0. A tap swaps in the field, focused;
-   * leaving it swaps the number back. The 44px tap area is an invisible
-   * `::after`, so the row stays one line tall.
-   */
-  function renderPhoneHave(material: MaterialTableRow) {
-    if (editingHave === material.typeID) {
-      return (
-        <span
-          className="w-full"
-          onBlur={(event) => {
-            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-              setEditingHave(null);
-            }
-          }}
-        >
-          {renderHave(material, false, true, true)}
-        </span>
-      );
-    }
-    const owned = sourcing?.[material.typeID]?.ownedQuantity ?? 0;
-    return (
-      <button
-        type="button"
-        onClick={() => setEditingHave(material.typeID)}
-        className={cx(
-          editableValueClassName,
-          'tabular-nums',
-          owned > 0 ? 'text-accent' : 'text-text-dim'
-        )}
-      >
-        <span className="sr-only">
-          {t('industry.errands.haveFor', { material: nameFor(material.typeID) })},{' '}
-        </span>
-        {owned.toLocaleString()}
-        <Icon.Rename size={Icon.ICON_SIZE.sm} aria-hidden="true" className={editPencilClassName} />
-      </button>
-    );
-  }
-
-  /**
-   * The phone card's price: "@ 3,320,000 ISK" as light text, the way the
-   * mockup drew it, which becomes the field when tapped and goes back to text
-   * once focus leaves it. A box on every card made the cards heavy, and gave
-   * a card with nothing else on its last line a 44px line just for that box.
-   * The tap area is still 44px tall — an invisible `::after` around the text —
-   * so it costs no layout height. A row with no price yet stays the field,
-   * since there is no number to show.
-   */
-  function renderPhonePrice(material: MaterialTableRow) {
-    const state = materialRowState(material, sourcing, pricesReady);
-    if (editingPrice === material.typeID || state.unitPrice === null) {
-      return (
-        <span
-          onBlur={(event) => {
-            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-              setEditingPrice(null);
-            }
-          }}
-        >
-          {renderPrice(material, true, editingPrice === material.typeID)}
-        </span>
-      );
-    }
-    const overridden = state.priceSource === 'override';
-    const depth = overridden ? undefined : depthOf(material);
-    return (
-      <>
-        <button
-          type="button"
-          onClick={() => setEditingPrice(material.typeID)}
-          className={cx(
-            editableValueClassName,
-            'text-xs tabular-nums',
-            overridden ? 'text-accent' : 'text-text'
-          )}
-        >
-          <span className="sr-only">
-            {t('industry.priceFor', { material: nameFor(material.typeID) })}:{' '}
-          </span>
-          {t('industry.errands.atPrice', { price: maskNumber(state.unitPrice) })}
-          {overridden && (
-            <span className="ml-1.5 text-[0.6875rem] no-underline">
-              {t('industry.priceSourceOverride')}
-            </span>
-          )}
-          <Icon.Rename
-            size={Icon.ICON_SIZE.sm}
-            aria-hidden="true"
-            className={editPencilClassName}
-          />
-        </button>
-        {depth && (
-          <span className="mt-0.5 block text-right">
-            <DepthPriceLine depth={depth} />
-          </span>
-        )}
-      </>
-    );
-  }
-
   /** Within one section only — a sort never pulls a row out of its errand. */
   function sortForPhone(rows: readonly MaterialTableRow[]): readonly MaterialTableRow[] {
     if (phoneSort === 'plan') return rows;
@@ -1552,7 +844,36 @@ export function MaterialsTable({
                       </span>
                     </div>
                   )}
-                  <ul>{sortForPhone(rows).map((material) => renderPhoneRow(material))}</ul>
+                  <ul>
+                    {sortForPhone(rows).map((material) => (
+                      <MaterialsPhoneRow
+                        key={material.typeID}
+                        material={material}
+                        sourcing={sourcing}
+                        pricesReady={pricesReady}
+                        nameFor={nameFor}
+                        depth={depthOf(material)}
+                        savings={isBuilt(material) ? buildSavings(material) : null}
+                        editingHave={editingHave === material.typeID}
+                        editingPrice={editingPrice === material.typeID}
+                        onEditHave={() => setEditingHave(material.typeID)}
+                        onStopEditingHave={() => setEditingHave(null)}
+                        onEditPrice={() => setEditingPrice(material.typeID)}
+                        onStopEditingPrice={() => setEditingPrice(null)}
+                        name={renderName(material, false, true)}
+                        total={renderTotal(material)}
+                        ownedHint={renderOwnedHint(material)}
+                        action={renderAction(material, false)}
+                        haveField={
+                          editingHave === material.typeID
+                            ? renderHave(material, false, true, true)
+                            : null
+                        }
+                        priceField={(autoFocus) => renderPrice(material, true, autoFocus)}
+                        unpricedField={isBuilt(material) ? renderPrice(material) : null}
+                      />
+                    ))}
+                  </ul>
                 </>
               ) : (
                 <div className="overflow-x-auto">

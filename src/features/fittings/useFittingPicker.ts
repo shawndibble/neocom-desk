@@ -11,7 +11,8 @@ import type { LoadedFitting, LoadOutcome } from '@/engine/fittings/load';
 import { fittingToShareInput } from '@/engine/fittings/shareMapper';
 import type { Fitting } from '@/engine/fittings/types';
 import { loadFittingFromText } from './loadFittingFromText';
-import { resolveFittingXmlDocument, type FittingWorkspace } from './useFittingWorkspace';
+import { resolveFittingXmlDocument } from './fittingXmlList';
+import type { FittingWorkspace } from './useFittingWorkspace';
 
 /** The slice of the workspace `FittingStartScreen` drives; the picker supplies its own. */
 export type FittingLibrarySource = Pick<

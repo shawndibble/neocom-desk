@@ -46,7 +46,7 @@ Scope gating: `/ships` and `/ships/fittings/compare` are UNGATED (`src/app/route
 - `fittingRoutes.ts`: `fittingsRedirect` sends `/ships/fittings?f=code` to editor; editor with no `f` goes to library.
 - Open Fitting lives in the address bar as `?f=<Fitting Share Code>`; every edit is a history entry, so browser Back is undo (`shortcuts.onPageHint`).
 - Too-large Fitting cannot be carried in a link: warning `fittings.load.tooLargeToShare`, reload loses it; Save to My Fittings and Compare-through-link disabled with tooltip.
-- Router state `fittingLoadText` (`@/lib/shortcuts` `FittingLoadState`) lets `GlobalPasteRouter` (paste of EFT anywhere outside a field) open the Fittings tab and Load it (`src/routes/Fittings.tsx` effect ~line 200).
+- Router state `fittingLoadText` (`@/lib/shortcuts` `FittingLoadState`) lets `GlobalPasteRouter` (paste of EFT anywhere outside a field) open the Fittings tab and Load it (`useFittingPasteLoad`).
 
 ## Start screen (`FittingStartScreen.tsx`)
 
@@ -156,16 +156,16 @@ Collapsible sections with stable ids: assumptions ("Implants & skills"), whatToT
 
 ## Fixing an over-CPU / over-PG fit
 
-**Make it fit…** (`src/engine/fittings/makeItFit.ts`, `MakeItFitDialog.tsx`) sits beside the red "Over by" text on the CPU, powergrid and calibration readouts. It recalculates every meta-variant swap of a fitted module or rig, offers those that bring the fit under budget (a pair of swaps only when no single swap does), ranked by smallest loss of damage, tank and speed, then by ISK at the pilot's Trade Hub. One click applies it as an ordinary edit. Other tools:
+**Fix CPU / Fix powergrid / Fix calibration** sit under each over-budget readout (the Ring, the List and the stats card's Fitting section, whose figures go red when over) and open **Make it fit** (`MakeItFitDialog.tsx`), which lists every way back under budget, those that cost the fit nothing first: **Train** — the lowest level of one skill that makes it fit, or, when none does alone, the helpful skills together at the lowest levels that still fit (`src/engine/fittings/skillFixes.ts`), quickest first, with Add to plan; **Implants** — the Implant Finder's cheapest fixes for that budget that bring the whole fit under (none for calibration), a click puts them in the Fitting's set; **Swap modules** — every meta-variant swap of a fitted module or rig that brings the fit under (`src/engine/fittings/makeItFit.ts`; a pair only when no single swap does), ranked by smallest loss of damage, tank and speed, then by ISK at the pilot's Trade Hub, one click applying it as an ordinary edit. Training shows only for the active Character's real skills. Other tools:
 
-| Tool                    | Where                                | What it shows                                                                                                              |
-| ----------------------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
-| Gauge / Fitting section | Ring gauges, stats "Fitting" section | CPU/PG used vs total, over-by state, over-budget flash                                                                     |
-| Variations (menu entry) | Item menu on a module                | All meta variants in one table: whole-fitting stat changes, Fits / Doesn't fit, can-fly, price; click to swap; CSV         |
-| Add panel filters       | Add panel > Modules                  | "Fits this slot", Resources filter, Meta level; rows disabled with reason "too much CPU/PG"                                |
-| What to train           | Stats section                        | Skill levels ranked by effect on the fit (CPU/PG skills included), Add to Skill Plan; Tech II upgrades within a few skills |
-| Implant Finder          | Header Implants control              | Tries every implant on this fit; lists cheapest fixes when over CPU/PG (`implantFinder.ts`)                                |
-| Skill basis: All V      | Header Skill basis control           | Stats only; shows if skills alone would fix it                                                                             |
+| Tool                    | Where                                | What it shows                                                                                                                                                                                         |
+| ----------------------- | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Gauge / Fitting section | Ring gauges, stats "Fitting" section | CPU/PG used vs total, over-by state, over-budget flash                                                                                                                                                |
+| Variations (menu entry) | Item menu on a module                | All meta variants in one table: whole-fitting stat changes, Fits / Doesn't fit, can-fly, price; click to swap; CSV                                                                                    |
+| Add panel filters       | Add panel > Modules                  | "Fits this slot", Resources filter, Meta level; rows disabled with reason "too much CPU/PG"                                                                                                           |
+| What to train           | Stats section                        | Over budget: the training that makes it fit first, then levels that clear part of the overage; then skill levels ranked by effect on the fit, Add to Skill Plan; Tech II upgrades within a few skills |
+| Implant Finder          | Header Implants control              | Tries every implant on this fit; lists cheapest fixes when over CPU/PG (`implantFinder.ts`)                                                                                                           |
+| Skill basis: All V      | Header Skill basis control           | Stats only; shows if skills alone would fix it                                                                                                                                                        |
 
 Unconfirmed: whether the Variations "Fits" column counts CPU and PG or hull/slot rules only (`FittingVariationsPanel.tsx:95-110`).
 

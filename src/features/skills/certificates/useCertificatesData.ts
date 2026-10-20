@@ -4,36 +4,31 @@
  * inputs, from the same hooks, the Skill Plan editor and the Ship Info
  * mastery tab cost training with, so a certificate's time matches theirs.
  */
-import { useEffect, useState } from 'react';
+import { useMemo } from 'react';
 import type { CloneState } from '@/engine/types';
 import { cloneStateFor, useCloneStates } from '@/features/skills/cloneState';
 import { usePlanEditorData } from '@/features/skills/planner/usePlanEditorData';
 import { loadCertificates } from '@/sde/loadSde';
 import type { Certificate } from '@/sde/types';
+import { useAsyncLoad } from '@/lib/useAsyncLoad';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 
 export type CertificatesLoad =
   { status: 'loading' } | { status: 'failed' } | { status: 'ready'; certificates: Certificate[] };
 
 export function useCertificatesData(characterId: number | null) {
-  const [load, setLoad] = useState<CertificatesLoad>({ status: 'loading' });
+  const certificatesLoad = useAsyncLoad(loadCertificates);
+  const { status, data } = certificatesLoad;
+  const load = useMemo<CertificatesLoad>(
+    () =>
+      status === 'ready'
+        ? { status, certificates: data }
+        : { status: status === 'failed' ? 'failed' : 'loading' },
+    [status, data]
+  );
   const editor = usePlanEditorData(characterId);
   const cloneStates = useCloneStates((state) => state.value);
 
-  useEffect(() => {
-    let cancelled = false;
-    loadCertificates().then(
-      (certificates) => {
-        if (!cancelled) setLoad({ status: 'ready', certificates });
-      },
-      () => {
-        if (!cancelled) setLoad({ status: 'failed' });
-      }
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, []);
   const cloneStatesHydrated = useHydratedStore(useCloneStates);
 
   const cloneState: CloneState =

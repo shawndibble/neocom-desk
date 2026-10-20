@@ -32,9 +32,7 @@ import {
   resolveRigFit,
   setRigSlot,
 } from '@/engine/industry/types';
-import { makeOrBuy, type MakeOrBuy } from '@/engine/industry/makeOrBuy';
 import { groupStockClaims, type GroupClaimMember } from '@/engine/industry/groupStockClaims';
-import { totalVolume } from '@/engine/industry/materialVolume';
 import {
   autoBuildHere,
   maxAutoBuildDepth,
@@ -42,15 +40,10 @@ import {
 } from '@/engine/industry/autoMakeOrBuy';
 import { craftScope } from '@/engine/industry/craftScope';
 import { ownedStockSale, sellableMaterials } from '@/engine/industry/ownedStockSale';
-import type {
-  FacilityKind,
-  MaterialPriceBasis,
-  MaterialSourcing,
-  RigKind,
-} from '@/engine/industry/types';
-import { rigKindLabelKey, rigFitSummaryLabel } from './rigFitLabels';
+import type { FacilityKind, MaterialPriceBasis, RigKind } from '@/engine/industry/types';
+import { rigKindLabelKey } from './rigFitLabels';
 import { RigMatchHelper } from './RigMatchHelper';
-import type { BuildPlanChange, SourcingPatchEntry } from './buildPlanStore';
+import type { BuildPlanChange } from './buildPlanStore';
 import type { BuildGroup, BuildGroupSnapshot } from './buildGroups';
 import { GroupTargetLink } from './GroupTargetLink';
 import {
@@ -60,21 +53,9 @@ import {
 } from './planFacilityContext';
 import { REACTION_FACILITY_PRESETS } from './reactionFacilityDefaults';
 import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
-import {
-  hydrateActivityFacilityDefaults,
-  loadActivityFacilityDefaults,
-  rememberActivityLocations,
-} from './facilityDefaults';
-import { rememberedLocationsFromEdit } from './rememberLocationFromEdit';
+import { hydrateActivityFacilityDefaults } from './facilityDefaults';
 import { applyCostIndexOverride, costIndexSource, parseCostIndexPct } from './costIndexOverride';
-import {
-  facilityMemoryKey,
-  forgetFacility,
-  memoryFromPlan,
-  patchFromMemory,
-  recallFacility,
-  rememberFacility,
-} from './facilityMemory';
+import { facilityMemoryKey, patchFromMemory, recallFacility } from './facilityMemory';
 import { retargetPatch } from './retargetPatch';
 import { DEFAULT_TRADE_HUB, TRADE_HUBS, getTradeHub } from '@/market/hubs';
 import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
@@ -99,6 +80,7 @@ import { inventionPricingContextFor, planOwnedBlueprints } from './resolveBuildP
 import { inventionQuoteFor } from './inventionSources';
 import { buildPlanTypeIds, recipeForLookup } from './recipes';
 import { materialPriceBasisOf } from './priceBasis';
+import { usePlanMaterials } from './usePlanMaterials';
 import { useResolvedPlan } from './useResolvedPlan';
 import { useMarketSnapshot } from './useMarketSnapshot';
 import { priceVsMedianFor, usePriceVsMedian } from './usePriceVsMedian';
@@ -108,10 +90,10 @@ import { TableActionsMenu } from '@/components/ui/TableExport';
 import { writeToClipboard } from '@/lib/clipboard';
 import { parseOrKeep, parseTaxPct } from './planInputParsers';
 import { buildItemMenuProps } from './buildItemMenuProps';
-import { MaterialsTable, SourcingInput, type MaterialsTableHandle } from './MaterialsTable';
+import { MaterialsTable, type MaterialsTableHandle } from './MaterialsTable';
+import { SourcingInput } from './SourcingInput';
 import { BuildRecipeModal } from './BuildRecipeModal';
 import { BlueprintAcquisitionModal } from './BlueprintAcquisitionModal';
-import { buyPricedLine } from './materialRow';
 import { materialsCsvColumns } from './materialsCsv';
 import { GroupOwnedDiffersHint } from './GroupOwnedDiffersHint';
 import {
@@ -119,13 +101,7 @@ import {
   hasShoppingList,
   shoppingListText,
 } from '@/engine/industry/shoppingList';
-import {
-  buildRecipe,
-  hasSubBuilds,
-  materialTableRows,
-  shoppingListMaterials,
-  subBuildSeconds as computeSubBuildSeconds,
-} from './subBuildPlan';
+import { buildRecipe } from './subBuildPlan';
 import { formatIsk } from '@/lib/isk';
 import { cx } from '@/lib/cx';
 import type { OwnedStockSnapshot } from './ownedStockDetection';
@@ -144,6 +120,7 @@ import { OwnedStockScopeControl } from './OwnedStockScopeControl';
 import { BuildPlanAutoBuildControl } from './BuildPlanAutoBuildControl';
 import { ResultsSummary } from './ResultsSummary';
 import { BpcCoverageWarning, PlanVerdictHero } from './PlanVerdictHero';
+import { PlanSetupFacts } from './PlanSetupFacts';
 import { useNearestLowsecSystem } from './useNearestLowsecSystem';
 import { planReactionLocation } from './planReactionLocation';
 import { PlanScheduleLine } from './PlanScheduleLine';
@@ -156,6 +133,7 @@ import { BuildLocationPicker } from './BuildLocationPicker';
 import { buildLocationLabel } from './buildLocationLabel';
 import { buildLocationPatch, reactionBuildLocationPatch } from './buildLocationPatch';
 import { useDerivedSecurityBand } from './useDerivedSecurityBand';
+import { usePlanEdits } from './usePlanEdits';
 
 /** The Build Plan fields this panel edits, sent as an `edit` `BuildPlanChange`. */
 export type PlanPatch = Partial<
@@ -307,6 +285,16 @@ export function BuildPlanDetail({
   const entry = catalog.byBlueprintTypeID.get(plan.blueprintTypeID) ?? null;
   const blueprint = useMemo(() => (entry ? toIndustryBlueprint(entry.blueprint) : null), [entry]);
   const activity = blueprint ? industryActivityOf(blueprint) : 'manufacturing';
+  const {
+    latestPlan,
+    latestOnChange,
+    update,
+    movePlan,
+    changeSourcing,
+    changeOneSourcing,
+    toggleBuildHere,
+    toggleIncludeReactions,
+  } = usePlanEdits(plan, activity, onChange);
   const hub = useMemo(() => getTradeHub(plan.hubId) ?? DEFAULT_TRADE_HUB, [plan.hubId]);
   const productTypeID = entry?.productTypeID ?? null;
   const vs90dTargets = useMemo(
@@ -555,12 +543,6 @@ export function BuildPlanDetail({
   // pick: its rigs and tax while it still has none of its own, and the cost
   // index where ESI has none. Once per facility, and not keyed on the override
   // itself — a pilot clearing it must not have it recalled straight back.
-  const latestPlan = useRef(plan);
-  const latestOnChange = useRef(onChange);
-  useEffect(() => {
-    latestPlan.current = plan;
-    latestOnChange.current = onChange;
-  });
   const memoryKey = facilityMemoryKey(plan);
   const recalledFor = useRef<{ rigs: string | null; index: string | null }>({
     rigs: null,
@@ -587,7 +569,7 @@ export function BuildPlanDetail({
       }
       if (Object.keys(patch).length > 0) latestOnChange.current({ kind: 'edit', patch });
     });
-  }, [costIndexMissing, memoryKey]);
+  }, [costIndexMissing, memoryKey, latestPlan, latestOnChange]);
 
   // The Reaction Location's own cost index — a second, independent fetch
   // (issue #698): sharing `snapshot` would charge a reaction job at the
@@ -801,31 +783,26 @@ export function BuildPlanDetail({
     reactionPlanFacilityContext,
   ]);
 
-  /**
-   * The materials table's rows: `result.materials` is already the whole
-   * resolved tree — `buildVsBuy` applies every `buildHere` choice itself, at
-   * whatever depth (src/engine/industry/materialResolution) — so this only
-   * has to flatten it to one row per material. One computation, not two:
-   * before this, a separate expansion priced the table while the Results
-   * panel above priced the plan as written, and the two could disagree the
-   * moment a build was toggled (docs/context/decisions, since superseded).
-   */
-  const visibleMaterials = useMemo(
-    () => (result ? materialTableRows(result.materials) : []),
-    [result]
-  );
-
-  // Same exclusion the volume column itself applies (issue #874): a built
-  // row's quantity is produced here, never hauled at that typeID — its own
-  // inputs already carry that volume as their own rows in this same list.
-  const materialVolume = useMemo(
-    () =>
-      totalVolume(
-        visibleMaterials.filter((material) => material.subBuilds.length === 0),
-        (typeID) => volumeForType(catalog, typeID)
-      ),
-    [visibleMaterials, catalog]
-  );
+  const {
+    visibleMaterials,
+    materialVolume,
+    shoppingMaterials,
+    boughtDepth,
+    anySubBuilds,
+    subBuildTimeSeconds,
+    materialAdvice,
+    builtTopLevel,
+    subBuildTotal,
+    buyInsteadTotal,
+  } = usePlanMaterials({
+    result,
+    catalog,
+    depth,
+    materialSourcing: plan.materialSourcing,
+    materialPrices,
+    makeOrBuyContext,
+    recipeFor,
+  });
 
   // Every material on the table, not just the blueprint's own: a mineral a
   // sub-build introduced is as ownable as anything else, and while this was
@@ -978,108 +955,29 @@ export function BuildPlanDetail({
     return row ? buildRecipe(row) : null;
   }, [visibleMaterials, recipeTypeId]);
 
-  /**
-   * What the plan still has to shop for: every leaf of the resolved tree,
-   * merged by type. Feeds the shopping-list copy — never the table (or its
-   * export), which shows the full tree including what it's building.
-   */
-  const shoppingMaterials = useMemo(
-    () => (result ? shoppingListMaterials(result.materials) : []),
-    [result]
-  );
-  // A dearer walked price can flip a material to built; its walk then explains nothing here.
-  const boughtDepth = useMemo(() => {
-    const bought = new Set(shoppingMaterials.map((m) => m.typeID));
-    return new Map([...depth].filter(([typeID]) => bought.has(typeID)));
-  }, [depth, shoppingMaterials]);
-
-  const anySubBuilds = useMemo(() => (result ? hasSubBuilds(result.materials) : false), [result]);
-
-  /** Job time of every sub-job in the tree, summed (not wall-clock: they run side by side). */
-  const subBuildTimeSeconds = useMemo(
-    () => (result ? computeSubBuildSeconds(result.materials) : 0),
-    [result]
-  );
-
   const jobNodes = useMemo(
     () =>
       result
-        ? planJobNodes({ activity, seconds: result.seconds, materials: result.materials }, catalog)
+        ? planJobNodes(
+            {
+              activity,
+              seconds: result.seconds,
+              materials: result.materials,
+              blueprintTypeID: plan.blueprintTypeID,
+            },
+            catalog
+          )
         : [],
-    [result, activity, catalog]
+    [result, activity, catalog, plan.blueprintTypeID]
   );
-  const planSchedule = usePlanSchedule(plan.characterId, jobNodes);
+  const planCorpBlueprints = useMemo(
+    () => planOwnedBlueprints({ includeCorpAssets: plan.includeCorpAssets }, [], corpBlueprints),
+    [plan.includeCorpAssets, corpBlueprints]
+  );
+  const planSchedule = usePlanSchedule(plan.characterId, jobNodes, planCorpBlueprints);
   const planSeconds = planSchedule
     ? (planSchedule.schedule.finishMs - planSchedule.nowMs) / 1000
     : undefined;
-
-  /**
-   * Make-or-buy verdict per material (GLOSSARY.md round 29), computed once for
-   * the table and the CSV export rather than per row render. Covers every
-   * row regardless of depth: a recipe input a build introduced is exactly as
-   * eligible for advice — and for the build-here control itself — as one of
-   * the plan's own materials.
-   */
-  const materialAdvice = useMemo(() => {
-    const verdicts = new Map<number, MakeOrBuy>();
-    if (!makeOrBuyContext) return verdicts;
-    for (const material of visibleMaterials) {
-      // Priced at what it would cost to buy even while it is being built
-      // (`buyPricedLine`) — the verdict compares against buying, so a built
-      // row's null unit price would silently withdraw the advice exactly
-      // when the player is acting on it.
-      const verdict = makeOrBuy(
-        buyPricedLine(material, plan.materialSourcing, materialPrices),
-        recipeFor(material.typeID),
-        makeOrBuyContext
-      );
-      if (verdict) verdicts.set(material.typeID, verdict);
-    }
-    return verdicts;
-  }, [visibleMaterials, makeOrBuyContext, recipeFor, plan.materialSourcing, materialPrices]);
-
-  /** Top-level materials the player chose to build — what the sub-build footnote summarizes. */
-  const builtTopLevel = useMemo(
-    () => (result ? result.materials.filter((material) => material.subBuild !== undefined) : []),
-    [result]
-  );
-
-  /**
-   * What building the chosen material(s) actually costs — the sum of exactly
-   * the `lineCost`s `result.materialCost` already added for them, so this is
-   * never a second number that could drift from the totals above. Not split
-   * into materials/fees: a nested build's own fee is folded proportionally
-   * into its parent's `lineCost` whenever the job makes more than the parent
-   * needs (EVE sizes jobs in whole runs), so a separately-summed "fees"
-   * figure could disagree with what the split inside `lineCost` actually is.
-   */
-  const subBuildTotal = useMemo(
-    () => builtTopLevel.reduce((sum, material) => sum + material.lineCost, 0),
-    [builtTopLevel]
-  );
-
-  /**
-   * What buying the built material(s) outright would have cost instead, for
-   * the footnote's comparison — priced the same way a plain (unbuilt) row on
-   * this plan is, straight off `materialPrices`/an override, no second
-   * `buildVsBuy` pass. `null` when there is nothing to compare, or when any
-   * of them genuinely isn't sold at this hub, rather than showing a number
-   * that quietly priced the unsold one as free (the bug this replaces).
-   */
-  const buyInsteadTotal = useMemo(() => {
-    if (builtTopLevel.length === 0) return null;
-    let total = 0;
-    for (const material of builtTopLevel) {
-      // Through `buyPricedLine`, the same ladder the make-or-buy advice uses,
-      // rather than a third hand-rolled `override ?? hub`: that one guarded
-      // only `undefined`, so a NaN or negative override reached this figure
-      // and was rendered as ISK. The helper range-checks.
-      const { unitPrice } = buyPricedLine(material, plan.materialSourcing, materialPrices);
-      if (unitPrice === null) return null;
-      total += material.remainingQuantity * unitPrice;
-    }
-    return total;
-  }, [builtTopLevel, plan.materialSourcing, materialPrices]);
 
   // The Materials table's rows as shown, for its export button and row menus.
   const materialsCsv = useMemo(
@@ -1110,135 +1008,6 @@ export function BuildPlanDetail({
   // the blueprint has no product. Shared by the Results panel and the
   // Production Runs panel's "Log Production" default below.
   const productQuantity = blueprint.products[0] ? blueprint.products[0].quantity * plan.runs : null;
-
-  /** A plan edit that is not the pilot choosing a place — see {@link update}. */
-  function editPlan(patch: PlanPatch) {
-    onChange({ kind: 'edit', patch });
-  }
-
-  /**
-   * Every control's edit. One that moves the plan's location — or its
-   * Reaction Location — also remembers the result as where the pilot's next
-   * plan of that activity starts. Edits that touch no location fields
-   * remember nothing, so this is safe for every control on the page.
-   */
-  function update(patch: PlanPatch, { moved = false }: { moved?: boolean } = {}) {
-    editPlan(patch);
-    if (!moved) rememberFacilityFromEdit(patch);
-    const remembered = rememberedLocationsFromEdit(plan, patch, activity);
-    if (remembered.manufacturing || remembered.reaction) {
-      void rememberActivityLocations(remembered);
-    }
-  }
-
-  /**
-   * Saves what the pilot just set for this facility — rigs, tax and the cost
-   * index they typed (the field only exists where ESI has none) — so any other
-   * plan built there starts with it
-   * (`facilityMemory.ts`). A cleared index is forgotten, so a deliberate clear
-   * is not undone by the recall on the next visit.
-   */
-  function rememberFacilityFromEdit(patch: PlanPatch) {
-    const next = { ...plan, ...patch };
-    if ('costIndexOverridePct' in patch && patch.costIndexOverridePct === undefined) {
-      void forgetFacility(next, 'costIndexPct');
-    }
-    const touched =
-      'rigFit' in patch ||
-      'rigLevel' in patch ||
-      'facilityTaxPct' in patch ||
-      patch.costIndexOverridePct !== undefined;
-    if (!touched) return;
-    const memory = memoryFromPlan(next);
-    if (Object.keys(memory).length > 0) void rememberFacility(next, memory);
-  }
-
-  /**
-   * Moves the plan to another place, then fills in what the pilot already told
-   * the app about it. The override is tied to the system it was read for, so it
-   * is dropped first; the recall may bring one back for the new place. Skips
-   * `rememberFacilityFromEdit`: the plan still carries the old place's rigs for
-   * a moment, and filing those under the new one would poison it.
-   */
-  function movePlan(patch: PlanPatch) {
-    update({ ...patch, costIndexOverridePct: undefined }, { moved: true });
-    const place = { ...plan, ...patch };
-    const key = facilityMemoryKey(place);
-    void recallFacility(place).then((memory) => {
-      // The pilot moved again while this was read: the answer is for a place
-      // they have already left.
-      if (!memory || facilityMemoryKey(latestPlan.current) !== key) return;
-      update(patchFromMemory(memory, place.facility), { moved: true });
-    });
-  }
-
-  function changeSourcing(edits: readonly SourcingPatchEntry[]) {
-    onChange({ kind: 'sourcing', edits });
-  }
-
-  function changeOneSourcing(typeID: number, patch: MaterialSourcing) {
-    changeSourcing([{ typeID, patch }]);
-  }
-
-  /**
-   * Switches one material between being bought and being produced here.
-   *
-   * The whole list is rewritten rather than the single entry toggled in place,
-   * because it is a plain field on the record — unlike `materialSourcing`,
-   * which is a nested map and so needs the read-modify-write path a
-   * `sourcing` change takes.
-   */
-  function toggleBuildHere(typeID: number) {
-    const current = plan.buildHere ?? [];
-    update({
-      buildHere: current.includes(typeID)
-        ? current.filter((id) => id !== typeID)
-        : [...current, typeID],
-    });
-  }
-
-  /**
-   * Include Reactions (issue #698). Turning it on for the first time — no
-   * Reaction Location configured yet — pre-fills the whole Reaction Location
-   * from the remembered reaction default (`reactionFacilityDefaults.ts`), the
-   * place the pilot last set reactions to run. Turning it off only clears the
-   * flag: the Reaction Location itself is left alone, so flipping it back on
-   * doesn't lose whatever the pilot configured.
-   *
-   * Through `editPlan`, not `update`: the pre-fill *is* the remembered
-   * default, so writing it back would only re-stamp it as a fresh choice.
-   * Awaits hydration, so a click that lands before the stored record has
-   * loaded still pre-fills the remembered place, not the built-in default.
-   */
-  function toggleIncludeReactions(next: boolean) {
-    if (next && plan.reactionFacility === undefined) {
-      void loadActivityFacilityDefaults().then(({ reaction: seed }) =>
-        editPlan({
-          includeReactions: true,
-          reactionFacility: seed.facility,
-          reactionRigFit: seed.rigFit,
-          reactionFacilityTaxPct: seed.facilityTaxPct ?? undefined,
-          // Only what the record holds: an absent band already reads as
-          // highsec, and an absent system as the hub's.
-          ...(seed.security !== undefined ? { reactionSecurity: seed.security } : {}),
-          ...(seed.buildSystemId !== undefined && seed.buildSystemName !== undefined
-            ? {
-                reactionBuildSystemId: seed.buildSystemId,
-                reactionBuildSystemName: seed.buildSystemName,
-              }
-            : {}),
-          ...(seed.buildLocationId !== undefined
-            ? { reactionBuildLocationId: seed.buildLocationId }
-            : {}),
-          ...(seed.buildLocationName !== undefined
-            ? { reactionBuildLocationName: seed.buildLocationName }
-            : {}),
-        })
-      );
-    } else {
-      editPlan({ includeReactions: next });
-    }
-  }
 
   /**
    * Auto Build (issue #695): a one-shot bulk write, not a persistent policy
@@ -1319,65 +1088,9 @@ export function BuildPlanDetail({
     })),
   };
 
-  // Read-only summary of the setup: plain label-over-value pairs, not chips —
-  // a bordered, filled box reads as a button, and nothing here is clickable.
-  const setupFact = (label: string, value: string, warn = false) => (
-    <div key={label} className="min-w-0">
-      <dt className={eyebrowClassName}>{label}</dt>
-      <dd className={cx('text-xs tabular-nums', warn ? 'text-warning' : 'text-text')}>
-        {warn && <Icon.Warn size={Icon.ICON_SIZE.sm} aria-hidden="true" className="mr-1 inline" />}
-        {value}
-      </dd>
-    </div>
-  );
-  // ME/TE belong to the materials table's blueprint row, whose tier picker
-  // sets them. An owned BPO gets no such row (nothing to buy), so only then
-  // does the summary carry them — and not before the plan resolves, or they
-  // would flash in and out on every plan that does have the row.
   const lacksBlueprintRow =
     result !== null &&
     !result.materials.some((m) => m.typeID === plan.blueprintTypeID && m.acquisitionTier);
-  const setupFacts = [
-    setupFact(t('industry.runs'), plan.runs.toLocaleString()),
-    ...(activity === 'manufacturing' && lacksBlueprintRow
-      ? [
-          setupFact(t('industry.setupChipMe'), `${resolvedMe}%`),
-          setupFact(t('industry.setupChipTe'), `${resolvedTe}%`),
-        ]
-      : []),
-    // The place the pilot picked, by the name they picked it under; the
-    // facility · system · band triple only when no place was picked.
-    setupFact(
-      t('industry.buildLocation'),
-      buildLocationName ??
-        `${facilityPreset.name} · ${buildSystem?.name ?? hub.systemName} · ${t(`industry.${plan.security}`)}`
-    ),
-    ...(facilityPreset.structure
-      ? [
-          setupFact(t('industry.setupChipRig'), rigFitSummaryLabel(resolveRigFit(plan), t)),
-          setupFact(t('industry.setupChipTax'), `${plan.facilityTaxPct ?? 0}%`),
-        ]
-      : []),
-    ...(includeReactions && activity !== 'reaction'
-      ? [
-          setupFact(
-            t('industry.reactionLocation'),
-            reactionBuildSystem === null
-              ? t('industry.reactionLocationEntryNotSet')
-              : (reactionBuildLocationName ??
-                  `${FACILITY_PRESETS[plan.reactionFacility ?? 'athanor'].name} · ${reactionBuildSystem.name} · ${t(`industry.${plan.reactionSecurity ?? 'highsec'}`)}`),
-            reactionsInHighsec
-          ),
-        ]
-      : []),
-    setupFact(t('industry.tradeHub'), hub.systemName),
-    setupFact(
-      t('industry.materialPriceBasis'),
-      materialPriceBasisOf(plan.materialPriceBasis) === 'buy'
-        ? t('industry.materialPriceBasisBuy')
-        : t('industry.materialPriceBasisSell')
-    ),
-  ];
 
   return (
     <div className="space-y-4">
@@ -1904,7 +1617,21 @@ export function BuildPlanDetail({
             </div>
           </div>
         ) : (
-          <dl className="flex flex-wrap gap-x-6 gap-y-2">{setupFacts}</dl>
+          <PlanSetupFacts
+            plan={plan}
+            activity={activity}
+            hub={hub}
+            facilityPreset={facilityPreset}
+            buildSystemName={buildSystem?.name ?? null}
+            buildLocationName={buildLocationName}
+            includeReactions={includeReactions}
+            reactionBuildSystemName={reactionBuildSystem?.name ?? null}
+            reactionBuildLocationName={reactionBuildLocationName}
+            reactionsInHighsec={reactionsInHighsec}
+            resolvedMe={resolvedMe}
+            resolvedTe={resolvedTe}
+            lacksBlueprintRow={lacksBlueprintRow}
+          />
         )}
       </Panel>
 

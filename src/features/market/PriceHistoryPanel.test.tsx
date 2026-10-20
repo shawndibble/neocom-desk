@@ -516,19 +516,12 @@ describe('PriceHistoryPanel', () => {
       expect(mockedOpen).toHaveBeenCalledTimes(1);
     });
 
-    it('hands the chart the hub station the series is from, and none for an old region-wide one', async () => {
+    it('hands the chart the hub station the series is from', async () => {
       mockedOpen.mockResolvedValue(OPEN);
-      const first = renderPanel();
+      renderPanel();
       await waitFor(() =>
         expect(screen.getByTestId('chart')).toHaveTextContent('{open 10000002:2:both}@Jita 4-4')
       );
-      first.unmount();
-      mockedOpen.mockResolvedValue({ stationId: null, series: SERIES });
-      renderPanel();
-      await waitFor(() =>
-        expect(screen.getByTestId('chart')).toHaveTextContent('{open 10000002:2:both}')
-      );
-      expect(screen.getByTestId('chart')).not.toHaveTextContent('@');
     });
 
     it('remembers the chosen side across panels', async () => {

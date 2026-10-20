@@ -17,7 +17,7 @@ import * as Icon from '@/components/ui/icons';
 import type { MarketOrder, WalletTransaction } from '@/esi/endpoints';
 import type { ProductionLossRecord } from '@/db';
 import type { SaleLinking } from './useSaleLinking';
-import { SourcingInput } from './MaterialsTable';
+import { SourcingInput } from './SourcingInput';
 import { formatIsk } from '@/lib/isk';
 import { unmaskNumber } from '@/lib/numberMask';
 

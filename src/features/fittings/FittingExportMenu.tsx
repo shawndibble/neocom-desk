@@ -79,10 +79,7 @@ export function FittingExportItems({
       <DropdownMenuSeparator />
       <div className="px-2 py-1.5 text-xs text-text-dim">
         {price ? (
-          <>
-            <p>{t('fittings.stats.priceSell', { value: formatIsk(price.totals.sell) })}</p>
-            <p>{t('fittings.stats.priceBuy', { value: formatIsk(price.totals.buy) })}</p>
-          </>
+          <p>{t('fittings.stats.priceSell', { value: formatIsk(price.totals.sell) })}</p>
         ) : (
           <p>{t('fittings.stats.priceLoading')}</p>
         )}

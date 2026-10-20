@@ -22,6 +22,7 @@ import {
   DECLARATIONS,
   DISMISSALS,
   EXTRACTIONS,
+  MEMBER_SETUP_MS,
   META,
   MINERS,
   OBSERVED,
@@ -274,6 +275,7 @@ export async function turnOnBook(deps: BookDeps, caller: Caller, input: TurnOnIn
       createdAt: now,
       createdBy: access.characterId,
       lastSync: null,
+      membersSeeFrom: now + MEMBER_SETUP_MS,
       schemaVersion: 1,
     });
     tx.set(sub(deps.db, input.corporationId, OFFICERS).doc(caller.uid), access);
@@ -283,6 +285,42 @@ export async function turnOnBook(deps: BookDeps, caller: Caller, input: TurnOnIn
     });
   });
   return { corporationId: input.corporationId };
+}
+
+/**
+ * The player who turned the book on (or the CEO) deletes it outright: the book,
+ * everything under it and its Statement verify links. `beforeDelete` lets the
+ * caller drop what lives outside the book first (the scheduled-sync grant), so a
+ * failure there leaves the book standing. Turning the book on again starts clean.
+ */
+export async function deleteBook(
+  deps: BookDeps,
+  caller: Caller,
+  call: BookCall,
+  beforeDelete: (corporationId: number) => Promise<void> = async () => {}
+) {
+  const access = await authorizeOfficer(deps, caller, call, 'director', { live: true });
+  const ref = bookRef(deps.db, call.corporationId);
+  const book = await ref.get();
+  if (!book.exists) fail('not-found', 'This corporation has no Corp Tax Book', 'no-book');
+  const openedBy = [book.get('createdBy'), book.get('ownerCharacterId')];
+  if (!access.isCeo && !openedBy.includes(access.characterId)) {
+    fail(
+      'permission-denied',
+      'Only whoever turned the book on, or the CEO, can delete it',
+      'not-opener'
+    );
+  }
+  await beforeDelete(call.corporationId);
+  const links = await deps.db
+    .collection(TOKENS_COLLECTION)
+    .where('corporationId', '==', call.corporationId)
+    .get();
+  await Promise.all(links.docs.map((d) => d.ref.delete()));
+  await deps.db.recursiveDelete(ref);
+  // A scheduled sync that loaded its grant before it was dropped may still have been writing.
+  await deps.db.recursiveDelete(ref);
+  return { deleted: true };
 }
 
 /** The CEO can always reclaim the book: becomes owner, and every other officer must re-verify. */
@@ -1361,11 +1399,24 @@ export async function listPendingGroupings(deps: BookDeps, caller: Caller) {
     .collectionGroup(MINERS)
     .where('pendingConfirmation', 'array-contains', characterId)
     .get();
-  return snap.docs.flatMap((d) => {
+  const now = deps.now();
+  const found = snap.docs.flatMap((d) => {
     const corporationId = Number(d.ref.parent.parent?.id);
     if (d.ref.parent.parent?.parent.id !== BOOKS_COLLECTION || !Number.isFinite(corporationId))
       return [];
     return [{ corporationId, minerId: d.id, mainCharacterId: d.get('mainCharacterId') as number }];
+  });
+  // A book still in its setup window is not shown to members yet, grouping questions included.
+  const books = new Map(
+    await Promise.all(
+      [...new Set(found.map((f) => f.corporationId))].map(
+        async (id) => [id, (await bookRef(deps.db, id).get()).get('membersSeeFrom')] as const
+      )
+    )
+  );
+  return found.filter((f) => {
+    const seeFrom = books.get(f.corporationId);
+    return typeof seeFrom !== 'number' || now >= seeFrom;
   });
 }
 

@@ -1,4 +1,5 @@
 import { idSetKey } from '@/lib/idSetKey';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 /**
  * Bigger chains (Plan) and what-if chains (Plan, the Map), priced off the main
  * render. Mounted only while the pilot hauls between planets, so nothing here
@@ -15,10 +16,10 @@ import { idSetKey } from '@/lib/idSetKey';
  * planet). Cached by inputs and `whatIfKey`: a tab with the same inputs as the
  * other reuses its figures.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { JumpsFn, PlannerColony, PlanetType } from '@/engine/pi/goalTypes';
 import type { PiData } from '@/sde/types';
-import { jumpsBetween, useJumpBasis } from '@/features/route/jumpBasis';
+import { jumpsBetween, useSharedJumpBasis } from '@/features/route/jumpBasis';
 import {
   biggerChainCandidates,
   estimateOnColonies,
@@ -99,40 +100,32 @@ function useColonyJumps(
   fn: JumpsFn | undefined;
   key: string | null;
 } {
-  const basis = useJumpBasis();
+  const basis = useSharedJumpBasis();
   const systemKey = idSetKey(systemOf.values());
   const wanted = `${basis.key}|${systemKey}`;
-  const [own, setPairs] = useState(cachedPairs);
-  // Another hook on the page may have counted them since this one mounted.
-  const pairs = own?.key === wanted ? own : cachedPairs?.key === wanted ? cachedPairs : own;
-  useEffect(() => {
-    if (!enabled || !basis.hydrated || pairs?.key === wanted) return;
-    let cancelled = false;
+  // Another hook on the page may have counted them already: read that, don't recount.
+  const counted = cachedPairs?.key === wanted;
+  const count = useCallback(async () => {
     const ids = systemKey === '' ? [] : systemKey.split(',').map(Number);
     const pairIds = ids.flatMap((a, i) => ids.slice(i + 1).map((b) => [a, b] as const));
-    void Promise.all(
+    const between = await Promise.all(
       pairIds.map(([a, b]) =>
         jumpsBetween(a, b, basis)
           .then((r) => (r.kind === 'known' ? r.jumps : null))
           .catch(() => null)
       )
-    ).then((between) => {
-      if (cancelled) return;
-      cachedPairs = {
-        key: wanted,
-        byPair: new Map(pairIds.map(([a, b], i) => [`${a}-${b}`, between[i]])),
-      };
-      setPairs(cachedPairs);
-    });
-    return () => {
-      cancelled = true;
+    );
+    cachedPairs = {
+      key: wanted,
+      byPair: new Map(pairIds.map(([a, b], i) => [`${a}-${b}`, between[i]])),
     };
-    // `pairs` is only read to skip a count already made.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [basis, systemKey, wanted, enabled]);
+    return cachedPairs;
+  }, [basis, systemKey, wanted]);
+  const { data: loaded } = useKeyedLoad(wanted, count, !enabled || !basis.hydrated || counted);
+  const pairs = counted ? cachedPairs : loaded;
 
   return useMemo(() => {
-    if (!enabled || pairs?.key !== wanted) return { fn: undefined, key: null };
+    if (!enabled || !pairs || pairs.key !== wanted) return { fn: undefined, key: null };
     const fn: JumpsFn = (from, to) => {
       if (to === 'hub') return null;
       const a = systemOf.get(from);

@@ -43,14 +43,10 @@ import {
 } from '@/engine/fittings/skillGains';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { hasSkillOverrides } from '@/engine/fittings/skillOverrides';
-import { normalizePlan } from '@/engine/skills/plan';
 import { romanLevel } from '@/engine/projection';
 import type { EngineSkill, PlanEntry, ScheduledStep, TrainedSkill } from '@/engine/types';
 import { formatCountdown } from '@/lib/duration';
-import { cloneStateFor, useCloneStates } from '@/features/skills/cloneState';
-import { usePlanEditorData } from '@/features/skills/planner/usePlanEditorData';
 import { buildFitCheckRows } from '@/features/skills/ships/fitCheckRows';
-import { scheduleEntries } from '@/features/skills/ships/scheduleEntries';
 import { SkillLink } from '@/features/entities';
 import { TargetPlanPicker } from '@/features/skills/TargetPlanPicker';
 import { useTargetPlan } from '@/features/skills/useTargetPlan';
@@ -61,13 +57,22 @@ import { useSkillGains } from './useSkillGains';
 import { useSkillLevelGain } from './useSkillLevelGain';
 import { ModuleUpgradeList } from './FittingModuleUpgrades';
 import { gainChangeLabels } from './whatToTrainChanges';
-import { useModuleUpgrades, type ScheduleEntries } from './useModuleUpgrades';
+import { useModuleUpgrades } from './useModuleUpgrades';
+import { SkillFixList } from './FittingSkillFixList';
+import { useSkillFixes } from './useSkillFixes';
+import { usePlannedLevels, useTrainingSchedule } from './useTrainingSchedule';
+import { cx } from '@/lib/cx';
 import { catalogueTypeName, type FittingCatalogue } from './useFittingCatalogue';
 import { rankModuleUpgrades } from '@/engine/fittings/moduleUpgrades';
 import type { SkillPlanRecord } from '@/db';
 import { StatField, StatFields, StatNote } from './StatFacts';
-import { STAT_DETAIL, STAT_FIELD_WIDTH, joinDetail, statRowClassName } from './statKit';
-import { useHydratedStore } from '@/lib/useHydratedStore';
+import {
+  STAT_DETAIL,
+  STAT_EYEBROW_TYPE,
+  STAT_FIELD_WIDTH,
+  joinDetail,
+  statRowClassName,
+} from './statKit';
 
 interface WhatToTrainRow extends SkillGain {
   name: string;
@@ -125,11 +130,11 @@ function WhatToTrainRanking({
   } | null>(null);
   const target = useTargetPlan(characterId);
   const { gains, loading, failed } = useSkillGains(evaluator);
-  const { catalog, trainedSkills, trainedSkillsKnown, attributes, implants } =
-    usePlanEditorData(characterId);
-  const cloneStates = useCloneStates((state) => state.value);
-  useHydratedStore(useCloneStates);
-  const cloneState = cloneStateFor(cloneStates, characterId);
+  const { catalog, trainedSkills, trainedSkillsKnown, scheduleEntriesFor } =
+    useTrainingSchedule(characterId);
+  // Only once some level is seen to clear part of an overage: a fit within budget has nothing to fix.
+  const overBudget = gains?.some((gain) => (gain.budgetFreed ?? 0) > 0) ?? false;
+  const skillFixes = useSkillFixes(evaluator, overBudget);
 
   // Worked out once per result, not per sort change.
   const rows = useMemo((): WhatToTrainRow[] | null => {
@@ -139,22 +144,6 @@ function WhatToTrainRanking({
       name: catalog?.engineSkills.get(gain.skillTypeId)?.name ?? `#${gain.skillTypeId}`,
     }));
   }, [gains, catalog]);
-  // The schedule for some skill levels; null before the Character's skills are in,
-  // or every row would time from level 0.
-  const scheduleEntriesFor = useMemo(
-    (): ScheduleEntries | null =>
-      catalog && trainedSkillsKnown
-        ? (entries) =>
-            scheduleEntries(entries, {
-              skills: catalog.engineSkills,
-              trainedSkills,
-              attributes,
-              implants,
-              cloneState,
-            })
-        : null,
-    [catalog, trainedSkills, trainedSkillsKnown, attributes, implants, cloneState]
-  );
   const scheduleFor = useCallback(
     (skillTypeId: number, level: number): readonly ScheduledStep[] | null =>
       scheduleEntriesFor?.([{ skillTypeID: skillTypeId, targetLevel: level }]) ?? null,
@@ -182,27 +171,7 @@ function WhatToTrainRanking({
   );
 
   const targetPlan = target.plans?.find((plan) => plan.id === target.targetPlanId);
-  // Highest level the target plan trains each skill to — its derived
-  // prerequisite rows included, so a level it already trains on the way to
-  // another entry isn't offered again as a redundant entry.
-  const plannedLevels = useMemo(() => {
-    const levels = new Map<number, number>();
-    if (!targetPlan) return levels;
-    const raise = (skillTypeID: number, level: number) =>
-      levels.set(skillTypeID, Math.max(levels.get(skillTypeID) ?? 0, level));
-    for (const entry of targetPlan.entries) raise(entry.skillTypeID, entry.targetLevel);
-    // Not before the Character's skills are in, or every prerequisite would count as untrained.
-    if (!catalog || !trainedSkillsKnown) return levels;
-    try {
-      const known = targetPlan.entries.filter((e) => catalog.engineSkills.has(e.skillTypeID));
-      for (const step of normalizePlan(known, catalog.engineSkills, trainedSkills)) {
-        raise(step.skillTypeID, step.level);
-      }
-    } catch {
-      // A circular plan is the Skill Plan editor's to report; its entries still count.
-    }
-    return levels;
-  }, [targetPlan, catalog, trainedSkills, trainedSkillsKnown]);
+  const plannedLevels = usePlannedLevels(targetPlan, catalog, trainedSkills, trainedSkillsKnown);
 
   if (evaluator === null || loading)
     return <StatNote>{t('fittings.whatToTrain.loading')}</StatNote>;
@@ -254,6 +223,21 @@ function WhatToTrainRanking({
           </StatField>
         )}
       </StatFields>
+      {skillFixes.fixes && skillFixes.fixes.length > 0 && (
+        <div className="space-y-1">
+          <p className={cx(STAT_EYEBROW_TYPE, 'text-warning')}>
+            {t('fittings.skillFixes.heading')}
+          </p>
+          <SkillFixList
+            fixes={skillFixes.fixes}
+            skillName={(id) => catalog?.engineSkills.get(id)?.name ?? `#${id}`}
+            scheduleEntriesFor={scheduleEntriesFor}
+            plan={plan}
+            plannedLevels={plannedLevels}
+            onAdd={(entries) => void addEntries(entries)}
+          />
+        </div>
+      )}
       {/* Only once no Tech II upgrade is left to suggest either: else it reads as "nothing to train". */}
       {ranked.length === 0 && rankedUpgrades?.length === 0 && (
         <StatNote>{t('fittings.whatToTrain.none')}</StatNote>

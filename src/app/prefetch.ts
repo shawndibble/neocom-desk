@@ -44,7 +44,7 @@ import {
   loadWalletJournal,
   loadWalletTransactions,
 } from '@/features/character/wallet';
-import { KEY as ASSETS_KEY, loadCharacterAssets } from '@/features/character/assets';
+import { KEY as ASSETS_KEY, loadCharacterAssets } from '@/features/assets/assets';
 import { KEYS as ORDER_KEYS, loadOrders, loadOrderHistory } from '@/features/character/orders';
 import { KEY as CONTRACTS_KEY, loadContracts } from '@/features/character/contracts';
 import { loadMailHeaders, loadMailLabels, prefetchMailBodies } from '@/features/character/mail';

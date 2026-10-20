@@ -9,7 +9,8 @@ import { describe, it, expect } from 'vitest';
  */
 const REVIEWED = new Set<string>([
   'src/features/abyssal/AbyssalItemDetail.tsx',
-  'src/features/character/assetBrowserRows.tsx',
+  'src/features/assets/assetBrowserRows.tsx',
+  'src/features/character/CloneCard.tsx',
   'src/features/character/ContractDetailModal.tsx',
   'src/features/character/JournalDescriptionCell.tsx',
   // A show-info link inside a mail body's prose, not a row: no primary action competes.
@@ -23,7 +24,7 @@ const REVIEWED = new Set<string>([
   'src/features/fittings/FittingFightersPanel.tsx',
   'src/features/fittings/FittingModuleList.tsx',
   'src/features/fittings/FittingPreviewPanels.tsx',
-  'src/features/fittings/FittingRackList.tsx',
+  'src/features/fittings/RackListParts.tsx',
   'src/features/fittings/ImplantFinder.tsx',
   'src/features/fittings/ImplantSetPicker.tsx',
   'src/features/industry/activeJobColumns.tsx',
@@ -34,7 +35,6 @@ const REVIEWED = new Set<string>([
   'src/features/market/UsedInSection.tsx',
   'src/features/travel/PilotShips.tsx',
   'src/features/travel/ZkillStatsSection.tsx',
-  'src/routes/Clones.tsx',
 ]);
 
 const sources = import.meta.glob<string>(['/src/**/*.tsx', '!/src/**/*.test.tsx'], {

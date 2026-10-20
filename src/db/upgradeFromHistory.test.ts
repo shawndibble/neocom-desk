@@ -53,6 +53,7 @@ const HISTORY: [number, Record<string, string | null>][] = [
   ],
   [25, { dynamicItems: 'itemId' }],
   [26, { corpMailQueue: 'id, corporationId, batchId, senderCharacterId' }],
+  [27, { jitaPriceSnapshots: null }],
 ];
 
 /** The complete schema at `version`: every delta up to it, drops removed. */

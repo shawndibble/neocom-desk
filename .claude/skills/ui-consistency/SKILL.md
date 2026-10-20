@@ -60,9 +60,9 @@ The app writes most of them down:
   the glossary is a finding under axis G.
 - `LEDGER.md` — what past runs swept, settled, filed and killed.
 
-Survey **`origin/main`, not the working tree** — the main checkout is often
-dozens of commits stale. `git fetch origin main`, then `git grep <pattern>
-origin/main -- src` and `git show origin/main:<path>`.
+Survey **`origin/develop`, not the working tree** — the main checkout is often
+dozens of commits stale. `git fetch origin develop`, then `git grep <pattern>
+origin/develop -- src` and `git show origin/develop:<path>`.
 
 Where an axis has no written canonical pattern (the icon map often has none),
 **derive it from the majority**: the usage most sites already follow is the
@@ -124,7 +124,7 @@ A finding the measurement contradicts is dead.
 Every finding gets checked against current code and the tracker. A hit drops
 the finding, or narrows it to what the hit leaves open:
 
-1. **The code** — re-read every deviating site on `origin/main`. Consistency
+1. **The code** — re-read every deviating site on `origin/develop`. Consistency
    fixes land constantly as side effects of other tickets.
 2. `eslint.config.js` and any test asserting the pattern — guarded already.
 3. `docs/context/decisions/` and `docs/adr/` — a decision may make the
@@ -163,7 +163,7 @@ Give it this kill-bar, also in its prompt:
   DESIGN.md says otherwise.
 - **Actually different.** The two sites only look alike; they mean different
   things, and matching them would lie to the user.
-- **Already shipped.** It re-checks the code on `origin/main`.
+- **Already shipped.** It re-checks the code on `origin/develop`.
   Two more checks can only narrow a finding, never kill it:
 
 - **One PR's worth.** A migration touching 40 files across unrelated features

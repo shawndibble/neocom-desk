@@ -6,9 +6,9 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useLiveQuery } from 'dexie-react-hooks';
 import { typeNameOr } from '@/lib/typeNameOr';
-import { db, type FittingRecord } from '@/db';
+import type { FittingRecord } from '@/db';
+import { useSavedFittingRecords } from './useSavedFittingRecords';
 import { useEndpointsGranted } from '@/app/useGrantedScopes';
 import { isSyncConfigured } from '@/app/syncStatus';
 import {
@@ -74,13 +74,7 @@ function useHullNames(records: readonly FittingRecord[] | undefined): Map<string
 
 /** The Character's saved Fittings and each one's hull name (absent while it decodes). */
 export function useSavedFittings(characterId: number | null) {
-  const records = useLiveQuery(
-    () =>
-      characterId === null
-        ? Promise.resolve([] as FittingRecord[])
-        : db.fittings.where('characterId').equals(characterId).toArray(),
-    [characterId]
-  );
+  const records = useSavedFittingRecords(characterId);
   const hulls = useHullNames(records);
   return { records, hulls };
 }

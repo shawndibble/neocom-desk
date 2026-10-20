@@ -1043,6 +1043,9 @@ export function BpcSourcingPanel({
         {openRow !== null && (
           <BpcContractModal
             row={openRow}
+            // Every listed copy, not the filtered board: a tight ME, price or region
+            // filter must not shrink the pool a fair price is judged against.
+            comparables={sourceData.contractRows}
             // Non-null past the `activeCharacterId === null` guard above; the
             // modal needs one to resolve a player-structure location, whose ACL
             // is per Character (#655 item F).

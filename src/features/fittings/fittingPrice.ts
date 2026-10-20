@@ -18,6 +18,15 @@ import type { TradeHub } from '@/market/hubs';
 import { fittingItemCounts } from '@/engine/fittings/fittingExport';
 import type { Fitting } from '@/engine/fittings/types';
 
+/**
+ * The rows with no sell order at the hub. A fit is priced on sell orders alone
+ * (what buying it off the hub costs), so a missing buy order is not a gap:
+ * `totals.unpricedRows` counts it as one, which is why callers use this.
+ */
+export function unpricedSellRows<T extends { sellTotal: number | null }>(rows: readonly T[]): T[] {
+  return rows.filter((row) => row.sellTotal === null);
+}
+
 /** `cloneImplants`: the pilot's active clone, whose implants are already bought (`fittingItemCounts`). */
 export async function loadFittingPrice(
   fitting: Fitting,

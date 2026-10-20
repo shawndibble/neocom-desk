@@ -77,12 +77,19 @@ function gain(skillTypeId: number, fromLevel: number, overall: number): SkillGai
 }
 
 // Every skill row by default; a test empties it to see the empty state.
-const skillGainsState = vi.hoisted(() => ({ empty: false }));
+const skillGainsState = vi.hoisted(() => ({ empty: false, overBudget: false }));
 vi.mock('./useSkillGains', () => ({
   useSkillGains: () => ({
     gains: skillGainsState.empty
       ? []
-      : [gain(3315, 0, 0.2), gain(3436, 2, 0.1), gain(3300, 1, 0.05)],
+      : [
+          gain(3315, 0, 0.2),
+          // Over budget, Drones' next level eats into the overage (as Drones Rigging's does on an Orca).
+          skillGainsState.overBudget
+            ? { ...gain(3436, 2, 0), budgetFreed: 0.3 }
+            : gain(3436, 2, 0.1),
+          gain(3300, 1, 0.05),
+        ],
     loading: false,
     failed: false,
   }),
@@ -99,6 +106,14 @@ vi.mock('./useSkillLevelGain', () => ({
             roleChanges: [{ key: 'miningYield', before: 100, after: 100 + level }],
             metrics: gain.metrics,
           },
+  }),
+}));
+// The training that makes the fit fit: none by default.
+const skillFixesState = vi.hoisted(() => ({ fixes: null as unknown[] | null }));
+vi.mock('./useSkillFixes', () => ({
+  useSkillFixes: (_evaluator: unknown, enabled: boolean) => ({
+    fixes: enabled ? skillFixesState.fixes : null,
+    failed: false,
   }),
 }));
 // Tech II upgrades: none by default; a test sets a row to see the section.
@@ -149,6 +164,8 @@ afterEach(async () => {
   await db.skillPlans.clear();
   upgradeState.rows = [];
   skillGainsState.empty = false;
+  skillGainsState.overBudget = false;
+  skillFixesState.fixes = null;
 });
 
 function renderPanel() {
@@ -457,5 +474,29 @@ describe('FittingWhatToTrainPanel — skill detail', () => {
     upgradeState.rows = [];
     renderPanel();
     expect(await screen.findByText(/no single skill level/i)).toBeInTheDocument();
+  });
+});
+
+describe('FittingWhatToTrainPanel — over budget', () => {
+  it('heads the list with the training that makes it fit, and ranks a level that frees CPU first', async () => {
+    skillGainsState.overBudget = true;
+    skillFixesState.fixes = [{ entries: [{ skillTypeID: 3436, targetLevel: 4 }], after: {} }];
+    const user = userEvent.setup();
+    renderPanel();
+    expect(await screen.findByText('Makes it fit')).toBeInTheDocument();
+    // Awaited: the heading renders at once, but the fix block's button waits for the target plan to load.
+    await user.click(await screen.findByRole('button', { name: 'Add to plan: Drones IV' }));
+    await waitFor(async () => {
+      expect(await planEntries()).toEqual([{ skillTypeID: 3436, targetLevel: 4 }]);
+    });
+    const ranked = within(screen.getByRole('list', { name: 'What to train' }));
+    expect(ranked.getAllByRole('listitem')[0]).toHaveTextContent(/^1Drones/);
+  });
+
+  it('shows no fix block within budget', async () => {
+    skillFixesState.fixes = [{ entries: [{ skillTypeID: 3436, targetLevel: 4 }], after: {} }];
+    renderPanel();
+    await screen.findByText('Surgical Strike');
+    expect(screen.queryByText('Makes it fit')).toBeNull();
   });
 });

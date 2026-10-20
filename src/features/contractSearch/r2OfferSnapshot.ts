@@ -14,7 +14,7 @@
  */
 import { loadWithCache, GLOBAL_CACHE_CHARACTER_ID, type CachedResult } from '@/esi/cache';
 import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
-import { CHUNK_READ_CONCURRENCY } from './chunkedSnapshot';
+import { CHUNK_READ_CONCURRENCY } from './r2Snapshot';
 
 export const R2_SNAPSHOT_ORIGIN = 'https://data.neocomdesk.com';
 const INDEX_URL = `${R2_SNAPSHOT_ORIGIN}/contract-offers/index.json`;

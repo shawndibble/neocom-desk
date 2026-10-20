@@ -13,14 +13,14 @@
 // Deliberately `--merge`, not `--squash`: squashing rewrites the branch's
 // commits into a new one, which orphans the base of any PR stacked on this
 // branch and scrambles its diff. A merge commit preserves those commits, so
-// a stack survives the merge. Cost is a noisier `main` history — accepted.
+// a stack survives the merge. Cost is a noisier `develop` history — accepted.
 //
 // Prints one line of JSON to stdout:
 //   {"status":"open","number":123,"url":"...","autoMergeArmed":true}
 //   {"status":"error","message":"..."}
 
 import fs from 'node:fs';
-import { run, gh, tryRun, printResult } from './lib.mjs';
+import { run, gh, tryRun, printResult, INTEGRATION_BRANCH } from './lib.mjs';
 
 const [, , title, bodyFile] = process.argv;
 if (!title || !bodyFile) {
@@ -35,7 +35,16 @@ if (!push.ok) {
   process.exit(1);
 }
 
-const create = tryRun('gh', ['pr', 'create', '--base', 'main', '--title', title, '--body', body]);
+const create = tryRun('gh', [
+  'pr',
+  'create',
+  '--base',
+  INTEGRATION_BRANCH,
+  '--title',
+  title,
+  '--body',
+  body,
+]);
 if (!create.ok) {
   printResult({ status: 'error', message: create.stderr.trim() });
   process.exit(1);

@@ -11,7 +11,7 @@ import {
 } from '@/components/ui';
 import { formatIsk } from '@/lib/isk';
 import { unmaskNumber } from '@/lib/numberMask';
-import { SourcingInput } from './MaterialsTable';
+import { SourcingInput } from './SourcingInput';
 import type { LossInsuranceMode, RunLoss } from './useRunLoss';
 
 function todayInput(): string {

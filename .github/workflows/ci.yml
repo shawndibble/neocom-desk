@@ -1,10 +1,12 @@
 name: CI
 
 on:
+  # `develop` is where work lands (PRs into it run the full gate); a push to
+  # `main` is a develop→main promotion and is what deploys production.
   push:
-    branches: [main]
+    branches: [main, develop]
   pull_request:
-    branches: [main]
+    branches: [main, develop]
 
 # Superseding a PR's checks is free; superseding a deploy is not. A second
 # merge landing mid-deploy used to cancel the first outright, which is how
@@ -16,7 +18,7 @@ concurrency:
 jobs:
   # `validate` used to be one serial chain of checks. They are independent, so
   # each is its own job and they run side by side; `validate` below is the
-  # aggregate that keeps the context name the `main` ruleset requires.
+  # aggregate that keeps the context name the `develop`/`main` ruleset requires.
   check-case:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
@@ -65,7 +67,7 @@ jobs:
       - run: npm run typecheck
 
   # Builds once for the whole run. The `e2e-shard` jobs download this `dist/`
-  # instead of each rebuilding it (four more builds, each after its own
+  # instead of each rebuilding it (one more build per shard, each after its own
   # `npm ci`). Build-time env must match what the dev-server project gets (see
   # E2E_ENV in playwright.config.ts) — these are baked into the bundle here,
   # not readable from the environment later, and blank Firebase vars are what
@@ -118,7 +120,7 @@ jobs:
       - run: npm run typecheck --prefix functions
       - run: npm test --prefix functions
 
-  # The name the `main` ruleset requires. See the `e2e` job below for the full
+  # The name the `develop`/`main` ruleset requires. See the `e2e` job below for the full
   # reasoning; this one aggregates the parallel jobs above instead of a matrix.
   validate:
     if: ${{ !cancelled() && github.event_name == 'pull_request' }}
@@ -172,7 +174,7 @@ jobs:
 
   # Firestore rules tests (rules-tests/): run against the Firestore emulator,
   # which needs a JRE. Kept out of `test-shard` so `npm run test:run` never
-  # needs Java. Not yet a required context in the `main` ruleset.
+  # needs Java. Not yet a required context in the `develop`/`main` ruleset.
   rules:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
@@ -208,9 +210,9 @@ jobs:
       - run: npm ci --prefix functions
       - run: npm run test:rules
 
-  # The name the `main` ruleset requires. See the `e2e` job below for the full
+  # The name the `develop`/`main` ruleset requires. See the `e2e` job below for the full
   # reasoning — a matrix reports as `test-shard (1)`…`(4)`, none of which is
-  # the required context, so this turns the four results back into it.
+  # the required context, so this turns the shard results back into it.
   test:
     if: ${{ !cancelled() && github.event_name == 'pull_request' }}
     needs: [test-shard]
@@ -303,6 +305,54 @@ jobs:
           path: .cache/asset-history.json
           key: asset-history-${{ github.run_id }}-${{ github.run_attempt }}
 
+  # dev.neocomdesk.com: every merge to `develop` ships here, so the 5-7 merges
+  # an hour never touch production (`deploy` above runs only for `main`).
+  # Cloudflare Pages by direct upload, because GitHub Pages serves one site
+  # per repo. Uses the `dev` environment's own EVE application (a callback URL
+  # is one per app), and sits out Sentry so dev noise stays out of production.
+  # Needs, in the `dev` environment: secrets CLOUDFLARE_API_TOKEN (Pages: Edit)
+  # and CLOUDFLARE_ACCOUNT_ID; variable VITE_EVE_CLIENT_ID. The custom domain
+  # is attached to the project once, in the Cloudflare dashboard.
+  deploy-dev:
+    if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    # Latest wins: a newer merge makes an in-flight dev upload pointless.
+    concurrency:
+      group: pages-dev
+      cancel-in-progress: true
+    environment:
+      name: dev
+      url: https://dev.neocomdesk.com
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      PAGES_PROJECT: neocom-desk-dev
+      # The project's production branch: an upload to it is what the custom
+      # domain serves.
+      PAGES_BRANCH: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+        env:
+          VITE_EVE_CLIENT_ID: ${{ vars.VITE_EVE_CLIENT_ID }}
+          VITE_FIREBASE_API_KEY: ${{ vars.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ vars.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ vars.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ vars.VITE_FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ vars.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ vars.VITE_FIREBASE_APP_ID }}
+          VITE_FIREBASE_VAPID_KEY: ${{ vars.VITE_FIREBASE_VAPID_KEY }}
+          VITE_FIREBASE_MEASUREMENT_ID: ${{ vars.VITE_FIREBASE_MEASUREMENT_ID }}
+      # Idempotent: creates the project on the first run, then finds it there.
+      - run: npx --yes wrangler@4 pages project create "$PAGES_PROJECT" --production-branch "$PAGES_BRANCH"
+        continue-on-error: true
+      - run: npx --yes wrangler@4 pages deploy dist --project-name "$PAGES_PROJECT" --branch "$PAGES_BRANCH" --commit-hash "$GITHUB_SHA" --commit-dirty=true
+
   e2e-shard:
     if: github.event_name == 'pull_request'
     needs: [build]
@@ -326,12 +376,31 @@ jobs:
     #
     # `fail-fast: false` so one shard's failure still lets the others report
     # theirs — otherwise a flake in shard 1 hides real breakage in shard 3.
+    #
+    # Eight shards, files dealt out by measured run time (see the run step).
+    # Playwright's own `--shard` cut the test list into contiguous runs, so a
+    # ~100-test sweep landed whole in one shard: wall time per shard ranged
+    # 259s to 354s on the same suite. Eight is where the ~45s of fixed setup
+    # per shard starts to eat what the extra runner saves.
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+    # Playwright's own image: Chromium and its apt libraries are baked in, so
+    # there is no `playwright install --with-deps`, no apt index to go bad
+    # (that failure mode cost a whole run before), and no browser cache to
+    # key. The tag must match the installed @playwright/test exactly; the
+    # "Check the image" step below fails with a clear message when a bump of
+    # one forgets the other.
+    container:
+      image: mcr.microsoft.com/playwright:v1.62.1-noble
+      options: --init --ipc=host
     steps:
       - uses: actions/checkout@v4
+      # The container runs as root over a checkout owned by the runner user, so
+      # git refuses the repo ("dubious ownership") and `npm ci`'s husky
+      # postinstall check then reports no hook installed.
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -342,51 +411,19 @@ jobs:
         id: node-modules
         with:
           path: node_modules
-          key: node-modules-${{ runner.os }}-node24-${{ hashFiles('package-lock.json') }}
+          key: node-modules-container-${{ runner.os }}-node24-${{ hashFiles('package-lock.json') }}
       - if: steps.node-modules.outputs.cache-hit != 'true'
         run: npm ci
-      # Chromium comes from Playwright's own CDN; the only thing `--with-deps`
-      # needs apt for is Ubuntu's shared libraries. The runner image ships
-      # Google's Chrome repo regardless, so `apt-get update` fetches an index
-      # this job never uses — and when that index is bad it fails the whole
-      # step (`Hash Sum mismatch`, exit 100) in ~40s, before a browser exists
-      # and before a single test runs. Dropping the source list removes a
-      # dependency on a server we were not using.
-      #
-      # Nothing here consumes it: playwright.config.ts uses
-      # `devices['Desktop Chrome']`, which picks a viewport and user agent, not
-      # `channel: 'chrome'`. A project that did ask for a real-Chrome channel
-      # would need this reconsidered.
-      #
-      # The retry below is the residual net — an Ubuntu archive wobble, or a
-      # failure fetching the browser itself — neither of which the line above
-      # covers.
-      # Browser binaries only; `--with-deps` below still installs the apt
-      # libraries, and skips the Chromium download on a cache hit.
-      - uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-      - name: Install Playwright browsers
-        # A retry loop turns one hung install into three, and the job default
-        # is six hours.
-        timeout-minutes: 10
+      - name: Check the image matches @playwright/test
+        env:
+          # Keep in sync with `container.image` above.
+          IMAGE_VERSION: 1.62.1
         run: |
-          sudo rm -f /etc/apt/sources.list.d/google-chrome.list
-          for attempt in 1 2 3; do
-            if npx playwright install --with-deps chromium; then exit 0; fi
-            # Nothing follows the last attempt, so it neither sleeps nor claims
-            # it is about to retry.
-            if [ "$attempt" -eq 3 ]; then break; fi
-            echo "::warning::playwright install failed (attempt $attempt/3), retrying"
-            # The index specifically: a bad one is otherwise reused and the
-            # retry fails identically. `apt-get clean` is not used — it empties
-            # the .deb cache, which is not what goes wrong here.
-            sudo rm -rf /var/lib/apt/lists/* || true
-            sleep $((attempt * 20))
-          done
-          echo "::error::playwright install failed after 3 attempts"
-          exit 1
+          installed="$(node -p "require('@playwright/test/package.json').version")"
+          if [ "$installed" != "$IMAGE_VERSION" ]; then
+            echo "::error::@playwright/test is $installed but the e2e-shard container image is v$IMAGE_VERSION; bump the image tag and IMAGE_VERSION in ci.yml together"
+            exit 1
+          fi
       # The `built` Playwright project renders dist/ via `vite preview`; the
       # `build` job made it, with the e2e env baked in. A downloaded file's
       # mtime says nothing about when it was built, so the preview script's
@@ -395,7 +432,16 @@ jobs:
         with:
           name: dist
           path: dist
-      - run: npx playwright test --shard=${{ matrix.shard }}/4
+      # Whole files, dealt out by e2e/shard-weights.json. A file missing from
+      # it counts as median, so a new spec needs no edit to run; refresh the
+      # weights with `node scripts/e2e-shard.mjs --weights <ci-log>`.
+      - name: Run this shard's specs
+        # The container's default shell is sh, which has no `mapfile`.
+        shell: bash
+        run: |
+          mapfile -t specs < <(node scripts/e2e-shard.mjs --shard ${{ matrix.shard }}/${{ strategy.job-total }})
+          if [ "${#specs[@]}" -eq 0 ]; then echo "no specs in this shard"; exit 0; fi
+          npx playwright test "${specs[@]}"
         env:
           VITE_EVE_CLIENT_ID: e2e-fake-client
           E2E_PREVIEW_SKIP_STALE_CHECK: '1'
@@ -417,9 +463,9 @@ jobs:
           if-no-files-found: error
 
   # The `main` ruleset requires a status check named exactly `e2e`, and a
-  # matrix job reports as `e2e-shard (1)`, `e2e-shard (2)`, … — four contexts,
+  # matrix job reports as `e2e-shard (1)`, `e2e-shard (2)`, … — one context per shard,
   # none of them the required one. This job keeps that single name and turns
-  # the four shard results back into it. `scripts/next-ticket/drive-ci.mjs`
+  # the shard results back into it. `scripts/next-ticket/drive-ci.mjs`
   # waits on the same context, so the ticket loop needs no change either.
   #
   # `!cancelled()` rather than the default: `fail-fast: false` means a failing

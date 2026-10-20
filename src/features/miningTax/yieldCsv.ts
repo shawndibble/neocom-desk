@@ -71,12 +71,8 @@ export function yieldOverviewCsvColumns(
     },
     {
       header: t('miningTax.overview.pricingColumn'),
-      value: (row) => {
-        const source = t(`miningTax.overview.priceSource.${row.priceSource}`);
-        return row.valuation.pricedAll
-          ? source
-          : `${source} (${t('miningTax.overview.pricingPartial')})`;
-      },
+      value: (row) =>
+        t(`miningTax.overview.${row.valuation.pricedAll ? 'pricingFull' : 'pricingPartial'}`),
     },
   ];
   return columns.filter((c): c is CsvColumn<MiningYieldRow> => c !== false);

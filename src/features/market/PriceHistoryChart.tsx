@@ -47,7 +47,7 @@ import {
   openPriceStroke,
   PRIMARY_REGION_STROKE,
 } from './compareRegionStrokes';
-import { openSideLabel } from './priceHistoryLabels';
+import { chartOpenSideLabel, openSideLabel } from './priceHistoryLabels';
 import { priceHistoryCsvColumns, type PriceHistoryTableRow } from './priceHistoryCsv';
 import type { MarketHistoryPoint, MovingAveragePoint } from '@/engine/market/priceHistory';
 import { joinRegionAverages } from '@/engine/market/priceHistoryCompare';
@@ -142,8 +142,15 @@ const SYNC_ID = 'market-price-history';
  */
 const BAND_FILL_OPACITY = 0.14;
 
-/** The two price lines are `monotone`; the band's edges must match, or the average renders outside its own range between points. */
-const CURVE_TYPE = 'monotone';
+/**
+ * Every series is `linear`: one point per day, joined by straight lines. A
+ * smoothed curve (`monotone`) turned a one-day swing into a wave that
+ * overshot between days, inventing prices nobody traded or listed. One
+ * constant for every series on both strips: the band, the average, the
+ * Buy/Sell lines, the moving average, the compared averages and the
+ * order-count line.
+ */
+const CURVE_TYPE = 'linear';
 
 /** Inset both strips leave beyond their axes. Shared, because unequal horizontal insets slide one plot off the other. */
 const PLOT_MARGIN_RIGHT = 8;
@@ -242,7 +249,7 @@ export function HistoryTooltip({
       const value = point[side][line.regionId];
       return (
         <p key={`${line.regionId}-${side}`}>
-          {openSideLabel(t, side, line.label)}:{' '}
+          {chartOpenSideLabel(t, side, line.label)}:{' '}
           {value === undefined ? t('market.priceHistory.noOrders') : formatMarketIsk(value)}
         </p>
       );
@@ -259,7 +266,7 @@ export function HistoryTooltip({
             </p>
           )}
           <p>
-            {t('market.priceHistory.priceRange')}:{' '}
+            {t('market.priceHistory.tradedRange')}:{' '}
             {formatPriceRange(point.lowest ?? 0, point.highest ?? 0)}
           </p>
           <p>
@@ -344,7 +351,7 @@ function OpenLegend({ line, series }: { line: OpenLine; series: PriceSeriesChoic
       {SIDES.filter((side) => seriesShows(series, side)).map((side) => (
         <li key={side}>
           <LegendItem
-            label={openSideLabel(t, side, line.label)}
+            label={chartOpenSideLabel(t, side, line.label)}
             shape="line"
             color={openPriceStroke(line.region, side).color}
             dash={openPriceStroke(line.region, side).dash}
@@ -449,6 +456,7 @@ export default function PriceHistoryChart({
       : t('market.priceHistory.averageNoOrderData');
   };
   const comparedAverageLabel = (c: ComparedRegionSeries) => lineAverageLabel(c.regionId, c.name);
+  const tradedRangeLabel = t('market.priceHistory.tradedRange');
   const noOrderDataTip = (regionId: number | undefined, label: string) =>
     lacksOpen(regionId) ? (
       <InfoTooltip
@@ -760,7 +768,7 @@ export default function PriceHistoryChart({
                 // breaking there. With nothing compared there is no such day,
                 // so the single-region chart draws exactly as before.
                 connectNulls
-                name={t('market.priceHistory.priceRange')}
+                name={tradedRangeLabel}
               />
               {!primaryOpen && (
                 <Line
@@ -789,7 +797,7 @@ export default function PriceHistoryChart({
                     strokeWidth={openPriceStroke(line.region, side).width}
                     strokeDasharray={openPriceStroke(line.region, side).dash}
                     dot={false}
-                    name={openSideLabel(t, side, line.label)}
+                    name={chartOpenSideLabel(t, side, line.label)}
                   />
                 ))
               )}
@@ -920,10 +928,23 @@ export default function PriceHistoryChart({
         <ul className="flex flex-wrap items-center gap-x-3.5 gap-y-1.5 px-3 pt-2 pb-1 text-[0.6875rem] text-text-dim">
           <li>
             <LegendItem
-              label={t('market.priceHistory.priceRange')}
+              label={tradedRangeLabel}
               shape="swatch"
               color="var(--color-accent-dim)"
               opacity={BAND_FILL_OPACITY}
+              // Best buy/sell at close regularly sits outside the band: the
+              // orders filled that day are gone by 23:45. Said where the
+              // reader meets the two marks, so that reads as data, not a bug.
+              note={
+                <InfoTooltip
+                  label={t('common.aboutLabel', { label: tradedRangeLabel })}
+                  content={
+                    drawnOpenLines.length > 0
+                      ? t('market.priceHistory.tradedRangeAtCloseTip')
+                      : t('market.priceHistory.tradedRangeTip')
+                  }
+                />
+              }
             />
           </li>
           {primaryOpen ? (

@@ -27,7 +27,7 @@ import type {
   MarketRegionEntry,
   VariationData,
 } from '@/sde/marketTypes';
-import { onReconnect } from '@/stores/network';
+import { useRetryOnReconnect } from '@/lib/useRetryOnReconnect';
 import { buildVariationIndex, type VariationIndex } from '@/engine/market/variations';
 
 /**
@@ -122,7 +122,7 @@ export function useMarketCatalogue(): MarketCatalogue {
   }, []);
   // The catalogue is a lazy download, so offline it may simply not be on the
   // device yet: load it again the moment the connection returns.
-  useEffect(() => (catalogueError ? onReconnect(retry) : undefined), [catalogueError, retry]);
+  useRetryOnReconnect(catalogueError, retry);
 
   // One pass over `groups` builds both lookups this route needs — by id (URL
   // param validation and the ancestor walk) and by parent (the tree's own

@@ -433,9 +433,13 @@ describe('esiFetch — app-wide error budget (issue #655)', () => {
   });
 
   it('honours an AbortSignal raised while the caller is queued at the gate', async () => {
+    let openGate!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      openGate = resolve;
+    });
     server.use(
       http.get(`${ESI_BASE_URL}/universe/types/:id`, async () => {
-        await new Promise((resolve) => setTimeout(resolve, 30));
+        await gate;
         return HttpResponse.json({ name: 'Tritanium' });
       })
     );
@@ -448,6 +452,7 @@ describe('esiFetch — app-wide error budget (issue #655)', () => {
     controller.abort();
 
     await expect(queued).rejects.toThrow();
+    openGate();
     await Promise.all(holders);
     expect(esiInFlight()).toBe(0);
   });
@@ -773,9 +778,13 @@ describe('esiFetch — activity log (issue #32)', () => {
   });
 
   it('does not emit for a cancelled (aborted) request', async () => {
+    let openGate!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      openGate = resolve;
+    });
     server.use(
       http.get(`${ESI_BASE_URL}/alliances/99000001`, async () => {
-        await new Promise((resolve) => setTimeout(resolve, 50));
+        await gate;
         return HttpResponse.json({});
       })
     );
@@ -789,6 +798,7 @@ describe('esiFetch — activity log (issue #32)', () => {
     controller.abort();
 
     await expect(promise).rejects.toThrow();
+    openGate();
     expect(events).toEqual([]);
     unsubscribe();
   });

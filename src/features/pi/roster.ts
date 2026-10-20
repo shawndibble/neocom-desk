@@ -15,7 +15,7 @@
  * re-runs that live load; this still only reads what it left behind.
  *
  * **The planets scope is checked up front, per Character, before any read.**
- * That is the trap `features/character/assets.ts` documents at
+ * That is the trap `features/assets/assets.ts` documents at
  * `loadAllCharactersAssets`: a live 403 is an auth failure, so it raises the
  * app-wide re-auth banner naming an alt the player never asked about, and
  * nothing caches it, so the same Character trips it again every visit.

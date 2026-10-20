@@ -77,6 +77,7 @@ import { EyeSlash } from '@phosphor-icons/react/dist/csr/EyeSlash';
 import { Factory } from '@phosphor-icons/react/dist/csr/Factory';
 import { FileText } from '@phosphor-icons/react/dist/csr/FileText';
 import { Flag } from '@phosphor-icons/react/dist/csr/Flag';
+import { Note } from '@phosphor-icons/react/dist/csr/Note';
 import { Flask } from '@phosphor-icons/react/dist/csr/Flask';
 import { FolderSimple } from '@phosphor-icons/react/dist/csr/FolderSimple';
 import { Funnel } from '@phosphor-icons/react/dist/csr/Funnel';
@@ -294,6 +295,8 @@ export const OptimizeRemaps = withWeight(Sliders);
 export const AddMarker = withWeight(Flag);
 /** Pins a named goal ("Fly Loki") to a plan entry row — GLOSSARY.md "Plan Milestone". Same glyph as `AddMarker`, named for the goal-marking sense rather than the remap sense. */
 export const Milestone = withWeight(Flag);
+
+export const SystemNote = withWeight(Note);
 /** Open the mobile filter sheet — the one control a narrow filter row collapses to (`FilterBar`). */
 export const Filter = withWeight(Funnel);
 /** A build plan material this character is better off manufacturing or growing than buying. */

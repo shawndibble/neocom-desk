@@ -19,6 +19,18 @@ vi.mock('@/features/bpcContracts/publicContractItems', () => ({
   loadPublicContractItems: (...args: unknown[]) => loadPublicContractItems(...args),
 }));
 
+const mutamarket = vi.hoisted(() => ({ getAbyssalEstimate: vi.fn() }));
+vi.mock('@/market/mutamarket', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/market/mutamarket')>()),
+  getAbyssalEstimate: (...args: unknown[]) => mutamarket.getAbyssalEstimate(...args),
+}));
+
+const ABYSSAL_TYPE = 47832;
+vi.mock('@/features/abyssal/mutaplasmidData', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/features/abyssal/mutaplasmidData')>()),
+  useMutaplasmidLookup: () => ({ isAbyssalType: (typeId: number) => typeId === 47832 }),
+}));
+
 vi.mock('@/features/character/typeNames', () => ({
   loadTypeNames: vi.fn(
     async () =>
@@ -34,8 +46,8 @@ vi.mock('@/market/prices', () => ({
   getHubPricesWithStatus: vi.fn(async () => ({
     unreachable: false,
     prices: new Map([
-      [40520, { sellMin: 1_000_000_000, buyMax: null }],
-      [40519, { sellMin: 100_000_000, buyMax: null }],
+      [40520, { sellMin: 1_000_000_000, buyMax: 900_000_000 }],
+      [40519, { sellMin: 100_000_000, buyMax: 90_000_000 }],
     ]),
   })),
 }));
@@ -48,11 +60,15 @@ function showItems(items: PublicContractItem[]) {
   loadPublicContractItems.mockResolvedValue({ data: { kind: 'items', items } });
 }
 
-function renderModal(system?: { id: number; name: string } | null) {
+function renderModal(
+  system?: { id: number; name: string } | null,
+  extra: Partial<React.ComponentProps<typeof PublicContractDetailModal>> = {}
+) {
   render(
     <MemoryRouter>
       <PublicContractDetailModal
         system={system}
+        {...extra}
         title="Large Skill Injector"
         characterId={1}
         contractId={235091192}
@@ -102,6 +118,20 @@ describe('PublicContractDetailModal — contents', () => {
     for (const label of ['Region', 'System']) {
       expect(screen.getByText(label).nextElementSibling).not.toHaveClass('truncate');
     }
+  });
+
+  it('links the location name to its Place Info', async () => {
+    renderModal();
+    expect(
+      await screen.findByRole('link', { name: 'Jita IV - Moon 4 - Caldari Navy Assembly Plant' })
+    ).toHaveAttribute('href', expect.stringContaining('info=place-60003760'));
+  });
+
+  it('shows the unknown-location text without a link when the name did not resolve', async () => {
+    loadContractLocationName.mockResolvedValue(null as unknown as string);
+    renderModal();
+    expect(await screen.findByText(/60003760/)).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /60003760/ })).toBeNull();
   });
 
   it('gives every line the item icon', async () => {
@@ -187,9 +217,10 @@ describe('PublicContractDetailModal — contents', () => {
     renderModal();
 
     // 5 injectors at 1b, 10 extractors at 100m — whole ISK, since cents on a
-    // billion-ISK bundle are noise.
-    expect(await screen.findByText('5,000,000,000')).toBeInTheDocument();
-    expect(screen.getByText('1,000,000,000')).toBeInTheDocument();
+    // billion-ISK bundle are noise. Sell orders: what taking it outright costs.
+    const check = await screen.findByRole('region', { name: 'Is it fair? · Jita 4-4 right now' });
+    expect(await within(check).findByText('5,000,000,000 ISK')).toBeInTheDocument();
+    expect(within(check).getByText('1,000,000,000 ISK')).toBeInTheDocument();
   });
 
   it('says so when ESI no longer lists the contract', async () => {
@@ -197,6 +228,151 @@ describe('PublicContractDetailModal — contents', () => {
     renderModal();
 
     expect(await screen.findByText('Contract no longer listed')).toBeInTheDocument();
+  });
+});
+
+describe('PublicContractDetailModal — price check', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    configureClipboard(null);
+    loadContractLocationName.mockResolvedValue('Jita IV - Moon 4 - Caldari Navy Assembly Plant');
+  });
+
+  it('opens on sell orders, what buying it outright costs, against the ask', async () => {
+    showItems([item({ record_id: 1, quantity: 5 })]);
+    renderModal(null, { askingIsk: 4_500_000_000 });
+
+    const check = await screen.findByRole('region', { name: 'Is it fair? · Jita 4-4 right now' });
+    expect(await within(check).findByText('5,000,000,000 ISK')).toBeInTheDocument();
+    expect(within(check).getByRole('button', { name: 'Sell orders' })).toBeInTheDocument();
+    expect(within(check).getByText('−10.0%')).toBeInTheDocument();
+    expect(within(check).getByText('Asking is below sell orders')).toBeInTheDocument();
+  });
+
+  it('flips to buy orders from the side label and the figures follow', async () => {
+    showItems([item({ record_id: 1, quantity: 5 })]);
+    renderModal(null, { askingIsk: 4_500_000_000 });
+
+    const check = await screen.findByRole('region', { name: /^Is it fair/ });
+    await within(check).findByText('5,000,000,000 ISK');
+    fireEvent.click(within(check).getByRole('button', { name: 'Sell orders' }));
+    expect(within(check).getByRole('button', { name: 'Buy orders' })).toBeInTheDocument();
+    expect(within(check).getAllByText('4,500,000,000 ISK')).toHaveLength(2); // asking and buy value
+    expect(within(check).getByText('Asking is level with buy orders')).toBeInTheDocument();
+  });
+
+  it('tags the line the shopper searched for and splits the value into theirs and the rest', async () => {
+    showItems([
+      item({ record_id: 1, quantity: 5 }),
+      item({ record_id: 2, type_id: 40519, quantity: 10 }),
+    ]);
+    renderModal(null, { askingIsk: 6_000_000_000, searchedTypeIds: new Set([40520]) });
+
+    const rows = await itemRows();
+    expect(rows[0]).toHaveTextContent('Your search');
+    expect(rows[1]).not.toHaveTextContent('Your search');
+    const check = await screen.findByRole('region', { name: /^Is it fair/ });
+    expect(await within(check).findByText('5,000,000,000 ISK')).toBeInTheDocument(); // theirs
+    expect(within(check).getByText('1,000,000,000 ISK')).toBeInTheDocument(); // the rest
+    expect(within(check).getByText('1 line you did not search for')).toBeInTheDocument();
+  });
+
+  it('tags nothing when no search is active', async () => {
+    showItems([
+      item({ record_id: 1, quantity: 5 }),
+      item({ record_id: 2, type_id: 40519, quantity: 10 }),
+    ]);
+    renderModal(null, { askingIsk: 6_000_000_000, searchedTypeIds: null });
+
+    const rows = await itemRows();
+    expect(rows[0]).not.toHaveTextContent('Your search');
+    const check = await screen.findByRole('region', { name: /^Is it fair/ });
+    expect(await within(check).findAllByText('6,000,000,000 ISK')).toHaveLength(2); // ask and value
+    expect(within(check).queryByText('Other items')).not.toBeInTheDocument();
+  });
+
+  it("never prices a blueprint copy at the original's hub price, so a copy-only listing has no hub check", async () => {
+    // 40520 has a hub price (1b sell), but only the original trades; a copy never does.
+    showItems([
+      item({
+        record_id: 1,
+        is_blueprint_copy: true,
+        material_efficiency: 10,
+        time_efficiency: 16,
+        runs: 1,
+      }),
+    ]);
+    renderModal(null, { askingIsk: 500_000 });
+
+    await itemRows();
+    expect(screen.queryByRole('region', { name: /^Is it fair/ })).not.toBeInTheDocument();
+    expect(screen.queryByText('1,000,000,000 ISK')).not.toBeInTheDocument();
+  });
+
+  it('leaves a copy out of the figure and counts it unpriced when it sits beside priced items', async () => {
+    showItems([
+      item({
+        record_id: 1,
+        is_blueprint_copy: true,
+        material_efficiency: 10,
+        time_efficiency: 16,
+        runs: 1,
+      }),
+      item({ record_id: 2, type_id: 40519, quantity: 10 }),
+    ]);
+    renderModal(null, { askingIsk: 50_000_000 });
+
+    const check = await screen.findByRole('region', { name: /^Is it fair/ });
+    expect(await within(check).findByText('1,000,000,000 ISK')).toBeInTheDocument(); // 10 x 100m, the item only
+    expect(within(check).getByText('(1 item unpriced)')).toBeInTheDocument();
+  });
+
+  it('has no price check for a contract with no ISK ask and nothing requested', async () => {
+    showItems([item({ record_id: 1 })]);
+    renderModal(null, { askingIsk: null });
+
+    await itemRows();
+    expect(screen.queryByRole('region', { name: /^Is it fair/ })).not.toBeInTheDocument();
+  });
+
+  it('shows a blueprint listing per run against similar copies, with no buy/sell flip', async () => {
+    showItems([item({ record_id: 1 })]);
+    renderModal(null, {
+      bpcCheck: {
+        perRun: 850_000,
+        medianPerRun: 920_000,
+        cheapestPerRun: 790_000,
+        count: 14,
+        diff: -7.6,
+      },
+    });
+
+    const check = await screen.findByRole('region', {
+      name: 'Is it fair? · 14 similar copies for sale now',
+    });
+    expect(within(check).getByText('850,000 ISK')).toBeInTheDocument();
+    expect(within(check).getByText('920,000 ISK')).toBeInTheDocument();
+    expect(within(check).getByText('790,000 ISK')).toBeInTheDocument();
+    expect(within(check).getByText('−7.6%')).toBeInTheDocument();
+    expect(within(check).getByText('Below the median per run')).toBeInTheDocument();
+    expect(within(check).queryByRole('button')).not.toBeInTheDocument();
+  });
+
+  it('says there are too few similar copies when the check could not be made', async () => {
+    showItems([item({ record_id: 1 })]);
+    renderModal(null, { bpcCheck: null });
+
+    expect(
+      await screen.findByText('Too few similar copies for sale to compare with.')
+    ).toBeInTheDocument();
+  });
+
+  it('marks the contract as public and shows its expiry beside the price', async () => {
+    showItems([item({ record_id: 1 })]);
+    renderModal();
+
+    expect(await screen.findByText('Public')).toBeInTheDocument();
+    expect(screen.getByText('Expires')).toBeInTheDocument();
   });
 });
 
@@ -251,5 +427,24 @@ describe('PublicContractDetailModal — system row', () => {
     renderModal(null);
     await screen.findByRole('list');
     expect(screen.queryByText('System')).not.toBeInTheDocument();
+  });
+
+  it('values an abyssal module at its own MutaMarket estimate, apart from the hub figure', async () => {
+    mutamarket.getAbyssalEstimate.mockResolvedValue({
+      status: 'priced',
+      value: 90_000_000,
+      source: 'mutamarket',
+      fetchedAt: 0,
+      valueUpdatedAt: null,
+      url: 'https://mutamarket.com',
+    });
+    showItems([item({ record_id: 1, type_id: ABYSSAL_TYPE, item_id: 11 })]);
+    renderModal();
+
+    expect(await screen.findByText('Abyssal modules (MutaMarket estimate)')).toBeInTheDocument();
+    expect(await screen.findByText('90,000,000')).toBeInTheDocument();
+    expect(mutamarket.getAbyssalEstimate).toHaveBeenCalledWith(ABYSSAL_TYPE, 11, {
+      characterId: 1,
+    });
   });
 });

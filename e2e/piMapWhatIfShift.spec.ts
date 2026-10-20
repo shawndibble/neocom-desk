@@ -58,7 +58,12 @@ for (const [label, viewport] of [
     await expect(page.getByTestId('map-whatif')).toContainText('What if I add a Lava planet?');
     const hover = await measure(page);
     // Page-wide layout shift across the hover stays at zero, not just this box (a tick opens the detail, which is meant to).
-    await page.waitForTimeout(300);
+    await page.evaluate(
+      () =>
+        new Promise<void>((done) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => done()))
+        )
+    );
     expect(await page.evaluate(() => (window as unknown as { __cls: number }).__cls)).toBeLessThan(
       0.001
     );

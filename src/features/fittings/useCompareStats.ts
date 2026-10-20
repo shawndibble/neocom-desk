@@ -5,8 +5,8 @@
  * adding a slot doesn't recompute the ones already shown. Each Fitting is
  * worked out on the set it carries, as it would open (`evaluateFitting`).
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { onReconnect } from '@/stores/network';
+import { useCallback, useMemo, useState } from 'react';
+import { useRetryOnReconnect } from '@/lib/useRetryOnReconnect';
 import type { DamageProfile, Fitting, FittingStats, PilotProfile } from '@/engine/fittings/types';
 import { useStatsConditions, type StatsConditions } from './statsConditions';
 import { useDamageProfiles } from './damageProfiles';
@@ -54,6 +54,6 @@ export function useCompareStats(
   );
   // A calculation that failed offline (the ship data never downloaded) mends itself on reconnect.
   const anyFailed = result.failed.some(Boolean);
-  useEffect(() => (anyFailed ? onReconnect(retry) : undefined), [anyFailed, retry]);
+  useRetryOnReconnect(anyFailed, retry);
   return { ...result, retry };
 }

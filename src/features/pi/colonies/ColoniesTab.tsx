@@ -32,7 +32,7 @@ import { PricesUnavailable } from '../PricesUnavailable';
 import { EsiDidntAnswer } from '../EsiDidntAnswer';
 import { piTypeNames } from './coloniesNames';
 import { useColoniesAdvice } from './useColoniesAdvice';
-import { buildAltAdvice } from './altAdvice';
+import { askOneAltAdvice, groupAltColonies, type AltCharacterAdvice } from './altAdvice';
 import { loadSystemNameAndSecurity } from '@/features/character/systemSecurity';
 import { AssumedCustomsNote } from '../AssumedCustomsNote';
 import { assumedCustomsNames } from '../colonyCustoms';
@@ -421,17 +421,35 @@ export function ColoniesTab({
       cancelled = true;
     };
   }, [showAltColonies, roster.colonies, knownSecurity, altSecurity]);
-  const altAdvice = useMemo(
-    () =>
-      planAdvice.input && showAltColonies
-        ? buildAltAdvice(
-            planAdvice.input,
-            roster.colonies,
-            new Map([...altSecurity, ...(knownSecurity ?? [])])
-          )
-        : null,
-    [planAdvice.input, roster.colonies, showAltColonies, altSecurity, knownSecurity]
-  );
+  // One `buildPlanAdvice` per alt, off the main thread where there is a worker, so a roster of alts never blocks the page.
+  const [altBuilt, setAltBuilt] = useState<{
+    input: unknown;
+    byCharacter: ReadonlyMap<number, AltCharacterAdvice>;
+  } | null>(null);
+  useEffect(() => {
+    if (!planAdvice.input || !showAltColonies) return;
+    const input = planAdvice.input;
+    const security = new Map([...altSecurity, ...(knownSecurity ?? [])]);
+    const todo = [...groupAltColonies(roster.colonies, security)];
+    const built = new Map<number, AltCharacterAdvice>();
+    let live = true;
+    void (async () => {
+      for (const [characterId, owned] of todo) {
+        built.set(characterId, await askOneAltAdvice(input, owned, security));
+        // Without a worker the build ran on the page: give it a frame before the next alt.
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        if (!live) return;
+      }
+      setAltBuilt({ input, byCharacter: new Map(built) });
+    })();
+    return () => {
+      live = false;
+    };
+  }, [planAdvice.input, roster.colonies, showAltColonies, altSecurity, knownSecurity]);
+  const altAdvice =
+    showAltColonies && planAdvice.input && altBuilt?.input === planAdvice.input
+      ? altBuilt.byCharacter
+      : null;
   const altGroups = useMemo(() => {
     const byCharacter = new Map<
       number,

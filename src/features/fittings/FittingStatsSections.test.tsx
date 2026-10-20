@@ -23,6 +23,7 @@ import type { Fitting } from '@/engine/fittings/types';
 import { FakeItemActions } from '@/features/market/__fixtures__/itemActions';
 import { FittingItemActionsProvider } from './fittingItemActions';
 import { fakeItemActions } from './__fixtures__/itemActions';
+import { MakeItFitContext } from './makeItFitContext';
 
 beforeEach(async () => {
   await db.settings.clear();
@@ -160,6 +161,7 @@ const [frigate, cruiser] = BUILT_IN_TARGET_PROFILES;
 
 function targetProfiles(overrides: Partial<TargetProfiles> = {}): TargetProfiles {
   return {
+    hydrated: true,
     custom: [],
     selected: cruiser,
     select: vi.fn(),
@@ -1295,6 +1297,32 @@ describe('FittingStatsSections price', () => {
     expect(body.getByRole('combobox', { name: 'Priced at' })).toBeInTheDocument();
   });
 
+  it('prices on sell orders alone: no Buy fact, and a missing buy order is not "unpriced"', async () => {
+    // Sells at the hub, no buy order there (the order book's usual state for a rare module).
+    const sellOnly = { ...row(1, 2, 1500), buyEach: null, buyTotal: null };
+    const price = {
+      rows: [sellOnly],
+      totals: { buy: 0, sell: 3000, spread: 0, unpricedRows: 1 },
+    } as unknown as Appraisal;
+    render(
+      <FittingStatsSections
+        stats={stats()}
+        statsProgress={null}
+        statsError={false}
+        price={price}
+        damageProfiles={damageProfiles()}
+        targetProfiles={targetProfiles()}
+        typeName={priceTypeName}
+      />
+    );
+    await userEvent.click(screen.getByRole('button', { name: /^Price/ }));
+    const body = within(sectionBody('Price'));
+
+    expect(body.queryByText(/no price at this hub/)).toBeNull();
+    expect(body.queryByText('Buy')).toBeNull();
+    expect(body.getByText('Sell')).toBeInTheDocument();
+  });
+
   afterEach(() => configureClipboard(null));
 
   it('breaks the price down per item and copies it as a multibuy list', async () => {
@@ -1546,5 +1574,52 @@ describe('FittingStatsSections — column and side panels', () => {
       'true'
     );
     await waitFor(() => expect(compare).toHaveBeenCalledWith(47382));
+  });
+});
+
+describe('FittingStatsSections Fitting section over budget', () => {
+  function renderOver(fittingStats: FittingStats, open = vi.fn()) {
+    render(
+      <MakeItFitContext.Provider value={open}>
+        <FittingStatsSections
+          stats={fittingStats}
+          statsProgress={null}
+          statsError={false}
+          price={null}
+          damageProfiles={damageProfiles()}
+          targetProfiles={targetProfiles()}
+          typeName={typeName}
+        />
+      </MakeItFitContext.Provider>
+    );
+    return open;
+  }
+
+  async function expandFitting() {
+    const toggle = screen.getByRole('button', { name: /^Fitting/ });
+    if (toggle.getAttribute('aria-expanded') !== 'true') await userEvent.click(toggle);
+  }
+
+  it('calls out the over budget in red, header and figure, with its Fix link', async () => {
+    const open = renderOver(stats({ cpuUsed: 448.1 }));
+    expect(screen.getByText('CPU 112% · PG 50%')).toHaveClass('text-danger');
+    await expandFitting();
+    expect(screen.getByText('448.1 / 400.0')).toHaveClass('text-danger');
+    expect(screen.getByText('50.0 / 100.0')).not.toHaveClass('text-danger');
+    expect(screen.queryByRole('button', { name: 'Fix powergrid' })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Fix CPU' }));
+    expect(open).toHaveBeenCalledWith('cpu');
+  });
+
+  it('names calibration in the header when it is the budget over', () => {
+    renderOver(stats({ calibrationUsed: 425 }));
+    expect(screen.getByText('CPU 25% · PG 50% · Cal 106%')).toHaveClass('text-danger');
+  });
+
+  it('shows no red and no Fix link within budget', async () => {
+    renderOver(stats());
+    expect(screen.getByText('CPU 25% · PG 50%')).not.toHaveClass('text-danger');
+    await expandFitting();
+    expect(screen.queryByRole('button', { name: /^Fix / })).toBeNull();
   });
 });

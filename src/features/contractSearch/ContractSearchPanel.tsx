@@ -56,12 +56,17 @@ import {
 import {
   contractOfferPriceSummary,
   listedContractTypeOptions,
+  isUnpricedOffer,
   offerAskingPrice,
   type ContractOfferStats,
   type ContractSaleKind,
   type ContractTypeOption,
 } from '@/engine/contracts/contractSearch';
-import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
+import {
+  bpcRowsFromContractOffers,
+  type PublicContractOfferRow,
+} from '@/engine/contracts/contractOffers';
+import { bpcPerRunCheck } from '@/engine/contracts/bpcPerRunCheck';
 import {
   resolveCourierRoutes,
   type PublicCourierContractRow,
@@ -387,8 +392,6 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
 
   const offersResult = offers.data?.cached ?? null;
   const courierResult = courier.data?.cached ?? null;
-  const fullRows = offersResult?.data?.rows ?? EMPTY_ROWS;
-  const haveFull = fullRows.length > 0;
   const courierRows = courierResult?.data?.rows ?? EMPTY_COURIER_CONTRACT_ROWS;
 
   const [itemsParams, setItemsParams] = useUrlParams(ITEMS_FILTER_PARAMS);
@@ -416,17 +419,15 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
   // Below market needs no search: it is already a narrowing of the snapshot.
   const searchActive = belowMarket || isItemsSearchActive(uiFilter, selectedTypeId);
 
-  // The index and, for a search naming a few types, just those types' chunks
-  // arrive ahead of the full snapshot (issue #2921). Until the full rows land,
-  // names, suggestions and the region list come off the index, and the table
-  // off the early rows; both quietly hand over to the full snapshot.
+  // R2 is index-only (issue #4270): names, suggestions and the region list
+  // come off the index, and the table off the rows read for a search's types.
   const offerIndex = useOfferIndex(mode === 'items');
   const indexTypeRows = useMemo(
     () =>
       offerIndex ? [...offerIndex.types.keys()].map((typeId) => ({ typeId })) : EMPTY_TYPE_ROWS,
     [offerIndex]
   );
-  const nameSource = haveFull ? fullRows : indexTypeRows;
+  const nameSource = indexTypeRows;
   // Names fill in behind whichever table is showing — see
   // `contractSearchNames.ts`. None of them gate a board: every consumer
   // already renders an unresolved id honestly.
@@ -467,12 +468,11 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
   const early = useEarlyOffers(
     offerIndex,
     belowMarket ? null : typeIds,
-    mode === 'items' && !haveFull && searchActive
+    mode === 'items' && searchActive
   );
-  const rows = haveFull ? fullRows : (early.rows ?? EMPTY_ROWS);
+  const rows = early.rows ?? EMPTY_ROWS;
   /**
-   * A search with nothing to show yet: the full snapshot is still coming down
-   * and no early read answered. A query that matched no listed type needs no
+   * A search with nothing to show yet: no per-type read has answered. A query that matched no listed type needs no
    * rows at all, so it is not waiting on any.
    */
   // "Matched nothing" is only knowable once every listed type has a name to
@@ -480,7 +480,6 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
   // or names still resolving, an empty set means "not known", not "no match".
   const typesKnown = offerIndex !== null && !namingTypes;
   const awaitingRows =
-    !haveFull &&
     early.rows === null &&
     !early.failed &&
     // Below market reads every type, so a query matching none still awaits rows.
@@ -496,13 +495,13 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
   );
   const regionIds = useMemo(() => {
     const ids = new Set<number>(rows.map((row) => row.regionId));
-    for (const id of haveFull ? [] : (offerIndex?.regionIds ?? [])) ids.add(id);
+    for (const id of offerIndex?.regionIds ?? []) ids.add(id);
     for (const route of courierRoutes) {
       if (route.origin.regionId !== null) ids.add(route.origin.regionId);
       if (route.destination.regionId !== null) ids.add(route.destination.regionId);
     }
     return [...ids];
-  }, [rows, courierRoutes, haveFull, offerIndex]);
+  }, [rows, courierRoutes, offerIndex]);
   const { value: regionNames } = useRegionNames(regionIds);
   // Over the whole snapshot, not the filtered rows: keyed on the distinct
   // location ids, so narrowing the filter never changes the key and never
@@ -529,12 +528,30 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
     void setVisibleItemsColumns(next);
   }
   const [selectedRow, setSelectedRow] = useState<PublicContractOfferRow | null>(null);
+  // A blueprint copy has no market price, so an opened one is held per run
+  // against the other copies of the same blueprint, as BPC Sourcing does.
+  // Absent for anything that is not a copy. The rows are those read for the
+  // search, so a contract that bundles other types looks single-type here: its
+  // price is then divided by one blueprint's runs. That can only raise a rate,
+  // so the cheapest is safe, and the median shrugs off the odd bundle.
+  const selectedBpcCheck = useMemo(() => {
+    if (!selectedRow?.isBlueprintCopy) return undefined;
+    const copies = bpcRowsFromContractOffers(rows);
+    const subject = copies.find(
+      (copy) => copy.contractId === selectedRow.contractId && copy.typeId === selectedRow.typeId
+    );
+    return subject ? bpcPerRunCheck(subject, copies) : null;
+  }, [selectedRow, rows]);
 
   // Freshness and the offline banner both name the snapshot actually on
   // screen: the two are published by the same job but cached separately, so a
   // courier read served from Dexie under a live offers read is a real state.
   const activeResult = mode === 'courier' ? courierResult : offersResult;
-  const modeRowCount = mode === 'courier' ? courierRoutes.length : rows.length;
+  // Items rows stay empty until a search names types (R2 is index-only), so the
+  // listed types stand in for them: an index with types is data, not "nothing
+  // synced" — that would hide the filter bar and the search box.
+  const modeRowCount =
+    mode === 'courier' ? courierRoutes.length : offerIndex ? offerIndex.types.size : rows.length;
   const active = mode === 'courier' ? courier : offers;
   /**
    * Per mode, and against that mode's own data: the board on screen spins only
@@ -545,9 +562,8 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
   const modeLoadingLabel = t(
     mode === 'courier' ? 'contractSearch.loadingCourier' : 'contractSearch.loadingOffers'
   );
-  // A failed per-type R2 read is an error too: with R2 the only store (issue
-  // #4270) no full snapshot is coming to replace it, and an empty table would
-  // claim nothing matched.
+  // A failed per-type R2 read is an error too: an empty table would claim
+  // nothing matched.
   const modeError = active.error || (mode === 'items' && early.failed === true);
   /** Last cycle's rows are on screen and this cycle's are on the way (#963). */
   const revalidating = active.data?.revalidating ?? false;
@@ -575,17 +591,15 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
   const regionOptions = useMemo(() => {
     // Every region with an offer, which the index states before any chunk has
     // landed; a few early rows would otherwise offer only their own regions.
-    const ids =
-      !haveFull && offerIndex
-        ? [...offerIndex.regionIds]
-        : [...new Set(rows.map((row) => row.regionId))];
+    const ids = offerIndex
+      ? [...offerIndex.regionIds]
+      : [...new Set(rows.map((row) => row.regionId))];
     return ids.map((id) => ({ id, name: regionNames.get(id) ?? `#${id}` }));
-  }, [rows, haveFull, offerIndex, regionNames]);
+  }, [rows, offerIndex, regionNames]);
 
   const { displayRows, statsByType, awaitingQuery } = useContractSearchRows({
     uiFilter,
     rows,
-    haveFull,
     offerIndex,
     earlyRows: early.rows,
     plexPrice,
@@ -1072,6 +1086,15 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
           regionName={regionNames.get(selectedRow.regionId) ?? `#${selectedRow.regionId}`}
           dateExpired={selectedRow.dateExpired}
           statChips={statChipsForRow(selectedRow)}
+          // The ISK the contract costs, for the price check. A barter, a PLEX ask
+          // with no PLEX price yet, or an ask for items has no honest ISK figure.
+          askingIsk={
+            selectedRow.requestsItems || isUnpricedOffer(selectedRow, plexPrice)
+              ? null
+              : offerAskingPrice(selectedRow, plexPrice)
+          }
+          searchedTypeIds={typeIds}
+          bpcCheck={selectedBpcCheck}
           onClose={() => setSelectedRow(null)}
         />
       )}

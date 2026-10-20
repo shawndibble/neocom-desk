@@ -60,7 +60,7 @@ vi.mock('@/features/industry/data', () => ({
     needsReauth: false,
   }),
 }));
-vi.mock('@/features/character/assets', () => ({
+vi.mock('@/features/assets/assets', () => ({
   loadCharacterAssets: async () => ({ cached: { data: [] }, needsReauth: false }),
 }));
 const location = vi.hoisted(() => vi.fn());

@@ -5,12 +5,20 @@
   is reserved for manually running/testing the app in a browser (`npm run
 dev`) — Shawn frequently has another agent working there at the same
   time, and editing it races with that. Branch into a sibling worktree
-  first: `git worktree add ../neocom-desk.worktrees/<name> -b <branch>` (or
+  first: `git worktree add ../neocom-desk.worktrees/<name> -b <branch> origin/develop` (or
   `../neocom-desk-<short-name>`), then `npm ci` inside it — `node_modules`
   isn't shared across worktrees. `scripts/next-ticket/setup-worktree.mjs`
   does this automatically for the ticket loop. For cleanup or admin git
   commands that must target the main repo, use `git -C <main-repo-path>
 ...` rather than `cd`, so the other agent's working tree isn't disturbed.
+- **Branches: PRs target `develop`; `main` is production.** Never open a PR against
+  `main` or push to it except the `develop` → `main` promotion (merge commit, not
+  squash), which is what deploys. Branch worktrees off `origin/develop`. See
+  `docs/agents/issue-tracker.md` "CI and merge". Every merge to `develop` ships to
+  `https://dev.neocomdesk.com` (its own EVE app and client ID); Cloud Functions are
+  not auto-deployed, so a new client ID also goes in `functions/.env`'s `EVE_CLIENT_ID`.
+  Dev and production share one Firebase project and its data, so Firestore changes from
+  `develop` stay additive and backward-compatible (docs/context/decisions/).
 - Architecture map: docs/ARCHITECTURE.md — read before locating or adding features.
 - `GLOSSARY.md` is the glossary. Use its terms exactly. Don't read it whole: `grep -n -i "<term>" GLOSSARY.md` for the terms in your task.
 - **Never append a scope decision to `GLOSSARY.md`.** Scope decisions live one
@@ -52,8 +60,11 @@ dev`) — Shawn frequently has another agent working there at the same
   `ignore-scripts` is set). Worktree setup does this for you.
 - **Run at most three agents at once**, each running only the test files it
   touched. Run an e2e spec locally only when changing it, one file at a time.
-- **A flaky CI test blocking your PR gets fixed, not rerun or ignored**, even
-  when unrelated. Reproduce with `npx vitest run <path>` and fix it in the same PR.
+- **A flaky CI test never holds up your PR, and is never left unfixed.** If an
+  unrelated test fails CI, confirm it's unrelated (`npx vitest run <path>`),
+  rerun the failed job, merge your PR, then **immediately** fix the flake as its
+  own separate branch and PR, before picking up any other work. A flake your
+  change caused, or in a file your PR touches, is fixed in your PR.
 - **Tests stay under 10 seconds each.** Make a slow test faster; never raise
   `testTimeout` or add a per-test timeout.
 - Full detail and rationale for the rules above: `docs/agents/testing-and-ci.md`.

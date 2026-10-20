@@ -1,7 +1,7 @@
 /**
  * Fetch + cache layer for the corporation's assets (issue #327).
  *
- * The corp twin of `features/character/assets.ts`, and the same departures
+ * The corp twin of `features/assets/assets.ts`, and the same departures
  * every corp data module makes via `corpRead.ts`: a corp-scoped cache key
  * (issue #293) so a corporation change misses rather than serving the previous
  * corporation's hangars, and `detectCorpAuthFailure` so a 403 reads as the

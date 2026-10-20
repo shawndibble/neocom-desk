@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { OwnedStockPlacement } from '@/engine/industry/ownedStock';
 
 const loadAllCharactersAssets = vi.fn();
-vi.mock('@/features/character/assets', () => ({
+vi.mock('@/features/assets/assets', () => ({
   loadAllCharactersAssets: () => loadAllCharactersAssets(),
 }));
 

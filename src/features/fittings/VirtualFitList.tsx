@@ -22,6 +22,7 @@
  * place in the whole list (`aria-posinset`/`aria-setsize`) since only some are
  * in the DOM. Each row is measured once laid out, so rows of any height fit.
  */
+import { useObservedMeasure } from '@/lib/useObservedMeasure';
 import { useCallback, useLayoutEffect, useState, type ReactNode } from 'react';
 import { measureElement, useVirtualizer } from '@tanstack/react-virtual';
 
@@ -84,27 +85,37 @@ export function VirtualFitList<T>({
   // goes — which resizes one of the boxes between the list and its scroll
   // parent, or the scroll parent's own content.
   const [scrollMargin, setScrollMargin] = useState(0);
+  const measureScrollMargin = useCallback(() => {
+    if (!list || !scrollParent) return;
+    setScrollMargin(
+      list.getBoundingClientRect().top -
+        scrollParent.getBoundingClientRect().top -
+        scrollParent.clientTop +
+        scrollParent.scrollTop
+    );
+  }, [list, scrollParent]);
+  useObservedMeasure(
+    () => {
+      if (capped || !list || !scrollParent) return null;
+      const observed: Element[] = [...scrollParent.children];
+      for (
+        let node = list.parentElement;
+        node && node !== scrollParent;
+        node = node.parentElement
+      ) {
+        observed.push(node);
+      }
+      return observed;
+    },
+    measureScrollMargin,
+    [capped, list, scrollParent, measureScrollMargin],
+    { layout: true }
+  );
   useLayoutEffect(() => {
-    if (capped || !list || !scrollParent) return;
-    const measure = () =>
-      setScrollMargin(
-        list.getBoundingClientRect().top -
-          scrollParent.getBoundingClientRect().top -
-          scrollParent.clientTop +
-          scrollParent.scrollTop
-      );
-    measure();
-    window.addEventListener('resize', measure);
-    const observer = new ResizeObserver(measure);
-    for (const child of scrollParent.children) observer.observe(child);
-    for (let node = list.parentElement; node && node !== scrollParent; node = node.parentElement) {
-      observer.observe(node);
-    }
-    return () => {
-      window.removeEventListener('resize', measure);
-      observer.disconnect();
-    };
-  }, [capped, list, scrollParent]);
+    if (capped) return;
+    window.addEventListener('resize', measureScrollMargin);
+    return () => window.removeEventListener('resize', measureScrollMargin);
+  }, [capped, measureScrollMargin]);
 
   const scrollElement = capped ? box : (scrollParent ?? null);
   const margin = capped ? 0 : scrollMargin;

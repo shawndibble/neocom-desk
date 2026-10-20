@@ -222,6 +222,10 @@ export interface BookSettings extends BookSummary {
   /** Above this a dismissal needs a Director (D6); null when there is no limit. */
   dismissApprovalAboveIsk: number | null;
   ownerCharacterId: number | null;
+  /** Who turned the book on; the owner changes when the CEO reclaims it. */
+  createdBy: number | null;
+  /** Epoch ms: until then members' own Mining Tax pages ignore the book (setup window). */
+  membersSeeFrom?: number;
 }
 
 /** The book's settings document, or null when the corporation has none. */
@@ -253,6 +257,8 @@ function settingsFrom(d: Record<string, unknown>): BookSettings {
     dismissApprovalAboveIsk:
       typeof d.dismissApprovalAboveIsk === 'number' ? d.dismissApprovalAboveIsk : null,
     ownerCharacterId: typeof d.ownerCharacterId === 'number' ? d.ownerCharacterId : null,
+    createdBy: typeof d.createdBy === 'number' ? d.createdBy : null,
+    ...(typeof d.membersSeeFrom === 'number' ? { membersSeeFrom: d.membersSeeFrom } : {}),
   };
 }
 
@@ -410,6 +416,15 @@ export async function reclaimBook(
 ): Promise<{ officersRevoked: number }> {
   const accessToken = await getValidAccessToken(characterId);
   return call(characterId, 'reclaimCorpTaxBookCallable', { corporationId, accessToken });
+}
+
+/**
+ * Deletes the corporation's book for good: whoever turned it on (still a
+ * Director), or the CEO. Turning it on again starts from nothing.
+ */
+export async function deleteBook(characterId: number, corporationId: number): Promise<void> {
+  const accessToken = await getValidAccessToken(characterId);
+  await call(characterId, 'deleteCorpTaxBookCallable', { corporationId, accessToken });
 }
 
 /** The verify token for each Statement id; one with no link doc is left out. Editors only (rules). */

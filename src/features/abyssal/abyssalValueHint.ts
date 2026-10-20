@@ -1,6 +1,6 @@
 import { formatAge } from '@/lib/age';
 import type { AbyssalEstimate } from '@/market/mutamarket';
-import type { Translate } from '@/features/character/assetBrowserFormat';
+import type { Translate } from '@/features/assets/assetBrowserFormat';
 
 /** When the estimate was made: MutaMarket's model run, else when this device fetched it. */
 function estimatedAt(estimate: AbyssalEstimate): number {

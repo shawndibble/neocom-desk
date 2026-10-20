@@ -21,6 +21,7 @@ import {
 } from '@/engine/fittings/moduleUpgrades';
 import { levelGain, type LevelGain } from '@/engine/fittings/skillGains';
 import { fitsResourceBudget } from '@/engine/fittings/skillGaps';
+import { findSkillFixes } from '@/engine/fittings/skillFixes';
 import {
   buildVariationIndex,
   type MetaGroupNameMap,
@@ -212,5 +213,62 @@ describe('Tech II upgrades on that Rokh (real WASM + real pinned SDE)', () => {
     const from = rows.map((row) => row.fromTypeId);
     expect(from).not.toContain(REPUBLIC_FLEET_LARGE_CAP_BATTERY);
     for (const row of rows) expect(row.fromTypeId).not.toBe(row.toTypeId);
+  });
+});
+
+describe('An Orca over CPU on its drone rigs (real WASM + real pinned SDE)', () => {
+  /** A player's Orca: two drone rigs whose CPU drawback Drones Rigging shrinks. */
+  const ORCA_SHARE =
+    '2.Lc3BCsIwDIDhp-ltQpJaxOw2PHjzog_QdYpSJy7gVqUPL212-kj4Q0YaMzCGXpgaZNzfH0wNcXqWhV3drjq1BUaZ9UCG2quWUX61R0naxUU7tHWOfahz7Nc_85WpzbtlYscu54Rvnj8NfmEoJpwUKYQI7G-Qs3Fdt7kcjTsYgrN_RUNwkuD_';
+  const DRONES_RIGGING = 26255;
+  let fitting: Fitting;
+  let pilot: PilotProfile;
+  let before: Awaited<ReturnType<typeof computeFittingStats>>;
+  let candidates: ReturnType<typeof skillGainCandidates>;
+
+  const statsWith = (levels: Map<number, number>) =>
+    computeFittingStats(fitting, { ...pilot, skillLevels: levels }, undefined, undefined, {
+      overheated: false,
+    });
+
+  beforeAll(async () => {
+    await loadRealDogmaEngine();
+    const decoded = await decodeFittingShare(ORCA_SHARE);
+    if (!decoded.ok) throw new Error('share code did not decode');
+    fitting = shareToFitting(decoded.value, 'Orca');
+    const ids = await allSkillTypeIds();
+    // Everything at V but Drones Rigging, untrained: 48.1 tf over, as the player saw.
+    const levels = new Map(ids.map((id): [number, number] => [id, 5]));
+    levels.set(DRONES_RIGGING, 0);
+    pilot = buildPilotProfile(levels, []);
+    before = await statsWith(pilot.skillLevels);
+    const allV = buildPilotProfile(new Map(ids.map((id): [number, number] => [id, 5])), []);
+    candidates = skillGainCandidates(await fittingSkillSources(fitting, allV), pilot.skillLevels);
+  }, 60_000);
+
+  afterAll(() => vi.unstubAllGlobals());
+
+  it('is over CPU to begin with', () => {
+    expect(before.cpuUsed - before.cpuTotal).toBeCloseTo(48.1, 1);
+  });
+
+  it('ranks Drones Rigging first in What to train, though it only moves CPU', async () => {
+    const gains = await evaluateSkillGains(candidates, async (skillTypeId, level) => ({
+      before,
+      after: await statsWith(new Map(pilot.skillLevels).set(skillTypeId, level)),
+    }));
+    expect(rankSkillGains(gains ?? [], 'overall')[0]?.skillTypeId).toBe(DRONES_RIGGING);
+  });
+
+  it('finds Drones Rigging IV as the training that makes it fit', async () => {
+    const fixes = await findSkillFixes({
+      before,
+      candidates,
+      stats: (trained) => statsWith(new Map(raisedSkillLevels(pilot.skillLevels, trained))),
+    });
+    expect(fixes.map((fix) => fix.entries)).toEqual([
+      [{ skillTypeID: DRONES_RIGGING, targetLevel: 4 }],
+    ]);
+    expect(fitsResourceBudget(fixes[0]!.after)).toBe(true);
   });
 });

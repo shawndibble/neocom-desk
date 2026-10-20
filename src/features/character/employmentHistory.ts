@@ -6,6 +6,7 @@
  */
 import { getCharacterCorporationHistory, type CorporationHistoryEntry } from '@/esi/endpoints';
 import { conditionalFetch, loadWithCache, type CachedResult } from '@/esi/cache';
+import { isNpcCorporationId } from '@/esi/entityIds';
 
 const KEY = 'employment-history';
 
@@ -26,11 +27,21 @@ export interface EmploymentHistoryRow {
   tenureSeconds: number;
   /** Whether this is the most recent (current) employer. */
   ongoing: boolean;
+  /**
+   * An NPC corporation: where a pilot sits while idle or passes through between
+   * player corps, so it says nothing about their career. Never `returned` or
+   * `shortStay`, and left out of the summary's count and longest stay.
+   */
+  npc: boolean;
   /** The pilot was in this corporation in an earlier record too. */
   returned: boolean;
   /** Stayed under `SHORT_STAY_SECONDS`; never the ongoing stint, which isn't over yet. */
   shortStay: boolean;
-  /** `tenureSeconds` over the longest stint's, 0..1; sizes the card's bar. */
+  /**
+   * `tenureSeconds` over the longest player-corp stint's (every stint's when
+   * there is none), capped at 1; sizes the card's bar. A long idle spell in an
+   * NPC corp would otherwise shrink every real stint to a sliver.
+   */
   tenureRatio: number;
 }
 
@@ -49,26 +60,30 @@ export function deriveEmploymentHistoryRows(
     const endMs = i === 0 ? now : new Date(sorted[i - 1].start_date).getTime();
     return Math.max(0, (endMs - new Date(entry.start_date).getTime()) / 1000);
   });
-  const longest = Math.max(0, ...tenures);
+  const npc = sorted.map((entry) => isNpcCorporationId(entry.corporation_id));
+  const playerTenures = tenures.filter((_, i) => !npc[i]);
+  const longest = Math.max(0, ...(playerTenures.length > 0 ? playerTenures : tenures));
   return sorted.map((entry, i) => ({
     recordId: entry.record_id,
     corporationId: entry.corporation_id,
     startDate: entry.start_date,
     tenureSeconds: tenures[i],
     ongoing: i === 0,
-    returned: sorted.slice(i + 1).some((older) => older.corporation_id === entry.corporation_id),
-    shortStay: i > 0 && tenures[i] < SHORT_STAY_SECONDS,
-    tenureRatio: longest > 0 ? tenures[i] / longest : 0,
+    npc: npc[i],
+    returned:
+      !npc[i] && sorted.slice(i + 1).some((older) => older.corporation_id === entry.corporation_id),
+    shortStay: !npc[i] && i > 0 && tenures[i] < SHORT_STAY_SECONDS,
+    tenureRatio: longest > 0 ? Math.min(1, tenures[i] / longest) : 0,
   }));
 }
 
 export interface EmploymentSummary {
   /** Now minus the earliest start: how long the pilot has existed on record. */
   timeInGameSeconds: number;
-  /** Distinct corporations, so a return counts once. */
+  /** Distinct player corporations, so a return counts once and NPC corps not at all. */
   corporationCount: number;
   currentTenureSeconds: number;
-  /** The longest single stint; a tie goes to the more recent one. */
+  /** The longest single player-corp stint; a tie goes to the more recent one. */
   longest: { corporationId: number; seconds: number } | null;
 }
 
@@ -81,12 +96,15 @@ export function deriveEmploymentSummary(
     return { timeInGameSeconds: 0, corporationCount: 0, currentTenureSeconds: 0, longest: null };
   }
   const earliest = rows[rows.length - 1];
-  let longest = rows[0];
-  for (const row of rows) if (row.tenureSeconds > longest.tenureSeconds) longest = row;
+  const playerRows = rows.filter((r) => !r.npc);
+  let longest = playerRows[0];
+  for (const row of playerRows) if (row.tenureSeconds > longest.tenureSeconds) longest = row;
   return {
     timeInGameSeconds: Math.max(0, (now - new Date(earliest.startDate).getTime()) / 1000),
-    corporationCount: new Set(rows.map((r) => r.corporationId)).size,
+    corporationCount: new Set(playerRows.map((r) => r.corporationId)).size,
     currentTenureSeconds: rows[0].tenureSeconds,
-    longest: { corporationId: longest.corporationId, seconds: longest.tenureSeconds },
+    longest: longest
+      ? { corporationId: longest.corporationId, seconds: longest.tenureSeconds }
+      : null,
   };
 }

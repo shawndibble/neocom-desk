@@ -379,10 +379,36 @@ export function usePlanMapState({
     [advice, t]
   );
 
-  const whatIfAdvice = useMemo(
-    () => (whatIf.size > 0 ? adviceWithWhatIf(whatIf) : null),
-    [whatIf, adviceWithWhatIf]
-  );
+  // A what-if build is a full advice solve: it runs off the click that picked the planet type
+  // (in the worker where there is one), and shows only once it matches the current pick.
+  const [whatIfBuilt, setWhatIfBuilt] = useState<{
+    types: ReadonlySet<PlanetType>;
+    build: typeof adviceWithWhatIf;
+    advice: PlanAdvice;
+  } | null>(null);
+  useEffect(() => {
+    if (whatIf.size === 0) return;
+    let live = true;
+    // The prop may hand back a plain advice; the tick lets the click that picked the type return first.
+    Promise.resolve()
+      .then(() => adviceWithWhatIf(whatIf))
+      .then(
+        (advice) => {
+          if (live) setWhatIfBuilt({ types: whatIf, build: adviceWithWhatIf, advice });
+        },
+        // A failed build leaves no what-if figures, as a model failure does elsewhere on the board.
+        () => {
+          if (live) setWhatIfBuilt(null);
+        }
+      );
+    return () => {
+      live = false;
+    };
+  }, [whatIf, adviceWithWhatIf]);
+  const whatIfAdvice =
+    whatIf.size > 0 && whatIfBuilt?.types === whatIf && whatIfBuilt.build === adviceWithWhatIf
+      ? whatIfBuilt.advice
+      : null;
   const whatIfRecipe = useMemo(
     () => (whatIfAdvice ? unlockedRecipe(whatIfAdvice, whatIf, [...owned]) : null),
     [whatIf, whatIfAdvice, owned]

@@ -1,39 +1,17 @@
 /**
  * How the Mining Yield Overview prices a mined day (issue #1279).
  *
- * ESI's market history only has a daily *average* — a mix of buy- and
- * sell-side trades, neither the price a pilot gets selling into buy orders nor
- * the sell-order price — and no row at all for today. So each day is priced
- * from a station buy/sell price instead where one exists — the server's daily
- * end-of-day hub-station prices (`hubSnapshot.ts`, folded by
- * `syncMarketOpenPrices`; decision 20261018-233051) and, for Jita, the snapshot
- * this browser saves each time the Overview loads — from the best source it
- * has, in this order:
- *
- *   saved snapshot for that day → Adam4EVE's historical buy/sell split →
- *   ESI daily average → today's live price (the last only for today and
- *   yesterday, before ESI has published them).
+ * A mined-day basis values each day at that day's hub buy or sell price: the
+ * server's end-of-day Open Prices (`hubSnapshot.ts`, published by
+ * `syncMarketOpenPrices`; decision 20261019-091155). Today and yesterday,
+ * before the job has published them, fall back to today's live price.
  *
  * The "now" bases skip all of that and value every day at today's live price.
- *
- * `historical` (issue #1279 follow-up) is a real buy/sell split, unlike the
- * blended ESI average, but region-wide rather than station-level (Adam4EVE's
- * `market_price_history` has no station filter) — weaker than `saved`
- * (station-exact) and `live` (station-exact, just the wrong day), stronger
- * than `average` (not even the right side of the book). It only covers Jita
- * days from before the retired `captureMiningPriceSnapshot` job captured live,
- * a one-time backfill since copied into the R2 hub prices; no new day gets it.
- *
- * `saved` is the day's end-of-day best price (the last EVE Ref order snapshot
- * of the UTC day) since decision 20261018-233051; days before that were the
- * old job's average of up to four Fuzzwork captures through the day.
  */
 import { shiftDate } from './yieldRange';
-import { LEDGER_HISTORY_DAYS } from './ledgerHistory';
 
 export type PriceBasis = 'buy' | 'sell' | 'now-buy' | 'now-sell';
 export type PriceSide = 'buy' | 'sell';
-export type PriceSource = 'saved' | 'historical' | 'average' | 'live' | 'none';
 
 export const PRICE_BASES: readonly PriceBasis[] = ['buy', 'sell', 'now-buy', 'now-sell'];
 
@@ -44,19 +22,10 @@ export interface SidePrices {
 }
 
 export interface UnitPriceInputs {
-  /** This app's saved snapshot for the day, if one was taken. */
-  saved?: SidePrices;
-  /** Adam4EVE's region-wide historical buy/sell split for the day, if the server ever had to backfill it. */
-  historical?: SidePrices;
-  /** ESI market history's daily average for the day. */
-  average?: number;
+  /** The hub's end-of-day prices for the day, once published. */
+  day?: SidePrices;
   /** Today's live book. */
   live?: SidePrices;
-}
-
-export interface ResolvedPrice {
-  price: number | undefined;
-  source: PriceSource;
 }
 
 export function basisSide(basis: PriceBasis): PriceSide {
@@ -72,36 +41,29 @@ function sidePrice(prices: SidePrices | undefined, side: PriceSide): number | un
   return value !== null && value !== undefined && value > 0 ? value : undefined;
 }
 
+/** The day's price on `basis`, or undefined when there is none. */
 export function resolveUnitPrice(
   inputs: UnitPriceInputs,
   basis: PriceBasis,
   date: string,
   today: string
-): ResolvedPrice {
+): number | undefined {
   const side = basisSide(basis);
   const live = sidePrice(inputs.live, side);
-  if (isNowBasis(basis)) {
-    return live !== undefined
-      ? { price: live, source: 'live' }
-      : { price: undefined, source: 'none' };
-  }
-  const saved = sidePrice(inputs.saved, side);
-  if (saved !== undefined) return { price: saved, source: 'saved' };
-  const historical = sidePrice(inputs.historical, side);
-  if (historical !== undefined) return { price: historical, source: 'historical' };
-  if (inputs.average !== undefined) return { price: inputs.average, source: 'average' };
-  // Only while ESI has not published the day yet: an older day with no
-  // history is a type that does not trade, not one waiting on downtime.
-  if (live !== undefined && date >= shiftDate(today, -1)) return { price: live, source: 'live' };
-  return { price: undefined, source: 'none' };
+  if (isNowBasis(basis)) return live;
+  const day = sidePrice(inputs.day, side);
+  if (day !== undefined) return day;
+  // Only while the day is not published yet: an older day with no price is a
+  // type that did not trade, not one waiting on the end-of-day job.
+  return date >= shiftDate(today, -1) ? live : undefined;
 }
 
 export type TaxPriceSource = 'saved' | 'historical' | 'live' | 'live-sell' | 'none';
 
 export interface TaxUnitPriceInputs {
-  /** This app's saved snapshot for the day, if one was taken. */
+  /** The hub station's end-of-day prices for the day. */
   saved?: SidePrices;
-  /** Adam4EVE's region-wide historical buy/sell split for the day, if the server ever had to backfill it. */
+  /** Region-wide end-of-day prices. Nothing feeds this since #4293; the tier is kept for the engine's callers. */
   historical?: SidePrices;
   /** Today's live book. */
   live?: SidePrices;
@@ -117,16 +79,15 @@ export interface ResolvedTaxPrice {
  * buy side only — Tax has never had a basis selector, it bills at what a
  * Payee would actually get selling into buy orders — in this order:
  *
- *   saved snapshot for that day → Adam4EVE's historical buy split →
+ *   the hub station's buy that day → the region-wide buy that day →
  *   today's live buy → today's live sell (only when no buy side exists anywhere).
  *
  * Deliberately its own resolver rather than `resolveUnitPrice` with a fixed
  * `'buy'` basis: that function gates its `live` fallback to today/yesterday
- * (an older day with no ESI history is a type that doesn't trade), which
- * would leave every older, never-captured day unpriced. Tax has no ESI
- * `average` tier to fall to first, so it keeps billing at today's live price
- * for any such day — the same number it billed before this tiered pricing
- * existed, not a new "unpriced" regression.
+ * (an older day with no price is a type that doesn't trade), which would
+ * leave every such day unpriced. Tax keeps billing at today's live price for
+ * it — the same number it billed before this tiered pricing existed, not a
+ * new "unpriced" regression.
  */
 export function resolveTaxUnitPrice(inputs: TaxUnitPriceInputs): ResolvedTaxPrice {
   const saved = sidePrice(inputs.saved, 'buy');
@@ -143,68 +104,10 @@ export function resolveTaxUnitPrice(inputs: TaxUnitPriceInputs): ResolvedTaxPric
   return { price: undefined, source: 'none' };
 }
 
-const SOURCE_RANK: Record<Exclude<PriceSource, 'none'>, number> = {
-  saved: 0,
-  live: 1,
-  historical: 2,
-  average: 3,
-};
-
-/**
- * The least certain source among `sources`, for a row's or a day's tag: a
- * daily average is not the side the pilot chose at all, a live price is the
- * right side but not the day's. Unpriced lines are ignored — `pricedAll` is
- * what reports those.
- */
-export function weakestSource(sources: readonly PriceSource[]): PriceSource {
-  let weakest: PriceSource = 'none';
-  for (const source of sources) {
-    if (source === 'none') continue;
-    if (weakest === 'none' || SOURCE_RANK[source] > SOURCE_RANK[weakest]) weakest = source;
-  }
-  return weakest;
-}
-
-export interface DaysBySource {
-  total: number;
-  saved: number;
-  historical: number;
-  average: number;
-  live: number;
-  none: number;
-}
-
-export function countDaysBySource(
-  rows: readonly { date: string; source: PriceSource }[]
-): DaysBySource {
-  const byDate = new Map<string, PriceSource[]>();
-  for (const row of rows) {
-    const list = byDate.get(row.date) ?? [];
-    list.push(row.source);
-    byDate.set(row.date, list);
-  }
-  const counts: DaysBySource = {
-    total: byDate.size,
-    saved: 0,
-    historical: 0,
-    average: 0,
-    live: 0,
-    none: 0,
-  };
-  for (const sources of byDate.values()) counts[weakestSource(sources)] += 1;
-  return counts;
-}
-
 /** A day's saved prices, keyed by type id. */
 export type SnapshotDay = Record<number, SidePrices>;
 
 /** A later fetch on the same day overwrites each type it priced; types it did not price keep their earlier values. */
 export function mergeSnapshotDay(existing: SnapshotDay, fresh: SnapshotDay): SnapshotDay {
   return { ...existing, ...fresh };
-}
-
-/** Saved days older than the one-year window ending today — the ones to delete. */
-export function prunePriceSnapshotDates(dates: readonly string[], today: string): string[] {
-  const cutoff = shiftDate(today, -(LEDGER_HISTORY_DAYS - 1));
-  return dates.filter((date) => date < cutoff);
 }

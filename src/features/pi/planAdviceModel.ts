@@ -44,9 +44,9 @@
 import { orderQuickWins, planTotals, sellBooks, slotNudge } from '@/engine/pi/planAdvice';
 import { haulSummary, type HaulColony } from '@/engine/pi/planHaul';
 import type { BuiltColonyAdvice } from './systemPlanetModel';
-import { cadenceHours } from './cadencePref';
+import { cadenceHours } from './cadenceHours';
 import { goalPlannerInput, plannerColonies, type PlannerColonyRow } from './goalPlannerModel';
-import { planetSlots } from './planetSlots';
+import { planetSlots } from './planetSlotsModel';
 import { analyseColony } from './planAdvice/analyseColony';
 import { factoryRoom } from './planAdvice/factoryRoom';
 import { rankingFor } from './planAdvice/ranking';
@@ -74,6 +74,27 @@ export function planColonyAnchor(name: string | null, planetId: number): string 
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
   return `plan-${slug || `planet-${planetId}`}`;
+}
+
+const sharedAdvice = new WeakMap<PlanAdviceInput, { advice: PlanAdvice } | { error: unknown }>();
+
+/**
+ * `buildPlanAdvice`, remembered per input object: the PI tabs share their inputs
+ * (`PiAdviceInputsProvider`), so a tab switch reuses the model run instead of
+ * repeating it. A throw is remembered too and rethrown.
+ */
+export function buildSharedPlanAdvice(input: PlanAdviceInput): PlanAdvice {
+  let hit = sharedAdvice.get(input);
+  if (!hit) {
+    try {
+      hit = { advice: buildPlanAdvice(input) };
+    } catch (error) {
+      hit = { error };
+    }
+    sharedAdvice.set(input, hit);
+  }
+  if ('error' in hit) throw hit.error;
+  return hit.advice;
 }
 
 export function buildPlanAdvice(input: PlanAdviceInput): PlanAdvice {

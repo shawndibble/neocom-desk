@@ -335,6 +335,18 @@ async function readLocalSettingsTombstones(): Promise<SyncedSettingTombstone[]> 
   return Array.isArray(record?.value) ? (record.value as SyncedSettingTombstone[]) : [];
 }
 
+/** Lets queued microtasks and IO callbacks run, without waiting on wall-clock time. */
+async function settle(turns = 20) {
+  for (let i = 0; i < turns; i++) await new Promise<void>((resolve) => setImmediate(resolve));
+}
+
+// Only timers are faked (never setImmediate): fake-indexeddb schedules on it.
+const fakeTimers = () => vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 beforeEach(async () => {
   // Helpers like markPlanDeleted schedule a debounced sync that outlives
   // their test; left alone it fires mid-way through a later test and queues
@@ -2010,7 +2022,7 @@ describe('sync orchestration', () => {
     const p1 = triggerSync(1);
     const p2 = triggerSync(2);
     // Give character 2 every chance to (incorrectly) start while 1 is blocked.
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    await settle();
     expect(order.some((path) => path.includes('char:2'))).toBe(false);
 
     release();
@@ -2087,7 +2099,7 @@ describe('sync orchestration', () => {
     const p1 = triggerSync(1);
     const p2 = triggerSync(2);
     const p1Settled = p1.catch(() => {});
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    await settle();
     // The plans pull of character 1 has failed, but its buildPlans pull is
     // still running under the char:1 session — char:2 must not sign in over it.
     expect(firstReadOf(order, 2)).toBe(-1);
@@ -2106,7 +2118,7 @@ describe('sync orchestration', () => {
     await addAlts([2, 3]);
     const { order, release } = gateReads((path) => path === 'characters/char:2/plans');
     const background = [triggerSync(2, 'background'), triggerSync(3, 'background')];
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await settle();
 
     const edit = triggerSync(1);
     release();
@@ -2125,7 +2137,7 @@ describe('sync orchestration', () => {
       triggerSync(3, 'background'),
       triggerSync(1, 'background'),
     ];
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await settle();
 
     const edit = triggerSync(1);
     expect(edit).toBe(queued[2]);
@@ -2147,9 +2159,10 @@ describe('sync orchestration', () => {
     async (_label, priorities) => {
       await addAlts([2, 3]);
       const { order, release } = gateReads((path) => path === 'characters/char:2/plans');
+      fakeTimers();
       const background = [triggerSync(2, 'background'), triggerSync(3, 'background')];
       for (const priority of priorities) scheduleSync(1, 10, priority);
-      await new Promise((resolve) => setTimeout(resolve, 40));
+      await vi.advanceTimersByTimeAsync(40);
 
       release();
       await Promise.all(background);
@@ -2162,7 +2175,7 @@ describe('sync orchestration', () => {
   it('runs one more pass for a request that arrives mid-sync, and holds its promise until then', async () => {
     const { release } = gateReads((path) => path === PLANS_PATH);
     const first = triggerSync(1);
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await settle();
 
     // An edit lands after the running pass already read its local rows —
     // what flushSync (removeCharacter.ts) does right before deleting them.
@@ -2197,6 +2210,7 @@ describe('sync orchestration', () => {
   });
 
   it('debounces scheduleSync into a single run', async () => {
+    fakeTimers();
     scheduleSync(1, 20);
     scheduleSync(1, 20);
     scheduleSync(1, 20);
@@ -2205,7 +2219,9 @@ describe('sync orchestration', () => {
     // productionOrderWatches + payees + miningTaxAssignments +
     // notificationFeed + settings).
     await vi.waitFor(() => expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(COLLECTION_COUNT));
-    await new Promise((resolve) => setTimeout(resolve, 100)); // no extra runs
+    // The heartbeat write follows a Dexie read after the last getDocs, so wait for it.
+    await vi.waitFor(() => expect(vi.mocked(setDoc)).toHaveBeenCalledTimes(1));
+    await vi.advanceTimersByTimeAsync(100); // no extra runs
     expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(COLLECTION_COUNT);
     expect(vi.mocked(setDoc)).toHaveBeenCalledTimes(1); // the heartbeat, once
   });
@@ -2246,12 +2262,13 @@ describe('haltSync', () => {
   });
 
   it('cancels a scheduled sync and refuses new ones', async () => {
+    fakeTimers();
     scheduleSync(1, 20);
     await haltSync();
 
     await triggerSync(1);
     scheduleSync(1, 20);
-    await new Promise((resolve) => setTimeout(resolve, 60));
+    await vi.advanceTimersByTimeAsync(60);
 
     expect(vi.mocked(getDocs)).not.toHaveBeenCalled();
   });
@@ -2267,7 +2284,7 @@ describe('haltSync', () => {
       return fake.getDocsImpl(target);
     }) as never);
     const syncs = [triggerSync(1, 'background'), triggerSync(2, 'background')];
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await settle();
     const halt = haltSync();
 
     release();
@@ -2294,7 +2311,7 @@ describe('haltSync', () => {
       halted = true;
     });
 
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    await settle();
     expect(halted).toBe(false);
     release();
     await Promise.all([running, halt]);

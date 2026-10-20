@@ -113,6 +113,27 @@ export const fieldSizeClassName: Record<ControlSize, string> = {
 };
 
 /**
+ * The select-shaped trigger (DESIGN.md §6c, `CaretDown` inside field chrome):
+ * field chrome at the given size, the value on the left and the chevron
+ * (`SelectChevron`) on the right, on one line. `SelectTrigger`,
+ * `MultiSelect` and `CheckboxSelect` all draw from this, so every "open a list
+ * and pick" control looks the same and none can drift from the others.
+ *
+ * The trigger is a fixed-height control, so a label a few pixels wider than
+ * the box must not wrap — two lines of text overflow the height rather than
+ * growing it. The value goes in a child `<span>` that ellipsizes; `min-w-0`
+ * is what lets it shrink at all, since a flex child defaults to
+ * `min-width: auto` and would otherwise refuse to go below its text.
+ */
+export function selectTriggerClassName(size: ControlSize): string {
+  return cx(
+    fieldBaseClassName,
+    fieldSizeClassName[size],
+    'flex items-center justify-between gap-2 overflow-hidden whitespace-nowrap [&>span]:min-w-0 [&>span]:truncate'
+  );
+}
+
+/**
  * A full-width list row that is itself the tap target — the `<label>` wrapping
  * a checkbox in Mining Tax's Settle Up / Link Payment / Bulk Dismiss dialogs,
  * and the single-line pick-a-row `<button>`s in the blueprint, skill and ship

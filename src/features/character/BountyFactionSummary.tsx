@@ -4,30 +4,18 @@
  * `typeID: count` reason. Reads the total ("21 NPCs killed") until the
  * factions resolve, and keeps it if they never do.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { killsByFaction, type BountyKill } from './bountyKills';
+import { useAsyncLoad } from '@/lib/useAsyncLoad';
 import { loadNpcFactions } from './npcFactions';
 
 export function BountyFactionSummary({ kills }: { kills: readonly BountyKill[] }) {
   const { t } = useTranslation();
-  // Keyed by the kills it was resolved for, so a row handed new kills never
-  // sums them against the previous row's map.
-  const [resolved, setResolved] = useState<{
-    kills: readonly BountyKill[];
-    factions: ReadonlyMap<number, string | null>;
-  } | null>(null);
-  const factions = resolved?.kills === kills ? resolved.factions : null;
-
-  useEffect(() => {
-    let cancelled = false;
-    void loadNpcFactions(kills.map((kill) => kill.typeId)).then((factions) => {
-      if (!cancelled) setResolved({ kills, factions });
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [kills]);
+  // A new `kills` is a new loader, so a row handed new kills never sums them
+  // against the previous row's map.
+  const loader = useCallback(() => loadNpcFactions(kills.map((kill) => kill.typeId)), [kills]);
+  const factions = useAsyncLoad(loader).data ?? null;
 
   const grouped = useMemo(
     () => (factions ? killsByFaction(kills, factions) : null),

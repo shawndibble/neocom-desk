@@ -3,11 +3,10 @@ import type { ComponentProps } from 'react';
 import { cx } from '@/lib/cx';
 import { useDescribedBy } from './fieldNote';
 import { usePortalContainer } from './portalContainer';
-import * as Icon from './icons';
+import { SelectChevron } from './SelectChevron';
 import {
-  fieldBaseClassName,
-  fieldSizeClassName,
   highlightedOptionClassName,
+  selectTriggerClassName,
   interactiveClassName,
   type ControlSize,
 } from './controlStyles';
@@ -47,17 +46,8 @@ export function SelectTrigger({
   return (
     <SelectPrimitive.Trigger
       className={cx(
-        fieldBaseClassName,
-        fieldSizeClassName[size],
-        'flex items-center justify-between gap-2 data-[disabled]:pointer-events-none data-[disabled]:opacity-40 data-[placeholder]:text-text-dim',
-        // The trigger is a fixed-height control, so a label a few pixels wider
-        // than the box must not wrap — two lines of text overflow the height
-        // rather than growing it. Callers size these to their known options, but
-        // the widest label is not always knowable (a character's group name, a
-        // future translation), so the value ellipsizes instead. `min-w-0` is
-        // what lets the value shrink at all: a flex child defaults to
-        // `min-width: auto` and would otherwise refuse to go below its text.
-        'overflow-hidden whitespace-nowrap [&>span]:min-w-0 [&>span]:truncate',
+        selectTriggerClassName(size),
+        'data-[disabled]:pointer-events-none data-[disabled]:opacity-40 data-[placeholder]:text-text-dim',
         className
       )}
       {...props}
@@ -65,11 +55,7 @@ export function SelectTrigger({
     >
       {children}
       <SelectPrimitive.Icon asChild>
-        <Icon.Expanded
-          aria-hidden="true"
-          size={size === 'sm' ? Icon.ICON_SIZE.sm : Icon.ICON_SIZE.md}
-          className="shrink-0 text-text-dim"
-        />
+        <SelectChevron size={size} />
       </SelectPrimitive.Icon>
     </SelectPrimitive.Trigger>
   );

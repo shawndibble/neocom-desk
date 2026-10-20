@@ -56,6 +56,7 @@ const PINNED_SYNCED_SETTING_KEYS: string[] = [
   'sync.stockLists',
   'sync.surveyHistory',
   'sync.surveyInfoTemplates',
+  'sync.systemNotes',
   'sync.targetSkillPlan',
 ];
 

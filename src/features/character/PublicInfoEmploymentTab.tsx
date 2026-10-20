@@ -3,37 +3,26 @@
  * Character the modal was opened on (not the active one). Lazy-loaded and
  * fetches on mount, so nothing is requested until the tab is first opened.
  */
-import { useEffect, useState } from 'react';
+import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EmptyState, Spinner } from '@/components/ui';
+import { useAsyncLoad } from '@/lib/useAsyncLoad';
 import { EmploymentSummaryChips, EmploymentTimeline } from './EmploymentTimeline';
-import { loadPublicEmploymentHistory, type PublicEmploymentHistory } from './publicInfoData';
-
-type State =
-  { status: 'loading' } | { status: 'error' } | { status: 'ready'; data: PublicEmploymentHistory };
+import { loadPublicEmploymentHistory } from './publicInfoData';
 
 export default function PublicInfoEmploymentTab({ characterId }: { characterId: number }) {
   const { t } = useTranslation();
-  const [state, setState] = useState<State>({ status: 'loading' });
+  const loader = useCallback(() => loadPublicEmploymentHistory(characterId), [characterId]);
+  const { status, data } = useAsyncLoad(loader);
 
-  useEffect(() => {
-    let cancelled = false;
-    void loadPublicEmploymentHistory(characterId).then((data) => {
-      if (!cancelled) setState(data ? { status: 'ready', data } : { status: 'error' });
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [characterId]);
-
-  if (state.status === 'loading') {
+  if (status === 'loading' || status === 'idle') {
     return (
       <div className="flex justify-center py-8">
         <Spinner label={t('common.loading')} />
       </div>
     );
   }
-  if (state.status === 'error') {
+  if (status === 'failed' || !data) {
     return (
       <EmptyState
         title={t('common.loadFailedTitle')}
@@ -42,7 +31,7 @@ export default function PublicInfoEmploymentTab({ characterId }: { characterId: 
       />
     );
   }
-  const { rows, summary, names } = state.data;
+  const { rows, summary, names } = data;
   if (rows.length === 0) {
     return (
       <EmptyState

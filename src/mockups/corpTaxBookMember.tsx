@@ -41,7 +41,7 @@ import * as Icon from '@/components/ui/icons';
 import { HintText } from '@/components/ui/HintText';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
-import { SecurityValue } from '@/features/character/assetBrowserRows';
+import { SecurityValue } from '@/features/assets/assetBrowserRows';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
 import { AttentionStrip } from '@/features/miningTax/AttentionStrip';
 import { OreIcon, OreLink } from '@/features/miningTax/OreIcon';

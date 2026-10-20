@@ -4,7 +4,7 @@ The axes a run sweeps, the canonical pattern each checks against, the greps
 that surface candidates, and the kill-tests. **A grep hit is a candidate,
 never a finding.** Read the component and confirm it before counting it.
 
-Run every grep against `origin/main`, over the **surfaces**: every place the
+Run every grep against `origin/develop`, over the **surfaces**: every place the
 app renders UI, minus `src/components/ui/` (the primitives define the
 canonical patterns, so they are not a surface to audit). `src/app` holds the
 nav rail, the phone tab bar and the More sheet, which is where a glyph most
@@ -13,7 +13,7 @@ so start each call with the array:
 
 ```
 S=(src/routes src/features src/app src/components ':!src/components/ui' ':!*.test.tsx')
-git grep -n -E '<pattern>' origin/main -- "${S[@]}"
+git grep -n -E '<pattern>' origin/develop -- "${S[@]}"
 ```
 
 Some greps below carry a hit count, measured when this rubric was written, to
@@ -48,9 +48,9 @@ Look for:
   A Refresh button is `sm` on one `Panel` header and `md` on the next.
 
 ```
-git grep -n -E '\b(min-)?h-(6|7|8|9|10|11|\[[^]]+\])\b|\bsize-(6|7|8|9|10|11)\b' origin/main -- "${S[@]}"
-git grep -n -E 'size="(sm|md)"' origin/main -- "${S[@]}"
-git grep -n -E '\bitems-(start|baseline|end)\b' origin/main -- "${S[@]}"
+git grep -n -E '\b(min-)?h-(6|7|8|9|10|11|\[[^]]+\])\b|\bsize-(6|7|8|9|10|11)\b' origin/develop -- "${S[@]}"
+git grep -n -E 'size="(sm|md)"' origin/develop -- "${S[@]}"
+git grep -n -E '\bitems-(start|baseline|end)\b' origin/develop -- "${S[@]}"
 ```
 
 Heights can also come from padding. A `py-*` on a control-like element with no
@@ -85,18 +85,18 @@ Look for:
 - A spinner, badge or chip re-implemented locally.
 
 ```
-git grep -n -E '<(button|select|input)\b' origin/main -- "${S[@]}"
-git grep -n -E '\bIcon\.Search\b' origin/main -- "${S[@]}"
-git grep -n -E 'border-b-2' origin/main -- "${S[@]}"
-git grep -L 'PageHeader' origin/main -- src/routes ':!*.test.tsx'
-git grep -n -E 'toLocaleString|Intl\.NumberFormat' origin/main -- "${S[@]}"
+git grep -n -E '<(button|select|input)\b' origin/develop -- "${S[@]}"
+git grep -n -E '\bIcon\.Search\b' origin/develop -- "${S[@]}"
+git grep -n -E 'border-b-2' origin/develop -- "${S[@]}"
+git grep -L 'PageHeader' origin/develop -- src/routes ':!*.test.tsx'
+git grep -n -E 'toLocaleString|Intl\.NumberFormat' origin/develop -- "${S[@]}"
 ```
 
 Bare `radix-ui` and `@phosphor-icons/react` imports fail lint
 (`eslint.config.js`). The rule matches those exact specifiers only, so a deep
 import (`@phosphor-icons/react/dist/csr/X`) in a feature file still passes.
 Sweep for that one:
-`git grep -n -E "from '(radix-ui|@phosphor-icons/react)/" origin/main -- "${S[@]}"`.
+`git grep -n -E "from '(radix-ui|@phosphor-icons/react)/" origin/develop -- "${S[@]}"`.
 
 ## C. Icon semantics (DESIGN.md §5)
 
@@ -127,14 +127,14 @@ That gives the map two layers, and drift can happen in each:
 
 ```
 # glyphs wrapped by more than one alias
-git show origin/main:src/components/ui/icons.tsx | grep -oE '^export const [A-Z]\w+ = withWeight\(\w+\)' \
+git show origin/develop:src/components/ui/icons.tsx | grep -oE '^export const [A-Z]\w+ = withWeight\(\w+\)' \
   | sed -E 's/export const (\w+) = withWeight\((\w+)\)/\2 \1/' | sort \
   | awk '{a[$1]=a[$1]" "$2; c[$1]++} END{for(k in c) if(c[k]>1) print k":"a[k]}'
 # every site per alias: read each one and write down what it means there
-for n in $(git show origin/main:src/components/ui/icons.tsx | grep -oE '^export const [A-Z]\w+ = withWeight' | cut -d' ' -f3); do
-  echo "== $n"; git grep -n -E "\bIcon\.$n\b" origin/main -- "${S[@]}"; done
-git grep -n -E 'size=\{?[0-9]+' origin/main -- "${S[@]}"
-git grep -n -P '[\x{2190}-\x{21FF}\x{2600}-\x{27BF}\x{1F300}-\x{1FAFF}]' origin/main -- "${S[@]}" src/i18n | grep -v -E ':\s*(//|\*|/\*)'   # ~15
+for n in $(git show origin/develop:src/components/ui/icons.tsx | grep -oE '^export const [A-Z]\w+ = withWeight' | cut -d' ' -f3); do
+  echo "== $n"; git grep -n -E "\bIcon\.$n\b" origin/develop -- "${S[@]}"; done
+git grep -n -E 'size=\{?[0-9]+' origin/develop -- "${S[@]}"
+git grep -n -P '[\x{2190}-\x{21FF}\x{2600}-\x{27BF}\x{1F300}-\x{1FAFF}]' origin/develop -- "${S[@]}" src/i18n | grep -v -E ':\s*(//|\*|/\*)'   # ~15
 ```
 
 When this rubric was written, the first command printed 8 shared glyphs,
@@ -167,9 +167,9 @@ Look for:
   already does.
 
 ```
-git grep -l -E 'ContextMenu' origin/main -- src/features src/routes
-git grep -n -E 'RowActionsMenu|RowMoreActions|rowMoreActions' origin/main -- src
-git grep -n -E 'onContextMenu' origin/main -- "${S[@]}"
+git grep -l -E 'ContextMenu' origin/develop -- src/features src/routes
+git grep -n -E 'RowActionsMenu|RowMoreActions|rowMoreActions' origin/develop -- src
+git grep -n -E 'onContextMenu' origin/develop -- "${S[@]}"
 ```
 
 ## E. Cross-links (DESIGN.md §6 "Accent = interactive")
@@ -194,10 +194,10 @@ Look for:
   surface and not another, or with a different external-link glyph.
 
 ```
-git grep -n -E "to=\{?[\`'\"]/market" origin/main -- "${S[@]}"
-git grep -n -E 'MarketItemLink|IssuerLink|LpStoreLink|PublicInfoModal|SkillDetailModal' origin/main -- src
-git grep -n -E 'target="_blank"' origin/main -- "${S[@]}"
-git grep -n -E 'text-accent' origin/main -- "${S[@]}"
+git grep -n -E "to=\{?[\`'\"]/market" origin/develop -- "${S[@]}"
+git grep -n -E 'MarketItemLink|IssuerLink|LpStoreLink|PublicInfoModal|SkillDetailModal' origin/develop -- src
+git grep -n -E 'target="_blank"' origin/develop -- "${S[@]}"
+git grep -n -E 'text-accent' origin/develop -- "${S[@]}"
 ```
 
 ## F. Tokens (DESIGN.md §1, §3, §6)
@@ -220,13 +220,13 @@ Look for:
 - The same status shown in two different tones on two pages.
 
 ```
-git grep -n -P '\brounded(-(sm|md|lg|xl|2xl|3xl))?(?![-\w])' origin/main -- "${S[@]}"   # ~17 of ~320 rounded-*
-git grep -n -E 'border-2|border-[a-z]-2' origin/main -- src
-git grep -n -E 'gradient' origin/main -- src
-git grep -n -E '\bshadow(-[a-z]+)?\b' origin/main -- "${S[@]}"
-git grep -n -E 'variant="primary"' origin/main -- "${S[@]}"
-git grep -n -E '(text|bg|border)-(red|green|blue|yellow|amber|slate|gray|zinc|neutral|emerald|sky|cyan|orange)-[0-9]{2,3}' origin/main -- src
-git grep -n -E "\[#[0-9a-fA-F]{3,8}\]|\[rgba?\(|['\"]#[0-9a-fA-F]{3,8}['\"]|['\"]rgba?\(" origin/main -- "${S[@]}"   # ~14; a bare '#abc' also matches every '#123' issue ref
+git grep -n -P '\brounded(-(sm|md|lg|xl|2xl|3xl))?(?![-\w])' origin/develop -- "${S[@]}"   # ~17 of ~320 rounded-*
+git grep -n -E 'border-2|border-[a-z]-2' origin/develop -- src
+git grep -n -E 'gradient' origin/develop -- src
+git grep -n -E '\bshadow(-[a-z]+)?\b' origin/develop -- "${S[@]}"
+git grep -n -E 'variant="primary"' origin/develop -- "${S[@]}"
+git grep -n -E '(text|bg|border)-(red|green|blue|yellow|amber|slate|gray|zinc|neutral|emerald|sky|cyan|orange)-[0-9]{2,3}' origin/develop -- src
+git grep -n -E "\[#[0-9a-fA-F]{3,8}\]|\[rgba?\(|['\"]#[0-9a-fA-F]{3,8}['\"]|['\"]rgba?\(" origin/develop -- "${S[@]}"   # ~14; a bare '#abc' also matches every '#123' issue ref
 ```
 
 ## G. Labels and wording
@@ -252,12 +252,12 @@ Look for:
   Keep only **action verbs** (buttons, menu items).
 
 ```
-git show origin/main:src/i18n/locales/en.json > <scratchpad>/en.json
+git show origin/develop:src/i18n/locales/en.json > <scratchpad>/en.json
 node -e "const f=require(process.argv[1]);const m={};(function w(o,p){for(const k in o){const v=o[k],q=p?p+'.'+k:k;typeof v==='string'?(m[v]=m[v]||[]).push(q):w(v,q)}})(f,'');for(const v in m)if(m[v].length>1)console.log(JSON.stringify(v),m[v].join(' '))" <scratchpad>/en.json
-git grep -n -E '>[A-Z][a-z]+( [A-Za-z]+)*<' origin/main -- "${S[@]}"
+git grep -n -E '>[A-Z][a-z]+( [A-Za-z]+)*<' origin/develop -- "${S[@]}"
 ```
 
-Read `en.json` from `origin/main` rather than a working tree, which may be
+Read `en.json` from `origin/develop` rather than a working tree, which may be
 stale.
 
 ---

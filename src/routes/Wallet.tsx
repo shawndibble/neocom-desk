@@ -1,186 +1,43 @@
-import { NO_NAMES } from '@/lib/emptyCollections';
-import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { useMemo, useState } from 'react';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useLiveQuery } from 'dexie-react-hooks';
 import {
   DataAgeBadge,
-  DataTable,
-  CachedEmptyState,
   EmptyState,
   IconButton,
-  InfoTooltip,
   PageHeader,
-  Panel,
-  LoadFailedState,
   Spinner,
-  RowCaret,
   TabPanel,
   Tabs,
   useTabsId,
-  type DataTableColumn,
-  CachedNotice,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
-import { inlineLinkClassName } from '@/components/ui/controlStyles';
-import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
-import { GrantBanner } from '@/app/GrantNote';
-import { db } from '@/db';
+import { NO_NAMES } from '@/lib/emptyCollections';
 import { useCharacters } from '@/features/character/useCharacters';
-import { miningTaxPaymentHref } from '@/features/miningTax/paymentDeepLink';
-import { linkedRefIds } from '@/features/miningTax/paymentLinks';
-import {
-  loadWalletBalanceWithStatus,
-  loadWalletJournalHistory,
-  loadWalletTransactionsHistory,
-  loadAllCharactersWalletBalances,
-  oldestCachedBalanceAt,
-  type WalletBalancesSnapshot,
-} from '@/features/character/wallet';
-import { LpStorePicker } from '@/features/loyalty/LpStorePicker';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
 import { useViewedCharacterId } from '@/features/character/viewedCharacter';
-import { WalletOriginCrumb } from '@/features/character/WalletOriginCrumb';
 import {
   useResolvedCharacterFilter,
   type CharacterFilterValue,
 } from '@/features/character/characterFilterValue';
 import { useRememberedCharacterFilter } from '@/features/character/characterFilterPicks';
-import { loadCharacterLoyaltyPoints, splitEverMarks } from '@/features/character/loyalty';
-import { resolveNames } from '@/features/character/names';
-import type { CachedResult } from '@/esi/cache';
-import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
-import { useCorpSnapshot } from '@/features/corp/useCorpSnapshot';
+import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { usePageTab } from '@/lib/usePageTab';
-import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
-import { useRememberedUrlParams, useUrlFilter, useUrlParam, useUrlSort } from '@/lib/useUrlState';
+import { useRememberedUrlParams } from '@/lib/useUrlState';
 import { WALLET_TABS } from '@/app/pageTabs';
 import { tabPath } from '@/lib/pageTabs';
 import { characterFilterParam } from '@/features/character/characterFilterUrlParam';
-import { useHighlightParam } from '@/lib/useHighlightParam';
-import { loadTypeNames } from '@/features/character/typeNames';
-import { TableActionsMenu } from '@/components/ui/TableExport';
-import { useTableExport } from '@/components/ui/useTableExport';
-import { walletJournalCsvColumns } from '@/features/character/walletJournalCsv';
 import { FromWalletCrumb } from '@/features/netWorth/FromWalletCrumb';
-import { NetWorthPanel } from '@/features/netWorth/NetWorthPanel';
-import { loyaltyPointsCsvColumns } from '@/features/character/loyaltyPointsCsv';
-import { classifyJournal, journalCoverage, type JournalLine } from '@/engine/journalNetting';
-import {
-  loadAllCharactersJournals,
-  loadWalletScopedCharacterIds,
-  type AllJournalsSnapshot,
-} from '@/features/character/walletJournalAll';
-import { journalTransactionLinks } from '@/features/character/journalTransactionLink';
-import {
-  EMPTY_JOURNAL_FILTER_PARAMS,
-  JOURNAL_FIELD_TO_PARAM,
-  JOURNAL_FILTER_PARAMS,
-  type WalletJournalFilter,
-} from '@/features/character/walletJournalFilter';
-import {
-  JOURNAL_SORT,
-  JOURNAL_SORT_COLUMN_IDS,
-  typeNameLookup,
-  useJournalColumnsBuilder,
-  useJournalFilterResult,
-} from '@/features/character/walletJournal';
-import { JournalTable } from '@/features/character/WalletJournalTable';
-import { WalletHistoryNote } from '@/features/character/WalletHistoryNote';
-import { loadWalletArchiveInfo, type WalletArchiveInfo } from '@/features/character/walletArchive';
-import type {
-  CharacterLoyaltyPoints,
-  WalletJournalEntry,
-  WalletTransactionCommon,
-} from '@/esi/endpoints';
-import { intParam } from '@/lib/urlState';
+import { WalletBalanceTab } from '@/features/character/WalletBalanceTab';
+import { WalletJournalPanel } from '@/features/character/WalletJournalPanel';
+import { useWalletBalances } from '@/features/character/useWalletBalances';
+import { useWalletDrill } from '@/features/character/useWalletDrill';
+import { useWalletJournalView } from '@/features/character/useWalletJournalView';
+import { useWalletLoyalty } from '@/features/character/useWalletLoyalty';
+import { loadWalletSnapshot } from '@/features/character/walletSnapshot';
 
-/** Stable identity, so the fallback doesn't invalidate the column memo every render. */
-/** Stable identity, so a missing journal doesn't invalidate its dependent memos every render. */
-const EMPTY_JOURNAL: readonly WalletJournalEntry[] = [];
-/** Same, for the personal fills the journal links its market lines to. */
-const EMPTY_FILLS: readonly (WalletTransactionCommon & { characterId?: number })[] = [];
-
-/**
- * `?drill=<id>`: the Character the net worth view is drilled into; 0 = none. Not
- * `?character=`: that param is the alert deep link, which `AlertCharacterSwitch`
- * strips and turns into an active-Character switch.
- */
-const DRILL_PARAM = intParam(0);
 const WALLET_CHARACTER_PARAMS = { char: characterFilterParam('current') };
-const LOYALTY_SORT = { columnId: 'points', direction: 'desc' } as const;
-
-interface Snapshot {
-  balanceResult: CachedResult<number> | null;
-  /** 401/403 (or a failed token refresh) means "log in again", not "offline". */
-  balanceNeedsReauth: boolean;
-  journalResult: CachedResult<WalletJournalEntry[]> | null;
-  /** 401/403 (or a failed token refresh) means "log in again", not "offline". */
-  journalNeedsReauth: boolean;
-  /** Fewer pages came back than ESI advertised — the list below is partial. */
-  journalTruncated: boolean;
-  /** What the device-kept history reaches back to. */
-  archive: WalletArchiveInfo;
-  loyaltyResult: CachedResult<CharacterLoyaltyPoints[]> | null;
-  /** 401/403 (or a failed token refresh) means "log in again", not "offline". */
-  loyaltyNeedsReauth: boolean;
-  corporationNames: Map<number, string>;
-}
-
-async function loadWalletSnapshot(
-  characterId: number,
-  signal: RouteSnapshotSignal
-): Promise<Snapshot> {
-  const [balanceStatus, journalStatus, loyaltyStatus] = await Promise.all([
-    loadWalletBalanceWithStatus(characterId),
-    loadWalletJournalHistory(characterId),
-    loadCharacterLoyaltyPoints(characterId),
-  ]);
-  // After the journal load: that fetch is what extends the coverage read here.
-  const archive = await loadWalletArchiveInfo(characterId);
-  const { cached: balanceResult, needsReauth: balanceNeedsReauth } = balanceStatus;
-  const { cached: loyaltyResult, needsReauth: loyaltyNeedsReauth } = loyaltyStatus;
-  const { cached: journalResult, needsReauth: journalNeedsReauth } = journalStatus;
-  const journalTruncated = journalResult?.truncated ?? false;
-  // Already superseded: skip the ESI name resolve, its result would be discarded.
-  const corporationIds = signal.cancelled
-    ? []
-    : (loyaltyResult?.data ?? []).map((entry) => entry.corporation_id);
-  const corporationNames = await resolveNames(corporationIds);
-  return {
-    balanceResult,
-    balanceNeedsReauth,
-    journalResult,
-    journalNeedsReauth,
-    journalTruncated,
-    archive,
-    loyaltyResult,
-    loyaltyNeedsReauth,
-    corporationNames,
-  };
-}
-
-/**
- * The Character's recent fills, read only so a journal line can name the item
- * behind it (the fills themselves are listed on Market's History tab). Its
- * own load, not part of `loadWalletSnapshot`: the Balance tab would
- * otherwise wait on a cursor walk it never shows.
- */
-interface PersonalFillsSnapshot {
-  transactions: readonly WalletTransactionCommon[];
-  typeNames: Map<number, string>;
-  /** The fetch stopped at its page cap: older journal lines stay unnamed. */
-  truncated: boolean;
-}
-
-async function loadPersonalFills(characterId: number): Promise<PersonalFillsSnapshot> {
-  const result = await loadWalletTransactionsHistory(characterId);
-  const transactions = result?.data ?? [];
-  const typeNames = await loadTypeNames([...new Set(transactions.map((txn) => txn.type_id))]);
-  return { transactions, typeNames, truncated: result?.truncated ?? false };
-}
 
 /**
  * Wallet: the pilot's own ISK — balance and journal, for the active Character
@@ -203,8 +60,6 @@ export function Wallet() {
   // switch is (ADR 0015, issue #1302).
   const [tab, setTab] = usePageTab(WALLET_TABS);
   const tabsId = useTabsId();
-  // The journal line a `walletBalanceChanged` alert pointed at, if any.
-  const highlightedEntryId = useHighlightParam();
 
   /**
    * The cross-character Balance view (issue #607): `'current'` by default —
@@ -241,50 +96,11 @@ export function Wallet() {
     resolvedWalletFilter.size !== 1 ||
     !resolvedWalletFilter.has(activeCharacterId ?? -1);
 
-  // Drilling into one Character is route state, so the browser Back button undoes it.
-  const [drilledId, setDrilledId] = useUrlParam('drill', DRILL_PARAM);
-  // The drill swaps one panel for another, so the focused row or button is
-  // removed; hand focus to its counterpart in the panel that replaces it.
-  const focusAfterCommit = useFocusAfterCommit();
-  const panelHeadingRef = useRef<HTMLHeadingElement>(null);
-  const backButtonRef = useRef<HTMLButtonElement>(null);
-  const drillInto = useCallback(
-    (id: number) => {
-      setDrilledId(id, { push: true });
-      focusAfterCommit(backButtonRef);
-    },
-    [setDrilledId, focusAfterCommit]
-  );
-  const leaveDrill = useCallback(() => {
-    setDrilledId(0, { push: true });
-    focusAfterCommit(
-      () =>
-        document.querySelector<HTMLElement>(
-          `[aria-label="${CSS.escape(t('wallet.balanceByCharacter'))}"] [data-row-key="${drilledId}"]`
-        ),
-      // The old drilled panel's heading is still mounted until the route
-      // commits, so only fall back to it once the back button is gone.
-      () => (backButtonRef.current?.isConnected ? null : panelHeadingRef.current)
-    );
-  }, [setDrilledId, focusAfterCommit, drilledId, t]);
+  const drill = useWalletDrill();
 
   const allCharacters = useCharacters();
   const activeCharacter = allCharacters.find((c) => c.characterId === activeCharacterId);
-  const drilledCharacter = allCharacters.find((c) => c.characterId === drilledId);
-  const drilledCharacters = useMemo(
-    () =>
-      drilledCharacter
-        ? [{ characterId: drilledCharacter.characterId, name: drilledCharacter.name }]
-        : [],
-    [drilledCharacter]
-  );
-  const activeCharacters = useMemo(
-    () =>
-      activeCharacter
-        ? [{ characterId: activeCharacter.characterId, name: activeCharacter.name }]
-        : [],
-    [activeCharacter]
-  );
+  const drilledCharacter = allCharacters.find((c) => c.characterId === drill.drilledId);
   const multiCharacters = useMemo(
     () =>
       allCharacters
@@ -316,76 +132,7 @@ export function Wallet() {
       />
     ) : undefined;
 
-  // Nothing fetched until the Character filter actually asks for more than
-  // the active Character. No separate "loading" state: `walletBalancesSnapshot
-  // === null` already means "nothing to show yet," and a manual refresh
-  // deliberately leaves the previous snapshot in place while it re-fetches —
-  // same retained-snapshot idiom `useRouteSnapshot`/`useCorpSnapshot` use
-  // elsewhere in this app, and the only way to give the effect below no
-  // synchronous `setState` call of its own (`react-hooks/set-state-in-effect`).
-  const [walletBalancesSnapshot, setWalletBalancesSnapshot] =
-    useState<WalletBalancesSnapshot | null>(null);
-  const [walletBalancesRefreshCount, setWalletBalancesRefreshCount] = useState(0);
-  useEffect(() => {
-    if (!showingBeyondActive && !drilledCharacter) return;
-    let cancelled = false;
-    void loadAllCharactersWalletBalances().then((snapshot) => {
-      if (!cancelled) setWalletBalancesSnapshot(snapshot);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [showingBeyondActive, drilledCharacter, walletBalancesRefreshCount]);
-  const refreshWalletBalances = useCallback(
-    () => setWalletBalancesRefreshCount((count) => count + 1),
-    []
-  );
-  const walletBalancesLoading = walletBalancesSnapshot === null;
-  // The all-characters totals add up one balance read per character: if any of
-  // them is the saved copy the total is only as fresh as the oldest of those.
-  const walletBalancesCachedAt = useMemo(() => {
-    return oldestCachedBalanceAt(
-      walletBalancesSnapshot?.entries ?? [],
-      new Set(multiCharacters.map((c) => c.characterId))
-    );
-  }, [walletBalancesSnapshot, multiCharacters]);
-
-  // Opt-in: fetched only once the Journal tab is open, and kept alive once
-  // visited, so a tab toggle doesn't walk the cursor again.
-  const personalFillsBaseKey = activeCharacterId !== null ? `${activeCharacterId}` : null;
-  const [visitedFillsKey, setVisitedFillsKey] = useState<string | null>(null);
-  if (
-    tab === 'journal' &&
-    personalFillsBaseKey !== null &&
-    visitedFillsKey !== personalFillsBaseKey
-  ) {
-    setVisitedFillsKey(personalFillsBaseKey);
-  }
-  const personalFills = useCorpSnapshot<PersonalFillsSnapshot | null>(
-    personalFillsBaseKey !== null && (tab === 'journal' || visitedFillsKey === personalFillsBaseKey)
-      ? personalFillsBaseKey
-      : null,
-    async () => (activeCharacterId === null ? null : loadPersonalFills(activeCharacterId)),
-    { name: 'wallet:personal-fills', characterId: activeCharacterId }
-  );
-  // The Journal's own Character filter reads the same `?char=` pick as the
-  // Balance tab; anything beyond the active Character fans the journal out
-  // across the picked Characters, and the pick is part of the snapshot's key.
-  const journalSelectionKey =
-    tab === 'journal' && showingBeyondActive && multiCharacters.length > 0
-      ? multiCharacters.map((c) => c.characterId).join(',')
-      : null;
-  const allJournals = useCorpSnapshot<AllJournalsSnapshot | null>(journalSelectionKey, () =>
-    loadAllCharactersJournals(multiCharacters)
-  );
-  const scopedCharacterIds = useLiveQuery(loadWalletScopedCharacterIds, [], undefined);
-  // "Where the ISK went" side panel; the page shifts aside while it is open.
-  const [iskPanelOpen, setIskPanelOpen] = useState(false);
-  const handlePersonalRefresh = () => {
-    refresh();
-    personalFills.refresh();
-    allJournals.refresh();
-  };
+  const balances = useWalletBalances(showingBeyondActive || !!drilledCharacter, multiCharacters);
 
   const balanceResult = data?.balanceResult ?? null;
   const balanceNeedsReauth = data?.balanceNeedsReauth ?? false;
@@ -396,10 +143,23 @@ export function Wallet() {
   const loyaltyNeedsReauth = data?.loyaltyNeedsReauth ?? false;
   const corporationNames = data?.corporationNames ?? NO_NAMES;
 
-  const { everMarks, otherLoyalty } = useMemo(
-    () => splitEverMarks(loyaltyResult?.data ?? []),
-    [loyaltyResult]
-  );
+  const journalView = useWalletJournalView({
+    journalOpen: tab === 'journal',
+    activeCharacterId,
+    showingBeyondActive,
+    pickedCharacters: multiCharacters,
+    allCharacters,
+    journalResult,
+    journalNeedsReauth,
+    journalTruncated,
+  });
+  const loyalty = useWalletLoyalty(loyaltyResult, corporationNames);
+  // "Where the ISK went" side panel; the page shifts aside while it is open.
+  const [iskPanelOpen, setIskPanelOpen] = useState(false);
+  const handlePersonalRefresh = () => {
+    refresh();
+    journalView.refresh();
+  };
 
   // One age for the page: the stalest of the two feeds it shows.
   const oldestFetchedAt = useMemo(() => {
@@ -409,245 +169,6 @@ export function Wallet() {
     ].filter((d): d is Date => d != null);
     return dates.length === 0 ? null : new Date(Math.min(...dates.map((d) => d.getTime())));
   }, [balanceResult, loyaltyResult, loyaltyNeedsReauth]);
-
-  const loyaltyColumns = useMemo<DataTableColumn<CharacterLoyaltyPoints>[]>(
-    () => [
-      {
-        id: 'corporation',
-        header: t('loyalty.corporation'),
-        // The row navigates to the LP Store (§6c): the name is its accent
-        // link, the caret column closes the row. Show Info for the corporation
-        // is on the LP Store page header.
-        render: (entry) => (
-          <Link
-            to={`/wallet/lp-store/${entry.corporation_id}`}
-            className={entityLinkClassName('group')}
-          >
-            {corporationNames.get(entry.corporation_id) ?? `#${entry.corporation_id}`}
-          </Link>
-        ),
-        sortValue: (entry) =>
-          corporationNames.get(entry.corporation_id) ?? `#${entry.corporation_id}`,
-      },
-      {
-        id: 'points',
-        header: t('loyalty.points'),
-        align: 'right',
-        className: 'tabular-nums font-semibold',
-        render: (entry) => entry.loyalty_points.toLocaleString(),
-        sortValue: (entry) => entry.loyalty_points,
-      },
-      {
-        id: 'go',
-        header: '',
-        align: 'right',
-        render: () => <RowCaret />,
-      },
-    ],
-    [t, corporationNames]
-  );
-  const loyaltySortProps = useUrlSort(
-    'loyalty.sort',
-    LOYALTY_SORT,
-    loyaltyColumns.map((column) => column.id)
-  );
-
-  // The fills that name an item or a PLEX line: this Character's, or every loaded Character's.
-  const allJournalsData = showingBeyondActive ? allJournals.data : null;
-  // Tagged with their Character in the multi view: two journals can carry the same ref id.
-  const personalTransactions = useMemo<
-    readonly (WalletTransactionCommon & { characterId?: number })[]
-  >(
-    () =>
-      allJournalsData
-        ? allJournalsData.loaded.flatMap((c) =>
-            c.transactions.map((txn) => ({ ...txn, characterId: c.characterId }))
-          )
-        : (personalFills.data?.transactions ?? EMPTY_FILLS),
-    [allJournalsData, personalFills.data]
-  );
-  const personalTypeNames =
-    (allJournalsData ? allJournalsData.typeNames : personalFills.data?.typeNames) ?? NO_NAMES;
-  const itemNamesTruncated = allJournalsData
-    ? allJournalsData.loaded.some((c) => c.fillsTruncated)
-    : (personalFills.data?.truncated ?? false);
-  const journalIsTruncated = allJournalsData
-    ? allJournalsData.loaded.some((c) => c.truncated)
-    : journalTruncated;
-  const keyByCharacter = (allJournalsData?.loaded.length ?? 0) > 1;
-  // The stalest of the loaded journals, as the Balance tab does for its balances.
-  const allJournalsFetchedAt = useMemo(
-    () =>
-      allJournalsData && allJournalsData.loaded.length > 0
-        ? new Date(Math.min(...allJournalsData.loaded.map((c) => c.fetchedAt.getTime())))
-        : null,
-    [allJournalsData]
-  );
-  const personalLinkFor = useMemo(
-    () => journalTransactionLinks(personalTransactions),
-    [personalTransactions]
-  );
-  const personalNameFor = useMemo(() => typeNameLookup(personalTypeNames), [personalTypeNames]);
-  const characterNameFor = useMemo(() => {
-    const names = new Map(allCharacters.map((c) => [c.characterId, c.name]));
-    return (id: number) => names.get(id) ?? `#${id}`;
-  }, [allCharacters]);
-  // Journal lines a pilot linked to a Moon Mining Tax payment get a way back
-  // to the tax row they settled. Every character's Assignments, since the
-  // journal can show any of them.
-  const taxLinks = useLiveQuery(
-    async () => linkedRefIds(await db.miningTaxAssignments.toArray()),
-    [],
-    undefined
-  );
-  const miningTaxHrefFor = useCallback(
-    (entry: WalletJournalEntry) => {
-      if (!taxLinks) return undefined;
-      if (taxLinks.journal.has(entry.id)) {
-        return miningTaxPaymentHref({ kind: 'journal', id: entry.id });
-      }
-      if (
-        entry.context_id_type === 'contract_id' &&
-        entry.context_id !== undefined &&
-        taxLinks.contract.has(entry.context_id)
-      ) {
-        return miningTaxPaymentHref({ kind: 'contract', id: entry.context_id });
-      }
-      return undefined;
-    },
-    [taxLinks]
-  );
-  const buildJournalColumns = useJournalColumnsBuilder();
-  const journalColumns = useMemo(
-    () =>
-      buildJournalColumns(
-        personalLinkFor,
-        personalNameFor,
-        miningTaxHrefFor,
-        showingBeyondActive ? characterNameFor : undefined
-      ),
-    [
-      buildJournalColumns,
-      personalLinkFor,
-      personalNameFor,
-      miningTaxHrefFor,
-      showingBeyondActive,
-      characterNameFor,
-    ]
-  );
-
-  // Unsorted: `DataTable`'s own controlled `sort` below is the one place
-  // these rows get ordered — sorting here too was a redundant second pass
-  // over the same array on every render (issue #413). Export reads the
-  // table's sorted rows, so it follows the same order.
-  const journal = journalResult?.data ?? EMPTY_JOURNAL;
-
-  // In the URL (`journal.*`, issue #1302).
-  const [journalFilter, setJournalFilter, journalRowsFilter] = useUrlFilter<WalletJournalFilter>(
-    'personal',
-    JOURNAL_FILTER_PARAMS,
-    JOURNAL_FIELD_TO_PARAM,
-    EMPTY_JOURNAL_FILTER_PARAMS
-  );
-  const liveWallet = useMemo(() => {
-    const map = new Map<number, { balance: number | null; needsReauth: boolean }>();
-    for (const entry of walletBalancesSnapshot?.entries ?? []) {
-      map.set(entry.characterId, {
-        balance: entry.balanceResult?.data ?? null,
-        needsReauth: entry.needsReauth,
-      });
-    }
-    // The page already holds the active Character's own balance.
-    if (activeCharacterId !== null && !map.has(activeCharacterId)) {
-      map.set(activeCharacterId, {
-        balance: balanceResult?.data ?? null,
-        needsReauth: balanceNeedsReauth,
-      });
-    }
-    return map;
-  }, [walletBalancesSnapshot, activeCharacterId, balanceResult, balanceNeedsReauth]);
-  // Lines between the pilot's own Characters are netted against every Character
-  // with the wallet permission, picked or not: a donation from your own alt is
-  // internal even in the one-Character view.
-  const journalRows = useMemo<readonly JournalLine[]>(
-    () =>
-      allJournalsData
-        ? allJournalsData.loaded.flatMap((c) =>
-            c.journal.map((entry) => ({ ...entry, characterId: c.characterId }))
-          )
-        : showingBeyondActive || activeCharacterId === null
-          ? []
-          : journal,
-    [allJournalsData, showingBeyondActive, journal, activeCharacterId]
-  );
-  const trackedIds = useMemo(() => {
-    const ids = new Set(scopedCharacterIds ?? []);
-    for (const c of allJournalsData?.loaded ?? []) ids.add(c.characterId);
-    if (!showingBeyondActive && activeCharacterId !== null && !journalNeedsReauth) {
-      ids.add(activeCharacterId);
-    }
-    return ids;
-  }, [
-    allJournalsData,
-    scopedCharacterIds,
-    showingBeyondActive,
-    activeCharacterId,
-    journalNeedsReauth,
-  ]);
-  const classifiedJournal = useMemo(
-    () => classifyJournal(journalRows, { trackedIds, linkFor: personalLinkFor }),
-    [journalRows, trackedIds, personalLinkFor]
-  );
-  const journalCoverageInfo = useMemo(() => {
-    if (allCharacters.length < 2) return undefined;
-    return allJournalsData
-      ? journalCoverage(multiCharacters, new Set(allJournalsData.loaded.map((c) => c.characterId)))
-      : journalCoverage(
-          allCharacters.map((c) => ({ characterId: c.characterId, name: c.name })),
-          trackedIds
-        );
-  }, [allCharacters, allJournalsData, multiCharacters, trackedIds]);
-  const { filteredJournal, breakdownJournal, chartJournal, refTypeOptions } =
-    useJournalFilterResult(classifiedJournal, journalRowsFilter);
-  const journalSortProps = useUrlSort('journal.sort', JOURNAL_SORT, JOURNAL_SORT_COLUMN_IDS);
-
-  // Each table's title-bar export button and its row menus export the same rows, in
-  // the order the table shows them.
-  const journalCsvColumns = useMemo(
-    () => walletJournalCsvColumns(t, showingBeyondActive ? characterNameFor : undefined),
-    [t, showingBeyondActive, characterNameFor]
-  );
-  const journalExport = useTableExport({
-    surface: 'wallet-journal',
-    rows: filteredJournal,
-    columns: journalCsvColumns,
-    truncated: journalIsTruncated,
-  });
-  const loyaltyCsvColumns = useMemo(
-    () => loyaltyPointsCsvColumns(t, (id) => corporationNames.get(id) ?? `#${id}`),
-    [t, corporationNames]
-  );
-  const loyaltyExport = useTableExport({
-    surface: 'loyalty-points',
-    rows: otherLoyalty,
-    columns: loyaltyCsvColumns,
-  });
-
-  const journalFetchedAt = showingBeyondActive
-    ? allJournalsFetchedAt
-    : (journalResult?.fetchedAt ?? null);
-  // An alert's entry id belongs to the active Character; the multi view keys rows per Character.
-  const journalHighlightKey =
-    keyByCharacter && highlightedEntryId !== null
-      ? `${activeCharacterId}:${highlightedEntryId}`
-      : highlightedEntryId;
-  const journalScopeLabel = !showingBeyondActive
-    ? t('character.filter.thisCharacter')
-    : multiCharacters.length === allCharacters.length
-      ? t('character.filter.allCharacters')
-      : multiCharacters.length === 1
-        ? t('character.scope.one', { name: multiCharacters[0].name })
-        : t('wallet.journalScopeSome', { count: multiCharacters.length });
 
   if (!hydrated) {
     return (
@@ -689,7 +210,7 @@ export function Wallet() {
             icon={<Icon.Refresh />}
             label={t('wallet.refresh')}
             onClick={handlePersonalRefresh}
-            disabled={loading || personalFills.loading || allJournals.loading}
+            disabled={loading || journalView.loading}
           />
         }
       />
@@ -724,293 +245,38 @@ export function Wallet() {
         ) : error ? (
           <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
         ) : tab === 'balance' ? (
-          <div className="space-y-4">
-            {/*
-            The picker stays visible in both branches, even while pinned to
-            "This character" — otherwise there is no way to discover the
-            cross-character view at all (issue #607) — but it rides in each
-            panel's own header rather than a row above them. The panel content
-            swaps beneath it: unchanged for "This character", a per-character
-            table + total for anything wider.
-          */}
-            {drilledCharacter ? (
-              <NetWorthPanel
-                mode="single"
-                drilled
-                backRef={backButtonRef}
-                characters={drilledCharacters}
-                liveWallet={liveWallet}
-                filterMeta={walletCharacterFilterMeta}
-                onDrill={drillInto}
-                onBack={leaveDrill}
-                headingRef={panelHeadingRef}
-              />
-            ) : showingBeyondActive ? (
-              <NetWorthPanel
-                mode="multi"
-                characters={multiCharacters}
-                liveWallet={liveWallet}
-                notices={
-                  walletBalancesCachedAt !== null && (
-                    <CachedNotice
-                      className="mt-3"
-                      fetchedAt={walletBalancesCachedAt}
-                      refreshFailed={walletBalancesRefreshCount > 0}
-                    />
-                  )
-                }
-                filterMeta={walletCharacterFilterMeta}
-                onDrill={drillInto}
-                onBack={leaveDrill}
-                headingRef={panelHeadingRef}
-                actions={
-                  <IconButton
-                    size="sm"
-                    icon={<Icon.Refresh />}
-                    label={t('wallet.refresh')}
-                    onClick={refreshWalletBalances}
-                    disabled={walletBalancesLoading}
-                  />
-                }
-              />
-            ) : (
-              <>
-                <NetWorthPanel
-                  mode="single"
-                  characters={activeCharacters}
-                  liveWallet={liveWallet}
-                  filterMeta={walletCharacterFilterMeta}
-                  onDrill={drillInto}
-                  onBack={leaveDrill}
-                  headingRef={panelHeadingRef}
-                  stats={
-                    <div>
-                      <p className={cx(eyebrowClassName, 'flex items-center gap-1')}>
-                        {t('wallet.everMarks')}
-                        <InfoTooltip
-                          label={t('wallet.everMarksTooltipLabel')}
-                          content={t('wallet.everMarksTooltip')}
-                        />
-                      </p>
-                      <p className="text-xl font-medium tabular-nums">
-                        {loyaltyResult && !loyaltyNeedsReauth
-                          ? everMarks.toLocaleString()
-                          : t('common.unknown')}
-                      </p>
-                    </div>
-                  }
-                  notices={
-                    <>
-                      {balanceNeedsReauth && (
-                        <div className="mt-3">
-                          <GrantBanner
-                            characterId={activeCharacterId}
-                            endpoints={['getCharacterWallet']}
-                            title={t('wallet.reauthTitle')}
-                            hint={t('wallet.reauthHint')}
-                            actionLabel={t('wallet.reauthAction')}
-                          />
-                        </div>
-                      )}
-                      {(balanceResult?.fromCache || loyaltyResult?.fromCache) && (
-                        <CachedNotice
-                          className="mt-3"
-                          fetchedAt={oldestFetchedAt}
-                          refreshFailed={refreshCount > 0}
-                        />
-                      )}
-                      {journalNeedsReauth ? (
-                        <div className="mt-4">
-                          <GrantBanner
-                            characterId={activeCharacterId}
-                            endpoints={['getCharacterWalletJournal']}
-                            title={t('wallet.reauthTitle')}
-                            hint={t('wallet.reauthHint')}
-                            actionLabel={t('wallet.reauthAction')}
-                          />
-                        </div>
-                      ) : (
-                        journalTruncated && (
-                          <p className="mt-4 px-1 text-[0.6875rem] text-warning uppercase">
-                            {t('common.incompleteTitle')} — {t('wallet.journalTruncatedHint')}
-                          </p>
-                        )
-                      )}
-                    </>
-                  }
-                />
-              </>
-            )}
-
-            {loyaltyResult && !loyaltyNeedsReauth && otherLoyalty.length === 0 ? (
-              // Nothing to list: one muted line instead of an empty panel. The
-              // picker stays as the way into any corp's store (issue #2321).
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-1 text-xs text-text-dim">
-                <span>{t('loyalty.noneLine')}</span>
-                <LpStorePicker corporationName={null} size="sm" className="w-44" />
-              </div>
-            ) : (
-              <Panel
-                // Lifts this panel's stacking context over the next one, so the
-                // picker's popover isn't painted under it.
-                className="relative z-10"
-                padded={false}
-                title={t('loyalty.title')}
-                actions={
-                  <span className="flex items-center gap-2">
-                    {/* Always shown, LP or not (issue #2321): the way into any
-                    corp's store for a pilot who holds LP nowhere yet. */}
-                    <LpStorePicker corporationName={null} size="sm" className="w-44" />
-                    {loyaltyResult && !loyaltyNeedsReauth && otherLoyalty.length > 0 && (
-                      <TableActionsMenu name={t('loyalty.title')} tableExport={loyaltyExport} />
-                    )}
-                  </span>
-                }
-              >
-                {loyaltyNeedsReauth ? (
-                  <div className="p-3">
-                    <GrantBanner
-                      characterId={activeCharacterId}
-                      endpoints={['getCharacterLoyaltyPoints']}
-                      title={t('loyalty.reauthTitle')}
-                      hint={t('loyalty.reauthHint')}
-                      actionLabel={t('loyalty.reauthAction')}
-                    />
-                  </div>
-                ) : !loyaltyResult || otherLoyalty.length === 0 ? (
-                  <CachedEmptyState
-                    result={loyaltyResult}
-                    title={t('loyalty.emptyTitle')}
-                    hint={t('loyalty.emptyHint')}
-                    fetchedTitle={t('loyalty.emptyTitle')}
-                    className="py-8"
-                  />
-                ) : (
-                  <DataTable
-                    {...loyaltyExport.tableProps}
-                    label={t('loyalty.title')}
-                    columns={loyaltyColumns}
-                    rows={otherLoyalty}
-                    rowKey={(entry) => entry.corporation_id}
-                    sort={loyaltySortProps.sort}
-                    onSortChange={loyaltySortProps.onSortChange}
-                    responsive="table"
-                    rowClassName={() => 'group'}
-                    onRowClick={(entry) => navigate(`/wallet/lp-store/${entry.corporation_id}`)}
-                  />
-                )}
-              </Panel>
-            )}
-          </div>
+          <WalletBalanceTab
+            activeCharacterId={activeCharacterId}
+            drilledCharacter={drilledCharacter}
+            activeCharacter={activeCharacter}
+            showingBeyondActive={showingBeyondActive}
+            pickedCharacters={multiCharacters}
+            balances={balances}
+            drill={drill}
+            loyalty={loyalty}
+            filterMeta={walletCharacterFilterMeta}
+            balanceResult={balanceResult}
+            balanceNeedsReauth={balanceNeedsReauth}
+            loyaltyResult={loyaltyResult}
+            loyaltyNeedsReauth={loyaltyNeedsReauth}
+            journalNeedsReauth={journalNeedsReauth}
+            journalTruncated={journalTruncated}
+            oldestFetchedAt={oldestFetchedAt}
+            refreshCount={refreshCount}
+          />
         ) : (
-          <Panel
-            padded={false}
-            title={t('wallet.journalTab')}
-            wrapMeta
-            // Beside the open panel the page is narrow at any viewport, so the
-            // Character filter drops under the title instead of crowding the actions.
-            className={iskPanelOpen ? '[&>header>div:first-child]:flex-wrap' : undefined}
-            meta={
-              <span
-                className={cx(
-                  'flex flex-wrap items-center gap-2 max-md:basis-full',
-                  iskPanelOpen && 'md:basis-full'
-                )}
-              >
-                <WalletOriginCrumb />
-                {walletCharacterFilterMeta}
-              </span>
-            }
-            actions={
-              <span className="flex items-center gap-2">
-                <Link
-                  to="/market/history"
-                  className={cx(
-                    'inline-flex min-h-11 min-w-11 items-center justify-center text-xs md:min-h-0 md:min-w-0',
-                    inlineLinkClassName
-                  )}
-                >
-                  {t('wallet.transactionsLink')}
-                </Link>
-                {journalFetchedAt && (
-                  <>
-                    <TableActionsMenu name={t('wallet.journalTab')} tableExport={journalExport} />
-                    <DataAgeBadge date={journalFetchedAt} />
-                  </>
-                )}
-              </span>
-            }
-          >
-            {showingBeyondActive && !allJournalsData ? (
-              allJournals.loading || journalSelectionKey === null ? (
-                <div className="flex justify-center py-8">
-                  <Spinner label={t('common.loading')} />
-                </div>
-              ) : (
-                <LoadFailedState onRetry={allJournals.refresh} className="py-8" />
-              )
-            ) : !showingBeyondActive && journalNeedsReauth ? (
-              <div className="p-3">
-                <GrantBanner
-                  characterId={activeCharacterId}
-                  endpoints={['getCharacterWalletJournal']}
-                  title={t('wallet.reauthTitle')}
-                  hint={t('wallet.reauthHint')}
-                  actionLabel={t('wallet.reauthAction')}
-                />
-              </div>
-            ) : !showingBeyondActive && (!journalResult || journal.length === 0) ? (
-              <CachedEmptyState
-                result={journalResult}
-                title={t('wallet.journalEmptyTitle')}
-                hint={t('wallet.journalEmptyHint')}
-                fetchedTitle={t('wallet.journalEmptyFetchedTitle')}
-                className="py-8"
-              />
-            ) : (
-              <>
-                {!showingBeyondActive && journalResult?.fromCache && (
-                  <CachedNotice
-                    className="px-3 pt-2"
-                    fetchedAt={journalResult.fetchedAt}
-                    refreshFailed={refreshCount > 0}
-                  />
-                )}
-                {journalIsTruncated && (
-                  <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
-                    {t('common.incompleteTitle')} — {t('wallet.journalTruncatedHint')}
-                  </p>
-                )}
-                {itemNamesTruncated && (
-                  <p className="px-3 pt-2 text-[0.6875rem] text-text-dim">
-                    {t('wallet.journalItemNamesCappedHint')}
-                  </p>
-                )}
-                <WalletHistoryNote info={data?.archive} />
-                <JournalTable
-                  filter={journalFilter}
-                  onFilterChange={setJournalFilter}
-                  refTypeOptions={refTypeOptions}
-                  filteredJournal={filteredJournal}
-                  breakdownJournal={breakdownJournal}
-                  chartJournal={chartJournal}
-                  journalColumns={journalColumns}
-                  label={t('wallet.journalTab')}
-                  sort={journalSortProps.sort}
-                  onSortChange={journalSortProps.onSortChange}
-                  highlightRowKey={journalHighlightKey}
-                  keyByCharacter={keyByCharacter}
-                  tableExport={journalExport}
-                  panel={{
-                    open: iskPanelOpen,
-                    onOpenChange: setIskPanelOpen,
-                    scopeLabel: journalScopeLabel,
-                    coverage: journalCoverageInfo,
-                  }}
-                />
-              </>
-            )}
-          </Panel>
+          <WalletJournalPanel
+            activeCharacterId={activeCharacterId}
+            showingBeyondActive={showingBeyondActive}
+            iskPanelOpen={iskPanelOpen}
+            filterMeta={walletCharacterFilterMeta}
+            refreshCount={refreshCount}
+            archive={data?.archive}
+            journalResult={journalResult}
+            journalNeedsReauth={journalNeedsReauth}
+            {...journalView.panel}
+            onIskPanelOpenChange={setIskPanelOpen}
+          />
         )}
       </TabPanel>
     </div>

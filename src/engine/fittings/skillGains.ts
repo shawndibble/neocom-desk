@@ -13,6 +13,7 @@ import { alignTimeSeconds } from './stats';
 import type { PlanEntry } from '../types';
 import type { FittingStats } from './types';
 import { round } from './fittingStatFields';
+import { budgetOverages } from './skillGaps';
 import { diffFittingStats, type FittingStatsDelta } from './variationDelta';
 
 /** One calculated object's attributes, and its loaded charge's — the shape of the engine's `ItemResult`. */
@@ -320,6 +321,24 @@ export interface SkillGain extends SkillGainCandidate {
   /** Weapon reach, mining, hold, remote-repair and jump-range changes, which `delta` leaves out. */
   roleChanges: RoleChange[];
   metrics: GainMetrics;
+  /**
+   * How much of the fit's CPU, powergrid and calibration overage the level
+   * clears, each as a fraction of that overage, summed; absent or 0 on a fit
+   * within budget. A level that helps the fit fit at all outranks any gain.
+   */
+  budgetFreed?: number;
+}
+
+/**
+ * Each over budget's share of its overage that `after` clears, summed; 0
+ * when `after` is further over on any budget — a trade, not a step towards
+ * fitting (`findSkillFixes` takes the same view).
+ */
+export function budgetFreed(before: FittingStats, after: FittingStats): number {
+  const was = budgetOverages(before);
+  const now = budgetOverages(after);
+  if (now.some((overage, i) => overage > was[i]!)) return 0;
+  return was.reduce((sum, w, i) => (w > 0 ? sum + (w - now[i]!) / w : sum), 0);
 }
 
 /** What one skill level does to a fit: `SkillGain` without the skill it is for. */
@@ -389,11 +408,14 @@ export async function evaluateSkillGains(
     if (cancelled?.()) return null;
     try {
       const { before, after } = await compare(candidate.skillTypeId, candidate.toLevel);
-      // Only a change to a stat the pilot ranks by counts: a skill that
-      // just moves CPU use or the cargo hold isn't "what to train" for a fit.
+      // Only a change to a stat the pilot ranks by counts — a skill that
+      // just moves CPU use or the cargo hold isn't "what to train" for a fit —
+      // unless the fit is over budget and the level eats into the overage:
+      // then it is what makes the fit flyable at all.
       const described = levelGain(before, after);
-      if (GAIN_METRICS.every((metric) => described.metrics[metric] === 0)) continue;
-      gains.push({ ...candidate, ...described });
+      const freed = budgetFreed(before, after);
+      if (freed <= 0 && GAIN_METRICS.every((metric) => described.metrics[metric] === 0)) continue;
+      gains.push({ ...candidate, ...described, ...(freed > 0 ? { budgetFreed: freed } : {}) });
     } catch {
       // Left out — see above.
     }
@@ -402,10 +424,17 @@ export async function evaluateSkillGains(
   return gains;
 }
 
-/** `gains` ordered by `sort`, largest improvement first, ties by skill id. A new array. */
+/**
+ * `gains` ordered by `sort`, largest improvement first, ties by skill id —
+ * after every level that clears some of an overage, most cleared first,
+ * since a fit that doesn't fit has nothing to improve yet. A new array.
+ */
 export function rankSkillGains<T extends SkillGain>(gains: readonly T[], sort: GainSort): T[] {
   return [...gains].sort(
-    (a, b) => b.metrics[sort] - a.metrics[sort] || a.skillTypeId - b.skillTypeId
+    (a, b) =>
+      (b.budgetFreed ?? 0) - (a.budgetFreed ?? 0) ||
+      b.metrics[sort] - a.metrics[sort] ||
+      a.skillTypeId - b.skillTypeId
   );
 }
 

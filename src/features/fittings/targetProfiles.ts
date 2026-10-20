@@ -4,7 +4,6 @@
  * same reason, as `damageProfiles.ts`. The selection is global, not per
  * Fitting, and stays out of the `?f=` Fitting Share Code.
  */
-import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   CUSTOM_TARGET_PROFILE_ID_PREFIX,
@@ -16,11 +15,12 @@ import {
   type CustomTargetProfile,
   type NamedTargetProfile,
 } from '@/engine/fittings/targetProfile';
+import {
+  SYNCED_CUSTOM_TARGET_PROFILES_KEY,
+  SYNCED_SELECTED_TARGET_PROFILE_KEY,
+} from '@/sync/syncedSettings';
 import { createSyncedSetting } from '@/lib/useSyncedSetting';
-import { useHydratedStore } from '@/lib/useHydratedStore';
-
-export const SYNCED_CUSTOM_TARGET_PROFILES_KEY = 'sync.fittingTargetProfiles';
-export const SYNCED_SELECTED_TARGET_PROFILE_KEY = 'sync.fittingTargetProfileId';
+import { useCustomProfiles, type CustomProfiles } from './useCustomProfiles';
 
 export const useCustomTargetProfiles = createSyncedSetting<CustomTargetProfile[]>({
   key: SYNCED_CUSTOM_TARGET_PROFILES_KEY,
@@ -48,54 +48,13 @@ export function newCustomTargetProfileId(): string {
   return `${CUSTOM_TARGET_PROFILE_ID_PREFIX}${crypto.randomUUID()}`;
 }
 
-export interface TargetProfiles {
-  custom: CustomTargetProfile[];
-  /** The profile applied DPS is worked out against — the default when the stored id names nothing. */
-  selected: NamedTargetProfile;
-  select: (id: string) => void;
-  /** Adds a new custom profile, or replaces the one with the same id. */
-  saveCustom: (profile: CustomTargetProfile) => void;
-  deleteCustom: (id: string) => void;
-}
+export type TargetProfiles = CustomProfiles<CustomTargetProfile, NamedTargetProfile>;
 
 export function useTargetProfiles(): TargetProfiles {
-  const custom = useCustomTargetProfiles((s) => s.value);
-  const setCustom = useCustomTargetProfiles((s) => s.setValue);
-  const selectedId = useSelectedTargetProfileId((s) => s.value);
-  const select = useSelectedTargetProfileId((s) => s.setValue);
-
-  useHydratedStore(useCustomTargetProfiles, useSelectedTargetProfileId);
-
-  const selected = useMemo(() => resolveTargetProfile(selectedId, custom), [selectedId, custom]);
-
-  // Both writes rewrite the whole list from the store's current value, never
-  // this render's possibly stale or not-yet-hydrated `[]` — see damageProfiles.ts.
-  const saveCustom = useCallback(
-    (profile: CustomTargetProfile) => {
-      const current = useCustomTargetProfiles.getState().value;
-      const exists = current.some((p) => p.id === profile.id);
-      void setCustom(
-        exists ? current.map((p) => (p.id === profile.id ? profile : p)) : [...current, profile]
-      );
-    },
-    [setCustom]
-  );
-
-  const deleteCustom = useCallback(
-    (id: string) => {
-      void setCustom(useCustomTargetProfiles.getState().value.filter((p) => p.id !== id));
-      if (useSelectedTargetProfileId.getState().value === id) {
-        void select(DEFAULT_TARGET_PROFILE_ID);
-      }
-    },
-    [setCustom, select]
-  );
-
-  return {
-    custom,
-    selected,
-    select: (id) => void select(id),
-    saveCustom,
-    deleteCustom,
-  };
+  return useCustomProfiles({
+    useCustom: useCustomTargetProfiles,
+    useSelectedId: useSelectedTargetProfileId,
+    defaultId: DEFAULT_TARGET_PROFILE_ID,
+    resolve: resolveTargetProfile,
+  });
 }

@@ -32,10 +32,12 @@ import { idSetKey } from '@/lib/idSetKey';
  * from the local SDE snapshot only (`loadContractLocationInfo`) — no ESI
  * call per row; a player structure stays unnamed.
  */
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { lpRate } from '@/engine/loyalty/marketLpValue';
 import { loadMarketLpValues } from '@/features/loyalty/marketLpValue';
 import {
+  useCallback,
   useEffect,
   useId,
   useMemo,
@@ -200,26 +202,20 @@ const loadStationName = async (id: number) => (await loadContractLocationInfo(id
  * reads as loading until its own result lands, and a stale one is dropped.
  */
 function useLoad<T>(load: () => Promise<T | null>, key: string): Load<T> {
-  const [state, setState] = useState<{ key: string; result: Load<T> } | null>(null);
+  // `key` encodes everything `load` reads, so the loader's identity follows
+  // the key and a re-render with a fresh closure never reloads on its own.
+  const latest = useRef(load);
   useEffect(() => {
-    let cancelled = false;
-    load()
-      .then((data) => {
-        if (cancelled) return;
-        setState({
-          key,
-          result: data === null ? { status: 'unavailable' } : { status: 'ready', data },
-        });
-      })
-      .catch(() => {
-        if (!cancelled) setState({ key, result: { status: 'unavailable' } });
-      });
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `key` encodes everything `load` reads
-  }, [key]);
-  return state?.key === key ? state.result : { status: 'loading' };
+    latest.current = load;
+  });
+  const loader = useCallback(() => latest.current(), [key]); // eslint-disable-line react-hooks/exhaustive-deps -- see above
+  const result = useKeyedLoad(key, loader);
+  if (result.status === 'ready') {
+    return result.data === null
+      ? { status: 'unavailable' }
+      : { status: 'ready', data: result.data };
+  }
+  return { status: result.status === 'failed' ? 'unavailable' : 'loading' };
 }
 
 export function BlueprintAcquisitionModal({

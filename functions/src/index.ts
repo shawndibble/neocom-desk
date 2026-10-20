@@ -3,15 +3,22 @@
 // the client sends only its short-lived access token, which is verified
 // against EVE's published JWKS before any Firebase credential is minted.
 
-import { setTimeout as sleep } from 'node:timers/promises';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { defineSecret } from 'firebase-functions/params';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { error as logError, info as logInfo, warn as logWarn } from 'firebase-functions/logger';
 import { initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
-import { getFirestore, type Firestore } from 'firebase-admin/firestore';
 import { getMessaging } from 'firebase-admin/messaging';
+import { firestore } from './firestore.js';
+import { runPurgeNotificationFeed, runPurgeStaleAccounts } from './purgeJobs.js';
+import { R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY } from './r2Publish.js';
+import { runSyncLawlessSystems, runSyncMarketOpenPrices } from './marketHistoryJob.js';
+import {
+  runSyncLpStoreOffers,
+  runSyncPublicContractOffers,
+  runSyncWorkbenchFits,
+} from './snapshotJobs.js';
 import {
   verifyEveAccessToken,
   verifyOptionsFromEnv,
@@ -30,24 +37,10 @@ import {
 } from './alertGrant.js';
 import { parseAlertsKey } from './alertGrantCrypto.js';
 import { firestoreAlertGrantStore, firestorePollerStore } from './alertGrantStore.js';
-import { ESI_USER_AGENT, fetchNotifications as fetchEsiNotifications } from './esiNotifications.js';
+import { fetchNotifications as fetchEsiNotifications } from './esiNotifications.js';
 import { pollEveNotifications as pollEveNotificationsRun } from './pollEveNotifications.js';
 import { buildDeviceRegistration, parseRegisterDeviceInput } from './registerDevice.js';
 import { dispatchDueProjections, writeDeviceRegistration } from './projectionStore.js';
-import {
-  FEED_PURGE_BATCH_SIZE,
-  FEED_PURGE_MAX_PASSES,
-  NOTIFICATION_FEED_COLLECTION,
-  feedPurgeCutoff,
-} from './purgeFeed.js';
-import {
-  LAST_SYNCED_FIELD,
-  STALE_ACCOUNT_BATCH_SIZE,
-  STALE_ACCOUNT_READ_PAGE_SIZE,
-  STALE_ACCOUNT_MAX_PASSES,
-  decideAccountAction,
-  lastSyncedAtOf,
-} from './purgeStaleAccounts.js';
 import {
   parseBookCall,
   parseClaimPaymentInput,
@@ -61,8 +54,8 @@ import {
 } from './corpTaxBook.js';
 import { esiIdentityReader } from './corpTaxBookEsi.js';
 import {
-  deleteCorpSyncGrantsHeldBy,
   parseSaveCorpSyncGrantInput,
+  dropCorpSyncGrant,
   revokeCorpSyncGrant,
   runScheduledCorpSyncs,
   saveCorpSyncGrant,
@@ -77,6 +70,7 @@ import {
   listPendingGroupings,
   editBook,
   readStatementByToken,
+  deleteBook,
   reclaimBook,
   setRemindersByToken,
   syncBook,
@@ -103,7 +97,6 @@ import {
   confirmMailInvite,
   leaveCommunity,
   previewCommunity,
-  purgeCharacterCommunities,
   regenerateInvite,
   releaseMailInvite,
   removeMember,
@@ -130,66 +123,6 @@ import {
   setRequestClosed,
 } from './communityRequestsStore.js';
 import { removePledge, removeRequest, sweepRequests } from './communityRequestsCleanup.js';
-import { LP_CORP_STATION_SYSTEMS } from './data/lpCorpStationSystems.js';
-import { LP_STORE_REQUEST_GAP_MS, fetchLpStoreRows } from './lpOffersSnapshot.js';
-import { fetchArchiveFingerprint, streamPublicContractsCsvs } from './publicContractsArchive.js';
-import {
-  createR2Get,
-  createR2Put,
-  type R2Config,
-  publishContractOffersToR2,
-  publishCourierContractsToR2,
-  publicContractsRunVerdict,
-  r2PublishOutcome,
-  type CourierR2PublishState,
-  type R2PublishOutcome,
-  type R2PublishState,
-} from './r2Publisher.js';
-import { measureContractTypeChanges, type ContractTypeHashes } from './contractTypeChanges.js';
-import {
-  INSURGENCY_URL,
-  LAWLESS_SYSTEMS_DOC,
-  SYSTEM_CONDITIONS_COLLECTION,
-  lawlessWriteNeeded,
-  parseLawlessSystemIds,
-} from './lawlessSystems.js';
-import {
-  accumulateRequestedSide,
-  applyRequestedSide,
-  emptyRequestedSide,
-  compactContractOfferRow,
-  courierContractFrom,
-  eligibleContractFrom,
-  isOutstandingCourierContract,
-  type EligibleContract,
-  type PublicContractOfferRow,
-  type PublicCourierContractRow,
-} from './publicContracts.js';
-import {
-  MARKET_OPEN_PRICES_META_PATH,
-  OpenPriceFold,
-  SNAPSHOT_HUBS,
-  StationPriceFold,
-  findFinalSnapshot,
-  groupByDocument,
-  implausibleReason,
-  mergeDays,
-  previousUtcDate,
-  regionCounts,
-  shrunkRegion,
-} from './marketOpenPrices.js';
-import { publishLpStoreOffersToR2, writeOpenPricesToR2 } from './r2DailySnapshots.js';
-import { publishMiningPricesToR2 } from './r2MiningPrices.js';
-import { createR2Delete } from './r2Client.js';
-import { stationFoldWrites } from './miningHubPrices.js';
-import { MINING_TYPE_IDS } from './data/miningTypeIds.js';
-import { fetchJson as fetchEverefJson, foldSnapshotUrl } from './marketOrdersArchive.js';
-import { runWorkbenchSync } from './workbenchFits.js';
-import { r2WorkbenchHulls, workbenchFitsStore } from './workbenchFitsStore.js';
-import {
-  firestoreWorkbenchMigration,
-  migrateLegacyWorkbenchFits,
-} from './workbenchFitsMigration.js';
 import {
   MutamarketBusyError,
   MutamarketInputError,
@@ -262,7 +195,7 @@ export const registerDevice = onCall<unknown>({ maxInstances: 5 }, async (reques
     throw new HttpsError('unauthenticated', 'No character access token could be verified');
   }
 
-  await writeDeviceRegistration(getFirestore(), {
+  await writeDeviceRegistration(firestore(), {
     deviceId: input.deviceId,
     fcmToken: registration.fcmToken,
     characterIds: registration.characterIds,
@@ -295,7 +228,7 @@ const ALERTS_TOKEN_KEY = defineSecret('ALERTS_TOKEN_KEY');
 
 function alertGrantDeps(): AlertGrantDeps {
   return {
-    store: firestoreAlertGrantStore(getFirestore()),
+    store: firestoreAlertGrantStore(firestore()),
     key: () => parseAlertsKey(ALERTS_TOKEN_KEY.value()),
     verify: (accessToken) => verifyEveAccessToken(accessToken, verifyOptions),
     refresh: (clientId, refreshToken) => refreshAtSso(clientId, refreshToken),
@@ -352,7 +285,7 @@ export const deleteAlertGrant = onCall<unknown>(
  * see projectionStore.ts.
  */
 export const dispatchProjections = onSchedule('every 15 minutes', async () => {
-  await dispatchDueProjections(getFirestore(), getMessaging(), Date.now(), logError);
+  await dispatchDueProjections(firestore(), getMessaging(), Date.now(), logError);
 });
 
 /**
@@ -372,7 +305,7 @@ export const pollEveNotifications = onSchedule(
   async () => {
     const messaging = getMessaging();
     const summary = await pollEveNotificationsRun({
-      store: firestorePollerStore(getFirestore(), {
+      store: firestorePollerStore(firestore(), {
         key: () => parseAlertsKey(ALERTS_TOKEN_KEY.value()),
         refresh: (clientId, refreshToken) => refreshAtSso(clientId, refreshToken),
       }),
@@ -409,40 +342,7 @@ export const pollEveNotifications = onSchedule(
  * `firedAt` in firestore.indexes.json — deploy indexes before this function,
  * or the query fails FAILED_PRECONDITION until the index finishes building.
  */
-export const purgeNotificationFeed = onSchedule('every 24 hours', async () => {
-  const db = getFirestore();
-  // Mirrors purgeFeed.ts's `isPurgeableFeedRow` (and so dispatchProjections'
-  // `isPastRetention`) as a query filter — a Firestore `where` can't call
-  // either, but the boundary must stay the one their tests pin. One cutoff
-  // for the whole run, so a long backlog can't shift the edge mid-pass.
-  const cutoff = feedPurgeCutoff(Date.now());
-
-  let deleted = 0;
-  for (let pass = 0; pass < FEED_PURGE_MAX_PASSES; pass += 1) {
-    const snapshot = await db
-      .collectionGroup(NOTIFICATION_FEED_COLLECTION)
-      .where('firedAt', '<', cutoff)
-      .limit(FEED_PURGE_BATCH_SIZE)
-      .get();
-    if (snapshot.empty) return;
-
-    const batch = db.batch();
-    for (const doc of snapshot.docs) batch.delete(doc.ref);
-    await batch.commit();
-    deleted += snapshot.size;
-
-    // A short page means the backlog is drained; anything else keeps going
-    // until the pass bound, which is what stops one run spinning forever.
-    if (snapshot.size < FEED_PURGE_BATCH_SIZE) return;
-  }
-
-  // Hit the ceiling: the remainder is simply left for tomorrow's tick rather
-  // than dropped, but it is worth knowing the backlog is that large.
-  logWarn('Notification Feed purge: pass limit reached, backlog continues next run', {
-    cutoff,
-    deleted,
-  });
-});
+export const purgeNotificationFeed = onSchedule('every 24 hours', runPurgeNotificationFeed);
 
 /**
  * purgeStaleAccounts: deletes the synced data of accounts with no successful
@@ -458,92 +358,7 @@ export const purgeNotificationFeed = onSchedule('every 24 hours', async () => {
  */
 export const purgeStaleAccounts = onSchedule(
   { schedule: 'every 24 hours', secrets: [ALERTS_TOKEN_KEY] },
-  async () => {
-    const db = getFirestore();
-    const now = Date.now();
-    let passes = 0;
-    let purged = 0;
-
-    const refs = await db.collection('characters').listDocuments();
-    const snaps = new Map<string, FirebaseFirestore.DocumentSnapshot>();
-    // Heartbeat reads are batched and masked to the one field the decision
-    // needs; the rest of each parent doc is never loaded.
-    for (let i = 0; i < refs.length; i += STALE_ACCOUNT_READ_PAGE_SIZE) {
-      const page = refs.slice(i, i + STALE_ACCOUNT_READ_PAGE_SIZE);
-      for (const snap of await db.getAll(...page, { fieldMask: [LAST_SYNCED_FIELD] })) {
-        snaps.set(snap.ref.path, snap);
-      }
-    }
-
-    for (const ref of refs) {
-      const snap = snaps.get(ref.path);
-      const action = decideAccountAction(lastSyncedAtOf(snap?.data()), now);
-      if (action === 'keep') continue;
-      if (action === 'seed') {
-        await ref.set({ [LAST_SYNCED_FIELD]: now }, { merge: true });
-        continue;
-      }
-
-      // Shared Community data lives outside `characters/{uid}`, so the
-      // subcollection sweep below would never reach it (ADR 0018).
-      try {
-        await purgeCharacterCommunities(db, ref.id);
-      } catch (err) {
-        // Leave the account (and its stale heartbeat) in place so tomorrow's
-        // run retries it, rather than letting one bad Community abort the rest.
-        logWarn('Stale account purge: Community cleanup failed, will retry', {
-          uid: ref.id,
-          error: err instanceof Error ? err.message : err,
-        });
-        continue;
-      }
-
-      // The server-held Alerts Grant token goes with the account (ADR 0020).
-      try {
-        const characterId = characterIdForUid(ref.id);
-        if (characterId !== undefined) await deleteAlertGrantFor(alertGrantDeps(), characterId);
-      } catch (err) {
-        logWarn('Stale account purge: Alerts Grant cleanup failed, will retry', {
-          uid: ref.id,
-          error: err instanceof Error ? err.name : 'unknown',
-        });
-        continue;
-      }
-
-      // So does any Corp Tax Book sync grant it holds (ADR 0025).
-      try {
-        const characterId = characterIdForUid(ref.id);
-        if (characterId !== undefined) {
-          await deleteCorpSyncGrantsHeldBy(corpSyncDeps(), characterId);
-        }
-      } catch (err) {
-        logWarn('Stale account purge: Corp sync grant cleanup failed, will retry', {
-          uid: ref.id,
-          error: err instanceof Error ? err.name : 'unknown',
-        });
-        continue;
-      }
-
-      for (const sub of await ref.listCollections()) {
-        for (;;) {
-          if (passes >= STALE_ACCOUNT_MAX_PASSES) {
-            logWarn('Stale account purge: pass limit reached, backlog continues next run', {
-              purged,
-            });
-            return;
-          }
-          const page = await sub.limit(STALE_ACCOUNT_BATCH_SIZE).get();
-          if (page.empty) break;
-          passes += 1;
-          const batch = db.batch();
-          for (const doc of page.docs) batch.delete(doc.ref);
-          await batch.commit();
-        }
-      }
-      await ref.delete();
-      purged += 1;
-    }
-  }
+  () => runPurgeStaleAccounts({ alertGrantDeps, corpSyncDeps })
 );
 
 // Communities (issue #3596, ADR 0018). Every write that enforces a cap or
@@ -565,24 +380,24 @@ function callerOf(request: {
 const COMMUNITY_CALLABLE_OPTIONS = { maxInstances: 5 };
 
 export const createCommunityCallable = onCall<unknown>(COMMUNITY_CALLABLE_OPTIONS, (request) =>
-  createCommunity(getFirestore(), callerOf(request), parseCreateInput(request.data))
+  createCommunity(firestore(), callerOf(request), parseCreateInput(request.data))
 );
 
 // Callable with no session on purpose: the invite page shows what the link is
 // for before a visitor signs in. Returns three public facts, see previewCommunity.
 export const previewCommunityCallable = onCall<unknown>(COMMUNITY_CALLABLE_OPTIONS, (request) =>
-  previewCommunity(getFirestore(), parsePreviewInput(request.data).inviteCode)
+  previewCommunity(firestore(), parsePreviewInput(request.data).inviteCode)
 );
 
 export const joinCommunityCallable = onCall<unknown>(COMMUNITY_CALLABLE_OPTIONS, (request) =>
-  joinCommunity(getFirestore(), callerOf(request), parseJoinInput(request.data))
+  joinCommunity(firestore(), callerOf(request), parseJoinInput(request.data))
 );
 
 export const setCommunityApprovalCallable = onCall<unknown>(
   COMMUNITY_CALLABLE_OPTIONS,
   async (request) => {
     const { communityId, requireApproval } = parseRequireApprovalInput(request.data);
-    await setRequireApproval(getFirestore(), callerOf(request), communityId, requireApproval);
+    await setRequireApproval(firestore(), callerOf(request), communityId, requireApproval);
   }
 );
 
@@ -590,7 +405,7 @@ export const decideCommunityJoinRequestCallable = onCall<unknown>(
   COMMUNITY_CALLABLE_OPTIONS,
   async (request) => {
     const { communityId, memberUid, accept } = parseJoinRequestDecisionInput(request.data);
-    await decideJoinRequest(getFirestore(), callerOf(request), communityId, memberUid, accept);
+    await decideJoinRequest(firestore(), callerOf(request), communityId, memberUid, accept);
   }
 );
 
@@ -598,7 +413,7 @@ export const leaveCommunityCallable = onCall<unknown>(
   COMMUNITY_CALLABLE_OPTIONS,
   async (request) => {
     await leaveCommunity(
-      getFirestore(),
+      firestore(),
       callerOf(request),
       parseCommunityIdInput(request.data).communityId
     );
@@ -609,7 +424,7 @@ export const removeCommunityMemberCallable = onCall<unknown>(
   COMMUNITY_CALLABLE_OPTIONS,
   async (request) => {
     const { communityId, memberUid } = parseRemoveMemberInput(request.data);
-    await removeMember(getFirestore(), callerOf(request), communityId, memberUid);
+    await removeMember(firestore(), callerOf(request), communityId, memberUid);
   }
 );
 
@@ -617,7 +432,7 @@ export const transferCommunityAdminCallable = onCall<unknown>(
   COMMUNITY_CALLABLE_OPTIONS,
   async (request) => {
     const { communityId, memberUid } = parseTransferAdminInput(request.data);
-    await transferAdmin(getFirestore(), callerOf(request), communityId, memberUid);
+    await transferAdmin(firestore(), callerOf(request), communityId, memberUid);
   }
 );
 
@@ -628,7 +443,7 @@ export const reserveCommunityMailInviteCallable = onCall<unknown>(
   (request) => {
     const { communityId, targetCharacterId, targetName } = parseMailInviteInput(request.data);
     return reserveMailInvite(
-      getFirestore(),
+      firestore(),
       callerOf(request),
       communityId,
       targetCharacterId,
@@ -641,7 +456,7 @@ export const confirmCommunityMailInviteCallable = onCall<unknown>(
   COMMUNITY_CALLABLE_OPTIONS,
   async (request) => {
     const { communityId, targetCharacterId } = parseMailInviteInput(request.data);
-    await confirmMailInvite(getFirestore(), callerOf(request), communityId, targetCharacterId);
+    await confirmMailInvite(firestore(), callerOf(request), communityId, targetCharacterId);
   }
 );
 
@@ -649,7 +464,7 @@ export const releaseCommunityMailInviteCallable = onCall<unknown>(
   COMMUNITY_CALLABLE_OPTIONS,
   async (request) => {
     const { communityId, targetCharacterId } = parseMailInviteInput(request.data);
-    await releaseMailInvite(getFirestore(), callerOf(request), communityId, targetCharacterId);
+    await releaseMailInvite(firestore(), callerOf(request), communityId, targetCharacterId);
   }
 );
 
@@ -657,7 +472,7 @@ export const revokeCommunityInviteCallable = onCall<unknown>(
   COMMUNITY_CALLABLE_OPTIONS,
   async (request) => {
     await revokeInvite(
-      getFirestore(),
+      firestore(),
       callerOf(request),
       parseCommunityIdInput(request.data).communityId
     );
@@ -668,7 +483,7 @@ export const regenerateCommunityInviteCallable = onCall<unknown>(
   COMMUNITY_CALLABLE_OPTIONS,
   (request) =>
     regenerateInvite(
-      getFirestore(),
+      firestore(),
       callerOf(request),
       parseCommunityIdInput(request.data).communityId
     )
@@ -678,7 +493,7 @@ export const deleteCommunityCallable = onCall<unknown>(
   COMMUNITY_CALLABLE_OPTIONS,
   async (request) => {
     await deleteCommunity(
-      getFirestore(),
+      firestore(),
       callerOf(request),
       parseCommunityIdInput(request.data).communityId
     );
@@ -688,18 +503,18 @@ export const deleteCommunityCallable = onCall<unknown>(
 // Community Requests (issue #3807, ADR 0021): posting counts the caller's open
 // Requests, so it is a callable; extend and close/reopen are the requester's own.
 export const postCommunityRequestCallable = onCall<unknown>(COMMUNITY_CALLABLE_OPTIONS, (request) =>
-  postRequest(getFirestore(), callerOf(request), parsePostRequestInput(request.data))
+  postRequest(firestore(), callerOf(request), parsePostRequestInput(request.data))
 );
 
 export const editCommunityRequestCallable = onCall<unknown>(COMMUNITY_CALLABLE_OPTIONS, (request) =>
-  editRequest(getFirestore(), callerOf(request), parseEditRequestInput(request.data))
+  editRequest(firestore(), callerOf(request), parseEditRequestInput(request.data))
 );
 
 export const extendCommunityRequestCallable = onCall<unknown>(
   COMMUNITY_CALLABLE_OPTIONS,
   (request) => {
     const { communityId, requestId } = parseRequestIdInput(request.data);
-    return extendRequest(getFirestore(), callerOf(request), communityId, requestId);
+    return extendRequest(firestore(), callerOf(request), communityId, requestId);
   }
 );
 
@@ -707,7 +522,7 @@ export const setCommunityRequestClosedCallable = onCall<unknown>(
   COMMUNITY_CALLABLE_OPTIONS,
   async (request) => {
     const { communityId, requestId, closed } = parseSetClosedInput(request.data);
-    await setRequestClosed(getFirestore(), callerOf(request), communityId, requestId, closed);
+    await setRequestClosed(firestore(), callerOf(request), communityId, requestId, closed);
   }
 );
 
@@ -718,7 +533,7 @@ export const reserveCommunityPledgeMailCallable = onCall<unknown>(
   COMMUNITY_CALLABLE_OPTIONS,
   (request) => {
     const { communityId, requestId } = parseRequestIdInput(request.data);
-    return reservePledgeMail(getFirestore(), callerOf(request), communityId, requestId);
+    return reservePledgeMail(firestore(), callerOf(request), communityId, requestId);
   }
 );
 
@@ -726,7 +541,7 @@ export const confirmCommunityPledgeMailCallable = onCall<unknown>(
   COMMUNITY_CALLABLE_OPTIONS,
   async (request) => {
     const { communityId, requestId } = parseRequestIdInput(request.data);
-    await confirmPledgeMail(getFirestore(), callerOf(request), communityId, requestId);
+    await confirmPledgeMail(firestore(), callerOf(request), communityId, requestId);
   }
 );
 
@@ -734,7 +549,7 @@ export const releaseCommunityPledgeMailCallable = onCall<unknown>(
   COMMUNITY_CALLABLE_OPTIONS,
   async (request) => {
     const { communityId, requestId } = parseRequestIdInput(request.data);
-    await releasePledgeMail(getFirestore(), callerOf(request), communityId, requestId);
+    await releasePledgeMail(firestore(), callerOf(request), communityId, requestId);
   }
 );
 
@@ -744,7 +559,7 @@ export const removeCommunityRequestCallable = onCall<unknown>(
   COMMUNITY_CALLABLE_OPTIONS,
   async (request) => {
     const { communityId, requestId } = parseRequestIdInput(request.data);
-    await removeRequest(getFirestore(), callerOf(request), communityId, requestId);
+    await removeRequest(firestore(), callerOf(request), communityId, requestId);
   }
 );
 
@@ -752,7 +567,7 @@ export const removeCommunityPledgeCallable = onCall<unknown>(
   COMMUNITY_CALLABLE_OPTIONS,
   async (request) => {
     const { communityId, requestId, pledgeUid } = parseRemovePledgeInput(request.data);
-    await removePledge(getFirestore(), callerOf(request), communityId, requestId, pledgeUid);
+    await removePledge(firestore(), callerOf(request), communityId, requestId, pledgeUid);
   }
 );
 
@@ -762,7 +577,7 @@ export const removeCommunityPledgeCallable = onCall<unknown>(
 // short-lived EVE access token for the role check; it is used for ESI reads
 // and dropped, never stored or logged.
 const corpTaxBookDeps = (): BookDeps => ({
-  db: getFirestore(),
+  db: firestore(),
   now: Date.now,
   verifyToken: (token) => verifyEveAccessToken(token, verifyOptions),
   readIdentity: esiIdentityReader(),
@@ -777,7 +592,7 @@ const CORP_TAX_BOOK_OPTIONS = { maxInstances: 5 };
 // grant collection.
 function corpSyncDeps(): CorpSyncDeps {
   return {
-    db: getFirestore(),
+    db: firestore(),
     now: Date.now,
     key: () => parseAlertsKey(ALERTS_TOKEN_KEY.value()),
     verify: (accessToken) => verifyEveAccessToken(accessToken, verifyOptions),
@@ -827,6 +642,15 @@ export const verifyCorpOfficerCallable = onCall<unknown>(CORP_TAX_BOOK_OPTIONS, 
 
 export const turnOnCorpTaxBookCallable = onCall<unknown>(CORP_TAX_BOOK_OPTIONS, (request) =>
   turnOnBook(corpTaxBookDeps(), callerOf(request), parseTurnOnInput(request.data))
+);
+
+// Whoever turned the book on (or the CEO) deletes it; the scheduled-sync grant is revoked with it.
+export const deleteCorpTaxBookCallable = onCall<unknown>(
+  { ...CORP_TAX_BOOK_OPTIONS, secrets: [ALERTS_TOKEN_KEY] },
+  (request) =>
+    deleteBook(corpTaxBookDeps(), callerOf(request), parseBookCall(request.data), (corporationId) =>
+      dropCorpSyncGrant(corpSyncDeps(), corporationId)
+    )
 );
 
 export const reclaimCorpTaxBookCallable = onCall<unknown>(CORP_TAX_BOOK_OPTIONS, (request) =>
@@ -908,7 +732,7 @@ export const stopCorpTaxBookRemindersCallable = onCall<unknown>(
 export const sweepCommunityRequests = onSchedule(
   { schedule: 'every 24 hours', timeoutSeconds: 540 },
   async () => {
-    const result = await sweepRequests(getFirestore(), Date.now());
+    const result = await sweepRequests(firestore(), Date.now());
     const { deleted, failed, truncated } = result;
     if (failed > 0 || truncated) {
       logWarn('Community Request sweep incomplete, continues next run', {
@@ -920,6 +744,22 @@ export const sweepCommunityRequests = onSchedule(
       logInfo('Community Request sweep done', { deleted, failed, truncated });
     }
   }
+);
+
+/**
+ * syncLawlessSystems (issue #2870): Route Safety's "lawless" badge. CCP's
+ * insurgency feed is CORS-locked to eveonline.com, so this fetches it every
+ * 10 minutes (its own cache window) and stores the lawless system ids for the
+ * app to read. A failed fetch writes nothing: the doc just ages, and the app
+ * hides the badge once `updatedAt` passes its staleness limit. An unchanged
+ * list is not rewritten each run (issue #4272): only when it changes or the
+ * `LAWLESS_HEARTBEAT_MS` refresh is due, so `updatedAt` means "last confirmed".
+ *
+ * Another Cloud Scheduler job past the free three, like the jobs above.
+ */
+export const syncLawlessSystems = onSchedule(
+  { schedule: 'every 10 minutes' },
+  runSyncLawlessSystems
 );
 
 /**
@@ -972,171 +812,6 @@ export const sweepCommunityRequests = onSchedule(
  * per billing account ADR 0013 budgeted against, now that the blueprint-only
  * sync it briefly ran beside is gone.
  */
-// The public data hosts (EVE Ref, EVE Workbench, the LP and insurgency feeds)
-// get the ESI User-Agent naming this app, never a personal contact.
-const MARKET_HISTORY_USER_AGENT = ESI_USER_AGENT;
-/**
- * The retired `captureMiningPriceSnapshot`'s Firestore collection. Read only
- * by `syncMarketOpenPrices`'s one-time copy into R2; the maintainer deletes it
- * after the first successful run.
- */
-const LEGACY_MARKET_HISTORY_COLLECTION = 'marketHistory';
-
-/**
- * syncLawlessSystems (issue #2870): Route Safety's "lawless" badge. CCP's
- * insurgency feed is CORS-locked to eveonline.com, so this fetches it every
- * 10 minutes (its own cache window) and stores the lawless system ids for the
- * app to read. A failed fetch writes nothing: the doc just ages, and the app
- * hides the badge once `updatedAt` passes its staleness limit. An unchanged
- * list is not rewritten each run (issue #4272): only when it changes or the
- * `LAWLESS_HEARTBEAT_MS` refresh is due, so `updatedAt` means "last confirmed".
- *
- * Another Cloud Scheduler job past the free three, like the jobs above.
- */
-export const syncLawlessSystems = onSchedule({ schedule: 'every 10 minutes' }, async () => {
-  const response = await fetch(INSURGENCY_URL, {
-    headers: {
-      'User-Agent': MARKET_HISTORY_USER_AGENT,
-      'X-User-Agent': MARKET_HISTORY_USER_AGENT,
-      Accept: 'application/json',
-    },
-  });
-  if (!response.ok) {
-    logWarn('lawless systems fetch failed', { status: response.status });
-    return;
-  }
-  const body: unknown = await response.json().catch(() => null);
-  // A changed or broken body is not "nothing lawless": write nothing, let the doc age.
-  if (!Array.isArray(body)) {
-    logWarn('lawless systems body was not a list');
-    return;
-  }
-  const systemIds = parseLawlessSystemIds(body);
-  const ref = getFirestore().collection(SYSTEM_CONDITIONS_COLLECTION).doc(LAWLESS_SYSTEMS_DOC);
-  const now = Date.now();
-  const written = lawlessWriteNeeded((await ref.get()).data(), systemIds, now);
-  if (written) await ref.set({ systemIds, updatedAt: now });
-  logInfo('lawless systems sync', { count: systemIds.length, written });
-});
-
-/** Doc under `systemConditions` holding the archive version the last publish was built from. */
-const PUBLIC_CONTRACTS_ARCHIVE_FINGERPRINT_DOC = 'publicContractsArchiveFingerprint';
-
-/** Doc under `systemConditions` holding the last publish's per-type content hashes (issue #3744). */
-const PUBLIC_CONTRACTS_TYPE_HASHES_DOC = 'publicContractTypeHashes';
-
-/** Doc under `systemConditions` holding what the R2 writer last published (issue #3745). */
-const PUBLIC_CONTRACTS_R2_STATE_DOC = 'publicContractR2State';
-
-/** Doc under `systemConditions` holding what the R2 courier writer last published (issue #3748). */
-const PUBLIC_COURIERS_R2_STATE_DOC = 'publicCourierR2State';
-
-const R2_ACCESS_KEY_ID = defineSecret('R2_ACCESS_KEY_ID');
-const R2_SECRET_ACCESS_KEY = defineSecret('R2_SECRET_ACCESS_KEY');
-
-/**
- * The R2 connection for jobs whose only store is R2 (public contracts, LP
- * offers, open prices): throws when the config is missing so the run fails
- * loudly.
- */
-function r2ConfigOrThrow(): R2Config {
-  const endpoint = process.env.R2_ENDPOINT;
-  const bucket = process.env.R2_BUCKET;
-  if (!endpoint?.startsWith('https://') || !bucket) {
-    throw new Error('R2_ENDPOINT (https) / R2_BUCKET not set');
-  }
-  return {
-    endpoint,
-    bucket,
-    accessKeyId: R2_ACCESS_KEY_ID.value(),
-    secretAccessKey: R2_SECRET_ACCESS_KEY.value(),
-  };
-}
-
-/**
- * Publishes the offers snapshot to R2 (ADR 0019, issue #4270). Errors reading
- * the state doc are tolerated (a full re-upload is the worst case); upload and
- * index failures come back as the outcome, which the run turns into a throw.
- */
-async function publishOffersToR2(
-  db: Firestore,
-  config: R2Config,
-  rows: readonly PublicContractOfferRow[],
-  lastSyncedAt: number
-): Promise<R2PublishOutcome> {
-  const stateRef = db.collection(SYSTEM_CONDITIONS_COLLECTION).doc(PUBLIC_CONTRACTS_R2_STATE_DOC);
-  const previous = await stateRef
-    .get()
-    .then((snap) => (snap.exists ? (snap.data() as R2PublishState) : null))
-    .catch(() => null);
-  const result = await publishContractOffersToR2({
-    rows,
-    lastSyncedAt,
-    previous,
-    now: Date.now(),
-    put: createR2Put(config),
-    onProgress: async (state) => {
-      await stateRef.set(state);
-    },
-  });
-  await stateRef.set(result.state);
-  const outcome = r2PublishOutcome(result);
-  const { uploaded, skipped, failed, remaining, indexWritten, firstError } = result;
-  (outcome.kind === 'complete' ? logInfo : logWarn)('public contract offers R2 publish', {
-    uploaded,
-    skipped,
-    failed,
-    remaining,
-    indexWritten,
-    firstError,
-  });
-  return outcome;
-}
-
-/** Same contract as `publishOffersToR2`, for the courier snapshot (issue #3748). */
-async function publishCourierToR2(
-  db: Firestore,
-  config: R2Config,
-  rows: readonly PublicCourierContractRow[],
-  lastSyncedAt: number
-): Promise<R2PublishOutcome> {
-  const stateRef = db.collection(SYSTEM_CONDITIONS_COLLECTION).doc(PUBLIC_COURIERS_R2_STATE_DOC);
-  const previous = await stateRef
-    .get()
-    .then((snap) => (snap.exists ? (snap.data() as CourierR2PublishState) : null))
-    .catch(() => null);
-  const result = await publishCourierContractsToR2({
-    rows,
-    lastSyncedAt,
-    previous,
-    now: Date.now(),
-    put: createR2Put(config),
-  });
-  await stateRef.set(result.state);
-  const outcome = r2PublishOutcome(result);
-  const { uploaded, indexWritten, firstError } = result;
-  (outcome.kind === 'complete' ? logInfo : logWarn)('public courier contracts R2 publish', {
-    uploaded,
-    indexWritten,
-    firstError,
-  });
-  return outcome;
-}
-
-/**
- * Runs one R2 publish, folding a thrown error (a state-doc write, say) into a
- * failed outcome so the other snapshot's publish still runs before the job fails.
- */
-async function settleR2Publish(
-  publish: () => Promise<R2PublishOutcome>
-): Promise<R2PublishOutcome> {
-  try {
-    return await publish();
-  } catch (error) {
-    return { kind: 'failed', error: String(error) };
-  }
-}
-
 export const syncPublicContractOffers = onSchedule(
   {
     schedule: 'every 30 minutes',
@@ -1144,125 +819,7 @@ export const syncPublicContractOffers = onSchedule(
     timeoutSeconds: 540,
     secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY],
   },
-  async () => {
-    // Skip the whole run when EVE Ref has not published a new archive since
-    // the last publish. The fingerprint is read before the download and stored
-    // only after a complete R2 publish, so a refresh landing in between (or a
-    // failed publish) is picked up next run rather than lost. An unreadable fingerprint always syncs.
-    // R2 is the only store, so a missing config fails before the download.
-    const r2Config = r2ConfigOrThrow();
-    const db = getFirestore();
-    const fingerprintRef = db
-      .collection(SYSTEM_CONDITIONS_COLLECTION)
-      .doc(PUBLIC_CONTRACTS_ARCHIVE_FINGERPRINT_DOC);
-    const fingerprint = await fetchArchiveFingerprint();
-    if (fingerprint !== null) {
-      // A failed read just means "cannot tell": sync rather than fail the run.
-      const stored = await fingerprintRef
-        .get()
-        .then((snap) => snap.data()?.fingerprint as unknown)
-        .catch(() => null);
-      if (stored === fingerprint) {
-        logInfo('public contract offers sync skipped: archive unchanged', { fingerprint });
-        return;
-      }
-    }
-    const nowMs = Date.now();
-    const eligibleContracts = new Map<string, EligibleContract>();
-    const rows: PublicContractOfferRow[] = [];
-    const courierRows: PublicCourierContractRow[] = [];
-    // Keyed the same as `eligibleContracts` (raw CSV `contract_id`), and just
-    // as small — an entry per contract asking for something in return, not a
-    // second copy of `contract_items.csv`. `contract_items.csv` is a single
-    // stream (see publicContractsArchive.ts), so a requested line can arrive
-    // before or after the same contract's offered line; folding every line
-    // as it passes and patching `rows` once the stream ends (below) gets
-    // `requestedSideByContract`'s answer without a second pass or buffering
-    // the line-by-line records.
-    const requestedSide = emptyRequestedSide();
-    let outstandingCourierContracts = 0;
-
-    await streamPublicContractsCsvs({
-      onContract: (record) => {
-        const eligible = eligibleContractFrom(record, nowMs);
-        if (eligible) {
-          eligibleContracts.set(record.contract_id, eligible);
-          return;
-        }
-        if (isOutstandingCourierContract(record, nowMs)) outstandingCourierContracts += 1;
-        const courier = courierContractFrom(record, nowMs);
-        if (courier) courierRows.push(courier);
-      },
-      onItem: (record) => {
-        accumulateRequestedSide(record, eligibleContracts, requestedSide);
-        const contract = eligibleContracts.get(record.contract_id);
-        if (!contract) return;
-        const row = compactContractOfferRow(record, contract);
-        if (row) rows.push(row);
-      },
-    });
-
-    applyRequestedSide(rows, requestedSide);
-
-    // `outstandingCourierContracts` against `courierRowCount` is the only
-    // thing that tells an empty courier snapshot apart from one whose rows were
-    // all dropped for a blank endpoint, reward or volume — the same reason
-    // publicContractsArchive.ts throws on a reordered archive rather than
-    // publishing silence. The two counts share a gate
-    // (`isOutstandingCourierContract`), so expiry and contract type are already
-    // excluded from both and cannot open a gap: any gap at all is EVE Ref
-    // leaving a column blank that `courierContractFrom` requires.
-    logInfo('public contract offers sync', {
-      eligibleContracts: eligibleContracts.size,
-      rowCount: rows.length,
-      outstandingCourierContracts,
-      courierRowCount: courierRows.length,
-    });
-
-    // The lookup is dead once the join is done, and it is ~50k objects the
-    // publish would otherwise be holding alongside the rows.
-    eligibleContracts.clear();
-    // Sizes the R2 per-type writer (ADR 0019): how many types change per
-    // publish. Telemetry only — a failure here must not fail the publish.
-    const typeHashesRef = db
-      .collection(SYSTEM_CONDITIONS_COLLECTION)
-      .doc(PUBLIC_CONTRACTS_TYPE_HASHES_DOC);
-    let typeHashes: ContractTypeHashes | null = null;
-    try {
-      const previousHashes = await typeHashesRef
-        .get()
-        .then((snap) => (snap.data()?.hashes as ContractTypeHashes | undefined) ?? null)
-        .catch(() => null);
-      const measured = measureContractTypeChanges(rows, previousHashes);
-      typeHashes = measured.hashes;
-      logInfo('public contract type changes', {
-        ...measured.stats,
-        firstRun: previousHashes === null,
-      });
-    } catch (err) {
-      logWarn('public contract type change measurement failed', { error: String(err) });
-    }
-    const lastSyncedAt = Date.now();
-    // Courier first: one small object, so a slow offers upload cannot starve it
-    // of the time budget. Both run before either failure is thrown.
-    const courier = await settleR2Publish(() =>
-      publishCourierToR2(db, r2Config, courierRows, lastSyncedAt)
-    );
-    const offers = await settleR2Publish(() => publishOffersToR2(db, r2Config, rows, lastSyncedAt));
-    if (typeHashes !== null) {
-      await typeHashesRef
-        .set({ hashes: typeHashes, updatedAt: Date.now() })
-        .catch((err) =>
-          logWarn('public contract type hashes write failed', { error: String(err) })
-        );
-    }
-    // R2 is the only store (issue #4270): see `publicContractsRunVerdict`.
-    const verdict = publicContractsRunVerdict(courier, offers);
-    if (verdict.error !== null) throw new Error(verdict.error);
-    if (fingerprint !== null && verdict.storeFingerprint) {
-      await fingerprintRef.set({ fingerprint, updatedAt: Date.now() });
-    }
-  }
+  runSyncPublicContractOffers
 );
 
 /**
@@ -1293,8 +850,6 @@ export const syncPublicContractOffers = onSchedule(
  * Another Cloud Scheduler job past the free three — the same trade
  * `captureMiningPriceSnapshot` already made.
  */
-const WORKBENCH_FETCH_BUDGET_MS = 360_000;
-const WORKBENCH_REQUEST_GAP_MS = 250;
 
 export const syncWorkbenchFits = onSchedule(
   {
@@ -1303,36 +858,7 @@ export const syncWorkbenchFits = onSchedule(
     timeoutSeconds: 540,
     secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY],
   },
-  async () => {
-    const r2 = r2ConfigOrThrow();
-    const db = getFirestore();
-    const hulls = r2WorkbenchHulls({ get: createR2Get(r2), put: createR2Put(r2) });
-    // The first run after the move to R2 only copies the Firestore fits over
-    // (workbenchFitsMigration.ts); every later run skips straight past.
-    const migration = await migrateLegacyWorkbenchFits({
-      ...firestoreWorkbenchMigration(db),
-      hulls,
-    });
-    if (migration.migrated) {
-      logInfo('EVE Workbench fits migrated to R2', { ...migration });
-      return;
-    }
-    const result = await runWorkbenchSync({
-      store: workbenchFitsStore(db, hulls),
-      fetchJson: async (url) => {
-        const response = await fetch(url, {
-          headers: { 'User-Agent': MARKET_HISTORY_USER_AGENT, Accept: 'application/json' },
-        });
-        const body: unknown = response.ok ? await response.json().catch(() => null) : null;
-        return { status: response.status, retryAfter: response.headers.get('Retry-After'), body };
-      },
-      now: Date.now,
-      sleep,
-      budgetMs: WORKBENCH_FETCH_BUDGET_MS,
-      requestGapMs: WORKBENCH_REQUEST_GAP_MS,
-    });
-    logInfo('EVE Workbench fits sync', { ...result });
-  }
+  runSyncWorkbenchFits
 );
 
 /**
@@ -1351,7 +877,6 @@ export const syncWorkbenchFits = onSchedule(
  * Another Cloud Scheduler job past the free three, the same trade as
  * `syncWorkbenchFits`; the deployment now has eight scheduled functions.
  */
-const LP_STORE_MAX_FAILED_SHARE = 0.1;
 
 export const syncLpStoreOffers = onSchedule(
   {
@@ -1360,34 +885,7 @@ export const syncLpStoreOffers = onSchedule(
     timeoutSeconds: 540,
     secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY],
   },
-  async () => {
-    // Before the ~170-request crawl, so a missing R2 config fails fast.
-    const r2 = r2ConfigOrThrow();
-    const { rows, failed } = await fetchLpStoreRows({
-      corporations: LP_CORP_STATION_SYSTEMS,
-      fetchJson: async (url) => {
-        const response = await fetch(url, {
-          headers: {
-            'User-Agent': MARKET_HISTORY_USER_AGENT,
-            'X-User-Agent': MARKET_HISTORY_USER_AGENT,
-            'X-Compatibility-Date': '2026-08-01',
-            Accept: 'application/json',
-          },
-        });
-        const body: unknown = response.ok ? await response.json().catch(() => null) : null;
-        return { status: response.status, retryAfter: response.headers.get('Retry-After'), body };
-      },
-      sleep,
-      requestGapMs: LP_STORE_REQUEST_GAP_MS,
-    });
-    logInfo('LP store offers sync', { corporations: rows.length, failed: failed.length });
-    if (rows.length === 0 || failed.length > Math.max(1, rows.length * LP_STORE_MAX_FAILED_SHARE)) {
-      logError('LP store offers sync skipped publishing', { failed });
-      return;
-    }
-    await publishLpStoreOffersToR2(rows, Date.now(), createR2Put(r2));
-    logInfo('LP store offers published to R2', { corporations: rows.length });
-  }
+  runSyncLpStoreOffers
 );
 
 /**
@@ -1401,10 +899,8 @@ export const syncLpStoreOffers = onSchedule(
  * decision 20261018-201511-moving-the-daily-snapshots-to-r2). The region-wide
  * fold still runs in the same pass, but only for the plausibility guards; it is
  * no longer stored. Only the small meta doc stays in Firestore, for the shrink
- * guard. The mining types' share of the same station fold is merged into
- * `mining-prices/<hubId>/<YYYY-MM>.json` (decision 20261018-233051, which
- * retired `captureMiningPriceSnapshot` and its Firestore `marketHistory`; its
- * days are copied into R2 once, on the first run).
+ * guard. The mining pages price from these same objects (decision
+ * 20261019-091155, which retired the separate `mining-prices/` month objects).
  *
  * Idempotent (re-running a day replaces its entry). The day's 23:45 snapshot is
  * normally listed by ~23:50, but a run that finds only an earlier one (EVE Ref
@@ -1446,84 +942,7 @@ export const syncMarketOpenPrices = onSchedule(
     maxBackoffSeconds: 1800,
     secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY],
   },
-  async () => {
-    const date = previousUtcDate(new Date());
-    const found = await findFinalSnapshot(date, (url) =>
-      fetchEverefJson(url, MARKET_HISTORY_USER_AGENT)
-    );
-    if (!found.final) {
-      // Thrown, not returned, so the run fails and is retried.
-      throw new Error(
-        `Market open prices: no final snapshot listed for ${date} (last listed: ${found.snapshot?.fileTime ?? 'none'}); retried, and after the last retry the day has no point`
-      );
-    }
-    const { url: snapshotUrl, fileTime } = found.snapshot;
-    const fold = new OpenPriceFold();
-    // The hub-station prices (Open Prices for every type, and the mining
-    // prices) ride the same single pass; the region fold only feeds the guards.
-    const stations = new StationPriceFold(SNAPSHOT_HUBS);
-    const rows = await foldSnapshotUrl(snapshotUrl, fold, MARKET_HISTORY_USER_AGENT, stations);
-    logInfo('Market open prices fold', {
-      date,
-      fileTime,
-      snapshotUrl,
-      rows,
-      pairs: fold.size,
-      stationPairs: stations.size,
-    });
-    const reason = implausibleReason(fold);
-    if (reason) {
-      logError('Market open prices sync skipped publishing', { date, reason });
-      return;
-    }
-    const db = getFirestore();
-    const meta = db.doc(MARKET_OPEN_PRICES_META_PATH);
-    const shrunk = shrunkRegion(fold, (await meta.get()).data()?.regions);
-    if (shrunk) {
-      logError('Market open prices sync skipped publishing: snapshot shrank', {
-        date,
-        reason: shrunk,
-        hint: `if the drop is real, delete ${MARKET_OPEN_PRICES_META_PATH}`,
-      });
-      return;
-    }
-    const r2 = r2ConfigOrThrow();
-    const get = createR2Get(r2);
-    const put = createR2Put(r2);
-    const { written, failed, firstError } = await writeOpenPricesToR2(
-      groupByDocument(new Map([[date, stations]])),
-      mergeDays,
-      { get, put }
-    );
-    if (failed > 0) {
-      // Thrown so the run is retried; meta is only recorded for a complete day.
-      throw new Error(
-        `Market open prices: ${failed} types failed to write to R2 (${written} written); first error: ${firstError}`
-      );
-    }
-    // Throws on a failed write, so the run (both halves, both idempotent) retries.
-    const mining = await publishMiningPricesToR2(
-      date,
-      stationFoldWrites(stations, SNAPSHOT_HUBS, date, MINING_TYPE_IDS),
-      SNAPSHOT_HUBS,
-      {
-        get,
-        put,
-        del: createR2Delete(r2),
-        // The retired captureMiningPriceSnapshot's days, copied once (miningHubPrices.ts).
-        loadLegacyDays: async () =>
-          (await db.collection(LEGACY_MARKET_HISTORY_COLLECTION).get()).docs.map((doc) => ({
-            date: doc.id,
-            data: doc.data(),
-          })),
-      }
-    );
-    if (mining.deleteFailed > 0) {
-      logWarn('Mining prices: expired month objects not deleted', { date, ...mining });
-    }
-    await meta.set({ date, regions: regionCounts(fold) });
-    logInfo('Market open prices sync', { date, written, mining });
-  }
+  runSyncMarketOpenPrices
 );
 
 // mutamarketEstimate (mutamarket.ts). Session required: an import publishes

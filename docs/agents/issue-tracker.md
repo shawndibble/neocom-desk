@@ -57,7 +57,7 @@ Create a GitHub issue.
 
 ## CI and merge
 
-- On every PR to `main`, `.github/workflows/ci.yml` runs a `validate` job (`lint`, `format:check`, `typecheck`, `test:run`, `build`) and an `e2e` job (Playwright). Watch with `gh pr checks <pr> --watch`.
-- `main` is protected by a ruleset requiring the `validate` and `e2e` checks to pass (plus no force-push/deletion) — GitHub blocks merge on red checks itself. There is no review requirement.
-- Merging to `main` triggers the `deploy` job → GitHub Pages (production).
-- Squash-merge with `Closes #<n>` in the PR body auto-closes the issue.
+- Work branches target `develop`, the integration branch; `main` is production. On every PR to `develop` or `main`, `.github/workflows/ci.yml` runs a `validate` job (`lint`, `format:check`, `typecheck`, `test:run`, `build`) and an `e2e` job (Playwright). Watch with `gh pr checks <pr> --watch`.
+- `develop` and `main` are each protected by a ruleset requiring the `validate` and `e2e` checks to pass (plus no force-push/deletion) — GitHub blocks merge on red checks itself. There is no review requirement.
+- A push to `develop` runs the `deploy-dev` job → Cloudflare Pages at `https://dev.neocomdesk.com` (the `dev` GitHub environment holds its own EVE client ID and the Cloudflare secrets). It never touches production. A push to `main` triggers the `deploy` job → GitHub Pages (production), so production ships only when `develop` is promoted: open a PR `develop` → `main` and **merge it with a merge commit, never squash** (a squash makes `develop` diverge from `main` and every later promotion conflicts). `gh pr create --base main --head develop`, then `gh pr merge --merge`.
+- `Closes #<n>` only auto-closes an issue when merged into the repo's default branch; `scripts/next-ticket/finish.mjs` closes the issue itself either way.

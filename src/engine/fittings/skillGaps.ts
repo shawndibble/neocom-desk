@@ -37,6 +37,15 @@ export function resourceOverage(used: number | null, total: number | null): numb
   return used > total ? used - total : 0;
 }
 
+/** How far `stats` is over its CPU, powergrid and calibration budgets, in that order; 0 for each within. */
+export function budgetOverages(stats: FittingStats): [number, number, number] {
+  return [
+    resourceOverage(stats.cpuUsed, stats.cpuTotal),
+    resourceOverage(stats.powergridUsed, stats.powergridTotal),
+    resourceOverage(stats.calibrationUsed, stats.calibrationTotal),
+  ];
+}
+
 /** Whole-fit CPU/PG/calibration budget only — deliberately not hull/rack rules, which `candidates.ts`'s `fitsHull` already owns and deliberately excludes resource overflow from. */
 export function fitsResourceBudget(stats: FittingStats): boolean {
   return (

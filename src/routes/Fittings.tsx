@@ -1,34 +1,17 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useHydratedStore } from '@/lib/useHydratedStore';
-import { fittingCompareHref, fittingsRedirect } from '@/features/fittings/fittingRoutes';
+import { fittingsRedirect } from '@/features/fittings/fittingRoutes';
 import { ShipsTabBar } from '@/features/fittings/ShipsTabBar';
 import { SHIPS_TABS_ID } from '@/features/fittings/shipsTabs';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
 import { useCharacters } from '@/features/character/useCharacters';
 import { useActiveCharacter } from '@/stores/activeCharacter';
-import { useOnline } from '@/stores/network';
 import { useTranslation } from 'react-i18next';
-import { Navigate, useLocation, useNavigate } from 'react-router-dom';
-import type { FittingLoadState } from '@/lib/shortcuts';
-import {
-  Button,
-  Disclosure,
-  LiveStatus,
-  Modal,
-  Panel,
-  SlideOver,
-  Tabs,
-  TabPanel,
-  useTabsId,
-  TextInput,
-  Toast,
-  useTimedToast,
-} from '@/components/ui';
+import { Navigate, useLocation } from 'react-router-dom';
+import { Button, LiveStatus } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { AddRow } from '@/components/ui/icons';
-import { SkillsUnknownNote } from '@/features/fittings/FittingPreviewPanels';
-import { useEndpointsGranted } from '@/app/useGrantedScopes';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { moduleKey } from '@/engine/fittings/skillGaps';
@@ -41,55 +24,40 @@ import {
   addModule,
   cargoGroups,
   droneRoom,
-  droneTotals,
   firstFreeSlotIndex,
-  moveModule,
   newFitting,
   setCargoQuantity,
   swapModuleType,
 } from '@/engine/fittings/fittingEdit';
 import { FittingAddPanel } from '@/features/fittings/FittingAddPanel';
-import { MakeItFitContext } from '@/features/fittings/makeItFitContext';
-import { MakeItFitDialog } from '@/features/fittings/MakeItFitDialog';
 import { CargoQuantityDialog } from '@/features/fittings/CargoQuantityDialog';
 import { FittingItemActionsProvider } from '@/features/fittings/fittingItemActions';
 import { useChargeLoading } from '@/features/fittings/useChargeLoading';
 import { useEditorItemActions } from '@/features/fittings/useEditorItemActions';
 import { targetRack, type AddTarget } from '@/features/fittings/addTarget';
-import { writeCompareCodes } from '@/features/fittings/compareUrl';
 import { useEditorShare } from '@/features/fittings/useEditorShare';
-import { FittingHeader, type LibraryAction } from '@/features/fittings/FittingHeader';
 import type { HullEntry } from '@/engine/fittings/hullCatalogue';
-import { FittingSaveButton } from '@/features/fittings/FittingSaveButton';
 import { LoadWarnings } from '@/features/fittings/FittingLoadCard';
+import { FittingEditorHeader } from '@/features/fittings/FittingEditorHeader';
+import { FittingEditorLayout } from '@/features/fittings/FittingEditorLayout';
+import { useMakeItFitDialog } from '@/features/fittings/useMakeItFitDialog';
+import type { LibraryAction } from '@/features/fittings/FittingHeader';
 import { FittingStartScreen } from '@/features/fittings/FittingStartScreen';
-import { ImportFittingDialog, NewFromHullDialog } from '@/features/fittings/FittingStartDialogs';
-import { LazySaveToEveDialog } from '@/features/fittings/LazySaveToEveDialog';
+import { FittingLibraryDialogs } from '@/features/fittings/FittingLibraryDialogs';
+import { FittingEditorPanes } from '@/features/fittings/FittingEditorPanes';
+import { FittingRackSheet } from '@/features/fittings/FittingRackSheet';
 import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
 import { usePageItemActions } from '@/features/market/usePageItemActions';
-import {
-  DroneSection,
-  FittingRackList,
-  ModuleRow,
-  RackSlots,
-} from '@/features/fittings/FittingRackList';
-import { FittingRing, RING_ROOM_ATTR } from '@/features/fittings/FittingRing';
-import { FittingStatsSections } from '@/features/fittings/FittingStatsSections';
-import { FittingVariationsPanel } from '@/features/fittings/FittingVariationsPanel';
-import { FittingMutationPanel } from '@/features/fittings/FittingMutationPanel';
-import { FittingAffectedByPanel } from '@/features/fittings/FittingAffectedByPanel';
-import { FittingFightersPanel } from '@/features/fittings/FittingFightersPanel';
-import { TacticalModePicker } from '@/features/fittings/TacticalModePicker';
-import { tacticalModeKind, tacticalModesFor } from '@/engine/fittings/tacticalModes';
-import { ImplantSetControl } from '@/features/fittings/ImplantSetControl';
-import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
+import { FittingModuleDialog } from '@/features/fittings/FittingModuleDialog';
+import { FittingStatsColumn } from '@/features/fittings/FittingStatsColumn';
+import { THREE_COLUMN_QUERY, addModeFor } from '@/features/fittings/fittingLayout';
+import { useFittingPasteLoad } from '@/features/fittings/useFittingPasteLoad';
+import { useSavedFittingRecord } from '@/features/fittings/useSavedFittingRecord';
+import { tacticalModeKind } from '@/engine/fittings/tacticalModes';
 import {
   resolveFittingView,
   useFittingViewPreference,
-  type FittingView,
 } from '@/features/fittings/fittingViewPreference';
-import { MissingSkillsChip } from '@/features/fittings/MissingSkillsChip';
-import { FittingWhatToTrainPanel } from '@/features/fittings/FittingWhatToTrainPanel';
 import { useFittingAlpha } from '@/features/fittings/useFittingAlpha';
 import { useFittingHardpoints } from '@/features/fittings/useFittingHardpoints';
 import { useFittingSkillGaps } from '@/features/fittings/useFittingSkillGaps';
@@ -101,14 +69,6 @@ import { useModuleVariations } from '@/features/fittings/useModuleVariations';
 import { useOverlayFitting } from '@/features/fittings/useOverlayFitting';
 import { useTargetProfiles } from '@/features/fittings/targetProfiles';
 import { COARSE_POINTER_QUERY, useMediaQuery } from '@/lib/useMediaQuery';
-
-/**
- * Wide enough for browser | Ring | stats side by side: the 12rem nav, a 20rem
- * browser, a Ring column wide enough for a ring of ~36rem (it grows to 48rem when
- * there's more), and
- * 22-26rem of stats, with gaps and page padding.
- */
-const THREE_COLUMN_QUERY = '(min-width: 100rem)';
 
 /**
  * The Fittings section (scope decision `20260924-215855`).
@@ -138,8 +98,6 @@ function FittingsPage() {
       .then(({ warmFittingAssets }) => warmFittingAssets())
       .catch(() => {});
   }, []);
-  const navigate = useNavigate();
-  const location = useLocation();
   const workspace = useFittingWorkspace();
   const catalogue = useFittingCatalogue();
   const context = useFittingContext(workspace.profile, catalogue);
@@ -149,11 +107,7 @@ function FittingsPage() {
   // The HTML5 drag gate follows the input, not just the width: a touch laptop
   // is wide, but a long-press there belongs to the row menu, not a drag.
   const coarsePointer = useMediaQuery(COARSE_POINTER_QUERY);
-  const addMode: 'docked' | 'slideOut' | 'sheet' = threeColumns
-    ? 'docked'
-    : isDesktop
-      ? 'slideOut'
-      : 'sheet';
+  const addMode = addModeFor(threeColumns, isDesktop);
   const [target, setTarget] = useState<AddTarget | null>(null);
   // The slide-out or sheet Add panel is open (the docked one always is).
   // Opened by an empty slot, or by "+ Add module" — which works before the
@@ -162,19 +116,10 @@ function FittingsPage() {
   // What the last add did, read out by the sr-only status (the browser stays open beside the Ring).
   const [added, setAdded] = useState({ message: '', n: 0 });
   const setAddedMessage = (message: string) => setAdded((a) => ({ message, n: a.n + 1 }));
-  const [makeItFitOpen, setMakeItFitOpen] = useState(false);
-  // What the last applied Make it fit swap changed, for its confirmation toast.
-  const [swapped, setSwapped] = useState<string | null>(null);
-  useTimedToast(swapped, () => setSwapped(null));
-  const openMakeItFit = useCallback(() => setMakeItFitOpen(true), []);
   const storedView = useFittingViewPreference((state) => state.value);
   const viewHydrated = useHydratedStore(useFittingViewPreference);
   const setView = useFittingViewPreference((state) => state.setValue);
   const view = resolveFittingView(storedView, isPhone);
-  // Below desktop the Ring, the List and the stats are one set of tabs.
-  const [phoneTab, setPhoneTab] = useState<'editor' | 'stats'>('editor');
-  // One tab bar renders at a time (phone sheet or docked/wide), so one id base serves both.
-  const viewTabsId = useTabsId();
   // Phone Ring: the rack whose slots sheet is open (scope decision `20260924-205720`).
   const [rackSheet, setRackSheet] = useState<FittingSlotKind | 'drone' | null>(null);
   // The module dialog's variations start folded: a tap on a module is
@@ -203,44 +148,13 @@ function FittingsPage() {
   const gaps = useFittingSkillGaps(workspace.fitting, activeCharacterId);
   const alpha = useFittingAlpha(workspace.fitting);
   const hardpoints = useFittingHardpoints(workspace.fitting);
-  const [saveToEveOpen, setSaveToEveOpen] = useState(false);
-  const [saveAsNewOpen, setSaveAsNewOpen] = useState(false);
-  const [saveAsNewName, setSaveAsNewName] = useState('');
-  // The record the open Fitting was saved from, for the "Save as new…"
-  // prefill and to tell Compare there are unsaved edits against it.
-  const savedRecord = useLiveQuery(
-    () => (workspace.savedId === null ? undefined : db.fittings.get(workspace.savedId)),
-    [workspace.savedId]
-  );
-  // The app-wide paste router (`app/GlobalPasteRouter.tsx`) lands here with
-  // a pasted EFT fit to open. Keyed on the navigation itself so a re-render
-  // never re-loads it, and the state is cleared once read: unlike appraising,
-  // loading opens the editor, so a remount on this entry (Back from another
-  // section) must not open the fit all over again. The editor replaces this
-  // landing entry rather than pushing past it, so one Back undoes the paste.
-  const handledLoadKey = useRef<string | null>(null);
-  const { loadFromInput } = workspace;
-  useEffect(() => {
-    const text = (location.state as Partial<FittingLoadState> | null)?.fittingLoadText;
-    if (!text || handledLoadKey.current === location.key) return;
-    handledLoadKey.current = location.key;
-    void navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
-    void loadFromInput(text, { replaceEntry: true });
-  }, [location.key, location.state, location.pathname, location.search, navigate, loadFromInput]);
+  const saved = useSavedFittingRecord(workspace.savedId);
+  const { savedRecord } = saved;
+  useFittingPasteLoad(workspace.loadFromInput);
   const editorShare = useEditorShare(
     activeCharacterId,
     workspace.savedId !== null && savedRecord?.id === workspace.savedId ? savedRecord : null
   );
-  const currentShareCode = new URLSearchParams(location.search).get('f');
-  const hasUnsavedEdits =
-    workspace.savedId !== null &&
-    savedRecord !== undefined &&
-    // Guards the render right after a save/save-as-new, where `savedRecord`
-    // (async, via useLiveQuery) can still be the previous record for a tick
-    // after `workspace.savedId` (synchronous) already points at the new one.
-    savedRecord.id === workspace.savedId &&
-    currentShareCode !== null &&
-    savedRecord.code !== currentShareCode;
   // The page's Item Actions — here only Show info (the Fitting editor's menu
   // has no Add to Quickbar or Build Plan): a List name click or a menu's
   // "Show info" opens the page's Item Detail modal.
@@ -248,10 +162,18 @@ function FittingsPage() {
   // Bumped on a successful Save to EVE so In-game Fittings remounts and
   // refetches, picking up the fitting that just landed (or the overwrite).
   const [inGameFittingsKey, setInGameFittingsKey] = useState(0);
-  const canSaveToEve = useEndpointsGranted(['postCharacterFitting']);
-  const online = useOnline();
 
   const { fitting, stats, edit } = workspace;
+  const makeItFit = useMakeItFitDialog({
+    workspace,
+    fitting,
+    catalogue,
+    characterId: activeCharacterId,
+    isPhone,
+    view,
+    setView,
+    edit,
+  });
   // Warm the module browser's hull check in the background once the ship data,
   // pilot and catalogue are in, so opening Add (or changing hull) needn't wait.
   // The panel's own call finds the memoized results.
@@ -293,22 +215,31 @@ function FittingsPage() {
   });
   // The cargo item whose quantity dialog is open.
   const [cargoQuantityFor, setCargoQuantityFor] = useState<number | null>(null);
-  const selectTarget = useCallback((next: AddTarget | null) => {
-    setTarget(next);
-    setAddOpen(true);
-  }, []);
-  const openVariations = useCallback((slot: FittingSlotKind, slotIndex: number) => {
-    setRackSheet(null);
-    setModuleSlot({ slot, slotIndex });
-    setVariationsOpen(true);
-    setMutationOpen(false);
-  }, []);
-  const openMutation = useCallback((slot: FittingSlotKind, slotIndex: number) => {
-    setRackSheet(null);
-    setModuleSlot({ slot, slotIndex });
-    setVariationsOpen(false);
-    setMutationOpen(true);
-  }, []);
+  const selectTarget = useCallback(
+    (next: AddTarget | null) => {
+      setTarget(next);
+      setAddOpen(true);
+    },
+    [setTarget, setAddOpen]
+  );
+  const openVariations = useCallback(
+    (slot: FittingSlotKind, slotIndex: number) => {
+      setRackSheet(null);
+      setModuleSlot({ slot, slotIndex });
+      setVariationsOpen(true);
+      setMutationOpen(false);
+    },
+    [setRackSheet, setModuleSlot, setVariationsOpen, setMutationOpen]
+  );
+  const openMutation = useCallback(
+    (slot: FittingSlotKind, slotIndex: number) => {
+      setRackSheet(null);
+      setModuleSlot({ slot, slotIndex });
+      setVariationsOpen(false);
+      setMutationOpen(true);
+    },
+    [setRackSheet, setModuleSlot, setVariationsOpen, setMutationOpen]
+  );
   const { itemActions, fitAt, droneBay, noteRecent, defaultCharges } = useEditorItemActions({
     fitting,
     stats,
@@ -507,166 +438,46 @@ function FittingsPage() {
     fitting !== null &&
     ((fitting.fighters?.length ?? 0) > 0 || (stats?.fighters.tubes?.total ?? 0) > 0);
 
-  const editorBody =
-    view === 'ring' ? (
-      <div className="min-w-0 space-y-3">
-        <FittingRing
-          fitting={fitting}
-          stats={stats}
-          moduleResults={moduleResults}
-          unusableModuleKeys={gaps?.unusableModuleKeys}
-          typeName={typeName}
-          onSlotSelect={selectSlot}
-          // Drag is pointer-only: a touch tablet taps a slot and picks instead.
-          onDropType={isDesktop ? fitAt : undefined}
-          onMoveModule={
-            isDesktop ? (rack, from, to) => edit((f) => moveModule(f, rack, from, to)) : undefined
-          }
-          compact={isPhone}
-          onRackOpen={setRackSheet}
-          hardpointsUsed={hardpoints.used}
-          hardpointKindOf={hardpoints.kindOf}
-          selectedSlot={
-            target?.kind === 'slot' ? { rack: target.slot, index: target.slotIndex } : null
-          }
-          actions={addButton}
-          droneButton={
-            dronesShown ? (
-              <Button
-                size="md"
-                className="w-full justify-between"
-                onClick={() => setRackSheet('drone')}
-              >
-                <span>{t('fittings.list.drones')}</span>
-                <span className="text-xs font-normal text-text-dim tabular-nums">
-                  {t('fittings.ring.droneCount', droneTotals(fitting))}
-                </span>
-              </Button>
-            ) : undefined
-          }
-        />
-        {/* The phone overview has its Drones button among the rack buttons instead. */}
-        {!isPhone && dronesShown && (
-          <Panel title={t('fittings.list.drones')}>
-            <DroneSection
-              fitting={fitting}
-              catalogue={catalogue}
-              stats={stats}
-              edit={edit}
-              target={target}
-              onSelectTarget={selectTarget}
-              variant="panel"
-            />
-          </Panel>
-        )}
-      </div>
-    ) : (
-      <FittingRackList
-        fitting={fitting}
-        stats={stats}
-        moduleResults={moduleResults}
-        catalogue={catalogue}
-        context={context}
-        edit={edit}
-        target={target}
-        onSelectTarget={selectTarget}
-        unusableModuleKeys={gaps?.unusableModuleKeys}
-        actions={addButton}
-      />
-    );
-
   const editor = (
-    <div className="min-w-0 space-y-3">
-      <MakeItFitContext.Provider value={openMakeItFit}>{editorBody}</MakeItFitContext.Provider>
-      {fightersShown && (
-        <Panel title={t('fittings.fighters.title')}>
-          <FittingFightersPanel
-            fitting={fitting}
-            stats={stats}
-            onChange={edit}
-            typeName={(typeId) => catalogueTypeName(catalogue, typeId)}
-          />
-        </Panel>
-      )}
-    </div>
+    <FittingEditorPanes
+      view={view}
+      fitting={fitting}
+      stats={stats}
+      moduleResults={moduleResults}
+      catalogue={catalogue}
+      context={context}
+      edit={edit}
+      target={target}
+      onSelectTarget={selectTarget}
+      unusableModuleKeys={gaps?.unusableModuleKeys}
+      typeName={typeName}
+      onSlotSelect={selectSlot}
+      dragEnabled={isDesktop}
+      onDropType={fitAt}
+      isPhone={isPhone}
+      onRackOpen={setRackSheet}
+      hardpoints={hardpoints}
+      addButton={addButton}
+      dronesShown={dronesShown}
+      fightersShown={fightersShown}
+      onOpenMakeItFit={makeItFit.open}
+    />
   );
 
-  // What the stats column's Pilot and Situation panels hold beyond its own sections.
-  const hasModes = tacticalModesFor(fitting.shipTypeId).length > 0;
-  const showMissingSkills = gaps !== null && gaps.missing.length > 0 && activeCharacterId !== null;
-  const showSkillsUnknown = gaps?.unknown === true && activeCharacterId !== null;
-
   const statsSections = (
-    <FittingStatsSections
-      stats={stats}
-      statsProgress={workspace.statsProgress}
-      statsError={workspace.statsError}
-      statsErrorReason={workspace.statsErrorReason}
-      skillsKnown={workspace.skillsKnown}
-      onRetry={workspace.retry}
-      price={workspace.price}
-      typeName={(typeId) => catalogueTypeName(catalogue, typeId)}
-      damageProfiles={workspace.damageProfiles}
-      targetProfiles={targetProfiles}
-      overlay={overlay}
-      showDrones={dronesShown}
+    <FittingStatsColumn
+      workspace={workspace}
+      catalogue={catalogue}
       fitting={fitting}
       moduleResults={moduleResults}
-      whatToTrain={
-        <FittingWhatToTrainPanel
-          evaluator={workspace.skillGains}
-          characterId={activeCharacterId}
-          fittingName={fitting.name}
-          catalogue={catalogue}
-        />
-      }
-      yourCharacters={yourCharacters.length > 1 ? yourCharacters : undefined}
-      implants={
-        <>
-          <ImplantSetControl
-            basis={workspace.implantBasis}
-            canUseCloneBasis={workspace.canUseCloneBasis}
-            implantSet={fitting.implantSet}
-            onImplantSetChange={workspace.setImplantSet}
-            fitting={fitting}
-            profile={workspace.profile}
-          />
-          {workspace.implantBasis === 'clone' && workspace.canUseCloneBasis && (
-            // Across both columns of the stats column's controls grid.
-            <div className="col-span-2">
-              <ImplantsAssumedNote hint={t('fittings.implants.assumesNoImplantsHint')} />
-            </div>
-          )}
-        </>
-      }
-      abyssal={{
-        hullGroupId: catalogue?.types[String(fitting.shipTypeId)]?.groupID,
-        compare: workspace.compareWeather,
-      }}
-      statsWeatherTypeId={workspace.statsWeatherTypeId}
-      tacticalMode={hasModes ? <TacticalModePicker fitting={fitting} onChange={edit} /> : undefined}
-      pilot={
-        activeCharacterId === null
-          ? undefined
-          : {
-              characterName: characterName ?? null,
-              missingSkills: gaps?.missing.length,
-              skillsUnknown: gaps?.unknown === true,
-              notes:
-                showMissingSkills || showSkillsUnknown ? (
-                  <>
-                    {showMissingSkills && (
-                      <MissingSkillsChip
-                        entries={gaps.missing}
-                        characterId={activeCharacterId}
-                        fittingName={fitting.name}
-                      />
-                    )}
-                    {showSkillsUnknown && <SkillsUnknownNote />}
-                  </>
-                ) : undefined,
-            }
-      }
+      dronesShown={dronesShown}
+      gaps={gaps}
+      characterId={activeCharacterId}
+      characterName={characterName}
+      yourCharacters={yourCharacters}
+      targetProfiles={targetProfiles}
+      overlay={overlay}
+      onOpenMakeItFit={makeItFit.open}
     />
   );
 
@@ -693,75 +504,19 @@ function FittingsPage() {
         <div
           className={`mx-auto max-w-[120rem] space-y-3 ${addOpen && addMode === 'slideOut' ? 'pl-[26rem]' : ''}`}
         >
-          <FittingHeader
+          <FittingEditorHeader
+            workspace={workspace}
             fitting={fitting}
-            subtitle={subtitle}
-            onRename={workspace.rename}
-            onLibrary={openLibrary}
-            onCompare={() => {
-              // Unsaved edits against a saved Fitting: Compare opens saved vs.
-              // current rather than just the one code already in the URL.
-              if (hasUnsavedEdits && savedRecord && currentShareCode) {
-                const params = writeCompareCodes(new URLSearchParams(), [
-                  savedRecord.code,
-                  currentShareCode,
-                ]);
-                navigate(fittingCompareHref(params.toString()));
-                return;
-              }
-              navigate(fittingCompareHref(location.search));
-            }}
-            price={workspace.price}
-            cloneImplants={workspace.profile?.implantTypeIds}
-            compact={headerCompact}
             stats={stats}
+            characterId={activeCharacterId}
+            subtitle={subtitle}
+            hullName={hullName}
+            compact={headerCompact}
+            alpha={alpha}
             share={editorShare}
-            badges={{
-              alpha: { blockers: alpha.blockers, skillName: alpha.skillName },
-              mastery:
-                activeCharacterId !== null
-                  ? {
-                      hullTypeId: fitting.shipTypeId,
-                      hullName,
-                      characterId: activeCharacterId,
-                    }
-                  : null,
-            }}
-            save={
-              <FittingSaveButton
-                compact={headerCompact}
-                onSave={() => void workspace.save()}
-                canSave={workspace.canSave}
-                saveBlockedReason={
-                  activeCharacterId === null
-                    ? t('fittings.myFittings.needCharacter')
-                    : workspace.tooLargeToShare
-                      ? t('fittings.myFittings.tooLarge')
-                      : undefined
-                }
-                updating={workspace.savedId !== null}
-                onSaveAsNew={() => {
-                  setSaveAsNewName(
-                    t('fittings.myFittings.saveAsNewDefaultName', {
-                      name: savedRecord?.name ?? fitting.name,
-                    })
-                  );
-                  setSaveAsNewOpen(true);
-                }}
-                onSaveToEve={() => setSaveToEveOpen(true)}
-                canSaveToEve={activeCharacterId !== null && canSaveToEve === true && online}
-                saveToEveBlockedReason={
-                  activeCharacterId === null
-                    ? t('fittings.saveToEve.needCharacter')
-                    : !online
-                      ? t('fittings.saveToEve.needsConnection')
-                      : undefined
-                }
-                saveToEveMissingGroups={
-                  activeCharacterId !== null && canSaveToEve === false ? ['fittings'] : undefined
-                }
-              />
-            }
+            saved={saved}
+            onLibrary={openLibrary}
+            onSavedToEve={() => setInGameFittingsKey((key) => key + 1)}
           />
           {workspace.tooLargeToShare && (
             <p role="alert" className="text-xs text-warning">
@@ -779,341 +534,70 @@ function FittingsPage() {
             {charges.message}
           </p>
 
-          {viewHydrated &&
-            (addMode === 'sheet' ? (
-              <div className="space-y-3">
-                <Tabs
-                  tabsId={viewTabsId}
-                  tabs={[
-                    { id: 'ring', label: t('fittings.view.ring') },
-                    { id: 'list', label: t('fittings.view.list') },
-                    { id: 'stats', label: t('fittings.phoneTabs.stats') },
-                  ]}
-                  value={phoneTab === 'stats' ? 'stats' : view}
-                  onChange={(id) => {
-                    if (id === 'stats') {
-                      setPhoneTab('stats');
-                      return;
-                    }
-                    setPhoneTab('editor');
-                    void setView(id as FittingView);
-                  }}
-                  label={t('fittings.phoneTabs.label')}
-                />
-                <TabPanel
-                  tabsId={viewTabsId}
-                  tabId={phoneTab === 'stats' ? 'stats' : view}
-                  className="space-y-3"
-                >
-                  {phoneTab === 'stats' ? statsSections : editor}
-                </TabPanel>
-              </div>
-            ) : (
-              <div
-                // Docked: browser | Ring | stats. Otherwise the editor beside the
-                // stats when wide, but stacked while the slide-out has pushed the
-                // page aside, so the editor keeps the width rather than the stats.
-                // The Ring goes beside them from the desktop breakpoint — it is
-                // capped and square, so it fits beside 22rem of stats there (scope
-                // decision `20260925-095734`); the stats hold at 22rem until xl.
-                // The List's rows want the width, so it waits for xl. The Ring's
-                // track stops at 52rem (its 48rem ring and the panel around it);
-                // width past the caps becomes even gutters.
-                className={`grid items-start justify-center gap-3 ${
-                  addMode === 'docked'
-                    ? view === 'ring'
-                      ? 'grid-cols-[20rem_minmax(0,52rem)_minmax(22rem,26rem)]'
-                      : 'grid-cols-[20rem_minmax(0,1fr)_minmax(22rem,26rem)]'
-                    : addOpen
-                      ? 'grid-cols-1'
-                      : view === 'ring'
-                        ? 'grid-cols-1 lg:grid-cols-[minmax(0,52rem)_22rem] xl:grid-cols-[minmax(0,52rem)_minmax(22rem,28rem)]'
-                        : 'grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(22rem,28rem)]'
-                }`}
-              >
-                {addMode === 'docked' && (
-                  <Panel
-                    title={addTitle}
-                    className="sticky top-3 max-h-[calc(100vh-1.5rem)] overflow-y-auto"
-                  >
-                    {addPanel}
-                  </Panel>
-                )}
-                {/* Ring | List as the app's own tabs over the column they switch. */}
-                {/* The Ring stays in view while the tall stats column is read (lg+). The List
-                  needs the width and the stacked layout has nothing beside it. At its max
-                  height the column also clears the page's bottom padding, so at the page's
-                  end, where it rests on the grid's bottom, its top is still on screen. The
-                  Ring sizes itself to that max height (`--ring-room`). */}
-                <div
-                  data-testid="fitting-editor-column"
-                  {...{ [RING_ROOM_ATTR]: '' }}
-                  className={`min-w-0 space-y-3 ${
-                    view === 'ring' && (addMode === 'docked' || !addOpen)
-                      ? 'lg:sticky lg:top-3 lg:max-h-(--ring-room) lg:overflow-y-auto lg:[--ring-room:calc(100vh-2.5rem)]'
-                      : ''
-                  }`}
-                >
-                  <Tabs
-                    tabsId={viewTabsId}
-                    tabs={[
-                      { id: 'ring', label: t('fittings.view.ring') },
-                      { id: 'list', label: t('fittings.view.list') },
-                    ]}
-                    value={view}
-                    onChange={(id) => void setView(id as FittingView)}
-                    label={t('fittings.view.label')}
-                  />
-                  <TabPanel tabsId={viewTabsId} tabId={view} className="space-y-3">
-                    {editor}
-                  </TabPanel>
-                </div>
-                {statsSections}
-              </div>
-            ))}
-
-          <MakeItFitDialog
-            open={makeItFitOpen}
-            onClose={() => setMakeItFitOpen(false)}
-            variants={workspace.variants}
-            catalogue={catalogue}
-            placement={isPhone ? 'sheet' : 'center'}
-            onOpenList={
-              view === 'list'
-                ? undefined
-                : () => {
-                    void setView('list');
-                    setMakeItFitOpen(false);
-                  }
-            }
-            onApply={(option) => {
-              edit((f) =>
-                option.swaps.reduce(
-                  (acc, swap) => swapModuleType(acc, swap.slot, swap.slotIndex, swap.toTypeId),
-                  f
-                )
-              );
-              setMakeItFitOpen(false);
-              setSwapped(
-                option.swaps
-                  .map((swap) =>
-                    t('fittings.makeItFit.swap', {
-                      from: catalogueTypeName(catalogue, swap.fromTypeId),
-                      to: catalogueTypeName(catalogue, swap.toTypeId),
-                    })
-                  )
-                  .join('; ')
-              );
-            }}
+          <FittingEditorLayout
+            addMode={addMode}
+            addOpen={addOpen}
+            addTitle={addTitle}
+            addPanel={addPanel}
+            onCloseAdd={closeAdd}
+            viewHydrated={viewHydrated}
+            view={view}
+            onViewChange={(next) => void setView(next)}
+            editor={editor}
+            statsSections={statsSections}
           />
-          {/* No Undo here: the editor has no in-app undo, only the browser's Back (one swap is one history entry). */}
-          {swapped !== null && (
-            <Toast message={t('fittings.makeItFit.applied', { swap: swapped })} />
-          )}
-          <Modal
-            open={saveAsNewOpen}
-            onClose={() => setSaveAsNewOpen(false)}
-            title={t('fittings.myFittings.saveAsNewTitle')}
-          >
-            <form
-              className="space-y-3"
-              onSubmit={(e) => {
-                e.preventDefault();
-                const name = saveAsNewName.trim();
-                if (name === '') return;
-                void workspace.saveAsNew(name);
-                setSaveAsNewOpen(false);
-              }}
-            >
-              <label className="block text-xs text-text-dim" htmlFor="fitting-save-as-new-name">
-                {t('fittings.myFittings.saveAsNewLabel')}
-              </label>
-              <TextInput
-                id="fitting-save-as-new-name"
-                className="w-full"
-                value={saveAsNewName}
-                onChange={(e) => setSaveAsNewName(e.target.value)}
-              />
-              <div className="flex justify-end gap-2">
-                <Button onClick={() => setSaveAsNewOpen(false)}>
-                  {t('fittings.myFittings.cancel')}
-                </Button>
-                <Button type="submit" variant="primary" disabled={saveAsNewName.trim() === ''}>
-                  {t('fittings.myFittings.saveAsNewConfirm')}
-                </Button>
-              </div>
-            </form>
-          </Modal>
-          {activeCharacterId !== null && saveToEveOpen && (
-            <LazySaveToEveDialog
-              open
-              onClose={() => setSaveToEveOpen(false)}
-              characterId={activeCharacterId}
-              fitting={fitting}
-              description={savedRecord?.notes ?? ''}
-              onSaved={() => setInGameFittingsKey((key) => key + 1)}
-              onSaveToMyFittings={workspace.savedId === null ? workspace.save : undefined}
-            />
-          )}
-          <Modal
-            open={library === 'open'}
-            onClose={closeLibrary}
-            title={t('fittings.header.libraryTitle')}
-            placement={isPhone ? 'sheet' : 'wide'}
-          >
-            {library === 'open' && (
-              <FittingStartScreen
-                variant="dialog"
-                workspace={workspace}
-                catalogue={catalogue}
-                characterId={activeCharacterId}
-                inGameKey={inGameFittingsKey}
-                onOpened={closeLibrary}
-              />
-            )}
-          </Modal>
-          <NewFromHullDialog
-            open={library === 'new'}
-            onClose={closeLibrary}
-            catalogue={catalogue}
-            onStart={(hull) => {
-              startHull(hull);
-              closeLibrary();
-            }}
-            onOpenPopular={async (loaded) => {
-              await workspace.openLoaded(loaded);
-              closeLibrary();
-            }}
-          />
-          <ImportFittingDialog
-            open={library === 'import'}
+          {makeItFit.dialog}
+          <FittingLibraryDialogs
+            library={library}
             onClose={closeLibrary}
             workspace={workspace}
-            onOpened={closeLibrary}
+            catalogue={catalogue}
+            characterId={activeCharacterId}
+            inGameKey={inGameFittingsKey}
+            isPhone={isPhone}
+            onStartHull={startHull}
           />
-          <Modal
-            open={openModule !== null}
+          <FittingModuleDialog
+            module={openModule}
+            moduleIndex={openModuleIndex}
+            fallbackSlot={moduleSlot?.slot ?? 'high'}
             onClose={() => setModuleSlot(null)}
-            title={
-              openModule
-                ? catalogueTypeName(catalogue, openModule.typeId)
-                : t(`fittings.list.rack.${moduleSlot?.slot ?? 'high'}`)
-            }
             placement={isPhone ? 'sheet' : 'wide'}
-          >
-            {openModule && (
-              <div className="space-y-3">
-                <ModuleRow
-                  module={openModule}
-                  result={moduleResults?.[openModuleIndex] ?? null}
-                  cantUse={gaps?.unusableModuleKeys.has(moduleKey(openModule)) ?? false}
-                  fitting={fitting}
-                  catalogue={catalogue}
-                  context={context}
-                  edit={edit}
-                />
-                <Disclosure
-                  label={t('fittings.variations.swapTitle')}
-                  trailing={variationRows.length > 0 ? String(variationRows.length) : undefined}
-                  expanded={variationsOpen}
-                  onToggle={() => setVariationsOpen((open) => !open)}
-                  className="rounded-xs border border-line"
-                >
-                  <div className="p-2">
-                    <FittingVariationsPanel rows={variationRows} onSelect={swapVariation} />
-                  </div>
-                </Disclosure>
-                {itemActions?.canMutate(openModule.typeId) && (
-                  <Disclosure
-                    label={t('fittings.mutation.title')}
-                    expanded={mutationOpen}
-                    onToggle={() => setMutationOpen((open) => !open)}
-                    className="rounded-xs border border-line"
-                  >
-                    <div className="p-2">
-                      <FittingMutationPanel
-                        module={openModule}
-                        catalogue={catalogue}
-                        edit={edit}
-                        characterId={activeCharacterId}
-                      />
-                    </div>
-                  </Disclosure>
-                )}
-                <Disclosure
-                  label={t('fittings.affectedBy.title')}
-                  expanded={affectedOpen}
-                  onToggle={() => setAffectedOpen((open) => !open)}
-                  className="rounded-xs border border-line"
-                >
-                  <div className="p-2">
-                    {affectedOpen && (
-                      <FittingAffectedByPanel
-                        explain={workspace.explainModule}
-                        moduleIndex={openModuleIndex}
-                        typeName={typeName}
-                      />
-                    )}
-                  </div>
-                </Disclosure>
-              </div>
-            )}
-          </Modal>
+            result={moduleResults?.[openModuleIndex] ?? null}
+            cantUse={
+              openModule ? (gaps?.unusableModuleKeys.has(moduleKey(openModule)) ?? false) : false
+            }
+            fitting={fitting}
+            catalogue={catalogue}
+            context={context}
+            edit={edit}
+            variationRows={variationRows}
+            onSwapVariation={swapVariation}
+            variationsOpen={variationsOpen}
+            onToggleVariations={() => setVariationsOpen((open) => !open)}
+            mutationOpen={mutationOpen}
+            onToggleMutation={() => setMutationOpen((open) => !open)}
+            canMutate={openModule ? (itemActions?.canMutate(openModule.typeId) ?? false) : false}
+            affectedOpen={affectedOpen}
+            onToggleAffected={() => setAffectedOpen((open) => !open)}
+            explainModule={workspace.explainModule}
+            typeName={typeName}
+            characterId={activeCharacterId}
+          />
           {isPhone && (
-            <Modal
-              open={rackSheet !== null}
+            <FittingRackSheet
+              rack={rackSheet}
               onClose={() => setRackSheet(null)}
-              title={
-                rackSheet === 'drone'
-                  ? t('fittings.list.drones')
-                  : t(`fittings.list.rack.${rackSheet ?? 'high'}`)
-              }
-              placement="sheet"
-            >
-              {rackSheet === 'drone' && (
-                <DroneSection
-                  fitting={fitting}
-                  catalogue={catalogue}
-                  stats={stats}
-                  edit={edit}
-                  target={target}
-                  onSelectTarget={selectTargetFromSheet}
-                  variant="panel"
-                />
-              )}
-              {rackSheet && rackSheet !== 'drone' && (
-                <RackSlots
-                  rack={rackSheet}
-                  hideLabel
-                  fitting={fitting}
-                  catalogue={catalogue}
-                  context={context}
-                  edit={edit}
-                  stats={stats}
-                  moduleResults={moduleResults}
-                  target={target}
-                  onSelectTarget={selectTargetFromSheet}
-                  unusableModuleKeys={gaps?.unusableModuleKeys}
-                />
-              )}
-            </Modal>
-          )}
-          {addMode === 'sheet' && (
-            <Modal open={addOpen} onClose={closeAdd} placement="sheet" title={addTitle}>
-              {addPanel}
-            </Modal>
-          )}
-          {addMode === 'slideOut' && (
-            <SlideOver
-              side="left"
-              // Clears the app's 12rem nav, so it slides out where the docked column sits.
-              className="md:left-48"
-              open={addOpen}
-              onClose={closeAdd}
-              title={addTitle}
-            >
-              {addPanel}
-            </SlideOver>
+              fitting={fitting}
+              catalogue={catalogue}
+              context={context}
+              edit={edit}
+              stats={stats}
+              moduleResults={moduleResults}
+              target={target}
+              onSelectTarget={selectTargetFromSheet}
+              unusableModuleKeys={gaps?.unusableModuleKeys}
+            />
           )}
           {cargoQuantityFor !== null && (
             <CargoQuantityDialog

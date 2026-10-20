@@ -29,7 +29,7 @@ Seven runs in one day once produced two tickets and then four consecutive empty
 ones, each re-reading forum pages an earlier run had read the same afternoon.
 
 ```
-git -C <main-repo> log -1 --format=%cI origin/main -- .claude/skills/add-missing-features/TOOLS.md
+git -C <main-repo> log -1 --format=%cI origin/develop -- .claude/skills/add-missing-features/TOOLS.md
 ```
 
 - **Ledger touched within the last 5 days, and `$ARGUMENTS` is empty** → do
@@ -79,7 +79,7 @@ covers it or the confirmed absence of one.
 Check `git status -sb` for a `[behind N]` marker before trusting local
 `grep`/`ls` results. A stale local checkout has caused real "proposed a
 feature that shipped months ago" misses; if behind, verify against
-`origin/main` (`git fetch origin main`, then `git show origin/main:<path>`)
+`origin/develop` (`git fetch origin develop`, then `git show origin/develop:<path>`)
 instead of the stale working tree.
 
 ## 2. Survey the ecosystem
@@ -302,11 +302,11 @@ gh pr list --head chore/add-missing-features-ledger --state open --json number,u
 ```
 
 - **A PR is already open**: branch a sibling worktree off that branch (never
-  the main checkout), rebase onto `origin/main`, merge your curated update
+  the main checkout), rebase onto `origin/develop`, merge your curated update
   into the existing content — not a second append — commit, and push to the
   same branch. Do not open a second PR.
 - **No open PR is found**: branch a sibling worktree off current
-  `origin/main` using that same branch name, commit your update, push, and
+  `origin/develop` using that same branch name, commit your update, push, and
   open the PR with `node scripts/next-ticket/open-pr.mjs "<title>" <body-file>`
   (also arms auto-merge — see below). Both scripts are generic over any PR
   number; nothing here is `/next-ticket`-specific.

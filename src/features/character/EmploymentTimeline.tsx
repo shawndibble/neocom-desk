@@ -7,9 +7,15 @@
  * Each stint's date range shows once. On the page at `md` and up it sits in the
  * gutter beside the rail; everywhere else (a phone, and always in the modal,
  * which is too narrow for a gutter) it sits under the name.
+ *
+ * An NPC corporation stint (idle time, or a stop between player corps) draws
+ * as a slim dimmed line instead of a card: an NPC tag in place of the stint
+ * pills, and no logo or bar.
  */
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { StatChip, StatChips } from '@/components/ui';
+import { Pill } from '@/components/ui/Pill';
 import { CorporationLink } from '@/features/entities/EntityLink';
 import { cx } from '@/lib/cx';
 import { formatTenure } from '@/lib/duration';
@@ -20,13 +26,44 @@ import { monthYear } from './publicInfoStyles';
 /** A bar never shrinks below this, so a two-day stint still shows a sliver. */
 const MIN_BAR_PERCENT = 2;
 
-const PILL =
-  'inline-flex shrink-0 items-center rounded-xs border px-1.5 py-px text-[0.6875rem] leading-4 font-semibold tracking-widest whitespace-nowrap uppercase';
-const PILL_TONE = {
-  success: 'border-success/40 bg-success/10 text-success',
-  warning: 'border-warning/40 bg-warning/10 text-warning',
-  neutral: 'border-line text-text-dim',
-} as const;
+/**
+ * The stint's name and tags, then its date range under them wherever the page's
+ * gutter doesn't carry it. Shared by the card and the slim NPC line.
+ */
+function StintHeading({
+  row,
+  name,
+  current,
+  range,
+  page,
+  children,
+}: {
+  row: EmploymentHistoryRow;
+  name: string;
+  current: boolean;
+  range: string;
+  page: boolean;
+  /** Tags after CURRENT: the card's stint pills, or the NPC line's NPC tag. */
+  children: ReactNode;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="min-w-0 flex-1">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <CorporationLink id={row.corporationId} className="min-w-0 truncate text-left">
+          {name}
+        </CorporationLink>
+        {current && (
+          <Pill tone="success" className="leading-4">
+            {t('employmentHistory.current')}
+          </Pill>
+        )}
+        {children}
+      </div>
+      <div className={cx('text-xs text-text-dim', page && 'md:hidden')}>{range}</div>
+    </div>
+  );
+}
 
 export function EmploymentSummaryChips({
   summary,
@@ -135,53 +172,52 @@ export function EmploymentTimeline({
                 )}
               />
             </div>
-            <div className="mb-2.5 min-w-0 rounded-xs bg-panel-2 px-3 py-2.5">
-              <div className="flex items-center gap-3">
-                <img
-                  src={corporationLogoUrl(row.corporationId, 64)}
-                  crossOrigin="anonymous"
-                  alt=""
-                  width={32}
-                  height={32}
-                  loading="lazy"
-                  className="size-8 max-w-none shrink-0 rounded-xs border border-line"
-                />
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                    <CorporationLink id={row.corporationId} className="min-w-0 truncate text-left">
-                      {name}
-                    </CorporationLink>
-                    {current && (
-                      <span className={cx(PILL, PILL_TONE.success)}>
-                        {t('employmentHistory.current')}
-                      </span>
-                    )}
+            {row.npc ? (
+              <div className="mb-2.5 min-w-0 px-3 py-2 text-sm text-text-dim">
+                <div className="flex items-center gap-3">
+                  <StintHeading row={row} name={name} current={current} range={range} page={page}>
+                    <Pill className="leading-4">{t('employmentHistory.npc')}</Pill>
+                  </StintHeading>
+                  <span className="shrink-0 tabular-nums">{formatTenure(row.tenureSeconds)}</span>
+                </div>
+              </div>
+            ) : (
+              <div className="mb-2.5 min-w-0 rounded-xs bg-panel-2 px-3 py-2.5">
+                <div className="flex items-center gap-3">
+                  <img
+                    src={corporationLogoUrl(row.corporationId, 64)}
+                    crossOrigin="anonymous"
+                    alt=""
+                    width={32}
+                    height={32}
+                    loading="lazy"
+                    className="size-8 max-w-none shrink-0 rounded-xs border border-line"
+                  />
+                  <StintHeading row={row} name={name} current={current} range={range} page={page}>
                     {row.returned && (
-                      <span className={cx(PILL, PILL_TONE.neutral)}>
-                        {t('employmentHistory.returned')}
-                      </span>
+                      <Pill className="leading-4">{t('employmentHistory.returned')}</Pill>
                     )}
                     {row.shortStay && (
-                      <span className={cx(PILL, PILL_TONE.warning)}>
+                      <Pill tone="warning" className="leading-4">
                         {t('employmentHistory.shortStay')}
-                      </span>
+                      </Pill>
                     )}
-                  </div>
-                  <div className={cx('text-xs text-text-dim', page && 'md:hidden')}>{range}</div>
+                  </StintHeading>
+                  <span className="shrink-0 font-semibold tabular-nums">
+                    {formatTenure(row.tenureSeconds)}
+                  </span>
                 </div>
-                <span className="shrink-0 font-semibold tabular-nums">
-                  {formatTenure(row.tenureSeconds)}
-                </span>
+                <div aria-hidden className="mt-2 h-1 overflow-hidden rounded-xs bg-line">
+                  <div
+                    data-tenure-bar
+                    className="h-full rounded-xs bg-line-bright"
+                    style={{
+                      width: `${Math.max(MIN_BAR_PERCENT, Math.round(row.tenureRatio * 100))}%`,
+                    }}
+                  />
+                </div>
               </div>
-              <div aria-hidden className="mt-2 h-1 overflow-hidden rounded-xs bg-line">
-                <div
-                  className="h-full rounded-xs bg-line-bright"
-                  style={{
-                    width: `${Math.max(MIN_BAR_PERCENT, Math.round(row.tenureRatio * 100))}%`,
-                  }}
-                />
-              </div>
-            </div>
+            )}
           </li>
         );
       })}

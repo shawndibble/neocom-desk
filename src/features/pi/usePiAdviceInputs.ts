@@ -1,9 +1,16 @@
-import { useCallback, useMemo } from 'react';
+import {
+  createContext,
+  createElement,
+  useCallback,
+  useContext,
+  useMemo,
+  type ReactNode,
+} from 'react';
 import type { RebuildPreference } from '@/engine/pi/planAdvice';
 import type { RouteSystem } from '@/engine/pi/planHaul';
 import { localRoutesFromOrigin } from '@/features/route/localRoute';
 import { loadSolarSystemsById } from '@/sde/solarSystems';
-import { useJumpBasis } from '@/features/route/jumpBasis';
+import { useSharedJumpBasis } from '@/features/route/jumpBasis';
 import { useCadence } from './cadencePref';
 import { loadCommandCenterUpgrades } from './colonyBudget';
 import { useGoalPlannerPrefs } from './goalPlannerPrefs';
@@ -13,6 +20,7 @@ import type { PlanPrices } from './planPrices';
 import { loadInterplanetaryConsolidation } from './planetSlots';
 import { usePlanetRichness } from './richnessOverride';
 import { useSellHub } from './sellHub';
+import { usePiSnapshot } from './usePiSnapshot';
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 
@@ -48,6 +56,83 @@ export function usePiAdviceInputs(
   characterId: number | null,
   preference: RebuildPreference,
   reloadKey = 0
+): PiAdviceInputsState {
+  const shared = useContext(SharedAdviceInputs);
+  const served =
+    shared !== null &&
+    snapshot !== null &&
+    shared.characterId === characterId &&
+    shared.snapshot === snapshot;
+  // Always called so the hook order is stable; no snapshot loads nothing.
+  const local = useLiveAdviceInputs(served ? null : snapshot, characterId, preference, reloadKey);
+  return served ? withPreference(shared.state, preference) : local;
+}
+
+interface SharedInputs {
+  characterId: number;
+  snapshot: GoalPlannerSnapshot | null;
+  state: PiAdviceInputsState;
+}
+
+const SharedAdviceInputs = createContext<SharedInputs | null>(null);
+
+/**
+ * Reads the advice inputs once for a subtree. The PI page mounts this inside its
+ * `PiSnapshotProvider` so Plan, Map and Colonies share one prices, skills and
+ * routes load, and one model run per preference, across tab switches.
+ */
+export function PiAdviceInputsProvider({
+  characterId,
+  reloadKey = 0,
+  children,
+}: {
+  characterId: number;
+  reloadKey?: number;
+  children: ReactNode;
+}) {
+  const { snapshot } = usePiSnapshot(characterId, reloadKey);
+  const state = useLiveAdviceInputs(snapshot, characterId, 'isk', reloadKey);
+  return createElement(
+    SharedAdviceInputs.Provider,
+    { value: { characterId, snapshot, state } },
+    children
+  );
+}
+
+const byPreference = new WeakMap<PlanAdviceInput, Map<RebuildPreference, PlanAdviceInput>>();
+
+function inputFor(input: PlanAdviceInput, preference: RebuildPreference): PlanAdviceInput {
+  if (input.preference === preference) return input;
+  let variants = byPreference.get(input);
+  if (!variants) byPreference.set(input, (variants = new Map()));
+  let variant = variants.get(preference);
+  if (!variant) variants.set(preference, (variant = { ...input, preference }));
+  return variant;
+}
+
+/** The shared state re-read under another preference; the same input object per (input, preference), so the advice cache hits. */
+function withPreference(state: PiAdviceInputsState, preference: RebuildPreference) {
+  if (state.status === 'loading') return state;
+  if (state.status === 'ready') return stable(state, inputFor(state.input, preference));
+  return state.input ? stable(state, inputFor(state.input, preference)) : state;
+}
+
+const states = new WeakMap<PlanAdviceInput, PiAdviceInputsState>();
+function stable(
+  state: Exclude<PiAdviceInputsState, { status: 'loading' }>,
+  input: PlanAdviceInput
+): PiAdviceInputsState {
+  if (state.input === input) return state;
+  let hit = states.get(input);
+  if (!hit) states.set(input, (hit = { ...state, input }));
+  return hit;
+}
+
+function useLiveAdviceInputs(
+  snapshot: GoalPlannerSnapshot | null,
+  characterId: number | null,
+  preference: RebuildPreference,
+  reloadKey: number
 ): PiAdviceInputsState {
   const { hub, buybackPct } = useSellHub();
   const cadence = useCadence((state) => state.value);
@@ -85,7 +170,7 @@ export function usePiAdviceInputs(
     useKeyedLoad(characterId !== null && nowMs !== null ? String(characterId) : null, loadSkills)
       .data ?? null;
 
-  const basis = useJumpBasis();
+  const basis = useSharedJumpBasis();
   const colonies = snapshot?.colonies;
   const systemKey = useMemo(
     () =>

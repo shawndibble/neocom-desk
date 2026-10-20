@@ -9,7 +9,7 @@
  */
 
 import type { OwnedStockPlacement, OwnedStockSource } from '@/engine/industry/ownedStock';
-import { loadAllCharactersAssets } from '@/features/character/assets';
+import { loadAllCharactersAssets } from '@/features/assets/assets';
 import { loadStationName } from '@/features/character/stations';
 import { loadStructureName } from '@/features/character/structures';
 import { loadSystemName } from '@/features/character/systemSecurity';

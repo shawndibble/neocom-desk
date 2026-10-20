@@ -12,7 +12,7 @@ vi.mock('./colonyBudget', () => ({ loadCommandCenterUpgrades: vi.fn(async () => 
 vi.mock('./planetSlots', () => ({ loadInterplanetaryConsolidation: vi.fn(async () => 4) }));
 vi.mock('./planAdviceModel', () => ({ hubBooks: vi.fn(() => ({})) }));
 const BASIS = vi.hoisted(() => ({ rules: {}, network: {}, key: 'k', hydrated: true }));
-vi.mock('@/features/route/jumpBasis', () => ({ useJumpBasis: () => BASIS }));
+vi.mock('@/features/route/jumpBasis', () => ({ useSharedJumpBasis: () => BASIS }));
 let routesRead: () => Promise<{ kind: 'unknown' }> = async () => ({ kind: 'unknown' });
 vi.mock('@/features/route/localRoute', () => ({
   localRoutesFromOrigin: () => routesRead(),

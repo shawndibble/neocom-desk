@@ -3,8 +3,8 @@
 // Model: one Firebase session per app instance, uid = char:{characterId}.
 // Sync docs are per character, so the client signs in as the ACTIVE character
 // and re-authenticates on character switch (ensureSignedIn is a no-op when the
-// session already matches). Reads that only need *a* session (the public
-// snapshots) use ensureAnySession instead, so they never swap it mid-sync.
+// session already matches). Reads that only need *a* session (the lawless
+// systems list, share links) use ensureAnySession instead, so they never swap it mid-sync.
 // Cross-device: the same character always maps to the same uid, so its docs
 // converge across devices.
 //
@@ -126,7 +126,7 @@ export async function ensureSignedIn(characterId: number): Promise<string> {
 
 /**
  * Ensure *some* Character is signed in, for reads whose rule is only
- * `request.auth != null` (the public snapshots). Reuses the current session
+ * `request.auth != null` (the lawless systems list, share links). Reuses the current session
  * whoever owns it, waits out a sign-in already in progress, and signs in as
  * `fallbackCharacterId` only when neither leaves a session. It never replaces
  * an existing session, so it cannot swap one out from under a Character's

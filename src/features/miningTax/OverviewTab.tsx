@@ -34,7 +34,6 @@ import {
   CachedNotice,
 } from '@/components/ui';
 import { onReconnect } from '@/stores/network';
-import { HintText } from '@/components/ui/HintText';
 import * as Icon from '@/components/ui/icons';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
@@ -46,7 +45,7 @@ import { CharacterFilterControl } from '@/features/character/CharacterFilterCont
 import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
 import { useResolvedCharacterFilter } from '@/features/character/characterFilterValue';
 import { characterFilterParam } from '@/features/character/characterFilterUrlParam';
-import { SecurityValue } from '@/features/character/assetBrowserRows';
+import { SecurityValue } from '@/features/assets/assetBrowserRows';
 import { useUrlParam, useUrlSort } from '@/lib/useUrlState';
 import {
   loadMiningYieldSnapshot,
@@ -85,9 +84,7 @@ import {
   ShowRefiningToggle,
   ValueMenu,
 } from './OverviewSettings';
-import { basisSummary, basisUsage } from './basisLabel';
-import { countDaysBySource, weakestSource, type PriceSource } from '@/engine/miningTax/priceBasis';
-import { SOURCE_TAG_CLASS } from './priceSourceTone';
+import { basisSummary } from './basisLabel';
 import { YieldDetailModal } from './YieldDetailModal';
 import { yieldOverviewCsvColumns } from './yieldCsv';
 import { sumVolume, volumeDisplayMode } from './volume';
@@ -120,23 +117,6 @@ function dateRangeLabel(dates: readonly string[]): string {
   const first = sorted[0];
   const last = sorted[sorted.length - 1];
   return first === last ? first : `${first} – ${last}`;
-}
-
-/**
- * Saved / Daily avg / Live / No price — where a row's ore prices came from on
- * the chosen basis, with a tooltip saying what that means. `HintText`: focusable, taps reveal
- * the bubble, and the table leaves those taps from opening the row's modal.
- */
-function PriceSourceTag({ source }: { source: PriceSource }) {
-  const { t } = useTranslation();
-  return (
-    <HintText
-      content={t(`miningTax.overview.priceSourceHint.${source}`)}
-      className={`text-[0.6875rem] font-semibold tracking-widest uppercase ${SOURCE_TAG_CLASS[source]}`}
-    >
-      {t(`miningTax.overview.priceSource.${source}`)}
-    </HintText>
-  );
 }
 
 interface OverviewTabProps {
@@ -306,31 +286,14 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
     };
   }, [visibleRows, data]);
 
-  const daysBySource = useMemo(
-    () =>
-      countDaysBySource(visibleRows.map((r) => ({ date: r.entry.date, source: r.priceSource }))),
-    [visibleRows]
-  );
   const dailyRate: DailyRatePoint[] = useMemo(() => {
     const byDate = new Map<string, number>();
-    const sourcesByDate = new Map<string, PriceSource[]>();
     for (const row of visibleRows) {
       byDate.set(row.entry.date, (byDate.get(row.entry.date) ?? 0) + row.valuation.rawValue);
-      const list = sourcesByDate.get(row.entry.date) ?? [];
-      list.push(row.priceSource);
-      sourcesByDate.set(row.entry.date, list);
     }
     // Every day of the range, mined or not, so the axis spans the whole window
-    // and a gap (or days before saved history began) reads as a gap. Each bar
-    // carries its day's weakest price source, so the chart can colour it.
-    return rangeDates(range, today).map((date) => {
-      const sources = sourcesByDate.get(date);
-      return {
-        date,
-        iskValue: byDate.get(date) ?? 0,
-        source: sources ? weakestSource(sources) : null,
-      };
-    });
+    // and a gap reads as a gap.
+    return rangeDates(range, today).map((date) => ({ date, iskValue: byDate.get(date) ?? 0 }));
   }, [visibleRows, range, today]);
 
   const typeComparison: TypeComparisonPoint[] = useMemo(() => {
@@ -470,17 +433,14 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
       id: 'pricing',
       header: t('miningTax.overview.pricingColumn'),
       className: 'whitespace-nowrap',
-      render: (row) => (
-        <DataTableDenseCell>
-          <PriceSourceTag source={row.priceSource} />
-          {!row.valuation.pricedAll && (
-            <span className="text-[0.6875rem] text-warning">
-              {t('miningTax.overview.pricingPartial')}
-            </span>
-          )}
-        </DataTableDenseCell>
-      ),
-      sortValue: (row) => `${row.priceSource}:${row.valuation.pricedAll ? 1 : 0}`,
+      render: (row) =>
+        // Only a gap is worth a mark; a fully priced row says nothing.
+        !row.valuation.pricedAll && (
+          <span className="text-[0.6875rem] text-warning">
+            {t('miningTax.overview.pricingPartial')}
+          </span>
+        ),
+      sortValue: (row) => (row.valuation.pricedAll ? 1 : 0),
     },
   };
 
@@ -658,11 +618,7 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
               />
             ) : (
               <>
-                <p className="text-xs text-text-dim">
-                  {[basisSummary(t, basis, buybackRate), basisUsage(t, basis, daysBySource)]
-                    .filter(Boolean)
-                    .join(' ')}
-                </p>
+                <p className="text-xs text-text-dim">{basisSummary(t, basis, buybackRate)}</p>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                   <Panel>
                     <p className={eyebrowClassName}>{t('miningTax.overview.totalValueStat')}</p>
@@ -801,6 +757,9 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
             typeNames={data?.typeNames ?? new Map()}
             typeVolumes={data?.typeVolumes ?? new Map()}
             showRefining={refining}
+            basis={basis}
+            buybackRate={buybackRate}
+            today={today}
           />
         )}
       </TabPanel>

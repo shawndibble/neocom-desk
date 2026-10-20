@@ -13,10 +13,11 @@
  * and summing every member corp's record would cost a request per corp.
  */
 import { ExternalLink } from '@/components/ui/ExternalLink';
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useAsyncLoad } from '@/lib/useAsyncLoad';
 import { allianceLogoUrl } from '@/lib/eveImages';
-import { allianceZkillUrl, fetchAllianceStats, type PilotStatsResult } from '@/lib/zkillboard';
+import { allianceZkillUrl, fetchAllianceStats } from '@/lib/zkillboard';
 import {
   StatTiles,
   ZkillRatioMeters,
@@ -26,11 +27,7 @@ import {
 import { killFigures, type StatTileItem } from '@/features/travel/zkillFigures';
 import { corporationAge } from './corporationInfo';
 import { resolveNames } from './names';
-import {
-  loadPublicAllianceCorporations,
-  type PublicAllianceCorporations,
-  type PublicAllianceInfo,
-} from './publicInfoData';
+import { loadPublicAllianceCorporations, type PublicAllianceInfo } from './publicInfoData';
 import { CorporationEntry, PersonLink } from './PublicInfoParts';
 import { FACT_COLUMNS, fullDate, sectionHeading, termClassName } from './publicInfoStyles';
 
@@ -38,45 +35,24 @@ export interface PublicInfoAllianceTabProps {
   data: PublicAllianceInfo;
 }
 
+const NO_NAMES: ReadonlyMap<number, string> = new Map();
+
 export default function PublicInfoAllianceTab({ data }: PublicInfoAllianceTabProps) {
   const { t } = useTranslation();
   const allianceId = data.alliance_id;
   const [now] = useState(() => new Date());
-  const [stats, setStats] = useState<PilotStatsResult | null>(null);
-  const [members, setMembers] = useState<PublicAllianceCorporations | null>(null);
-  const [names, setNames] = useState<Map<number, string>>(new Map());
+  const loadStats = useCallback(() => fetchAllianceStats(allianceId), [allianceId]);
+  const loadMembers = useCallback(() => loadPublicAllianceCorporations(allianceId), [allianceId]);
+  const stats = useAsyncLoad(loadStats).data ?? null;
+  const members = useAsyncLoad(loadMembers).data ?? null;
 
   const executorId = data.executor_corporation_id;
   const nameIds = [data.creator_id, data.creator_corporation_id, executorId, data.faction_id]
     .filter((id): id is number => id !== undefined)
     .join(',');
 
-  useEffect(() => {
-    let cancelled = false;
-    void fetchAllianceStats(allianceId).then((result) => {
-      if (!cancelled) setStats(result);
-    });
-    void loadPublicAllianceCorporations(allianceId)
-      .then((result) => {
-        if (!cancelled) setMembers(result);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [allianceId]);
-
-  useEffect(() => {
-    let cancelled = false;
-    void resolveNames(nameIds.split(',').map(Number))
-      .then((resolved) => {
-        if (!cancelled) setNames(resolved);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [nameIds]);
+  const loadNames = useCallback(() => resolveNames(nameIds.split(',').map(Number)), [nameIds]);
+  const names = useAsyncLoad(loadNames).data ?? NO_NAMES;
 
   const name = (id: number) => names.get(id) ?? null;
   const age = corporationAge(data.date_founded, now);

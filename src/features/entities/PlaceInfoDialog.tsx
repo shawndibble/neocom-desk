@@ -7,11 +7,12 @@
  * Character; one it cannot dock at has no name or system for it, and says so.
  * A solar system is not a target: systems open Route Safety (§6c).
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import { EmptyState, Modal, Spinner } from '@/components/ui';
 import { loadSystemName } from '@/features/character/systemSecurity';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { SetDestinationButton } from '@/features/market/SetDestinationButton';
 import {
   classifyPlaceInfoId,
@@ -28,21 +29,10 @@ function useLookup<T>(
   id: number | null | undefined,
   load: (id: number) => Promise<T | null>
 ): T | null | undefined {
-  const [state, setState] = useState<{ id: number; value: T | null } | null>(null);
-  useEffect(() => {
-    if (id == null) return;
-    let cancelled = false;
-    void load(id)
-      .catch(() => null)
-      .then((value) => {
-        if (!cancelled) setState({ id, value });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [id, load]);
+  const loader = useCallback(() => load(id ?? 0).catch(() => null), [id, load]);
+  const { status, data } = useKeyedLoad(id == null ? null : String(id), loader);
   if (id == null) return id;
-  return state?.id === id ? state.value : undefined;
+  return status === 'ready' ? data : undefined;
 }
 
 export function PlaceInfoDialog({ id, onClose }: { id: number; onClose: () => void }) {

@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { BoardStructureSource } from '@/engine/corp/board';
 import { visibleColumns } from '../tableModel';
 import { buildView } from './models';
-import { elapsedShare, FUEL_BAR_HORIZON_MS, shortStructureName } from './worldModels';
+import { elapsedShare } from './industryModels';
+import { FUEL_BAR_HORIZON_MS, shortStructureName } from './structureModels';
 import type { BuildContext, FeedState, Feeds, KindView, TableCell } from './types';
 
 const NOW = Date.parse('2026-10-11T12:00:00Z');

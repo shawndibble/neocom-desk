@@ -7,17 +7,15 @@
  * `PI_SHOTS=<dir>` also writes full-page screenshots there, for the side by
  * side with `docs/design/pi-tabs/ref/`.
  */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { SCOPES } from './support/fixtureData';
 import { mockPlannerColonies, withVariants, type Colony } from './support/piColonies';
+import { expectNoPageOverflow } from './support/overflow';
+import { mockHubPrices } from './support/piPrices';
 
 type ColonyVariants = Record<number, Partial<Colony>>;
-import { piTier } from '../src/engine/pi/chain';
-import type { PiData } from '../src/sde/types';
 
 const PHONE = { width: 390, height: 844 };
 const DESKTOP = { width: 1440, height: 900 };
@@ -32,30 +30,6 @@ const DAILY: ColonyVariants = {
   [JITA_IV]: { expiresInHours: -3, installedHoursAgo: 75 },
   [JITA_V]: { idleBasics: 2 },
 };
-
-const pi = JSON.parse(
-  readFileSync(resolve(process.cwd(), 'public/data/pi.json'), 'utf8')
-) as PiData;
-const UNIT_PRICE = [5, 760, 14_000, 100_000, 1_900_000];
-
-async function mockHubPrices(page: Page): Promise<void> {
-  await page.route('https://market.fuzzwork.co.uk/**', async (route) => {
-    const types = new URL(route.request().url()).searchParams.get('types') ?? '';
-    const body: Record<string, unknown> = {};
-    for (const raw of types.split(',').filter(Boolean)) {
-      const sell = UNIT_PRICE[piTier(Number(raw), pi)];
-      body[raw] = {
-        buy: { max: sell * 0.95, volume: 500_000, orderCount: 40 },
-        sell: { min: sell, volume: 500_000, orderCount: 40 },
-      };
-    }
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify(body),
-    });
-  });
-}
 
 async function openColonies(page: Page, variants: ColonyVariants = DAILY): Promise<void> {
   await signInAndGoto(page, './planetary-industry/colonies');
@@ -72,14 +46,6 @@ async function openColonies(page: Page, variants: ColonyVariants = DAILY): Promi
 async function shot(page: Page, name: string): Promise<void> {
   const dir = process.env.PI_SHOTS;
   if (dir) await page.screenshot({ path: `${dir}/${name}.png`, fullPage: true });
-}
-
-async function assertNoOverflow(page: Page): Promise<void> {
-  const doc = await page.evaluate(() => ({
-    scrollWidth: document.documentElement.scrollWidth,
-    clientWidth: document.documentElement.clientWidth,
-  }));
-  expect(doc.scrollWidth).toBeLessThanOrEqual(doc.clientWidth);
 }
 
 test.describe('PI Colonies, the daily check', () => {
@@ -140,7 +106,7 @@ test.describe('PI Colonies, the daily check', () => {
   test('lays out at 390px without a sideways scroll, with 44px controls', async ({ page }) => {
     await page.setViewportSize(PHONE);
     await openColonies(page);
-    await assertNoOverflow(page);
+    await expectNoPageOverflow(page);
 
     const row = page.locator('[data-colony-status]').first();
     for (const control of [
@@ -154,7 +120,7 @@ test.describe('PI Colonies, the daily check', () => {
     }
     await shot(page, 'colonies-phone');
     await row.getByRole('button', { name: /^Show details for / }).click();
-    await assertNoOverflow(page);
+    await expectNoPageOverflow(page);
     await shot(page, 'colonies-expanded-phone');
   });
 
@@ -267,7 +233,7 @@ test.describe('PI Colonies, the daily check', () => {
     await expect(group.getByText('not in your plan')).toBeVisible();
     await shot(page, 'colonies-alts-desk');
     await page.setViewportSize(PHONE);
-    await assertNoOverflow(page);
+    await expectNoPageOverflow(page);
     await shot(page, 'colonies-alts-phone');
   });
 

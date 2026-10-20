@@ -543,7 +543,7 @@ const GRACE = Symbol('grace');
  *   this only reaches keys on the default window: `isRefreshInvalidated`
  *   deliberately exempts longer ones, so a Refresh does not force a
  *   `Published Snapshot` live — there is nothing newer to fetch until the
- *   backend republishes, and `chunkedSnapshot.ts` documents that trade.
+ *   backend republishes, and `r2Snapshot.ts` documents that trade.
  * - **Keys whose window is longer than the default but shorter than a day.**
  *   Neither a constant nor on the default cadence, so neither substitution
  *   applies. A key whose long window is a *publish cadence* rather than a

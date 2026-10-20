@@ -7,24 +7,7 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
-
-async function answerAnyType(page: Page) {
-  await page.route(/\/universe\/types\/\d+$/, async (route) => {
-    const typeId = Number(/\/universe\/types\/(\d+)$/.exec(route.request().url())![1]);
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        type_id: typeId,
-        name: `Type ${typeId}`,
-        description: '',
-        group_id: 46,
-        published: true,
-        dogma_attributes: [],
-      }),
-    });
-  });
-}
+import { answerAnyType } from './support/universeTypes';
 
 async function openRifter(page: Page) {
   const newFromHull = page.getByRole('button', { name: 'New from hull' });
@@ -142,8 +125,10 @@ test.describe('Ring tab on the phone', () => {
     expect(pgBox!.y).toBeLessThan(rackBox!.y);
     expect(cpuBox!.x + cpuBox!.width).toBeLessThanOrEqual(pgBox!.x + 0.5);
     expect(pgBox!.x + pgBox!.width).toBeLessThanOrEqual(390);
-    // Under budget: no Make it fit.
-    await expect(page.getByRole('button', { name: /make it fit/i })).toHaveCount(0);
+    // Under budget: no Fix link.
+    await expect(
+      page.getByRole('button', { name: /^Fix (CPU|powergrid|calibration)$/ })
+    ).toHaveCount(0);
     await expectNoHorizontalOverflow(page);
   });
 });
