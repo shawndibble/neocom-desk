@@ -1,17 +1,24 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Panel } from '@/components/ui';
+import { beginFeederGrantLogin } from '@/app/loginFlow';
+import { Button, LoadFailedState, Spinner } from '@/components/ui';
 import { formatIsk } from '@/lib/isk';
 import { leaveFeeder, type FeederStatus } from '../taxBook/feederClient';
+import { RECONNECT_CODE, requestFeederRate } from '../taxBook/feederViewClient';
+import { isStale } from '../taxBook/feederViewModel';
 import { DialogShell } from './BookDialogs';
+import { MoonOwnerView } from './MoonOwnerView';
+import { OwnerStaleBanner } from './OwnerStaleBanner';
+import { useFeederView } from './useFeederView';
 
 type Owner = Extract<FeederStatus, { status: 'feeder' }>;
 
 /**
- * A moon owner's Moons page once an accounting corporation handles its tax: what
- * it reads, whether the first sync has landed, the rate, and Leave. A member who
- * is not an officer of the corporation never reaches this (the status read is
- * refused). Leave shows what is still owed before it revokes anything.
+ * A moon owner's Moons page once an accounting corporation handles its tax:
+ * the owner page (statement, who mined, payments and rate) from the server-built
+ * view, the stale-ledger banner with Reconnect, and Leave. A member who is not
+ * an officer of the corporation never reaches this (the status read is refused).
+ * Leave shows what is still owed before it revokes anything.
  */
 export function MoonOwnerPanel({
   owner,
@@ -27,42 +34,63 @@ export function MoonOwnerPanel({
   onLeft: () => void;
 }) {
   const { t } = useTranslation();
+  const { load, reload } = useFeederView(characterId, corporationId);
   const [leaving, setLeaving] = useState(false);
   const [owed, setOwed] = useState<number | null>(owner.owedIsk);
+  const [reconnectError, setReconnectError] = useState<string | null>(null);
   const name = owner.collectorName ?? t('corpTaxBook.moons.owner.anonymous');
-  const rate = owner.effectiveRatePct ?? owner.requestedRatePct;
+
+  const reconnect = () => {
+    setReconnectError(null);
+    beginFeederGrantLogin(characterId, RECONNECT_CODE).catch((e: unknown) =>
+      setReconnectError(e instanceof Error ? e.message : String(e))
+    );
+  };
+
+  let body;
+  if (load.state === 'loading')
+    body = (
+      <div className="flex justify-center p-8">
+        <Spinner label={t('common.loading')} />
+      </div>
+    );
+  else if (load.state === 'failed')
+    body = (
+      <LoadFailedState title={t('corpTaxBook.moons.failed')} hint={load.message} onRetry={reload} />
+    );
+  else if (load.view === null)
+    body = (
+      <p className="text-center text-sm text-text-dim">{t('corpTaxBook.moons.owner.waiting')}</p>
+    );
+  else {
+    const { view, access } = load;
+    body = (
+      <MoonOwnerView
+        view={view}
+        names={load.names}
+        canEdit={access.canEdit}
+        onRequestRate={async (pct) => {
+          await requestFeederRate(characterId, corporationId, pct);
+          reload();
+        }}
+        banner={
+          isStale(view.summary) && view.summary.staleSince !== null ? (
+            <>
+              <OwnerStaleBanner since={view.summary.staleSince} onReconnect={reconnect} />
+              {reconnectError && (
+                <p role="alert" className="text-xs text-danger">
+                  {reconnectError}
+                </p>
+              )}
+            </>
+          ) : undefined
+        }
+      />
+    );
+  }
   return (
-    <div className="mx-auto max-w-2xl space-y-4">
-      <Panel title={t('corpTaxBook.moons.owner.title', { name })}>
-        <div className="space-y-3 p-3 text-sm">
-          <p>
-            {owner.lastReadWellAt === null
-              ? t('corpTaxBook.moons.owner.waiting')
-              : t('corpTaxBook.moons.owner.synced', {
-                  date: new Date(owner.lastReadWellAt).toISOString().slice(0, 10),
-                })}
-          </p>
-          <p className="text-text-dim">
-            {rate === null
-              ? t('corpTaxBook.moons.owner.noRate')
-              : t('corpTaxBook.moons.owner.rate', { pct: rate })}
-          </p>
-          {owner.refineries.length === 0 ? (
-            <p className="text-text-dim">{t('corpTaxBook.moons.owner.noMining')}</p>
-          ) : (
-            <ul className="divide-y divide-line">
-              {owner.refineries.map((r) => (
-                <li key={r.structureId} className="flex justify-between py-1">
-                  <span>{r.label ?? `#${r.structureId}`}</span>
-                  <span className="tabular-nums">
-                    {t('corpTaxBook.moons.owner.volume', { volume: formatIsk(r.volume) })}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </Panel>
+    <div className="mx-auto max-w-5xl space-y-4">
+      {body}
       {canLeave && (
         <div>
           <Button variant="danger" size="sm" onClick={() => setLeaving(true)}>

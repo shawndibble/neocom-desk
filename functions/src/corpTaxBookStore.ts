@@ -73,11 +73,16 @@ import {
 import { ROLES_SCOPE, type IdentityReader } from './corpTaxBookEsi.js';
 import { characterIdForUid, type EveTokenClaims } from './verifyEveToken.js';
 
+/** One type's parsed R2 `open-prices/<typeId>.json` object, or null when R2 has none. Throws on a failed read. */
+export type OpenPricesReader = (typeId: number) => Promise<unknown | null>;
+
 export interface BookDeps {
   db: Firestore;
   now: () => number;
   verifyToken: (accessToken: string) => Promise<EveTokenClaims>;
   readIdentity: IdentityReader;
+  /** Prices the feeder view (issue #4512); absent in tests that never rebuild one. */
+  openPrices?: OpenPricesReader;
 }
 
 /** Who is calling: the Firebase uid `char:{id}` and the ownerHash claim. */
