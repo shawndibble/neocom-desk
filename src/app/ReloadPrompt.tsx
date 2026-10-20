@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { getServiceWorkerRegistration } from '@/lib/serviceWorker';
+import { watchRegistration } from './updateAvailable';
 import { isPublicRoute } from './routerPath';
 
 // Checking is cheap, so check often: a build found here is applied by the next
@@ -46,6 +47,7 @@ function RegisteredReloadPrompt() {
     onRegisteredSW(_swUrl, registration) {
       if (!registration) return;
       registrationRef.current = registration;
+      watchRegistration(registration);
       if (pollingRegistrations.has(registration)) return;
       pollingRegistrations.add(registration);
       setInterval(() => void checkForUpdate(registration), UPDATE_CHECK_INTERVAL_MS);

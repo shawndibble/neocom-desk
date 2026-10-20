@@ -199,7 +199,7 @@ describe('FaqPanel — What We Store', () => {
     expect(
       screen.getByText(/Delete all data deletes every character's synced data/)
     ).toBeInTheDocument();
-    expect(screen.getByText(/press Update app/)).toBeInTheDocument();
+    expect(screen.getByText(/press Update now/)).toBeInTheDocument();
     expect(
       screen.getByText(
         /Alerts whose time is known ahead.*a contract about to expire.*Community alerts, needs the app open/

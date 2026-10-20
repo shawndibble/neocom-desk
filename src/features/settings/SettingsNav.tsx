@@ -11,7 +11,9 @@ import {
   rowInteractiveClassName,
 } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
-import { UpdateButton } from './UpdateButton';
+import { Button, LiveStatus } from '@/components/ui';
+import { ActionResult } from './settingsFields';
+import { useApplyUpdate, useUpdateStatusLine } from './useUpdateState';
 import type { SettingsGroup, SettingsSectionId } from './sections';
 
 const LABEL_KEYS = new Map<string, string>(SETTINGS_TABS.tabs.map((tab) => [tab.id, tab.labelKey]));
@@ -29,6 +31,7 @@ interface SettingsNavProps {
  */
 export function SettingsNav({ groups, value }: SettingsNavProps) {
   const { t } = useTranslation();
+  const updateAvailable = useUpdateStatusLine().status === 'available';
 
   return (
     <nav
@@ -61,6 +64,13 @@ export function SettingsNav({ groups, value }: SettingsNavProps) {
                     )}
                   >
                     {t(LABEL_KEYS.get(id) ?? id)}
+                    {id === 'app' && updateAvailable && (
+                      <span
+                        role="img"
+                        aria-label={t('settings.update.available')}
+                        className="ml-1.5 inline-block size-1.5 rounded-full bg-accent align-middle"
+                      />
+                    )}
                   </Link>
                 </li>
               );
@@ -68,9 +78,6 @@ export function SettingsNav({ groups, value }: SettingsNavProps) {
           </ul>
         </div>
       ))}
-      <div className="flex flex-col items-start gap-1 px-2 pt-1">
-        <UpdateButton />
-      </div>
     </nav>
   );
 }
@@ -88,6 +95,8 @@ interface SettingsIndexProps {
  */
 export function SettingsIndex({ groups, summaries }: SettingsIndexProps) {
   const { t } = useTranslation();
+  const { status, line } = useUpdateStatusLine();
+  const { updating, failed, update } = useApplyUpdate();
 
   return (
     <nav aria-label={t('settings.navLabel')} className="space-y-4">
@@ -98,38 +107,67 @@ export function SettingsIndex({ groups, summaries }: SettingsIndexProps) {
           </h2>
           <ul className="divide-y divide-line border border-line bg-panel">
             {group.sections.map((id) => {
-              const summary = summaries[id];
+              const isApp = id === 'app';
+              const highlighted = isApp && status === 'available';
+              const summary = isApp ? line : summaries[id];
               return (
-                <li key={id}>
-                  <Link
-                    to={tabPath(SETTINGS_TABS, id)}
-                    className={cx(
-                      'group flex min-h-11 items-center justify-between gap-3 px-3 py-2 text-sm',
-                      rowInteractiveClassName,
-                      focusRingInsetClassName
-                    )}
-                  >
-                    <span className="min-w-0">
-                      <span className="block text-text">{t(LABEL_KEYS.get(id) ?? id)}</span>
-                      {summary && (
-                        <span className="block truncate text-xs text-text-dim">{summary}</span>
+                <li
+                  key={id}
+                  className={highlighted ? 'border-l-2 border-accent bg-accent/10' : undefined}
+                >
+                  {isApp && <LiveStatus>{line}</LiveStatus>}
+                  <div className="flex items-center">
+                    <Link
+                      to={tabPath(SETTINGS_TABS, id)}
+                      className={cx(
+                        'group flex min-h-11 min-w-0 flex-1 items-center justify-between gap-3 px-3 py-2 text-sm',
+                        rowInteractiveClassName,
+                        focusRingInsetClassName
                       )}
-                    </span>
-                    <Icon.Descend
-                      size={Icon.ICON_SIZE.sm}
-                      aria-hidden="true"
-                      className="shrink-0 text-text-faint group-hover:text-accent group-focus-visible:text-accent"
-                    />
-                  </Link>
+                    >
+                      <span className="min-w-0">
+                        <span className="block text-text">{t(LABEL_KEYS.get(id) ?? id)}</span>
+                        {(summary || isApp) && (
+                          <span
+                            className={cx(
+                              'block truncate text-xs',
+                              isApp && 'min-h-4',
+                              highlighted ? 'text-accent' : 'text-text-dim'
+                            )}
+                          >
+                            {summary}
+                          </span>
+                        )}
+                      </span>
+                      <Icon.Descend
+                        size={Icon.ICON_SIZE.sm}
+                        aria-hidden="true"
+                        className="shrink-0 text-text-faint group-hover:text-accent group-focus-visible:text-accent"
+                      />
+                    </Link>
+                    {highlighted && (
+                      <Button
+                        size="md"
+                        variant="accent"
+                        className="mr-2 shrink-0"
+                        loading={updating}
+                        onClick={update}
+                      >
+                        {t('settings.updateAction')}
+                      </Button>
+                    )}
+                  </div>
+                  {isApp && failed && (
+                    <div className="px-3 pb-2">
+                      <ActionResult kind="error">{t('settings.updateFailed')}</ActionResult>
+                    </div>
+                  )}
                 </li>
               );
             })}
           </ul>
         </section>
       ))}
-      <div className="flex flex-col items-start gap-1 px-1">
-        <UpdateButton />
-      </div>
     </nav>
   );
 }

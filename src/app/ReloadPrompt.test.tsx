@@ -3,11 +3,13 @@ import { act, render } from '@testing-library/react';
 import { useEffect } from 'react';
 import { MemoryRouter, useNavigate, type NavigateFunction } from 'react-router-dom';
 import '@/i18n';
+import { watchRegistration } from './updateAvailable';
 import { ReloadPrompt } from './ReloadPrompt';
 
 const { existingWorker } = vi.hoisted(() => ({
   existingWorker: { current: undefined as unknown },
 }));
+vi.mock('./updateAvailable', () => ({ watchRegistration: vi.fn() }));
 vi.mock('@/lib/serviceWorker', () => ({
   getServiceWorkerRegistration: () => Promise.resolve(existingWorker.current),
 }));
@@ -216,6 +218,11 @@ describe('ReloadPrompt', () => {
 
       expect(fetch).not.toHaveBeenCalled();
       expect(update).not.toHaveBeenCalled();
+    });
+
+    it('hands the registration to the update-state watcher', () => {
+      const registration = setup();
+      expect(watchRegistration).toHaveBeenCalledWith(registration);
     });
 
     it('survives a failed update check and still checks again next tick', async () => {
