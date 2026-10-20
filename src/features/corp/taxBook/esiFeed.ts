@@ -94,7 +94,8 @@ export async function loadObserverFeed(
     const rows = observedRowsFromLedger(
       observer.observer_id,
       ledger.cached.data,
-      ledger.cached.fetchedAt.toISOString()
+      ledger.cached.fetchedAt.toISOString(),
+      corporationId
     );
     const systemId = await loadStructureSystemId(characterId, observer.observer_id).catch(
       () => null

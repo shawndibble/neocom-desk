@@ -19,6 +19,7 @@ here — they go one per file in `docs/context/decisions/`.
 - **Acquisition Verdict**: Whether a Build Plan's product costs less to build
   than to buy outright at the trade hub. A personal-use comparison — no
   sales tax or broker fee applies, because nothing is being sold.
+- **Agreed rate**: What the **Collector** set as a **Feeder**'s **Owner rate**. When one exists it wins over the **Requested rate**. Player-facing: "your rate" or "their rate".
 - **Alert**: One fired Notification Event as it appears in the Notification
   Feed and in the bell panel, grouped by _type_ (the EVE notification type, or
   the event id otherwise). A danger type nobody has acknowledged also raises
@@ -34,8 +35,16 @@ here — they go one per file in `docs/context/decisions/`.
   worth", Compare answers "which of these is cheaper". Its "Compare hubs"
   section prices the same pile at all 5 Trade Hubs ("where is it worth the
   most") and is not the **Compare** drawer.
+- **Collector**: A corporation whose **Corp Tax Book** also collects moon mining tax for moons it does not own, billing the miners and accounting to each **Feeder**. Dev term: to a moon owner it is "the accounting corporation".
+- **Disconnected**: A **Feeder**'s status after 30 days of a stale grant. Player-facing: "Disconnected".
+- **Feeder**: A moon-owning corporation whose mining ledger a **Collector** reads. Dev term: player-facing, "moon owner".
+- **Feeder view**: What a **Feeder** sees of the **Collector**'s book: its own mined volume, rate, amount due and payouts, never the miner debts, **Miner rate** or margin. Player-facing: the moon owner's page.
+- **Miner rate**: What miners pay in a **Collector**'s book, with a per-**Feeder** tier in its chain. Never shown to a **Feeder**. Player-facing: "miner rate".
 - **Omega coverage**: Overview widget: how many Omega subscriptions ("accounts") a pilot's net ISK income per rolling 7, 30 or 90 days (the widget range; 30 by default) could pay for, at PLEX's price, against one account's cost for that window. Its "accounts" are EVE subscriptions counted from ISK, not the **Account** UI grouping of Characters.
 - **Open in EVE**: A button or menu item that asks the running EVE client to open a window (the information window for a character, corporation or alliance; an item's market window; or a contract) through `esi-ui.open_window.v1`. A write only in that it reaches the game: nothing in EVE changes. Its own default-on **Permission**, "Open in EVE".
+- **Owner rate**: What a **Feeder** is owed, kept as its own effective-dated history: the **Agreed rate** if one exists, else the **Requested rate**. Player-facing: "their rate" or "your rate".
+- **Payout**: ISK a **Collector** sent a **Feeder** for what it is owed. Distinct from a **Tax Payment**. Player-facing: "payment".
+- **Pending removal**: A **Collector**-started removal of a **Feeder** while it waits out its 24 hours. Player-facing: "Removal pending".
 - **Price Percent**: The fraction of market an **Appraisal** is quoted at —
   100 is the order book untouched, and a buyer quoting loot pays some fraction
   of it.
@@ -363,6 +372,8 @@ here — they go one per file in `docs/context/decisions/`.
   **Appraisal**, which reads it for what the loadout costs to buy.
 - **Fitting**: One ship hull plus everything loaded into it — modules, charges, drones, fighters, cargo — under a name. Its numbers are worked out for the active Character's skills, so switching Character re-states the same Fitting for the new pilot. The implants and combat boosters in play are the set the Fitting itself carries when it carries one, and that Character's own clone otherwise. The exception is a **Fitting Share Code** or **Share Link** opened with nobody logged in, which is stated at every skill level V. Distinct from an **In-game Fitting**, which is a Fitting as the game itself stores it on a Character, and from **Fit Import**, which turns fit text into Build Plans.
 - **Fleet boosts**: The Fittings stats section for what a command ship gives its fleet — each running command or mining foreman burst and an industrial core's compression. Only shown on a fit that has one. Distinct from **Support out**, which is what a fit's modules do to another ship (remote repair, webs, ewar), and from **Projected effects**, which is what other ships do to this one.
+- **Requested rate**: The **Owner rate** a **Feeder** asks for, which stands only until the **Collector** sets an **Agreed rate**. Player-facing: "you asked for 6%".
+- **Settled otherwise**: A **Feeder** mode in which it is compensated another way, such as fuel or rock access: nothing is due and no balance is kept. Player-facing: "Settled otherwise".
 - **Skill Comparison**: The drawer over Skills › Trained that sets several **Character**s' trained skills against one **Baseline Character**, skill by skill, with saved selections. Opened by "Compare with…"; not a page or a tab. Distinct from Market **Compare**, Appraisal's **Compare hubs**, **Fitting Compare** and **Build Plan Compare**: it shares nothing with them.
 - **Baseline Character**: The **Character** in a **Skill Comparison** every other column is measured against (`+2`, `−3`, `missing`). Defaults to the active Character; any selected Character can be set as it.
 - **Fitting Compare**: The Ships section's page showing up to three **Fitting**s side by side, their stats worked out for the active Character's skills. The whole comparison lives in the URL as **Fitting Share Code**s. Distinct from Market **Compare** / **Compare Set**, Appraisal's **Compare hubs**, and **Build Plan Compare**: it shares nothing with them.

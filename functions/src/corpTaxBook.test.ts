@@ -154,6 +154,12 @@ describe('parsers', () => {
     expect(kept).toMatchObject({ solarSystemId: 30003838, moonId: 40000001 });
     const [bare] = parseSyncInput({ corporationId: 9, observed: [row] }, now).observed;
     expect('solarSystemId' in bare).toBe(false);
+    expect('sourceCorporationId' in bare).toBe(false);
+    const [fed] = parseSyncInput(
+      { corporationId: 9, observed: [{ ...row, sourceCorporationId: 98000002 }] },
+      now
+    ).observed;
+    expect(fed.sourceCorporationId).toBe(98000002);
     expect(() =>
       parseSyncInput({ corporationId: 9, observed: [{ ...row, solarSystemId: 5 }] }, now)
     ).toThrow();

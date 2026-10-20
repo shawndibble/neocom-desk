@@ -61,6 +61,20 @@ describe('functions mirror of the Corp Tax Book engine', () => {
     expect(mirror.observedRowKey(existing[0])).toBe(observedRowKey(existing[0]));
   });
 
+  it('keeps two refineries in one system on one day apart, and a source corporation intact', () => {
+    const a = row(10, '2026-07-12T10:00:00Z', {
+      structureId: 1,
+      solarSystemId: 30000142,
+      sourceCorporationId: 5,
+    });
+    const b = row(10, '2026-07-12T10:00:00Z', { structureId: 2, solarSystemId: 30000142 });
+    const merged = mirror.mergeObservedRows([], [a, b]);
+    expect(merged).toEqual(mergeObservedRows([], [a, b]));
+    expect(merged.rows).toHaveLength(2);
+    expect(mirror.observedRowKey(a)).not.toBe(mirror.observedRowKey(b));
+    expect(merged.rows.find((r) => r.structureId === 1)?.sourceCorporationId).toBe(5);
+  });
+
   it('agrees on dates and rate rules', () => {
     expect(mirror.isRetroactiveRate('2026-07-11', '2026-07-12')).toBe(
       isRetroactiveRate('2026-07-11', '2026-07-12')

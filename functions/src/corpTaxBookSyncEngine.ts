@@ -32,7 +32,8 @@ export interface LedgerRowLike {
 export function observedRowsFromLedger(
   structureId: number,
   rows: readonly LedgerRowLike[],
-  cachedAt: string
+  cachedAt: string,
+  sourceCorporationId?: number
 ): ObservedRow[] {
   return rows
     .filter(
@@ -46,6 +47,7 @@ export function observedRowsFromLedger(
       date: r.last_updated,
       quantity: r.quantity,
       cachedAt,
+      ...(sourceCorporationId !== undefined ? { sourceCorporationId } : {}),
     }));
 }
 
