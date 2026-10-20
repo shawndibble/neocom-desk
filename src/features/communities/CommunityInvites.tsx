@@ -74,7 +74,7 @@ export function CommunityInvites({
           <>
             <p className="text-xs text-text-dim">{t('communities.inviteHint')}</p>
             <div className="flex flex-wrap items-center gap-2">
-              <code className="min-w-0 flex-1 truncate rounded bg-surface-2 px-2 py-1 text-xs">
+              <code className="min-w-0 flex-1 truncate rounded-xs bg-panel-2 px-2 py-1 text-xs">
                 {inviteUrl}
               </code>
               <Button

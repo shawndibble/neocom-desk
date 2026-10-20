@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cx } from '@/lib/cx';
 import { Tooltip } from '@/components/ui';
+import { Pill } from '@/components/ui/Pill';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { useOnline } from '@/stores/network';
 import type { BpcSearchRow } from '@/engine/contracts/bpcSearch';
@@ -60,9 +61,7 @@ export function CommunityOfferCell({
             names: row.communities.map((c) => c.name).join(', '),
           })}
         </span>
-        {row.stale && (
-          <span className="rounded bg-surface-2 px-1.5 py-0.5">{t('communities.staleBadge')}</span>
-        )}
+        {row.stale && <Pill>{t('communities.staleBadge')}</Pill>}
       </span>
     </span>
   );
