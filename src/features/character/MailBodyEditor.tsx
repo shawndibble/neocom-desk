@@ -1,7 +1,7 @@
 import { lazy, Suspense, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Spinner } from '@/components/ui';
 import { guarded } from '@/app/routeChunks';
+import { Spinner } from '@/components/ui';
 
 /**
  * The seam between the New Mail composer and whatever edits its body. The

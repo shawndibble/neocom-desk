@@ -1,7 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '@/db';
 import { guarded } from '@/app/routeChunks';
+import { db } from '@/db';
 
 const MailQueueHost = lazy(() => guarded(() => import('./MailQueueHost')));
 

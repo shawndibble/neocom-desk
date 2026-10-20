@@ -9,7 +9,7 @@
  * command palette, the `a` shortcut, a push-notification click and the old
  * card links all land on a page with the panel already open.
  */
-import { lazy, Suspense, useCallback, useMemo, useState, type ReactNode } from 'react';
+import { Suspense, useCallback, useMemo, useState, type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
   AlertsPanelContext,
@@ -19,12 +19,11 @@ import {
 import { useUrlParams } from '@/lib/useUrlState';
 import { boolParam } from '@/lib/urlState';
 import { ALERTS_PANEL_PATH } from './alertsPanelPath';
+import { lazyNamed } from '@/app/lazyNamed';
 
 // Deferred: the panel pulls in the feed-sync write path, and nothing needs it
 // until a bell is pressed.
-const AlertsPanel = lazy(() =>
-  import('./AlertsPanel').then((module) => ({ default: module.AlertsPanel }))
-);
+const AlertsPanel = lazyNamed(() => import('./AlertsPanel'), 'AlertsPanel');
 
 const PARAMS = { alerts: boolParam() };
 
