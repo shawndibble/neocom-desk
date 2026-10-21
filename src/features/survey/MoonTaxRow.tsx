@@ -18,7 +18,7 @@
  * name and rate is also stored on the survey (`setSurveyTax`), so everyone with
  * the link sees it.
  */
-import { useCallback, useEffect, useId, useRef, useState, type FocusEvent } from 'react';
+import { useEffect, useId, useRef, useState, type FocusEvent, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -26,6 +26,7 @@ import { Button, TextInput, Toast } from '@/components/ui';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import type { SurveyConnection } from '@/engine/miningTax/surveyConnection';
 import { eveWhen } from '@/lib/eveTime';
+import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { InfoRow } from './InfoRow';
 import { blockedButtonClassName, blockedReasonClassName } from './blockedActionStyles';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -58,12 +59,12 @@ function ConnectedNote({
   connection,
   nowMs,
   onStop,
-  stopRef,
+  stopId,
 }: {
   connection: SurveyConnection;
   nowMs: number;
   onStop: () => void;
-  stopRef: (el: HTMLButtonElement | null) => void;
+  stopId: string;
 }) {
   const { t } = useTranslation();
   return (
@@ -79,7 +80,7 @@ function ConnectedNote({
       <Link to={MINING_TAX_HREF} className={inlineLinkClassName}>
         {t('survey.moonTax.openTax')}
       </Link>
-      <Button ref={stopRef} size="sm" variant="ghost" className="touch:min-h-11" onClick={onStop}>
+      <Button id={stopId} size="sm" variant="ghost" className="touch:min-h-11" onClick={onStop}>
         {t('survey.moonTax.stop')}
       </Button>
     </div>
@@ -105,21 +106,56 @@ function ConnectionToastView({
 }
 
 /**
- * Manage Taxes and Stop swap places, so whichever was clicked hands focus to
- * the other once it mounts (DESIGN §6c focus).
+ * The Survey connection behind Manage Taxes, with focus handed between Manage
+ * Taxes and Stop as they swap places (DESIGN §6c focus) and a failed Stop or
+ * Undo reported through `onFailed`.
  */
-function useSwapFocus() {
-  const [pending, setPending] = useState(false);
-  const focusOnMount = useCallback(
-    (el: HTMLButtonElement | null) => {
-      if (el && pending) {
-        setPending(false);
-        el.focus();
-      }
+function useManageTaxes(
+  options: Omit<Parameters<typeof useSurveyConnection>[0], 'onFailed'>,
+  onFailed: () => void
+) {
+  const moon = useSurveyConnection({ ...options, onFailed });
+  const manageId = useId();
+  const stopId = useId();
+  const focusAfterCommit = useFocusAfterCommit();
+  const byId = (id: string) => () => document.getElementById(id);
+  return {
+    ...moon,
+    manageId,
+    stopId,
+    connect: async () => {
+      await moon.connect();
+      focusAfterCommit(byId(stopId));
     },
-    [pending]
+    stop: () => {
+      void moon.stop().then(() => focusAfterCommit(byId(manageId)), onFailed);
+    },
+  };
+}
+
+/** Manage Taxes (`children`) until the Survey is connected, then what it is doing, plus its Undo toast. */
+function MoonConnectionSlot({
+  moon,
+  children,
+}: {
+  moon: ReturnType<typeof useManageTaxes>;
+  children: ReactNode;
+}) {
+  return (
+    <>
+      {moon.connection ? (
+        <ConnectedNote
+          connection={moon.connection}
+          nowMs={moon.now}
+          stopId={moon.stopId}
+          onStop={moon.stop}
+        />
+      ) : (
+        children
+      )}
+      <ConnectionToastView toast={moon.toast} onClose={moon.closeToast} />
+    </>
   );
-  return { focusOnMount, handOff: () => setPending(true) };
 }
 
 /** Stable fallback while the live query loads, so `payees` keeps one identity. */
@@ -161,13 +197,10 @@ export function MoonTaxRow({
   const pct = parseTaxPct(saved.pct);
   const name = saved.name.trim();
   const ready = name !== '' && pct !== null;
-  const link = useSurveyConnection({
-    characterId,
-    survey: connectable,
-    tax: ready ? { name, pct } : null,
-    updateRate: true,
-  });
-  const { focusOnMount, handOff } = useSwapFocus();
+  const moon = useManageTaxes(
+    { characterId, survey: connectable, tax: ready ? { name, pct } : null, updateRate: true },
+    () => setFailed(true)
+  );
 
   // Stored on the survey once focus leaves the pair. Best effort: a failed write
   // is not retried until the name or rate changes, and the local line is unaffected.
@@ -200,8 +233,7 @@ export function MoonTaxRow({
     setFailed(false);
     try {
       if (connectable) {
-        await link.connect();
-        handOff();
+        await moon.connect();
       } else {
         const payee = await ensurePayee(characterId, saved.name, pct);
         await useSurveyPayeeId.getState().setValue(payee.id);
@@ -259,19 +291,9 @@ export function MoonTaxRow({
             ))}
           </datalist>
         </div>
-        {link.connection ? (
-          <ConnectedNote
-            connection={link.connection}
-            nowMs={link.now}
-            stopRef={focusOnMount}
-            onStop={() => {
-              handOff();
-              void link.stop();
-            }}
-          />
-        ) : (
+        <MoonConnectionSlot moon={moon}>
           <Button
-            ref={focusOnMount}
+            id={moon.manageId}
             size="sm"
             className="touch:min-h-11 sm:ml-auto"
             disabled={!ready}
@@ -280,14 +302,13 @@ export function MoonTaxRow({
           >
             {t('survey.moonTax.open')}
           </Button>
-        )}
+        </MoonConnectionSlot>
         {failed && (
           <span role="alert" className="w-full text-xs text-danger">
             {t('survey.moonTax.failed')}
           </span>
         )}
       </div>
-      <ConnectionToastView toast={link.toast} onClose={link.closeToast} />
     </InfoRow>
   );
 }
@@ -317,13 +338,10 @@ export function MoonTaxReadout({
   const inFlight = useRef(false);
   const hintId = useId();
   const loggedOut = characterId === null;
-  const link = useSurveyConnection({
-    characterId,
-    survey: connectable,
-    tax: { name: tax.name, pct: tax.pct },
-    updateRate: false,
-  });
-  const { focusOnMount, handOff } = useSwapFocus();
+  const moon = useManageTaxes(
+    { characterId, survey: connectable, tax: { name: tax.name, pct: tax.pct }, updateRate: false },
+    () => setFailed(true)
+  );
 
   async function open() {
     if (characterId === null || inFlight.current) return;
@@ -332,8 +350,7 @@ export function MoonTaxReadout({
     setFailed(false);
     try {
       if (connectable) {
-        await link.connect();
-        handOff();
+        await moon.connect();
       } else {
         const known = findPayeeByName(await loadPayees(characterId), tax.name);
         if (known) await useSurveyPayeeId.getState().setValue(known.id);
@@ -355,20 +372,10 @@ export function MoonTaxReadout({
           <span className="font-normal text-text-dim">{t('survey.moonTax.to')}</span>
           <span className="min-w-0 [overflow-wrap:anywhere]">{tax.name}</span>
         </p>
-        {link.connection ? (
-          <ConnectedNote
-            connection={link.connection}
-            nowMs={link.now}
-            stopRef={focusOnMount}
-            onStop={() => {
-              handOff();
-              void link.stop();
-            }}
-          />
-        ) : (
+        <MoonConnectionSlot moon={moon}>
           <div className={blockedButtonClassName}>
             <Button
-              ref={focusOnMount}
+              id={moon.manageId}
               size="sm"
               className="touch:min-h-11"
               // Stays focusable with its reason linked, rather than the native attribute (DESIGN §6c Disabled).
@@ -385,14 +392,13 @@ export function MoonTaxReadout({
               </span>
             )}
           </div>
-        )}
+        </MoonConnectionSlot>
         {failed && (
           <span role="alert" className="w-full text-xs text-danger">
             {t('survey.moonTax.failed')}
           </span>
         )}
       </div>
-      <ConnectionToastView toast={link.toast} onClose={link.closeToast} />
     </InfoRow>
   );
 }

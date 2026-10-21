@@ -29,6 +29,9 @@ import { loadAllCharacterLedgers } from './ledger';
 import { readCompressedOre } from './oreForm';
 import { loadPayees } from './payees';
 import { hubForPayee, loadUnitPricesOnDate } from './pricing';
+import { reconcileAssignments } from './reconcile';
+import { loadManualMoonOreTypeIds } from './typeOverrides';
+import { loadMoonOreTypeIds, loadTypes } from '@/sde/loadSde';
 
 export const SYNCED_SURVEY_CONNECTIONS_KEY = 'sync.miningTaxSurveyConnections';
 
@@ -42,6 +45,27 @@ export const useSurveyConnections = createSyncedSetting<SurveyConnection[]>({
 async function current(): Promise<ReturnType<typeof useSurveyConnections.getState>> {
   if (!useSurveyConnections.getState().hydrated) await useSurveyConnections.getState().hydrate();
   return useSurveyConnections.getState();
+}
+
+async function liveConnections(nowMs: number): Promise<SurveyConnection[]> {
+  return (await current()).value.filter((c) => isConnectionLive(c, nowMs));
+}
+
+/**
+ * The moon ore type ids among a Survey's scanner ore names (raw names, the
+ * ledger's type ids): the SDE's moon ores plus any the pilot tagged as moon
+ * ore, the same set the ledger groups into entries (`ledger.ts`).
+ */
+export async function surveyMoonOreTypeIds(oreNames: readonly string[]): Promise<number[]> {
+  const [moonIds, tagged, types] = await Promise.all([
+    loadMoonOreTypeIds(),
+    loadManualMoonOreTypeIds(),
+    loadTypes(),
+  ]);
+  const wanted = new Set(oreNames);
+  return [...new Set([...moonIds, ...tagged])]
+    .filter((id) => wanted.has(types[String(id)]?.name ?? ''))
+    .sort((a, b) => a - b);
 }
 
 export async function saveSurveyConnection(connection: SurveyConnection): Promise<void> {
@@ -64,7 +88,7 @@ export async function applySurveyConnections(
   ledgers: readonly { characterId: number; entries: readonly MiningLedgerEntry[] }[],
   nowMs = Date.now()
 ): Promise<MiningTaxAssignmentRecord[]> {
-  const live = (await current()).value.filter((c) => isConnectionLive(c, nowMs));
+  const live = await liveConnections(nowMs);
   if (live.length === 0) return [];
   const created: MiningTaxAssignmentRecord[] = [];
   for (const ledger of ledgers) {
@@ -110,9 +134,22 @@ export async function applySurveyConnections(
   return created;
 }
 
-/** Reads every Character's ledger and applies the live connections — for the Survey, which has no snapshot of its own. */
+/**
+ * Reads every Character's ledger and applies the live connections — for the
+ * Survey, which has no snapshot of its own. Then reconciles those Characters,
+ * as the Tax tab's load would, so growth a connection leaves to its own
+ * earlier Assignment is folded in now rather than on the next Tax tab visit.
+ */
 export async function autoAssignFromSurveys(): Promise<MiningTaxAssignmentRecord[]> {
-  const live = (await current()).value.filter((c) => isConnectionLive(c, Date.now()));
+  const live = await liveConnections(Date.now());
   if (live.length === 0) return [];
-  return applySurveyConnections(await loadAllCharacterLedgers());
+  const connected = new Set(live.map((c) => c.characterId));
+  const ledgers = (await loadAllCharacterLedgers()).filter((l) => connected.has(l.characterId));
+  const created = await applySurveyConnections(ledgers);
+  await Promise.all(
+    ledgers
+      .filter((ledger) => ledger.entries.length > 0)
+      .map((ledger) => reconcileAssignments(ledger.characterId, ledger.entries))
+  );
+  return created;
 }

@@ -6,8 +6,10 @@ import {
   applySurveyConnections,
   removeSurveyConnection,
   saveSurveyConnection,
+  surveyMoonOreTypeIds,
   useSurveyConnections,
 } from './surveyConnections';
+import { tagAsMoonOre } from './typeOverrides';
 
 const syncMock = vi.hoisted(() => ({ scheduleSync: vi.fn(), setSyncedSetting: vi.fn() }));
 vi.mock('@/sync', () => syncMock);
@@ -16,6 +18,17 @@ const pricingMock = vi.hoisted(() => ({ loadUnitPricesOnDate: vi.fn() }));
 vi.mock('./pricing', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./pricing')>()),
   loadUnitPricesOnDate: pricingMock.loadUnitPricesOnDate,
+}));
+
+vi.mock('@/sde/loadSde', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/sde/loadSde')>()),
+  loadMoonOreTypeIds: () => Promise.resolve([45492]),
+  loadTypes: () =>
+    Promise.resolve({
+      45492: { name: 'Bitumens' },
+      90001: { name: 'Unpublished Goo' },
+      1230: { name: 'Veldspar' },
+    }),
 }));
 
 const CHAR = 1;
@@ -100,5 +113,14 @@ describe('applySurveyConnections', () => {
     await saveSurveyConnection(connection({ payeeId: payee.id }));
     await removeSurveyConnection('s1', CHAR);
     expect(await applySurveyConnections([ledger(50)], NOW)).toEqual([]);
+  });
+});
+
+describe('surveyMoonOreTypeIds', () => {
+  it('finds the moon ores among the scanned names, ore the pilot tagged as moon ore included', async () => {
+    await tagAsMoonOre(90001);
+    expect(await surveyMoonOreTypeIds(['Bitumens', 'Veldspar', 'Unpublished Goo'])).toEqual([
+      45492, 90001,
+    ]);
   });
 });

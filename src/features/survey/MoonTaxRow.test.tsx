@@ -168,6 +168,17 @@ describe('MoonTaxRow', () => {
     ]);
   });
 
+  it('Undo puts back the default rate the owner’s click changed, and focus moves to Stop', async () => {
+    const mine = await createPayee(7, { name: 'Moon Corp', defaultTaxPct: 5 });
+    renderRow({ ...SURVEY, published: { name: 'Moon Corp', pct: 8 } }, CONNECTABLE);
+    fireEvent.click(screen.getByRole('button', { name: 'Manage Taxes' }));
+    const stop = await screen.findByRole('button', { name: 'Stop' });
+    await waitFor(() => expect(document.activeElement).toBe(stop));
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    await waitFor(async () => expect((await db.payees.get(mine.id))?.defaultTaxPct).toBe(5));
+    expect(useSurveyConnections.getState().value).toEqual([]);
+  });
+
   it('starts blank on a survey with no stored tax, whatever was set on another', () => {
     const first = renderRow({ ...SURVEY, published: { name: 'Moon Corp', pct: 8 } });
     expect((screen.getByLabelText('Tax rate, percent') as HTMLInputElement).value).toBe('8');
@@ -269,7 +280,8 @@ describe('MoonTaxReadout', () => {
     renderReadout();
     fireEvent.click(screen.getByRole('button', { name: 'Manage Taxes' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Stop' }));
-    expect(await screen.findByRole('button', { name: 'Manage Taxes' })).toBeTruthy();
+    const manage = await screen.findByRole('button', { name: 'Manage Taxes' });
+    await waitFor(() => expect(document.activeElement).toBe(manage));
     expect(useSurveyConnections.getState().value).toEqual([]);
   });
 

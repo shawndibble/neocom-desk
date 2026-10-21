@@ -1228,7 +1228,7 @@ Rows:
 
 ### Transient messages
 
-A confirmation that offers Undo or another action is a `Toast` with `onClose` and stays until dismissed — close button, Escape, the next toast, or a route change — because a timer can remove the button while it has focus (WCAG 2.2.1). A plain note ("Copied") expires on its own and pauses while hovered or focused.
+A write the app makes on the pilot's behalf (Continue the session's automatic mode, a Survey connection assigning moon ore) announces itself with the same Undo `Toast`, naming what it did. A confirmation that offers Undo or another action is a `Toast` with `onClose` and stays until dismissed — close button, Escape, the next toast, or a route change — because a timer can remove the button while it has focus (WCAG 2.2.1). A plain note ("Copied") expires on its own and pauses while hovered or focused.
 
 ### Header controls
 

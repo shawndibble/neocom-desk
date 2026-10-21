@@ -2,16 +2,17 @@
  * "Manage Taxes" on a moon Survey, in one click (issue #4684): finds or adds
  * the Payee, connects the Survey's moon to it (`surveyConnections.ts`) and
  * assigns whatever of that moon's ore is already in the Mining Ledger. While
- * the Survey stays open and connected it re-reads the ledger every few
- * minutes, so ore mined since is assigned too; the Tax tab's own load does the
- * same. Each run that assigns or adds something says so with Undo.
+ * the Survey is open and connected it re-reads the ledger on opening and then
+ * every few minutes, so ore mined since is assigned too; the Tax tab's own
+ * load does the same. Each run that assigns or adds something says so with
+ * Undo.
  *
  * The connection follows the Survey as it is scanned: a moving ETA, a
  * location set later, or a new moon ore type are saved onto it.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { MiningTaxAssignmentRecord } from '@/db';
+import { db, type MiningTaxAssignmentRecord } from '@/db';
 import {
   connectionWindow,
   isConnectionLive,
@@ -25,12 +26,12 @@ import {
   autoAssignFromSurveys,
   removeSurveyConnection,
   saveSurveyConnection,
+  surveyMoonOreTypeIds,
   useSurveyConnections,
 } from '@/features/miningTax/surveyConnections';
 import { resolvePlaceSystemId } from '@/features/route/placeSystem';
 import { useHydratedStore } from '@/lib/useHydratedStore';
-import { loadMoonOreTypeIds, loadTypes } from '@/sde/loadSde';
-import { ensurePayee, findPayeeByName } from './moonTaxPayee';
+import { ensurePayee, findPayeeByName, samePayeeName } from './moonTaxPayee';
 
 /** How often an open, connected Survey re-reads the ledger. ESI caches it for ten minutes, so oftener finds nothing new. */
 export const AUTO_ASSIGN_EVERY_MS = 5 * 60 * 1000;
@@ -57,19 +58,10 @@ export interface ConnectionToast {
   onUndo: () => void;
 }
 
-/** The moon ore type ids among the scanner's ore names (raw names, the ledger's type ids). */
-async function moonOreTypeIds(oreNames: readonly string[]): Promise<number[]> {
-  const [ids, types] = await Promise.all([loadMoonOreTypeIds(), loadTypes()]);
-  const wanted = new Set(oreNames);
-  return ids.filter((id) => wanted.has(types[String(id)]?.name ?? '')).sort((a, b) => a - b);
-}
-
 async function systemOf(locationId: number | null, characterId: number): Promise<number | null> {
   if (locationId === null) return null;
   return resolvePlaceSystemId(locationId, characterId).catch(() => null);
 }
-
-const sameName = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
 
 const sameIds = (a: readonly number[], b: readonly number[]) =>
   a.length === b.length && a.every((id, i) => id === b[i]);
@@ -79,6 +71,7 @@ export function useSurveyConnection({
   survey,
   tax,
   updateRate,
+  onFailed,
 }: {
   characterId: number | null;
   survey: ConnectableSurvey | undefined;
@@ -86,12 +79,18 @@ export function useSurveyConnection({
   tax: SurveyTax | null;
   /** The owner's click also makes the rate an existing Payee's default; a viewer's keeps their own. */
   updateRate: boolean;
+  /** An Undo that could not be saved. */
+  onFailed: () => void;
 }) {
   const { t } = useTranslation();
   useHydratedStore(useSurveyConnections);
   const all = useSurveyConnections((s) => s.value);
   const [now, setNow] = useState(() => Date.now());
   const [toast, setToast] = useState<ConnectionToast | null>(null);
+  const failedRef = useRef(onFailed);
+  useEffect(() => {
+    failedRef.current = onFailed;
+  });
 
   const stored =
     survey !== undefined && characterId !== null
@@ -103,10 +102,18 @@ export function useSurveyConnection({
     stored !== undefined &&
     tax !== null &&
     isConnectionLive(stored, now) &&
-    sameName(stored.payeeName, tax.name) &&
+    samePayeeName(stored.payeeName, tax.name) &&
     stored.taxPct === tax.pct
       ? stored
       : null;
+
+  /** An Undo's writes, reporting a failure rather than leaving half of it done silently. */
+  function undoWith(steps: () => Promise<unknown>) {
+    return () => {
+      setToast(null);
+      void steps().catch(() => failedRef.current());
+    };
+  }
 
   // Follow the Survey: a moving ETA, a location set later, a new moon ore.
   const span = survey ? connectionWindow({ ...survey.summary, expiresAt: survey.expiresAt }) : null;
@@ -117,7 +124,7 @@ export function useSurveyConnection({
     let cancelled = false;
     void (async () => {
       const [typeIds, systemId] = await Promise.all([
-        moonOreTypeIds(oreKey.split('\n')),
+        surveyMoonOreTypeIds(oreKey.split('\n')),
         systemOf(locationId, connection.characterId),
       ]);
       if (cancelled) return;
@@ -128,7 +135,7 @@ export function useSurveyConnection({
         next.systemId !== connection.systemId ||
         !sameIds(next.typeIds, connection.typeIds);
       if (changed) await saveSurveyConnection(next);
-    })().catch(() => undefined);
+    })().catch(() => undefined); // Kept as it was; the next change or reopen tries again.
     return () => {
       cancelled = true;
     };
@@ -136,29 +143,34 @@ export function useSurveyConnection({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connection, span?.untilMs, span?.fromDate, oreKey, locationId]);
 
-  // While connected and open: ore mined since keeps being assigned.
+  // While connected and open: ore mined since keeps being assigned, from opening on.
   const live = connection !== null;
+  const payeeId = connection?.payeeId ?? '';
   const payeeName = connection?.payeeName ?? '';
   useEffect(() => {
     if (!live) return;
+    let cancelled = false;
     const run = () => {
       setNow(Date.now());
       void autoAssignFromSurveys()
-        .then((created: MiningTaxAssignmentRecord[]) => {
-          if (created.length === 0) return;
+        .then((made) => {
+          // Only this Survey's Payee: another connected Survey's ore isn't this page's to undo.
+          const created = made.filter((a) => a.payeeId === payeeId);
+          if (cancelled || created.length === 0) return;
           setToast({
             message: t('survey.moonTax.assigned', { count: created.length, name: payeeName }),
-            onUndo: () => {
-              setToast(null);
-              void unassign(created);
-            },
+            onUndo: undoWith(() => unassign(created)),
           });
         })
-        .catch(() => undefined);
+        .catch(() => undefined); // The next run, or the Tax tab's load, tries again.
     };
+    run();
     const id = setInterval(run, AUTO_ASSIGN_EVERY_MS);
-    return () => clearInterval(id);
-  }, [live, payeeName, t]);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [live, payeeId, payeeName, t]);
 
   /** Adds the Payee if need be, connects the moon and assigns what is already mined. Rejects when nothing could be saved. */
   async function connect(): Promise<void> {
@@ -171,7 +183,7 @@ export function useSurveyConnection({
     // Still the Assign dialog's suggestion for ore this connection can't place.
     await useSurveyPayeeId.getState().setValue(payee.id);
     const [typeIds, systemId] = await Promise.all([
-      moonOreTypeIds(survey.summary.oreNames),
+      surveyMoonOreTypeIds(survey.summary.oreNames),
       systemOf(survey.locationId, characterId),
     ]);
     const connectedAt = Date.now();
@@ -188,7 +200,7 @@ export function useSurveyConnection({
       connectedAt,
     });
     setNow(connectedAt);
-    const created = await autoAssignFromSurveys().catch(() => []);
+    const created = await autoAssignFromSurveys().catch((): MiningTaxAssignmentRecord[] => []);
 
     const parts = [
       known === undefined ? t('survey.moonTax.addedPayee', { name: payee.name, pct: tax.pct }) : '',
@@ -199,17 +211,30 @@ export function useSurveyConnection({
     const surveyId = survey.id;
     setToast({
       message: parts.filter((p) => p !== '').join(' '),
-      onUndo: () => {
-        setToast(null);
-        void (async () => {
-          if (created.length > 0) await unassign(created);
-          await removeSurveyConnection(surveyId, characterId);
-          if (known === undefined) await deletePayee(payee);
-        })();
-      },
+      onUndo: undoWith(async () => {
+        // A Payee this click added goes with everything assigned to it since,
+        // including what the open Survey assigned after the click.
+        const assigned =
+          known === undefined
+            ? await db.miningTaxAssignments.filter((a) => a.payeeId === payee.id).toArray()
+            : created;
+        if (assigned.length > 0) {
+          const undone = await unassign(assigned);
+          if (!undone.ok) throw undone.cause;
+        }
+        await removeSurveyConnection(surveyId, characterId);
+        if (known === undefined) {
+          const removed = await deletePayee(payee);
+          if (!removed.ok) throw removed.cause;
+        } else if (known.defaultTaxPct !== payee.defaultTaxPct) {
+          // The owner's click made the rate this Payee's default; Undo puts the old one back.
+          await ensurePayee(characterId, known.name, known.defaultTaxPct);
+        }
+      }),
     });
   }
 
+  /** Disconnects the moon. Rejects when that could not be saved. */
   async function stop(): Promise<void> {
     if (connection === null) return;
     await removeSurveyConnection(connection.surveyId, connection.characterId);
