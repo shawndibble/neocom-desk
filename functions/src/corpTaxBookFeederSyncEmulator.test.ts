@@ -266,9 +266,9 @@ suite('scheduled feeder pass (emulator)', () => {
         status: 'pending-removal',
         lastReadWellAt: Date.parse('2026-09-10T08:00:00Z'),
         staleSince: T0,
-        removal: { startedAt: T0, startedByCharacterId: 1, startedByName: 'Officer' },
+        removal: { startedAt: T0, startedBy: 1, startedByName: 'Officer' },
         removalLinkId: 'link-hash',
-      } as Partial<FeederRecord>,
+      },
       false
     );
     const link = db.collection('corpTaxBookRemovalLinks').doc('link-hash');
