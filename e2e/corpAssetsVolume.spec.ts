@@ -88,7 +88,9 @@ test.describe('Corp Assets — item row volume', () => {
 
       await page.setViewportSize({ width, height: 900 });
       await page.goto('./corp/assets');
-      await expect(page.getByRole('link', { name: 'Tritanium' })).toBeVisible();
+      await expect(
+        page.getByRole('main').getByText('Tritanium', { exact: true }).first()
+      ).toBeVisible();
 
       // Volume starts off; the column picker adds it.
       await page.getByRole('button', { name: 'Columns' }).click();

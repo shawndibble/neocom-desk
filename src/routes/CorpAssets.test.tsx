@@ -307,8 +307,8 @@ describe('state tabs', () => {
     await ledger('/corp/assets?q=r');
     await user.click(screen.getByRole('tab', { name: 'Impounded 1' }));
     expect(currentLocation()).toBe('/corp/assets/impounded?q=r');
-    expect(await screen.findByRole('link', { name: 'Rifter' })).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Tritanium' })).not.toBeInTheDocument();
+    expect(await screen.findByText('Rifter')).toBeInTheDocument();
+    expect(screen.queryByText('Tritanium')).not.toBeInTheDocument();
   });
 
   it('opens a tab straight from its path', async () => {
@@ -316,8 +316,8 @@ describe('state tabs', () => {
     expect(
       screen.getByRole('tab', { name: 'Corp deliveries 1', selected: true })
     ).toBeInTheDocument();
-    expect(await screen.findByRole('link', { name: 'Tritanium' })).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Pyerite' })).not.toBeInTheDocument();
+    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
+    expect(screen.queryByText('Pyerite')).not.toBeInTheDocument();
   });
 
   it('sends an old tree deep link to /corp/assets, keeping the query', async () => {
@@ -330,11 +330,9 @@ describe('state tabs', () => {
 describe('group by item', () => {
   it('lists one row per item type, with a blueprint copy as its own badged row', async () => {
     await ledger();
-    expect(await screen.findByRole('link', { name: 'Tritanium' })).toHaveAttribute(
-      'href',
-      expect.stringMatching(/info=type-34/)
-    );
-    expect(screen.getAllByRole('link', { name: 'Tritanium' })).toHaveLength(1);
+    // A plain name, not a Show info link: the row expands in place (DESIGN.md §6c).
+    expect(await screen.findByText('Tritanium')).not.toHaveAttribute('href');
+    expect(screen.getAllByText('Tritanium')).toHaveLength(1);
     expect(screen.getByText('Blueprint copy').parentElement).toHaveTextContent('BPC');
     expect(screen.getByText('5,200')).toBeInTheDocument();
   });
@@ -349,7 +347,7 @@ describe('group by item', () => {
   it('sorts by any column from its header, writing the sort to the query', async () => {
     const user = userEvent.setup();
     await ledger();
-    await screen.findByRole('link', { name: 'Pyerite' });
+    await screen.findByText('Pyerite');
     await user.click(screen.getByRole('button', { name: /^Qty/ }));
     await waitFor(() => expect(currentLocation()).toContain('sort=quantity'));
     const rows = itemOrder();
@@ -361,7 +359,7 @@ describe('group by item', () => {
   it('adds a column from the column picker', async () => {
     const user = userEvent.setup();
     await ledger();
-    await screen.findByRole('link', { name: 'Pyerite' });
+    await screen.findByText('Pyerite');
     expect(screen.queryByRole('button', { name: /^Volume/ })).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Columns' }));
     await user.click(await screen.findByRole('menuitemcheckbox', { name: 'Volume' }));
@@ -383,23 +381,21 @@ describe('group by item', () => {
     await ledger();
     await user.type(screen.getByPlaceholderText('Search items…'), 'pyer');
     await waitFor(() => expect(currentLocation()).toBe('/corp/assets?q=pyer'));
-    await waitFor(() =>
-      expect(screen.queryByRole('link', { name: 'Tritanium' })).not.toBeInTheDocument()
-    );
-    expect(screen.getByRole('link', { name: 'Pyerite' })).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText('Tritanium')).not.toBeInTheDocument());
+    expect(screen.getByText('Pyerite')).toBeInTheDocument();
   });
 
   it('applies ?q= on arrival', async () => {
     await ledger('/corp/assets?q=tri');
-    expect(await screen.findByRole('link', { name: 'Tritanium' })).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Pyerite' })).not.toBeInTheDocument();
+    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
+    expect(screen.queryByText('Pyerite')).not.toBeInTheDocument();
     expect(screen.getByPlaceholderText('Search items…')).toHaveValue('tri');
   });
 
   it('filters by location and division from the query', async () => {
     await ledger('/corp/assets?loc=60003760&div=3');
-    expect(await screen.findByRole('link', { name: 'Pyerite' })).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Tritanium' })).not.toBeInTheDocument();
+    expect(await screen.findByText('Pyerite')).toBeInTheDocument();
+    expect(screen.queryByText('Tritanium')).not.toBeInTheDocument();
   });
 
   it('shows an empty state when the filters leave nothing', async () => {
@@ -431,20 +427,18 @@ describe('stock targets', () => {
     const user = userEvent.setup();
     useTargets([[35, 50]]);
     await ledger();
-    await screen.findByRole('link', { name: 'Tritanium' });
+    await screen.findByText('Tritanium');
     await user.click(screen.getByRole('button', { name: /Below target/ }));
     await waitFor(() => expect(currentLocation()).toBe('/corp/assets?below=1'));
-    await waitFor(() =>
-      expect(screen.queryByRole('link', { name: 'Tritanium' })).not.toBeInTheDocument()
-    );
-    expect(screen.getByRole('link', { name: 'Pyerite' })).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText('Tritanium')).not.toBeInTheDocument());
+    expect(screen.getByText('Pyerite')).toBeInTheDocument();
   });
 
   it('names a targeted type the corporation owns none of, and finds it by search', async () => {
     useTargets([[4242, 7]]);
     await ledger('/corp/assets?q=name 4242');
-    expect(await screen.findByRole('link', { name: 'Name 4242' })).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Tritanium' })).not.toBeInTheDocument();
+    expect(await screen.findByText('Name 4242')).toBeInTheDocument();
+    expect(screen.queryByText('Tritanium')).not.toBeInTheDocument();
   });
 
   it('opens the Stock targets dialog', async () => {
@@ -472,8 +466,8 @@ describe('group by location', () => {
     await ledger('/corp/assets?group=location');
     await user.click((await screen.findAllByText('Ships'))[0]);
     await waitFor(() => expect(currentLocation()).toBe('/corp/assets?loc=60003760&div=1'));
-    expect(await screen.findByRole('link', { name: 'Tritanium' })).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Pyerite' })).not.toBeInTheDocument();
+    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
+    expect(screen.queryByText('Pyerite')).not.toBeInTheDocument();
   });
 
   it('lists only the divisions in use, with a count, and folds an empty office', async () => {
@@ -550,7 +544,7 @@ describe('row actions', () => {
   it('opens the item menu from a visible More actions button', async () => {
     const user = userEvent.setup();
     await ledger();
-    await screen.findByRole('link', { name: 'Pyerite' });
+    await screen.findByText('Pyerite');
     await user.click(screen.getByRole('button', { name: 'More actions for Pyerite' }));
     expect(await screen.findByRole('menuitem', { name: 'Copy name' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'No blueprint options' })).toBeInTheDocument();

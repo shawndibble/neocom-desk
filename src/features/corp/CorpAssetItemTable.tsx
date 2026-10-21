@@ -11,7 +11,6 @@ import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { BlueprintBadge } from '@/features/assets/assetBrowserRows';
-import { ItemInfoLink } from '@/features/entities';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { assetBlueprintKind } from '@/engine/blueprintKind';
 import type { ItemLedgerRow, StockStatus } from '@/engine/corp/assetLedger';
@@ -143,9 +142,8 @@ export function CorpAssetItemTable({
         );
         return (
           <span className="flex min-w-0 items-center">
-            <ItemInfoLink typeId={r.ledger.typeId} itemName={r.name}>
-              {r.name}
-            </ItemInfoLink>
+            {/* Plain name: the row expands in place, and a row's primary action beats a name link (DESIGN.md §6c); Show info lives in the row menu. */}
+            <span className="truncate">{r.name}</span>
             {kind && <BlueprintBadge kind={kind} t={t} />}
           </span>
         );
