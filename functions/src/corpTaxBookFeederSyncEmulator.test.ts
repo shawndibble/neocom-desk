@@ -259,6 +259,34 @@ suite('scheduled feeder pass (emulator)', () => {
     expect(audit).toContain('feederDisconnected');
   });
 
+  it('a disconnect during a pending removal clears the removal and deletes its link (#4621)', async () => {
+    await addFeeder(
+      98000002,
+      {
+        status: 'pending-removal',
+        lastReadWellAt: Date.parse('2026-09-10T08:00:00Z'),
+        staleSince: T0,
+        removal: { startedAt: T0, startedByCharacterId: 1, startedByName: 'Officer' },
+        removalLinkId: 'link-hash',
+      } as Partial<FeederRecord>,
+      false
+    );
+    const link = db.collection('corpTaxBookRemovalLinks').doc('link-hash');
+    await link.set({
+      collectorCorporationId: COLLECTOR,
+      feederCorporationId: 98000002,
+      startedAt: T0,
+      expiresAt: T0 + 2 * DAY,
+    });
+    now = T0 + 30 * DAY;
+    await run();
+    const rec = await feederRecord(98000002);
+    expect(rec?.status).toBe('disconnected');
+    expect(rec?.removal).toBeUndefined();
+    expect(rec?.removalLinkId).toBeUndefined();
+    expect((await link.get()).exists).toBe(false);
+  });
+
   it('a disconnected feeder is no longer read', async () => {
     await addFeeder(98000002, { status: 'disconnected' });
     await run();
