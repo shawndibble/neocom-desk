@@ -1,3 +1,5 @@
+import { createNumberFormat } from '@/lib/numberLocale';
+import { formatCount } from '@/lib/formatCount';
 import { Fragment, useId, useMemo, useState, type ReactNode } from 'react';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
@@ -24,8 +26,8 @@ interface Props {
 const COLUMNS = 'grid-cols-[minmax(0,1fr)_3.2rem_2.4rem_3.2rem_3.8rem]';
 const HELP_KEYS = ['a', 'b', 'c', 'tech2'] as const;
 
-const m3s = (value: number) =>
-  value.toLocaleString('en-US', { maximumFractionDigits: value < 100 ? 1 : 0 });
+const m3sOnePlace = createNumberFormat({ maximumFractionDigits: 1 });
+const m3s = (value: number) => (value < 100 ? m3sOnePlace(value) : formatCount(value));
 
 function rowLabel(t: TFunction, { choice }: CrystalChoice): string {
   const mining = choice.mining!;

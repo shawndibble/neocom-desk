@@ -3,6 +3,7 @@ import { EmptyState, StatChip, StatChips } from '@/components/ui';
 import { ShareShell, type OpenInApp } from '@/features/share/ShareShell';
 import type { DscanRow } from '@/engine/pilotList/parsePilotPaste';
 import { FleetBoard } from './FleetBoard';
+import { formatNumber } from '@/lib/numberLocale';
 
 export type DscanShareState = { status: 'invalid' } | { status: 'ready'; rows: DscanRow[] };
 
@@ -34,10 +35,7 @@ export function DscanShareScreen({
       ) : (
         <>
           <StatChips className="border-b border-line px-1 py-2">
-            <StatChip
-              label={t('dscanShare.linesLabel')}
-              value={state.rows.length.toLocaleString()}
-            />
+            <StatChip label={t('dscanShare.linesLabel')} value={formatNumber(state.rows.length)} />
             <StatChip
               label={t('dscanShare.expiresLabel')}
               value={new Date(expiresAt).toLocaleString()}

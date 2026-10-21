@@ -1,3 +1,4 @@
+import { formatCount } from '@/lib/formatCount';
 import { Link } from 'react-router-dom';
 import type { TFunction } from 'i18next';
 import { Pill } from '@/components/ui/Pill';
@@ -106,7 +107,7 @@ export function activeJobColumns({
       sortValue: (job) => job.runs,
       render: (job) => (
         <>
-          {job.runs.toLocaleString()}
+          {formatCount(job.runs)}
           {/* The card has no Runs header to say what the bare number is. */}
           <span className="sm:hidden"> {t('industry.jobsRunsUnit', { count: job.runs })}</span>
         </>
@@ -239,7 +240,7 @@ export function historyColumns({
       align: 'right',
       className: 'tabular-nums',
       sortValue: (job) => job.runs,
-      render: (job) => job.runs.toLocaleString(),
+      render: (job) => formatCount(job.runs),
     },
     {
       id: 'delivered',

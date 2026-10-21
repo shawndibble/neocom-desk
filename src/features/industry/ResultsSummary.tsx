@@ -30,6 +30,7 @@ import { formatCostIndex, formatPercent, formatVolume } from './format';
 import { ownedSaleCsvColumns } from './ownedSaleCsv';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
+import { formatCount } from '@/lib/formatCount';
 
 interface CostRowProps {
   label: string;
@@ -202,7 +203,7 @@ export function ResultsSummary({
         header: t('industry.quantity'),
         align: 'right',
         className: 'tabular-nums',
-        render: (row) => row.quantity.toLocaleString(),
+        render: (row) => formatCount(row.quantity),
       },
       {
         id: 'unitPrice',
@@ -237,7 +238,7 @@ export function ResultsSummary({
         align: 'right',
         className: 'tabular-nums',
         sortValue: (row) => row.quantity,
-        render: (row) => row.quantity.toLocaleString(),
+        render: (row) => formatCount(row.quantity),
       },
       {
         id: 'unitPrice',

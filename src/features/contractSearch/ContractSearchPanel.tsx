@@ -20,6 +20,7 @@
  * Mounts under a Router: every item row is a Build Plan context-menu
  * trigger (#931), and so is each line of the detail modal's contents.
  */
+import { formatCount } from '@/lib/formatCount';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useCallback, useDeferredValue, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useHydratedStore } from '@/lib/useHydratedStore';
@@ -741,7 +742,7 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
         ? plexAskLabel(row)
         : t('contractSearch.priceInclPlex', {
             price: formatIskAuto(offerAskingPrice(row, plexPrice), CONTRACT_ISK_CENTS_BELOW),
-            plex: row.requestedPlex.toLocaleString(),
+            plex: formatCount(row.requestedPlex),
           })
       : row.isAuction
         ? row.buyout !== undefined
@@ -754,7 +755,7 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
         : formatIskAuto(row.price, CONTRACT_ISK_CENTS_BELOW);
     const chips: PublicContractDetailModalStatChip[] = [
       { label: t('contractSearch.priceColumn'), value: priceLabel },
-      { label: t('contractSearch.qtyColumn'), value: row.quantity.toLocaleString() },
+      { label: t('contractSearch.qtyColumn'), value: formatCount(row.quantity) },
     ];
     // ME/TE/runs are blueprint-only columns, absent on a plain item line.
     if (row.isBlueprintCopy) {
@@ -960,7 +961,7 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
                   <StatChips>
                     <StatChip
                       label={t('contractSearch.offersLabel')}
-                      value={summary.offerCount.toLocaleString()}
+                      value={formatCount(summary.offerCount)}
                     />
                     <StatChip
                       label={t('contractSearch.cheapestLabel')}

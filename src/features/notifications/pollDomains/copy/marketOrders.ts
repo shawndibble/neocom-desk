@@ -7,6 +7,7 @@ import type {
 import { assertProjectionWording, type PushCopy } from '@/engine/projection';
 import { formatIsk } from '@/lib/isk';
 import { type DomainCopy, type NoNames, fired, HOUR_MS } from './shared';
+import { formatNumber } from '@/lib/numberLocale';
 
 export const marketOrderCopy: DomainCopy<MarketOrderNotificationFire, ItemNames> = {
   poll: (fire, character, names) => {
@@ -18,7 +19,7 @@ export const marketOrderCopy: DomainCopy<MarketOrderNotificationFire, ItemNames>
         fire.quantity > 1
           ? fired('marketOrderFilled', 'bodyWithQuantity', {
               item,
-              quantity: fire.quantity.toLocaleString(),
+              quantity: formatNumber(fire.quantity),
             })
           : fired('marketOrderFilled', 'body', { item }),
     };

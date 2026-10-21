@@ -3,6 +3,7 @@
  * owned quantity updates that same row's Still To Buy instead of a separate
  * panel scroll-lengths away.
  */
+import { formatCount } from '@/lib/formatCount';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, DataTable, EmptyState, Panel } from '@/components/ui';
@@ -150,7 +151,7 @@ export function GroupMaterialsPanel({
         align: 'right',
         className: 'tabular-nums text-text-dim',
         sortValue: (material) => material.quantity,
-        render: (material) => material.quantity.toLocaleString(),
+        render: (material) => formatCount(material.quantity),
       },
       {
         id: 'volume',
@@ -211,7 +212,7 @@ export function GroupMaterialsPanel({
             <span className={material.buyToShow === 0 ? 'text-success' : 'font-semibold'}>
               {material.buyToShow === 0
                 ? t('industry.stillToBuyCovered')
-                : material.buyToShow.toLocaleString()}
+                : formatCount(material.buyToShow)}
             </span>
             {material.unpriced && material.buyToShow > 0 && (
               <span className="text-[0.6875rem] text-warning">{t('industry.unpriced')}</span>

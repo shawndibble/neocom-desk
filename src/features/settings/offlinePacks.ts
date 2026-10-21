@@ -3,6 +3,7 @@
  * pilot recognises, and how a byte count reads. Pure: the Cache Storage reads
  * live in `offlineStatus.ts`.
  */
+import { getDecimalMark } from '@/lib/numberLocale';
 
 /** The lazy SDE packs, in display order (the fitting engine is a pack of its own, outside this list). */
 export const OFFLINE_PACK_IDS = ['itemInfo', 'market', 'planetary', 'reference'] as const;
@@ -53,18 +54,20 @@ export function summarizePacks(
 
 const UNITS = ['byte', 'kilobyte', 'megabyte', 'gigabyte', 'terabyte'] as const;
 
-/** "5 MB", "3.5 GB": binary steps, at most one decimal, in the reader's locale. */
-export function formatBytes(bytes: number, locale: string): string {
+/** "5 MB", "3.5 GB": binary steps, at most one decimal, with the Number format's decimal mark. */
+export function formatBytes(bytes: number): string {
   let value = Math.max(0, bytes);
   let unit = 0;
   while (value >= 1024 && unit < UNITS.length - 1) {
     value /= 1024;
     unit += 1;
   }
-  return new Intl.NumberFormat(locale, {
+  const text = new Intl.NumberFormat('en', {
     style: 'unit',
     unit: UNITS[unit],
     unitDisplay: 'short',
     maximumFractionDigits: 1,
   }).format(value);
+  // Unit names stay English; the group and decimal marks follow the Number format.
+  return getDecimalMark() === ',' ? text.replace(/[.,]/g, (c) => (c === '.' ? ',' : '.')) : text;
 }

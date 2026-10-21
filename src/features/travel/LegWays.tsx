@@ -31,6 +31,7 @@ import { formatCountdown, formatDuration } from '@/lib/duration';
 import { useIsPhone } from '@/lib/useIsPhone';
 import type { RouteHolesState } from '@/features/route/useRouteHoles';
 import type { RouteSafetyLeg, RouteSafetyWay } from './useRouteSafety';
+import { formatNumber } from '@/lib/numberLocale';
 
 const badgeClassName = 'rounded-xs px-1 text-[0.625rem] tracking-widest text-text-dim uppercase';
 
@@ -76,7 +77,7 @@ function WayBox({
     facts.push(
       t('travel.jumpDrive.wayJumps', { count: jump.jumps }),
       t('travel.jumpDrive.wayLy', { ly: jump.totalLy.toFixed(1) }),
-      t('travel.jumpDrive.fuelValue', { count: jump.fuel, fuel: jump.fuel.toLocaleString() }),
+      t('travel.jumpDrive.fuelValue', { count: jump.fuel, fuel: formatNumber(jump.fuel) }),
       t('travel.jumpDrive.wayFatigue', {
         time: formatDuration(Math.round(jump.fatigueMinutes) * 60),
       })

@@ -39,6 +39,9 @@ import type { DailyMetricPoint } from './chartAggregation';
 import { useMiningTaxCompressedOre } from './oreForm';
 import type { ChartMetric } from './chartMetricPref';
 import { formatDateTick } from '@/lib/formatDateTick';
+import { createNumberFormat } from '@/lib/numberLocale';
+
+const formatFull = createNumberFormat({ maximumFractionDigits: 3 });
 
 export interface DailyRatePoint {
   date: string;
@@ -80,9 +83,9 @@ function formatMetricCompact(metric: MetricKind, value: number): string {
   return metric === 'volume' ? `${formatCompactNumber(value)} m³` : formatCompactNumber(value);
 }
 
-/** `toLocaleString`, plus an "m³" suffix for the volume metric — the sr-only tables' full-precision figure. */
+/** Grouped with up to 3 decimals, plus an "m³" suffix for the volume metric — the sr-only tables' full-precision figure. */
 function formatMetricFull(metric: MetricKind, value: number): string {
-  return metric === 'volume' ? `${value.toLocaleString()} m³` : value.toLocaleString();
+  return metric === 'volume' ? `${formatFull(value)} m³` : formatFull(value);
 }
 
 /** The rate chart's per-metric knobs: where a point's figure lives, and how each surface prints it. */

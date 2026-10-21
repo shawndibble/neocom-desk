@@ -21,6 +21,7 @@ import type { MoonMiningTaxRow } from './snapshot';
 import { useLedgerAction } from './useLedgerAction';
 import { LedgerActionError } from './LedgerActionError';
 import { toggleInSet } from '@/lib/sets';
+import { formatCount } from '@/lib/formatCount';
 
 export interface JoinCandidate {
   row: MoonMiningTaxRow;
@@ -241,7 +242,7 @@ export function JoinAssignDialog({
                       </OreLink>
                     </span>
                     <span className="w-24 shrink-0 tabular-nums text-text-dim">
-                      {line.quantity.toLocaleString()}
+                      {formatCount(line.quantity)}
                     </span>
                     <span className="text-text-dim">{candidate.row.entry.date}</span>
                   </li>

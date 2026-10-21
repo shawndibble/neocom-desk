@@ -15,6 +15,7 @@
  *
  * Every other type renders nothing here.
  */
+import { createNumberFormat } from '@/lib/numberLocale';
 import { useEffect, useId, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
@@ -46,7 +47,7 @@ import type { DynamicItemState } from './useDynamicItem';
 const SECTION_HEADING =
   'border-b border-line pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
 
-const PERCENT = new Intl.NumberFormat('en', {
+const PERCENT = createNumberFormat({
   maximumFractionDigits: 1,
   signDisplay: 'exceptZero',
 });
@@ -528,8 +529,8 @@ function MutaplasmidSection({
                 </dt>
                 <dd className="text-right whitespace-nowrap text-text tabular-nums">
                   {t('market.itemDetail.abyssal.multiplierRange', {
-                    low: `${PERCENT.format(row.lowPct)}%`,
-                    high: `${PERCENT.format(row.highPct)}%`,
+                    low: `${PERCENT(row.lowPct)}%`,
+                    high: `${PERCENT(row.highPct)}%`,
                   })}
                 </dd>
               </div>

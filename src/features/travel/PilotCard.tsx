@@ -25,6 +25,7 @@ import {
   THREAT_ROW_CLASS,
   THREAT_TEXT_CLASS,
 } from './threatTone';
+import { formatNumber } from '@/lib/numberLocale';
 
 /** Where most of the recent kills were; the worse space wins a tie. Null with no recent kill that says where. */
 function mainSpaceOf(bySpace: KillSummary['bySpace']): KillSpace | null {
@@ -54,7 +55,7 @@ export function PilotCard({
   const tone = threat === null ? null : THREAT_LEVEL_TONE[threat];
   const ready = row.kills.kind === 'ready' ? row.kills.summary : null;
   const big =
-    ready !== null ? ready.recentCount.toLocaleString() : row.kills.kind === 'loading' ? '…' : '—';
+    ready !== null ? formatNumber(ready.recentCount) : row.kills.kind === 'loading' ? '…' : '—';
   const status =
     row.kills.kind === 'loading'
       ? t('travel.pilot.list.stateLoading')

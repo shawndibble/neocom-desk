@@ -6,6 +6,7 @@ import { formatIsk, formatMarketIsk } from '@/lib/isk';
 import type { OpenOrderRow } from './openOrdersModel';
 import type { OrderDetailView } from './orderDetailView';
 import { CopyablePrice } from './CopyablePrice';
+import { formatCount } from '@/lib/formatCount';
 
 /** "What it cost you" once a cost basis is known: build run or wallet buys, fees, floor. */
 export function CostLedger({
@@ -27,11 +28,11 @@ export function CostLedger({
           <>
             <LedgerRow
               label={t('market.orders.walletBasisUnits')}
-              value={costBasis.unitsCovered.toLocaleString()}
+              value={formatCount(costBasis.unitsCovered)}
             />
             <LedgerRow
               label={t('market.orders.walletBasisBuys')}
-              value={costBasis.buyCount.toLocaleString()}
+              value={formatCount(costBasis.buyCount)}
             />
             <LedgerRow
               label={t('market.orders.walletBasisRange')}
@@ -43,10 +44,7 @@ export function CostLedger({
           </>
         ) : (
           <>
-            <LedgerRow
-              label={t('industry.quantity')}
-              value={costBasis.runQuantity.toLocaleString()}
-            />
+            <LedgerRow label={t('industry.quantity')} value={formatCount(costBasis.runQuantity)} />
             <LedgerRow
               label={t('industry.materialCost')}
               value={`${formatIsk(costBasis.materialCost)} ISK`}
@@ -74,7 +72,7 @@ export function CostLedger({
               {costBasis.buys.map((buy, i) => (
                 <li key={i}>
                   {t('market.orders.walletBasisBuyLine', {
-                    quantity: buy.quantity.toLocaleString(),
+                    quantity: formatCount(buy.quantity),
                     price: formatMarketIsk(buy.unitPrice),
                     date: new Date(buy.date).toLocaleDateString(),
                   })}

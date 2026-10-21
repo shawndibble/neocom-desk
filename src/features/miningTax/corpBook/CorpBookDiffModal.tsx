@@ -7,6 +7,7 @@ import { useIsPhone } from '@/lib/useIsPhone';
 import type { BookRowView } from '@/engine/corpTaxBook/personal';
 import { typeLabel } from './typeLabel';
 import { hubForPayee } from '../pricing';
+import { formatCount } from '@/lib/formatCount';
 
 interface Props {
   open: boolean;
@@ -87,9 +88,9 @@ export function CorpBookDiffModal({ open, onClose, view, systemName, typeNames }
                       ore: typeLabel(typeNames, line.typeId),
                     })}
                   </td>
-                  <td className={cell(false)}>{you === undefined ? '—' : you.toLocaleString()}</td>
+                  <td className={cell(false)}>{you === undefined ? '—' : formatCount(you)}</td>
                   <td className={cell(differsHere)}>
-                    {line.quantity.toLocaleString()}
+                    {formatCount(line.quantity)}
                     {differsHere && differs}
                   </td>
                 </tr>
@@ -132,8 +133,8 @@ export function CorpBookDiffModal({ open, onClose, view, systemName, typeNames }
                 })
               : dispute.quantity && !dispute.rate
                 ? t('miningTax.corpBook.disputed.quantity', {
-                    you: dispute.personalQuantity.toLocaleString(),
-                    book: dispute.bookQuantity.toLocaleString(),
+                    you: formatCount(dispute.personalQuantity),
+                    book: formatCount(dispute.bookQuantity),
                   })
                 : t('miningTax.corpBook.disputed.both')}
           </p>

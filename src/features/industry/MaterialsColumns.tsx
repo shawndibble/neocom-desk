@@ -7,6 +7,7 @@ import { formatVolume } from './format';
 import { NotApplicable } from './NotApplicable';
 import { materialRowState } from './materialRow';
 import type { MaterialTableRow } from './subBuildPlan';
+import { formatCount } from '@/lib/formatCount';
 
 interface MaterialsColumnsInput {
   t: TFunction;
@@ -49,7 +50,7 @@ export function buildMaterialsColumns({
       className: 'tabular-nums',
       headerCellClassName: 'w-20',
       sortValue: (material) => material.quantity,
-      render: (material) => <span>{material.quantity.toLocaleString()}</span>,
+      render: (material) => <span>{formatCount(material.quantity)}</span>,
     },
     {
       id: 'owned',
@@ -72,7 +73,7 @@ export function buildMaterialsColumns({
         material.subBuilds.length > 0 ? (
           <NotApplicable />
         ) : (
-          <span>{material.remainingQuantity.toLocaleString()}</span>
+          <span>{formatCount(material.remainingQuantity)}</span>
         ),
     },
     {

@@ -21,6 +21,7 @@ import { ROUTE_PREFERENCE_SHORT_LABEL_KEYS } from '@/features/route/routePrefere
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import { focusRingClassName } from '@/components/ui/controlStyles';
+import { formatNumber } from '@/lib/numberLocale';
 
 function Strip({ securities }: { securities: PreferenceCard['securities'] }) {
   return (
@@ -82,7 +83,7 @@ function CardBody({ card }: { card: PreferenceCard }) {
           )}
         </Fact>
         <Fact label={t('travel.summary.killsLabel')}>
-          {card.kills === null ? DASH : card.kills.toLocaleString()}
+          {card.kills === null ? DASH : formatNumber(card.kills)}
         </Fact>
         <Fact label={t('travel.summary.chokepointsLabel')}>
           {summary === null ? DASH : summary.chokepoints.length}

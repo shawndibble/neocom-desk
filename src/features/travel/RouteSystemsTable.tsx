@@ -53,6 +53,7 @@ import { LawlessTag } from './LawlessTag';
 import { routeSystemName } from './routeSystemName';
 import type { RouteKillsCell } from './useRouteKills';
 import type { RouteSafetyTripRow } from './useRouteSafety';
+import { formatNumber } from '@/lib/numberLocale';
 
 type TableRow = RouteSafetyTripRow | HoleStep | BridgeStep;
 
@@ -91,7 +92,7 @@ function withHoleSteps(rows: readonly RouteSafetyTripRow[]): TableRow[] {
 const DASH = '—';
 
 function count(value: number | null): string {
-  return value === null ? DASH : value.toLocaleString();
+  return value === null ? DASH : formatNumber(value);
 }
 
 /** A zKillboard figure the fold can trust: loading and unavailable are unknown, never zero. */

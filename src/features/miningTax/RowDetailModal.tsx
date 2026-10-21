@@ -35,6 +35,7 @@ import { StatusPill } from './StatusPill';
 import type { MoonMiningTaxRow } from './snapshot';
 import type { PayeeSuggestion } from './suggestPayee';
 import { LedgerActionError } from './LedgerActionError';
+import { formatCount } from '@/lib/formatCount';
 
 interface RowDetailModalProps {
   open: boolean;
@@ -351,9 +352,7 @@ export function RowDetailModal({
                       {typeNames.get(line.typeId) ?? `#${line.typeId}`}
                     </OreLink>
                   </span>
-                  <span className="tabular-nums text-text-dim">
-                    {line.quantity.toLocaleString()}
-                  </span>
+                  <span className="tabular-nums text-text-dim">{formatCount(line.quantity)}</span>
                 </li>
               ))}
             </ul>
@@ -393,7 +392,7 @@ export function RowDetailModal({
                     </OreLink>
                   </span>
                   <span className="shrink-0 tabular-nums">
-                    {diff.before.toLocaleString()} → {diff.after.toLocaleString()}
+                    {formatCount(diff.before)} → {formatCount(diff.after)}
                   </span>
                 </li>
               ))}

@@ -1,3 +1,4 @@
+import { formatCount } from '@/lib/formatCount';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import {
   useCallback,
@@ -560,8 +561,8 @@ export function BpcSourcingPanel({
   const capNote =
     sources.size > 0 && displayRows.length > shownRows.length
       ? t('bpcContracts.resultsCapped', {
-          shown: shownRows.length.toLocaleString(),
-          total: displayRows.length.toLocaleString(),
+          shown: formatCount(shownRows.length),
+          total: formatCount(displayRows.length),
         })
       : null;
   const marketNoteApplies = marketLookup.typeIds.length > 0 || sources.has('market');
@@ -960,8 +961,8 @@ export function BpcSourcingPanel({
                   stackSummary={
                     displayRows.length > shownRows.length
                       ? t('bpcContracts.mobile.offerCountCapped', {
-                          shown: shownRows.length.toLocaleString(),
-                          total: displayRows.length.toLocaleString(),
+                          shown: formatCount(shownRows.length),
+                          total: formatCount(displayRows.length),
                         })
                       : t('bpcContracts.mobile.offerCount', { count: displayRows.length })
                   }

@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { Tooltip, textActionClassName } from '@/components/ui';
 import type { SiblingClaim } from '@/engine/industry/groupStockClaims';
 import type { OwnedStockDetection } from './ownedStockDetection';
+import { formatCount } from '@/lib/formatCount';
 
 interface OwnedStockHintProps {
   /**
@@ -71,7 +72,7 @@ export function OwnedStockHint({
 }: OwnedStockHintProps) {
   const { t } = useTranslation();
 
-  const quantity = scopedQuantity.toLocaleString();
+  const quantity = formatCount(scopedQuantity);
   // The lower-bound marker is part of the number, so it has to be part of the
   // accessible name too: a name that dropped it would announce a floor as an
   // exact count, and the buy list a player builds on that is wrong low.
@@ -84,11 +85,11 @@ export function OwnedStockHint({
       ? null
       : claimedAhead.length === 1
         ? t('industry.groupClaimedIn', {
-            quantity: claimedQuantity.toLocaleString(),
+            quantity: formatCount(claimedQuantity),
             plan: claimedAhead[0].name,
           })
         : t('industry.groupClaimedInPlans', {
-            quantity: claimedQuantity.toLocaleString(),
+            quantity: formatCount(claimedQuantity),
             count: claimedAhead.length,
           });
   const owned = claim === null ? detected : `${detected} · ${claim}`;
@@ -99,7 +100,7 @@ export function OwnedStockHint({
         type="button"
         onClick={onApply}
         aria-label={t('industry.useDetectedFor', {
-          quantity: suggestion.toLocaleString(),
+          quantity: formatCount(suggestion),
           material: materialName,
           detected: owned,
         })}
@@ -110,7 +111,7 @@ export function OwnedStockHint({
             above still carries what a click will write. */}
         {claim === null
           ? t('industry.useDetected')
-          : t('industry.useDetectedQuantity', { quantity: suggestion.toLocaleString() })}
+          : t('industry.useDetectedQuantity', { quantity: formatCount(suggestion) })}
       </button>
     </Tooltip>
   );

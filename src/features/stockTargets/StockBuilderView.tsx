@@ -30,6 +30,7 @@ import { formatDuration } from '@/lib/duration';
 import { StockListNameDialog } from './StockListDialogs';
 import { StockStatusPill } from './StockStatus';
 import { useHydratedStore } from '@/lib/useHydratedStore';
+import { formatNumber } from '@/lib/numberLocale';
 
 interface BuilderRow extends StockRow {
   blueprint: CharacterBlueprint | null;
@@ -197,7 +198,7 @@ export function StockBuilderView({
       headerCellClassName: 'sm:w-28',
       className: 'tabular-nums',
       stackAffix: { after: ` ${t('stockTargets.builder.toBuildAffix')}` },
-      render: (row) => row.toSource.toLocaleString(),
+      render: (row) => formatNumber(row.toSource),
       sortValue: (row) => row.toSource,
     },
     // Needs-blueprint table: no row has one; its heading says so.

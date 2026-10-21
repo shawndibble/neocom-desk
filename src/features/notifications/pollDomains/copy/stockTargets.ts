@@ -1,5 +1,6 @@
 import type { StockBelowTargetFire } from '@/engine/stockTargets/stockAlert';
 import { type DomainCopy, type NoNames, fired } from './shared';
+import { formatNumber } from '@/lib/numberLocale';
 
 export const stockBelowTargetCopy: DomainCopy<StockBelowTargetFire, NoNames> = {
   // Per item on a list, like a price alert: the lists count every Character.
@@ -10,9 +11,9 @@ export const stockBelowTargetCopy: DomainCopy<StockBelowTargetFire, NoNames> = {
     // Stock waiting in the hangar there is the quickest restock, so the alert says so.
     body: fired('stockBelowTarget', fire.inHangar > 0 ? 'bodyHangar' : 'body', {
       list: fire.listName,
-      listed: fire.listed.toLocaleString(),
-      target: fire.target.toLocaleString(),
-      hangar: fire.inHangar.toLocaleString(),
+      listed: formatNumber(fire.listed),
+      target: formatNumber(fire.target),
+      hangar: formatNumber(fire.inHangar),
       count: fire.inHangar,
     }),
   }),

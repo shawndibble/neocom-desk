@@ -10,6 +10,7 @@ import type { LpBasis } from '@/features/loyalty/lpBasis';
 import { LoyaltyItemName } from '@/features/loyalty/OfferDetail';
 import { iskPerLpTone } from '@/features/loyalty/offerRowDisplay';
 import type { LoyaltyOfferRow } from '@/features/loyalty/offerRows';
+import { formatCount } from '@/lib/formatCount';
 
 /**
  * The offers table's columns: the identity column (never hidden) plus the optional
@@ -91,7 +92,7 @@ export function useLoyaltyOfferColumns({
             )}
           </span>
           <span className="text-[0.6875rem] text-text-dim">
-            {row.offer.lp_cost.toLocaleString()} LP +{' '}
+            {formatCount(row.offer.lp_cost)} LP +{' '}
             <IskAmount value={row.offer.isk_cost} decimals={0} />
           </span>
         </span>

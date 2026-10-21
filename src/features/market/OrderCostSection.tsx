@@ -9,6 +9,7 @@ import type { OpenOrderRow } from './openOrdersModel';
 import type { OrderDetailView } from './orderDetailView';
 import type { LocationState } from './orderScopeState';
 import { CostLedger } from './OrderCostLedger';
+import { formatCount } from '@/lib/formatCount';
 
 /** "Cost basis" (sell orders only): the ledger the floor came from, the structure fee and the build link. */
 export function OrderCostSection({
@@ -59,8 +60,8 @@ export function OrderCostSection({
                 <p className="text-xs text-text-dim">
                   {row.walletGap.kind === 'partial'
                     ? t('market.orders.walletBasisPartial', {
-                        covered: row.walletGap.coveredUnits.toLocaleString(),
-                        total: row.walletGap.pool.toLocaleString(),
+                        covered: formatCount(row.walletGap.coveredUnits),
+                        total: formatCount(row.walletGap.pool),
                       })
                     : t('market.orders.walletBasisHistoryShort')}
                   {row.walletGap.truncated ? ' ' + t('market.orders.walletBasisTruncated') : null}

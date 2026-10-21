@@ -92,6 +92,7 @@ import { UnpricedIsk } from './UnpricedIsk';
 import { systemLabel } from './names';
 import type { DailyRatePoint, TypeComparisonPoint } from './MiningYieldCharts';
 import { useHydratedStore } from '@/lib/useHydratedStore';
+import { formatCount } from '@/lib/formatCount';
 
 const LazyMiningYieldCharts = lazy(() => guarded(() => import('./MiningYieldCharts')));
 
@@ -424,7 +425,7 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
       header: t('miningTax.overview.unitsColumn'),
       align: 'right',
       className: 'whitespace-nowrap tabular-nums',
-      render: (row) => sumUnits(row.entry.oreLines).toLocaleString(),
+      render: (row) => formatCount(sumUnits(row.entry.oreLines)),
       sortValue: (row) => sumUnits(row.entry.oreLines),
       stackAffix: { after: ` ${t('miningTax.overview.unitsColumn').toLowerCase()}` },
     },

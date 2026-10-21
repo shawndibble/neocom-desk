@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import type { GroupOwnedDifference } from './planMaterialsView';
+import { formatCount } from '@/lib/formatCount';
 
 /**
  * One line under a member plan's Owned Material Source row when its owned
@@ -17,18 +18,17 @@ export function GroupOwnedDiffersHint({
   difference: GroupOwnedDifference | null;
   group: { id: string; name: string } | null;
 }) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   if (!difference || !group) return null;
-  const fmt = new Intl.NumberFormat(i18n.language);
   return (
     <p className="flex flex-wrap items-center gap-x-1.5 text-[0.6875rem] text-text-dim">
       <Icon.Warn size={Icon.ICON_SIZE.sm} className="text-warning" aria-hidden />
       <span>
         {t('industry.groupOwnedDiffers', {
           group: group.name,
-          groupQty: fmt.format(difference.group),
+          groupQty: formatCount(difference.group),
           material: difference.name,
-          planQty: fmt.format(difference.plan),
+          planQty: formatCount(difference.plan),
         })}
       </span>
       <Link to={`/industry/groups/${group.id}`} className={inlineLinkClassName}>

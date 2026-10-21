@@ -3,6 +3,7 @@ import { RowCaret, type DataTableColumn } from '@/components/ui';
 import { cx } from '@/lib/cx';
 import type { DayLine, PaymentLine } from './corpTaxBookFixtures';
 import { isk, isk2 } from './corpTaxBookFormat';
+import { formatNumber } from '@/lib/numberLocale';
 
 export function caretColumn<T>(): DataTableColumn<T> {
   return {
@@ -43,7 +44,7 @@ export const dayColumns: DataTableColumn<DayLine>[] = [
     render: (row) => (
       <span>
         {row.ore}
-        <span className="text-text-dim"> × {row.units.toLocaleString('en')}</span>
+        <span className="text-text-dim"> × {formatNumber(row.units)}</span>
       </span>
     ),
   },

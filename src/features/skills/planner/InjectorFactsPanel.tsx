@@ -11,6 +11,10 @@ import { ALPHA_SP_CAP } from '@/engine/skills/skillInjectors';
 import type { CloneState } from '@/engine/types';
 import { buildInjectorFacts } from './injectorFacts';
 import { useHydratedStore } from '@/lib/useHydratedStore';
+import { createNumberFormat, formatNumber } from '@/lib/numberLocale';
+
+// Part-trained levels bank fractional SP; the old default printed up to 3 decimals.
+const formatSp = createNumberFormat({ maximumFractionDigits: 3 });
 
 const LARGE_SKILL_INJECTOR_NAME = 'Large Skill Injector';
 
@@ -88,15 +92,15 @@ export function InjectorFactsPanel({
       <dl className="space-y-1">
         <div className="flex items-center justify-between gap-2">
           <dt className="text-text-dim">{t('plans.injectors.spToTrain')}</dt>
-          <dd className="tabular-nums">{facts.spToTrain.toLocaleString()}</dd>
+          <dd className="tabular-nums">{formatSp(facts.spToTrain)}</dd>
         </div>
         <div className="flex items-center justify-between gap-2">
           <dt className="text-text-dim">{t('plans.injectors.unallocated')}</dt>
-          <dd className="tabular-nums">{(facts.unallocatedSp ?? 0).toLocaleString()}</dd>
+          <dd className="tabular-nums">{formatNumber(facts.unallocatedSp ?? 0)}</dd>
         </div>
         <div className="flex items-center justify-between gap-2">
           <dt className="text-text-dim">{t('plans.injectors.gap')}</dt>
-          <dd className="tabular-nums">{(facts.gapSp ?? 0).toLocaleString()}</dd>
+          <dd className="tabular-nums">{formatSp(facts.gapSp ?? 0)}</dd>
         </div>
         <div className="flex items-center justify-between gap-2">
           <dt className="text-text-dim">{t('plans.injectors.count')}</dt>
@@ -109,7 +113,7 @@ export function InjectorFactsPanel({
         </div>
         <div className="flex items-center justify-between gap-2">
           <dt className="text-text-dim">{t('plans.injectors.surplus')}</dt>
-          <dd className="tabular-nums">{facts.surplusSp.toLocaleString()}</dd>
+          <dd className="tabular-nums">{formatSp(facts.surplusSp)}</dd>
         </div>
         <div className="flex items-center justify-between gap-2">
           <dt className="text-text-dim">{t('plans.injectors.pricePer')}</dt>
@@ -123,8 +127,8 @@ export function InjectorFactsPanel({
       {facts.alphaShortfallSp > 0 && (
         <p className="text-warning">
           {t('plans.injectors.alphaOverCap', {
-            sp: facts.alphaShortfallSp.toLocaleString(),
-            cap: ALPHA_SP_CAP.toLocaleString(),
+            sp: formatNumber(facts.alphaShortfallSp),
+            cap: formatNumber(ALPHA_SP_CAP),
           })}
         </p>
       )}

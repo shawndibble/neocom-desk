@@ -29,6 +29,7 @@ import { useLedgerAction } from './useLedgerAction';
 import { LabelField } from './LabelField';
 import { LedgerActionError } from './LedgerActionError';
 import { toggleInSet } from '@/lib/sets';
+import { formatCount } from '@/lib/formatCount';
 
 interface AssignDialogProps {
   row: MoonMiningTaxRow;
@@ -368,7 +369,7 @@ export function AssignDialog({
                     {typeNames.get(line.typeId) ?? `#${line.typeId}`}
                   </OreLink>
                 </span>
-                <span className="tabular-nums text-text-dim">{line.quantity.toLocaleString()}</span>
+                <span className="tabular-nums text-text-dim">{formatCount(line.quantity)}</span>
               </li>
             ))}
           </ul>

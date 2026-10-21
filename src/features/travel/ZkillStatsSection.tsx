@@ -22,6 +22,7 @@ import { useRetryFocus } from '@/lib/useRetryFocus';
 import { zkillFailureKey } from '@/lib/zkillFailureKey';
 import type { PilotStats, PilotStatsResult, PilotTopShip } from '@/lib/zkillboard';
 import { killerRatio, type StatTileItem } from './zkillFigures';
+import { formatNumber } from '@/lib/numberLocale';
 
 const NO_HISTORY_HINT = {
   pilot: 'travel.pilot.noHistoryHint',
@@ -177,12 +178,12 @@ export function ZkillStatsSection({
       <p className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm text-text-dim tabular-nums">
         <span>
           <b className="font-semibold text-isk-pos">
-            {t('travel.pilot.allTime.kills', { value: s.kills.toLocaleString() })}
+            {t('travel.pilot.allTime.kills', { value: formatNumber(s.kills) })}
           </b>
         </span>
         <span>
           <b className="font-semibold text-isk-neg">
-            {t('travel.pilot.allTime.losses', { value: s.losses.toLocaleString() })}
+            {t('travel.pilot.allTime.losses', { value: formatNumber(s.losses) })}
           </b>
         </span>
         <span>
@@ -197,7 +198,7 @@ export function ZkillStatsSection({
           </b>{' '}
           {t('travel.pilot.allTime.lost')}
         </span>
-        <span>{t('travel.pilot.allTime.solo', { value: s.soloKills.toLocaleString() })}</span>
+        <span>{t('travel.pilot.allTime.solo', { value: formatNumber(s.soloKills) })}</span>
       </p>
       <ZkillStatsNote stats={stats} subject="pilot" />
     </section>
@@ -397,7 +398,7 @@ export function ZkillTopShips({ ships }: { ships: PilotTopShip[] }) {
             <span className="text-sm font-medium text-text tabular-nums">
               {t('travel.pilot.shipKills', {
                 count: ship.kills,
-                formatted: ship.kills.toLocaleString(),
+                formatted: formatNumber(ship.kills),
               })}
             </span>
           </li>
