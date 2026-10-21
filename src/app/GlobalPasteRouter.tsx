@@ -8,7 +8,6 @@ import { FITTINGS_PATH } from '@/features/fittings/fittingRoutes';
 import { tabPath } from '@/lib/pageTabs';
 import {
   isTypingTarget,
-  OVERLAY_SELECTOR,
   type FittingLoadState,
   type IndustryBlueprintListState,
   type MarketAppraiseState,
@@ -136,9 +135,9 @@ function looksLikeList(text: string): boolean {
  * Fittings or the Appraisal straight away. No confirm step: a mistaken paste
  * is one Back away, and every page keeps its own state across the trip.
  *
- * Mounted once from `Layout`. Steps aside for a focused field and for any
- * open overlay (a dialog's own import box handles its own paste), same as
- * the global keyboard shortcuts.
+ * Mounted once from `Layout`. Steps aside only for a paste into a field (a
+ * dialog's own import box handles its own paste); an open dialog, drawer or
+ * menu does not block it.
  */
 export function GlobalPasteRouter() {
   const { t } = useTranslation();
@@ -156,8 +155,8 @@ export function GlobalPasteRouter() {
   useEffect(() => {
     function onPaste(event: ClipboardEvent) {
       if (event.defaultPrevented) return;
-      if (isTypingTarget(event.target) || isTypingTarget(document.activeElement)) return;
-      if (document.querySelector(OVERLAY_SELECTOR)) return;
+      // Only where the paste lands: a dialog's own import box is a field.
+      if (isTypingTarget(event.target)) return;
       const text = event.clipboardData?.getData('text/plain') ?? '';
       if (text.trim() === '') return;
 

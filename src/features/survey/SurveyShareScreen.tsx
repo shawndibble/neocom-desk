@@ -110,7 +110,7 @@ export function SurveyShareScreen({ shareId }: { shareId: string }) {
   useEffect(() => {
     function onPaste(event: ClipboardEvent) {
       if (event.defaultPrevented) return;
-      if (isTypingTarget(event.target) || isTypingTarget(document.activeElement)) return;
+      if (isTypingTarget(event.target)) return;
       const text = event.clipboardData?.getData('text/plain') ?? '';
       if (parseSurveyScan(text) !== null) void trackedAdd(text);
     }
