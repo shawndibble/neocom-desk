@@ -159,6 +159,8 @@ export interface RemovalMailsInput {
   /** `startsClock`: a copy to the moon owner's CEO or payee (a removal notice only). */
   recipients: readonly { id: number; name: string; startsClock?: boolean }[];
   mail: { subject: string; body: string };
+  /** The removal a notice belongs to (`startedAt`); the queue re-checks it before sending (#4621). */
+  removalStartedAt?: number;
 }
 
 /**
@@ -180,6 +182,7 @@ export async function enqueueRemovalMails(input: RemovalMailsInput): Promise<num
     recipientId: r.id,
     recipientName: r.name,
     ...(r.startsClock === undefined ? {} : { startsClock: r.startsClock }),
+    ...(input.removalStartedAt === undefined ? {} : { removalStartedAt: input.removalStartedAt }),
     amount: 0,
     subject: input.mail.subject,
     body: input.mail.body,

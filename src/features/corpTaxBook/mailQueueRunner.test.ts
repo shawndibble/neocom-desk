@@ -50,6 +50,38 @@ describe('stepQueue', () => {
     expect(h.deps.log).toHaveBeenCalledTimes(1);
   });
 
+  it('drops a removal notice the precheck says is no longer due, and sends nothing (#4621)', async () => {
+    const isStillDue = vi.fn(async () => false);
+    const drop = vi.fn(async (ids: readonly string[]) => ids.forEach((id) => h.rows.delete(id)));
+    const h = harness([item(1, { kind: 'removal', feederCorporationId: 2 })], { isStillDue, drop });
+    await stepQueue(h.deps);
+    expect(isStillDue).toHaveBeenCalledTimes(1);
+    expect(h.deps.send).not.toHaveBeenCalled();
+    expect(drop).toHaveBeenCalledWith(['m1']);
+    expect(h.rows.has('m1')).toBe(false);
+  });
+
+  it('sends a removal notice the precheck still wants', async () => {
+    const h = harness([item(1, { kind: 'removal', feederCorporationId: 2 })], {
+      isStillDue: async () => true,
+      drop: vi.fn(async () => undefined),
+    });
+    await stepQueue(h.deps);
+    expect(h.deps.send).toHaveBeenCalledTimes(1);
+  });
+
+  it('never sends when the precheck cannot tell: the mail fails for a Retry', async () => {
+    const h = harness([item(1, { kind: 'removal', feederCorporationId: 2 })], {
+      isStillDue: async () => {
+        throw Object.assign(new Error('permission-denied'), { status: 403 });
+      },
+      drop: vi.fn(async () => undefined),
+    });
+    await stepQueue(h.deps);
+    expect(h.deps.send).not.toHaveBeenCalled();
+    expect(h.rows.get('m1')?.status).toBe('failed');
+  });
+
   it('is done (null delay) once nothing is waiting', async () => {
     const h = harness([item(1, { status: 'sent', logged: true, mailId: 1 })]);
     expect((await stepQueue(h.deps)).delayMs).toBeNull();

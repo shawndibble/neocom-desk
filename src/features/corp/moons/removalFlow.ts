@@ -82,6 +82,7 @@ export async function startRemovalAndMail(ctx: RemovalContext): Promise<void> {
     senderCharacterId: ctx.characterId,
     kind: 'removal',
     recipients,
+    removalStartedAt: started.startedAt,
     mail: composeRemovalMail({
       accountingName: ctx.accountingName,
       ownerName: ctx.ownerName,
