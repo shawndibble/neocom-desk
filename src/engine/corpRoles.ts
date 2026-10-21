@@ -80,6 +80,11 @@ export interface CorpCapabilities {
    * holds this; it alone never opens a corp surface (`hasAnyCorpCapability`).
    */
   canReadContracts: boolean;
+  /**
+   * GET /corporations/{id}/orders — the corporation's open market orders
+   * (issue #4612). `x-required-roles` is Accountant or Trader.
+   */
+  canReadOrders: boolean;
 }
 
 export type CorpCapability = keyof CorpCapabilities;
@@ -103,6 +108,7 @@ export const CORP_CAPABILITIES: readonly CorpCapability[] = [
   'canReadCustomsOffices',
   'canReadRoleAudit',
   'canReadContracts',
+  'canReadOrders',
 ];
 
 /** The answer for a Character with no roles — and the shape of "not loaded yet". */
@@ -118,6 +124,7 @@ export const NO_CORP_CAPABILITIES: CorpCapabilities = {
   canReadCustomsOffices: false,
   canReadRoleAudit: false,
   canReadContracts: false,
+  canReadOrders: false,
 };
 
 /**
@@ -156,6 +163,8 @@ const ROLES_FOR_CAPABILITY: Readonly<Record<CorpCapability, readonly string[]>> 
   canReadRoleAudit: [],
   // No `x-required-roles` on the contracts routes: handled as "every member" in `corpCapabilities`.
   canReadContracts: [],
+  // `x-required-roles` on /corporations/{id}/orders: Accountant or Trader.
+  canReadOrders: ['Accountant', 'Trader'],
 };
 
 /** Capabilities every corp member holds: ESI names no role for them, so they say nothing about roles. */

@@ -17,6 +17,7 @@ import {
   getCorporationMiningObservers,
   getCorporationContracts,
   getCorporationContractItems,
+  getCorporationOrders,
   getCorporationMiningObserver,
   getAlliancePublicInfo,
   getUniverseType,
@@ -711,6 +712,29 @@ describe('corp mining observers', () => {
 
     expect(ledger.items).toEqual([row(1), row(2)]);
     expect(ledger.truncated).toBe(false);
+  });
+});
+
+describe('corp orders', () => {
+  const CORPORATION_ID = 98000001;
+
+  it('getCorporationOrders lists the corporation’s open orders, across pages', async () => {
+    const row = (id: number) => ({ order_id: id, type_id: 34, issued_by: 7 });
+    server.use(
+      http.get(`${ESI_BASE_URL}/corporations/${CORPORATION_ID}/orders`, ({ request }) => {
+        const bad = rejectBadEsiHeaders(request);
+        if (bad) return bad;
+        const page = new URL(request.url).searchParams.get('page');
+        return HttpResponse.json(page === '2' ? [row(2)] : [row(1)], {
+          headers: { 'X-Pages': '2' },
+        });
+      })
+    );
+
+    const result = await getCorporationOrders(CHARACTER_ID, CORPORATION_ID);
+
+    expect(result.items).toEqual([row(1), row(2)]);
+    expect(result.truncated).toBe(false);
   });
 });
 

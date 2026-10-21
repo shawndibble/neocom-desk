@@ -254,6 +254,7 @@ describe('useCorpAccess — ready', () => {
       canReadCustomsOffices: true,
       canReadRoleAudit: true,
       canReadContracts: true,
+      canReadOrders: true,
     });
   });
 
@@ -285,6 +286,7 @@ describe('useCorpAccess — ready', () => {
     expect(result.current.missingScopes).toEqual([
       'esi-industry.read_corporation_mining.v1',
       'esi-contracts.read_corporation_contracts.v1',
+      'esi-markets.read_corporation_orders.v1',
     ]);
   });
 
@@ -293,6 +295,7 @@ describe('useCorpAccess — ready', () => {
       ...CORP_SCOPES_FOR_CAPABILITY.canReadWallet,
       ...CORP_SCOPES_FOR_CAPABILITY.canReadMiningLedger,
       ...CORP_SCOPES_FOR_CAPABILITY.canReadContracts,
+      ...CORP_SCOPES_FOR_CAPABILITY.canReadOrders,
       ROLES_SCOPE,
     ]);
     mockedLoadRoles.mockResolvedValue(rolesResolvingTo(['Accountant']));
