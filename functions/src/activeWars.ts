@@ -51,9 +51,9 @@ export interface StoredWar {
 
 /** Where the last run got to, kept in the same doc as the list. */
 export interface SweepState {
-  /** The newest war id every id above which has been read. */
+  /** Every listed id above this one has been read. */
   topId?: number;
-  /** Every listed id at or above this one, back to the newest, has been read. */
+  /** Every listed id from the newest down to this one has been read. */
   floorId?: number;
 }
 

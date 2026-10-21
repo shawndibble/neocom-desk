@@ -24,6 +24,10 @@ export const ACTIVE_WARS_RUN_BUDGET = 1500;
 /** Stop reading when ESI says this few tokens are left, so the window is never emptied. */
 const MIN_TOKENS_LEFT = 300;
 const CONCURRENCY = 8;
+/** Share of held wars that must read again for `updatedAt` to move. */
+const OPEN_CONFIRMED_SHARE = 0.95;
+/** Open wars past this and one doc, or one run's reads, start to strain. */
+const OPEN_WARS_WARN_AT = 1000;
 /** `/wars` pages are 2,000 ids, so the horizon is about six. */
 const MAX_LIST_PAGES = 10;
 
@@ -80,7 +84,9 @@ async function listWarIds(fetchImpl: typeof fetch): Promise<number[] | null> {
 
 function heldWars(value: unknown): StoredWar[] {
   return Array.isArray(value)
-    ? value.filter((war): war is StoredWar => typeof war?.id === 'number')
+    ? value.filter(
+        (war): war is StoredWar => typeof war?.id === 'number' && typeof war?.declared === 'number'
+      )
     : [];
 }
 
@@ -126,15 +132,14 @@ export async function runActiveWarsSweep(deps: ActiveWarsDeps): Promise<ActiveWa
         ) {
           stop = true;
         }
-        if (res.status === 404) {
+        if (res.status === 404 || res.status === 410) {
           done.add(id);
           removed.push(id);
         } else if (res.ok) {
+          // A body that is not a war will not be one next run either: done, not stored.
           const war = parseEsiWar(await res.json().catch(() => null));
-          if (war !== null) {
-            fetched.push(war);
-            done.add(id);
-          }
+          if (war !== null) fetched.push(war);
+          done.add(id);
         }
       } catch {
         // A failed read is left undone: the next run tries it again.
@@ -146,9 +151,12 @@ export async function runActiveWarsSweep(deps: ActiveWarsDeps): Promise<ActiveWa
   const at = now();
   const wars = mergeOpenWars(held, fetched, removed, at);
   const next = advanceSweep(listed, state, plan, done);
-  // The list is "confirmed now" only if every war it holds was read again; a
-  // new id that would not read is retried next run and does not age the rest.
-  const openConfirmed = plan.openIds.every((id) => done.has(id));
+  // The list is "confirmed now" when nearly every war it holds was read again,
+  // so one war ESI will not serve cannot freeze the list for everyone; an
+  // outage or a spent rate window reads few and does not confirm. A new id that
+  // would not read is retried next run and does not age the rest.
+  const openRead = plan.openIds.filter((id) => done.has(id)).length;
+  const openConfirmed = openRead >= plan.openIds.length * OPEN_CONFIRMED_SHARE;
   const updatedAt = openConfirmed ? at : (doc?.updatedAt ?? 0);
   await deps.write({ updatedAt, wars, ...next });
   const outcome: ActiveWarsOutcome = {
@@ -158,6 +166,9 @@ export async function runActiveWarsSweep(deps: ActiveWarsDeps): Promise<ActiveWa
     failed: plan.newIds.length + plan.openIds.length + plan.seedIds.length - done.size,
     ...(next.floorId === undefined ? {} : { floorId: next.floorId }),
   };
+  if (wars.length > OPEN_WARS_WARN_AT) {
+    logWarn('active wars: the open list is large for one doc and one run', { open: wars.length });
+  }
   logInfo('active wars sweep', { ...outcome, openConfirmed });
   return outcome;
 }

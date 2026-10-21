@@ -128,4 +128,45 @@ describe('runActiveWarsSweep', () => {
     expect(doc.updatedAt).toBe(777);
     expect(doc.wars.map((war) => war.id)).toEqual([20, 5]);
   });
+
+  it('counts a seed war whose body is not a war as done, so the floor can pass it', async () => {
+    const esi = fakeEsi([12, 11, 10], {
+      12: { body: esiWar(12) },
+      11: { body: { id: 11 } },
+      10: { body: esiWar(10) },
+    });
+    const { write, result } = run(esi, undefined);
+    await result;
+    const doc = (write.mock.calls[0] as unknown[])[0] as {
+      floorId: number;
+      wars: { id: number }[];
+    };
+    expect(doc.floorId).toBe(10);
+    expect(doc.wars.map((war) => war.id)).toEqual([12, 10]);
+  });
+
+  it('keeps the list fresh when one held war of many will not read', async () => {
+    const held = (id: number) => ({
+      id,
+      declared: NOW - 10 * HOUR,
+      started: NOW - HOUR,
+      mutual: false,
+      openForAllies: false,
+      aggressor: { corporationId: 1, iskDestroyed: 0, shipsKilled: 0 },
+      defender: { corporationId: 2, iskDestroyed: 0, shipsKilled: 0 },
+      allies: [],
+    });
+    const ids = Array.from({ length: 40 }, (_, i) => 100 + i);
+    const routes: Record<number, Route> = {};
+    for (const id of ids) routes[id] = id === 100 ? { status: 500 } : { body: esiWar(id) };
+    const esi = fakeEsi([...ids].reverse(), routes);
+    const { write, result } = run(
+      esi,
+      { updatedAt: 777, topId: 139, floorId: 100, wars: ids.map(held) },
+      100
+    );
+    await result;
+    const doc = (write.mock.calls[0] as unknown[])[0] as { updatedAt: number };
+    expect(doc.updatedAt).toBe(NOW);
+  });
 });
