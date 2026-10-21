@@ -5603,6 +5603,40 @@
       "pushOff": "Push on this device: Off"
     }
   },
+  "wars": {
+    "banner": {
+      "label": "War",
+      "title": "At war with {{name}}",
+      "titleMore_one": "At war with {{name}} and {{count}} more",
+      "titleMore_other": "At war with {{name}} and {{count}} more",
+      "declared": "Declared {{age}}",
+      "startsIn": "Starts in {{time}}",
+      "notStarted": "Not started yet",
+      "view": "Details"
+    },
+    "modal": {
+      "title_one": "War declared",
+      "title_other": "{{count}} wars declared",
+      "active": "Active",
+      "startsIn": "Starts in {{time}}",
+      "pendingUnknown": "Not started",
+      "declaredOnYou": "Declared war on you",
+      "declaredOnAlly": "Declared war on your ally {{name}}",
+      "declared": "Declared",
+      "starts": "Starts",
+      "started": "Started",
+      "ends": "Ends",
+      "mutual": "Mutual",
+      "noEnd": "No end set",
+      "allies": "Allies",
+      "noAllies": "None",
+      "theyDestroyed": "They destroyed",
+      "weDestroyed": "We destroyed",
+      "ships_one": "{{count}} ship",
+      "ships_other": "{{count}} ships",
+      "zkill": "War on zKillboard"
+    }
+  },
   "common": {
     "unknownType": "Type {{id}}",
     "needsConnection": "Needs a connection",
