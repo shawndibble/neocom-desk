@@ -15,7 +15,7 @@ import {
   WHAT_WE_STORE_GROUPS,
 } from './whatWeStore';
 
-const QUESTIONS = 18;
+const QUESTIONS = 19;
 
 /** Renders the FAQ with every question opened, as the content tests read the answers. */
 function renderFaq(initialEntry = '/help/faq') {
@@ -96,6 +96,9 @@ function syncedItemIds(): Set<string> {
   const group = WHAT_WE_STORE_GROUPS.find((g) => g.id === 'synced');
   return new Set(group?.items.map((item) => item.id) ?? []);
 }
+
+/** The always-open sub-list under the "find skills to train" question. */
+const TRAIN_SKILLS_STEPS = 6;
 
 describe('FaqPanel — What We Store', () => {
   // Which line accounts for each remote collection is declared on the
@@ -188,6 +191,7 @@ describe('FaqPanel — What We Store', () => {
     const items = WHAT_WE_STORE_GROUPS.flatMap((g) => g.items);
     const lines =
       QUESTIONS +
+      TRAIN_SKILLS_STEPS +
       RETENTION_GROUPS.reduce((sum, g) => sum + g.items.length, 0) +
       items.length +
       items.reduce((sum, item) => sum + (item.detailKeys?.length ?? 0), 0);
@@ -197,12 +201,12 @@ describe('FaqPanel — What We Store', () => {
   it('answers the how-to questions with where to go', () => {
     renderFaq();
     expect(
-      screen.getByText(/Delete all data deletes every character's synced data/)
+      screen.getByText(/Delete all data removes every Character's synced data/)
     ).toBeInTheDocument();
-    expect(screen.getByText(/press Update now/)).toBeInTheDocument();
+    expect(screen.getByText(/Update now/)).toBeInTheDocument();
     expect(
       screen.getByText(
-        /Alerts whose time is known ahead.*a contract about to expire.*Community alerts, needs the app open/
+        /Alerts with a known time.*a contract or market order about to expire.*Community alerts, needs the app open/
       )
     ).toBeInTheDocument();
   });
@@ -245,7 +249,7 @@ describe('FaqPanel — What We Store', () => {
       screen.getByText(/is not uploaded, apart from what you choose to share/i)
     ).toBeInTheDocument();
     // The intro used to say EVE data "stays on this device" without exception.
-    expect(screen.getByText(/exceptions are listed below/i)).toBeInTheDocument();
+    expect(screen.getByText(/exceptions, listed below/i)).toBeInTheDocument();
   });
 
   it('points to the Help page’s Support tab', () => {
@@ -348,6 +352,7 @@ describe('FaqPanel: Using Neocom Desk', () => {
       'phone',
       'install',
       'update',
+      'train-skills',
       'communities',
     ]) {
       expect(document.getElementById(id), `#${id}`).toBeInTheDocument();

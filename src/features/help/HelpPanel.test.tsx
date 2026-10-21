@@ -27,15 +27,6 @@ describe('HelpPanel', () => {
     expect(screen.getByText(/report bugs and ideas on Discord, not GitHub/i)).toBeInTheDocument();
   });
 
-  it('lists the ways to find and add skills', () => {
-    render(<HelpPanel />);
-
-    expect(screen.getByRole('heading', { name: /finding skills to train/i })).toBeInTheDocument();
-    expect(screen.getByText(/From skill queue/i)).toBeInTheDocument();
-    expect(screen.getByText(/Certified Plan/i)).toBeInTheDocument();
-    expect(screen.getByText(/Ships > Tree/)).toBeInTheDocument();
-  });
-
   it('names the pilot to thank', () => {
     render(<HelpPanel />);
 
