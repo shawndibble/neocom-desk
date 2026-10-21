@@ -8,22 +8,26 @@
  */
 import {
   buildOpenOrderRows,
+  type OpenOrderRow,
   openOrderProblemCounts,
   notCheckedCount,
 } from '@/features/market/openOrdersModel';
 import { formatIskCompact } from '@/lib/isk';
 import { blank, corpUnreadable, count, statusOf, type Builder } from './builderKit';
+import type { CorpOrdersFeed } from './corpFeeds';
 import { ordersListed, ordersTable } from './ordersModels';
 
 const C = 'overview.widgets.corpOrders';
+/** The Market orders page's Corp view. */
+const TO = '/market/orders?scope=corp';
 
-export const corpOrders: Builder = (feeds, { t, now }) => {
-  const feed = feeds.corpOrders;
-  const data = feed?.data ?? null;
-  if (!data) return blank(null, statusOf(feed));
-  if (!data.readable) return corpUnreadable(null, feed, data.needsReauth, t);
-
-  const rows = buildOpenOrderRows({
+/**
+ * The corporation's open orders as Orders-page rows, judged by the character
+ * undercut rules. Shared by the widget and the Market orders Corp view, so the
+ * two never disagree on what is undercut.
+ */
+export function corpOrderRows(data: CorpOrdersFeed, now: number): OpenOrderRow[] {
+  return buildOpenOrderRows({
     snapshot: {
       entries: [
         {
@@ -45,6 +49,15 @@ export const corpOrders: Builder = (feeds, { t, now }) => {
     skillsByCharacter: new Map(),
     now,
   });
+}
+
+export const corpOrders: Builder = (feeds, { t, now }) => {
+  const feed = feeds.corpOrders;
+  const data = feed?.data ?? null;
+  if (!data) return blank(TO, statusOf(feed));
+  if (!data.readable) return corpUnreadable(TO, feed, data.needsReauth, t);
+
+  const rows = corpOrderRows(data, now);
   const counts = openOrderProblemCounts(rows);
   const undercut = counts.undercutStation + counts.undercutSystem + counts.undercutRegion;
   const unchecked = notCheckedCount(rows);
@@ -56,7 +69,7 @@ export const corpOrders: Builder = (feeds, { t, now }) => {
   for (const [id, name] of issuedBy) if (name === '') issuedBy.delete(id);
 
   return {
-    ...blank(null, statusOf(feed, { isEmpty: rows.length === 0 })),
+    ...blank(TO, statusOf(feed, { isEmpty: rows.length === 0 })),
     fetchedAt: data.fetchedAt,
     fromCache: data.fromCache,
     number: {
