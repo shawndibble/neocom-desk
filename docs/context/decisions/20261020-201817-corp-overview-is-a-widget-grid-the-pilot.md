@@ -17,8 +17,10 @@ _Recorded 2026-10-20._
   edits, the page draws the full default (every default corp kind) and never
   saves it; the capability gate decides what is drawn. The default is never
   trimmed to one Character's roles: an alt's edit would then save a layout
-  missing the Director main's widgets. On a new device it waits for the first
-  sync pull before drawing the default, like the Overview's first run.
+  missing the Director main's widgets. The default draws at once; on a new
+  device a first edit is shown but only saved once the first sync pull has
+  landed (a synced layout arriving meanwhile wins), so a pilot who never edits
+  never waits.
 - **Hide, don't lock.** A kind whose capability the Character lacks is never
   offered in the Gallery, drawn or fetched. A saved one stays in the layout but
   is not drawn. Coming-soon kinds are listed for everyone, not addable.

@@ -22,7 +22,7 @@
  *   about an hour. The data-age popover says so, and no widget prints a
  *   countdown shorter than that window.
  */
-import { lazy, Suspense, useCallback, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PageHeader, Spinner } from '@/components/ui';
 import { guarded } from '@/app/routeChunks';
@@ -133,19 +133,34 @@ function CorpGridView({ capabilities }: { capabilities: CorpCapabilities }) {
   const stored = useCorpOverviewLayout((state) => state.value);
   const setLayout = useCorpOverviewLayout((state) => state.setValue);
   const hydrated = useHydratedStore(useCorpOverviewLayout);
-  // An absent layout is the default only once a second device's pull has had its say: an edit
-  // made over the default before then would overwrite the layout already synced.
-  const firstRunReady = useFirstRunReady(hydrated, CORP_OVERVIEW_LAYOUT_KEY);
   const board = useMemo(() => corpWidgetBoard(capabilities), [capabilities]);
   const fallback = useMemo(() => corpDefaultLayout(), []);
-  const layout = stored ?? fallback;
-  const onLayoutChange = useCallback((next: OverviewLayout) => void setLayout(next), [setLayout]);
+
+  // The default draws at once, but a first edit over it is only saved once this device's first
+  // pull has had its say: written earlier, it would overwrite the layout another device synced.
+  // Until then it is held here; if a synced layout lands meanwhile, that one wins.
+  const firstRunReady = useFirstRunReady(hydrated, CORP_OVERVIEW_LAYOUT_KEY);
+  const [pending, setPending] = useState<OverviewLayout | null>(null);
+  const canSave = stored !== null || firstRunReady;
+  const canSaveRef = useRef(canSave);
+  useEffect(() => {
+    canSaveRef.current = canSave;
+  }, [canSave]);
+  // Once stored, `stored` wins over `pending`, so `pending` never needs clearing.
+  useEffect(() => {
+    if (pending !== null && canSave && stored === null) void setLayout(pending);
+  }, [pending, canSave, stored, setLayout]);
+  const onLayoutChange = useCallback(
+    (next: OverviewLayout) => (canSaveRef.current ? void setLayout(next) : setPending(next)),
+    [setLayout]
+  );
+  const layout = stored ?? pending ?? fallback;
   const kinds = useMemo(
     () => distinctKinds(visibleWidgets(layout.widgets, isPhone, board.canDraw)),
     [layout.widgets, isPhone, board]
   );
 
-  if (!hydrated || (stored === null && !firstRunReady)) {
+  if (!hydrated) {
     return (
       <div className="flex justify-center py-16">
         <Spinner label={t('common.loading')} />

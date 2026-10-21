@@ -24,9 +24,17 @@ import {
 } from '@/features/overview/widgets/layoutStore';
 import type { OverviewLayout } from '@/features/overview/widgets/layout';
 import { CORP_DEFAULT_KINDS } from '@/features/corp/grid/corpGrid';
+import { resetRouteSnapshots } from '@/lib/routeSnapshotCache';
+import { setStatus } from '@/sync/status';
 import { Corp } from './Corp';
 
 vi.mock('@/features/corp/useCorpAccess', () => ({ useCorpAccess: vi.fn() }));
+// Off by default, as in e2e; one test turns it on to hold a first edit until the first pull.
+const sync = vi.hoisted(() => ({ configured: false }));
+vi.mock('@/app/syncStatus', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/app/syncStatus')>()),
+  isSyncConfigured: () => sync.configured,
+}));
 // The widget loaders gate on this before they fetch; the test sets it to the
 // same capabilities `useCorpAccess` reports, as the real two always agree.
 vi.mock('@/features/corp/corpReadAccess', () => ({ resolveCorpReadAccess: vi.fn() }));
@@ -150,6 +158,9 @@ function renderCorp() {
 
 beforeEach(async () => {
   vi.clearAllMocks();
+  // Each widget read keeps its last result per character across unmounts; a test must not inherit one.
+  resetRouteSnapshots();
+  sync.configured = false;
   await db.settings.clear();
   useCorpOverviewLayout.setState({ value: null, hydrated: false });
   // The clock, not the timers: `waitFor` needs real ones, and every deadline
@@ -286,6 +297,8 @@ describe('per-widget capability gating (AC3)', () => {
     expect(await widget('Corp wallet')).toBeInTheDocument();
     expect(await widget('Cash flow')).toBeInTheDocument();
     expect(await widget('Income by source')).toBeInTheDocument();
+    // Let the wallet reads land here: one still in flight would fire into the next test's mocks.
+    await waitFor(() => expect(mocked.loadCorporationWalletJournal).toHaveBeenCalled());
     expect(mocked.loadCorporationStructures).not.toHaveBeenCalled();
     expect(screen.queryByRole('region', { name: 'Structures' })).not.toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Due soon' })).not.toBeInTheDocument();
@@ -368,6 +381,36 @@ describe('the layout', () => {
 
     await user.click(within(gallery).getByRole('button', { name: 'Add another Members' }));
     // The whole default is saved, not this Character's slice: a Director main keeps its wallet.
+    await waitFor(async () =>
+      expect((await storedLayout())?.widgets.map((w) => w.kind)).toEqual([
+        ...CORP_DEFAULT_KINDS,
+        'corpMembers',
+      ])
+    );
+  });
+
+  it('draws the default at once on a new device, and saves a first edit only after the first pull', async () => {
+    const user = userEvent.setup();
+    sync.configured = true;
+    mockedAccess.mockReturnValue(accessOf('ready', { canReadMembers: true }));
+    mocked.loadCorporationMemberTracking.mockResolvedValue(cached([]));
+    mocked.loadCorporationMemberIds.mockResolvedValue(cached([]));
+
+    renderCorp();
+    // No wait for the pull before drawing: a pilot who never edits never waits.
+    expect(await widget('Members')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Customize' }));
+    await user.click(await screen.findByRole('button', { name: 'Add widget' }));
+    const gallery = await screen.findByRole('dialog', { name: 'Add a widget' });
+    await user.click(within(gallery).getByRole('button', { name: 'Add another Members' }));
+    // The edit shows at once (the Gallery's own preview aside), though nothing is written yet.
+    const onPage = screen
+      .getAllByRole('region', { name: 'Members' })
+      .filter((region) => !gallery.contains(region));
+    expect(onPage).toHaveLength(2);
+    expect(await storedLayout()).toBeUndefined();
+
+    setStatus(CHARACTER_ID, { state: 'idle', lastSyncedAt: NOW });
     await waitFor(async () =>
       expect((await storedLayout())?.widgets.map((w) => w.kind)).toEqual([
         ...CORP_DEFAULT_KINDS,
