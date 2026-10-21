@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
-import type { MailQueueItem } from '@/engine/corpTaxBook/mailQueue';
+import { isStatementMail, type MailQueueItem } from '@/engine/corpTaxBook/mailQueue';
 import { isOfflineFailure, isUnconfirmedWrite } from '@/esi/client';
 import { sendMail } from '@/features/character/mail';
 import { openNewMail } from '@/features/openInEve/sendOpenNewMail';
@@ -24,6 +24,8 @@ function liveDeps(sending: (id: string | undefined) => void): QueueDeps {
         item.body
       ),
     log: async (item) => {
+      // A rate-change mail has no Statement to log on; the rate change is already in the audit trail.
+      if (!isStatementMail(item.kind)) return;
       const { editBook } = await import('@/features/corp/taxBook/bookClient');
       await editBook(
         item.senderCharacterId,

@@ -47,6 +47,18 @@ describe('MoonOwnerView', () => {
     expect(document.body.textContent).not.toMatch(/feeder|collector/i);
   });
 
+  it('has no "You asked" when nothing was asked for or the ask equals the new rate', () => {
+    const agreed = {
+      kind: 'agreed' as const,
+      pct: 8,
+      effectiveFrom: '2026-10-01',
+      recordedAt: '2026-10-01T10:00:00Z',
+    };
+    view({ requestedRatePct: null, rateHistory: [agreed] });
+    expect(screen.getByText('Your rate is 8%.')).toBeVisible();
+    expect(screen.queryByText(/You asked/)).toBeNull();
+  });
+
   it('shows the rate override line and the payments', () => {
     view();
     expect(

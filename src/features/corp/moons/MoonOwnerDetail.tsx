@@ -1,11 +1,14 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EmptyState } from '@/components/ui';
-import { moonOwnerDetail } from '@/engine/corpTaxBook/moonOwners';
+import { useGrantedScopes } from '@/app/useGrantedScopes';
+import { deriveOwnerRateHistory, moonOwnerDetail } from '@/engine/corpTaxBook/moonOwners';
 import { setFeederMode, setFeederRate } from '../taxBook/feederClient';
 import { SetRateDialog, SettledOtherwiseDialog } from './MoonOwnerDialogs';
 import { MoonOwnerPage } from './MoonOwnerPage';
+import { agreedRateChange, mailRateChange } from './rateChangeNotice';
 import { Crumb } from './moonsParts';
+import { useCorporationName } from './statementMailing';
 import { useBook } from './useBook';
 import { useMoonOwners } from './useMoonOwners';
 
@@ -14,7 +17,9 @@ const BACK = '/corp/moons/moon-owners';
 /** A moon owner's page at `/corp/moons/moon-owners/:id`, wired to the book. */
 export function MoonOwnerDetail({ id }: { id: string }) {
   const { t } = useTranslation();
-  const { names, canEdit, characterId, corporationId, reload } = useBook();
+  const { names, canEdit, characterId, corporationId, reload, data } = useBook();
+  const grantedScopes = useGrantedScopes();
+  const accountingName = useCorporationName();
   const { input } = useMoonOwners();
   const [dialog, setDialog] = useState<'rate' | 'settled' | null>(null);
   const corp = Number(id);
@@ -53,7 +58,27 @@ export function MoonOwnerDetail({ id }: { id: string }) {
         <SetRateDialog
           initial={detail.row.theirRatePct ?? null}
           onClose={() => setDialog(null)}
-          onSave={(pct) => afterEdit(() => setFeederRate(characterId, corporationId, corp, pct))}
+          onSave={(pct) =>
+            afterEdit(async () => {
+              const feeder = data.feeders?.find((f) => f.corporationId === corp);
+              const change = feeder
+                ? agreedRateChange(deriveOwnerRateHistory(feeder), pct, new Date())
+                : undefined;
+              await setFeederRate(characterId, corporationId, corp, pct);
+              // After the save, and never awaited: the rate change does not wait on the mail.
+              if (change && accountingName) {
+                void mailRateChange({
+                  grantedScopes,
+                  characterId,
+                  corporationId,
+                  accountingCorporationName: accountingName,
+                  feederCorporationId: corp,
+                  ...(feeder?.payee ? { payee: feeder.payee } : {}),
+                  change,
+                });
+              }
+            })
+          }
         />
       )}
       {dialog === 'settled' && (

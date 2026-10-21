@@ -3,6 +3,7 @@
  * the rate line, who mined where, and which state the page is in. No fetch, no
  * React: it reads the server-written view (`feederViewClient.ts`).
  */
+import { latestRateChange, rateNotice } from '@/engine/corpTaxBook/ownerRate';
 import type {
   FeederViewDay,
   FeederViewPayout,
@@ -43,6 +44,14 @@ export type RateNote =
 
 /** The rate line: the agreed rate wins; a different request is shown beside it. */
 export function rateNote(s: FeederViewSummary): RateNote {
+  // The rate-changed event drives the line; records with no event fall back to the plain fields.
+  const change = latestRateChange(s.rateHistory);
+  if (change) {
+    const notice = rateNotice(change);
+    return notice.askedPct === undefined
+      ? { kind: 'plain', pct: notice.pct }
+      : { kind: 'override', agreedPct: notice.pct, since: notice.date, askedPct: notice.askedPct };
+  }
   if (s.agreedRatePct !== null) {
     if (s.requestedRatePct !== null && s.requestedRatePct !== s.agreedRatePct) {
       const since =
