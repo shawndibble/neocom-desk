@@ -83,7 +83,7 @@ export const useOverviewLayout = createSyncedSetting<OverviewLayout | null>({
 });
 
 /**
- * The Corp overview's layout: same shape and parse. `null` means the pilot has
+ * The Corp Board's layout: same shape and parse. `null` means the pilot has
  * never edited it, and the page draws the full default without saving it
  * (`features/corp/grid/corpGrid.ts`).
  */

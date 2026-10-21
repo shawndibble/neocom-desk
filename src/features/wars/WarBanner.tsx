@@ -1,7 +1,7 @@
 /**
  * The red strip under a page header while the Character's corporation (or its
  * alliance) has a war declared on it, still running or about to start. It
- * draws nothing otherwise. The Overview and the Corp overview mount it;
+ * draws nothing otherwise. The Overview and the Corp Board mount it;
  * pressing the strip opens the war's card in a modal.
  *
  * Not the Danger banner: that one is driven by Alerts and acknowledged away,

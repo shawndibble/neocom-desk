@@ -299,7 +299,7 @@ function Source({ feed }: { feed: FeedId }) {
           accountWide
         />
       );
-    // The Corp overview's reads: keyed `corp:` so they never share a row with a character read.
+    // The Corp Board's reads: keyed `corp:` so they never share a row with a character read.
     case 'corpWallet':
       return <SnapshotSource feed="corpWallet" load={loadCorpWalletFeed} cacheKey="corp:wallet" />;
     case 'corpJobs':

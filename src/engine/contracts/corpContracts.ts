@@ -1,5 +1,5 @@
 /**
- * What the Corp overview's Contracts widget answers: the corporation's open
+ * What the Corp Board's Contracts widget answers: the corporation's open
  * courier and item-exchange contracts, which are on a clock, and how much courier
  * collateral is at stake.
  *

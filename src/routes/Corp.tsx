@@ -1,5 +1,5 @@
 /**
- * `/corp` — the Corp overview: a grid of corp widgets the pilot chooses,
+ * `/corp` — the Corp Board: a grid of corp widgets the pilot chooses,
  * sizes, orders, renames and removes, like the Overview (`routes/Overview.tsx`).
  *
  * A corp manager does not browse, they triage, and the default layout says so:
@@ -29,7 +29,6 @@ import { guarded } from '@/app/routeChunks';
 import { useCorpRouteGate } from '@/features/corp/useCorpRouteGate';
 import { CorpRolesGate } from '@/features/corp/CorpRolesGate';
 import { CorpDenied } from '@/features/corp/CorpDenied';
-import { CorpSubNav } from '@/features/corp/CorpSubNav';
 import { corpDefaultLayout, corpWidgetBoard } from '@/features/corp/grid/corpGrid';
 import {
   OverviewCachedNotice,
@@ -95,9 +94,8 @@ function CorpGrid({ layout }: { layout: OverviewLayout }) {
         names the next clock.
       */}
       <PageHeader
-        title={t('corp.title')}
+        title={t('nav.corpBoard')}
         meta={<OverviewDataAge summary={summary} note={t('corp.dataAgeNote')} />}
-        subNav={<CorpSubNav flush />}
         actions={<OverviewCustomize />}
       />
       {characterId !== null && <WarBanner characterId={characterId} />}

@@ -3685,7 +3685,7 @@
         "caption": "Alerts for everything that needs you"
       },
       "corporation": {
-        "alt": "The Corporation overview: standing and runway, deadlines per day for the next 14 days, and fuel and moon chunk lists that put what runs out soonest first.",
+        "alt": "The Corp Board: standing and runway, deadlines per day for the next 14 days, and fuel and moon chunk lists that put what runs out soonest first.",
         "caption": "One deadline-ranked board for the corp"
       },
       "industryJobs": {
@@ -3739,7 +3739,7 @@
       },
       "corp": {
         "tab": "Corporation",
-        "board": "The Corporation overview merges fuel, structure timers, moon extractions, finished jobs and offline services into one deadline-ranked board.",
+        "board": "The Corp Board merges fuel, structure timers, moon extractions, finished jobs and offline services into one deadline-ranked board.",
         "deadlines": "A strip shows the deadlines per day for the next 14 days, beside the fuel list, soonest first.",
         "tables": "Members, Wallet and Assets are the tables behind it.",
         "access": "It appears only when a character holds a Corp Role in game, and corporation data is a separate grant, requested only when you open those pages."
@@ -11832,7 +11832,7 @@
             "skills": "Skills: Alpha/Omega per character, the target skill plan, and SP Extraction monitoring and its threshold. Clones: the names you gave your jump clones.",
             "fittings": "Fittings: your damage and target profiles, and which ones are active.",
             "pi": "PI and mining tax: customs rate overrides, ore types you tagged, whether ore is valued as compressed ore, and how the Assign form edits ore values. Assets: the refining rate you type for your own structure. Market: the markets you stock, with their stock targets. Mining Survey: the survey links you created or opened, the names you gave them, and your survey info templates.",
-            "layout": "Layout: your Overview layout (the widgets you chose, with their sizes, views, order and Omega plan), your corporation overview layout, the stock targets you set on corporation assets, hidden and reordered Overview cards from before the widget grid, pages hidden from the navigation, and whether you answered the rail question.",
+            "layout": "Layout: your Overview layout (the widgets you chose, with their sizes, views, order and Omega plan), your Corp Board layout, the stock targets you set on corporation assets, hidden and reordered Overview cards from before the widget grid, pages hidden from the navigation, and whether you answered the rail question.",
             "travel": "Travel: route preference, security penalty, avoided systems (and whether the list is on), and avoiding EDENCOM, Triglavian and recent pod-kill systems (with your threshold). Route Safety: whether it routes through Thera / Turnur, your ship size, minimum hole life and which hubs. The notes you wrote on solar systems (up to 500 characters each, so don't put anything private in them)."
           }
         },
@@ -12445,7 +12445,7 @@
     },
     "members": {
       "darkState": ", dark",
-      "title": "Corp members",
+      "title": "Members",
       "refresh": "Refresh member list",
       "tableLabel": "Corporation members",
       "columnMember": "Member",
@@ -12508,7 +12508,7 @@
       "needsGrantHint": "The corporation permission needs to be granted again from Settings before roles can load."
     },
     "wallet": {
-      "title": "Corp wallet",
+      "title": "Corp Wallet",
       "divisionsTitle": "Divisions",
       "divisionsShow": "Show all divisions",
       "divisionsHide": "Hide divisions",
@@ -12607,22 +12607,22 @@
     },
     "grid": {
       "customize": {
-        "barLabel": "Customize the corporation overview",
-        "emptyTitle": "Your corporation overview is empty",
+        "barLabel": "Customize the Corp Board",
+        "emptyTitle": "Your Corp Board is empty",
         "emptyBody": "Add widgets to track what your corporation needs."
       },
       "gallery": {
-        "subtitle": "{{total}} widgets · {{onBoard}} on your corporation overview",
-        "onBoard": "On your corporation overview ×{{count}}"
+        "subtitle": "{{total}} widgets · {{onBoard}} on your Corp Board",
+        "onBoard": "On your Corp Board ×{{count}}"
       },
       "menu": {
-        "remove": "Remove from corporation overview"
+        "remove": "Remove from Corp Board"
       },
       "header": {
-        "breakdownCaption": "When each widget on the corporation overview last read its data"
+        "breakdownCaption": "When each widget on the Corp Board last read its data"
       },
       "widgets": {
-        "noWidgets": "There are no widgets to show on this corporation overview."
+        "noWidgets": "There are no widgets to show on this Corp Board."
       }
     },
     "stockTargets": {

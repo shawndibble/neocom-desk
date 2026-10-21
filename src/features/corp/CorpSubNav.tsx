@@ -16,6 +16,10 @@ function subNavClass({ isActive }: { isActive: boolean }): string {
 }
 
 /**
+ * Kept only for `routes/CorpAssets.tsx`, the last page still drawing it; #4671
+ * rewrites that page and deletes this file with it. Every other Corp page has
+ * dropped it (#4675).
+ *
  * The Corp section's frame, not the Overview page's chrome.
  *
  * It carries four entries today and is built for more. Real navigation (routes) rather than a `Tabs` widget,

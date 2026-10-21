@@ -284,7 +284,7 @@ across Characters · whether other alert types than danger raise the banner.
   `null` after hydration. Returning pilots with old hidden/order keys are
   migrated.
 
-## 13. Corp overview board
+## 13. Corp Board board
 
 `/corp` is the same engine on a second board (decision
 `docs/context/decisions/20261020-201817-corp-overview-is-a-widget-grid-the-pilot.md`).

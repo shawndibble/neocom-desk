@@ -80,7 +80,7 @@ describe('widget kind catalogue', () => {
     ).toEqual([...ALL_IDS].sort());
   });
 
-  it('offers the Corp overview its corp kinds, structures and moon chunks among them', () => {
+  it('offers the Corp Board its corp kinds, structures and moon chunks among them', () => {
     expect(boardKinds('corp').map((k) => k.id)).toEqual(CORP_IDS);
   });
 
