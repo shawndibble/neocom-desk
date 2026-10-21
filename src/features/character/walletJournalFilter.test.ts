@@ -28,6 +28,16 @@ describe('filterWalletJournal', () => {
     expect(filterWalletJournal(rows, EMPTY_WALLET_JOURNAL_FILTER)).toEqual(rows);
   });
 
+  it('keeps only rows for the selected player', () => {
+    const rows = [
+      { ...entry({ id: 1 }), playerId: 5 },
+      { ...entry({ id: 2 }), playerId: 7 },
+      entry({ id: 3 }),
+    ];
+    const filter: WalletJournalFilter = { ...EMPTY_WALLET_JOURNAL_FILTER, player: '7' };
+    expect(filterWalletJournal(rows, filter).map((r) => r.id)).toEqual([2]);
+  });
+
   it('keeps only rows matching the selected ref type', () => {
     const rows = [
       entry({ id: 1, ref_type: 'bounty_prize' }),
@@ -109,6 +119,7 @@ describe('filterWalletJournal', () => {
       refType: 'bounty_prize',
       startDate: '2026-08-02',
       endDate: null,
+      player: null,
       text: 'x',
     };
     expect(filterWalletJournal(rows, filter).map((r) => r.id)).toEqual([2]);
@@ -141,6 +152,7 @@ describe('activeWalletJournalFilterCount', () => {
         refType: 'bounty_prizes',
         startDate: '2026-01-01',
         endDate: null,
+        player: null,
         text: '',
       })
     ).toBe(2);

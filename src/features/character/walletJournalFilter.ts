@@ -14,6 +14,8 @@ export interface WalletJournalFilter {
   refType: string | null;
   startDate: string | null;
   endDate: string | null;
+  /** A corp journal's player, as a character id; the personal journal never sets it. */
+  player: string | null;
   text: string;
 }
 
@@ -21,6 +23,7 @@ export const EMPTY_WALLET_JOURNAL_FILTER: WalletJournalFilter = {
   refType: null,
   startDate: null,
   endDate: null,
+  player: null,
   text: '',
 };
 
@@ -38,6 +41,7 @@ export const {
   refType: { key: 'journal.refType', codec: nullableTextParam() },
   startDate: { key: 'journal.start', codec: nullableTextParam() },
   endDate: { key: 'journal.end', codec: nullableTextParam() },
+  player: { key: 'journal.player', codec: nullableTextParam() },
   text: { key: 'journal.q', codec: textParam() },
 });
 
@@ -46,7 +50,7 @@ export const {
  * slice of `entry.date` is sufficient for the range check — ISO dates sort
  * lexicographically the same as chronologically.
  */
-export function filterWalletJournal<T extends WalletJournalEntry>(
+export function filterWalletJournal<T extends WalletJournalEntry & { playerId?: number }>(
   entries: readonly T[],
   filter: WalletJournalFilter,
   /** The description the journal shows for a line, which free text matches against. */
@@ -55,6 +59,7 @@ export function filterWalletJournal<T extends WalletJournalEntry>(
   const text = filter.text.trim().toLowerCase();
   return entries.filter((entry) => {
     if (filter.refType !== null && journalRefKey(entry) !== filter.refType) return false;
+    if (filter.player !== null && String(entry.playerId) !== filter.player) return false;
     const day = entry.date.slice(0, 10);
     if (filter.startDate !== null && day < filter.startDate) return false;
     if (filter.endDate !== null && day > filter.endDate) return false;
@@ -155,5 +160,6 @@ export function journalRefTypes(entries: readonly JournalRow[]): string[] {
  * behind it.
  */
 export function activeWalletJournalFilterCount(filter: WalletJournalFilter): number {
-  return [filter.refType, filter.startDate, filter.endDate].filter((v) => v !== null).length;
+  return [filter.refType, filter.startDate, filter.endDate, filter.player].filter((v) => v !== null)
+    .length;
 }

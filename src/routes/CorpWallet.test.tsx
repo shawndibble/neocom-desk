@@ -67,6 +67,8 @@ const corpJournalByDivision: Record<number, unknown[]> = {
       description: 'Master division payout',
       amount: 900,
       balance: 1000000,
+      first_party_id: 91000001,
+      second_party_id: 98000001,
     },
   ],
   2: [
@@ -331,6 +333,62 @@ describe('Corp Wallet: divisions and the journal (AC 2, AC 3)', () => {
     expect(within(table).getByText('Insurance')).toBeInTheDocument();
     // Never the Character's own journal.
     expect(screen.queryByText('My bounty')).toBeNull();
+  });
+
+  it('shows which player each corp journal line is for, and never on the personal wallet', async () => {
+    server.use(
+      http.post(`${BASE}/universe/names`, () =>
+        HttpResponse.json([
+          { id: 91000001, name: 'Pilot Paula', category: 'character' },
+          { id: 98000001, name: 'Paula Industries', category: 'corporation' },
+        ])
+      )
+    );
+    render(<App />);
+    await screen.findByText('Master division payout');
+
+    const table = screen.getByRole('table', { name: 'Journal' });
+    expect(within(table).getByRole('columnheader', { name: 'Player' })).toBeInTheDocument();
+    expect(await within(table).findByText('Pilot Paula')).toBeInTheDocument();
+    expect(within(table).queryByText('Paula Industries')).toBeNull();
+  });
+
+  it('filters the corp journal by player from the filter bar', async () => {
+    server.use(
+      http.get(`${BASE}/corporations/${CORP_ID}/wallets/1/journal`, () =>
+        HttpResponse.json([
+          ...corpJournalByDivision[1],
+          {
+            id: 12,
+            date: '2026-08-02T00:00:00Z',
+            ref_type: 'corporate_reward_payout',
+            description: 'Other pilot payout',
+            amount: 10,
+            balance: 999990,
+            first_party_id: 91000002,
+            second_party_id: 98000001,
+          },
+        ])
+      ),
+      http.post(`${BASE}/universe/names`, () =>
+        HttpResponse.json([
+          { id: 91000001, name: 'Pilot Paula', category: 'character' },
+          { id: 91000002, name: 'Pilot Omar', category: 'character' },
+          { id: 98000001, name: 'Paula Industries', category: 'corporation' },
+        ])
+      )
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('Other pilot payout');
+    await screen.findByText('Pilot Omar');
+
+    await user.click(screen.getByRole('button', { name: /^Filters/ }));
+    await user.click(await screen.findByRole('combobox', { name: 'Player' }));
+    await user.click(await screen.findByRole('option', { name: 'Pilot Omar' }));
+
+    expect(await screen.findByText('Other pilot payout')).toBeInTheDocument();
+    expect(screen.queryByText('Master division payout')).toBeNull();
   });
 
   it('keeps a Where the ISK went panel on the corp journal, with no own-Character netting', async () => {

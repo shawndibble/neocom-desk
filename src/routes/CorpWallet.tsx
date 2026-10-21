@@ -29,7 +29,7 @@ import {
   interactiveClassName,
   selectedRowClassName,
 } from '@/components/ui/controlStyles';
-import { useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { cx } from '@/lib/cx';
 import { useTranslation } from 'react-i18next';
 import {
@@ -60,6 +60,8 @@ import { iskToneClass } from '@/features/character/format';
 import type { JournalRow } from '@/engine/journalNetting';
 import { journalTransactionLinks } from '@/features/character/journalTransactionLink';
 import { loadTypeNames } from '@/features/character/typeNames';
+import { resolveCategories, resolveNames } from '@/features/character/names';
+import { journalPlayerId } from '@/engine/journalPlayer';
 import { walletJournalCsvColumns } from '@/features/character/walletJournalCsv';
 import {
   EMPTY_JOURNAL_FILTER_PARAMS,
@@ -74,7 +76,7 @@ import {
   useJournalColumnsBuilder,
   useJournalFilterResult,
 } from '@/features/character/walletJournal';
-import { JournalTable } from '@/features/character/WalletJournalTable';
+import { JournalTable, type PlayerOption } from '@/features/character/WalletJournalTable';
 import {
   EMPTY_TRANSACTION_FILTER_PARAMS,
   filterWalletTransactions,
@@ -160,6 +162,31 @@ async function loadCorpTransactions(
   const typeIds = [...new Set((transactionsResult.cached?.data ?? []).map((txn) => txn.type_id))];
   const typeNames = await loadTypeNames(typeIds);
   return { transactionsResult, typeNames };
+}
+
+/**
+ * One division's journal, plus the names of the players in it. ESI names no
+ * one on a journal line, only party ids, so the character side of each line is
+ * looked up here — a network read, like the transactions' item names.
+ */
+interface CorpJournalSnapshot {
+  journalResult: StatusResult<WalletJournalEntry[]>;
+  /** Character id -> name, for the lines that have a character party. */
+  playerNames: Map<number, string>;
+}
+
+async function loadCorpJournal(
+  characterId: number,
+  corporationId: number,
+  division: number
+): Promise<CorpJournalSnapshot> {
+  const journalResult = await loadCorporationWalletJournal(characterId, corporationId, division);
+  const partyIds = (journalResult.cached?.data ?? []).flatMap((entry) =>
+    [entry.first_party_id, entry.second_party_id].filter((id): id is number => id !== undefined)
+  );
+  const categories = await resolveCategories(partyIds);
+  const characterIds = [...categories].filter(([, c]) => c === 'character').map(([id]) => id);
+  return { journalResult, playerNames: await resolveNames(characterIds) };
 }
 
 interface CorpDivisionsPanelProps {
@@ -287,6 +314,8 @@ interface CorpJournalPanelProps {
   journal: readonly WalletJournalEntry[];
   loading: boolean;
   journalColumns: DataTableColumn<JournalRow>[];
+  playerOptions: readonly PlayerOption[];
+  playerNameFor: (entry: JournalRow) => string;
   filter: WalletJournalFilter;
   rowsFilter: WalletJournalFilter;
   onFilterChange: (filter: WalletJournalFilter) => void;
@@ -304,6 +333,8 @@ function CorpJournalPanel({
   journal,
   loading,
   journalColumns,
+  playerOptions,
+  playerNameFor,
   filter,
   rowsFilter,
   onFilterChange,
@@ -317,7 +348,10 @@ function CorpJournalPanel({
   const { t } = useTranslation();
   const { filteredJournal, breakdownJournal, chartJournal, refTypeOptions } =
     useJournalFilterResult(journal, rowsFilter);
-  const journalCsvColumns = useMemo(() => walletJournalCsvColumns(t), [t]);
+  const journalCsvColumns = useMemo(
+    () => walletJournalCsvColumns(t, undefined, playerNameFor),
+    [t, playerNameFor]
+  );
   // Named after the division, so exporting two divisions never overwrites the
   // same file (issue #413).
   const journalExport = useTableExport({
@@ -377,6 +411,7 @@ function CorpJournalPanel({
             filter={filter}
             onFilterChange={onFilterChange}
             refTypeOptions={refTypeOptions}
+            playerOptions={playerOptions}
             filteredJournal={filteredJournal}
             breakdownJournal={breakdownJournal}
             chartJournal={chartJournal}
@@ -454,12 +489,12 @@ function CorpWalletView() {
   // each division caches separately (features/corp/wallet.ts). A division or
   // corporation change resets it.
   const divisionKey = corpKey !== null ? `${corpKey}:${effectiveDivision}` : null;
-  const corpJournal = useCorpSnapshot<StatusResult<WalletJournalEntry[]> | null>(
+  const corpJournal = useCorpSnapshot<CorpJournalSnapshot | null>(
     divisionKey,
     async () =>
       activeCharacterId === null || corporationId === null
         ? null
-        : loadCorporationWalletJournal(activeCharacterId, corporationId, effectiveDivision),
+        : loadCorpJournal(activeCharacterId, corporationId, effectiveDivision),
     { name: 'corp-wallet:journal', characterId: activeCharacterId }
   );
 
@@ -495,14 +530,37 @@ function CorpWalletView() {
     () => journalTransactionLinks(corpTransactionRows),
     [corpTransactionRows]
   );
+  const corpJournalResult = corpJournal.data?.journalResult.cached ?? null;
+  const playerNames = corpJournal.data?.playerNames ?? NO_NAMES;
+  // The corp journal shows who did it; a party that isn't a resolved character
+  // (the corp itself, a system) leaves the cell blank.
+  const playerNameFor = useCallback(
+    (entry: JournalRow) =>
+      entry.playerId === undefined ? '' : (playerNames.get(entry.playerId) ?? ''),
+    [playerNames]
+  );
+  // Stamped on each line so the Player filter, column and CSV read one field.
+  const stampedJournal = useMemo<JournalRow[]>(
+    () =>
+      (corpJournalResult?.data ?? EMPTY_JOURNAL).map((entry) => ({
+        ...entry,
+        playerId: journalPlayerId(entry, (partyId) => playerNames.has(partyId)),
+      })),
+    [corpJournalResult, playerNames]
+  );
+  const playerOptions = useMemo<PlayerOption[]>(
+    () =>
+      [...new Set(stampedJournal.map((entry) => entry.playerId))]
+        .filter((id): id is number => id !== undefined)
+        .map((id) => ({ id: String(id), name: playerNames.get(id) ?? '' }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [stampedJournal, playerNames]
+  );
   const buildJournalColumns = useJournalColumnsBuilder();
   const journalColumns = useMemo(
-    () => buildJournalColumns(linkFor, nameForType),
-    [buildJournalColumns, linkFor, nameForType]
+    () => buildJournalColumns(linkFor, nameForType, undefined, undefined, playerNameFor),
+    [buildJournalColumns, linkFor, nameForType, playerNameFor]
   );
-
-  const corpJournalResult = corpJournal.data?.cached ?? null;
-  const corpJournalEntries = corpJournalResult?.data ?? EMPTY_JOURNAL;
 
   // Keyed on the raw `?division=` param, not `effectiveDivision`: the division
   // list resolves async, so a cold reload of a filtered deep link would
@@ -585,9 +643,11 @@ function CorpWalletView() {
         {view === 'journal' ? (
           <CorpJournalPanel
             journalResult={corpJournalResult}
-            journal={corpJournalEntries}
+            journal={stampedJournal}
             loading={corpPending || (corpJournal.loading && corpJournal.data === null)}
             journalColumns={journalColumns}
+            playerOptions={playerOptions}
+            playerNameFor={playerNameFor}
             filter={journalFilter}
             rowsFilter={journalRowsFilter}
             onFilterChange={setJournalFilter}
