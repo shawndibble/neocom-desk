@@ -14068,6 +14068,7 @@
       "balanceDue": "Balance due",
       "balanceSum": "Billed {{billed}} − paid {{paid}}.",
       "dismissed": "{{amount}} was waived by an officer.",
+      "forgiven": "{{amount}} was written off by an officer.",
       "writtenOff": "{{amount}} short of the Statement was written off.",
       "howToPay": "Donate ISK to {{corp}}; any of your characters counts.",
       "payCodeLead": "Put the code",
