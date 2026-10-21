@@ -61,7 +61,6 @@ import {
 } from './corpTaxBookEsi.js';
 import {
   parseSaveCorpSyncGrantInput,
-  dropCorpSyncGrant,
   revokeCorpSyncGrant,
   runScheduledCorpSyncs,
   saveCorpSyncGrant,
@@ -72,10 +71,13 @@ import {
   createFeederInvite,
   parseAcceptFeederInviteInput,
   parseCreateFeederInviteInput,
+  parsePreviewFeederInviteInput,
   parseRevokeFeederInviteInput,
+  previewFeederInvite,
   revokeFeederInvite,
 } from './corpTaxBookFeeders.js';
 import {
+  dropBookGrants,
   getFeederStatus,
   leaveFeeder,
   parseFeederCall,
@@ -662,6 +664,17 @@ export const revokeCorpTaxBookFeederInviteCallable = onCall<unknown>(
     )
 );
 
+// The consent screen's preview of a link: the accounting corporation and the offered rate.
+export const previewCorpTaxBookFeederInviteCallable = onCall<unknown>(
+  CORP_TAX_BOOK_OPTIONS,
+  (request) =>
+    previewFeederInvite(
+      corpTaxBookDeps(),
+      callerOf(request),
+      parsePreviewFeederInviteInput(request.data)
+    )
+);
+
 export const acceptCorpTaxBookFeederInviteCallable = onCall<unknown>(
   CORP_TAX_BOOK_OPTIONS,
   (request) =>
@@ -877,7 +890,7 @@ export const deleteCorpTaxBookCallable = onCall<unknown>(
   { ...CORP_TAX_BOOK_OPTIONS, secrets: [ALERTS_TOKEN_KEY] },
   (request) =>
     deleteBook(corpTaxBookDeps(), callerOf(request), parseBookCall(request.data), (corporationId) =>
-      dropCorpSyncGrant(corpSyncDeps(), corporationId)
+      dropBookGrants(corpSyncDeps(), corporationId)
     )
 );
 

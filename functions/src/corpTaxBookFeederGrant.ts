@@ -18,6 +18,7 @@ import { boundedString, record } from './communities.js';
 import { encryptRefreshToken } from './alertGrantCrypto.js';
 import type { RefreshedTokens } from './alertGrant.js';
 import {
+  dropCorpSyncGrant,
   grantRef,
   revokeStored,
   syncOneFeeder,
@@ -223,6 +224,9 @@ export async function saveFeederGrant(
   let undo: AcceptUndo | undefined;
   let accepted: (AcceptFeederInviteResult & { undo?: AcceptUndo }) | undefined;
   let reconnectPrior: FeederRecord | undefined;
+  // The grant this save replaces (a Reconnect): revoked once the new one works, else put back.
+  let previousGrant: CorpSyncGrantDoc | undefined;
+  let grantWritten = false;
   try {
     const claims = await verifiedClaims(deps, refreshed.accessToken);
     if (claims.characterId !== supplied.characterId) {
@@ -261,7 +265,10 @@ export async function saveFeederGrant(
       collectorCorporationId: accepted.collectorCorporationId,
       grantedBy: callerId,
     };
+    previousGrant = (await grantRef(deps.db, feederCorp).get()).data() as
+      CorpSyncGrantDoc | undefined;
     await grantRef(deps.db, feederCorp).set(doc);
+    grantWritten = true;
 
     const first = await syncOneFeeder(deps, deps.esi, accepted.collectorCorporationId, feederCorp);
     // A refused first pull means the alt is not an Accountant (or lost the role at once).
@@ -285,16 +292,20 @@ export async function saveFeederGrant(
       );
     }
     if (reconnectPrior && accepted) {
-      // A refused reconnect puts the record back and drops the grant it just stored.
+      // A refused reconnect puts the record back.
       await bookRef(deps.db, accepted.collectorCorporationId)
         .collection(FEEDERS)
         .doc(String(accepted.feederCorporationId))
         .set(reconnectPrior);
-      await grantRef(deps.db, accepted.feederCorporationId).delete();
+    }
+    if (accepted && grantWritten) {
+      await putBackGrant(deps, accepted.feederCorporationId, previousGrant);
     }
     await orphan();
     throw err;
   }
+  // The replaced token is orphaned: revoke it, unless SSO handed back that same one.
+  if (previousGrant) await revokeStored(deps, previousGrant, refreshed.refreshToken);
 
   if (input.requestedRatePct !== undefined) {
     // A blank rate is a complete grant, so a rate that fails to save never fails it.
@@ -325,6 +336,24 @@ export async function saveFeederGrant(
   };
 }
 
+/**
+ * A refused save stored a grant over whatever was held: drop the new one (SSO may have
+ * rotated it on the first pull, so it is revoked as stored) and restore the earlier one.
+ */
+async function putBackGrant(
+  deps: CorpSyncDeps,
+  feederCorp: number,
+  previous: CorpSyncGrantDoc | undefined
+): Promise<void> {
+  const ref = grantRef(deps.db, feederCorp);
+  const current = (await ref.get()).data() as CorpSyncGrantDoc | undefined;
+  if (previous) await ref.set(previous);
+  else if (current) await ref.delete();
+  if (current && current.encryptedRefreshToken !== previous?.encryptedRefreshToken) {
+    await revokeStored(deps, current);
+  }
+}
+
 /** Put the feeder record, pointer, invite and grant back to how they were before the accept. */
 async function unwindAccept(
   deps: FeederGrantDeps,
@@ -339,7 +368,9 @@ async function unwindAccept(
   await deps.db.runTransaction(async (tx) => {
     if (undo.priorRecord) tx.set(feederRef, undo.priorRecord);
     else tx.delete(feederRef);
-    tx.delete(deps.db.collection(FEEDER_OF_COLLECTION).doc(String(feederCorp)));
+    const pointerRef = deps.db.collection(FEEDER_OF_COLLECTION).doc(String(feederCorp));
+    if (undo.priorPointer) tx.set(pointerRef, undo.priorPointer);
+    else tx.delete(pointerRef);
     tx.update(deps.db.collection(FEEDER_INVITES_COLLECTION).doc(undo.inviteId), {
       acceptedBy: FieldValue.delete(),
       acceptedAt: FieldValue.delete(),
@@ -478,6 +509,8 @@ export interface EndFeederInput {
   action: string;
   /** The statuses this may end; anything else is refused. */
   allowed: readonly FeederRecord['status'][];
+  /** False when the view is about to go with its book (a book delete). */
+  rebuildView?: boolean;
 }
 
 /**
@@ -510,6 +543,11 @@ export async function endFeeder(deps: CorpSyncDeps, input: EndFeederInput): Prom
       coveragePeriods: closePeriod(rec.coveragePeriods, utcDate(input.effectiveAt)),
       removal: FieldValue.delete(),
       removalLinkId: FieldValue.delete(),
+      // The feed's sync state and a dismissed history belong to this feed, not the next.
+      staleSince: FieldValue.delete(),
+      disconnectedAt: FieldValue.delete(),
+      lastSyncResult: FieldValue.delete(),
+      viewDismissedAt: FieldValue.delete(),
     });
     if (rec.removalLinkId) {
       tx.delete(deps.db.collection(REMOVAL_LINKS_COLLECTION).doc(rec.removalLinkId));
@@ -524,7 +562,40 @@ export async function endFeeder(deps: CorpSyncDeps, input: EndFeederInput): Prom
     return grant?.kind === 'feeder' ? grant : undefined;
   });
   if (dropped) await revokeStored(deps, dropped);
-  await tryRebuildFeederView(bookDeps(deps), collector, feederCorp);
+  if (input.rebuildView !== false)
+    await tryRebuildFeederView(bookDeps(deps), collector, feederCorp);
+}
+
+const ENDABLE: readonly FeederRecord['status'][] = ['active', 'pending-removal', 'disconnected'];
+
+/**
+ * A book is being deleted (`deleteBook`'s `beforeDelete`): end every moon owner it holds as
+ * removed, so each grant is revoked at SSO and each owner keeps its after-leaving pointer
+ * (and its own book's start-date floor), then drop the book's own sync grant.
+ */
+export async function dropBookGrants(deps: CorpSyncDeps, collector: number): Promise<void> {
+  const pointers = await deps.db
+    .collection(FEEDER_OF_COLLECTION)
+    .where('collectorCorporationId', '==', collector)
+    .get();
+  for (const doc of pointers.docs) {
+    try {
+      await endFeeder(deps, {
+        collectorCorporationId: collector,
+        feederCorporationId: Number(doc.id),
+        effectiveAt: deps.now(),
+        finalStatus: 'removed',
+        actor: { characterId: null, name: 'Book deleted' },
+        action: 'feederRemovedBookDeleted',
+        allowed: ENDABLE,
+        rebuildView: false,
+      });
+    } catch (err) {
+      // Already ended (a race with a leave): the pointer goes with the book anyway.
+      if (!(err instanceof HttpsError && err.code === 'failed-precondition')) throw err;
+    }
+  }
+  await dropCorpSyncGrant(deps, collector);
 }
 
 // --- Status ----------------------------------------------------------------

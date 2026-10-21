@@ -9,6 +9,7 @@ import { ROLES_SCOPE, type CorpIdentity } from './corpTaxBookEsi.js';
 import { CORP_SYNC_GRANTS_COLLECTION } from './corpSyncGrant.js';
 import { FEEDER_SYNC_SCOPES } from './corpSyncScopes.js';
 import {
+  RECONNECT_CODE,
   getFeederStatus,
   leaveFeeder,
   saveFeederGrant,
@@ -133,13 +134,14 @@ const newInvite = async () =>
       accessToken: `roles-${COLLECTOR_CEO}`,
     })
   ).code;
-const save = (code: string, requestedRatePct?: number) =>
+const save = (code: string, requestedRatePct?: number, alt = ALT) =>
   saveFeederGrant(deps(), who(PLAYER), {
     code,
-    accessToken: `mine-${ALT}`,
-    refreshToken: `rt-${ALT}`,
+    accessToken: `mine-${alt}`,
+    refreshToken: `rt-${alt}`,
     ...(requestedRatePct !== undefined ? { requestedRatePct } : {}),
   });
+const OTHER_ALT = 15;
 
 suite('moon owner onboarding', () => {
   beforeEach(async () => {
@@ -219,6 +221,58 @@ suite('moon owner onboarding', () => {
     expect(await pointer()).toBeUndefined();
     expect(await feederRecord()).toMatchObject({ status: 'left', leftAt: T0 });
     expect(revoked).toContain(`rt-${ALT}`);
+  });
+
+  it('leave: the stale spell and the dismissed history do not outlive the feed', async () => {
+    await save(await newInvite());
+    await collectorBook()
+      .collection('feeders')
+      .doc(String(FEEDER))
+      .update({ staleSince: T0 - 1000, disconnectedAt: T0 - 500, viewDismissedAt: T0 - 100 });
+    await leaveFeeder(deps(), who(FEEDER_DIRECTOR), {
+      corporationId: FEEDER,
+      accessToken: `roles-${FEEDER_DIRECTOR}`,
+    });
+    const record = await feederRecord();
+    for (const gone of ['staleSince', 'disconnectedAt', 'lastSyncResult', 'viewDismissedAt']) {
+      expect(record).not.toHaveProperty(gone);
+    }
+  });
+
+  it('reconnect: the new grant replaces the old one, which is revoked', async () => {
+    await save(await newInvite());
+    revoked.length = 0;
+    await save(RECONNECT_CODE, undefined, OTHER_ALT);
+    expect(await grant()).toMatchObject({ kind: 'feeder', characterId: OTHER_ALT });
+    expect(revoked).toEqual([`rt-${ALT}`]);
+  });
+
+  it('reconnect: a refused first pull puts the earlier grant back', async () => {
+    await save(await newInvite());
+    revoked.length = 0;
+    ledger = 'forbidden';
+    expect(await reason(save(RECONNECT_CODE, undefined, OTHER_ALT))).toBe('not-an-accountant');
+    expect(await grant()).toMatchObject({ kind: 'feeder', characterId: ALT });
+    expect(revoked).toContain(`rt-${OTHER_ALT}`);
+    expect(revoked).not.toContain(`rt-${ALT}`);
+  });
+
+  it('a refused rejoin of a disconnected moon owner keeps it pointed at its book', async () => {
+    await save(await newInvite());
+    await collectorBook()
+      .collection('feeders')
+      .doc(String(FEEDER))
+      .update({
+        status: 'disconnected',
+        coveragePeriods: [{ from: '2026-10-01', to: '2026-10-10' }],
+      });
+    // A disconnect drops the grant.
+    await db.collection(CORP_SYNC_GRANTS_COLLECTION).doc(String(FEEDER)).delete();
+    const code = await newInvite();
+    ledger = 'forbidden';
+    expect(await reason(save(code))).toBe('not-an-accountant');
+    expect(await pointer()).toMatchObject({ collectorCorporationId: COLLECTOR });
+    expect((await feederRecord())?.status).toBe('disconnected');
   });
 
   it('leave: someone without standing is refused', async () => {

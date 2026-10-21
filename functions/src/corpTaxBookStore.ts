@@ -25,6 +25,7 @@ import {
   FEEDER_INVITES_COLLECTION,
   BILLED_BY_COLLECTION,
   FEEDER_OF_COLLECTION,
+  FEEDER_PREVIOUS_COLLECTION,
   MEMBER_SETUP_MS,
   META,
   MINERS,
@@ -283,6 +284,13 @@ export async function turnOnBook(deps: BookDeps, caller: Caller, input: TurnOnIn
         .exists
     )
       fail('failed-precondition', 'This corporation feeds another book', 'is-a-feeder');
+    // A former moon owner's book starts no earlier than the leave day: the accounting
+    // corporation covered every day before it, and an earlier start would bill them twice.
+    const leftAt = (
+      await tx.get(deps.db.collection(FEEDER_PREVIOUS_COLLECTION).doc(String(input.corporationId)))
+    ).get('leftAt');
+    if (typeof leftAt === 'number' && input.startDate < utcDate(leftAt))
+      fail('invalid-argument', 'The start date is before the leave day', 'start-before-leave');
     tx.create(ref, {
       ...defaultSettings(input.startDate, input.startRatePct),
       corporationId: input.corporationId,
